@@ -57,6 +57,7 @@ struct CentroidAccumulator {
     Vec3f accumulated_value = Vec3f::Zero();
     float accumulated_volume { };
     float base_area { };
+    float additional_supports_adhesion { };
     const float base_height { };
 
     explicit CentroidAccumulator(float base_height) :
@@ -304,7 +305,7 @@ struct BalanceDistributionGrid {
         std::unordered_set<int> modified_acc_ids;
         modified_acc_ids.reserve(issues.supports_nedded.size() + 1);
         for (int z = 1; z < local_z_cell_count; ++z) {
-            std::cout << "current z: "  << z << std::endl;
+            std::cout << "current z: " << z << std::endl;
 
             modified_acc_ids.clear();
 
@@ -313,21 +314,24 @@ struct BalanceDistributionGrid {
                     Cell &current = this->access_cell(Vec3i(x, y, z));
 
                     // distribute curling
-                    std::cout << "distribute curling " << std::endl;
                     if (current.volume > 0) {
-                        for (int y_offset = -1; y_offset <= 1; ++y_offset) {
-                            for (int x_offset = -1; x_offset <= 1; ++x_offset) {
-                                if (validate_xy_coords(Vec2i(x+x_offset,y+ y_offset))) {
+                        float curled_height = 0;
+                        for (int y_offset = -2; y_offset <= 2; ++y_offset) {
+                            for (int x_offset = -2; x_offset <= 2; ++x_offset) {
+                                if (validate_xy_coords(Vec2i(x + x_offset, y + y_offset))) {
                                     Cell &under = this->access_cell(Vec3i(x + x_offset, y + y_offset, z - 1));
-                                    current.curled_height += under.curled_height
-                                            / (2 + std::abs(x_offset) + std::abs(y_offset));
+                                    curled_height = std::max(curled_height, under.curled_height);
                                 }
                             }
+                        }
+                        bool curled = current.curled_height > 0;
+                        current.curled_height += std::max(0.0f, float(curled_height - unscaled(this->cell_size.z())));
+                        if (!curled) {
+                            current.curled_height /= 4.0f;
                         }
                     }
 
                     // distribute islands info
-                    std::cout << "distribute islands info " << std::endl;
                     if (current.volume > 0 && current.island_id == std::numeric_limits<int>::max()) {
                         int min_island_id_found = std::numeric_limits<int>::max();
                         std::unordered_set<int> ids_to_merge { };
@@ -343,7 +347,6 @@ struct BalanceDistributionGrid {
                             }
                         }
                         // assign island and update its info
-                        std::cout << "assign island and update its info " << std::endl;
                         if (min_island_id_found < std::numeric_limits<int>::max()) {
                             ids_to_merge.erase(std::numeric_limits<int>::max());
                             ids_to_merge.erase(min_island_id_found);
@@ -426,12 +429,13 @@ struct BalanceDistributionGrid {
 
                 float weight = acc.accumulated_volume * params.filament_density * params.gravity_constant;
                 float weight_torque = embedded_distance * weight;
-                if (!inside){
-                    weight_torque*=-1;
+                if (!inside) {
+                    weight_torque *= -1;
                 }
                 std::cout << "weight: " << weight << "  weight_torque: " << weight_torque << std::endl;
 
-                float extruder_conflict_torque = params.tolerable_extruder_conflict_force * 2.0f * centroid_pivot_distance;
+                float extruder_conflict_torque = params.tolerable_extruder_conflict_force * 2.0f
+                        * centroid_pivot_distance;
                 std::cout << "extruder_conflict_torque: " << extruder_conflict_torque << std::endl;
 
                 float total_momentum = sticking_torque + weight_torque - xy_movement_torque - extruder_conflict_torque;
@@ -451,7 +455,7 @@ struct BalanceDistributionGrid {
 
                     double min_dist = std::numeric_limits<double>::max();
                     Vec3f support_point = centroid;
-                    Vec2i coords = Vec2i(0,0);
+                    Vec2i coords = Vec2i(0, 0);
                     for (int y = 0; y < global_cell_count.y(); ++y) {
                         for (int x = 0; x < global_cell_count.x(); ++x) {
                             Cell &cell = this->access_cell(Vec3i(x, y, z));
@@ -464,20 +468,23 @@ struct BalanceDistributionGrid {
                                 if (dist_sq < min_dist) {
                                     min_dist = dist_sq;
                                     support_point = cell_center;
-                                    coords = Vec2i(x,y);
+                                    coords = Vec2i(x, y);
                                 }
                             }
                         }
                     }
 
                     int final_height_coords = z;
-                    while (final_height_coords > 0 && this->access_cell(Vec3i(coords.x(), coords.y(), final_height_coords)).volume > 0){
-                        final_height_coords --;
+                    while (final_height_coords > 0
+                            && this->access_cell(Vec3i(coords.x(), coords.y(), final_height_coords)).volume > 0) {
+                        final_height_coords--;
                     }
-                    support_point.z() = unscaled((final_height_coords + this->local_z_index_offset) * this->cell_size.z());
-                    float expected_force = total_momentum /  (support_point - pivot_3d).norm();
+                    support_point.z() = unscaled(
+                            (final_height_coords + this->local_z_index_offset) * this->cell_size.z());
+                    float expected_force = total_momentum / (support_point - pivot_3d).norm();
 
-                    std::cout << " new support point:  " << support_point.x() << " | " << support_point.y() << " | " << support_point.z() << std::endl;
+                    std::cout << " new support point:  " << support_point.x() << " | " << support_point.y() << " | "
+                            << support_point.z() << std::endl;
                     std::cout << " expected_force:  " << expected_force << std::endl;
 
                     issues.supports_nedded.emplace_back(support_point, expected_force);
@@ -705,12 +712,12 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
         SegmentAccumulator supports_acc { };
         supports_acc.add_distance(params.bridge_distance + 1.0f); // initialize unsupported distance with larger than tolerable distance ->
         // -> it prevents extruding perimeter start and short loops into air.
-        SegmentAccumulator curling_acc { };
 
         const auto to_vec3f = [print_z](const Point &point) {
             Vec2f tmp = unscale(point).cast<float>();
             return Vec3f(tmp.x(), tmp.y(), print_z);
         };
+        float region_height = layer_region->layer()->height;
 
         Point prev_point = points.top(); // prev point of the path. Initialize with first point.
         Vec3f prev_fpoint = to_vec3f(prev_point);
@@ -741,7 +748,6 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
             }
 
             supports_acc.add_angle(angle);
-            curling_acc.add_angle(angle);
 
             if (dist_from_prev_layer > max_allowed_dist_from_prev_layer) { //extrusion point is unsupported
                 supports_acc.add_distance(edge_len); // for algorithm simplicity, expect that the whole line between prev and current point is unsupported
@@ -758,14 +764,9 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
             }
 
             // Estimation of short curvy segments which are not supported -> problems with curling
-            if (dist_from_prev_layer > 0.0f) { //extrusion point is unsupported or poorly supported
-                curling_acc.add_distance(edge_len);
-                if (curling_acc.max_curvature / (PI * curling_acc.distance) > params.limit_curvature) {
-                    issues.curling_up.push_back(CurledFilament(fpoint, layer_region->layer()->height));
-                    curling_acc.reset();
-                }
-            } else {
-                curling_acc.reset();
+            if (dist_from_prev_layer > -max_allowed_dist_from_prev_layer * 0.7071) { //extrusion point is unsupported or poorly supported
+                issues.curling_up.push_back(
+                        CurledFilament(fpoint, 2.0f * region_height + region_height * 6.0f * std::abs(angle) / PI));
             }
 
             prev_point = point;
@@ -788,7 +789,8 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
     return issues;
 }
 
-void distribute_layer_volume(const PrintObject *po, size_t layer_idx, BalanceDistributionGrid &balance_grid) {
+void distribute_layer_volume(const PrintObject *po, size_t layer_idx,
+        BalanceDistributionGrid &balance_grid) {
     const Layer *layer = po->get_layer(layer_idx);
     for (const LayerRegion *region : layer->regions()) {
         for (const ExtrusionEntity *collections : region->fills.entities) {
@@ -810,7 +812,8 @@ void distribute_layer_volume(const PrintObject *po, size_t layer_idx, BalanceDis
     }
 }
 
-Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_check, const Params &params) {
+Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_check,
+        const Params &params) {
     const Layer *layer = po->get_layer(layer_idx);
     //Prepare edge grid of previous layer, will be used to check if the extrusion path is supported
     EdgeGridWrapper supported_grid = compute_layer_edge_grid(layer->lower_layer);
@@ -827,9 +830,11 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
             } // ex_entity
             for (const ExtrusionEntity *ex_entity : layer_region->fills.entities) {
                 for (const ExtrusionEntity *fill : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-                    if (fill->role() == ExtrusionRole::erGapFill || fill->role() == ExtrusionRole::erBridgeInfill) {
+                    if (fill->role() == ExtrusionRole::erGapFill
+                            || fill->role() == ExtrusionRole::erBridgeInfill) {
                         issues.add(
-                                check_extrusion_entity_stability(fill, layer->print_z, layer_region, supported_grid,
+                                check_extrusion_entity_stability(fill, layer->print_z, layer_region,
+                                        supported_grid,
                                         params));
                     }
                 } // fill
