@@ -1,5 +1,18 @@
 #include "CutSurface.hpp"
 
+/// model.off - CGAL model created from index_triangle_set
+/// shape.off - CGAL model created from shapes
+/// constrained.off - Visualization of inside and outside triangles
+///    Green - not along constrained edge
+///    Red - sure that are inside
+///    Purple - sure that are outside
+/// filled.off - flood fill green triangles inside of red area
+///            - Same meaning of color as constrained
+/// reduction.off - Visualization of reduced and non-reduced Vertices
+/// aois/cutAOI{N}.obj - Cuted Area of interest from corefined model
+/// cuts/cut{N}.obj - Filtered surface cuts + Reduced vertices made by e2 (text_edge_2)
+//#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/")
+
 using namespace Slic3r;
 
 void Slic3r::append(SurfaceCut &sc, SurfaceCut &&sc_add)
@@ -401,6 +414,10 @@ SurfaceCut::CutContour create_cut(const std::vector<HI> &outlines,
                                const ReductionMap &reduction_map,
                                const ConvertMap      &v2v);
 
+#ifdef DEBUG_OUTPUT_DIR
+indexed_triangle_set create_indexed_triangle_set(const std::vector<FI> &faces,
+                                                 const CutMesh         &mesh);
+
 /// <summary>
 /// Debug purpose store of mesh with colored face by face type
 /// </summary>
@@ -410,20 +427,30 @@ SurfaceCut::CutContour create_cut(const std::vector<HI> &outlines,
 /// <param name="file">File to store</param>
 void store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string &file);
 void store(CutMesh &mesh, const ReductionMap &reduction_map, const std::string &file);
-void store(const SurfaceCuts &cut, const std::string &file_prefix);
+void store(const CutAOIs &aois, const CutMesh &mesh, const std::string &dir);
+void store(const SurfaceCuts &cut, const std::string &dir);
+#endif // DEBUG_OUTPUT_DIR
+
 } // namespace privat
+
 
 SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
                                 const ExPolygons           &shapes,
                                 const Emboss::IProject     &projection)
 {
     priv::CutMesh cgal_model = priv::to_cgal(model);
-    CGAL::IO::write_OFF("C:/data/temp/model.off", cgal_model); // only debug
+
+#ifdef DEBUG_OUTPUT_DIR
+    CGAL::IO::write_OFF(DEBUG_OUTPUT_DIR + "model.off", cgal_model); // only debug
+#endif // DEBUG_OUTPUT_DIR
 
     std::string edge_shape_map_name = "e:IntersectingElement";
     std::string face_shape_map_name = "f:IntersectingElement";
-    priv::CutMesh cgal_shape = priv::to_cgal(shapes, projection, edge_shape_map_name, face_shape_map_name);   
-    CGAL::IO::write_OFF("C:/data/temp/shape.off", cgal_shape); // only debug
+    priv::CutMesh cgal_shape = priv::to_cgal(shapes, projection, edge_shape_map_name, face_shape_map_name);
+
+#ifdef DEBUG_OUTPUT_DIR
+    CGAL::IO::write_OFF(DEBUG_OUTPUT_DIR + "shape.off", cgal_shape); // only debug
+#endif // DEBUG_OUTPUT_DIR
 
     auto edge_shape_map = cgal_shape.property_map<priv::EI, priv::IntersectingElement>(edge_shape_map_name).first;    
     auto face_shape_map = cgal_shape.property_map<priv::FI, priv::IntersectingElement>(face_shape_map_name).first;
@@ -453,18 +480,31 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
 
     // Select inside and outside face in model
     priv::set_face_type(face_type_map, cgal_model, vert_shape_map, ecm, projection, cgal_shape);
-    priv::store(cgal_model, face_type_map, "C:/data/temp/constrained.off"); // only debug
+
+#ifdef DEBUG_OUTPUT_DIR
+    priv::store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrained.off"); // only debug
+#endif // DEBUG_OUTPUT_DIR
     
     // Seed fill the other faces inside the region.
     priv::flood_fill_inner(cgal_model, projection, face_type_map);
-    priv::store(cgal_model, face_type_map, "C:/data/temp/filled.off"); // only debug
+
+#ifdef DEBUG_OUTPUT_DIR
+    priv::store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "filled.off"); // only debug
+#endif // DEBUG_OUTPUT_DIR
 
     std::string vertex_reduction_map_name = "v:reduction";
     priv::ReductionMap vertex_reduction_map = cgal_model.add_property_map<priv::VI, priv::VI>(vertex_reduction_map_name).first;
     priv::create_reduce_map(vertex_reduction_map, cgal_model, face_type_map, vert_shape_map);
-    priv::store(cgal_model, vertex_reduction_map, "C:/data/temp/reduction.off"); // only debug
+
+#ifdef DEBUG_OUTPUT_DIR
+    priv::store(cgal_model, vertex_reduction_map, DEBUG_OUTPUT_DIR + "reduction.off"); // only debug
+#endif // DEBUG_OUTPUT_DIR
 
     priv::CutAOIs cutAOIs = create_cut_area_of_interests(cgal_model, shapes, face_type_map);
+
+#ifdef DEBUG_OUTPUT_DIR
+    priv::store(cutAOIs, cgal_model, DEBUG_OUTPUT_DIR + "aois/"); // only debug
+#endif // DEBUG_OUTPUT_DIR
 
     // Filter out NO top one cuts
     priv::filter_cuts(cutAOIs, cgal_model, shapes, projection, vert_shape_map);
@@ -474,8 +514,10 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
     std::string vertec_convert_map_name = "v:convert";
     priv::ConvertMap vertex_convert_map = cgal_model.add_property_map<priv::VI, SurfaceCut::Index>(vertec_convert_map_name).first;    
     SurfaceCuts result = priv::create_surface_cuts(cutAOIs, cgal_model, vertex_reduction_map, vertex_convert_map);
-        
-    priv::store(result, "C:/data/temp/cut"); // only debug
+    
+#ifdef DEBUG_OUTPUT_DIR
+    priv::store(result, DEBUG_OUTPUT_DIR + "cuts/"); // only debug
+#endif // DEBUG_OUTPUT_DIR
     
     // TODO: Filter surfaceCuts to only the top most.
     return result;
@@ -1355,7 +1397,7 @@ void priv::filter_cuts(CutAOIs              &cuts,
         Vec3f act_point(act.x(), act.y(), act.z());
         float act_sq_norm = (source_point - act_point).squaredNorm();
         
-        if (act_sq_norm > prev_sq_norm) {
+        if (act_sq_norm < prev_sq_norm) {
             del_cuts[cut_index] = true;
             return true;
         }
@@ -1412,7 +1454,7 @@ SurfaceCuts priv::create_surface_cuts(const CutAOIs      &cuts,
     return result;
 }
 
-// only for debug
+#ifdef DEBUG_OUTPUT_DIR
 void priv::store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string& file)
 {
     auto face_colors = mesh.add_property_map<priv::FI, CGAL::Color>("f:color").first;    
@@ -1448,10 +1490,67 @@ void priv::store(CutMesh &mesh, const ReductionMap &reduction_map, const std::st
     mesh.remove_property_map(vertex_colors);
 }
 
-void priv::store(const SurfaceCuts &cut, const std::string &file_prefix) {
-    for (auto &c : cut) {
+indexed_triangle_set priv::create_indexed_triangle_set(
+    const std::vector<FI> &faces, const CutMesh &mesh)
+{
+    std::vector<VI> vertices;
+    vertices.reserve(faces.size() * 2);
+
+    indexed_triangle_set its;
+    its.indices.reserve(faces.size());
+    for (FI fi : faces) {
+        HI hi     = mesh.halfedge(fi);
+        HI hi_end = hi;
+
+        int   ti = 0;
+        Vec3i t;
+
+        do {
+            VI   vi  = mesh.source(hi);
+            auto res = std::find(vertices.begin(), vertices.end(), vi);
+            t[ti++]  = res - vertices.begin();
+            if (res == vertices.end()) vertices.push_back(vi);
+            hi = mesh.next(hi);
+        } while (hi != hi_end);
+
+        its.indices.push_back(t);
+    }
+
+    its.vertices.reserve(vertices.size());
+    for (VI vi : vertices) {
+        const auto &p = mesh.point(vi);
+        its.vertices.emplace_back(p.x(), p.y(), p.z());
+    }
+    return its;
+}
+
+#include <filesystem>
+static void prepare_dir(const std::string &dir) {
+    namespace fs = std::filesystem;
+    if (fs::exists(dir)) {
+        for (auto &path : fs::directory_iterator(dir))
+            fs::remove_all(path);
+    } else {
+        fs::create_directories(dir);
+    }
+}
+
+void priv::store(const CutAOIs &aois, const CutMesh &mesh, const std::string &dir) {
+    prepare_dir(dir);
+    for (const auto &aoi : aois) {
+        size_t      index = &aoi - &aois.front();
+        std::string file  = dir + "aoi" + std::to_string(index) + ".obj";
+        indexed_triangle_set its = create_indexed_triangle_set(aoi.first, mesh);
+        its_write_obj(its, file.c_str());
+        // TODO: Store outline from half edge somehow
+    }
+}
+
+void priv::store(const SurfaceCuts &cut, const std::string &dir) {
+    for (const auto &c : cut) {
         size_t index = &c - &cut.front();
-        std::string file  = file_prefix + std::to_string(index) + ".obj";
+        std::string file  = dir + "cut" + std::to_string(index) + ".obj";
         its_write_obj(c, file.c_str());  
     }
 }
+#endif // DEBUG_OUTPUT_DIR

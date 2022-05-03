@@ -316,26 +316,26 @@ TEST_CASE("Cut surface", "[]")
     REQUIRE(!shape.empty());
 
     Transform3d tr = Transform3d::Identity();
-    tr.translate(Vec3d(0., 0., z_depth));
+    tr.translate(Vec3d(0., 0., -z_depth));
     tr.scale(Emboss::SHAPE_SCALE);
-    Emboss::OrthoProject cut_projection(tr, Vec3f(0.f, 0.f, -50));
+    Emboss::OrthoProject cut_projection(tr, Vec3f(0.f, 0.f, z_depth));
 
     auto object = its_make_cube(782 - 49 + 50, 724 + 10 + 50, 5);
-    its_translate(object, Vec3f(49 - 25, -10 - 25, 2.5));
+    its_translate(object, Vec3f(49 - 25, -10 - 25, -40));
     auto cube2 = object; // copy
-    its_translate(cube2, Vec3f(100, -40, 40));
+    its_translate(cube2, Vec3f(100, -40, 7.5));
     its_merge(object, std::move(cube2));
 
     auto surfaces = cut_surface(object, shape, cut_projection);
     CHECK(!surfaces.empty());
 
-    Emboss::OrthoProject projection(Transform3d::Identity(), Vec3f(0.f, 0.f, -10.f));
+    Emboss::OrthoProject projection(Transform3d::Identity(), Vec3f(0.f, 0.f, 10.f));
     for (auto &surface : surfaces)
         its_translate(surface, Vec3f(0.f, 0.f, 10));
 
     indexed_triangle_set its = cuts2model(surfaces, projection);
     CHECK(!its.empty());
-    its_write_obj(its, "C:/data/temp/projected.obj");
+    //its_write_obj(its, "C:/data/temp/projected.obj");
 }
 
 
