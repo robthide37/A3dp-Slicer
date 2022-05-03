@@ -235,25 +235,27 @@ static int GetSelectedChoices(  wxArrayInt& selections,
                                 const wxString& caption,
                                 const wxArrayString& choices)
 {
-    wxMultiChoiceDialog dialog(nullptr, message, caption, choices);
-    // Add a third button and rename the "ok" to "Apply"
+    // wxMultiChoiceDialog only allow "ok" and "Apply" button
+    // do't ask for the wxStdDialogButtonSizer, and create my own
+    wxMultiChoiceDialog dialog(nullptr, message, caption, choices, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER | wxCENTRE);
     // As I don't want to recreate the wxMultiChoiceDialog and the parent classes, i just use this ugly hack.
     try {
-        //get the button vertical sizer that has the separator and then the button line 
-        wxSizer* vertical_bt_sizer = dialog.GetSizer()->GetItem(dialog.GetSizer()->GetItemCount() - 1)->GetSizer();
-        //get the button line
-        wxStdDialogButtonSizer* button_line = (wxStdDialogButtonSizer*) vertical_bt_sizer->GetItem(vertical_bt_sizer->GetItemCount() - 1)->GetSizer();
-        //rename
-        wxButton* win = (wxButton*)button_line->GetItem(1)->GetWindow();
-        win->SetLabelText(_L("Apply"));
-        //create the button
-        wxButton* bt_remove_all = new wxButton(&dialog, wxID_NO, _L("Clear"));
-        button_line->Insert(2, bt_remove_all);
-        button_line->AddButton(bt_remove_all);
-        dialog.SetEscapeId(wxID_CANCEL);
-        bt_remove_all->Bind(wxEVT_BUTTON, [&dialog](wxCommandEvent& e) { dialog.EndModal(wxID_NO); });
+        if (dialog.GetSizer()->GetItemCount() > 0 && dialog.GetSizer()->GetItem(dialog.GetSizer()->GetItemCount() - 1)->GetSizer()) {
+            //get the button vertical sizer that has the separator and then the button line 
+            wxSizer* vertical_bt_sizer = dialog.GetSizer()->GetItem(dialog.GetSizer()->GetItemCount() - 1)->GetSizer();
+            //create the button line
+            wxStdDialogButtonSizer* button_line = dialog.CreateStdDialogButtonSizer(wxYES | wxNO | wxCANCEL);
+            //replace labels
+            button_line->GetAffirmativeButton()->SetLabelText(_L("Apply"));
+            button_line->GetNegativeButton()->SetLabelText(_L("Clear"));
+            //wxMultiChoiceDialog don't respond to wxID_NO, so we have to endmodal manually
+            button_line->GetNegativeButton()->Bind(wxEVT_BUTTON, [&dialog](wxCommandEvent& e) { dialog.EndModal(wxID_NO); });
+            //add the button line like the base wxMultiChoiceDialog (but no double border becasue ther is already one)
+            vertical_bt_sizer->Add(button_line, wxSizerFlags().Expand());
+            dialog.SetSize(dialog.GetBestSize());
+        }
     }
-    catch (Exception e) {
+    catch (const std::exception&) {
         // continue without the third button
     }
     wxGetApp().UpdateDlgDarkUI(&dialog);
@@ -301,7 +303,7 @@ static int GetSelectedChoices(  wxArrayInt& selections,
         selections.clear();
     }
     // Cancel
-    if (result != wxID_OK)
+    if (result == wxID_CANCEL)
     {
         // NB: intentionally do not clear the selections array here, the caller
         //     might want to preserve its original contents if the dialog was
