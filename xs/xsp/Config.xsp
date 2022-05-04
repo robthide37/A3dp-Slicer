@@ -76,10 +76,6 @@
         %code{% RETVAL = new GCodeConfig(); %};
     static StaticPrintConfig* new_PrintConfig()
         %code{% RETVAL = static_cast<GCodeConfig*>(new PrintConfig()); %};
-    static StaticPrintConfig* new_PrintObjectConfig()
-        %code{% RETVAL = new PrintObjectConfig(); %};
-    static StaticPrintConfig* new_PrintRegionConfig()
-        %code{% RETVAL = new PrintRegionConfig(); %};
     static StaticPrintConfig* new_FullPrintConfig()
         %code{% RETVAL = static_cast<GCodeConfig*>(new FullPrintConfig()); %};
     ~StaticPrintConfig();

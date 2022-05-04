@@ -42,20 +42,6 @@ SurfaceCollection::filter_by_type(surface_type)
     OUTPUT:
         RETVAL
 
-void
-SurfaceCollection::replace(index, surface)
-    int         index
-    Surface*    surface
-    CODE:
-        THIS->surfaces[index] = *surface;
-
-void
-SurfaceCollection::set_surface_type(index, surface_type)
-    int             index
-    SurfaceType     surface_type;
-    CODE:
-        THIS->surfaces[index].surface_type = surface_type;
-
 SV*
 SurfaceCollection::group()
     CODE:

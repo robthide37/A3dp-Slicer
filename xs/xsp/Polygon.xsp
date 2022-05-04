@@ -34,12 +34,8 @@
     bool contains_point(Point* point)
         %code{% RETVAL = THIS->contains(*point); %};
     Polygons simplify(double tolerance);
-    Polygons triangulate_convex()
-        %code{% THIS->triangulate_convex(&RETVAL); %};
     Clone<Point> centroid();
     Clone<BoundingBox> bounding_box();
-    Clone<Point> point_projection(Point* point)
-        %code{% RETVAL = THIS->point_projection(*point); %};
     Clone<Point> first_intersection(Line* line)
         %code{%
             Point p;

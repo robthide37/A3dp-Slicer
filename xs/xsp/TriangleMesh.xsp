@@ -28,7 +28,6 @@
     void merge(TriangleMesh* mesh)
         %code{% THIS->merge(*mesh); %};
     Clone<Polygon> convex_hull();
-    Clone<BoundingBoxf3> bounding_box();
     Clone<Vec3d> center()
         %code{% RETVAL = THIS->bounding_box().center(); %};
     int facets_count();

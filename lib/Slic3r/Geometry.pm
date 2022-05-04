@@ -12,7 +12,6 @@ our @EXPORT_OK = qw(
     scale
     unscale
     scaled_epsilon
-    size_2D
 
     X Y Z
     convex_hull
@@ -50,15 +49,6 @@ sub bounding_box {
     }
     
     return @bb[X1,Y1,X2,Y2];
-}
-
-# used by ExPolygon::size
-sub size_2D {
-    my @bounding_box = bounding_box(@_);
-    return (
-        ($bounding_box[X2] - $bounding_box[X1]),
-        ($bounding_box[Y2] - $bounding_box[Y1]),
-    );
 }
 
 1;

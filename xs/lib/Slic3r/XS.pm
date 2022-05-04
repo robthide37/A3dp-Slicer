@@ -74,11 +74,6 @@ sub new_from_paths {
     return $loop;
 }
 
-package Slic3r::ExtrusionMultiPath;
-use overload
-    '@{}' => sub { $_[0]->arrayref },
-    'fallback' => 1;
-
 package Slic3r::ExtrusionPath;
 use overload
     '@{}' => sub { $_[0]->arrayref },
@@ -105,25 +100,6 @@ sub clone {
         $args{mm3_per_mm}    // $self->mm3_per_mm,
         $args{width}         // $self->width,
         $args{height}        // $self->height,
-    );
-}
-
-package Slic3r::Flow;
-
-sub new {
-    my ($class, %args) = @_;
-    
-    my $self = $class->_new(
-        @args{qw(width height nozzle_diameter)},
-    );
-    return $self;
-}
-
-sub new_from_width {
-    my ($class, %args) = @_;
-    
-    return $class->_new_from_width(
-        @args{qw(role width nozzle_diameter layer_height)},
     );
 }
 
@@ -175,26 +151,18 @@ sub new {
 package main;
 for my $class (qw(
         Slic3r::Config
-        Slic3r::Config::Full
         Slic3r::Config::GCode
         Slic3r::Config::Print
-        Slic3r::Config::PrintObject
-        Slic3r::Config::PrintRegion
         Slic3r::Config::Static
         Slic3r::ExPolygon
         Slic3r::ExtrusionLoop
-        Slic3r::ExtrusionMultiPath
         Slic3r::ExtrusionPath
         Slic3r::ExtrusionPath::Collection
-        Slic3r::Flow
         Slic3r::GCode
         Slic3r::Geometry::BoundingBox
-        Slic3r::Geometry::BoundingBoxf
-        Slic3r::Geometry::BoundingBoxf3
         Slic3r::Layer
         Slic3r::Layer::Region
         Slic3r::Line
-        Slic3r::Linef3
         Slic3r::Model
         Slic3r::Model::Instance
         Slic3r::Model::Material

@@ -18,26 +18,12 @@ BoundingBox*               O_OBJECT_SLIC3R
 Ref<BoundingBox>           O_OBJECT_SLIC3R_T
 Clone<BoundingBox>         O_OBJECT_SLIC3R_T
 
-BoundingBoxf*              O_OBJECT_SLIC3R
-Ref<BoundingBoxf>          O_OBJECT_SLIC3R_T
-Clone<BoundingBoxf>        O_OBJECT_SLIC3R_T
-
-BoundingBoxf3*             O_OBJECT_SLIC3R
-Ref<BoundingBoxf3>         O_OBJECT_SLIC3R_T
-Clone<BoundingBoxf3>       O_OBJECT_SLIC3R_T
-
 DynamicPrintConfig*        O_OBJECT_SLIC3R
 Ref<DynamicPrintConfig>    O_OBJECT_SLIC3R_T
 Clone<DynamicPrintConfig>  O_OBJECT_SLIC3R_T
 
 StaticPrintConfig*         O_OBJECT_SLIC3R
 Ref<StaticPrintConfig>     O_OBJECT_SLIC3R_T
-
-PrintObjectConfig*         O_OBJECT_SLIC3R
-Ref<PrintObjectConfig>     O_OBJECT_SLIC3R_T
-
-PrintRegionConfig*         O_OBJECT_SLIC3R
-Ref<PrintRegionConfig>     O_OBJECT_SLIC3R_T
 
 GCodeConfig*               O_OBJECT_SLIC3R
 Ref<GCodeConfig>           O_OBJECT_SLIC3R_T
@@ -72,10 +58,6 @@ Line*                      O_OBJECT_SLIC3R
 Ref<Line>                  O_OBJECT_SLIC3R_T
 Clone<Line>                O_OBJECT_SLIC3R_T
 
-Linef3*                    O_OBJECT_SLIC3R
-Ref<Linef3>                O_OBJECT_SLIC3R_T
-Clone<Linef3>              O_OBJECT_SLIC3R_T
-
 Polyline*                  O_OBJECT_SLIC3R
 Ref<Polyline>              O_OBJECT_SLIC3R_T
 Clone<Polyline>            O_OBJECT_SLIC3R_T
@@ -92,10 +74,6 @@ ExtrusionEntityCollection*              O_OBJECT_SLIC3R
 Ref<ExtrusionEntityCollection>          O_OBJECT_SLIC3R_T
 Clone<ExtrusionEntityCollection>        O_OBJECT_SLIC3R_T
 
-ExtrusionMultiPath*        O_OBJECT_SLIC3R
-Ref<ExtrusionMultiPath>    O_OBJECT_SLIC3R_T
-Clone<ExtrusionMultiPath>  O_OBJECT_SLIC3R_T
-
 ExtrusionPath*             O_OBJECT_SLIC3R
 Ref<ExtrusionPath>         O_OBJECT_SLIC3R_T
 Clone<ExtrusionPath>       O_OBJECT_SLIC3R_T
@@ -103,10 +81,6 @@ Clone<ExtrusionPath>       O_OBJECT_SLIC3R_T
 ExtrusionLoop*             O_OBJECT_SLIC3R
 Ref<ExtrusionLoop>         O_OBJECT_SLIC3R_T
 Clone<ExtrusionLoop>       O_OBJECT_SLIC3R_T
-
-Flow*                      O_OBJECT_SLIC3R
-Ref<Flow>                  O_OBJECT_SLIC3R_T
-Clone<Flow>                O_OBJECT_SLIC3R_T
 
 Surface*                   O_OBJECT_SLIC3R
 Ref<Surface>               O_OBJECT_SLIC3R_T
@@ -164,8 +138,6 @@ ExtrusionLoopRole     T_UV
 ExtrusionRole     T_UV
 FlowRole     T_UV
 SurfaceType     T_UV
-Slic3r::ClipperLib::JoinType		T_UV
-Slic3r::ClipperLib::PolyFillType		T_UV
 
 # we return these types whenever we want the items to be cloned
 Points          T_ARRAYREF

@@ -28,8 +28,5 @@ use parent 'Slic3r::Config';
 
 sub Slic3r::Config::GCode::new { Slic3r::Config::Static::new_GCodeConfig }
 sub Slic3r::Config::Print::new { Slic3r::Config::Static::new_PrintConfig }
-sub Slic3r::Config::PrintObject::new { Slic3r::Config::Static::new_PrintObjectConfig }
-sub Slic3r::Config::PrintRegion::new { Slic3r::Config::Static::new_PrintRegionConfig }
-sub Slic3r::Config::Full::new { Slic3r::Config::Static::new_FullPrintConfig }
 
 1;

@@ -4,7 +4,6 @@ use strict;
 use warnings;
 
 use List::Util qw(min max sum first);
-use Slic3r::Flow ':roles';
 use Slic3r::Surface ':types';
 
 sub layers {
