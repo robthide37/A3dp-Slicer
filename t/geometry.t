@@ -2,7 +2,7 @@ use Test::More;
 use strict;
 use warnings;
 
-plan tests => 27;
+plan tests => 26;
 
 BEGIN {
     use FindBin;
@@ -121,13 +121,6 @@ my $polygons = [
     my $bb = Slic3r::Geometry::BoundingBox->new_from_points([ map Slic3r::Point->new(@$_), [0, 1], [10, 2], [20, 2] ]);
     $bb->scale(2);
     is_deeply [ $bb->min_point->pp, $bb->max_point->pp ], [ [0,2], [40,4] ], 'bounding box is scaled correctly';
-}
-
-#==========================================================
-
-{
-    my $line = Slic3r::Line->new([10,10], [20,10]);
-    is $line->grow(5)->[0]->area, Slic3r::Polygon->new([10,5], [20,5], [20,15], [10,15])->area, 'grow line';
 }
 
 #==========================================================

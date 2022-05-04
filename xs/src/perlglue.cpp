@@ -13,15 +13,11 @@ REGISTER_CLASS(Flow, "Flow");
 REGISTER_CLASS(CoolingBuffer, "GCode::CoolingBuffer");
 REGISTER_CLASS(GCode, "GCode");
 REGISTER_CLASS(Layer, "Layer");
-REGISTER_CLASS(SupportLayer, "Layer::Support");
 REGISTER_CLASS(LayerRegion, "Layer::Region");
 REGISTER_CLASS(Line, "Line");
 REGISTER_CLASS(Linef3, "Linef3");
-REGISTER_CLASS(PerimeterGenerator, "Layer::PerimeterGenerator");
-REGISTER_CLASS(PlaceholderParser, "GCode::PlaceholderParser");
 REGISTER_CLASS(Polygon, "Polygon");
 REGISTER_CLASS(Polyline, "Polyline");
-REGISTER_CLASS(PolylineCollection, "Polyline::Collection");
 REGISTER_CLASS(Print, "Print");
 REGISTER_CLASS(PrintObject, "Print::Object");
 REGISTER_CLASS(PrintRegion, "Print::Region");
@@ -46,7 +42,6 @@ REGISTER_CLASS(PrintConfig, "Config::Print");
 REGISTER_CLASS(FullPrintConfig, "Config::Full");
 REGISTER_CLASS(Surface, "Surface");
 REGISTER_CLASS(SurfaceCollection, "Surface::Collection");
-REGISTER_CLASS(PrintObjectSupportMaterial, "Print::SupportMaterial2");
 REGISTER_CLASS(TriangleMesh, "TriangleMesh");
 
 SV* ConfigBase__as_hash(ConfigBase* THIS)

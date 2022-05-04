@@ -10,6 +10,8 @@ add_executable(${_TEST_NAME}_tests
 	test_gcodefindreplace.cpp
 	test_gcodewriter.cpp
 	test_model.cpp
+	test_multi.cpp
+	test_perimeters.cpp
 	test_print.cpp
 	test_printgcode.cpp
 	test_printobject.cpp

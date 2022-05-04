@@ -23,7 +23,6 @@
         %code{% RETVAL = THIS->split_at_vertex(*point); %};
     Clone<Polyline> split_at_index(int index);
     Clone<Polyline> split_at_first_point();
-    Points equally_spaced_points(double distance);
     double length();
     double area();
     bool is_counter_clockwise();

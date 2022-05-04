@@ -301,6 +301,11 @@ SCENARIO("Various Clipper operations - t/clipper.t", "[ClipperUtils]") {
             }
         }
     }
+    GIVEN("line") {
+        THEN("expand by 5") {
+            REQUIRE(offset(Polyline({10,10}, {20,10}), 5).front().area() == Polygon({ {10,5}, {20,5}, {20,15}, {10,15} }).area());
+        }
+    }
 }
 
 template<e_ordering o = e_ordering::OFF, class P, class Tree> 

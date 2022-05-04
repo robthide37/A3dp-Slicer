@@ -45,7 +45,6 @@ set(XSP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/xsp)
 set(XS_XSP_FILES
     ${XSP_DIR}/BoundingBox.xsp
     ${XSP_DIR}/BridgeDetector.xsp
-    ${XSP_DIR}/Clipper.xsp
     ${XSP_DIR}/Config.xsp
     ${XSP_DIR}/ExPolygon.xsp
     ${XSP_DIR}/ExPolygonCollection.xsp
@@ -59,12 +58,9 @@ set(XS_XSP_FILES
     ${XSP_DIR}/Layer.xsp
     ${XSP_DIR}/Line.xsp
     ${XSP_DIR}/Model.xsp
-    ${XSP_DIR}/PerimeterGenerator.xsp
-    ${XSP_DIR}/PlaceholderParser.xsp
     ${XSP_DIR}/Point.xsp
     ${XSP_DIR}/Polygon.xsp
     ${XSP_DIR}/Polyline.xsp
-    ${XSP_DIR}/PolylineCollection.xsp
     ${XSP_DIR}/Print.xsp
     ${XSP_DIR}/Surface.xsp
     ${XSP_DIR}/SurfaceCollection.xsp

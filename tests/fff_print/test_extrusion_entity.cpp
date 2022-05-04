@@ -141,3 +141,10 @@ TEST_CASE("ExtrusionEntityCollection: Chained path", "[ExtrusionEntity]") {
         }
     }
 }
+
+TEST_CASE("ExtrusionEntityCollection: Chained path with no explicit starting point", "[ExtrusionEntity]") {
+    auto polylines = Polylines { { { 0, 15 }, {0, 18}, {0, 20} }, { { 0, 10 }, {0, 8}, {0, 5} } };
+    auto target    = Polylines { { {0, 5}, {0, 8}, { 0, 10 } }, { { 0, 15 }, {0, 18}, {0, 20} } };
+    auto chained   = chain_polylines(polylines);
+    REQUIRE(chained == target);
+}

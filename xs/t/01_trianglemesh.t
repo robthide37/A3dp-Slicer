@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Slic3r::XS;
-use Test::More tests => 5;
+use Test::More tests => 4;
 
 my $cube = {
     vertices    => [ [20,20,0], [20,0,0], [0,0,0], [0,20,0], [20,20,20], [0,20,20], [0,0,20], [20,0,20] ],
@@ -24,11 +24,6 @@ my $cube = {
         is_deeply $m2->vertices, $cube->{vertices}, 'cloned vertices arrayref roundtrip';
         is_deeply $m2->facets, $cube->{facets}, 'cloned facets arrayref roundtrip';
         $m2->scale(3);  # check that it does not affect $m
-    }
-    
-    {
-        my $stats = $m->stats;
-        is $stats->{number_of_facets}, scalar(@{ $cube->{facets} }), 'stats.number_of_facets';
     }
 }
 

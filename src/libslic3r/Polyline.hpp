@@ -80,15 +80,6 @@ public:
 inline bool operator==(const Polyline &lhs, const Polyline &rhs) { return lhs.points == rhs.points; }
 inline bool operator!=(const Polyline &lhs, const Polyline &rhs) { return lhs.points != rhs.points; }
 
-// Don't use this class in production code, it is used exclusively by the Perl binding for unit tests!
-#ifdef PERL_UCHAR_MIN
-class PolylineCollection
-{
-public:
-    Polylines polylines;
-};
-#endif /* PERL_UCHAR_MIN */
-
 extern BoundingBox get_extents(const Polyline &polyline);
 extern BoundingBox get_extents(const Polylines &polylines);
 

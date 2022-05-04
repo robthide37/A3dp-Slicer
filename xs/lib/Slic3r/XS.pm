@@ -4,21 +4,6 @@ use strict;
 
 our $VERSION = '0.01';
 
-# We have to load these modules in order to have Wx.pm find the correct paths
-# for wxWidgets dlls on MSW.
-# We avoid loading these on OS X because Wx::Load() initializes a Wx App
-# automatically and it steals focus even when we're not running Slic3r in GUI mode.
-# TODO: only load these when compiling with GUI support
-BEGIN {
-    if ($^O eq 'MSWin32') {
-        eval "use Wx";
-        eval "use Wx::GLCanvas";
-        eval "use Wx::GLContext";
-        eval "use Wx::Html";
-        eval "use Wx::Print";  # because of some Wx bug, thread creation fails if we don't have this (looks like Wx::Printout is hard-coded in some thread cleanup code)
-    }
-}
-
 use Carp qw();
 use XSLoader;
 XSLoader::load(__PACKAGE__, $VERSION);
@@ -54,11 +39,6 @@ use overload
     'fallback' => 1;
 
 package Slic3r::Polyline;
-use overload
-    '@{}' => sub { $_[0]->arrayref },
-    'fallback' => 1;
-
-package Slic3r::Polyline::Collection;
 use overload
     '@{}' => sub { $_[0]->arrayref },
     'fallback' => 1;
@@ -197,31 +177,6 @@ sub new {
     return $self;
 }
 
-package Slic3r::Print::SupportMaterial2;
-
-sub new {
-    my ($class, %args) = @_;
-    
-    return $class->_new(
-        $args{print_config},        # required
-        $args{object_config},       # required
-        $args{first_layer_flow},    # required
-        $args{flow},                # required
-        $args{interface_flow},      # required
-        $args{soluble_interface}    // 0
-    );
-}
-
-package Slic3r::GUI::_3DScene::GLVolume::Collection;
-use overload
-    '@{}' => sub { $_[0]->arrayref },
-    'fallback' => 1;
-
-package Slic3r::GUI::PresetCollection;
-use overload
-    '@{}' => sub { $_[0]->arrayref },
-    'fallback' => 1;
-
 package main;
 for my $class (qw(
         Slic3r::BridgeDetector
@@ -240,13 +195,11 @@ for my $class (qw(
         Slic3r::ExtrusionPath::Collection
         Slic3r::Flow
         Slic3r::GCode
-        Slic3r::GCode::PlaceholderParser
         Slic3r::Geometry::BoundingBox
         Slic3r::Geometry::BoundingBoxf
         Slic3r::Geometry::BoundingBoxf3
         Slic3r::Layer
         Slic3r::Layer::Region
-        Slic3r::Layer::Support
         Slic3r::Line
         Slic3r::Linef3
         Slic3r::Model
@@ -264,10 +217,8 @@ for my $class (qw(
         Slic3r::Print
         Slic3r::Print::Object
         Slic3r::Print::Region
-        Slic3r::Print::State
         Slic3r::Surface
         Slic3r::Surface::Collection
-        Slic3r::Print::SupportMaterial2
         Slic3r::TriangleMesh
     ))
 {

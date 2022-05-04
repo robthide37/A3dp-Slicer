@@ -4,13 +4,6 @@ use warnings;
 
 # an ExPolygon is a polygon with holes
 
-sub noncollapsing_offset_ex {
-    my $self = shift;
-    my ($distance, @params) = @_;
-    
-    return $self->offset_ex($distance + 1, @params);
-}
-
 sub bounding_box {
     my $self = shift;
     return $self->contour->bounding_box;

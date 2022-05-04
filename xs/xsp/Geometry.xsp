@@ -48,14 +48,6 @@ convex_hull(points)
         RETVAL
 
 std::vector<Points::size_type>
-chained_path(points)
-    Points      points
-    CODE:
-        RETVAL = chain_points(points);
-    OUTPUT:
-        RETVAL
-
-std::vector<Points::size_type>
 chained_path_from(points, start_from)
     Points      points
     Point*      start_from

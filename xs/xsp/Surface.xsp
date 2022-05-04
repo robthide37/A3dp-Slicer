@@ -3,7 +3,6 @@
 %{
 #include <xsinit.h>
 #include "libslic3r/Surface.hpp"
-#include "libslic3r/ClipperUtils.hpp"
 %}
 
 %name{Slic3r::Surface} class Surface {
