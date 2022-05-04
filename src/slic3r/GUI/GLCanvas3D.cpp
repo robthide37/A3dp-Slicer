@@ -3825,9 +3825,17 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
             ModelObject* model_object = m_model->objects[object_idx];
             if (model_object != nullptr) {
                 if (selection_mode == Selection::Instance)
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                    model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+#else
                     model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
                 else if (selection_mode == Selection::Volume)
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                    model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
+#else
                     model_object->volumes[volume_idx]->set_offset(v->get_volume_offset());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
                 object_moved = true;
                 model_object->invalidate_bounding_box();
@@ -3907,8 +3915,8 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
         int object_idx = v->object_idx();
         if (object_idx == 1000) { // the wipe tower
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
-            Vec3d offset = v->get_volume_offset();
-            post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset(0), offset(1), v->get_volume_rotation()(2))));
+            const Vec3d offset = v->get_volume_offset();
+            post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset.x(), offset.y(), v->get_volume_rotation().z())));
         }
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         int object_idx = v->object_idx();
@@ -3916,8 +3924,8 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
             continue;
 
-        int instance_idx = v->instance_idx();
-        int volume_idx = v->volume_idx();
+        const int instance_idx = v->instance_idx();
+        const int volume_idx = v->volume_idx();
 
         done.insert(std::pair<int, int>(object_idx, instance_idx));
 
@@ -3925,12 +3933,20 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
         ModelObject* model_object = m_model->objects[object_idx];
         if (model_object != nullptr) {
             if (selection_mode == Selection::Instance) {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+#else
                 model_object->instances[instance_idx]->set_rotation(v->get_instance_rotation());
                 model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             }
             else if (selection_mode == Selection::Volume) {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
+#else
                 model_object->volumes[volume_idx]->set_rotation(v->get_volume_rotation());
                 model_object->volumes[volume_idx]->set_offset(v->get_volume_offset());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             }
             model_object->invalidate_bounding_box();
         }
@@ -7347,13 +7363,11 @@ bool GLCanvas3D::_is_any_volume_outside() const
 void GLCanvas3D::_update_selection_from_hover()
 {
     bool ctrl_pressed = wxGetKeyState(WXK_CONTROL);
-    bool selection_changed = false;
-
     if (m_hover_volume_idxs.empty()) {
-        if (!ctrl_pressed && m_rectangle_selection.get_state() == GLSelectionRectangle::EState::Select) {
-            selection_changed = ! m_selection.is_empty();
+        if (!ctrl_pressed && m_rectangle_selection.get_state() == GLSelectionRectangle::EState::Select)
             m_selection.remove_all();
-        }
+
+        return;
     }
 
     GLSelectionRectangle::EState state = m_rectangle_selection.get_state();
@@ -7366,6 +7380,7 @@ void GLCanvas3D::_update_selection_from_hover()
         }
     }
 
+    bool selection_changed = false;
 #if ENABLE_NEW_RECTANGLE_SELECTION
     if (!m_rectangle_selection.is_empty()) {
 #endif // ENABLE_NEW_RECTANGLE_SELECTION

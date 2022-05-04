@@ -54,9 +54,7 @@ bool GLGizmoMove3D::on_mouse(const wxMouseEvent &mouse_event) {
 }
 
 void GLGizmoMove3D::data_changed() {
-    const Selection &selection = m_parent.get_selection();
-    bool is_wipe_tower = selection.is_wipe_tower();
-    m_grabbers[2].enabled = !is_wipe_tower;
+    m_grabbers[2].enabled = !m_parent.get_selection().is_wipe_tower();
 }
 
 bool GLGizmoMove3D::on_init()
@@ -100,11 +98,19 @@ void GLGizmoMove3D::on_start_dragging()
         m_starting_drag_position = m_center + m_grabbers[m_hover_id].center;
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
         const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        m_starting_drag_position = m_center + v.get_instance_transformation().get_rotation_matrix() * v.get_volume_transformation().get_rotation_matrix() * m_grabbers[m_hover_id].center;
+#else
         m_starting_drag_position = m_center + Geometry::assemble_transform(Vec3d::Zero(), v.get_instance_rotation()) * Geometry::assemble_transform(Vec3d::Zero(), v.get_volume_rotation()) * m_grabbers[m_hover_id].center;
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
     else {
         const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        m_starting_drag_position = m_center + v.get_instance_transformation().get_rotation_matrix() * m_grabbers[m_hover_id].center;
+#else
         m_starting_drag_position = m_center + Geometry::assemble_transform(Vec3d::Zero(), v.get_instance_rotation()) * m_grabbers[m_hover_id].center;
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
     m_starting_box_center = m_center;
     m_starting_box_bottom_center = m_center;

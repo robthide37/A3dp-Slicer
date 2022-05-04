@@ -287,7 +287,15 @@ void GLGizmoRotate::on_render_for_picking()
 #if ENABLE_WORLD_COORDINATE
 void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    ECoordinatesType coordinates_type;
+    if (selection.is_wipe_tower())
+        coordinates_type = ECoordinatesType::Local;
+    else
+        coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
+#else
     const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     if (coordinates_type == ECoordinatesType::World) {
         m_bounding_box = selection.get_bounding_box();
         m_center = m_bounding_box.center();
@@ -326,7 +334,11 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 
     if (coordinates_type == ECoordinatesType::World)
         m_orient_matrix = Transform3d::Identity();
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    else if (coordinates_type == ECoordinatesType::Local && (selection.is_wipe_tower() || selection.is_single_volume_or_modifier())) {
+#else
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
         const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
         m_orient_matrix = v.get_instance_transformation().get_rotation_matrix() * v.get_volume_transformation().get_rotation_matrix();
@@ -749,12 +761,20 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
     {
     case X:
     {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        ret = Geometry::rotation_transform(0.5 * PI * Vec3d::UnitY()) * Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitZ());
+#else
         ret = Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitY()) * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitZ());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
         break;
     }
     case Y:
     {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        ret = Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitZ()) * Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitY());
+#else
         ret = Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitZ()) * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitY());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
         break;
     }
     default:
@@ -868,13 +888,21 @@ bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
         // Apply new temporary rotations
 #if ENABLE_WORLD_COORDINATE
         TransformationType transformation_type;
-        switch (wxGetApp().obj_manipul()->get_coordinates_type())
-        {
-        default:
-        case ECoordinatesType::World: { transformation_type = TransformationType::World_Relative_Joint; break; }
-        case ECoordinatesType::Instance: { transformation_type = TransformationType::Instance_Relative_Joint; break; }
-        case ECoordinatesType::Local: { transformation_type = TransformationType::Local_Relative_Joint; break; }
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        if (m_parent.get_selection().is_wipe_tower())
+            transformation_type = TransformationType::Instance_Relative_Joint;
+        else {
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+            switch (wxGetApp().obj_manipul()->get_coordinates_type())
+            {
+            default:
+            case ECoordinatesType::World: { transformation_type = TransformationType::World_Relative_Joint; break; }
+            case ECoordinatesType::Instance: { transformation_type = TransformationType::Instance_Relative_Joint; break; }
+            case ECoordinatesType::Local: { transformation_type = TransformationType::Local_Relative_Joint; break; }
+            }
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
         }
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
         TransformationType transformation_type(TransformationType::World_Relative_Joint);
 #endif // ENABLE_WORLD_COORDINATE
@@ -885,22 +913,27 @@ bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
 }
 
 void GLGizmoRotate3D::data_changed() {
-    const Selection &selection = m_parent.get_selection();
-    bool is_wipe_tower = selection.is_wipe_tower();
-    if (is_wipe_tower) {
-        DynamicPrintConfig& config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
-        float wipe_tower_rotation_angle =
-            dynamic_cast<const ConfigOptionFloat *>(
-                config.option("wipe_tower_rotation_angle"))
-                ->value;
+    if (m_parent.get_selection().is_wipe_tower()) {
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
+        const DynamicPrintConfig& config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        const float wipe_tower_rotation_angle =
+            dynamic_cast<const ConfigOptionFloat*>(
+                config.option("wipe_tower_rotation_angle"))->value;
         set_rotation(Vec3d(0., 0., (M_PI / 180.) * wipe_tower_rotation_angle));
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
         m_gizmos[0].disable_grabber();
         m_gizmos[1].disable_grabber();
-    } else {
+    }
+    else {
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
         set_rotation(Vec3d::Zero());
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
         m_gizmos[0].enable_grabber();
         m_gizmos[1].enable_grabber();
     }
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    set_rotation(Vec3d::Zero());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 }
 
 bool GLGizmoRotate3D::on_init()

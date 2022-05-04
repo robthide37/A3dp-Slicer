@@ -121,16 +121,19 @@ private:
     private:
         struct TransformCache
         {
-            Vec3d position;
-            Vec3d rotation;
-            Vec3d scaling_factor;
-            Vec3d mirror;
-            Transform3d rotation_matrix;
-            Transform3d scale_matrix;
-            Transform3d mirror_matrix;
-            Transform3d full_matrix;
+            Vec3d position{ Vec3d::Zero() };
+            Vec3d rotation{ Vec3d::Zero() };
+            Vec3d scaling_factor{ Vec3d::Ones() };
+            Vec3d mirror{ Vec3d::Ones() };
+            Transform3d rotation_matrix{ Transform3d::Identity() };
+            Transform3d scale_matrix{ Transform3d::Identity() };
+            Transform3d mirror_matrix{ Transform3d::Identity() };
+            Transform3d full_matrix{ Transform3d::Identity() };
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            Geometry::Transformation transform;
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
-            TransformCache();
+            TransformCache() = default;
             explicit TransformCache(const Geometry::Transformation& transform);
         };
 
@@ -142,13 +145,18 @@ private:
         VolumeCache(const Geometry::Transformation& volume_transform, const Geometry::Transformation& instance_transform);
 
         const Vec3d& get_volume_position() const { return m_volume.position; }
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
         const Vec3d& get_volume_rotation() const { return m_volume.rotation; }
         const Vec3d& get_volume_scaling_factor() const { return m_volume.scaling_factor; }
         const Vec3d& get_volume_mirror() const { return m_volume.mirror; }
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
         const Transform3d& get_volume_rotation_matrix() const { return m_volume.rotation_matrix; }
         const Transform3d& get_volume_scale_matrix() const { return m_volume.scale_matrix; }
         const Transform3d& get_volume_mirror_matrix() const { return m_volume.mirror_matrix; }
         const Transform3d& get_volume_full_matrix() const { return m_volume.full_matrix; }
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        const Geometry::Transformation& get_volume_transform() const { return m_volume.transform; }
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
         const Vec3d& get_instance_position() const { return m_instance.position; }
         const Vec3d& get_instance_rotation() const { return m_instance.rotation; }
@@ -158,6 +166,9 @@ private:
         const Transform3d& get_instance_scale_matrix() const { return m_instance.scale_matrix; }
         const Transform3d& get_instance_mirror_matrix() const { return m_instance.mirror_matrix; }
         const Transform3d& get_instance_full_matrix() const { return m_instance.full_matrix; }
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        const Geometry::Transformation& get_instance_transform() const { return m_instance.transform; }
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     };
 
 public:

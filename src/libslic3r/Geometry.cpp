@@ -314,6 +314,18 @@ Transform3d assemble_transform(const Vec3d& translation, const Vec3d& rotation, 
 }
 
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
+void assemble_transform(Transform3d& transform, const Transform3d& translation, const Transform3d& rotation, const Transform3d& scale, const Transform3d& mirror)
+{
+    transform = translation * rotation * scale * mirror;
+}
+
+Transform3d assemble_transform(const Transform3d& translation, const Transform3d& rotation, const Transform3d& scale, const Transform3d& mirror)
+{
+    Transform3d transform;
+    assemble_transform(transform, translation, rotation, scale, mirror);
+    return transform;
+}
+
 void rotation_transform(Transform3d& transform, const Vec3d& rotation)
 {
     transform = Transform3d::Identity();
