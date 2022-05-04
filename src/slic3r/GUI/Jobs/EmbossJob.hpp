@@ -31,19 +31,6 @@ struct EmbossDataBase
 };
 
 /// <summary>
-/// Hold neccessary data to update embossed text object in job
-/// </summary>
-struct EmbossDataUpdate : public EmbossDataBase
-{
-    // unique identifier of volume to change
-    ObjectID volume_id;
-
-    // flag that job is canceled 
-    // for time after process.
-    std::shared_ptr<std::atomic<bool> > cancel;
-};
-
-/// <summary>
 /// Hold neccessary data to create ModelVolume in job
 /// Volume is created on the surface of existing volume in object.
 /// </summary>
@@ -68,6 +55,22 @@ struct EmbossDataCreateVolume : public EmbossDataBase
 };
 
 /// <summary>
+/// Create new TextVolume on the surface of ModelObject
+/// Should not be stopped
+/// </summary>
+class EmbossCreateVolumeJob : public Job
+{
+    EmbossDataCreateVolume m_input;
+    TriangleMesh           m_result;
+    Transform3d            m_transformation;
+
+public:
+    EmbossCreateVolumeJob(EmbossDataCreateVolume&& input);
+    void process(Ctl &ctl) override;
+    void finalize(bool canceled, std::exception_ptr &) override;
+};
+
+/// <summary>
 /// Hold neccessary data to create ModelObject in job
 /// Object is placed on bed under screen coor
 /// OR to center of scene when it is out of bed shape
@@ -85,51 +88,6 @@ struct EmbossDataCreateObject : public EmbossDataBase
 };
 
 /// <summary>
-/// Update text shape in existing text volume
-/// Predict that there is only one runnig(not canceled) instance of it
-/// </summary>
-class EmbossUpdateJob : public Job
-{
-    EmbossDataUpdate m_input;
-    TriangleMesh     m_result;
-public:
-    // only move params to private variable
-    EmbossUpdateJob(EmbossDataUpdate&& input);
-
-    /// <summary>
-    /// Create volume movel by input data
-    /// </summary>
-    /// <param name="ctl">Control containing cancel flag</param>
-    void process(Ctl &ctl) override;
-
-    /// <summary>
-    /// Update volume - change object_id
-    /// </summary>
-    /// <param name="canceled">Was process canceled.
-    /// NOTE: Be carefull it doesn't care about 
-    /// time between finished process and started finalize part.</param>
-    /// <param name="">unused</param>
-    void finalize(bool canceled, std::exception_ptr &) override;
-};
-
-
-/// <summary>
-/// Create new TextVolume on the surface of ModelObject
-/// Should not be stopped
-/// </summary>
-class EmbossCreateVolumeJob : public Job
-{
-    EmbossDataCreateVolume m_input;
-    TriangleMesh           m_result;
-    Transform3d            m_transformation;
-
-public:
-    EmbossCreateVolumeJob(EmbossDataCreateVolume&& input);
-    void process(Ctl &ctl) override;
-    void finalize(bool canceled, std::exception_ptr &) override;
-};
-
-/// <summary>
 /// Create new TextObject on the platter
 /// Should not be stopped
 /// </summary>
@@ -138,9 +96,87 @@ class EmbossCreateObjectJob : public Job
     EmbossDataCreateObject m_input;
     TriangleMesh           m_result;
     Transform3d            m_transformation;
-
 public:
     EmbossCreateObjectJob(EmbossDataCreateObject&& input);
+    void process(Ctl &ctl) override;
+    void finalize(bool canceled, std::exception_ptr &) override;
+};
+
+/// <summary>
+/// Hold neccessary data to update embossed text object in job
+/// </summary>
+struct EmbossDataUpdate : public EmbossDataBase
+{
+    // unique identifier of volume to change
+    ObjectID volume_id;
+
+    // flag that job is canceled
+    // for time after process.
+    std::shared_ptr<std::atomic<bool>> cancel;
+};
+
+/// <summary>
+/// Update text shape in existing text volume
+/// Predict that there is only one runnig(not canceled) instance of it
+/// </summary>
+class EmbossUpdateJob : public Job
+{
+    EmbossDataUpdate m_input;
+    TriangleMesh     m_result;
+
+public:
+    // move params to private variable
+    EmbossUpdateJob(EmbossDataUpdate &&input);
+
+    /// <summary>
+    /// Create new embossed volume by m_input data and store to m_result
+    /// </summary>
+    /// <param name="ctl">Control containing cancel flag</param>
+    void process(Ctl &ctl) override;
+
+    /// <summary>
+    /// Update volume - change object_id
+    /// </summary>
+    /// <param name="canceled">Was process canceled.
+    /// NOTE: Be carefull it doesn't care about
+    /// time between finished process and started finalize part.</param>
+    /// <param name="">unused</param>
+    void finalize(bool canceled, std::exception_ptr &) override;
+};
+
+/// <summary>
+/// Hold neccessary data to update embossed text object in job
+/// </summary>
+struct UseSurfaceData : public EmbossDataUpdate
+{
+    // Transformation of text volume inside of object
+    Transform3d text_tr;
+
+    // Define projection move
+    // True (raised) .. move outside from surface
+    // False (engraved).. move into object
+    bool is_outside;
+
+    // IMPROVE: copy of source mesh tringles
+    // copy could slow down on big meshes
+    indexed_triangle_set mesh_its;
+    // Transformation of volume inside of object
+    Transform3d          mesh_tr;
+    // extract bounds for projection
+    BoundingBoxf3        mesh_bb;
+};
+
+/// <summary>
+/// Update text volume to use surface from object
+/// </summary>
+class UseSurfaceJob : public Job
+{
+    UseSurfaceData m_input;
+    TriangleMesh   m_result;
+
+public:
+    // move params to private variable
+    UseSurfaceJob(UseSurfaceData &&input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &) override;
 };

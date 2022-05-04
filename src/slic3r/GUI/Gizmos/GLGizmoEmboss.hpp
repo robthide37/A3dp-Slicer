@@ -116,6 +116,12 @@ private:
     void use_surface();
 
     /// <summary>
+    /// Choose valid source Volume to project on(cut surface from).
+    /// </summary>
+    /// <returns>ModelVolume to project on</returns>
+    const ModelVolume *get_volume_to_cut_surface_from();
+
+    /// <summary>
     /// Reversible input float with option to restor default value
     /// TODO: make more general, static and move to ImGuiWrapper 
     /// </summary>
@@ -123,6 +129,7 @@ private:
     bool rev_input(const std::string &name, float &value, float *default_value, 
         const std::string &undo_tooltip, float step, float step_fast, const char *format, 
         ImGuiInputTextFlags flags = 0);
+    bool rev_checkbox(const std::string &name, bool &value, bool* default_value, const std::string  &undo_tooltip);
     bool rev_slider(const std::string &name, std::optional<int>& value, std::optional<int> *default_value,
         const std::string &undo_tooltip, int v_min, int v_max, const std::string &format, const wxString &tooltip);
     bool rev_slider(const std::string &name, std::optional<float>& value, std::optional<float> *default_value,
@@ -185,6 +192,7 @@ private:
             std::string font;
             std::string size;
             std::string depth;
+            std::string use_surface;
 
             // advanced
             std::string char_gap;

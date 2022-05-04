@@ -57,9 +57,9 @@ SurfaceCut merge(SurfaceCuts&& cuts);
 /// <param name="shapes">Multiple shape to cut from model</param>
 /// <param name="projection">Define transformation from 2d coordinate of shape to 3d</param>
 /// <returns>Cutted surface from model</returns>
-SurfaceCuts cut_surface(const indexed_triangle_set &model,
-                        const ExPolygons           &shapes,
-                        const Emboss::IProject     &projection);
+SurfaceCut cut_surface(const indexed_triangle_set &model,
+                       const ExPolygons           &shapes,
+                       const Emboss::IProjection  &projection);
 
 /// <summary>
 /// Create model from surface cuts by projection
@@ -67,16 +67,16 @@ SurfaceCuts cut_surface(const indexed_triangle_set &model,
 /// <param name="cuts">Surfaces from model</param>
 /// <param name="projection">Way of emboss</param>
 /// <returns>Mesh</returns>
-indexed_triangle_set cuts2model(const SurfaceCuts      &cuts,
-                                const Emboss::IProject &projection);
+indexed_triangle_set cuts2model(const SurfaceCuts        &cuts,
+                                const Emboss::IProject3f &projection);
 /// <summary>
 /// Create model from surface cuts by projection
 /// </summary>
 /// <param name="cut">Surface from model with outlines</param>
 /// <param name="projection">Way of emboss</param>
 /// <returns>Mesh</returns>
-indexed_triangle_set cut2model(const SurfaceCut       &cut,
-                               const Emboss::IProject &projection);
+indexed_triangle_set cut2model(const SurfaceCut         &cut,
+                               const Emboss::IProject3f &projection);
 
 
 } // namespace Slic3r

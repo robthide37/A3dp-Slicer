@@ -157,6 +157,7 @@ static constexpr const char *CHAR_GAP_ATTR    = "char_gap";
 static constexpr const char *LINE_GAP_ATTR    = "line_gap";
 static constexpr const char *LINE_HEIGHT_ATTR = "line_height";
 static constexpr const char *DEPTH_ATTR       = "depth";
+static constexpr const char *USE_SURFACE_ATTR = "use_surface";
 static constexpr const char *BOLDNESS_ATTR    = "boldness";
 static constexpr const char *SKEW_ATTR        = "skew";
 static constexpr const char *DISTANCE_ATTR    = "distance";
@@ -3335,6 +3336,8 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
 
     stream << LINE_HEIGHT_ATTR << "=\"" << fp.size_in_mm << "\" ";
     stream << DEPTH_ATTR << "=\"" << fp.emboss << "\" ";
+    if (fp.use_surface)
+        stream << USE_SURFACE_ATTR << "=\"" << 1 << "\" ";
     if (fp.boldness.has_value())
         stream << BOLDNESS_ATTR << "=\"" << *fp.boldness << "\" ";
     if (fp.skew.has_value())
@@ -3416,7 +3419,9 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
         fp.skew = skew;
     float distance = get_attribute_value_float(attributes, num_attributes, DISTANCE_ATTR);
     if (std::fabs(distance) > std::numeric_limits<float>::epsilon())
-        fp.distance = distance;    
+        fp.distance = distance;
+    std::string use_surface = get_attribute_value_string(attributes, num_attributes, USE_SURFACE_ATTR);
+    if (!use_surface.empty()) fp.use_surface = true;
     float angle = get_attribute_value_float(attributes, num_attributes, ANGLE_ATTR);
     if (std::fabs(angle) > std::numeric_limits<float>::epsilon())
         fp.angle = angle;

@@ -152,7 +152,7 @@ struct IntersectingElement
 /// <returns>CGAL mesh - half edge mesh</returns>
 CutMesh to_cgal(const indexed_triangle_set &its);
 
-using Project = Emboss::IProject;
+using Project = Emboss::IProjection;
 /// <summary>
 /// Covert 2d shape (e.g. Glyph) to CGAL model
 /// </summary>
@@ -434,9 +434,9 @@ void store(const SurfaceCuts &cut, const std::string &dir);
 } // namespace privat
 
 
-SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
+SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
                                 const ExPolygons           &shapes,
-                                const Emboss::IProject     &projection)
+                                const Emboss::IProjection  &projection)
 {
     priv::CutMesh cgal_model = priv::to_cgal(model);
 
@@ -519,12 +519,11 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::store(result, DEBUG_OUTPUT_DIR + "cuts/"); // only debug
 #endif // DEBUG_OUTPUT_DIR
     
-    // TODO: Filter surfaceCuts to only the top most.
-    return result;
+    return merge(std::move(result));
 }
 
-indexed_triangle_set Slic3r::cuts2model(const SurfaceCuts      &cuts,
-                                        const Emboss::IProject &projection)
+indexed_triangle_set Slic3r::cuts2model(const SurfaceCuts        &cuts,
+                                        const Emboss::IProject3f &projection)
 {
     indexed_triangle_set result;
     size_t count_vertices = 0;
@@ -604,8 +603,8 @@ indexed_triangle_set Slic3r::cuts2model(const SurfaceCuts      &cuts,
     return result;
 }
 
-indexed_triangle_set Slic3r::cut2model(const SurfaceCut       &cut,
-                                       const Emboss::IProject &projection)
+indexed_triangle_set Slic3r::cut2model(const SurfaceCut         &cut,
+                                       const Emboss::IProject3f &projection)
 {
     assert(!cut.empty());
     size_t count_vertices = cut.vertices.size() * 2;
@@ -707,7 +706,7 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
         indices.reserve(polygon.points.size() * 2);
         size_t  num_vertices_old = result.number_of_vertices();
         for (const Point &p2 : polygon.points) {
-            auto p  = projection.project(p2);
+            auto p  = projection.create_front_back(p2);
             CutMesh::Point v_first{p.first.x(), p.first.y(), p.first.z()};
             CutMesh::Point v_second{p.second.x(), p.second.y(), p.second.z()};
 
@@ -1388,7 +1387,7 @@ void priv::filter_cuts(CutAOIs              &cuts,
 
         // compare distances of vertices
         Point p = get_point(*i);
-        Vec3f source_point = projection.project(p).first;
+        Vec3f source_point = projection.create_front_back(p).first;
         const auto &prev = mesh.point(ci.vi);
         Vec3f prev_point(prev.x(), prev.y(), prev.z());
         float prev_sq_norm = (source_point - prev_point).squaredNorm();

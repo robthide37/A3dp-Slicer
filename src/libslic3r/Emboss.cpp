@@ -769,7 +769,7 @@ std::string Emboss::create_range_text(const std::string &text,
 
 
 indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
-                                            const IProject &projection)
+                                            const IProjection &projection)
 {
     indexed_triangle_set result;
     size_t count_point = count_points(shape2d);
@@ -782,7 +782,7 @@ indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
     auto insert_point = [&projection, &front_points,
                          &back_points](const Polygon& polygon) {
         for (const Point& p : polygon.points) {
-            auto p2 = projection.project(p);
+            auto p2 = projection.create_front_back(p);
             front_points.emplace_back(p2.first);
             back_points.emplace_back(p2.second);
         }
@@ -832,7 +832,7 @@ indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
     return result;
 }
 
-std::pair<Vec3f, Vec3f> Emboss::ProjectZ::project(const Point &p) const
+std::pair<Vec3f, Vec3f> Emboss::ProjectZ::create_front_back(const Point &p) const
 {
     Vec3f front(
         static_cast<float>(p.x() * SHAPE_SCALE), 
@@ -902,7 +902,7 @@ Transform3d Emboss::create_transformation_onto_surface(const Vec3f &position,
 
 // OrthoProject
 
-std::pair<Vec3f, Vec3f> Emboss::OrthoProject::project(const Point &p) const {
+std::pair<Vec3f, Vec3f> Emboss::OrthoProject::create_front_back(const Point &p) const {
     Vec3d front(p.x(), p.y(), 0.);
     Vec3f front_tr = (m_matrix * front).cast<float>();
     return std::make_pair(front_tr, project(front_tr));

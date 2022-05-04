@@ -603,13 +603,15 @@ void GLGizmoEmboss::initialize()
     int count_letter_M_in_input = 12;
     cfg.advanced_input_width = letter_m_size.x * count_letter_M_in_input;
     GuiCfg::Translations &tr = cfg.translations;
-    tr.font                  = _u8L("Font");
-    tr.size                  = _u8L("Height");
-    tr.depth                 = _u8L("Depth");
+    tr.font        = _u8L("Font");
+    tr.size        = _u8L("Height");
+    tr.depth       = _u8L("Depth");
+    tr.use_surface = _u8L("Use surface");
     float max_edit_text_width = std::max(
         {ImGui::CalcTextSize(tr.font.c_str()).x,
          ImGui::CalcTextSize(tr.size.c_str()).x,
-         ImGui::CalcTextSize(tr.depth.c_str()).x });
+         ImGui::CalcTextSize(tr.depth.c_str()).x,
+         ImGui::CalcTextSize(tr.use_surface.c_str()).x });
     cfg.edit_input_offset = 
         3 * space + ImGui::GetTreeNodeToLabelSpacing() +
                             max_edit_text_width;
@@ -646,7 +648,7 @@ void GLGizmoEmboss::initialize()
     float window_width = cfg.style_combobox_width + style.WindowPadding.x * 2;
     cfg.minimal_window_size = ImVec2(window_width, window_height);
 
-    float addition_edit_height        = input_height * 3 + tree_header;
+    float addition_edit_height        = input_height * 4 + tree_header;
     cfg.minimal_window_size_with_edit = ImVec2(cfg.minimal_window_size.x,
                                                cfg.minimal_window_size.y +
                                                    addition_edit_height);
@@ -869,11 +871,40 @@ bool GLGizmoEmboss::process()
     m_update_job_cancel = std::make_shared<std::atomic<bool> >(false);
     EmbossDataBase   base{font, create_configuration(), create_volume_name()};
     EmbossDataUpdate data{std::move(base), m_volume->id(), m_update_job_cancel};
+
+    std::unique_ptr<Job> job = nullptr;
+
+    // check cutting from source mesh
+    const TextConfiguration &tc = data.text_configuration;
+    if (tc.font_item.prop.use_surface) {
+        // Model to cut surface from.
+        const ModelVolume *mesh = get_volume_to_cut_surface_from();
+        if (mesh == nullptr) return false;
+
+        Transform3d text_tr = m_volume->get_matrix();
+        if (tc.fix_3mf_tr.has_value())
+            text_tr = text_tr * tc.fix_3mf_tr->inverse();
+
+        bool is_outside = m_volume->is_model_part();
+        // check that there is not unexpected volume type
+        assert(is_outside || m_volume->is_negative_volume() ||
+               m_volume->is_modifier());
+        UseSurfaceData surface_data{std::move(data),
+                                    text_tr,
+                                    is_outside,
+                                    mesh->mesh().its /*copy*/,
+                                    mesh->get_matrix(),
+                                    mesh->mesh().bounding_box()};
+        job = std::make_unique<UseSurfaceJob>(std::move(surface_data));                  
+    } else {
+        job = std::make_unique<EmbossUpdateJob>(std::move(data));
+    }
+
     //*    
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    queue_job(worker, std::make_unique<EmbossUpdateJob>(std::move(data)));
+    queue_job(worker, std::move(job));
     /*/ // Run Job on main thread (blocking) - ONLY DEBUG
-    execute_job(std::make_shared<EmbossUpdateJob>(std::move(data)));
+    execute_job(std::move(job));
     // */
 
     // notification is removed befor object is changed by job
@@ -913,49 +944,18 @@ void GLGizmoEmboss::select_stored_font_item()
     m_stored_font_item = it->second;
 }
 
-/// <summary>
-/// choose valid source object for cut surface
-/// </summary>
-/// <param name="text_volume">Source model volume</param>
-/// <returns>triangle set OR nullptr</returns>
-const indexed_triangle_set *get_source_object(const ModelVolume* mv) { 
-    if (mv == nullptr) return nullptr;
-    if (!mv->text_configuration.has_value()) return nullptr;
-    const auto &volumes = mv->get_object()->volumes;
-    // no other volume in object
-    if (volumes.size() <= 1) return nullptr;
-
-    // Improve create object from part or use gl_volume
-    // Get first model part in object
-    for (const ModelVolume *v : volumes) { 
-        if (v->id() == mv->id()) continue;
-        if (!v->is_model_part()) continue;
-        const TriangleMesh &tm = v->mesh();
-        if (tm.empty()) continue;
-        return &tm.its;
-    }
-
-    // No valid source volume in objct volumes
-    return nullptr;
-}
-
-/// <summary>
-/// Choose valid source Volume to project on(cut surface from).
-/// </summary>
-/// <param name="text_volume">Volume with text</param>
-/// <returns>ModelVolume to project on</returns>
-const ModelVolume *get_source_volume(const ModelVolume *text_volume)
+const ModelVolume * GLGizmoEmboss::get_volume_to_cut_surface_from()
 {
-    if (text_volume == nullptr) return nullptr;
-    if (!text_volume->text_configuration.has_value()) return nullptr;
-    const auto &volumes = text_volume->get_object()->volumes;
+    if (m_volume == nullptr) return nullptr;
+    if (!m_volume->text_configuration.has_value()) return nullptr;
+    const auto &volumes = m_volume->get_object()->volumes;
     // no other volume in object
     if (volumes.size() <= 1) return nullptr;
 
     // Improve create object from part or use gl_volume
     // Get first model part in object
     for (const ModelVolume *v : volumes) {
-        if (v->id() == text_volume->id()) continue;
+        if (v->id() == m_volume->id()) continue;
         if (!v->is_model_part()) continue;
         const TriangleMesh &tm = v->mesh();
         if (tm.empty()) continue;
@@ -967,169 +967,36 @@ const ModelVolume *get_source_volume(const ModelVolume *text_volume)
     return nullptr;
 }
 
-double get_shape_scale(const FontProp &fp, const Emboss::FontFile &ff)
-{
-    const auto  &cn          = fp.collection_number;
-    unsigned int font_index  = (cn.has_value()) ? *cn : 0;
-    int          unit_per_em = ff.infos[font_index].unit_per_em;
-    double       scale       = fp.size_in_mm / unit_per_em;
-    // Shape is scaled for store point coordinate as integer
-    return scale * Emboss::SHAPE_SCALE;
-}
-
-/// <summary>
-/// Create cut_projection for cut surface
-/// </summary>
-/// <param name="tr">Volume transformation in object</param>
-/// <param name="tc">Configuration of embossig</param>
-/// <param name="ff">Font file for size --> unit per em</param>
-/// <param name="shape_bb">Bounding box 2d of shape to center result volume</param>
-/// <param name="z_range">Bounding box 3d of model volume for projection ranges</param>
-/// <returns>Orthogonal cut_projection</returns>
-std::unique_ptr<Emboss::IProject> create_projection_for_cut(
-    Transform3d              tr,
-    const TextConfiguration &tc,
-    const Emboss::FontFile  &ff,
-    const BoundingBox       &shape_bb,
-    const std::pair<float, float>& z_range)
-{
-    // create sure that emboss object is bigger than source object
-    const float safe_extension = 1.0f;
-    float min_z = z_range.first - safe_extension;
-    float max_z = z_range.second + safe_extension;
-    assert(min_z < max_z);
-    // range between min and max value
-    double projection_size = max_z - min_z; 
-    Matrix3d transformation_for_vector = tr.linear();
-    // Projection must be negative value.
-    // System of text coordinate
-    // X .. from left to right
-    // Y .. from bottom to top
-    // Z .. from text to eye
-    Vec3d untransformed_direction(0., 0., projection_size);
-    Vec3f project_direction =
-        (transformation_for_vector * untransformed_direction).cast<float>();
-
-    // Projection is in direction from far plane
-    tr.translate(Vec3d(0., 0., min_z));
-
-    tr.scale(get_shape_scale(tc.font_item.prop, ff));
-    // Text alignemnt to center 2D
-    Vec2d move = -(shape_bb.max + shape_bb.min).cast<double>() / 2.;
-    tr.translate(Vec3d(move.x(), move.y(), 0.));
-    return std::make_unique<Emboss::OrthoProject>(tr, project_direction);
-}
-
-#include "libslic3r/CutSurface.hpp"
-/// <summary>
-/// Create tranformation for emboss
-/// </summary>
-/// <param name="is_outside">True .. raise, False .. engrave</param>
-/// <param name="tc">Text configuration</param>
-/// <param name="tr">Text voliume transformation inside object</param>
-/// <param name="cut">Cutted surface from model</param>
-/// <returns>Projection</returns>
-static std::unique_ptr<Emboss::IProject> create_emboss_projection(
-    bool                     is_outside,
-    const TextConfiguration &tc,
-    Transform3d              tr,
-    SurfaceCut              &cut)
-{
-    // Offset of clossed side to model
-    const float surface_offset = 1e-3f; // [in mm]
-        
-    const FontProp &fp = tc.font_item.prop;
-    float front_move, back_move;
-    if (is_outside) {
-        front_move = fp.emboss;
-        back_move  = -surface_offset;
-    } else {
-        front_move = surface_offset;
-        back_move  = -fp.emboss;
-    }
-    Matrix3d rot_i = tr.linear().inverse();
-    its_transform(cut, rot_i);
-    
-    BoundingBoxf3 bb = Slic3r::bounding_box(cut);
-    float z_move   = -bb.max.z();
-    float x_center = (bb.max.x() + bb.min.x()) / 2;
-    float y_center = (bb.max.y() + bb.min.y()) / 2;
-    // move to front distance
-    Vec3f move(x_center, y_center, front_move + z_move);
-
-    its_translate(cut, move);
-
-    Vec3f from_front_to_back(0.f, 0.f, back_move - front_move);
-    return std::make_unique<Emboss::OrthoProject>(Transform3d::Identity() /*not used*/,
-                                                  from_front_to_back);
-}
-
 void GLGizmoEmboss::use_surface() {
-    // Model to cut surface from.
-    const ModelVolume *source = get_source_volume(m_volume);
-    if (source == nullptr) return;
-
     // font face with glyph cache
     auto ffc = m_font_manager.get_font().font_file_with_cache;
     if (!ffc.has_value()) return;
 
+    // Model to cut surface from.
+    const ModelVolume *mesh = get_volume_to_cut_surface_from();
+    if (mesh == nullptr) return;
+
+    // Cancel previous job
+    if (m_update_job_cancel != nullptr) m_update_job_cancel->store(true);
+    // create new shared ptr to cancel new job
+    m_update_job_cancel = std::make_shared<std::atomic<bool>>(false);
+    EmbossDataBase   base{ffc, create_configuration(), create_volume_name()};
+    EmbossDataUpdate data{std::move(base), m_volume->id(), m_update_job_cancel};
+
+    assert(m_volume->text_configuration.has_value());
+    if (!m_volume->text_configuration.has_value()) return;
     const TextConfiguration &tc = *m_volume->text_configuration;
-    const char *text = tc.text.c_str();
-    const FontProp& fp = tc.font_item.prop;
-    ExPolygons shapes = Emboss::text2shapes(ffc, text, fp);
-
-    if (shapes.empty()) return;
-    if (shapes.front().contour.empty()) return;
-
-    BoundingBox bb = get_extents(shapes);
-
     Transform3d text_tr = m_volume->get_matrix();
     if (tc.fix_3mf_tr.has_value())
-        text_tr = text_tr * tc.fix_3mf_tr->inverse();
-
-    Transform3d source_tr = source->get_matrix();
-    Transform3d source_tr_inv = source_tr.inverse();
-    Transform3d cut_projection_tr = source_tr_inv * text_tr;
-    //Transform3d cut_projection_tr = source_tr * text_tr.inverse();
-
-    BoundingBoxf3 source_bb = source->mesh().bounding_box();
-    BoundingBoxf3 source_bb_tr = source_bb.transformed(cut_projection_tr.inverse());
-    std::pair<float, float> z_range{source_bb_tr.min.z(), source_bb_tr.max.z()};
-
-    const Emboss::FontFile &ff = *ffc.font_file;
-    auto cut_projection = create_projection_for_cut(cut_projection_tr, tc, ff, bb, z_range);
-    if (cut_projection == nullptr) return;
-
-    SurfaceCuts cuts = cut_surface(source->mesh().its, shapes, *cut_projection);
-    if (cuts.empty()) return;
-
+         text_tr = text_tr * tc.fix_3mf_tr->inverse();
     bool is_outside = m_volume->is_model_part();
+    // check that there is not unexpected volume type
     assert(is_outside || m_volume->is_negative_volume() || m_volume->is_modifier());
-    
-    SurfaceCut cut = merge(std::move(cuts));
-    // !! Projection needs to transform cut
-    auto projection = create_emboss_projection(is_outside, tc, cut_projection_tr, cut);
-    if (projection == nullptr) return;
+    UseSurfaceData surface_data{std::move(data), text_tr, is_outside,
+                                mesh->mesh().its /*copy*/, mesh->get_matrix(), mesh->mesh().bounding_box()};
 
-    indexed_triangle_set new_its = cut2model(cut, *projection);    
-    its_write_obj(new_its, "C:/data/temp/projected.obj"); // only debug
-
-    TriangleMesh tm(std::move(new_its));
-    // center triangle mesh
-    Vec3d shift = tm.bounding_box().center();
-    // do not center in emboss direction
-    shift.z() = 0; 
-    tm.translate(-shift.cast<float>());
-
-    // discard fix transformation when exists
-    if (tc.fix_3mf_tr.has_value()) {        
-        m_volume->set_transformation(text_tr);
-        m_volume->text_configuration->fix_3mf_tr = {};
-    }
-
-    m_volume->set_mesh(std::move(tm));
-    m_volume->set_new_unique_id();
-    wxGetApp().plater()->canvas3D()->reload_scene(true);
+    auto &worker = wxGetApp().plater()->get_ui_job_worker();
+    queue_job(worker, std::make_unique<UseSurfaceJob>(std::move(surface_data)));
 }
 
 void GLGizmoEmboss::draw_window()
@@ -1907,6 +1774,25 @@ bool GLGizmoEmboss::rev_input(const std::string  &name,
     return revertible(name, value, default_value, exist_change, undo_tooltip, undo_offset, draw_offseted_input);
 }
 
+bool GLGizmoEmboss::rev_checkbox(const std::string &name,
+                                 bool              &value,
+                                 bool              *default_value,
+                                 const std::string &undo_tooltip)
+{
+    // draw offseted input
+    auto draw_offseted_input = [&]() -> bool {
+        float input_offset = m_gui_cfg->edit_input_offset;
+        ImGui::SameLine(input_offset);
+        return ImGui::Checkbox(("##" + name).c_str(), &value);
+    };
+    float undo_offset  = ImGui::GetStyle().FramePadding.x;
+    bool  exist_change = default_value != nullptr ?
+                             (value != *default_value) :
+                             false;
+    return revertible(name, value, default_value, exist_change, undo_tooltip,
+                      undo_offset, draw_offseted_input);
+}
+
 void GLGizmoEmboss::draw_style_edit() {
     const GuiCfg::Translations &tr = m_gui_cfg->translations;
 
@@ -2005,6 +1891,18 @@ void GLGizmoEmboss::draw_style_edit() {
     if (rev_input(tr.depth, font_prop.emboss, def_depth,
                   _u8L("Revert embossed depth."), 0.1f, 0.25, "%.2f mm")) 
         process();
+
+    bool *def_use_surface = m_stored_font_item.has_value() ?
+        &m_stored_font_item->prop.use_surface : nullptr;
+    if (rev_checkbox(tr.use_surface, font_prop.use_surface, def_use_surface,
+                     _u8L("Revert using of model surface."))) {
+        if (font_prop.use_surface) { 
+            font_prop.distance.reset();
+            if (font_prop.emboss < 0.1)
+                font_prop.emboss = 1;
+        }
+        process();
+    }
 
     if (ImGui::TreeNode(_u8L("advanced").c_str())) {
         if (!m_is_advanced_edit_style) {

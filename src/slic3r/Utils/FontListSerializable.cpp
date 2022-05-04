@@ -10,6 +10,7 @@ const std::string FontListSerializable::APP_CONFIG_FONT_NAME        = "name";
 const std::string FontListSerializable::APP_CONFIG_FONT_DESCRIPTOR  = "descriptor";
 const std::string FontListSerializable::APP_CONFIG_FONT_LINE_HEIGHT = "line_height";
 const std::string FontListSerializable::APP_CONFIG_FONT_DEPTH       = "depth";
+const std::string FontListSerializable::APP_CONFIG_FONT_USE_SURFACE = "use_surface";
 const std::string FontListSerializable::APP_CONFIG_FONT_BOLDNESS    = "boldness";
 const std::string FontListSerializable::APP_CONFIG_FONT_SKEW        = "skew";
 const std::string FontListSerializable::APP_CONFIG_FONT_DISTANCE    = "distance";
@@ -21,6 +22,15 @@ const std::string FontListSerializable::APP_CONFIG_FONT_LINE_GAP    = "line_gap"
 std::string FontListSerializable::create_section_name(unsigned index)
 {
     return AppConfig::SECTION_FONT + ':' + std::to_string(index);
+}
+
+// check only existence of flag
+bool FontListSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, bool& value){
+    auto item = section.find(key);
+    if (item == section.end()) return false;
+
+    value = true;
+    return true;
 }
 
 #include "fast_float/fast_float.h"
@@ -92,6 +102,7 @@ std::optional<FontItem> FontListSerializable::load_font_item(
     FontProp fp;
     read(app_cfg_section, APP_CONFIG_FONT_LINE_HEIGHT, fp.size_in_mm);
     read(app_cfg_section, APP_CONFIG_FONT_DEPTH, fp.emboss);
+    read(app_cfg_section, APP_CONFIG_FONT_USE_SURFACE, fp.use_surface);
     read(app_cfg_section, APP_CONFIG_FONT_BOLDNESS, fp.boldness);
     read(app_cfg_section, APP_CONFIG_FONT_SKEW, fp.skew);
     read(app_cfg_section, APP_CONFIG_FONT_DISTANCE, fp.distance);
@@ -115,6 +126,8 @@ void FontListSerializable::store_font_item(AppConfig &     cfg,
     const FontProp &fp = fi.prop;
     cfg.set(section_name, APP_CONFIG_FONT_LINE_HEIGHT, std::to_string(fp.size_in_mm));
     cfg.set(section_name, APP_CONFIG_FONT_DEPTH, std::to_string(fp.emboss));
+    if (fp.use_surface)
+        cfg.set(section_name, APP_CONFIG_FONT_USE_SURFACE, "true");
     if (fp.boldness.has_value())
         cfg.set(section_name, APP_CONFIG_FONT_BOLDNESS, std::to_string(*fp.boldness));
     if (fp.skew.has_value())

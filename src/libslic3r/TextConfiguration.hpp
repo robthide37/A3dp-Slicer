@@ -25,6 +25,12 @@ struct FontProp
     // Z depth of text 
     float emboss; // [in mm]
 
+    // Flag that text should use surface cutted from object
+    // FontProp::distance should without value
+    // FontProp::emboss should be positive number
+    // Note: default value is false
+    bool use_surface;
+
     // positive value mean wider character shape
     // negative value mean tiner character shape
     // When not set value is zero and is not stored
@@ -85,13 +91,14 @@ struct FontProp
     /// <param name="line_height">Y size of text [in mm]</param>
     /// <param name="depth">Z size of text [in mm]</param>
     FontProp(float line_height = 10.f, float depth = 2.f)
-        : emboss(depth), size_in_mm(line_height)
+        : emboss(depth), size_in_mm(line_height), use_surface(false)
     {}
 
     bool operator==(const FontProp& other) const {
         return 
             char_gap == other.char_gap && 
             line_gap == other.line_gap &&
+            use_surface == other.use_surface &&
             is_approx(emboss, other.emboss) &&
             is_approx(size_in_mm, other.size_in_mm) && 
             is_approx(boldness, other.boldness) &&

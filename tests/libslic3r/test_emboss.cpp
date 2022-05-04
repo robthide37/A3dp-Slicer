@@ -330,10 +330,9 @@ TEST_CASE("Cut surface", "[]")
     CHECK(!surfaces.empty());
 
     Emboss::OrthoProject projection(Transform3d::Identity(), Vec3f(0.f, 0.f, 10.f));
-    for (auto &surface : surfaces)
-        its_translate(surface, Vec3f(0.f, 0.f, 10));
+    its_translate(surfaces, Vec3f(0.f, 0.f, 10));
 
-    indexed_triangle_set its = cuts2model(surfaces, projection);
+    indexed_triangle_set its = cut2model(surfaces, projection);
     CHECK(!its.empty());
     //its_write_obj(its, "C:/data/temp/projected.obj");
 }
@@ -479,12 +478,12 @@ namespace Slic3r::MeshBoolean::cgal2 {
     /// <param name="face_shape_map_name">Name of property map to store conversion from face to contour</param>
     /// <param name="contour_indices">Identify point on shape contour</param>
     /// <returns>CGAL model of extruded shape</returns>
-    CGALMesh to_cgal(const ExPolygons                &shape,
-                     const Slic3r::Emboss::IProject &projection,
-                     int32_t                         shape_id,
-                     const std::string              &edge_shape_map_name,
-                     const std::string              &face_shape_map_name,
-                     std::vector<ShapesVertexId>      &contour_indices)
+    CGALMesh to_cgal(const ExPolygons                  &shape,
+                     const Slic3r::Emboss::IProjection &projection,
+                     int32_t                            shape_id,
+                     const std::string                 &edge_shape_map_name,
+                     const std::string                 &face_shape_map_name,
+                     std::vector<ShapesVertexId>       &contour_indices)
     {
         CGALMesh result;
         if (shape.empty()) return result;
@@ -500,7 +499,7 @@ namespace Slic3r::MeshBoolean::cgal2 {
             int32_t vertex_index = static_cast<int32_t>(contour_indices.size());
             contour_indices.push_back({iexpoly, id, int32_t(num_vertices_old) });
             for (const Point& p2 : polygon.points) {
-                auto p = projection.project(p2);
+                auto p = projection.create_front_back(p2);
                 auto vi = result.add_vertex(typename CGALMesh::Point{ p.first.x(), p.first.y(), p.first.z() });
                 assert((size_t)vi == indices.size() + num_vertices_old);
                 indices.emplace_back(vi);
@@ -565,7 +564,7 @@ namespace Slic3r::MeshBoolean::cgal2 {
 /// <returns>Cutted surface, Its do not represent Volume</returns>
 indexed_triangle_set cut_shape(const indexed_triangle_set &source,
                                const ExPolygon            &shape,
-                               const Emboss::IProject     &projection)
+                               const Emboss::IProjection  &projection)
 {
     // NOT implemented yet
     return {};
@@ -580,7 +579,7 @@ indexed_triangle_set cut_shape(const indexed_triangle_set &source,
 /// <returns>Cutted surface, Its do not represent Volume</returns>
 indexed_triangle_set cut_shape(const indexed_triangle_set &source,
                                const ExPolygons           &shapes,
-                               const Emboss::IProject     &projection)
+                               const Emboss::IProjection  &projection)
 {
     indexed_triangle_set result;
     for (const ExPolygon &shape : shapes)

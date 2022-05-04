@@ -21,6 +21,7 @@ class FontListSerializable
     static const std::string APP_CONFIG_FONT_DESCRIPTOR;
     static const std::string APP_CONFIG_FONT_LINE_HEIGHT;
     static const std::string APP_CONFIG_FONT_DEPTH;
+    static const std::string APP_CONFIG_FONT_USE_SURFACE;
     static const std::string APP_CONFIG_FONT_BOLDNESS;
     static const std::string APP_CONFIG_FONT_SKEW;
     static const std::string APP_CONFIG_FONT_DISTANCE;
@@ -37,10 +38,11 @@ public:
 
 private:
     // TODO: move to app config like read from section
+    static bool read(const std::map<std::string, std::string>& section, const std::string& key, bool& value);
     static bool read(const std::map<std::string, std::string>& section, const std::string& key, float& value);
     static bool read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<int>& value);
     static bool read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<unsigned int>& value);
-    static bool read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<float>& value);
+    static bool read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<float>& value);    
 };
 } // namespace Slic3r
 

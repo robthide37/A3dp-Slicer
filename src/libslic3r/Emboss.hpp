@@ -183,23 +183,12 @@ public:
     static std::string create_range_text(const std::string &text, const FontFile &font, unsigned int font_index, bool* exist_unknown = nullptr);    
 
     /// <summary>
-    /// Project 2d point into space
-    /// Could be plane, sphere, cylindric, ...
+    /// Project spatial point
     /// </summary>
-    class IProject
+    class IProject3f
     {
     public:
-        virtual ~IProject() = default;
-        /// <summary>
-        /// convert 2d point to 3d point
-        /// </summary>
-        /// <param name="p">2d coordinate</param>
-        /// <returns>
-        /// first - front spatial point
-        /// second - back spatial point
-        /// </returns>
-        virtual std::pair<Vec3f, Vec3f> project(const Point &p) const = 0;
-
+        virtual ~IProject3f() = default;
         /// <summary>
         /// Move point with respect to projection direction
         /// e.g. Orthogonal projection will move with point by direction
@@ -211,12 +200,32 @@ public:
     };
 
     /// <summary>
+    /// Project 2d point into space
+    /// Could be plane, sphere, cylindric, ...
+    /// </summary>
+    class IProjection : public IProject3f
+    {
+    public:
+        virtual ~IProjection() = default;
+
+        /// <summary>
+        /// convert 2d point to 3d points
+        /// </summary>
+        /// <param name="p">2d coordinate</param>
+        /// <returns>
+        /// first - front spatial point
+        /// second - back spatial point
+        /// </returns>
+        virtual std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const = 0;
+    };
+
+    /// <summary>
     /// Create triangle model for text
     /// </summary>
     /// <param name="shape2d">text or image</param>
     /// <param name="projection">Define transformation from 2d to 3d(orientation, position, scale, ...)</param>
     /// <returns>Projected shape into space</returns>
-    static indexed_triangle_set polygons2model(const ExPolygons &shape2d, const IProject& projection);
+    static indexed_triangle_set polygons2model(const ExPolygons &shape2d, const IProjection& projection);
         
     /// <summary>
     /// Create transformation for emboss text object to lay on surface point
@@ -228,29 +237,29 @@ public:
     static Transform3d create_transformation_onto_surface(
         const Vec3f &position, const Vec3f &normal, float up_limit = 0.9f);
 
-    class ProjectZ : public IProject
+    class ProjectZ : public IProjection
     {
     public:
         ProjectZ(float depth) : m_depth(depth) {}
         // Inherited via IProject
-        std::pair<Vec3f, Vec3f> project(const Point &p) const override;
+        std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const override;
         Vec3f project(const Vec3f &point) const override;
         float m_depth;
     };
 
-    class ProjectScale : public IProject
+    class ProjectScale : public IProjection
     {
-        std::unique_ptr<IProject> core;
+        std::unique_ptr<IProjection> core;
         float m_scale;
     public:
-        ProjectScale(std::unique_ptr<IProject> core, float scale)
+        ProjectScale(std::unique_ptr<IProjection> core, float scale)
             : core(std::move(core)), m_scale(scale)
         {}
 
         // Inherited via IProject
-        std::pair<Vec3f, Vec3f> project(const Point &p) const override
+        std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const override
         {
-            auto res = core->project(p);
+            auto res = core->create_front_back(p);
             return std::make_pair(res.first * m_scale, res.second * m_scale);
         }
         Vec3f project(const Vec3f &point) const override{
@@ -258,7 +267,16 @@ public:
         }
     };
 
-    class OrthoProject: public Emboss::IProject {
+    class OrthoProject3f : public Emboss::IProject3f
+    {
+        // size and direction of emboss for ortho projection
+        Vec3f m_direction;
+    public:
+        OrthoProject3f(Vec3f direction) : m_direction(direction) {}
+        Vec3f project(const Vec3f &point) const override{ return point + m_direction;}
+    };
+
+    class OrthoProject: public Emboss::IProjection {
         Transform3d m_matrix;
         // size and direction of emboss for ortho projection
         Vec3f       m_direction;
@@ -267,7 +285,7 @@ public:
             : m_matrix(matrix), m_direction(direction)
         {}
         // Inherited via IProject
-        std::pair<Vec3f, Vec3f> project(const Point &p) const override;
+        std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const override;
         Vec3f project(const Vec3f &point) const override;
     };
 };
