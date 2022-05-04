@@ -4,7 +4,6 @@
 namespace Slic3r {
 
 REGISTER_CLASS(ExPolygon, "ExPolygon");
-REGISTER_CLASS(ExPolygonCollection, "ExPolygon::Collection");
 REGISTER_CLASS(ExtrusionMultiPath, "ExtrusionMultiPath");
 REGISTER_CLASS(ExtrusionPath, "ExtrusionPath");
 REGISTER_CLASS(ExtrusionLoop, "ExtrusionLoop");
@@ -29,7 +28,6 @@ REGISTER_CLASS(ModelInstance, "Model::Instance");
 REGISTER_CLASS(BoundingBox, "Geometry::BoundingBox");
 REGISTER_CLASS(BoundingBoxf, "Geometry::BoundingBoxf");
 REGISTER_CLASS(BoundingBoxf3, "Geometry::BoundingBoxf3");
-REGISTER_CLASS(BridgeDetector, "BridgeDetector");
 REGISTER_CLASS(Point, "Point");
 __REGISTER_CLASS(Vec2d, "Pointf");
 __REGISTER_CLASS(Vec3d, "Pointf3");

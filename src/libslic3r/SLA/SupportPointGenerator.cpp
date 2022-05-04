@@ -1,17 +1,14 @@
-//#include "igl/random_points_on_mesh.h"
-//#include "igl/AABB.h"
-
 #include <tbb/parallel_for.h>
 
 #include "SupportPointGenerator.hpp"
 #include "Concurrency.hpp"
+#include "Geometry/ConvexHull.hpp"
 #include "Model.hpp"
 #include "ExPolygon.hpp"
 #include "SVG.hpp"
 #include "Point.hpp"
 #include "ClipperUtils.hpp"
 #include "Tesselate.hpp"
-#include "ExPolygonCollection.hpp"
 #include "MinAreaBoundingBox.hpp"
 #include "libslic3r.h"
 
@@ -550,7 +547,7 @@ void SupportPointGenerator::uniformly_cover(const ExPolygons& islands, Structure
 //    auto bb = get_extents(islands);
 
     if (flags & icfIsNew) {
-        auto chull = ExPolygonCollection{islands}.convex_hull();
+        auto chull = Geometry::convex_hull(islands);
         auto rotbox = MinAreaBoundigBox{chull, MinAreaBoundigBox::pcConvex};
         Vec2d bbdim = {unscaled(rotbox.width()), unscaled(rotbox.height())};
 

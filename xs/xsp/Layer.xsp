@@ -3,7 +3,6 @@
 %{
 #include <xsinit.h>
 #include "libslic3r/Layer.hpp"
-#include "libslic3r/ExPolygonCollection.hpp"
 %}
 
 %name{Slic3r::Layer::Region} class LayerRegion {
@@ -58,9 +57,6 @@
     size_t region_count();
     Ref<LayerRegion> get_region(int idx);
     Ref<LayerRegion> add_region(PrintRegion* print_region);
-
-    ExPolygonCollection* slices()
-        %code%{ RETVAL = new ExPolygonCollection(THIS->lslices); %};
 
     int ptr()
         %code%{ RETVAL = (int)(intptr_t)THIS; %};

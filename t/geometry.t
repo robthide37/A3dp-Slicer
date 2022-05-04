@@ -2,7 +2,7 @@ use Test::More;
 use strict;
 use warnings;
 
-plan tests => 26;
+plan tests => 11;
 
 BEGIN {
     use FindBin;
@@ -11,7 +11,7 @@ BEGIN {
 }
 
 use Slic3r;
-use Slic3r::Geometry qw(PI polygon_is_convex
+use Slic3r::Geometry qw(PI
     chained_path_from epsilon scale);
 
 {
@@ -24,18 +24,6 @@ use Slic3r::Geometry qw(PI polygon_is_convex
     my $point = Slic3r::Point->new(95706562, -57294774);
     ok $polygon->contains_point($point), 'contains_point';
 }
-
-#==========================================================
-
-my $line1 = [ [5, 15], [30, 15] ];
-my $line2 = [ [10, 20], [10, 10] ];
-is_deeply Slic3r::Geometry::line_intersection($line1, $line2, 1)->arrayref, [10, 15], 'line_intersection';
-
-#==========================================================
-
-$line1 = [ [73.6310778185108/0.0000001, 371.74239268924/0.0000001], [73.6310778185108/0.0000001, 501.74239268924/0.0000001] ];
-$line2 = [ [75/0.0000001, 437.9853/0.0000001], [62.7484/0.0000001, 440.4223/0.0000001] ];
-isnt Slic3r::Geometry::line_intersection($line1, $line2, 1), undef, 'line_intersection';
 
 #==========================================================
 
@@ -57,54 +45,6 @@ my $polygons = [
     ),
 ];
 
-#==========================================================
-
-{
-    my $p1 = [10, 10];
-    my $p2 = [10, 20];
-    my $p3 = [10, 30];
-    my $p4 = [20, 20];
-    my $p5 = [0,  20];
-    
-    is Slic3r::Geometry::angle3points($p2, $p3, $p1),  PI(),   'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p1, $p3),  PI(),   'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p3, $p4),  PI()/2*3, 'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p4, $p3),  PI()/2, 'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p1, $p4),  PI()/2, 'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p1, $p5),  PI()/2*3, 'angle3points';
-}
-
-{
-    my $p1 = [30, 30];
-    my $p2 = [20, 20];
-    my $p3 = [10, 10];
-    my $p4 = [30, 10];
-    
-    is Slic3r::Geometry::angle3points($p2, $p1, $p3), PI(),       'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p1, $p4), PI()/2*3,   'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p1, $p1), 2*PI(),     'angle3points';
-}
-
-#==========================================================
-
-{
-    my $cw_square = [ [0,0], [0,10], [10,10], [10,0] ];
-    is polygon_is_convex($cw_square), 0, 'cw square is not convex';
-    is polygon_is_convex([ reverse @$cw_square ]), 1, 'ccw square is convex';
-    
-    my $convex1 = [ [0,0], [10,0], [10,10], [0,10], [0,6], [4,6], [4,4], [0,4] ];
-    is polygon_is_convex($convex1), 0, 'concave polygon';
-}
-
-#==========================================================
-
-{
-    my $polyline = Slic3r::Polyline->new([0, 0], [10, 0], [20, 0]);
-    is_deeply [ map $_->pp, @{$polyline->lines} ], [
-        [ [0, 0], [10, 0] ],
-        [ [10, 0], [20, 0] ],
-    ], 'polyline_lines';
-}
 
 #==========================================================
 

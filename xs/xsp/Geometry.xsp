@@ -65,14 +65,6 @@ rad2deg(angle)
         RETVAL
 
 double
-rad2deg_dir(angle)
-    double      angle
-    CODE:
-        RETVAL = Slic3r::Geometry::rad2deg_dir(angle);
-    OUTPUT:
-        RETVAL
-
-double
 deg2rad(angle)
     double      angle
     CODE:

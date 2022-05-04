@@ -294,7 +294,7 @@ SCENARIO("Various Clipper operations - t/clipper.t", "[ClipperUtils]") {
     
         WHEN("clipping a line") {
             auto line = Polyline::new_scale({ { 152.742,288.086671142818 }, { 152.742,34.166466971035 } });    
-            Polylines intersection = intersection_pl({ line }, { circle_with_hole });
+            Polylines intersection = intersection_pl(line, Polygons{ circle_with_hole });
             THEN("clipped to two pieces") {
                 REQUIRE(intersection.front().length() == Approx((Vec2d(152742000, 215178843) - Vec2d(152742000, 288086661)).norm()));
                 REQUIRE(intersection[1].length() == Approx((Vec2d(152742000, 35166477) - Vec2d(152742000, 108087507)).norm()));

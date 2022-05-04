@@ -54,9 +54,6 @@
 %typemap{ExPolygon*};
 %typemap{Ref<ExPolygon>}{simple};
 %typemap{Clone<ExPolygon>}{simple};
-%typemap{ExPolygonCollection*};
-%typemap{Ref<ExPolygonCollection>}{simple};
-%typemap{Clone<ExPolygonCollection>}{simple};
 %typemap{Flow*};
 %typemap{Ref<Flow>}{simple};
 %typemap{Clone<Flow>}{simple};
@@ -87,9 +84,6 @@
 %typemap{TriangleMesh*};
 %typemap{Ref<TriangleMesh>}{simple};
 %typemap{Clone<TriangleMesh>}{simple};
-%typemap{BridgeDetector*};
-%typemap{Ref<BridgeDetector>}{simple};
-%typemap{Clone<BridgeDetector>}{simple};
 %typemap{SurfaceCollection*};
 %typemap{Ref<SurfaceCollection>}{simple};
 %typemap{Clone<SurfaceCollection>}{simple};

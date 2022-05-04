@@ -197,8 +197,7 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
 SCENARIO("Infill does not exceed perimeters", "[Fill]") 
 {
     auto test = [](const std::string_view pattern) {
-        DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
-        config.set_deserialize_strict({
+        DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config_with({
             { "nozzle_diameter",        "0.4, 0.4, 0.4, 0.4" },
             { "fill_pattern",           pattern },
             { "top_fill_pattern",       pattern },

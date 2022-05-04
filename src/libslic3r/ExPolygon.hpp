@@ -9,7 +9,7 @@
 namespace Slic3r {
 
 class ExPolygon;
-typedef std::vector<ExPolygon> ExPolygons;
+using ExPolygons = std::vector<ExPolygon>;
 
 class ExPolygon
 {

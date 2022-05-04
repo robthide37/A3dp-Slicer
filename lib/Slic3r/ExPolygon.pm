@@ -9,11 +9,4 @@ sub bounding_box {
     return $self->contour->bounding_box;
 }
 
-package Slic3r::ExPolygon::Collection;
-
-sub size {
-    my $self = shift;
-    return [ Slic3r::Geometry::size_2D([ map @$_, map @$_, @$self ]) ];
-}
-
 1;

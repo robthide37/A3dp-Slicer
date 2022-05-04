@@ -48,11 +48,6 @@ use overload
     '@{}' => sub { $_[0]->arrayref },
     'fallback' => 1;
 
-package Slic3r::ExPolygon::Collection;
-use overload
-    '@{}' => sub { $_[0]->arrayref },
-    'fallback' => 1;
-
 package Slic3r::ExtrusionPath::Collection;
 use overload
     '@{}' => sub { $_[0]->arrayref },
@@ -179,7 +174,6 @@ sub new {
 
 package main;
 for my $class (qw(
-        Slic3r::BridgeDetector
         Slic3r::Config
         Slic3r::Config::Full
         Slic3r::Config::GCode
@@ -188,7 +182,6 @@ for my $class (qw(
         Slic3r::Config::PrintRegion
         Slic3r::Config::Static
         Slic3r::ExPolygon
-        Slic3r::ExPolygon::Collection
         Slic3r::ExtrusionLoop
         Slic3r::ExtrusionMultiPath
         Slic3r::ExtrusionPath
