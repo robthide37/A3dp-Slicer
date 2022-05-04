@@ -287,7 +287,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 #else
             if (selection.is_single_volume() || selection.is_single_modifier()) {
 #endif // ENABLE_WORLD_COORDINATE
-                GLVolume* volume = const_cast<GLVolume*>(selection.get_volume(*selection.get_volume_idxs().begin()));
+                GLVolume* volume = const_cast<GLVolume*>(selection.get_first_volume());
                 volume->set_volume_mirror(axis, -volume->get_volume_mirror(axis));
             }
             else if (selection.is_single_full_instance()) {
@@ -351,7 +351,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 
 #if ENABLE_WORLD_COORDINATE
         if (selection.is_single_volume_or_modifier()) {
-                const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+            const GLVolume* volume = selection.get_first_volume();
             const double min_z = get_volume_min_z(*volume);
             if (!is_world_coordinates()) {
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
@@ -371,7 +371,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
             }
 #else
         if (selection.is_single_volume() || selection.is_single_modifier()) {
-            const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+            const GLVolume* volume = selection.get_first_volume();
             const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix(true).inverse() * (get_volume_min_z(*volume) * Vec3d::UnitZ());
 
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Drop to bed"));
@@ -384,7 +384,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 #if ENABLE_WORLD_COORDINATE
             const double min_z = selection.get_scaled_instance_bounding_box().min.z();
             if (!is_world_coordinates()) {
-                const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+                const GLVolume* volume = selection.get_first_volume();
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
                 const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix_no_offset().inverse() * (min_z * Vec3d::UnitZ());
 #else
@@ -432,7 +432,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 #else
         if (selection.is_single_volume() || selection.is_single_modifier())
 #endif // ENABLE_WORLD_COORDINATE
-            const_cast<GLVolume*>(selection.get_volume(*selection.get_volume_idxs().begin()))->set_volume_rotation(Vec3d::Zero());
+            const_cast<GLVolume*>(selection.get_first_volume())->set_volume_rotation(Vec3d::Zero());
         else if (selection.is_single_full_instance()) {
             for (unsigned int idx : selection.get_volume_idxs()) {
                 const_cast<GLVolume*>(selection.get_volume(idx))->set_instance_rotation(Vec3d::Zero());
@@ -611,7 +611,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
     ObjectList* obj_list = wxGetApp().obj_list();
     if (selection.is_single_full_instance()) {
         // all volumes in the selection belongs to the same instance, any of them contains the needed instance data, so we take the first one
-        const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume* volume = selection.get_first_volume();
 #if !ENABLE_WORLD_COORDINATE
         m_new_position = volume->get_instance_offset();
 #endif // !ENABLE_WORLD_COORDINATE
@@ -674,7 +674,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
     else if (selection.is_single_modifier() || selection.is_single_volume()) {
 #endif // ENABLE_WORLD_COORDINATE
         // the selection contains a single volume
-        const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume* volume = selection.get_first_volume();
 #if ENABLE_WORLD_COORDINATE
         if (is_world_coordinates()) {
             const Geometry::Transformation trafo(volume->world_matrix());
@@ -872,18 +872,18 @@ void ObjectManipulation::update_reset_buttons_visibility()
     if ((m_coordinates_type == ECoordinatesType::World && selection.is_single_full_instance()) ||
         (m_coordinates_type == ECoordinatesType::Instance && selection.is_single_volume_or_modifier())) {
         const double min_z = selection.is_single_full_instance() ? selection.get_scaled_instance_bounding_box().min.z() :
-            get_volume_min_z(*selection.get_volume(*selection.get_volume_idxs().begin()));
+            get_volume_min_z(*selection.get_first_volume());
 
         show_drop_to_bed = std::abs(min_z) > EPSILON;
     }
 
     if (m_coordinates_type == ECoordinatesType::Local && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
-        const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume* volume = selection.get_first_volume();
         Vec3d rotation = Vec3d::Zero();
         Vec3d scale = Vec3d::Ones();
 #else
     if (selection.is_single_full_instance() || selection.is_single_modifier() || selection.is_single_volume()) {
-        const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume* volume = selection.get_first_volume();
         Vec3d rotation;
         Vec3d scale;
         double min_z = 0.0;
@@ -947,7 +947,7 @@ void ObjectManipulation::update_mirror_buttons_visibility()
 #else
         if (selection.is_single_full_instance() || selection.is_single_modifier() || selection.is_single_volume()) {
 #endif // ENABLE_WORLD_COORDINATE
-            const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+            const GLVolume* volume = selection.get_first_volume();
             Vec3d mirror;
 
             if (selection.is_single_full_instance())
@@ -1141,7 +1141,7 @@ void ObjectManipulation::change_size_value(int axis, double value)
 #else
     if (selection.is_single_volume() || selection.is_single_modifier()) {
 #endif // ENABLE_WORLD_COORDINATE
-        const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume* v = selection.get_first_volume();
         const Vec3d local_size = size.cwiseQuotient(v->get_instance_scaling_factor());
         const Vec3d local_ref_size = v->bounding_box().size().cwiseProduct(v->get_volume_scaling_factor());
         const Vec3d local_change = local_size.cwiseQuotient(local_ref_size);
@@ -1156,7 +1156,7 @@ void ObjectManipulation::change_size_value(int axis, double value)
         ref_size = m_world_coordinates ?
 #endif // ENABLE_WORLD_COORDINATE
             selection.get_unscaled_instance_bounding_box().size() :
-            wxGetApp().model().objects[selection.get_volume(*selection.get_volume_idxs().begin())->object_idx()]->raw_mesh_bounding_box().size();
+            wxGetApp().model().objects[selection.get_first_volume()->object_idx()]->raw_mesh_bounding_box().size();
 
 #if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
     this->do_size(axis, size.cwiseQuotient(ref_size));
@@ -1196,10 +1196,10 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
 
     if (!uniform_scale && is_world_coordinates()) {
         if (selection.is_single_full_instance())
-            scaling_factor = (Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse() * scaling_factor).cwiseAbs();
+            scaling_factor = (Geometry::assemble_transform(Vec3d::Zero(), selection.get_first_volume()->get_instance_rotation()).inverse() * scaling_factor).cwiseAbs();
         else if (selection.is_single_volume_or_modifier()) {
-            const Transform3d mi = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse();
-            const Transform3d mv = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_rotation()).inverse();
+            const Transform3d mi = Geometry::assemble_transform(Vec3d::Zero(), selection.get_first_volume()->get_instance_rotation()).inverse();
+            const Transform3d mv = Geometry::assemble_transform(Vec3d::Zero(), selection.get_first_volume()->get_volume_rotation()).inverse();
             scaling_factor = (mv * mi * scaling_factor).cwiseAbs();
         }
     }
@@ -1236,10 +1236,10 @@ void ObjectManipulation::do_size(int axis, const Vec3d& scale) const
 
     if (!uniform_scale && is_world_coordinates()) {
         if (selection.is_single_full_instance())
-            scaling_factor = (Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse() * scaling_factor).cwiseAbs();
+            scaling_factor = (Geometry::assemble_transform(Vec3d::Zero(), selection.get_first_volume()->get_instance_rotation()).inverse() * scaling_factor).cwiseAbs();
         else if (selection.is_single_volume_or_modifier()) {
-            const Transform3d mi = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse();
-            const Transform3d mv = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_rotation()).inverse();
+            const Transform3d mi = Geometry::assemble_transform(Vec3d::Zero(), selection.get_first_volume()->get_instance_rotation()).inverse();
+            const Transform3d mv = Geometry::assemble_transform(Vec3d::Zero(), selection.get_first_volume()->get_volume_rotation()).inverse();
             scaling_factor = (mv * mi * scaling_factor).cwiseAbs();
         }
     }
@@ -1309,7 +1309,7 @@ void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
 #endif // ENABLE_WORLD_COORDINATE
         // Verify whether the instance rotation is multiples of 90 degrees, so that the scaling in world coordinates is possible.
         // all volumes in the selection belongs to the same instance, any of them contains the needed instance data, so we take the first one
-        const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume* volume = selection.get_first_volume();
         // Is the angle close to a multiple of 90 degrees?
         if (!Geometry::is_rotation_ninety_degrees(volume->get_instance_rotation())) {
             // Cannot apply scaling in the world coordinate system.

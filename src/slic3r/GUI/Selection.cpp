@@ -35,25 +35,25 @@ static const Slic3r::ColorRGBA TRANSPARENT_PLANE_COLOR = { 0.8f, 0.8f, 0.8f, 0.5
 namespace Slic3r {
 namespace GUI {
 
-    Selection::VolumeCache::TransformCache::TransformCache(const Geometry::Transformation& transform)
-        : position(transform.get_offset())
-        , rotation(transform.get_rotation())
-        , scaling_factor(transform.get_scaling_factor())
-        , mirror(transform.get_mirror())
-        , full_matrix(transform.get_matrix())
+Selection::VolumeCache::TransformCache::TransformCache(const Geometry::Transformation& transform)
+    : position(transform.get_offset())
+    , rotation(transform.get_rotation())
+    , scaling_factor(transform.get_scaling_factor())
+    , mirror(transform.get_mirror())
+    , full_matrix(transform.get_matrix())
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-        , transform(transform)
-        , rotation_matrix(transform.get_rotation_matrix())
-        , scale_matrix(transform.get_scaling_factor_matrix())
-        , mirror_matrix(transform.get_mirror_matrix())
+    , transform(transform)
+    , rotation_matrix(transform.get_rotation_matrix())
+    , scale_matrix(transform.get_scaling_factor_matrix())
+    , mirror_matrix(transform.get_mirror_matrix())
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-    {
+{
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES
-        rotation_matrix = Geometry::assemble_transform(Vec3d::Zero(), rotation);
-        scale_matrix = Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), scaling_factor);
-        mirror_matrix = Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), Vec3d::Ones(), mirror);
+    rotation_matrix = Geometry::assemble_transform(Vec3d::Zero(), rotation);
+    scale_matrix = Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), scaling_factor);
+    mirror_matrix = Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), Vec3d::Ones(), mirror);
 #endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
-    }
+}
 
 Selection::VolumeCache::VolumeCache(const Geometry::Transformation& volume_transform, const Geometry::Transformation& instance_transform)
     : m_volume(volume_transform)
@@ -612,14 +612,14 @@ bool Selection::requires_uniform_scale() const
     ECoordinatesType coord_type = wxGetApp().obj_manipul()->get_coordinates_type();
     if (is_single_volume_or_modifier()) {
         if (coord_type == ECoordinatesType::World) {
-            if (!Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation())) {
+            if (!Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_first_volume()->world_matrix()).get_rotation())) {
                 if (reason != nullptr)
                     *reason = EUniformScaleRequiredReason::VolumeNotAxisAligned_World;
                 return true;
             }
         }
         else if (coord_type == ECoordinatesType::Instance) {
-            if (!Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_volume_rotation())) {
+            if (!Geometry::is_rotation_ninety_degrees(get_first_volume()->get_volume_rotation())) {
                 if (reason != nullptr)
                     *reason = EUniformScaleRequiredReason::VolumeNotAxisAligned_Instance;
                 return true;
@@ -629,7 +629,7 @@ bool Selection::requires_uniform_scale() const
     }
     else if (is_single_full_instance()) {
         if (coord_type == ECoordinatesType::World) {
-            if (!Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation())) {
+            if (!Geometry::is_rotation_ninety_degrees(get_first_volume()->get_instance_rotation())) {
                 if (reason != nullptr)
                     *reason = EUniformScaleRequiredReason::InstanceNotAxisAligned_World;
                 return true;
@@ -1478,7 +1478,7 @@ int Selection::bake_transform_if_needed() const
         (is_single_volume_or_modifier() && !wxGetApp().obj_manipul()->is_local_coordinates())) {
         // Verify whether the instance rotation is multiples of 90 degrees, so that the scaling in world coordinates is possible.
         // all volumes in the selection belongs to the same instance, any of them contains the needed instance data, so we take the first one
-        const GLVolume& volume = *get_volume(*get_volume_idxs().begin());
+        const GLVolume& volume = *get_first_volume();
         bool needs_baking = false;
         if (is_single_full_instance()) {
             // Is the instance angle close to a multiple of 90 degrees?
@@ -1646,13 +1646,14 @@ void Selection::render(float scale_factor)
         trafo = Transform3d::Identity();
     }
     else if (coordinates_type == ECoordinatesType::Local && is_single_volume_or_modifier()) {
-        const GLVolume& v = *get_volume(*get_volume_idxs().begin());
+        const GLVolume& v = *get_first_volume();
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-        box = v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_scaling_factor_matrix());
-        trafo = v.get_instance_transformation().get_matrix() * v.get_volume_transformation().get_matrix_no_scaling_factor();
+        const Geometry::Transformation inst_trafo = get_first_volume()->get_instance_transformation();
+        box = box.transformed(inst_trafo.get_scaling_factor_matrix());
+        trafo = inst_trafo.get_matrix_no_scaling_factor();
 #else
-        box = v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true));
-        trafo = v.get_instance_transformation().get_matrix(false, false, true, false) * v.get_volume_transformation().get_matrix(false, false, true, false);
+        box = box.transformed(get_first_volume()->get_instance_transformation().get_matrix(true, true, false, true));
+        trafo = get_first_volume()->get_instance_transformation().get_matrix(false, false, true, false);
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
     else {

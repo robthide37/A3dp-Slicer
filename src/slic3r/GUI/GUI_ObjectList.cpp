@@ -1530,7 +1530,7 @@ void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& mo
     const BoundingBoxf3 instance_bb = model_object.instance_bounding_box(instance_idx);
 
     // First (any) GLVolume of the selected instance. They all share the same instance matrix.
-    const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* v = selection.get_first_volume();
     const Geometry::Transformation inst_transform = v->get_instance_transformation();
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
     const Transform3d inv_inst_transform = inst_transform.get_matrix_no_offset().inverse();
@@ -1654,7 +1654,7 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
     ModelVolume *new_volume = model_object.add_volume(std::move(mesh), type);
 
     // First (any) GLVolume of the selected instance. They all share the same instance matrix.
-    const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* v = selection.get_first_volume();
     // Transform the new modifier to be aligned with the print bed.
 	const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
     new_volume->set_transformation(Geometry::Transformation::volume_to_bed_transformation(v->get_instance_transformation(), mesh_bb));
@@ -3282,7 +3282,7 @@ void ObjectList::update_selections()
 #else
         else if (selection.is_single_volume() || selection.is_any_modifier()) {
 #endif // ENABLE_WORLD_COORDINATE
-            const auto gl_vol = selection.get_volume(*selection.get_volume_idxs().begin());
+            const auto gl_vol = selection.get_first_volume();
             if (m_objects_model->GetVolumeIdByItem(m_objects_model->GetParent(item)) == gl_vol->volume_idx())
                 return;
         }

@@ -301,7 +301,7 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
         m_center = m_bounding_box.center();
     }
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume& v = *selection.get_first_volume();
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
         m_bounding_box = v.transformed_convex_hull_bounding_box(
             v.get_instance_transformation().get_scaling_factor_matrix() * v.get_volume_transformation().get_scaling_factor_matrix());
@@ -318,11 +318,12 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
             m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
         }
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-        m_bounding_box = m_bounding_box.transformed(selection.get_volume(*ids.begin())->get_instance_transformation().get_scaling_factor_matrix());
-        m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix_no_scaling_factor() * m_bounding_box.center();
+        const Geometry::Transformation inst_trafo = selection.get_first_volume()->get_instance_transformation();
+        m_bounding_box = m_bounding_box.transformed(inst_trafo.get_scaling_factor_matrix());
+        m_center = inst_trafo.get_matrix_no_scaling_factor() * m_bounding_box.center();
 #else
-        m_bounding_box = m_bounding_box.transformed(selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(true, true, false, true));
-        m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(false, false, true, false) * m_bounding_box.center();
+        m_bounding_box = m_bounding_box.transformed(selection.get_first_volume()->get_instance_transformation().get_matrix(true, true, false, true));
+        m_center = selection.get_first_volume()->get_instance_transformation().get_matrix(false, false, true, false) * m_bounding_box.center();
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
 
@@ -339,7 +340,7 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 #else
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume& v = *selection.get_first_volume();
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
         m_orient_matrix = v.get_instance_transformation().get_rotation_matrix() * v.get_volume_transformation().get_rotation_matrix();
 #else
@@ -347,7 +348,7 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
     else {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume& v = *selection.get_first_volume();
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
         m_orient_matrix = v.get_instance_transformation().get_rotation_matrix();
 #else
@@ -789,7 +790,7 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
     return Geometry::assemble_transform(m_center) * m_orient_matrix * ret;
 #else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
-        ret = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true) * ret;
+        ret = selection.get_first_volume()->get_instance_transformation().get_matrix(true, false, true, true) * ret;
 
     return Geometry::assemble_transform(m_center) * ret;
 #endif // ENABLE_WORLD_COORDINATE
@@ -803,7 +804,7 @@ void GLGizmoRotate::transform_to_local(const Selection& selection) const
     glsafe(::glMultMatrixd(m_orient_matrix.data()));
 #else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes()) {
-        const Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+        const Transform3d orient_matrix = selection.get_first_volume()->get_instance_transformation().get_matrix(true, false, true, true);
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
 #endif // ENABLE_WORLD_COORDINATE
@@ -864,7 +865,7 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
     m = m * m_orient_matrix.inverse();
 #else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
-        m = m * selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true).inverse();
+        m = m * selection.get_first_volume()->get_instance_transformation().get_matrix(true, false, true, true).inverse();
 #endif // ENABLE_WORLD_COORDINATE
 
     m.translate(-m_center);
