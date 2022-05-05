@@ -3131,10 +3131,14 @@ void Selection::synchronize_unselected_volumes()
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 
         const int volume_idx = volume->volume_idx();
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        const Geometry::Transformation& trafo = volume->get_volume_transformation();
+#else
         const Vec3d& offset = volume->get_volume_offset();
         const Vec3d& rotation = volume->get_volume_rotation();
         const Vec3d& scaling_factor = volume->get_volume_scaling_factor();
         const Vec3d& mirror = volume->get_volume_mirror();
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
         // Process unselected volumes.
         for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
@@ -3145,10 +3149,14 @@ void Selection::synchronize_unselected_volumes()
             if (v->object_idx() != object_idx || v->volume_idx() != volume_idx)
                 continue;
 
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            v->set_volume_transformation(trafo);
+#else
             v->set_volume_offset(offset);
             v->set_volume_rotation(rotation);
             v->set_volume_scaling_factor(scaling_factor);
             v->set_volume_mirror(mirror);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
         }
     }
 }
