@@ -9,6 +9,7 @@
 #include "Notebook.hpp"
 #include "ButtonsDescription.hpp"
 #include "OG_CustomCtrl.hpp"
+#include "GLCanvas3D.hpp"
 
 namespace Slic3r {
 
@@ -54,6 +55,14 @@ PreferencesDialog::PreferencesDialog(wxWindow* parent) :
 	m_highlighter.set_timer_owner(this, 0);
 }
 
+static void update_color(wxColourPickerCtrl* color_pckr, const wxColour& color) 
+{
+	if (color_pckr->GetColour() != color) {
+		color_pckr->SetColour(color);
+		wxPostEvent(color_pckr, wxCommandEvent(wxEVT_COLOURPICKER_CHANGED));
+	}
+}
+
 void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::string()*/, const std::string& tab_name/*= std::string()*/)
 {
 	int selected_tab = 0;
@@ -65,6 +74,14 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 
 	if (!highlight_opt_key.empty())
 		init_highlighter(highlight_opt_key);
+
+	// cache input values for custom toolbar size
+	m_custom_toolbar_size		= atoi(get_app_config()->get("custom_toolbar_size").c_str());
+	m_use_custom_toolbar_size	= get_app_config()->get("use_custom_toolbar_size") == "1";
+
+	// update colors for color pickers
+	update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
+	update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
 
 	this->ShowModal();
 }
@@ -378,6 +395,10 @@ void PreferencesDialog::build()
 		if (opt_key == "use_custom_toolbar_size") {
 			m_icon_size_sizer->ShowItems(boost::any_cast<bool>(value));
 			refresh_og(m_optgroup_gui);
+			get_app_config()->set("use_custom_toolbar_size", boost::any_cast<bool>(value) ? "1" : "0");
+			get_app_config()->save();
+			wxGetApp().plater()->get_current_canvas3D()->render();
+			return;
 		}
 		if (opt_key == "tabs_as_menu") {
 			bool disable_new_layout = boost::any_cast<bool>(value);
@@ -648,12 +669,30 @@ void PreferencesDialog::accept(wxEvent&)
 #endif // _WIN32
 	
 	wxGetApp().update_ui_from_settings();
-	m_values.clear();
+	clear_cache();
 }
 
 void PreferencesDialog::revert(wxEvent&)
 {
 	auto app_config = get_app_config();
+
+	bool save_app_config = false;
+	if (m_custom_toolbar_size != atoi(app_config->get("custom_toolbar_size").c_str())) {
+		app_config->set("custom_toolbar_size", (boost::format("%d") % m_custom_toolbar_size).str());
+		m_icon_size_slider->SetValue(m_custom_toolbar_size);
+		save_app_config |= true;
+	}
+	if (m_use_custom_toolbar_size != (get_app_config()->get("use_custom_toolbar_size") == "1")) {
+		app_config->set("use_custom_toolbar_size", m_use_custom_toolbar_size ? "1" : "0");
+		save_app_config |= true;
+
+		m_optgroup_gui->set_value("use_custom_toolbar_size", m_use_custom_toolbar_size);
+		m_icon_size_sizer->ShowItems(m_use_custom_toolbar_size);
+		refresh_og(m_optgroup_gui);
+	}
+	if (save_app_config)
+		app_config->save();
+
 
 	for (auto value : m_values) {
 		bool reverted = false;
@@ -669,10 +708,6 @@ void PreferencesDialog::revert(wxEvent&)
 		}
 		if (key == "notify_release") {
 			m_optgroup_gui->set_value(key, s_keys_map_NotifyReleaseMode.at(app_config->get(key)));
-			continue;
-		}
-		if (key == "custom_toolbar_size") {
-			m_icon_size_slider->SetValue(atoi(app_config->get("custom_toolbar_size").c_str()));
 			continue;
 		}
 		if (key == "old_settings_layout_mode") {
@@ -706,24 +741,9 @@ void PreferencesDialog::revert(wxEvent&)
 			refresh_og(m_optgroup_gui);
 			continue;
 		}
-
-		if (key == "use_custom_toolbar_size") {
-			m_icon_size_sizer->ShowItems(app_config->get(key) == "1");
-			refresh_og(m_optgroup_gui);
-		}
 	}
 
-	m_values.clear();
-
-	auto revert_colors = [](wxColourPickerCtrl* color_pckr, const wxColour& color) {
-		if (color_pckr->GetColour() != color) {
-			color_pckr->SetColour(color);
-			wxPostEvent(color_pckr, wxCommandEvent(wxEVT_COLOURPICKER_CHANGED));
-		}
-	};
-	revert_colors(m_sys_colour, wxGetApp().get_label_clr_sys());
-	revert_colors(m_mod_colour, wxGetApp().get_label_clr_modified());
-
+	clear_cache();
 	EndModal(wxID_CANCEL);
 }
 
@@ -758,6 +778,12 @@ void PreferencesDialog::layout()
     Fit();
 
     Refresh();
+}
+
+void PreferencesDialog::clear_cache()
+{
+	m_values.clear();
+	m_custom_toolbar_size = -1;
 }
 
 void PreferencesDialog::refresh_og(std::shared_ptr<ConfigOptionsGroup> og)
@@ -808,9 +834,12 @@ void PreferencesDialog::create_icon_size_slider()
         m_icon_size_sizer->Add(val_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, em);
     }
 
-    m_icon_size_slider->Bind(wxEVT_SLIDER, ([this, val_label](wxCommandEvent e) {
+    m_icon_size_slider->Bind(wxEVT_SLIDER, ([this, val_label, app_config](wxCommandEvent e) {
         auto val = m_icon_size_slider->GetValue();
-        m_values["custom_toolbar_size"] = (boost::format("%d") % val).str();
+
+		app_config->set("custom_toolbar_size", (boost::format("%d") % val).str());
+		app_config->save();
+		wxGetApp().plater()->get_current_canvas3D()->render();
 
         if (val_label)
             val_label->SetLabelText(wxString::Format("%d", val));

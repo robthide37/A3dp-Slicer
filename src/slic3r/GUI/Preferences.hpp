@@ -55,6 +55,9 @@ class PreferencesDialog : public DPIDialog
 	bool								m_seq_top_layer_only_changed{ false };
 	bool								m_recreate_GUI{false};
 
+	int									m_custom_toolbar_size{-1};
+	bool								m_use_custom_toolbar_size{false};
+
 public:
 	explicit PreferencesDialog(wxWindow* paren);
 	~PreferencesDialog() = default;
@@ -73,6 +76,7 @@ protected:
 	void on_dpi_changed(const wxRect& suggested_rect) override { msw_rescale(); }
 	void on_sys_color_changed() override;
     void layout();
+	void clear_cache();
 	void refresh_og(std::shared_ptr<ConfigOptionsGroup> og);
     void create_icon_size_slider();
     void create_settings_mode_widget();
