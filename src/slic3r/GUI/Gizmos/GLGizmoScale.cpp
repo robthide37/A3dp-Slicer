@@ -75,14 +75,36 @@ bool GLGizmoScale3D::on_mouse(const wxMouseEvent &mouse_event)
 {
     if (mouse_event.Dragging()) {
         if (m_dragging) {
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            int res = 1;
+            if (m_scale.x() != m_scale.y() || m_scale.x() != m_scale.z())
+                res = m_parent.get_selection().bake_transform_if_needed();
+
+            if (res != 1) {
+                do_stop_dragging(true);
+                return true;
+            }
+            else {
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
             // Apply new temporary scale factors
             TransformationType transformation_type(TransformationType::Local_Absolute_Joint);
             if (mouse_event.AltDown()) transformation_type.set_independent();
 
-            Selection &selection = m_parent.get_selection();
-            selection.scale(get_scale(), transformation_type);
-            if (mouse_event.CmdDown()) selection.translate(m_offset, ECoordinatesType::Local);
-        }
+                Selection &selection = m_parent.get_selection();
+                selection.scale(m_scale, transformation_type);
+#if ENABLE_WORLD_COORDINATE
+                if (mouse_event.CmdDown()) selection.translate(m_offset, wxGetApp().obj_manipul()->get_coordinates_type());
+#else
+                if (mouse_event.CmdDown()) selection.translate(m_offset, true);
+#endif // ENABLE_WORLD_COORDINATE
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            }
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
+    }
     }
     return use_grabbers(mouse_event);
 }

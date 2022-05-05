@@ -1289,6 +1289,7 @@ void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
     const Selection &selection = wxGetApp().plater()->canvas3D()->get_selection();
 #if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
     if (!use_uniform_scale) {
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
         int res = selection.bake_transform_if_needed();
         if (res == -1) {
             // Enforce uniform scaling.
@@ -1296,6 +1297,7 @@ void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
             return;
         }
         else if (res == 0)
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
             // Recalculate cached values at this panel, refresh the screen.
             this->UpdateAndShow(true);
     }
