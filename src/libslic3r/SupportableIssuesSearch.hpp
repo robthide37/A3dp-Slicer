@@ -22,7 +22,8 @@ struct Params {
     float max_acceleration = 1000.0f; // mm/s^2 ; max acceleration of object (bed) in XY
     float filament_density = 1.25f * 0.001f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
 
-    float tolerable_extruder_conflict_force = 50.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... ); current value corresponds to weight of 200g
+    float tolerable_extruder_conflict_force = 50.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... ); current value corresponds to weight of 50g
+    float max_curled_conflict_extruder_force = 200.0f * gravity_constant; // for areas with possible high layered curled filaments, max force to account fo ; current value corresponds to weight of 200g
 
 };
 

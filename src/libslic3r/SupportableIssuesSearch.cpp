@@ -51,23 +51,37 @@ struct Cell {
     int island_id = std::numeric_limits<int>::max();
 };
 
-struct CentroidAccumulator {
+class CentroidAccumulator {
+private:
     Polygon convex_hull { };
     Points points { };
+public:
     Vec3f accumulated_value = Vec3f::Zero();
     float accumulated_volume { };
     float base_area { };
     float additional_supports_adhesion { };
-    const float base_height { };
+    float base_height { };
 
     explicit CentroidAccumulator(float base_height) :
             base_height(base_height) {
     }
 
-    void calculate_base_hull() {
-        convex_hull = Geometry::convex_hull(points);
-        assert(convex_hull.is_counter_clockwise());
+    const Polygon& base_hull(){
+        if (this->convex_hull.empty()) {
+            this->convex_hull = Geometry::convex_hull(this->points);
+        }
+        return this->convex_hull;
     }
+
+    void add_base_points(const Points& other) {
+        this->points.insert(this->points.end(), other.begin(), other.end());
+        convex_hull.clear();
+    }
+
+    const Points& get_base_points(){
+        return this->points;
+    }
+
 };
 
 struct CentroidAccumulators {
@@ -96,10 +110,11 @@ struct CentroidAccumulators {
         }
         to_acc.accumulated_value += from_acc.accumulated_value;
         to_acc.accumulated_volume += from_acc.accumulated_volume;
-        to_acc.points.insert(to_acc.points.end(), from_acc.points.begin(), from_acc.points.end());
-        to_acc.calculate_base_hull();
+        to_acc.add_base_points(from_acc.get_base_points());
         to_acc.base_area += from_acc.base_area;
         mapping[from_id] = mapping[to_id];
+        from_acc = CentroidAccumulator{0.0f};
+
     }
 };
 
@@ -263,7 +278,7 @@ struct BalanceDistributionGrid {
                         cell.island_id = next_island_id;
                         Vec3crd cell_center = this->get_cell_center(
                                 Vec3i(current_coords.x(), current_coords.y(), local_z_index_offset));
-                        acc.points.push_back(Point(cell_center.head<2>()));
+                        acc.add_base_points({Point(cell_center.head<2>())});
                         acc.accumulated_value += unscale(cell_center).cast<float>() * cell.volume;
                         acc.accumulated_volume += cell.volume;
 
@@ -277,8 +292,7 @@ struct BalanceDistributionGrid {
                         }
                     }
                     next_island_id--;
-                    acc.calculate_base_hull();
-                    acc.base_area = unscale<float>(unscale<float>(acc.convex_hull.area())); //apply unscale 2x, it has units of area
+                    acc.base_area = unscale<float>(unscale<float>(acc.base_hull().area())); //apply unscale 2x, it has units of area
                 }
             }
         }
@@ -293,8 +307,7 @@ struct BalanceDistributionGrid {
             this->access_cell(local_coords).island_id = index;
             CentroidAccumulator &acc = accumulators.create_accumulator(index,
                     issues.supports_nedded[index].position.z());
-            acc.points.push_back(Point(scaled(Vec2f(issues.supports_nedded[index].position.head<2>()))));
-            acc.calculate_base_hull();
+            acc.add_base_points({Point(scaled(Vec2f(issues.supports_nedded[index].position.head<2>())))});
             acc.base_area = params.support_points_interface_area;
         }
 
@@ -329,8 +342,9 @@ struct BalanceDistributionGrid {
                         if (!curled) {
                             current.curled_height /= 4.0f;
                         }
-                    }
 
+                        std::cout << "Curling: " << current.curled_height << std::endl;
+                    }
                     // distribute islands info
                     if (current.volume > 0 && current.island_id == std::numeric_limits<int>::max()) {
                         int min_island_id_found = std::numeric_limits<int>::max();
@@ -354,7 +368,6 @@ struct BalanceDistributionGrid {
                             for (auto id : ids_to_merge) {
                                 accumulators.merge_to(id, min_island_id_found);
                             }
-
                             CentroidAccumulator &acc = accumulators.access(min_island_id_found);
                             acc.accumulated_value += current.volume
                                     * unscale(this->get_cell_center(this->to_global_cell_coords(Vec3i(x, y, z)))).cast<
@@ -385,12 +398,12 @@ struct BalanceDistributionGrid {
                 Point pivot;
                 double distance_scaled_sq = std::numeric_limits<double>::max();
                 bool inside = true;
-                if (acc.convex_hull.points.size() == 1) {
-                    pivot = acc.convex_hull.points[0];
+                if (acc.base_hull().points.size() == 1) {
+                    pivot = acc.base_hull().points[0];
                     distance_scaled_sq = (pivot - centroid_base_projection).squaredNorm();
                     inside = true;
                 } else {
-                    for (Line line : acc.convex_hull.lines()) {
+                    for (Line line : acc.base_hull().lines()) {
                         Point closest_point;
                         double dist_sq = line.distance_to_squared(centroid_base_projection, &closest_point);
                         if (dist_sq < distance_scaled_sq) {
@@ -408,7 +421,7 @@ struct BalanceDistributionGrid {
                 pivot_3d << unscale(pivot).cast<float>(), acc.base_height;
                 float embedded_distance = unscaled(sqrt(distance_scaled_sq));
                 float centroid_pivot_distance = (centroid - pivot_3d).norm();
-                float base_center_pivot_distance = float(unscale(Vec2crd(acc.convex_hull.centroid() - pivot)).norm());
+                float base_center_pivot_distance = float(unscale(Vec2crd(acc.base_hull().centroid() - pivot)).norm());
 
                 std::cout << "centroid inside ? " << inside << "  and embedded distance is: " << embedded_distance
                         << std::endl;
@@ -488,9 +501,8 @@ struct BalanceDistributionGrid {
                     std::cout << " expected_force:  " << expected_force << std::endl;
 
                     issues.supports_nedded.emplace_back(support_point, expected_force);
-                    acc.points.push_back(Point::new_scale(Vec2f(support_point.head<2>())));
+                    acc.add_base_points({Point::new_scale(Vec2f(support_point.head<2>()))});
                     acc.base_area += params.support_points_interface_area;
-                    acc.calculate_base_hull();
                 }
 
             }
@@ -766,7 +778,7 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
             // Estimation of short curvy segments which are not supported -> problems with curling
             if (dist_from_prev_layer > -max_allowed_dist_from_prev_layer * 0.7071) { //extrusion point is unsupported or poorly supported
                 issues.curling_up.push_back(
-                        CurledFilament(fpoint, 2.0f * region_height + region_height * 6.0f * std::abs(angle) / PI));
+                        CurledFilament(fpoint, 0.2f * region_height + region_height * 0.6f * std::abs(angle) / PI));
             }
 
             prev_point = point;
