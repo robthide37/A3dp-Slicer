@@ -365,7 +365,7 @@ std::string get_custom_var_option(int preset_type) {
             : current_script->tab()->m_preset_bundle->sla_materials.get_edited_preset().config.opt_string("filament_custom_variables", (unsigned int)(0));
     } else return current_script->tab()->m_preset_bundle->printers.get_edited_preset().config.opt_string("printer_custom_variables");
 }
-std::string getCustomValue(std::string custom_var_field, const std::string& opt_key) {
+std::string get_custom_value(std::string custom_var_field, const std::string& opt_key) {
     if (custom_var_field.find(opt_key) != std::string::npos) {
         boost::erase_all(custom_var_field, "\r");
         std::vector<std::string> lines;
@@ -410,14 +410,19 @@ void set_custom_value(std::string& custom_var_field, const std::string& opt_key,
     //iterate onlines,until you find the good one
     std::vector<std::string> lines;
     boost::algorithm::split(lines, custom_var_field, boost::is_any_of("\n"));
-    for (std::string& line : lines) {
-        size_t equal_pos = line.find_first_of('=');
+    for (auto line = lines.begin(); line != lines.end(); ++line) {
+        size_t equal_pos = line->find_first_of('=');
         if (equal_pos != std::string::npos) {
-            std::string name = line.substr(0, equal_pos);
-            std::string value = line.substr(equal_pos + 1);
+            std::string name = line->substr(0, equal_pos);
+            std::string value = line->substr(equal_pos + 1);
             boost::algorithm::trim(name);
             if (name == opt_key) {
-                line = name + " = " + new_value;
+                if (new_value == "") {
+                    //delete
+                    lines.erase(line);
+                } else {
+                    *line = name + " = " + new_value;
+                }
                 found = true;
                 break;
             }
@@ -435,7 +440,7 @@ void set_custom_value(std::string& custom_var_field, const std::string& opt_key,
 }
 bool as_get_custom_bool(int preset, std::string& key, bool& result)
 {
-    std::string serialized_value = getCustomValue(get_custom_var_option(preset), key);
+    std::string serialized_value = get_custom_value(get_custom_var_option(preset), key);
     if (serialized_value.empty())
         return false;
 
@@ -457,7 +462,7 @@ void as_set_custom_bool(int preset, std::string& key, bool b)
 }
 bool as_get_custom_int(int preset, std::string& key, int32_t& result)
 {
-    std::string serialized_value = getCustomValue(get_custom_var_option(preset), key);
+    std::string serialized_value = get_custom_value(get_custom_var_option(preset), key);
     if (serialized_value.empty())
         return false;
 
@@ -478,7 +483,7 @@ void as_set_custom_int(int preset, std::string& key, int32_t val)
 }
 bool as_get_custom_float(int preset, std::string& key, float& result)
 {
-    std::string serialized_value = getCustomValue(get_custom_var_option(preset), key);
+    std::string serialized_value = get_custom_value(get_custom_var_option(preset), key);
     if (serialized_value.empty())
         return false;
 
@@ -499,7 +504,7 @@ void as_set_custom_float(int preset, std::string& key, float f)
 }
 bool as_get_custom_string(int preset, std::string& key, std::string& result)
 {
-    std::string serialized_value = getCustomValue(get_custom_var_option(preset), key);
+    std::string serialized_value = get_custom_value(get_custom_var_option(preset), key);
     if (serialized_value.empty())
         return false;
 
@@ -585,6 +590,23 @@ void as_ask_for_refresh()
 void as_back_initial_value(std::string& key) {
     current_script->add_to_reset(key);
 }
+void as_back_custom_initial_value(int preset_type, std::string& key) {
+    if (!current_script->can_set()) return;
+    std::string initial_serialized_vars;
+    if (preset_type <= 0)
+        initial_serialized_vars = (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0
+        ? current_script->tab()->m_preset_bundle->fff_prints.get_selected_preset().config.opt_string("print_custom_variables")
+        : current_script->tab()->m_preset_bundle->sla_prints.get_selected_preset().config.opt_string("print_custom_variables");
+    else if (preset_type == 1) {
+        initial_serialized_vars = (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0
+            ? current_script->tab()->m_preset_bundle->filaments.get_selected_preset().config.opt_string("filament_custom_variables", (unsigned int)(0))
+            : current_script->tab()->m_preset_bundle->sla_materials.get_selected_preset().config.opt_string("filament_custom_variables", (unsigned int)(0));
+    } else initial_serialized_vars = current_script->tab()->m_preset_bundle->printers.get_selected_preset().config.opt_string("printer_custom_variables");
+    std::string serialized_value = get_custom_value(initial_serialized_vars, key);
+    std::string serialized_vars = get_custom_var_option(preset_type);
+    set_custom_value(serialized_vars, key, serialized_value);
+    set_custom_option(preset_type, serialized_vars);
+}
 
 /////// main script fucntions //////
 
@@ -644,6 +666,7 @@ void ScriptContainer::init(const std::string& tab_key, Tab* tab)
 
             m_script_engine.get()->RegisterGlobalFunction("float get_computed_float(string &in)", WRAP_FN(as_get_computed_float), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)", WRAP_FN(as_back_initial_value), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void back_custom_initial_value(int, string &in)", WRAP_FN(as_back_custom_initial_value), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void ask_for_refresh()", WRAP_FN(as_ask_for_refresh), AngelScript::asCALL_GENERIC);
 
 #else
@@ -673,6 +696,7 @@ void ScriptContainer::init(const std::string& tab_key, Tab* tab)
 
             m_script_engine.get()->RegisterGlobalFunction("float get_computed_float(string &in)",   AngelScript::asFUNCTION(as_get_computed_float), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)",    AngelScript::asFUNCTION(as_back_initial_value), AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void back_custom_initial_value(int, string &in)",    AngelScript::asFUNCTION(as_back_custom_initial_value), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void ask_for_refresh()",                 AngelScript::asFUNCTION(as_ask_for_refresh),    AngelScript::asCALL_CDECL);
 #endif
         }
@@ -737,7 +761,7 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     std::string func_name = ("void " + def.opt_key + "_set(" + get_type_name(def.type) + ")");
     AngelScript::asIScriptFunction* func = m_script_module->GetFunctionByDecl(func_name.c_str());
     if (func == nullptr) {
-        BOOST_LOG_TRIVIAL(error) << "Error, can't find function '" << func_name<<"' in the script file";
+        BOOST_LOG_TRIVIAL(error) << "Error, can't find function '" << func_name << "' in the script file";
         return;
     }
     AngelScript::asIScriptContext* ctx = m_script_engine->CreateContext();
@@ -781,19 +805,23 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
         ctx->SetArgAddress(0, &str_arg);
         break;
     }
-    case coEnum: { 
+    case coEnum: {
         int32_t enum_idx = boost::any_cast<std::int32_t>(value);
         if (enum_idx >= 0 && enum_idx < def.enum_values.size()) {
             str_arg = def.enum_values[enum_idx];
             ctx->SetArgAddress(0, &str_arg);
             ctx->SetArgDWord(1, enum_idx);
         }
-        break; 
+        break;
     }
     }
     // init globals for script exec (TODO find a way to change that)
     current_script = this;
+    m_need_refresh = false;
     m_to_update.clear();
+    for (Tab* tab : wxGetApp().tabs_list)
+        if (tab->completed())
+            m_to_update[tab->type()] = {};
     m_can_set = true;
     // exec
     int res = ctx->Execute();
@@ -802,25 +830,36 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     m_to_update.clear();
     auto to_reset = m_to_reset_initial;
     m_to_reset_initial.clear();
+
     //update the tabs from the results
+    for (auto& data : to_update) {
+        Tab* tab = wxGetApp().get_tab(data.first);
+        //also reset
+        if (!to_reset.empty()) {
+            const DynamicPrintConfig& initial_conf = tab->m_presets->get_selected_preset().config;
+            for (size_t key_idx = 0; key_idx != to_reset.size(); ++key_idx) {
+                const std::string& key = to_reset[key_idx];
+                if (initial_conf.has(key)) {
+                    data.second.set_key_value(key, initial_conf.option(key)->clone());
+                    to_reset.erase(to_reset.begin() + key_idx);
+                    key_idx--;
+                }
+            }
+        }
+        tab->load_config(data.second);
+    }
+    //also call for value_changed, as it's not really a load but a change
     for (const auto& data : to_update) {
         Tab* tab = wxGetApp().get_tab(data.first);
-        tab->load_config(data.second);
-        //also call for value_changed, as it's not really a load but a change
         for (auto opt_key : data.second.keys()) {
             tab->on_value_change(opt_key, data.second.option(opt_key)->getAny());
         }
     }
-    //reset if needed
-    for (const std::string& key : to_reset) {
-        for (Tab* tab : wxGetApp().tabs_list) {
-            if (tab != nullptr && tab->supports_printer_technology(current_script->tab()->get_printer_technology())) {
-                // more optimal to create a tab::back_to_initial_value() that call the optgroup... here we are going down to the optgroup to get the field to get back to the opgroup via on_back_to_initial_value
-                Field* f = tab->get_field(key);
-                if (f != nullptr) {
-                    f->on_back_to_initial_value();
-                }
-            }
+    // refresh the field if needed
+    if (m_need_refresh && m_tab) {
+        Field* f = m_tab->get_field(def.opt_key);
+        if (f != nullptr) {
+            f->set_value(call_script_function_get_value(def), false);
         }
     }
 }
