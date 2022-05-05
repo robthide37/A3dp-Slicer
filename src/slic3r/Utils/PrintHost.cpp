@@ -72,6 +72,7 @@ PrintHost* PrintHost::get_print_host(DynamicPrintConfig *config)
             case htMPMDv2:    return new MPMDv2(config);
             case htPrusaLink: return new PrusaLink(config);
             case htMKS:       return new MKS(config);
+            case htMiniDeltaLCD: return new MiniDeltaLCD(config);
             default:          return nullptr;
         }
     } else {

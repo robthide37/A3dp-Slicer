@@ -90,6 +90,7 @@ enum PrintHostType {
     htKlipper,
     htMPMDv2,
     htMKS,
+    htMiniDeltaLCD,
 };
 
 enum AuthorizationType {

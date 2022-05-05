@@ -36,6 +36,7 @@ public:
 
 protected:
     virtual bool validate_version_text(const boost::optional<std::string> &version_text) const;
+    virtual void set_http_send(Http& request, const PrintHostUpload& upload_data) const;
 
 private:
     std::string m_host;
@@ -46,6 +47,24 @@ private:
 
     virtual void set_auth(Http &http) const;
     std::string make_url(const std::string &path) const;
+};
+
+class MiniDeltaLCD : public OctoPrint
+{
+public:
+    MiniDeltaLCD(DynamicPrintConfig* config);
+    ~MiniDeltaLCD() override = default;
+
+    const char* get_name() const override;
+
+    wxString get_test_ok_msg() const override;
+    wxString get_test_failed_msg(wxString& msg) const override;
+    PrintHostPostUploadActions get_post_upload_actions() const override { return {}; }
+
+protected:
+    bool validate_version_text(const boost::optional<std::string>& version_text) const override;
+    void set_http_send(Http& request, const PrintHostUpload& upload_data) const override;
+
 };
 
 class SL1Host: public OctoPrint

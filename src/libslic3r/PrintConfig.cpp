@@ -106,6 +106,7 @@ static const t_config_enum_values s_keys_map_PrintHostType{
     {"klipper", htKlipper},
     {"mpmdv2",  htMPMDv2},
     {"mks",     htMKS },
+    {"monoprice", htMiniDeltaLCD },
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrintHostType)
 
@@ -3578,7 +3579,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Host Type");
     def->category = OptionCategory::general;
     def->tooltip = L("Slic3r can upload G-code files to a printer host. This field must contain "
-                   "the kind of the host.");
+                   "the kind of the host."
+                   "\nPrusaLink is only available for prusa printer.");
     def->enum_keys_map = &ConfigOptionEnum<PrintHostType>::get_enum_values();
     def->enum_values.push_back("prusalink");
     def->enum_values.push_back("octoprint");
@@ -3589,6 +3591,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("klipper");
     def->enum_values.push_back("mpmdv2");
     def->enum_values.push_back("mks");
+    def->enum_values.push_back("monoprice");
     def->enum_labels.push_back("PrusaLink");
     def->enum_labels.push_back("OctoPrint");
     def->enum_labels.push_back("Duet");
@@ -3598,6 +3601,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back("Klipper");
     def->enum_labels.push_back("MPMDv2");
     def->enum_labels.push_back("MKS");
+    def->enum_labels.push_back("Monoprice lcd");
     def->mode = comAdvancedE | comPrusa;
     def->cli = ConfigOptionDef::nocli;
     def->set_default_value(new ConfigOptionEnum<PrintHostType>(htOctoPrint));

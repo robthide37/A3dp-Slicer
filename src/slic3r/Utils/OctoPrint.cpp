@@ -199,6 +199,7 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
 
 #ifdef WIN32
     // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+    // the workaround is needed if it's not https, as a host ip and has allow_ip_resolve to 1
     if (m_host.find("https://") == 0 || test_msg_or_host_ip.empty() || GUI::get_app_config()->get("allow_ip_resolve") != "1")
 #endif // _WIN32
     {
@@ -227,12 +228,10 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
         % upload_parent_path.string()
         % (upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false");
 
-    auto http = Http::post(std::move(url));
+    Http http = Http::post(std::move(url));
     set_auth(http);
-    http.form_add("print", upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false")
-        .form_add("path", upload_parent_path.string())      // XXX: slashes on windows ???
-        .form_add_file("file", upload_data.source_path.string(), upload_filename.string())
-        .on_complete([&](std::string body, unsigned status) {
+    set_http_send(http, upload_data);
+    http.on_complete([&](std::string body, unsigned status) {
             BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: File uploaded: HTTP %2%: %3%") % name % status % body;
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
@@ -254,6 +253,15 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
         .perform_sync();
 
     return res;
+}
+
+void OctoPrint::set_http_send(Http& http, const PrintHostUpload& upload_data) const
+{
+    const auto upload_filename = upload_data.upload_path.filename();
+    const auto upload_parent_path = upload_data.upload_path.parent_path();
+    http.form_add("print", upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false")
+        .form_add("path", upload_parent_path.string())      // XXX: slashes on windows ???
+        .form_add_file("file", upload_data.source_path.string(), upload_filename.string());
 }
 
 bool OctoPrint::validate_version_text(const boost::optional<std::string> &version_text) const
@@ -287,6 +295,42 @@ std::string OctoPrint::make_url(const std::string &path) const
     }
 }
 
+//  ------------ MiniDeltaLCD ------------
+
+MiniDeltaLCD::MiniDeltaLCD(DynamicPrintConfig* config) :
+    OctoPrint(config)
+{
+}
+
+void MiniDeltaLCD::set_http_send(Http& http, const PrintHostUpload& upload_data) const
+{
+    const auto upload_filename = upload_data.upload_path.filename();
+    const auto upload_parent_path = upload_data.upload_path.parent_path();
+    http.form_add_file("file", upload_data.source_path.string(), upload_filename.string())
+        .form_add("select", "true")
+        .form_add("print", upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false");
+}
+
+const char* MiniDeltaLCD::get_name() const { return "MiniDeltaLCD"; }
+
+wxString MiniDeltaLCD::get_test_ok_msg() const
+{
+    return  wxString::Format(_L("Connection to %s works correctly."), "Monoprice lcd");
+}
+
+wxString MiniDeltaLCD::get_test_failed_msg(wxString& msg) const
+{
+    return GUI::from_u8((boost::format("%s: %s")
+        % _utf8(L("Could not connect to Monoprice lcd"))
+        % std::string(msg.ToUTF8())).str());
+}
+
+bool MiniDeltaLCD::validate_version_text(const boost::optional<std::string>& version_text) const
+{
+    return version_text ? boost::starts_with(*version_text, "MiniDeltaLCD") : false;
+}
+
+// SL1Host
 SL1Host::SL1Host(DynamicPrintConfig *config) : 
     OctoPrint(config),
     m_authorization_type(dynamic_cast<const ConfigOptionEnum<AuthorizationType>*>(config->option("printhost_authorization_type"))->value),
@@ -295,7 +339,6 @@ SL1Host::SL1Host(DynamicPrintConfig *config) :
 {
 }
 
-// SL1Host
 const char* SL1Host::get_name() const { return "SL1Host"; }
 
 wxString SL1Host::get_test_ok_msg () const
