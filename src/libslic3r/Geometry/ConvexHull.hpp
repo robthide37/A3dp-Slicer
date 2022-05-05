@@ -4,6 +4,10 @@
 #include "../Polygon.hpp"
 
 namespace Slic3r {
+
+class ExPolygon;
+using ExPolygons = std::vector<ExPolygon>;
+
 namespace Geometry {
 
 Pointf3s convex_hull(Pointf3s points);
