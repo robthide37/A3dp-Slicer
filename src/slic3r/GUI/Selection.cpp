@@ -3026,22 +3026,30 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
         if (done.size() == m_volumes->size())
             break;
 
-        const GLVolume* volume = (*m_volumes)[i];
+        const GLVolume* volume_i = (*m_volumes)[i];
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
-        if (volume->is_wipe_tower)
+        if (volume_i->is_wipe_tower)
             continue;
 
-        const int object_idx = volume->object_idx();
+        const int object_idx = volume_i->object_idx();
 #else
-        const int object_idx = volume->object_idx();
+        const int object_idx = volume_i->object_idx();
         if (object_idx >= 1000)
             continue;
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 
-        const int instance_idx = volume->instance_idx();
-        const Vec3d& rotation = volume->get_instance_rotation();
-        const Vec3d& scaling_factor = volume->get_instance_scaling_factor();
-        const Vec3d& mirror = volume->get_instance_mirror();
+        const int instance_idx = volume_i->instance_idx();
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        const Geometry::Transformation& curr_inst_trafo_i = volume_i->get_instance_transformation();
+        const Vec3d curr_inst_rotation_i = curr_inst_trafo_i.get_rotation();
+        const Vec3d& curr_inst_scaling_factor_i = curr_inst_trafo_i.get_scaling_factor();
+        const Vec3d& curr_inst_mirror_i = curr_inst_trafo_i.get_mirror();
+        const Vec3d old_inst_rotation_i = m_cache.volumes_data[i].get_instance_transform().get_rotation();
+#else
+        const Vec3d& rotation = volume_i->get_instance_rotation();
+        const Vec3d& scaling_factor = volume_i->get_instance_scaling_factor();
+        const Vec3d& mirror = volume_i->get_instance_mirror();
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
         // Process unselected instances.
         for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
@@ -3051,14 +3059,17 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
             if (done.find(j) != done.end())
                 continue;
 
-            GLVolume* v = (*m_volumes)[j];
-            if (v->object_idx() != object_idx || v->instance_idx() == instance_idx)
+            GLVolume* volume_j = (*m_volumes)[j];
+            if (volume_j->object_idx() != object_idx || volume_j->instance_idx() == instance_idx)
                 continue;
 
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-            const Vec3d inst_rotation_i = m_cache.volumes_data[i].get_instance_transform().get_rotation();
-            const Vec3d inst_rotation_j = m_cache.volumes_data[j].get_instance_transform().get_rotation();
-            assert(is_rotation_xy_synchronized(inst_rotation_i, inst_rotation_j));
+            const Vec3d old_inst_rotation_j = m_cache.volumes_data[j].get_instance_transform().get_rotation();
+            assert(is_rotation_xy_synchronized(old_inst_rotation_i, old_inst_rotation_j));
+            const Geometry::Transformation& curr_inst_trafo_j = volume_j->get_instance_transformation();
+            const Vec3d curr_inst_rotation_j = curr_inst_trafo_j.get_rotation();
+            Vec3d new_inst_offset_j = curr_inst_trafo_j.get_offset();
+            Vec3d new_inst_rotation_j = curr_inst_rotation_j; 
 #else
             assert(is_rotation_xy_synchronized(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation()));
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
@@ -3066,45 +3077,59 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
             case SyncRotationType::NONE: {
                 // z only rotation -> synch instance z
                 // The X,Y rotations should be synchronized from start to end of the rotation.
-                assert(is_rotation_xy_synchronized(rotation, v->get_instance_rotation()));
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                assert(is_rotation_xy_synchronized(curr_inst_rotation_i, curr_inst_rotation_j));
                 if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
-                    v->set_instance_offset(Z, volume->get_instance_offset().z());
+                    new_inst_offset_j.z() = curr_inst_trafo_i.get_offset().z();
+#else
+                assert(is_rotation_xy_synchronized(rotation, volume_j->get_instance_rotation()));
+                if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
+                    volume_j->set_instance_offset(Z, volume_i->get_instance_offset().z());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
                 break;
             }
             case SyncRotationType::GENERAL: {
                 // generic rotation -> update instance z with the delta of the rotation.
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-                const double z_diff = Geometry::rotation_diff_z(inst_rotation_i, inst_rotation_j);
+                const double z_diff = Geometry::rotation_diff_z(old_inst_rotation_i, old_inst_rotation_j);
+                new_inst_rotation_j = curr_inst_rotation_i + z_diff * Vec3d::UnitZ();
 #else
                 const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation());
+                volume_j->set_instance_rotation({ rotation.x(), rotation.y(), rotation.z() + z_diff });
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-                v->set_instance_rotation({ rotation.x(), rotation.y(), rotation.z() + z_diff });
                 break;
             }
 #if ENABLE_WORLD_COORDINATE
             case SyncRotationType::FULL: {
                 // generic rotation -> update instance z with the delta of the rotation.
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-                const Eigen::AngleAxisd angle_axis(Geometry::rotation_xyz_diff(rotation, inst_rotation_j));
+                const Eigen::AngleAxisd angle_axis(Geometry::rotation_xyz_diff(curr_inst_rotation_i, old_inst_rotation_j));
 #else
                 const Eigen::AngleAxisd angle_axis(Geometry::rotation_xyz_diff(rotation, m_cache.volumes_data[j].get_instance_rotation()));
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
                 const Vec3d& axis = angle_axis.axis();
                 const double z_diff = (std::abs(axis.x()) > EPSILON || std::abs(axis.y()) > EPSILON) ?
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-                    angle_axis.angle() * axis.z() : Geometry::rotation_diff_z(rotation, inst_rotation_j);
+                    angle_axis.angle() * axis.z() : Geometry::rotation_diff_z(curr_inst_rotation_i, old_inst_rotation_j);
+
+                new_inst_rotation_j = curr_inst_rotation_i + z_diff * Vec3d::UnitZ();
 #else
                     angle_axis.angle()* axis.z() : Geometry::rotation_diff_z(rotation, m_cache.volumes_data[j].get_instance_rotation());
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
-                v->set_instance_rotation({ rotation.x(), rotation.y(), rotation.z() + z_diff });
+                volume_j->set_instance_rotation({ rotation.x(), rotation.y(), rotation.z() + z_diff });
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
                 break;
             }
 #endif // ENABLE_WORLD_COORDINATE
             }
 
-            v->set_instance_scaling_factor(scaling_factor);
-            v->set_instance_mirror(mirror);
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            volume_j->set_instance_transformation(Geometry::assemble_transform(new_inst_offset_j, new_inst_rotation_j,
+                curr_inst_scaling_factor_i, curr_inst_mirror_i));
+#else
+            volume_j->set_instance_scaling_factor(scaling_factor);
+            volume_j->set_instance_mirror(mirror);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
             done.insert(j);
         }
