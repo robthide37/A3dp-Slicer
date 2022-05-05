@@ -169,31 +169,79 @@ float as_get_float(std::string& key)
         return (float)(opt->getFloat());
     }
 }
-void as_set_float(std::string& key, float f)
+
+double round(float f) {
+    std::stringstream ss;
+    double dbl_val;
+    ss << f;
+    ss >> dbl_val;
+    return dbl_val;
+}
+
+void as_set_float(std::string& key, float f_val)
 {
     if (!current_script->can_set()) return;
     std::pair<const PresetCollection*, const ConfigOption*> result = get_coll(key);
     if (result.second == nullptr)
         throw NoDefinitionException("error, can't find float option " + key);
+
     DynamicPrintConfig& conf = current_script->to_update()[result.first->type()];
     if (result.second->type() == ConfigOptionType::coFloat) {
-        conf.set_key_value(key, new ConfigOptionFloat(f));
+        double old_value = result.second->getFloat();
+        double new_val = round(f_val);
+        // only update if difference is significant
+        if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
+            return;
+        conf.set_key_value(key, new ConfigOptionFloat(f_val));
     } else if (result.second->type() == ConfigOptionType::coFloats) {
-        ConfigOptionFloats* new_val = static_cast<ConfigOptionFloats*>(result.second->clone());
-        new_val->set_at(f, 0);
-        conf.set_key_value(key, new_val);
+        ConfigOptionFloats* new_opt = static_cast<ConfigOptionFloats*>(result.second->clone());
+        if (!new_opt->values.empty()) {
+            // only update if difference is significant
+            double old_value = new_opt->values.front();
+            double new_val = round(f_val);
+            if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
+                return;
+        }
+        new_opt->set_at(f_val, 0);
+        conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coPercent) {
-        conf.set_key_value(key, new ConfigOptionPercent(f * 100));
+        double percent_f = floor(f_val * 100000. + 0.5) / 1000.;
+        // only update if difference is significant
+        double old_value = result.second->getFloat();
+        if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
+            return;
+        conf.set_key_value(key, new ConfigOptionPercent(percent_f));
     } else if (result.second->type() == ConfigOptionType::coPercents) {
-        ConfigOptionPercents* new_val = static_cast<ConfigOptionPercents*>(result.second->clone());
-        new_val->set_at(f * 100, 0);
-        conf.set_key_value(key, new_val);
+        ConfigOptionPercents* new_opt = static_cast<ConfigOptionPercents*>(result.second->clone());
+        double percent_f = floor(f_val * 100000. + 0.5) / 1000.;
+        if (!new_opt->values.empty()) {
+            // only update if difference is significant
+            double old_value = new_opt->values.front();
+            if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
+                return;
+        }
+        new_opt->set_at(percent_f, 0);
+        conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coFloatOrPercent) {
-        conf.set_key_value(key, new ConfigOptionFloatOrPercent(f, false));
+        if (!static_cast<const ConfigOptionFloatOrPercent*>(result.second)->percent) {
+            // only update if difference is significant
+            double old_value = result.second->getFloat();
+            double new_val = round(f_val);
+            if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
+                return;
+        }
+        conf.set_key_value(key, new ConfigOptionFloatOrPercent(f_val, false));
     } else if (result.second->type() == ConfigOptionType::coFloatsOrPercents) {
-        ConfigOptionFloatsOrPercents* new_val = static_cast<ConfigOptionFloatsOrPercents*>(result.second->clone());
-        new_val->set_at(FloatOrPercent{f, false}, 0);
-        conf.set_key_value(key, new_val);
+        ConfigOptionFloatsOrPercents* new_opt = static_cast<ConfigOptionFloatsOrPercents*>(result.second->clone());
+        if (!new_opt->values.empty() && !new_opt->values.front().percent) {
+            // only update if difference is significant
+            double old_value = new_opt->values.front().value;
+            double new_val = round(f_val);
+            if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
+                return;
+        }
+        new_opt->set_at(FloatOrPercent{ f_val, false}, 0);
+        conf.set_key_value(key, new_opt);
     }
 }
 bool as_is_percent(std::string& key)
@@ -205,31 +253,64 @@ bool as_is_percent(std::string& key)
         || (opt->type() == ConfigOptionType::coFloatOrPercent && ((ConfigOptionFloatOrPercent*)opt)->percent) 
         || (opt->type() == ConfigOptionType::coFloatsOrPercents && ((ConfigOptionFloatsOrPercents*)opt)->get_at(0).percent);
 }
-void as_set_percent(std::string& key, float f)
+void as_set_percent(std::string& key, float f_val)
 {
     if (!current_script->can_set()) return;
     std::pair<const PresetCollection*, const ConfigOption*> result = get_coll(key);
     if (result.second == nullptr)
         throw NoDefinitionException("error, can't find percent option " + key);
+    double percent_f = floor(f_val * 1000. + 0.5) / 1000.;
     DynamicPrintConfig& conf = current_script->to_update()[result.first->type()];
     if (result.second->type() == ConfigOptionType::coFloat) {
-        conf.set_key_value(key, new ConfigOptionFloat(f / 100.));
+        // only update if difference is significant
+        double old_value = result.second->getFloat() * 100;
+        if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
+            return;
+        conf.set_key_value(key, new ConfigOptionFloat(percent_f / 100.));
     } else if (result.second->type() == ConfigOptionType::coFloats) {
-        ConfigOptionFloats* new_val = static_cast<ConfigOptionFloats*>(result.second->clone());
-        new_val->set_at(f / 100., 0);
-        conf.set_key_value(key, new_val);
+        ConfigOptionFloats* new_opt = static_cast<ConfigOptionFloats*>(result.second->clone());
+        if (!new_opt->values.empty()) {
+            // only update if difference is significant
+            double old_value = new_opt->values.front() * 100;
+            if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
+                return;
+        }
+        new_opt->set_at(percent_f / 100., 0);
+        conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coPercent) {
-        conf.set_key_value(key, new ConfigOptionPercent(f));
+        // only update if difference is significant
+        double old_value = get_coll(key).second->getFloat();
+        if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
+            return;
+        conf.set_key_value(key, new ConfigOptionPercent(percent_f));
     } else if (result.second->type() == ConfigOptionType::coPercents) {
-        ConfigOptionPercents* new_val = static_cast<ConfigOptionPercents*>(result.second->clone());
-        new_val->set_at(f, 0);
-        conf.set_key_value(key, new_val);
+        ConfigOptionPercents* new_opt = static_cast<ConfigOptionPercents*>(result.second->clone());
+        if (!new_opt->values.empty()) {
+            // only update if difference is significant
+            double old_value = new_opt->values.front();
+            if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
+                return;
+        }
+        new_opt->set_at(percent_f, 0);
+        conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coFloatOrPercent) {
-        conf.set_key_value(key, new ConfigOptionFloatOrPercent(f, true));
+        if (static_cast<const ConfigOptionFloatOrPercent*>(result.second)->percent) {
+            // only update if difference is significant
+            double old_value = result.second->getFloat();
+            if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
+                return;
+        }
+        conf.set_key_value(key, new ConfigOptionFloatOrPercent(percent_f, true));
     } else if (result.second->type() == ConfigOptionType::coFloatsOrPercents) {
-        ConfigOptionFloatsOrPercents* new_val = static_cast<ConfigOptionFloatsOrPercents*>(result.second->clone());
-        new_val->set_at(FloatOrPercent{ f, true }, 0);
-        conf.set_key_value(key, new_val);
+        ConfigOptionFloatsOrPercents* new_opt = static_cast<ConfigOptionFloatsOrPercents*>(result.second->clone());
+        if (!new_opt->values.empty() && new_opt->values.front().percent) {
+            // only update if difference is significant
+            double old_value = new_opt->values.front().value;
+            if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
+                return;
+        }
+        new_opt->set_at(FloatOrPercent{ percent_f, true }, 0);
+        conf.set_key_value(key, new_opt);
     }
 }
 void as_get_string(std::string& key, std::string& val)

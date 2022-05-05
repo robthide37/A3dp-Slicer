@@ -109,7 +109,8 @@ float compute_overlap()
 	float solid_spacing = (width - height * 0.215);
 	float solid_flow = height * solid_spacing;
 	float bridge_spacing = sqrt(solid_flow*1.2739);
-	return bridge_spacing / solid_spacing;
+	float round_val = floor((bridge_spacing / solid_spacing) * 1000. + 0.5) / 1000.;
+	return round_val;
 }
 
 int s_not_thick_bridge_get()
