@@ -2,7 +2,6 @@
 #include "Polyline.hpp"
 #include "Exception.hpp"
 #include "ExPolygon.hpp"
-#include "ExPolygonCollection.hpp"
 #include "Line.hpp"
 #include "Polygon.hpp"
 #include <iostream>
@@ -196,7 +195,7 @@ BoundingBox get_extents(const Polylines &polylines)
 const Point& leftmost_point(const Polylines &polylines)
 {
     if (polylines.empty())
-        throw Slic3r::InvalidArgument("leftmost_point() called on empty PolylineCollection");
+        throw Slic3r::InvalidArgument("leftmost_point() called on empty Polylines");
     Polylines::const_iterator it = polylines.begin();
     const Point *p = &it->leftmost_point();
     for (++ it; it != polylines.end(); ++it) {

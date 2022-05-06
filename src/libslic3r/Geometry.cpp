@@ -50,13 +50,6 @@ bool contains(const std::vector<T> &vector, const Point &point)
 }
 template bool contains(const ExPolygons &vector, const Point &point);
 
-double rad2deg_dir(double angle)
-{
-    angle = (angle < PI) ? (-angle + PI/2.0) : (angle + PI/2.0);
-    if (angle < 0) angle += PI;
-    return rad2deg(angle);
-}
-
 void simplify_polygons(const Polygons &polygons, double tolerance, Polygons* retval)
 {
     Polygons pp;

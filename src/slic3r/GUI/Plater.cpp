@@ -3862,6 +3862,9 @@ void Plater::priv::reload_from_disk()
                 old_model_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
 
                 sla::reproject_points_and_holes(old_model_object);
+
+                // Fix warning icon in object list
+                wxGetApp().obj_list()->update_item_error_icon(obj_idx, vol_idx);
             }
         }
 #else

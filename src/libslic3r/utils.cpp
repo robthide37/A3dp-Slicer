@@ -125,14 +125,6 @@ static struct RunOnInit {
     }
 } g_RunOnInit;
 
-void trace(unsigned int level, const char *message)
-{
-    boost::log::trivial::severity_level severity = level_to_boost(level);
-
-    BOOST_LOG_STREAM_WITH_PARAMS(::boost::log::trivial::logger::get(),\
-        (::boost::log::keywords::severity = severity)) << message;
-}
-
 void disable_multi_threading()
 {
     // Disable parallelization so the Shiny profiler works
@@ -820,49 +812,6 @@ bool is_shapes_dir(const std::string& dir)
 
 namespace Slic3r {
 
-// Encode an UTF-8 string to the local code page.
-std::string encode_path(const char *src)
-{    
-#ifdef WIN32
-    // Convert the source utf8 encoded string to a wide string.
-    std::wstring wstr_src = boost::nowide::widen(src);
-    if (wstr_src.length() == 0)
-        return std::string();
-    // Convert a wide string to a local code page.
-    int size_needed = ::WideCharToMultiByte(0, 0, wstr_src.data(), (int)wstr_src.size(), nullptr, 0, nullptr, nullptr);
-    std::string str_dst(size_needed, 0);
-    ::WideCharToMultiByte(0, 0, wstr_src.data(), (int)wstr_src.size(), str_dst.data(), size_needed, nullptr, nullptr);
-    return str_dst;
-#else /* WIN32 */
-    return src;
-#endif /* WIN32 */
-}
-
-// Encode an 8-bit string from a local code page to UTF-8.
-// Multibyte to utf8
-std::string decode_path(const char *src)
-{  
-#ifdef WIN32
-    int len = int(strlen(src));
-    if (len == 0)
-        return std::string();
-    // Convert the string encoded using the local code page to a wide string.
-    int size_needed = ::MultiByteToWideChar(0, 0, src, len, nullptr, 0);
-    std::wstring wstr_dst(size_needed, 0);
-    ::MultiByteToWideChar(0, 0, src, len, wstr_dst.data(), size_needed);
-    // Convert a wide string to utf8.
-    return boost::nowide::narrow(wstr_dst.c_str());
-#else /* WIN32 */
-    return src;
-#endif /* WIN32 */
-}
-
-std::string normalize_utf8_nfc(const char *src)
-{
-    static std::locale locale_utf8(boost::locale::generator().generate(""));
-    return boost::locale::normalize(src, boost::locale::norm_nfc, locale_utf8);
-}
-
 size_t get_utf8_sequence_length(const std::string& text, size_t pos)
 {
 	assert(pos < text.size());
@@ -932,18 +881,6 @@ size_t get_utf8_sequence_length(const char *seq, size_t size)
 	}
 	return length;
 }
-
-namespace PerlUtils {
-    // Get a file name including the extension.
-    std::string path_to_filename(const char *src)       { return boost::filesystem::path(src).filename().string(); }
-    // Get a file name without the extension.
-    std::string path_to_stem(const char *src)           { return boost::filesystem::path(src).stem().string(); }
-    // Get just the extension.
-    std::string path_to_extension(const char *src)      { return boost::filesystem::path(src).extension().string(); }
-    // Get a directory without the trailing slash.
-    std::string path_to_parent_path(const char *src)    { return boost::filesystem::path(src).parent_path().string(); }
-};
-
 
 std::string string_printf(const char *format, ...)
 {

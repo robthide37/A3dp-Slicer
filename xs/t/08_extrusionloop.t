@@ -5,7 +5,7 @@ use warnings;
 
 use List::Util qw(sum);
 use Slic3r::XS;
-use Test::More tests => 47;
+use Test::More tests => 46;
 
 {
     my $square = [
@@ -33,7 +33,6 @@ use Test::More tests => 47;
     is scalar(@$loop), 1, 'loop contains one path';
     {
         my $path = $loop->[0];
-        isa_ok $path, 'Slic3r::ExtrusionPath::Ref';
         is $path->role, Slic3r::ExtrusionPath::EXTR_ROLE_EXTERNAL_PERIMETER, 'role';
     }
 

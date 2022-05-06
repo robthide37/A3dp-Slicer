@@ -26,6 +26,7 @@ const std::unordered_map<TestMesh, const char*, TestMeshHash> mesh_names {
     std::pair<TestMesh, const char*>(TestMesh::V,						"V"), 
     std::pair<TestMesh, const char*>(TestMesh::_40x10,					"40x10"), 
     std::pair<TestMesh, const char*>(TestMesh::cube_20x20x20,			"cube_20x20x20"), 
+    std::pair<TestMesh, const char*>(TestMesh::cube_2x20x10,            "cube_2x20x10"), 
     std::pair<TestMesh, const char*>(TestMesh::sphere_50mm,				"sphere_50mm"), 
     std::pair<TestMesh, const char*>(TestMesh::bridge,					"bridge"), 
     std::pair<TestMesh, const char*>(TestMesh::bridge_with_hole,		"bridge_with_hole"), 
@@ -48,6 +49,9 @@ TriangleMesh mesh(TestMesh m)
     switch(m) {
         case TestMesh::cube_20x20x20:
             mesh = Slic3r::make_cube(20, 20, 20);
+            break;
+        case TestMesh::cube_2x20x10:
+            mesh = Slic3r::make_cube(2, 20, 10);
             break;
         case TestMesh::sphere_50mm:
             mesh = Slic3r::make_sphere(50, PI / 243.0);
@@ -185,6 +189,19 @@ TriangleMesh mesh(TestMesh m)
     }
 
     return mesh;
+}
+
+TriangleMesh mesh(TestMesh min, Vec3d translate, Vec3d scale)
+{
+    TriangleMesh m = mesh(min);
+    m.translate(translate.cast<float>());
+    m.scale(scale.cast<float>());
+    return m;
+}
+
+TriangleMesh mesh(TestMesh m, Vec3d translate, double scale)
+{
+    return mesh(m, translate, Vec3d(scale, scale, scale));
 }
 
 static bool verbose_gcode() 

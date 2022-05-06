@@ -95,22 +95,6 @@ ExtrusionPath::append(...)
             THIS->polyline.points.push_back(p);
         }
 
-ExtrusionEntityCollection*
-ExtrusionPath::intersect_expolygons(ExPolygonCollection* collection)
-    CODE:
-        RETVAL = new ExtrusionEntityCollection ();
-        THIS->intersect_expolygons(*collection, RETVAL);
-    OUTPUT:
-        RETVAL
-
-ExtrusionEntityCollection*
-ExtrusionPath::subtract_expolygons(ExPolygonCollection* collection)
-    CODE:
-        RETVAL = new ExtrusionEntityCollection ();
-        THIS->subtract_expolygons(*collection, RETVAL);
-    OUTPUT:
-        RETVAL
-
 %}
 };
 

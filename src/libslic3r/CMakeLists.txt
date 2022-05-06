@@ -44,8 +44,6 @@ set(SLIC3R_SOURCES
     enum_bitmask.hpp
     ExPolygon.cpp
     ExPolygon.hpp
-    ExPolygonCollection.cpp
-    ExPolygonCollection.hpp
     Extruder.cpp
     Extruder.hpp
     ExtrusionEntity.cpp

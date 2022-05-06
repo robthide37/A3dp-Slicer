@@ -3941,9 +3941,8 @@ void GCodeViewer::render_legend(float& legend_height)
             PartialTimes items;
 
             std::vector<CustomGCode::Item> custom_gcode_per_print_z = wxGetApp().is_editor() ? wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes : m_custom_gcode_per_print_z;
-            int extruders_count = wxGetApp().extruders_edited_cnt();
-            std::vector<ColorRGBA> last_color(extruders_count);
-            for (int i = 0; i < extruders_count; ++i) {
+            std::vector<ColorRGBA> last_color(m_extruders_count);
+            for (size_t i = 0; i < m_extruders_count; ++i) {
                 last_color[i] = m_tool_colors[i];
             }
             int last_extruder_id = 1;

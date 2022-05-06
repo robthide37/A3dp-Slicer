@@ -5,6 +5,7 @@
 #include "libslic3r/ExtrusionEntityCollection.hpp"
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Point.hpp"
+#include "libslic3r/ShortestPath.hpp"
 #include "libslic3r/libslic3r.h"
 
 #include "test_data.hpp"
@@ -82,4 +83,68 @@ SCENARIO("ExtrusionEntityCollection: Polygon flattening", "[ExtrusionEntity]") {
             }
         }
     }
+}
+
+TEST_CASE("ExtrusionEntityCollection: Chained path", "[ExtrusionEntity]") {
+    struct Test {
+        Polylines unchained;
+        Polylines chained;
+        Point     initial_point;
+    };
+    std::vector<Test> tests { 
+        {
+            { 
+                { {0,15}, {0,18}, {0,20} },
+                { {0,10}, {0,8}, {0,5} }
+            },
+            {
+                { {0,20}, {0,18}, {0,15} },
+                { {0,10}, {0,8}, {0,5} }
+            },
+            { 0,30 }
+        },
+        {
+            { 
+                { {4,0}, {10,0}, {15,0} },
+                { {10,5}, {15,5}, {20,5} }
+            },
+            {
+                { {20,5}, {15,5}, {10,5} },
+                { {15,0}, {10,0}, {4,0} }
+            },
+            { 30,0 }
+        },
+        {
+            { 
+                { {15,0}, {10,0}, {4,0} },
+                { {10,5}, {15,5}, {20,5} }
+            },
+            {
+                { {20,5}, {15,5}, {10,5} },
+                { {15,0}, {10,0}, {4,0} }
+            },
+            { 30,0 }
+        },
+    };
+    for (const Test &test : tests) {
+        Polylines chained = chain_polylines(test.unchained, &test.initial_point);
+        REQUIRE(chained == test.chained);
+        ExtrusionEntityCollection unchained_extrusions;
+        extrusion_entities_append_paths(unchained_extrusions.entities, test.unchained,
+            erInternalInfill, 0., 0.4f, 0.3f);
+        ExtrusionEntityCollection chained_extrusions = unchained_extrusions.chained_path_from(test.initial_point);
+        REQUIRE(chained_extrusions.entities.size() == test.chained.size());
+        for (size_t i = 0; i < chained_extrusions.entities.size(); ++ i) {
+            const Points &p1 = test.chained[i].points;
+            const Points &p2 = dynamic_cast<const ExtrusionPath*>(chained_extrusions.entities[i])->polyline.points;
+            REQUIRE(p1 == p2);
+        }
+    }
+}
+
+TEST_CASE("ExtrusionEntityCollection: Chained path with no explicit starting point", "[ExtrusionEntity]") {
+    auto polylines = Polylines { { { 0, 15 }, {0, 18}, {0, 20} }, { { 0, 10 }, {0, 8}, {0, 5} } };
+    auto target    = Polylines { { {0, 5}, {0, 8}, { 0, 10 } }, { { 0, 15 }, {0, 18}, {0, 20} } };
+    auto chained   = chain_polylines(polylines);
+    REQUIRE(chained == target);
 }

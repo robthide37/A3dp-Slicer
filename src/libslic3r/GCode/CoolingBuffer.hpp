@@ -26,6 +26,8 @@ public:
     void        reset(const Vec3d &position);
     void        set_current_extruder(unsigned int extruder_id) { m_current_extruder = extruder_id; }
     std::string process_layer(std::string &&gcode, size_t layer_id, bool flush);
+    std::string process_layer(const std::string &gcode, size_t layer_id, bool flush)
+        { return this->process_layer(std::string(gcode), layer_id, flush); }
 
 private:
 	CoolingBuffer& operator=(const CoolingBuffer&) = delete;

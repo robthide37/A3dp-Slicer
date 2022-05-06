@@ -31,7 +31,4 @@ sub regions {
     return [ map $self->get_region($_), 0..($self->region_count-1) ];
 }
 
-package Slic3r::Layer::Support;
-our @ISA = qw(Slic3r::Layer);
-
 1;
