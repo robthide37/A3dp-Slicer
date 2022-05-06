@@ -882,8 +882,9 @@ bool GLGizmoEmboss::process()
         if (mesh == nullptr) return false;
 
         Transform3d text_tr = m_volume->get_matrix();
-        if (tc.fix_3mf_tr.has_value())
-            text_tr = text_tr * tc.fix_3mf_tr->inverse();
+        auto& fix_3mf = m_volume->text_configuration->fix_3mf_tr;
+        if (fix_3mf.has_value())
+            text_tr = text_tr * fix_3mf->inverse();
 
         bool is_outside = m_volume->is_model_part();
         // check that there is not unexpected volume type
@@ -967,38 +968,6 @@ const ModelVolume * GLGizmoEmboss::get_volume_to_cut_surface_from()
     return nullptr;
 }
 
-void GLGizmoEmboss::use_surface() {
-    // font face with glyph cache
-    auto ffc = m_font_manager.get_font().font_file_with_cache;
-    if (!ffc.has_value()) return;
-
-    // Model to cut surface from.
-    const ModelVolume *mesh = get_volume_to_cut_surface_from();
-    if (mesh == nullptr) return;
-
-    // Cancel previous job
-    if (m_update_job_cancel != nullptr) m_update_job_cancel->store(true);
-    // create new shared ptr to cancel new job
-    m_update_job_cancel = std::make_shared<std::atomic<bool>>(false);
-    EmbossDataBase   base{ffc, create_configuration(), create_volume_name()};
-    EmbossDataUpdate data{std::move(base), m_volume->id(), m_update_job_cancel};
-
-    assert(m_volume->text_configuration.has_value());
-    if (!m_volume->text_configuration.has_value()) return;
-    const TextConfiguration &tc = *m_volume->text_configuration;
-    Transform3d text_tr = m_volume->get_matrix();
-    if (tc.fix_3mf_tr.has_value())
-         text_tr = text_tr * tc.fix_3mf_tr->inverse();
-    bool is_outside = m_volume->is_model_part();
-    // check that there is not unexpected volume type
-    assert(is_outside || m_volume->is_negative_volume() || m_volume->is_modifier());
-    UseSurfaceData surface_data{std::move(data), text_tr, is_outside,
-                                mesh->mesh().its /*copy*/, mesh->get_matrix(), mesh->mesh().bounding_box()};
-
-    auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    queue_job(worker, std::make_unique<UseSurfaceJob>(std::move(surface_data)));
-}
-
 void GLGizmoEmboss::draw_window()
 {
 #ifdef ALLOW_DEBUG_MODE
@@ -1042,11 +1011,7 @@ void GLGizmoEmboss::draw_window()
 
     m_imgui->disabled_end(); // !is_selected_style
 
-    if (ImGui::Button(_u8L("Close").c_str())) close();
-
-    ImGui::SameLine();
-    if (ImGui::Button(_u8L("UseSurface").c_str()))
-        use_surface();    
+    if (ImGui::Button(_u8L("Close").c_str())) close();   
 
     // Option to create text volume when reselecting volumes
     m_imgui->disabled_begin(!exist_font_file);
