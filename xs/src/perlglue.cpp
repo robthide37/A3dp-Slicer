@@ -7,7 +7,6 @@ REGISTER_CLASS(ExPolygon, "ExPolygon");
 REGISTER_CLASS(ExtrusionPath, "ExtrusionPath");
 REGISTER_CLASS(ExtrusionLoop, "ExtrusionLoop");
 REGISTER_CLASS(ExtrusionEntityCollection, "ExtrusionPath::Collection");
-REGISTER_CLASS(CoolingBuffer, "GCode::CoolingBuffer");
 REGISTER_CLASS(GCode, "GCode");
 REGISTER_CLASS(Layer, "Layer");
 REGISTER_CLASS(LayerRegion, "Layer::Region");

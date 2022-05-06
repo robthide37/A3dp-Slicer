@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Slic3r::XS;
-use Test::More tests => 7;
+use Test::More tests => 5;
 
 my $points = [
     [100, 100],
@@ -17,8 +17,6 @@ my $path = Slic3r::ExtrusionPath->new(
     role     => Slic3r::ExtrusionPath::EXTR_ROLE_EXTERNAL_PERIMETER,
     mm3_per_mm => 1,
 );
-isa_ok $path->polyline, 'Slic3r::Polyline::Ref', 'path polyline';
-is_deeply $path->polyline->pp, $points, 'path points roundtrip';
 
 $path->reverse;
 is_deeply $path->polyline->pp, [ reverse @$points ], 'reverse path';

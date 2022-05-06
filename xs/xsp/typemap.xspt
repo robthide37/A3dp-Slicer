@@ -92,18 +92,6 @@
 %typemap{Layer*};
 %typemap{Ref<Layer>}{simple};
 
-%typemap{CoolingBuffer*};
-%typemap{Ref<CoolingBuffer>}{simple};
-%typemap{Clone<CoolingBuffer>}{simple};
-
-%typemap{GCode*};
-%typemap{Ref<GCode>}{simple};
-%typemap{Clone<GCode>}{simple};
-
-//%typemap{GCodePreviewData*};
-//%typemap{Ref<GCodePreviewData>}{simple};
-//%typemap{Clone<GCodePreviewData>}{simple};
-
 %typemap{Points};
 %typemap{Pointfs};
 %typemap{Lines};
@@ -165,11 +153,5 @@
   %cpp_type{ExtrusionRole};
   %precall_code{%
     $CVar = (ExtrusionRole)SvUV($PerlVar);
-  %};
-};
-%typemap{FlowRole}{parsed}{
-  %cpp_type{FlowRole};
-  %precall_code{%
-    $CVar = (FlowRole)SvUV($PerlVar);
   %};
 };

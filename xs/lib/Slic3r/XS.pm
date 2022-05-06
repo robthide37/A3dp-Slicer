@@ -158,7 +158,6 @@ for my $class (qw(
         Slic3r::ExtrusionLoop
         Slic3r::ExtrusionPath
         Slic3r::ExtrusionPath::Collection
-        Slic3r::GCode
         Slic3r::Geometry::BoundingBox
         Slic3r::Layer
         Slic3r::Layer::Region

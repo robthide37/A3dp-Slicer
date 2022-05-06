@@ -12,6 +12,8 @@
 
 class wxColourPickerCtrl;
 class wxBookCtrlBase;
+class wxSlider;
+class wxRadioButton;
 
 namespace Slic3r {
 
@@ -39,6 +41,11 @@ class PreferencesDialog : public DPIDialog
 	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_render;
 #endif // ENABLE_ENVIRONMENT_MAP
 	wxSizer*                            m_icon_size_sizer;
+	wxSlider*							m_icon_size_slider {nullptr};
+	wxRadioButton*						m_rb_old_settings_layout_mode {nullptr};
+	wxRadioButton*						m_rb_new_settings_layout_mode {nullptr};
+	wxRadioButton*						m_rb_dlg_settings_layout_mode {nullptr};
+
 	wxColourPickerCtrl*					m_sys_colour {nullptr};
 	wxColourPickerCtrl*					m_mod_colour {nullptr};
 	wxBookCtrlBase*						tabs {nullptr};
@@ -47,6 +54,9 @@ class PreferencesDialog : public DPIDialog
 	bool								m_settings_layout_changed {false};
 	bool								m_seq_top_layer_only_changed{ false };
 	bool								m_recreate_GUI{false};
+
+	int									m_custom_toolbar_size{-1};
+	bool								m_use_custom_toolbar_size{false};
 
 public:
 	explicit PreferencesDialog(wxWindow* paren);
@@ -58,6 +68,7 @@ public:
 	void	build();
 	void	update_ctrls_alignment();
 	void	accept(wxEvent&);
+	void    revert(wxEvent&);
 	void	show(const std::string& highlight_option = std::string(), const std::string& tab_name = std::string());
 
 protected:
@@ -65,6 +76,8 @@ protected:
 	void on_dpi_changed(const wxRect& suggested_rect) override { msw_rescale(); }
 	void on_sys_color_changed() override;
     void layout();
+	void clear_cache();
+	void refresh_og(std::shared_ptr<ConfigOptionsGroup> og);
     void create_icon_size_slider();
     void create_settings_mode_widget();
     void create_settings_text_color_widget();

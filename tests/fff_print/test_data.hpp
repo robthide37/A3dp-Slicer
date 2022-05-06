@@ -21,6 +21,7 @@ enum class TestMesh {
     V,
     _40x10,
     cube_20x20x20,
+    cube_2x20x10,
     sphere_50mm,
     bridge,
     bridge_with_hole,
