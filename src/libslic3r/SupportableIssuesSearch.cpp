@@ -81,7 +81,6 @@ private:
     const Points& get_base_points() {
         return this->points;
     }
-
 };
 
 struct CentroidAccumulators {
@@ -385,11 +384,10 @@ public:
                                 }
                             }
                         }
-                        bool curled = current.curled_height > 0;
-                        current.curled_height += curled_height;
-                        if (!curled) {
-                            current.curled_height -= unscaled(this->cell_size.z());
-                        }
+                        current.curled_height += std::max(0.0f,
+                                float(curled_height - unscaled(this->cell_size.z()) / 2.0f));
+                        current.curled_height = std::min(current.curled_height,
+                                float(unscaled(this->cell_size.z()) * 2.0f));
                         std::cout << "Curling: " << current.curled_height << std::endl;
 
                         if (current.curled_height / unscaled(this->cell_size.z()) > 0.3f) {
@@ -402,7 +400,8 @@ public:
             filtered_active_accumulators.clear();
             for (const auto &pair : modified_acc_ids) {
                 CentroidAccumulator *acc = &accumulators.access(pair.first);
-                filtered_active_accumulators[acc].insert(filtered_active_accumulators[acc].end(), pair.second.begin(),
+                filtered_active_accumulators[acc].insert(filtered_active_accumulators[acc].end(),
+                        pair.second.begin(),
                         pair.second.end());
             }
 
@@ -422,9 +421,9 @@ private:
             std::cout << "acc.accumulated_value :   " << acc.accumulated_value.x() << "  "
                     << acc.accumulated_value.y() << " " << acc.accumulated_value.z() << std::endl;
             std::cout << "acc.accumulated_volume :   " << acc.accumulated_volume << std::endl;
-            std::cout << "centroid:   " << centroid.x() << "  " << centroid.y() << " " << centroid.z() << std::endl;
+            std::cout << "centroid:   " << centroid.x() << "  " << centroid.y() << " " << centroid.z()
+                    << std::endl;
 
-            //determine signed shortest distance to the convex hull
             Point centroid_base_projection = Point(scaled(Vec2f(centroid.head<2>())));
             Point pivot;
             double distance_scaled_sq = std::numeric_limits<double>::max();
@@ -441,7 +440,8 @@ private:
                         pivot = closest_point;
                         distance_scaled_sq = dist_sq;
                     }
-                    if ((centroid_base_projection - closest_point).cast<double>().dot(line.normal().cast<double>())
+                    if ((centroid_base_projection - closest_point).cast<double>().dot(
+                            line.normal().cast<double>())
                             > 0) {
                         inside = false;
                     }
@@ -452,7 +452,8 @@ private:
             pivot_3d << unscale(pivot).cast<float>(), acc.base_height;
             float embedded_distance = unscaled(sqrt(distance_scaled_sq));
             float centroid_pivot_distance = (centroid - pivot_3d).norm();
-            float base_center_pivot_distance = float(unscale(Vec2crd(acc.base_hull().centroid() - pivot)).norm());
+            float base_center_pivot_distance = float(
+                    unscale(Vec2crd(acc.base_hull().centroid() - pivot)).norm());
 
             std::cout << "centroid inside ? " << inside << "  and embedded distance is: " << embedded_distance
                     << std::endl;
@@ -465,7 +466,8 @@ private:
             std::cout << "sticking force: " << sticking_force << "   sticking torque: " << sticking_torque
                     << std::endl;
 
-            float xy_movement_force = acc.accumulated_volume * params.filament_density * params.max_acceleration;
+            float xy_movement_force = acc.accumulated_volume * params.filament_density
+                    * params.max_acceleration;
             float xy_movement_torque = xy_movement_force * centroid_pivot_distance;
 
             std::cout << "xy_movement_force: " << xy_movement_force << "  xy_movement_torque: "
@@ -482,7 +484,8 @@ private:
                     * centroid_pivot_distance;
             std::cout << "extruder_conflict_torque: " << extruder_conflict_torque << std::endl;
 
-            float total_momentum = sticking_torque + weight_torque - xy_movement_torque - extruder_conflict_torque;
+            float total_momentum = sticking_torque + weight_torque - xy_movement_torque
+                    - extruder_conflict_torque;
             additional_supports_needed = total_momentum < 0;
 
             std::cout << "total_momentum: " << total_momentum << std::endl;
@@ -538,6 +541,50 @@ private:
         }
     }
 
+    float check_point_stability_under_pressure(CentroidAccumulator &acc, const Point &base_centroid,
+            const Vec3f &pressure_point, const Params &params) {
+        Point pressure_base_projection = Point(scaled(Vec2f(pressure_point.head<2>())));
+        Point pivot;
+        double distance_scaled_sq = std::numeric_limits<double>::max();
+        bool inside = true;
+        if (acc.base_hull().points.size() == 1) {
+            pivot = acc.base_hull().points[0];
+            distance_scaled_sq = (pivot - pressure_base_projection).squaredNorm();
+            inside = distance_scaled_sq < params.support_points_interface_area;
+        } else {
+            for (Line line : acc.base_hull().lines()) {
+                Point closest_point;
+                double dist_sq = line.distance_to_squared(pressure_base_projection, &closest_point);
+                if (dist_sq < distance_scaled_sq) {
+                    pivot = closest_point;
+                    distance_scaled_sq = dist_sq;
+                }
+                if ((pressure_base_projection - closest_point).cast<double>().dot(line.normal().cast<double>())
+                        > 0) {
+                    inside = false;
+                }
+            }
+        }
+        float embedded_distance = unscaled(sqrt(distance_scaled_sq));
+        float base_center_pivot_distance = float(unscale(Vec2crd(base_centroid - pivot)).norm());
+        Vec3f pivot_3d;
+        pivot_3d << unscale(pivot).cast<float>(), acc.base_height;
+
+        float sticking_force = acc.base_area
+                * (acc.base_height == 0 ? params.base_adhesion : params.support_adhesion);
+        float sticking_torque = sticking_force * base_center_pivot_distance;
+
+        float pressure_arm = inside ? pressure_point.z() - pivot_3d.z() : (pressure_point - pivot_3d).norm();
+        float pressure_force = 1.0f;
+        float pressure_torque = pressure_arm * pressure_force;
+
+        if (sticking_torque < pressure_torque) {
+            return pressure_force;
+        } else {
+            return 0.0f;
+        }
+    }
+
 #ifdef DEBUG_FILES
 public:
     void debug_export() const {
@@ -575,7 +622,8 @@ public:
             for (int x = 0; x < global_cell_count.x(); ++x) {
                 for (int y = 0; y < global_cell_count.y(); ++y) {
                     for (int z = 0; z < local_z_cell_count; ++z) {
-                        Vec3f center = unscale(get_cell_center(to_global_cell_coords(Vec3i { x, y, z }))).cast<float>();
+                        Vec3f center = unscale(get_cell_center(to_global_cell_coords(Vec3i { x, y, z }))).cast<
+                                float>();
                         const Cell &cell = access_cell(Vec3i(x, y, z));
                         if (cell.volume != 0) {
                             auto volume_color = value_to_rgbf(0, cell.volume, cell.volume);
@@ -584,12 +632,14 @@ public:
                         }
                         if (cell.island_id != std::numeric_limits<int>::max()) {
                             auto island_color = value_to_rgbf(min_island_id, max_island_id + 1, cell.island_id);
-                            fprintf(islands_grid_file, "v %f %f %f  %f %f %f\n", center(0), center(1), center(2),
+                            fprintf(islands_grid_file, "v %f %f %f  %f %f %f\n", center(0), center(1),
+                                    center(2),
                                     island_color.x(), island_color.y(), island_color.z());
                         }
                         if (cell.curled_height > 0) {
                             auto curling_color = value_to_rgbf(0, max_curling_height, cell.curled_height);
-                            fprintf(curling_grid_file, "v %f %f %f  %f %f %f\n", center(0), center(1), center(2),
+                            fprintf(curling_grid_file, "v %f %f %f  %f %f %f\n", center(0), center(1),
+                                    center(2),
                                     curling_color.x(), curling_color.y(), curling_color.z());
                         }
                     }
@@ -722,7 +772,8 @@ struct SegmentAccumulator {
 
 };
 
-Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float print_z, const LayerRegion *layer_region,
+Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float print_z,
+        const LayerRegion *layer_region,
         const EdgeGridWrapper &supported_grid, const Params &params) {
 
     Issues issues { };
@@ -794,11 +845,12 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
 
             // Estimation of short curvy segments which are not supported -> problems with curling
             if (dist_from_prev_layer > -max_allowed_dist_from_prev_layer * 0.7071) { //extrusion point is unsupported or poorly supported
-                float dist_factor = (dist_from_prev_layer + max_allowed_dist_from_prev_layer * 0.7071)
+                float dist_factor = 0.5f + 0.5f * (dist_from_prev_layer + max_allowed_dist_from_prev_layer * 0.7071)
                         / max_allowed_dist_from_prev_layer;
                 issues.curling_up.push_back(
                         CurledFilament(fpoint,
-                                dist_factor * (0.25f * region_height + region_height * 0.75f * std::abs(angle) / PI)));
+                                dist_factor
+                                        * (0.25f * region_height + region_height * 0.75f * std::abs(angle) / PI)));
             }
 
             prev_point = point;
