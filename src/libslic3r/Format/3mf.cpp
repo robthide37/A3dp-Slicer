@@ -2261,14 +2261,13 @@ namespace Slic3r {
         typedef std::vector<BuildItem> BuildItemsList;
         typedef std::map<int, ObjectData> IdToObjectDataMap;
 
-        bool m_fullpath_sources{ true };
-        bool m_zip64 { true };
+        OptionStore3mf m_options{};
 
     public:
-        bool save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64);
+        bool save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, const OptionStore3mf& options);
 
     private:
-        bool _save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, const ThumbnailData* thumbnail_data);
+        bool _save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config);
         bool _add_content_types_file_to_archive(mz_zip_archive& archive);
         bool _add_thumbnail_file_to_archive(mz_zip_archive& archive, const ThumbnailData& thumbnail_data);
         bool _add_relationships_file_to_archive(mz_zip_archive& archive);
@@ -2285,15 +2284,14 @@ namespace Slic3r {
         bool _add_custom_gcode_per_print_z_file_to_archive(mz_zip_archive& archive, Model& model, const DynamicPrintConfig& config);
     };
 
-    bool _3MF_Exporter::save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64)
+    bool _3MF_Exporter::save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, const OptionStore3mf& options)
     {
         clear_errors();
-        m_fullpath_sources = fullpath_sources;
-        m_zip64 = zip64;
-        return _save_model_to_file(filename, model, config, thumbnail_data);
+        m_options = options;
+        return _save_model_to_file(filename, model, config);
     }
 
-    bool _3MF_Exporter::_save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, const ThumbnailData* thumbnail_data)
+    bool _3MF_Exporter::_save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config)
     {
         mz_zip_archive archive;
         mz_zip_zero_struct(&archive);
@@ -2311,10 +2309,10 @@ namespace Slic3r {
             return false;
         }
 
-        if (!model.objects.empty() && thumbnail_data != nullptr && thumbnail_data->is_valid())
+        if (!model.objects.empty() && m_options.thumbnail_data != nullptr && m_options.thumbnail_data->is_valid())
         {
             // Adds the file Metadata/thumbnail.png.
-            if (!_add_thumbnail_file_to_archive(archive, *thumbnail_data)) {
+            if (!_add_thumbnail_file_to_archive(archive, *m_options.thumbnail_data)) {
                 close_zip_writer(&archive);
                 boost::filesystem::remove(filename);
                 return false;
@@ -2353,7 +2351,7 @@ namespace Slic3r {
         // Adds layer config ranges file ("Metadata/Slic3r_PE_layer_config_ranges.txt").
         // All layer height profiles of all ModelObjects are stored here, indexed by 1 based index of the ModelObject in Model.
         // The index differes from the index of an object ID of an object instance of a 3MF file!
-        if (!_add_layer_config_ranges_file_to_archive(archive, model, *config)) {
+        if (config && m_options.export_modifiers && !_add_layer_config_ranges_file_to_archive(archive, model, *config)) {
             close_zip_writer(&archive);
             boost::filesystem::remove(filename);
             return false;
@@ -2377,7 +2375,7 @@ namespace Slic3r {
 
         // Adds custom gcode per height file ("Metadata/Prusa_Slicer_custom_gcode_per_print_z.xml").
         // All custom gcode per height of whole Model are stored here
-        if (!_add_custom_gcode_per_print_z_file_to_archive(archive, model, *config)) {
+        if (config && m_options.export_modifiers && !_add_custom_gcode_per_print_z_file_to_archive(archive, model, *config)) {
             close_zip_writer(&archive);
             boost::filesystem::remove(filename);
             return false;
@@ -2385,7 +2383,7 @@ namespace Slic3r {
 
         // Adds slic3r print config file ("Metadata/Slic3r_PE.config").
         // This file contains the content of FullPrintConfing / SLAFullPrintConfig.
-        if (config != nullptr) {
+        if (config && m_options.export_config) {
             // also add prusa (& superslicer for backward comp, just for some version from 2.3.56) print config
             bool error = !_add_print_config_file_to_archive(archive, *config, SLIC3R_PRINT_CONFIG_FILE);
             error = error || !_add_print_config_file_to_archive(archive, *config, PRUSA_PRINT_CONFIG_FILE);
@@ -2401,20 +2399,20 @@ namespace Slic3r {
         // This file contains all the attributes of all ModelObjects and their ModelVolumes (names, parameter overrides).
         // As there is just a single Indexed Triangle Set data stored per ModelObject, offsets of volumes into their respective Indexed Triangle Set data
         // is stored here as well.
-        if (!_add_model_config_file_to_archive(archive, model, *config, objects_data, SLIC3R_MODEL_CONFIG_FILE)) {
+        if (config && m_options.export_modifiers && !_add_model_config_file_to_archive(archive, model, *config, objects_data, SLIC3R_MODEL_CONFIG_FILE)) {
             close_zip_writer(&archive);
             boost::filesystem::remove(filename);
             return false;
         }
         // also add prusa
-        if (!_add_model_config_file_to_archive(archive, model, *config, objects_data, PRUSA_MODEL_CONFIG_FILE))
+        if (config && m_options.export_modifiers && !_add_model_config_file_to_archive(archive, model, *config, objects_data, PRUSA_MODEL_CONFIG_FILE))
         {
             close_zip_writer(&archive);
             boost::filesystem::remove(filename);
             return false;
         }
         //  also superslicer for backward comp, just for some version from 2.3.56
-        if (!_add_model_config_file_to_archive(archive, model, *config, objects_data, SUPER_MODEL_CONFIG_FILE))
+        if (config && m_options.export_modifiers && !_add_model_config_file_to_archive(archive, model, *config, objects_data, SUPER_MODEL_CONFIG_FILE))
         {
             close_zip_writer(&archive);
             boost::filesystem::remove(filename);
@@ -2504,7 +2502,7 @@ namespace Slic3r {
     {
         mz_zip_writer_staged_context context;
         if (!mz_zip_writer_add_staged_open(&archive, &context, MODEL_FILE.c_str(), 
-            m_zip64 ? 
+            m_options.zip64 ?
                 // Maximum expected and allowed 3MF file size is 16GiB.
                 // This switches the ZIP file to a 64bit mode, which adds a tiny bit of overhead to file records.
                 (uint64_t(1) << 30) * 16 : 
@@ -3231,7 +3229,7 @@ namespace Slic3r {
 
                             // stores volume's source data
                             {
-                                std::string input_file = xml_escape(m_fullpath_sources ? volume->source.input_file : boost::filesystem::path(volume->source.input_file).filename().string());
+                                std::string input_file = xml_escape(m_options.fullpath_sources ? volume->source.input_file : boost::filesystem::path(volume->source.input_file).filename().string());
                                 std::string prefix = std::string("   <") + METADATA_TAG + " " + TYPE_ATTR + "=\"" + VOLUME_TYPE + "\" " + KEY_ATTR + "=\"";
                                 if (! volume->source.input_file.empty()) {
                                     stream << prefix << SOURCE_FILE_KEY      << "\" " << VALUE_ATTR << "=\"" << input_file << "\"/>\n";
@@ -3407,7 +3405,7 @@ bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionCo
     return res;
 }
 
-bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64)
+bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config, OptionStore3mf options)
 {
     // All export should use "C" locales for number formatting.
     CNumericLocalesSetter locales_setter;
@@ -3416,7 +3414,7 @@ bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config,
         return false;
 
     _3MF_Exporter exporter;
-    bool res = exporter.save_model_to_file(path, *model, config, fullpath_sources, thumbnail_data, zip64);
+    bool res = exporter.save_model_to_file(path, *model, config, options);
     if (!res)
         exporter.log_errors();
 

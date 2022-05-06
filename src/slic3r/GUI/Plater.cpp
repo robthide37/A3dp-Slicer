@@ -510,7 +510,7 @@ wxSizer* FreqChangedParams::get_sizer()
 
 void FreqChangedParams::Show(bool visible) {
     //shouldn't be called!
-    std::cout << "error vfafeza";
+    assert(false);
     this->Show(PrinterTechnology::ptFFF);
 }
 
@@ -5921,13 +5921,210 @@ void Plater::export_gcode(bool prefer_removable)
 	}
 }
 
-void Plater::export_stl(bool extended, bool selection_only)
+bool OptionForExportPlatter_can_select = true;
+bool OptionForExportPlatter_can_support = true;
+// panel with custom controls for file dialog
+class OptionForExportPlatter : public wxPanel
+{
+public:
+    OptionForExportPlatter(wxWindow* parent);
+    bool with_support() { return m_with_supports->GetValue(); }
+    bool only_selection() { return m_sel_only->GetValue(); }
+    bool with_modifers() { return m_with_modifiers->GetValue(); }
+    bool with_config() { return m_with_config->GetValue(); }
+private:
+
+    void OnUpdateLabelUI(wxUpdateUIEvent& event)
+    {
+        wxFileDialogBase* const dialog = wxStaticCast(GetParent(), wxFileDialogBase);
+        const wxString fn = dialog->GetCurrentlySelectedFilename();
+
+
+        const int filter = dialog->GetCurrentlySelectedFilterIndex();
+
+        m_with_modifiers->Enable(filter > 0);
+        m_with_config->Enable(filter == 1);
+    }
+
+    wxCheckBox* m_with_supports;
+    wxCheckBox* m_sel_only;
+    wxCheckBox* m_with_modifiers;
+    wxCheckBox* m_with_config;
+};
+
+OptionForExportPlatter::OptionForExportPlatter(wxWindow* parent)
+    : wxPanel(parent)
+{
+    m_with_supports = new wxCheckBox(this, -1, _L("Include supports"));
+    m_sel_only = new wxCheckBox(this, -1, _L("Only selected objects"));
+    m_with_modifiers = new wxCheckBox(this, -1, _L("Include modifiers"));
+    m_with_config = new wxCheckBox(this, -1, _L("Include presets"));
+
+    m_with_supports->Enable(OptionForExportPlatter_can_support);
+    m_sel_only->Enable(OptionForExportPlatter_can_select);
+    m_with_modifiers->Enable(false);
+    m_with_config->Enable(false);
+
+    this->Bind(wxEVT_UPDATE_UI, &OptionForExportPlatter::OnUpdateLabelUI, this);
+
+    wxBoxSizer* sizerTop = new wxBoxSizer(wxHORIZONTAL);
+    sizerTop->Add(m_with_supports, wxSizerFlags().Centre().Border());
+    sizerTop->AddSpacer(10);
+    sizerTop->Add(m_sel_only, wxSizerFlags().Centre().Border());
+    wxBoxSizer* sizerBot = new wxBoxSizer(wxHORIZONTAL);
+    sizerBot->Add(m_with_config, wxSizerFlags().Centre().Border());
+    sizerBot->AddSpacer(10);
+    sizerBot->Add(m_with_modifiers, wxSizerFlags().Centre().Border());
+    wxBoxSizer* sizerMain = new wxBoxSizer(wxVERTICAL);
+    sizerMain->Add(sizerTop, wxSizerFlags().Left());
+    sizerMain->Add(sizerBot, wxSizerFlags().Left());
+
+    SetSizerAndFit(sizerMain);
+}
+
+std::string Plater::get_export_path()
+{
+    if (p->model.objects.empty()) { return ""; }
+    wxString path = p->get_export_file(FT_STL);
+    if (path.empty()) { return ""; }
+    return into_u8(path);
+}
+
+void Plater::export_platter()
 {
     if (p->model.objects.empty()) { return; }
 
-    wxString path = p->get_export_file(FT_STL);
-    if (path.empty()) { return; }
-    const std::string path_u8 = into_u8(path);
+    wxString wildcard = file_wildcards(FT_STL) + "|" + file_wildcards(FT_3MF) + "|" + file_wildcards(FT_AMF);
+
+    fs::path output_file = p->get_export_file_path(FT_STL);
+
+    wxString dlg_title;
+    output_file.replace_extension("");
+    dlg_title = _L("Export Platter:");
+
+    std::string out_dir = (boost::filesystem::path(output_file).parent_path()).string();
+
+    wxFileDialog dlg(this, dlg_title,
+        is_shapes_dir(out_dir) ? from_u8(wxGetApp().app_config->get_last_dir()) : from_path(output_file.parent_path()), from_path(output_file.filename()),
+        wildcard, wxFD_SAVE |(wxGetApp().app_config->get_show_overwrite_dialog() ? wxFD_OVERWRITE_PROMPT : 0) );
+
+    const Selection& selection = this->get_selection();
+    const auto obj_idx = selection.get_object_idx();
+    OptionForExportPlatter_can_select = !(obj_idx == -1 || selection.is_wipe_tower());
+    OptionForExportPlatter_can_support = p->printer_technology == ptSLA;
+    dlg.SetExtraControlCreator([](wxWindow* parent)->wxWindow* {
+        return new OptionForExportPlatter(parent);
+        });
+
+    int res = dlg.ShowModal();
+    if (res != wxID_OK)
+        return;
+    OptionForExportPlatter* extra_options = static_cast<OptionForExportPlatter*>(dlg.GetExtraControl());
+
+    wxString out_path = dlg.GetPath();
+    fs::path path(into_path(out_path));
+    wxGetApp().app_config->update_last_output_dir(path.parent_path().string());
+    std::string path_u8 = into_u8(out_path);
+
+    if (dlg.GetCurrentlySelectedFilterIndex() == 0) {
+        this->export_stl(path_u8, extra_options->with_support(), extra_options->only_selection());
+    } else if (dlg.GetCurrentlySelectedFilterIndex() > 0) {
+        //export 3mf
+        wxBusyCursor wait;
+
+        //selection
+        Model model_to_save = p->model;
+        if (extra_options->only_selection()) {
+            const Selection& selection =  get_selection();
+            std::set<size_t> objects_idxes;
+            for (unsigned int vol_idx : selection.get_volume_idxs()) {
+                objects_idxes.insert(selection.get_volume(vol_idx)->object_idx());
+            }
+            for (size_t idx = model_to_save.objects.size() - 1; idx < model_to_save.objects.size(); idx--) {
+                if (objects_idxes.find(idx) == objects_idxes.end()) {
+                    model_to_save.delete_object(idx);
+                }
+            }
+        }
+
+        //support
+        if (extra_options->with_support()) {
+            if (p->printer_technology == ptSLA) {
+                for (const SLAPrintObject* object : p->sla_print.objects()) {
+                    const Transform3d mesh_trafo_inv = object->trafo().inverse();
+
+                    TriangleMesh pad_mesh;
+                    const bool has_pad_mesh = object->has_mesh(slaposPad);
+                    if (has_pad_mesh) {
+                        pad_mesh = object->get_mesh(slaposPad);
+                        pad_mesh.transform(mesh_trafo_inv);
+                    }
+
+                    ModelObject* obj = model_to_save.add_object();
+                    ModelVolume* vol = obj->add_volume(std::move(pad_mesh), ModelVolumeType::MODEL_PART, false);
+                    vol->name = "pad_" + object->model_object()->name;
+
+                    TriangleMesh supports_mesh;
+                    const bool has_supports_mesh = object->has_mesh(slaposSupportTree);
+                    if (has_supports_mesh) {
+                        supports_mesh = object->get_mesh(slaposSupportTree);
+                        supports_mesh.transform(mesh_trafo_inv);
+                    }
+
+                    obj = model_to_save.add_object();
+                    vol = obj->add_volume(std::move(supports_mesh), ModelVolumeType::MODEL_PART, false);
+                    vol->name = "support_" + object->model_object()->name;
+                }
+            }
+        }
+        DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config_secure();
+        if (dlg.GetCurrentlySelectedFilterIndex() == 1) {
+
+            //thumbnail
+            ThumbnailData thumbnail_data;
+            const DynamicPrintConfig* printer_config = wxGetApp().get_tab(Preset::TYPE_PRINTER)->get_config();
+            bool show_bed_on_thumbnails = true;
+            if (const ConfigOptionBool* conf = printer_config->option<ConfigOptionBool>("thumbnails_with_bed"))
+                show_bed_on_thumbnails = conf->value;
+            bool show_support_on_thumbnails = false;
+            if (const ConfigOptionBool* conf = printer_config->option<ConfigOptionBool>("thumbnails_with_support"))
+                show_support_on_thumbnails = conf->value;
+            ThumbnailsParams thumbnail_params = { {},
+                false, // printable_only
+                !show_support_on_thumbnails, // parts_only
+                show_bed_on_thumbnails, // show_bed
+                true }; // transparent_background
+            //p->generate_thumbnail(thumbnail_data, THUMBNAIL_SIZE_3MF.first, THUMBNAIL_SIZE_3MF.second, thumbnail_params, Camera::EType::Ortho);
+            const GLVolumeCollection& collection = p->view3D->get_canvas3d()->get_volumes();
+            p->view3D->get_canvas3d()->render_thumbnail(thumbnail_data, THUMBNAIL_SIZE_3MF.first, THUMBNAIL_SIZE_3MF.second, thumbnail_params, collection, Camera::EType::Ortho);
+
+            //store 3mf
+            bool ret = Slic3r::store_3mf(path_u8.c_str(),
+                &model_to_save,
+                &full_config,
+                OptionStore3mf{}
+                .set_fullpath_sources(wxGetApp().app_config->get("export_sources_full_pathnames") == "1")
+                .set_thumbnail_data(&thumbnail_data)
+                .set_export_config(extra_options->with_config())
+                .set_export_modifiers(extra_options->with_modifers())
+            );
+        } else if (dlg.GetCurrentlySelectedFilterIndex() == 2) {
+            //store amf
+            bool ret = Slic3r::store_amf(path_u8,
+                &model_to_save,
+                &full_config,
+                OptionStoreAmf{}
+                .set_fullpath_sources(wxGetApp().app_config->get("export_sources_full_pathnames") == "1")
+                .set_export_config(true) // no effect extra_options->with_config())
+                .set_export_modifiers(extra_options->with_modifers())
+            );
+        }
+    }
+}
+
+void Plater::export_stl(std::string path_u8, bool extended, bool selection_only)
+{
+    if (p->model.objects.empty()) { return; }
 
     wxBusyCursor wait;
 
@@ -6072,7 +6269,7 @@ void Plater::export_amf()
     bool export_config = true;
     DynamicPrintConfig cfg = wxGetApp().preset_bundle->full_config_secure();
     bool full_pathnames = wxGetApp().app_config->get("export_sources_full_pathnames") == "1";
-    if (Slic3r::store_amf(path_u8, &p->model, export_config ? &cfg : nullptr, full_pathnames)) {
+    if (Slic3r::store_amf(path_u8, &p->model, export_config ? &cfg : nullptr, OptionStoreAmf{}.set_fullpath_sources(full_pathnames))) {
         // Success
 //        p->statusbar()->set_status_text(format_wxstr(_L("AMF file exported to %s"), path));
     } else {
@@ -6119,7 +6316,7 @@ bool Plater::export_3mf(const boost::filesystem::path& output_path)
         show_bed_on_thumbnails, // show_bed
         true}; // transparent_background
     p->generate_thumbnail(thumbnail_data, THUMBNAIL_SIZE_3MF.first, THUMBNAIL_SIZE_3MF.second, thumbnail_params, Camera::EType::Ortho);
-    bool ret = Slic3r::store_3mf(path_u8.c_str(), &p->model, &cfg, full_pathnames, &thumbnail_data);
+    bool ret = Slic3r::store_3mf(path_u8.c_str(), &p->model, &cfg, OptionStore3mf{}.set_fullpath_sources(full_pathnames).set_thumbnail_data(&thumbnail_data));
     if (ret) {
         // Success
 //        p->statusbar()->set_status_text(format_wxstr(_L("3MF file exported to %s"), path));

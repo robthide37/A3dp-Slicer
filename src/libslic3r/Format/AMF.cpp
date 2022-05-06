@@ -1104,7 +1104,7 @@ bool load_amf(const char* path, DynamicPrintConfig* config, ConfigSubstitutionCo
         return false;
 }
 
-bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config, bool fullpath_sources)
+bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config, OptionStoreAmf options)
 {
     if ((path.empty()) || (model == nullptr))
         return false;
@@ -1129,7 +1129,7 @@ bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config
     stream << "<metadata type=\"cad\">Slic3r " << SLIC3R_VERSION << "</metadata>\n";
     stream << "<metadata type=\"" << SLIC3RPE_AMF_VERSION << "\">" << VERSION_AMF << "</metadata>\n";
 
-    if (config != nullptr)
+    if (config && options.export_config)
     {
         std::string str_config = "\n";
         for (const std::string &key : config->keys())
@@ -1153,8 +1153,9 @@ bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config
     for (size_t object_id = 0; object_id < model->objects.size(); ++ object_id) {
         ModelObject *object = model->objects[object_id];
         stream << "  <object id=\"" << object_id << "\">\n";
-        for (const std::string &key : object->config.keys())
-            stream << "    <metadata type=\"slic3r." << key << "\">" << object->config.opt_serialize(key) << "</metadata>\n";
+        if (options.export_modifiers)
+            for (const std::string &key : object->config.keys())
+                stream << "    <metadata type=\"slic3r." << key << "\">" << object->config.opt_serialize(key) << "</metadata>\n";
         if (!object->name.empty())
             stream << "    <metadata type=\"name\">" << xml_escape(object->name) << "</metadata>\n";
         const std::vector<double> &layer_height_profile = object->layer_height_profile.get();
@@ -1169,7 +1170,7 @@ bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config
 
         // Export layer height ranges including the layer range specific config overrides.
         const t_layer_config_ranges& config_ranges = object->layer_config_ranges;
-        if (!config_ranges.empty())
+        if (!config_ranges.empty() && options.export_modifiers)
         {
             // Store the layer config range as a single semicolon separated list.
             stream << "    <layer_config_ranges>\n";
@@ -1231,8 +1232,9 @@ bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config
                 stream << "      <volume>\n";
             else
                 stream << "      <volume materialid=\"" << volume->material_id() << "\">\n";
-            for (const std::string &key : volume->config.keys())
-                stream << "        <metadata type=\"slic3r." << key << "\">" << volume->config.opt_serialize(key) << "</metadata>\n";
+            if (options.export_modifiers)
+                for (const std::string &key : volume->config.keys())
+                    stream << "        <metadata type=\"slic3r." << key << "\">" << volume->config.opt_serialize(key) << "</metadata>\n";
             if (!volume->name.empty())
                 stream << "        <metadata type=\"name\">" << xml_escape(volume->name) << "</metadata>\n";
             if (volume->is_modifier())
@@ -1253,7 +1255,7 @@ bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config
             stream << "</metadata>\n";
             if (!volume->source.input_file.empty())
             {
-                std::string input_file = xml_escape(fullpath_sources ? volume->source.input_file : boost::filesystem::path(volume->source.input_file).filename().string());
+                std::string input_file = xml_escape(options.fullpath_sources ? volume->source.input_file : boost::filesystem::path(volume->source.input_file).filename().string());
                 stream << "        <metadata type=\"slic3r.source_file\">" << input_file << "</metadata>\n";
                 stream << "        <metadata type=\"slic3r.source_object_id\">" << volume->source.object_idx << "</metadata>\n";
                 stream << "        <metadata type=\"slic3r.source_volume_id\">" << volume->source.volume_idx << "</metadata>\n";
@@ -1308,7 +1310,7 @@ bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config
         stream << "  </constellation>\n";
     }
 
-    if (!model->custom_gcode_per_print_z.gcodes.empty())
+    if (!model->custom_gcode_per_print_z.gcodes.empty() && options.export_modifiers)
     {
         std::string out = "";
         pt::ptree tree;
