@@ -307,12 +307,6 @@ static inline void set_extra_lift(const float previous_print_z, const int layer_
 
         std::string tcr_rotated_gcode = post_process_wipe_tower_moves(tcr, wipe_tower_offset, wipe_tower_rotation);
 
-        //if needed, write the gcode_label_objects_end then priming tower
-        if (!gcodegen.m_gcode_label_objects_end.empty()) {
-            gcode += gcodegen.m_gcode_label_objects_end;
-            gcodegen.m_gcode_label_objects_end = "";
-        }
-
         bool need_unretract = false;
         if (! tcr.priming) {
             // Move over the wipe tower.
@@ -324,6 +318,12 @@ static inline void set_extra_lift(const float previous_print_z, const int layer_
                 erMixed);
             gcodegen.write_travel_to(gcode, polyline, "Travel to a Wipe Tower");
             need_unretract = true;
+        }
+
+        //if needed, write the gcode_label_objects_end then priming tower, if the retract, didn't did it.
+        if (!gcodegen.m_gcode_label_objects_end.empty()) {
+            gcode += gcodegen.m_gcode_label_objects_end;
+            gcodegen.m_gcode_label_objects_end = "";
         }
 
         double current_z = gcodegen.writer().get_unlifted_position().z();
@@ -2729,16 +2729,16 @@ GCode::LayerResult GCode::process_layer(
             + "\n";
     }
     // print z move to next layer UNLESS
-    // if it's going to the first layer, then we may want to dealy the move in these condition:
+    // if it's going to the first layer, then we may want to delay the move in these condition:
     // there is no "after layer change gcode" and it's the first move from the unknown
     if (print.config().layer_gcode.value.empty() && !m_last_pos_defined && m_config.start_gcode_manual && (
             // there is a lift (on the first llyer, so the first move will bring us to the required height
         (m_writer.tool()->retract_lift() > 0 && (m_config.retract_lift_above.get_at(m_writer.tool()->id()) == 0 || BOOL_EXTRUDER_CONFIG(retract_lift_first_layer)))
         ||   // or lift_min is higher than the first layer height.
          m_config.lift_min.value > layer.print_z
-        ))
+            )) {
         m_delayed_layer_change = this->change_layer(print_z); //HACK for superslicer#1775
-    else {
+    } else {
         //extra lift on layer change if multiple objects
         if(single_object_instance_idx == size_t(-1) && (support_layer != nullptr || layers.size() > 1))
             set_extra_lift(m_last_layer_z, layer.id(), print.config(), m_writer, first_extruder_id);
@@ -3082,9 +3082,6 @@ GCode::LayerResult GCode::process_layer(
                     m_gcode_label_objects_start = std::string("; printing object ") + instance_to_print.print_object.model_object()->name
                         + " id:" + std::to_string(std::find(this->m_ordered_objects.begin(), this->m_ordered_objects.end(), &instance_to_print.print_object) - this->m_ordered_objects.begin())
                         + " copy " + std::to_string(instance_to_print.instance_id) + "\n";
-                    gcode += std::string("; INIT printing object ") + instance_to_print.print_object.model_object()->name
-                        + " id:" + std::to_string(std::find(this->m_ordered_objects.begin(), this->m_ordered_objects.end(), &instance_to_print.print_object) - this->m_ordered_objects.begin())
-                        + " copy " + std::to_string(instance_to_print.instance_id) + "\n";
                     if (print.config().gcode_flavor.value == gcfMarlinLegacy || print.config().gcode_flavor.value == gcfMarlinFirmware || print.config().gcode_flavor.value == gcfRepRap) {
                         size_t instance_plater_id = 0;
                         //get index of the current copy in the whole itemset;
@@ -3139,11 +3136,11 @@ GCode::LayerResult GCode::process_layer(
                     gcode += this->extrude_infill(print, by_region_specific, false);
                     gcode += this->extrude_ironing(print, by_region_specific);
                 }
-                if (this->config().gcode_label_objects) {
+                // Don't set m_gcode_label_objects_end if you don't had to write the m_gcode_label_objects_start.
+                if (m_gcode_label_objects_start != "") {
+                    m_gcode_label_objects_start = "";
+                }else if (this->config().gcode_label_objects) {
                     m_gcode_label_objects_end = std::string("; stop printing object ") + instance_to_print.print_object.model_object()->name
-                        + " id:" + std::to_string((std::find(this->m_ordered_objects.begin(), this->m_ordered_objects.end(), &instance_to_print.print_object) - this->m_ordered_objects.begin()))
-                        + " copy " + std::to_string(instance_to_print.instance_id) + "\n";
-                    gcode += std::string("; INIT stop printing object ") + instance_to_print.print_object.model_object()->name
                         + " id:" + std::to_string((std::find(this->m_ordered_objects.begin(), this->m_ordered_objects.end(), &instance_to_print.print_object) - this->m_ordered_objects.begin()))
                         + " copy " + std::to_string(instance_to_print.instance_id) + "\n";
                     if (print.config().gcode_flavor.value == gcfMarlinLegacy || print.config().gcode_flavor.value == gcfMarlinFirmware || print.config().gcode_flavor.value == gcfRepRap) {
