@@ -35,9 +35,22 @@ namespace Slic3r {
     // Load the content of a 3mf file into the given model and preset bundle.
     extern bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, Model* model, bool check_version);
 
+    struct OptionStore3mf {
+        bool fullpath_sources = true;
+        bool zip64 = true;
+        bool export_config = true;
+        bool export_modifiers = true;
+        const ThumbnailData* thumbnail_data = nullptr;
+        OptionStore3mf& set_fullpath_sources(bool use_fullpath_sources) { fullpath_sources = use_fullpath_sources; return *this; }
+        OptionStore3mf& set_zip64(bool use_zip64) { zip64 = use_zip64; return *this; }
+        OptionStore3mf& set_export_config(bool use_export_config) { export_config = use_export_config; return *this; }
+        OptionStore3mf& set_export_modifiers(bool use_export_modifiers) { export_modifiers = use_export_modifiers; return *this; }
+        OptionStore3mf& set_thumbnail_data(const ThumbnailData* thumbnail) { thumbnail_data = thumbnail; return *this; }
+    };
+
     // Save the given model and the config data contained in the given Print into a 3mf file.
     // The model could be modified during the export process if meshes are not repaired or have no shared vertices
-    extern bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data = nullptr, bool zip64 = true);
+    extern bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config, OptionStore3mf options = OptionStore3mf{});
 
 } // namespace Slic3r
 

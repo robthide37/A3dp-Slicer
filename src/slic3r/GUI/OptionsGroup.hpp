@@ -262,7 +262,10 @@ public:
 	void		copy_for_freq_settings(const ConfigOptionsGroup& origin) { this->m_opt_map = origin.m_opt_map; }
 
 	void 		set_config_category_and_type(const wxString &category, int type) { m_config_category = category; m_config_type = type; }
-    void        set_config(DynamicPrintConfig* config) { m_config = config; m_modelconfig = nullptr; }
+	void        set_config(DynamicPrintConfig* config) { 
+		m_config = config; m_modelconfig = nullptr; 
+	}
+	bool		has_option(const std::string& opt_key, int opt_index = -1);
 	// more like "create option from def"
 	Option		get_option(const std::string& opt_key, int opt_index = -1);
 	void		register_to_search(const std::string& opt_key, const ConfigOptionDef& option_def, int opt_index = -1);

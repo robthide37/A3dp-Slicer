@@ -600,6 +600,16 @@ void OptionsGroup::update_script_presets() {
     }
 }
 
+bool ConfigOptionsGroup::has_option(const std::string& opt_key, int opt_index /*= -1*/)
+{
+    if (!m_config->has(opt_key)) {
+        std::cerr << "No " << opt_key << " in ConfigOptionsGroup config.\n";
+    }
+
+    std::string opt_id = opt_index == -1 ? opt_key : opt_key + "#" + std::to_string(opt_index);
+    return m_opt_map.find(opt_id) != m_opt_map.end();
+}
+
 Option ConfigOptionsGroup::get_option(const std::string& opt_key, int opt_index /*= -1*/)
 {
 	if (!m_config->has(opt_key)) {
@@ -669,14 +679,30 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
 		auto   *milling_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("milling_diameter"));
 		value = int(milling_diameter->values.size());
 	} else if (it_opt != m_options.end() && it_opt->second.opt.is_script) {
-        //when a scripted key is reset, rest its deps
-        for (std::string dep_key : it_opt->second.opt.depends_on) {
+        //when a scripted key is reset, reset its deps
+        //reset if needed in other tabs
+        for (const std::string& dep_key : it_opt->second.opt.depends_on) {
             for (Tab* tab : wxGetApp().tabs_list) {
-                if (tab != nullptr) {
-                    // more optimal to create a tab::back_to_initial_value() that call the optgroup... here we are going down to the optgroup to get the field to get back to the opgroup via on_back_to_initial_value
-                    Field* f = tab->get_field(dep_key);
-                    if (f != nullptr) {
-                        f->on_back_to_initial_value();
+                if (tab != nullptr && tab->completed()) {
+                    const DynamicPrintConfig& initial_conf = tab->m_presets->get_selected_preset().config;
+                    DynamicPrintConfig& edited_conf = tab->m_presets->get_edited_preset().config;
+                    if (initial_conf.has(dep_key) && edited_conf.has(dep_key)) {
+                        ConfigOption* conf_opt = initial_conf.option(dep_key)->clone();
+                        //set the conf
+                        edited_conf.set_key_value(dep_key, conf_opt);
+                    }
+                }
+            }
+        }
+        for (const std::string& dep_key : it_opt->second.opt.depends_on) {
+            for (Tab* tab : wxGetApp().tabs_list) {
+                if (tab != nullptr && tab->completed()) {
+                    const DynamicPrintConfig& initial_conf = tab->m_presets->get_selected_preset().config;
+                    DynamicPrintConfig& edited_conf = tab->m_presets->get_edited_preset().config;
+                    if (initial_conf.has(dep_key) && edited_conf.has(dep_key)) {
+                        ConfigOption* conf_opt = initial_conf.option(dep_key)->clone();
+                        // update the field
+                        tab->on_value_change(dep_key, conf_opt->getAny());
                     }
                 }
             }

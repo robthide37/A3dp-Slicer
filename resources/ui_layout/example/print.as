@@ -109,7 +109,8 @@ float compute_overlap()
 	float solid_spacing = (width - height * 0.215);
 	float solid_flow = height * solid_spacing;
 	float bridge_spacing = sqrt(solid_flow*1.2739);
-	return bridge_spacing / solid_spacing;
+	float round_val = floor((bridge_spacing / solid_spacing) * 1000. + 0.5) / 1000.;
+	return round_val;
 }
 
 int s_not_thick_bridge_get()
@@ -215,7 +216,8 @@ float s_wall_thickness_get()
 	float ps = get_computed_float("perimeter_extrusion_spacing");
 	float eps = get_computed_float("external_perimeter_extrusion_spacing");
 	//print("s_wall_thickness_get "+ps+" "+eps+" *"+nb_peri+"\n");
-	if (nb_peri < 2) nb_peri = 2;
+	if (nb_peri == 0) return 0; // fake 'disable'
+	if (nb_peri < 2) nb_peri = 2; // too thin value
 	if( eps > 100000) return 0;
 	if( ps > 100000) return 0;
 	return eps * 2 + (nb_peri-2) * ps;
@@ -223,20 +225,20 @@ float s_wall_thickness_get()
 
 void s_wall_thickness_set(float new_val)
 {
-	float ne = get_float("nozzle_diameter");
-	float nb = new_val / ne;
+	float diameter = get_float("nozzle_diameter");
+	float nb = new_val / diameter;
 	int int_nb = int(floor(nb+0.1));
 	//print("float "+nb+" cast into "+int_nb+"\n");
-	if(int_nb > 1 && int_nb < 4){
+	if (int_nb > 1 && int_nb < 4) {
 		float ext_spacing = new_val / int_nb;
 		set_float("external_perimeter_extrusion_spacing", ext_spacing);
 		set_float("perimeter_extrusion_spacing", ext_spacing);
 		set_custom_int(0,"wall_thickness_lines", int_nb);
-	}else if(int_nb > 3) {
+	} else if(int_nb > 3) {
 		//try with thin external
-		float ext_spacing = ne;
+		float ext_spacing = diameter;
 		float spacing = (new_val - ext_spacing * 2) / (int_nb - 2);
-		if (spacing > ne * 1.5) {
+		if (spacing > diameter * 1.5) {
 			// too different, get back to same value
 			ext_spacing = new_val / int_nb;
 			spacing = ext_spacing;
@@ -244,19 +246,30 @@ void s_wall_thickness_set(float new_val)
 		set_float("external_perimeter_extrusion_spacing", ext_spacing);
 		set_float("perimeter_extrusion_spacing", spacing);
 		set_custom_int(0,"wall_thickness_lines", int_nb);
+	} else if(new_val == 0) {
+		// fake 'disable' to not confuse people susi#2700
+		set_custom_int(0,"wall_thickness_lines", 0);
+		back_initial_value("external_perimeter_extrusion_spacing");
+		back_initial_value("perimeter_extrusion_spacing");
+	} else {
+		back_custom_initial_value(0,"wall_thickness_lines");
+		back_initial_value("external_perimeter_extrusion_spacing");
+		back_initial_value("perimeter_extrusion_spacing");
+		// refresh the displayed value to a valid one
+		ask_for_refresh();
 	}
 //	ask_for_refresh();
 }
 
 // quick settings brim
 
-float last_val = 5;
+float last_brim_val = 5;
 
 int s_brim_get()
 {
 	float bw = get_float("brim_width");
 	if (bw > 0) {
-		last_val = bw;
+		last_brim_val = bw;
 		return 1;
 	}
 	return 0;
@@ -266,7 +279,7 @@ void s_brim_set(bool new_val)
 {
 	if(new_val) {
 		float bw = get_float("brim_width");
-		set_float("brim_width", last_val);
+		set_float("brim_width", last_brim_val);
 	} else {
 			set_float("brim_width", 0);
 	}

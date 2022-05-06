@@ -106,6 +106,7 @@ static const t_config_enum_values s_keys_map_PrintHostType{
     {"klipper", htKlipper},
     {"mpmdv2",  htMPMDv2},
     {"mks",     htMKS },
+    {"monoprice", htMiniDeltaLCD },
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrintHostType)
 
@@ -3578,7 +3579,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Host Type");
     def->category = OptionCategory::general;
     def->tooltip = L("Slic3r can upload G-code files to a printer host. This field must contain "
-                   "the kind of the host.");
+                   "the kind of the host."
+                   "\nPrusaLink is only available for prusa printer.");
     def->enum_keys_map = &ConfigOptionEnum<PrintHostType>::get_enum_values();
     def->enum_values.push_back("prusalink");
     def->enum_values.push_back("octoprint");
@@ -3589,6 +3591,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("klipper");
     def->enum_values.push_back("mpmdv2");
     def->enum_values.push_back("mks");
+    def->enum_values.push_back("monoprice");
     def->enum_labels.push_back("PrusaLink");
     def->enum_labels.push_back("OctoPrint");
     def->enum_labels.push_back("Duet");
@@ -3598,6 +3601,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back("Klipper");
     def->enum_labels.push_back("MPMDv2");
     def->enum_labels.push_back("MKS");
+    def->enum_labels.push_back("Monoprice lcd");
     def->mode = comAdvancedE | comPrusa;
     def->cli = ConfigOptionDef::nocli;
     def->set_default_value(new ConfigOptionEnum<PrintHostType>(htOctoPrint));
@@ -7045,6 +7049,11 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
     if ("gcode_resolution" == opt_key) {
         output["min_length"] = value;
     }
+    if ("fill_pattern" == opt_key && "alignedrectilinear" == value) {
+        value = "rectilinear";
+        output["fill_angle_increment"] = "90";
+    }
+
     return output;
 }
 
@@ -7215,6 +7224,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "print_retract_lift",
 "print_temperature",
 "printhost_client_cert",
+"remaining_times_type",
 "retract_lift_first_layer",
 "retract_lift_top",
 "seam_angle_cost",
@@ -7246,7 +7256,10 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "thumbnails_end_file",
 "thumbnails_with_bed",
 "thumbnails_with_support",
+"time_cost",
 "time_estimation_compensation",
+"time_start_gcode",
+"time_toolchange",
 "tool_name",
 "top_fan_speed",
 "top_infill_extrusion_spacing",
@@ -7276,10 +7289,16 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         opt_key = "";
         value = "";
     } else if (opt_key.find("_pattern") != std::string::npos) {
-        if ("smooth" == value || "smoothtriple" == value || "smoothhilbert" == value || "rectiwithperimeter" == value || "scatteredrectilinear" == value || "rectilineargapfill" == value || "monotonicgapfill" == value || "sawtooth" == value) {
+        if ("smooth" == value || "smoothtriple" == value || "smoothhilbert" == value || "rectiwithperimeter" == value || "scatteredrectilinear" == value || "rectilineargapfill" == value || "sawtooth" == value) {
             value = "rectilinear";
         } else if ("concentricgapfill" == value) {
             value = "concentric";
+        } else if ("monotonicgapfill" == value) {
+            value = "monotonic";
+        }
+        if (all_conf.has("fill_angle_increment") && ((int(all_conf.option("fill_angle_increment")->getFloat())-90)%180) == 0 && "rectilinear" == value
+            && ("fill_pattern" == opt_key || "top_fill_pattern" == opt_key)) {
+            value = "alignedrectilinear";
         }
     } else if ("seam_position" == opt_key) {
         if ("cost" == value) {
@@ -7397,6 +7416,12 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
     if ("output_format" == opt_key) {
         opt_key = "sla_archive_format";
     }
+    if ("host_type" == opt_key) {
+        if ("klipper" == value || "mpmdv2" == value || "monoprice" == value) value = "octoprint";
+    }
+    if ("fan_below_layer_time" == opt_key)
+        if (value.find('.') != std::string::npos)
+            value = value.substr(0, value.find('.'));
 
     return new_entries;
 }

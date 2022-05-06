@@ -1734,12 +1734,13 @@ void MainFrame::init_menubar_as_editor()
 			[this](wxCommandEvent&) { if (m_plater) m_plater->export_gcode(true); }, "export_to_sd", nullptr,
 			[this]() {return can_export_gcode_sd(); }, this);
         export_menu->AppendSeparator();
-        append_menu_item(export_menu, wxID_ANY, _L("Export Plate as &STL") + dots, _L("Export current plate as STL"),
-            [this](wxCommandEvent&) { if (m_plater) m_plater->export_stl(); }, "export_plater", nullptr,
+        append_menu_item(export_menu, wxID_ANY, _L("Export &Plate") + dots, _L("Export current plate (options available in the dialog)"),
+            [this](wxCommandEvent&) { if (m_plater) m_plater->export_platter(); }, "export_plater", nullptr,
             [this](){return can_export_model(); }, this);
-        append_menu_item(export_menu, wxID_ANY, _L("Export Plate as STL &Including Supports") + dots, _L("Export current plate as STL including supports"),
-            [this](wxCommandEvent&) { if (m_plater) m_plater->export_stl(true); }, "export_plater", nullptr,
-            [this](){return can_export_supports(); }, this);
+        // now via option in the export dialog
+        //append_menu_item(export_menu, wxID_ANY, _L("Export Plate as STL &Including Supports") + dots, _L("Export current plate as STL including supports"),
+        //    [this](wxCommandEvent&) { if (m_plater) m_plater->export_stl(true); }, "export_plater", nullptr,
+        //    [this](){return can_export_supports(); }, this);
 // Deprecating AMF export. Let's wait for user feedback.
 //        append_menu_item(export_menu, wxID_ANY, _L("Export Plate as &AMF") + dots, _L("Export current plate as AMF"),
 //            [this](wxCommandEvent&) { if (m_plater) m_plater->export_amf(); }, "export_plater", nullptr,

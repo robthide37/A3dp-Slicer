@@ -1319,7 +1319,7 @@ msgid "between %1%%% %2%%% over bridges"
 msgstr "在 %1%%% %2%%% 之间通过桥梁"
 
 msgid "between %1%%% %2%%% over external perimeters"
-msgstr "外围轮廓"
+msgstr "外围轮廓 %1%%% %2%%%"
 
 msgid "between %1%%% %2%%% over infill bridges"
 msgstr "在填充桥上 %1%%% %2%%% 之间"
