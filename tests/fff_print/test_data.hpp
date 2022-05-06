@@ -81,6 +81,9 @@ std::string slice(std::initializer_list<TriangleMesh> meshes, const DynamicPrint
 std::string slice(std::initializer_list<TestMesh> meshes, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments = false);
 std::string slice(std::initializer_list<TriangleMesh> meshes, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments = false);
 
+bool contains(const std::string &data, const std::string &pattern);
+bool contains_regex(const std::string &data, const std::string &pattern);
+
 } } // namespace Slic3r::Test
 
 

@@ -13,6 +13,7 @@
 #include <boost/nowide/cstdio.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/regex.hpp>
 #include <libslic3r/ModelArrange.hpp>
 
 using namespace std;
@@ -228,6 +229,7 @@ void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r
 		object->add_instance();
 	}
     arrange_objects(model, InfiniteBed{}, ArrangeParams{ scaled(min_object_distance(config))});
+    model.center_instances_around_point({100, 100});
 	for (ModelObject *mo : model.objects) {
         mo->ensure_on_bed();
 		print.auto_assign_extruders(mo);
@@ -350,6 +352,17 @@ std::string slice(std::initializer_list<TriangleMesh> meshes, std::initializer_l
 	Slic3r::Model model;
 	init_print(meshes, print, model, config_items, comments);
 	return gcode(print);
+}
+
+bool contains(const std::string &data, const std::string &pattern)
+{
+    return data.find(pattern) != data.npos;    
+}
+
+bool contains_regex(const std::string &data, const std::string &pattern)
+{
+    boost::regex re(pattern);
+    return boost::regex_match(data, re);
 }
 
 } } // namespace Slic3r::Test
