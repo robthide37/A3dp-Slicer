@@ -731,11 +731,9 @@ void PreferencesDialog::revert(wxEvent&)
 			, m_optgroup_render
 #endif // ENABLE_ENVIRONMENT_MAP
 			}) {
-			if (reverted = opt_group->set_value(key, app_config->get(key) == "1"))
+			if (opt_group->set_value(key, app_config->get(key) == "1"))
 				break;
 		}
-		if (!reverted)
-			int i=0;
 		if (key == "tabs_as_menu") {
 			m_rb_new_settings_layout_mode->Show(app_config->get(key) != "1");
 			refresh_og(m_optgroup_gui);
