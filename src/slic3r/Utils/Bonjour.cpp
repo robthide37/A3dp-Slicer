@@ -603,14 +603,14 @@ namespace {
 std::string strip_service_dn(const std::string& service_name, const std::string& service_dn)
 {
 	if (service_name.size() <= service_dn.size()) {
-		return service_name;
+		return std::string();
 	}
 
 	auto needle = service_name.rfind(service_dn);
 	if (needle == service_name.size() - service_dn.size()) {
 		return service_name.substr(0, needle - 1);
 	} else {
-		return service_name;
+		return std::string();
 	}
 }
 } // namespace
@@ -746,7 +746,10 @@ void LookupSession::handle_receive(const error_code& error, size_t bytes)
 			}
 
 			const auto& srv = *sdpair.second.srv;
+
 			auto service_name = strip_service_dn(sdpair.first, socket->get_service_dn());
+			if (service_name.empty())
+				continue;
 
 			std::string path;
 			std::string version;
