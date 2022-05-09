@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <regex>
 #include <string_view>
+#include <boost/nowide/fstream.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
