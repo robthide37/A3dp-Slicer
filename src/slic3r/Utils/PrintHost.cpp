@@ -98,6 +98,7 @@ struct PrintHostJobQueue::priv
     void stop_bg_thread();
     void bg_thread_main();
     void progress_fn(Http::Progress progress, bool &cancel);
+    void error_fn(wxString error);
     void remove_source(const fs::path &path);
     void remove_source();
     void perform_job(PrintHostJob the_job);
@@ -241,6 +242,36 @@ void PrintHostJobQueue::priv::progress_fn(Http::Progress progress, bool &cancel)
     }
 }
 
+void PrintHostJobQueue::priv::error_fn(wxString error)
+{
+    // check if transfer was not canceled before error occured - than do not show the error
+    bool do_emit_err = true;
+    if (channel_cancels.size_hint() > 0) {
+        // Lock both queues
+        auto cancels = channel_cancels.lock_rw();
+        auto jobs = channel_jobs.lock_rw();
+
+        for (size_t cancel_id : *cancels) {
+            if (cancel_id == job_id) {
+                do_emit_err = false;
+                emit_cancel(job_id);
+            }
+            else if (cancel_id > job_id) {
+                const size_t idx = cancel_id - job_id - 1;
+                if (idx < jobs->size()) {
+                    jobs->at(idx).cancelled = true;
+                    BOOST_LOG_TRIVIAL(debug) << boost::format("PrintHostJobQueue: Job id %1% cancelled") % cancel_id;
+                    emit_cancel(cancel_id);
+                }
+            }
+        }
+        cancels->clear();
+    }
+    if (do_emit_err)
+        emit_error(std::move(error));
+}
+
+
 void PrintHostJobQueue::priv::remove_source(const fs::path &path)
 {
     if (! path.empty()) {
@@ -263,13 +294,9 @@ void PrintHostJobQueue::priv::perform_job(PrintHostJob the_job)
     emit_progress(0);   // Indicate the upload is starting
 
     bool success = the_job.printhost->upload(std::move(the_job.upload_data),
-        [this](Http::Progress progress, bool &cancel) { this->progress_fn(std::move(progress), cancel); },
-        [this](wxString error) {
-            emit_error(std::move(error));
-        },
-        [this](wxString host) {
-            emit_resolve(std::move(host));
-        }
+        [this](Http::Progress progress, bool &cancel)   { this->progress_fn(std::move(progress), cancel); },
+        [this](wxString error)                          { this->error_fn(std::move(error)); },
+        [this](wxString host)                           { emit_resolve(std::move(host)); }
     );
 
     if (success) {

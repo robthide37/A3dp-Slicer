@@ -339,7 +339,7 @@ bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, Progr
 }
 #endif //WIN32
 
-bool OctoPrint::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ResolveFn resolve_fn, ErrorFn error_fn) const
+bool OctoPrint::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn) const
 {
     const char* name = get_name();
 
