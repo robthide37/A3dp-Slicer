@@ -156,37 +156,37 @@ TEST_CASE("DefaultSupports::FloorSupportsDoNotPierceModel", "[SLASupportGenerati
         test_support_model_collision(fname, supportcfg);
 }
 
-//TEST_CASE("CleverSupports::ElevatedSupportGeometryIsValid", "[SLASupportGeneration][Clever]") {
+//TEST_CASE("BranchingSupports::ElevatedSupportGeometryIsValid", "[SLASupportGeneration][Branching]") {
 //    sla::SupportTreeConfig supportcfg;
 //    supportcfg.object_elevation_mm = 10.;
-//    supportcfg.tree_type = sla::SupportTreeType::Clever;
+//    supportcfg.tree_type = sla::SupportTreeType::Branching;
 
 //    for (auto fname : SUPPORT_TEST_MODELS) test_supports(fname, supportcfg);
 //}
 
-//TEST_CASE("CleverSupports::FloorSupportGeometryIsValid", "[SLASupportGeneration][Clever]") {
+//TEST_CASE("BranchingSupports::FloorSupportGeometryIsValid", "[SLASupportGeneration][Branching]") {
 //    sla::SupportTreeConfig supportcfg;
 //    supportcfg.object_elevation_mm = 0;
-//    supportcfg.tree_type = sla::SupportTreeType::Clever;
+//    supportcfg.tree_type = sla::SupportTreeType::Branching;
 
 //    for (auto &fname: SUPPORT_TEST_MODELS) test_supports(fname, supportcfg);
 //}
 
-TEST_CASE("CleverSupports::ElevatedSupportsDoNotPierceModel", "[SLASupportGeneration][Clever]") {
+TEST_CASE("BranchingSupports::ElevatedSupportsDoNotPierceModel", "[SLASupportGeneration][Branching]") {
 
     sla::SupportTreeConfig supportcfg;
     supportcfg.object_elevation_mm = 10.;
-    supportcfg.tree_type = sla::SupportTreeType::Clever;
+    supportcfg.tree_type = sla::SupportTreeType::Branching;
 
     for (auto fname : SUPPORT_TEST_MODELS)
         test_support_model_collision(fname, supportcfg);
 }
 
-TEST_CASE("CleverSupports::FloorSupportsDoNotPierceModel", "[SLASupportGeneration][Clever]") {
+TEST_CASE("BranchingSupports::FloorSupportsDoNotPierceModel", "[SLASupportGeneration][Branching]") {
 
     sla::SupportTreeConfig supportcfg;
     supportcfg.object_elevation_mm = 0;
-    supportcfg.tree_type = sla::SupportTreeType::Clever;
+    supportcfg.tree_type = sla::SupportTreeType::Branching;
 
     for (auto fname : SUPPORT_TEST_MODELS)
         test_support_model_collision(fname, supportcfg);

@@ -176,6 +176,12 @@ static const t_config_enum_values s_keys_map_SLAMaterialSpeed = {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLAMaterialSpeed);
 
+static inline const t_config_enum_values s_keys_map_SLASupportTreeType = {
+    {"default", int(sla::SupportTreeType::Default)},
+    {"branching",   int(sla::SupportTreeType::Branching)}
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLASupportTreeType);
+
 static const t_config_enum_values s_keys_map_BrimType = {
     {"no_brim",         btNoBrim},
     {"outer_only",      btOuterOnly},
@@ -3564,6 +3570,17 @@ void PrintConfigDef::init_sla_params()
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionBool(true));
 
+    def = this->add("support_tree_type", coEnum);
+    def->label = L("Support tree type");
+    def->tooltip = L("Support tree building strategy");
+    def->enum_keys_map = &ConfigOptionEnum<sla::SupportTreeType>::get_enum_values();
+    def->enum_values = ConfigOptionEnum<sla::SupportTreeType>::get_enum_names();
+    def->enum_labels = ConfigOptionEnum<sla::SupportTreeType>::get_enum_names();
+    def->enum_labels[0] = L("Default");
+    def->enum_labels[1] = L("Branching");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum(sla::SupportTreeType::Default));
+
     def = this->add("support_head_front_diameter", coFloat);
     def->label = L("Pinhead front diameter");
     def->category = L("Supports");
@@ -3655,7 +3672,7 @@ void PrintConfigDef::init_sla_params()
     def->min = 0;
     def->max = 1;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(0.0));
+    def->set_default_value(new ConfigOptionFloat(0.1));
 
     def = this->add("support_base_diameter", coFloat);
     def->label = L("Support base diameter");

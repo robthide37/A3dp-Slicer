@@ -4637,6 +4637,7 @@ void TabSLAPrint::build()
     page = add_options_page(L("Supports"), "support"/*"sla_supports"*/);
     optgroup = page->new_optgroup(L("Supports"));
     optgroup->append_single_option_line("supports_enable");
+    optgroup->append_single_option_line("support_tree_type");
 
     optgroup = page->new_optgroup(L("Support head"));
     optgroup->append_single_option_line("support_head_front_diameter");
@@ -4650,8 +4651,7 @@ void TabSLAPrint::build()
     
     optgroup->append_single_option_line("support_pillar_connection_mode");
     optgroup->append_single_option_line("support_buildplate_only");
-    // TODO: This parameter is not used at the moment.
-    // optgroup->append_single_option_line("support_pillar_widening_factor");
+    optgroup->append_single_option_line("support_pillar_widening_factor");
     optgroup->append_single_option_line("support_base_diameter");
     optgroup->append_single_option_line("support_base_height");
     optgroup->append_single_option_line("support_base_safety_distance");

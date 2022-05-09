@@ -5,7 +5,7 @@
 
 namespace Slic3r { namespace sla {
 
-enum class SupportTreeType { Default, Clever };
+enum class SupportTreeType { Default, Branching };
 enum class PillarConnectionMode { zigzag, cross, dynamic };
 
 }} // namespace Slic3r::sla
