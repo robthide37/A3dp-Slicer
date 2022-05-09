@@ -2,6 +2,7 @@
 #include "libslic3r/TriangleMeshSlicer.hpp"
 #include "libslic3r/SLA/AGGRaster.hpp"
 #include "libslic3r/SLA/DefaultSupportTree.hpp"
+#include "libslic3r/SLA/BranchingTreeSLA.hpp"
 
 #include <iomanip>
 
@@ -158,6 +159,11 @@ void test_supports(const std::string          &obj_filename,
     case sla::SupportTreeType::Default: {
         sla::DefaultSupportTree::execute(treebuilder, sm);
         check_support_tree_integrity(treebuilder, supportcfg, sla::ground_level(sm));
+        break;
+    }
+    case sla::SupportTreeType::Branching: {
+        create_branching_tree(treebuilder, sm);
+        // TODO: check_support_tree_integrity(treebuilder, supportcfg);
         break;
     }
     default:;
