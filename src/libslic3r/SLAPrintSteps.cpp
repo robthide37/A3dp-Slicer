@@ -408,9 +408,9 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
         AABBTreeIndirect::traverse(
                     tree,
                     AABBTreeIndirect::intersecting(ebb),
-                    [&part_to_drill, &hollowed_mesh](size_t faceid)
+                    [&part_to_drill, &hollowed_mesh](const auto& node)
         {
-            part_to_drill.indices.emplace_back(hollowed_mesh.its.indices[faceid]);
+            part_to_drill.indices.emplace_back(hollowed_mesh.its.indices[node.idx]);
         });
 
         auto cgal_meshpart = MeshBoolean::cgal::triangle_mesh_to_cgal(
