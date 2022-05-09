@@ -261,9 +261,20 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
         return upload_inner_with_resolved_ip(upload_data, prorgess_fn, error_fn, resolve_fn, resolved_addr.front());
     } else if (resolved_addr.size() == 2 && resolved_addr[0].is_v4() != resolved_addr[1].is_v4()) {
         // there are just 2 addresses and 1 is ip_v4 and other is ip_v6
-        // try sending to both. (First without verbose, so user doesnt get error msg twice)
-        if (!upload_inner_with_resolved_ip(upload_data, prorgess_fn, error_fn, resolve_fn, resolved_addr.front(), false))
-            return upload_inner_with_resolved_ip(upload_data, prorgess_fn, error_fn, resolve_fn, resolved_addr.back());
+        // try sending to both. (Then if both fail, show both error msg after second try)
+        wxString error_message;
+        if (!upload_inner_with_resolved_ip(upload_data, prorgess_fn 
+            , [&msg = error_message, resolved_addr](wxString error) { msg = GUI::format_wxstr("%1%: %2%", resolved_addr.front(), error); }
+            , resolve_fn, resolved_addr.front())
+            &&
+            !upload_inner_with_resolved_ip(upload_data, prorgess_fn
+            , [&msg = error_message, resolved_addr](wxString error) { msg += GUI::format_wxstr("\n%1%: %2%", resolved_addr.back(), error); }
+            , resolve_fn, resolved_addr.back())
+            ) {
+
+            error_fn(error_message);
+            return false;
+        }
         return true;
     } else {
         // There are multiple addresses - user needs to choose which to use.
@@ -277,7 +288,7 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
 #endif // WIN32
 }
 #ifdef WIN32
-bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn, const boost::asio::ip::address& resolved_addr, bool verbose /*= true*/) const
+bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn, const boost::asio::ip::address& resolved_addr) const
 {
     resolve_fn(boost::nowide::widen(resolved_addr.to_string()));
 
@@ -286,10 +297,7 @@ bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, Progr
     // Test_msg already contains resolved ip and will be cleared on start of test().
     wxString test_msg_or_host_ip = GUI::from_u8(resolved_addr.to_string());
     if (!test_with_resolved_ip(test_msg_or_host_ip)) {
-        if (verbose)
-            error_fn(std::move(test_msg_or_host_ip));
-        else BOOST_LOG_TRIVIAL(info) << test_msg_or_host_ip;
-        //continue;
+        error_fn(std::move(test_msg_or_host_ip));
         return false;
     }
 
@@ -316,12 +324,8 @@ bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, Progr
             BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: File uploaded: HTTP %2%: %3%") % name % status % body;
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
-            if (verbose) {
-                BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error uploading file: %2%, HTTP %3%, body: `%4%`") % name % error % status % body;
-                error_fn(format_error(body, error, status));
-            }
-            else
-                BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Error uploading file: %2%, HTTP %3%, body: `%4%`") % name % error % status % body;
+            BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error uploading file: %2%, HTTP %3%, body: `%4%`") % name % error % status % body;
+            error_fn(format_error(body, error, status));
             result = false;
         })
         .on_progress([&](Http::Progress progress, bool& cancel) {

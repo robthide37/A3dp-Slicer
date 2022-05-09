@@ -37,7 +37,7 @@ public:
 protected:
     virtual bool validate_version_text(const boost::optional<std::string> &version_text) const;
 #ifdef WIN32
-    virtual bool upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn, const boost::asio::ip::address& resolved_addr, bool verbose = true) const;
+    virtual bool upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn, const boost::asio::ip::address& resolved_addr) const;
     virtual bool test_with_resolved_ip(wxString& curl_msg) const;
 #endif
     virtual bool upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn) const;
