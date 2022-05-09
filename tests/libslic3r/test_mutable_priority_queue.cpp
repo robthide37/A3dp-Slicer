@@ -356,7 +356,7 @@ TEST_CASE("Mutable priority queue - first pop", "[MutableSkipHeapPriorityQueue]"
         [](MyValue &l, MyValue &r) { return l.val < r.val; });
     q.reserve(count);
     for (size_t id = 0; id < count; id++) {
-        MyValue mv{ id, rand()};
+        MyValue mv{ id, rand() / 100.f };
         q.push(mv);
     }
     MyValue it = q.top(); // copy
