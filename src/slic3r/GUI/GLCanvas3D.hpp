@@ -822,7 +822,7 @@ public:
     
     class WipeTowerInfo {
     protected:
-        Vec2d m_pos = {std::nan(""), std::nan("")};
+        Vec2d m_pos = {NaNd, NaNd};
         double m_rotation = 0.;
         BoundingBoxf m_bb;
         friend class GLCanvas3D;

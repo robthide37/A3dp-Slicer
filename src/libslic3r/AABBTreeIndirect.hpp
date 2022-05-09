@@ -771,8 +771,8 @@ inline bool is_any_triangle_in_radius(
     auto distancer = detail::IndexedTriangleSetDistancer<VertexType, IndexedFaceType, TreeType, VectorType>
             { vertices, faces, tree, point };
 
-	size_t hit_idx;
-	VectorType hit_point = VectorType::Ones() * (std::nan(""));
+    size_t hit_idx;
+    VectorType hit_point = VectorType::Ones() * (NaN<typename VectorType::Scalar>);
 
 	if(tree.empty())
 	{

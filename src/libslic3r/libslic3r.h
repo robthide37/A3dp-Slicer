@@ -331,6 +331,12 @@ public:
     inline bool   empty() const { return size() == 0; }
 };
 
+template<class T, class = FloatingOnly<T>>
+constexpr T NaN = std::numeric_limits<T>::quiet_NaN();
+
+constexpr float NaNf = NaN<float>;
+constexpr double NaNd = NaN<double>;
+
 } // namespace Slic3r
 
 #endif

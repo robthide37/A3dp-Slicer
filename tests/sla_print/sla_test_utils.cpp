@@ -386,7 +386,7 @@ long raster_pxsum(const sla::RasterGrayscaleAA &raster)
 
 double raster_white_area(const sla::RasterGrayscaleAA &raster)
 {
-    if (raster.resolution().pixels() == 0) return std::nan("");
+    if (raster.resolution().pixels() == 0) return NaNd;
     
     auto res = raster.resolution();
     double a = 0;

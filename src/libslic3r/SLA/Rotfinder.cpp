@@ -76,7 +76,7 @@ struct Facestats {
 // Try to guess the number of support points needed to support a mesh
 double get_misalginment_score(const TriangleMesh &mesh, const Transform3f &tr)
 {
-    if (mesh.its.vertices.empty()) return std::nan("");
+    if (mesh.its.vertices.empty()) return NaNd;
 
     auto accessfn = [&mesh, &tr](size_t fi) {
         Facestats fc{get_transformed_triangle(mesh, tr, fi)};
@@ -117,7 +117,7 @@ inline double get_supportedness_score(const Facestats &fc)
 // Try to guess the number of support points needed to support a mesh
 double get_supportedness_score(const TriangleMesh &mesh, const Transform3f &tr)
 {
-    if (mesh.its.vertices.empty()) return std::nan("");
+    if (mesh.its.vertices.empty()) return NaNd;
 
     auto accessfn = [&mesh, &tr](size_t fi) {
         Facestats fc{get_transformed_triangle(mesh, tr, fi)};
@@ -149,10 +149,10 @@ float find_ground_level(const TriangleMesh &mesh,
     return execution::reduce(ex_tbb, size_t(0), vsize, zmin, minfn, accessfn, granularity);
 }
 
-float get_supportedness_onfloor_score(const TriangleMesh &mesh,
-                                      const Transform3f & tr)
+double get_supportedness_onfloor_score(const TriangleMesh &mesh,
+                                       const Transform3f  &tr)
 {
-    if (mesh.its.vertices.empty()) return std::nan("");
+    if (mesh.its.vertices.empty()) return NaNd;
 
     size_t Nthreads = std::thread::hardware_concurrency();
 

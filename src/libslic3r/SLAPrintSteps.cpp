@@ -1036,7 +1036,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     // Estimated printing time
     // A layers count o the highest object
     if (printer_input.size() == 0)
-        print_statistics.estimated_print_time = std::nan("");
+        print_statistics.estimated_print_time = NaNd;
     else {
         print_statistics.estimated_print_time = estim_time;
         print_statistics.layers_times = layers_times;
