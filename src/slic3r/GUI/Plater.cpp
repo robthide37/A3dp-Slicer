@@ -2977,10 +2977,11 @@ bool Plater::priv::delete_object_from_model(size_t obj_idx)
     // show warning message that "cut consistancy" will not be supported any more
     ModelObject* obj = model.objects[obj_idx];
     if (obj->is_cut()) {
-        MessageDialog dialog(q, _L("You try to delete an object which is a part of a cut object.\n"
-                                   "This action will break a cut correspondence.\n"
-                                   "After that PrusaSlicer can't garantie model consistency"), 
-                                _L("Delete object which is a part of cut object"), wxYES | wxCANCEL | wxCANCEL_DEFAULT);
+        InfoDialog dialog(q, _L("Delete object which is a part of cut object"), 
+                             _L("You try to delete an object which is a part of a cut object.\n"
+                                "This action will break a cut correspondence.\n"
+                                "After that PrusaSlicer can't garantie model consistency"), 
+                                false, wxYES | wxCANCEL | wxCANCEL_DEFAULT | wxICON_WARNING);
         dialog.SetButtonLabel(wxID_YES, _L("Delete object"));
         if (dialog.ShowModal() == wxID_CANCEL)
             return false;

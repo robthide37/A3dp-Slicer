@@ -255,8 +255,6 @@ bool GLGizmoCut3D::render_combo(const std::string& label, const std::vector<std:
     if (ImGui::BeginCombo(("##"+label).c_str(), "")) {
         for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
             ImGui::PushID(int(line_idx));
-            ImVec2 start_position = ImGui::GetCursorScreenPos();
-
             if (ImGui::Selectable("", line_idx == selection_idx))
                 selection_out = line_idx;
 
@@ -966,11 +964,10 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
         double koef = m_imperial_units ? ObjectManipulation::mm_to_in : 1.0;
         wxString unit_str = " " + (m_imperial_units ? _L("in") : _L("mm"));
 
-        const BoundingBoxf3 tbb = transformed_bounding_box();
-        Vec3d tbb_sz = tbb.size();
-        wxString size =    "X: " + double_to_string(tbb.size().x() * koef, 2) + unit_str +
-                        ",  Y: " + double_to_string(tbb.size().y() * koef, 2) + unit_str +
-                        ",  Z: " + double_to_string(tbb.size().z() * koef, 2) + unit_str;
+        Vec3d tbb_sz = transformed_bounding_box().size();
+        wxString size =    "X: " + double_to_string(tbb_sz.x() * koef, 2) + unit_str +
+                        ",  Y: " + double_to_string(tbb_sz.y() * koef, 2) + unit_str +
+                        ",  Z: " + double_to_string(tbb_sz.z() * koef, 2) + unit_str;
 
         ImGui::AlignTextToFramePadding();
         m_imgui->text(_L("Build size"));
@@ -1158,7 +1155,7 @@ void GLGizmoCut3D::render_connectors(bool picking)
 
     for (size_t i = 0; i < connectors.size(); ++i) {
         const CutConnector& connector = connectors[i];
-        const bool& point_selected = m_selected[i];
+//        const bool& point_selected = m_selected[i];
 
         double height = connector.height;
         // recalculate connector position to world position
@@ -1449,14 +1446,11 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
     if (is_dragging() || m_connector_mode == CutConnectorMode::Auto || (!m_keep_upper || !m_keep_lower))
         return false;
 
-    CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;
-    const Camera& camera = wxGetApp().plater()->get_camera();
-
     if ( m_hover_id < 0 && shift_down && 
         (action == SLAGizmoEventType::LeftDown || action == SLAGizmoEventType::Moving) )
         return process_cut_line(action, mouse_position);
 
-    int mesh_id = -1;
+    CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;
 
     // left down without selection rectangle - place connector on the cut plane:
     if (action == SLAGizmoEventType::LeftDown && /*!m_selection_rectangle.is_dragging() && */!shift_down) {
@@ -1469,7 +1463,6 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
             std::pair<Vec3d, Vec3d> pos_and_normal;
             if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal)) {
                 const Vec3d& hit = pos_and_normal.first;
-                const Vec3d& normal = pos_and_normal.second;
                 // The clipping plane was clicked, hit containts coordinates of the hit in world coords.
                 std::cout << hit.x() << "\t" << hit.y() << "\t" << hit.z() << std::endl;
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
