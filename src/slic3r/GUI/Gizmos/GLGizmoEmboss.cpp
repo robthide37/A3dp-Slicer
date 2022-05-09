@@ -65,6 +65,46 @@
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
+// anonymous namespace for unique names
+namespace {
+template<typename T>
+struct MinMax
+{
+    T min;
+    T max;
+};
+template<typename T>
+struct Limit
+{
+    MinMax<T> gui;
+    MinMax<T> values;
+};
+struct Limits
+{
+    MinMax<float> emboss{0.01f, 1e4f};
+    MinMax<float> size_in_mm{1.f, 100.f};
+    Limit<float> boldness{{-200.f, 200.f}, {-2e4f, 2e4f}};
+    Limit<float> skew{{-1.f, 1.f}, {-100.f, 100.f}};
+    MinMax<int>  char_gap{-20000, 20000};
+    MinMax<int>  line_gap{-20000, 20000};
+    // distance text object from surface
+    MinMax<float> angle{-180.f, 180.f}; // in mm
+
+    template<typename T>
+    static void apply(std::optional<T> &val, const MinMax<T> &limit) {
+        if (val.has_value())
+            apply<T>(*val, limit);
+    }
+    template<typename T>
+    static void apply(T &val, const MinMax<T> &limit)
+    {
+        if (val > limit.max) val = limit.max;
+        if (val < limit.min) val = limit.min;
+    }
+};
+static const Limits limits;
+} // namespace
+
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
     , m_volume(nullptr)
@@ -1807,14 +1847,13 @@ void GLGizmoEmboss::draw_style_edit() {
     }
 
     FontProp &font_prop = fi.prop;
-
     float * def_size = m_stored_font_item.has_value() ? 
         &m_stored_font_item->prop.size_in_mm : nullptr;
     if (rev_input(tr.size, font_prop.size_in_mm, def_size,
                   _u8L("Revert text size."), 0.1f, 1.f, "%.1f mm")) {
         // size can't be zero or negative
-        if (font_prop.size_in_mm < std::numeric_limits<float>::epsilon())
-            font_prop.size_in_mm = 10.f;
+        Limits::apply(font_prop.size_in_mm, limits.size_in_mm);
+
         // store font size into path
         if (fi.type == WxFontUtils::get_actual_type()) {
             if (wx_font.has_value()) {
@@ -1854,8 +1893,10 @@ void GLGizmoEmboss::draw_style_edit() {
     float *def_depth = m_stored_font_item.has_value() ?
         &m_stored_font_item->prop.emboss : nullptr;
     if (rev_input(tr.depth, font_prop.emboss, def_depth,
-                  _u8L("Revert embossed depth."), 0.1f, 0.25, "%.2f mm")) 
+        _u8L("Revert embossed depth."), 0.1f, 0.25, "%.2f mm")) {
+        Limits::apply(font_prop.emboss, limits.emboss);
         process();
+    }
 
     bool *def_use_surface = m_stored_font_item.has_value() ?
         &m_stored_font_item->prop.use_surface : nullptr;
@@ -2031,6 +2072,7 @@ void GLGizmoEmboss::draw_advanced()
     int min_char_gap = -half_ascent, max_char_gap = half_ascent;
     if (rev_slider(tr.char_gap, font_prop.char_gap, def_char_gap, _u8L("Revert gap between letters"), 
         min_char_gap, max_char_gap, units_fmt, _L("Distance between letters"))){
+        Limits::apply(font_prop.char_gap, limits.char_gap);
         // char gap is stored inside of imgui font atlas
         m_font_manager.clear_imgui_font();
         exist_change = true;
@@ -2042,7 +2084,8 @@ void GLGizmoEmboss::draw_advanced()
     int  min_line_gap = -half_ascent, max_line_gap = half_ascent;
     if (rev_slider(tr.line_gap, font_prop.line_gap, def_line_gap, _u8L("Revert gap between lines"), 
         min_line_gap, max_line_gap, units_fmt, _L("Distance between lines"))){
-        // char gap is stored inside of imgui font atlas
+        Limits::apply(font_prop.line_gap, limits.line_gap);
+        // line gap is planed to be stored inside of imgui font atlas
         m_font_manager.clear_imgui_font();
         exist_change = true;
     }
@@ -2050,20 +2093,20 @@ void GLGizmoEmboss::draw_advanced()
     // input boldness
     auto def_boldness = m_stored_font_item.has_value() ?
         &m_stored_font_item->prop.boldness : nullptr;
-    float min_boldness = -200.f,
-          max_boldness = 200.f;
     if (rev_slider(tr.boldness, font_prop.boldness, def_boldness, _u8L("Undo boldness"), 
-        min_boldness, max_boldness, units_fmt, _L("Tiny / Wide glyphs")))
+        limits.boldness.gui.min, limits.boldness.gui.max, units_fmt, _L("Tiny / Wide glyphs"))){
+        Limits::apply(font_prop.boldness, limits.boldness.values);
         exist_change = true;
+    }
 
     // input italic
     auto def_skew = m_stored_font_item.has_value() ?
         &m_stored_font_item->prop.skew : nullptr;
-    float min_skew = -1.f,
-          max_skew = 1.f;
     if (rev_slider(tr.italic, font_prop.skew, def_skew, _u8L("Undo letter's skew"),
-        min_skew, max_skew, "%.2f", _L("Italic strength ratio")))
+        limits.skew.gui.min, limits.skew.gui.max, "%.2f", _L("Italic strength ratio"))){
+        Limits::apply(font_prop.skew, limits.skew.values);
         exist_change = true;
+    }
     
     // input surface distance
     std::optional<float> &distance = font_prop.distance;
@@ -2080,12 +2123,10 @@ void GLGizmoEmboss::draw_advanced()
         do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
     }
 
-    // slider fot Clock-wise angle in degress
+    // slider for Clock-wise angle in degress
     // stored angle is optional CCW and in radians
     std::optional<float> &angle = font_prop.angle;
-    float prev_angle = angle.has_value() ? *angle : .0f,
-          min_angle = -180.f,
-          max_angle = 180.f;
+    float prev_angle = angle.has_value() ? *angle : .0f;
     // Convert stored value to degress
     // minus create clock-wise roation from CCW
     float angle_deg = angle.has_value() ?
@@ -2097,11 +2138,17 @@ void GLGizmoEmboss::draw_advanced()
     float* def_angle_deg = m_stored_font_item.has_value() ?
         &def_angle_deg_val : nullptr;
     if (rev_slider(tr.angle, angle_deg, def_angle_deg, _u8L("Undo rotation"), 
-        min_angle, max_angle, u8"%.2f °", _L("Rotate text Clock-wise."))) {
+        limits.angle.min, limits.angle.max, u8"%.2f °",
+                   _L("Rotate text Clock-wise."))) {
         // convert back to radians and CCW
         angle = -angle_deg * M_PI / 180.0;
+        if (angle < M_PI || angle > M_PI) {
+            int count = std::round(*angle / 2 * M_PI);
+            angle     = *angle - count * (2 * M_PI);
+        }
         if (is_approx(*angle, 0.f))
             angle.reset();
+        
         if (m_volume != nullptr && m_volume->text_configuration.has_value()) {
             m_volume->text_configuration->font_item.prop.angle = angle;
             float act_angle = angle.has_value() ? *angle : .0f;
