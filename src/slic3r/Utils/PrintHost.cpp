@@ -93,6 +93,7 @@ struct PrintHostJobQueue::priv
     void emit_progress(int progress);
     void emit_error(wxString error);
     void emit_cancel(size_t id);
+    void emit_resolve(wxString host);
     void start_bg_thread();
     void stop_bg_thread();
     void bg_thread_main();
@@ -130,6 +131,13 @@ void PrintHostJobQueue::priv::emit_cancel(size_t id)
     auto evt = new PrintHostQueueDialog::Event(GUI::EVT_PRINTHOST_CANCEL, queue_dialog->GetId(), id);
     wxQueueEvent(queue_dialog, evt);
 }
+
+void PrintHostJobQueue::priv::emit_resolve(wxString host)
+{
+    auto evt = new PrintHostQueueDialog::Event(GUI::EVT_PRINTHOST_RESOLVE, queue_dialog->GetId(), job_id, host);
+    wxQueueEvent(queue_dialog, evt);
+}
+
 
 void PrintHostJobQueue::priv::start_bg_thread()
 {
@@ -258,6 +266,9 @@ void PrintHostJobQueue::priv::perform_job(PrintHostJob the_job)
         [this](Http::Progress progress, bool &cancel) { this->progress_fn(std::move(progress), cancel); },
         [this](wxString error) {
             emit_error(std::move(error));
+        },
+        [this](wxString host) {
+            emit_resolve(std::move(host));
         }
     );
 
