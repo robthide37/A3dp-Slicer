@@ -10,7 +10,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 set(_unicode_utf8 OFF)
-if (UNIX) # wxWidgets will not use char as the underlying type for wxString unless its forced to.
+if (UNIX AND NOT APPLE) # wxWidgets will not use char as the underlying type for wxString unless its forced to.
     set (_unicode_utf8 ON)
 endif()
 
