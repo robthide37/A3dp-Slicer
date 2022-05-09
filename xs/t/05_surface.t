@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Slic3r::XS;
-use Test::More tests => 15;
+use Test::More tests => 11;
 
 my $square = [  # ccw
     [100, 100],
@@ -26,10 +26,6 @@ my $surface = Slic3r::Surface->new(
 );
 
 $surface = $surface->clone;
-
-isa_ok $surface->expolygon, 'Slic3r::ExPolygon::Ref', 'expolygon';
-is_deeply [ @{$surface->expolygon->pp} ], [$square, $hole_in_square], 'expolygon roundtrip';
-is scalar(@{$surface->polygons}), 2, 'polygons roundtrip';
 
 is $surface->surface_type, Slic3r::Surface::S_TYPE_INTERNAL, 'surface_type';
 $surface->surface_type(Slic3r::Surface::S_TYPE_BOTTOM);
@@ -59,7 +55,6 @@ is $surface->extra_perimeters, 2, 'extra_perimeters';
     is scalar(@$collection), 1, 'append to collection';
     
     my $item = $collection->[0];
-    isa_ok $item, 'Slic3r::Surface::Ref';
     $item->surface_type(Slic3r::Surface::S_TYPE_INTERNAL);
     is $item->surface_type, $collection->[0]->surface_type, 'collection returns items by reference';
 }

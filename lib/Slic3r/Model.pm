@@ -133,11 +133,4 @@ sub add_instance {
     }
 }
 
-sub mesh_stats {
-    my $self = shift;
-    
-    # TODO: sum values from all volumes
-    return $self->volumes->[0]->mesh->stats;
-}
-
 1;

@@ -9,6 +9,7 @@
 #include "Notebook.hpp"
 #include "ButtonsDescription.hpp"
 #include "OG_CustomCtrl.hpp"
+#include "GLCanvas3D.hpp"
 
 namespace Slic3r {
 
@@ -54,6 +55,14 @@ PreferencesDialog::PreferencesDialog(wxWindow* parent) :
 	m_highlighter.set_timer_owner(this, 0);
 }
 
+static void update_color(wxColourPickerCtrl* color_pckr, const wxColour& color) 
+{
+	if (color_pckr->GetColour() != color) {
+		color_pckr->SetColour(color);
+		wxPostEvent(color_pckr, wxCommandEvent(wxEVT_COLOURPICKER_CHANGED));
+	}
+}
+
 void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::string()*/, const std::string& tab_name/*= std::string()*/)
 {
 	int selected_tab = 0;
@@ -65,6 +74,14 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 
 	if (!highlight_opt_key.empty())
 		init_highlighter(highlight_opt_key);
+
+	// cache input values for custom toolbar size
+	m_custom_toolbar_size		= atoi(get_app_config()->get("custom_toolbar_size").c_str());
+	m_use_custom_toolbar_size	= get_app_config()->get("use_custom_toolbar_size") == "1";
+
+	// update colors for color pickers
+	update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
+	update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
 
 	this->ShowModal();
 }
@@ -173,6 +190,10 @@ void PreferencesDialog::build()
 	// Add "General" tab
 	m_optgroup_general = create_options_tab(L("General"), tabs);
 	m_optgroup_general->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+		if (auto it = m_values.find(opt_key); it != m_values.end()) {
+			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+			return;
+		}
 		if (opt_key == "default_action_on_close_application" || opt_key == "default_action_on_select_preset" || opt_key == "default_action_on_new_project")
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "none" : "discard";
 		else if (opt_key == "default_action_on_dirty_project")
@@ -335,6 +356,10 @@ void PreferencesDialog::build()
 	// Add "Camera" tab
 	m_optgroup_camera = create_options_tab(L("Camera"), tabs);
 	m_optgroup_camera->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+		if (auto it = m_values.find(opt_key);it != m_values.end()) {
+			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+			return;
+		}
 		m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 	};
 
@@ -358,25 +383,42 @@ void PreferencesDialog::build()
 	// Add "GUI" tab
 	m_optgroup_gui = create_options_tab(L("GUI"), tabs);
 	m_optgroup_gui->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
-        if (opt_key == "suppress_hyperlinks")
-            m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
-		else if (opt_key == "notify_release") {
+		if (opt_key == "notify_release") {
 			int val_int = boost::any_cast<int>(value);
 			for (const auto& item : s_keys_map_NotifyReleaseMode) {
 				if (item.second == val_int) {
 					m_values[opt_key] = item.first;
-					break;
+					return;
 				}
 			}
-		} else
-            m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
-
+		}
 		if (opt_key == "use_custom_toolbar_size") {
 			m_icon_size_sizer->ShowItems(boost::any_cast<bool>(value));
-			m_optgroup_gui->parent()->Layout();
-			tabs->Layout();
-			this->layout();
+			refresh_og(m_optgroup_gui);
+			get_app_config()->set("use_custom_toolbar_size", boost::any_cast<bool>(value) ? "1" : "0");
+			get_app_config()->save();
+			wxGetApp().plater()->get_current_canvas3D()->render();
+			return;
 		}
+		if (opt_key == "tabs_as_menu") {
+			bool disable_new_layout = boost::any_cast<bool>(value);
+			m_rb_new_settings_layout_mode->Show(!disable_new_layout);
+			if (disable_new_layout && m_rb_new_settings_layout_mode->GetValue()) {
+				m_rb_new_settings_layout_mode->SetValue(false);
+				m_rb_old_settings_layout_mode->SetValue(true);
+			}
+			refresh_og(m_optgroup_gui);
+		}
+
+		if (auto it = m_values.find(opt_key); it != m_values.end()) {
+			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+			return;
+		}
+
+		if (opt_key == "suppress_hyperlinks")
+			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
+		else
+			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 	};
 
 	append_bool_option(m_optgroup_gui, "seq_top_layer_only",
@@ -464,6 +506,10 @@ void PreferencesDialog::build()
 		// Add "Render" tab
 		m_optgroup_render = create_options_tab(L("Render"), tabs);
 		m_optgroup_render->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+			if (auto it = m_values.find(opt_key); it != m_values.end()) {
+				m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+				return;
+			}
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 		};
 
@@ -479,6 +525,10 @@ void PreferencesDialog::build()
 		// Add "Dark Mode" tab
 		m_optgroup_dark_mode = create_options_tab(_L("Dark mode (experimental)"), tabs);
 		m_optgroup_dark_mode->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+			if (auto it = m_values.find(opt_key); it != m_values.end()) {
+				m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+				return;
+			}
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 		};
 
@@ -509,6 +559,7 @@ void PreferencesDialog::build()
 
 	auto buttons = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
 	this->Bind(wxEVT_BUTTON, &PreferencesDialog::accept, this, wxID_OK);
+	this->Bind(wxEVT_BUTTON, &PreferencesDialog::revert, this, wxID_CANCEL);
 
 	for (int id : {wxID_OK, wxID_CANCEL})
 		wxGetApp().UpdateDarkUI(static_cast<wxButton*>(FindWindowById(id, this)));
@@ -592,19 +643,6 @@ void PreferencesDialog::accept(wxEvent&)
 	    }
 	}
 
-	for (const std::string& key : {	"default_action_on_close_application", 
-									"default_action_on_select_preset", 
-									"default_action_on_new_project" }) {
-	    auto it = m_values.find(key);
-		if (it != m_values.end() && it->second != "none" && app_config->get(key) != "none")
-			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
-	}
-	{
-	    auto it = m_values.find("default_action_on_dirty_project");
-		if (it != m_values.end() && !it->second.empty() && !app_config->get("default_action_on_dirty_project").empty())
-			m_values.erase(it); // we shouldn't change value, if this parameter was selected, and then deselected
-	}
-
 #if 0 //#ifdef _WIN32 // #ysDarkMSW - Allow it when we deside to support the sustem colors for application
 	if (m_values.find("always_dark_color_mode") != m_values.end())
 		wxGetApp().force_sys_colors_update();
@@ -629,11 +667,82 @@ void PreferencesDialog::accept(wxEvent&)
 		wxGetApp().force_menu_update();
 #endif //_MSW_DARK_MODE
 #endif // _WIN32
-	if (m_settings_layout_changed)
-		;// application will be recreated after Preference dialog will be destroyed
-	else
-	    // Nothify the UI to update itself from the ini file.
-        wxGetApp().update_ui_from_settings();
+	
+	wxGetApp().update_ui_from_settings();
+	clear_cache();
+}
+
+void PreferencesDialog::revert(wxEvent&)
+{
+	auto app_config = get_app_config();
+
+	bool save_app_config = false;
+	if (m_custom_toolbar_size != atoi(app_config->get("custom_toolbar_size").c_str())) {
+		app_config->set("custom_toolbar_size", (boost::format("%d") % m_custom_toolbar_size).str());
+		m_icon_size_slider->SetValue(m_custom_toolbar_size);
+		save_app_config |= true;
+	}
+	if (m_use_custom_toolbar_size != (get_app_config()->get("use_custom_toolbar_size") == "1")) {
+		app_config->set("use_custom_toolbar_size", m_use_custom_toolbar_size ? "1" : "0");
+		save_app_config |= true;
+
+		m_optgroup_gui->set_value("use_custom_toolbar_size", m_use_custom_toolbar_size);
+		m_icon_size_sizer->ShowItems(m_use_custom_toolbar_size);
+		refresh_og(m_optgroup_gui);
+	}
+	if (save_app_config)
+		app_config->save();
+
+
+	for (auto value : m_values) {
+		bool reverted = false;
+		const std::string& key = value.first;
+
+		if (key == "default_action_on_dirty_project") {
+			m_optgroup_general->set_value(key, app_config->get(key).empty());
+			continue;
+		}
+		if (key == "default_action_on_close_application" || key == "default_action_on_select_preset" || key == "default_action_on_new_project") {
+			m_optgroup_general->set_value(key, app_config->get(key) == "none");
+			continue;
+		}
+		if (key == "notify_release") {
+			m_optgroup_gui->set_value(key, s_keys_map_NotifyReleaseMode.at(app_config->get(key)));
+			continue;
+		}
+		if (key == "old_settings_layout_mode") {
+			m_rb_old_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			continue;
+		}
+		if (key == "new_settings_layout_mode") {
+			m_rb_new_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			continue;
+		}
+		if (key == "dlg_settings_layout_mode") {
+			m_rb_dlg_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			continue;
+		}
+
+		for (auto opt_group : { m_optgroup_general, m_optgroup_camera, m_optgroup_gui
+#ifdef _WIN32
+			, m_optgroup_dark_mode
+#endif // _WIN32
+#if ENABLE_ENVIRONMENT_MAP
+			, m_optgroup_render
+#endif // ENABLE_ENVIRONMENT_MAP
+			}) {
+			if (opt_group->set_value(key, app_config->get(key) == "1"))
+				break;
+		}
+		if (key == "tabs_as_menu") {
+			m_rb_new_settings_layout_mode->Show(app_config->get(key) != "1");
+			refresh_og(m_optgroup_gui);
+			continue;
+		}
+	}
+
+	clear_cache();
+	EndModal(wxID_CANCEL);
 }
 
 void PreferencesDialog::msw_rescale()
@@ -669,6 +778,19 @@ void PreferencesDialog::layout()
     Refresh();
 }
 
+void PreferencesDialog::clear_cache()
+{
+	m_values.clear();
+	m_custom_toolbar_size = -1;
+}
+
+void PreferencesDialog::refresh_og(std::shared_ptr<ConfigOptionsGroup> og)
+{
+	og->parent()->Layout();
+	tabs->Layout();
+	this->layout();
+}
+
 void PreferencesDialog::create_icon_size_slider()
 {
     const auto app_config = get_app_config();
@@ -695,14 +817,14 @@ void PreferencesDialog::create_icon_size_slider()
     if (!isOSX)
         style |= wxSL_LABELS | wxSL_AUTOTICKS;
 
-    auto slider = new wxSlider(parent, wxID_ANY, def_val, 30, 100, 
+    m_icon_size_slider = new wxSlider(parent, wxID_ANY, def_val, 30, 100, 
                                wxDefaultPosition, wxDefaultSize, style);
 
-    slider->SetTickFreq(10);
-    slider->SetPageSize(10);
-    slider->SetToolTip(_L("Select toolbar icon size in respect to the default one."));
+    m_icon_size_slider->SetTickFreq(10);
+    m_icon_size_slider->SetPageSize(10);
+    m_icon_size_slider->SetToolTip(_L("Select toolbar icon size in respect to the default one."));
 
-    m_icon_size_sizer->Add(slider, 1, wxEXPAND);
+    m_icon_size_sizer->Add(m_icon_size_slider, 1, wxEXPAND);
 
     wxStaticText* val_label{ nullptr };
     if (isOSX) {
@@ -710,15 +832,18 @@ void PreferencesDialog::create_icon_size_slider()
         m_icon_size_sizer->Add(val_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, em);
     }
 
-    slider->Bind(wxEVT_SLIDER, ([this, slider, val_label](wxCommandEvent e) {
-        auto val = slider->GetValue();
-        m_values["custom_toolbar_size"] = (boost::format("%d") % val).str();
+    m_icon_size_slider->Bind(wxEVT_SLIDER, ([this, val_label, app_config](wxCommandEvent e) {
+        auto val = m_icon_size_slider->GetValue();
+
+		app_config->set("custom_toolbar_size", (boost::format("%d") % val).str());
+		app_config->save();
+		wxGetApp().plater()->get_current_canvas3D()->render();
 
         if (val_label)
             val_label->SetLabelText(wxString::Format("%d", val));
-    }), slider->GetId());
+    }), m_icon_size_slider->GetId());
 
-    for (wxWindow* win : std::vector<wxWindow*>{ slider, label, val_label }) {
+    for (wxWindow* win : std::vector<wxWindow*>{ m_icon_size_slider, label, val_label }) {
         if (!win) continue;         
         win->SetFont(wxGetApp().normal_font());
 
@@ -731,26 +856,6 @@ void PreferencesDialog::create_icon_size_slider()
 
 void PreferencesDialog::create_settings_mode_widget()
 {
-#ifdef _MSW_DARK_MODE
-	bool disable_new_layout = wxGetApp().tabs_as_menu();
-#endif
-	std::vector<wxString> choices = {  _L("Old regular layout with the tab bar"),
-                                       _L("New layout, access via settings button in the top menu"),
-                                       _L("Settings in non-modal window") };
-
-	auto app_config = get_app_config();
-    int selection = app_config->get("old_settings_layout_mode") == "1" ? 0 :
-                    app_config->get("new_settings_layout_mode") == "1" ? 1 :
-                    app_config->get("dlg_settings_layout_mode") == "1" ? 2 : 0;
-
-#ifdef _MSW_DARK_MODE
-	if (disable_new_layout) {
-		choices = { _L("Old regular layout with the tab bar"),
-					_L("Settings in non-modal window") };
-		selection = app_config->get("dlg_settings_layout_mode") == "1" ? 1 : 0;
-	}
-#endif
-
 	wxWindow* parent = m_optgroup_gui->parent();
 	wxGetApp().UpdateDarkUI(parent);
 
@@ -762,32 +867,35 @@ void PreferencesDialog::create_settings_mode_widget()
 
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
 
-	int id = 0;
-	for (const wxString& label : choices) {
-		wxRadioButton* btn = new wxRadioButton(parent, wxID_ANY, label, wxDefaultPosition, wxDefaultSize, id==0 ? wxRB_GROUP : 0);
-		stb_sizer->Add(btn);
-		btn->SetValue(id == selection);
-
-        int dlg_id = 2;
-#ifdef _MSW_DARK_MODE
-		if (disable_new_layout)
-			dlg_id = 1;
-#endif
-
-        btn->Bind(wxEVT_RADIOBUTTON, [this, id, dlg_id
-#ifdef _MSW_DARK_MODE
-			, disable_new_layout
-#endif
-		](wxCommandEvent& ) {
-            m_values["old_settings_layout_mode"] = (id == 0) ? "1" : "0";
-#ifdef _MSW_DARK_MODE
-			if (!disable_new_layout)
-#endif
-            m_values["new_settings_layout_mode"] = (id == 1) ? "1" : "0";
-            m_values["dlg_settings_layout_mode"] = (id == dlg_id) ? "1" : "0";
+	auto app_config = get_app_config();
+	std::vector<wxString> choices = {	_L("Old regular layout with the tab bar"),
+										_L("New layout, access via settings button in the top menu"),
+										_L("Settings in non-modal window") };
+	int id = -1;
+	auto add_radio = [this, parent, stb_sizer, choices](wxRadioButton** rb, int id, bool select) {
+		*rb = new wxRadioButton(parent, wxID_ANY, choices[id], wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
+		stb_sizer->Add(*rb);
+		(*rb)->SetValue(select);
+		(*rb)->Bind(wxEVT_RADIOBUTTON, [this, id](wxCommandEvent&) {
+			m_values["old_settings_layout_mode"] = (id == 0) ? "1" : "0";
+			m_values["new_settings_layout_mode"] = (id == 1) ? "1" : "0";
+			m_values["dlg_settings_layout_mode"] = (id == 2) ? "1" : "0";
 		});
-		id++;
+	};
+
+	add_radio(&m_rb_old_settings_layout_mode, ++id, app_config->get("old_settings_layout_mode") == "1");
+	add_radio(&m_rb_new_settings_layout_mode, ++id, app_config->get("new_settings_layout_mode") == "1");
+	add_radio(&m_rb_dlg_settings_layout_mode, ++id, app_config->get("dlg_settings_layout_mode") == "1");
+
+#ifdef _MSW_DARK_MODE
+	if (app_config->get("tabs_as_menu") == "1") {
+		m_rb_new_settings_layout_mode->Hide();
+		if (m_rb_new_settings_layout_mode->GetValue()) {
+			m_rb_new_settings_layout_mode->SetValue(false);
+			m_rb_old_settings_layout_mode->SetValue(true);
+		}
 	}
+#endif
 
 	std::string opt_key = "settings_layout_mode";
 	m_blinkers[opt_key] = new BlinkingBitmap(parent);

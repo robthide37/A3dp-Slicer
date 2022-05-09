@@ -3661,42 +3661,44 @@ void GCodeProcessor::post_process()
         return std::tuple(!ret.empty(), (extra_lines_count == 0) ? extra_lines_count : extra_lines_count - 1);
     };
 
-    struct FilamentData
-    {
-        double mm{ 0.0 };
-        double cm3{ 0.0 };
-        double g{ 0.0 };
-        double cost{ 0.0 };
-    };
+    std::vector<double> filament_mm(m_result.extruders_count, 0.0);
+    std::vector<double> filament_cm3(m_result.extruders_count, 0.0);
+    std::vector<double> filament_g(m_result.extruders_count, 0.0);
+    std::vector<double> filament_cost(m_result.extruders_count, 0.0);
 
-    FilamentData filament_data;
-    for (const auto& [role, used] : m_result.print_statistics.used_filaments_per_role) {
-        filament_data.mm += used.first;
-        filament_data.g += used.second;
-    }
+    double filament_total_g    = 0.0;
+    double filament_total_cost = 0.0;
+
     for (const auto& [id, volume] : m_result.print_statistics.volumes_per_extruder) {
-        filament_data.cm3 += volume;
-        filament_data.cost += volume * double(m_result.filament_densities[id]) * double(m_result.filament_cost[id]) * 0.000001;
+        filament_mm[id]   = volume / (static_cast<double>(M_PI) * sqr(0.5 * m_result.filament_diameters[id]));
+        filament_cm3[id]  = volume * 0.001;
+        filament_g[id]    = filament_cm3[id] * double(m_result.filament_densities[id]);
+        filament_cost[id] = filament_g[id] * double(m_result.filament_cost[id]) * 0.001;
+        filament_total_g    += filament_g[id];
+        filament_total_cost += filament_cost[id];
     }
 
-    auto process_used_filament = [&filament_data](std::string& gcode_line) {
-        auto process_tag = [](std::string& gcode_line, const std::string& tag, double value) {
+    auto process_used_filament = [&](std::string& gcode_line) {
+        auto process_tag = [](std::string& gcode_line, const std::string& tag, const std::vector<double>& values) {
             if (boost::algorithm::istarts_with(gcode_line, tag)) {
-                char buf[128];
-                sprintf(buf, "%s %.2lf\n", tag.c_str(), value);
-                gcode_line = buf;
+                gcode_line = tag;
+                char buf[1024];
+                for (size_t i = 0; i < values.size(); ++i) {
+                    sprintf(buf, i == values.size() - 1 ? " %.2lf\n" : " %.2lf,", values[i]);
+                    gcode_line += buf;
+                }
                 return true;
             }
             return false;
         };
 
         bool ret = false;
-        ret |= process_tag(gcode_line, "; filament used [mm] =", filament_data.mm * 1000.0);
-        ret |= process_tag(gcode_line, "; filament used [g] =", filament_data.g);
-        ret |= process_tag(gcode_line, "; total filament used [g] =", filament_data.g);
-        ret |= process_tag(gcode_line, "; filament used [cm3] =", filament_data.cm3 / 1000.0);
-        ret |= process_tag(gcode_line, "; filament cost =", filament_data.cost);
-        ret |= process_tag(gcode_line, "; total filament cost =", filament_data.cost);
+        ret |= process_tag(gcode_line, "; filament used [mm] =", filament_mm);
+        ret |= process_tag(gcode_line, "; filament used [g] =", filament_g);
+        ret |= process_tag(gcode_line, "; total filament used [g] =", { filament_total_g });
+        ret |= process_tag(gcode_line, "; filament used [cm3] =", filament_cm3);
+        ret |= process_tag(gcode_line, "; filament cost =", filament_cost);
+        ret |= process_tag(gcode_line, "; total filament cost =", { filament_total_cost });
         return ret;
     };
 

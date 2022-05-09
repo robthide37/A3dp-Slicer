@@ -4,26 +4,15 @@
 namespace Slic3r {
 
 REGISTER_CLASS(ExPolygon, "ExPolygon");
-REGISTER_CLASS(ExPolygonCollection, "ExPolygon::Collection");
-REGISTER_CLASS(ExtrusionMultiPath, "ExtrusionMultiPath");
 REGISTER_CLASS(ExtrusionPath, "ExtrusionPath");
 REGISTER_CLASS(ExtrusionLoop, "ExtrusionLoop");
 REGISTER_CLASS(ExtrusionEntityCollection, "ExtrusionPath::Collection");
-REGISTER_CLASS(ExtrusionSimulator, "ExtrusionSimulator");
-REGISTER_CLASS(Filler, "Filler");
-REGISTER_CLASS(Flow, "Flow");
-REGISTER_CLASS(CoolingBuffer, "GCode::CoolingBuffer");
 REGISTER_CLASS(GCode, "GCode");
 REGISTER_CLASS(Layer, "Layer");
-REGISTER_CLASS(SupportLayer, "Layer::Support");
 REGISTER_CLASS(LayerRegion, "Layer::Region");
 REGISTER_CLASS(Line, "Line");
-REGISTER_CLASS(Linef3, "Linef3");
-REGISTER_CLASS(PerimeterGenerator, "Layer::PerimeterGenerator");
-REGISTER_CLASS(PlaceholderParser, "GCode::PlaceholderParser");
 REGISTER_CLASS(Polygon, "Polygon");
 REGISTER_CLASS(Polyline, "Polyline");
-REGISTER_CLASS(PolylineCollection, "Polyline::Collection");
 REGISTER_CLASS(Print, "Print");
 REGISTER_CLASS(PrintObject, "Print::Object");
 REGISTER_CLASS(PrintRegion, "Print::Region");
@@ -33,22 +22,16 @@ REGISTER_CLASS(ModelObject, "Model::Object");
 REGISTER_CLASS(ModelVolume, "Model::Volume");
 REGISTER_CLASS(ModelInstance, "Model::Instance");
 REGISTER_CLASS(BoundingBox, "Geometry::BoundingBox");
-REGISTER_CLASS(BoundingBoxf, "Geometry::BoundingBoxf");
-REGISTER_CLASS(BoundingBoxf3, "Geometry::BoundingBoxf3");
-REGISTER_CLASS(BridgeDetector, "BridgeDetector");
 REGISTER_CLASS(Point, "Point");
 __REGISTER_CLASS(Vec2d, "Pointf");
 __REGISTER_CLASS(Vec3d, "Pointf3");
 REGISTER_CLASS(DynamicPrintConfig, "Config");
 REGISTER_CLASS(StaticPrintConfig, "Config::Static");
-REGISTER_CLASS(PrintObjectConfig, "Config::PrintObject");
-REGISTER_CLASS(PrintRegionConfig, "Config::PrintRegion");
 REGISTER_CLASS(GCodeConfig, "Config::GCode");
 REGISTER_CLASS(PrintConfig, "Config::Print");
-REGISTER_CLASS(FullPrintConfig, "Config::Full");
 REGISTER_CLASS(Surface, "Surface");
 REGISTER_CLASS(SurfaceCollection, "Surface::Collection");
-REGISTER_CLASS(PrintObjectSupportMaterial, "Print::SupportMaterial2");
+REGISTER_CLASS(FullPrintConfig, "Config::Full");
 REGISTER_CLASS(TriangleMesh, "TriangleMesh");
 
 SV* ConfigBase__as_hash(ConfigBase* THIS)

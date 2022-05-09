@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Slic3r::XS;
-use Test::More tests => 40;
+use Test::More tests => 35;
 
 use constant PI         => 4 * atan2(1, 1);
 use constant EPSILON    => 1E-4;
@@ -15,21 +15,6 @@ my $points = [
 ];
 
 my $line = Slic3r::Line->new(@$points);
-is_deeply $line->pp, $points, 'line roundtrip';
-
-is ref($line->arrayref), 'ARRAY', 'line arrayref is unblessed';
-isa_ok $line->[0], 'Slic3r::Point::Ref', 'line point is blessed';
-
-{
-    my $clone = $line->clone;
-    $clone->reverse;
-    is_deeply $clone->pp, [ reverse @$points ], 'reverse';
-}
-
-{
-    my $line2 = Slic3r::Line->new($line->a->clone, $line->b->clone);
-    is_deeply $line2->pp, $points, 'line roundtrip with cloned points';
-}
 
 {
     my $clone = $line->clone;

@@ -1,5 +1,6 @@
 #include <catch2/catch.hpp>
 
+#include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 
@@ -13,20 +14,20 @@ using namespace Slic3r;
 SCENARIO("Generic config validation performs as expected.", "[Config]") {
     GIVEN("A config generated from default options") {
         Slic3r::DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
-        WHEN( "perimeter_extrusion_width is set to 250%, a valid value") {
+        WHEN("perimeter_extrusion_width is set to 250%, a valid value") {
             config.set_deserialize_strict("perimeter_extrusion_width", "250%");
             THEN( "The config is read as valid.") {
                 REQUIRE(config.validate().empty());
             }
         }
-        WHEN( "perimeter_extrusion_width is set to -10, an invalid value") {
+        WHEN("perimeter_extrusion_width is set to -10, an invalid value") {
             config.set("perimeter_extrusion_width", -10);
             THEN( "Validate returns error") {
                 REQUIRE(! config.validate().empty());
             }
         }
 
-        WHEN( "perimeters is set to -10, an invalid value") {
+        WHEN("perimeters is set to -10, an invalid value") {
             config.set("perimeters", -10);
             THEN( "Validate returns error") {
                 REQUIRE(! config.validate().empty());
@@ -36,8 +37,7 @@ SCENARIO("Generic config validation performs as expected.", "[Config]") {
 }
 
 SCENARIO("Config accessor functions perform as expected.", "[Config]") {
-    GIVEN("A config generated from default options") {
-        Slic3r::DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
+    auto test = [](ConfigBase &config) {
         WHEN("A boolean option is set to a boolean value") {
             REQUIRE_NOTHROW(config.set("gcode_comments", true));
             THEN("The underlying value is set correctly.") {
@@ -70,8 +70,8 @@ SCENARIO("Config accessor functions perform as expected.", "[Config]") {
             }
         }
 #if 0
-		//FIXME better design accessors for vector elements.
-		WHEN("An integer-based option is set through the integer interface") {
+        //FIXME better design accessors for vector elements.
+        WHEN("An integer-based option is set through the integer interface") {
             config.set("bed_temperature", 100);
             THEN("The underlying value is set correctly.") {
                 REQUIRE(config.opt<ConfigOptionInts>("bed_temperature")->get_at(0) == 100);
@@ -193,6 +193,14 @@ SCENARIO("Config accessor functions perform as expected.", "[Config]") {
                 REQUIRE(config.opt_float("layer_height") == 0.5);
             }
         }
+    };
+    GIVEN("DynamicPrintConfig generated from default options") {
+        auto config = Slic3r::DynamicPrintConfig::full_print_config();
+        test(config);
+    }
+    GIVEN("FullPrintConfig generated from default options") {
+        Slic3r::FullPrintConfig config;
+        test(config);
     }
 }
 
