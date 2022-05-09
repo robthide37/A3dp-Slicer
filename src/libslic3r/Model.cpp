@@ -1511,11 +1511,17 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
 
         if (!volume->is_model_part()) {
             if (volume->source.is_connector) {
-                if (attributes.has(ModelObjectCutAttribute::KeepUpper))
+                if (attributes.has(ModelObjectCutAttribute::KeepUpper)) {
                     ModelVolume* vol = upper->add_volume(*volume);
+                    // make a "hole" dipper
+                    vol->set_scaling_factor(Z, 1.1 * vol->get_scaling_factor(Z));
+                }
                 if (attributes.has(ModelObjectCutAttribute::KeepLower)) {
                     ModelVolume* vol = lower->add_volume(*volume);
-                    if (!attributes.has(ModelObjectCutAttribute::CreateDowels))
+                    if (attributes.has(ModelObjectCutAttribute::CreateDowels))
+                        // make a "hole" dipper
+                        vol->set_scaling_factor(Z, 1.2 * vol->get_scaling_factor(Z));
+                    else
                         // for lower part change type of connector from NEGATIVE_VOLUME to MODEL_PART if this connector is a plug
                         vol->set_type(ModelVolumeType::MODEL_PART);
                 }

@@ -714,8 +714,7 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
 
     if (m_hover_id == m_group_id) {
 #if use_grabber_extension
-        Vec3d starting_box_center = m_plane_center;
-        starting_box_center[Z] -= 1.0; // some Margin
+        Vec3d starting_box_center = m_plane_center - Vec3d::UnitZ();// some Margin
         rotate_vec3d_around_center(starting_box_center, m_rotation_gizmo.get_rotation(), m_plane_center);
 #else
         const Vec3d& starting_box_center = m_plane_center;
@@ -1155,7 +1154,7 @@ void GLGizmoCut3D::render_connectors(bool picking)
     const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
     const Vec3d& normal = cp && cp->is_active() ? cp->get_normal() : m_clp_normal;
 
-    const Transform3d instance_trafo = Geometry::assemble_transform(Vec3d(0.0, 0.0, sla_shift), Vec3d::Zero(), Vec3d::Ones(), Vec3d::Ones()) * mi->get_transformation().get_matrix();
+    const Transform3d instance_trafo = Geometry::assemble_transform(Vec3d(0.0, 0.0, sla_shift)) * mi->get_transformation().get_matrix();
 
     for (size_t i = 0; i < connectors.size(); ++i) {
         const CutConnector& connector = connectors[i];
@@ -1268,29 +1267,34 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         if(!mo)
             return;
 
-        Plater::TakeSnapshot snapshot(plater, _L("Cut by Plane"));
-
         const bool has_connectors = !mo->cut_connectors.empty();
-        // update connectors pos as offset of its center before cut performing
-        if (has_connectors && m_connector_mode == CutConnectorMode::Manual) {
-            for (CutConnector& connector : mo->cut_connectors) {
-                connector.rotation = m_rotation_gizmo.get_rotation();
+        {
+            Plater::TakeSnapshot snapshot(plater, _L("Cut by Plane"));
+            // update connectors pos as offset of its center before cut performing
+            if (has_connectors && m_connector_mode == CutConnectorMode::Manual) {
+                for (CutConnector& connector : mo->cut_connectors) {
+                    connector.rotation = m_rotation_gizmo.get_rotation();
 
-                if (m_connector_type == CutConnectorType::Dowel) {
-                    if (m_connector_style == size_t(CutConnectorStyle::Prizm))
-                        connector.height *= 2;
+                    if (m_connector_type == CutConnectorType::Dowel) {
+                        if (m_connector_style == size_t(CutConnectorStyle::Prizm))
+                            connector.height *= 2;
+                    }
+                    else {
+                        // culculate shift of the connector center regarding to the position on the cut plane
+#if use_grabber_extension
+                        Vec3d shifted_center = m_plane_center + Vec3d::UnitZ();
+                        rotate_vec3d_around_center(shifted_center, m_rotation_gizmo.get_rotation(), m_plane_center);
+                        Vec3d norm = (shifted_center - m_plane_center).normalized();
+#else
+                        Vec3d norm = (m_grabbers[0].center - m_plane_center).normalize();
+#endif
+                        connector.pos += norm * (0.5 * connector.height);
+                    }
                 }
-                else {
-                    // culculate shift of the connector center regarding to the position on the cut plane
-                    Vec3d norm = m_grabbers[0].center - m_plane_center;
-                    norm.normalize();
-                    Vec3d shift = norm * (0.5 * connector.height);
-                    connector.pos += shift;
-                }
+                mo->apply_cut_connectors(_u8L("Connector"), CutConnectorAttributes(CutConnectorType(m_connector_type), CutConnectorStyle(m_connector_style), CutConnectorShape(m_connector_shape_id)));
+                if (m_connector_type == CutConnectorType::Dowel)
+                    create_dowels_as_separate_object = true;
             }
-            mo->apply_cut_connectors(_u8L("Connector"), CutConnectorAttributes(CutConnectorType(m_connector_type), CutConnectorStyle(m_connector_style), CutConnectorShape(m_connector_shape_id)));
-            if (m_connector_type == CutConnectorType::Dowel)
-                create_dowels_as_separate_object = true;
         }
 
         plater->cut(object_idx, instance_idx, cut_center_offset, m_rotation_gizmo.get_rotation(),
@@ -1420,6 +1424,8 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
             if (action == SLAGizmoEventType::LeftDown && cut_line_processing()) {
                 Vec3f camera_dir = camera.get_dir_forward().cast<float>();
                 Vec3f line_dir = (m_line_end - m_line_beg).cast<float>();
+
+                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by line"), UndoRedo::SnapshotType::GizmoAction);
 
                 Vec3f cross_dir = line_dir.cross(camera_dir).normalized();
                 Eigen::Quaterniond q;
