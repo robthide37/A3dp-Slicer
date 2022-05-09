@@ -153,6 +153,9 @@ public:
         bool* was_clipping_plane_hit = nullptr // is the hit on the clipping place cross section?
     ) const;
 
+    // Given a mouse position, this returns true in case it is on the mesh.
+    bool unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera, Vec3d& position, Vec3d& normal) const;
+
     bool is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const;
 
     // Given a vector of points in woorld coordinates, this returns vector

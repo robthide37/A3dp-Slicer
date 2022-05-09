@@ -40,9 +40,12 @@ class GLGizmoCut3D : public GLGizmoBase
     // workaround for using of the clipping plane normal
     Vec3d           m_clp_normal{ Vec3d::Ones() };
 
+    Vec3d           m_line_beg{ Vec3d::Zero() };
+    Vec3d           m_line_end{ Vec3d::Zero() };
+
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_plane;
-//    GLModel m_grabber_connection;
+    GLModel m_cut_line;
     GLModel m_cone;
     GLModel m_sphere;
     Vec3d   m_old_center;
@@ -74,7 +77,6 @@ class GLGizmoCut3D : public GLGizmoBase
 
     enum class CutMode {
         cutPlanar
-        , cutByLine
         , cutGrig
         //,cutRadial
         //,cutModular
@@ -159,15 +161,18 @@ private:
     void render_connectors(bool picking);
 
     bool can_perform_cut() const;
+    bool cut_line_processing() const;
 
     void render_cut_plane();
     void render_cut_center_graber();
+    void render_cut_line();
     void perform_cut(const Selection& selection);
     void set_center_pos(const Vec3d& center_pos);
     bool update_bb();
     void reset_connectors();
     void update_connector_shape();
     void update_model_object() const;
+    bool process_cut_line(SLAGizmoEventType action, const Vec2d& mouse_position);
 };
 
 } // namespace GUI

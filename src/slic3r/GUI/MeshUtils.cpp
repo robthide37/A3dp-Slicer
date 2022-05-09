@@ -406,6 +406,24 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
     return true;
 }
 
+bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
+                                      Vec3d& position, Vec3d& normal) const
+{
+    Vec3d point;
+    Vec3d direction;
+    line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
+
+    std::vector<sla::IndexedMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction);
+
+    if (hits.empty())
+        return false; // no intersection found
+
+    // Now stuff the points in the provided vector and calculate normals if asked about them:
+    position = hits[0].position();
+    normal = hits[0].normal();
+
+    return true;
+}
 
 bool MeshRaycaster::is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const 
 {
