@@ -99,7 +99,7 @@ bool ObjectSettings::update_settings_list()
             btn->SetToolTip(_(L("Remove parameter")));
 
             btn->SetBitmapFocus(m_bmp_delete_focus.bmp());
-            btn->SetBitmapHover(m_bmp_delete_focus.bmp());
+            btn->SetBitmapCurrent(m_bmp_delete_focus.bmp());
 
 			btn->Bind(wxEVT_BUTTON, [opt_key, config, this](wxEvent &event) {
                 wxGetApp().plater()->take_snapshot(from_u8((boost::format(_utf8(L("Delete Option %s"))) % opt_key).str()));
@@ -133,7 +133,7 @@ bool ObjectSettings::update_settings_list()
                     return;
                 ctrl->SetBitmap_(m_bmp_delete);
                 ctrl->SetBitmapFocus(m_bmp_delete_focus.bmp()); 
-                ctrl->SetBitmapHover(m_bmp_delete_focus.bmp());
+                ctrl->SetBitmapCurrent(m_bmp_delete_focus.bmp());
             };
 
             const bool is_extruders_cat = cat.first == "Extruders";
@@ -266,15 +266,6 @@ void ObjectSettings::update_config_values(ModelConfig* config)
 void ObjectSettings::UpdateAndShow(const bool show)
 {
     OG_Settings::UpdateAndShow(show ? update_settings_list() : false);
-}
-
-void ObjectSettings::msw_rescale()
-{
-    m_bmp_delete.msw_rescale();
-    m_bmp_delete_focus.msw_rescale();
-
-    for (auto group : m_og_settings)
-        group->msw_rescale();
 }
 
 void ObjectSettings::sys_color_changed()

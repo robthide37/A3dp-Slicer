@@ -297,7 +297,7 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
     if (can_create_editor_ctrl && !can_create_editor_ctrl())
         return nullptr;
 
-    std::vector<wxBitmap*> icons = get_extruder_color_icons();
+    std::vector<wxBitmapBundle*> icons = get_extruder_color_icons();
     if (icons.empty())
         return nullptr;
 

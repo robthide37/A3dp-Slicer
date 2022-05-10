@@ -221,9 +221,7 @@ AboutDialog::AboutDialog()
 	main_sizer->Add(hsizer, 0, wxEXPAND | wxALL, 20);
 
     // logo
-//    m_logo_bitmap = ScalableBitmap(this, wxGetApp().logo_name(), 192);
-//    m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bitmap.bmp());
-    m_logo = new wxStaticBitmap(this, wxID_ANY, wxBitmapBundle::FromSVGFile(Slic3r::var(wxGetApp().logo_name()+".svg"), wxSize(192, 192)));
+    m_logo = new wxStaticBitmap(this, wxID_ANY, *get_bmp_bundle(wxGetApp().logo_name(), 192));
 	hsizer->Add(m_logo, 1, wxALIGN_CENTER_VERTICAL);
     
     wxBoxSizer* vsizer = new wxBoxSizer(wxVERTICAL); 	

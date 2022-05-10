@@ -104,7 +104,7 @@ SysInfoDialog::SysInfoDialog()
     // logo
     //m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 192);
     //m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bmp.bmp());
-    m_logo = new wxStaticBitmap(this, wxID_ANY, wxBitmapBundle::FromSVGFile(Slic3r::var(wxGetApp().logo_name() + ".svg"), wxSize(192, 192)));
+    m_logo = new wxStaticBitmap(this, wxID_ANY, *get_bmp_bundle(wxGetApp().logo_name(), 192));
 
 	hsizer->Add(m_logo, 0, wxALIGN_CENTER_VERTICAL);
     

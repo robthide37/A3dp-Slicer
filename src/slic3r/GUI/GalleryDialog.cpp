@@ -157,8 +157,9 @@ bool GalleryDialog::can_change_thumbnail()
 
 void GalleryDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
-    const int& em = em_unit();
+    update();
 
+    const int& em = em_unit();
     msw_buttons_rescale(this, em, { ID_BTN_ADD_CUSTOM_SHAPE, ID_BTN_DEL_CUSTOM_SHAPE, ID_BTN_REPLACE_CUSTOM_PNG, wxID_OK, wxID_CLOSE });
 
     wxSize size = wxSize(50 * em, 35 * em);
@@ -169,13 +170,14 @@ void GalleryDialog::on_dpi_changed(const wxRect& suggested_rect)
     Refresh();
 }
 
-static void add_lock(wxImage& image) 
+static void add_lock(wxImage& image, wxWindow* parent_win) 
 {
-    int lock_sz = 22;
+    wxBitmapBundle* bmp_bndl = get_bmp_bundle("lock", 22);
 #ifdef __APPLE__
-    lock_sz /= mac_max_scaling_factor();
+    wxBitmap bmp = bmp_bndl->GetBitmap(bmp_bndl->GetDefaultSize() * mac_max_scaling_factor());
+#else
+    wxBitmap bmp = bmp_bndl->GetBitmapFor(parent_win);
 #endif
-    wxBitmap bmp = create_scaled_bitmap("lock", nullptr, lock_sz);
 
     wxImage lock_image = bmp.ConvertToImage();
     if (!lock_image.IsOk() || lock_image.GetWidth() == 0 || lock_image.GetHeight() == 0)
@@ -213,21 +215,28 @@ static void add_lock(wxImage& image)
     }
 }
 
-static void add_default_image(wxImageList* img_list, bool is_system)
+static void add_default_image(wxImageList* img_list, bool is_system, wxWindow* parent_win)
 {
-    int sz = IMG_PX_CNT;
+    wxBitmapBundle* bmp_bndl = get_bmp_bundle("cog", IMG_PX_CNT);
 #ifdef __APPLE__
-    sz /= mac_max_scaling_factor();
+    wxBitmap bmp = bmp_bndl->GetBitmap(bmp_bndl->GetDefaultSize() * mac_max_scaling_factor());
+#else
+    wxBitmap bmp = bmp_bndl->GetBitmapFor(parent_win);
 #endif
-    wxBitmap bmp = create_scaled_bitmap("cog", nullptr, sz, true);
 
+    bmp = bmp.ConvertToDisabled();
     if (is_system) {
         wxImage image = bmp.ConvertToImage();
         if (image.IsOk() && image.GetWidth() != 0 && image.GetHeight() != 0) {
-            add_lock(image);
+            add_lock(image, parent_win);
+#ifdef __APPLE__
+            bmp = wxBitmap(std::move(image), -1, mac_max_scaling_factor());
+#else
             bmp = wxBitmap(std::move(image));
+#endif
         }
     }
+
     img_list->Add(bmp);
 };
 
@@ -344,8 +353,13 @@ void GalleryDialog::load_label_icon_list()
 
     // Make an image list containing large icons
 
+#ifdef __APPLE__
+    m_image_list = new wxImageList(IMG_PX_CNT, IMG_PX_CNT);
+    int px_cnt = IMG_PX_CNT * mac_max_scaling_factor();
+#else
     int px_cnt = (int)(em_unit() * IMG_PX_CNT * 0.1f + 0.5f);
     m_image_list = new wxImageList(px_cnt, px_cnt);
+#endif
 
     std::string ext = ".png";
 
@@ -364,7 +378,7 @@ void GalleryDialog::load_label_icon_list()
             if (can_generate_thumbnail)
                 generate_thumbnail_from_model(model_name);
             else {
-                add_default_image(m_image_list, item.is_system);
+                add_default_image(m_image_list, item.is_system, this);
                 continue;
             }
         }
@@ -373,14 +387,18 @@ void GalleryDialog::load_label_icon_list()
         if (!image.CanRead(from_u8(img_name)) ||
             !image.LoadFile(from_u8(img_name), wxBITMAP_TYPE_PNG) ||
             image.GetWidth() == 0 || image.GetHeight() == 0) {
-            add_default_image(m_image_list, item.is_system);
+            add_default_image(m_image_list, item.is_system, this);
             continue;
         }
         image.Rescale(px_cnt, px_cnt, wxIMAGE_QUALITY_BILINEAR);
 
         if (item.is_system)
-            add_lock(image);
+            add_lock(image, this);
+#ifdef __APPLE__
+        wxBitmap bmp = wxBitmap(std::move(image), -1, mac_max_scaling_factor());
+#else
         wxBitmap bmp = wxBitmap(std::move(image));
+#endif
         m_image_list->Add(bmp);
     }
 
