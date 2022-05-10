@@ -243,7 +243,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 			tmp_path += format(".%1%%2%", get_current_pid(), ".download");
 			try
 			{
-				boost::nowide::fstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
+				boost::nowide::fstream file(tmp_path.string(), std::ios::out | std::ios::binary | std::ios::trunc);
 				file.write(body.c_str(), body.size());
 				file.close();
 				boost::filesystem::rename(tmp_path, dest_path);
