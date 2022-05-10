@@ -106,14 +106,14 @@ public:
 	bool 	set_undo_to_sys_tooltip(const wxString* tip)		{ return m_undo_ui.set_undo_to_sys_tooltip(tip); }	
 
 	// ui items used for revert line value
-	bool				has_undo_ui()			const { return m_undo_ui.undo_bitmap != nullptr; }
-	const wxBitmap&		undo_bitmap()			const { return m_undo_ui.undo_bitmap->bmp(); }
-	const wxString*		undo_tooltip()			const { return m_undo_ui.undo_tooltip; }
-	const wxBitmap&		undo_to_sys_bitmap()	const { return m_undo_ui.undo_to_sys_bitmap->bmp(); }
-	const wxString*		undo_to_sys_tooltip()	const { return m_undo_ui.undo_to_sys_tooltip; }
-	const wxColour*		label_color()			const { return m_undo_ui.label_color; }
-	const bool			blink()					const { return m_undo_ui.blink; }
-	bool*				get_blink_ptr()				  { return &m_undo_ui.blink; }
+	bool					has_undo_ui()			const { return m_undo_ui.undo_bitmap != nullptr; }
+	const wxBitmapBundle&	undo_bitmap()			const { return m_undo_ui.undo_bitmap->bmp(); }
+	const wxString*			undo_tooltip()			const { return m_undo_ui.undo_tooltip; }
+	const wxBitmapBundle&	undo_to_sys_bitmap()	const { return m_undo_ui.undo_to_sys_bitmap->bmp(); }
+	const wxString*			undo_to_sys_tooltip()	const { return m_undo_ui.undo_to_sys_tooltip; }
+	const wxColour*			label_color()			const { return m_undo_ui.label_color; }
+	const bool				blink()					const { return m_undo_ui.blink; }
+	bool*					get_blink_ptr()				  { return &m_undo_ui.blink; }
 };
 
 

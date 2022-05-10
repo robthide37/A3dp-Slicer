@@ -266,9 +266,7 @@ wxPanel* KBShortcutsDialog::create_header(wxWindow* parent, const wxFont& bold_f
     sizer->AddStretchSpacer();
 
     // logo
-    //m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 32);
-    //m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, m_logo_bmp.bmp());
-    m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, wxBitmapBundle::FromSVGFile(Slic3r::var(wxGetApp().logo_name() + ".svg"), wxSize(32, 32)));
+    m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, *get_bmp_bundle(wxGetApp().logo_name(), 32));
 
     sizer->Add(m_header_bitmap, 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
 
