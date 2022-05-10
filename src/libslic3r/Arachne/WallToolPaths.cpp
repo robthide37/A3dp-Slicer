@@ -486,6 +486,12 @@ const std::vector<VariableWidthLines> &WallToolPaths::generate()
     removeDegenerateVerts(prepared_outline);
     removeSmallAreas(prepared_outline, small_area_length * small_area_length, false);
 
+    // The functions above could produce intersecting polygons that could cause a crash inside Arachne.
+    // Applying Clipper union should be enough to get rid of this issue.
+    // Clipper union also fixed an issue in Arachne that in post-processing Voronoi diagram, some edges
+    // didn't have twin edges (this probably isn't an issue in Boost Voronoi generator).
+    prepared_outline = union_(prepared_outline);
+
     if (area(prepared_outline) <= 0) {
         assert(toolpaths.empty());
         return toolpaths;
