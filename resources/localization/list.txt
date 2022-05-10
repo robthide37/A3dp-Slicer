@@ -30,6 +30,7 @@ src/slic3r/GUI/Gizmos/GLGizmoScale.cpp
 src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp
 src/slic3r/GUI/Gizmos/GLGizmoSeam.hpp
 src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp
+src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp
 src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
 src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp
 src/slic3r/GUI/Gizmos/GLGizmosManager.cpp
