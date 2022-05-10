@@ -11,12 +11,12 @@ namespace Slic3r::Arachne
 
 ExtrusionLine::ExtrusionLine(const size_t inset_idx, const bool is_odd) : inset_idx(inset_idx), is_odd(is_odd), is_closed(false) {}
 
-coord_t ExtrusionLine::getLength() const
+int64_t ExtrusionLine::getLength() const
 {
     if (junctions.empty())
         return 0;
 
-    coord_t           len  = 0;
+    int64_t           len  = 0;
     ExtrusionJunction prev = junctions.front();
     for (const ExtrusionJunction &next : junctions) {
         len += (next.p - prev.p).cast<int64_t>().norm();

@@ -8,7 +8,7 @@
 #include "ExtrusionJunction.hpp"
 #include "../../Polyline.hpp"
 #include "../../Polygon.hpp"
-#include "BoundingBox.hpp"
+#include "../../BoundingBox.hpp"
 
 namespace Slic3r {
 class ThickPolyline;
@@ -116,8 +116,8 @@ struct ExtrusionLine
     /*!
      * Sum the total length of this path.
      */
-    coord_t getLength() const;
-    coord_t polylineLength() const { return getLength(); }
+    int64_t getLength() const;
+    int64_t polylineLength() const { return getLength(); }
 
     /*!
      * Put all junction locations into a polygon object.

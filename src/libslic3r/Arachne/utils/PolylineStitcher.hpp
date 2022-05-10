@@ -85,7 +85,7 @@ public:
                 { // try extending chain in the other direction
                     chain.reverse();
                 }
-                coord_t chain_length = chain.polylineLength();
+                int64_t chain_length = chain.polylineLength();
 
                 while (true)
                 {
