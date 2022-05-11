@@ -225,7 +225,7 @@ struct FontItem
 
     // undo / redo stack recovery
     template<class Archive> void serialize(Archive &ar){
-        ar(name, path, (int) type, prop);
+        ar(name, path, type, prop);
     }
 };
 

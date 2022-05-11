@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+﻿#include <catch2/catch.hpp>
 
 #include <libslic3r/Emboss.hpp>
 #include <libslic3r/SVG.hpp> // only debug visualization
@@ -335,6 +335,41 @@ TEST_CASE("Cut surface", "[]")
     indexed_triangle_set its = cut2model(surfaces, projection);
     CHECK(!its.empty());
     //its_write_obj(its, "C:/data/temp/projected.obj");
+}
+
+#include <sstream>
+#include <cereal/cereal.hpp>
+#include <cereal/archives/binary.hpp>
+TEST_CASE("UndoRedo serialization", "[Emboss]")
+{
+    TextConfiguration tc;
+    tc.text = "Dovede-li se člověk zasmát sám sobě, nevyjde ze smíchu po celý život.";
+    FontItem& fi = tc.font_item;
+    fi.name       = "Seneca";
+    fi.path       = "Simply the best";
+    fi.type       = FontItem::Type::file_path;
+    FontProp &fp  = fi.prop;
+    fp.angle      = 100.;
+    fp.distance   = 10.;
+    fp.char_gap   = 1;
+    fp.use_surface = true;
+    tc.fix_3mf_tr = Transform3d::Identity();
+
+    std::stringstream ss; // any stream can be used
+    {
+        cereal::BinaryOutputArchive oarchive(ss); // Create an output archive  
+
+        oarchive(tc);
+    } // archive goes out of scope, ensuring all contents are flushed
+
+    TextConfiguration tc_loaded;
+    {
+        cereal::BinaryInputArchive iarchive(ss); // Create an input archive
+        iarchive(tc_loaded);
+    }
+    CHECK(tc.font_item == tc_loaded.font_item);
+    CHECK(tc.text == tc_loaded.text);
+    CHECK(tc.fix_3mf_tr.has_value() == tc_loaded.fix_3mf_tr.has_value());
 }
 
 
