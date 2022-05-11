@@ -1356,18 +1356,8 @@ void GLGizmoEmboss::draw_model_type()
     ModelVolumeType part = ModelVolumeType::MODEL_PART;
     ModelVolumeType type = (m_volume != nullptr) ? m_volume->type() :
                                                    ModelVolumeType::INVALID;
-    bool is_last_solid_part = false;
-    if (type == part) {
-        is_last_solid_part = true;
-        for (const ModelVolume* vol : m_volume->get_object()->volumes) {
-            if (vol == m_volume) continue;
-            if (vol->type() == part) {
-                is_last_solid_part = false;
-                break;
-            }
-        }
-    }
 
+    bool is_last_solid_part = is_text_object(m_volume);
     ImGui::Text("%s :", _u8L("Type").c_str());
     ImGui::SameLine(75);
     if (type == part) { 
@@ -2124,12 +2114,17 @@ void GLGizmoEmboss::draw_advanced()
     }
     
     // input surface distance
+    bool allowe_surface_distance = 
+        m_volume->text_configuration.has_value() &&
+        !m_volume->text_configuration->font_item.prop.use_surface &&
+        !is_text_object(m_volume);    
     std::optional<float> &distance = font_prop.distance;
     float prev_distance = distance.has_value() ? *distance : .0f,
           min_distance = -2 * font_prop.emboss,
           max_distance = 2 * font_prop.emboss;
     auto def_distance = m_stored_font_item.has_value() ?
-        &m_stored_font_item->prop.distance : nullptr;
+        &m_stored_font_item->prop.distance : nullptr;    
+    m_imgui->disabled_begin(!allowe_surface_distance);
     if (rev_slider(tr.surface_distance, distance, def_distance, _u8L("Undo translation"), 
         min_distance, max_distance, "%.2f mm", _L("Distance center of text from model surface")) &&
         m_volume != nullptr && m_volume->text_configuration.has_value()){
@@ -2137,6 +2132,7 @@ void GLGizmoEmboss::draw_advanced()
         float act_distance = font_prop.distance.has_value() ? *font_prop.distance : .0f;
         do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
     }
+    m_imgui->disabled_end();
 
     // slider for Clock-wise angle in degress
     // stored angle is optional CCW and in radians
@@ -2652,6 +2648,17 @@ void GLGizmoEmboss::store_font_list_to_app_config()
         section_name = FontListSerializable::create_section_name(++index);
     }
     cfg->save();
+}
+
+bool GLGizmoEmboss::is_text_object(const ModelVolume *text) {
+    if (text == nullptr) return false;
+    if (!text->text_configuration.has_value()) return false;
+    if (text->type() != ModelVolumeType::MODEL_PART) return false;
+    for (const ModelVolume *v : text->get_object()->volumes) {
+        if (v == text) continue;
+        if (v->type() == ModelVolumeType::MODEL_PART) return false;
+    }
+    return true;
 }
 
 //void GLGizmoEmboss::store_font_item_to_app_config() const

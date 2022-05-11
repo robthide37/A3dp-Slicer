@@ -430,6 +430,14 @@ void priv::update_volume(TriangleMesh &&mesh,
     // update printable state on canvas
     if (volume->type() == ModelVolumeType::MODEL_PART)
         canvas->update_instance_printable_state_for_object((size_t) object_idx);
+    
+    // Move object on bed
+    if (GLGizmoEmboss::is_text_object(volume)) {
+        // Must be called after because GLVolume is invalidated by new_unique_id
+        plater->CallAfter([object_idx]() {
+            wxGetApp().plater()->canvas3D()->ensure_on_bed(object_idx, false);            
+        });
+    }
 
     // redraw scene
     bool refresh_immediately = false;

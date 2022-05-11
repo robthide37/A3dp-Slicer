@@ -291,9 +291,16 @@ private:
     static const std::string M_ICON_FILENAME;
 
 public:
+    /// <summary>
+    /// Check if text is last solid part of object
+    /// TODO: move to emboss gui utils
+    /// </summary>
+    /// <param name="text">Model volume of Text</param>
+    /// <returns>True when object otherwise False</returns>
+    static bool is_text_object(const ModelVolume *text);
+
     // TODO: move to file utils
     static std::string get_file_name(const std::string &file_path);
-
 };
 
 } // namespace Slic3r::GUI
