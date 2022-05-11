@@ -239,15 +239,15 @@ IPListDialog::IPListDialog(wxWindow* parent, const wxString& hostname, const std
 	, m_selected_index (selected_index)
 {
 	const int em = GUI::wxGetApp().em_unit();
-	m_list->SetMinSize(wxSize(20 * em, 30 * em));
+	m_list->SetMinSize(wxSize(40 * em, 30 * em));
 
 	wxBoxSizer* vsizer = new wxBoxSizer(wxVERTICAL);
 
-	auto* label = new wxStaticText(this, wxID_ANY, GUI::format_wxstr(_L("There are several IP addresses resolving to hostname %1%.\n Please select one that should be used."), hostname));
+	auto* label = new wxStaticText(this, wxID_ANY, GUI::format_wxstr(_L("There are several IP addresses resolving to hostname %1%.\nPlease select one that should be used."), hostname));
 	vsizer->Add(label, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, em);
 
 	m_list->SetSingleStyle(wxLC_SINGLE_SEL);
-	m_list->AppendColumn(_(L("Address")), wxLIST_FORMAT_LEFT, 20 * em);
+	m_list->AppendColumn(_(L("Address")), wxLIST_FORMAT_LEFT, 40 * em);
 
 	for (size_t i = 0; i < ips.size(); i++) 
 		auto item = m_list->InsertItem(i, boost::nowide::widen(ips[i].to_string()));
