@@ -882,15 +882,21 @@ void ObjectManipulation::update_reset_buttons_visibility()
     bool show_drop_to_bed = false;
 
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    if (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) {
+#else
     if ((m_coordinates_type == ECoordinatesType::World && selection.is_single_full_instance()) ||
         (m_coordinates_type == ECoordinatesType::Instance && selection.is_single_volume_or_modifier())) {
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
         const double min_z = selection.is_single_full_instance() ? selection.get_scaled_instance_bounding_box().min.z() :
             get_volume_min_z(*selection.get_first_volume());
 
         show_drop_to_bed = std::abs(min_z) > EPSILON;
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
 
     if (m_coordinates_type == ECoordinatesType::Local && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
         const GLVolume* volume = selection.get_first_volume();
         Vec3d rotation = Vec3d::Zero();
         Vec3d scale = Vec3d::Ones();
