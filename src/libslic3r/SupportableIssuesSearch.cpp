@@ -8,10 +8,10 @@
 #include <unordered_set>
 #include <stack>
 
+#include "AABBTreeLines.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
-#include "PolygonPointTest.hpp"
 
 #define DEBUG_FILES
 

@@ -8,6 +8,28 @@
 
 namespace Slic3r {
 
+
+struct EdgeGridWrapper {
+    EdgeGridWrapper(coord_t edge_width, std::vector<Points> lines) :
+            lines(lines), edge_width(edge_width) {
+
+        grid.create(this->lines, edge_width, true);
+        grid.calculate_sdf();
+    }
+
+    bool signed_distance(const Point &point, coordf_t point_width, coordf_t &dist_out) const {
+        coordf_t tmp_dist_out;
+        bool found = grid.signed_distance(point, edge_width, tmp_dist_out);
+        dist_out = tmp_dist_out - edge_width / 2 - point_width / 2;
+        return found;
+    }
+
+    EdgeGrid::Grid grid;
+    std::vector<Points> lines;
+    coord_t edge_width;
+};
+
+
 namespace AABBTreeLines {
 
 namespace detail {
