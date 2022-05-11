@@ -558,6 +558,30 @@ inline bool is_rotation_ninety_degrees(const Vec3d &rotation)
     return is_rotation_ninety_degrees(rotation.x()) && is_rotation_ninety_degrees(rotation.y()) && is_rotation_ninety_degrees(rotation.z());
 }
 
+template <class T>
+std::pair<T, T> dir_to_spheric(const Vec<3, T> &n, T norm = 1.)
+{
+    T z       = n.z();
+    T r       = norm;
+    T polar   = std::acos(z / r);
+    T azimuth = std::atan2(n(1), n(0));
+    return {polar, azimuth};
+}
+
+template <class T = double>
+Vec<3, T> spheric_to_dir(double polar, double azimuth)
+{
+    return {T(std::cos(azimuth) * std::sin(polar)),
+            T(std::sin(azimuth) * std::sin(polar)), T(std::cos(polar))};
+}
+
+template <class T = double, class Pair>
+Vec<3, T> spheric_to_dir(const Pair &v)
+{
+    double plr = std::get<0>(v), azm = std::get<1>(v);
+    return spheric_to_dir<T>(plr, azm);
+}
+
 } } // namespace Slicer::Geometry
 
 #endif

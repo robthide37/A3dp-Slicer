@@ -3,9 +3,9 @@
 
 #include <random>
 
-#include <libslic3r/SLA/SupportPoint.hpp>
-#include <libslic3r/SLA/IndexedMesh.hpp>
+#include <libslic3r/AABBMesh.hpp>
 
+#include <libslic3r/SLA/SupportPoint.hpp>
 #include <libslic3r/BoundingBox.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/Point.hpp>
@@ -28,10 +28,10 @@ public:
         inline float tear_pressure() const { return 1.f; }  // pressure that the display exerts    (the force unit per mm2)
     };
     
-    SupportPointGenerator(const IndexedMesh& emesh, const std::vector<ExPolygons>& slices,
+    SupportPointGenerator(const AABBMesh& emesh, const std::vector<ExPolygons>& slices,
                     const std::vector<float>& heights, const Config& config, std::function<void(void)> throw_on_cancel, std::function<void(int)> statusfn);
     
-    SupportPointGenerator(const IndexedMesh& emesh, const Config& config, std::function<void(void)> throw_on_cancel, std::function<void(int)> statusfn);
+    SupportPointGenerator(const AABBMesh& emesh, const Config& config, std::function<void(void)> throw_on_cancel, std::function<void(int)> statusfn);
     
     const std::vector<SupportPoint>& output() const { return m_output; }
     std::vector<SupportPoint>& output() { return m_output; }
@@ -217,7 +217,7 @@ private:
     static void output_structures(const std::vector<Structure> &structures);
 #endif // SLA_SUPPORTPOINTGEN_DEBUG
     
-    const IndexedMesh& m_emesh;
+    const AABBMesh& m_emesh;
     std::function<void(void)> m_throw_on_cancel;
     std::function<void(int)>  m_statusfn;
     

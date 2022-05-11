@@ -126,6 +126,15 @@ inline void append(std::vector<T>& dest, std::vector<T>&& src)
     src.shrink_to_fit();
 }
 
+template<class T, class... Args> // Arbitrary allocator can be used
+void clear_and_shrink(std::vector<T, Args...>& vec)
+{
+    // shrink_to_fit does not garantee the release of memory nor does it clear()
+    std::vector<T, Args...> tmp;
+    vec.swap(tmp);
+    assert(vec.capacity() == 0);
+}
+
 // Append the source in reverse.
 template <typename T>
 inline void append_reversed(std::vector<T>& dest, const std::vector<T>& src)

@@ -5,10 +5,11 @@
 #include <libslic3r/TriangleMesh.hpp>
 #include <libslic3r/TriangleMeshSlicer.hpp>
 #include <libslic3r/SLA/Hollowing.hpp>
-#include <libslic3r/SLA/IndexedMesh.hpp>
+#include <libslic3r/AABBMesh.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/QuadricEdgeCollapse.hpp>
 #include <libslic3r/SLA/SupportTreeMesher.hpp>
+#include <libslic3r/Execution/ExecutionSeq.hpp>
 
 #include <boost/log/trivial.hpp>
 
@@ -219,7 +220,7 @@ bool DrainHole::get_intersections(const Vec3f& s, const Vec3f& dir,
     const Eigen::ParametrizedLine<float, 3> ray(s, dir.normalized());
 
     for (size_t i=0; i<2; ++i)
-        out[i] = std::make_pair(sla::IndexedMesh::hit_result::infty(), Vec3d::Zero());
+        out[i] = std::make_pair(AABBMesh::hit_result::infty(), Vec3d::Zero());
 
     const float sqr_radius = pow(radius, 2.f);
 
@@ -448,7 +449,7 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
     };
 
     // TODO: Parallel mode not working yet
-    using exec_policy = ccr_seq;
+    constexpr auto &exec_policy = ex_seq;
 
     // Info about the needed modifications on the input mesh.
     struct MeshMods {
@@ -456,7 +457,7 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
         // Just a thread safe wrapper for a vector of triangles.
         struct {
             std::vector<std::array<Vec3f, 3>> data;
-            exec_policy::SpinningMutex        mutex;
+            execution::SpinningMutex<decltype(exec_policy)> mutex;
 
             void emplace_back(const std::array<Vec3f, 3> &pts)
             {
@@ -533,27 +534,28 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
 
     interior.reset_accessor();
 
-    exec_policy::for_each(size_t(0), faces.size(), [&] (size_t face_idx) {
-        const Vec3i &face = faces[face_idx];
+    execution::for_each(
+        exec_policy, size_t(0), faces.size(),
+        [&](size_t face_idx) {
+            const Vec3i &face = faces[face_idx];
 
-        // If the triangle is excluded, we need to keep it.
-        if (is_excluded(face_idx))
-            return;
+            // If the triangle is excluded, we need to keep it.
+            if (is_excluded(face_idx)) return;
 
-        std::array<Vec3f, 3> pts =
-            { vertices[face(0)], vertices[face(1)], vertices[face(2)] };
+            std::array<Vec3f, 3> pts = {vertices[face(0)], vertices[face(1)],
+                                        vertices[face(2)]};
 
-        BoundingBoxf3 facebb { pts.begin(), pts.end() };
+            BoundingBoxf3 facebb{pts.begin(), pts.end()};
 
-        // Face is certainly outside the cavity
-        if (! facebb.intersects(bb)) return;
+            // Face is certainly outside the cavity
+            if (!facebb.intersects(bb)) return;
 
-        DivFace df{face, pts, long(face_idx)};
+            DivFace df{face, pts, long(face_idx)};
 
-        if (divfn(df))
-            divide_triangle(df, divfn);
-
-    }, exec_policy::max_concurreny());
+            if (divfn(df)) divide_triangle(df, divfn);
+        },
+        execution::max_concurrency(exec_policy)
+    );
 
     auto new_faces = reserve_vector<Vec3i>(faces.size() +
                                            mesh_mods.new_triangles.size());

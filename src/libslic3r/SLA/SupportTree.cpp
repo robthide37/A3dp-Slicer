@@ -7,15 +7,13 @@
 #include <libslic3r/SLA/SupportTree.hpp>
 #include <libslic3r/SLA/SpatIndex.hpp>
 #include <libslic3r/SLA/SupportTreeBuilder.hpp>
-#include <libslic3r/SLA/SupportTreeBuildsteps.hpp>
+#include <libslic3r/SLA/DefaultSupportTree.hpp>
 
 #include <libslic3r/MTUtils.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/Model.hpp>
 #include <libslic3r/TriangleMeshSlicer.hpp>
 
-#include <libnest2d/optimizers/nlopt/genetic.hpp>
-#include <libnest2d/optimizers/nlopt/subplex.hpp>
 #include <boost/log/trivial.hpp>
 #include <libslic3r/I18N.hpp>
 
@@ -23,43 +21,96 @@
 //! return same string
 #define L(s) Slic3r::I18N::translate(s)
 
-namespace Slic3r {
-namespace sla {
+namespace Slic3r { namespace sla {
 
-void SupportTree::retrieve_full_mesh(indexed_triangle_set &outmesh) const {
-    its_merge(outmesh, retrieve_mesh(MeshType::Support));
-    its_merge(outmesh, retrieve_mesh(MeshType::Pad));
+indexed_triangle_set create_support_tree(const SupportableMesh &sm,
+                                         const JobController   &ctl)
+{
+    auto builder = make_unique<SupportTreeBuilder>(ctl);
+
+    if (sm.cfg.enabled) {
+        switch (sm.cfg.tree_type) {
+        case SupportTreeType::Default: {
+            create_default_tree(*builder, sm);
+            break;
+        }
+        default:;
+        }
+
+        builder->merge_and_cleanup();   // clean metadata, leave only the meshes.
+    }
+
+    indexed_triangle_set out = builder->retrieve_mesh(MeshType::Support);
+
+    return out;
 }
 
-std::vector<ExPolygons> SupportTree::slice(const std::vector<float> &grid,
-                                           float                     cr) const
+indexed_triangle_set create_pad(const SupportableMesh      &sm,
+                                const indexed_triangle_set &support_mesh,
+                                const JobController        &ctl)
 {
-    const indexed_triangle_set &sup_mesh = retrieve_mesh(MeshType::Support);
-    const indexed_triangle_set &pad_mesh = retrieve_mesh(MeshType::Pad);
 
+    ExPolygons model_contours; // This will store the base plate of the pad.
+    double   pad_h             = sm.pad_cfg.full_height();
+
+    float zstart = ground_level(sm);
+    float zend   = zstart + float(pad_h + EPSILON);
+    auto heights = grid(zstart, zend, 0.1f);
+
+    if (!sm.cfg.enabled || sm.pad_cfg.embed_object) {
+        // No support (thus no elevation) or zero elevation mode
+        // we sometimes call it "builtin pad" is enabled so we will
+        // get a sample from the bottom of the mesh and use it for pad
+        // creation.
+        sla::pad_blueprint(*sm.emesh.get_triangle_mesh(), model_contours,
+                           heights, ctl.cancelfn);
+    }
+
+    ExPolygons sup_contours;
+    pad_blueprint(support_mesh, sup_contours, heights, ctl.cancelfn);
+
+    indexed_triangle_set out;
+    create_pad(sup_contours, model_contours, out, sm.pad_cfg);
+
+    Vec3f offs{.0f, .0f, zstart};
+    for (auto &p : out.vertices) p += offs;
+
+    its_merge_vertices(out);
+
+    return out;
+}
+
+std::vector<ExPolygons> slice(const indexed_triangle_set &sup_mesh,
+                              const indexed_triangle_set &pad_mesh,
+                              const std::vector<float>   &grid,
+                              float                       cr,
+                              const JobController        &ctl)
+{
     using Slices = std::vector<ExPolygons>;
+
     auto slices = reserve_vector<Slices>(2);
 
     if (!sup_mesh.empty()) {
         slices.emplace_back();
-        slices.back() = slice_mesh_ex(sup_mesh, grid, cr, ctl().cancelfn);
+        slices.back() = slice_mesh_ex(sup_mesh, grid, cr, ctl.cancelfn);
     }
 
     if (!pad_mesh.empty()) {
         slices.emplace_back();
 
-        auto bb = bounding_box(pad_mesh);
+        auto bb     = bounding_box(pad_mesh);
         auto maxzit = std::upper_bound(grid.begin(), grid.end(), bb.max.z());
-        
-        auto cap = grid.end() - maxzit;
+
+        auto cap     = grid.end() - maxzit;
         auto padgrid = reserve_vector<float>(size_t(cap > 0 ? cap : 0));
         std::copy(grid.begin(), maxzit, std::back_inserter(padgrid));
 
-        slices.back() = slice_mesh_ex(pad_mesh, padgrid, cr, ctl().cancelfn);
+        slices.back() = slice_mesh_ex(pad_mesh, padgrid, cr, ctl.cancelfn);
     }
 
     size_t len = grid.size();
-    for (const Slices &slv : slices) { len = std::min(len, slv.size()); }
+    for (const Slices &slv : slices)
+        len = std::min(len, slv.size());
 
     // Either the support or the pad or both has to be non empty
     if (slices.empty()) return {};
@@ -75,24 +126,6 @@ std::vector<ExPolygons> SupportTree::slice(const std::vector<float> &grid,
     }
 
     return mrg;
-}
-
-SupportTree::UPtr SupportTree::create(const SupportableMesh &sm,
-                                      const JobController &  ctl)
-{
-    auto builder = make_unique<SupportTreeBuilder>();
-    builder->m_ctl = ctl;
-    
-    if (sm.cfg.enabled) {
-        // Execute takes care about the ground_level
-        SupportTreeBuildsteps::execute(*builder, sm);
-        builder->merge_and_cleanup();   // clean metadata, leave only the meshes.
-    } else {
-        // If a pad gets added later, it will be in the right Z level
-        builder->ground_level = sm.emesh.ground_level();
-    }
-    
-    return std::move(builder);
 }
 
 }} // namespace Slic3r::sla
