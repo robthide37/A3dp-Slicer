@@ -336,7 +336,6 @@ void assemble_transform(Transform3d& transform, const Vec3d& translation = Vec3d
 Transform3d assemble_transform(const Vec3d& translation = Vec3d::Zero(), const Vec3d& rotation = Vec3d::Zero(),
     const Vec3d& scale = Vec3d::Ones(), const Vec3d& mirror = Vec3d::Ones());
 
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
 // Sets the given transform by multiplying the given transformations in the following order:
 // T = translation * rotation * scale * mirror
 void assemble_transform(Transform3d& transform, const Transform3d& translation = Transform3d::Identity(),
@@ -347,6 +346,12 @@ void assemble_transform(Transform3d& transform, const Transform3d& translation =
 // T = translation * rotation * scale * mirror
 Transform3d assemble_transform(const Transform3d& translation = Transform3d::Identity(), const Transform3d& rotation = Transform3d::Identity(),
     const Transform3d& scale = Transform3d::Identity(), const Transform3d& mirror = Transform3d::Identity());
+
+// Sets the given transform by assembling the given translation
+void translation_transform(Transform3d& transform, const Vec3d& translation);
+
+// Returns the transform obtained by assembling the given translation
+Transform3d translation_transform(const Vec3d& translation);
 
 // Sets the given transform by assembling the given rotations in the following order:
 // 1) rotate X
@@ -365,7 +370,6 @@ void scale_transform(Transform3d& transform, const Vec3d& scale);
 
 // Returns the transform obtained by assembling the given scale factors
 Transform3d scale_transform(const Vec3d& scale);
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 // Returns the euler angles extracted from the given rotation matrix
 // Warning -> The matrix should not contain any scale or shear !!!
@@ -477,6 +481,10 @@ public:
 
     void set_mirror(const Vec3d& mirror);
     void set_mirror(Axis axis, double mirror);
+
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    bool has_skew() const;
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES
     void set_from_transform(const Transform3d& transform);

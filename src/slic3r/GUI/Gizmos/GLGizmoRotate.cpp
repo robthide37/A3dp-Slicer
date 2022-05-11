@@ -787,7 +787,7 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
     }
 
 #if ENABLE_WORLD_COORDINATE
-    return Geometry::assemble_transform(m_center) * m_orient_matrix * ret;
+    return Geometry::translation_transform(m_center) * m_orient_matrix * ret;
 #else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
         ret = selection.get_first_volume()->get_instance_transformation().get_matrix(true, false, true, true) * ret;

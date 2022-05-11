@@ -313,7 +313,6 @@ Transform3d assemble_transform(const Vec3d& translation, const Vec3d& rotation, 
     return transform;
 }
 
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
 void assemble_transform(Transform3d& transform, const Transform3d& translation, const Transform3d& rotation, const Transform3d& scale, const Transform3d& mirror)
 {
     transform = translation * rotation * scale * mirror;
@@ -323,6 +322,19 @@ Transform3d assemble_transform(const Transform3d& translation, const Transform3d
 {
     Transform3d transform;
     assemble_transform(transform, translation, rotation, scale, mirror);
+    return transform;
+}
+
+void translation_transform(Transform3d& transform, const Vec3d& translation)
+{
+    transform = Transform3d::Identity();
+    transform.translate(translation);
+}
+
+Transform3d translation_transform(const Vec3d& translation)
+{
+    Transform3d transform;
+    translation_transform(transform, translation);
     return transform;
 }
 
@@ -351,7 +363,6 @@ Transform3d scale_transform(const Vec3d& scale)
     scale_transform(transform, scale);
     return transform;
 }
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 Vec3d extract_euler_angles(const Eigen::Matrix<double, 3, 3, Eigen::DontAlign>& rotation_matrix)
 {
@@ -431,6 +442,14 @@ static std::pair<Transform3d, Transform3d> extract_rotation_scale(const Transfor
     Matrix3d scale;
     trafo.computeRotationScaling(&rotation, &scale);
     return { Transform3d(rotation), Transform3d(scale) };
+}
+
+static bool contains_skew(const Transform3d& trafo)
+{
+    Matrix3d rotation;
+    Matrix3d scale;
+    trafo.computeRotationScaling(&rotation, &scale);
+    return !scale.isDiagonal();
 }
 
 Vec3d Transformation::get_rotation() const
@@ -623,7 +642,12 @@ void Transformation::set_mirror(Axis axis, double mirror)
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 }
 
-#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+bool Transformation::has_skew() const
+{
+    return contains_skew(m_matrix);
+}
+#else
 void Transformation::set_from_transform(const Transform3d& transform)
 {
     // offset
@@ -661,7 +685,7 @@ void Transformation::set_from_transform(const Transform3d& transform)
 //    if (!m_matrix.isApprox(transform))
 //        std::cout << "something went wrong in extracting data from matrix" << std::endl;
 }
-#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 void Transformation::reset()
 {

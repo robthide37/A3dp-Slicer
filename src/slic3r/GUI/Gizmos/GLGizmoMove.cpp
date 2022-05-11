@@ -141,7 +141,19 @@ void GLGizmoMove3D::on_dragging(const UpdateData& data)
         
     Selection &selection = m_parent.get_selection();
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    TransformationType trafo_type;
+    trafo_type.set_relative();
+    switch (wxGetApp().obj_manipul()->get_coordinates_type())
+    {
+    case ECoordinatesType::Instance: { trafo_type.set_instance(); break; }
+    case ECoordinatesType::Local: { trafo_type.set_local(); break; }
+    default: { break; }
+    }
+    selection.translate(m_displacement, trafo_type);
+#else
     selection.translate(m_displacement, wxGetApp().obj_manipul()->get_coordinates_type());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
     selection.translate(m_displacement);
 #endif // ENABLE_WORLD_COORDINATE

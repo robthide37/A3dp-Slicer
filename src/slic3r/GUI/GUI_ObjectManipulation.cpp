@@ -461,9 +461,16 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
     m_reset_scale_button->SetToolTip(_L("Reset scale"));
     m_reset_scale_button->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Reset scale"));
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        bool old_uniform = m_uniform_scale;
+        m_uniform_scale = true;
+        change_scale_value(0, 100.0);
+        m_uniform_scale = old_uniform;
+#else
         change_scale_value(0, 100.);
         change_scale_value(1, 100.);
         change_scale_value(2, 100.);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     });
     editors_grid_sizer->Add(m_reset_scale_button);
 
@@ -616,6 +623,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         m_new_position = volume->get_instance_offset();
 #endif // !ENABLE_WORLD_COORDINATE
 
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
         // Verify whether the instance rotation is multiples of 90 degrees, so that the scaling in world coordinates is possible.
 #if ENABLE_WORLD_COORDINATE
         if (is_world_coordinates() && !m_uniform_scale &&
@@ -627,6 +635,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
 			m_uniform_scale = true;
 			m_lock_bnt->SetLock(true);
 		}
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 #if ENABLE_WORLD_COORDINATE
         if (is_world_coordinates()) {
@@ -790,6 +799,7 @@ void ObjectManipulation::update_if_dirty()
         update(m_cache.rotation, m_cache.rotation_rounded, meRotation, m_new_rotation);
     }
 
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if ENABLE_WORLD_COORDINATE
     Selection::EUniformScaleRequiredReason reason;
     if (selection.requires_uniform_scale(&reason)) {
@@ -829,10 +839,13 @@ void ObjectManipulation::update_if_dirty()
 #endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
     }
     else {
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
         m_lock_bnt->SetLock(m_uniform_scale);
         m_lock_bnt->SetToolTip(wxEmptyString);
         m_lock_bnt->enable();
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 #if !ENABLE_WORLD_COORDINATE
     {
@@ -1048,7 +1061,19 @@ void ObjectManipulation::change_position_value(int axis, double value)
     Selection& selection = canvas->get_selection();
     selection.setup_cache();
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    TransformationType trafo_type;
+    trafo_type.set_relative();
+    switch (get_coordinates_type())
+    {
+    case ECoordinatesType::Instance: { trafo_type.set_instance(); break; }
+    case ECoordinatesType::Local:    { trafo_type.set_local(); break; }
+    default:                         { break; }
+    }
+    selection.translate(position - m_cache.position, trafo_type);
+#else
     selection.translate(position - m_cache.position, get_coordinates_type());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
     selection.translate(position - m_cache.position, selection.requires_local_axes());
 #endif // ENABLE_WORLD_COORDINATE
@@ -1191,6 +1216,9 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
         transformation_type.set_local();
 #endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    Vec3d scaling_factor = m_uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
+#else
     bool uniform_scale = m_uniform_scale || selection.requires_uniform_scale();
     Vec3d scaling_factor = uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
 
@@ -1203,6 +1231,7 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
             scaling_factor = (mv * mi * scaling_factor).cwiseAbs();
         }
     }
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
     TransformationType transformation_type(TransformationType::World_Relative_Joint);
     if (selection.is_single_full_instance()) {
@@ -1231,6 +1260,12 @@ void ObjectManipulation::do_size(int axis, const Vec3d& scale) const
     else if (is_instance_coordinates())
         transformation_type.set_instance();
 
+    if (!is_local_coordinates())
+        transformation_type.set_relative();
+
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    Vec3d scaling_factor = m_uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
+#else
     bool uniform_scale = m_uniform_scale || selection.requires_uniform_scale();
     Vec3d scaling_factor = uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
 
@@ -1243,6 +1278,7 @@ void ObjectManipulation::do_size(int axis, const Vec3d& scale) const
             scaling_factor = (mv * mi * scaling_factor).cwiseAbs();
         }
     }
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
     selection.setup_cache();
     selection.scale(scaling_factor, transformation_type);
@@ -1303,6 +1339,10 @@ void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
     }
 
     m_uniform_scale = use_uniform_scale;
+
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    set_dirty();
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
 #if ENABLE_WORLD_COORDINATE
     if (selection.is_single_full_instance() && is_world_coordinates() && !use_uniform_scale) {

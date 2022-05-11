@@ -126,7 +126,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 #else
     const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-    const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * trafo.get_matrix();
+    const Transform3d instance_matrix = Geometry::translation_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * trafo.get_matrix();
 
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();

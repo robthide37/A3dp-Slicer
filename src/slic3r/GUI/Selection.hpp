@@ -336,7 +336,9 @@ public:
         VolumeNotAxisAligned_Instance,
         MultipleSelection,
     };
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
     bool requires_uniform_scale(EUniformScaleRequiredReason* reason = nullptr) const;
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
     bool requires_uniform_scale() const;
 #endif // ENABLE_WORLD_COORDINATE
@@ -365,7 +367,11 @@ public:
     void setup_cache();
 
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    void translate(const Vec3d& displacement, TransformationType transformation_type);
+#else
     void translate(const Vec3d& displacement, ECoordinatesType type = ECoordinatesType::World);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
     void translate(const Vec3d& displacement, bool local = false);
 #endif // ENABLE_WORLD_COORDINATE
@@ -374,6 +380,9 @@ public:
     void scale(const Vec3d& scale, TransformationType transformation_type);
     void scale_to_fit_print_volume(const BuildVolume& volume);
     void mirror(Axis axis);
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    void scale_and_translate(const Vec3d& scale, const Vec3d& translation, TransformationType transformation_type);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES
     void translate(unsigned int object_idx, const Vec3d& displacement);
@@ -468,6 +477,11 @@ private:
 
     void paste_volumes_from_clipboard();
     void paste_objects_from_clipboard();
+
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    void transform_volume_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
+        const Transform3d& transform);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 };
 
 } // namespace GUI

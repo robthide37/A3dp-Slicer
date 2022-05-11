@@ -2914,7 +2914,13 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
             else
                 displacement = multiplier * direction;
 
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            TransformationType trafo_type;
+            trafo_type.set_relative();
+            m_selection.translate(displacement, trafo_type);
+#else
             m_selection.translate(displacement);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_dirty = true;
         }
     );
@@ -3579,7 +3585,13 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 }
             }
 
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            TransformationType trafo_type;
+            trafo_type.set_relative();
+            m_selection.translate(cur_pos - m_mouse.drag.start_position_3D, trafo_type);
+#else
             m_selection.translate(cur_pos - m_mouse.drag.start_position_3D);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects)
                 update_sequential_clearance();
             wxGetApp().obj_manipul()->set_dirty();
@@ -3996,12 +4008,12 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
     Selection::EMode selection_mode = m_selection.get_mode();
 
     for (const GLVolume* v : m_volumes.volumes) {
-        int object_idx = v->object_idx();
+        const int object_idx = v->object_idx();
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
             continue;
 
-        int instance_idx = v->instance_idx();
-        int volume_idx = v->volume_idx();
+        const int instance_idx = v->instance_idx();
+        const int volume_idx = v->volume_idx();
 
         done.insert(std::pair<int, int>(object_idx, instance_idx));
 
@@ -4009,13 +4021,22 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
         ModelObject* model_object = m_model->objects[object_idx];
         if (model_object != nullptr) {
             if (selection_mode == Selection::Instance) {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+#else
                 model_object->instances[instance_idx]->set_scaling_factor(v->get_instance_scaling_factor());
                 model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             }
             else if (selection_mode == Selection::Volume) {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+                model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
+#else
                 model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
                 model_object->volumes[volume_idx]->set_scaling_factor(v->get_volume_scaling_factor());
                 model_object->volumes[volume_idx]->set_offset(v->get_volume_offset());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             }
             model_object->invalidate_bounding_box();
         }
@@ -4024,10 +4045,10 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
     // Fixes sinking/flying instances
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
-        double shift_z = m->get_instance_min_z(i.second);
+        const double shift_z = m->get_instance_min_z(i.second);
         // leave sinking instances as sinking
         if (min_zs.empty() || min_zs.find({ i.first, i.second })->second >= SINKING_Z_THRESHOLD || shift_z > SINKING_Z_THRESHOLD) {
-            Vec3d shift(0.0, 0.0, -shift_z);
+            const Vec3d shift(0.0, 0.0, -shift_z);
             m_selection.translate(i.first, i.second, shift);
             m->translate_instance(i.second, shift);
         }
