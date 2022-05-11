@@ -376,19 +376,6 @@ TriangleMesh priv::create_default_mesh()
     return triangle_mesh;
 }
 
-static ModelVolume *get_volume(const ObjectID &volume_id, Model &model)
-{
-    for (auto obj : model.objects)
-        for (auto vol : obj->volumes)
-            if (vol->id() == volume_id)
-                return vol;
-    return nullptr;
-}
-
-static ModelVolume *get_volume(const ObjectID &volume_id) {
-    return get_volume(volume_id, wxGetApp().plater()->model());
-}
-
 void priv::update_volume(TriangleMesh &&mesh,
                          const EmbossDataUpdate &data)
 {
@@ -406,7 +393,13 @@ void priv::update_volume(TriangleMesh &&mesh,
     std::string snap_name = GUI::format(_L("Text: %1%"), data.text_configuration.text);
     Plater::TakeSnapshot snapshot(plater, snap_name, UndoRedo::SnapshotType::GizmoAction);
 
-    ModelVolume *volume = get_volume(data.volume_id, plater->model());
+    auto get_volume = [&model = plater->model()](const ObjectID &volume_id)->ModelVolume *{
+        for (ModelObject* obj : model.objects)
+            for (ModelVolume* vol : obj->volumes)
+                if (vol->id() == volume_id) return vol;
+        return nullptr;
+    };
+    ModelVolume *volume = get_volume(data.volume_id);
     // could appear when user delete edited volume
     if (volume == nullptr)
         return;
