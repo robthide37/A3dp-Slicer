@@ -54,13 +54,13 @@
 #define ALLOW_REVERT_ALL_STYLES
 #endif // ALLOW_DEBUG_MODE
 
-#define SHOW_WX_FONT_DESCRIPTOR
-#define SHOW_FONT_FILE_PROPERTY
-#define SHOW_FONT_COUNT
+//#define SHOW_WX_FONT_DESCRIPTOR
+//#define SHOW_FONT_FILE_PROPERTY
+//#define SHOW_FONT_COUNT
 #define SHOW_CONTAIN_3MF_FIX
-#define ALLOW_ADD_FONT_BY_FILE
-#define ALLOW_ADD_FONT_BY_OS_SELECTOR
-#define ALLOW_REVERT_ALL_STYLES
+//#define ALLOW_ADD_FONT_BY_FILE
+//#define ALLOW_ADD_FONT_BY_OS_SELECTOR
+//#define ALLOW_REVERT_ALL_STYLES
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
@@ -646,16 +646,15 @@ void GLGizmoEmboss::initialize()
     tr.font        = _u8L("Font");
     tr.size        = _u8L("Height");
     tr.depth       = _u8L("Depth");
-    tr.use_surface = _u8L("Use surface");
-    float max_edit_text_width = std::max(
-        {ImGui::CalcTextSize(tr.font.c_str()).x,
-         ImGui::CalcTextSize(tr.size.c_str()).x,
-         ImGui::CalcTextSize(tr.depth.c_str()).x,
-         ImGui::CalcTextSize(tr.use_surface.c_str()).x });
+    float max_edit_text_width = std::max({
+        ImGui::CalcTextSize(tr.font.c_str()).x,
+        ImGui::CalcTextSize(tr.size.c_str()).x,
+        ImGui::CalcTextSize(tr.depth.c_str()).x });
     cfg.edit_input_offset = 
         3 * space + ImGui::GetTreeNodeToLabelSpacing() +
                             max_edit_text_width;
-
+    
+    tr.use_surface = _u8L("Use surface");
     tr.char_gap = _u8L("Char gap");
     tr.line_gap = _u8L("Line gap");
     tr.boldness = _u8L("Boldness");
@@ -663,14 +662,15 @@ void GLGizmoEmboss::initialize()
     tr.surface_distance = _u8L("Z-move");
     tr.angle = _u8L("Z-rot");
     tr.collection = _u8L("Collection");
-    float max_advanced_text_width = std::max(
-        {ImGui::CalcTextSize(tr.char_gap.c_str()).x,
-         ImGui::CalcTextSize(tr.line_gap.c_str()).x,
-         ImGui::CalcTextSize(tr.boldness.c_str()).x,
-         ImGui::CalcTextSize(tr.italic.c_str()).x,
-         ImGui::CalcTextSize(tr.surface_distance.c_str()).x,
-         ImGui::CalcTextSize(tr.angle.c_str()).x,
-         ImGui::CalcTextSize(tr.collection.c_str()).x });
+    float max_advanced_text_width = std::max({
+        ImGui::CalcTextSize(tr.use_surface.c_str()).x,
+        ImGui::CalcTextSize(tr.char_gap.c_str()).x,
+        ImGui::CalcTextSize(tr.line_gap.c_str()).x,
+        ImGui::CalcTextSize(tr.boldness.c_str()).x,
+        ImGui::CalcTextSize(tr.italic.c_str()).x,
+        ImGui::CalcTextSize(tr.surface_distance.c_str()).x,
+        ImGui::CalcTextSize(tr.angle.c_str()).x,
+        ImGui::CalcTextSize(tr.collection.c_str()).x });
     cfg.advanced_input_offset = 
         3 * space + 2* ImGui::GetTreeNodeToLabelSpacing() + max_advanced_text_width;
 
@@ -688,13 +688,13 @@ void GLGizmoEmboss::initialize()
     float window_width = cfg.style_combobox_width + style.WindowPadding.x * 2;
     cfg.minimal_window_size = ImVec2(window_width, window_height);
 
-    float addition_edit_height        = input_height * 4 + tree_header;
+    float addition_edit_height        = input_height * 3 + tree_header;
     cfg.minimal_window_size_with_edit = ImVec2(cfg.minimal_window_size.x,
                                                cfg.minimal_window_size.y +
                                                    addition_edit_height);
     // 6 = charGap, LineGap, Bold, italic, surfDist, angle
     // 4 = 1px for fix each edit image of drag float 
-    float advance_height = input_height * 6 + 8;
+    float advance_height = input_height * 7 + 8;
     cfg.minimal_window_size_with_advance =
         ImVec2(cfg.minimal_window_size_with_edit.x,
                cfg.minimal_window_size_with_edit.y + advance_height);
@@ -1786,8 +1786,7 @@ bool GLGizmoEmboss::rev_checkbox(const std::string &name,
 {
     // draw offseted input
     auto draw_offseted_input = [&]() -> bool {
-        float input_offset = m_gui_cfg->edit_input_offset;
-        ImGui::SameLine(input_offset);
+        ImGui::SameLine(m_gui_cfg->advanced_input_offset);
         return ImGui::Checkbox(("##" + name).c_str(), &value);
     };
     float undo_offset  = ImGui::GetStyle().FramePadding.x;
@@ -1895,18 +1894,6 @@ void GLGizmoEmboss::draw_style_edit() {
     if (rev_input(tr.depth, font_prop.emboss, def_depth,
         _u8L("Revert embossed depth."), 0.1f, 0.25, "%.2f mm")) {
         Limits::apply(font_prop.emboss, limits.emboss);
-        process();
-    }
-
-    bool *def_use_surface = m_stored_font_item.has_value() ?
-        &m_stored_font_item->prop.use_surface : nullptr;
-    if (rev_checkbox(tr.use_surface, font_prop.use_surface, def_use_surface,
-                     _u8L("Revert using of model surface."))) {
-        if (font_prop.use_surface) { 
-            font_prop.distance.reset();
-            if (font_prop.emboss < 0.1)
-                font_prop.emboss = 1;
-        }
         process();
     }
 
@@ -2058,9 +2045,21 @@ void GLGizmoEmboss::draw_advanced()
     m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, ff_property);
 #endif // SHOW_FONT_FILE_PROPERTY
 
-    bool   exist_change = false;    
-        
+    bool exist_change = false;
     auto &tr = m_gui_cfg->translations;
+
+    bool *def_use_surface = m_stored_font_item.has_value() ?
+        &m_stored_font_item->prop.use_surface : nullptr;
+    if (rev_checkbox(tr.use_surface, font_prop.use_surface, def_use_surface,
+                     _u8L("Revert using of model surface."))) {
+        if (font_prop.use_surface) { 
+            font_prop.distance.reset();
+            if (font_prop.emboss < 0.1)
+                font_prop.emboss = 1;
+        }
+        process();
+    }
+
     std::string units = _u8L("font points");
     std::string units_fmt = "%.0f " + units;
     
