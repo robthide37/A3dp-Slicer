@@ -112,9 +112,6 @@ private:
     void do_translate(const Vec3d& relative_move);
     void do_rotate(float relative_z_angle);
 
-    // TODO: only for developing - remove it
-    void use_surface();
-
     /// <summary>
     /// Choose valid source Volume to project on(cut surface from).
     /// </summary>

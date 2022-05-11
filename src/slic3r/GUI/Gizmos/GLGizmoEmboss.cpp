@@ -356,6 +356,13 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // Apply temporary position
         m_temp_transformation = {};
         m_dragging_mouse_offset = {};
+
+        // Update surface by new position
+        if (m_volume->text_configuration->font_item.prop.use_surface) {
+            // need actual position
+            m_volume->set_transformation(volume_trmat);
+            process();
+        }
     }
     return false;
 }
@@ -1413,6 +1420,15 @@ void GLGizmoEmboss::draw_model_type()
             obj_list->get_selected_obj_idx(),
             [volume](const ModelVolume *vol) { return vol == volume; });
         if (!sel.IsEmpty()) obj_list->select_item(sel.front());
+
+        // Update volume position when switch from part or into part
+        if (m_volume->text_configuration->font_item.prop.use_surface) {
+            // move inside
+            bool is_volume_move_inside = (type == part);
+            bool is_volume_move_outside = (*new_type == part);
+            if (is_volume_move_inside || is_volume_move_outside)
+                process();
+        }
     }
 }
 
