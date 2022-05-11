@@ -103,6 +103,12 @@ struct Limits
     }
 };
 static const Limits limits;
+
+static bool is_text_empty(const std::string &text){
+    return text.empty() ||
+           text.find_first_not_of(" \n\t\r") == std::string::npos;
+}
+
 } // namespace
 
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
@@ -962,8 +968,24 @@ bool GLGizmoEmboss::process()
 
 void GLGizmoEmboss::close()
 {
+    // remove volume when text is empty
+    if (m_volume != nullptr && 
+        m_volume->text_configuration.has_value() &&
+        is_text_empty(m_text)) {
+        Plater &p = *wxGetApp().plater();
+        if (is_text_object(m_volume)) {
+            // delete whole object
+            p.remove(m_parent.get_selection().get_object_idx());
+        } else {
+            // delete text volume
+            p.remove_selected();
+        }
+    }
+
     // close gizmo == open it again
-    m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
+    auto& mng = m_parent.get_gizmos_manager();
+    if (mng.get_current_type() == GLGizmosManager::Emboss)
+        mng.open_gizmo(GLGizmosManager::Emboss);
 }
 
 void GLGizmoEmboss::fill_stored_font_items()
@@ -1154,8 +1176,7 @@ void GLGizmoEmboss::draw_text_input()
                 tool_tip += t;            
             }
         };
-        if (m_text.empty() || 
-            m_text.find_first_not_of(" \n\t\r") == std::string::npos)
+        if (is_text_empty(m_text))
             append_warning(_u8L("Empty"), 
                 _u8L("Embossed text can NOT contain only white spaces."));
         if (m_text_contain_unknown_glyph)
