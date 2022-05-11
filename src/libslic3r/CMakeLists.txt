@@ -17,6 +17,7 @@ endif()
 set(SLIC3R_SOURCES
     pchheader.cpp
     pchheader.hpp
+    AStar.hpp
     BoundingBox.cpp
     BoundingBox.hpp
     BridgeDetector.cpp

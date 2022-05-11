@@ -32,9 +32,9 @@ public:
     }
 
     Vec3i get_coord(size_t idx) const {
-        size_t iz = idx / XY;
-        size_t iy = (idx / m_size.x()) % m_size.y();
-        size_t ix = idx % m_size.x();
+        int iz = idx / XY;
+        int iy = (idx / m_size.x()) % m_size.y();
+        int ix = idx % m_size.x();
 
         return {ix, iy, iz};
     }
@@ -59,9 +59,9 @@ PointGrid<CoordT> point_grid(Ex                                      policy,
     size_t XY = numpts[X] * numpts[Y];
 
     execution::for_each(policy, size_t(0), out.size(), [&](size_t i) {
-        size_t iz = i / XY;
-        size_t iy = (i / numpts[X]) % numpts[Y];
-        size_t ix = i % numpts[X];
+        int iz = i / XY;
+        int iy = (i / numpts[X]) % numpts[Y];
+        int ix = i % numpts[X];
 
         out[i] = Vec<3, CoordT>(ix * stride.x(), iy * stride.y(), iz * stride.z());
     });
