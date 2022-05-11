@@ -17,6 +17,11 @@ public:
 		{}
 	~MutablePriorityQueue()	{ clear(); }
 
+	MutablePriorityQueue(MutablePriorityQueue &&) = default;
+	MutablePriorityQueue& operator=(MutablePriorityQueue &&) = default;
+	MutablePriorityQueue(const MutablePriorityQueue &) = default;
+	MutablePriorityQueue& operator=(const MutablePriorityQueue &) = default;
+
 	void		clear();
 	void		reserve(size_t cnt) 				{ m_heap.reserve(cnt); }
 	void		push(const T &item);
