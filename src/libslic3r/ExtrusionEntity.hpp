@@ -187,7 +187,7 @@ public:
     virtual ExtrusionEntity* clone() const = 0;
     // Create a new object, initialize it with this object using the move semantics.
     virtual ExtrusionEntity* clone_move() = 0;
-    virtual ~ExtrusionEntity() {}
+    virtual ~ExtrusionEntity() = default;
     virtual void reverse() = 0;
     virtual const Point& first_point() const = 0;
     virtual const Point& last_point() const = 0;
