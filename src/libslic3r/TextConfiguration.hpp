@@ -4,7 +4,42 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <cereal/cereal.hpp>
+#include <cereal/types/optional.hpp>
+#include <cereal/types/string.hpp>
+#include <cereal/archives/binary.hpp>
 #include "Point.hpp" // Transform3d
+
+// Serialization through the Cereal library
+namespace cereal {    
+    // Eigen Matrix 4x4 serialization
+    template <class Archive> void serialize(Archive &ar, ::Slic3r::Matrix4d &m){
+        ar(binary_data(m.data(), 4*4*sizeof(double)));
+    }
+
+    // !!! create duplicit implementation
+    // General solution for Eigen matrix serialization 
+    //template <class Archive, class Derived> inline typename std::enable_if<traits::is_output_serializable<BinaryData<typename Derived::Scalar>, Archive>::value, void>::type
+    //save(Archive & ar, Eigen::PlainObjectBase<Derived> const & m){
+    //    typedef Eigen::PlainObjectBase<Derived> ArrT;
+    //    if(ArrT::RowsAtCompileTime==Eigen::Dynamic) ar(m.rows());
+    //    if(ArrT::ColsAtCompileTime==Eigen::Dynamic) ar(m.cols());
+    //    ar(binary_data(m.data(),m.size()*sizeof(typename Derived::Scalar)));
+    //}
+    //template <class Archive, class Derived> inline typename std::enable_if<traits::is_input_serializable<BinaryData<typename Derived::Scalar>, Archive>::value, void>::type
+    //load(Archive & ar, Eigen::PlainObjectBase<Derived> & m){
+    //    typedef Eigen::PlainObjectBase<Derived> ArrT;
+    //    Eigen::Index rows=ArrT::RowsAtCompileTime, cols=ArrT::ColsAtCompileTime;
+    //    if(rows==Eigen::Dynamic) ar(rows);
+    //    if(cols==Eigen::Dynamic) ar(cols);
+    //    m.resize(rows,cols);
+    //    ar(binary_data(m.data(),static_cast<std::size_t>(rows*cols*sizeof(typename Derived::Scalar))));
+    //}
+    
+    // Eigen Transformation serialization
+    template<class Archive, class T, int N> inline void
+    serialize(Archive & ar, Eigen::Transform<T, N, Eigen::Affine, Eigen::DontAlign>& t){ ar(t.matrix()); }
+}
 
 namespace Slic3r {
 
@@ -108,10 +143,36 @@ struct FontProp
     }
 
     // undo / redo stack recovery
-    //template<class Archive> void serialize(Archive &ar)
-    //{
-    //    ar(char_gap, line_gap, emboss, boldness, skew, size_in_mm, family, face_name, style, weight);
-    //}
+    template<class Archive> void save(Archive &ar) const
+    {
+        ar(emboss, use_surface, size_in_mm);
+        cereal::save(ar, char_gap);
+        cereal::save(ar, line_gap);
+        cereal::save(ar, boldness);
+        cereal::save(ar, skew);
+        cereal::save(ar, distance);
+        cereal::save(ar, angle);
+        cereal::save(ar, collection_number);
+        cereal::save(ar, family);
+        cereal::save(ar, face_name);
+        cereal::save(ar, style);
+        cereal::save(ar, weight);        
+    }
+    template<class Archive> void load(Archive &ar)
+    {
+        ar(emboss, use_surface, size_in_mm);
+        cereal::load(ar, char_gap);
+        cereal::load(ar, line_gap);
+        cereal::load(ar, boldness);
+        cereal::load(ar, skew);
+        cereal::load(ar, distance);
+        cereal::load(ar, angle);
+        cereal::load(ar, collection_number);
+        cereal::load(ar, family);
+        cereal::load(ar, face_name);
+        cereal::load(ar, style);
+        cereal::load(ar, weight);
+    }
 };
 
 /// <summary>
@@ -162,11 +223,10 @@ struct FontItem
             ;
     }
 
-    //// undo / redo stack recovery
-    //template<class Archive> void serialize(Archive &ar)
-    //{
-    //    ar(name, path, (int) type, prop);
-    //}
+    // undo / redo stack recovery
+    template<class Archive> void serialize(Archive &ar){
+        ar(name, path, (int) type, prop);
+    }
 };
 
 // Font item name inside list is unique
@@ -194,7 +254,14 @@ struct TextConfiguration
     std::optional<Transform3d> fix_3mf_tr;
 
     // undo / redo stack recovery
-    //template<class Archive> void serialize(Archive &ar){ ar(text, font_item); }
+    template<class Archive> void save(Archive &ar) const{
+        ar(text, font_item); 
+        cereal::save(ar, fix_3mf_tr);
+    }
+    template<class Archive> void load(Archive &ar){
+        ar(text, font_item); 
+        cereal::load(ar, fix_3mf_tr);
+    }
 };    
 
 } // namespace Slic3r

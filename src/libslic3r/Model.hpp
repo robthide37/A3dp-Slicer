@@ -864,6 +864,7 @@ private:
         cereal::load_by_value(ar, seam_facets);
         cereal::load_by_value(ar, mmu_segmentation_facets);
         cereal::load_by_value(ar, config);
+        cereal::load(ar, text_configuration);
 		assert(m_mesh);
 		if (has_convex_hull) {
 			cereal::load_optional(ar, m_convex_hull);
@@ -872,11 +873,6 @@ private:
 				this->calculate_convex_hull();
 		} else
 			m_convex_hull.reset();
-        //TextConfiguration tc;
-        //cereal::load_by_value(ar, tc);
-        //if (tc.font_item.type != FontItem::Type::undefined) {
-        //    text_configuration = tc;
-        //}
 	}
 	template<class Archive> void save(Archive &ar) const {
 		bool has_convex_hull = m_convex_hull.get() != nullptr;
@@ -885,10 +881,9 @@ private:
         cereal::save_by_value(ar, seam_facets);
         cereal::save_by_value(ar, mmu_segmentation_facets);
         cereal::save_by_value(ar, config);
+        cereal::save(ar, text_configuration);
 		if (has_convex_hull)
 			cereal::save_optional(ar, m_convex_hull);
-        //if (text_configuration.has_value())
-        //    cereal::save_by_value(ar, *text_configuration);
 	}
 };
 
