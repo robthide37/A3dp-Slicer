@@ -408,9 +408,9 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
         AABBTreeIndirect::traverse(
                     tree,
                     AABBTreeIndirect::intersecting(ebb),
-                    [&part_to_drill, &hollowed_mesh](size_t faceid)
+                    [&part_to_drill, &hollowed_mesh](const auto& node)
         {
-            part_to_drill.indices.emplace_back(hollowed_mesh.its.indices[faceid]);
+            part_to_drill.indices.emplace_back(hollowed_mesh.its.indices[node.idx]);
         });
 
         auto cgal_meshpart = MeshBoolean::cgal::triangle_mesh_to_cgal(
@@ -1036,7 +1036,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     // Estimated printing time
     // A layers count o the highest object
     if (printer_input.size() == 0)
-        print_statistics.estimated_print_time = std::nan("");
+        print_statistics.estimated_print_time = NaNd;
     else {
         print_statistics.estimated_print_time = estim_time;
         print_statistics.layers_times = layers_times;

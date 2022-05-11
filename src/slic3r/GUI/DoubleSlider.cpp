@@ -1163,7 +1163,7 @@ void Control::draw_ruler(wxDC& dc)
         }
     };
 
-    double short_tick = std::nan("");
+    double short_tick = NaNd;
     int tick = 0;
     double value = 0.0;
     size_t sequence = 0;

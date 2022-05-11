@@ -1991,14 +1991,15 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
     if (comment == reserved_tag(ETags::Layer_Change)) {
         ++m_layer_id;
         if (m_spiral_vase_active) {
-            if (m_result.moves.empty())
-                m_result.spiral_vase_layers.push_back({ m_first_layer_height, { 0, 0 } });
+            if (m_result.moves.empty() || m_result.spiral_vase_layers.empty())
+                // add a placeholder for layer height. the actual value will be set inside process_G1() method
+                m_result.spiral_vase_layers.push_back({ FLT_MAX, { 0, 0 } });
             else {
                 const size_t move_id = m_result.moves.size() - 1;
-                if (!m_result.spiral_vase_layers.empty() && m_end_position[Z] == m_result.spiral_vase_layers.back().first)
+                if (!m_result.spiral_vase_layers.empty())
                     m_result.spiral_vase_layers.back().second.second = move_id;
-                else
-                    m_result.spiral_vase_layers.push_back({ static_cast<float>(m_end_position[Z]), { move_id, move_id } });
+                // add a placeholder for layer height. the actual value will be set inside process_G1() method
+                m_result.spiral_vase_layers.push_back({ FLT_MAX, { move_id, move_id } });
             }
         }
         return;
@@ -2828,8 +2829,13 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         m_seams_detector.set_first_vertex(m_result.moves.back().position - m_extruder_offsets[m_extruder_id]);
     }
 
-    if (m_spiral_vase_active && !m_result.spiral_vase_layers.empty() && !m_result.moves.empty())
-        m_result.spiral_vase_layers.back().second.second = m_result.moves.size() - 1;
+    if (m_spiral_vase_active && !m_result.spiral_vase_layers.empty()) {
+        if (m_result.spiral_vase_layers.back().first == FLT_MAX && delta_pos[Z] > 0.0)
+            // replace layer height placeholder with correct value
+            m_result.spiral_vase_layers.back().first = static_cast<float>(m_end_position[Z]);
+        if (!m_result.moves.empty())
+            m_result.spiral_vase_layers.back().second.second = m_result.moves.size() - 1;
+    }
 
     // store move
 #if ENABLE_PROCESS_G2_G3_LINES

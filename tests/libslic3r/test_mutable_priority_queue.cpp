@@ -343,7 +343,7 @@ TEST_CASE("Mutable priority queue - reshedule first", "[MutableSkipHeapPriorityQ
 TEST_CASE("Mutable priority queue - first pop", "[MutableSkipHeapPriorityQueue]")
 {
     struct MyValue{
-        int   id;
+        size_t id;
         float val;
     };
     size_t              count = 50000;
@@ -356,15 +356,15 @@ TEST_CASE("Mutable priority queue - first pop", "[MutableSkipHeapPriorityQueue]"
         [](MyValue &l, MyValue &r) { return l.val < r.val; });
     q.reserve(count);
     for (size_t id = 0; id < count; id++) {
-        MyValue mv;
-        mv.id  = id;
-        mv.val = rand();
+        MyValue mv{ id, rand() / 100.f };
         q.push(mv);
     }
     MyValue it = q.top(); // copy
     q.pop();
-    bool valid = (it.id != 0) && (idxs[0] < 3 * count);
-    CHECK(valid);
+    // is valid id (no initial value default value)
+    CHECK(it.id != 0);
+    // is first item in queue valid value
+    CHECK(idxs[0] != std::numeric_limits<size_t>::max());
 }
 
 TEST_CASE("Mutable priority queue complex", "[MutableSkipHeapPriorityQueue]")

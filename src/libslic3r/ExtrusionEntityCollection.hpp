@@ -36,9 +36,13 @@ public:
     ExtrusionEntityCollection(ExtrusionEntityCollection &&other) : entities(std::move(other.entities)), no_sort(other.no_sort) {}
     explicit ExtrusionEntityCollection(const ExtrusionPaths &paths);
     ExtrusionEntityCollection& operator=(const ExtrusionEntityCollection &other);
-    ExtrusionEntityCollection& operator=(ExtrusionEntityCollection &&other)
-        { this->entities = std::move(other.entities); this->no_sort = other.no_sort; return *this; }
-    ~ExtrusionEntityCollection() { clear(); }
+    ExtrusionEntityCollection& operator=(ExtrusionEntityCollection &&other) {
+        this->clear();
+        this->entities = std::move(other.entities);
+        this->no_sort  = other.no_sort;
+        return *this;
+    }
+    ~ExtrusionEntityCollection() override { clear(); }
     explicit operator ExtrusionPaths() const;
     
     bool is_collection() const override { return true; }

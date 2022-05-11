@@ -60,8 +60,6 @@
     size_t object_count()
         %code%{ RETVAL = THIS->objects().size(); %};
 
-    PrintRegionPtrs* regions()
-        %code%{ RETVAL = const_cast<PrintRegionPtrs*>(&THIS->print_regions_mutable()); %};
     
     void auto_assign_extruders(ModelObject* model_object);
     std::string output_filepath(std::string path = "")

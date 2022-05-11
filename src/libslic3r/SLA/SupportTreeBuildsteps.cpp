@@ -654,7 +654,7 @@ void SupportTreeBuildsteps::filter()
     for (const SupportPoint &sp : m_support_pts) {
         m_thr();
         heads.emplace_back(
-            std::nan(""),
+            NaNd,
             sp.head_front_radius,
             0.,
             m_cfg.head_penetration_mm,
