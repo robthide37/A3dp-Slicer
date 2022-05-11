@@ -19,8 +19,11 @@ public:
 
 	MutablePriorityQueue(MutablePriorityQueue &&) = default;
 	MutablePriorityQueue& operator=(MutablePriorityQueue &&) = default;
-	MutablePriorityQueue(const MutablePriorityQueue &) = default;
-	MutablePriorityQueue& operator=(const MutablePriorityQueue &) = default;
+
+	// This class modifies the outside data through the m_index_setter
+	// and thus it should not be copied. The semantics are similar to std::unique_ptr
+	MutablePriorityQueue(const MutablePriorityQueue &) = delete;
+	MutablePriorityQueue& operator=(const MutablePriorityQueue &) = delete;
 
 	void		clear();
 	void		reserve(size_t cnt) 				{ m_heap.reserve(cnt); }
