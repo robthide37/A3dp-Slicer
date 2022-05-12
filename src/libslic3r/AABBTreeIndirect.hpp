@@ -771,8 +771,8 @@ inline bool is_any_triangle_in_radius(
     auto distancer = detail::IndexedTriangleSetDistancer<VertexType, IndexedFaceType, TreeType, VectorType>
             { vertices, faces, tree, point };
 
-	size_t hit_idx;
-	VectorType hit_point = VectorType::Ones() * (std::nan(""));
+    size_t hit_idx;
+    VectorType hit_point = VectorType::Ones() * (NaN<typename VectorType::Scalar>);
 
 	if(tree.empty())
 	{
@@ -828,22 +828,22 @@ struct Intersecting<Eigen::AlignedBox<CoordType, NumD>> {
 
 template<class G> auto intersecting(const G &g) { return Intersecting<G>{g}; }
 
-template<class G> struct Containing {};
+template<class G> struct Within {};
 
 // Intersection predicate specialization for box-box intersections
 template<class CoordType, int NumD>
-struct Containing<Eigen::AlignedBox<CoordType, NumD>> {
+struct Within<Eigen::AlignedBox<CoordType, NumD>> {
     Eigen::AlignedBox<CoordType, NumD> box;
 
-    Containing(const Eigen::AlignedBox<CoordType, NumD> &bb): box{bb} {}
+    Within(const Eigen::AlignedBox<CoordType, NumD> &bb): box{bb} {}
 
     bool operator() (const typename Tree<NumD, CoordType>::Node &node) const
     {
-        return box.contains(node.bbox);
+        return node.is_leaf() ? box.contains(node.bbox) : box.intersects(node.bbox);
     }
 };
 
-template<class G> auto containing(const G &g) { return Containing<G>{g}; }
+template<class G> auto within(const G &g) { return Within<G>{g}; }
 
 namespace detail {
 
@@ -858,7 +858,7 @@ void traverse_recurse(const Tree<Dims, T> &tree,
     if (!pred(tree.node(idx))) return;
 
     if (tree.node(idx).is_leaf()) {
-        callback(tree.node(idx).idx);
+        callback(tree.node(idx));
     } else {
 
         // call this with left and right node idx:

@@ -15,7 +15,7 @@ class CircleBed {
     double radius_;
 public:
 
-    inline CircleBed(): center_(0, 0), radius_(std::nan("")) {}
+    inline CircleBed(): center_(0, 0), radius_(NaNd) {}
     explicit inline CircleBed(const Point& c, double r): center_(c), radius_(r) {}
 
     inline double radius() const { return radius_; }

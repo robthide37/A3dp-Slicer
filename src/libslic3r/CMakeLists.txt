@@ -17,6 +17,7 @@ endif()
 set(SLIC3R_SOURCES
     pchheader.cpp
     pchheader.hpp
+    AStar.hpp
     BoundingBox.cpp
     BoundingBox.hpp
     BridgeDetector.cpp
@@ -212,6 +213,7 @@ set(SLIC3R_SOURCES
     PrintObject.cpp
     PrintObjectSlice.cpp
     PrintRegion.cpp
+    PointGrid.hpp
     PNGReadWrite.hpp
     PNGReadWrite.cpp
     QuadricEdgeCollapse.cpp

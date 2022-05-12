@@ -4,6 +4,7 @@ add_executable(${_TEST_NAME}_tests
 	${_TEST_NAME}_tests.cpp
 	test_3mf.cpp
 	test_aabbindirect.cpp
+	test_kdtreeindirect.cpp
 	test_clipper_offset.cpp
 	test_clipper_utils.cpp
 	test_color.cpp
@@ -25,6 +26,7 @@ add_executable(${_TEST_NAME}_tests
     test_png_io.cpp
     test_timeutils.cpp
     test_indexed_triangle_set.cpp
+    test_astar.cpp
     ../libnest2d/printer_parts.cpp
 	)
 
