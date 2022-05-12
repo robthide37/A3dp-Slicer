@@ -382,6 +382,7 @@ public:
     void mirror(Axis axis);
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
     void scale_and_translate(const Vec3d& scale, const Vec3d& translation, TransformationType transformation_type);
+    void reset_skew();
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES

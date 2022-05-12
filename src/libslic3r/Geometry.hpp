@@ -496,6 +496,7 @@ public:
     void reset_rotation() { set_rotation(Vec3d::Zero()); }
     void reset_scaling_factor() { set_scaling_factor(Vec3d::Ones()); }
     void reset_mirror() { set_mirror(Vec3d::Ones()); }
+    void reset_skew();
 
     const Transform3d& get_matrix() const { return m_matrix; }
     Transform3d get_matrix_no_offset() const;

@@ -1101,6 +1101,9 @@ wxDEFINE_EVENT(EVT_GLCANVAS_QUESTION_MARK, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_INCREASE_INSTANCES, Event<int>);
 wxDEFINE_EVENT(EVT_GLCANVAS_INSTANCE_MOVED, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_INSTANCE_ROTATED, SimpleEvent);
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+wxDEFINE_EVENT(EVT_GLCANVAS_RESET_SKEW, SimpleEvent);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 wxDEFINE_EVENT(EVT_GLCANVAS_INSTANCE_SCALED, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_FORCE_UPDATE, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_WIPETOWER_MOVED, Vec3dEvent);
@@ -4098,9 +4101,17 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
         ModelObject* model_object = m_model->objects[object_idx];
         if (model_object != nullptr) {
             if (selection_mode == Selection::Instance)
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+#else
                 model_object->instances[instance_idx]->set_mirror(v->get_instance_mirror());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             else if (selection_mode == Selection::Volume)
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
+#else
                 model_object->volumes[volume_idx]->set_mirror(v->get_volume_mirror());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
             model_object->invalidate_bounding_box();
         }
@@ -4123,6 +4134,45 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
 
     m_dirty = true;
 }
+
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
+{
+    if (m_model == nullptr)
+        return;
+
+    if (!snapshot_type.empty())
+        wxGetApp().plater()->take_snapshot(_(snapshot_type));
+
+    std::set<std::pair<int, int>> done;  // keeps track of modified instances
+
+    Selection::EMode selection_mode = m_selection.get_mode();
+    const Selection::IndicesList& idxs = m_selection.get_volume_idxs();
+
+    for (unsigned int id : idxs) {
+        const GLVolume* v = m_volumes.volumes[id];
+        int object_idx = v->object_idx();
+        if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
+            continue;
+
+        int instance_idx = v->instance_idx();
+        int volume_idx = v->volume_idx();
+
+        done.insert(std::pair<int, int>(object_idx, instance_idx));
+
+        ModelObject* model_object = m_model->objects[object_idx];
+        if (model_object != nullptr) {
+            model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+            model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
+            model_object->invalidate_bounding_box();
+        }
+    }
+
+    post_event(SimpleEvent(EVT_GLCANVAS_RESET_SKEW));
+
+    m_dirty = true;
+}
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 void GLCanvas3D::update_gizmos_on_off_state()
 {

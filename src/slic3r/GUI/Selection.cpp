@@ -1347,8 +1347,6 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
     if (!m_valid)
         return;
 
-    std::cout << "Selection::scale_and_translate: " << to_string(scale) << " - " << to_string(translation) << "\n";
-
     for (unsigned int i : m_list) {
         GLVolume& v = *(*m_volumes)[i];
         const VolumeCache& volume_data = m_cache.volumes_data[i];
@@ -1407,6 +1405,46 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
     else if (m_mode == Volume)
         synchronize_unselected_volumes();
 #endif // !DISABLE_INSTANCES_SYNCH
+
+    ensure_on_bed();
+    set_bounding_boxes_dirty();
+    wxGetApp().plater()->canvas3D()->requires_check_outside_state();
+}
+
+void Selection::reset_skew()
+{
+    if (!m_valid)
+        return;
+
+    for (unsigned int i : m_list) {
+        GLVolume& v = *(*m_volumes)[i];
+        const VolumeCache& volume_data = m_cache.volumes_data[i];
+        const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
+        const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
+        if (m_mode == Instance && inst_trafo.has_skew()) {
+            Geometry::Transformation trafo = inst_trafo;
+            trafo.reset_skew();
+            v.set_instance_transformation(trafo);
+        }
+        else if (m_mode == Volume && vol_trafo.has_skew()) {
+            Geometry::Transformation trafo = vol_trafo;
+            trafo.reset_skew();
+            v.set_volume_transformation(trafo);
+        }
+        else {
+            const Geometry::Transformation world_trafo = inst_trafo * vol_trafo;
+            if (world_trafo.has_skew()) {
+                if (m_mode == Instance) {
+                    // TODO
+                    int a = 0;
+                }
+                else {
+                    // TODO
+                    int a = 0;
+                }
+            }
+        }
+    }
 
     ensure_on_bed();
     set_bounding_boxes_dirty();

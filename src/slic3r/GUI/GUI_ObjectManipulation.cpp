@@ -481,6 +481,25 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 
     m_main_grid_sizer->Add(editors_grid_sizer, 1, wxEXPAND);
 
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    m_skew_label = new wxStaticText(parent, wxID_ANY, _L("Skew"));
+    m_main_grid_sizer->Add(m_skew_label, 1, wxEXPAND);
+
+    m_reset_skew_button = new ScalableButton(parent, wxID_ANY, ScalableBitmap(parent, "undo"));
+    m_reset_skew_button->SetToolTip(_L("Reset skew"));
+    m_reset_skew_button->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
+        GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
+        Selection& selection = canvas->get_selection();
+        if (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) {
+            selection.setup_cache();
+            selection.reset_skew();
+            canvas->do_reset_skew(L("Reset skew"));
+            UpdateAndShow(true);
+        }
+        });
+    m_main_grid_sizer->Add(m_reset_skew_button);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+
     m_check_inch = new wxCheckBox(parent, wxID_ANY, _L("Inches"));
     m_check_inch->SetFont(wxGetApp().normal_font());
 
@@ -880,6 +899,9 @@ void ObjectManipulation::update_reset_buttons_visibility()
     bool show_rotation = false;
     bool show_scale = false;
     bool show_drop_to_bed = false;
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    bool show_skew = false;
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 #if ENABLE_WORLD_COORDINATE
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
@@ -898,8 +920,14 @@ void ObjectManipulation::update_reset_buttons_visibility()
     if (m_coordinates_type == ECoordinatesType::Local && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
 #endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
         const GLVolume* volume = selection.get_first_volume();
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        Transform3d rotation = Transform3d::Identity();
+        Transform3d scale = Transform3d::Identity();
+        Geometry::Transformation skew;
+#else
         Vec3d rotation = Vec3d::Zero();
         Vec3d scale = Vec3d::Ones();
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
     if (selection.is_single_full_instance() || selection.is_single_modifier() || selection.is_single_volume()) {
         const GLVolume* volume = selection.get_first_volume();
@@ -909,27 +937,72 @@ void ObjectManipulation::update_reset_buttons_visibility()
 #endif // ENABLE_WORLD_COORDINATE
 
         if (selection.is_single_full_instance()) {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            const Geometry::Transformation& trafo = volume->get_instance_transformation();
+            rotation = trafo.get_rotation_matrix();
+            scale = trafo.get_scaling_factor_matrix();
+            if (trafo.has_skew())
+                // the instance transform contains skew
+                skew = trafo;
+            else {
+                // the world transform contains skew
+                const Selection::IndicesList& idxs = selection.get_volume_idxs();
+                for (unsigned int id : idxs) {
+                    const Geometry::Transformation world_trafo(selection.get_volume(id)->world_matrix());
+                    if (world_trafo.has_skew()) {
+                        skew = world_trafo;
+                        break;
+                    }
+                }
+            }
+#else
             rotation = volume->get_instance_rotation();
             scale = volume->get_instance_scaling_factor();
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if !ENABLE_WORLD_COORDINATE
             min_z = selection.get_scaled_instance_bounding_box().min.z();
 #endif // !ENABLE_WORLD_COORDINATE
         }
         else {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            const Geometry::Transformation& trafo = volume->get_volume_transformation();
+            rotation = trafo.get_rotation_matrix();
+            scale = trafo.get_scaling_factor_matrix();
+            if (trafo.has_skew())
+                // the volume transform contains skew
+                skew = trafo;
+            else {
+                // the world transform contains skew
+                const Geometry::Transformation world_trafo(volume->world_matrix());
+                if (world_trafo.has_skew())
+                    skew = world_trafo;
+            }
+#else
             rotation = volume->get_volume_rotation();
             scale = volume->get_volume_scaling_factor();
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if !ENABLE_WORLD_COORDINATE
             min_z = get_volume_min_z(*volume);
 #endif // !ENABLE_WORLD_COORDINATE
         }
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        show_rotation = !rotation.isApprox(Transform3d::Identity());
+        show_scale = !scale.isApprox(Transform3d::Identity());
+        show_skew = skew.has_skew();
+#else
         show_rotation = !rotation.isApprox(Vec3d::Zero());
         show_scale = !scale.isApprox(Vec3d::Ones());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if !ENABLE_WORLD_COORDINATE
         show_drop_to_bed = std::abs(min_z) > SINKING_Z_THRESHOLD;
 #endif // !ENABLE_WORLD_COORDINATE
     }
 
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    wxGetApp().CallAfter([this, show_rotation, show_scale, show_drop_to_bed, show_skew] {
+#else
     wxGetApp().CallAfter([this, show_rotation, show_scale, show_drop_to_bed] {
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
         // There is a case (under OSX), when this function is called after the Manipulation panel is hidden
         // So, let check if Manipulation panel is still shown for this moment
         if (!this->IsShown())
@@ -937,6 +1010,10 @@ void ObjectManipulation::update_reset_buttons_visibility()
         m_reset_rotation_button->Show(show_rotation);
         m_reset_scale_button->Show(show_scale);
         m_drop_to_bed_button->Show(show_drop_to_bed);
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        m_reset_skew_button->Show(show_skew);
+        m_skew_label->Show(show_skew);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
         // Because of CallAfter we need to layout sidebar after Show/hide of reset buttons one more time
         Sidebar& panel = wxGetApp().sidebar();
@@ -1423,6 +1500,9 @@ void ObjectManipulation::msw_rescale()
     m_mirror_bitmap_hidden.msw_rescale();
     m_reset_scale_button->msw_rescale();
     m_reset_rotation_button->msw_rescale();
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    m_reset_skew_button->msw_rescale();
+#endif /// ENABLE_TRANSFORMATIONS_BY_MATRICES
     m_drop_to_bed_button->msw_rescale();
     m_lock_bnt->msw_rescale();
 
@@ -1462,6 +1542,9 @@ void ObjectManipulation::sys_color_changed()
     m_mirror_bitmap_hidden.msw_rescale();
     m_reset_scale_button->msw_rescale();
     m_reset_rotation_button->msw_rescale();
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    m_reset_skew_button->msw_rescale();
+#endif /// ENABLE_TRANSFORMATIONS_BY_MATRICES
     m_drop_to_bed_button->msw_rescale();
     m_lock_bnt->msw_rescale();
 

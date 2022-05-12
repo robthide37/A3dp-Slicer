@@ -120,9 +120,12 @@ private:
     wxStaticText*   m_empty_str = nullptr;
 
     // Non-owning pointers to the reset buttons, so we can hide and show them.
-    ScalableButton* m_reset_scale_button = nullptr;
-    ScalableButton* m_reset_rotation_button = nullptr;
-    ScalableButton* m_drop_to_bed_button = nullptr;
+    ScalableButton* m_reset_scale_button{ nullptr };
+    ScalableButton* m_reset_rotation_button{ nullptr };
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    ScalableButton* m_reset_skew_button{ nullptr };
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+    ScalableButton* m_drop_to_bed_button{ nullptr };
 
     wxCheckBox*     m_check_inch {nullptr};
 
@@ -175,6 +178,10 @@ private:
 
     wxFlexGridSizer* m_main_grid_sizer;
     wxFlexGridSizer* m_labels_grid_sizer;
+
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    wxStaticText* m_skew_label{ nullptr };
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
     // sizers, used for msw_rescale
     wxBoxSizer*     m_word_local_combo_sizer;

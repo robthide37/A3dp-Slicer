@@ -702,6 +702,30 @@ void Transformation::reset()
 }
 
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
+void Transformation::reset_skew()
+{
+    Matrix3d rotation;
+    Matrix3d scale;
+    m_matrix.computeRotationScaling(&rotation, &scale);
+
+    const double average_scale = std::cbrt(scale(0, 0) * scale(1, 1) * scale(2, 2));
+
+    scale(0, 0) = average_scale;
+    scale(1, 1) = average_scale;
+    scale(2, 2) = average_scale;
+
+    scale(0, 1) = 0.0;
+    scale(0, 2) = 0.0;
+    scale(1, 0) = 0.0;
+    scale(1, 2) = 0.0;
+    scale(2, 0) = 0.0;
+    scale(2, 1) = 0.0;
+
+    const Vec3d offset = get_offset();
+    m_matrix = rotation * scale;
+    m_matrix.translation() = offset;
+}
+
 Transform3d Transformation::get_matrix_no_offset() const
 {
     Transformation copy(*this);
