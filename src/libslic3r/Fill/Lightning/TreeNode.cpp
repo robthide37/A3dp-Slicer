@@ -180,7 +180,11 @@ bool lineSegmentPolygonsIntersection(const Point& a, const Point& b, const EdgeG
     } visitor { outline_locator, a.cast<double>(), b.cast<double>() };
 
     outline_locator.visit_cells_intersecting_line(a, b, visitor);
-    return visitor.d2min < double(within_max_dist) * double(within_max_dist);
+    if (visitor.d2min < double(within_max_dist) * double(within_max_dist)) {
+        result = Point(visitor.intersection_pt);
+        return true;
+    }
+    return false;
 }
 
 bool Node::realign(const Polygons& outlines, const EdgeGrid::Grid& outline_locator, std::vector<NodeSPtr>& rerooted_parts)
