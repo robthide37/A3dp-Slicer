@@ -13,8 +13,12 @@
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
-bool is_valid_ttf(std::string_view file_path)
+namespace {
+
+#ifdef __APPLE__
+static bool is_valid_ttf(std::string_view file_path)
 {
+    if (file_path.empty()) return false;
     auto const pos_point = file_path.find_last_of('.');
     if (pos_point == std::string_view::npos) return false;
 
@@ -29,7 +33,8 @@ bool is_valid_ttf(std::string_view file_path)
     if (extension_size >= 5) return false; // a lot of symbols for extension
     if (extension_size <= 1) return false; // few letters for extension
 
-    std::string_view extension = file_path.substr(pos_point+1, extension_size);
+    std::string_view extension = file_path.substr(pos_point + 1,
+                                                  extension_size);
 
     // Because of MacOs - Courier, Geneva, Monaco
     if (extension == std::string_view("dfont")) return false;
@@ -37,27 +42,36 @@ bool is_valid_ttf(std::string_view file_path)
     return true;
 }
 
+// get filepath from wxFont on Mac OsX
+static std::string get_file_path(const wxFont& font) {
+    const wxNativeFontInfo *info = font.GetNativeFontInfo();
+    if (info == nullptr) return {};
+    CTFontDescriptorRef descriptor = info->GetCTFontDescriptor();
+    CFURLRef            typeref    = (CFURLRef)
+        CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
+    if (typeref == NULL) return {};
+    CFStringRef url = CFURLGetString(typeref);
+    if (url == NULL) return {};
+    wxString file_uri;
+    wxCFTypeRef(url).GetValue(file_uri);
+    std::string file_path(wxURI::Unescape(file_uri).c_str());
+    if (file_path.empty() ||
+        file_path.size() <= std::string_view("file://").size())
+        return {};
+    // remove prefix file://
+    file_path = file_path.substr(start, file_path.size() - start);
+    return file_path;
+}    
+#endif // __APPLE__
+} // namespace
+
 bool WxFontUtils::can_load(const wxFont &font)
 {
     if (!font.IsOk()) return false;    
 #ifdef _WIN32
     return Emboss::can_load(font.GetHFONT()) != nullptr;
 #elif defined(__APPLE__)
-    // use file path
-    const wxNativeFontInfo *info = font.GetNativeFontInfo();
-    if (info == nullptr) return false;
-    CTFontDescriptorRef descriptor = info->GetCTFontDescriptor();
-    CFURLRef            typeref    = (CFURLRef)
-        CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
-    CFStringRef url = CFURLGetString(typeref);
-    if (url == NULL) return false;
-    wxString file_uri;
-    wxCFTypeRef(url).GetValue(file_uri);
-    std::string file_path(wxURI::Unescape(file_uri).c_str());
-    if (file_path.empty() || 
-        file_path.size() <= std::string_view("file://").size())
-        return false;
-    return is_valid_ttf(file_path);
+    return is_valid_ttf(get_file_path(font));
 #elif defined(__linux__)
     std::string font_path = Slic3r::GUI::get_font_path(font);
     return !font_path.empty();
@@ -70,20 +84,8 @@ std::unique_ptr<Emboss::FontFile> WxFontUtils::create_font_file(const wxFont &fo
 #ifdef _WIN32
     return Emboss::create_font_file(font.GetHFONT());
 #elif defined(__APPLE__)
-    // use file path
-    const wxNativeFontInfo *info = font.GetNativeFontInfo();
-    if (info == nullptr) return nullptr;
-    CTFontDescriptorRef descriptor = info->GetCTFontDescriptor();
-    CFURLRef            typeref    = (CFURLRef)
-        CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
-    CFStringRef url = CFURLGetString(typeref);
-    if (url == NULL) return nullptr;
-    wxString file_uri;
-    wxCFTypeRef(url).GetValue(file_uri);
-    std::string file_path(wxURI::Unescape(file_uri).c_str());
-    size_t      start = std::string("file://").size();
-    if (file_path.empty() || file_path.size() <= start) return nullptr;
-    file_path = file_path.substr(start, file_path.size() - start);
+    std::string file_path = get_file_path(font);
+    if (file_path.empty()) return nullptr;
     return Emboss::create_font_file(file_path.c_str());
 #elif defined(__linux__)
     std::string font_path = Slic3r::GUI::get_font_path(font);
