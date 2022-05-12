@@ -55,8 +55,8 @@ static std::string get_file_path(const wxFont& font) {
     wxString file_uri;
     wxCFTypeRef(url).GetValue(file_uri);
     std::string file_path(wxURI::Unescape(file_uri).c_str());
-    if (file_path.empty() ||
-        file_path.size() <= std::string_view("file://").size())
+    size_t start = std::string("file://").size();
+    if (file_path.empty() || file_path.size() <= start)
         return {};
     // remove prefix file://
     file_path = file_path.substr(start, file_path.size() - start);
