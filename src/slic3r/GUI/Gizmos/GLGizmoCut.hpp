@@ -167,7 +167,7 @@ private:
     void render_cut_center_graber();
     void render_cut_line();
     void perform_cut(const Selection& selection);
-    void set_center_pos(const Vec3d& center_pos);
+    void set_center_pos(const Vec3d& center_pos, bool force = false);
     bool update_bb();
     void reset_connectors();
     void update_connector_shape();

@@ -651,7 +651,7 @@ void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
         m_connector_depth_ratio, m_connector_size, m_connector_mode, m_connector_type, m_connector_style, m_connector_shape_id,
         m_ar_plane_center, m_ar_rotations);
 
-    set_center_pos(m_ar_plane_center);
+    set_center_pos(m_ar_plane_center, true);
     m_rotation_gizmo.set_center(m_ar_plane_center);
     m_rotation_gizmo.set_rotation(m_ar_rotations);
     force_update_clipper_on_render = true;
@@ -771,21 +771,12 @@ void GLGizmoCut3D::on_stop_dragging()
     }
 }
 
-void GLGizmoCut3D::set_center_pos(const Vec3d& center_pos)
+void GLGizmoCut3D::set_center_pos(const Vec3d& center_pos, bool force/* = false*/)
 {
-    const BoundingBoxf3 tbb = transformed_bounding_box(true);
-    if (!tbb.contains(center_pos))
-        return;
-
-    m_plane_center = center_pos;
-
-    // !!! ysFIXME add smart clamp calculation
-    // Clamp the center position of the cut plane to the object's bounding box
-    //m_plane_center = Vec3d(std::clamp(center_pos.x(), m_min_pos.x(), m_max_pos.x()),
-    //                       std::clamp(center_pos.y(), m_min_pos.y(), m_max_pos.y()),
-    //                       std::clamp(center_pos.z(), m_min_pos.z(), m_max_pos.z()));
-
-    m_center_offset = m_plane_center - m_bb_center;
+    if (force || transformed_bounding_box(true).contains(center_pos)) {
+        m_plane_center = center_pos;
+        m_center_offset = m_plane_center - m_bb_center;
+    }
 }
 
 BoundingBoxf3 GLGizmoCut3D::bounding_box() const
@@ -806,18 +797,18 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(bool revert_move /*= false*
 {
     // #ysFIXME !!!
     BoundingBoxf3 ret;
-    const Selection& selection = m_parent.get_selection();
-    const Selection::IndicesList& idxs = selection.get_volume_idxs();
 
-    const int instance_idx = selection.get_instance_idx();
-    const int object_idx = selection.get_object_idx();
-    if (instance_idx < 0 || object_idx < 0)
+    const ModelObject* mo = m_c->selection_info()->model_object();
+    if (!mo)
         return ret;
+    const int instance_idx = m_c->selection_info()->get_active_instance();
+    if (instance_idx < 0)
+        return ret;
+    const ModelInstance* mi = mo->instances[instance_idx];
 
-    const Vec3d& instance_offset = wxGetApp().plater()->model().objects[object_idx]->instances[instance_idx]->get_offset();
-
+    const Vec3d& instance_offset = mi->get_offset();
     Vec3d cut_center_offset = m_plane_center - instance_offset;
-    cut_center_offset[Z] -= selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z();
+    cut_center_offset[Z] -= m_c->selection_info()->get_sla_shift();
 
     const Vec3d& rotation = m_rotation_gizmo.get_rotation();
     const auto move  = Geometry::assemble_transform(-cut_center_offset);
@@ -828,6 +819,8 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(bool revert_move /*= false*
 
     const auto cut_matrix = (revert_move ? move2 : Transform3d::Identity()) * rot_x * rot_y * rot_z * move;
 
+    const Selection& selection = m_parent.get_selection();
+    const Selection::IndicesList& idxs = selection.get_volume_idxs();
     for (unsigned int i : idxs) {
         const GLVolume* volume = selection.get_volume(i);
         // respect just to the solid parts for FFF and ignore pad and supports for SLA
@@ -853,7 +846,7 @@ bool GLGizmoCut3D::update_bb()
         m_max_pos = box.max;
         m_min_pos = box.min;
         m_bb_center = box.center();
-        set_center_pos(m_bb_center + m_center_offset);
+        set_center_pos(m_bb_center + m_center_offset, true);
 
         m_plane.reset();
         m_cone.reset();
@@ -1270,9 +1263,9 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
         const bool has_connectors = !mo->cut_connectors.empty();
         {
-            Plater::TakeSnapshot snapshot(plater, _L("Cut by Plane"));
             // update connectors pos as offset of its center before cut performing
             if (has_connectors && m_connector_mode == CutConnectorMode::Manual) {
+                Plater::TakeSnapshot snapshot(plater, _L("Cut by Plane"));
                 for (CutConnector& connector : mo->cut_connectors) {
                     connector.rotation = m_rotation_gizmo.get_rotation();
 

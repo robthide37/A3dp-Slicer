@@ -1780,7 +1780,7 @@ struct Plater::priv
     std::string get_config(const std::string &key) const;
 
     std::vector<size_t> load_files(const std::vector<fs::path>& input_files, bool load_model, bool load_config, bool used_inches = false);
-    std::vector<size_t> load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z = false);
+    std::vector<size_t> load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z = false, bool call_selection_changed = true);
 
     fs::path get_export_file_path(GUI::FileType file_type);
     wxString get_export_file(GUI::FileType file_type);
@@ -2691,7 +2691,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
 // #define AUTOPLACEMENT_ON_LOAD
 
-std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z)
+std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z, bool call_selection_changed /*= true*/)
 {
     const Vec3d bed_size = Slic3r::to_3d(this->bed.build_volume().bounding_volume2d().size(), 1.0) - 2.0 * Vec3d::Ones();
 
@@ -2774,17 +2774,18 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
 
     notification_manager->close_notification_of_type(NotificationType::UpdatedItemsInfo);
     for (const size_t idx : obj_idxs) {
-        wxGetApp().obj_list()->add_object_to_list(idx);
+        wxGetApp().obj_list()->add_object_to_list(idx, call_selection_changed);
     }
 
-    update();
-    // Update InfoItems in ObjectList after update() to use of a correct value of the GLCanvas3D::is_sinking(),
-    // which is updated after a view3D->reload_scene(false, flags & (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH) call
-    for (const size_t idx : obj_idxs)
-        wxGetApp().obj_list()->update_info_items(idx);
+    if (call_selection_changed) {
+        update();
+        // Update InfoItems in ObjectList after update() to use of a correct value of the GLCanvas3D::is_sinking(),
+        // which is updated after a view3D->reload_scene(false, flags & (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH) call
+        for (const size_t idx : obj_idxs)
+            wxGetApp().obj_list()->update_info_items(idx);
 
-    object_list_changed();
-
+        object_list_changed();
+    }
     this->schedule_background_process();
 
     return obj_idxs;
@@ -5919,18 +5920,29 @@ void Slic3r::GUI::Plater::cut(size_t obj_idx, size_t instance_idx, const Vec3d& 
 
     wxCHECK_RET(instance_idx < object->instances.size(), "instance_idx out of bounds");
 
-    //Plater::TakeSnapshot snapshot(this, _L("Cut by Plane"));
+    this->suppress_snapshots();
     wxBusyCursor wait;
     
     const auto new_objects = object->cut(instance_idx, cut_center, cut_rotation, attributes);
 
-    remove(obj_idx);
-    p->load_model_objects(new_objects);
+    model().delete_object(obj_idx);
+    sidebar().obj_list()->delete_object_from_list(obj_idx);
+
+    // suppress to call selection update for Object List to avoid call of early Gizmos on/off update
+    p->load_model_objects(new_objects, false, false);
 
     Selection& selection = p->get_selection();
     size_t last_id = p->model.objects.size() - 1;
     for (size_t i = 0; i < new_objects.size(); ++i)
         selection.add_object((unsigned int)(last_id - i), i == 0);
+    this->allow_snapshots();
+
+    // now process all updates of the 3d scene
+    update();
+    // Update InfoItems in ObjectList after update() to use of a correct value of the GLCanvas3D::is_sinking(),
+    // which is updated after a view3D->reload_scene(false, flags & (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH) call
+    for (size_t idx = 0; idx < p->model.objects.size(); idx++)
+        wxGetApp().obj_list()->update_info_items(idx);
 }
 
 void Plater::export_gcode(bool prefer_removable)

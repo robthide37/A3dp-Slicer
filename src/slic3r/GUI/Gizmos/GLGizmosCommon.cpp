@@ -414,8 +414,11 @@ void ObjectClipper::render_cut() const
     if (m_clp_ratio == 0.)
         return;
     const SelectionInfo* sel_info = get_pool()->selection_info();
+    int sel_instance_idx = sel_info->get_active_instance();
+    if (sel_instance_idx < 0)
+        return;
     const ModelObject* mo = sel_info->model_object();
-    const Geometry::Transformation inst_trafo = mo->instances[sel_info->get_active_instance()]->get_transformation();
+    const Geometry::Transformation inst_trafo = mo->instances[sel_instance_idx]->get_transformation();
 
     size_t clipper_id = 0;
     for (const ModelVolume* mv : mo->volumes) {
