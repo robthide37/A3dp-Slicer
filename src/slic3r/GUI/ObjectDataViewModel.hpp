@@ -83,7 +83,7 @@ class ObjectDataViewModelNode
     bool                            m_has_lock{false};
 
     std::string                     m_action_icon_name = "";
-    ModelVolumeType                 m_volume_type;
+    ModelVolumeType                 m_volume_type{ -1 };
     InfoItemType                    m_info_item_type {InfoItemType::Undef};
 
 public:

@@ -23,7 +23,7 @@ namespace Slic3r {
 namespace GUI {
 
 static const double Margin = 20.0;
-static const ColorRGBA GRABBER_COLOR = ColorRGBA::ORANGE();
+static const ColorRGBA GRABBER_COLOR = ColorRGBA::YELLOW();
 
 #define use_grabber_extension 1
 
@@ -163,7 +163,7 @@ void GLGizmoCut3D::shift_cut_z(double delta)
 {
     Vec3d new_cut_center = m_plane_center;
     new_cut_center[Z] += delta;
-    set_center_pos(new_cut_center);
+    set_center(new_cut_center);
 }
 
 void GLGizmoCut3D::rotate_vec3d_around_center(Vec3d& vec, const Vec3d& angles, const Vec3d& center)
@@ -616,7 +616,7 @@ void GLGizmoCut3D::render_cut_line()
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
-        init_data.color = ColorRGBA::YELLOW();
+        init_data.color = GRABBER_COLOR;
         init_data.reserve_vertices(2);
         init_data.reserve_indices(2);
 
@@ -773,6 +773,10 @@ void GLGizmoCut3D::on_stop_dragging()
 
 void GLGizmoCut3D::set_center_pos(const Vec3d& center_pos)
 {
+    const BoundingBoxf3 tbb = transformed_bounding_box(true);
+    if (!tbb.contains(center_pos))
+        return;
+
     m_plane_center = center_pos;
 
     // !!! ysFIXME add smart clamp calculation
