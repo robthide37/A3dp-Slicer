@@ -250,9 +250,6 @@ private:
     // Only when drag text object it stores world position
     std::optional<Transform3d> m_temp_transformation;
 
-    // initialize when GL is accessible
-    bool m_is_initialized;
-
     // drawing icons
     GLTexture m_icons_texture;
     void init_icons();

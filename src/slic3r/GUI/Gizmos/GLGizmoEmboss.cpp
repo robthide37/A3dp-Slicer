@@ -115,7 +115,6 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
     , m_volume(nullptr)
     , m_exist_notification(false)
-    , m_is_initialized(false) // initialize on first opening gizmo
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
     , m_font_manager(m_imgui->get_glyph_ranges())
     , m_update_job_cancel(nullptr)
@@ -158,7 +157,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     assert(volume_type == ModelVolumeType::MODEL_PART ||
            volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
            volume_type == ModelVolumeType::PARAMETER_MODIFIER);
-    if (!m_is_initialized) initialize();    
+    if (!m_gui_cfg.has_value()) initialize();
     set_default_text();
 
     Vec2d screen_coor = mouse_pos;
@@ -596,9 +595,10 @@ void GLGizmoEmboss::on_set_state()
             return;
         }
         m_volume = nullptr;
+
         remove_notification_not_valid_font();
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
-        if (!m_is_initialized) initialize();
+        if (!m_gui_cfg.has_value()) initialize();
 
         // to reload fonts from system, when install new one
         wxFontEnumerator::InvalidateCache();
@@ -629,11 +629,9 @@ void GLGizmoEmboss::on_dragging(const UpdateData &data) { m_rotate_gizmo.draggin
 
 void GLGizmoEmboss::initialize()
 {
-    if (m_is_initialized) return;
-    m_is_initialized = true;
+    if (m_gui_cfg.has_value()) return;
 
-    GuiCfg cfg; // initialize by default values;
-    
+    GuiCfg cfg; // initialize by default values;    
     float line_height = ImGui::GetTextLineHeight();
     float line_height_with_spacing = ImGui::GetTextLineHeightWithSpacing();
     float space = line_height_with_spacing - line_height;
@@ -715,7 +713,7 @@ void GLGizmoEmboss::initialize()
     cfg.min_style_image_height = line_height_with_spacing;
     cfg.max_style_image_width  = cfg.max_font_name_width -
                                 2 * style.FramePadding.x;
-    m_gui_cfg.emplace(cfg);
+    m_gui_cfg.emplace(std::move(cfg));
 
     init_icons();
     
