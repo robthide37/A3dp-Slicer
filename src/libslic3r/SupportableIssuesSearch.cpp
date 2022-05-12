@@ -557,11 +557,17 @@ private:
         // essentially doing nothing.
         int final_height_coords = local_coords.z();
         while (final_height_coords > 0
-                && this->access_cell(this->to_global_cell_coords(Vec3i(local_coords.x(), local_coords.y(), final_height_coords))).volume > 0) {
+                && this->access_cell(
+                        this->to_global_cell_coords(Vec3i(local_coords.x(), local_coords.y(), final_height_coords))).volume
+                        > 0) {
             final_height_coords--;
         }
-        Vec3f support_point = unscale(this->get_cell_center(this->to_global_cell_coords(Vec3i(local_coords.x(), local_coords.y(), final_height_coords)))).cast<
-                float>();
+        Vec3f support_point =
+                unscale(
+                        this->get_cell_center(
+                                this->to_global_cell_coords(
+                                        Vec3i(local_coords.x(), local_coords.y(), final_height_coords)))).cast<
+                        float>();
 
         std::cout << " new support point:  " << support_point.x() << " | " << support_point.y() << " | "
                 << support_point.z() << std::endl;
@@ -683,51 +689,76 @@ void debug_export(Issues issues, std::string file_name) {
 }
 #endif
 
-EdgeGridWrapper compute_layer_edge_grid(const Layer *layer) {
-    float min_region_flow_width { 1.0f };
-    for (const auto *region : layer->regions()) {
-        min_region_flow_width = std::min(min_region_flow_width,
-                region->flow(FlowRole::frExternalPerimeter).width());
-    }
-    std::vector<Points> lines;
-    for (const LayerRegion *layer_region : layer->regions()) {
-        for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
-            lines.push_back(Points { });
-            ex_entity->collect_points(lines.back());
-        } // ex_entity
+struct LayerLinesDistancer {
+    std::vector<Linef> lines;
+    AABBTreeIndirect::Tree<2, double> tree;
+    float line_width;
 
-        for (const ExtrusionEntity *ex_entity : layer_region->fills.entities) {
-            lines.push_back(Points { });
-            ex_entity->collect_points(lines.back());
-        } // ex_entity
+    LayerLinesDistancer(const Layer *layer) {
+        float min_region_flow_width { 1.0f };
+        for (const auto *region : layer->regions()) {
+            min_region_flow_width = std::min(min_region_flow_width,
+                    region->flow(FlowRole::frExternalPerimeter).width());
+        }
+        for (const LayerRegion *layer_region : layer->regions()) {
+            for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
+                Points points { };
+                ex_entity->collect_points(points);
+                Vec2d prev = points.size() > 0 ? unscaled(points.front()) : Vec2d::Zero();
+                for (size_t idx = 1; idx < points.size(); ++idx) {
+                    lines.emplace_back(prev, unscaled(points[idx]));
+                }
+            } // ex_entity
+
+            for (const ExtrusionEntity *ex_entity : layer_region->fills.entities) {
+                Points points { };
+                ex_entity->collect_points(points);
+                Vec2d prev = points.size() > 0 ? unscaled(points.front()) : Vec2d::Zero();
+                for (size_t idx = 1; idx < points.size(); ++idx) {
+                    lines.emplace_back(prev, unscaled(points[idx]));
+                }
+            } // ex_entity
+        }
+        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
+        line_width = min_region_flow_width;
     }
 
-    return EdgeGridWrapper(scale_(min_region_flow_width), lines);
-}
+    float distance_from_lines(const Point &point, float point_width) const {
+        Vec2d p = unscaled(point);
+        size_t hit_idx_out;
+        Vec2d hit_point_out;
+        auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, p, hit_idx_out, hit_point_out);
+        if (distance < 0)
+            return distance;
+
+        distance = sqrt(distance);
+        return std::max(float(distance - point_width / 2 - line_width / 20), 0.0f);
+    }
+};
 
 //TODO needs revision
-coordf_t get_flow_width(const LayerRegion *region, ExtrusionRole role) {
+float get_flow_width(const LayerRegion *region, ExtrusionRole role) {
     switch (role) {
         case ExtrusionRole::erBridgeInfill:
-            return region->flow(FlowRole::frExternalPerimeter).scaled_width();
+            return region->flow(FlowRole::frExternalPerimeter).width();
         case ExtrusionRole::erExternalPerimeter:
-            return region->flow(FlowRole::frExternalPerimeter).scaled_width();
+            return region->flow(FlowRole::frExternalPerimeter).width();
         case ExtrusionRole::erGapFill:
-            return region->flow(FlowRole::frInfill).scaled_width();
+            return region->flow(FlowRole::frInfill).width();
         case ExtrusionRole::erPerimeter:
-            return region->flow(FlowRole::frPerimeter).scaled_width();
+            return region->flow(FlowRole::frPerimeter).width();
         case ExtrusionRole::erSolidInfill:
-            return region->flow(FlowRole::frSolidInfill).scaled_width();
+            return region->flow(FlowRole::frSolidInfill).width();
         case ExtrusionRole::erInternalInfill:
-            return region->flow(FlowRole::frInfill).scaled_width();
+            return region->flow(FlowRole::frInfill).width();
         case ExtrusionRole::erTopSolidInfill:
-            return region->flow(FlowRole::frTopSolidInfill).scaled_width();
+            return region->flow(FlowRole::frTopSolidInfill).width();
         default:
-            return region->flow(FlowRole::frPerimeter).scaled_width();
+            return region->flow(FlowRole::frPerimeter).width();
     }
 }
 
-coordf_t get_max_allowed_distance(ExtrusionRole role, coordf_t flow_width, bool external_perimeters_first,
+float get_max_allowed_distance(ExtrusionRole role, float flow_width, bool external_perimeters_first,
         const Params &params) { // <= distance / flow_width (can be larger for perimeter, if not external perimeter first)
     if ((role == ExtrusionRole::erExternalPerimeter || role == ExtrusionRole::erOverhangPerimeter)
             && (external_perimeters_first)) {
@@ -761,13 +792,13 @@ struct SegmentAccumulator {
 
 Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float print_z,
         const LayerRegion *layer_region,
-        const EdgeGridWrapper &supported_grid, const Params &params) {
+        const LayerLinesDistancer &support_layer, const Params &params) {
 
     Issues issues { };
     if (entity->is_collection()) {
         for (const auto *e : static_cast<const ExtrusionEntityCollection*>(entity)->entities) {
             issues.add(
-                    check_extrusion_entity_stability(e, print_z, layer_region, supported_grid, params));
+                    check_extrusion_entity_stability(e, print_z, layer_region, support_layer, params));
         }
     } else { //single extrusion path, with possible varying parameters
         //prepare stack of points on the extrusion path. If there are long segments, additional points might be pushed onto the stack during the algorithm.
@@ -788,9 +819,9 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
 
         Point prev_point = points.top(); // prev point of the path. Initialize with first point.
         Vec3f prev_fpoint = to_vec3f(prev_point);
-        coordf_t flow_width = get_flow_width(layer_region, entity->role());
+        float flow_width = get_flow_width(layer_region, entity->role());
         bool external_perimters_first = layer_region->region().config().external_perimeters_first;
-        const coordf_t max_allowed_dist_from_prev_layer = get_max_allowed_distance(entity->role(), flow_width,
+        const float max_allowed_dist_from_prev_layer = get_max_allowed_distance(entity->role(), flow_width,
                 external_perimters_first, params);
 
         while (!points.empty()) {
@@ -799,8 +830,8 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
             Vec3f fpoint = to_vec3f(point);
             float edge_len = (fpoint - prev_fpoint).norm();
 
-            coordf_t dist_from_prev_layer { 0 };
-            if (!supported_grid.signed_distance(point, flow_width, dist_from_prev_layer)) { // dist from prev layer not found, assume empty layer
+            float dist_from_prev_layer = support_layer.distance_from_lines(point, flow_width);
+            if (dist_from_prev_layer < 0) { // dist from prev layer not found, assume empty layer
                 issues.supports_nedded.push_back(SupportPoint(fpoint, 1.0f));
                 supports_acc.reset();
             }
@@ -867,7 +898,7 @@ void distribute_layer_volume(const PrintObject *po, size_t layer_idx,
             for (const ExtrusionEntity *entity : static_cast<const ExtrusionEntityCollection*>(collections)->entities) {
                 for (const Line &line : entity->as_polyline().lines()) {
                     balance_grid.distribute_edge(line.a, line.b, layer->print_z,
-                            unscale<float>(get_flow_width(region, entity->role())), layer->height);
+                            get_flow_width(region, entity->role()), layer->height);
                 }
             }
         }
@@ -875,7 +906,7 @@ void distribute_layer_volume(const PrintObject *po, size_t layer_idx,
             for (const ExtrusionEntity *entity : static_cast<const ExtrusionEntityCollection*>(collections)->entities) {
                 for (const Line &line : entity->as_polyline().lines()) {
                     balance_grid.distribute_edge(line.a, line.b, layer->print_z,
-                            unscale<float>(get_flow_width(region, entity->role())), layer->height);
+                            get_flow_width(region, entity->role()), layer->height);
                 }
             }
         }
@@ -886,7 +917,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
         const Params &params) {
     const Layer *layer = po->get_layer(layer_idx);
     //Prepare edge grid of previous layer, will be used to check if the extrusion path is supported
-    EdgeGridWrapper supported_grid = compute_layer_edge_grid(layer->lower_layer);
+    LayerLinesDistancer support_layer(layer->lower_layer);
 
     Issues issues { };
     if (full_check) { // If full check; check stability of perimeters, gap fills, and bridges.
@@ -895,7 +926,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     issues.add(
                             check_extrusion_entity_stability(perimeter, layer->print_z, layer_region,
-                                    supported_grid, params));
+                                    support_layer, params));
                 } // perimeter
             } // ex_entity
             for (const ExtrusionEntity *ex_entity : layer_region->fills.entities) {
@@ -904,7 +935,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
                             || fill->role() == ExtrusionRole::erBridgeInfill) {
                         issues.add(
                                 check_extrusion_entity_stability(fill, layer->print_z, layer_region,
-                                        supported_grid,
+                                        support_layer,
                                         params));
                     }
                 } // fill
@@ -919,7 +950,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
                             || perimeter->role() == ExtrusionRole::erOverhangPerimeter) {
                         issues.add(
                                 check_extrusion_entity_stability(perimeter, layer->print_z, layer_region,
-                                        supported_grid, params));
+                                        support_layer, params));
                     }; // ex_perimeter
                 } // perimeter
             } // ex_entity
