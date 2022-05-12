@@ -677,9 +677,16 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         else {
 #if ENABLE_WORLD_COORDINATE
             m_new_move_label_string = L("Translate");
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            m_new_rotate_label_string = L("Rotate");
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_position = Vec3d::Zero();
 #endif // ENABLE_WORLD_COORDINATE
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            m_new_rotation = Vec3d::Zero();
+#else
             m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_size     = volume->get_instance_scaling_factor().cwiseProduct(wxGetApp().model().objects[volume->object_idx()]->raw_mesh_bounding_box().size());
             m_new_scale    = volume->get_instance_scaling_factor() * 100.0;
 		}
@@ -728,8 +735,15 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         }
         else if (is_local_coordinates()) {
             m_new_move_label_string = L("Translate");
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            m_new_rotate_label_string = L("Rotate");
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_position = Vec3d::Zero();
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            m_new_rotation = Vec3d::Zero();
+#else
             m_new_rotation = volume->get_volume_rotation() * (180.0 / M_PI);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_scale = volume->get_volume_scaling_factor() * 100.0;
             m_new_size = volume->get_volume_scaling_factor().cwiseProduct(volume->bounding_box().size());
         }
@@ -1178,19 +1192,27 @@ void ObjectManipulation::change_rotation_value(int axis, double value)
     GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
     Selection& selection = canvas->get_selection();
 
-    TransformationType transformation_type(TransformationType::World_Relative_Joint);
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    TransformationType transformation_type;
+    transformation_type.set_relative();
+#else
+    TransformationType transformation_type(TransformationType::World_Relative_Joint);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     if (selection.is_single_full_instance())
         transformation_type.set_independent();
 
     if (is_local_coordinates()) {
         transformation_type.set_local();
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
         transformation_type.set_absolute();
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
 
     if (is_instance_coordinates())
         transformation_type.set_instance();
 #else
+    TransformationType transformation_type(TransformationType::World_Relative_Joint);
     if (selection.is_single_full_instance() || selection.requires_local_axes())
 		transformation_type.set_independent();
 	if (selection.is_single_full_instance() && ! m_world_coordinates) {
