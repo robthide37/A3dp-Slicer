@@ -136,7 +136,7 @@ private:
     template<typename T, typename Draw>
     bool revertible(const std::string &name, T &value, T *default_value, bool exist_change, const std::string &undo_tooltip, float undo_offset, Draw draw);
 
-    void set_minimal_window_size(bool is_edit_style, bool is_advance_edit_style);
+    void set_minimal_window_size(bool is_advance_edit_style);
     const ImVec2 &get_minimal_window_size() const;
 
     // process mouse event
@@ -166,10 +166,8 @@ private:
         size_t max_count_char_in_volume_name = 20;
         // Zero means it is calculated in init function
         ImVec2 minimal_window_size              = ImVec2(0, 0);
-        ImVec2 minimal_window_size_with_edit    = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
-        float advanced_input_width    = 0.f;
-        float style_combobox_width    = 0.f;
+        float input_width    = 0.f;
         float delete_pos_x            = 0.f;
         float max_font_name_width     = 0.f;
         unsigned int  icon_width      = 0;
@@ -177,7 +175,7 @@ private:
         float min_style_image_height = 0.f;
         int   max_style_image_width   = 0.f;
 
-        float edit_input_offset   = 0.f;
+        float input_offset   = 0.f;
         float advanced_input_offset = 0.f;
 
         ImVec2 text_size;
@@ -185,7 +183,8 @@ private:
         // Only translations needed for calc GUI size
         struct Translations
         {
-            // edit style
+            std::string type;
+            std::string style;
             std::string font;
             std::string size;
             std::string depth;
@@ -207,7 +206,6 @@ private:
     std::optional<const GuiCfg> m_gui_cfg;
     // setted only when wanted to use - not all the time
     std::optional<ImVec2> m_set_window_offset;
-    bool m_is_edit_style = false;
     bool m_is_advanced_edit_style = false;
 
     FontManager m_font_manager;

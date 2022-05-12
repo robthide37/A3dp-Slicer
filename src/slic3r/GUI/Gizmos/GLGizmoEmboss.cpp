@@ -91,15 +91,23 @@ struct Limits
     MinMax<float> angle{-180.f, 180.f}; // in mm
 
     template<typename T>
-    static void apply(std::optional<T> &val, const MinMax<T> &limit) {
+    static bool apply(std::optional<T> &val, const MinMax<T> &limit) {
         if (val.has_value())
-            apply<T>(*val, limit);
+            return apply<T>(*val, limit);
+        return false;
     }
     template<typename T>
-    static void apply(T &val, const MinMax<T> &limit)
+    static bool apply(T &val, const MinMax<T> &limit)
     {
-        if (val > limit.max) val = limit.max;
-        if (val < limit.min) val = limit.min;
+        if (val > limit.max) {
+            val = limit.max;
+            return true;
+        }
+        if (val < limit.min) {
+            val = limit.min;
+            return true;
+        }
+        return false;
     }
 };
 static const Limits limits;
@@ -644,27 +652,26 @@ void GLGizmoEmboss::initialize()
 
     float icon_width_with_spacing = cfg.icon_width + space;
     float scroll_width = icon_width_with_spacing; // TODO: fix it
-    cfg.style_combobox_width = cfg.max_font_name_width + space
-                                  + icon_width_with_spacing
-                                  + scroll_width;
     cfg.delete_pos_x = cfg.max_font_name_width + space;
     int count_line_of_text = 3;
     cfg.text_size = ImVec2(-FLT_MIN, line_height_with_spacing * count_line_of_text);
     ImVec2 letter_m_size = ImGui::CalcTextSize("M");
     int count_letter_M_in_input = 12;
-    cfg.advanced_input_width = letter_m_size.x * count_letter_M_in_input;
+    cfg.input_width = letter_m_size.x * count_letter_M_in_input;
     GuiCfg::Translations &tr = cfg.translations;
-    tr.font        = _u8L("Font");
-    tr.size        = _u8L("Height");
-    tr.depth       = _u8L("Depth");
-    float max_edit_text_width = std::max({
+    tr.type  = _u8L("Type");
+    tr.style = _u8L("Style");
+    tr.font  = _u8L("Font");
+    tr.size  = _u8L("Height");
+    tr.depth = _u8L("Depth");
+    float max_text_width = std::max({
+        ImGui::CalcTextSize(tr.type.c_str()).x,
+        ImGui::CalcTextSize(tr.style.c_str()).x,
         ImGui::CalcTextSize(tr.font.c_str()).x,
         ImGui::CalcTextSize(tr.size.c_str()).x,
-        ImGui::CalcTextSize(tr.depth.c_str()).x });
-    cfg.edit_input_offset = 
-        3 * space + ImGui::GetTreeNodeToLabelSpacing() +
-                            max_edit_text_width;
-    
+        ImGui::CalcTextSize(tr.depth.c_str()).x});
+    cfg.input_offset = max_text_width + 3 * space + ImGui::GetTreeNodeToLabelSpacing();
+
     tr.use_surface = _u8L("Use surface");
     tr.char_gap = _u8L("Char gap");
     tr.line_gap = _u8L("Line gap");
@@ -693,22 +700,19 @@ void GLGizmoEmboss::initialize()
     float window_height = 
         window_title + // window title
         cfg.text_size.y +  // text field
-        input_height * 3 + // type Radios + style selector + close button
-        tree_header +      // Edit style
+        input_height * 6 + // type Radios + style selector + font name +
+                           // height + depth + close button
+        tree_header +      // advance tree
         2 * style.WindowPadding.y;
-    float window_width = cfg.style_combobox_width + style.WindowPadding.x * 2;
+    float window_width = cfg.input_offset + cfg.input_width + style.WindowPadding.x * 2;
     cfg.minimal_window_size = ImVec2(window_width, window_height);
 
-    float addition_edit_height        = input_height * 3 + tree_header;
-    cfg.minimal_window_size_with_edit = ImVec2(cfg.minimal_window_size.x,
-                                               cfg.minimal_window_size.y +
-                                                   addition_edit_height);
     // 6 = charGap, LineGap, Bold, italic, surfDist, angle
     // 4 = 1px for fix each edit image of drag float 
     float advance_height = input_height * 7 + 8;
     cfg.minimal_window_size_with_advance =
-        ImVec2(cfg.minimal_window_size_with_edit.x,
-               cfg.minimal_window_size_with_edit.y + advance_height);
+        ImVec2(cfg.minimal_window_size.x,
+               cfg.minimal_window_size.y + advance_height);
 
     cfg.min_style_image_height = line_height_with_spacing;
     cfg.max_style_image_width  = cfg.max_font_name_width -
@@ -1058,26 +1062,26 @@ void GLGizmoEmboss::draw_window()
     draw_text_input();
     draw_model_type();
     draw_style_list();
-
     m_imgui->disabled_begin(!is_selected_style);
-    if (ImGui::TreeNode(_u8L("Edit style").c_str())) {
-        
-#ifdef SHOW_WX_FONT_DESCRIPTOR
-        ImGui::SameLine();
-        if (m_font_manager.is_activ_font())
-            m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_font_manager.get_font_item().path);
-#endif // SHOW_WX_FONT_DESCRIPTOR
-        if (!m_is_edit_style) {
-            set_minimal_window_size(true, m_is_advanced_edit_style);
+    ImGui::TreePush();
+    draw_style_edit();
+    ImGui::TreePop();
+    if (ImGui::TreeNode(_u8L("advanced").c_str())) {
+        if (!m_is_advanced_edit_style) {
+            set_minimal_window_size(true);
         } else {
-            draw_style_edit();
+            draw_advanced();
         }
         ImGui::TreePop();
-    } else if (m_is_edit_style)
-        set_minimal_window_size(false, m_is_advanced_edit_style);
-
+    } else if (m_is_advanced_edit_style) 
+        set_minimal_window_size(false);
     m_imgui->disabled_end(); // !is_selected_style
-
+       
+#ifdef SHOW_WX_FONT_DESCRIPTOR
+    if (is_selected_style)
+        m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_font_manager.get_font_item().path);
+#endif // SHOW_WX_FONT_DESCRIPTOR
+        
     if (ImGui::Button(_u8L("Close").c_str())) close();   
 
     // Option to create text volume when reselecting volumes
@@ -1377,8 +1381,8 @@ void GLGizmoEmboss::draw_model_type()
                                                    ModelVolumeType::INVALID;
 
     bool is_last_solid_part = is_text_object(m_volume);
-    ImGui::Text("%s :", _u8L("Type").c_str());
-    ImGui::SameLine(75);
+    ImGui::Text("%s", m_gui_cfg->translations.type.c_str());
+    ImGui::SameLine(m_gui_cfg->input_offset);
     if (type == part) { 
         draw_icon(IconType::part, IconState::hovered);
     } else {
@@ -1500,8 +1504,9 @@ void GLGizmoEmboss::draw_style_list() {
         const std::string &current_name  = actual_font_item.name;
         trunc_name = ImGuiWrapper::trunc(current_name, max_width);
     }
-
-    ImGui::SetNextItemWidth(m_gui_cfg->style_combobox_width);
+    ImGui::Text("%s", m_gui_cfg->translations.style.c_str());
+    ImGui::SameLine(m_gui_cfg->input_offset);
+    ImGui::SetNextItemWidth(m_gui_cfg->input_width);
     if (ImGui::BeginCombo("##style_selector", trunc_name.c_str())) {
         m_font_manager.init_style_images(m_gui_cfg->max_style_image_width);
         const auto &fonts = m_font_manager.get_fonts();
@@ -1605,51 +1610,57 @@ void GLGizmoEmboss::draw_style_list() {
         }
     }
 
-    if (is_stored && is_changed) {
-        ImGui::SameLine();
-        if (draw_button(IconType::undo)) {
-            bool is_path_changed = font_item.path != m_stored_font_item->path;
+    ImGui::SameLine();
+    bool can_undo = is_stored && is_changed;
+    if (draw_button(IconType::undo, !can_undo)) {
+        bool is_path_changed = font_item.path != m_stored_font_item->path;
             
-            // is rotation changed
-            auto &angle = font_item.prop.angle;
-            const auto &angle_ = m_stored_font_item->prop.angle;
-            // TODO: compare with approx
-            if (angle.has_value() != angle_.has_value() ||
-                (angle.has_value() && !is_approx(*angle, *angle_))) {
-                auto &tc = m_volume->text_configuration;
-                if (m_volume != nullptr && tc.has_value()) {
-                    // change actual text configuration
-                    tc->font_item.prop.angle = angle_;
-                    float act_angle  = angle_.has_value() ? *angle_ : .0f;
-                    float prev_angle = angle.has_value() ? *angle : .0f;
-                    do_rotate(act_angle - prev_angle);
-                }
+        // is rotation changed
+        auto &angle = font_item.prop.angle;
+        const auto &angle_ = m_stored_font_item->prop.angle;
+        // TODO: compare with approx
+        if (angle.has_value() != angle_.has_value() ||
+            (angle.has_value() && !is_approx(*angle, *angle_))) {
+            auto &tc = m_volume->text_configuration;
+            if (m_volume != nullptr && tc.has_value()) {
+                // change actual text configuration
+                tc->font_item.prop.angle = angle_;
+                float act_angle  = angle_.has_value() ? *angle_ : .0f;
+                float prev_angle = angle.has_value() ? *angle : .0f;
+                do_rotate(act_angle - prev_angle);
             }
+        }
             
-            // is distance changed
-            auto &distance = font_item.prop.distance;
-            const auto &distance_ = m_stored_font_item->prop.distance;
-            if (distance.has_value() != distance_.has_value() ||
-                (distance.has_value() && !is_approx(*distance, *distance_))) {
-                auto &tc = m_volume->text_configuration;
-                if (m_volume != nullptr && tc.has_value()) {
-                    tc->font_item.prop.distance = distance_;
-                    float act_distance = distance_.has_value() ? *distance_ : .0f;
-                    float prev_distance = distance.has_value() ? *distance : .0f;
-                    do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
-                }
+        // is distance changed
+        auto &distance = font_item.prop.distance;
+        const auto &distance_ = m_stored_font_item->prop.distance;
+        if (distance.has_value() != distance_.has_value() ||
+            (distance.has_value() && !is_approx(*distance, *distance_))) {
+            auto &tc = m_volume->text_configuration;
+            if (m_volume != nullptr && tc.has_value()) {
+                tc->font_item.prop.distance = distance_;
+                float act_distance = distance_.has_value() ? *distance_ : .0f;
+                float prev_distance = distance.has_value() ? *distance : .0f;
+                do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
             }
+        }
 
-            font_item = *m_stored_font_item;
-            if (is_path_changed) {
-                m_font_manager.get_wx_font() = WxFontUtils::load_wxFont(font_item.path);
-                m_font_manager.wx_font_changed();
-            }
-            m_font_manager.free_style_images();
-            process();
-        } else if (ImGui::IsItemHovered()) 
+        font_item = *m_stored_font_item;
+        if (is_path_changed) {
+            m_font_manager.get_wx_font() = WxFontUtils::load_wxFont(font_item.path);
+            m_font_manager.wx_font_changed();
+        }
+        m_font_manager.free_style_images();
+        process();
+    } else if (ImGui::IsItemHovered()) {
+        if (can_undo)
             ImGui::SetTooltip("%s", _u8L("Reload stored values of selected style").c_str());
+        else if (!is_stored)
+            ImGui::SetTooltip("%s", _u8L("Nothing to reload from").c_str());
+        else if (!is_changed)
+            ImGui::SetTooltip("%s", _u8L("Everything is already restored").c_str());
     }
+    
     
 #ifdef ALLOW_REVERT_ALL_STYLES
     ImGui::SameLine();
@@ -1792,8 +1803,8 @@ bool GLGizmoEmboss::rev_input(const std::string  &name,
 {
     // draw offseted input
     auto draw_offseted_input = [&]()->bool{
-        float input_offset = m_gui_cfg->edit_input_offset;
-        float input_width  = m_gui_cfg->advanced_input_width;
+        float input_offset = m_gui_cfg->input_offset;
+        float input_width  = m_gui_cfg->input_width;
         ImGui::SameLine(input_offset);
         ImGui::SetNextItemWidth(input_width);
         return ImGui::InputFloat(("##" + name).c_str(),
@@ -1844,8 +1855,8 @@ void GLGizmoEmboss::draw_style_edit() {
         ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, tr.font);
     else
         ImGuiWrapper::text(tr.font);
-    ImGui::SameLine(m_gui_cfg->edit_input_offset);
-    ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
+    ImGui::SameLine(m_gui_cfg->input_offset);
+    ImGui::SetNextItemWidth(m_gui_cfg->input_width);
     draw_font_list();
     ImGui::SameLine();
     bool exist_change = false;
@@ -1878,21 +1889,28 @@ void GLGizmoEmboss::draw_style_edit() {
         // size can't be zero or negative
         Limits::apply(font_prop.size_in_mm, limits.size_in_mm);
 
-        // store font size into path
-        if (fi.type == WxFontUtils::get_actual_type()) {
-            if (wx_font.has_value()) {
-                wx_font->SetPointSize(static_cast<int>(font_prop.size_in_mm));
-                m_font_manager.wx_font_changed();
+        // only different value need process
+        if (m_volume != nullptr &&
+            m_volume->text_configuration.has_value() &&
+            !is_approx(font_prop.size_in_mm, m_volume->text_configuration->font_item.prop.size_in_mm)) {
+
+            // store font size into path
+            if (fi.type == WxFontUtils::get_actual_type()) {
+                if (wx_font.has_value()) {
+                    wx_font->SetPointSize(
+                        static_cast<int>(font_prop.size_in_mm));
+                    m_font_manager.wx_font_changed();
+                }
             }
+            process();
         }
-        process();
     }
 
 #ifdef SHOW_WX_WEIGHT_INPUT
     if (wx_font.has_value()) {
         ImGui::Text("%s", "weight");
-        ImGui::SameLine(m_gui_cfg->edit_input_offset);
-        ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
+        ImGui::SameLine(m_gui_cfg->input_offset);
+        ImGui::SetNextItemWidth(m_gui_cfg->input_width);
         int weight     = wx_font->GetNumericWeight();
         int min_weight = 1, max_weight = 1000;
         if (ImGui::SliderInt("##weight", &weight, min_weight, max_weight)) {
@@ -1920,17 +1938,7 @@ void GLGizmoEmboss::draw_style_edit() {
         _u8L("Revert embossed depth."), 0.1f, 0.25, "%.2f mm")) {
         Limits::apply(font_prop.emboss, limits.emboss);
         process();
-    }
-
-    if (ImGui::TreeNode(_u8L("advanced").c_str())) {
-        if (!m_is_advanced_edit_style) {
-            set_minimal_window_size(true, true);
-        } else {
-            draw_advanced();
-        }
-        ImGui::TreePop();
-    } else if (m_is_advanced_edit_style) 
-        set_minimal_window_size(true, false);    
+    }    
 }
 
 bool GLGizmoEmboss::rev_slider(const std::string &name,
@@ -1944,14 +1952,13 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
 {    
     auto draw_slider_optional_int = [&]() -> bool {
         float slider_offset = m_gui_cfg->advanced_input_offset;
-        float slider_width  = m_gui_cfg->advanced_input_width;
+        float slider_width  = m_gui_cfg->input_width;
         ImGui::SameLine(slider_offset);
         ImGui::SetNextItemWidth(slider_width);
         return m_imgui->slider_optional_int( ("##" + name).c_str(), value, 
             v_min, v_max, format.c_str(), 1.f, false, tooltip);
     };
-    float undo_offset = ImGui::GetStyle().FramePadding.x +
-                        ImGui::GetTreeNodeToLabelSpacing();    
+    float undo_offset = ImGui::GetStyle().FramePadding.x;    
     bool exist_change = default_value != nullptr ? (value != *default_value) : false;
     return revertible(name, value, default_value, exist_change, 
         undo_tooltip, undo_offset, draw_slider_optional_int);
@@ -1968,14 +1975,13 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
 {    
     auto draw_slider_optional_float = [&]() -> bool {
         float slider_offset = m_gui_cfg->advanced_input_offset;
-        float slider_width  = m_gui_cfg->advanced_input_width;
+        float slider_width  = m_gui_cfg->input_width;
         ImGui::SameLine(slider_offset);
         ImGui::SetNextItemWidth(slider_width);
         return m_imgui->slider_optional_float(("##" + name).c_str(), value,
             v_min, v_max, format.c_str(), 1.f, false, tooltip);
     };
-    float undo_offset = ImGui::GetStyle().FramePadding.x +
-                        ImGui::GetTreeNodeToLabelSpacing();    
+    float undo_offset = ImGui::GetStyle().FramePadding.x;    
     bool exist_change = (default_value != nullptr)? 
         (!is_approx(value, *default_value)) : false;
     return revertible(name, value, default_value, exist_change,
@@ -1993,14 +1999,13 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
 {    
     auto draw_slider_float = [&]() -> bool {
         float slider_offset = m_gui_cfg->advanced_input_offset;
-        float slider_width  = m_gui_cfg->advanced_input_width;
+        float slider_width  = m_gui_cfg->input_width;
         ImGui::SameLine(slider_offset);
         ImGui::SetNextItemWidth(slider_width);
         return m_imgui->slider_float("##" + name, &value, v_min, v_max,
             format.c_str(), 1.f, false, tooltip);
     };
-    float undo_offset = ImGui::GetStyle().FramePadding.x +
-                        ImGui::GetTreeNodeToLabelSpacing();    
+    float undo_offset = ImGui::GetStyle().FramePadding.x;    
     bool exist_change = default_value != nullptr ? 
         (!is_approx(value, *default_value)) : false;
     return revertible(name, value, default_value, exist_change,
@@ -2134,6 +2139,7 @@ void GLGizmoEmboss::draw_advanced()
     
     // input surface distance
     bool allowe_surface_distance = 
+        m_volume != nullptr &&
         m_volume->text_configuration.has_value() &&
         !m_volume->text_configuration->font_item.prop.use_surface &&
         !is_text_object(m_volume);    
@@ -2190,7 +2196,7 @@ void GLGizmoEmboss::draw_advanced()
     if (font_file->infos.size() > 1) {
         ImGui::Text("%s", tr.collection.c_str());
         ImGui::SameLine(m_gui_cfg->advanced_input_offset);
-        ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
+        ImGui::SetNextItemWidth(m_gui_cfg->input_width);
         unsigned int selected = font_prop.collection_number.has_value() ?
                                *font_prop.collection_number : 0;
         if (ImGui::BeginCombo("## Font collection", std::to_string(selected).c_str())) {
@@ -2234,15 +2240,13 @@ void GLGizmoEmboss::draw_advanced()
 #endif // ALLOW_DEBUG_MODE
 }
 
-void GLGizmoEmboss::set_minimal_window_size(bool is_edit_style,
-                                            bool is_advance_edit_style)
+void GLGizmoEmboss::set_minimal_window_size(bool is_advance_edit_style)
 {
     ImVec2 window_size = ImGui::GetWindowSize();
     const ImVec2& min_win_size_prev = get_minimal_window_size();
     //ImVec2 diff(window_size.x - min_win_size_prev.x,
     //            window_size.y - min_win_size_prev.y);
     float diff_y = window_size.y - min_win_size_prev.y;
-    m_is_edit_style = is_edit_style;
     m_is_advanced_edit_style = is_advance_edit_style;
     const ImVec2 &min_win_size = get_minimal_window_size();
     ImGui::SetWindowSize(ImVec2(0.f, min_win_size.y + diff_y),
@@ -2251,10 +2255,8 @@ void GLGizmoEmboss::set_minimal_window_size(bool is_edit_style,
 
 const ImVec2 &GLGizmoEmboss::get_minimal_window_size() const
 {
-    return (m_is_edit_style) ?
-               ((m_is_advanced_edit_style) ?
-                    m_gui_cfg->minimal_window_size_with_advance :
-                    m_gui_cfg->minimal_window_size_with_edit) :
+    return m_is_advanced_edit_style ?
+               m_gui_cfg->minimal_window_size_with_advance :
                m_gui_cfg->minimal_window_size;
 }
 
