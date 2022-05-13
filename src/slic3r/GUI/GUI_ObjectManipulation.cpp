@@ -460,13 +460,24 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
     m_reset_scale_button = new ScalableButton(parent, wxID_ANY, ScalableBitmap(parent, "undo"));
     m_reset_scale_button->SetToolTip(_L("Reset scale"));
     m_reset_scale_button->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
-        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Reset scale"));
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-        bool old_uniform = m_uniform_scale;
-        m_uniform_scale = true;
-        change_scale_value(0, 100.0);
-        m_uniform_scale = old_uniform;
+        GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
+        Selection& selection = canvas->get_selection();
+        if (selection.is_single_volume_or_modifier())
+            const_cast<GLVolume*>(selection.get_first_volume())->set_volume_scaling_factor(Vec3d::Ones());
+        else if (selection.is_single_full_instance()) {
+            for (unsigned int idx : selection.get_volume_idxs()) {
+                const_cast<GLVolume*>(selection.get_volume(idx))->set_instance_scaling_factor(Vec3d::Ones());
+        }
+        }
+        else
+            return;
+
+        canvas->do_scale(L("Reset scale"));
+
+        UpdateAndShow(true);
 #else
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Reset scale"));
         change_scale_value(0, 100.);
         change_scale_value(1, 100.);
         change_scale_value(2, 100.);
