@@ -105,11 +105,16 @@ public:
 
     // free used memory and font file data
     void free_except_active_font();
+    
+    // init truncated names of styles
+    void init_trunc_names(float max_width);
 
     /// <summary>
-    /// initialization texture with rendered font style
+    /// Initialization texture with rendered font style
     /// </summary>
-    void init_style_images(int max_width);
+    /// <param name="max_size">Maximal width and height of one style texture</param>
+    /// <param name="text">Text to render by style</param>
+    void init_style_images(const Vec2i& max_size, const std::string &text);
     void free_style_images();
     
     struct Item;
@@ -208,9 +213,10 @@ private:
 
         // Keep styles to render
         Items styles;
-
-        // Maximal width in pixels of image
-        int max_width;
+        // Maximal width and height in pixels of image
+        Vec2i max_size;
+        // Text to render
+        std::string text;
 
         /// <summary>
         /// Result of job

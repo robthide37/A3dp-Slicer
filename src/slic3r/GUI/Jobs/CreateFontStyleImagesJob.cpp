@@ -19,7 +19,9 @@ CreateFontStyleImagesJob::CreateFontStyleImagesJob(
 {
     assert(m_input.result != nullptr);
     assert(!m_input.styles.empty());
-    assert(m_input.max_width > 1);
+    assert(!m_input.text.empty());
+    assert(m_input.max_size.x() > 1);
+    assert(m_input.max_size.y() > 1);
 }
 
 void CreateFontStyleImagesJob::process(Ctl &ctl)
@@ -32,7 +34,7 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
     for (auto &item : m_input.styles) {
         size_t index = &item - &m_input.styles.front();
         ExPolygons &shapes = name_shapes[index];
-        shapes = Emboss::text2shapes(item.font, item.text.c_str(), item.prop);
+        shapes = Emboss::text2shapes(item.font, m_input.text.c_str(), item.prop);
 
         // create image description
         FontManager::StyleImage &image = images[index];
@@ -60,8 +62,11 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
         image.tex_size.y = std::ceil(bb2.max.y() - bb2.min.y());
 
         // crop image width
-        if (image.tex_size.x > m_input.max_width) 
-            image.tex_size.x = m_input.max_width;
+        if (image.tex_size.x > m_input.max_size.x()) 
+            image.tex_size.x = m_input.max_size.x();
+        // crop image height
+        if (image.tex_size.y > m_input.max_size.y())
+            image.tex_size.y = m_input.max_size.y();
     }
 
     // arrange bounding boxes
@@ -100,6 +105,8 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
         // copy rastered data to pixels
         sla::RasterEncoder encoder = [&offset = image.offset, &pix = pixels, w=width,h=height]
         (const void *ptr, size_t width, size_t height, size_t num_components) {
+            // bigger value create darker image
+            unsigned char gray_level = 5;
             size_t size {static_cast<size_t>(w*h)};
             assert((offset.x() + width) <= w);
             assert((offset.y() + height) <= h);
@@ -109,7 +116,7 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
                     size_t index = (offset.y() + y)*w + offset.x() + x;
                     assert(index < size);
                     if (index >= size) continue;
-                    pix[index] = ptr2[y * width + x];
+                    pix[index] = ptr2[y * width + x] / gray_level;
                 }
             return sla::EncodedRaster();
         };

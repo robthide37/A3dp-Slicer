@@ -102,7 +102,7 @@ private:
     void draw_delete_style_button();
     void draw_undo_style_button(bool is_stored, bool is_changed);
     void draw_revert_all_styles_button();
-    void draw_rename_style(bool start_rename);
+    void draw_rename_style_botton();
     void draw_font_list();
     void draw_style_edit();
     bool italic_button();
@@ -175,8 +175,8 @@ private:
         float        max_font_name_width              = 0.f;
         unsigned int icon_width                       = 0;
 
-        float min_style_image_height = 0.f;
-        int   max_style_image_width  = 0.f;
+        // maximal width and height of style image
+        Vec2i max_style_image_size = Vec2i(0, 0);
 
         float style_offset          = 0.f;
         float input_offset          = 0.f;

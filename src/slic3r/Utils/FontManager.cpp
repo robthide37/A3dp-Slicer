@@ -344,13 +344,23 @@ ImFont* FontManager::extend_imgui_font_range(size_t index, const std::string& te
     return create_imgui_font(index, text);
 }
 
+
+void FontManager::init_trunc_names(float max_width) { 
+    for (auto &s : m_font_list) {
+        if (s.truncated_name.empty())
+            s.truncated_name = ImGuiWrapper::trunc(s.font_item.name, max_width);
+    }
+}
+
 #include "slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp"
 
 // for access to worker
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp" 
 
-void FontManager::init_style_images(int max_width) {
+void FontManager::init_style_images(const Vec2i &max_size,
+                                    const std::string &text)
+{
     // check already initialized
     if (m_exist_style_images) return;
 
@@ -398,13 +408,13 @@ void FontManager::init_style_images(int max_width) {
     }
 
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    StyleImagesData data{std::move(styles), max_width, m_temp_style_images};
+    StyleImagesData data{std::move(styles), max_size, text, m_temp_style_images};
     queue_job(worker, std::make_unique<CreateFontStyleImagesJob>(std::move(data)));
 }
 
 void FontManager::free_style_images() {
-    if (!is_activ_font()) return;
     if (!m_exist_style_images) return;
+    if (!is_activ_font()) return;
 
     GLuint tex_id = 0;
     

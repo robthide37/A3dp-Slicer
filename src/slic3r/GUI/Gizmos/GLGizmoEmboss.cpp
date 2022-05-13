@@ -654,7 +654,6 @@ void GLGizmoEmboss::initialize()
     if (cfg.icon_width % 2 != 0) ++cfg.icon_width;
 
     float icon_width_with_spacing = cfg.icon_width + space;
-    float scroll_width = icon_width_with_spacing; // TODO: fix it
     cfg.delete_pos_x = cfg.max_font_name_width + space;
     int count_line_of_text = 3;
     cfg.text_size = ImVec2(-FLT_MIN, line_height_with_spacing * count_line_of_text);
@@ -720,9 +719,10 @@ void GLGizmoEmboss::initialize()
         ImVec2(cfg.minimal_window_size.x,
                cfg.minimal_window_size.y + advance_height);
 
-    cfg.min_style_image_height = line_height_with_spacing;
-    cfg.max_style_image_width  = cfg.max_font_name_width -
+    int max_style_image_width = cfg.max_font_name_width -
                                 2 * style.FramePadding.x;
+    int max_style_image_height = 2 * input_height;
+    cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
     m_gui_cfg.emplace(std::move(cfg));
 
     init_icons();
@@ -1359,7 +1359,6 @@ void GLGizmoEmboss::draw_font_list()
     // select font file by file browser
     if (draw_button(IconType::open_file)) {
         if (choose_true_type_file()) { 
-            m_font_manager.free_style_images();
             process();
         }
     } else if (ImGui::IsItemHovered())
@@ -1369,8 +1368,7 @@ void GLGizmoEmboss::draw_font_list()
 #ifdef ALLOW_ADD_FONT_BY_OS_SELECTOR
     ImGui::SameLine();
     if (draw_button(IconType::system_selector)) {
-        if (choose_font_by_wxdialog()) {           
-            m_font_manager.free_style_images();
+        if (choose_font_by_wxdialog()) {
             process();
         }
     } else if (ImGui::IsItemHovered())
@@ -1453,8 +1451,14 @@ void GLGizmoEmboss::draw_model_type()
     }
 }
 
-void GLGizmoEmboss::draw_rename_style(bool start_rename)
+void GLGizmoEmboss::draw_rename_style_botton()
 {
+    bool start_rename = false;
+    if (draw_button(IconType::rename))
+        start_rename = true;
+    else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Rename actual style.").c_str());
+
     std::string title = _u8L("Rename style");
     const char * popup_id = title.c_str();
     static FontItem *  rename_item;
@@ -1493,7 +1497,6 @@ void GLGizmoEmboss::draw_rename_style(bool start_rename)
             m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change)) {
             rename_item->name = new_name;
             m_font_manager.get_truncated_name().clear();
-            m_font_manager.free_style_images();
             ImGui::CloseCurrentPopup();
             select_stored_font_item();
         }
@@ -1600,7 +1603,6 @@ void GLGizmoEmboss::draw_undo_style_button(bool is_stored, bool is_changed)
             m_font_manager.get_wx_font() = WxFontUtils::load_wxFont(font_item.path);
             m_font_manager.wx_font_changed();
         }
-        m_font_manager.free_style_images();
         process();
     } else if (ImGui::IsItemHovered()) {
         if (can_undo)
@@ -1640,7 +1642,8 @@ void GLGizmoEmboss::draw_style_list() {
     ImGui::SameLine(m_gui_cfg->style_offset);
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
     if (ImGui::BeginCombo("##style_selector", trunc_name.c_str())) {
-        m_font_manager.init_style_images(m_gui_cfg->max_style_image_width);
+        m_font_manager.init_style_images(m_gui_cfg->max_style_image_size, m_text);
+        m_font_manager.init_trunc_names(max_width);
         std::optional<std::pair<size_t,size_t>> swap_indexes;
         const std::vector<FontManager::Item> &styles = m_font_manager.get_styles();
         for (const auto &item : styles) {
@@ -1650,18 +1653,11 @@ void GLGizmoEmboss::draw_style_list() {
             ImGui::PushID(actual_style_name.c_str());
             bool is_selected = (&fi == &actual_font_item);
 
-            ImVec2 select_size(0,0); // 0,0 --> calculate in draw
-            std::string selectable_name = "##style_select"; // ## --> no visible
-            if (item.image.has_value()) {
-                const FontManager::StyleImage &img = *item.image;
-                select_size = ImVec2(0.f, std::max(img.tex_size.y, m_gui_cfg->min_style_image_height));            
-            } else {
-                selectable_name = ImGuiWrapper::trunc(actual_style_name, max_width);                
-            }
-
+            ImVec2 select_size(0,m_gui_cfg->max_style_image_size.y()); // 0,0 --> calculate in draw
+            const std::optional<FontManager::StyleImage> img = item.image;            
             // allow click delete button
             ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; 
-            if (ImGui::Selectable(selectable_name.c_str(), is_selected, flags, select_size)) {
+            if (ImGui::Selectable(item.truncated_name.c_str(), is_selected, flags, select_size)) {
                 if (m_font_manager.load_font(index)) { 
                     process();
                     select_stored_font_item();
@@ -1681,10 +1677,9 @@ void GLGizmoEmboss::draw_style_list() {
             }
 
             // draw style name
-            if (item.image.has_value()) {
-                const FontManager::StyleImage &img = *item.image;
+            if (img.has_value()) {
                 ImGui::SameLine();
-                ImGui::Image(img.texture_id, img.tex_size, img.uv0, img.uv1);
+                ImGui::Image(img->texture_id, img->tex_size, img->uv0, img->uv1);
             }
 
             ImGui::PopID();
@@ -1693,15 +1688,15 @@ void GLGizmoEmboss::draw_style_list() {
             m_font_manager.swap(swap_indexes->first,
                                 swap_indexes->second);
         ImGui::EndCombo();
-    }else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Style selector").c_str());    
+    } else {
+        // do not keep in memory style images when no combo box open
+        m_font_manager.free_style_images();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Style selector").c_str());
+    }
         
     ImGui::SameLine();
-    bool start_rename = false;
-    if (draw_button(IconType::rename)) start_rename = true;
-    else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Rename actual style.").c_str());
-    draw_rename_style(start_rename);
+    draw_rename_style_botton();
 
     ImGui::SameLine();
     if (draw_button(IconType::duplicate)) m_font_manager.duplicate();
@@ -1815,7 +1810,6 @@ bool GLGizmoEmboss::bold_button() {
                 // bold font can't be loaded
                 // set up boldness
                 boldness = 20.f;
-                m_font_manager.free_style_images();
                 //font_file->cache.empty();
             }
             return true;
@@ -1952,7 +1946,6 @@ void GLGizmoEmboss::draw_style_edit() {
     }
 
     if (exist_change) {
-        m_font_manager.free_style_images();
         m_font_manager.clear_glyphs_cache();
         process();
     }
@@ -2293,7 +2286,6 @@ void GLGizmoEmboss::draw_advanced()
     }
 
     if (exist_change) {
-        m_font_manager.free_style_images();
         m_font_manager.clear_glyphs_cache();
         process();
     }
