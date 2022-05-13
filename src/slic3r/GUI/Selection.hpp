@@ -436,11 +436,11 @@ private:
     void set_bounding_boxes_dirty() { m_bounding_box.reset(); m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset(); }
     void render_synchronized_volumes();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if ENABLE_WORLD_COORDINATE
     void render_bounding_box(const BoundingBoxf3& box, const Transform3d& trafo, const ColorRGB& color);
 #else
     void render_bounding_box(const BoundingBoxf3& box, const ColorRGB& color);
-#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#endif // ENABLE_WORLD_COORDINATE
 #else
     void render_selected_volumes() const;
     void render_bounding_box(const BoundingBoxf3& box, float* color) const;

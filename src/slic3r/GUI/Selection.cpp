@@ -1725,7 +1725,7 @@ void Selection::render(float scale_factor)
     m_scale_factor = scale_factor;
     // render cumulative bounding box of selected volumes
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if ENABLE_WORLD_COORDINATE
     BoundingBoxf3 box;
     Transform3d trafo;
     const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
@@ -1762,7 +1762,7 @@ void Selection::render(float scale_factor)
     render_bounding_box(box, trafo, ColorRGB::WHITE());
 #else
     render_bounding_box(get_bounding_box(), ColorRGB::WHITE());
-#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#endif // ENABLE_WORLD_COORDINATE
 #else
     render_selected_volumes();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -2477,11 +2477,11 @@ void Selection::render_synchronized_volumes()
     float color[3] = { 1.0f, 1.0f, 0.0f };
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if ENABLE_WORLD_COORDINATE
     const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
     BoundingBoxf3 box;
     Transform3d trafo;
-#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#endif // ENABLE_WORLD_COORDINATE
 
     for (unsigned int i : m_list) {
         const GLVolume& volume = *(*m_volumes)[i];
@@ -2496,7 +2496,7 @@ void Selection::render_synchronized_volumes()
                 continue;
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if ENABLE_WORLD_COORDINATE
             if (coordinates_type == ECoordinatesType::World) {
                 box = v.transformed_convex_hull_bounding_box();
                 trafo = Transform3d::Identity();
@@ -2512,7 +2512,7 @@ void Selection::render_synchronized_volumes()
             render_bounding_box(box, trafo, ColorRGB::YELLOW());
 #else
             render_bounding_box(v.transformed_convex_hull_bounding_box(), ColorRGB::YELLOW());
-#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#endif // ENABLE_WORLD_COORDINATE
 #else
             render_bounding_box(v.transformed_convex_hull_bounding_box(), color);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -2521,11 +2521,11 @@ void Selection::render_synchronized_volumes()
 }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if ENABLE_WORLD_COORDINATE
 void Selection::render_bounding_box(const BoundingBoxf3& box, const Transform3d& trafo, const ColorRGB& color)
 #else
 void Selection::render_bounding_box(const BoundingBoxf3& box, const ColorRGB& color)
-#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#endif // ENABLE_WORLD_COORDINATE
 {
 #else
 void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) const
@@ -2629,32 +2629,32 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
     if (shader == nullptr)
         return;
 
-#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if ENABLE_WORLD_COORDINATE
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(trafo.data()));
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
-#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#endif // ENABLE_WORLD_COORDINATE
 
     shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if ENABLE_WORLD_COORDINATE
     shader->set_uniform("view_model_matrix", camera.get_view_matrix() * trafo);
 #else
     shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#endif // ENABLE_WORLD_COORDINATE
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
     m_box.set_color(to_rgba(color));
     m_box.render();
     shader->stop_using();
 
-#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if ENABLE_WORLD_COORDINATE
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
-#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#endif // ENABLE_WORLD_COORDINATE
 #else
     ::glBegin(GL_LINES);
 
