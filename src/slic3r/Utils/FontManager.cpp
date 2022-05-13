@@ -259,6 +259,8 @@ ImFont *FontManager::get_imgui_font(size_t item_index)
     if (font == nullptr) return nullptr;
     if (!font->IsLoaded()) return nullptr;
     if (font->Scale <= 0.f) return nullptr;
+    // Symbol fonts doesn't have atlas because their glyph range is out of language range
+    if (font->ContainerAtlas == nullptr) return nullptr;
     return font;
 }
 

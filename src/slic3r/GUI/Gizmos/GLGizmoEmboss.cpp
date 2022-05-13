@@ -1139,7 +1139,8 @@ void GLGizmoEmboss::draw_text_input()
     ImFont *imgui_font = m_font_manager.get_imgui_font();
     if (imgui_font == nullptr) {
         // try create new imgui font
-        imgui_font = m_font_manager.create_imgui_font(create_range_text());
+        m_font_manager.create_imgui_font(create_range_text());
+        imgui_font = m_font_manager.get_imgui_font();
     }
     bool exist_font = imgui_font != nullptr;
     assert(!exist_font || imgui_font->IsLoaded());
@@ -1556,15 +1557,15 @@ void GLGizmoEmboss::draw_style_list() {
             }
 
             // delete button
-            ImGui::SameLine(m_gui_cfg->delete_pos_x);
-            if (draw_button(IconType::erase, is_selected) && !is_selected)
-                delete_index = index;
-            if (ImGui::IsItemHovered()) {
-                std::string tooltip = (is_selected)?
-                    GUI::format(_L("Active style \"%1%\" can't be deleted."), actual_style_name) :
-                    GUI::format(_L("Delete \"%1%\" style."), actual_style_name);
-                ImGui::SetTooltip("%s", tooltip.c_str());
-            }
+            //ImGui::SameLine(m_gui_cfg->delete_pos_x);
+            //if (draw_button(IconType::erase, is_selected) && !is_selected)
+            //    delete_index = index;
+            //if (ImGui::IsItemHovered()) {
+            //    std::string tooltip = (is_selected)?
+            //        GUI::format(_L("Active style \"%1%\" can't be deleted."), actual_style_name) :
+            //        GUI::format(_L("Delete \"%1%\" style."), actual_style_name);
+            //    ImGui::SetTooltip("%s", tooltip.c_str());
+            //}
             ImGui::PopID();
         }
 
@@ -1577,8 +1578,8 @@ void GLGizmoEmboss::draw_style_list() {
         ImGui::SetTooltip("%s", _u8L("Style selector").c_str());    
 
     // delete font item
-    if (delete_index.has_value())
-        m_font_manager.erase(*delete_index);
+    //if (delete_index.has_value())
+    //    m_font_manager.erase(*delete_index);
     
     ImGui::SameLine();
     bool start_rename = false;
@@ -1658,9 +1659,8 @@ void GLGizmoEmboss::draw_style_list() {
         else if (!is_stored)
             ImGui::SetTooltip("%s", _u8L("Nothing to reload from").c_str());
         else if (!is_changed)
-            ImGui::SetTooltip("%s", _u8L("Everything is already restored").c_str());
+            ImGui::SetTooltip("%s", _u8L("No change to restore from style").c_str());
     }
-    
     
 #ifdef ALLOW_REVERT_ALL_STYLES
     ImGui::SameLine();
@@ -1677,6 +1677,25 @@ void GLGizmoEmboss::draw_style_list() {
     }else if (ImGui::IsItemHovered()) 
         ImGui::SetTooltip("%s", _u8L("Revert all styles").c_str());
 #endif // ALLOW_REVERT_ALL_STYLES
+
+    // delete font item
+    if (delete_index.has_value()) 
+        m_font_manager.erase(*delete_index);
+
+    // delete button
+    ImGui::SameLine();
+    bool can_delete = false;
+    if (draw_button(IconType::erase, !can_delete)) { 
+        delete_index = 1;
+    }
+    if (ImGui::IsItemHovered()) {
+        std::string style_name = "";
+        std::string tooltip =
+            (can_delete) ?
+                GUI::format(_L("Active style \"%1%\" can't be deleted."), style_name) :
+                GUI::format(_L("Delete \"%1%\" style."), style_name);
+        ImGui::SetTooltip("%s", tooltip.c_str());
+    }
 }
 
 bool GLGizmoEmboss::italic_button()
