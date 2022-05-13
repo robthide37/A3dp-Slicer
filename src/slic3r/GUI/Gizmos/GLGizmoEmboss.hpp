@@ -221,6 +221,7 @@ private:
 
     // Track stored values in AppConfig
     std::optional<FontItem> m_stored_font_item;
+    std::optional<wxFont> m_stored_wx_font; // cache for stored wx font to not create every frame
     std::map<std::string, FontItem> m_stored_font_items;
     void fill_stored_font_items();
     void select_stored_font_item();

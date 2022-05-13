@@ -1014,9 +1014,11 @@ void GLGizmoEmboss::select_stored_font_item()
     const auto &it = m_stored_font_items.find(name);
     if (it == m_stored_font_items.end()) { 
         m_stored_font_item.reset();
+        m_stored_wx_font.reset();
         return;
     }
     m_stored_font_item = it->second;
+    m_stored_wx_font = WxFontUtils::load_wxFont(m_stored_font_item->path);
 }
 
 const ModelVolume * GLGizmoEmboss::get_volume_to_cut_surface_from()
@@ -1865,30 +1867,28 @@ void GLGizmoEmboss::draw_style_edit() {
     if (!wx_font.has_value() && fi.type == WxFontUtils::get_actual_type())
         wx_font = WxFontUtils::load_wxFont(fi.path);
 
-    bool is_font_face_changed = false;
-    bool is_font_style_changed = false;
-    if (m_stored_font_item.has_value() && wx_font.has_value()) {
-        // TODO: cache wx font inside m_stored_font_item
-        std::optional<wxFont> stored_wx_font = WxFontUtils::load_wxFont(m_stored_font_item->path);
-        is_font_face_changed = stored_wx_font->GetFaceName() !=
-                          wx_font->GetFaceName();
+    bool is_font_changed = false;
+    if (m_stored_font_item.has_value() && wx_font.has_value() && m_stored_wx_font.has_value()) {
+        bool is_font_face_changed = m_stored_wx_font->GetFaceName() != wx_font->GetFaceName();
 
         const std::optional<float> &skew = m_font_manager.get_font_prop().skew;
         bool is_italic = skew.has_value() || WxFontUtils::is_italic(*wx_font);
         const std::optional<float> &skew_stored = m_stored_font_item->prop.skew;
-        bool is_stored_italic = skew_stored.has_value() || WxFontUtils::is_italic(*stored_wx_font);
+        bool is_stored_italic = skew_stored.has_value() || WxFontUtils::is_italic(*m_stored_wx_font);
         bool is_italic_changed = is_italic != is_stored_italic;
 
         const std::optional<float> &boldness = m_font_manager.get_font_prop().boldness;
         bool is_bold = boldness.has_value() || WxFontUtils::is_bold(*wx_font);
         const std::optional<float> &boldness_stored = m_stored_font_item->prop.boldness;
-        bool is_stored_bold = boldness_stored.has_value() || WxFontUtils::is_bold(*stored_wx_font);
+        bool is_stored_bold = boldness_stored.has_value() || WxFontUtils::is_bold(*m_stored_wx_font);
         bool is_bold_changed = is_bold != is_stored_bold;
 
-        is_font_style_changed = is_italic_changed || is_bold_changed;
+        bool is_font_style_changed = is_italic_changed || is_bold_changed;
+
+        is_font_changed = is_font_face_changed || is_font_style_changed;
     }
 
-    if (is_font_face_changed)
+    if (is_font_changed)
         ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, tr.font);
     else
         ImGuiWrapper::text(tr.font);
@@ -1901,7 +1901,6 @@ void GLGizmoEmboss::draw_style_edit() {
     ImGui::SameLine();
     exist_change |= bold_button();
     
-    bool is_font_changed = is_font_face_changed || is_font_style_changed;
     if (is_font_changed) {
         ImGui::SameLine(ImGui::GetStyle().FramePadding.x);
         if (draw_button(IconType::undo)) {
