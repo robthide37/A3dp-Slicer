@@ -468,7 +468,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         else if (selection.is_single_full_instance()) {
             for (unsigned int idx : selection.get_volume_idxs()) {
                 const_cast<GLVolume*>(selection.get_volume(idx))->set_instance_scaling_factor(Vec3d::Ones());
-        }
+            }
         }
         else
             return;
@@ -674,16 +674,18 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         if (m_world_coordinates) {
 #endif // ENABLE_WORLD_COORDINATE
             m_new_rotate_label_string = L("Rotate");
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             m_new_scale_label_string = L("Scale");
 #endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_rotation = Vec3d::Zero();
             m_new_size     = selection.get_scaled_instance_bounding_box().size();
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_scale = Vec3d(100.0, 100.0, 100.0);
 #else
-            m_new_scale    = m_new_size.cwiseProduct(selection.get_unscaled_instance_bounding_box().size().cwiseInverse()) * 100.0;
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            m_new_scale    = m_new_size.cwiseQuotient(selection.get_unscaled_instance_bounding_box().size()) * 100.0;
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
         }
         else {
 #if ENABLE_WORLD_COORDINATE
@@ -733,16 +735,22 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
 
             m_new_position = offset;
             m_new_rotate_label_string = L("Rotate");
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             m_new_scale_label_string = L("Scale");
 #endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_rotation = Vec3d::Zero();
             m_new_size = volume->transformed_convex_hull_bounding_box(trafo.get_matrix()).size();
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_scale = Vec3d(100.0, 100.0, 100.0);
 #else
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            m_new_scale = m_new_size.cwiseQuotient(volume->transformed_convex_hull_bounding_box(volume->get_instance_transformation().get_matrix() * volume->get_volume_transformation().get_matrix_no_scaling_factor()).size()) * 100.0;
+#else
             m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_instance_transformation().get_matrix() * volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
         }
         else if (is_local_coordinates()) {
             m_new_move_label_string = L("Translate");
@@ -762,17 +770,23 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
 #endif // ENABLE_WORLD_COORDINATE
         m_new_position = volume->get_volume_offset();
         m_new_rotate_label_string = L("Rotate");
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
         m_new_scale_label_string = L("Scale");
 #endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
         m_new_rotation = Vec3d::Zero();
 #if ENABLE_WORLD_COORDINATE
             m_new_size = volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix()).size();
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_scale = Vec3d(100.0, 100.0, 100.0);
 #else
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            m_new_scale = m_new_size.cwiseQuotient(volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix_no_scaling_factor()).size()) * 100.0;
+#else
             m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
         }
 #else
         m_new_scale    = volume->get_volume_scaling_factor() * 100.0;
@@ -1325,8 +1339,10 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
     else if (is_instance_coordinates())
         transformation_type.set_instance();
 
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
     if (!is_local_coordinates())
         transformation_type.set_relative();
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
     if (!is_world_coordinates())
         transformation_type.set_local();
@@ -1376,8 +1392,10 @@ void ObjectManipulation::do_size(int axis, const Vec3d& scale) const
     else if (is_instance_coordinates())
         transformation_type.set_instance();
 
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
     if (!is_local_coordinates())
         transformation_type.set_relative();
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
     Vec3d scaling_factor = m_uniform_scale ? scale(axis) * Vec3d::Ones() : scale;

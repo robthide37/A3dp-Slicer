@@ -1357,7 +1357,6 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
         if (m_mode == Instance) {
             assert(is_from_fully_selected_instance(i));
             if (transformation_type.absolute()) {
-                assert(transformation_type.local());
                 assert(transformation_type.joint());
                 v.set_instance_transformation(Geometry::assemble_transform(inst_trafo.get_offset_matrix(), inst_trafo.get_rotation_matrix(),
                     Geometry::scale_transform(scale), inst_trafo.get_mirror_matrix()));
@@ -1392,7 +1391,6 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
         }
         else {
             if (transformation_type.absolute()) {
-                assert(transformation_type.local());
                 const Geometry::Transformation& volume_trafo = volume_data.get_volume_transform();
                 v.set_volume_transformation(Geometry::assemble_transform(volume_trafo.get_offset_matrix(), volume_trafo.get_rotation_matrix(),
                     Geometry::scale_transform(scale), volume_trafo.get_mirror_matrix()));
