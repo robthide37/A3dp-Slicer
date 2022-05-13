@@ -335,7 +335,7 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
             return true;
         }
         else if (mouse_event.LeftUp() || is_leaving || is_dragging_finished) {
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
             do_stop_dragging(is_leaving);
 #else
             for (auto &grabber : m_grabbers) grabber.dragging = false;
@@ -360,14 +360,14 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
             m_parent.post_event(SimpleEvent(EVT_GLCANVAS_MOUSE_DRAGGING_FINISHED));
             // updates camera target constraints
             m_parent.refresh_camera_scene_box();
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
             return true;
         }
     }
     return false;
 }
 
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
 void GLGizmoBase::do_stop_dragging(bool perform_mouse_cleanup)
 {
     for (auto& grabber : m_grabbers) grabber.dragging = false;
@@ -393,7 +393,7 @@ void GLGizmoBase::do_stop_dragging(bool perform_mouse_cleanup)
     // updates camera target constraints
     m_parent.refresh_camera_scene_box();
 }
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 
 std::string GLGizmoBase::format(float value, unsigned int decimals) const
 {

@@ -675,17 +675,17 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
 #endif // ENABLE_WORLD_COORDINATE
             m_new_rotate_label_string = L("Rotate");
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
             m_new_scale_label_string = L("Scale");
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 #endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_rotation = Vec3d::Zero();
             m_new_size     = selection.get_scaled_instance_bounding_box().size();
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
-            m_new_scale = Vec3d(100.0, 100.0, 100.0);
+#if ENABLE_WORLD_COORDINATE && !ENABLE_TRANSFORMATIONS_BY_MATRICES
+            m_new_scale    = Vec3d(100.0, 100.0, 100.0);
 #else
             m_new_scale    = m_new_size.cwiseQuotient(selection.get_unscaled_instance_bounding_box().size()) * 100.0;
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE && !ENABLE_TRANSFORMATIONS_BY_MATRICES
         }
         else {
 #if ENABLE_WORLD_COORDINATE
@@ -736,21 +736,15 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
             m_new_position = offset;
             m_new_rotate_label_string = L("Rotate");
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             m_new_scale_label_string = L("Scale");
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 #endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_rotation = Vec3d::Zero();
             m_new_size = volume->transformed_convex_hull_bounding_box(trafo.get_matrix()).size();
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
-            m_new_scale = Vec3d(100.0, 100.0, 100.0);
-#else
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_scale = m_new_size.cwiseQuotient(volume->transformed_convex_hull_bounding_box(volume->get_instance_transformation().get_matrix() * volume->get_volume_transformation().get_matrix_no_scaling_factor()).size()) * 100.0;
 #else
-            m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_instance_transformation().get_matrix() * volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
+            m_new_scale = Vec3d(100.0, 100.0, 100.0);
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
         }
         else if (is_local_coordinates()) {
             m_new_move_label_string = L("Translate");
@@ -771,22 +765,18 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         m_new_position = volume->get_volume_offset();
         m_new_rotate_label_string = L("Rotate");
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
         m_new_scale_label_string = L("Scale");
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 #endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
         m_new_rotation = Vec3d::Zero();
 #if ENABLE_WORLD_COORDINATE
             m_new_size = volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix()).size();
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
-            m_new_scale = Vec3d(100.0, 100.0, 100.0);
-#else
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
             m_new_scale = m_new_size.cwiseQuotient(volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix_no_scaling_factor()).size()) * 100.0;
 #else
-            m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
+            m_new_scale = Vec3d(100.0, 100.0, 100.0);
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED && !ENABLE_TRANSFORMATIONS_BY_MATRICES
         }
 #else
         m_new_scale    = volume->get_volume_scaling_factor() * 100.0;
@@ -861,40 +851,14 @@ void ObjectManipulation::update_if_dirty()
 #if ENABLE_WORLD_COORDINATE
     Selection::EUniformScaleRequiredReason reason;
     if (selection.requires_uniform_scale(&reason)) {
-#else
-    if (selection.requires_uniform_scale()) {
-#endif // ENABLE_WORLD_COORDINATE
-#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-        m_lock_bnt->SetLock(true);
-#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-#if ENABLE_WORLD_COORDINATE
-        wxString tooltip;
-        if (selection.is_single_volume_or_modifier()) {
-#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-            if (reason == Selection::EUniformScaleRequiredReason::VolumeNotAxisAligned_Instance)
-                tooltip = _L("You cannot use non-uniform scaling mode for parts non aligned with the instance local axes");
-            else if (reason == Selection::EUniformScaleRequiredReason::VolumeNotAxisAligned_World)
-                tooltip = _L("You cannot use non-uniform scaling mode for parts non aligned with the printer axes");
-#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-        }
-        else if (selection.is_single_full_instance()) {
-#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-            if (reason == Selection::EUniformScaleRequiredReason::InstanceNotAxisAligned_World)
-                tooltip = _L("You cannot use non-uniform scaling mode for instances non aligned with the printer axes");
-            else if (reason == Selection::EUniformScaleRequiredReason::VolumeNotAxisAligned_Instance)
-                tooltip = _L("You cannot use non-uniform scaling mode for instances containing non locally axis-aligned parts");
-#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-        }
-        else
-            tooltip = _L("You cannot use non-uniform scaling mode for multiple objects/parts selection");
-
+        wxString tooltip = _L("You cannot use non-uniform scaling mode for multiple objects/parts selection");
         m_lock_bnt->SetToolTip(tooltip);
 #else
+    if (selection.requires_uniform_scale()) {
+        m_lock_bnt->SetLock(true);
         m_lock_bnt->SetToolTip(_L("You cannot use non-uniform scaling mode for multiple objects/parts selection"));
-#endif // ENABLE_WORLD_COORDINATE
-#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
         m_lock_bnt->disable();
-#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
     }
     else {
 #endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
@@ -1313,11 +1277,11 @@ void ObjectManipulation::change_size_value(int axis, double value)
             selection.get_unscaled_instance_bounding_box().size() :
             wxGetApp().model().objects[selection.get_first_volume()->object_idx()]->raw_mesh_bounding_box().size();
 
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
     this->do_size(axis, size.cwiseQuotient(ref_size));
 #else
     this->do_scale(axis, size.cwiseQuotient(ref_size));
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 
     m_cache.size = size;
 	m_cache.size_rounded(axis) = DBL_MAX;
@@ -1333,24 +1297,17 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
 
 #if ENABLE_WORLD_COORDINATE
     TransformationType transformation_type;
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
     if (is_local_coordinates())
         transformation_type.set_local();
     else if (is_instance_coordinates())
         transformation_type.set_instance();
 
-#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
-    if (!is_local_coordinates())
-        transformation_type.set_relative();
-#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
-#else
-    if (!is_world_coordinates())
-        transformation_type.set_local();
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
     Vec3d scaling_factor = m_uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
 #else
+    if (!is_local_coordinates())
+        transformation_type.set_relative();
+
     bool uniform_scale = m_uniform_scale || selection.requires_uniform_scale();
     Vec3d scaling_factor = uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
 
@@ -1381,7 +1338,7 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
     wxGetApp().plater()->canvas3D()->do_scale(L("Set Scale"));
 }
 
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
 void ObjectManipulation::do_size(int axis, const Vec3d& scale) const
 {
     Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
@@ -1418,7 +1375,7 @@ void ObjectManipulation::do_size(int axis, const Vec3d& scale) const
     selection.scale(scaling_factor, transformation_type);
     wxGetApp().plater()->canvas3D()->do_scale(L("Set Size"));
 }
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 
 void ObjectManipulation::on_change(const std::string& opt_key, int axis, double new_value)
 {
@@ -1457,7 +1414,7 @@ void ObjectManipulation::on_change(const std::string& opt_key, int axis, double 
 void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
 { 
     const Selection &selection = wxGetApp().plater()->canvas3D()->get_selection();
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
     if (!use_uniform_scale) {
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES
         int res = selection.bake_transform_if_needed();
@@ -1478,11 +1435,7 @@ void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
     set_dirty();
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
-#if ENABLE_WORLD_COORDINATE
-    if (selection.is_single_full_instance() && is_world_coordinates() && !use_uniform_scale) {
-#else
     if (selection.is_single_full_instance() && m_world_coordinates && !use_uniform_scale) {
-#endif // ENABLE_WORLD_COORDINATE
         // Verify whether the instance rotation is multiples of 90 degrees, so that the scaling in world coordinates is possible.
         // all volumes in the selection belongs to the same instance, any of them contains the needed instance data, so we take the first one
         const GLVolume* volume = selection.get_first_volume();
@@ -1513,7 +1466,7 @@ void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
     }
 
     m_uniform_scale = use_uniform_scale;
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 #if ENABLE_WORLD_COORDINATE

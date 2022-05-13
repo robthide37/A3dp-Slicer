@@ -1425,11 +1425,11 @@ void ModelObject::bake_xy_rotation_into_meshes(size_t instance_idx)
     assert(instance_idx < this->instances.size());
 
 	const Geometry::Transformation reference_trafo = this->instances[instance_idx]->get_transformation();
-#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if !ENABLE_WORLD_COORDINATE
     if (Geometry::is_rotation_ninety_degrees(reference_trafo.get_rotation()))
         // nothing to do, scaling in the world coordinate space is possible in the representation of Geometry::Transformation.
         return;
-#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // !ENABLE_WORLD_COORDINATE
 
     bool   left_handed        = reference_trafo.is_left_handed();
     bool   has_mirrorring     = ! reference_trafo.get_mirror().isApprox(Vec3d(1., 1., 1.));

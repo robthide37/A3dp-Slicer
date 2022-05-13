@@ -263,11 +263,9 @@ private:
     void change_scale_value(int axis, double value);
     void change_size_value(int axis, double value);
     void do_scale(int axis, const Vec3d &scale) const;
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-    void do_size(int axis, const Vec3d& scale) const;
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-
 #if ENABLE_WORLD_COORDINATE
+    void do_size(int axis, const Vec3d& scale) const;
+
     void set_coordinates_type(const wxString& type_string);
 #endif // ENABLE_WORLD_COORDINATE
 };

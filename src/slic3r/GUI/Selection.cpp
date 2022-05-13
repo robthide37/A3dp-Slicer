@@ -10,9 +10,9 @@
 #include "Camera.hpp"
 #include "Plater.hpp"
 
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
 #include "MsgDialog.hpp"
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 
 #include "Gizmos/GLGizmoBase.hpp"
 
@@ -1559,7 +1559,7 @@ void Selection::translate(unsigned int object_idx, unsigned int instance_idx, co
     this->set_bounding_boxes_dirty();
 }
 
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
 int Selection::bake_transform_if_needed() const
 {
     if ((is_single_full_instance() && wxGetApp().obj_manipul()->is_world_coordinates()) ||
@@ -1610,7 +1610,7 @@ int Selection::bake_transform_if_needed() const
 
     return 1;
 }
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 
 void Selection::erase()
 {

@@ -80,7 +80,7 @@ bool GLGizmoScale3D::on_mouse(const wxMouseEvent &mouse_event)
     if (mouse_event.Dragging()) {
         if (m_dragging) {
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
             int res = 1;
             if (m_scale.x() != m_scale.y() || m_scale.x() != m_scale.z())
                 res = m_parent.get_selection().bake_transform_if_needed();
@@ -90,7 +90,7 @@ bool GLGizmoScale3D::on_mouse(const wxMouseEvent &mouse_event)
                 return true;
             }
             else {
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 #endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
             // Apply new temporary scale factors
 #if ENABLE_WORLD_COORDINATE
@@ -123,9 +123,9 @@ bool GLGizmoScale3D::on_mouse(const wxMouseEvent &mouse_event)
 #endif // ENABLE_WORLD_COORDINATE
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-            }
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
+        }
+#endif // ENABLE_WORLD_COORDINATE
 #endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
         }
     }
@@ -138,9 +138,6 @@ void GLGizmoScale3D::data_changed()
     const Selection &selection = m_parent.get_selection();
 #endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if ENABLE_WORLD_COORDINATE
-#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-    bool enable_scale_xyz = !selection.requires_uniform_scale();
-#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 #else
     bool             enable_scale_xyz = selection.is_single_full_instance() ||
                             selection.is_single_volume() ||
@@ -149,24 +146,28 @@ void GLGizmoScale3D::data_changed()
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
     set_scale(Vec3d::Ones());
 #else
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
     if (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) {
 #else
     for (unsigned int i = 0; i < 6; ++i)
         m_grabbers[i].enabled = enable_scale_xyz;
 
     if (enable_scale_xyz) {
+#endif // ENABLE_WORLD_COORDINATE
         // all volumes in the selection belongs to the same instance, any of
         // them contains the needed data, so we take the first
         const GLVolume* volume = selection.get_first_volume();
         if (selection.is_single_full_instance())
             set_scale(volume->get_instance_scaling_factor());
+#if ENABLE_WORLD_COORDINATE
+        else if (selection.is_single_volume_or_modifier())
+#else
         else if (selection.is_single_volume() || selection.is_single_modifier())
+#endif // ENABLE_WORLD_COORDINATE
             set_scale(volume->get_volume_scaling_factor());
     }
     else
         set_scale(Vec3d::Ones());
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 }
 
