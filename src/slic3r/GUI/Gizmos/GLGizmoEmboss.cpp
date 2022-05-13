@@ -186,7 +186,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
 
     Emboss::FontFileWithCache font;
     if (m_font_manager.is_activ_font())
-        font = m_font_manager.get_font().font_file_with_cache;
+        font = m_font_manager.get_activ_style().font_file_with_cache;
 
     EmbossDataBase base{font, create_configuration(), create_volume_name()};
     EmbossDataCreateObject data{std::move(base),
@@ -564,16 +564,19 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
                ImGuiWindowFlags_NoCollapse
         ;
     bool is_open = true;
-    if (ImGui::Begin(on_get_name().c_str(), &is_open, flag))
+    if (ImGui::Begin(on_get_name().c_str(), &is_open, flag)) {
+        // Need to pop var before draw window
+        ImGui::PopStyleVar(); // WindowMinSize
         draw_window();
+    } else {
+        ImGui::PopStyleVar(); // WindowMinSize
+    }
     ImGui::End();
 
     // close button in header was hit
     if (!is_open) { 
         close();     
     }
-
-    ImGui::PopStyleVar(); // WindowMinSize
 }
 
 void GLGizmoEmboss::on_set_state()
@@ -812,7 +815,7 @@ bool GLGizmoEmboss::start_volume_creation(ModelVolumeType volume_type,
     // create volume
     auto &worker = plater->get_ui_job_worker(); 
     
-    const Emboss::FontFileWithCache& font = m_font_manager.get_font().font_file_with_cache;
+    const Emboss::FontFileWithCache& font = m_font_manager.get_activ_style().font_file_with_cache;
     EmbossDataBase base{font, create_configuration(), create_volume_name()};
     EmbossDataCreateVolume data{std::move(base),
                                 volume_type,
@@ -915,7 +918,7 @@ bool GLGizmoEmboss::process()
 
     // exist loaded font
     if (!m_font_manager.is_activ_font()) return false;
-    Emboss::FontFileWithCache font = m_font_manager.get_font().font_file_with_cache;
+    Emboss::FontFileWithCache font = m_font_manager.get_activ_style().font_file_with_cache;
     assert(font.has_value());
     if (!font.has_value()) return false;    
     
@@ -996,8 +999,7 @@ void GLGizmoEmboss::close()
 void GLGizmoEmboss::fill_stored_font_items()
 {
     m_stored_font_items.clear();
-    const auto& fonts = m_font_manager.get_fonts();
-    for (const auto &item : fonts) {
+    for (const auto &item : m_font_manager.get_styles()) {
         const FontItem &fi = item.font_item;
         // skip file paths + fonts from other OS(loaded from .3mf)
         if (fi.type != WxFontUtils::get_actual_type()) continue;
@@ -1470,7 +1472,7 @@ void GLGizmoEmboss::draw_rename_style(bool start_rename)
         ImGui::Text("%s", text_in_popup.c_str());
 
         bool is_unique = true;
-        for (const auto &item : m_font_manager.get_fonts()) {
+        for (const auto &item : m_font_manager.get_styles()) {
             const FontItem &fi = item.font_item;
             if (&fi == rename_item)
                 continue; // could be same as original name
@@ -1499,126 +1501,66 @@ void GLGizmoEmboss::draw_rename_style(bool start_rename)
     }
 }
 
-void GLGizmoEmboss::draw_style_list() {
-    if (!m_font_manager.is_activ_font()) return;
-    const float &max_width = m_gui_cfg->max_font_name_width;
-    std::optional<size_t> delete_index;
-    const FontItem &actual_font_item = m_font_manager.get_font_item();
-    std::string &trunc_name = m_font_manager.get_truncated_name();
-    if (trunc_name.empty()) {
-        // generate trunc name
-        const std::string &current_name  = actual_font_item.name;
-        trunc_name = ImGuiWrapper::trunc(current_name, max_width);
-    }
-    ImGui::Text("%s", m_gui_cfg->translations.style.c_str());
-    ImGui::SameLine(m_gui_cfg->style_offset);
-    ImGui::SetNextItemWidth(m_gui_cfg->input_width);
-    if (ImGui::BeginCombo("##style_selector", trunc_name.c_str())) {
-        m_font_manager.init_style_images(m_gui_cfg->max_style_image_width);
-        const auto &fonts = m_font_manager.get_fonts();
-        std::optional<std::pair<size_t,size_t>> swap_indexes;
-        for (const auto &item : fonts) {
-            size_t             index             = &item - &fonts.front();
-            const FontItem &   fi                = item.font_item;
-            const std::string &actual_style_name = fi.name;
-            ImGui::PushID(actual_style_name.c_str());
-            bool is_selected = (&fi == &actual_font_item);
-
-            ImVec2 select_size(0,0); // 0,0 --> calculate in draw
-            std::string selectable_name = "##style_select"; // ## --> no visible
-            if (item.image.has_value()) {
-                const FontManager::StyleImage &img = *item.image;
-                select_size = ImVec2(0.f, std::max(img.tex_size.y, m_gui_cfg->min_style_image_height));            
-            } else {
-                selectable_name = ImGuiWrapper::trunc(actual_style_name, max_width);                
+void GLGizmoEmboss::draw_delete_style_button() {
+    const std::vector<FontManager::Item> &styles = m_font_manager.get_styles();    
+    bool can_delete = styles.size() > 1;
+    std::string title = _u8L("Remove style");
+    const char * popup_id = title.c_str();
+    static size_t next_style_index = std::numeric_limits<size_t>::max();
+    if (draw_button(IconType::erase, !can_delete)) {
+        while (true) {
+            const FontManager::Item &style = m_font_manager.get_activ_style();
+            size_t activ_index = &style - &styles.front();
+            next_style_index = (activ_index > 0) ? activ_index - 1 :
+                                                   activ_index + 1;
+            if (next_style_index >= styles.size()) {
+                // can't remove last font style
+                break;
+            }
+            // clean unactivable styles
+            if (!m_font_manager.load_font(next_style_index)) {
+                m_font_manager.erase(next_style_index);
+                continue;
             }
 
-            // allow click delete button
-            ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; 
-            if (ImGui::Selectable(selectable_name.c_str(), is_selected, flags, select_size)) {
-                if (m_font_manager.load_font(index)) { 
-                    process();
-                    select_stored_font_item();
-                }
-            } else if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", actual_style_name.c_str());
-
-            // reorder items
-            if (ImGui::IsItemActive() && !ImGui::IsItemHovered()) {
-                if (ImGui::GetMouseDragDelta(0).y < 0.f) {
-                    if (index > 0) 
-                        swap_indexes = {index, index - 1};
-                } else if ((index + 1) < fonts.size())
-                    swap_indexes = {index, index + 1};
-                if (swap_indexes.has_value()) 
-                    ImGui::ResetMouseDragDelta();
-            }
-
-            // draw style name
-            if (item.image.has_value()) {
-                const FontManager::StyleImage &img = *item.image;
-                ImGui::SameLine();
-                ImGui::Image(img.texture_id, img.tex_size, img.uv0, img.uv1);
-            }
-
-            // delete button
-            //ImGui::SameLine(m_gui_cfg->delete_pos_x);
-            //if (draw_button(IconType::erase, is_selected) && !is_selected)
-            //    delete_index = index;
-            //if (ImGui::IsItemHovered()) {
-            //    std::string tooltip = (is_selected)?
-            //        GUI::format(_L("Active style \"%1%\" can't be deleted."), actual_style_name) :
-            //        GUI::format(_L("Delete \"%1%\" style."), actual_style_name);
-            //    ImGui::SetTooltip("%s", tooltip.c_str());
-            //}
-            ImGui::PopID();
-        }
-
-        if (swap_indexes.has_value()) 
-            m_font_manager.swap(swap_indexes->first,
-                                swap_indexes->second);
-
-        ImGui::EndCombo();
-    }else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Style selector").c_str());    
-
-    // delete font item
-    //if (delete_index.has_value())
-    //    m_font_manager.erase(*delete_index);
-    
-    ImGui::SameLine();
-    bool start_rename = false;
-    if (draw_button(IconType::rename)) start_rename = true;
-    else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Rename actual style.").c_str());
-    draw_rename_style(start_rename);
-
-    ImGui::SameLine();
-    if (draw_button(IconType::duplicate)) m_font_manager.duplicate();
-    else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Duplicate style.").c_str());
-    
-    // Is style changed against stored one
-    FontItem &font_item  = m_font_manager.get_font_item();
-    bool is_stored  = m_stored_font_item.has_value();
-    bool is_changed = (is_stored) ? !(*m_stored_font_item == font_item) : true;
-    // TODO: check order of font items in list to allowe save actual order
-
-    ImGui::SameLine();
-    if (draw_button(IconType::save, !is_changed)) {
-        // save styles to app config
-        store_font_list_to_app_config();
-    }else if (ImGui::IsItemHovered()) { 
-        if (is_changed) {
-            ImGui::SetTooltip("%s", _u8L("Save current settings to selected style").c_str());
-        } else {
-            ImGui::SetTooltip("%s", _u8L("No changes to save into style").c_str());
+            // load back
+            m_font_manager.load_font(activ_index);
+            ImGui::OpenPopup(popup_id);
+            break;
         }
     }
+    if (ImGui::IsItemHovered()) {
+        const FontManager::Item &style = m_font_manager.get_activ_style();
+        std::string style_name = style.font_item.name;
+        std::string tooltip = GUI::format(_L("Delete \"%1%\" style."), style_name);
+        ImGui::SetTooltip("%s", tooltip.c_str());
+    }
 
-    ImGui::SameLine();
+    if (ImGui::BeginPopupModal(popup_id)) {
+        const FontManager::Item &style = m_font_manager.get_activ_style();
+        std::string style_name = style.font_item.name;
+        std::string text_in_popup = GUI::format(_u8L("Are you sure,\nthat you want permanently and unrecoverable \nremove style \"%1%\"?"), style_name);
+        ImGui::Text("%s", text_in_popup.c_str());
+        if (ImGui::Button(_u8L("Yes").c_str())) {
+            m_font_manager.load_font(next_style_index);
+            size_t activ_index = &style - &styles.front();
+            m_font_manager.erase(activ_index);
+            store_font_list_to_app_config();
+            ImGui::CloseCurrentPopup();
+            process();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(_u8L("No").c_str()))
+            ImGui::CloseCurrentPopup();        
+        ImGui::EndPopup();
+    }
+}
+
+void GLGizmoEmboss::draw_undo_style_button(bool is_stored, bool is_changed)
+{
     bool can_undo = is_stored && is_changed;
     if (draw_button(IconType::undo, !can_undo)) {
+        FontItem &font_item  = m_font_manager.get_font_item();
         bool is_path_changed = font_item.path != m_stored_font_item->path;
             
         // is rotation changed
@@ -1666,41 +1608,133 @@ void GLGizmoEmboss::draw_style_list() {
         else if (!is_changed)
             ImGui::SetTooltip("%s", _u8L("No change to restore from style").c_str());
     }
-    
-#ifdef ALLOW_REVERT_ALL_STYLES
-    ImGui::SameLine();
+}
+
+void GLGizmoEmboss::draw_revert_all_styles_button() {
     if (draw_button(IconType::revert_all)) {
         m_font_manager     = FontManager(m_imgui->get_glyph_ranges());
         FontList font_list = create_default_font_list();
         m_font_manager.add_fonts(font_list);
         // What to do when NO one default font is loadable?
-        [[maybe_unused]]
-        bool success = m_font_manager.load_first_valid_font();
+        [[maybe_unused]] bool success = m_font_manager.load_first_valid_font();
         assert(success);
         select_stored_font_item();
         process();
-    }else if (ImGui::IsItemHovered()) 
+    } else if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Revert all styles").c_str());
-#endif // ALLOW_REVERT_ALL_STYLES
+}
 
-    // delete font item
-    if (delete_index.has_value()) 
-        m_font_manager.erase(*delete_index);
+void GLGizmoEmboss::draw_style_list() {
+    if (!m_font_manager.is_activ_font()) return;
+    const float &max_width = m_gui_cfg->max_font_name_width;
+    const FontItem &actual_font_item = m_font_manager.get_font_item();
+    std::string &trunc_name = m_font_manager.get_truncated_name();
+    if (trunc_name.empty()) {
+        // generate trunc name
+        const std::string &current_name  = actual_font_item.name;
+        trunc_name = ImGuiWrapper::trunc(current_name, max_width);
+    }
+    ImGui::Text("%s", m_gui_cfg->translations.style.c_str());
+    ImGui::SameLine(m_gui_cfg->style_offset);
+    ImGui::SetNextItemWidth(m_gui_cfg->input_width);
+    if (ImGui::BeginCombo("##style_selector", trunc_name.c_str())) {
+        m_font_manager.init_style_images(m_gui_cfg->max_style_image_width);
+        std::optional<std::pair<size_t,size_t>> swap_indexes;
+        const std::vector<FontManager::Item> &styles = m_font_manager.get_styles();
+        for (const auto &item : styles) {
+            size_t             index             = &item - &styles.front();
+            const FontItem &   fi                = item.font_item;
+            const std::string &actual_style_name = fi.name;
+            ImGui::PushID(actual_style_name.c_str());
+            bool is_selected = (&fi == &actual_font_item);
+
+            ImVec2 select_size(0,0); // 0,0 --> calculate in draw
+            std::string selectable_name = "##style_select"; // ## --> no visible
+            if (item.image.has_value()) {
+                const FontManager::StyleImage &img = *item.image;
+                select_size = ImVec2(0.f, std::max(img.tex_size.y, m_gui_cfg->min_style_image_height));            
+            } else {
+                selectable_name = ImGuiWrapper::trunc(actual_style_name, max_width);                
+            }
+
+            // allow click delete button
+            ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; 
+            if (ImGui::Selectable(selectable_name.c_str(), is_selected, flags, select_size)) {
+                if (m_font_manager.load_font(index)) { 
+                    process();
+                    select_stored_font_item();
+                }
+            } else if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", actual_style_name.c_str());
+
+            // reorder items
+            if (ImGui::IsItemActive() && !ImGui::IsItemHovered()) {
+                if (ImGui::GetMouseDragDelta(0).y < 0.f) {
+                    if (index > 0) 
+                        swap_indexes = {index, index - 1};
+                } else if ((index + 1) < styles.size())
+                    swap_indexes = {index, index + 1};
+                if (swap_indexes.has_value()) 
+                    ImGui::ResetMouseDragDelta();
+            }
+
+            // draw style name
+            if (item.image.has_value()) {
+                const FontManager::StyleImage &img = *item.image;
+                ImGui::SameLine();
+                ImGui::Image(img.texture_id, img.tex_size, img.uv0, img.uv1);
+            }
+
+            ImGui::PopID();
+        }
+        if (swap_indexes.has_value()) 
+            m_font_manager.swap(swap_indexes->first,
+                                swap_indexes->second);
+        ImGui::EndCombo();
+    }else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Style selector").c_str());    
+        
+    ImGui::SameLine();
+    bool start_rename = false;
+    if (draw_button(IconType::rename)) start_rename = true;
+    else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Rename actual style.").c_str());
+    draw_rename_style(start_rename);
+
+    ImGui::SameLine();
+    if (draw_button(IconType::duplicate)) m_font_manager.duplicate();
+    else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Duplicate style.").c_str());
+    
+    // Is style changed against stored one
+    FontItem &font_item  = m_font_manager.get_font_item();
+    bool is_stored  = m_stored_font_item.has_value();
+    bool is_changed = (is_stored) ? !(*m_stored_font_item == font_item) : true;
+    // TODO: check order of font items in list to allowe save actual order
+
+    ImGui::SameLine();
+    if (draw_button(IconType::save, !is_changed)) {
+        // save styles to app config
+        store_font_list_to_app_config();
+    }else if (ImGui::IsItemHovered()) { 
+        if (is_changed) {
+            ImGui::SetTooltip("%s", _u8L("Save current settings to selected style").c_str());
+        } else {
+            ImGui::SetTooltip("%s", _u8L("No changes to save into style").c_str());
+        }
+    }
+
+    ImGui::SameLine();
+    draw_undo_style_button(is_stored, is_changed);    
+    
+#ifdef ALLOW_REVERT_ALL_STYLES
+    ImGui::SameLine();
+    draw_revert_all_styles_button();
+#endif // ALLOW_REVERT_ALL_STYLES
 
     // delete button
     ImGui::SameLine();
-    bool can_delete = false;
-    if (draw_button(IconType::erase, !can_delete)) { 
-        delete_index = 1;
-    }
-    if (ImGui::IsItemHovered()) {
-        std::string style_name = "";
-        std::string tooltip =
-            (can_delete) ?
-                GUI::format(_L("Active style \"%1%\" can't be deleted."), style_name) :
-                GUI::format(_L("Delete \"%1%\" style."), style_name);
-        ImGui::SetTooltip("%s", tooltip.c_str());
-    }
+    draw_delete_style_button();
 }
 
 bool GLGizmoEmboss::italic_button()
@@ -2099,7 +2133,7 @@ void GLGizmoEmboss::draw_advanced()
 
 #ifdef SHOW_FONT_FILE_PROPERTY
     ImGui::SameLine();
-    auto& ff = m_font_manager.get_font().font_file_with_cache;
+    auto& ff = m_font_manager.get_activ_style().font_file_with_cache;
     int cache_size = ff.has_value()? (int)ff.cache->size() : 0;
     std::string ff_property = 
         "ascent=" + std::to_string(font_info.ascent) +
@@ -2442,18 +2476,18 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
         const FontItem &fi = font_item.font_item;
         return fi.path == c_font_item.path && fi.prop == c_font_item.prop;
     };
-    const auto& fonts = m_font_manager.get_fonts();
-    auto it = std::find_if(fonts.begin(), fonts.end(), is_config);
-    bool found_font = it != fonts.end();
+    const auto& styles = m_font_manager.get_styles();
+    auto it = std::find_if(styles.begin(), styles.end(), is_config);
+    bool found_font = it != styles.end();
     size_t font_index;
     if (!found_font) {
         // font is not in list
         // add font to list
-        font_index = fonts.size();
+        font_index = styles.size();
         m_font_manager.add_font(c_font_item);        
     } else {
         // font is found in list
-        font_index = it - fonts.begin();
+        font_index = it - styles.begin();
     }
 
     m_text      = configuration.text;
@@ -2685,16 +2719,16 @@ void GLGizmoEmboss::store_font_list_to_app_config()
 {
     AppConfig *cfg   = wxGetApp().app_config;
     unsigned   index = 1;
-    const auto& fonts = m_font_manager.get_fonts();
+    const auto& styles = m_font_manager.get_styles();
 
     // store actual font index
-    size_t activ_index = &m_font_manager.get_font() - &fonts.front();
+    size_t activ_index = &m_font_manager.get_activ_style() - &styles.front();
     cfg->clear_section(AppConfig::SECTION_FONT);
     // activ font first index is +1 to correspond with section name
     std::string activ_font = std::to_string(activ_index + 1);
     cfg->set(AppConfig::SECTION_FONT, APP_CONFIG_ACTIVE_FONT, activ_font);
 
-    for (const auto& item : fonts) {
+    for (const auto &item : styles) {
         const FontItem &fi = item.font_item;
         // skip file paths + fonts from other OS(loaded from .3mf)
         if (fi.type != WxFontUtils::get_actual_type()) continue;
@@ -2726,10 +2760,10 @@ bool GLGizmoEmboss::is_text_object(const ModelVolume *text) {
 //{
 //    AppConfig *cfg = wxGetApp().app_config;
 //    // index of section start from 1
-//    const auto &act_item = m_font_manager.get_font();
+//    const auto &act_item = m_font_manager.get_activ_style();
 //    const FontItem &fi = act_item.font_item;
 //
-//    //size_t index = &m_font_manager.get_font() -
+//    //size_t index = &m_font_manager.get_activ_style() -
 //    //               &m_font_manager.get_fonts().front();
 //    // fix index when, not serialized font is in list
 //    size_t index = 0;

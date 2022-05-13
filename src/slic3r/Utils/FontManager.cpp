@@ -275,12 +275,12 @@ void FontManager::free_except_active_font() {
     }
 }
 
-const std::vector<FontManager::Item> &FontManager::get_fonts() const
+const std::vector<FontManager::Item> &FontManager::get_styles() const
 {
     return m_font_list;
 }
 
-const FontManager::Item &FontManager::get_font() const
+const FontManager::Item &FontManager::get_activ_style() const
 {
     return m_font_list[m_font_selected];
 }

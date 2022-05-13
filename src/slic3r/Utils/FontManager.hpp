@@ -113,9 +113,9 @@ public:
     void free_style_images();
     
     struct Item;
-    // access to all managed fonts
-    const std::vector<Item> &get_fonts() const;
-    const Item &get_font() const;
+    // access to all managed font styles
+    const std::vector<Item> &get_styles() const;
+    const Item &get_activ_style() const; // TODO: rename to style
 
     /// <summary>
     /// Describe image in GPU to show settings of style
