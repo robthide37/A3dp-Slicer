@@ -1532,7 +1532,9 @@ void GLGizmoEmboss::draw_delete_style_button() {
     if (ImGui::IsItemHovered()) {
         const FontManager::Item &style = m_font_manager.get_activ_style();
         std::string style_name = style.font_item.name;
-        std::string tooltip = GUI::format(_L("Delete \"%1%\" style."), style_name);
+        std::string tooltip = can_delete ?            
+            GUI::format(_L("Delete \"%1%\" style."), style_name) :
+            GUI::format(_L("Can't delete \"%1%\". It is last style."), style_name) ;
         ImGui::SetTooltip("%s", tooltip.c_str());
     }
 
