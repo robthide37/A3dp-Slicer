@@ -742,7 +742,11 @@ public:
 
     void update_volumes_colors_by_extruder();
 
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    bool is_dragging() const { return m_gizmos.is_dragging() || (m_moving && !m_mouse.scene_position.isApprox(m_mouse.drag.start_position_3D)); }
+#else
     bool is_dragging() const { return m_gizmos.is_dragging() || m_moving; }
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
     void render();
     // printable_only == false -> render also non printable volumes as grayed
