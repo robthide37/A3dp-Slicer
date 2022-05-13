@@ -22,7 +22,7 @@ bool build_tree(PointCloud &nodes, Builder &builder)
         ptsqueue.pop();
 
         Node node = nodes.get(node_id);
-        nodes.remove_node(node_id);
+        nodes.mark_unreachable(node_id);
 
         distances.clear();
         distances.reserve(nodes.reachable_count());
@@ -53,10 +53,21 @@ bool build_tree(PointCloud &nodes, Builder &builder)
             switch (type) {
             case BED: {
                 closest_node.weight = w;
-                if ((routed = builder.add_ground_bridge(node, closest_node))) {
+                if (closest_it->distance > nodes.properties().max_branch_length()) {
+                    auto hl_br_len = float(nodes.properties().max_branch_length()) / 2.f;
+                    Node new_node {{node.pos.x(), node.pos.y(), node.pos.z() - hl_br_len}, node.Rmin};
+                    new_node.id = int(nodes.next_junction_id());
+                    new_node.weight = nodes.get(node_id).weight + nodes.properties().max_branch_length();
+                    new_node.left = node.id;
+                    if ((routed = builder.add_bridge(node, new_node))) {
+                        size_t new_idx = nodes.insert_junction(new_node);
+                        ptsqueue.push(new_idx);
+                    }
+                }
+                else if ((routed = builder.add_ground_bridge(node, closest_node))) {
                     closest_node.left = closest_node.right = node_id;
                     nodes.get(closest_node_id) = closest_node;
-                    nodes.remove_node(closest_node_id);
+                    nodes.mark_unreachable(closest_node_id);
                 }
 
                 break;
@@ -66,12 +77,12 @@ bool build_tree(PointCloud &nodes, Builder &builder)
                 if ((routed = builder.add_mesh_bridge(node, closest_node))) {
                     closest_node.left = closest_node.right = node_id;
                     nodes.get(closest_node_id) = closest_node;
-                    nodes.remove_node(closest_node_id);
+                    nodes.mark_unreachable(closest_node_id);
                 }
 
                 break;
             }
-            case SUPP:
+            case LEAF:
             case JUNCTION: {
                 auto max_slope = float(properties.max_slope());
 
@@ -96,7 +107,7 @@ bool build_tree(PointCloud &nodes, Builder &builder)
                             size_t new_idx = nodes.insert_junction(mergenode);
                             ptsqueue.push(new_idx);
                             ptsqueue.remove(nodes.get_queue_idx(closest_node_id));
-                            nodes.remove_node(closest_node_id);
+                            nodes.mark_unreachable(closest_node_id);
                         }
                     } else if (closest_node.left == Node::ID_NONE ||
                                closest_node.right == Node::ID_NONE)
@@ -136,6 +147,21 @@ bool build_tree(const indexed_triangle_set & its,
     PointCloud nodes(its, support_roots, properties);
 
     return build_tree(nodes, builder);
+}
+
+ExPolygon make_bed_poly(const indexed_triangle_set &its)
+{
+    auto bb = bounding_box(its);
+
+    BoundingBox bbcrd{scaled(to_2d(bb.min)), scaled(to_2d(bb.max))};
+    bbcrd.offset(scaled(10.));
+    Point     min = bbcrd.min, max = bbcrd.max;
+    ExPolygon ret = {{min.x(), min.y()},
+                     {max.x(), min.y()},
+                     {max.x(), max.y()},
+                     {min.x(), max.y()}};
+
+    return ret;
 }
 
 }} // namespace Slic3r::branchingtree

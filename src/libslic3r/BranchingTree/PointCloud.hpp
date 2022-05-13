@@ -1,8 +1,11 @@
 #ifndef POINTCLOUD_HPP
 #define POINTCLOUD_HPP
 
+#include <optional>
+
 #include "BranchingTree.hpp"
 
+#include "libslic3r/Execution/Execution.hpp"
 #include "libslic3r/KDTreeIndirect.hpp"
 #include "libslic3r/MutablePriorityQueue.hpp"
 
@@ -16,14 +19,13 @@ void to_eigen_mesh(const indexed_triangle_set &its,
                    Eigen::MatrixXd            &V,
                    Eigen::MatrixXi            &F);
 
-std::vector<Node> sample_mesh(const indexed_triangle_set &its,
-                                  double                      radius);
+std::vector<Node> sample_mesh(const indexed_triangle_set &its, double radius);
 
 std::vector<Node> sample_bed(const ExPolygons &bed,
                                  float             z,
                                  double            radius = 1.);
 
-enum PtType { SUPP, MESH, BED, JUNCTION, NONE };
+enum PtType { LEAF, MESH, BED, JUNCTION, NONE };
 
 // A cloud of points including support points, mesh points, junction points
 // and anchor points on the bed. Junction points can be added or removed, all
@@ -34,7 +36,7 @@ class PointCloud {
     const branchingtree::Properties &m_props;
 
     const double cos2bridge_slope;
-    const size_t MESHPTS_BEGIN, SUPP_BEGIN, JUNCTIONS_BEGIN;
+    const size_t MESHPTS_BEGIN, LEAFS_BEGIN, JUNCTIONS_BEGIN;
 
 private:
 
@@ -57,7 +59,7 @@ private:
 
     KDTreeIndirect<3, float, CoordFn> m_ktree;
 
-    bool is_outside_support_cone(const Vec3f &supp, const Vec3f &pt)
+    bool is_outside_support_cone(const Vec3f &supp, const Vec3f &pt) const
     {
         Vec3d D = (pt - supp).cast<double>();
         double dot_sq = -D.z() * std::abs(-D.z());
@@ -75,7 +77,7 @@ private:
         switch(pc.get_type(id)) {
         case BED: ret = &pc.m_bedpoints[id]; break;
         case MESH: ret = &pc.m_meshpoints[id - pc.MESHPTS_BEGIN]; break;
-        case SUPP: ret = &pc.m_leafs [id - pc.SUPP_BEGIN]; break;
+        case LEAF: ret = &pc.m_leafs [id - pc.LEAFS_BEGIN]; break;
         case JUNCTION: ret = &pc.m_junctions[id - pc.JUNCTIONS_BEGIN]; break;
         case NONE: assert(false);
         }
@@ -99,13 +101,18 @@ public:
                std::vector<Node>        support_leafs,
                const Properties &           props);
 
+    PointCloud(std::vector<Node> meshpts,
+               std::vector<Node> bedpts,
+               std::vector<Node> support_leafs,
+               const Properties &props);
+
     PtType get_type(size_t node_id) const
     {
         PtType ret = NONE;
 
         if (node_id < MESHPTS_BEGIN && !m_bedpoints.empty()) ret = BED;
-        else if (node_id < SUPP_BEGIN && !m_meshpoints.empty()) ret = MESH;
-        else if (node_id < JUNCTIONS_BEGIN && !m_leafs.empty()) ret = SUPP;
+        else if (node_id < LEAFS_BEGIN && !m_meshpoints.empty()) ret = MESH;
+        else if (node_id < JUNCTIONS_BEGIN && !m_leafs.empty()) ret = LEAF;
         else if (node_id >= JUNCTIONS_BEGIN && !m_junctions.empty()) ret = JUNCTION;
 
         return ret;
@@ -128,14 +135,14 @@ public:
     // node id is indeed of type SUPP
     int get_leaf_id(size_t node_id) const
     {
-        return node_id >= SUPP_BEGIN && node_id < JUNCTIONS_BEGIN ?
-                   node_id - SUPP_BEGIN :
+        return node_id >= LEAFS_BEGIN && node_id < JUNCTIONS_BEGIN ?
+                   node_id - LEAFS_BEGIN :
                    Node::ID_NONE;
     }
 
     size_t get_queue_idx(size_t node_id) const { return m_queue_indices[node_id]; }
 
-    float get_distance(const Vec3f &p, size_t node);
+    float get_distance(const Vec3f &p, size_t node) const;
 
     size_t next_junction_id() const
     {
@@ -154,7 +161,13 @@ public:
         return new_id;
     }
 
-    void remove_node(size_t node_id)
+    const std::vector<Node> &get_junctions() const noexcept  { return m_junctions; }
+    const std::vector<Node> &get_bedpoints() const noexcept  { return m_bedpoints; }
+    const std::vector<Node> &get_meshpoints() const noexcept { return m_meshpoints; }
+    const std::vector<Node> &get_leafs() const noexcept      { return m_leafs; }
+    const Properties & properties() const noexcept { return m_props; }
+
+    void mark_unreachable(size_t node_id)
     {
         m_searchable_indices[node_id] = false;
         m_queue_indices[node_id] = UNQUEUED;
@@ -175,7 +188,7 @@ public:
             if (anchor != m_ktree.npos)
                 visitor(anchor, get_distance(pos, anchor));
 
-        for (size_t i = SUPP_BEGIN; i < m_searchable_indices.size(); ++i)
+        for (size_t i = LEAFS_BEGIN; i < m_searchable_indices.size(); ++i)
             if (m_searchable_indices[i])
                 visitor(i, get_distance(pos, i));
     }
@@ -187,14 +200,12 @@ public:
             ZCompareFn{this});
 
         ptsqueue.reserve(m_leafs.size());
-        size_t iend = SUPP_BEGIN + m_leafs.size();
-        for (size_t i = SUPP_BEGIN; i < iend; ++i)
+        size_t iend = LEAFS_BEGIN + m_leafs.size();
+        for (size_t i = LEAFS_BEGIN; i < iend; ++i)
             ptsqueue.push(i);
 
         return ptsqueue;
     }
-
-    const Properties & properties() const { return m_props; }
 };
 
 template<class PC, class Fn> void traverse(PC &&pc, size_t root, Fn &&fn)

@@ -26,7 +26,7 @@ class BranchingTreeBuilder: public branchingtree::Builder {
     {
         double w = WIDENING_SCALE * m_sm.cfg.pillar_widening_factor * j.weight;
 
-        return std::max(double(j.Rmin), std::min(m_sm.cfg.base_radius_mm, w));
+        return std::min(m_sm.cfg.base_radius_mm, double(j.Rmin) + w);
     }
 
     std::vector<size_t>  m_unroutable_pinheads;
@@ -51,10 +51,13 @@ class BranchingTreeBuilder: public branchingtree::Builder {
             } else if (int child = node.left + node.right + 1; child >= 0) {
                 auto from = m_cloud.get(child);
                 auto to   = m_cloud.get(node.id);
+                auto tod  = to.pos.cast<double>();
+                double toR = get_radius(to);
                 m_builder.add_diffbridge(from.pos.cast<double>(),
-                                         to.pos.cast<double>(),
+                                         tod,
                                          get_radius(from),
-                                         get_radius(to));
+                                         toR);
+                m_builder.add_junction(tod, toR);
             }
         });
     }

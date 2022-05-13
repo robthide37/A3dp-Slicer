@@ -16,7 +16,7 @@ class Properties
     double m_max_slope       = PI / 4.;
     double m_ground_level    = 0.;
     double m_sampling_radius = .5;
-    double m_max_branch_len  = 20.;
+    double m_max_branch_len  = 10.;
 
     ExPolygons m_bed_shape;
 
@@ -67,11 +67,11 @@ struct Node
     int id = ID_NONE, left = ID_NONE, right = ID_NONE;
 
     Vec3f pos;
-    float Rmin;
+    float Rmin = 0.f;
 
     // Tracking the weight of each junction, which is essentially the sum of
     // the lenghts of all branches emanating from this junction.
-    float weight;
+    float weight = 0.f;
 
     Node(const Vec3f &p, float r_min = .0f) : pos{p}, Rmin{r_min}, weight{0.f}
     {}
@@ -137,20 +137,7 @@ inline bool build_tree(const indexed_triangle_set & its,
 //bool build_tree(PointCloud &pcloud, Builder &builder);
 
 // Helper function to derive a bed polygon only from the model bounding box.
-inline ExPolygon make_bed_poly(const indexed_triangle_set &its)
-{
-    auto bb = bounding_box(its);
-
-    BoundingBox bbcrd{scaled(to_2d(bb.min)), scaled(to_2d(bb.max))};
-    bbcrd.offset(scaled(10.));
-    Point     min = bbcrd.min, max = bbcrd.max;
-    ExPolygon ret = {{min.x(), min.y()},
-                     {max.x(), min.y()},
-                     {max.x(), max.y()},
-                     {min.x(), max.y()}};
-
-    return ret;
-}
+ExPolygon make_bed_poly(const indexed_triangle_set &its);
 
 }} // namespace Slic3r::branchingtree
 

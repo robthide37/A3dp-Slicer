@@ -109,72 +109,82 @@ std::vector<Node> sample_bed(const ExPolygons &bed, float z, double radius)
 }
 
 PointCloud::PointCloud(const indexed_triangle_set &M,
-                       std::vector<Node>       support_leafs,
+                       std::vector<Node>           support_leafs,
                        const Properties           &props)
+    : PointCloud{sample_mesh(M, props.sampling_radius()),
+                 sample_bed(props.bed_shape(),
+                            props.ground_level(),
+                            props.sampling_radius()),
+                 std::move(support_leafs), props}
+{}
+
+PointCloud::PointCloud(std::vector<Node> meshpts,
+                       std::vector<Node> bedpts,
+                       std::vector<Node> support_leafs,
+                       const Properties &props)
     : m_leafs{std::move(support_leafs)}
-    , m_meshpoints{sample_mesh(M, props.sampling_radius())}
-    , m_bedpoints{sample_bed(props.bed_shape(),
-                             props.ground_level(),
-                             props.sampling_radius())}
+    , m_meshpoints{std::move(meshpts)}
+    , m_bedpoints{std::move(bedpts)}
     , m_props{props}
     , cos2bridge_slope{std::cos(props.max_slope()) *
                        std::abs(std::cos(props.max_slope()))}
     , MESHPTS_BEGIN{m_bedpoints.size()}
-    , SUPP_BEGIN{MESHPTS_BEGIN + m_meshpoints.size()}
-    , JUNCTIONS_BEGIN{SUPP_BEGIN + m_leafs.size()}
+    , LEAFS_BEGIN{MESHPTS_BEGIN + m_meshpoints.size()}
+    , JUNCTIONS_BEGIN{LEAFS_BEGIN + m_leafs.size()}
     , m_searchable_indices(JUNCTIONS_BEGIN, true)
     , m_queue_indices(JUNCTIONS_BEGIN, UNQUEUED)
     , m_reachable_cnt{JUNCTIONS_BEGIN}
-    , m_ktree{CoordFn{this}, SUPP_BEGIN} // Only for bed and mesh points
+    , m_ktree{CoordFn{this}, LEAFS_BEGIN} // Only for bed and mesh points
 {
     for (size_t i = 0; i < m_bedpoints.size(); ++i)
         m_bedpoints[i].id = int(i);
-
+    
     for (size_t i = 0; i < m_meshpoints.size(); ++i)
         m_meshpoints[i].id = int(MESHPTS_BEGIN + i);
-
+    
     for (size_t i = 0; i < m_leafs.size(); ++i)
-        m_leafs[i].id = int(SUPP_BEGIN + i);
+        m_leafs[i].id = int(LEAFS_BEGIN + i);
 }
 
-float PointCloud::get_distance(const Vec3f &p, size_t node)
+float PointCloud::get_distance(const Vec3f &p, size_t node_id) const
 {
-    auto t = get_type(node);
+    auto t = get_type(node_id);
     auto ret = std::numeric_limits<float>::infinity();
-
+    const auto &node = get(node_id);
+    
     switch (t) {
     case MESH:
     case BED: {
         // Points of mesh or bed which are outside of the support cone of
         // 'pos' must be discarded.
-        if (is_outside_support_cone(p, get(node).pos))
+        if (is_outside_support_cone(p, node.pos))
             ret = std::numeric_limits<float>::infinity();
         else
-            ret  = (get(node).pos - p).norm();
-
+            ret  = (node.pos - p).norm();
+        
         break;
     }
-    case SUPP:
+    case LEAF:
     case JUNCTION:{
-        auto mergept = find_merge_pt(p, get(node).pos, m_props.max_slope());
-        if (!mergept || mergept->z() < (m_props.ground_level() + 2 * get(node).Rmin))
+        auto mergept = find_merge_pt(p, node.pos, m_props.max_slope());
+        if (!mergept || mergept->z() < (m_props.ground_level() + 2 * node.Rmin))
             ret = std::numeric_limits<float>::infinity();
-        else
+        else if ( (node.pos - *mergept).norm() < m_props.max_branch_length())
             ret = (p - *mergept).norm();
-
+        
         break;
     }
     case NONE:
         ;
     }
-
-       // Setting the ret val to infinity will effectively discard this
-       // connection of nodes. max_branch_length property if used here
-       // to discard node=>node and node=>mesh connections longer than this
-       // property.
+    
+    // Setting the ret val to infinity will effectively discard this
+    // connection of nodes. max_branch_length property if used here
+    // to discard node=>node and node=>mesh connections longer than this
+    // property.
     if (t != BED && ret > m_props.max_branch_length())
         ret = std::numeric_limits<float>::infinity();
-
+    
     return ret;
 }
 
