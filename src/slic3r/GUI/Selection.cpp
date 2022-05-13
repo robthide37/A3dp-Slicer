@@ -119,12 +119,12 @@ Selection::Selection()
     , m_scale_factor(1.0f)
 {
     this->set_bounding_boxes_dirty();
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
     m_axes.set_stem_radius(0.15f);
     m_axes.set_stem_length(3.0f);
     m_axes.set_tip_radius(0.45f);
     m_axes.set_tip_length(1.5f);
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 
@@ -1844,46 +1844,39 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     const Transform3d base_matrix = Geometry::assemble_transform(get_bounding_box().center());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
-#if ENABLE_GL_SHADERS_ATTRIBUTES || ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_GL_SHADERS_ATTRIBUTES || ENABLE_WORLD_COORDINATE
     Transform3d orient_matrix = Transform3d::Identity();
 #else
     glsafe(::glPushMatrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES || ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES || ENABLE_WORLD_COORDINATE
 
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
     const Vec3d center = get_bounding_box().center();
     Vec3d axes_center = center;
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE
 
     if (!boost::starts_with(sidebar_field, "layer")) {
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         shader->set_uniform("emission_factor", 0.05f);
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
-#if !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE
         const Vec3d& center = get_bounding_box().center();
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE
 #if ENABLE_WORLD_COORDINATE
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
 #else
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->get_world_coordinates()) {
 #endif // ENABLE_WORLD_COORDINATE
-#if !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE
 #if ENABLE_WORLD_COORDINATE
-#if !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
-            Transform3d orient_matrix = Transform3d::Identity();
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
             orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
 #else
             orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
             axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
-#else
-            glsafe(::glMultMatrixd(orient_matrix.data()));
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
 #else
             if (!boost::starts_with(sidebar_field, "position")) {
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
@@ -1913,14 +1906,11 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #else
         else if (is_single_volume() || is_single_modifier()) {
 #endif // ENABLE_WORLD_COORDINATE
-#if !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE
 #if ENABLE_WORLD_COORDINATE
             if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
-#if !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
-                Transform3d orient_matrix = Transform3d::Identity();
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
                 if (wxGetApp().obj_manipul()->is_local_coordinates()) {
                     const GLVolume* v = (*m_volumes)[*m_list.begin()];
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
@@ -1928,9 +1918,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #else
                     orient_matrix = v->get_instance_transformation().get_matrix(true, false, true, true) * v->get_volume_transformation().get_matrix(true, false, true, true);
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
                     axes_center = (*m_volumes)[*m_list.begin()]->world_matrix().translation();
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
                 }
                 else {
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
@@ -1938,15 +1926,8 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #else
                     orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
                     axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
                 }
-#else
-                }
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-                glsafe(::glMultMatrixd(orient_matrix.data()));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
             }
 #else
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -1962,7 +1943,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #endif // ENABLE_WORLD_COORDINATE
         }
         else {
-#if ENABLE_GL_SHADERS_ATTRIBUTES || ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_GL_SHADERS_ATTRIBUTES || ENABLE_WORLD_COORDINATE
             if (requires_local_axes())
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
                 orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
@@ -1975,16 +1956,16 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
                 const Transform3d orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
                 glsafe(::glMultMatrixd(orient_matrix.data()));
             }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES || ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES || ENABLE_WORLD_COORDINATE
         }
-        }
+    }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!boost::starts_with(sidebar_field, "layer"))
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
     if (!boost::starts_with(sidebar_field, "layer")) {
         shader->set_uniform("emission_factor", 0.1f);
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
@@ -1993,7 +1974,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         glsafe(::glMultMatrixd(orient_matrix.data()));
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
     }
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     if (boost::starts_with(sidebar_field, "position"))
@@ -2004,12 +1985,12 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         render_sidebar_scale_hints(sidebar_field, *shader, base_matrix * orient_matrix);
     else if (boost::starts_with(sidebar_field, "layer"))
         render_sidebar_layers_hints(sidebar_field, *shader);
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
     if (!boost::starts_with(sidebar_field, "layer")) {
         if (!wxGetApp().obj_manipul()->is_world_coordinates())
             m_axes.render(Geometry::assemble_transform(axes_center) * orient_matrix, 0.25f);
     }
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE
 #else
     if (boost::starts_with(sidebar_field, "position"))
         render_sidebar_position_hints(sidebar_field);
@@ -2020,7 +2001,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     else if (boost::starts_with(sidebar_field, "layer"))
         render_sidebar_layers_hints(sidebar_field);
 
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
     if (!boost::starts_with(sidebar_field, "layer")) {
         glsafe(::glPopMatrix());
         glsafe(::glPushMatrix());
@@ -2030,14 +2011,14 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
             m_axes.render(0.25f);
         glsafe(::glPopMatrix());
     }
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     if (!boost::starts_with(sidebar_field, "layer"))

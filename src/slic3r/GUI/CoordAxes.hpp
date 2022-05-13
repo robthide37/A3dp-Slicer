@@ -1,7 +1,7 @@
 #ifndef slic3r_CoordAxes_hpp_
 #define slic3r_CoordAxes_hpp_
 
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
 #include "GLModel.hpp"
 
 namespace Slic3r {
@@ -59,6 +59,6 @@ public:
 } // GUI
 } // Slic3r
 
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE
 
 #endif // slic3r_CoordAxes_hpp_

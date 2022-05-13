@@ -267,7 +267,11 @@ void GLGizmoMove3D::on_render()
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
@@ -327,7 +331,11 @@ void GLGizmoMove3D::on_render()
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#if ENABLE_WORLD_COORDINATE
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix()* base_matrix);
+#else
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 

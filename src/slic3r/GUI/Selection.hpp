@@ -4,11 +4,7 @@
 #include "libslic3r/Geometry.hpp"
 #if ENABLE_WORLD_COORDINATE
 #include "GUI_Geometry.hpp"
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
 #include "CoordAxes.hpp"
-#else
-#include "GLModel.hpp"
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
 #else
 #include "GLModel.hpp"
 #endif // ENABLE_WORLD_COORDINATE
@@ -238,9 +234,9 @@ private:
     GLModel m_vbo_sphere;
 #endif // ENABLE_RENDER_SELECTION_CENTER
 
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
     CoordAxes m_axes;
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE
     GLModel m_arrow;
     GLModel m_curved_arrow;
 #if ENABLE_LEGACY_OPENGL_REMOVAL

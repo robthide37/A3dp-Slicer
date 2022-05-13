@@ -357,9 +357,10 @@ void GLGizmoScale3D::on_render()
     else
         m_bounding_box = selection.get_bounding_box();
 
-    Vec3d offset_x = offsets_transform * (Offset * Vec3d::UnitX());
-    Vec3d offset_y = offsets_transform * (Offset * Vec3d::UnitY());
-    Vec3d offset_z = offsets_transform * (Offset * Vec3d::UnitZ());
+    const Vec3d& center = m_bounding_box.center();
+    const Vec3d offset_x = offsets_transform * Vec3d((double)Offset, 0.0, 0.0);
+    const Vec3d offset_y = offsets_transform * Vec3d(0.0, (double)Offset, 0.0);
+    const Vec3d offset_z = offsets_transform * Vec3d(0.0, 0.0, (double)Offset);
 
     bool ctrl_down = m_dragging && m_starting.ctrl_down || !m_dragging && wxGetKeyState(WXK_CONTROL);
 #endif // ENABLE_WORLD_COORDINATE
@@ -397,8 +398,6 @@ void GLGizmoScale3D::on_render()
     m_grabbers[9].color = (use_constrain && m_hover_id == 7) ? CONSTRAINED_COLOR : m_highlight_color;
 #else
     // x axis
-    const Vec3d center = m_bounding_box.center();
-
     m_grabbers[0].center = m_transform * Vec3d(m_bounding_box.min.x(), center.y(), center.z()) - offset_x;
     m_grabbers[0].color = (ctrl_down && m_hover_id == 1) ? CONSTRAINED_COLOR : AXES_COLOR[0];
     m_grabbers[1].center = m_transform * Vec3d(m_bounding_box.max.x(), center.y(), center.z()) + offset_x;
@@ -457,7 +456,11 @@ void GLGizmoScale3D::on_render()
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             if (m_grabbers[0].enabled && m_grabbers[1].enabled)
@@ -504,7 +507,11 @@ void GLGizmoScale3D::on_render()
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(0, 1, m_grabbers[0].color);
@@ -537,7 +544,11 @@ void GLGizmoScale3D::on_render()
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(2, 3, m_grabbers[2].color);
@@ -570,7 +581,11 @@ void GLGizmoScale3D::on_render()
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(4, 5, m_grabbers[4].color);
@@ -603,7 +618,11 @@ void GLGizmoScale3D::on_render()
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(6, 7, m_drag_color);

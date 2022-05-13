@@ -10,7 +10,7 @@
 
 #include <GL/glew.h>
 
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
 
 namespace Slic3r {
 namespace GUI {
@@ -101,4 +101,4 @@ void CoordAxes::render(float emission_factor)
 } // GUI
 } // Slic3r
 
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE
