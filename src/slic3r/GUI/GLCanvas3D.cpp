@@ -6600,12 +6600,13 @@ bool GLCanvas3D::_is_any_volume_outside() const
 void GLCanvas3D::_update_selection_from_hover()
 {
     bool ctrl_pressed = wxGetKeyState(WXK_CONTROL);
+    bool selection_changed = false;
 
     if (m_hover_volume_idxs.empty()) {
-        if (!ctrl_pressed && (m_rectangle_selection.get_state() == GLSelectionRectangle::Select))
+        if (!ctrl_pressed && (m_rectangle_selection.get_state() == GLSelectionRectangle::Select)) {
+            selection_changed = ! m_selection.is_empty();
             m_selection.remove_all();
-
-        return;
+        }
     }
 
     GLSelectionRectangle::EState state = m_rectangle_selection.get_state();
@@ -6618,7 +6619,6 @@ void GLCanvas3D::_update_selection_from_hover()
         }
     }
 
-    bool selection_changed = false;
     if (state == GLSelectionRectangle::Select) {
         bool contains_all = true;
         for (int i : m_hover_volume_idxs) {
