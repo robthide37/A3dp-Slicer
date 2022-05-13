@@ -167,15 +167,16 @@ private:
         // Zero means it is calculated in init function
         ImVec2 minimal_window_size              = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
-        float input_width    = 0.f;
-        float delete_pos_x            = 0.f;
-        float max_font_name_width     = 0.f;
-        unsigned int  icon_width      = 0;
-        
-        float min_style_image_height = 0.f;
-        int   max_style_image_width   = 0.f;
+        float        input_width                      = 0.f;
+        float        delete_pos_x                     = 0.f;
+        float        max_font_name_width              = 0.f;
+        unsigned int icon_width                       = 0;
 
-        float input_offset   = 0.f;
+        float min_style_image_height = 0.f;
+        int   max_style_image_width  = 0.f;
+
+        float style_offset          = 0.f;
+        float input_offset          = 0.f;
         float advanced_input_offset = 0.f;
 
         ImVec2 text_size;

@@ -82,7 +82,7 @@ struct Limit
 struct Limits
 {
     MinMax<float> emboss{0.01f, 1e4f};
-    MinMax<float> size_in_mm{1.f, 100.f};
+    MinMax<float> size_in_mm{0.1f, 1000.f};
     Limit<float> boldness{{-200.f, 200.f}, {-2e4f, 2e4f}};
     Limit<float> skew{{-1.f, 1.f}, {-100.f, 100.f}};
     MinMax<int>  char_gap{-20000, 20000};
@@ -661,12 +661,15 @@ void GLGizmoEmboss::initialize()
     GuiCfg::Translations &tr = cfg.translations;
     tr.type  = _u8L("Type");
     tr.style = _u8L("Style");
+    float max_style_text_width = std::max(
+        ImGui::CalcTextSize(tr.type.c_str()).x,
+        ImGui::CalcTextSize(tr.style.c_str()).x);
+    cfg.style_offset = max_style_text_width + 3 * space;
+
     tr.font  = _u8L("Font");
     tr.size  = _u8L("Height");
     tr.depth = _u8L("Depth");
     float max_text_width = std::max({
-        ImGui::CalcTextSize(tr.type.c_str()).x,
-        ImGui::CalcTextSize(tr.style.c_str()).x,
         ImGui::CalcTextSize(tr.font.c_str()).x,
         ImGui::CalcTextSize(tr.size.c_str()).x,
         ImGui::CalcTextSize(tr.depth.c_str()).x});
@@ -1383,7 +1386,7 @@ void GLGizmoEmboss::draw_model_type()
 
     bool is_last_solid_part = is_text_object(m_volume);
     ImGui::Text("%s", m_gui_cfg->translations.type.c_str());
-    ImGui::SameLine(m_gui_cfg->input_offset);
+    ImGui::SameLine(m_gui_cfg->style_offset);
     if (type == part) { 
         draw_icon(IconType::part, IconState::hovered);
     } else {
@@ -1506,7 +1509,7 @@ void GLGizmoEmboss::draw_style_list() {
         trunc_name = ImGuiWrapper::trunc(current_name, max_width);
     }
     ImGui::Text("%s", m_gui_cfg->translations.style.c_str());
-    ImGui::SameLine(m_gui_cfg->input_offset);
+    ImGui::SameLine(m_gui_cfg->style_offset);
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
     if (ImGui::BeginCombo("##style_selector", trunc_name.c_str())) {
         m_font_manager.init_style_images(m_gui_cfg->max_style_image_width);
@@ -1862,15 +1865,30 @@ void GLGizmoEmboss::draw_style_edit() {
     if (!wx_font.has_value() && fi.type == WxFontUtils::get_actual_type())
         wx_font = WxFontUtils::load_wxFont(fi.path);
 
-    bool is_font_changed = false;
+    bool is_font_face_changed = false;
+    bool is_font_style_changed = false;
     if (m_stored_font_item.has_value() && wx_font.has_value()) {
         // TODO: cache wx font inside m_stored_font_item
         std::optional<wxFont> stored_wx_font = WxFontUtils::load_wxFont(m_stored_font_item->path);
-        is_font_changed = stored_wx_font->GetFaceName() !=
+        is_font_face_changed = stored_wx_font->GetFaceName() !=
                           wx_font->GetFaceName();
+
+        const std::optional<float> &skew = m_font_manager.get_font_prop().skew;
+        bool is_italic = skew.has_value() || WxFontUtils::is_italic(*wx_font);
+        const std::optional<float> &skew_stored = m_stored_font_item->prop.skew;
+        bool is_stored_italic = skew_stored.has_value() || WxFontUtils::is_italic(*stored_wx_font);
+        bool is_italic_changed = is_italic != is_stored_italic;
+
+        const std::optional<float> &boldness = m_font_manager.get_font_prop().boldness;
+        bool is_bold = boldness.has_value() || WxFontUtils::is_bold(*wx_font);
+        const std::optional<float> &boldness_stored = m_stored_font_item->prop.boldness;
+        bool is_stored_bold = boldness_stored.has_value() || WxFontUtils::is_bold(*stored_wx_font);
+        bool is_bold_changed = is_bold != is_stored_bold;
+
+        is_font_style_changed = is_italic_changed || is_bold_changed;
     }
 
-    if (is_font_changed)
+    if (is_font_face_changed)
         ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, tr.font);
     else
         ImGuiWrapper::text(tr.font);
@@ -1882,11 +1900,15 @@ void GLGizmoEmboss::draw_style_edit() {
     exist_change |= italic_button();
     ImGui::SameLine();
     exist_change |= bold_button();
-
+    
+    bool is_font_changed = is_font_face_changed || is_font_style_changed;
     if (is_font_changed) {
         ImGui::SameLine(ImGui::GetStyle().FramePadding.x);
         if (draw_button(IconType::undo)) {
             fi.path = m_stored_font_item->path;
+            fi.prop.boldness = m_stored_font_item->prop.boldness;
+            fi.prop.skew = m_stored_font_item->prop.skew;
+
             wx_font = WxFontUtils::load_wxFont(fi.path);
             m_font_manager.wx_font_changed();
             exist_change = true;
