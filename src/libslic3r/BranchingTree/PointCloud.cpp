@@ -42,8 +42,7 @@ void to_eigen_mesh(const indexed_triangle_set &its,
         V.row(i) = its.vertices[i].cast<double>();
 }
 
-std::vector<Node> sample_mesh(const indexed_triangle_set &its,
-                                  double                      radius)
+std::vector<Node> sample_mesh(const indexed_triangle_set &its, double radius)
 {
     std::vector<Node> ret;
 
@@ -68,7 +67,17 @@ std::vector<Node> sample_mesh(const indexed_triangle_set &its,
 
     ret.reserve(size_t(N));
     for (int i = 0; i < FI.size(); i++) {
-        Vec3i face = its.indices[FI(i)];
+        int face_id = FI(i);
+
+        if (face_id < 0 || face_id >= int(its.indices.size()))
+            continue;
+
+        Vec3i face = its.indices[face_id];
+
+        if (face(0) >= int(its.vertices.size()) ||
+            face(1) >= int(its.vertices.size()) ||
+            face(2) >= int(its.vertices.size()))
+            continue;
 
         Vec3f c = B.row(i)(0) * its.vertices[face(0)] +
                   B.row(i)(1) * its.vertices[face(1)] +
