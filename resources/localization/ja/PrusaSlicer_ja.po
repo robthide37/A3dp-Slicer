@@ -4739,7 +4739,7 @@ msgstr "NetFabbで修正"
 
 #: src/slic3r/GUI/GUI_App.cpp:2190
 msgid "Flash Printer &Firmware"
-msgstr "プリンターフェームウェアの書込み&F"
+msgstr "プリンターファームウェアの書込み&F"
 
 #: src/slic3r/GUI/FirmwareDialog.cpp:152
 msgid "Flash!"
