@@ -132,14 +132,16 @@ void change_opt_keyFoP(std::string& opt_key, DynamicPrintConfig* config, int& cn
 }
 const GroupAndCategory& OptionsSearcher::get_group_and_category(const std::string& opt_key, ConfigOptionMode tags) const
 {
+    static GroupAndCategory empty = GroupAndCategory{ "","",ConfigOptionDef {} };
+
     auto it = groups_and_categories.find(opt_key);
     if (it == groups_and_categories.end())
-        return GroupAndCategory{ "","",ConfigOptionDef {} };
+        return empty;
     for (const GroupAndCategory& gag : it->second) {
         if ((gag.gui_opt.mode & tags) == tags)
             return gag;
     }
-    return GroupAndCategory{ "","",ConfigOptionDef{} };
+    return empty;
 }
 
 void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type type)
