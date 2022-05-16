@@ -41,6 +41,7 @@ public:
 	bool		empty() const						{ return m_heap.empty(); }
 	T&			operator[](std::size_t idx) noexcept { return m_heap[idx]; }
 	const T&	operator[](std::size_t idx) const noexcept { return m_heap[idx]; }
+	static constexpr size_t invalid_id() { return std::numeric_limits<size_t>::max(); }
 
 	using iterator		 = typename std::vector<T>::iterator;
 	using const_iterator = typename std::vector<T>::const_iterator;
@@ -69,14 +70,10 @@ MutablePriorityQueue<T, IndexSetter, LessPredicate, ResetIndexWhenRemoved> make_
 template<class T, class LessPredicate, class IndexSetter, const bool ResetIndexWhenRemoved>
 inline void MutablePriorityQueue<T, LessPredicate, IndexSetter, ResetIndexWhenRemoved>::clear()
 { 
-#ifdef NDEBUG
-	// Only mark as removed from the queue in release mode, if configured so.
-	if (ResetIndexWhenRemoved)
-#endif /* NDEBUG */
-	{
+	if constexpr (ResetIndexWhenRemoved) {
 		for (size_t idx = 0; idx < m_heap.size(); ++ idx)
 			// Mark as removed from the queue.
-			m_index_setter(m_heap[idx], std::numeric_limits<size_t>::max());
+			m_index_setter(m_heap[idx], this->invalid_id());
 	}
 	m_heap.clear();
 }
@@ -103,13 +100,9 @@ template<class T, class LessPredicate, class IndexSetter, const bool ResetIndexW
 inline void MutablePriorityQueue<T, LessPredicate, IndexSetter, ResetIndexWhenRemoved>::pop()
 {
 	assert(! m_heap.empty());
-#ifdef NDEBUG
-	// Only mark as removed from the queue in release mode, if configured so.
-	if (ResetIndexWhenRemoved)
-#endif /* NDEBUG */
-	{
+	if constexpr (ResetIndexWhenRemoved) {
 		// Mark as removed from the queue.
-		m_index_setter(m_heap.front(), std::numeric_limits<size_t>::max());
+		m_index_setter(m_heap.front(), this->invalid_id());
 	}
 	if (m_heap.size() > 1) {
 		m_heap.front() = m_heap.back();
@@ -124,13 +117,10 @@ template<class T, class LessPredicate, class IndexSetter, const bool ResetIndexW
 inline void MutablePriorityQueue<T, LessPredicate, IndexSetter, ResetIndexWhenRemoved>::remove(size_t idx)
 {
 	assert(idx < m_heap.size());
-#ifdef NDEBUG
 	// Only mark as removed from the queue in release mode, if configured so.
-	if (ResetIndexWhenRemoved)
-#endif /* NDEBUG */
-	{
+	if constexpr (ResetIndexWhenRemoved) {
 		// Mark as removed from the queue.
-		m_index_setter(m_heap[idx], std::numeric_limits<size_t>::max());
+		m_index_setter(m_heap[idx], this->invalid_id());
 	}
 	if (idx + 1 == m_heap.size()) {
 		m_heap.pop_back();
@@ -291,6 +281,7 @@ public:
 	bool		empty() const						{ return m_heap.empty(); }
 	T&			operator[](std::size_t idx) noexcept { assert(! address::is_padding(idx)); return m_heap[idx]; }
 	const T&    operator[](std::size_t idx) const noexcept { assert(! address::is_padding(idx)); return m_heap[idx]; }
+	static constexpr size_t invalid_id() { return std::numeric_limits<size_t>::max(); }
 
 protected:
 	void		update_heap_up(size_t top, size_t bottom);
@@ -320,15 +311,11 @@ MutableSkipHeapPriorityQueue<T, IndexSetter, LessPredicate, BlockSize, ResetInde
 template<class T, class LessPredicate, class IndexSetter, std::size_t blocking, const bool ResetIndexWhenRemoved>
 inline void MutableSkipHeapPriorityQueue<T, LessPredicate, IndexSetter, blocking, ResetIndexWhenRemoved>::clear()
 { 
-#ifdef NDEBUG
-	// Only mark as removed from the queue in release mode, if configured so.
-	if (ResetIndexWhenRemoved)
-#endif /* NDEBUG */
-	{
+	if constexpr (ResetIndexWhenRemoved) {
 		for (size_t idx = 0; idx < m_heap.size(); ++ idx)
 			// Mark as removed from the queue.
 			if (! address::is_padding(idx))
-				m_index_setter(m_heap[idx], std::numeric_limits<size_t>::max());
+				m_index_setter(m_heap[idx], this->invalid_id());
 	}
 	m_heap.clear();
 }
@@ -359,13 +346,9 @@ template<class T, class LessPredicate, class IndexSetter, std::size_t blocking, 
 inline void MutableSkipHeapPriorityQueue<T, LessPredicate, IndexSetter, blocking, ResetIndexWhenRemoved>::pop()
 {
 	assert(! m_heap.empty());
-#ifdef NDEBUG
-	// Only mark as removed from the queue in release mode, if configured so.
-	if (ResetIndexWhenRemoved)
-#endif /* NDEBUG */
-	{
+	if constexpr (ResetIndexWhenRemoved) {
 		// Mark as removed from the queue.
-		m_index_setter(m_heap[1], std::numeric_limits<size_t>::max());
+        m_index_setter(m_heap[1], this->invalid_id());
 	}
 	// Zero'th element is padding, thus non-empty queue must have at least two elements.
 	if (m_heap.size() > 2) {
@@ -382,13 +365,9 @@ inline void MutableSkipHeapPriorityQueue<T, LessPredicate, IndexSetter, blocking
 {
 	assert(idx < m_heap.size());
 	assert(! address::is_padding(idx));
-#ifdef NDEBUG
-	// Only mark as removed from the queue in release mode, if configured so.
-	if (ResetIndexWhenRemoved)
-#endif /* NDEBUG */
-	{
+	if constexpr (ResetIndexWhenRemoved) {
 		// Mark as removed from the queue.
-		m_index_setter(m_heap[idx], std::numeric_limits<size_t>::max());
+        m_index_setter(m_heap[idx], this->invalid_id());
 	}
 	if (idx + 1 == m_heap.size()) {
 		this->pop_back();

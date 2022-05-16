@@ -346,25 +346,22 @@ TEST_CASE("Mutable priority queue - first pop", "[MutableSkipHeapPriorityQueue]"
         size_t id;
         float val;
     };
-    size_t              count = 50000;
-    std::vector<size_t> idxs(count, {0});
-    std::vector<bool>   dels(count, false);
+    static constexpr const size_t count = 50000;
     auto q = make_miniheap_mutable_priority_queue<MyValue, 16, true>(
-        [&](MyValue &v, size_t idx) {
-            idxs[v.id] = idx; 
-        },
+        [](MyValue &v, size_t idx) { v.id = idx; },
         [](MyValue &l, MyValue &r) { return l.val < r.val; });
+    using QueueType = decltype(q);
     q.reserve(count);
-    for (size_t id = 0; id < count; id++) {
-        MyValue mv{ id, rand() / 100.f };
-        q.push(mv);
-    }
-    MyValue it = q.top(); // copy
-    q.pop();
+    for (size_t id = 0; id < count; ++ id)
+        q.push({ id, rand() / 100.f });
+    MyValue v = q.top(); // copy
     // is valid id (no initial value default value)
-    CHECK(it.id != 0);
+    CHECK(QueueType::address::is_padding(0));
+    CHECK(!QueueType::address::is_padding(1));
+    q.pop();
+    CHECK(v.id == 1);
     // is first item in queue valid value
-    CHECK(idxs[0] != std::numeric_limits<size_t>::max());
+    CHECK(q.top().id == 1);
 }
 
 TEST_CASE("Mutable priority queue complex", "[MutableSkipHeapPriorityQueue]")
