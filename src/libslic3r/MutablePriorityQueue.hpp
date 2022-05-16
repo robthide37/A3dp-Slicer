@@ -24,7 +24,7 @@ public:
 	MutablePriorityQueue& operator=(MutablePriorityQueue &&) = default;
 
 	// This class modifies the outside data through the m_index_setter
-	// and thus it should not be copied. The semantics are similar to std::unique_ptr
+	// and thus it should not be copied. The semantics is similar to std::unique_ptr
 	MutablePriorityQueue(const MutablePriorityQueue &) = delete;
 	MutablePriorityQueue& operator=(const MutablePriorityQueue &) = delete;
 
@@ -267,6 +267,14 @@ public:
 		{}
 	~MutableSkipHeapPriorityQueue()	{ clear(); }
 
+	MutableSkipHeapPriorityQueue(MutableSkipHeapPriorityQueue &&) = default;
+    MutableSkipHeapPriorityQueue &operator=(MutableSkipHeapPriorityQueue &&) = default;
+
+    // This class modifies the outside data through the m_index_setter
+    // and thus it should not be copied. The semantics is similar to std::unique_ptr
+    MutableSkipHeapPriorityQueue(const MutableSkipHeapPriorityQueue &) = delete;
+    MutableSkipHeapPriorityQueue &operator=(const MutableSkipHeapPriorityQueue &) = delete;
+
 	void		clear();
 	// Reserve one unused element per miniheap.
 	void		reserve(size_t cnt) 				{ m_heap.reserve(cnt + ((cnt + (address::block_size - 1)) / (address::block_size - 1))); }
@@ -278,6 +286,8 @@ public:
 	void		update(size_t idx) 					{ assert(! address::is_padding(idx)); T item = m_heap[idx]; remove(idx); push(item); }
 	// There is one padding element storead at each miniheap, thus lower the number of elements by the number of miniheaps.
 	size_t 		size() const noexcept 				{ return m_heap.size() - (m_heap.size() + address::block_size - 1) / address::block_size; }
+	// Number of heap elements including padding. heap_size() >= size().
+	size_t      heap_size() const noexcept          { return m_heap.size(); }
 	bool		empty() const						{ return m_heap.empty(); }
 	T&			operator[](std::size_t idx) noexcept { assert(! address::is_padding(idx)); return m_heap[idx]; }
 	const T&    operator[](std::size_t idx) const noexcept { assert(! address::is_padding(idx)); return m_heap[idx]; }
