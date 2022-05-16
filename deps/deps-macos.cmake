@@ -15,6 +15,11 @@ set(DEP_CMAKE_OPTS
 
 include("deps-unix-common.cmake")
 
+find_package(CURL QUIET)
+if (NOT CURL_FOUND)
+    message(WARNING "No CURL dev package found in system, building static library. Mac SDK should include CURL from at least version 10.12. Check your SDK installation.")
+endif ()
+
 
 # ExternalProject_Add(dep_boost
 #     EXCLUDE_FROM_ALL 1
