@@ -3,6 +3,9 @@
 
 #include <assert.h>
 #include <type_traits>
+#include <vector>
+#include <limits>
+#include <cstdlib> // adds size_t (without std::)
 
 template<typename T, typename IndexSetter, typename LessPredicate, const bool ResetIndexWhenRemoved = false>
 class MutablePriorityQueue
