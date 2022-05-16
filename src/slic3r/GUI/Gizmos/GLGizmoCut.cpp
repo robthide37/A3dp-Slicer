@@ -1391,49 +1391,37 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
 
     const Camera& camera = wxGetApp().plater()->get_camera();
 
-    int mesh_id = -1;
-    for (const ModelVolume* mv : mo->volumes) {
-        ++mesh_id;
-        if (!mv->is_model_part())
-            continue;
+    Vec3d pt;
+    Vec3d dir;
+    MeshRaycaster::line_from_mouse_pos(mouse_position, Transform3d::Identity(), camera, pt, dir);
+    dir.normalize();
+    pt += dir; // Move the pt along dir so it is not clipped.
 
-        const Transform3d trafo = inst_trafo * mv->get_matrix();
-        const MeshRaycaster* raycaster = m_c->raycaster()->raycasters()[mesh_id];
+    if (action == SLAGizmoEventType::LeftDown && !cut_line_processing()) {
+        m_line_beg = pt;
+        m_line_end = pt;
+        return true;
+    }
 
-        Vec3d point;
-        Vec3d direction;
-        if (raycaster->unproject_on_mesh(mouse_position, trafo, camera, point, direction))
-        {
-            point += mi->get_offset();
-            point[Z] += sla_shift;
+    if (cut_line_processing()) {
+        m_line_end = pt;
+        if (action == SLAGizmoEventType::LeftDown) {
+            Vec3d point = m_line_end;
+            Vec3d line_dir = m_line_end - m_line_beg;
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by line"), UndoRedo::SnapshotType::GizmoAction);
 
-            if (action == SLAGizmoEventType::LeftDown && !cut_line_processing()) {
-                m_line_beg = point;
-                return true;
-            }
-            if (action == SLAGizmoEventType::Moving && cut_line_processing()) {
-                m_line_end = point;
-                return true;
-            }
-            if (action == SLAGizmoEventType::LeftDown && cut_line_processing()) {
-                Vec3f camera_dir = camera.get_dir_forward().cast<float>();
-                Vec3f line_dir = (m_line_end - m_line_beg).cast<float>();
+            Vec3d cross_dir = line_dir.cross(dir).normalized();
+            Eigen::Quaterniond q;
+            Transform3d m = Transform3d::Identity();
+            m.matrix().block(0, 0, 3, 3) = q.setFromTwoVectors(Vec3d::UnitZ(), cross_dir).toRotationMatrix();
 
-                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by line"), UndoRedo::SnapshotType::GizmoAction);
+            m_rotation_gizmo.set_rotation(Geometry::Transformation(m).get_rotation());
 
-                Vec3f cross_dir = line_dir.cross(camera_dir).normalized();
-                Eigen::Quaterniond q;
-                Transform3d m = Transform3d::Identity();
-                m.matrix().block(0, 0, 3, 3) = q.setFromTwoVectors(Vec3d::UnitZ(), cross_dir.cast<double>()).toRotationMatrix();
+            set_center(m_plane_center + cross_dir * (cross_dir.dot(pt - m_plane_center)));
 
-                m_rotation_gizmo.set_rotation(Geometry::Transformation(m).get_rotation());
-
-                set_center(Vec3d(0.5 * (point[X] + m_line_beg[X]), 0.5 * (point[Y] + m_line_beg[Y]), 0.5 * (point[Z] + m_line_beg[Z])));
-
-                m_line_end = m_line_beg = Vec3d::Zero();
-                return true;
-            }
+            m_line_end = m_line_beg = Vec3d::Zero();
         }
+        return true;
     }
     return false;
 }
@@ -1461,7 +1449,7 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
             if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal)) {
                 const Vec3d& hit = pos_and_normal.first;
                 // The clipping plane was clicked, hit containts coordinates of the hit in world coords.
-                std::cout << hit.x() << "\t" << hit.y() << "\t" << hit.z() << std::endl;
+                //std::cout << hit.x() << "\t" << hit.y() << "\t" << hit.z() << std::endl;
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
 
                 connectors.emplace_back(hit, m_rotation_gizmo.get_rotation(), float(m_connector_size * 0.5), float(m_connector_depth_ratio));

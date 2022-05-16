@@ -138,8 +138,8 @@ public:
     {
     }
 
-    void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                             Vec3d& point, Vec3d& direction) const;
+    static void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
+                             Vec3d& point, Vec3d& direction);
 
     // Given a mouse position, this returns true in case it is on the mesh.
     bool unproject_on_mesh(
