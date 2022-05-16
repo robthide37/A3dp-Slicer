@@ -76,6 +76,7 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::LegendToolMarker      , "legend_toolmarker"             },
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
     {ImGui::RevertButton          , "undo"                          },
+    {ImGui::WarningMarkerSmall    , "notification_warning"          },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {

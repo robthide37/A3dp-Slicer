@@ -475,10 +475,10 @@ void ObjectClipper::set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset
     get_pool()->get_canvas()->set_as_dirty();
 }
 
-const ClippingPlane* ObjectClipper::get_clipping_plane() const
+const ClippingPlane* ObjectClipper::get_clipping_plane(bool ignore_hide_clipped) const
 {
     static const ClippingPlane no_clip = ClippingPlane::ClipsNothing();
-    return m_hide_clipped ? m_clp.get() : &no_clip;
+    return (ignore_hide_clipped || m_hide_clipped) ? m_clp.get() : &no_clip;
 }
 
 void ObjectClipper::set_behavior(bool hide_clipped, bool fill_cut, double contour_width)

@@ -57,6 +57,7 @@ class GLGizmoCut3D : public GLGizmoBase
     bool m_rotate_lower{ false };
 
     bool m_hide_cut_plane{ false };
+    bool m_connectors_editing{ false };
 
     double m_connector_depth_ratio{ 3.0 };
     double m_connector_size{ 2.5 };
