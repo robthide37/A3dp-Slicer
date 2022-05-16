@@ -43,6 +43,14 @@ set(SLIC3R_GTK "2" CACHE STRING "GTK version to use with wxWidgets on Linux")
 
 set(IS_CROSS_COMPILE FALSE)
 
+if (SLIC3R_STATIC)
+    # Prefer config scripts over find modules. This is helpful when building with
+    # the static dependencies. Many libraries have their own export scripts
+    # while having a Find<PkgName> module in standard cmake installation.
+    # (e.g. CURL)
+    set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
+endif ()
+
 if (APPLE)
     set(CMAKE_FIND_FRAMEWORK LAST)
     set(CMAKE_FIND_APPBUNDLE LAST)
@@ -438,23 +446,6 @@ else()
     target_link_libraries(libcurl INTERFACE crypt32)
 endif()
 
-if (SLIC3R_STATIC AND NOT SLIC3R_STATIC_EXCLUDE_CURL)
-    if (NOT APPLE)
-        # libcurl is always linked dynamically to the system libcurl on OSX.
-        # On other systems, libcurl is linked statically if SLIC3R_STATIC is set.
-        target_compile_definitions(libcurl INTERFACE CURL_STATICLIB)
-    endif()
-    if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        # As of now, our build system produces a statically linked libcurl,
-        # which links the OpenSSL library dynamically.
-        find_package(OpenSSL REQUIRED)
-        message("OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
-        message("OpenSSL libraries: ${OPENSSL_LIBRARIES}")
-        target_include_directories(libcurl INTERFACE ${OPENSSL_INCLUDE_DIR})
-        target_link_libraries(libcurl INTERFACE ${OPENSSL_LIBRARIES})
-    endif()
-endif()
-
 ## OPTIONAL packages
 
 # Find eigen3 or use bundled version
@@ -471,6 +462,14 @@ include_directories(BEFORE SYSTEM ${EIGEN3_INCLUDE_DIR})
 # Always use the system libexpat on Linux.
 
 find_package(EXPAT REQUIRED)
+
+add_library(libexpat INTERFACE)
+
+if (TARGET EXPAT::EXPAT )
+    target_link_libraries(libexpat INTERFACE EXPAT::EXPAT)
+elseif(TARGET expat::expat)
+    target_link_libraries(libexpat INTERFACE expat::expat)
+endif ()
 
 find_package(PNG REQUIRED)
 
