@@ -54,18 +54,9 @@ TEST_CASE("astar algorithm test over 3D point grid", "[AStar]") {
 
     auto pgrid = point_grid(ex_seq, vol, {0.1f, 0.1f, 0.1f});
 
-    size_t target = pgrid.point_count() - 1;
-
-    std::cout << "Tracing route to " << pgrid.get_coord(target).transpose() << std::endl;
     PointGridTracer pgt{pgrid, pgrid.point_count() - 1};
     std::vector<size_t> out;
     bool found = astar::search_route(pgt, size_t(0), std::back_inserter(out));
-
-    std::cout << "Route taken: ";
-    for (size_t i : out) {
-        std::cout << "(" << pgrid.get_coord(i).transpose() << ") ";
-    }
-    std::cout << std::endl;
 
     REQUIRE(found);
 }

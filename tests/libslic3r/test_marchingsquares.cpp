@@ -325,9 +325,9 @@ static void recreate_object_from_rasters(const std::string &objname, float lh) {
     double                      disp_w = 120.96;
     double                      disp_h = 68.04;
 
-#ifndef NDEBUG
-    size_t cntr = 0;
-#endif
+//#ifndef NDEBUG
+//    size_t cntr = 0;
+//#endif
     for (ExPolygons &layer : layers) {
         auto rst = create_raster(res, disp_w, disp_h);
         
@@ -335,11 +335,11 @@ static void recreate_object_from_rasters(const std::string &objname, float lh) {
             rst.draw(island);
         }
         
-#ifndef NDEBUG
-        std::fstream out(objname + std::to_string(cntr) + ".png", std::ios::out);
-        out << rst.encode(sla::PNGRasterEncoder{});
-        out.close();
-#endif
+//#ifndef NDEBUG
+//        std::fstream out(objname + std::to_string(cntr) + ".png", std::ios::out);
+//        out << rst.encode(sla::PNGRasterEncoder{});
+//        out.close();
+//#endif
         
         ExPolygons layer_ = sla::raster_to_polygons(rst);
 //        float delta = scaled(std::min(rst.pixel_dimensions().h_mm,
@@ -347,19 +347,19 @@ static void recreate_object_from_rasters(const std::string &objname, float lh) {
         
 //        layer_ = expolygons_simplify(layer_, delta);
 
-#ifndef NDEBUG
-        SVG svg(objname +  std::to_string(cntr) + ".svg", BoundingBox(Point{0, 0}, Point{scaled(disp_w), scaled(disp_h)}));
-        svg.draw(layer_);
-        svg.draw(layer, "green");
-        svg.Close();
-#endif
+//#ifndef NDEBUG
+//        SVG svg(objname +  std::to_string(cntr) + ".svg", BoundingBox(Point{0, 0}, Point{scaled(disp_w), scaled(disp_h)}));
+//        svg.draw(layer_);
+//        svg.draw(layer, "green");
+//        svg.Close();
+//#endif
         
         double layera = 0., layera_ = 0.;
         for (auto &p : layer) layera += p.area();
         for (auto &p : layer_) layera_ += p.area();
-#ifndef NDEBUG
-        std::cout << cntr++ << std::endl;
-#endif
+//#ifndef NDEBUG
+//        std::cout << cntr++ << std::endl;
+//#endif
         double diff = std::abs(layera_ - layera);
         REQUIRE((diff <= 0.1 * layera || diff < scaled<double>(1.) * scaled<double>(1.)));
         
