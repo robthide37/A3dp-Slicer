@@ -12,7 +12,7 @@ class wxListView;
 class wxStaticText;
 class wxTimer;
 class wxTimerEvent;
-class boost::asio::ip::address;
+class address;
 
 namespace Slic3r {
 
