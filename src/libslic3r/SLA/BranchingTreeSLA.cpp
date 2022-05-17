@@ -120,7 +120,7 @@ bool BranchingTreeBuilder::add_bridge(const branchingtree::Node &from,
     double fromR = get_radius(from), toR = get_radius(to);
     Beam beam{Ball{fromd, fromR}, Ball{tod, toR}};
     auto   hit = beam_mesh_hit(ex_tbb, m_sm.emesh, beam,
-                               2 * m_sm.cfg.safety_distance_mm);
+                               m_sm.cfg.head_back_radius_mm);
 
     bool ret = hit.distance() > (tod - fromd).norm();
 
@@ -141,7 +141,7 @@ bool BranchingTreeBuilder::add_merger(const branchingtree::Node &node,
     Beam beam1{Ball{from1d, nodeR}, Ball{tod, mergeR}};
     Beam beam2{Ball{from2d, closestR}, Ball{tod, mergeR}};
 
-    auto sd = 2 * m_sm.cfg.safety_distance_mm;
+    auto sd = m_sm.cfg.safety_distance_mm ;
     auto hit1 = beam_mesh_hit(ex_tbb, m_sm.emesh, beam1, sd);
     auto hit2 = beam_mesh_hit(ex_tbb, m_sm.emesh, beam2, sd);
 
@@ -175,15 +175,20 @@ bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
                                              fromj,
                                              to.pos.cast<double>());
 
+    sla::Junction toj = {anchor->junction_point(), anchor->r_back_mm};
+
     if (anchor) {
-        m_builder.add_diffbridge(fromj.pos, anchor->junction_point(), fromj.r,
-                                 anchor->r_back_mm);
+        auto hit1 = beam_mesh_hit(ex_tbb, m_sm.emesh,
+                                  Beam{{fromj.pos, fromj.r}, {toj.pos, toj.r}},
+                                  m_sm.cfg.safety_distance_mm);
+        if (hit1.distance() >= distance(fromj.pos, toj.pos)) {
+            m_builder.add_diffbridge(fromj.pos, toj.pos, fromj.r, toj.r);
 
-        if (!m_sm.cfg.ground_facing_only) { // Easter egg, to omit the anchors
-            m_builder.add_anchor(*anchor);
+            if (!m_sm.cfg.ground_facing_only) { // Easter egg, to omit the anchors
+                m_builder.add_anchor(*anchor);
+            }
+            build_subtree(from.id);
         }
-
-        build_subtree(from.id);
     }
 
     return bool(anchor);
