@@ -498,7 +498,8 @@ std::vector<size_t> non_duplicate_suppt_indices(const PtIndex &index,
                                           !to_remove[i_closest];
                                });
 
-        if ((suppts[i].pos - suppts[closest_idx].pos).norm() < eps)
+        if (closest_idx < suppts.size() &&
+            (suppts[i].pos - suppts[closest_idx].pos).norm() < eps)
             to_remove[i] = true;
     }
 
