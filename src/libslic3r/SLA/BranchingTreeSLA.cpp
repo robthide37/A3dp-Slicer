@@ -175,19 +175,22 @@ bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
                                              fromj,
                                              to.pos.cast<double>());
 
-    sla::Junction toj = {anchor->junction_point(), anchor->r_back_mm};
-
     if (anchor) {
-        auto hit1 = beam_mesh_hit(ex_tbb, m_sm.emesh,
-                                  Beam{{fromj.pos, fromj.r}, {toj.pos, toj.r}},
-                                  m_sm.cfg.safety_distance_mm);
-        if (hit1.distance() >= distance(fromj.pos, toj.pos)) {
+        sla::Junction toj = {anchor->junction_point(), anchor->r_back_mm};
+
+        auto hit = beam_mesh_hit(ex_tbb, m_sm.emesh,
+                                 Beam{{fromj.pos, fromj.r}, {toj.pos, toj.r}}, 0.);
+
+        if (hit.distance() > distance(fromj.pos, toj.pos)) {
             m_builder.add_diffbridge(fromj.pos, toj.pos, fromj.r, toj.r);
 
             if (!m_sm.cfg.ground_facing_only) { // Easter egg, to omit the anchors
                 m_builder.add_anchor(*anchor);
             }
+
             build_subtree(from.id);
+        } else {
+            anchor.reset();
         }
     }
 
