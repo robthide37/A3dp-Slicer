@@ -230,16 +230,23 @@ void PreferencesDialog::build()
 			app_config->get("export_sources_full_pathnames") == "1");
 
 #ifdef _WIN32
-		// Please keep in sync with ConfigWizard
-		append_bool_option(m_optgroup_general, "associate_3mf",
-			L("Associate .3mf files to PrusaSlicer"),
-			L("If enabled, sets PrusaSlicer as default application to open .3mf files."),
-			app_config->get("associate_3mf") == "1");
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+		// file association is not possible anymore starting with Win 8
+		if (wxPlatformInfo::Get().GetOSMajorVersion() < 8) {
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+			// Please keep in sync with ConfigWizard
+			append_bool_option(m_optgroup_general, "associate_3mf",
+				L("Associate .3mf files to PrusaSlicer"),
+				L("If enabled, sets PrusaSlicer as default application to open .3mf files."),
+				app_config->get("associate_3mf") == "1");
 
-		append_bool_option(m_optgroup_general, "associate_stl",
-			L("Associate .stl files to PrusaSlicer"),
-			L("If enabled, sets PrusaSlicer as default application to open .stl files."),
-			app_config->get("associate_stl") == "1");
+			append_bool_option(m_optgroup_general, "associate_stl",
+				L("Associate .stl files to PrusaSlicer"),
+				L("If enabled, sets PrusaSlicer as default application to open .stl files."),
+				app_config->get("associate_stl") == "1");
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+		}
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
 #endif // _WIN32
 
 		m_optgroup_general->append_separator();
