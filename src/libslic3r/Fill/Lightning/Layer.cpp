@@ -129,9 +129,10 @@ GroundingLocation Layer::getBestGroundingLocation
             if (contour.size() > 2) {
                 Point prev = contour.points.back();
                 for (const Point &p2 : contour.points) {
-                    if (double d = Line::distance_to_squared(unsupported_location, prev, p2); d < d2) {
+                    Point closest_point;
+                    if (double d = line_alg::distance_to_squared(Line{prev, p2}, unsupported_location, &closest_point); d < d2) {
                         d2 = d;
-                        node_location = Geometry::foot_pt({ prev, p2 }, unsupported_location).cast<coord_t>();
+                        node_location = closest_point;
                     }
                     prev = p2;
                 }
