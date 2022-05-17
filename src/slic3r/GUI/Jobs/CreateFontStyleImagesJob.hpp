@@ -9,7 +9,6 @@
 
 namespace Slic3r::GUI {
 
-
 /// <summary>
 /// Create texture with name of styles written by its style
 /// NOTE: Access to glyph cache is possible only from job
@@ -34,4 +33,4 @@ public:
 
 } // namespace Slic3r::GUI
 
-#endif // slic3r_EmbossJob_hpp_
+#endif // slic3r_CreateFontStyleImagesJob_hpp_

@@ -723,6 +723,8 @@ void GLGizmoEmboss::initialize()
                                 2 * style.FramePadding.x;
     int max_style_image_height = 2 * input_height;
     cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
+    cfg.face_name_size.y() = line_height_with_spacing;
+
     m_gui_cfg.emplace(std::move(cfg));
 
     init_icons();
@@ -1313,8 +1315,43 @@ void GLGizmoEmboss::init_face_names() {
     std::sort(m_face_names.names.begin(), m_face_names.names.end());
 }
 
+#include "slic3r/GUI/Jobs/CreateFontNameImageJob.hpp"
 void GLGizmoEmboss::draw_font_list()
-{ 
+{
+    // Create of texture for font name
+    auto init_texture = [&face_names = m_face_names, size = m_gui_cfg->face_name_size]() {
+        // check if already exists
+        GLuint &id = face_names.texture_id; 
+        if (id != 0) return;
+        // create texture for font
+        GLenum target = GL_TEXTURE_2D, format = GL_ALPHA,
+               type = GL_UNSIGNED_BYTE;
+        GLint level = 0, border = 0;
+        glsafe(::glGenTextures(1, &id));
+        glsafe(::glBindTexture(target, id));
+        glsafe(::glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+        glsafe(::glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+        GLint w = size.x(), h = face_names.names.size() * size.y();
+        std::vector<unsigned char> data(w * h, {0});
+        glsafe(::glTexImage2D(target, level, GL_ALPHA, w, h, border, format, type, data.data()));
+        // bind default texture
+        GLuint no_texture_id = 0;
+        glsafe(::glBindTexture(target, no_texture_id));
+
+        // no one is initialized yet
+        face_names.exist_textures = std::vector<bool>(face_names.names.size(), {false});
+    };
+    auto init_trancated_names = [&face_names = m_face_names, 
+        width = m_gui_cfg->face_name_max_width]() { 
+        if (!face_names.names_truncated.empty()) return;
+        face_names.names_truncated.reserve(face_names.names.size());
+        for (const wxString &face_name : face_names.names) {
+            std::string name(face_name.ToUTF8().data());
+            face_names.names_truncated.emplace_back(ImGuiWrapper::trunc(name, width));
+        }
+    };
+
+    // Set partial
     wxString actual_face_name;
     if (m_font_manager.is_activ_font()) {
         std::optional<wxFont> &wx_font_opt = m_font_manager.get_wx_font();
@@ -1326,18 +1363,44 @@ void GLGizmoEmboss::draw_font_list()
     wxString del_facename;
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if (!m_face_names.is_init) init_face_names();
+        init_texture();
+        if (m_face_names.names_truncated.empty()) init_trancated_names();
+        ImTextureID tex_id = (void *) (intptr_t) m_face_names.texture_id;
         for (const wxString &face_name : m_face_names.names) {
             size_t index = &face_name - &m_face_names.names.front();
             ImGui::PushID(index);
             bool is_selected = (actual_face_name == face_name);
-            if (ImGui::Selectable(face_name.ToUTF8().data(), is_selected)) {
+            if (ImGui::Selectable(m_face_names.names_truncated[index].c_str(), is_selected)) {
                 if (!select_facename(face_name)) {
                     del_facename = face_name;
                     wxMessageBox(GUI::format(
                         _L("Font face \"%1%\" can't be selected."), face_name));
                 }
             }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(face_name.ToUTF8().data());
             if (is_selected) ImGui::SetItemDefaultFocus();
+            if (!m_face_names.exist_textures[index] && 
+                ImGui::IsItemVisible()) {
+                m_face_names.exist_textures[index] = true;
+                std::string text = m_text.empty() ? "AaBbCc" : m_text;
+                // render text to texture
+                FontImageData data{text,
+                                   face_name,
+                                   m_face_names.encoding,
+                                   m_face_names.texture_id,
+                                   index,
+                                   m_gui_cfg->face_name_size};
+                auto job = std::make_unique<CreateFontImageJob>(std::move(data));
+                auto& worker = wxGetApp().plater()->get_ui_job_worker();
+                queue_job(worker, std::move(job));
+            }
+            ImGui::SameLine(m_gui_cfg->face_name_offset);
+            ImVec2 size(m_gui_cfg->face_name_size.x(),
+                        m_gui_cfg->face_name_size.y()),
+                uv0(0.f, index / (float) m_face_names.names.size()),
+                uv1(1.f, (index + 1) / (float) m_face_names.names.size());
+            ImGui::Image(tex_id, size, uv0, uv1);
             ImGui::PopID();
         }        
 #ifdef SHOW_FONT_COUNT
@@ -1345,6 +1408,10 @@ void GLGizmoEmboss::draw_font_list()
                            static_cast<int>(m_face_names.names.size()));
 #endif // SHOW_FONT_COUNT
         ImGui::EndCombo();
+    } else {
+        // free texture and set id to zero
+        glsafe(::glDeleteTextures(1, &m_face_names.texture_id));
+        m_face_names.texture_id = 0;
     }
 
     // delete unloadable face name when appear
@@ -1352,6 +1419,7 @@ void GLGizmoEmboss::draw_font_list()
         // IMPROVE: store list of deleted facename into app.ini
         std::vector<wxString> &f = m_face_names.names;
         f.erase(std::remove(f.begin(), f.end(), del_facename), f.end());
+        m_face_names.names_truncated.clear();
     }
 
 #ifdef ALLOW_ADD_FONT_BY_FILE

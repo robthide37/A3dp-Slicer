@@ -22,6 +22,7 @@
 #include "libslic3r/TextConfiguration.hpp"
 
 #include <imgui/imgui.h>
+#include <GL/glew.h>
 
 class wxFont;
 namespace Slic3r{
@@ -184,6 +185,11 @@ private:
 
         ImVec2 text_size;
 
+        // maximal size of face image
+        Vec2i face_name_size = Vec2i(128, 0);
+        float face_name_max_width = 100.f;
+        float face_name_offset = 100.f;
+
         // Only translations needed for calc GUI size
         struct Translations
         {
@@ -220,6 +226,11 @@ private:
         bool                  is_init = false;
         std::vector<wxString> names;
         wxFontEncoding        encoding;
+
+        std::vector<std::string> names_truncated;
+        GLuint                texture_id = 0;
+        // is texture started create?
+        std::vector<bool> exist_textures = {};
     } m_face_names;
 
     // Track stored values in AppConfig
