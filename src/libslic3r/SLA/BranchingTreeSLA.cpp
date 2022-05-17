@@ -205,8 +205,8 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
 
     execution::for_each(
         ex_tbb, size_t(0), nondup_idx.size(),
-        [&sm, &heads](size_t i) {
-            heads[i] = calculate_pinhead_placement(ex_seq, sm, i);
+        [&sm, &heads, &nondup_idx](size_t i) {
+            heads[i] = calculate_pinhead_placement(ex_seq, sm, nondup_idx[i]);
         },
         execution::max_concurrency(ex_tbb)
     );
@@ -214,6 +214,7 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
     for (auto &h : heads)
         if (h && h->is_valid()) {
             leafs.emplace_back(h->junction_point().cast<float>(), h->r_back_mm);
+            h->id = leafs.size() - 1;
             builder.add_head(h->id, *h);
         }
 
