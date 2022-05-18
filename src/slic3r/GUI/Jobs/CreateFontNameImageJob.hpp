@@ -21,6 +21,7 @@ struct FontImageData
     wxString       font_name;
     wxFontEncoding encoding;
     // texture for copy result to
+    // texture MUST BE initialized
     GLuint         texture_id;
     // Index of face name, define place in texture
     size_t index;
@@ -31,6 +32,10 @@ struct FontImageData
     // bigger value create darker image
     // divide value 255
     unsigned char gray_level = 5;
+
+    // texture meta data
+    GLenum format = GL_ALPHA, type = GL_UNSIGNED_BYTE;
+    GLint  level = 0, border = 0;
 };
 
 /// <summary>

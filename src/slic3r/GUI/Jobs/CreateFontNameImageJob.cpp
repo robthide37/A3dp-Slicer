@@ -97,16 +97,15 @@ void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
     if (canceled) return;
     
     // upload texture on GPU
-    GLuint tex_id;
-    GLenum target = GL_TEXTURE_2D, format = GL_ALPHA, type = GL_UNSIGNED_BYTE;
-    GLint  level = 0, border = 0;
+    const GLenum target = GL_TEXTURE_2D;
     glsafe(::glBindTexture(target, m_input.texture_id));
 
     GLint 
         w = m_tex_size.x(), h = m_tex_size.y(),
         xoffset = m_input.size.x() - m_tex_size.x(), // arrange right
         yoffset = m_input.size.y() * m_input.index;
-    glsafe(::glTexSubImage2D(target, level, xoffset, yoffset, w, h, format, type, m_result.data()));
+    glsafe(::glTexSubImage2D(target, m_input.level, xoffset, yoffset, w, h,
+                             m_input.format, m_input.type, m_result.data()));
 
     // bind default texture
     GLuint no_texture_id = 0;
