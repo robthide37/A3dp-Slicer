@@ -171,9 +171,10 @@ bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
 {
     sla::Junction fromj = {from.pos.cast<double>(), get_radius(from)};
 
-    auto anchor = calculate_anchor_placement(ex_tbb, m_sm,
-                                             fromj,
-                                             to.pos.cast<double>());
+    auto anchor = m_sm.cfg.ground_facing_only ?
+                      std::optional<Anchor>{} : // If no mesh connections are allowed
+                      calculate_anchor_placement(ex_tbb, m_sm, fromj,
+                                                 to.pos.cast<double>());
 
     if (anchor) {
         sla::Junction toj = {anchor->junction_point(), anchor->r_back_mm};
@@ -183,10 +184,7 @@ bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
 
         if (hit.distance() > distance(fromj.pos, toj.pos)) {
             m_builder.add_diffbridge(fromj.pos, toj.pos, fromj.r, toj.r);
-
-            if (!m_sm.cfg.ground_facing_only) { // Easter egg, to omit the anchors
-                m_builder.add_anchor(*anchor);
-            }
+            m_builder.add_anchor(*anchor);
 
             build_subtree(from.id);
         } else {

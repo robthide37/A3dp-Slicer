@@ -57,11 +57,7 @@ sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfig& c)
     scfg.max_bridge_length_mm = c.support_max_bridge_length.getFloat();
     scfg.max_pillar_link_distance_mm = c.support_max_pillar_link_distance.getFloat();
     scfg.pillar_connection_mode = c.support_pillar_connection_mode.value;
-    if (scfg.tree_type != sla::SupportTreeType::Branching) {
-        // Branching tree is all about routing to model body, it doesn't support
-        // this option.
-        scfg.ground_facing_only = c.support_buildplate_only.getBool();
-    }
+    scfg.ground_facing_only = c.support_buildplate_only.getBool();
     scfg.pillar_widening_factor = c.support_pillar_widening_factor.getFloat();
     scfg.base_radius_mm = 0.5*c.support_base_diameter.getFloat();
     scfg.base_height_mm = c.support_base_height.getFloat();

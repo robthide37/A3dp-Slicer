@@ -16,9 +16,6 @@ void test_support_model_collision(
 
     sla::SupportTreeConfig supportcfg = input_supportcfg;
 
-    // Ensure that there are no anchors which would pierce the model.
-    supportcfg.ground_facing_only = true;
-
     // Set head penetration to a small negative value which should ensure that
     // the supports will not touch the model body.
     supportcfg.head_penetration_mm = -0.2;
