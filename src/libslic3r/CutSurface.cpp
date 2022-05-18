@@ -1610,10 +1610,81 @@ void priv::store(const CutAOIs &aois, const CutMesh &mesh, const std::string &di
 }
 
 void priv::store(const SurfaceCuts &cut, const std::string &dir) {
+    auto create_contour_its =
+        [](const indexed_triangle_set& its, const std::vector<unsigned int> &contour)
+        -> indexed_triangle_set {
+        static const float line_width = 0.1f;
+
+        auto get_triangle_tip = [&its](unsigned int vi1,
+                                       unsigned int vi2) -> const Vec3f& { 
+            for (const auto &t : its.indices) { 
+                unsigned int tvi = std::numeric_limits<unsigned int>::max();
+                for (const auto &vi : t) { 
+                    if (vi == vi1) continue;
+                    if (vi == vi2) continue;
+                    if (tvi == std::numeric_limits<unsigned int>::max()) {
+                        tvi = vi;
+                    } else {
+                        tvi = std::numeric_limits<unsigned int>::max();
+                        break;
+                    }
+                }
+                if (tvi != std::numeric_limits<unsigned int>::max())
+                    return its.vertices[tvi];
+            }
+            // triangle with indices vi1 and vi2 doesnt exist
+            assert(false);
+        };
+
+        indexed_triangle_set result;
+        result.vertices.reserve((contour.size() + 1) * 4);
+        result.indices.reserve((contour.size() + 1) * 2);
+        unsigned int prev_vi = contour.back();
+        for (unsigned int vi : contour) {
+            const Vec3f &a = its.vertices[vi];
+            const Vec3f &b = its.vertices[prev_vi];
+            const Vec3f &c = get_triangle_tip(vi, prev_vi);
+
+            Vec3f v1 = b - a; // from a to b
+            v1.normalize();
+            Vec3f v2 = c - a; // from a to c
+            v2.normalize();
+            // triangle normal
+            Vec3f norm = v1.cross(v2);
+            norm.normalize();
+            // perpendiculat to edge lay on triangle 
+            Vec3f perp_to_edge = norm.cross(v1);
+            perp_to_edge.normalize();
+
+            Vec3f dir = -perp_to_edge * line_width;
+
+            size_t ai = result.vertices.size();
+            result.vertices.push_back(a);
+            size_t bi = result.vertices.size();
+            result.vertices.push_back(b);
+            size_t ai2 = result.vertices.size();
+            result.vertices.push_back(a + dir);
+            size_t bi2 = result.vertices.size();
+            result.vertices.push_back(b + dir);
+
+            result.indices.push_back(Vec3i(ai, bi, ai2));
+            result.indices.push_back(Vec3i(ai2, bi, bi2));
+            prev_vi = vi;
+        }
+        return result;
+    };
+
     for (const auto &c : cut) {
         size_t index = &c - &cut.front();
         std::string file  = dir + "cut" + std::to_string(index) + ".obj";
-        its_write_obj(c, file.c_str());  
+        its_write_obj(c, file.c_str());
+        for (const auto& contour : c.contours) {
+            size_t c_index = &contour - &c.contours.front();
+            std::string c_file = dir + "cut" + std::to_string(index) + 
+                "contour" + std::to_string(c_index) + ".obj";
+            indexed_triangle_set c_its = create_contour_its(c, contour);
+            its_write_obj(c_its, c_file.c_str());
+        }
     }
 }
 #endif // DEBUG_OUTPUT_DIR
