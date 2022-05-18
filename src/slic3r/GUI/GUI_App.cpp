@@ -1204,10 +1204,17 @@ bool GUI_App::on_init_inner()
 
     if (is_editor()) {
 #ifdef __WXMSW__ 
-        if (app_config->get("associate_3mf") == "1")
-            associate_3mf_files();
-        if (app_config->get("associate_stl") == "1")
-            associate_stl_files();
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+        // file association is not possible anymore starting with Win 8
+        if (wxPlatformInfo::Get().GetOSMajorVersion() < 8) {
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+            if (app_config->get("associate_3mf") == "1")
+                associate_3mf_files();
+            if (app_config->get("associate_stl") == "1")
+                associate_stl_files();
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+        }
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
 #endif // __WXMSW__
 
         preset_updater = new PresetUpdater();
@@ -1245,8 +1252,15 @@ bool GUI_App::on_init_inner()
     }
     else {
 #ifdef __WXMSW__ 
-        if (app_config->get("associate_gcode") == "1")
-            associate_gcode_files();
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+        // file association is not possible anymore starting with Win 8
+        if (wxPlatformInfo::Get().GetOSMajorVersion() < 8) {
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+            if (app_config->get("associate_gcode") == "1")
+                associate_gcode_files();
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+        }
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
 #endif // __WXMSW__
     }
 
@@ -2419,16 +2433,23 @@ void GUI_App::open_preferences(const std::string& highlight_option /*= std::stri
         this->plater_->refresh_print();
 
 #ifdef _WIN32
-    if (is_editor()) {
-        if (app_config->get("associate_3mf") == "1")
-            associate_3mf_files();
-        if (app_config->get("associate_stl") == "1")
-            associate_stl_files();
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+    // file association is not possible anymore starting with Win 8
+    if (wxPlatformInfo::Get().GetOSMajorVersion() < 8) {
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+        if (is_editor()) {
+            if (app_config->get("associate_3mf") == "1")
+                associate_3mf_files();
+            if (app_config->get("associate_stl") == "1")
+                associate_stl_files();
+        }
+        else {
+            if (app_config->get("associate_gcode") == "1")
+                associate_gcode_files();
+        }
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
     }
-    else {
-        if (app_config->get("associate_gcode") == "1")
-            associate_gcode_files();
-    }
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
 #endif // _WIN32
 
     if (mainframe->preferences_dialog->settings_layout_changed()) {

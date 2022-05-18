@@ -181,7 +181,7 @@ Http::priv::~priv()
 
 bool Http::priv::ca_file_supported(::CURL *curl)
 {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
 	bool res = false;
 #else
 	bool res = true;
@@ -194,6 +194,7 @@ bool Http::priv::ca_file_supported(::CURL *curl)
 	if (::curl_easy_getinfo(curl, CURLINFO_TLS_SSL_PTR, &tls) == CURLE_OK) {
 		if (tls->backend == CURLSSLBACKEND_SCHANNEL || tls->backend == CURLSSLBACKEND_DARWINSSL) {
 			// With Windows and OS X native SSL support, cert files cannot be set
+            // DK: OSX is now not building CURL and links system one, thus we do not know which backend is installed. Still, false will be returned since the ifdef at the begining if this function.
 			res = false;
 		}
 	}

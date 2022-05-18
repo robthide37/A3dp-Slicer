@@ -13,6 +13,7 @@
 #include "GCode.hpp"
 #include "GCode/WipeTower.hpp"
 #include "Utils.hpp"
+#include "BuildVolume.hpp"
 
 #include <float.h>
 
@@ -387,7 +388,7 @@ bool Print::sequential_print_horizontal_clearance_valid(const Print& print, Poly
                     Geometry::assemble_transform({ 0.0, 0.0, model_instance0->get_offset().z() }, model_instance0->get_rotation(), model_instance0->get_scaling_factor(), model_instance0->get_mirror())),
                     // Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
                     // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
-                    float(scale_(0.5 * print.config().extruder_clearance_radius.value - EPSILON)),
+                    float(scale_(0.5 * print.config().extruder_clearance_radius.value - BuildVolume::BedEpsilon)),
                     jtRound, scale_(0.1)).front());
         }
 	    // Make a copy, so it may be rotated for instances.

@@ -44,10 +44,12 @@ void Layer::generateNewTrees
     const BoundingBox& current_outlines_bbox,
     const EdgeGrid::Grid& outlines_locator,
     const coord_t supporting_radius,
-    const coord_t wall_supporting_radius
+    const coord_t wall_supporting_radius,
+    const std::function<void()> &throw_on_cancel_callback
 )
 {
     DistanceField distance_field(supporting_radius, current_outlines, current_outlines_bbox, current_overhang);
+    throw_on_cancel_callback();
 
     SparseNodeGrid tree_node_locator;
     fillLocator(tree_node_locator, current_outlines_bbox);
@@ -56,6 +58,7 @@ void Layer::generateNewTrees
     // Determine next point from tree/outline areas via distance-field
     Point unsupported_location;
     while (distance_field.tryGetNextPoint(&unsupported_location)) {
+        throw_on_cancel_callback();
         GroundingLocation grounding_loc = getBestGroundingLocation(
             unsupported_location, current_outlines, current_outlines_bbox, outlines_locator, supporting_radius, wall_supporting_radius, tree_node_locator);
 
@@ -126,9 +129,10 @@ GroundingLocation Layer::getBestGroundingLocation
             if (contour.size() > 2) {
                 Point prev = contour.points.back();
                 for (const Point &p2 : contour.points) {
-                    if (double d = Line::distance_to_squared(unsupported_location, prev, p2); d < d2) {
+                    Point closest_point;
+                    if (double d = line_alg::distance_to_squared(Line{prev, p2}, unsupported_location, &closest_point); d < d2) {
                         d2 = d;
-                        node_location = Geometry::foot_pt({ prev, p2 }, unsupported_location).cast<coord_t>();
+                        node_location = closest_point;
                     }
                     prev = p2;
                 }

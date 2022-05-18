@@ -1934,7 +1934,10 @@ void ConfigWizard::priv::load_pages()
     index->add_page(page_update);
     index->add_page(page_reload_from_disk);
 #ifdef _WIN32
-    index->add_page(page_files_association);
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+    if (page_files_association != nullptr)
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+        index->add_page(page_files_association);
 #endif // _WIN32
     index->add_page(page_mode);
 
@@ -2747,20 +2750,31 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     app_config->set("export_sources_full_pathnames", page_reload_from_disk->full_pathnames ? "1" : "0");
 
 #ifdef _WIN32
-    app_config->set("associate_3mf", page_files_association->associate_3mf() ? "1" : "0");
-    app_config->set("associate_stl", page_files_association->associate_stl() ? "1" : "0");
-//    app_config->set("associate_gcode", page_files_association->associate_gcode() ? "1" : "0");
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+    if (page_files_association != nullptr) {
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+        app_config->set("associate_3mf", page_files_association->associate_3mf() ? "1" : "0");
+        app_config->set("associate_stl", page_files_association->associate_stl() ? "1" : "0");
+//        app_config->set("associate_gcode", page_files_association->associate_gcode() ? "1" : "0");
 
-    if (wxGetApp().is_editor()) {
-        if (page_files_association->associate_3mf())
-            wxGetApp().associate_3mf_files();
-        if (page_files_association->associate_stl())
-            wxGetApp().associate_stl_files();
+        if (wxGetApp().is_editor()) {
+            if (page_files_association->associate_3mf())
+                wxGetApp().associate_3mf_files();
+            if (page_files_association->associate_stl())
+                wxGetApp().associate_stl_files();
+        }
+//        else {
+//            if (page_files_association->associate_gcode())
+//                wxGetApp().associate_gcode_files();
+//        }
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
     }
-//    else {
-//        if (page_files_association->associate_gcode())
-//            wxGetApp().associate_gcode_files();
-//    }
+    else {
+        app_config->set("associate_3mf", "0");
+        app_config->set("associate_stl", "0");
+//        app_config->set("associate_gcode", "0");
+    }
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
 
 #endif // _WIN32
 
@@ -2921,7 +2935,11 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     p->add_page(p->page_update   = new PageUpdate(this));
     p->add_page(p->page_reload_from_disk = new PageReloadFromDisk(this));
 #ifdef _WIN32
-    p->add_page(p->page_files_association = new PageFilesAssociation(this));
+#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+    // file association is not possible anymore starting with Win 8
+    if (wxPlatformInfo::Get().GetOSMajorVersion() < 8)
+#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+        p->add_page(p->page_files_association = new PageFilesAssociation(this));
 #endif // _WIN32
     p->add_page(p->page_mode     = new PageMode(this));
     p->add_page(p->page_firmware = new PageFirmware(this));
