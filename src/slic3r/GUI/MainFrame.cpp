@@ -1009,12 +1009,12 @@ void MainFrame::init_tabpanel()
     m_tabpanel->Hide();
     m_settings_dialog.set_tabpanel(m_tabpanel);
 
+#ifndef _USE_CUSTOM_NOTEBOOK
     int icon_size = 0;
     try {
         icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
     }
     catch (std::exception e) {}
-#ifndef _USE_CUSTOM_NOTEBOOK
     // icons for m_tabpanel tabs
     wxImageList* img_list = nullptr;
     if (icon_size >= 8) {
@@ -1271,12 +1271,6 @@ void MainFrame::add_created_tab(Tab* panel)
     panel->create_preset_tab();
 
     const auto printer_tech = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
-
-    int icon_size = 0;
-    try {
-        icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
-    }
-    catch (std::exception e) {}
 
     if (panel->supports_printer_technology(printer_tech)) {
 #ifdef _USE_CUSTOM_NOTEBOOK

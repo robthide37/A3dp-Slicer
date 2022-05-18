@@ -216,7 +216,7 @@ public:
             return false;
 
         //create the button
-        GetBtnsListCtrl()->InsertPage(n, text, bSelect, bmp_name, bmp_size);
+        GetBtnsListCtrl()->InsertPage(n, text, bSelect, bmp_size > 0 ? bmp_name : "", bmp_size);
 
         if (bSelect)
             SetBtSelection(n);
@@ -237,7 +237,7 @@ public:
         btidx_to_tabpage.insert(btidx_to_tabpage.begin() + n, page_idx);
 
         //create the button
-        GetBtnsListCtrl()->InsertPage(n, text, bSelect, bmp_name, bmp_size);
+        GetBtnsListCtrl()->InsertPage(n, text, bSelect, bmp_size > 0 ? bmp_name : "", bmp_size);
 
 
         if (bSelect)
