@@ -1422,7 +1422,13 @@ void Selection::reset_skew()
         const VolumeCache& volume_data = m_cache.volumes_data[i];
         const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
         const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
-        if (m_mode == Instance && inst_trafo.has_skew()) {
+        const Geometry::Transformation world_trafo = inst_trafo * vol_trafo;
+        if (!inst_trafo.has_skew() && !vol_trafo.has_skew() && world_trafo.has_skew()) {
+            Geometry::Transformation mod_world_trafo = Geometry::Transformation(world_trafo.get_matrix_no_offset());
+            mod_world_trafo.reset_skew();
+            v.set_volume_transformation(vol_trafo.get_offset_matrix() * inst_trafo.get_matrix_no_offset().inverse() * mod_world_trafo.get_matrix());
+        }
+        else if (m_mode == Instance && inst_trafo.has_skew()) {
             Geometry::Transformation trafo = inst_trafo;
             trafo.reset_skew();
             v.set_instance_transformation(trafo);
@@ -1431,19 +1437,6 @@ void Selection::reset_skew()
             Geometry::Transformation trafo = vol_trafo;
             trafo.reset_skew();
             v.set_volume_transformation(trafo);
-        }
-        else {
-            const Geometry::Transformation world_trafo = inst_trafo * vol_trafo;
-            if (world_trafo.has_skew()) {
-                if (m_mode == Instance) {
-                    // TODO
-                    int a = 0;
-                }
-                else {
-                    // TODO
-                    int a = 0;
-                }
-            }
         }
     }
 
