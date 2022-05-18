@@ -1584,9 +1584,15 @@ void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& mo
             new_volume->source.mesh_offset = model.objects.front()->volumes.front()->source.mesh_offset;
 
         if (from_galery) {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            new_volume->set_transformation(v->get_instance_transformation().get_matrix_no_offset().inverse());
+            // Transform the new modifier to be aligned with the print bed.
+            const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
+#else
             // Transform the new modifier to be aligned with the print bed.
             const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
             new_volume->set_transformation(Geometry::Transformation::volume_to_bed_transformation(inst_transform, mesh_bb));
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
             // Set the modifier position.
             // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
             const Vec3d offset = Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - instance_offset;
@@ -1655,9 +1661,15 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
 
     // First (any) GLVolume of the selected instance. They all share the same instance matrix.
     const GLVolume* v = selection.get_first_volume();
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    new_volume->set_transformation(v->get_instance_transformation().get_matrix_no_offset().inverse());
     // Transform the new modifier to be aligned with the print bed.
-	const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
+    const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
+#else
+    // Transform the new modifier to be aligned with the print bed.
+    const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
     new_volume->set_transformation(Geometry::Transformation::volume_to_bed_transformation(v->get_instance_transformation(), mesh_bb));
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     // Set the modifier position.
     auto offset = (type_name == "Slab") ?
         // Slab: Lift to print bed

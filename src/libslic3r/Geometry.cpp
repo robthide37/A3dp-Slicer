@@ -764,6 +764,7 @@ Transformation Transformation::operator * (const Transformation& other) const
     return Transformation(get_matrix() * other.get_matrix());
 }
 
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
 Transformation Transformation::volume_to_bed_transformation(const Transformation& instance_transformation, const BoundingBoxf3& bbox)
 {
     Transformation out;
@@ -771,11 +772,7 @@ Transformation Transformation::volume_to_bed_transformation(const Transformation
     if (instance_transformation.is_scaling_uniform()) {
         // No need to run the non-linear least squares fitting for uniform scaling.
         // Just set the inverse.
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
-        out.set_matrix(instance_transformation.get_matrix_no_offset().inverse());
-#else
         out.set_from_transform(instance_transformation.get_matrix(true).inverse());
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
     else if (is_rotation_ninety_degrees(instance_transformation.get_rotation())) {
         // Anisotropic scaling, rotation by multiples of ninety degrees.
@@ -823,6 +820,7 @@ Transformation Transformation::volume_to_bed_transformation(const Transformation
 
     return out;
 }
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 // For parsing a transformation matrix from 3MF / AMF.
 Transform3d transform3d_from_string(const std::string& transform_str)

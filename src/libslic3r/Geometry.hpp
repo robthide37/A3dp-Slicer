@@ -509,10 +509,12 @@ public:
 
     Transformation operator * (const Transformation& other) const;
 
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
     // Find volume transformation, so that the chained (instance_trafo * volume_trafo) will be as close to identity
     // as possible in least squares norm in regard to the 8 corners of bbox.
     // Bounding box is expected to be centered around zero in all axes.
     static Transformation volume_to_bed_transformation(const Transformation& instance_transformation, const BoundingBoxf3& bbox);
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 private:
     friend class cereal::access;
