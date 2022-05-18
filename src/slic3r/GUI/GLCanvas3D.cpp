@@ -4146,7 +4146,6 @@ void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
 
     std::set<std::pair<int, int>> done;  // keeps track of modified instances
 
-    Selection::EMode selection_mode = m_selection.get_mode();
     const Selection::IndicesList& idxs = m_selection.get_volume_idxs();
 
     for (unsigned int id : idxs) {

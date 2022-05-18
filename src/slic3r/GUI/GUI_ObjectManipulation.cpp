@@ -1413,7 +1413,9 @@ void ObjectManipulation::on_change(const std::string& opt_key, int axis, double 
 
 void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
 { 
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
     const Selection &selection = wxGetApp().plater()->canvas3D()->get_selection();
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if ENABLE_WORLD_COORDINATE
     if (!use_uniform_scale) {
 #if !ENABLE_TRANSFORMATIONS_BY_MATRICES

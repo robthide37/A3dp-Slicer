@@ -785,7 +785,7 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
         }
         else {
             const Vec3d offset = transformation_type.local() ?
-                volume_data.get_volume_transform().get_rotation_matrix() * displacement : displacement;
+                (Vec3d)(volume_data.get_volume_transform().get_rotation_matrix() * displacement) : displacement;
             transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(offset));
         }
     }
