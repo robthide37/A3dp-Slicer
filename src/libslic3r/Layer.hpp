@@ -73,7 +73,7 @@ public:
     Flow    flow(FlowRole role, double layer_height) const;
     Flow    bridging_flow(FlowRole role) const;
 
-    void    slices_to_fill_surfaces_clipped();
+    void    slices_to_fill_surfaces_clipped(coord_t opening_offset);
     void    prepare_fill_surfaces();
     void    make_perimeters(const SurfaceCollection& slices, SurfaceCollection* fill_surfaces);
     void    make_milling_post_process(const SurfaceCollection& slices);

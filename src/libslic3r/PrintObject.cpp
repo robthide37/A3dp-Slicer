@@ -1597,7 +1597,10 @@ bool PrintObject::invalidate_state_by_config_options(
                 for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++idx_layer) {
                     m_print->throw_if_canceled();
                     LayerRegion* layerm = m_layers[idx_layer]->get_region(region_id);
-                    layerm->slices_to_fill_surfaces_clipped();
+                    layerm->slices_to_fill_surfaces_clipped(
+                        std::max(SCALED_EPSILON * 2,
+                        std::max(scale_t(m_print->config().resolution) / 4,
+                            scale_t(m_print->config().resolution_internal) / 8)));
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
                     layerm->export_region_fill_surfaces_to_svg_debug("1_detect_surfaces_type-final");
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */

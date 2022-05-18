@@ -52,7 +52,7 @@ Flow LayerRegion::bridging_flow(FlowRole role) const
 }
 
 // Fill in layerm->fill_surfaces by trimming the layerm->slices by the cummulative layerm->fill_surfaces.
-void LayerRegion::slices_to_fill_surfaces_clipped()
+void LayerRegion::slices_to_fill_surfaces_clipped(coord_t opening_offset)
 {
     //if (this->region()->config().no_perimeter_full_bridge) return;
     // Note: this method should be idempotent, but fill_surfaces gets modified 
@@ -68,33 +68,12 @@ void LayerRegion::slices_to_fill_surfaces_clipped()
     // Trim surfaces by the fill_boundaries.
     this->fill_surfaces.surfaces.clear();
     for (auto const& entry : polygons_by_surface) {
-        if (!entry.second.empty()) {
-            //if (entry.first & stModBridge == stModBridge && this->region()->config().no_perimeter_full_bridge)
-            //    this->fill_surfaces.append(entry.second, entry.first);
-            //else
-            this->fill_surfaces.append(intersection_ex(entry.second, this->fill_expolygons), entry.first);
-        }
-        //if (this->region()->config().no_perimeter_full_bridge) return;
-        // Note: this method should be idempotent, but fill_surfaces gets modified 
-        // in place. However we're now only using its boundaries (which are invariant)
-        // so we're safe. This guarantees idempotence of prepare_infill() also in case
-        // that combine_infill() turns some fill_surface into VOID surfaces.
-    //    Polygons fill_boundaries = to_polygons(std::move(this->fill_surfaces));
-        Polygons fill_boundaries = to_polygons(this->fill_expolygons);
-        // Collect polygons per surface type.
-        std::map<SurfaceType, Polygons> polygons_by_surface;
-        for (const Surface& surface : this->slices().surfaces) {
-            polygons_append(polygons_by_surface[surface.surface_type], surface.expolygon);
-        }
-        // Trim surfaces by the fill_boundaries.
-        this->fill_surfaces.surfaces.clear();
-        for (auto const& entry : polygons_by_surface) {
-            if (!entry.second.empty())
-                //if (entry.first & stModBridge == stModBridge && this->region()->config().no_perimeter_full_bridge)
-                //    this->fill_surfaces.append(entry.second, entry.first);
-                //else
-                this->fill_surfaces.append(intersection_ex(entry.second, fill_boundaries), entry.first);
-        }
+        if (!entry.second.empty())
+            for (ExPolygon& expoly_to_test : intersection_ex(entry.second, this->fill_expolygons)) {
+                if (!opening_ex({ expoly_to_test }, opening_offset).empty()) {
+                    this->fill_surfaces.append({ expoly_to_test }, entry.first);
+                }
+            }
     }
 }
 

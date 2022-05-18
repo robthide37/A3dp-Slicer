@@ -4099,7 +4099,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0.001;
     def->precision = 8;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloat(0.2));
+    def->set_default_value(new ConfigOptionFloat(0.1));
 
     def = this->add("retract_before_travel", coFloats);
     def->label = L("Minimum travel after retraction");

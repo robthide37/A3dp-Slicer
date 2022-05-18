@@ -1234,17 +1234,17 @@ void PerimeterGenerator::process()
         // simplify infill contours according to resolution
         Polygons not_filled_p;
         for (ExPolygon& ex : last_no_gaps)
-            ex.simplify_p(scale_t(print_config->resolution_internal), &not_filled_p);
+            ex.simplify_p(scale_t(std::max(this->print_config->resolution.value, print_config->resolution_internal/4)), &not_filled_p);
         ExPolygons not_filled_exp = union_ex(not_filled_p);
         // collapse too narrow infill areas
         coord_t min_perimeter_infill_spacing = (coord_t)(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE));
         ExPolygons infill_exp;
         //special branch if gap : don't inset away from gaps!
-        if (gap_srf.empty())
+        if (gap_srf.empty()) {
             infill_exp = offset2_ex(not_filled_exp,
                 double(-inset - min_perimeter_infill_spacing / 2 + infill_peri_overlap - infill_gap),
                 double(min_perimeter_infill_spacing / 2));
-        else {
+        } else {
             //store the infill_exp but not offseted, it will be used as a clip to remove the gapfill portion
             const ExPolygons infill_exp_no_gap = offset2_ex(not_filled_exp,
                 double(-inset - min_perimeter_infill_spacing / 2 + infill_peri_overlap - infill_gap),
@@ -1252,7 +1252,7 @@ void PerimeterGenerator::process()
             //redo the same as not_filled_exp but with last instead of last_no_gaps
             not_filled_p.clear();
             for (ExPolygon& ex : last)
-                ex.simplify_p(scale_t(print_config->resolution_internal), &not_filled_p);
+                ex.simplify_p(scale_t(std::max(this->print_config->resolution.value, print_config->resolution_internal/4)), &not_filled_p);
             not_filled_exp = union_ex(not_filled_p);
             infill_exp = offset2_ex(not_filled_exp,
                 double(-inset - min_perimeter_infill_spacing / 2 + infill_peri_overlap - infill_gap),
