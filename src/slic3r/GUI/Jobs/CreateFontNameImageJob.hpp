@@ -35,7 +35,7 @@ struct FontImageData
 
     // texture meta data
     GLenum format = GL_ALPHA, type = GL_UNSIGNED_BYTE;
-    GLint  level = 0, border = 0;
+    GLint  level = 0;
 };
 
 /// <summary>
@@ -59,7 +59,7 @@ public:
     /// </summary>
     /// <param name="canceled"></param>
     /// <param name=""></param>
-    void finalize(bool canceled, std::exception_ptr &);
+    void finalize(bool canceled, std::exception_ptr &) override;
 };
 
 } // namespace Slic3r::GUI

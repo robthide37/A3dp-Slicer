@@ -653,7 +653,6 @@ void GLGizmoEmboss::initialize()
     // make size pair number
     if (cfg.icon_width % 2 != 0) ++cfg.icon_width;
 
-    float icon_width_with_spacing = cfg.icon_width + space;
     cfg.delete_pos_x = cfg.max_font_name_width + space;
     int count_line_of_text = 3;
     cfg.text_size = ImVec2(-FLT_MIN, line_height_with_spacing * count_line_of_text);
@@ -1378,7 +1377,7 @@ void GLGizmoEmboss::draw_font_list()
                 }
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(face_name.ToUTF8().data());
+                ImGui::SetTooltip("%s", face_name.ToUTF8().data());
             if (is_selected) ImGui::SetItemDefaultFocus();
             if (!m_face_names.exist_textures[index] && 
                 ImGui::IsItemVisible()) {
