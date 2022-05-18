@@ -15,7 +15,7 @@ XCode is available through Apple's App Store, the other three tools are availabl
 
 You have to gitclone  the repository
 ```
-git clone https://github.com/slic3r/Slic3r.git
+git clone https://github.com/supermerill/SuperSlicer.git
 ```
 
 and then you have to clone the profiles submodules
@@ -24,6 +24,12 @@ and then you have to clone the profiles submodules
 cd resources/profiles
 git submodule update
 ```
+
+## How to build, the easy way
+
+After cloning, execute `./BuildMacOS.sh -i`
+The executable & dmg should be somewhere in the build directory. 
+
 ### How to build
 
 Just use the `BuildMacOS.sh` script (use the `-h` option to get the options available, and how to use them)
@@ -114,7 +120,7 @@ Works on a fresh installation of MacOS Catalina 10.15.6
 brew update
 brew install cmake git gettext
 brew upgrade
-git clone https://github.com/prusa3d/PrusaSlicer/
+git clone https://github.com/supermerill/SuperSlicer/
 cd PrusaSlicer/deps
 mkdir build
 cd build
@@ -125,5 +131,5 @@ mkdir build
 cd build
 cmake .. -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local"
 make
-src/prusa-slicer
+src/superslicer
 ```

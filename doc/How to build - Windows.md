@@ -15,7 +15,7 @@ Clone the respository.  To place it in C:\src\REPO_NAME (use Slic3r, SuperSlicer
 ```
 c:> mkdir src
 c:> cd src
-c:\src> git clone https://github.com/prusa3d/REPO_NAME.git
+c:\src> git clone https://github.com/supermerill/SuperSlicer.git
 ```
 
 ### Run the automatic build script
@@ -30,7 +30,7 @@ c:\src\REPO_NAME>build_win.bat -d=..\REPO_NAME-deps -r=console
 The build script will run for a while (over an hour, depending on your machine) and automatically perform the following steps:
 1. Configure and build [deps](#compile-the-dependencies) as RelWithDebInfo with `c:\src\REPO_NAME-deps` as the destination directory
 2. Configure and build all [application targets](#compile-slic3r) as RelWithDebInfo
-3. Launch the resulting `prusa-slicer-console.exe` binary
+3. Launch the resulting `superslicer-console.exe` binary
 
 You can change the above command line options to do things like:
 * Change the destination for the dependencies by pointing `-d` to a different directory such as: `build_win.bat -d=s:\REPO_NAMEDeps`

@@ -21,9 +21,9 @@ jobs:
       uses: actions/upload-artifact@v1.0.0
       with:
         name: nightly_macos.tar
-        path: build/Slic3r.tar
+        path: build/SuperSlicer.tar
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
         name: nightly_macos.dmg
-        path: build/Slic3r.dmg
+        path: build/SuperSlicer.dmg

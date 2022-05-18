@@ -14,8 +14,8 @@ from datetime import date
 import tarfile
 import subprocess
 
-repo = "slic3r/slic3r"
-program_name = "Slic3r"
+repo = "supermerill/SuperSlicer"
+program_name = "SuperSlicer"
 path_7zip = r"C:\Program Files\7-Zip\7z.exe"
 github_auth_token = "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"
 

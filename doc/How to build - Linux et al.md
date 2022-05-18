@@ -74,7 +74,7 @@ Now when the dependencies are compiled, all that is needed is to tell CMake that
 And that's it. It is now possible to run the freshly built Slic3r binary:
 
     cd src
-    ./prusa-slicer
+    ./superslicer
 
 
 
