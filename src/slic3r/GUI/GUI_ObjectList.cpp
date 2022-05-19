@@ -1585,8 +1585,8 @@ void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& mo
 
         if (from_galery) {
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-            new_volume->set_transformation(v->get_instance_transformation().get_matrix_no_offset().inverse());
             // Transform the new modifier to be aligned with the print bed.
+            new_volume->set_transformation(v->get_instance_transformation().get_matrix_no_offset().inverse());
             const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
 #else
             // Transform the new modifier to be aligned with the print bed.
@@ -1662,8 +1662,8 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
     // First (any) GLVolume of the selected instance. They all share the same instance matrix.
     const GLVolume* v = selection.get_first_volume();
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-    new_volume->set_transformation(v->get_instance_transformation().get_matrix_no_offset().inverse());
     // Transform the new modifier to be aligned with the print bed.
+    new_volume->set_transformation(v->get_instance_transformation().get_matrix_no_offset().inverse());
     const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
 #else
     // Transform the new modifier to be aligned with the print bed.

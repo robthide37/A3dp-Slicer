@@ -225,10 +225,24 @@ private:
     Cache m_cache;
     Clipboard m_clipboard;
     std::optional<BoundingBoxf3> m_bounding_box;
-    // Bounding box of a selection, with no instance scaling applied. This bounding box
-    // is useful for absolute scaling of tilted objects in world coordinate space.
+    // Bounding box of a single full instance selection, in world coordinates, with no instance scaling applied.
+    // This bounding box is useful for absolute scaling of tilted objects in world coordinate space.
+    // Modifiers are NOT taken in account
     std::optional<BoundingBoxf3> m_unscaled_instance_bounding_box;
+    // Bounding box of a single full instance selection, in world coordinates.
+    // Modifiers are NOT taken in account
     std::optional<BoundingBoxf3> m_scaled_instance_bounding_box;
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    // Bounding box of a single full instance selection, in world coordinates, with no instance scaling applied.
+    // Modifiers are taken in account
+    std::optional<BoundingBoxf3> m_full_unscaled_instance_bounding_box;
+    // Bounding box of a single full instance selection, in world coordinates.
+    // Modifiers are taken in account
+    std::optional<BoundingBoxf3> m_full_scaled_instance_bounding_box;
+    // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
+    // Modifiers are taken in account
+    std::optional<BoundingBoxf3> m_full_unscaled_instance_local_bounding_box;
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 #if ENABLE_RENDER_SELECTION_CENTER
     GLModel m_vbo_sphere;
@@ -355,10 +369,25 @@ public:
 
     unsigned int volumes_count() const { return (unsigned int)m_list.size(); }
     const BoundingBoxf3& get_bounding_box() const;
-    // Bounding box of a selection, with no instance scaling applied. This bounding box
-    // is useful for absolute scaling of tilted objects in world coordinate space.
+    // Bounding box of a single full instance selection, in world coordinates, with no instance scaling applied.
+    // This bounding box is useful for absolute scaling of tilted objects in world coordinate space.
+    // Modifiers are NOT taken in account
     const BoundingBoxf3& get_unscaled_instance_bounding_box() const;
+    // Bounding box of a single full instance selection, in world coordinates.
+    // Modifiers are NOT taken in account
     const BoundingBoxf3& get_scaled_instance_bounding_box() const;
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    // Bounding box of a single full instance selection, in world coordinates, with no instance scaling applied.
+    // Modifiers are taken in account
+    const BoundingBoxf3& get_full_unscaled_instance_bounding_box() const;
+    // Bounding box of a single full instance selection, in world coordinates.
+    // Modifiers are taken in account
+    const BoundingBoxf3& get_full_scaled_instance_bounding_box() const;
+
+    // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
+    // Modifiers are taken in account
+    const BoundingBoxf3& get_full_unscaled_instance_local_bounding_box() const;
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
     void setup_cache();
 
@@ -429,7 +458,16 @@ private:
     void do_remove_volume(unsigned int volume_idx);
     void do_remove_instance(unsigned int object_idx, unsigned int instance_idx);
     void do_remove_object(unsigned int object_idx);
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    void set_bounding_boxes_dirty() {
+        m_bounding_box.reset();
+        m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset();
+        m_full_unscaled_instance_bounding_box.reset(); m_full_scaled_instance_bounding_box.reset();
+        m_full_unscaled_instance_local_bounding_box.reset();;
+    }
+#else
     void set_bounding_boxes_dirty() { m_bounding_box.reset(); m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset(); }
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     void render_synchronized_volumes();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WORLD_COORDINATE

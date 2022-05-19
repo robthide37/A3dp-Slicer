@@ -713,6 +713,8 @@ const BoundingBoxf3& Selection::get_bounding_box() const
 
 const BoundingBoxf3& Selection::get_unscaled_instance_bounding_box() const
 {
+    assert(is_single_full_instance());
+
     if (!m_unscaled_instance_bounding_box.has_value()) {
         std::optional<BoundingBoxf3>* bbox = const_cast<std::optional<BoundingBoxf3>*>(&m_unscaled_instance_bounding_box);
         *bbox = BoundingBoxf3();
@@ -736,6 +738,8 @@ const BoundingBoxf3& Selection::get_unscaled_instance_bounding_box() const
 
 const BoundingBoxf3& Selection::get_scaled_instance_bounding_box() const
 {
+    assert(is_single_full_instance());
+
     if (!m_scaled_instance_bounding_box.has_value()) {
         std::optional<BoundingBoxf3>* bbox = const_cast<std::optional<BoundingBoxf3>*>(&m_scaled_instance_bounding_box);
         *bbox = BoundingBoxf3();
@@ -752,6 +756,65 @@ const BoundingBoxf3& Selection::get_scaled_instance_bounding_box() const
     }
     return *m_scaled_instance_bounding_box;
 }
+
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+const BoundingBoxf3& Selection::get_full_unscaled_instance_bounding_box() const
+{
+    assert(is_single_full_instance());
+
+    if (!m_full_unscaled_instance_bounding_box.has_value()) {
+        std::optional<BoundingBoxf3>* bbox = const_cast<std::optional<BoundingBoxf3>*>(&m_full_unscaled_instance_bounding_box);
+        *bbox = BoundingBoxf3();
+        if (m_valid) {
+            for (unsigned int i : m_list) {
+                const GLVolume& volume = *(*m_volumes)[i];
+                Transform3d trafo = volume.get_instance_transformation().get_matrix_no_scaling_factor() * volume.get_volume_transformation().get_matrix();
+                trafo.translation().z() += volume.get_sla_shift_z();
+                (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
+            }
+        }
+    }
+    return *m_full_unscaled_instance_bounding_box;
+}
+
+const BoundingBoxf3& Selection::get_full_scaled_instance_bounding_box() const
+{
+    assert(is_single_full_instance());
+
+    if (!m_full_scaled_instance_bounding_box.has_value()) {
+        std::optional<BoundingBoxf3>* bbox = const_cast<std::optional<BoundingBoxf3>*>(&m_full_scaled_instance_bounding_box);
+        *bbox = BoundingBoxf3();
+        if (m_valid) {
+            for (unsigned int i : m_list) {
+                const GLVolume& volume = *(*m_volumes)[i];
+                Transform3d trafo = volume.get_instance_transformation().get_matrix() * volume.get_volume_transformation().get_matrix();
+                trafo.translation().z() += volume.get_sla_shift_z();
+                (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
+            }
+        }
+    }
+    return *m_full_scaled_instance_bounding_box;
+}
+
+const BoundingBoxf3& Selection::get_full_unscaled_instance_local_bounding_box() const
+{
+    assert(is_single_full_instance());
+
+    if (!m_full_unscaled_instance_local_bounding_box.has_value()) {
+        std::optional<BoundingBoxf3>* bbox = const_cast<std::optional<BoundingBoxf3>*>(&m_full_unscaled_instance_local_bounding_box);
+        *bbox = BoundingBoxf3();
+        if (m_valid) {
+            for (unsigned int i : m_list) {
+                const GLVolume& volume = *(*m_volumes)[i];
+                Transform3d trafo = volume.get_volume_transformation().get_matrix();
+                trafo.translation().z() += volume.get_sla_shift_z();
+                (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
+            }
+        }
+    }
+    return *m_full_unscaled_instance_local_bounding_box;
+}
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 void Selection::setup_cache()
 {
@@ -1350,54 +1413,66 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
     if (!m_valid)
         return;
 
+    Vec3d relative_scale = scale;
+
     for (unsigned int i : m_list) {
         GLVolume& v = *(*m_volumes)[i];
         const VolumeCache& volume_data = m_cache.volumes_data[i];
         const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
-        if (m_mode == Instance) {
-            assert(is_from_fully_selected_instance(i));
-            if (transformation_type.absolute()) {
-                assert(transformation_type.joint());
-                v.set_instance_transformation(Geometry::assemble_transform(inst_trafo.get_offset_matrix(), inst_trafo.get_rotation_matrix(),
-                    Geometry::scale_transform(scale), inst_trafo.get_mirror_matrix()));
+
+        if (transformation_type.absolute()) {
+            // convert from absolute scaling to relative scaling
+            BoundingBoxf3 original_box;
+            if (m_mode == Instance) {
+                assert(is_from_fully_selected_instance(i));
+                if (transformation_type.world())
+                    original_box = get_full_unscaled_instance_bounding_box();
+                else
+                    original_box = get_full_unscaled_instance_local_bounding_box();
             }
             else {
-                if (transformation_type.world()) {
-                    const Transform3d scale_matrix = Geometry::scale_transform(scale);
-                    const Transform3d offset_matrix = (transformation_type.joint() && translation.isApprox(Vec3d::Zero())) ?
-                        // non-constrained scaling - add offset to scale around selection center
-                        Geometry::translation_transform(m_cache.dragging_center + scale_matrix * (inst_trafo.get_offset() - m_cache.dragging_center)) :
-                        // constrained scaling - add offset to keep constraint
-                        Geometry::translation_transform(translation) * inst_trafo.get_offset_matrix();
-                    v.set_instance_transformation(offset_matrix * scale_matrix * inst_trafo.get_matrix_no_offset());
-                }
-                else if (transformation_type.local()) {
-                    const Transform3d scale_matrix = Geometry::scale_transform(scale);
-                    Vec3d offset;
-                    if (transformation_type.joint() && translation.isApprox(Vec3d::Zero())) {
-                        // non-constrained scaling - add offset to scale around selection center
-                        offset = inst_trafo.get_matrix_no_offset().inverse() * (inst_trafo.get_offset() - m_cache.dragging_center);
-                        offset = inst_trafo.get_matrix_no_offset() * (scale_matrix * offset - offset);
-                    }
-                    else
-                        // constrained scaling - add offset to keep constraint
-                        offset = translation;
+                if (transformation_type.world())
+                    original_box = v.transformed_convex_hull_bounding_box((volume_data.get_instance_transform() *
+                        volume_data.get_volume_transform()).get_matrix_no_scaling_factor());
+                else if (transformation_type.instance())
+                    original_box = v.transformed_convex_hull_bounding_box(volume_data.get_volume_transform().get_matrix_no_scaling_factor());
+                else
+                    original_box = v.bounding_box();
+            }
 
-                    v.set_instance_transformation(Geometry::translation_transform(offset) * inst_trafo.get_matrix() * scale_matrix);
+            relative_scale = original_box.size().cwiseProduct(scale).cwiseQuotient(m_box.get_bounding_box().size());
+        }
+
+        if (m_mode == Instance) {
+            assert(is_from_fully_selected_instance(i));
+            if (transformation_type.world()) {
+                const Transform3d scale_matrix = Geometry::scale_transform(relative_scale);
+                const Transform3d offset_matrix = (transformation_type.joint() && translation.isApprox(Vec3d::Zero())) ?
+                    // non-constrained scaling - add offset to scale around selection center
+                    Geometry::translation_transform(m_cache.dragging_center + scale_matrix * (inst_trafo.get_offset() - m_cache.dragging_center)) :
+                    // constrained scaling - add offset to keep constraint
+                    Geometry::translation_transform(translation) * inst_trafo.get_offset_matrix();
+                v.set_instance_transformation(offset_matrix * scale_matrix * inst_trafo.get_matrix_no_offset());
+            }
+            else if (transformation_type.local()) {
+                const Transform3d scale_matrix = Geometry::scale_transform(relative_scale);
+                Vec3d offset;
+                if (transformation_type.joint() && translation.isApprox(Vec3d::Zero())) {
+                    // non-constrained scaling - add offset to scale around selection center
+                    offset = inst_trafo.get_matrix_no_offset().inverse() * (inst_trafo.get_offset() - m_cache.dragging_center);
+                    offset = inst_trafo.get_matrix_no_offset() * (scale_matrix * offset - offset);
                 }
                 else
-                    assert(false);
-            }
-        }
-        else {
-            if (transformation_type.absolute()) {
-                const Geometry::Transformation& volume_trafo = volume_data.get_volume_transform();
-                v.set_volume_transformation(Geometry::assemble_transform(volume_trafo.get_offset_matrix(), volume_trafo.get_rotation_matrix(),
-                    Geometry::scale_transform(scale), volume_trafo.get_mirror_matrix()));
+                    // constrained scaling - add offset to keep constraint
+                    offset = translation;
+
+                v.set_instance_transformation(Geometry::translation_transform(offset) * inst_trafo.get_matrix() * scale_matrix);
             }
             else
-                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(scale));
+                assert(false);
         }
+        else
+            transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale));
     }
 
 #if !DISABLE_INSTANCES_SYNCH

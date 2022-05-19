@@ -1303,7 +1303,10 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
         transformation_type.set_instance();
 
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-    Vec3d scaling_factor = m_uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
+    if (!selection.is_single_full_instance() && !selection.is_single_volume_or_modifier())
+        transformation_type.set_relative();
+
+    const Vec3d scaling_factor = m_uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
 #else
     if (!is_local_coordinates())
         transformation_type.set_relative();
