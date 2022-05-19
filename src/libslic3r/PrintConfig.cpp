@@ -3666,9 +3666,13 @@ void PrintConfigDef::init_sla_params()
     def = this->add("support_pillar_widening_factor", coFloat);
     def->label = L("Pillar widening factor");
     def->category = L("Supports");
-    def->tooltip = L("Merging bridges or pillars into another pillars can "
-                     "increase the radius. Zero means no increase, one means "
-                     "full increase.");
+    def->tooltip  = L(
+         "Merging bridges or pillars into another pillars can "
+          "increase the radius. Zero means no increase, one means "
+          "full increase. The exact amount of increase is unspecified and can "
+          "change in the future. What is garanteed is that thickness will not "
+          "exceed \"support_base_diameter\"");
+
     def->min = 0;
     def->max = 1;
     def->mode = comExpert;
