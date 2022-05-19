@@ -781,6 +781,9 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                         const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), new_rotation);
                         volume.set_instance_offset(m_cache.dragging_center + Eigen::AngleAxisd(z_diff, Vec3d::UnitZ()) * (m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center));
                     }
+                    else if (!(m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center).isApprox(Vec3d::Zero()))
+                        volume.set_instance_offset(m_cache.dragging_center + Geometry::assemble_transform(Vec3d::Zero(), new_rotation) * m_cache.volumes_data[i].get_instance_rotation_matrix().inverse() * (m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center));
+
                     volume.set_instance_rotation(new_rotation);
                     object_instance_first[volume.object_idx()] = i;
                 }
