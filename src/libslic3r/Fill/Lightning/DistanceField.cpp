@@ -5,6 +5,8 @@
 #include "../FillRectilinear.hpp"
 #include "../../ClipperUtils.hpp"
 
+#include <tbb/parallel_for.h>
+
 namespace Slic3r::FillLightning
 {
 
@@ -22,23 +24,25 @@ DistanceField::DistanceField(const coord_t& radius, const Polygons& current_outl
         const size_t unsupported_points_prev_size = m_unsupported_points.size();
         m_unsupported_points.resize(unsupported_points_prev_size + sampled_points.size());
 
-        for (size_t sp_idx = 0; sp_idx < sampled_points.size(); ++sp_idx) {
-            const Point &sp = sampled_points[sp_idx];
-            // Find a squared distance to the source expolygon boundary.
-            double d2 = std::numeric_limits<double>::max();
-            for (size_t icontour = 0; icontour <= expoly.holes.size(); ++icontour) {
-                const Polygon &contour = icontour == 0 ? expoly.contour : expoly.holes[icontour - 1];
-                if (contour.size() > 2) {
-                    Point prev = contour.points.back();
-                    for (const Point &p2 : contour.points) {
-                        d2   = std::min(d2, Line::distance_to_squared(sp, prev, p2));
-                        prev = p2;
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, sampled_points.size()), [&self = *this, &expoly = std::as_const(expoly), &sampled_points = std::as_const(sampled_points), &unsupported_points_prev_size = std::as_const(unsupported_points_prev_size)](const tbb::blocked_range<size_t> &range) -> void {
+            for (size_t sp_idx = range.begin(); sp_idx < range.end(); ++sp_idx) {
+                const Point &sp = sampled_points[sp_idx];
+                // Find a squared distance to the source expolygon boundary.
+                double d2 = std::numeric_limits<double>::max();
+                for (size_t icontour = 0; icontour <= expoly.holes.size(); ++icontour) {
+                    const Polygon &contour = icontour == 0 ? expoly.contour : expoly.holes[icontour - 1];
+                    if (contour.size() > 2) {
+                        Point prev = contour.points.back();
+                        for (const Point &p2 : contour.points) {
+                            d2   = std::min(d2, Line::distance_to_squared(sp, prev, p2));
+                            prev = p2;
+                        }
                     }
                 }
+                self.m_unsupported_points[unsupported_points_prev_size + sp_idx] = {sp, coord_t(std::sqrt(d2))};
+                assert(self.m_unsupported_points_bbox.contains(sp));
             }
-            m_unsupported_points[unsupported_points_prev_size + sp_idx] = {sp, coord_t(std::sqrt(d2))};
-            assert(m_unsupported_points_bbox.contains(p));
-        }
+        }); // end of parallel_for
     }
     std::stable_sort(m_unsupported_points.begin(), m_unsupported_points.end(), [&radius](const UnsupportedCell &a, const UnsupportedCell &b) {
         constexpr coord_t prime_for_hash = 191;
