@@ -35,16 +35,18 @@ DistanceField::DistanceField(const coord_t& radius, const Polygons& current_outl
             assert(m_unsupported_points_bbox.contains(p));
         }
     }
-    m_unsupported_points.sort([&radius](const UnsupportedCell &a, const UnsupportedCell &b) {
+    std::stable_sort(m_unsupported_points.begin(), m_unsupported_points.end(), [&radius](const UnsupportedCell &a, const UnsupportedCell &b) {
         constexpr coord_t prime_for_hash = 191;
         return std::abs(b.dist_to_boundary - a.dist_to_boundary) > radius ?
                a.dist_to_boundary < b.dist_to_boundary :
                (PointHash{}(a.loc) % prime_for_hash) < (PointHash{}(b.loc) % prime_for_hash);
         });
-    for (auto it = m_unsupported_points.begin(); it != m_unsupported_points.end(); ++it) {
-        UnsupportedCell& cell = *it;
-        m_unsupported_points_grid.emplace(this->to_grid_point(cell.loc), it);
-    }
+
+    m_unsupported_points_erased.resize(m_unsupported_points.size());
+    std::fill(m_unsupported_points_erased.begin(), m_unsupported_points_erased.end(), false);
+
+    m_unsupported_points_grid.initialize(m_unsupported_points, [&self = std::as_const(*this)](const Point &p) -> Point { return self.to_grid_point(p); });
+
     // Because the distance between two points is at least one axis equal to m_cell_size, every cell
     // in m_unsupported_points_grid contains exactly one point.
     assert(m_unsupported_points.size() == m_unsupported_points_grid.size());
@@ -96,12 +98,11 @@ void DistanceField::update(const Point& to_node, const Point& added_leaf)
             }
             // Inside a circle at the end of the new leaf, or inside a rotated rectangle.
             // Remove unsupported leafs at this grid location.
-            if (auto it = m_unsupported_points_grid.find(grid_addr); it != m_unsupported_points_grid.end()) {
-                std::list<UnsupportedCell>::iterator& list_it = it->second;
-                UnsupportedCell& cell = *list_it;
+            if (const size_t cell_idx = m_unsupported_points_grid.find_cell_idx(grid_addr); cell_idx != std::numeric_limits<size_t>::max()) {
+                const UnsupportedCell &cell = m_unsupported_points[cell_idx];
                 if ((cell.loc - added_leaf).cast<int64_t>().squaredNorm() <= m_supporting_radius2) {
-                    m_unsupported_points.erase(list_it);
-                    m_unsupported_points_grid.erase(it);
+                    m_unsupported_points_erased[cell_idx] = true;
+                    m_unsupported_points_grid.mark_erased(grid_addr);
                 }
             }
         }

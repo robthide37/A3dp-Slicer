@@ -56,8 +56,9 @@ void Layer::generateNewTrees
 
     // Until no more points need to be added to support all:
     // Determine next point from tree/outline areas via distance-field
-    Point unsupported_location;
-    while (distance_field.tryGetNextPoint(&unsupported_location)) {
+    size_t unsupported_cell_idx = 0;
+    Point  unsupported_location;
+    while (distance_field.tryGetNextPoint(&unsupported_location, &unsupported_cell_idx, unsupported_cell_idx)) {
         throw_on_cancel_callback();
         GroundingLocation grounding_loc = getBestGroundingLocation(
             unsupported_location, current_outlines, current_outlines_bbox, outlines_locator, supporting_radius, wall_supporting_radius, tree_node_locator);
