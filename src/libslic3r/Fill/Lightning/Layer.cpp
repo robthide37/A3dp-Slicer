@@ -142,26 +142,25 @@ GroundingLocation Layer::getBestGroundingLocation
 
     const auto within_dist = coord_t((node_location - unsupported_location).cast<double>().norm());
 
-    NodeSPtr sub_tree{ nullptr };
-    coord_t current_dist = getWeightedDistance(node_location, unsupported_location);
+    NodeSPtr sub_tree{nullptr};
+    coord_t  current_dist = getWeightedDistance(node_location, unsupported_location);
     if (current_dist >= wall_supporting_radius) { // Only reconnect tree roots to other trees if they are not already close to the outlines.
         const coord_t search_radius = std::min(current_dist, within_dist);
         BoundingBox region(unsupported_location - Point(search_radius, search_radius), unsupported_location + Point(search_radius + locator_cell_size, search_radius + locator_cell_size));
         region.min = to_grid_point(region.min, current_outlines_bbox);
         region.max = to_grid_point(region.max, current_outlines_bbox);
-        Point grid_addr;
-        for (grid_addr.y() = region.min.y(); grid_addr.y() < region.max.y(); ++ grid_addr.y())
-            for (grid_addr.x() = region.min.x(); grid_addr.x() < region.max.x(); ++ grid_addr.x()) {
-                auto it_range = tree_node_locator.equal_range(grid_addr);
-                for (auto it = it_range.first; it != it_range.second; ++ it) {
-                    auto candidate_sub_tree = it->second.lock();
+
+        for (coord_t grid_addr_y = region.min.y(); grid_addr_y < region.max.y(); ++grid_addr_y)
+            for (coord_t grid_addr_x = region.min.x(); grid_addr_x < region.max.x(); ++grid_addr_x) {
+                const auto it_range = tree_node_locator.equal_range({grid_addr_x, grid_addr_y});
+                for (auto it = it_range.first; it != it_range.second; ++it) {
+                    const NodeSPtr candidate_sub_tree = it->second.lock();
                     if ((candidate_sub_tree && candidate_sub_tree != exclude_tree) &&
                         !(exclude_tree && exclude_tree->hasOffspring(candidate_sub_tree)) &&
                         !polygonCollidesWithLineSegment(unsupported_location, candidate_sub_tree->getLocation(), outline_locator)) {
-                        const coord_t candidate_dist = candidate_sub_tree->getWeightedDistance(unsupported_location, supporting_radius);
-                        if (candidate_dist < current_dist) {
+                        if (const coord_t candidate_dist = candidate_sub_tree->getWeightedDistance(unsupported_location, supporting_radius); candidate_dist < current_dist) {
                             current_dist = candidate_dist;
-                            sub_tree = candidate_sub_tree;
+                            sub_tree     = candidate_sub_tree;
                         }
                     }
                 }

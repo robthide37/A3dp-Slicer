@@ -18,7 +18,12 @@ DistanceField::DistanceField(const coord_t& radius, const Polygons& current_outl
     m_supporting_radius2 = Slic3r::sqr(int64_t(radius));
     // Sample source polygons with a regular grid sampling pattern.
     for (const ExPolygon &expoly : union_ex(current_overhang)) {
-        for (const Point &p : sample_grid_pattern(expoly, m_cell_size)) {
+        const Points sampled_points               = sample_grid_pattern(expoly, m_cell_size);
+        const size_t unsupported_points_prev_size = m_unsupported_points.size();
+        m_unsupported_points.resize(unsupported_points_prev_size + sampled_points.size());
+
+        for (size_t sp_idx = 0; sp_idx < sampled_points.size(); ++sp_idx) {
+            const Point &sp = sampled_points[sp_idx];
             // Find a squared distance to the source expolygon boundary.
             double d2 = std::numeric_limits<double>::max();
             for (size_t icontour = 0; icontour <= expoly.holes.size(); ++icontour) {
@@ -26,12 +31,12 @@ DistanceField::DistanceField(const coord_t& radius, const Polygons& current_outl
                 if (contour.size() > 2) {
                     Point prev = contour.points.back();
                     for (const Point &p2 : contour.points) {
-                        d2   = std::min(d2, Line::distance_to_squared(p, prev, p2));
+                        d2   = std::min(d2, Line::distance_to_squared(sp, prev, p2));
                         prev = p2;
                     }
                 }
             }
-            m_unsupported_points.emplace_back(p, sqrt(d2));
+            m_unsupported_points[unsupported_points_prev_size + sp_idx] = {sp, coord_t(std::sqrt(d2))};
             assert(m_unsupported_points_bbox.contains(p));
         }
     }
