@@ -944,18 +944,12 @@ void ObjectManipulation::update_reset_buttons_visibility()
             const Geometry::Transformation& trafo = volume->get_instance_transformation();
             rotation = trafo.get_rotation_matrix();
             scale = trafo.get_scaling_factor_matrix();
-            if (trafo.has_skew())
-                // the instance transform contains skew
-                skew = trafo;
-            else {
-                // the world transform contains skew
-                const Selection::IndicesList& idxs = selection.get_volume_idxs();
-                for (unsigned int id : idxs) {
-                    const Geometry::Transformation world_trafo(selection.get_volume(id)->world_matrix());
-                    if (world_trafo.has_skew()) {
-                        skew = world_trafo;
-                        break;
-                    }
+            const Selection::IndicesList& idxs = selection.get_volume_idxs();
+            for (unsigned int id : idxs) {
+                const Geometry::Transformation world_trafo(selection.get_volume(id)->world_matrix());                
+                if (world_trafo.has_skew()) {
+                    skew = world_trafo;
+                    break;
                 }
             }
 #else
@@ -971,15 +965,9 @@ void ObjectManipulation::update_reset_buttons_visibility()
             const Geometry::Transformation& trafo = volume->get_volume_transformation();
             rotation = trafo.get_rotation_matrix();
             scale = trafo.get_scaling_factor_matrix();
-            if (trafo.has_skew())
-                // the volume transform contains skew
-                skew = trafo;
-            else {
-                // the world transform contains skew
-                const Geometry::Transformation world_trafo(volume->world_matrix());
-                if (world_trafo.has_skew())
-                    skew = world_trafo;
-            }
+            const Geometry::Transformation world_trafo(volume->world_matrix());
+            if (world_trafo.has_skew())
+                skew = world_trafo;
 #else
             rotation = volume->get_volume_rotation();
             scale = volume->get_volume_scaling_factor();

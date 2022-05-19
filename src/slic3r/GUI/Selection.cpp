@@ -1495,23 +1495,41 @@ void Selection::reset_skew()
     for (unsigned int i : m_list) {
         GLVolume& v = *(*m_volumes)[i];
         const VolumeCache& volume_data = m_cache.volumes_data[i];
-        const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
-        const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
-        const Geometry::Transformation world_trafo = inst_trafo * vol_trafo;
-        if (!inst_trafo.has_skew() && !vol_trafo.has_skew() && world_trafo.has_skew()) {
-            Geometry::Transformation mod_world_trafo = Geometry::Transformation(world_trafo.get_matrix_no_offset());
-            mod_world_trafo.reset_skew();
-            v.set_volume_transformation(vol_trafo.get_offset_matrix() * inst_trafo.get_matrix_no_offset().inverse() * mod_world_trafo.get_matrix());
+        Geometry::Transformation inst_trafo = volume_data.get_instance_transform();
+        Geometry::Transformation vol_trafo = volume_data.get_volume_transform();
+        Geometry::Transformation world_trafo = inst_trafo * vol_trafo;
+        if (world_trafo.has_skew()) {
+            if (!inst_trafo.has_skew() && !vol_trafo.has_skew()) {
+                // <W> = [I][V]
+                world_trafo.reset_offset();
+                world_trafo.reset_skew();
+                v.set_volume_transformation(vol_trafo.get_offset_matrix() * inst_trafo.get_matrix_no_offset().inverse() * world_trafo.get_matrix());
+            }
+            else {
+                // <W> = <I><V>
+                // <W> = <I>[V]
+                // <W> = [I]<V>
+                if (inst_trafo.has_skew()) {
+                    inst_trafo.reset_skew();
+                    v.set_instance_transformation(inst_trafo);
+                }
+                if (vol_trafo.has_skew()) {
+                    vol_trafo.reset_skew();
+                    v.set_volume_transformation(vol_trafo);
+                }
+            }
         }
-        else if (m_mode == Instance && inst_trafo.has_skew()) {
-            Geometry::Transformation trafo = inst_trafo;
-            trafo.reset_skew();
-            v.set_instance_transformation(trafo);
-        }
-        else if (m_mode == Volume && vol_trafo.has_skew()) {
-            Geometry::Transformation trafo = vol_trafo;
-            trafo.reset_skew();
-            v.set_volume_transformation(trafo);
+        else {
+            // [W] = [I][V]
+            // [W] = <I><V>
+            if (inst_trafo.has_skew()) {
+                inst_trafo.reset_skew();
+                v.set_instance_transformation(inst_trafo);
+            }
+            if (vol_trafo.has_skew()) {
+                vol_trafo.reset_skew();
+                v.set_volume_transformation(vol_trafo);
+            }
         }
     }
 
