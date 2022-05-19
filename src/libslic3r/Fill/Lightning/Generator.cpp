@@ -125,6 +125,8 @@ void Generator::generateTrees(const PrintObject &print_object, const std::functi
         if (const BoundingBox &outlines_locator_bbox = outlines_locator.bbox(); outlines_locator_bbox.defined)
             below_outlines_bbox.merge(outlines_locator_bbox);
 
+        below_outlines_bbox.merge(get_extents(current_lightning_layer.tree_roots).inflated(SCALED_EPSILON));
+
         outlines_locator.set_bbox(below_outlines_bbox);
         outlines_locator.create(below_outlines, locator_cell_size);
 
