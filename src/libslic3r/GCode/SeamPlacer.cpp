@@ -1179,17 +1179,18 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
                 float(po->get_layer(next_layer)->slice_z), comparator);
         if (maybe_next_seam.has_value()) {
 
-            std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.value();
+            // For old macOS (pre 10.14), std::optional does not have .value() method, so the code is using operator*() instead.
+            std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.operator*();
             const auto &next_seam = layers[next_seam_coords.first].points[next_seam_coords.second];
             bool is_moved = next_seam.perimeter.seam_index != next_seam_coords.second;
             out_moved_seams_count += is_moved;
             if (is_moved && (!out_best_moved_seam.has_value() ||
                     comparator.is_first_better(next_seam,
-                            layers[out_best_moved_seam.value().first].points[out_best_moved_seam.value().second]))) {
+                            layers[out_best_moved_seam.operator*().first].points[out_best_moved_seam.operator*().second]))) {
                 out_best_moved_seam = { next_seam_coords };
             }
 
-            seam_string.push_back(maybe_next_seam.value());
+            seam_string.push_back(maybe_next_seam.operator*());
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
         } else {
@@ -1208,17 +1209,17 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
                 float(po->get_layer(next_layer)->slice_z), comparator);
         if (maybe_next_seam.has_value()) {
 
-            std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.value();
+            std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.operator*();
             const auto &next_seam = layers[next_seam_coords.first].points[next_seam_coords.second];
             bool is_moved = next_seam.perimeter.seam_index != next_seam_coords.second;
             out_moved_seams_count += is_moved;
             if (is_moved && (!out_best_moved_seam.has_value() ||
                     comparator.is_first_better(next_seam,
-                            layers[out_best_moved_seam.value().first].points[out_best_moved_seam.value().second]))) {
+                            layers[out_best_moved_seam.operator*().first].points[out_best_moved_seam.operator*().second]))) {
                 out_best_moved_seam = { next_seam_coords };
             }
 
-            seam_string.push_back(maybe_next_seam.value());
+            seam_string.push_back(maybe_next_seam.operator*());
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
         } else {
@@ -1303,7 +1304,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                     moved_seams_count);
             if (best_moved_seam.has_value()) {
                 size_t alternative_moved_seams_count;
-                alternative_seam_string = this->find_seam_string(po, best_moved_seam.value(), comparator,
+                alternative_seam_string = this->find_seam_string(po, best_moved_seam.operator*(), comparator,
                         best_moved_seam, alternative_moved_seams_count);
                 if (alternative_seam_string.size() >= SeamPlacer::seam_align_minimum_string_seams &&
                         alternative_moved_seams_count < moved_seams_count) {
