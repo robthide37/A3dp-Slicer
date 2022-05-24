@@ -5,6 +5,8 @@
 #include "../FillRectilinear.hpp"
 #include "../../ClipperUtils.hpp"
 
+#include <tbb/parallel_for.h>
+
 namespace Slic3r::FillLightning
 {
 
@@ -18,33 +20,42 @@ DistanceField::DistanceField(const coord_t& radius, const Polygons& current_outl
     m_supporting_radius2 = Slic3r::sqr(int64_t(radius));
     // Sample source polygons with a regular grid sampling pattern.
     for (const ExPolygon &expoly : union_ex(current_overhang)) {
-        for (const Point &p : sample_grid_pattern(expoly, m_cell_size)) {
-            // Find a squared distance to the source expolygon boundary.
-            double d2 = std::numeric_limits<double>::max();
-            for (size_t icontour = 0; icontour <= expoly.holes.size(); ++icontour) {
-                const Polygon &contour = icontour == 0 ? expoly.contour : expoly.holes[icontour - 1];
-                if (contour.size() > 2) {
-                    Point prev = contour.points.back();
-                    for (const Point &p2 : contour.points) {
-                        d2   = std::min(d2, Line::distance_to_squared(p, prev, p2));
-                        prev = p2;
+        const Points sampled_points               = sample_grid_pattern(expoly, m_cell_size);
+        const size_t unsupported_points_prev_size = m_unsupported_points.size();
+        m_unsupported_points.resize(unsupported_points_prev_size + sampled_points.size());
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, sampled_points.size()), [&self = *this, &expoly = std::as_const(expoly), &sampled_points = std::as_const(sampled_points), &unsupported_points_prev_size = std::as_const(unsupported_points_prev_size)](const tbb::blocked_range<size_t> &range) -> void {
+            for (size_t sp_idx = range.begin(); sp_idx < range.end(); ++sp_idx) {
+                const Point &sp = sampled_points[sp_idx];
+                // Find a squared distance to the source expolygon boundary.
+                double d2 = std::numeric_limits<double>::max();
+                for (size_t icontour = 0; icontour <= expoly.holes.size(); ++icontour) {
+                    const Polygon &contour = icontour == 0 ? expoly.contour : expoly.holes[icontour - 1];
+                    if (contour.size() > 2) {
+                        Point prev = contour.points.back();
+                        for (const Point &p2 : contour.points) {
+                            d2   = std::min(d2, Line::distance_to_squared(sp, prev, p2));
+                            prev = p2;
+                        }
                     }
                 }
+                self.m_unsupported_points[unsupported_points_prev_size + sp_idx] = {sp, coord_t(std::sqrt(d2))};
+                assert(self.m_unsupported_points_bbox.contains(sp));
             }
-            m_unsupported_points.emplace_back(p, sqrt(d2));
-            assert(m_unsupported_points_bbox.contains(p));
-        }
+        }); // end of parallel_for
     }
-    m_unsupported_points.sort([&radius](const UnsupportedCell &a, const UnsupportedCell &b) {
+    std::stable_sort(m_unsupported_points.begin(), m_unsupported_points.end(), [&radius](const UnsupportedCell &a, const UnsupportedCell &b) {
         constexpr coord_t prime_for_hash = 191;
         return std::abs(b.dist_to_boundary - a.dist_to_boundary) > radius ?
                a.dist_to_boundary < b.dist_to_boundary :
                (PointHash{}(a.loc) % prime_for_hash) < (PointHash{}(b.loc) % prime_for_hash);
         });
-    for (auto it = m_unsupported_points.begin(); it != m_unsupported_points.end(); ++it) {
-        UnsupportedCell& cell = *it;
-        m_unsupported_points_grid.emplace(this->to_grid_point(cell.loc), it);
-    }
+
+    m_unsupported_points_erased.resize(m_unsupported_points.size());
+    std::fill(m_unsupported_points_erased.begin(), m_unsupported_points_erased.end(), false);
+
+    m_unsupported_points_grid.initialize(m_unsupported_points, [&self = std::as_const(*this)](const Point &p) -> Point { return self.to_grid_point(p); });
+
     // Because the distance between two points is at least one axis equal to m_cell_size, every cell
     // in m_unsupported_points_grid contains exactly one point.
     assert(m_unsupported_points.size() == m_unsupported_points_grid.size());
@@ -96,12 +107,11 @@ void DistanceField::update(const Point& to_node, const Point& added_leaf)
             }
             // Inside a circle at the end of the new leaf, or inside a rotated rectangle.
             // Remove unsupported leafs at this grid location.
-            if (auto it = m_unsupported_points_grid.find(grid_addr); it != m_unsupported_points_grid.end()) {
-                std::list<UnsupportedCell>::iterator& list_it = it->second;
-                UnsupportedCell& cell = *list_it;
+            if (const size_t cell_idx = m_unsupported_points_grid.find_cell_idx(grid_addr); cell_idx != std::numeric_limits<size_t>::max()) {
+                const UnsupportedCell &cell = m_unsupported_points[cell_idx];
                 if ((cell.loc - added_leaf).cast<int64_t>().squaredNorm() <= m_supporting_radius2) {
-                    m_unsupported_points.erase(list_it);
-                    m_unsupported_points_grid.erase(it);
+                    m_unsupported_points_erased[cell_idx] = true;
+                    m_unsupported_points_grid.mark_erased(grid_addr);
                 }
             }
         }

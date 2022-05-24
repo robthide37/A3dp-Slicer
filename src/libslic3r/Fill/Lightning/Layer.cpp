@@ -10,6 +10,10 @@
 #include "../../Geometry.hpp"
 #include "Utils.hpp"
 
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range2d.h>
+#include <mutex>
+
 namespace Slic3r::FillLightning {
 
 coord_t Layer::getWeightedDistance(const Point& boundary_loc, const Point& unsupported_location)
@@ -56,8 +60,9 @@ void Layer::generateNewTrees
 
     // Until no more points need to be added to support all:
     // Determine next point from tree/outline areas via distance-field
-    Point unsupported_location;
-    while (distance_field.tryGetNextPoint(&unsupported_location)) {
+    size_t unsupported_cell_idx = 0;
+    Point  unsupported_location;
+    while (distance_field.tryGetNextPoint(&unsupported_location, &unsupported_cell_idx, unsupported_cell_idx)) {
         throw_on_cancel_callback();
         GroundingLocation grounding_loc = getBestGroundingLocation(
             unsupported_location, current_outlines, current_outlines_bbox, outlines_locator, supporting_radius, wall_supporting_radius, tree_node_locator);
@@ -141,30 +146,52 @@ GroundingLocation Layer::getBestGroundingLocation
 
     const auto within_dist = coord_t((node_location - unsupported_location).cast<double>().norm());
 
-    NodeSPtr sub_tree{ nullptr };
-    coord_t current_dist = getWeightedDistance(node_location, unsupported_location);
+    NodeSPtr sub_tree{nullptr};
+    coord_t  current_dist = getWeightedDistance(node_location, unsupported_location);
     if (current_dist >= wall_supporting_radius) { // Only reconnect tree roots to other trees if they are not already close to the outlines.
         const coord_t search_radius = std::min(current_dist, within_dist);
         BoundingBox region(unsupported_location - Point(search_radius, search_radius), unsupported_location + Point(search_radius + locator_cell_size, search_radius + locator_cell_size));
         region.min = to_grid_point(region.min, current_outlines_bbox);
         region.max = to_grid_point(region.max, current_outlines_bbox);
-        Point grid_addr;
-        for (grid_addr.y() = region.min.y(); grid_addr.y() < region.max.y(); ++ grid_addr.y())
-            for (grid_addr.x() = region.min.x(); grid_addr.x() < region.max.x(); ++ grid_addr.x()) {
-                auto it_range = tree_node_locator.equal_range(grid_addr);
-                for (auto it = it_range.first; it != it_range.second; ++ it) {
-                    auto candidate_sub_tree = it->second.lock();
-                    if ((candidate_sub_tree && candidate_sub_tree != exclude_tree) &&
-                        !(exclude_tree && exclude_tree->hasOffspring(candidate_sub_tree)) &&
-                        !polygonCollidesWithLineSegment(unsupported_location, candidate_sub_tree->getLocation(), outline_locator)) {
-                        const coord_t candidate_dist = candidate_sub_tree->getWeightedDistance(unsupported_location, supporting_radius);
-                        if (candidate_dist < current_dist) {
-                            current_dist = candidate_dist;
-                            sub_tree = candidate_sub_tree;
+
+        Point      current_dist_grid_addr{std::numeric_limits<coord_t>::lowest(), std::numeric_limits<coord_t>::lowest()};
+        std::mutex current_dist_mutex;
+        tbb::parallel_for(tbb::blocked_range2d<coord_t>(region.min.y(), region.max.y(), region.min.x(), region.max.x()), [&current_dist, current_dist_copy = current_dist, &current_dist_mutex, &sub_tree, &current_dist_grid_addr, &exclude_tree = std::as_const(exclude_tree), &outline_locator = std::as_const(outline_locator), &supporting_radius = std::as_const(supporting_radius), &tree_node_locator = std::as_const(tree_node_locator), &unsupported_location = std::as_const(unsupported_location)](const tbb::blocked_range2d<coord_t> &range) -> void {
+            for (coord_t grid_addr_y = range.rows().begin(); grid_addr_y < range.rows().end(); ++grid_addr_y)
+                for (coord_t grid_addr_x = range.cols().begin(); grid_addr_x < range.cols().end(); ++grid_addr_x) {
+                    const Point local_grid_addr{grid_addr_x, grid_addr_y};
+                    NodeSPtr    local_sub_tree{nullptr};
+                    coord_t     local_current_dist = current_dist_copy;
+                    const auto  it_range           = tree_node_locator.equal_range(local_grid_addr);
+                    for (auto it = it_range.first; it != it_range.second; ++it) {
+                        const NodeSPtr candidate_sub_tree = it->second.lock();
+                        if ((candidate_sub_tree && candidate_sub_tree != exclude_tree) &&
+                            !(exclude_tree && exclude_tree->hasOffspring(candidate_sub_tree)) &&
+                            !polygonCollidesWithLineSegment(unsupported_location, candidate_sub_tree->getLocation(), outline_locator)) {
+                            if (const coord_t candidate_dist = candidate_sub_tree->getWeightedDistance(unsupported_location, supporting_radius); candidate_dist < local_current_dist) {
+                                local_current_dist = candidate_dist;
+                                local_sub_tree     = candidate_sub_tree;
+                            }
+                        }
+                    }
+                    // To always get the same result in a parallel version as in a non-parallel version,
+                    // we need to preserve that for the same current_dist, we select the same sub_tree
+                    // as in the non-parallel version. For this purpose, inside the variable
+                    // current_dist_grid_addr is stored from with 2D grid position assigned sub_tree comes.
+                    // And when there are two sub_tree with the same current_dist, one which will be found
+                    // the first in the non-parallel version is selected.
+                    {
+                        std::lock_guard<std::mutex> lock(current_dist_mutex);
+                        if (local_current_dist < current_dist ||
+                            (local_current_dist == current_dist && (grid_addr_y < current_dist_grid_addr.y() ||
+                              (grid_addr_y == current_dist_grid_addr.y() && grid_addr_x < current_dist_grid_addr.x())))) {
+                            current_dist           = local_current_dist;
+                            sub_tree               = local_sub_tree;
+                            current_dist_grid_addr = local_grid_addr;
                         }
                     }
                 }
-        }
+        }); // end of parallel_for
     }
 
     return ! sub_tree ?

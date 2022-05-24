@@ -269,6 +269,9 @@ protected:
 
     std::optional<Point> m_last_grounding_location;  //<! The last known grounding location, see 'getLastGroundingLocation()'.
 
+    friend BoundingBox get_extents(const NodeSPtr &root_node);
+    friend BoundingBox get_extents(const std::vector<NodeSPtr> &tree_roots);
+
 #ifdef LIGHTNING_TREE_NODE_DEBUG_OUTPUT
     friend void export_to_svg(const NodeSPtr &root_node, Slic3r::SVG &svg);
     friend void export_to_svg(const std::string &path, const Polygons &contour, const std::vector<NodeSPtr> &root_nodes);
@@ -277,6 +280,23 @@ protected:
 
 bool inside(const Polygons &polygons, const Point &p);
 bool lineSegmentPolygonsIntersection(const Point& a, const Point& b, const EdgeGrid::Grid& outline_locator, Point& result, coord_t within_max_dist);
+
+inline BoundingBox get_extents(const NodeSPtr &root_node)
+{
+    BoundingBox bbox;
+    for (const NodeSPtr &children : root_node->m_children)
+        bbox.merge(get_extents(children));
+    bbox.merge(root_node->getLocation());
+    return bbox;
+}
+
+inline BoundingBox get_extents(const std::vector<NodeSPtr> &tree_roots)
+{
+    BoundingBox bbox;
+    for (const NodeSPtr &root_node : tree_roots)
+        bbox.merge(get_extents(root_node));
+    return bbox;
+}
 
 #ifdef LIGHTNING_TREE_NODE_DEBUG_OUTPUT
 void export_to_svg(const NodeSPtr &root_node, SVG &svg);

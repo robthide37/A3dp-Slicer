@@ -903,6 +903,9 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                         const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), new_rotation);
                         volume.set_instance_offset(m_cache.dragging_center + Eigen::AngleAxisd(z_diff, Vec3d::UnitZ()) * (m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center));
                     }
+                    else if (!(m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center).isApprox(Vec3d::Zero()))
+                        volume.set_instance_offset(m_cache.dragging_center + Geometry::assemble_transform(Vec3d::Zero(), new_rotation) * m_cache.volumes_data[i].get_instance_rotation_matrix().inverse() * (m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center));
+
 #endif // ENABLE_WORLD_COORDINATE
                     volume.set_instance_rotation(new_rotation);
                     object_instance_first[volume.object_idx()] = i;
@@ -1340,7 +1343,7 @@ int Selection::bake_transform_if_needed() const
 
         if (needs_baking) {
             MessageDialog dlg((wxWindow*)wxGetApp().mainframe,
-                _L("The currently manipulated object is tilted or contains tilted parts (rotation angles are not multiples of 90°). "
+                _L("The currently manipulated object is tilted or contains tilted parts (rotation angles are not multiples of 90�). "
                     "Non-uniform scaling of tilted objects is only possible in non-local coordinate systems, "
                     "once the rotation is embedded into the object coordinates.") + "\n" +
                 _L("This operation is irreversible.") + "\n" +
