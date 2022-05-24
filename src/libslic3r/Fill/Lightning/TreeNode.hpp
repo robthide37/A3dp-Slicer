@@ -46,7 +46,7 @@ public:
     {
         struct EnableMakeShared : public Node
         {
-            EnableMakeShared(Arg&&...arg) : Node(std::forward<Arg>(arg)...) {}
+            explicit EnableMakeShared(Arg&&...arg) : Node(std::forward<Arg>(arg)...) {}
         };
         return std::make_shared<EnableMakeShared>(std::forward<Arg>(arg)...);
     }
@@ -179,16 +179,16 @@ public:
      */
     bool hasOffspring(const NodeSPtr& to_be_checked) const;
 
-protected:
     Node() = delete; // Don't allow empty contruction
 
+protected:
     /*!
      * Construct a new node, either for insertion in a tree or as root.
      * \param p The physical location in the 2D layer that this node represents.
      * Connecting other nodes to this node indicates that a line segment should
      * be drawn between those two physical positions.
      */
-    Node(const Point& p, const std::optional<Point>& last_grounding_location = std::nullopt);
+    explicit Node(const Point& p, const std::optional<Point>& last_grounding_location = std::nullopt);
 
     /*!
      * Copy this node and its entire sub-tree.
@@ -239,7 +239,7 @@ public:
      * 
      * \param output all branches in this tree connected into polylines
      */
-    void convertToPolylines(Polylines &output, coord_t line_width) const;
+    void convertToPolylines(Polylines &output, coord_t line_overlap) const;
 
     /*! If this was ever a direct child of the root, it'll have a previous grounding location.
      *
@@ -260,7 +260,7 @@ protected:
      */
     void convertToPolylines(size_t long_line_idx, Polylines &output) const;
 
-    void removeJunctionOverlap(Polylines &polylines, coord_t line_width) const;
+    void removeJunctionOverlap(Polylines &polylines, coord_t line_overlap) const;
 
     bool m_is_root;
     Point m_p;

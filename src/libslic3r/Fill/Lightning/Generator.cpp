@@ -7,7 +7,6 @@
 #include "../../ClipperUtils.hpp"
 #include "../../Layer.hpp"
 #include "../../Print.hpp"
-#include "../../Surface.hpp"
 
 /* Possible future tasks/optimizations,etc.:
  * - Improve connecting heuristic to favor connecting to shorter trees
@@ -54,8 +53,6 @@ Generator::Generator(const PrintObject &print_object, const std::function<void()
 void Generator::generateInitialInternalOverhangs(const PrintObject &print_object, const std::function<void()> &throw_on_cancel_callback)
 {
     m_overhang_per_layer.resize(print_object.layers().size());
-    // FIXME: It can be adjusted to improve bonding between infill and perimeters.
-    const float infill_wall_offset = 0;// m_infill_extrusion_width;
 
     Polygons infill_area_above;
     //Iterate from top to bottom, to subtract the overhang areas above from the overhang areas on the layer below, to get only overhang in the top layer where it is overhanging.
@@ -65,7 +62,7 @@ void Generator::generateInitialInternalOverhangs(const PrintObject &print_object
         for (const LayerRegion* layerm : print_object.get_layer(layer_nr)->regions())
             for (const Surface& surface : layerm->fill_surfaces.surfaces)
                 if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
-                    append(infill_area_here, infill_wall_offset == 0 ? surface.expolygon : offset(surface.expolygon, infill_wall_offset));
+                    infill_area_here.emplace_back(surface.expolygon);
 
         //Remove the part of the infill area that is already supported by the walls.
         Polygons overhang = diff(offset(infill_area_here, -float(m_wall_supporting_radius)), infill_area_above);
@@ -84,8 +81,6 @@ const Layer& Generator::getTreesForLayer(const size_t& layer_id) const
 void Generator::generateTrees(const PrintObject &print_object, const std::function<void()> &throw_on_cancel_callback)
 {
     m_lightning_layers.resize(print_object.layers().size());
-    // FIXME: It can be adjusted to improve bonding between infill and perimeters.
-    const coord_t infill_wall_offset = 0;// m_infill_extrusion_width;
 
     std::vector<Polygons> infill_outlines(print_object.layers().size(), Polygons());
 
@@ -95,7 +90,7 @@ void Generator::generateTrees(const PrintObject &print_object, const std::functi
         for (const LayerRegion *layerm : print_object.get_layer(layer_id)->regions())
             for (const Surface &surface : layerm->fill_surfaces.surfaces)
                 if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
-                    append(infill_outlines[layer_id], infill_wall_offset == 0 ? surface.expolygon : offset(surface.expolygon, infill_wall_offset));
+                    infill_outlines[layer_id].emplace_back(surface.expolygon);
     }
 
     // For various operations its beneficial to quickly locate nearby features on the polygon:

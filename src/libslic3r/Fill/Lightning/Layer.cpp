@@ -433,15 +433,14 @@ static unsigned int moveInside(const Polygons& polygons, Point& from, int distan
 }
 #endif
 
-// Returns 'added someting'.
-Polylines Layer::convertToLines(const Polygons& limit_to_outline, const coord_t line_width) const
+Polylines Layer::convertToLines(const Polygons& limit_to_outline, const coord_t line_overlap) const
 {
     if (tree_roots.empty())
         return {};
 
     Polylines result_lines;
     for (const auto &tree : tree_roots)
-        tree->convertToPolylines(result_lines, line_width);
+        tree->convertToPolylines(result_lines, line_overlap);
 
     return intersection_pl(result_lines, limit_to_outline);
 }
