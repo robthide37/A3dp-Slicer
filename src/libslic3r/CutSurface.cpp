@@ -393,6 +393,14 @@ void collect_surface_data(std::queue<FI>  &process,
                           const CutMesh   &mesh);
 
 /// <summary>
+/// Check if contour contain at least 2 unique source contour points
+/// </summary>
+bool is_valid(const std::vector<HI> &outlines,
+              const VertexShapeMap  &vert_shape_map,
+              const CutMesh         &mesh,
+              size_t                 min_count = 2);
+
+/// <summary>
 /// Copy triangles from CGAL mesh into index triangle set
 /// NOTE: Skip vertices created by edge in center of Quad.
 /// </summary>
@@ -993,21 +1001,24 @@ void priv::flood_fill_inner(const CutMesh &mesh,
     };
 
     for (FI fi : mesh.faces()) {
-        if (face_type_map[fi] != FaceType::not_constrained) continue;        
+        FaceType type = face_type_map[fi];
+        if (type != FaceType::not_constrained &&
+            type != FaceType::inside_parallel) continue;
         if (!has_inside_neighbor(fi)) continue;
         assert(process.empty());
         process.push_back(fi); 
         //store(mesh, face_type_map, DEBUG_OUTPUT_DIR + "progress.off");
 
         while (!process.empty()) {
-            FI fi = process.back();
+            FI process_fi = process.back();
             process.pop_back();
             // Do not fill twice
-            if (face_type_map[fi] == FaceType::inside) continue;
-            face_type_map[fi] = FaceType::inside;
+            FaceType& process_type = face_type_map[process_fi];
+            if (process_type == FaceType::inside) continue;
+            process_type = FaceType::inside;
 
             // check neighbor triangle
-            HI hi = mesh.halfedge(fi);
+            HI hi = mesh.halfedge(process_fi);
             HI hi_end = hi;
             auto exist_next = [&hi, &hi_end, &mesh]() -> bool {
                 hi = mesh.next(hi);
@@ -1019,9 +1030,9 @@ void priv::flood_fill_inner(const CutMesh &mesh,
                 if (!hi_opposite.is_valid()) continue;                
                 FI fi_opposite = mesh.face(hi_opposite);
                 if (!fi_opposite.is_valid()) continue;                
-                FaceType &side = face_type_map[fi_opposite];
-                if (side == FaceType::not_constrained || 
-                    side == FaceType::inside_parallel )
+                FaceType type_opposite = face_type_map[fi_opposite];
+                if (type_opposite == FaceType::not_constrained || 
+                    type_opposite == FaceType::inside_parallel)
                     process.push_back(fi_opposite);
             } while (exist_next());
         }
@@ -1089,25 +1100,54 @@ void priv::Visitor::new_vertex_added(std::size_t i_id, VI v, const CutMesh &tm)
     vert_shape_map[v] = intersection_ptr;
 }
 
+bool priv::is_valid(const std::vector<HI> &outlines,
+                    const VertexShapeMap &vert_shape_map,
+                    const CutMesh         &mesh,
+                    size_t                 min_count)
+{
+    // unique vector of indicies point from source contour(ExPolygon)
+    std::vector<uint32_t> point_indicies;
+    point_indicies.reserve(min_count);
+    for (HI hi : outlines) { 
+        VI vi = mesh.source(hi);
+        const auto& shape = vert_shape_map[vi];
+        if (shape == nullptr) continue;        
+        uint32_t pi = shape->point_index;
+        if (pi == std::numeric_limits<uint32_t>::max()) continue;
+        // is already stored in vector? 
+        if (std::find(point_indicies.begin(), point_indicies.end(), pi) 
+            != point_indicies.end())
+            continue;
+        if (point_indicies.size() == min_count) return true;
+        point_indicies.push_back(pi);
+    }
+    // prevent weird small pieces
+    return false;
+}
+
 void priv::collect_surface_data(std::queue<FI>  &process,
                                 std::vector<FI> &faces,
                                 std::vector<HI> &outlines,
                                 FaceTypeMap     &face_type_map,
                                 const CutMesh   &mesh)
 {
+    assert(!process.empty());
+    assert(faces.empty());
+    assert(outlines.empty());
     while (!process.empty()) {
-        FI fi_ = process.front();
+        FI fi = process.front();
         process.pop();
 
+        FaceType &fi_type = face_type_map[fi];
         // Do not process twice
-        if (face_type_map[fi_] == FaceType::inside_processed) continue;
-        assert(face_type_map[fi_] == FaceType::inside);
+        if (fi_type == FaceType::inside_processed) continue;
+        assert(fi_type == FaceType::inside);
         // flag face as processed
-        face_type_map[fi_] = FaceType::inside_processed;
-        faces.push_back(fi_);
+        fi_type = FaceType::inside_processed;
+        faces.push_back(fi);
 
         // check neighbor triangle
-        HI hi     = mesh.halfedge(fi_);
+        HI hi     = mesh.halfedge(fi);
         HI hi_end = hi;
         do {
             HI hi_opposite = mesh.opposite(hi);
@@ -1123,7 +1163,7 @@ void priv::collect_surface_data(std::queue<FI>  &process,
                 hi = mesh.next(hi);
                 continue;
             }
-            FaceType side  = face_type_map[fi_opposite];
+            FaceType side = face_type_map[fi_opposite];
             if (side == FaceType::inside) {
                 process.emplace(fi_opposite);
             } else if (side == FaceType::outside) {
@@ -1378,7 +1418,6 @@ priv::CutAOIs priv::create_cut_area_of_interests(const CutMesh    &mesh,
         // Process queue of faces to separate to surface_cut
         process.push(fi);
         collect_surface_data(process, faces, outlines, face_type_map, mesh);
-
         assert(!faces.empty());
         assert(!outlines.empty());
         result.emplace_back(std::move(cut));
@@ -1496,9 +1535,18 @@ void priv::filter_cuts(CutAOIs              &cuts,
         return false;
     };
 
+    // filter small pieces
+    for (const CutAOI &cut : cuts) {
+        if (!is_valid(cut.second, vert_shape_map, mesh)) { 
+            size_t index = &cut - &cuts.front();
+            del_cuts[index] = true;
+        }
+    }
+
     // filter top one cuts
     for (const CutAOI &cut : cuts) {
         size_t cut_index = &cut - &cuts.front();
+        if (del_cuts[cut_index]) continue;
         const std::vector<HI> &outlines = cut.second;
         for (HI hi : outlines) {
             if (is_behind(mesh.source(hi), cut_index) ||
