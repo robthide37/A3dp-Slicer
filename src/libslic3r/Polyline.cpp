@@ -34,15 +34,15 @@ Lines Polyline::lines() const
 }
 
 // removes the given distance from the end of the polyline
-void Polyline::clip_end(double distance)
+void Polyline::clip_end(coordf_t distance)
 {
     while (distance > 0) {
-        Vec2d  last_point = this->last_point().cast<double>();
+        Vec2d  last_point = this->last_point().cast<coordf_t>();
         this->points.pop_back();
         if (this->points.empty())
             break;
-        Vec2d  v    = this->last_point().cast<double>() - last_point;
-        double lsqr = v.squaredNorm();
+        Vec2d  v    = this->last_point().cast<coordf_t>() - last_point;
+        coordf_t lsqr = v.squaredNorm();
         if (lsqr > distance * distance) {
             this->points.emplace_back((last_point + v * (distance / sqrt(lsqr))).cast<coord_t>());
             return;
@@ -52,7 +52,7 @@ void Polyline::clip_end(double distance)
 }
 
 // removes the given distance from the start of the polyline
-void Polyline::clip_start(double distance)
+void Polyline::clip_start(coordf_t distance)
 {
     this->reverse();
     this->clip_end(distance);
@@ -60,23 +60,23 @@ void Polyline::clip_start(double distance)
         this->reverse();
 }
 
-void Polyline::extend_end(double distance)
+void Polyline::extend_end(coordf_t distance)
 {
     // relocate last point by extending the last segment by the specified length
-    Vec2d v = (this->points.back() - *(this->points.end() - 2)).cast<double>().normalized();
+    Vec2d v = (this->points.back() - *(this->points.end() - 2)).cast<coordf_t>().normalized();
     this->points.back() += (v * distance).cast<coord_t>();
 }
 
-void Polyline::extend_start(double distance)
+void Polyline::extend_start(coordf_t distance)
 {
     // relocate first point by extending the first segment by the specified length
-    Vec2d v = (this->points.front() - this->points[1]).cast<double>().normalized();
+    Vec2d v = (this->points.front() - this->points[1]).cast<coordf_t>().normalized();
     this->points.front() += (v * distance).cast<coord_t>();
 }
 
 /* this method returns a collection of points picked on the polygon contour
    so that they are evenly spaced according to the input distance */
-Points Polyline::equally_spaced_points(double distance) const
+Points Polyline::equally_spaced_points(coordf_t distance) const
 {
     Points points;
     points.emplace_back(this->first_point());
@@ -85,7 +85,7 @@ Points Polyline::equally_spaced_points(double distance) const
     for (Points::const_iterator it = this->points.begin() + 1; it != this->points.end(); ++it) {
         Vec2d  p1 = (it-1)->cast<double>();
         Vec2d  v  = it->cast<double>() - p1;
-        double segment_length = v.norm();
+        coordf_t segment_length = v.norm();
         len += segment_length;
         if (len < distance)
             continue;
@@ -94,7 +94,7 @@ Points Polyline::equally_spaced_points(double distance) const
             len = 0;
             continue;
         }
-        double take = segment_length - (len - distance);  // how much we take of this segment
+        coordf_t take = segment_length - (len - distance);  // how much we take of this segment
         points.emplace_back((p1 + v * (take / v.norm())).cast<coord_t>());
         -- it;
         len = - take;
@@ -102,7 +102,7 @@ Points Polyline::equally_spaced_points(double distance) const
     return points;
 }
 
-void Polyline::simplify(double tolerance)
+void Polyline::simplify(coordf_t tolerance)
 {
     this->points = MultiPoint::_douglas_peucker(this->points, tolerance);
 }
@@ -232,12 +232,39 @@ ThickLines ThickPolyline::thicklines() const
         lines.reserve(this->points.size() - 1);
         for (size_t i = 0; i < this->points.size() - 1; ++i) {
             ThickLine line(this->points[i], this->points[i + 1]);
-            line.a_width = this->width[i];
-            line.b_width = this->width[i + 1];
+            line.a_width = this->points_width[i];
+            line.b_width = this->points_width[i + 1];
             lines.push_back(line);
         }
     }
     return lines;
+}
+
+// Removes the given distance from the end of the ThickPolyline
+void ThickPolyline::clip_end(coordf_t distance)
+{
+    while (distance > 0) {
+        Vec2d    last_point = this->last_point().cast<double>();
+        coord_t last_width = this->points_width.back();
+        this->points.pop_back();
+        this->points_width.pop_back();
+        if (this->points.empty())
+            break;
+
+        Vec2d    vec            = this->last_point().cast<double>() - last_point;
+        coordf_t width_diff     = this->points_width.back() - last_width;
+        coordf_t   vec_length_sqr = vec.squaredNorm();
+        if (vec_length_sqr > distance * distance) {
+            coordf_t t = (distance / std::sqrt(vec_length_sqr));
+            this->points.emplace_back((last_point + vec * t).cast<coord_t>());
+            this->points_width.emplace_back(last_width + width_diff * t);
+            assert(this->points_width.size() == this->points.size());
+            return;
+        }
+
+        distance -= std::sqrt(vec_length_sqr);
+    }
+    assert(this->points_width.size() == this->points.size());
 }
 
 Lines3 Polyline3::lines() const
@@ -296,7 +323,7 @@ void concatThickPolylines(ThickPolylines& pp) {
                 if (polyline->first_point().coincides_with_epsilon(pp[id_candidate_first_point].first_point())) pp[id_candidate_first_point].reverse();
                 // it's a trap! it's a  loop!
                 polyline->points.insert(polyline->points.end(), pp[id_candidate_first_point].points.begin() + 1, pp[id_candidate_first_point].points.end());
-                polyline->width.insert(polyline->width.end(), pp[id_candidate_first_point].width.begin() + 1, pp[id_candidate_first_point].width.end());
+                polyline->points_width.insert(polyline->points_width.end(), pp[id_candidate_first_point].points_width.begin() + 1, pp[id_candidate_first_point].points_width.end());
                 pp.erase(pp.begin() + id_candidate_first_point);
                 changes = true;
                 polyline->endpoints.first = false;
@@ -306,9 +333,9 @@ void concatThickPolylines(ThickPolylines& pp) {
                 if (nbCandidate_first_point == 1) {
                     if (polyline->first_point().coincides_with_epsilon(pp[id_candidate_first_point].first_point())) pp[id_candidate_first_point].reverse();
                     //concat at front
-                    polyline->width[0] = std::max(polyline->width.front(), pp[id_candidate_first_point].width.back());
+                    polyline->points_width[0] = std::max(polyline->points_width.front(), pp[id_candidate_first_point].points_width.back());
                     polyline->points.insert(polyline->points.begin(), pp[id_candidate_first_point].points.begin(), pp[id_candidate_first_point].points.end() - 1);
-                    polyline->width.insert(polyline->width.begin(), pp[id_candidate_first_point].width.begin(), pp[id_candidate_first_point].width.end() - 1);
+                    polyline->points_width.insert(polyline->points_width.begin(), pp[id_candidate_first_point].points_width.begin(), pp[id_candidate_first_point].points_width.end() - 1);
                     polyline->endpoints.first = pp[id_candidate_first_point].endpoints.first;
                     pp.erase(pp.begin() + id_candidate_first_point);
                     changes = true;
@@ -326,9 +353,9 @@ void concatThickPolylines(ThickPolylines& pp) {
                 if (nbCandidate_last_point == 1) {
                     if (polyline->last_point().coincides_with_epsilon(pp[id_candidate_last_point].last_point())) pp[id_candidate_last_point].reverse();
                     //concat at back
-                    polyline->width[polyline->width.size() - 1] = std::max(polyline->width.back(), pp[id_candidate_last_point].width.front());
+                    polyline->points_width[polyline->points_width.size() - 1] = std::max(polyline->points_width.back(), pp[id_candidate_last_point].points_width.front());
                     polyline->points.insert(polyline->points.end(), pp[id_candidate_last_point].points.begin() + 1, pp[id_candidate_last_point].points.end());
-                    polyline->width.insert(polyline->width.end(), pp[id_candidate_last_point].width.begin() + 1, pp[id_candidate_last_point].width.end());
+                    polyline->points_width.insert(polyline->points_width.end(), pp[id_candidate_last_point].points_width.begin() + 1, pp[id_candidate_last_point].points_width.end());
                     polyline->endpoints.second = pp[id_candidate_last_point].endpoints.second;
                     pp.erase(pp.begin() + id_candidate_last_point);
                     changes = true;
