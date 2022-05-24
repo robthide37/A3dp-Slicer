@@ -255,13 +255,15 @@ struct Visitor {
 enum class FaceType {
     // face inside of the cutted shape
     inside,
+    // face, inside but almost in direction of projection
+    inside_parallel,
     // face outside of the cutted shape
     outside,
     // face without constrained edge (In or Out)
     not_constrained,
 
     // Helper flag that inside was processed
-    inside_
+    inside_processed
 };
 using FaceTypeMap = CutMesh::Property_map<FI, FaceType>;
 /// <summary>
@@ -279,6 +281,24 @@ void set_face_type(FaceTypeMap          &face_type_map,
                    const EcmType        &ecm,
                    const CutMesh        &shape_mesh);
 
+void set_almost_parallel_type(FaceTypeMap              &face_type_map,
+                              const CutMesh            &mesh,
+                              const Emboss::IProject3f &projection);
+
+/// <summary>
+/// Check if face is almost parallel
+/// </summary>
+/// <param name="fi">Index of triangle (Face index)</param>
+/// <param name="mesh">Must contain fi</param>
+/// <param name="projection">Direction of projection</param>
+/// <param name="threshold">Value for cos(alpha), must be greater than zero, 
+/// where alpha is minimal angle between projection direction and face normal</param>
+/// <returns>True when Triangle is almost parallel with direction of projection</returns>
+bool is_almost_parallel(FI                        fi,
+                        const CutMesh            &mesh,
+                        const Emboss::IProject3f &projection,
+                        float threshold = static_cast<float>(std::cos(80 * M_PI / 180)));
+
 /// <summary>
 /// Change FaceType from not_constrained to inside
 /// For neighbor(or neighbor of neighbor of ...) of inside triangles.
@@ -286,8 +306,7 @@ void set_face_type(FaceTypeMap          &face_type_map,
 /// </summary>
 /// <param name="mesh">Corefined mesh</param>
 /// <param name="face_type_map">In/Out map with faces type</param>
-void flood_fill_inner(const CutMesh &mesh,
-                      FaceTypeMap   &face_type_map);
+void flood_fill_inner(const CutMesh &mesh, FaceTypeMap &face_type_map);
 
 using ReductionMap = CutMesh::Property_map<VI, VI>;
 /// <summary>
@@ -365,7 +384,7 @@ SurfaceCuts create_surface_cuts(const CutAOIs      &cutAOIs,
 /// <param name="faces">[Output] collected Face indices from mesh</param>
 /// <param name="outlines">[Output] collected Halfedge indices from mesh</param>
 /// <param name="face_type_map">Use flag inside / outside
-/// NOTE: Modify in function: inside -> inside_</param>
+/// NOTE: Modify in function: inside -> inside_processed</param>
 /// <param name="mesh">mesh to process</param>
 void collect_surface_data(std::queue<FI>  &process,
                           std::vector<FI> &faces,
@@ -468,7 +487,7 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
 
     // Select inside and outside face in model
     priv::set_face_type(face_type_map, cgal_model, vert_shape_map, ecm, cgal_shape);
-
+    priv::set_almost_parallel_type(face_type_map, cgal_model, projection);
 #ifdef DEBUG_OUTPUT_DIR
     priv::store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrained.off"); // only debug
 #endif // DEBUG_OUTPUT_DIR
@@ -488,6 +507,7 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::store(cgal_model, vertex_reduction_map, DEBUG_OUTPUT_DIR + "reduction.off"); // only debug
 #endif // DEBUG_OUTPUT_DIR
 
+    // IMPROVE: AOIs area could be created during flood fill
     priv::CutAOIs cutAOIs = create_cut_area_of_interests(cgal_model, shapes, face_type_map);
 
 #ifdef DEBUG_OUTPUT_DIR
@@ -623,6 +643,9 @@ indexed_triangle_set Slic3r::cut2model(const SurfaceCut         &cut,
     size_t back_offset = cut.vertices.size();
     for (const auto &i : cut.indices) {
         // check range of indices in cut
+        assert(i.x() + back_offset < result.vertices.size());
+        assert(i.y() + back_offset < result.vertices.size());
+        assert(i.z() + back_offset < result.vertices.size());
         assert(i.x() >= 0 && i.x() < cut.vertices.size());
         assert(i.y() >= 0 && i.y() < cut.vertices.size());
         assert(i.z() >= 0 && i.z() < cut.vertices.size());
@@ -814,16 +837,17 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
 {
     for (const FI& fi : mesh.faces()) {
         FaceType face_type = FaceType::not_constrained;
-
         HI hi_end = mesh.halfedge(fi);
         HI hi     = hi_end;
         do {
             EI edge_index = mesh.edge(hi);
             // is edge new created - constrained?
             if (get(ecm, edge_index)) {
+                VI vi_from = mesh.source(hi);
+                VI vi_to   = mesh.target(hi);
                 // This face has a constrained edge.
-                const IntersectingElement& shape_from = *vertex_shape_map[mesh.source(hi)];
-                const IntersectingElement& shape_to = *vertex_shape_map[mesh.target(hi)];
+                const IntersectingElement& shape_from = *vertex_shape_map[vi_from];
+                const IntersectingElement& shape_to = *vertex_shape_map[vi_to];
                 
                 assert(shape_from.point_index != std::numeric_limits<uint32_t>::max());
                 assert(shape_from.attr != (unsigned char)IntersectingElement::Type::undefined);
@@ -842,6 +866,12 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
                 uint32_t i_to   = shape_to.point_index;
                 IntersectingElement::Type type_from = shape_from.get_type();
                 IntersectingElement::Type type_to = shape_to.get_type();
+                auto is_positive_type_direction = [&type_from, &type_to]()->bool {
+                    return 
+                        type_from == IntersectingElement::Type::edge_1 && type_to == IntersectingElement::Type::face_1 || 
+                        type_from == IntersectingElement::Type::face_1 && type_to == IntersectingElement::Type::edge_2 || 
+                        type_from == IntersectingElement::Type::edge_2 && type_to == IntersectingElement::Type::face_2 ;
+                };
                 if (i_from == i_to && type_from == type_to) {
                     // intersecting element must be face
                     assert(type_from == IntersectingElement::Type::face_1 ||
@@ -891,6 +921,48 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
         face_type_map[fi] = face_type;
     }
 } 
+
+void priv::set_almost_parallel_type(FaceTypeMap              &face_type_map,
+                                    const CutMesh            &mesh,
+                                    const Emboss::IProject3f &projection)
+{
+    for (const FI &fi : mesh.faces()) { 
+        auto &type = face_type_map[fi];
+        if (type != FaceType::inside) continue;
+        if (is_almost_parallel(fi, mesh, projection))
+            // change type
+            type = FaceType::inside_parallel;
+    }
+}
+
+bool priv::is_almost_parallel(FI fi, const CutMesh &mesh, const Emboss::IProject3f &projection, float threshold)
+{
+    HI hi = mesh.halfedge(fi);
+    std::array<VI, 3> vis = {
+        mesh.source(hi),
+        mesh.target(hi),
+        mesh.target(mesh.next(hi))
+    };
+    std::array<Vec3f, 3> vertices;
+    for (size_t i = 0; i < 3; i++) { 
+        const P3 &p3 = mesh.point(vis[i]);
+        vertices[i]  = Vec3f(p3.x(), p3.y(), p3.z());
+    }
+
+    Vec3f projected = projection.project(vertices[0]);
+    Vec3f project_dir = projected - vertices[0];
+    project_dir.normalize();
+    Vec3f v1 = vertices[1] - vertices[0];
+    v1.normalize();
+    Vec3f v2 = vertices[2] - vertices[0];
+    v2.normalize();
+    // face normal
+    Vec3f v_perp = v1.cross(v2);
+    v_perp.normalize();
+    
+    float cos_alpha = project_dir.dot(v_perp);
+    return cos_alpha <= threshold;
+}
 
 void priv::flood_fill_inner(const CutMesh &mesh,
                             FaceTypeMap   &face_type_map)
@@ -948,7 +1020,8 @@ void priv::flood_fill_inner(const CutMesh &mesh,
                 FI fi_opposite = mesh.face(hi_opposite);
                 if (!fi_opposite.is_valid()) continue;                
                 FaceType &side = face_type_map[fi_opposite];
-                if (side == FaceType::not_constrained)
+                if (side == FaceType::not_constrained || 
+                    side == FaceType::inside_parallel )
                     process.push_back(fi_opposite);
             } while (exist_next());
         }
@@ -1027,10 +1100,10 @@ void priv::collect_surface_data(std::queue<FI>  &process,
         process.pop();
 
         // Do not process twice
-        if (face_type_map[fi_] == FaceType::inside_) continue;
+        if (face_type_map[fi_] == FaceType::inside_processed) continue;
         assert(face_type_map[fi_] == FaceType::inside);
         // flag face as processed
-        face_type_map[fi_] = FaceType::inside_;
+        face_type_map[fi_] = FaceType::inside_processed;
         faces.push_back(fi_);
 
         // check neighbor triangle
@@ -1475,11 +1548,12 @@ void priv::store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::str
     for (FI fi : mesh.faces()) { 
         auto &color = face_colors[fi];
         switch (face_type_map[fi]) {
-        case FaceType::inside: color = CGAL::Color{255, 0, 0}; break;
-        case FaceType::inside_: color = CGAL::Color{150, 0, 0}; break;
-        case FaceType::outside: color = CGAL::Color{255, 0, 255}; break;
-        case FaceType::not_constrained: color = CGAL::Color{0, 255, 0}; break;
-        default: color = CGAL::Color{127, 127, 127};
+        case FaceType::inside: color = CGAL::Color{100, 250, 100}; break; // light green
+        case FaceType::inside_parallel: color = CGAL::Color{255, 0, 0}; break; // red
+        case FaceType::inside_processed: color = CGAL::Color{170, 0, 0}; break; // dark red
+        case FaceType::outside: color = CGAL::Color{100, 0, 100}; break; // purple
+        case FaceType::not_constrained: color = CGAL::Color{127, 127, 127}; break; // gray
+        default: color = CGAL::Color{0, 0, 255}; // blue
         }
     }
     CGAL::IO::write_OFF(file, mesh);
@@ -1539,16 +1613,17 @@ indexed_triangle_set priv::create_indexed_triangle_set(
 }
 
 #include <filesystem>
-static void prepare_dir(const std::string &dir) {
+namespace {
+static void prepare_dir(const std::string &dir)
+{
     namespace fs = std::filesystem;
     if (fs::exists(dir)) {
-        for (auto &path : fs::directory_iterator(dir))
-            fs::remove_all(path);
+        for (auto &path : fs::directory_iterator(dir)) fs::remove_all(path);
     } else {
         fs::create_directories(dir);
     }
 }
-
+} // namespace
 void priv::store(const CutAOIs &aois, const CutMesh &mesh, const std::string &dir) {
     auto create_outline_its =
         [&mesh](const std::vector<HI> &outlines) -> indexed_triangle_set {
@@ -1673,7 +1748,7 @@ void priv::store(const SurfaceCuts &cut, const std::string &dir) {
         }
         return result;
     };
-
+    prepare_dir(dir);
     for (const auto &c : cut) {
         size_t index = &c - &cut.front();
         std::string file  = dir + "cut" + std::to_string(index) + ".obj";
