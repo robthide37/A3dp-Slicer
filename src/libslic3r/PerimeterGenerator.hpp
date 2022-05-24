@@ -72,6 +72,8 @@ private:
     Polygons    m_lower_slices_polygons;
 };
 
+ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance, const float merge_tolerance);
+
 }
 
 #endif

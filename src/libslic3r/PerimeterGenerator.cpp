@@ -10,7 +10,7 @@
 
 namespace Slic3r {
 
-static ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance, const float merge_tolerance)
+ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance, const float merge_tolerance)
 {
     ExtrusionPaths paths;
     ExtrusionPath path(role);
@@ -24,7 +24,7 @@ static ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thi
         
         double thickness_delta = fabs(line.a_width - line.b_width);
         if (thickness_delta > tolerance) {
-            const unsigned int segments = (unsigned int)ceil(thickness_delta / tolerance);
+            const auto segments = (unsigned int)ceil(thickness_delta / tolerance);
             const coordf_t seg_len = line_len / segments;
             Points pp;
             std::vector<coordf_t> width;

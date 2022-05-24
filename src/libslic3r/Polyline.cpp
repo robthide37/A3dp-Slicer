@@ -235,6 +235,34 @@ ThickLines ThickPolyline::thicklines() const
     return lines;
 }
 
+// Removes the given distance from the end of the ThickPolyline
+void ThickPolyline::clip_end(double distance)
+{
+    while (distance > 0) {
+        Vec2d    last_point = this->last_point().cast<double>();
+        coordf_t last_width = this->width.back();
+        this->points.pop_back();
+        this->width.pop_back();
+        if (this->points.empty())
+            break;
+
+        Vec2d    vec            = this->last_point().cast<double>() - last_point;
+        coordf_t width_diff     = this->width.back() - last_width;
+        double   vec_length_sqr = vec.squaredNorm();
+        if (vec_length_sqr > distance * distance) {
+            double t = (distance / std::sqrt(vec_length_sqr));
+            this->points.emplace_back((last_point + vec * t).cast<coord_t>());
+            this->width.emplace_back(last_width + width_diff * t);
+            assert(this->width.size() == (this->points.size() - 1) * 2);
+            return;
+        } else
+            this->width.pop_back();
+
+        distance -= std::sqrt(vec_length_sqr);
+    }
+    assert(this->width.size() == (this->points.size() - 1) * 2);
+}
+
 Lines3 Polyline3::lines() const
 {
     Lines3 lines;

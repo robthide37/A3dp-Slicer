@@ -8,10 +8,12 @@
 #include "../Print.hpp"
 #include "../PrintConfig.hpp"
 #include "../Surface.hpp"
+#include "../PerimeterGenerator.hpp"
 
 #include "FillBase.hpp"
 #include "FillRectilinear.hpp"
 #include "FillLightning.hpp"
+#include "FillConcentric.hpp"
 
 namespace Slic3r {
 
@@ -329,9 +331,10 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 //	this->export_region_fill_surfaces_to_svg_debug("10_fill-initial");
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
-	std::vector<SurfaceFill>  surface_fills = group_fills(*this);
-	const Slic3r::BoundingBox bbox 			= this->object()->bounding_box();
-	const auto                resolution 	= this->object()->print()->config().gcode_resolution.value;
+    std::vector<SurfaceFill>  surface_fills  = group_fills(*this);
+    const Slic3r::BoundingBox bbox           = this->object()->bounding_box();
+    const auto                resolution     = this->object()->print()->config().gcode_resolution.value;
+    const auto                slicing_engine = this->object()->config().slicing_engine;
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
 	{
@@ -351,6 +354,13 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
         if (surface_fill.params.pattern == ipLightning)
             dynamic_cast<FillLightning::Filler*>(f.get())->generator = lightning_generator;
+
+        if (object()->config().slicing_engine.value == SlicingEngine::Arachne && surface_fill.params.pattern == ipConcentric) {
+            FillConcentric *fill_concentric = dynamic_cast<FillConcentric *>(f.get());
+            assert(fill_concentric != nullptr);
+            fill_concentric->print_config        = &this->object()->print()->config();
+            fill_concentric->print_object_config = &this->object()->config();
+        }
 
         // calculate flow spacing for infill pattern generation
         bool using_internal_flow = ! surface_fill.surface.is_solid() && ! surface_fill.params.bridge;
@@ -372,23 +382,28 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
         // apply half spacing using this flow's own spacing and generate infill
         FillParams params;
-        params.density 		     = float(0.01 * surface_fill.params.density);
-		params.dont_adjust		 = false; //  surface_fill.params.dont_adjust;
+        params.density           = float(0.01 * surface_fill.params.density);
+        params.dont_adjust       = false; //  surface_fill.params.dont_adjust;
         params.anchor_length     = surface_fill.params.anchor_length;
-		params.anchor_length_max = surface_fill.params.anchor_length_max;
-		params.resolution        = resolution;
+        params.anchor_length_max = surface_fill.params.anchor_length_max;
+        params.resolution        = resolution;
+        params.use_arachne       = slicing_engine == SlicingEngine::Arachne && surface_fill.params.pattern == ipConcentric;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
 			// Spacing is modified by the filler to indicate adjustments. Reset it for each expolygon.
 			f->spacing = surface_fill.params.spacing;
 			surface_fill.surface.expolygon = std::move(expoly);
-			Polylines polylines;
+            Polylines      polylines;
+            ThickPolylines thick_polylines;
 			try {
-				polylines = f->fill_surface(&surface_fill.surface, params);
+                if (params.use_arachne)
+                    thick_polylines = f->fill_surface_arachne(&surface_fill.surface, params);
+                else
+				    polylines = f->fill_surface(&surface_fill.surface, params);
 			} catch (InfillFailedException &) {
 			}
-	        if (! polylines.empty()) {
-		        // calculate actual flow from spacing (which might have been adjusted by the infill
+            if (!polylines.empty() || !thick_polylines.empty()) {
+                // calculate actual flow from spacing (which might have been adjusted by the infill
 		        // pattern generator)
 		        double flow_mm3_per_mm = surface_fill.params.flow.mm3_per_mm();
 		        double flow_width      = surface_fill.params.flow.width();
@@ -406,10 +421,28 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 		        m_regions[surface_fill.region_id]->fills.entities.push_back(eec = new ExtrusionEntityCollection());
 		        // Only concentric fills are not sorted.
 		        eec->no_sort = f->no_sort();
-		        extrusion_entities_append_paths(
-		            eec->entities, std::move(polylines),
-		            surface_fill.params.extrusion_role,
-		            flow_mm3_per_mm, float(flow_width), surface_fill.params.flow.height());
+                if (params.use_arachne) {
+                    for (const ThickPolyline &thick_polyline : thick_polylines) {
+                        Flow new_flow = surface_fill.params.flow.with_spacing(float(f->spacing));
+
+                        ExtrusionPaths paths = thick_polyline_to_extrusion_paths(thick_polyline, surface_fill.params.extrusion_role, new_flow, scaled<float>(0.05), 0);
+                        // Append paths to collection.
+                        if (!paths.empty()) {
+                            if (paths.front().first_point() == paths.back().last_point())
+                                eec->entities.emplace_back(new ExtrusionLoop(std::move(paths)));
+                            else
+                                for (ExtrusionPath &path : paths)
+                                    eec->entities.emplace_back(new ExtrusionPath(std::move(path)));
+                        }
+                    }
+
+                    thick_polylines.clear();
+                } else {
+                    extrusion_entities_append_paths(
+                        eec->entities, std::move(polylines),
+                        surface_fill.params.extrusion_role,
+                        flow_mm3_per_mm, float(flow_width), surface_fill.params.flow.height());
+                }
 		    }
 		}
     }
@@ -618,6 +651,7 @@ void Layer::make_ironing()
 			surface_fill.expolygon = std::move(expoly);
 			Polylines polylines;
 			try {
+                assert(!fill_params.use_arachne);
 				polylines = fill.fill_surface(&surface_fill, fill_params);
 			} catch (InfillFailedException &) {
 			}
