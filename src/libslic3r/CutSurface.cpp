@@ -874,12 +874,6 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
                 uint32_t i_to   = shape_to.point_index;
                 IntersectingElement::Type type_from = shape_from.get_type();
                 IntersectingElement::Type type_to = shape_to.get_type();
-                auto is_positive_type_direction = [&type_from, &type_to]()->bool {
-                    return 
-                        type_from == IntersectingElement::Type::edge_1 && type_to == IntersectingElement::Type::face_1 || 
-                        type_from == IntersectingElement::Type::face_1 && type_to == IntersectingElement::Type::edge_2 || 
-                        type_from == IntersectingElement::Type::edge_2 && type_to == IntersectingElement::Type::face_2 ;
-                };
                 if (i_from == i_to && type_from == type_to) {
                     // intersecting element must be face
                     assert(type_from == IntersectingElement::Type::face_1 ||
