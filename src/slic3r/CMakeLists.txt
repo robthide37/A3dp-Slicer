@@ -246,6 +246,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/TCPConsole.hpp
     Utils/MKS.cpp
     Utils/MKS.hpp
+    Utils/WinRegistry.cpp
+    Utils/WinRegistry.hpp
 )
 
 if (APPLE)
