@@ -8,6 +8,7 @@
 
 #include <libslic3r/TriangleMeshSlicer.hpp>
 #include <libslic3r/SLA/SupportTreeMesher.hpp>
+#include <libslic3r/BranchingTree/PointCloud.hpp>
 
 namespace {
 
@@ -171,6 +172,79 @@ TEST_CASE("DefaultSupports::FloorSupportsDoNotPierceModel", "[SLASupportGenerati
 
 //    for (auto &fname: SUPPORT_TEST_MODELS) test_supports(fname, supportcfg);
 //}
+
+TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branching]") {
+    SECTION("Identical points have the same merge point") {
+        Vec3f a{0.f, 0.f, 0.f}, b = a;
+        float slope = PI / 4.f;
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        REQUIRE((*mergept - b).norm() < EPSILON);
+        REQUIRE((*mergept - a).norm() < EPSILON);
+    }
+
+    // ^ Z
+    // | a *
+    // |
+    // | b * <= mergept
+    SECTION("Points at different heights have the lower point as mergepoint") {
+        Vec3f a{0.f, 0.f, 0.f}, b = {0.f, 0.f, -1.f};
+        float slope = PI / 4.f;
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        REQUIRE((*mergept - b).squaredNorm() < EPSILON);
+    }
+
+    // -|---------> X
+    //  a       b
+    //  *       *
+    //      * <= mergept
+    SECTION("Points at different X have mergept in the middle at lower Z") {
+        Vec3f a{0.f, 0.f, 0.f}, b = {1.f, 0.f, 0.f};
+        float slope = PI / 4.f;
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+
+           // Distance of mergept should be equal from both input points
+        float D = std::abs((*mergept - b).squaredNorm() - (*mergept - a).squaredNorm());
+
+        REQUIRE(D < EPSILON);
+    }
+
+    // -|---------> Y
+    //  a       b
+    //  *       *
+    //      * <= mergept
+    SECTION("Points at different Y have mergept in the middle at lower Z") {
+        Vec3f a{0.f, 0.f, 0.f}, b = {0.f, 1.f, 0.f};
+        float slope = PI / 4.f;
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+
+        // Distance of mergept should be equal from both input points
+        float D = std::abs((*mergept - b).squaredNorm() - (*mergept - a).squaredNorm());
+
+        REQUIRE(D < EPSILON);
+    }
+
+    SECTION("Points separated by less than critical angle have the lower point as mergept") {
+        Vec3f a{0.f, 0.f, 0.f}, b = {-0.5f, -0.5f, -1.f};
+        float slope = PI / 4.f;
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        REQUIRE((*mergept - b).norm() < EPSILON);
+    }
+}
 
 TEST_CASE("BranchingSupports::ElevatedSupportsDoNotPierceModel", "[SLASupportGeneration][Branching]") {
 

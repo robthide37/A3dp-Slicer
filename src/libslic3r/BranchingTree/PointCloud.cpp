@@ -14,19 +14,27 @@ std::optional<Vec3f> find_merge_pt(const Vec3f &A,
     Vec3f Da = (B - A).normalized(), Db = -Da;
     auto [polar_da, azim_da] = Geometry::dir_to_spheric(Da);
     auto [polar_db, azim_db] = Geometry::dir_to_spheric(Db);
-    polar_da = std::max(polar_da, float(PI) - max_slope);
-    polar_db = std::max(polar_db, float(PI) - max_slope);
+    polar_da = std::max(polar_da, float(PI) / 2.f + max_slope);
+    polar_db = std::max(polar_db, float(PI) / 2.f + max_slope);
 
     Da = Geometry::spheric_to_dir<float>(polar_da, azim_da);
     Db = Geometry::spheric_to_dir<float>(polar_db, azim_db);
 
+    // This formula is based on
+    // https://stackoverflow.com/questions/27459080/given-two-points-and-two-direction-vectors-find-the-point-where-they-intersect
     double t1 =
         (A.z() * Db.x() + Db.z() * B.x() - B.z() * Db.x() - Db.z() * A.x()) /
         (Da.x() * Db.z() - Da.z() * Db.x());
 
-    double t2 = (A.x() + Da.x() * t1 - B.x()) / Db.x();
+    if (std::isnan(t1) || std::abs(t1) < EPSILON)
+        t1 = (A.z() * Db.y() + Db.z() * B.y() - B.z() * Db.y() - Db.z() * A.y()) /
+             (Da.y() * Db.z() - Da.z() * Db.y());
 
-    return t1 > 0. && t2 > 0. ? A + t1 * Da : std::optional<Vec3f>{};
+    Vec3f m1 = A + t1 * Da;
+
+    double t2 = (m1.z() - B.z()) / Db.z();
+
+    return t1 >= 0. && t2 >= 0. ? m1 : std::optional<Vec3f>{};
 }
 
 void to_eigen_mesh(const indexed_triangle_set &its,
