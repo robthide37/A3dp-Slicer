@@ -368,10 +368,12 @@ void SkeletalTrapezoidation::computeSegmentCellRange(vd_t::cell_type& cell, Poin
 
 SkeletalTrapezoidation::SkeletalTrapezoidation(const Polygons& polys, const BeadingStrategy& beading_strategy,
                                                double transitioning_angle, coord_t discretization_step_size,
-                                               coord_t transition_filter_dist, coord_t beading_propagation_transition_dist
-    ): transitioning_angle(transitioning_angle), 
+                                               coord_t transition_filter_dist, coord_t allowed_filter_deviation,
+                                               coord_t beading_propagation_transition_dist
+    ): transitioning_angle(transitioning_angle),
     discretization_step_size(discretization_step_size),
     transition_filter_dist(transition_filter_dist),
+    allowed_filter_deviation(allowed_filter_deviation),
     beading_propagation_transition_dist(beading_propagation_transition_dist),
     beading_strategy(beading_strategy)
 {
@@ -918,7 +920,7 @@ void SkeletalTrapezoidation::generateTransitionMids(ptr_vector_t<std::list<Trans
                 edge.data.setTransitions(edge_transitions.back());  // initialization
                 transitions = edge.data.getTransitions();
             }
-            transitions->emplace_back(mid_pos, transition_lower_bead_count);
+            transitions->emplace_back(mid_pos, transition_lower_bead_count, mid_R);
         }
         assert((edge.from->data.bead_count == edge.to->data.bead_count) || edge.data.hasTransitions());
     }
@@ -997,17 +999,13 @@ std::list<SkeletalTrapezoidation::TransitionMidRef> SkeletalTrapezoidation::diss
 {
     std::list<TransitionMidRef> to_be_dissolved;
     if (traveled_dist > max_dist)
-    {
         return to_be_dissolved;
-    }
+
     bool should_dissolve = true;
-    for (edge_t* edge = edge_to_start->next; edge && edge != edge_to_start->twin; edge = edge->twin->next)
-    {
+    for (edge_t* edge = edge_to_start->next; edge && edge != edge_to_start->twin; edge = edge->twin->next){
         if (!edge->data.isCentral())
-        {
             continue;
-        }
-        
+
         Point a = edge->from->p;
         Point b = edge->to->p;
         Point ab = b - a;
@@ -1015,19 +1013,22 @@ std::list<SkeletalTrapezoidation::TransitionMidRef> SkeletalTrapezoidation::diss
         bool is_aligned = edge->isUpward();
         edge_t* aligned_edge = is_aligned? edge : edge->twin;
         bool seen_transition_on_this_edge = false;
-        
-        if (aligned_edge->data.hasTransitions())
-        {
+
+        const coord_t origin_radius          = origin_transition.feature_radius;
+        const coord_t radius_here            = edge->from->data.distance_to_boundary;
+        const bool    dissolve_result_is_odd = bool(origin_transition.lower_bead_count % 2) == going_up;
+        const coord_t width_deviation        = std::abs(origin_radius - radius_here) * 2; // times by two because the deviation happens at both sides of the significant edge
+        const coord_t line_width_deviation = dissolve_result_is_odd ? width_deviation : width_deviation / 2; // assume the deviation will be split over either 1 or 2 lines, i.e. assume wall_distribution_count = 1
+        if (line_width_deviation > allowed_filter_deviation)
+            should_dissolve = false;
+
+        if (should_dissolve && aligned_edge->data.hasTransitions()) {
             auto& transitions = *aligned_edge->data.getTransitions();
-            for (auto transition_it = transitions.begin(); transition_it != transitions.end(); ++ transition_it)
-            { // Note: this is not necessarily iterating in the traveling direction!
+            for (auto transition_it = transitions.begin(); transition_it != transitions.end(); ++ transition_it) { // Note: this is not necessarily iterating in the traveling direction!
                 // Check whether we should dissolve
                 coord_t pos = is_aligned? transition_it->pos : ab_size - transition_it->pos;
-                if (traveled_dist + pos < max_dist
-                    && transition_it->lower_bead_count == origin_transition.lower_bead_count) // Only dissolve local optima
-                {
-                    if (traveled_dist + pos < beading_strategy.getTransitioningLength(transition_it->lower_bead_count))
-                    {
+                if (traveled_dist + pos < max_dist && transition_it->lower_bead_count == origin_transition.lower_bead_count) { // Only dissolve local optima
+                    if (traveled_dist + pos < beading_strategy.getTransitioningLength(transition_it->lower_bead_count)) {
                         // Consecutive transitions both in/decreasing in bead count should never be closer together than the transition distance
                         assert(going_up != is_aligned || transition_it->lower_bead_count == 0); 
                     }
@@ -1036,11 +1037,9 @@ std::list<SkeletalTrapezoidation::TransitionMidRef> SkeletalTrapezoidation::diss
                 }
             }
         }
-        if (!seen_transition_on_this_edge)
-        {
+        if (should_dissolve && !seen_transition_on_this_edge) {
             std::list<SkeletalTrapezoidation::TransitionMidRef> to_be_dissolved_here = dissolveNearbyTransitions(edge, origin_transition, traveled_dist + ab_size, max_dist, going_up);
-            if (to_be_dissolved_here.empty())
-            { // The region is too long to be dissolved in this direction, so it cannot be dissolved in any direction.
+            if (to_be_dissolved_here.empty()) { // The region is too long to be dissolved in this direction, so it cannot be dissolved in any direction.
                 to_be_dissolved.clear();
                 return to_be_dissolved;
             }
@@ -1048,12 +1047,10 @@ std::list<SkeletalTrapezoidation::TransitionMidRef> SkeletalTrapezoidation::diss
             should_dissolve = should_dissolve && !to_be_dissolved.empty();
         }
     }
-    
+
     if (!should_dissolve)
-    {
         to_be_dissolved.clear();
-    }
-    
+
     return to_be_dissolved;
 }
 
@@ -1062,10 +1059,8 @@ void SkeletalTrapezoidation::dissolveBeadCountRegion(edge_t* edge_to_start, coor
 {
     assert(from_bead_count != to_bead_count);
     if (edge_to_start->to->data.bead_count != from_bead_count)
-    {
         return;
-    }
-    
+
     edge_to_start->to->data.bead_count = to_bead_count;
     for (edge_t* edge = edge_to_start->next; edge && edge != edge_to_start->twin; edge = edge->twin->next)
     {

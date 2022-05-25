@@ -334,7 +334,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, config->opt_bool("external_perimeters_first"));
 
     bool have_arachne = have_perimeters && config->opt_enum<SlicingEngine>("slicing_engine") == SlicingEngine::Arachne;
-    for (auto el : { "wall_transition_length", "wall_transition_filter_distance", "wall_transition_angle", "wall_distribution_count", "wall_split_middle_threshold", "wall_add_middle_threshold", "min_feature_size", "min_bead_width", "aaa" })
+    for (auto el : { "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle", "wall_distribution_count", "wall_split_middle_threshold", "wall_add_middle_threshold", "min_feature_size", "min_bead_width", "aaa" })
        toggle_field(el, have_arachne);
 
     toggle_field("overhangs_width_speed", !have_arachne);

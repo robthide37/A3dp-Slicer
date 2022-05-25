@@ -38,21 +38,24 @@ WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t bead_width_0
     if (const auto &min_bead_width_opt = print_object_config.min_bead_width; min_bead_width_opt.percent) {
         assert(!print_config.nozzle_diameter.empty());
         double min_nozzle_diameter = *std::min_element(print_config.nozzle_diameter.values.begin(), print_config.nozzle_diameter.values.end());
-        min_bead_width             = scaled<coord_t>(min_bead_width_opt.value * 0.01 * min_nozzle_diameter);
+        this->min_bead_width             = scaled<coord_t>(min_bead_width_opt.value * 0.01 * min_nozzle_diameter);
+    }
+
+    if (const auto &wall_transition_filter_deviation_opt = print_object_config.wall_transition_filter_deviation; wall_transition_filter_deviation_opt.percent) {
+        assert(!print_config.nozzle_diameter.empty());
+        double min_nozzle_diameter = *std::min_element(print_config.nozzle_diameter.values.begin(), print_config.nozzle_diameter.values.end());
+        this->wall_transition_filter_deviation = scaled<coord_t>(wall_transition_filter_deviation_opt.value * 0.01 * min_nozzle_diameter);
     }
 }
 
 void simplify(Polygon &thiss, const int64_t smallest_line_segment_squared, const int64_t allowed_error_distance_squared)
 {
-    if (thiss.size() < 3)
-    {
+    if (thiss.size() < 3) {
         thiss.points.clear();
         return;
     }
     if (thiss.size() == 3)
-    {
         return;
-    }
 
     Polygon new_path;
     Point previous = thiss.points.back();
@@ -76,22 +79,16 @@ void simplify(Polygon &thiss, const int64_t smallest_line_segment_squared, const
      */
     int64_t accumulated_area_removed = int64_t(previous.x()) * int64_t(current.y()) - int64_t(previous.y()) * int64_t(current.x()); // Twice the Shoelace formula for area of polygon per line segment.
 
-    for (size_t point_idx = 0; point_idx < thiss.points.size(); point_idx++)
-    {
+    for (size_t point_idx = 0; point_idx < thiss.points.size(); point_idx++) {
         current = thiss.points.at(point_idx % thiss.points.size());
 
         //Check if the accumulated area doesn't exceed the maximum.
         Point next;
-        if (point_idx + 1 < thiss.points.size())
-        {
+        if (point_idx + 1 < thiss.points.size()) {
             next = thiss.points.at(point_idx + 1);
-        }
-        else if (point_idx + 1 == thiss.points.size() && new_path.size() > 1)
-        { // don't spill over if the [next] vertex will then be equal to [previous]
+        } else if (point_idx + 1 == thiss.points.size() && new_path.size() > 1) { // don't spill over if the [next] vertex will then be equal to [previous]
             next = new_path[0]; //Spill over to new polygon for checking removed area.
-        }
-        else
-        {
+        } else {
             next = thiss.points.at((point_idx + 1) % thiss.points.size());
         }
         const int64_t removed_area_next = int64_t(current.x()) * int64_t(next.y()) - int64_t(current.y()) * int64_t(next.x()); // Twice the Shoelace formula for area of polygon per line segment.
@@ -99,8 +96,7 @@ void simplify(Polygon &thiss, const int64_t smallest_line_segment_squared, const
         accumulated_area_removed += removed_area_next;
 
         const int64_t length2 = (current - previous).cast<int64_t>().squaredNorm();
-        if (length2 < scaled<int64_t>(25.))
-        {
+        if (length2 < scaled<int64_t>(25.)) {
             // We're allowed to always delete segments of less than 5 micron.
             continue;
         }
@@ -109,9 +105,7 @@ void simplify(Polygon &thiss, const int64_t smallest_line_segment_squared, const
         const int64_t base_length_2 = (next - previous).cast<int64_t>().squaredNorm();
 
         if (base_length_2 == 0) //Two line segments form a line back and forth with no area.
-        {
             continue; //Remove the vertex.
-        }
         //We want to check if the height of the triangle formed by previous, current and next vertices is less than allowed_error_distance_squared.
         //1/2 L = A           [actual area is half of the computed shoelace value] // Shoelace formula is .5*(...) , but we simplify the computation and take out the .5
         //A = 1/2 * b * h     [triangle area formula]
@@ -122,16 +116,13 @@ void simplify(Polygon &thiss, const int64_t smallest_line_segment_squared, const
         const int64_t height_2 = double(area_removed_so_far) * double(area_removed_so_far) / double(base_length_2);
         if ((height_2 <= Slic3r::sqr(scaled<coord_t>(0.005)) //Almost exactly colinear (barring rounding errors).
              && Line::distance_to_infinite(current, previous, next) <= scaled<double>(0.005))) // make sure that height_2 is not small because of cancellation of positive and negative areas
-        {
             continue;
-        }
 
         if (length2 < smallest_line_segment_squared
             && height_2 <= allowed_error_distance_squared) // removing the vertex doesn't introduce too much error.)
         {
             const int64_t next_length2 = (current - next).cast<int64_t>().squaredNorm();
-            if (next_length2 > smallest_line_segment_squared)
-            {
+            if (next_length2 > 4 * smallest_line_segment_squared) {
                 // Special case; The next line is long. If we were to remove this, it could happen that we get quite noticeable artifacts.
                 // We should instead move this point to a location where both edges are kept and then remove the previous point that we wanted to keep.
                 // By taking the intersection of these two lines, we get a point that preserves the direction (so it makes the corner a bit more pointy).
@@ -146,20 +137,16 @@ void simplify(Polygon &thiss, const int64_t smallest_line_segment_squared, const
                     // We can't find a better spot for it, but the size of the line is more than 5 micron.
                     // So the only thing we can do here is leave it in...
                 }
-                else
-                {
+                else {
                     // New point seems like a valid one.
                     current = intersection_point;
                     // If there was a previous point added, remove it.
-                    if(!new_path.empty())
-                    {
+                    if(!new_path.empty()) {
                         new_path.points.pop_back();
                         previous = previous_previous;
                     }
                 }
-            }
-            else
-            {
+            } else {
                 continue; //Remove the vertex.
             }
         }
@@ -517,7 +504,8 @@ const std::vector<VariableWidthLines> &WallToolPaths::generate()
             wall_0_inset,
             wall_distribution_count
         );
-    const coord_t transition_filter_dist = scaled<coord_t>(this->print_object_config.wall_transition_filter_distance.value);
+    const coord_t transition_filter_dist   = scaled<coord_t>(100.f);
+    const coord_t allowed_filter_deviation = wall_transition_filter_deviation;
     SkeletalTrapezoidation wall_maker
     (
         prepared_outline,
@@ -525,6 +513,7 @@ const std::vector<VariableWidthLines> &WallToolPaths::generate()
         beading_strat->getTransitioningAngle(),
         discretization_step_size,
         transition_filter_dist,
+        allowed_filter_deviation,
         wall_transition_length
     );
     wall_maker.generateToolpaths(toolpaths);

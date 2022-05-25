@@ -734,7 +734,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<SlicingMode>,    slicing_mode))
     ((ConfigOptionBool,                 support_material))
     ((ConfigOptionFloat,                wall_transition_length))
-    ((ConfigOptionFloat,                wall_transition_filter_distance))
+    ((ConfigOptionFloatOrPercent,       wall_transition_filter_deviation))
     ((ConfigOptionFloat,                wall_transition_angle))
     ((ConfigOptionInt,                  wall_distribution_count))
     ((ConfigOptionPercent,              wall_split_middle_threshold))
