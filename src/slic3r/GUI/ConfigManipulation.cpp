@@ -320,7 +320,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     bool have_arachne = config->opt_enum<SlicingEngine>("slicing_engine") == SlicingEngine::Arachne;
     toggle_field("wall_transition_length", have_arachne);
-    toggle_field("wall_transition_filter_distance", have_arachne);
+    toggle_field("wall_transition_filter_deviation", have_arachne);
     toggle_field("wall_transition_angle", have_arachne);
     toggle_field("wall_distribution_count", have_arachne);
     toggle_field("wall_split_middle_threshold", have_arachne);

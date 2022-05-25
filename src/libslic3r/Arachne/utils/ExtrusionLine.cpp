@@ -127,7 +127,7 @@ void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const 
             && height_2 <= allowed_error_distance_squared) // Removing the junction (vertex) doesn't introduce too much error.
         {
             const int64_t next_length2 = (current - next).cast<int64_t>().squaredNorm();
-            if (next_length2 > smallest_line_segment_squared)
+            if (next_length2 > 4 * smallest_line_segment_squared)
             {
                 // Special case; The next line is long. If we were to remove this, it could happen that we get quite noticeable artifacts.
                 // We should instead move this point to a location where both edges are kept and then remove the previous point that we wanted to keep.

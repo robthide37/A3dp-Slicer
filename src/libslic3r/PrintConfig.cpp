@@ -3067,24 +3067,28 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(0.4));
 
-    def = this->add("wall_transition_filter_distance", coFloat);
-    def->label = L("Wall Transition Distance Filter");
+    def = this->add("wall_transition_filter_deviation", coFloatOrPercent);
+    def->label = L("Wall Transitioning Filter Margin");
     def->category = L("Advanced");
-    def->tooltip  = L("If it would be transitioning back and forth between different numbers of walls in "
-                       "quick succession, don't transition at all. Remove transitions if they are closer "
-                       "together than this distance.");
+    def->tooltip  = L("Prevent transitioning back and forth between one extra wall and one less. This "
+                       "margin extends the range of line widths which follow to [Minimum Wall Line "
+                       "Width - Margin, 2 * Minimum Wall Line Width + Margin]. Increasing this margin "
+                       "reduces the number of transitions, which reduces the number of extrusion "
+                       "starts/stops and travel time. However, large line width variation can lead to "
+                       "under- or overextrusion problems."
+                       "If expressed as percentage (for example 25%), it will be computed over nozzle diameter.");
     def->sidetext = L("mm");
     def->mode = comExpert;
     def->min = 0;
-    def->set_default_value(new ConfigOptionFloat(1.4));
+    def->set_default_value(new ConfigOptionFloatOrPercent(25, true));
 
     def = this->add("wall_transition_angle", coFloat);
-    def->label = L("Wall Transition Angle");
+    def->label = L("Wall Transitioning Threshold Angle");
     def->category = L("Advanced");
-    def->tooltip  = L("When transitioning between different numbers of walls as the part becomes thinner, "
-                       "two adjacent walls will join together at this angle. This can make the walls come "
-                       "together faster than what the Wall Transition Length indicates, filling the space "
-                       "better.");
+    def->tooltip  = L("When to create transitions between even and odd numbers of walls. A wedge shape with"
+                       " an angle greater than this setting will not have transitions and no walls will be "
+                       "printed in the center to fill the remaining space. Reducing this setting reduces "
+                       "the number and length of these center walls, but may leave gaps or overextrude.");
     def->sidetext = L("°");
     def->mode = comExpert;
     def->min = 1.;
@@ -4089,8 +4093,6 @@ void DynamicPrintConfig::normalize_fdm()
         opt_min_bead_width->value = std::max(opt_min_bead_width->value, 0.001);
     if (auto *opt_wall_transition_length = this->opt<ConfigOptionFloat>("wall_transition_length", false); opt_wall_transition_length)
         opt_wall_transition_length->value = std::max(opt_wall_transition_length->value, 0.001);
-    if (auto *opt_wall_transition_filter_distance = this->opt<ConfigOptionFloat>("wall_transition_filter_distance", false); opt_wall_transition_filter_distance)
-        opt_wall_transition_filter_distance->value = std::max(opt_wall_transition_filter_distance->value, 0.001);
 }
 
 void  handle_legacy_sla(DynamicPrintConfig &config)

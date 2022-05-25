@@ -664,7 +664,7 @@ bool PrintObject::invalidate_state_by_config_options(
         } else if (
             opt_key == "slicing_engine"
             || opt_key == "wall_transition_length"
-            || opt_key == "wall_transition_filter_distance"
+            || opt_key == "wall_transition_filter_deviation"
             || opt_key == "wall_transition_angle"
             || opt_key == "wall_distribution_count"
             || opt_key == "wall_split_middle_threshold"

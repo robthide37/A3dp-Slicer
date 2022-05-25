@@ -117,6 +117,7 @@ private:
     bool toolpaths_generated; //<! Are the toolpaths generated
     std::vector<VariableWidthLines> toolpaths; //<! The generated toolpaths
     Polygons inner_contour;  //<! The inner contour of the generated toolpaths
+    coord_t wall_transition_filter_deviation;  //!< The allowed line width deviation induced by filtering
     const PrintObjectConfig &print_object_config;
 };
 
