@@ -9,15 +9,15 @@
 #include <queue>
 
 #include "libslic3r/AABBTreeLines.hpp"
+#include "libslic3r/KDTreeIndirect.hpp"
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Layer.hpp"
-#include "libslic3r/QuadricEdgeCollapse.hpp"
-#include "libslic3r/Subdivide.hpp"
 
 #include "libslic3r/Geometry/Curves.hpp"
+#include "libslic3r/TriangleSetSampling.hpp"
 
 #include "libslic3r/Utils.hpp"
 
@@ -130,19 +130,22 @@ Vec3f sample_power_cosine_hemisphere(const Vec2f &samples, float power) {
     return Vec3f(cos(term1) * term3, sin(term1) * term3, term2);
 }
 
-std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &raycasting_tree,
-        const indexed_triangle_set &triangles, size_t negative_volumes_start_index) {
+std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &raycasting_tree,
+        const indexed_triangle_set &triangles,
+        const TriangleSetSamples &samples,
+        size_t negative_volumes_start_index) {
     BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer: raycast visibility for " << triangles.indices.size() << " triangles: start";
+    << "SeamPlacer: raycast visibility of " << samples.positions.size() << " samples over " << triangles.indices.size()
+            << " triangles: end";
 
     //prepare uniform samples of a hemisphere
-    float step_size = 1.0f / SeamPlacer::sqr_rays_per_triangle;
+    float step_size = 1.0f / SeamPlacer::sqr_rays_per_sample_point;
     std::vector<Vec3f> precomputed_sample_directions(
-            SeamPlacer::sqr_rays_per_triangle * SeamPlacer::sqr_rays_per_triangle);
-    for (size_t x_idx = 0; x_idx < SeamPlacer::sqr_rays_per_triangle; ++x_idx) {
+            SeamPlacer::sqr_rays_per_sample_point * SeamPlacer::sqr_rays_per_sample_point);
+    for (size_t x_idx = 0; x_idx < SeamPlacer::sqr_rays_per_sample_point; ++x_idx) {
         float sample_x = x_idx * step_size + step_size / 2.0;
-        for (size_t y_idx = 0; y_idx < SeamPlacer::sqr_rays_per_triangle; ++y_idx) {
-            size_t dir_index = x_idx * SeamPlacer::sqr_rays_per_triangle + y_idx;
+        for (size_t y_idx = 0; y_idx < SeamPlacer::sqr_rays_per_sample_point; ++y_idx) {
+            size_t dir_index = x_idx * SeamPlacer::sqr_rays_per_sample_point + y_idx;
             float sample_y = y_idx * step_size + step_size / 2.0;
             precomputed_sample_directions[dir_index] = sample_hemisphere_uniform( { sample_x, sample_y });
         }
@@ -150,24 +153,19 @@ std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<
 
     bool model_contains_negative_parts = negative_volumes_start_index < triangles.indices.size();
 
-    std::vector<FaceVisibilityInfo> result(triangles.indices.size());
+    std::vector<float> result(samples.positions.size());
     tbb::parallel_for(tbb::blocked_range<size_t>(0, result.size()),
             [&triangles, &precomputed_sample_directions, model_contains_negative_parts, negative_volumes_start_index,
-                    &raycasting_tree, &result](tbb::blocked_range<size_t> r) {
+                    &raycasting_tree, &result, &samples](tbb::blocked_range<size_t> r) {
                 // Maintaining hits memory outside of the loop, so it does not have to be reallocated for each query.
                 std::vector<igl::Hit> hits;
-                for (size_t face_index = r.begin(); face_index < r.end(); ++face_index) {
-                    FaceVisibilityInfo &dest = result[face_index];
-                    dest.visibility = 1.0f;
-                    constexpr float decrease = 1.0f
-                            / (SeamPlacer::sqr_rays_per_triangle * SeamPlacer::sqr_rays_per_triangle);
+                for (size_t s_idx = r.begin(); s_idx < r.end(); ++s_idx) {
+                    result[s_idx] = 1.0f;
+                    constexpr float decrease_step = 1.0f
+                            / (SeamPlacer::sqr_rays_per_sample_point * SeamPlacer::sqr_rays_per_sample_point);
 
-                    Vec3i face = triangles.indices[face_index];
-                    Vec3f A = triangles.vertices[face.x()];
-                    Vec3f B = triangles.vertices[face.y()];
-                    Vec3f C = triangles.vertices[face.z()];
-                    Vec3f center = (A + B + C) / 3.0f;
-                    Vec3f normal = ((B - A).cross(C - B)).normalized();
+                    const Vec3f &center = samples.positions[s_idx];
+                    const Vec3f &normal = samples.normals[s_idx];
                     // apply the local direction via Frame struct - the local_dir is with respect to +Z being forward
                     Frame f;
                     f.set_from_z(normal);
@@ -183,11 +181,14 @@ std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<
                             bool hit = AABBTreeIndirect::intersect_ray_first_hit(triangles.vertices,
                                     triangles.indices, raycasting_tree, ray_origin_d, final_ray_dir_d, hitpoint);
                             if (hit && its_face_normal(triangles, hitpoint.id).dot(final_ray_dir) <= 0) {
-                                dest.visibility -= decrease;
+                                result[s_idx] -= decrease_step;
                             }
                         } else { //TODO improve logic for order based boolean operations - consider order of volumes
+                            bool casting_from_negative_volume = samples.triangle_indices[s_idx]
+                                    >= negative_volumes_start_index;
+
                             Vec3d ray_origin_d = (center + normal * 0.1).cast<double>(); // start above surface.
-                            if (face_index >= negative_volumes_start_index) { // if casting from negative volume face, invert direction, change start pos
+                            if (casting_from_negative_volume) { // if casting from negative volume face, invert direction, change start pos
                                 final_ray_dir = -1.0 * final_ray_dir;
                                 ray_origin_d = (center - normal * 0.03).cast<double>();
                             }
@@ -209,7 +210,7 @@ std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<
                                     }
                                 }
                                 if (counter == 0) {
-                                    dest.visibility -= decrease;
+                                    result[s_idx] -= decrease_step;
                                 }
                             }
                         }
@@ -218,7 +219,8 @@ std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<
             });
 
     BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer: raycast visibility for " << triangles.indices.size() << " triangles: end";
+    << "SeamPlacer: raycast visibility of " << samples.positions.size() << " samples over " << triangles.indices.size()
+            << " triangles: end";
 
     return result;
 }
@@ -273,12 +275,28 @@ std::vector<float> calculate_polygon_angles_at_vertices(const Polygon &polygon, 
     return result;
 }
 
+struct CoordinateFunctor {
+    const std::vector<Vec3f> *coordinates;
+    CoordinateFunctor(const std::vector<Vec3f> *coords) :
+            coordinates(coords) {
+    }
+    CoordinateFunctor() :
+            coordinates(nullptr) {
+    }
+
+    const float& operator()(size_t idx, size_t dim) const {
+        return coordinates->operator [](idx)[dim];
+    }
+};
+
 // structure to store global information about the model - occlusion hits, enforcers, blockers
 struct GlobalModelInfo {
-    indexed_triangle_set model;
-    std::vector<Vec3i> triangle_neighbours;
-    AABBTreeIndirect::Tree<3, float> model_tree;
-    std::vector<FaceVisibilityInfo> visiblity_info;
+    TriangleSetSamples mesh_samples;
+    std::vector<float> mesh_samples_visibility;
+    CoordinateFunctor mesh_samples_coordinate_functor;
+    KDTreeIndirect<3, float, CoordinateFunctor> mesh_samples_tree { CoordinateFunctor { } };
+    float mesh_samples_radius;
+
     indexed_triangle_set enforcers;
     indexed_triangle_set blockers;
     AABBTreeIndirect::Tree<3, float> enforcers_tree;
@@ -303,48 +321,72 @@ struct GlobalModelInfo {
     }
 
     float calculate_point_visibility(const Vec3f &position) const {
-        size_t hit_idx;
-        Vec3f hit_point;
-        if (AABBTreeIndirect::squared_distance_to_indexed_triangle_set(model.vertices, model.indices, model_tree,
-                position, hit_idx, hit_point) >= 0) {
-            float visibility = visiblity_info[hit_idx].visibility;
-            Vec3i neighbours = this->triangle_neighbours[hit_idx];
-            size_t n_count = 0;
-            for (int neighbour : neighbours) {
-                if (neighbour >= 0) {
-                    visibility += visiblity_info[neighbour].visibility;
-                    n_count++;
-                }
-            }
-            return visibility / (1 + n_count);
-        } else {
-            return 0.0f;
+        std::vector<size_t> points = find_nearby_points(mesh_samples_tree, position, mesh_samples_radius);
+        if (points.empty()) {
+            size_t idx = find_closest_point(mesh_samples_tree, position);
+            return mesh_samples_visibility[idx];
         }
+
+        float total_weight = 0;
+        float total_visibility = 0;
+        for (size_t i = 0; i < points.size(); ++i) {
+            size_t sample_idx = points[i];
+            float weight = 1.0f;      // SeamPlacer::visibility_samples_radius * SeamPlacer::visibility_samples_radius -
+            //(position - mesh_samples.positions[sample_idx]).squaredNorm();
+            total_visibility += weight * mesh_samples_visibility[sample_idx];
+            total_weight += weight;
+        }
+
+        return total_visibility / total_weight;
+
     }
 
 #ifdef DEBUG_FILES
-    void debug_export(const indexed_triangle_set &obj_mesh, const char *file_name) const {
+    void debug_export(const indexed_triangle_set &obj_mesh) const {
+
         indexed_triangle_set divided_mesh = obj_mesh;
         Slic3r::CNumericLocalesSetter locales_setter;
 
-        FILE *fp = boost::nowide::fopen(file_name, "w");
-        if (fp == nullptr) {
-            BOOST_LOG_TRIVIAL(error)
-            << "stl_write_obj: Couldn't open " << file_name << " for writing";
-            return;
+        {
+            auto filename = debug_out_path("visiblity.obj");
+            FILE *fp = boost::nowide::fopen(filename.c_str(), "w");
+            if (fp == nullptr) {
+                BOOST_LOG_TRIVIAL(error)
+                << "stl_write_obj: Couldn't open " << filename << " for writing";
+                return;
+            }
+
+            for (size_t i = 0; i < divided_mesh.vertices.size(); ++i) {
+                float visibility = calculate_point_visibility(divided_mesh.vertices[i]);
+                Vec3f color = value_to_rgbf(0.0f, 1.0f, visibility);
+                fprintf(fp, "v %f %f %f  %f %f %f\n",
+                        divided_mesh.vertices[i](0), divided_mesh.vertices[i](1), divided_mesh.vertices[i](2),
+                        color(0), color(1), color(2));
+            }
+            for (size_t i = 0; i < divided_mesh.indices.size(); ++i)
+                fprintf(fp, "f %d %d %d\n", divided_mesh.indices[i][0] + 1, divided_mesh.indices[i][1] + 1,
+                        divided_mesh.indices[i][2] + 1);
+            fclose(fp);
         }
 
-        for (size_t i = 0; i < divided_mesh.vertices.size(); ++i) {
-            float visibility = calculate_point_visibility(divided_mesh.vertices[i]);
-            Vec3f color = value_to_rgbf(0.0f, 1.0f, visibility);
-            fprintf(fp, "v %f %f %f  %f %f %f\n",
-                    divided_mesh.vertices[i](0), divided_mesh.vertices[i](1), divided_mesh.vertices[i](2),
-                    color(0), color(1), color(2));
+        {
+            auto filename = debug_out_path("visiblity_samples.obj");
+            FILE *fp = boost::nowide::fopen(filename.c_str(), "w");
+            if (fp == nullptr) {
+                BOOST_LOG_TRIVIAL(error)
+                << "stl_write_obj: Couldn't open " << filename << " for writing";
+                return;
+            }
+
+            for (size_t i = 0; i < mesh_samples.positions.size(); ++i) {
+                float visibility = mesh_samples_visibility[i];
+                Vec3f color = value_to_rgbf(0.0f, 1.0f, visibility);
+                fprintf(fp, "v %f %f %f  %f %f %f\n",
+                        mesh_samples.positions[i](0), mesh_samples.positions[i](1), mesh_samples.positions[i](2),
+                        color(0), color(1), color(2));
+            }
+            fclose(fp);
         }
-        for (size_t i = 0; i < divided_mesh.indices.size(); ++i)
-            fprintf(fp, "f %d %d %d\n", divided_mesh.indices[i][0] + 1, divided_mesh.indices[i][1] + 1,
-                    divided_mesh.indices[i][2] + 1);
-        fclose(fp);
 
     }
 #endif
@@ -563,86 +605,40 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po) {
             }
         }
     }
-    BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer: gather occlusion meshes: end";
-
-    BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer: simplify occlusion meshes: start";
-
-    //simplify raycasting mesh
-    {
-        its_quadric_edge_collapse(triangle_set, SeamPlacer::raycasting_decimation_target_triangle_count, nullptr,
-                nullptr,
-                nullptr);
-        float triangle_set_area = tbb::parallel_reduce(tbb::blocked_range<size_t>(0, triangle_set.indices.size()), 0,
-                [&triangle_set](
-                        tbb::blocked_range<size_t> r, float sum) {
-                    for (size_t t_idx = r.begin(); t_idx < r.end(); ++t_idx) {
-                        const Vec3f &a = triangle_set.vertices[triangle_set.indices[t_idx].x()];
-                        const Vec3f &b = triangle_set.vertices[triangle_set.indices[t_idx].y()];
-                        const Vec3f &c = triangle_set.vertices[triangle_set.indices[t_idx].z()];
-                        sum += 0.5f * (b - a).cross(c - a).norm();
-                    }
-                    return sum;
-                }, std::plus<float>());
-
-        float target_triangle_area = triangle_set_area / SeamPlacer::raycasting_subdivision_target_triangle_count;
-        float target_triangle_length = 2 * 1.316 * sqrtf(target_triangle_area); //assuming 30-30-120 triangle
-        float subdivision_length = std::max(SeamPlacer::raycasting_subdivision_target_length, target_triangle_length);
-        triangle_set = its_subdivide(triangle_set, subdivision_length);
-        BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: triangle set after subdivision: " << triangle_set.indices.size();
-    }
-
-    //simplify negative volumes
-    {
-        its_quadric_edge_collapse(negative_volumes_set, SeamPlacer::raycasting_decimation_target_triangle_count,
-                nullptr,
-                nullptr,
-                nullptr);
-        float negative_volumes_set_area = tbb::parallel_reduce(
-                tbb::blocked_range<size_t>(0, negative_volumes_set.indices.size()), 0,
-                [&negative_volumes_set](
-                        tbb::blocked_range<size_t> r, float sum) {
-                    for (size_t t_idx = r.begin(); t_idx < r.end(); ++t_idx) {
-                        const Vec3f &a = negative_volumes_set.vertices[negative_volumes_set.indices[t_idx].x()];
-                        const Vec3f &b = negative_volumes_set.vertices[negative_volumes_set.indices[t_idx].y()];
-                        const Vec3f &c = negative_volumes_set.vertices[negative_volumes_set.indices[t_idx].z()];
-                        sum += 0.5f * (b - a).cross(c - a).norm();
-                    }
-                    return sum;
-                }, std::plus<float>());
-
-        float target_triangle_area = negative_volumes_set_area
-                / SeamPlacer::raycasting_subdivision_target_triangle_count;
-        float target_triangle_length = 2 * 1.316 * sqrtf(target_triangle_area);  //assuming 30-30-120 triangle
-        float subdivision_length = std::max(SeamPlacer::raycasting_subdivision_target_length, target_triangle_length);
-        negative_volumes_set = its_subdivide(negative_volumes_set, subdivision_length);
-    }
 
     size_t negative_volumes_start_index = triangle_set.indices.size();
     its_merge(triangle_set, negative_volumes_set);
     its_transform(triangle_set, obj_transform);
 
     BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer: simplify occlusion meshes: end";
+    << "SeamPlacer: gather occlusion meshes: end";
+
+    BOOST_LOG_TRIVIAL(debug)
+    << "SeamPlacer: Compute visiblity sample points: start";
+
+    result.mesh_samples = sample_its_uniform_parallel(SeamPlacer::raycasting_visibility_samples_count,
+            triangle_set);
+    result.mesh_samples_coordinate_functor = CoordinateFunctor(&result.mesh_samples.positions);
+    result.mesh_samples_tree = KDTreeIndirect<3, float, CoordinateFunctor>(result.mesh_samples_coordinate_functor,
+            result.mesh_samples.positions.size());
+    result.mesh_samples_radius = sqrt(
+            4.0f * (result.mesh_samples.total_area / SeamPlacer::raycasting_visibility_samples_count) / PI);
+
+    BOOST_LOG_TRIVIAL(debug)
+    << "SeamPlacer: Compute visiblity sample points: end;     mesh_sample_radius: " << result.mesh_samples_radius;
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer:build AABB tree: start";
     auto raycasting_tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(triangle_set.vertices,
             triangle_set.indices);
 
-    std::vector<Vec3i> neighbours = its_face_neighbors_par(triangle_set);
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer:build AABB tree: end";
-    result.model = triangle_set;
-    result.triangle_neighbours = neighbours;
-    result.model_tree = raycasting_tree;
-    result.visiblity_info = raycast_visibility(raycasting_tree, triangle_set, negative_volumes_start_index);
+    result.mesh_samples_visibility = raycast_visibility(raycasting_tree, triangle_set, result.mesh_samples,
+            negative_volumes_start_index);
 
 #ifdef DEBUG_FILES
-    auto filename = debug_out_path("visiblity.obj");
-    result.debug_export(triangle_set, filename.c_str());
+    result.debug_export(triangle_set);
 #endif
 }
 
@@ -1408,26 +1404,28 @@ void SeamPlacer::init(const Print &print) {
         SeamPosition configured_seam_preference = po->config().seam_position.value;
         SeamComparator comparator { configured_seam_preference };
 
-        GlobalModelInfo global_model_info { };
-        gather_enforcers_blockers(global_model_info, po);
+        {
+            GlobalModelInfo global_model_info { };
+            gather_enforcers_blockers(global_model_info, po);
 
-        if (configured_seam_preference == spAligned || configured_seam_preference == spNearest) {
-            compute_global_occlusion(global_model_info, po);
-        }
+            if (configured_seam_preference == spAligned || configured_seam_preference == spNearest) {
+                compute_global_occlusion(global_model_info, po);
+            }
 
-        BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: gather_seam_candidates: start";
-        gather_seam_candidates(po, global_model_info, configured_seam_preference);
-        BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: gather_seam_candidates: end";
-
-        if (configured_seam_preference == spAligned || configured_seam_preference == spNearest) {
             BOOST_LOG_TRIVIAL(debug)
-            << "SeamPlacer: calculate_candidates_visibility : start";
-            calculate_candidates_visibility(po, global_model_info);
+            << "SeamPlacer: gather_seam_candidates: start";
+            gather_seam_candidates(po, global_model_info, configured_seam_preference);
             BOOST_LOG_TRIVIAL(debug)
-            << "SeamPlacer: calculate_candidates_visibility : end";
-        }
+            << "SeamPlacer: gather_seam_candidates: end";
+
+            if (configured_seam_preference == spAligned || configured_seam_preference == spNearest) {
+                BOOST_LOG_TRIVIAL(debug)
+                << "SeamPlacer: calculate_candidates_visibility : start";
+                calculate_candidates_visibility(po, global_model_info);
+                BOOST_LOG_TRIVIAL(debug)
+                << "SeamPlacer: calculate_candidates_visibility : end";
+            }
+        } // destruction of global_model_info (large structure, no longer needed)
 
         BOOST_LOG_TRIVIAL(debug)
         << "SeamPlacer: calculate_overhangs and layer embdedding : start";
@@ -1495,7 +1493,7 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
 
     Vec3f seam_position;
     size_t seam_index;
-    if (const Perimeter &perimeter = layer_perimeters.points[closest_perimeter_point_index].perimeter ;
+    if (const Perimeter &perimeter = layer_perimeters.points[closest_perimeter_point_index].perimeter;
     perimeter.finalized) {
         seam_position = perimeter.final_seam_position;
         seam_index = perimeter.seam_index;

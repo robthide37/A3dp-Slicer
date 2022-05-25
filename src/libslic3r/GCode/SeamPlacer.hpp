@@ -87,10 +87,6 @@ struct SeamCandidate {
     bool central_enforcer; //marks this candidate as central point of enforced segment on the perimeter - important for alignment
 };
 
-struct FaceVisibilityInfo {
-    float visibility;
-};
-
 struct SeamCandidateCoordinateFunctor {
     SeamCandidateCoordinateFunctor(const std::vector<SeamCandidate> &seam_candidates) :
             seam_candidates(seam_candidates) {
@@ -125,15 +121,13 @@ struct PrintObjectSeamData
 
 class SeamPlacer {
 public:
-    static constexpr size_t raycasting_decimation_target_triangle_count = 10000;
-    // for subdivision, both following criteria are considered, and the one with less resulting triangles is used
-    static constexpr size_t raycasting_subdivision_target_triangle_count = 20000;
-    static constexpr float raycasting_subdivision_target_length = 2.0f;
-    //square of number of rays per triangle
-    static constexpr size_t sqr_rays_per_triangle = 7;
+    // Number of samples generated on the mesh. There are sqr_rays_per_sample_point*sqr_rays_per_sample_point rays casted from each samples
+    static constexpr size_t raycasting_visibility_samples_count = 40000;
+    //square of number of rays per sample point
+    static constexpr size_t sqr_rays_per_sample_point = 8;
 
     // arm length used during angles computation
-    static constexpr float polygon_local_angles_arm_distance = 0.1f;
+    static constexpr float polygon_local_angles_arm_distance = 0.3f;
 
 
     // max tolerable distance from the previous layer is overhang_distance_tolerance_factor * flow_width
@@ -141,7 +135,7 @@ public:
 
 
     // determines angle importance compared to visibility ( neutral value is 1.0f. )
-    static constexpr float angle_importance = 0.7f;
+    static constexpr float angle_importance = 0.6f;
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
     static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
@@ -150,7 +144,7 @@ public:
 
     // When searching for seam clusters for alignment:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
-    static constexpr float seam_align_score_tolerance = 0.25f;
+    static constexpr float seam_align_score_tolerance = 0.27f;
     // seam_align_tolerable_dist - if next layer closes point is too far away, break string
     static constexpr float seam_align_tolerable_dist = 1.0f;
     // if the seam of the current layer is too far away, and the closest seam candidate is not very good, layer is skipped.

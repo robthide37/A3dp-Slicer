@@ -245,6 +245,8 @@ add_library(libslic3r STATIC
     Thread.hpp
     TriangleSelector.cpp
     TriangleSelector.hpp
+    TriangleSetSampling.cpp
+    TriangleSetSampling.hpp
     MTUtils.hpp
     Zipper.hpp
     Zipper.cpp
