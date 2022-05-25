@@ -96,7 +96,7 @@ bool build_tree(PointCloud &nodes, Builder &builder)
                     float distsum = std::max(mergedist_closest, mergedist_node);
                     w = Wsum + distsum;
 
-                    if (mergedist_closest > EPSILON) {
+                    if (mergedist_closest > EPSILON && mergedist_node > EPSILON) {
                         Node mergenode{*mergept, closest_node.Rmin};
                         mergenode.weight = w;
                         mergenode.id = int(nodes.next_junction_id());
@@ -109,9 +109,9 @@ bool build_tree(PointCloud &nodes, Builder &builder)
                             ptsqueue.remove(nodes.get_queue_idx(closest_node_id));
                             nodes.mark_unreachable(closest_node_id);
                         }
-                    } else if (closest_node.left == Node::ID_NONE ||
-                               closest_node.right == Node::ID_NONE)
-                    {
+                    } else if (closest_node.pos.z() < node.pos.z() &&
+                               (closest_node.left == Node::ID_NONE ||
+                                closest_node.right == Node::ID_NONE)) {
                         closest_node.weight = w;
                         if ((routed = builder.add_bridge(node, closest_node))) {
                             if (closest_node.left == Node::ID_NONE)
