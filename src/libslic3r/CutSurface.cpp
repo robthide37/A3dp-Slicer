@@ -395,10 +395,49 @@ void collect_surface_data(std::queue<FI>  &process,
 /// <summary>
 /// Check if contour contain at least 2 unique source contour points
 /// </summary>
-bool is_valid(const std::vector<HI> &outlines,
-              const VertexShapeMap  &vert_shape_map,
-              const CutMesh         &mesh,
-              size_t                 min_count = 2);
+/// <param name="outlines">Vector of half edge define outline</param>
+/// <param name="vert_shape_map">For corefine edge vertices know source of intersection</param>
+/// <param name="mesh">Triangle half edge mesh</param>
+/// <param name="min_count">Minimal count of unique source points creating outline</param>
+/// <returns>True when outline is made by minimal or greater count of unique source point otherwise FALSE</returns>
+bool has_minimal_contour_points(const std::vector<HI> &outlines,
+                                const VertexShapeMap  &vert_shape_map,
+                                const CutMesh         &mesh,
+                                size_t                 min_count = 2);
+
+/// <summary>
+/// Check orientation of triangle
+/// </summary>
+/// <param name="fi">triangle</param>
+/// <param name="mesh">Triangle half edge mesh</param>
+/// <param name="projection">Direction to check</param>
+/// <returns>True when triangle normal is toward projection otherwise FALSE</returns>
+bool is_toward_projection(FI                        fi,
+                          const CutMesh            &mesh,
+                          const Emboss::IProject3f &projection);
+
+/// <summary>
+/// Check orientation of triangle defined by vertices a, b, c in CCW order
+/// </summary>
+/// <param name="a">Trienagle vertex</param>
+/// <param name="b">Trienagle vertex</param>
+/// <param name="c">Trienagle vertex</param>
+/// <param name="projection">Direction to check</param>
+/// <returns>True when triangle normal is toward projection otherwise FALSE</returns>
+bool is_toward_projection(const Vec3f        &a,
+                          const Vec3f        &b,
+                          const Vec3f        &c,
+                          const Emboss::IProject3f &projection);
+/// <summary>
+/// Check orientation of triangle
+/// </summary>
+/// <param name="t">triangle indicies into vertices vector</param>
+/// <param name="vertices">model vertices</param>
+/// <param name="projection">Direction to check</param>
+/// <returns>True when triangle normal is toward projection otherwise FALSE</returns>
+bool is_toward_projection(const stl_triangle_vertex_indices &t,
+                          const std::vector<stl_vertex>     &vertices,
+                          const Emboss::IProject3f          &projection);
 
 /// <summary>
 /// Copy triangles from CGAL mesh into index triangle set
@@ -682,6 +721,48 @@ indexed_triangle_set Slic3r::cut2model(const SurfaceCut         &cut,
     return result;
 }
 
+bool priv::is_toward_projection(FI                        fi,
+                                const CutMesh            &mesh,
+                                const Emboss::IProject3f &projection)
+{
+    HI hi = mesh.halfedge(fi);
+
+    const P3 &a = mesh.point(mesh.source(hi));
+    const P3 &b = mesh.point(mesh.target(hi));
+    const P3 &c = mesh.point(mesh.target(mesh.next(hi)));
+        
+    Vec3f a_(a.x(), a.y(), a.z());
+    Vec3f p_ = projection.project(a_);
+    P3 p{p_.x(), p_.y(), p_.z()};
+
+    return CGAL::orientation(a, b, c, p) == CGAL::POSITIVE;
+}
+
+bool priv::is_toward_projection(const stl_triangle_vertex_indices &t,
+                                const std::vector<stl_vertex> &vertices,
+                                const Emboss::IProject3f &projection)
+{
+    return is_toward_projection(vertices[t[0]], vertices[t[1]],
+                                vertices[t[2]], projection);
+}
+
+bool priv::is_toward_projection(const Vec3f              &a,
+                                const Vec3f              &b,
+                                const Vec3f              &c,
+                                const Emboss::IProject3f &projection)
+{
+    P3 cgal_a(a.x(), a.y(), a.z());
+    P3 cgal_b(b.x(), b.y(), b.z());
+    P3 cgal_c(c.x(), c.y(), c.z());
+
+    Vec3f p = projection.project(a);
+    P3    cgal_p{p.x(), p.y(), p.z()};
+
+    // is_toward_projection
+    return CGAL::orientation(cgal_a, cgal_b, cgal_c, cgal_p) ==
+           CGAL::POSITIVE;
+}
+
 priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
                             const Emboss::IProject3f   &projection)
 {
@@ -698,40 +779,27 @@ priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
     size_t faces_count    = 0;
     size_t edges_count    = 0;
 
-    for (const auto &t : indices) {
-        const Vec3f &t0 = vertices[t[0]];
-        const Vec3f &t1 = vertices[t[1]];
-        const Vec3f &t2 = vertices[t[2]];
-        
-        P3 a(t0.x(), t0.y(), t0.z());
-        P3 b(t1.x(), t1.y(), t1.z());
-        P3 c(t2.x(), t2.y(), t2.z());
-
-        Vec3f p_ = projection.project(t0);
-        P3 p{p_.x(), p_.y(), p_.z()};
-
-        // is_toward_projection
-        if (CGAL::orientation(a, b, c, p) == CGAL::POSITIVE) { 
-            ++faces_count;
-            size_t index = &t - &indices.front();
-            use_indices[index] = true;
-            size_t count_used_vertices = 0;
-            for (const auto vi : t) {
-                if (!use_vetices[vi]) {
-                    ++vertices_count;
-                    use_vetices[vi] = true;
-                } else {
-                    ++count_used_vertices;
-                }
-            }
-            switch (count_used_vertices) {
-            case 3: break; // all edges are already counted
-            case 2: edges_count += 2; break;
-            case 1:
-            case 0: edges_count += 3; break;
-            default: assert(false);
+    for (const auto &t : indices) {     
+        if (!is_toward_projection(t, vertices, projection)) continue;        
+        ++faces_count;
+        size_t index = &t - &indices.front();
+        use_indices[index] = true;
+        size_t count_used_vertices = 0;
+        for (const auto vi : t) {
+            if (!use_vetices[vi]) {
+                ++vertices_count;
+                use_vetices[vi] = true;
+            } else {
+                ++count_used_vertices;
             }
         }
+        switch (count_used_vertices) {
+        case 3: break; // all edges are already counted
+        case 2: edges_count += 2; break;
+        case 1:
+        case 0: edges_count += 3; break;
+        default: assert(false);
+        }        
     }
     assert(vertices_count <= vertices.size());
     assert(edges_count <= (indices.size() * 3) / 2);
@@ -903,14 +971,15 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
                                 shape_mesh.point(VI(j + 1)), p);
                     is_inside = abcp == CGAL::POSITIVE;
                 } else if (i_from < i_to || (i_from == i_to && type_from < type_to)) {
-                    // TODO: check that it is continous indices of contour
-                    bool is_last = shape_from.is_first() && shape_to.is_last() &&
-                                   shape_to.vertex_base == shape_from.vertex_base;
+                    bool is_last = shape_to.is_last() && shape_from.is_first();
+                    // check continuity of indicies
+                    assert(i_from == i_to || is_last || (i_from + 1) == i_to);
                     if (!is_last) is_inside = true;
-                } else { // i_from > i_to || (i_from == i_to && shape_from.type > shape_to.type)
-                    // TODO: check that it is continous indices of contour
-                    bool is_last = shape_to.is_first() && shape_from.is_last() &&
-                                   shape_to.vertex_base == shape_from.vertex_base;
+                } else { 
+                    assert(i_from > i_to || (i_from == i_to && type_from > type_to));
+                    bool is_last = shape_to.is_first() && shape_from.is_last();
+                    // check continuity of indicies
+                    assert(i_from == i_to || is_last || (i_to + 1) == i_from);
                     if (is_last) is_inside = true;
                 }
                 face_type = (is_inside) ? FaceType::inside :
@@ -928,7 +997,8 @@ void priv::set_almost_parallel_type(FaceTypeMap              &face_type_map,
                                     const CutMesh            &mesh,
                                     const Emboss::IProject3f &projection)
 {
-    for (const FI &fi : mesh.faces()) { 
+    for (const FI &fi : mesh.faces()) {
+        assert(is_toward_projection(fi, mesh, projection));
         auto &type = face_type_map[fi];
         if (type != FaceType::inside) continue;
         if (is_almost_parallel(fi, mesh, projection))
@@ -1094,10 +1164,10 @@ void priv::Visitor::new_vertex_added(std::size_t i_id, VI v, const CutMesh &tm)
     vert_shape_map[v] = intersection_ptr;
 }
 
-bool priv::is_valid(const std::vector<HI> &outlines,
-                    const VertexShapeMap &vert_shape_map,
-                    const CutMesh         &mesh,
-                    size_t                 min_count)
+bool priv::has_minimal_contour_points(const std::vector<HI> &outlines,
+                                      const VertexShapeMap  &vert_shape_map,
+                                      const CutMesh         &mesh,
+                                      size_t                 min_count)
 {
     // unique vector of indicies point from source contour(ExPolygon)
     std::vector<uint32_t> point_indicies;
@@ -1531,7 +1601,7 @@ void priv::filter_cuts(CutAOIs              &cuts,
 
     // filter small pieces
     for (const CutAOI &cut : cuts) {
-        if (!is_valid(cut.second, vert_shape_map, mesh)) { 
+        if (!has_minimal_contour_points(cut.second, vert_shape_map, mesh)) { 
             size_t index = &cut - &cuts.front();
             del_cuts[index] = true;
         }
