@@ -79,9 +79,11 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 	m_custom_toolbar_size		= atoi(get_app_config()->get("custom_toolbar_size").c_str());
 	m_use_custom_toolbar_size	= get_app_config()->get("use_custom_toolbar_size") == "1";
 
-	// update colors for color pickers
-	update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
-	update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
+	if (wxGetApp().is_editor()) {
+		// update colors for color pickers
+		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
+		update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
+	}
 
 	this->ShowModal();
 }
