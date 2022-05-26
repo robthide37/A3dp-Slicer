@@ -3025,9 +3025,9 @@ void GCodeViewer::render_toolpaths()
 #if ENABLE_GL_CORE_PROFILE
             const Camera& camera = wxGetApp().plater()->get_camera();
             const std::array<int, 4>& viewport = camera.get_viewport();
-            const double zoom = camera.get_zoom();
+            const float zoom = float(camera.get_zoom());
             shader.set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
-            shader.set_uniform("width", (zoom < 5.0) ? 1.0 : (1.0 + 5.0 * (zoom - 5.0) / (100.0 - 5.0)));
+            shader.set_uniform("width", (zoom < 5.0f) ? 0.5f : (0.5f + 5.0f * (zoom - 5.0f) / (100.0f - 5.0f)));
             shader.set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
 
@@ -3325,7 +3325,7 @@ void GCodeViewer::render_toolpaths()
         shader->set_uniform("view_normal_matrix", (Matrix3d)Matrix3d::Identity());
 
         const int position_id = shader->get_attrib_location("v_position");
-        const int normal_id = shader->get_attrib_location("v_normal");
+        const int normal_id   = shader->get_attrib_location("v_normal");
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_CORE_PROFILE

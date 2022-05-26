@@ -112,20 +112,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #else
     m_cube.set_color(-1, render_color);
 #endif // ENABLE_GIZMO_GRABBER_REFACTOR
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-    const Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_GIZMO_GRABBER_REFACTOR
-    const Transform3d view_model_matrix = camera.get_view_matrix() * matrix * Geometry::assemble_transform(center, angles, 2.0 * half_size * Vec3d::Ones());
-#else
-    const Transform3d view_model_matrix = camera.get_view_matrix() * matrix * Geometry::assemble_transform(center, angles, fullsize * Vec3d::Ones());
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
-    const Transform3d& projection_matrix = camera.get_projection_matrix();
- 
-    shader->set_uniform("view_model_matrix", view_model_matrix);
-    shader->set_uniform("projection_matrix", projection_matrix);
-    shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(center.x(), center.y(), center.z()));
     glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
@@ -136,6 +122,7 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #else
     glsafe(::glScaled(fullsize, fullsize, fullsize));
 #endif // ENABLE_GIZMO_GRABBER_REFACTOR
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GIZMO_GRABBER_REFACTOR
     s_cube.render();
 

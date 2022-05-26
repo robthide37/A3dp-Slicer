@@ -923,11 +923,8 @@ void Bed3D::render_contour(const Transform3d& view_matrix, const Transform3d& pr
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
-
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader->set_uniform("view_model_matrix", view_matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         glsafe(::glEnable(GL_DEPTH_TEST));
         glsafe(::glEnable(GL_BLEND));
