@@ -1347,7 +1347,8 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     print.throw_if_canceled();
 
     // Collect custom seam data from all objects.
-    m_seam_placer.init(print);
+    std::function<void(void)> throw_if_canceled_func = [&print]() { print.throw_if_canceled();};
+    m_seam_placer.init(print, throw_if_canceled_func);
 
     if (! (has_wipe_tower && print.config().single_extruder_multi_material_priming)) {
         // Set initial extruder only after custom start G-code.

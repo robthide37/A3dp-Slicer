@@ -129,13 +129,11 @@ public:
     // arm length used during angles computation
     static constexpr float polygon_local_angles_arm_distance = 0.3f;
 
-
     // max tolerable distance from the previous layer is overhang_distance_tolerance_factor * flow_width
     static constexpr float overhang_distance_tolerance_factor = 0.5f;
 
-
     // determines angle importance compared to visibility ( neutral value is 1.0f. )
-    static constexpr float angle_importance = 0.5f;
+    static constexpr float angle_importance = 0.6f;
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
     static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
@@ -144,7 +142,7 @@ public:
 
     // When searching for seam clusters for alignment:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
-    static constexpr float seam_align_score_tolerance = 0.3f;
+    static constexpr float seam_align_score_tolerance = 0.27f;
     // seam_align_tolerable_dist - if next layer closes point is too far away, break string
     static constexpr float seam_align_tolerable_dist = 1.0f;
     // if the seam of the current layer is too far away, and the closest seam candidate is not very good, layer is skipped.
@@ -158,7 +156,7 @@ public:
     //The following data structures hold all perimeter points for all PrintObject.
     std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
 
-    void init(const Print &print);
+    void init(const Print &print, std::function<void(void)> throw_if_canceled_func);
 
     void place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first, const Point &last_pos) const;
 

@@ -17,6 +17,7 @@
 #include "libslic3r/Layer.hpp"
 
 #include "libslic3r/Geometry/Curves.hpp"
+#include "libslic3r/QuadricEdgeCollapse.hpp"
 #include "libslic3r/TriangleSetSampling.hpp"
 
 #include "libslic3r/Utils.hpp"
@@ -584,7 +585,7 @@ std::pair<size_t, size_t> find_previous_and_next_perimeter_point(const std::vect
 }
 
 // Computes all global model info - transforms object, performs raycasting
-void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po) {
+void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po, std::function<void(void)> throw_if_canceled) {
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: gather occlusion meshes: start";
     auto obj_transform = po->trafo_centered();
@@ -604,6 +605,7 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po) {
             }
         }
     }
+    throw_if_canceled();
 
     size_t negative_volumes_start_index = triangle_set.indices.size();
     its_merge(triangle_set, negative_volumes_set);
@@ -613,7 +615,15 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po) {
     << "SeamPlacer: gather occlusion meshes: end";
 
     BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer: Compute visiblity sample points: start";
+        << "SeamPlacer: decimate: start";
+    float target_error = 1.0f;
+    its_quadric_edge_collapse(triangle_set, 0, &target_error, throw_if_canceled);
+    BOOST_LOG_TRIVIAL(debug)
+        << "SeamPlacer: decimate: end";
+
+
+    BOOST_LOG_TRIVIAL(debug)
+    << "SeamPlacer: Compute visibility sample points: start";
 
     result.mesh_samples = sample_its_uniform_parallel(SeamPlacer::raycasting_visibility_samples_count,
             triangle_set);
@@ -625,7 +635,7 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po) {
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: Compute visiblity sample points: end";
-
+    throw_if_canceled();
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: Mesh sample raidus: " << result.mesh_samples_radius;
@@ -635,11 +645,12 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po) {
     auto raycasting_tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(triangle_set.vertices,
             triangle_set.indices);
 
+    throw_if_canceled();
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: build AABB tree: end";
     result.mesh_samples_visibility = raycast_visibility(raycasting_tree, triangle_set, result.mesh_samples,
             negative_volumes_start_index);
-
+    throw_if_canceled();
 #ifdef DEBUG_FILES
     result.debug_export(triangle_set);
 #endif
@@ -1398,29 +1409,29 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
 
 }
 
-void SeamPlacer::init(const Print &print) {
+void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_canceled_func) {
     using namespace SeamPlacerImpl;
     m_seam_per_object.clear();
 
     for (const PrintObject *po : print.objects()) {
-
+        throw_if_canceled_func();
         SeamPosition configured_seam_preference = po->config().seam_position.value;
         SeamComparator comparator { configured_seam_preference };
 
         {
             GlobalModelInfo global_model_info { };
             gather_enforcers_blockers(global_model_info, po);
-
+            throw_if_canceled_func();
             if (configured_seam_preference == spAligned || configured_seam_preference == spNearest) {
-                compute_global_occlusion(global_model_info, po);
+                compute_global_occlusion(global_model_info, po, throw_if_canceled_func);
             }
-
+            throw_if_canceled_func();
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: gather_seam_candidates: start";
             gather_seam_candidates(po, global_model_info, configured_seam_preference);
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: gather_seam_candidates: end";
-
+            throw_if_canceled_func();
             if (configured_seam_preference == spAligned || configured_seam_preference == spNearest) {
                 BOOST_LOG_TRIVIAL(debug)
                 << "SeamPlacer: calculate_candidates_visibility : start";
@@ -1429,13 +1440,13 @@ void SeamPlacer::init(const Print &print) {
                 << "SeamPlacer: calculate_candidates_visibility : end";
             }
         } // destruction of global_model_info (large structure, no longer needed)
-
+        throw_if_canceled_func();
         BOOST_LOG_TRIVIAL(debug)
         << "SeamPlacer: calculate_overhangs and layer embdedding : start";
         calculate_overhangs_and_layer_embedding(po);
         BOOST_LOG_TRIVIAL(debug)
         << "SeamPlacer: calculate_overhangs and layer embdedding: end";
-
+        throw_if_canceled_func();
         if (configured_seam_preference != spNearest) { // For spNearest, the seam is picked in the place_seam method with actual nozzle position information
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: pick_seam_point : start";
@@ -1456,7 +1467,7 @@ void SeamPlacer::init(const Print &print) {
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: pick_seam_point : end";
         }
-
+        throw_if_canceled_func();
         if (configured_seam_preference == spAligned) {
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: align_seam_points : start";
