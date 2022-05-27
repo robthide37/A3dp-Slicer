@@ -65,7 +65,10 @@ public:
     explicit UIThreadWorker(std::shared_ptr<ProgressIndicator> pri,
                             const std::string & /*name*/ = "")
         : m_progress{pri}
-    {}
+    {
+        if (m_progress)
+            m_progress->set_cancel_callback([this](){ cancel(); });
+    }
 
     UIThreadWorker() = default;
 
