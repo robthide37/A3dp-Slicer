@@ -991,11 +991,13 @@ void GCodeViewer::render()
     render_toolpaths();
     render_shells();
     float legend_height = 0.0f;
-    render_legend(legend_height);
-    if (m_sequential_view.current.last != m_sequential_view.endpoints.last) {
-        m_sequential_view.marker.set_world_position(m_sequential_view.current_position);
-        m_sequential_view.marker.set_world_offset(m_sequential_view.current_offset);
-        m_sequential_view.render(legend_height);
+    if (!m_layers.empty()) {
+        render_legend(legend_height);
+        if (m_sequential_view.current.last != m_sequential_view.endpoints.last) {
+            m_sequential_view.marker.set_world_position(m_sequential_view.current_position);
+            m_sequential_view.marker.set_world_offset(m_sequential_view.current_offset);
+            m_sequential_view.render(legend_height);
+        }
     }
 #if ENABLE_GCODE_VIEWER_STATISTICS
     render_statistics();
