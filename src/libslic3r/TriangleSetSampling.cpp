@@ -7,7 +7,7 @@
 namespace Slic3r {
 
 TriangleSetSamples sample_its_uniform_parallel(size_t samples_count, const indexed_triangle_set &triangle_set) {
-    std::vector<float> triangles_area(triangle_set.indices.size());
+    std::vector<double> triangles_area(triangle_set.indices.size());
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, triangle_set.indices.size()),
             [&triangle_set, &triangles_area](
@@ -16,28 +16,27 @@ TriangleSetSamples sample_its_uniform_parallel(size_t samples_count, const index
                     const Vec3f &a = triangle_set.vertices[triangle_set.indices[t_idx].x()];
                     const Vec3f &b = triangle_set.vertices[triangle_set.indices[t_idx].y()];
                     const Vec3f &c = triangle_set.vertices[triangle_set.indices[t_idx].z()];
-                    float area = 0.5f * (b - a).cross(c - a).norm();
+                    double area = double(0.5 * (b - a).cross(c - a).norm());
                     triangles_area[t_idx] = area;
                 }
             });
 
-    std::map<float, size_t> area_sum_to_triangle_idx;
+    std::map<double, size_t> area_sum_to_triangle_idx;
     float area_sum = 0;
     for (size_t t_idx = 0; t_idx < triangles_area.size(); ++t_idx) {
         area_sum += triangles_area[t_idx];
         area_sum_to_triangle_idx[area_sum] = t_idx;
     }
 
-    std::random_device rnd_device;
-    std::mt19937 mersenne_engine { rnd_device() };
+    std::mt19937_64 mersenne_engine {  };
     // random numbers on interval [0, 1)
-    std::uniform_real_distribution<float> fdistribution;
+    std::uniform_real_distribution<double> fdistribution;
 
     auto get_random = [&fdistribution, &mersenne_engine]() {
-        return Vec3f { fdistribution(mersenne_engine), fdistribution(mersenne_engine), fdistribution(mersenne_engine) };
+        return Vec3d { fdistribution(mersenne_engine), fdistribution(mersenne_engine), fdistribution(mersenne_engine) };
     };
 
-    std::vector<Vec3f> random_samples(samples_count);
+    std::vector<Vec3d> random_samples(samples_count);
     std::generate(random_samples.begin(), random_samples.end(), get_random);
 
     TriangleSetSamples result;
@@ -50,11 +49,11 @@ TriangleSetSamples sample_its_uniform_parallel(size_t samples_count, const index
             [&triangle_set, &area_sum_to_triangle_idx, &area_sum, &random_samples, &result](
                     tbb::blocked_range<size_t> r) {
                 for (size_t s_idx = r.begin(); s_idx < r.end(); ++s_idx) {
-                    float t_sample = random_samples[s_idx].x() * area_sum;
+                    double t_sample = random_samples[s_idx].x() * area_sum;
                     size_t t_idx = area_sum_to_triangle_idx.upper_bound(t_sample)->second;
 
-                    float sq_u = std::sqrt(random_samples[s_idx].y());
-                    float v = random_samples[s_idx].z();
+                    double sq_u = std::sqrt(random_samples[s_idx].y());
+                    double v = random_samples[s_idx].z();
 
                     Vec3f A = triangle_set.vertices[triangle_set.indices[t_idx].x()];
                     Vec3f B = triangle_set.vertices[triangle_set.indices[t_idx].y()];

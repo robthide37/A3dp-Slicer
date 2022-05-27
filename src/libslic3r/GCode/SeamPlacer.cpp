@@ -323,8 +323,7 @@ struct GlobalModelInfo {
     float calculate_point_visibility(const Vec3f &position) const {
         std::vector<size_t> points = find_nearby_points(mesh_samples_tree, position, mesh_samples_radius);
         if (points.empty()) {
-            size_t idx = find_closest_point(mesh_samples_tree, position);
-            return mesh_samples_visibility[idx];
+            return 1.0f;
         }
 
         float total_weight = 0;
@@ -622,18 +621,22 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po) {
     result.mesh_samples_tree = KDTreeIndirect<3, float, CoordinateFunctor>(result.mesh_samples_coordinate_functor,
             result.mesh_samples.positions.size());
     result.mesh_samples_radius = sqrt(
-            4.0f * (result.mesh_samples.total_area / SeamPlacer::raycasting_visibility_samples_count) / PI);
+            10.0f * (result.mesh_samples.total_area / SeamPlacer::raycasting_visibility_samples_count) / PI);
 
     BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer: Compute visiblity sample points: end;     mesh_sample_radius: " << result.mesh_samples_radius;
+    << "SeamPlacer: Compute visiblity sample points: end";
+
 
     BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer:build AABB tree: start";
+    << "SeamPlacer: Mesh sample raidus: " << result.mesh_samples_radius;
+
+    BOOST_LOG_TRIVIAL(debug)
+    << "SeamPlacer: build AABB tree: start";
     auto raycasting_tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(triangle_set.vertices,
             triangle_set.indices);
 
     BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer:build AABB tree: end";
+    << "SeamPlacer: build AABB tree: end";
     result.mesh_samples_visibility = raycast_visibility(raycasting_tree, triangle_set, result.mesh_samples,
             negative_volumes_start_index);
 
