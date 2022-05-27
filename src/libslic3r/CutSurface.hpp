@@ -17,8 +17,8 @@ namespace Slic3r{
 /// </summary>
 struct SurfaceCut : public indexed_triangle_set
 {
-    // connected cutted surface
-    indexed_triangle_set mesh;
+    // connected cutted surface --> inheritance is used
+    //indexed_triangle_set mesh;
 
     // vertex indices(index to mesh vertices)
     using Index = unsigned int;

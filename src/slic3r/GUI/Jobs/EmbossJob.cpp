@@ -50,6 +50,14 @@ static TriangleMesh create_default_mesh();
 static void update_volume(TriangleMesh &&mesh, const EmbossDataUpdate &data);
 
 /// <summary>
+/// extract scale in 2d
+/// </summary>
+/// <param name="fp">Property of font style</param>
+/// <param name="ff">Font file for size --> unit per em</param>
+/// <returns>scaling factor</returns>
+static double get_shape_scale(const FontProp &fp, const Emboss::FontFile &ff);
+
+/// <summary>
 /// Create projection for cut surface from mesh
 /// </summary>
 /// <param name="tr">Volume transformation in object</param>
@@ -335,6 +343,8 @@ void UseSurfaceJob::finalize(bool canceled, std::exception_ptr &)
 {
     if (canceled || m_input.cancel->load()) return;
     priv::update_volume(std::move(m_result), m_input);
+    // TODO: use fix matrix to compensate uncentered position
+
 }
 
 ////////////////////////////
@@ -444,7 +454,7 @@ void priv::update_volume(TriangleMesh &&mesh,
     canvas->reload_scene(refresh_immediately);
 }
 
-static double get_shape_scale(const FontProp &fp, const Emboss::FontFile &ff)
+static double priv::get_shape_scale(const FontProp &fp, const Emboss::FontFile &ff)
 {
     const auto  &cn          = fp.collection_number;
     unsigned int font_index  = (cn.has_value()) ? *cn : 0;

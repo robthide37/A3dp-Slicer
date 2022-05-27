@@ -147,6 +147,16 @@ struct IntersectingElement
 };
 
 /// <summary>
+/// set true to skip map for indicies
+/// </summary>
+/// <param name="skip_indicies">Flag to convert triangle to cgal</param>
+/// <param name="its">model</param>
+/// <param name="projection">direction</param>
+void set_skip_for_outward_projection(std::vector<bool> &skip_indicies,
+                                     const indexed_triangle_set &its,
+                                     const Emboss::IProject3f   &projection);
+
+/// <summary>
 /// Convert triangle mesh model to CGAL Surface_mesh
 /// Filtrate out opposite triangles
 /// Add property map for source face index
@@ -533,10 +543,14 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::FaceTypeMap face_type_map = cgal_model.add_property_map<priv::FI, priv::FaceType>(face_type_map_name).first;
 
     // Select inside and outside face in model
-    priv::set_face_type(face_type_map, cgal_model, vert_shape_map, ecm, cgal_shape);
-    priv::set_almost_parallel_type(face_type_map, cgal_model, projection);
+    priv::set_face_type(face_type_map, cgal_model, vert_shape_map, ecm, cgal_shape);    
 #ifdef DEBUG_OUTPUT_DIR
     priv::store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrained.off"); // only debug
+#endif // DEBUG_OUTPUT_DIR
+
+    priv::set_almost_parallel_type(face_type_map, cgal_model, projection);
+#ifdef DEBUG_OUTPUT_DIR
+    priv::store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrainedWithAlmostParallel.off"); // only debug
 #endif // DEBUG_OUTPUT_DIR
     
     priv::flood_fill_inner(cgal_model, face_type_map);
@@ -763,11 +777,25 @@ bool priv::is_toward_projection(const Vec3f              &a,
            CGAL::POSITIVE;
 }
 
+void priv::set_skip_for_outward_projection(std::vector<bool> &skip_indicies,
+                                           const indexed_triangle_set &its,
+                                           const Emboss::IProject3f &projection)
+{    
+    for (const auto &t : its.indices) {
+        size_t index = &t - &its.indices.front();
+        if (skip_indicies[index]) continue;
+        if (is_toward_projection(t, its.vertices, projection)) continue;
+        skip_indicies[index] = true;
+    }
+}
+
 priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
                             const Emboss::IProject3f   &projection)
 {
-    CutMesh result;
-    if (its.empty()) return result;
+    if (its.empty()) return {};
+    std::vector<bool> skip_indicies(its.indices.size(), {false});
+    // cut out opposit triangles
+    set_skip_for_outward_projection(skip_indicies, its, projection);
 
     const std::vector<stl_vertex>                  &vertices = its.vertices;
     const std::vector<stl_triangle_vertex_indices> &indices = its.indices;
@@ -780,9 +808,9 @@ priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
     size_t edges_count    = 0;
 
     for (const auto &t : indices) {     
-        if (!is_toward_projection(t, vertices, projection)) continue;        
-        ++faces_count;
         size_t index = &t - &indices.front();
+        if (skip_indicies[index]) continue;        
+        ++faces_count;
         use_indices[index] = true;
         size_t count_used_vertices = 0;
         for (const auto vi : t) {
@@ -804,6 +832,8 @@ priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
     assert(vertices_count <= vertices.size());
     assert(edges_count <= (indices.size() * 3) / 2);
     assert(faces_count <= indices.size());
+
+    CutMesh result;
     result.reserve(vertices_count, edges_count, faces_count);
 
     std::vector<size_t> to_filtrated_vertices_index(vertices.size());
@@ -911,79 +941,76 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
                          const EcmType        &ecm,
                          const CutMesh        &shape_mesh)
 {
+    auto get_face_type = [&mesh, &shape_mesh, &vertex_shape_map](HI hi) -> FaceType {
+        VI vi_from = mesh.source(hi);
+        VI vi_to   = mesh.target(hi);
+        // This face has a constrained edge.
+        const IntersectingElement &shape_from = *vertex_shape_map[vi_from];
+        const IntersectingElement &shape_to   = *vertex_shape_map[vi_to];
+
+        assert(shape_from.point_index != std::numeric_limits<uint32_t>::max());
+        assert(shape_from.attr != (unsigned char) IntersectingElement::Type::undefined);
+        assert(shape_to.point_index != std::numeric_limits<uint32_t>::max());
+        assert(shape_to.attr != (unsigned char) IntersectingElement::Type::undefined);
+        // assert mean: There is constrained between two shapes
+        // Filip think it can't happens.
+        // consider what to do?
+        assert(shape_from.vertex_base == shape_to.vertex_base);
+
+        bool is_inside = false;
+        // index into contour
+        uint32_t                  i_from    = shape_from.point_index;
+        uint32_t                  i_to      = shape_to.point_index;
+        IntersectingElement::Type type_from = shape_from.get_type();
+        IntersectingElement::Type type_to   = shape_to.get_type();
+        if (i_from == i_to && type_from == type_to) {
+            // intersecting element must be face
+            assert(type_from == IntersectingElement::Type::face_1 ||
+                   type_from == IntersectingElement::Type::face_2);
+
+            // count of vertices is twice as count of point in the contour
+            uint32_t i = i_from * 2;
+            // j is next contour point in vertices
+            uint32_t j = shape_from.is_last() ? 0 : i + 2;
+            i += shape_from.vertex_base;
+            j += shape_from.vertex_base;
+
+            // opposit point(in triangle face) to edge
+            const auto &p = mesh.point(mesh.target(mesh.next(hi)));
+
+            // abc is source triangle face
+            auto abcp = type_from == IntersectingElement::Type::face_1 ?
+                            CGAL::orientation(shape_mesh.point(VI(i)),
+                                              shape_mesh.point(VI(i + 1)),
+                                              shape_mesh.point(VI(j)), p) :
+                            // type_from == IntersectingElement::Type::face_2
+                            CGAL::orientation(shape_mesh.point(VI(j)),
+                                              shape_mesh.point(VI(i + 1)),
+                                              shape_mesh.point(VI(j + 1)), p);
+            is_inside = abcp == CGAL::POSITIVE;
+        } else if (i_from < i_to || (i_from == i_to && type_from < type_to)) {
+            bool is_last = shape_to.is_last() && shape_from.is_first();
+            // check continuity of indicies
+            assert(i_from == i_to || is_last || (i_from + 1) == i_to);
+            if (!is_last) is_inside = true;
+        } else {
+            assert(i_from > i_to || (i_from == i_to && type_from > type_to));
+            bool is_last = shape_to.is_first() && shape_from.is_last();
+            // check continuity of indicies
+            assert(i_from == i_to || is_last || (i_to + 1) == i_from);
+            if (is_last) is_inside = true;
+        }
+        return (is_inside) ? FaceType::inside : FaceType::outside;
+    };
+
     for (const FI& fi : mesh.faces()) {
         FaceType face_type = FaceType::not_constrained;
         HI hi_end = mesh.halfedge(fi);
         HI hi     = hi_end;
         do {
-            EI edge_index = mesh.edge(hi);
             // is edge new created - constrained?
-            if (get(ecm, edge_index)) {
-                VI vi_from = mesh.source(hi);
-                VI vi_to   = mesh.target(hi);
-                // This face has a constrained edge.
-                const IntersectingElement& shape_from = *vertex_shape_map[vi_from];
-                const IntersectingElement& shape_to = *vertex_shape_map[vi_to];
-                
-                assert(shape_from.point_index != std::numeric_limits<uint32_t>::max());
-                assert(shape_from.attr != (unsigned char)IntersectingElement::Type::undefined);
-                assert(shape_to.point_index != std::numeric_limits<uint32_t>::max());
-                assert(shape_to.attr != (unsigned char)IntersectingElement::Type::undefined);
-                
-                // assert mean: There is constrained between two shapes
-                // Filip think it can't happens. 
-                // consider what to do?
-                assert(shape_from.vertex_base == shape_to.vertex_base);
-
-                bool is_inside = false;
-
-                // index into contour
-                uint32_t i_from = shape_from.point_index;
-                uint32_t i_to   = shape_to.point_index;
-                IntersectingElement::Type type_from = shape_from.get_type();
-                IntersectingElement::Type type_to = shape_to.get_type();
-                if (i_from == i_to && type_from == type_to) {
-                    // intersecting element must be face
-                    assert(type_from == IntersectingElement::Type::face_1 ||
-                           type_from == IntersectingElement::Type::face_2);
-
-                    // count of vertices is twice as count of point in the contour
-                    uint32_t i = i_from * 2;
-                    // j is next contour point in vertices
-                    uint32_t j = shape_from.is_last() ? 0 : i + 2;
-                    i += shape_from.vertex_base;
-                    j += shape_from.vertex_base;
-
-                    // opposit point(in triangle face) to edge
-                    const auto &p = mesh.point(mesh.target(mesh.next(hi)));
-
-                    // abc is source triangle face
-                    auto abcp =
-                        type_from == IntersectingElement::Type::face_1 ?
-                            CGAL::orientation(
-                                shape_mesh.point(VI(i)),
-                                shape_mesh.point(VI(i + 1)),
-                                shape_mesh.point(VI(j)), p) :
-                        // type_from == IntersectingElement::Type::face_2
-                            CGAL::orientation(
-                                shape_mesh.point(VI(j)),
-                                shape_mesh.point(VI(i + 1)),
-                                shape_mesh.point(VI(j + 1)), p);
-                    is_inside = abcp == CGAL::POSITIVE;
-                } else if (i_from < i_to || (i_from == i_to && type_from < type_to)) {
-                    bool is_last = shape_to.is_last() && shape_from.is_first();
-                    // check continuity of indicies
-                    assert(i_from == i_to || is_last || (i_from + 1) == i_to);
-                    if (!is_last) is_inside = true;
-                } else { 
-                    assert(i_from > i_to || (i_from == i_to && type_from > type_to));
-                    bool is_last = shape_to.is_first() && shape_from.is_last();
-                    // check continuity of indicies
-                    assert(i_from == i_to || is_last || (i_to + 1) == i_from);
-                    if (is_last) is_inside = true;
-                }
-                face_type = (is_inside) ? FaceType::inside :
-                                          FaceType::outside;
+            if (get(ecm, mesh.edge(hi))) {
+                face_type = get_face_type(hi);
                 break;
             }
             // next half edge index inside of face
@@ -998,9 +1025,15 @@ void priv::set_almost_parallel_type(FaceTypeMap              &face_type_map,
                                     const Emboss::IProject3f &projection)
 {
     for (const FI &fi : mesh.faces()) {
-        assert(is_toward_projection(fi, mesh, projection));
         auto &type = face_type_map[fi];
         if (type != FaceType::inside) continue;
+        //*
+        assert(is_toward_projection(fi, mesh, projection));
+        /*/
+        if (!is_toward_projection(fi, mesh, projection)) {
+            type = FaceType::outside;
+        }else
+        // */
         if (is_almost_parallel(fi, mesh, projection))
             // change type
             type = FaceType::inside_parallel;
@@ -1248,7 +1281,7 @@ void priv::create_reduce_map(ReductionMap         &reduction_map,
     // initialize reduction map
     for (VI reduction_from : mesh.vertices()) 
         reduction_map[reduction_from] = reduction_from;
-    
+
     // check if vertex was made by edge_2 which is diagonal of quad
     auto is_reducible_vertex = [&vert_shape_map](VI reduction_from) -> bool {
         const IntersectingElement *ie = vert_shape_map[reduction_from];
@@ -1316,6 +1349,14 @@ SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
                                            const ReductionMap &reduction_map,
                                            ConvertMap &v2v)
 {
+    // clear v2v
+    // more than one cut can share vertex and each cut need its own conversion
+    for (FI fi : faces) {
+        HI hi = mesh.halfedge(fi);
+        for (VI vi : {mesh.source(hi), mesh.target(hi), mesh.target(mesh.next(hi))})
+            v2v[vi] = std::numeric_limits<SurfaceCut::Index>::max();                
+    }
+
     // IMPROVE: use reduced count of faces and outlines
     size_t indices_size = faces.size();
     size_t vertices_size = (indices_size * 3 - count_outlines / 2) / 2;
@@ -1645,7 +1686,7 @@ SurfaceCuts priv::create_surface_cuts(const CutAOIs      &cuts,
         // convert_map could be used separately for each surface cut. 
         // But it is moore faster to use one memory allocation for them all.
         SurfaceCut sc = create_index_triangle_set(faces, outlines.size(), mesh, reduction_map, convert_map);
-        
+
         // connect outlines
         sc.contours = create_cut(outlines, mesh, reduction_map, convert_map);
         result.emplace_back(std::move(sc));
