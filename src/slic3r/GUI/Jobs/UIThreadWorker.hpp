@@ -67,7 +67,7 @@ public:
         : m_progress{pri}
     {
         if (m_progress)
-            m_progress->set_cancel_callback([this](){ cancel(); });
+            m_progress->set_cancel_callback([this]() { cancel(); });
     }
 
     UIThreadWorker() = default;
@@ -75,12 +75,14 @@ public:
     bool push(std::unique_ptr<Job> job) override
     {
         m_canceled = false;
-        m_jobqueue.push(std::move(job));
+
+        if (job)
+            m_jobqueue.push(std::move(job));
 
         return bool(job);
     }
 
-    bool is_idle() const override { return !m_running; }
+    bool is_idle() const override { return !m_running && m_jobqueue.empty(); }
 
     void cancel() override { m_canceled = true; }
 
@@ -88,7 +90,9 @@ public:
     {
         m_canceled = true;
         process_front();
-        while (!m_jobqueue.empty()) m_jobqueue.pop();
+
+        while (!m_jobqueue.empty())
+            m_jobqueue.pop();
     }
 
     void process_events() override {
