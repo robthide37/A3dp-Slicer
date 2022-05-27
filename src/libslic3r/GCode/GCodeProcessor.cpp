@@ -659,13 +659,30 @@ void GCodeProcessor::UsedFilaments::reset()
 
     role_cache = 0.0f;
     filaments_per_role.clear();
+
+    extruder_retracted_volume.clear();
 }
 
-void GCodeProcessor::UsedFilaments::increase_caches(double extruded_volume)
+void GCodeProcessor::UsedFilaments::increase_caches(double extruded_volume, unsigned char extruder_id, double parking_volume, double extra_loading_volume)
 {
-    color_change_cache += extruded_volume;
-    tool_change_cache += extruded_volume;
-    role_cache += extruded_volume;
+    if (extruder_id >= extruder_retracted_volume.size())
+        extruder_retracted_volume.resize(extruder_id + 1, parking_volume);
+    
+    if (recent_toolchange) {
+        extruded_volume -= extra_loading_volume;
+        recent_toolchange = false;
+    }
+    
+    extruder_retracted_volume[extruder_id] -= extruded_volume;
+
+    if (extruder_retracted_volume[extruder_id] < 0.) {
+        extruded_volume = - extruder_retracted_volume[extruder_id];
+        extruder_retracted_volume[extruder_id] = 0.;
+
+        color_change_cache += extruded_volume;
+        tool_change_cache += extruded_volume;
+        role_cache += extruded_volume;
+    }
 }
 
 void GCodeProcessor::UsedFilaments::process_color_change_cache()
@@ -676,19 +693,16 @@ void GCodeProcessor::UsedFilaments::process_color_change_cache()
     }
 }
 
-void GCodeProcessor::UsedFilaments::process_extruder_cache(GCodeProcessor* processor)
+void GCodeProcessor::UsedFilaments::process_extruder_cache(unsigned char extruder_id)
 {
-    size_t active_extruder_id = processor->m_extruder_id;
-    if (tool_change_cache != 0.0f) {
-        if (volumes_per_extruder.find(active_extruder_id) != volumes_per_extruder.end())
-            volumes_per_extruder[active_extruder_id] += tool_change_cache;
-        else
-            volumes_per_extruder[active_extruder_id] = tool_change_cache;
-        tool_change_cache = 0.0f;
+    if (tool_change_cache != 0.0) {
+        volumes_per_extruder[extruder_id] += tool_change_cache;
+         tool_change_cache = 0.0;
     }
-}
+    recent_toolchange = true;
+ }
 
-void GCodeProcessor::UsedFilaments::process_role_cache(GCodeProcessor* processor)
+void GCodeProcessor::UsedFilaments::process_role_cache(const GCodeProcessor* processor)
 {
     if (role_cache != 0.0f) {
         std::pair<double, double> filament = { 0.0f, 0.0f };
@@ -708,10 +722,10 @@ void GCodeProcessor::UsedFilaments::process_role_cache(GCodeProcessor* processor
     }
 }
 
-void GCodeProcessor::UsedFilaments::process_caches(GCodeProcessor* processor)
+void GCodeProcessor::UsedFilaments::process_caches(const GCodeProcessor* processor)
 {
     process_color_change_cache();
-    process_extruder_cache(processor);
+    process_extruder_cache(processor->m_extruder_id);
     process_role_cache(processor);
 }
 
@@ -871,6 +885,13 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     m_time_processor.filament_unload_times.resize(config.filament_unload_time.values.size());
     for (size_t i = 0; i < config.filament_unload_time.values.size(); ++i) {
         m_time_processor.filament_unload_times[i] = static_cast<float>(config.filament_unload_time.values[i]);
+    }
+
+    // With MM setups like Prusa MMU2, the filaments may be expected to be parked at the beginning.
+    // Remember the parking position so the initial load is not included in filament estimate.
+    if (config.single_extruder_multi_material && extruders_count > 1 && config.wipe_tower) {
+        m_parking_position = float(config.parking_pos_retraction.value);
+        m_extra_loading_move = float(config.extra_loading_move);
     }
 
     for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
@@ -1205,6 +1226,8 @@ void GCodeProcessor::reset()
         m_extruder_temps[i] = 0.0f;
     }
 
+    m_parking_position = 0.f;
+    m_extra_loading_move = 0.f;
     m_extruded_last_z = 0.0f;
     m_first_layer_height = 0.0f;
     m_processing_start_custom_gcode = false;
@@ -2472,26 +2495,25 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     if (line.has_f())
         m_feedrate = line.f() * MMMIN_TO_MMSEC;
 
-    // calculates movement deltas
-    float max_abs_delta = 0.0f;
-    AxisCoords delta_pos;
-    for (unsigned char a = X; a <= E; ++a) {
-        delta_pos[a] = m_end_position[a] - m_start_position[a];
-        max_abs_delta = std::max<float>(max_abs_delta, std::abs(delta_pos[a]));
-    }
-
-    // no displacement, return
-    if (max_abs_delta == 0.0f)
+     // calculates movement deltas
+     AxisCoords delta_pos;
+    for (unsigned char a = X; a <= E; ++a)
+         delta_pos[a] = m_end_position[a] - m_start_position[a];
+ 
+    if (std::all_of(delta_pos.begin(), delta_pos.end(), [](double d) { return d == 0.; }))
         return;
+    
+    const float volume_extruded_filament = area_filament_cross_section * delta_pos[E];
+
+    if (volume_extruded_filament != 0.)
+        m_used_filaments.increase_caches(volume_extruded_filament,
+            this->m_extruder_id, area_filament_cross_section * this->m_parking_position,
+            area_filament_cross_section * this->m_extra_loading_move);
 
     EMoveType type = move_type(delta_pos);
     if (type == EMoveType::Extrude) {
         float delta_xyz = std::sqrt(sqr(delta_pos[X]) + sqr(delta_pos[Y]) + sqr(delta_pos[Z]));
-        float volume_extruded_filament = area_filament_cross_section * delta_pos[E];
         float area_toolpath_cross_section = volume_extruded_filament / delta_xyz;
-
-        // save extruded volume to the cache
-        m_used_filaments.increase_caches(volume_extruded_filament);
 
         // volume extruded filament / tool displacement = area toolpath cross section
         m_mm3_per_mm = area_toolpath_cross_section;
@@ -3383,7 +3405,7 @@ void GCodeProcessor::process_filaments(CustomGCode::Type code)
         m_used_filaments.process_color_change_cache();
 
     if (code == CustomGCode::ToolChange)
-        m_used_filaments.process_extruder_cache(this);
+        m_used_filaments.process_extruder_cache(this->m_extruder_id);
 }
 
 void GCodeProcessor::simulate_st_synchronize(float additional_time)
