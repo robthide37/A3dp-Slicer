@@ -68,6 +68,9 @@ using FI = CGAL::SM_Face_index;
 
 using P3 = CGAL::Epick::Point_3;
 
+using Project = Emboss::IProjection;
+using Project3f = Emboss::IProject3f;
+
 /// <summary>
 /// IntersectingElement
 ///
@@ -154,7 +157,32 @@ struct IntersectingElement
 /// <param name="projection">direction</param>
 void set_skip_for_outward_projection(std::vector<bool> &skip_indicies,
                                      const indexed_triangle_set &its,
-                                     const Emboss::IProject3f   &projection);
+                                     const Project3f   &projection);
+
+/// <summary>
+/// Set true for indicies outward and almost parallel together.
+/// Note: internally calculate normals
+/// </summary>
+/// <param name="skip_indicies">Flag to convert triangle to cgal</param>
+/// <param name="its">model</param>
+/// <param name="projection">Direction to measure angle</param>
+/// <param name="max_angle">Maximal allowed angle between opposit normal and projection direction [in DEG]</param>
+void set_skip_by_angle(std::vector<bool>          &skip_indicies,
+                       const indexed_triangle_set &its,
+                       const Project3f            &projection,
+                       double                      max_angle = 89.);
+
+/// <summary>
+/// Set true for indices out of area of interest
+/// </summary>
+/// <param name="skip_indicies">Flag to convert triangle to cgal</param>
+/// <param name="its">model</param>
+/// <param name="projection">Convert 2d point to pair of 3d points</param>
+/// <param name="shapes">after projection define AOI</param>
+void set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
+                             const indexed_triangle_set &its,
+                             const Project              &projection,
+                             const ExPolygons           &shapes);
 
 /// <summary>
 /// Convert triangle mesh model to CGAL Surface_mesh
@@ -162,11 +190,11 @@ void set_skip_for_outward_projection(std::vector<bool> &skip_indicies,
 /// Add property map for source face index
 /// </summary>
 /// <param name="its">Model</param>
-/// <param name="projection">Projection to filtrate out oposite triangles</param>
+/// <param name="skip_indicies">Flags that triangle should be skiped</param>
 /// <returns>CGAL mesh - half edge mesh</returns>
-CutMesh to_cgal(const indexed_triangle_set &its, const ::Emboss::IProject3f & projection);
+CutMesh to_cgal(const indexed_triangle_set &its,
+                const std::vector<bool> &skip_indicies);
 
-using Project = Emboss::IProjection;
 /// <summary>
 /// Covert 2d shape (e.g. Glyph) to CGAL model
 /// </summary>
@@ -293,7 +321,7 @@ void set_face_type(FaceTypeMap          &face_type_map,
 
 void set_almost_parallel_type(FaceTypeMap              &face_type_map,
                               const CutMesh            &mesh,
-                              const Emboss::IProject3f &projection);
+                              const Project3f &projection);
 
 /// <summary>
 /// Check if face is almost parallel
@@ -306,7 +334,7 @@ void set_almost_parallel_type(FaceTypeMap              &face_type_map,
 /// <returns>True when Triangle is almost parallel with direction of projection</returns>
 bool is_almost_parallel(FI                        fi,
                         const CutMesh            &mesh,
-                        const Emboss::IProject3f &projection,
+                        const Project3f &projection,
                         float threshold = static_cast<float>(std::cos(80 * M_PI / 180)));
 
 /// <summary>
@@ -424,7 +452,7 @@ bool has_minimal_contour_points(const std::vector<HI> &outlines,
 /// <returns>True when triangle normal is toward projection otherwise FALSE</returns>
 bool is_toward_projection(FI                        fi,
                           const CutMesh            &mesh,
-                          const Emboss::IProject3f &projection);
+                          const Project3f &projection);
 
 /// <summary>
 /// Check orientation of triangle defined by vertices a, b, c in CCW order
@@ -437,7 +465,7 @@ bool is_toward_projection(FI                        fi,
 bool is_toward_projection(const Vec3f        &a,
                           const Vec3f        &b,
                           const Vec3f        &c,
-                          const Emboss::IProject3f &projection);
+                          const Project3f &projection);
 /// <summary>
 /// Check orientation of triangle
 /// </summary>
@@ -447,7 +475,7 @@ bool is_toward_projection(const Vec3f        &a,
 /// <returns>True when triangle normal is toward projection otherwise FALSE</returns>
 bool is_toward_projection(const stl_triangle_vertex_indices &t,
                           const std::vector<stl_vertex>     &vertices,
-                          const Emboss::IProject3f          &projection);
+                          const Project3f          &projection);
 
 /// <summary>
 /// Copy triangles from CGAL mesh into index triangle set
@@ -502,7 +530,16 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
                                 const ExPolygons           &shapes,
                                 const Emboss::IProjection  &projection)
 {
-    priv::CutMesh cgal_model = priv::to_cgal(model, projection);
+    if (model.empty() || shapes.empty() ) return {};
+
+    std::vector<bool> skip_indicies(model.indices.size(), {false});
+    // cut out of bounding box triangles
+    priv::set_skip_for_out_of_aoi(skip_indicies, model, projection, shapes);
+    // cut out opposit triangles
+    //priv::set_skip_for_outward_projection(skip_indicies, model, projection);
+    priv::set_skip_by_angle(skip_indicies, model, projection);
+
+    priv::CutMesh cgal_model = priv::to_cgal(model, skip_indicies);
 
 #ifdef DEBUG_OUTPUT_DIR
     CGAL::IO::write_OFF(DEBUG_OUTPUT_DIR + "model.off", cgal_model); // only debug
@@ -548,10 +585,11 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrained.off"); // only debug
 #endif // DEBUG_OUTPUT_DIR
 
-    priv::set_almost_parallel_type(face_type_map, cgal_model, projection);
-#ifdef DEBUG_OUTPUT_DIR
-    priv::store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrainedWithAlmostParallel.off"); // only debug
-#endif // DEBUG_OUTPUT_DIR
+    // It is neccesary when almost parallel face are contained in projection
+    // priv::set_almost_parallel_type(face_type_map, cgal_model, projection);
+//#ifdef DEBUG_OUTPUT_DIR
+//    priv::store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrainedWithAlmostParallel.off"); // only debug
+//#endif // DEBUG_OUTPUT_DIR
     
     priv::flood_fill_inner(cgal_model, face_type_map);
     // Seed fill the other faces inside the region.
@@ -588,11 +626,12 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::store(result, DEBUG_OUTPUT_DIR + "cuts/"); // only debug
 #endif // DEBUG_OUTPUT_DIR
     
+    // TODO: fill skipped source triangles to surface of cut
     return merge(std::move(result));
 }
 
 indexed_triangle_set Slic3r::cuts2model(const SurfaceCuts        &cuts,
-                                        const Emboss::IProject3f &projection)
+                                        const priv::Project3f &projection)
 {
     indexed_triangle_set result;
     size_t count_vertices = 0;
@@ -673,7 +712,7 @@ indexed_triangle_set Slic3r::cuts2model(const SurfaceCuts        &cuts,
 }
 
 indexed_triangle_set Slic3r::cut2model(const SurfaceCut         &cut,
-                                       const Emboss::IProject3f &projection)
+                                       const priv::Project3f &projection)
 {
     assert(!cut.empty());
     size_t count_vertices = cut.vertices.size() * 2;
@@ -737,7 +776,7 @@ indexed_triangle_set Slic3r::cut2model(const SurfaceCut         &cut,
 
 bool priv::is_toward_projection(FI                        fi,
                                 const CutMesh            &mesh,
-                                const Emboss::IProject3f &projection)
+                                const Project3f &projection)
 {
     HI hi = mesh.halfedge(fi);
 
@@ -754,7 +793,7 @@ bool priv::is_toward_projection(FI                        fi,
 
 bool priv::is_toward_projection(const stl_triangle_vertex_indices &t,
                                 const std::vector<stl_vertex> &vertices,
-                                const Emboss::IProject3f &projection)
+                                const Project3f &projection)
 {
     return is_toward_projection(vertices[t[0]], vertices[t[1]],
                                 vertices[t[2]], projection);
@@ -763,7 +802,7 @@ bool priv::is_toward_projection(const stl_triangle_vertex_indices &t,
 bool priv::is_toward_projection(const Vec3f              &a,
                                 const Vec3f              &b,
                                 const Vec3f              &c,
-                                const Emboss::IProject3f &projection)
+                                const Project3f &projection)
 {
     P3 cgal_a(a.x(), a.y(), a.z());
     P3 cgal_b(b.x(), b.y(), b.z());
@@ -779,8 +818,9 @@ bool priv::is_toward_projection(const Vec3f              &a,
 
 void priv::set_skip_for_outward_projection(std::vector<bool> &skip_indicies,
                                            const indexed_triangle_set &its,
-                                           const Emboss::IProject3f &projection)
-{    
+                                           const Project3f &projection)
+{
+    assert(skip_indicies.size() == its.indices.size());
     for (const auto &t : its.indices) {
         size_t index = &t - &its.indices.front();
         if (skip_indicies[index]) continue;
@@ -789,14 +829,129 @@ void priv::set_skip_for_outward_projection(std::vector<bool> &skip_indicies,
     }
 }
 
-priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
-                            const Emboss::IProject3f   &projection)
+void priv::set_skip_by_angle(std::vector<bool>          &skip_indicies,
+                             const indexed_triangle_set &its,
+                             const Project3f            &projection,
+                             double                      max_angle)
 {
-    if (its.empty()) return {};
-    std::vector<bool> skip_indicies(its.indices.size(), {false});
-    // cut out opposit triangles
-    set_skip_for_outward_projection(skip_indicies, its, projection);
+    float threshold = static_cast<float>(cos(max_angle / 180. * M_PI));
+    assert(skip_indicies.size() == its.indices.size());
+    for (const stl_triangle_vertex_indices& face : its.indices) {
+        size_t index = &face - &its.indices.front();
+        if (skip_indicies[index]) continue;
+        Vec3f n = its_face_normal(its, face);
+        const Vec3f v = its.vertices[face[0]];
+        // Improve: For Orthogonal Projection it is same for each vertex
+        Vec3f projected = projection.project(v);
+        Vec3f project_dir = projected - v;
+        project_dir.normalize();
+        float cos_alpha = project_dir.dot(n);
+        if (cos_alpha > threshold) continue;
+        skip_indicies[index] = true;
+    }
+}
 
+void priv::set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
+                                   const indexed_triangle_set &its,
+                                   const Project              &projection,
+                                   const ExPolygons           &shapes)
+{
+    assert(skip_indicies.size() == its.indices.size());
+    BoundingBox shapes_bb = get_extents(shapes);
+
+    //   1`*----* 2`
+    //    /  2 /|
+    // 1 *----* |
+    //   |    | * 3`
+    //   |    |/
+    // 0 *----* 3
+    //////////////////
+    std::array<std::pair<Vec3f, Vec3f>, 4> bb;
+    int index = 0;
+    for (Point v :
+         {shapes_bb.min, Point{shapes_bb.min.x(), shapes_bb.max.y()},
+          shapes_bb.max, Point{shapes_bb.max.x(), shapes_bb.min.y()}})
+        bb[index++] = projection.create_front_back(v);
+
+    // define planes to test
+    // 0 .. under
+    // 1 .. left
+    // 2 .. above
+    // 3 .. right
+    size_t prev_i = 3;
+    std::array<std::pair<Vec3d, Vec3d>, 4> point_normals;
+    for (size_t i = 0; i < 4; i++) {
+        const Vec3f &p1 = bb[i].first;
+        const Vec3f &p2 = bb[i].second;
+        const Vec3f &p3 = bb[prev_i].first;
+        prev_i = i;
+
+        Vec3d v1 = (p2 - p1).cast<double>();
+        v1.normalize();
+        Vec3d v2 = (p3 - p1).cast<double>();
+        v2.normalize();
+
+        Vec3d normal = v2.cross(v1);
+        normal.normalize(); 
+
+        point_normals[i] = {p1.cast<double>(), normal};
+    }
+    // same meaning as point normal
+    std::array<std::vector<bool>, 4> is_on_sides;
+    for (size_t side = 0; side < 4; side++)
+        is_on_sides[side] = std::vector<bool>(its.vertices.size(), {false});
+
+    auto is_out_of = [&point_normals](int side, const Vec3d &v) -> bool {
+        const auto &[p, n] = point_normals[side];
+        double signed_distance = (v - p).dot(n);
+        return signed_distance > 1e-5;
+    };
+
+    // inspect all vertices when it is out of bounding box
+    for (size_t i = 0; i < its.vertices.size(); i++) {
+        Vec3d v = its.vertices[i].cast<double>();
+        // under + above
+        for (int side : {0, 2}) {
+            if (is_out_of(side, v)) {
+                is_on_sides[side][i] = true;
+                break;
+            }
+        }
+        // left + right
+        for (int side : {1, 3}) {
+            if (is_out_of(side, v)) {
+                is_on_sides[side][i] = true;
+                break;
+            }        
+        }
+    }
+
+    auto is_all_on_one_side = [is_on_sides](const Vec3i &t) -> bool {
+        for (size_t side = 0; side < 4; side++) {
+            bool result = true;
+            for (auto vi : t){ 
+                if (!is_on_sides[side][vi]) { 
+                    result = false; 
+                    break;
+                }
+            }
+            if (result) return true;
+        }
+        return false;
+    };
+
+    // inspect all triangles, when it is out of bounding box
+    for (size_t i = 0; i < its.indices.size(); i++) { 
+        if (skip_indicies[i]) continue;
+        const auto& t = its.indices[i];
+        if (is_all_on_one_side(t)) 
+            skip_indicies[i] = true;
+    }
+}
+
+priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
+                            const std::vector<bool>    &skip_indicies)
+{
     const std::vector<stl_vertex>                  &vertices = its.vertices;
     const std::vector<stl_triangle_vertex_indices> &indices = its.indices;
 
@@ -1022,7 +1177,7 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
 
 void priv::set_almost_parallel_type(FaceTypeMap              &face_type_map,
                                     const CutMesh            &mesh,
-                                    const Emboss::IProject3f &projection)
+                                    const Project3f &projection)
 {
     for (const FI &fi : mesh.faces()) {
         auto &type = face_type_map[fi];
@@ -1040,7 +1195,7 @@ void priv::set_almost_parallel_type(FaceTypeMap              &face_type_map,
     }
 }
 
-bool priv::is_almost_parallel(FI fi, const CutMesh &mesh, const Emboss::IProject3f &projection, float threshold)
+bool priv::is_almost_parallel(FI fi, const CutMesh &mesh, const Project3f &projection, float threshold)
 {
     HI hi = mesh.halfedge(fi);
     std::array<VI, 3> vis = {
