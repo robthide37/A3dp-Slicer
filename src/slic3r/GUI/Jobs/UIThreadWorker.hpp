@@ -35,9 +35,13 @@ class UIThreadWorker : public Worker, private Job::Ctl {
                 eptr= std::current_exception();
             }
 
-            m_running = false;
-
             job->finalize(m_canceled, eptr);
+
+            // Unhandled exceptions are rethrown without mercy.
+            if (eptr)
+                std::rethrow_exception(eptr);
+
+            m_running = false;
 
             m_canceled = false;
         }
