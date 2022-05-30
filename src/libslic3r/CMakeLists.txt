@@ -407,6 +407,12 @@ if(SLIC3R_PROFILE)
     target_link_libraries(libslic3r Shiny)
 endif()
 
+if (APPLE)
+    # This flag prevents the need for minimum SDK version 10.14
+    # currently, PS targets v10.12
+    target_compile_options(libslic3r PUBLIC "-fno-aligned-allocation")
+endif ()
+
 if (SLIC3R_PCH AND NOT SLIC3R_SYNTAXONLY)
     add_precompiled_header(libslic3r pchheader.hpp FORCEINCLUDE)
 endif ()
