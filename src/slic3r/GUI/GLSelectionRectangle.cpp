@@ -105,9 +105,10 @@ namespace GUI {
         const float bottom = (float)std::min(start.y(), end.y()) * inv_zoom;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if !ENABLE_GL_CORE_PROFILE
-        glsafe(::glLineWidth(1.5f));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+        if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+            glsafe(::glLineWidth(1.5f));
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
         float color[3];
         color[0] = (m_state == EState::Select) ? 0.3f : 1.0f;
@@ -136,7 +137,7 @@ namespace GUI {
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE

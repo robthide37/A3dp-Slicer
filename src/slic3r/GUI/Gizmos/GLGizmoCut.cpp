@@ -169,7 +169,7 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 
-    shader = wxGetApp().get_shader("dashed_thick_lines");
+    shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
 
@@ -191,9 +191,10 @@ void GLGizmoCut::on_render()
 
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
-#if !ENABLE_GL_CORE_PROFILE
-        glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+        if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+            glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         if (!m_grabber_connection.is_initialized() || is_changed) {
             m_grabber_connection.reset();
@@ -257,10 +258,8 @@ void GLGizmoCut::on_render()
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_GL_CORE_PROFILE
-        glsafe(::glLineWidth(2.0f));
-#endif // !ENABLE_GL_CORE_PROFILE
-        m_cut_contours.contours.render();
+    glsafe(::glLineWidth(2.0f));
+    m_cut_contours.contours.render();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
     }

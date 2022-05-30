@@ -21,6 +21,9 @@ struct GUI_InitParams
     std::vector<std::string>    input_files;
 
 	bool	                    start_as_gcodeviewer;
+#if ENABLE_GL_CORE_PROFILE
+	std::pair<int, int>         opengl_version;
+#endif // ENABLE_GL_CORE_PROFILE
 };
 
 int GUI_Run(GUI_InitParams &params);

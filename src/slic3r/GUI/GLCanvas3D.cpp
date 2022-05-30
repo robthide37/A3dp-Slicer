@@ -504,7 +504,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
     }
 
 #if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+    GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -6048,9 +6048,10 @@ void GLCanvas3D::_render_camera_target()
     static const float half_length = 5.0f;
 
     glsafe(::glDisable(GL_DEPTH_TEST));
-#if !ENABLE_GL_CORE_PROFILE
-    glsafe(::glLineWidth(2.0f));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+    if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth(2.0f));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     const Vec3f& target = wxGetApp().plater()->get_camera().get_target().cast<float>();
@@ -6088,7 +6089,7 @@ void GLCanvas3D::_render_camera_target()
     }
 
 #if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+    GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE

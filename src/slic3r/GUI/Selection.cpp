@@ -2005,11 +2005,14 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
     glsafe(::glEnable(GL_DEPTH_TEST));
 
 #if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+    if (!OpenGLManager::get_gl_info().is_core_profile())
+        glsafe(::glLineWidth(2.0f * m_scale_factor));
+
+    GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
     glsafe(::glLineWidth(2.0f * m_scale_factor));
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // !ENABLE_GL_CORE_PROFILE
+#endif // ENABLE_GL_CORE_PROFILE
     if (shader == nullptr)
         return;
 

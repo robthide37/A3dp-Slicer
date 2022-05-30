@@ -84,6 +84,9 @@ private:
 
     bool m_gl_initialized{ false };
     wxGLContext* m_context{ nullptr };
+#if ENABLE_GL_CORE_PROFILE
+    std::pair<int, int> m_required_version{ 0, 0 };
+#endif // ENABLE_GL_CORE_PROFILE
     GLShadersManager m_shaders_manager;
     static GLInfo s_gl_info;
 #ifdef __APPLE__ 
@@ -99,7 +102,11 @@ public:
     ~OpenGLManager();
 
     bool init_gl();
+#if ENABLE_GL_CORE_PROFILE
+    wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version);
+#else
     wxGLContext* init_glcontext(wxGLCanvas& canvas);
+#endif // ENABLE_GL_CORE_PROFILE
 
     GLShaderProgram* get_shader(const std::string& shader_name) { return m_shaders_manager.get_shader(shader_name); }
     GLShaderProgram* get_current_shader() { return m_shaders_manager.get_current_shader(); }

@@ -350,13 +350,52 @@ bool OpenGLManager::init_gl()
     return true;
 }
 
+#if ENABLE_GL_CORE_PROFILE
+wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version)
+#else
 wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
+#endif // ENABLE_GL_CORE_PROFILE
 {
     if (m_context == nullptr) {
 #if ENABLE_GL_CORE_PROFILE
-        wxGLContextAttrs attrs;
-        attrs.CoreProfile().ForwardCompatible().OGLVersion(3, 3).EndList();
-        m_context = new wxGLContext(&canvas, nullptr, &attrs);
+        if (required_opengl_version != std::make_pair(0, 0)) { // the user specified a required version in the command line using --opengl=M.m
+            m_required_version = required_opengl_version;
+            const bool supports_core_profile = (m_required_version.first < 3) ? false :
+                (m_required_version.first > 3) ? true : m_required_version.second >= 3;
+            if (supports_core_profile) {
+                // disable wxWidgets logging to avoid showing the log dialog in case the following code fails generating a valid gl context
+                wxLogNull logNo;
+                wxGLContextAttrs attrs;
+                attrs.MajorVersion(m_required_version.first).MinorVersion(m_required_version.second).CoreProfile().ForwardCompatible().EndList();
+                m_context = new wxGLContext(&canvas, nullptr, &attrs);
+                if (!m_context->IsOK()) {
+                    BOOST_LOG_TRIVIAL(error) << "Unable to create context for required OpenGL " << required_opengl_version.first << "." << required_opengl_version.second;
+                    delete m_context;
+                    m_context = nullptr;
+                }
+            }
+        }
+        //else {
+        //    // try to get the highest supported OpenGL version with core profile
+        //    static const std::vector<std::pair<int, int>> valid_core_versions = { {4,6}, {4,5}, {4,4}, {4,3}, {4,2}, {4,1}, {4,0}, {3,3} };
+        //    // disable wxWidgets logging to avoid showing the log dialog in case the following code fails generating a valid gl context
+        //    wxLogNull logNo;
+        //    for (const auto& [major, minor] : valid_core_versions) {
+        //        wxGLContextAttrs attrs;
+        //        attrs.CoreProfile().ForwardCompatible().OGLVersion(major, minor).EndList();
+        //        m_context = new wxGLContext(&canvas, nullptr, &attrs);
+        //        if (m_context->IsOK())
+        //            break;
+        //        else {
+        //            delete m_context;
+        //            m_context = nullptr;
+        //        }
+        //    }
+        //}
+
+        if (m_context == nullptr)
+            // if no valid context was created use the default one
+            m_context = new wxGLContext(&canvas);
 #else
         m_context = new wxGLContext(&canvas);
 #endif // ENABLE_GL_CORE_PROFILE

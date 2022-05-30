@@ -132,9 +132,10 @@ void GLGizmoMove3D::on_render()
     m_grabbers[2].center = { center.x(), center.y(), box.max.z() + Offset };
     m_grabbers[2].color = AXES_COLOR[2];
 
-#if !ENABLE_GL_CORE_PROFILE
-    glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+    if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     auto render_grabber_connection = [this, &center](unsigned int id) {
@@ -167,7 +168,7 @@ void GLGizmoMove3D::on_render()
     if (m_hover_id == -1) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -217,7 +218,7 @@ void GLGizmoMove3D::on_render()
         // draw axis
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE

@@ -256,9 +256,10 @@ void GLGizmoScale3D::on_render()
         m_grabbers[i].angles = angles;
     }
 
-#if !ENABLE_GL_CORE_PROFILE
-    glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+    if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
     const BoundingBoxf3& selection_box = selection.get_bounding_box();
 
@@ -268,7 +269,7 @@ void GLGizmoScale3D::on_render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -323,7 +324,7 @@ void GLGizmoScale3D::on_render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -364,7 +365,7 @@ void GLGizmoScale3D::on_render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -405,7 +406,7 @@ void GLGizmoScale3D::on_render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -446,7 +447,7 @@ void GLGizmoScale3D::on_render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE

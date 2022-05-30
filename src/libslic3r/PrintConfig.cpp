@@ -4304,6 +4304,14 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def->cli = "gcodeviewer";
     def->set_default_value(new ConfigOptionBool(false));
 
+#if ENABLE_GL_CORE_PROFILE
+    def = this->add("opengl-core", coString);
+    def->label = L("OpenGL core version");
+    def->tooltip = L("Select the specified OpenGL version supporting core profile");
+    def->cli = "opengl-core";
+    def->set_default_value(new ConfigOptionString());
+#endif // ENABLE_GL_CORE_PROFILE
+
     def = this->add("slice", coBool);
     def->label = L("Slice");
     def->tooltip = L("Slice the model as FFF or SLA based on the printer_technology configuration value.");

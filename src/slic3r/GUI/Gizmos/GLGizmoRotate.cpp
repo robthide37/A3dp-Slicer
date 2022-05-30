@@ -175,12 +175,13 @@ void GLGizmoRotate::on_render()
     transform_to_local(selection);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if !ENABLE_GL_CORE_PROFILE
-    glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+    if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+    GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE

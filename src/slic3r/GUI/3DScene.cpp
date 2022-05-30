@@ -389,9 +389,10 @@ void GLVolume::NonManifoldEdges::render()
 {
     update();
 
-#if !ENABLE_GL_CORE_PROFILE
-    glsafe(::glLineWidth(2.0f));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+    if (!GUI::OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth(2.0f));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
@@ -1087,7 +1088,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* sink_shader  = GUI::wxGetApp().get_shader("flat");
 #if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("dashed_thick_lines");
+    GLShaderProgram* edges_shader = GUI::OpenGLManager::get_gl_info().is_core_profile() ? GUI::wxGetApp().get_shader("dashed_thick_lines") : GUI::wxGetApp().get_shader("flat");
 #else
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE

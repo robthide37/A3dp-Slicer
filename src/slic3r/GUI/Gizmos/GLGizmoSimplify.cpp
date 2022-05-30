@@ -772,9 +772,10 @@ void GLGizmoSimplify::on_render()
             const ColorRGBA color = glmodel.get_color();
             glmodel.set_color(ColorRGBA::WHITE());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_GL_CORE_PROFILE
-            glsafe(::glLineWidth(1.0f));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+            if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+                glsafe(::glLineWidth(1.0f));
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
             glmodel.render();
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));

@@ -847,7 +847,11 @@ std::string GUI_App::get_gl_info(bool for_github)
 
 wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
 {
+#if ENABLE_GL_CORE_PROFILE
+    return m_opengl_mgr.init_glcontext(canvas, init_params != nullptr ? init_params->opengl_version : std::make_pair(0, 0));
+#else
     return m_opengl_mgr.init_glcontext(canvas);
+#endif // ENABLE_GL_CORE_PROFILE
 }
 
 bool GUI_App::init_opengl()

@@ -3,6 +3,9 @@
 #include "GLShadersManager.hpp"
 #include "3DScene.hpp"
 #include "GUI_App.hpp"
+#if ENABLE_GL_CORE_PROFILE
+#include "OpenGLManager.hpp"
+#endif // ENABLE_GL_CORE_PROFILE
 
 #include <cassert>
 #include <algorithm>
@@ -46,8 +49,9 @@ std::pair<bool, std::string> GLShadersManager::init()
     // used to render 3D scene background
     valid &= append_shader("background", { prefix + "background.vs", prefix + "background.fs" });
 #if ENABLE_GL_CORE_PROFILE
-    // used to render thick and/or dashed lines
-    valid &= append_shader("dashed_thick_lines", { prefix + "dashed_thick_lines.vs", prefix + "dashed_thick_lines.fs", prefix + "dashed_thick_lines.gs" });
+    if (GUI::OpenGLManager::get_gl_info().is_core_profile())
+        // used to render thick and/or dashed lines
+        valid &= append_shader("dashed_thick_lines", { prefix + "dashed_thick_lines.vs", prefix + "dashed_thick_lines.fs", prefix + "dashed_thick_lines.gs" });
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SHOW_TOOLPATHS_COG

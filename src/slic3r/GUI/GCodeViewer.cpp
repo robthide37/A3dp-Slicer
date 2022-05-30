@@ -740,7 +740,7 @@ void GCodeViewer::init()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
             buffer.vertices.format = VBuffer::EFormat::Position;
 #if ENABLE_GL_CORE_PROFILE
-            buffer.shader = "dashed_thick_lines";
+            buffer.shader = OpenGLManager::get_gl_info().is_core_profile() ? "dashed_thick_lines" : "flat";
 #else
             buffer.shader = "flat";
 #endif // ENABLE_GL_CORE_PROFILE
@@ -3179,11 +3179,9 @@ void GCodeViewer::render_toolpaths()
         }
     };
 
-#if !ENABLE_GL_CORE_PROFILE
     auto line_width = [](double zoom) {
         return (zoom < 5.0) ? 1.0 : (1.0 + 5.0 * (zoom - 5.0) / (100.0 - 5.0));
     };
-#endif // !ENABLE_GL_CORE_PROFILE
 
     const unsigned char begin_id = buffer_id(EMoveType::Retract);
     const unsigned char end_id   = buffer_id(EMoveType::Count);
@@ -3272,9 +3270,12 @@ void GCodeViewer::render_toolpaths()
                 switch (buffer.render_primitive_type)
                 {
                 case TBuffer::ERenderPrimitiveType::Line: {
-#if !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+                    if (!OpenGLManager::get_gl_info().is_core_profile())
+                        glsafe(::glLineWidth(static_cast<GLfloat>(line_width(camera.get_zoom()))));
+#else
                     glsafe(::glLineWidth(static_cast<GLfloat>(line_width(zoom))));
-#endif // !ENABLE_GL_CORE_PROFILE
+#endif // ENABLE_GL_CORE_PROFILE
                     render_as_lines(it_path, buffer.render_paths.end(), *shader, uniform_color);
                     break;
                 }
