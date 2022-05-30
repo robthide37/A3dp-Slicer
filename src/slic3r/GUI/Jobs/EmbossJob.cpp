@@ -61,15 +61,13 @@ static double get_shape_scale(const FontProp &fp, const Emboss::FontFile &ff);
 /// Create projection for cut surface from mesh
 /// </summary>
 /// <param name="tr">Volume transformation in object</param>
-/// <param name="tc">Configuration of embossig</param>
-/// <param name="ff">Font file for size --> unit per em</param>
-/// <param name="shape_bb">Bounding box 2d of shape to center result
-/// volume</param> <param name="z_range">Bounding box 3d of model volume for
-/// projection ranges</param> <returns>Orthogonal cut_projection</returns>
+/// <param name="shape_scale">Convert shape to milimeters</param>
+/// <param name="shape_bb">Bounding box 2d of shape to center result</param>
+/// <param name="z_range">Bounding box 3d of model volume for projection ranges</param> 
+/// <returns>Orthogonal cut_projection</returns>
 static std::unique_ptr<Emboss::IProjection> create_projection_for_cut(
     Transform3d                    tr,
-    const TextConfiguration       &tc,
-    const Emboss::FontFile        &ff,
+    double                         shape_scale,
     const BoundingBox             &shape_bb,
     const std::pair<float, float> &z_range);
 
@@ -77,15 +75,12 @@ static std::unique_ptr<Emboss::IProjection> create_projection_for_cut(
 /// Create tranformation for emboss Cutted surface
 /// </summary>
 /// <param name="is_outside">True .. raise, False .. engrave</param>
-/// <param name="tc">Text configuration</param>
+/// <param name="emboss">Depth of embossing</param>
 /// <param name="tr">Text voliume transformation inside object</param>
 /// <param name="cut">Cutted surface from model</param>
 /// <returns>Projection</returns>
 static std::unique_ptr<Emboss::IProject3f> create_emboss_projection(
-    bool                     is_outside,
-    const TextConfiguration &tc,
-    Transform3d              tr,
-    SurfaceCut              &cut);
+    bool is_outside, float emboss, Transform3d tr, SurfaceCut &cut);
 
 }
 
@@ -312,11 +307,15 @@ void UseSurfaceJob::process(Ctl &ctl) {
 
     Transform3d mesh_tr_inv     = m_input.mesh_tr.inverse();
     Transform3d cut_projection_tr = mesh_tr_inv * m_input.text_tr;
-    BoundingBoxf3 mesh_bb_tr = m_input.mesh_bb.transformed(cut_projection_tr.inverse());
+    Transform3d emboss_tr         = cut_projection_tr.inverse();
+    BoundingBoxf3 mesh_bb_tr = m_input.mesh_bb.transformed(emboss_tr);
     std::pair<float, float> z_range{mesh_bb_tr.min.z(), mesh_bb_tr.max.z()};
 
     const Emboss::FontFile &ff = *m_input.font_file.font_file;
-    auto cut_projection = priv::create_projection_for_cut(cut_projection_tr, tc, ff, bb, z_range);
+    double shape_scale =  priv::get_shape_scale(fp, ff);
+    auto cut_projection = priv::create_projection_for_cut(cut_projection_tr,
+                                                          shape_scale, bb,
+                                                          z_range);
     if (cut_projection == nullptr) return;
 
     // Use CGAL to cut surface from triangle mesh
@@ -325,26 +324,19 @@ void UseSurfaceJob::process(Ctl &ctl) {
     if (was_canceled()) return;
 
     // !! Projection needs to transform cut
-    auto projection = priv::create_emboss_projection(m_input.is_outside, tc, cut_projection_tr, cut);
+    auto projection = priv::create_emboss_projection(m_input.is_outside, fp.emboss, emboss_tr, cut);
     if (projection == nullptr) return;
 
     indexed_triangle_set new_its = cut2model(cut, *projection);
     if (was_canceled()) return;
     //its_write_obj(new_its, "C:/data/temp/projected.obj"); // only debug
-
     m_result = TriangleMesh(std::move(new_its));
-    Vec3d shift = -m_result.bounding_box().center();
-    // do not center in emboss direction
-    shift.z() = 0;
-    m_result.translate(shift.cast<float>());
 }
 
 void UseSurfaceJob::finalize(bool canceled, std::exception_ptr &)
 {
     if (canceled || m_input.cancel->load()) return;
     priv::update_volume(std::move(m_result), m_input);
-    // TODO: use fix matrix to compensate uncentered position
-
 }
 
 ////////////////////////////
@@ -466,8 +458,7 @@ static double priv::get_shape_scale(const FontProp &fp, const Emboss::FontFile &
 
 std::unique_ptr<Emboss::IProjection> priv::create_projection_for_cut(
     Transform3d                    tr,
-    const TextConfiguration       &tc,
-    const Emboss::FontFile        &ff,
+    double                         shape_scale,
     const BoundingBox             &shape_bb,
     const std::pair<float, float> &z_range)
 {
@@ -491,43 +482,23 @@ std::unique_ptr<Emboss::IProjection> priv::create_projection_for_cut(
     // Projection is in direction from far plane
     tr.translate(Vec3d(0., 0., min_z));
 
-    tr.scale(get_shape_scale(tc.font_item.prop, ff));
+    tr.scale(shape_scale);
     // Text alignemnt to center 2D
     Vec2d move = -(shape_bb.max + shape_bb.min).cast<double>() / 2.;
+    //Vec2d move = -shape_bb.center().cast<double>(); // not precisse
     tr.translate(Vec3d(move.x(), move.y(), 0.));
     return std::make_unique<Emboss::OrthoProject>(tr, project_direction);
 }
 
 std::unique_ptr<Emboss::IProject3f> priv::create_emboss_projection(
-    bool                     is_outside,
-    const TextConfiguration &tc,
-    Transform3d              tr,
-    SurfaceCut              &cut)
+    bool is_outside, float emboss, Transform3d tr, SurfaceCut &cut)
 {
     // Offset of clossed side to model
     const float surface_offset = 1e-3f; // [in mm]
-        
-    const FontProp &fp = tc.font_item.prop;
-    float front_move, back_move;
-    if (is_outside) {
-        front_move = fp.emboss;
-        back_move  = -surface_offset;
-    } else {
-        front_move = surface_offset;
-        back_move  = -fp.emboss;
-    }
-    Matrix3d rot_i = tr.linear().inverse();
-    its_transform(cut, rot_i);
-    
-    BoundingBoxf3 bb = Slic3r::bounding_box(cut);
-    float z_move   = -bb.max.z();
-    float x_center = (bb.max.x() + bb.min.x()) / 2;
-    float y_center = (bb.max.y() + bb.min.y()) / 2;
-    // move to front distance
-    Vec3f move(x_center, y_center, front_move + z_move);
-
-    its_translate(cut, move);
-
+    float 
+        front_move = (is_outside) ? emboss : surface_offset,
+        back_move  = -(is_outside) ? surface_offset : emboss;    
+    its_transform(cut, tr.pretranslate(Vec3d(0., 0., front_move)));    
     Vec3f from_front_to_back(0.f, 0.f, back_move - front_move);
     return std::make_unique<Emboss::OrthoProject3f>(from_front_to_back);
 }
