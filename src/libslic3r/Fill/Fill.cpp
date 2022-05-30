@@ -331,10 +331,10 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 //	this->export_region_fill_surfaces_to_svg_debug("10_fill-initial");
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
-    std::vector<SurfaceFill>  surface_fills  = group_fills(*this);
-    const Slic3r::BoundingBox bbox           = this->object()->bounding_box();
-    const auto                resolution     = this->object()->print()->config().gcode_resolution.value;
-    const auto                slicing_engine = this->object()->config().slicing_engine;
+    std::vector<SurfaceFill>  surface_fills       = group_fills(*this);
+    const Slic3r::BoundingBox bbox                = this->object()->bounding_box();
+    const auto                resolution          = this->object()->print()->config().gcode_resolution.value;
+    const auto                perimeter_generator = this->object()->config().perimeter_generator;
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
 	{
@@ -355,7 +355,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         if (surface_fill.params.pattern == ipLightning)
             dynamic_cast<FillLightning::Filler*>(f.get())->generator = lightning_generator;
 
-        if (object()->config().slicing_engine.value == SlicingEngine::Arachne && surface_fill.params.pattern == ipConcentric) {
+        if (perimeter_generator.value == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) {
             FillConcentric *fill_concentric = dynamic_cast<FillConcentric *>(f.get());
             assert(fill_concentric != nullptr);
             fill_concentric->print_config        = &this->object()->print()->config();
@@ -387,7 +387,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         params.anchor_length     = surface_fill.params.anchor_length;
         params.anchor_length_max = surface_fill.params.anchor_length_max;
         params.resolution        = resolution;
-        params.use_arachne       = slicing_engine == SlicingEngine::Arachne && surface_fill.params.pattern == ipConcentric;
+        params.use_arachne       = perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
 			// Spacing is modified by the filler to indicate adjustments. Reset it for each expolygon.

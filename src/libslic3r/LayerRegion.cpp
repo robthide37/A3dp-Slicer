@@ -101,7 +101,7 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, SurfaceCollec
     g.overhang_flow         = this->bridging_flow(frPerimeter);
     g.solid_infill_flow     = this->flow(frSolidInfill);
 
-    if (this->layer()->object()->config().slicing_engine.value == SlicingEngine::Arachne)
+    if (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne)
         g.process_arachne();
     else
         g.process_classic();

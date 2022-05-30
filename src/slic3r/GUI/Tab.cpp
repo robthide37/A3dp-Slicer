@@ -1492,6 +1492,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("seam_position", category_path + "seam-position");
         optgroup->append_single_option_line("external_perimeters_first", category_path + "external-perimeters-first");
         optgroup->append_single_option_line("gap_fill_enabled", category_path + "fill-gaps");
+        optgroup->append_single_option_line("perimeter_generator");
 
         optgroup = page->new_optgroup(L("Fuzzy skin (experimental)"));
         category_path = "fuzzy-skin_246186/#";
@@ -1670,16 +1671,15 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Other"));
         optgroup->append_single_option_line("clip_multipart_objects");
 
-        optgroup = page->new_optgroup(L("Experimental"));
-        optgroup->append_single_option_line("slicing_engine");
-        optgroup->append_single_option_line("wall_transition_length");
-        optgroup->append_single_option_line("wall_transition_filter_deviation");
-        optgroup->append_single_option_line("wall_transition_angle");
-        optgroup->append_single_option_line("wall_distribution_count");
-        optgroup->append_single_option_line("wall_split_middle_threshold");
+        optgroup = page->new_optgroup(L("Arachne"));
         optgroup->append_single_option_line("wall_add_middle_threshold");
-        optgroup->append_single_option_line("min_feature_size");
+        optgroup->append_single_option_line("wall_split_middle_threshold");
+        optgroup->append_single_option_line("wall_transition_angle");
+        optgroup->append_single_option_line("wall_transition_filter_deviation");
+        optgroup->append_single_option_line("wall_transition_length");
+        optgroup->append_single_option_line("wall_distribution_count");
         optgroup->append_single_option_line("min_bead_width");
+        optgroup->append_single_option_line("min_feature_size");
 
     page = add_options_page(L("Output options"), "output+page_white");
         optgroup = page->new_optgroup(L("Sequential printing"));

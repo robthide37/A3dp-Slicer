@@ -127,7 +127,7 @@ enum DraftShield {
     dsDisabled, dsLimited, dsEnabled
 };
 
-enum class SlicingEngine
+enum class PerimeterGeneratorType
 {
     // Classic perimeter generator using Clipper offsets with constant extrusion width.
     Classic,
@@ -158,7 +158,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLAPillarConnectionMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
-CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SlicingEngine)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -487,7 +487,7 @@ PRINT_CONFIG_CLASS_DEFINE(
 //  ((ConfigOptionFloat,               seam_preferred_direction_jitter))
     ((ConfigOptionFloat,               slice_closing_radius))
     ((ConfigOptionEnum<SlicingMode>,   slicing_mode))
-    ((ConfigOptionEnum<SlicingEngine>, slicing_engine))
+    ((ConfigOptionEnum<PerimeterGeneratorType>, perimeter_generator))
     ((ConfigOptionFloat,               wall_transition_length))
     ((ConfigOptionFloatOrPercent,      wall_transition_filter_deviation))
     ((ConfigOptionFloat,               wall_transition_angle))

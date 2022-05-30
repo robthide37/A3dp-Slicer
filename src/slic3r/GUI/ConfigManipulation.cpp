@@ -318,7 +318,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     bool have_avoid_crossing_perimeters = config->opt_bool("avoid_crossing_perimeters");
     toggle_field("avoid_crossing_perimeters_max_detour", have_avoid_crossing_perimeters);
 
-    bool have_arachne = config->opt_enum<SlicingEngine>("slicing_engine") == SlicingEngine::Arachne;
+    bool have_arachne = config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
     toggle_field("wall_transition_length", have_arachne);
     toggle_field("wall_transition_filter_deviation", have_arachne);
     toggle_field("wall_transition_angle", have_arachne);

@@ -195,11 +195,11 @@ static const t_config_enum_values s_keys_map_ForwardCompatibilitySubstitutionRul
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
 
-static t_config_enum_values s_keys_map_SlicingEngine {
-    { "classic", int(SlicingEngine::Classic) },
-    { "arachne", int(SlicingEngine::Arachne) }
+static t_config_enum_values s_keys_map_PerimeterGeneratorType {
+    { "classic", int(PerimeterGeneratorType::Classic) },
+    { "arachne", int(PerimeterGeneratorType::Arachne) }
 };
-CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SlicingEngine)
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PerimeterGeneratorType)
 
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
@@ -3043,19 +3043,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
 
-    def = this->add("slicing_engine", coEnum);
-    def->label = L("Slicing engine");
-    def->category = L("Advanced");
-    def->tooltip = L("Classic slicing engine produces perimeters with constant extrusion width and for"
+    def = this->add("perimeter_generator", coEnum);
+    def->label = L("Perimeter generator");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Classic perimeter generator produces perimeters with constant extrusion width and for"
                       " very thing areas is used gap-fill."
                       "Arachne produces perimeters with variable extrusion width.");
-    def->enum_keys_map = &ConfigOptionEnum<SlicingEngine>::get_enum_values();
+    def->enum_keys_map = &ConfigOptionEnum<PerimeterGeneratorType>::get_enum_values();
     def->enum_values.push_back("classic");
     def->enum_values.push_back("arachne");
     def->enum_labels.push_back(L("Classic"));
     def->enum_labels.push_back(L("Arachne"));
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionEnum<SlicingEngine>(SlicingEngine::Classic));
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Arachne));
 
     def = this->add("wall_transition_length", coFloat);
     def->label = L("Wall Transition Length");
@@ -3114,7 +3114,7 @@ void PrintConfigDef::init_fff_params()
                        "between two outer edges of the shape, even if there actually is fill or (other) skin in "
                        "the print instead of wall.");
     def->sidetext = L("%");
-    def->mode = comExpert;
+    def->mode = comAdvanced;
     def->min = 1;
     def->max = 99;
     def->set_default_value(new ConfigOptionPercent(50));
@@ -3129,7 +3129,7 @@ void PrintConfigDef::init_fff_params()
                        "object between two outer edges of the shape, even if there actually is fill or (other) "
                        "skin in the print instead of wall.");
     def->sidetext = L("%");
-    def->mode = comExpert;
+    def->mode = comAdvanced;
     def->min = 1;
     def->max = 99;
     def->set_default_value(new ConfigOptionPercent(75));
