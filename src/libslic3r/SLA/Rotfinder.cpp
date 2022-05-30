@@ -288,7 +288,7 @@ template<unsigned MAX_ITER>
 struct RotfinderBoilerplate {
     static constexpr unsigned MAX_TRIES = MAX_ITER;
 
-    int status = 0;
+    int status = 0, prev_status = 0;
     TriangleMesh mesh;
     unsigned max_tries;
     const RotOptimizeParams &params;
@@ -314,13 +314,20 @@ struct RotfinderBoilerplate {
 
     RotfinderBoilerplate(const ModelObject &mo, const RotOptimizeParams &p)
         : mesh{get_mesh_to_rotate(mo)}
-        , params{p}
         , max_tries(p.accuracy() * MAX_TRIES)
-    {
+        , params{p}
+    {}
 
+    void statusfn() {
+        int s = status * 100 / max_tries;
+        if (s != prev_status) {
+            params.statuscb()(s);
+            prev_status = s;
+        }
+
+        ++status;
     }
 
-    void statusfn() { params.statuscb()(++status * 100.0 / max_tries); }
     bool stopcond() { return ! params.statuscb()(-1); }
 };
 

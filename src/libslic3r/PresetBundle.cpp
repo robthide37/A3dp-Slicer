@@ -1,7 +1,7 @@
 #include <cassert>
 
-#include "PresetBundle.hpp"
 #include "libslic3r.h"
+#include "PresetBundle.hpp"
 #include "Utils.hpp"
 #include "Model.hpp"
 #include "format.hpp"
@@ -452,6 +452,11 @@ void PresetBundle::save_changes_for_preset(const std::string& new_name, Preset::
         // revert unselected options to the old values
         presets.get_edited_preset().config.apply_only(presets.get_selected_preset().config, unselected_options);
     }
+
+#if ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
+    if (type == Preset::TYPE_PRINTER)
+        copy_bed_model_and_texture_if_needed(presets.get_edited_preset().config);
+#endif // ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
 
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
     presets.save_current_preset(new_name);
@@ -1859,5 +1864,33 @@ void PresetBundle::set_default_suppressed(bool default_suppressed)
     sla_materials.set_default_suppressed(default_suppressed);
     printers.set_default_suppressed(default_suppressed);
 }
+
+#if ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
+void copy_bed_model_and_texture_if_needed(DynamicPrintConfig& config)
+{
+    const boost::filesystem::path user_dir = boost::filesystem::absolute(boost::filesystem::path(data_dir()) / "printer").make_preferred();
+    const boost::filesystem::path res_dir  = boost::filesystem::absolute(boost::filesystem::path(resources_dir()) / "profiles").make_preferred();
+
+    auto do_copy = [&user_dir, &res_dir](ConfigOptionString* cfg, const std::string& type) {
+        if (cfg == nullptr || cfg->value.empty())
+            return;
+
+        const boost::filesystem::path src_dir = boost::filesystem::absolute(boost::filesystem::path(cfg->value)).make_preferred().parent_path();
+        if (src_dir != user_dir && src_dir.parent_path() != res_dir) {
+            const std::string dst_value = (user_dir / boost::filesystem::path(cfg->value).filename()).string();
+            std::string error;
+            if (copy_file_inner(cfg->value, dst_value, error) == SUCCESS)
+                cfg->value = dst_value;
+            else {
+                BOOST_LOG_TRIVIAL(error) << "Copying from " << cfg->value << " to " << dst_value << " failed. Unable to set custom bed " << type << ". [" << error << "]";
+                cfg->value = "";
+            }
+        }
+    };
+
+    do_copy(config.option<ConfigOptionString>("bed_custom_texture"), "texture");
+    do_copy(config.option<ConfigOptionString>("bed_custom_model"), "model");
+}
+#endif // ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
 
 } // namespace Slic3r

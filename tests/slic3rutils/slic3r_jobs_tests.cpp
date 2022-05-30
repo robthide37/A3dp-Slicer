@@ -4,9 +4,8 @@
 #include <thread>
 
 #include "slic3r/GUI/Jobs/BoostThreadWorker.hpp"
+#include "slic3r/GUI/Jobs/UIThreadWorker.hpp"
 #include "slic3r/GUI/Jobs/ProgressIndicator.hpp"
-
-//#include <boost/thread/thread.hpp>
 
 struct Progress: Slic3r::ProgressIndicator {
     int range = 100;
@@ -19,17 +18,30 @@ struct Progress: Slic3r::ProgressIndicator {
     int  get_range() const override { return range; }
 };
 
-TEST_CASE("nullptr job should be ignored", "[Jobs]") {
-    Slic3r::GUI::BoostThreadWorker worker{std::make_unique<Progress>()};
+using TestClasses = std::tuple< Slic3r::GUI::UIThreadWorker, Slic3r::GUI::BoostThreadWorker >;
+
+TEMPLATE_LIST_TEST_CASE("Empty worker should not do anything", "[Jobs]", TestClasses) {
+    TestType worker{std::make_unique<Progress>()};
+
+    REQUIRE(worker.is_idle());
+
+    worker.wait_for_current_job();
+    worker.process_events();
+
+    REQUIRE(worker.is_idle());
+}
+
+TEMPLATE_LIST_TEST_CASE("nullptr job should be ignored", "[Jobs]", TestClasses) {
+    TestType worker{std::make_unique<Progress>()};
     worker.push(nullptr);
 
     REQUIRE(worker.is_idle());
 }
 
-TEST_CASE("State should not be idle while running a job", "[Jobs]") {
+TEMPLATE_LIST_TEST_CASE("State should not be idle while running a job", "[Jobs]", TestClasses) {
     using namespace Slic3r;
     using namespace Slic3r::GUI;
-    BoostThreadWorker worker{std::make_unique<Progress>(), "worker_thread"};
+    TestType worker{std::make_unique<Progress>(), "worker_thread"};
 
     queue_job(worker, [&worker](Job::Ctl &ctl) {
         ctl.call_on_main_thread([&worker] {
@@ -42,11 +54,11 @@ TEST_CASE("State should not be idle while running a job", "[Jobs]") {
     REQUIRE(worker.is_idle());
 }
 
-TEST_CASE("Status messages should be received by the main thread during job execution", "[Jobs]") {
+TEMPLATE_LIST_TEST_CASE("Status messages should be received by the main thread during job execution", "[Jobs]", TestClasses) {
     using namespace Slic3r;
     using namespace Slic3r::GUI;
     auto pri = std::make_shared<Progress>();
-    BoostThreadWorker worker{pri};
+    TestType worker{pri};
 
     queue_job(worker, [](Job::Ctl &ctl){
         for (int s = 0; s <= 100; ++s) {
@@ -60,12 +72,12 @@ TEST_CASE("Status messages should be received by the main thread during job exec
     REQUIRE(pri->statustxt == "Running");
 }
 
-TEST_CASE("Cancellation should be recognized be the worker", "[Jobs]") {
+TEMPLATE_LIST_TEST_CASE("Cancellation should be recognized be the worker", "[Jobs]", TestClasses) {
     using namespace Slic3r;
     using namespace Slic3r::GUI;
 
     auto pri = std::make_shared<Progress>();
-    BoostThreadWorker worker{pri};
+    TestType worker{pri};
 
     queue_job(
         worker,
@@ -88,12 +100,12 @@ TEST_CASE("Cancellation should be recognized be the worker", "[Jobs]") {
     REQUIRE(pri->pr != 100);
 }
 
-TEST_CASE("cancel_all should remove all pending jobs", "[Jobs]") {
+TEMPLATE_LIST_TEST_CASE("cancel_all should remove all pending jobs", "[Jobs]", TestClasses) {
     using namespace Slic3r;
     using namespace Slic3r::GUI;
 
     auto pri = std::make_shared<Progress>();
-    BoostThreadWorker worker{pri};
+    TestType worker{pri};
 
     std::array<bool, 4> jobres = {false, false, false, false};
 
@@ -125,12 +137,12 @@ TEST_CASE("cancel_all should remove all pending jobs", "[Jobs]") {
     REQUIRE(jobres[3] == false);
 }
 
-TEST_CASE("Exception should be properly forwarded to finalize()", "[Jobs]") {
+TEMPLATE_LIST_TEST_CASE("Exception should be properly forwarded to finalize()", "[Jobs]", TestClasses) {
     using namespace Slic3r;
     using namespace Slic3r::GUI;
 
     auto pri = std::make_shared<Progress>();
-    BoostThreadWorker worker{pri};
+    TestType worker{pri};
 
     queue_job(
         worker, [](Job::Ctl &) { throw std::runtime_error("test"); },

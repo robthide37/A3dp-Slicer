@@ -40,6 +40,12 @@ class PlaterWorker: public Worker {
                 {
                     wxWakeUpIdle();
                     ctl.update_status(st, msg);
+
+                    // If the worker is not using additional threads, the UI
+                    // is refreshed with this call. If the worker is running
+                    // in it's own thread, the yield should not have any
+                    // visible effects.
+                    wxYieldIfNeeded();
                 }
 
                 bool was_canceled() const override { return ctl.was_canceled(); }
