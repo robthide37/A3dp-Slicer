@@ -6757,7 +6757,7 @@ void PrintConfigDef::init_sla_params()
     def->enum_labels.push_back(L("Masked CWS"));
     def->enum_labels.push_back(L("Prusa SL1"));
     def->mode = comAdvancedE | comSuSi; // output_format should be preconfigured in profiles;
-    def->set_default_value(new ConfigOptionEnum<OutputFormat>(ofMaskedCWS));
+    def->set_default_value(new ConfigOptionEnum<OutputFormat>(ofSL1));
 
     def = this->add("sla_output_precision", coFloat);
     def->label = L("SLA output precision");
