@@ -51,7 +51,7 @@ use Slic3r::Test;
             ($fill_surfaces = Slic3r::Surface::Collection->new),
         );
         $g->config->apply_dynamic($config);
-        $g->process;
+        $g->process_classic;
         
         is scalar(@$loops),
             scalar(@$expolygons), 'expected number of collections';
