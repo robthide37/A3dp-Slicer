@@ -308,11 +308,11 @@ static const t_config_enum_values s_keys_map_ForwardCompatibilitySubstitutionRul
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule);
 
-static t_config_enum_values s_keys_map_SlicingEngine {
-    { "classic", int(SlicingEngine::Classic) },
-    { "arachne", int(SlicingEngine::Arachne) }
+static t_config_enum_values s_keys_map_PerimeterGeneratorType {
+    { "classic", int(PerimeterGeneratorType::Classic) },
+    { "arachne", int(PerimeterGeneratorType::Arachne) }
 };
-CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SlicingEngine)
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PerimeterGeneratorType)
 
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
@@ -1376,7 +1376,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Don't check crossings for retraction on first layer");
     def->category = OptionCategory::extruders;
     def->tooltip = L("let the retraction happens on the first alyer even if the travel path does not exceed the upper layer's perimeters.");
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("external_infill_margin", coFloatOrPercent);
@@ -5809,19 +5809,19 @@ void PrintConfigDef::init_fff_params()
 
     //// Arachne slicing, put it in alpha order when out of experimental
 
-    def = this->add("slicing_engine", coEnum);
-    def->label = L("Slicing engine");
-    def->category = OptionCategory::advanced;
-    def->tooltip = L("Classic slicing engine produces perimeters with constant extrusion width and for"
+    def = this->add("perimeter_generator", coEnum);
+    def->label = L("Perimeter generator");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Classic perimeter generator produces perimeters with constant extrusion width and for"
         " very thing areas is used gap-fill."
         "Arachne produces perimeters with variable extrusion width.");
-    def->enum_keys_map = &ConfigOptionEnum<SlicingEngine>::get_enum_values();
+    def->enum_keys_map = &ConfigOptionEnum<PerimeterGeneratorType>::get_enum_values();
     def->enum_values.push_back("classic");
     def->enum_values.push_back("arachne");
     def->enum_labels.push_back(L("Classic"));
     def->enum_labels.push_back(L("Arachne"));
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionEnum<SlicingEngine>(SlicingEngine::Classic));
+    def->mode = comAdvancedE | comPrusa;
+    def->set_default_value(new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Arachne));
 
     def = this->add("wall_transition_length", coFloat);
     def->label = L("Wall Transition Length");
@@ -5829,7 +5829,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("When transitioning between different numbers of walls as the part becomes"
         "thinner, a certain amount of space is allotted to split or join the wall lines.");
     def->sidetext = L("mm");
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(0.4));
 
@@ -5844,7 +5844,7 @@ void PrintConfigDef::init_fff_params()
                        "under- or overextrusion problems."
                        "If expressed as percentage (for example 25%), it will be computed over nozzle diameter.");
     def->sidetext = L("mm");
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->min = 0;
     def->set_default_value(new ConfigOptionFloatOrPercent(25, true));
 
@@ -5856,7 +5856,7 @@ void PrintConfigDef::init_fff_params()
                        "printed in the center to fill the remaining space. Reducing this setting reduces "
                        "the number and length of these center walls, but may leave gaps or overextrude.");
     def->sidetext = L("°");
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->min = 1.;
     def->max = 59.;
     def->set_default_value(new ConfigOptionFloat(10.));
@@ -5866,7 +5866,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::advanced;
     def->tooltip = L("The number of walls, counted from the center, over which the variation needs to be "
         "spread. Lower values mean that the outer walls don't change in width.");
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->min = 1;
     def->set_default_value(new ConfigOptionInt(1));
 
@@ -5880,7 +5880,7 @@ void PrintConfigDef::init_fff_params()
         "between two outer edges of the shape, even if there actually is fill or (other) skin in "
         "the print instead of wall.");
     def->sidetext = L("%");
-    def->mode = comExpert;
+    def->mode = comAdvancedE | comPrusa;
     def->min = 1;
     def->max = 99;
     def->set_default_value(new ConfigOptionPercent(50));
@@ -5895,7 +5895,7 @@ void PrintConfigDef::init_fff_params()
         "object between two outer edges of the shape, even if there actually is fill or (other) "
         "skin in the print instead of wall.");
     def->sidetext = L("%");
-    def->mode = comExpert;
+    def->mode = comAdvancedE | comPrusa;
     def->min = 1;
     def->max = 99;
     def->set_default_value(new ConfigOptionPercent(75));
@@ -5907,7 +5907,7 @@ void PrintConfigDef::init_fff_params()
         "not be printed, while features thicker than the Minimum Feature Size will be widened to "
         "the Minimum Wall Line Width.");
     def->sidetext = L("mm");
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(0.1));
 
@@ -5919,7 +5919,7 @@ void PrintConfigDef::init_fff_params()
                        " the wall will become as thick as the feature itself. "
                        "If expressed as percentage (for example 85%), it will be computed over nozzle diameter.");
     def->sidetext = L("mm or %");
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->min = 0;
     def->set_default_value(new ConfigOptionFloatOrPercent(85, true));
 

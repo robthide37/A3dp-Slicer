@@ -249,7 +249,7 @@ enum DraftShield {
     dsEnabled,
 };
 
-enum class SlicingEngine
+enum class PerimeterGeneratorType
 {
     // Classic perimeter generator using Clipper offsets with constant extrusion width.
     Classic,
@@ -302,7 +302,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ZLiftTop)
-CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SlicingEngine)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -719,6 +719,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                mmu_segmented_region_max_width))
     ((ConfigOptionFloat,                model_precision))
     ((ConfigOptionPercent,              perimeter_bonding))
+    ((ConfigOptionEnum<PerimeterGeneratorType>, perimeter_generator))
     ((ConfigOptionFloat,                raft_contact_distance))
     ((ConfigOptionFloat,                raft_expansion))
     ((ConfigOptionPercent,              raft_first_layer_density))
@@ -730,7 +731,6 @@ PRINT_CONFIG_CLASS_DEFINE(
 //    ((ConfigOptionFloat,                seam_preferred_direction))
 //    ((ConfigOptionFloat,                seam_preferred_direction_jitter))
     ((ConfigOptionFloat,                slice_closing_radius))
-    ((ConfigOptionEnum<SlicingEngine>,  slicing_engine))
     ((ConfigOptionEnum<SlicingMode>,    slicing_mode))
     ((ConfigOptionBool,                 support_material))
     ((ConfigOptionFloat,                wall_transition_length))

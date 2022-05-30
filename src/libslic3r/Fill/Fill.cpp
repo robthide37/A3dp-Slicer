@@ -423,7 +423,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
     std::vector<SurfaceFill>  surface_fills  = group_fills(*this);
     const Slic3r::BoundingBox bbox           = this->object()->bounding_box();
     //const auto                resolution     = this->object()->print()->config().gcode_resolution.value;
-    const auto                slicing_engine = this->object()->config().slicing_engine;
+    const auto                perimeter_generator = this->object()->config().perimeter_generator;
 
     std::sort(surface_fills.begin(), surface_fills.end(), [](SurfaceFill& s1, SurfaceFill& s2) {
         if (s1.region_id == s2.region_id)
@@ -474,7 +474,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         f->angle    = surface_fill.params.angle;
         f->adapt_fill_octree = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
 
-        if (object()->config().slicing_engine.value == SlicingEngine::Arachne && surface_fill.params.pattern == ipConcentric) {
+        if (perimeter_generator.value == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) {
             FillConcentric *fill_concentric = dynamic_cast<FillConcentric *>(f.get());
             assert(fill_concentric != nullptr);
             fill_concentric->print_config        = &this->object()->print()->config();
@@ -513,10 +513,10 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         //FillParams params;
         //params.density         = float(0.01 * surface_fill.params.density);
         //params.dont_adjust     = false; //surface_fill.params.dont_adjust; // false
-        //params.anchor_length = surface_fill.params.anchor_length;
+        //params.anchor_length   = surface_fill.params.anchor_length;
         //params.anchor_length_max = surface_fill.params.anchor_length_max;
         //params.resolution        = resolution;
-        surface_fill.params.use_arachne       = slicing_engine == SlicingEngine::Arachne && surface_fill.params.pattern == ipConcentric;
+        surface_fill.params.use_arachne       = perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric;
 
         if (using_internal_flow) {
             // if we used the internal flow we're not doing a solid infill
