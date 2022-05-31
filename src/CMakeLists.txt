@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 project(PrusaSlicer-native)
 
+add_subdirectory(mesh_fix)
 add_subdirectory(build-utils)
 add_subdirectory(admesh)
 add_subdirectory(avrdude)

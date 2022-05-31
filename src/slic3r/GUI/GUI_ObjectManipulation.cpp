@@ -130,7 +130,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
                 if (m_fix_throught_netfab_bitmap->GetBitmap().GetRefData() == wxNullBitmap.GetRefData())
                     return;
 
-                wxGetApp().obj_list()->fix_through_netfabb();
+                wxGetApp().obj_list()->repair_mesh(ObjectList::rmaNetfabb);
                 update_warning_icon_state(wxGetApp().obj_list()->get_mesh_errors_info());
             });
 
