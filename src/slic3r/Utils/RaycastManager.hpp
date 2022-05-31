@@ -17,13 +17,15 @@ namespace Slic3r::GUI{
 /// </summary>
 class RaycastManager
 {
-    //               ModelVolume
-    std::map<size_t, std::unique_ptr<MeshRaycaster>> m_raycasters;
+    //                   ModelVolume.id
+    using Raycaster = std::pair<size_t, std::unique_ptr<MeshRaycaster> >;
+    std::vector<Raycaster> m_raycasters;
 
     // Key for transformation consist of unique volume and instance
     //                 ModelInstance, ModelVolume
     using TrKey = std::pair<size_t, size_t>;
-    std::map<TrKey, Transform3d> m_transformations;
+    using TrItem = std::pair<TrKey, Transform3d>;
+    std::vector<TrItem> m_transformations;
 
     // should contain shared pointer to camera but it is not shared pointer so it need it every time when casts rays
 
@@ -31,12 +33,6 @@ public:
     class ISkip{
     public:
         virtual ~ISkip() = default;
-        /// <summary>
-        /// Condition to not process specific transformation
-        /// </summary>
-        /// <param name="key">Transformation key</param>
-        /// <returns>True on skip otherwise false</returns>
-        //virtual bool skip(const TrKey &key) const { return false; }
 
         /// <summary>
         /// Condition to not process model volume
@@ -52,11 +48,8 @@ public:
     /// Detection of removed instance
     /// Detection of removed volume
     /// </summary>
+    /// <param name="object">Model representation</param>
     /// <param name="skip">Condifiton for skip actualization</param>
-    /// <param name="objects">Model representation</param>
-    void actualize(const ModelObjectPtrs &objects,
-                   const ISkip *          skip = nullptr);
-
     void actualize(const ModelObject *object, const ISkip *skip = nullptr);
 
     // TODO: it is more general object move outside of this class

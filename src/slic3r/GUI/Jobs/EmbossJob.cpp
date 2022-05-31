@@ -497,7 +497,7 @@ std::unique_ptr<Emboss::IProject3f> priv::create_emboss_projection(
     const float surface_offset = 1e-3f; // [in mm]
     float 
         front_move = (is_outside) ? emboss : surface_offset,
-        back_move  = -(is_outside) ? surface_offset : emboss;    
+        back_move  = -((is_outside) ? surface_offset : emboss);    
     its_transform(cut, tr.pretranslate(Vec3d(0., 0., front_move)));    
     Vec3f from_front_to_back(0.f, 0.f, back_move - front_move);
     return std::make_unique<Emboss::OrthoProject3f>(from_front_to_back);
