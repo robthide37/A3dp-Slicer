@@ -840,7 +840,9 @@ GLGizmoRotate3D::GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_fil
         GLGizmoRotate(parent, GLGizmoRotate::X), 
         GLGizmoRotate(parent, GLGizmoRotate::Y),
         GLGizmoRotate(parent, GLGizmoRotate::Z) })
-{}
+{
+    load_rotoptimize_state();
+}
 
 bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
 {

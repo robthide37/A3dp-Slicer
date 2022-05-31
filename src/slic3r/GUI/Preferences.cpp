@@ -79,9 +79,11 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 	m_custom_toolbar_size		= atoi(get_app_config()->get("custom_toolbar_size").c_str());
 	m_use_custom_toolbar_size	= get_app_config()->get("use_custom_toolbar_size") == "1";
 
-	// update colors for color pickers
-	update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
-	update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
+	if (wxGetApp().is_editor()) {
+		// update colors for color pickers
+		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
+		update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
+	}
 
 	this->ShowModal();
 }
@@ -230,23 +232,16 @@ void PreferencesDialog::build()
 			app_config->get("export_sources_full_pathnames") == "1");
 
 #ifdef _WIN32
-#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
-		// file association is not possible anymore starting with Win 8
-		if (wxPlatformInfo::Get().GetOSMajorVersion() < 8) {
-#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
-			// Please keep in sync with ConfigWizard
-			append_bool_option(m_optgroup_general, "associate_3mf",
-				L("Associate .3mf files to PrusaSlicer"),
-				L("If enabled, sets PrusaSlicer as default application to open .3mf files."),
-				app_config->get("associate_3mf") == "1");
+		// Please keep in sync with ConfigWizard
+		append_bool_option(m_optgroup_general, "associate_3mf",
+			L("Associate .3mf files to PrusaSlicer"),
+			L("If enabled, sets PrusaSlicer as default application to open .3mf files."),
+			app_config->get("associate_3mf") == "1");
 
-			append_bool_option(m_optgroup_general, "associate_stl",
-				L("Associate .stl files to PrusaSlicer"),
-				L("If enabled, sets PrusaSlicer as default application to open .stl files."),
-				app_config->get("associate_stl") == "1");
-#if ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
-		}
-#endif // ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER
+		append_bool_option(m_optgroup_general, "associate_stl",
+			L("Associate .stl files to PrusaSlicer"),
+			L("If enabled, sets PrusaSlicer as default application to open .stl files."),
+			app_config->get("associate_stl") == "1");
 #endif // _WIN32
 
 		m_optgroup_general->append_separator();

@@ -178,6 +178,12 @@ private:
 
 ENABLE_ENUM_BITMASK_OPERATORS(PresetBundle::LoadConfigBundleAttribute)
 
+#if ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
+// Copies bed texture and model files to 'data_dir()\printer' folder, if needed
+// and updates the config accordingly
+extern void copy_bed_model_and_texture_if_needed(DynamicPrintConfig& config);
+#endif // ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
+
 } // namespace Slic3r
 
 #endif /* slic3r_PresetBundle_hpp_ */

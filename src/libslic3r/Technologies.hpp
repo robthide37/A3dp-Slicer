@@ -91,8 +91,7 @@
 #define ENABLE_USED_FILAMENT_POST_PROCESS (1 && ENABLE_2_5_0_ALPHA1)
 // Enable gizmo grabbers to share common models
 #define ENABLE_GIZMO_GRABBER_REFACTOR (1 && ENABLE_2_5_0_ALPHA1)
-// Disable association to 3mf and stl files if the application is run on Windows 8 or later
-#define ENABLE_REMOVE_ASSOCIATION_TO_FILE_FOR_WINDOWS_8_AND_LATER (1 && ENABLE_2_5_0_ALPHA1)
-
+// Enable copy of custom bed model and texture
+#define ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE (1 && ENABLE_2_5_0_ALPHA1)
 
 #endif // _prusaslicer_technologies_h_

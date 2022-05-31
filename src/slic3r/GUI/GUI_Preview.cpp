@@ -983,10 +983,11 @@ void Preview::load_print_as_fff(bool keep_z_range)
         if (gcode_preview_data_valid) {
             // Load the real G-code preview.
             m_canvas->load_gcode_preview(*m_gcode_result, colors);
-            m_left_sizer->Show(m_bottom_toolbar_panel);
             m_left_sizer->Layout();
             Refresh();
             zs = m_canvas->get_gcode_layers_zs();
+            if (!zs.empty())
+                m_left_sizer->Show(m_bottom_toolbar_panel);
             m_loaded = true;
         }
         else if (wxGetApp().is_editor()) {

@@ -180,6 +180,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/Worker.hpp
     GUI/Jobs/BoostThreadWorker.hpp
     GUI/Jobs/BoostThreadWorker.cpp
+    GUI/Jobs/UIThreadWorker.hpp
     GUI/Jobs/BusyCursorJob.hpp
     GUI/Jobs/PlaterWorker.hpp
     GUI/Jobs/ArrangeJob.hpp
@@ -268,6 +269,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/TCPConsole.hpp
     Utils/MKS.cpp
     Utils/MKS.hpp
+    Utils/WinRegistry.cpp
+    Utils/WinRegistry.hpp
     Utils/WxFontUtils.cpp
     Utils/WxFontUtils.hpp
 )
