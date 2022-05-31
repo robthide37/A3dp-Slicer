@@ -455,6 +455,9 @@ void removeColinearEdges(Polygons &thiss, const double max_deviation_angle = 0.0
 
 const std::vector<VariableWidthLines> &WallToolPaths::generate()
 {
+    if (this->inset_count < 1)
+        return toolpaths;
+
     const coord_t smallest_segment = Slic3r::Arachne::meshfix_maximum_resolution;
     const coord_t allowed_distance = Slic3r::Arachne::meshfix_maximum_deviation;
     const coord_t epsilon_offset = (allowed_distance / 2) - 1;
