@@ -116,16 +116,8 @@ void PerimeterGenerator::process_arachne()
         ExPolygons last        = offset_ex(surface.expolygon.simplify_p(scaled_resolution), - float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
         Polygons   last_p      = to_polygons(last);
 
-        coord_t bead_width_0 = ext_perimeter_spacing;
-        coord_t bead_width_x = perimeter_spacing;
-        coord_t wall_0_inset = 0;
-
-        Arachne::WallToolPaths wallToolPaths(last_p, bead_width_0, bead_width_x, coord_t(loop_number + 1), wall_0_inset, *this->object_config, *this->print_config);
-        wallToolPaths.generate();
-
+        Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, *this->object_config, *this->print_config);
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
-        if (perimeters.empty())
-            continue;
 
         int start_perimeter = int(perimeters.size()) - 1;
         int end_perimeter   = -1;
@@ -160,7 +152,7 @@ void PerimeterGenerator::process_arachne()
         }
 
         std::vector<bool> processed(all_extrusions.size(), false);                // Indicate that the extrusion was already processed.
-        Point             current_position = all_extrusions.front()->junctions.front().p; // Some starting position.
+        Point             current_position = all_extrusions.empty() ? Point::Zero() : all_extrusions.front()->junctions.front().p; // Some starting position.
         std::vector<const Arachne::ExtrusionLine *> ordered_extrusions;                   // To store our result in. At the end we'll std::swap.
         ordered_extrusions.reserve(all_extrusions.size());
 
