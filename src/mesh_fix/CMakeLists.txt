@@ -19,7 +19,7 @@ set(SOURCES
 		src/Kernel/graph.cpp
 		src/Kernel/point.cpp
 		src/Kernel/jqsort.cpp
-		src/MeshFix/meshfix.cpp
+#		src/MeshFix/meshfix.cpp
 )
 
 ################################################################################

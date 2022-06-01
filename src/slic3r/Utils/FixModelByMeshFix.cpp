@@ -35,7 +35,7 @@ namespace Slic3r {
 class RepairCanceledException: public std::exception {
 public:
     const char* what() const throw () {
-        return "Model repair has been canceled";
+        return "Model repair has been cancelled";
     }
 };
 
@@ -281,50 +281,52 @@ bool fix_model_by_meshfix(ModelObject &model_object, int volume_idx, wxProgressD
                     meshes_repaired.reserve(volumes.size());
                     for (ModelVolume *mv : volumes) {
                         std::vector<indexed_triangle_set> parts = its_split(mv->mesh().its);
+                        unsigned percent_per_part = 95 / parts.size();
                         for (size_t part_idx = 0; part_idx < parts.size(); ++part_idx) {
+                            unsigned progress_part_base = part_idx * percent_per_part;
 
                             detail::Basic_TMesh_Adapter tin { };
-                            on_progress(L("Loading source model"), 0);
+                            on_progress(L("Loading source model"), progress_part_base);
                             if (canceled)
                                 throw RepairCanceledException();
                             tin.load_indexed_triangle_set(parts[part_idx]);
                             tin.boundaries();
-                            on_progress(L("Join closest components"), 10);
+                            on_progress(L("Join closest components"), unsigned(progress_part_base + 0.1 * percent_per_part));
                             if (canceled)
                                 throw RepairCanceledException();
                             joinClosestComponents(&tin);
                             tin.deselectTriangles();
                             tin.boundaries();
                             // Keep only the largest component (i.e. with most triangles)
-                            on_progress(L("Remove smallest components"), 20);
+                            on_progress(L("Remove smallest components"), unsigned(progress_part_base + 0.2 * percent_per_part));
                             if (canceled)
                                 throw RepairCanceledException();
                             tin.removeSmallestComponents();
 
                             // Fill holes
-                            on_progress(L("Check holes"), 30);
+                            on_progress(L("Check holes"), unsigned(progress_part_base + 0.3 * percent_per_part));
                             if (canceled)
                                 throw RepairCanceledException();
                             if (tin.boundaries()) {
-                                on_progress(L("Patch small holes"), 40);
+                                on_progress(L("Patch small holes"), unsigned(progress_part_base + 0.4 * percent_per_part));
                                 if (canceled)
                                     throw RepairCanceledException();
                                 tin.fillSmallBoundaries(0, true);
                             }
 
-                            on_progress(L("Geometry check"), 50);
+                            on_progress(L("Geometry check"), unsigned(progress_part_base + 0.5 * percent_per_part));
                             if (canceled)
                                 throw RepairCanceledException();
                             // Run geometry correction
                             if (!tin.boundaries()) {
                                 int iteration = 0;
-                                on_progress(L("Iterative geometry correction"), 55);
+                                on_progress(L("Start iterative correction"), unsigned(progress_part_base + 0.55 * percent_per_part));
                                 tin.deselectTriangles();
                                 tin.invertSelection();
                                 bool fixed = false;
                                 while (iteration < 10 && !fixed) { //default constants taken from TMesh library
                                     fixed = tin.meshclean_single_iteration(3, canceled);
-                                    on_progress(L("Fixing geometry"), std::min(95, 60 + iteration * 8)); // majority of objects should finish in 4 iterations
+                                    on_progress(L("Fixing geometry"), progress_part_base + percent_per_part * std::min(0.9, 0.6 + iteration*0.08)); // majority of objects should finish in 4 iterations
                                     if (canceled)
                                         throw RepairCanceledException();
                                     iteration++;
