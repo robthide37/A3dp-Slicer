@@ -83,9 +83,10 @@ void PerimeterGenerator::process_arachne()
     coord_t perimeter_spacing     = this->perimeter_flow.scaled_spacing();
 
     // external perimeters
-    m_ext_mm3_per_mm           	  = this->ext_perimeter_flow.mm3_per_mm();
-    coord_t ext_perimeter_width   = this->ext_perimeter_flow.scaled_width();
-    coord_t ext_perimeter_spacing = this->ext_perimeter_flow.scaled_spacing();
+    m_ext_mm3_per_mm           	   = this->ext_perimeter_flow.mm3_per_mm();
+    coord_t ext_perimeter_width    = this->ext_perimeter_flow.scaled_width();
+    coord_t ext_perimeter_spacing  = this->ext_perimeter_flow.scaled_spacing();
+    coord_t ext_perimeter_spacing2 = scaled<coord_t>(0.5f * (this->ext_perimeter_flow.spacing() + this->perimeter_flow.spacing()));
 
     // overhang perimeters
     m_mm3_per_mm_overhang         = this->overhang_flow.mm3_per_mm();
@@ -243,13 +244,14 @@ void PerimeterGenerator::process_arachne()
         for (ExPolygon &ex : infill_contour)
             ex.simplify_p(scaled_resolution, &pp);
         // collapse too narrow infill areas
-        auto min_perimeter_infill_spacing = coord_t(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE));
+        const coord_t min_perimeter_infill_spacing = coord_t(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE));
+        const coord_t spacing                      = (perimeters.size() == 1) ? ext_perimeter_spacing2 : perimeter_spacing;
         // append infill areas to fill_surfaces
         this->fill_surfaces->append(
-            offset_ex(offset2_ex(
-                          union_ex(pp),
-                          float(-min_perimeter_infill_spacing / 2.),
-                          float(min_perimeter_infill_spacing / 2.)), float(inset)),
+            offset2_ex(
+                union_ex(pp),
+                float(- min_perimeter_infill_spacing / 2. - spacing / 2.),
+                float(inset + min_perimeter_infill_spacing / 2. + spacing / 2.)),
             stPosInternal | stDensSparse);
     }
 }
