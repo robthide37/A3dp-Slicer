@@ -727,11 +727,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         if (is_world_coordinates()) {
             const Geometry::Transformation trafo(volume->world_matrix());
 
-#if ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET
-            const Vec3d offset = trafo.get_offset() - volume->get_instance_offset();
-#else
             const Vec3d& offset = trafo.get_offset();
-#endif // ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET
 
             m_new_position = offset;
             m_new_rotate_label_string = L("Rotate");
