@@ -122,9 +122,9 @@ private:
     // Non-owning pointers to the reset buttons, so we can hide and show them.
     ScalableButton* m_reset_scale_button{ nullptr };
     ScalableButton* m_reset_rotation_button{ nullptr };
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     ScalableButton* m_reset_skew_button{ nullptr };
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
     ScalableButton* m_drop_to_bed_button{ nullptr };
 
     wxCheckBox*     m_check_inch {nullptr};
@@ -179,9 +179,9 @@ private:
     wxFlexGridSizer* m_main_grid_sizer;
     wxFlexGridSizer* m_labels_grid_sizer;
 
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     wxStaticText* m_skew_label{ nullptr };
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
 
     // sizers, used for msw_rescale
     wxBoxSizer*     m_word_local_combo_sizer;

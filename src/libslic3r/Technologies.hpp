@@ -71,8 +71,6 @@
 #define ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC (1 && ENABLE_2_5_0_ALPHA1)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
-// Enable implementation of Geometry::Transformation using matrices only
-#define ENABLE_TRANSFORMATIONS_BY_MATRICES (1 && ENABLE_WORLD_COORDINATE)
 // Enable modified camera control using mouse
 #define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
 // Enable modified rectangle selection

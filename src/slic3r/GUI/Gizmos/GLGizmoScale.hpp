@@ -67,11 +67,11 @@ public:
     void set_snap_step(double step) { m_snap_step = step; }
 
     const Vec3d& get_scale() const { return m_scale; }
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     void set_scale(const Vec3d& scale) { m_starting.scale = scale; m_scale = scale; m_offset = Vec3d::Zero(); }
 #else
     void set_scale(const Vec3d& scale) { m_starting.scale = scale; m_scale = scale; }
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
     const Vec3d& get_starting_scale() const { return m_starting.scale; }

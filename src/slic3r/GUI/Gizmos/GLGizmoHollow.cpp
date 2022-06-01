@@ -121,11 +121,11 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
     Geometry::Transformation trafo =  vol->get_instance_transformation() * vol->get_volume_transformation();
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_scaling_factor_matrix().inverse();
 #else
     const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
     const Transform3d instance_matrix = Geometry::translation_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * trafo.get_matrix();
 
     const Camera& camera = wxGetApp().plater()->get_camera();

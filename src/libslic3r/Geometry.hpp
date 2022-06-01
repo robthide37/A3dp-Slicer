@@ -381,7 +381,7 @@ Vec3d extract_euler_angles(const Transform3d& transform);
 
 class Transformation
 {
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     Transform3d m_matrix{ Transform3d::Identity() };
 #else
     struct Flags
@@ -403,47 +403,43 @@ class Transformation
     mutable Transform3d m_matrix{ Transform3d::Identity() };
     mutable Flags m_flags;
     mutable bool m_dirty{ false };
-#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
 
 public:
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     Transformation() = default;
-    explicit Transformation(const Transform3d& transform) : m_matrix(transform) {}
-#else
-    Transformation();
-    explicit Transformation(const Transform3d& transform);
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+    explicit Transformation(const Transform3d & transform) : m_matrix(transform) {}
 
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
     Vec3d get_offset() const { return m_matrix.translation(); }
     double get_offset(Axis axis) const { return get_offset()[axis]; }
 
     Transform3d get_offset_matrix() const;
 
-    void set_offset(const Vec3d& offset) { m_matrix.translation() = offset; }
+    void set_offset(const Vec3d & offset) { m_matrix.translation() = offset; }
     void set_offset(Axis axis, double offset) { m_matrix.translation()[axis] = offset; }
-#else
-    const Vec3d& get_offset() const { return m_offset; }
-    double get_offset(Axis axis) const { return m_offset(axis); }
 
-    void set_offset(const Vec3d& offset);
-    void set_offset(Axis axis, double offset);
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
     Vec3d get_rotation() const;
     double get_rotation(Axis axis) const { return get_rotation()[axis]; }
 
     Transform3d get_rotation_matrix() const;
 #else
+    Transformation();
+    explicit Transformation(const Transform3d & transform);
+
+    const Vec3d& get_offset() const { return m_offset; }
+    double get_offset(Axis axis) const { return m_offset(axis); }
+
+    void set_offset(const Vec3d & offset);
+    void set_offset(Axis axis, double offset);
+
     const Vec3d& get_rotation() const { return m_rotation; }
     double get_rotation(Axis axis) const { return m_rotation(axis); }
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
 
     void set_rotation(const Vec3d& rotation);
     void set_rotation(Axis axis, double rotation);
 
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     Vec3d get_scaling_factor() const;
     double get_scaling_factor(Axis axis) const { return get_scaling_factor()[axis]; }
 
@@ -456,12 +452,12 @@ public:
 #else
     const Vec3d& get_scaling_factor() const { return m_scaling_factor; }
     double get_scaling_factor(Axis axis) const { return m_scaling_factor(axis); }
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
 
     void set_scaling_factor(const Vec3d& scaling_factor);
     void set_scaling_factor(Axis axis, double scaling_factor);
 
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     Vec3d get_mirror() const;
     double get_mirror(Axis axis) const { return get_mirror()[axis]; }
 
@@ -477,21 +473,19 @@ public:
     const Vec3d& get_mirror() const { return m_mirror; }
     double get_mirror(Axis axis) const { return m_mirror(axis); }
     bool is_left_handed() const { return m_mirror.x() * m_mirror.y() * m_mirror.z() < 0.; }
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
 
     void set_mirror(const Vec3d& mirror);
     void set_mirror(Axis axis, double mirror);
 
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     bool has_skew() const;
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
-
-#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
+#else
     void set_from_transform(const Transform3d& transform);
-#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
 
     void reset();
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     void reset_offset() { set_offset(Vec3d::Zero()); }
     void reset_rotation() { set_rotation(Vec3d::Zero()); }
     void reset_scaling_factor() { set_scaling_factor(Vec3d::Ones()); }
@@ -505,20 +499,20 @@ public:
     void set_matrix(const Transform3d& transform) { m_matrix = transform; }
 #else
     const Transform3d& get_matrix(bool dont_translate = false, bool dont_rotate = false, bool dont_scale = false, bool dont_mirror = false) const;
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
 
     Transformation operator * (const Transformation& other) const;
 
-#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if !ENABLE_WORLD_COORDINATE
     // Find volume transformation, so that the chained (instance_trafo * volume_trafo) will be as close to identity
     // as possible in least squares norm in regard to the 8 corners of bbox.
     // Bounding box is expected to be centered around zero in all axes.
     static Transformation volume_to_bed_transformation(const Transformation& instance_transformation, const BoundingBoxf3& bbox);
-#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // !ENABLE_WORLD_COORDINATE
 
 private:
     friend class cereal::access;
-#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+#if ENABLE_WORLD_COORDINATE
     template<class Archive> void serialize(Archive& ar) { ar(m_matrix); }
     explicit Transformation(int) {}
     template <class Archive> static void load_and_construct(Archive& ar, cereal::construct<Transformation>& construct)
@@ -536,7 +530,7 @@ private:
         construct(1);
         ar(construct.ptr()->m_offset, construct.ptr()->m_rotation, construct.ptr()->m_scaling_factor, construct.ptr()->m_mirror);
     }
-#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
+#endif // ENABLE_WORLD_COORDINATE
 };
 
 // For parsing a transformation matrix from 3MF / AMF.
