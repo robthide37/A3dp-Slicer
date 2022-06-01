@@ -195,6 +195,12 @@ static const t_config_enum_values s_keys_map_ForwardCompatibilitySubstitutionRul
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
 
+static t_config_enum_values s_keys_map_PerimeterGeneratorType {
+    { "classic", int(PerimeterGeneratorType::Classic) },
+    { "arachne", int(PerimeterGeneratorType::Arachne) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PerimeterGeneratorType)
+
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options)
@@ -3037,6 +3043,120 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("perimeter_generator", coEnum);
+    def->label = L("Perimeter generator");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Classic perimeter generator produces perimeters with constant extrusion width and for"
+                      " very thing areas is used gap-fill."
+                      "Arachne produces perimeters with variable extrusion width.");
+    def->enum_keys_map = &ConfigOptionEnum<PerimeterGeneratorType>::get_enum_values();
+    def->enum_values.push_back("classic");
+    def->enum_values.push_back("arachne");
+    def->enum_labels.push_back(L("Classic"));
+    def->enum_labels.push_back(L("Arachne"));
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Arachne));
+
+    def = this->add("wall_transition_length", coFloat);
+    def->label = L("Wall Transition Length");
+    def->category = L("Advanced");
+    def->tooltip  = L("When transitioning between different numbers of walls as the part becomes"
+                       "thinner, a certain amount of space is allotted to split or join the wall lines.");
+    def->sidetext = L("mm");
+    def->mode = comExpert;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0.4));
+
+    def = this->add("wall_transition_filter_deviation", coFloatOrPercent);
+    def->label = L("Wall Transitioning Filter Margin");
+    def->category = L("Advanced");
+    def->tooltip  = L("Prevent transitioning back and forth between one extra wall and one less. This "
+                       "margin extends the range of line widths which follow to [Minimum Wall Line "
+                       "Width - Margin, 2 * Minimum Wall Line Width + Margin]. Increasing this margin "
+                       "reduces the number of transitions, which reduces the number of extrusion "
+                       "starts/stops and travel time. However, large line width variation can lead to "
+                       "under- or overextrusion problems."
+                       "If expressed as percentage (for example 25%), it will be computed over nozzle diameter.");
+    def->sidetext = L("mm");
+    def->mode = comExpert;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloatOrPercent(25, true));
+
+    def = this->add("wall_transition_angle", coFloat);
+    def->label = L("Wall Transitioning Threshold Angle");
+    def->category = L("Advanced");
+    def->tooltip  = L("When to create transitions between even and odd numbers of walls. A wedge shape with"
+                       " an angle greater than this setting will not have transitions and no walls will be "
+                       "printed in the center to fill the remaining space. Reducing this setting reduces "
+                       "the number and length of these center walls, but may leave gaps or overextrude.");
+    def->sidetext = L("°");
+    def->mode = comExpert;
+    def->min = 1.;
+    def->max = 59.;
+    def->set_default_value(new ConfigOptionFloat(10.));
+
+    def = this->add("wall_distribution_count", coInt);
+    def->label = L("Wall Distribution Count");
+    def->category = L("Advanced");
+    def->tooltip  = L("The number of walls, counted from the center, over which the variation needs to be "
+                       "spread. Lower values mean that the outer walls don't change in width.");
+    def->mode = comExpert;
+    def->min = 1;
+    def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("wall_split_middle_threshold", coPercent);
+    def->label = L("Split Middle Line Threshold");
+    def->category = L("Advanced");
+    def->tooltip  = L("The smallest line width, as a factor of the normal line width, above which the middle "
+                       "line (if there is one) will be split into two. Reduce this setting to use more, thinner "
+                       "lines. Increase to use fewer, wider lines. Note that this applies -as if- the entire "
+                       "shape should be filled with wall, so the middle here refers to the middle of the object "
+                       "between two outer edges of the shape, even if there actually is fill or (other) skin in "
+                       "the print instead of wall.");
+    def->sidetext = L("%");
+    def->mode = comAdvanced;
+    def->min = 1;
+    def->max = 99;
+    def->set_default_value(new ConfigOptionPercent(50));
+
+    def = this->add("wall_add_middle_threshold", coPercent);
+    def->label = L("Add Middle Line Threshold");
+    def->category = L("Advanced");
+    def->tooltip  = L("The smallest line width, as a factor of the normal line width, above which a middle "
+                       "line (if there wasn't one already) will be added. Reduce this setting to use more, "
+                       "thinner lines. Increase to use fewer, wider lines. Note that this applies -as if- the "
+                       "entire shape should be filled with wall, so the middle here refers to the middle of the "
+                       "object between two outer edges of the shape, even if there actually is fill or (other) "
+                       "skin in the print instead of wall.");
+    def->sidetext = L("%");
+    def->mode = comAdvanced;
+    def->min = 1;
+    def->max = 99;
+    def->set_default_value(new ConfigOptionPercent(75));
+
+    def = this->add("min_feature_size", coFloat);
+    def->label = L("Minimum Feature Size");
+    def->category = L("Advanced");
+    def->tooltip  = L("Minimum thickness of thin features. Model features that are thinner than this value will "
+                       "not be printed, while features thicker than the Minimum Feature Size will be widened to "
+                       "the Minimum Wall Line Width.");
+    def->sidetext = L("mm");
+    def->mode = comExpert;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0.1));
+
+    def = this->add("min_bead_width", coFloatOrPercent);
+    def->label = L("Minimum Wall Line Width");
+    def->category = L("Advanced");
+    def->tooltip  = L("Width of the wall that will replace thin features (according to the Minimum Feature Size) "
+                       "of the model. If the Minimum Wall Line Width is thinner than the thickness of the feature,"
+                       " the wall will become as thick as the feature itself. "
+                       "If expressed as percentage (for example 85%), it will be computed over nozzle diameter.");
+    def->sidetext = L("mm or %");
+    def->mode = comExpert;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloatOrPercent(85, true));
+
     // Declare retract values for filament profile, overriding the printer's extruder profile.
     for (const char *opt_key : {
         // floats
@@ -3968,6 +4088,11 @@ void DynamicPrintConfig::normalize_fdm()
     if (auto *opt_gcode_resolution = this->opt<ConfigOptionFloat>("gcode_resolution", false); opt_gcode_resolution)
         // Resolution will be above 1um.
         opt_gcode_resolution->value = std::max(opt_gcode_resolution->value, 0.001);
+
+    if (auto *opt_min_bead_width = this->opt<ConfigOptionFloat>("min_bead_width", false); opt_min_bead_width)
+        opt_min_bead_width->value = std::max(opt_min_bead_width->value, 0.001);
+    if (auto *opt_wall_transition_length = this->opt<ConfigOptionFloat>("wall_transition_length", false); opt_wall_transition_length)
+        opt_wall_transition_length->value = std::max(opt_wall_transition_length->value, 0.001);
 }
 
 void  handle_legacy_sla(DynamicPrintConfig &config)

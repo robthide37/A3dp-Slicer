@@ -2,13 +2,15 @@
 #include "ClipperUtils.hpp"
 #include "ExtrusionEntityCollection.hpp"
 #include "ShortestPath.hpp"
+#include "Arachne/WallToolPaths.hpp"
 
 #include <cmath>
 #include <cassert>
+#include <stack>
 
 namespace Slic3r {
 
-static ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance)
+ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance, const float merge_tolerance)
 {
     ExtrusionPaths paths;
     ExtrusionPath path(role);
@@ -22,7 +24,7 @@ static ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thi
         
         double thickness_delta = fabs(line.a_width - line.b_width);
         if (thickness_delta > tolerance) {
-            const unsigned int segments = (unsigned int)ceil(thickness_delta / tolerance);
+            const auto segments = (unsigned int)ceil(thickness_delta / tolerance);
             const coordf_t seg_len = line_len / segments;
             Points pp;
             std::vector<coordf_t> width;
@@ -71,7 +73,7 @@ static ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thi
             path.height      = new_flow.height();
         } else {
             thickness_delta = fabs(scale_(flow.width()) - w);
-            if (thickness_delta <= tolerance) {
+            if (thickness_delta <= merge_tolerance) {
                 // the width difference between this line and the current flow width is 
                 // within the accepted tolerance
                 path.polyline.append(line.b);
@@ -95,7 +97,7 @@ static void variable_width(const ThickPolylines& polylines, ExtrusionRole role, 
 	// of segments, and any pruning shall be performed before we apply this tolerance.
 	const float tolerance = float(scale_(0.05));
 	for (const ThickPolyline &p : polylines) {
-		ExtrusionPaths paths = thick_polyline_to_extrusion_paths(p, role, flow, tolerance);
+		ExtrusionPaths paths = thick_polyline_to_extrusion_paths(p, role, flow, tolerance, tolerance);
 		// Append paths to collection.
 		if (! paths.empty()) {
 			if (paths.front().first_point() == paths.back().last_point())
@@ -275,7 +277,188 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perime
     return out;
 }
 
-void PerimeterGenerator::process()
+// Thanks, Cura developers, for implementing an algorithm for generating perimeters with variable width (Arachne) that is based on the paper
+// "A framework for adaptive width control of dense contour-parallel toolpaths in fused deposition modeling"
+void PerimeterGenerator::process_arachne()
+{
+    // other perimeters
+    m_mm3_per_mm               	  = this->perimeter_flow.mm3_per_mm();
+    coord_t perimeter_spacing     = this->perimeter_flow.scaled_spacing();
+
+    // external perimeters
+    m_ext_mm3_per_mm           	   = this->ext_perimeter_flow.mm3_per_mm();
+    coord_t ext_perimeter_width    = this->ext_perimeter_flow.scaled_width();
+    coord_t ext_perimeter_spacing  = this->ext_perimeter_flow.scaled_spacing();
+    coord_t ext_perimeter_spacing2 = scaled<coord_t>(0.5f * (this->ext_perimeter_flow.spacing() + this->perimeter_flow.spacing()));
+
+    // overhang perimeters
+    m_mm3_per_mm_overhang         = this->overhang_flow.mm3_per_mm();
+
+    // solid infill
+    coord_t solid_infill_spacing  = this->solid_infill_flow.scaled_spacing();
+
+    // prepare grown lower layer slices for overhang detection
+    if (this->lower_slices != nullptr && this->config->overhangs) {
+        // We consider overhang any part where the entire nozzle diameter is not supported by the
+        // lower layer, so we take lower slices and offset them by half the nozzle diameter used
+        // in the current layer
+        double nozzle_diameter = this->print_config->nozzle_diameter.get_at(this->config->perimeter_extruder-1);
+        m_lower_slices_polygons = offset(*this->lower_slices, float(scale_(+nozzle_diameter/2)));
+    }
+
+    // we need to process each island separately because we might have different
+    // extra perimeters for each one
+    for (const Surface &surface : this->slices->surfaces) {
+        // detect how many perimeters must be generated for this island
+        int        loop_number = this->config->perimeters + surface.extra_perimeters - 1; // 0-indexed loops
+        ExPolygons last        = offset_ex(surface.expolygon.simplify_p(m_scaled_resolution), - float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
+        Polygons   last_p      = to_polygons(last);
+
+        Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, *this->object_config, *this->print_config);
+        std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
+
+        int start_perimeter = int(perimeters.size()) - 1;
+        int end_perimeter   = -1;
+        int direction       = -1;
+
+        if (this->config->external_perimeters_first) {
+            start_perimeter = 0;
+            end_perimeter   = int(perimeters.size());
+            direction       = 1;
+        }
+
+        std::vector<const Arachne::ExtrusionLine *> all_extrusions;
+        for (int perimeter_idx = start_perimeter; perimeter_idx != end_perimeter; perimeter_idx += direction) {
+            if (perimeters[perimeter_idx].empty())
+                continue;
+            for (const Arachne::ExtrusionLine &wall : perimeters[perimeter_idx])
+                all_extrusions.emplace_back(&wall);
+        }
+
+        // Find topological order with constraints from extrusions_constrains.
+        std::vector<size_t>              blocked(all_extrusions.size(), 0); // Value indicating how many extrusions it is blocking (preceding extrusions) an extrusion.
+        std::vector<std::vector<size_t>> blocking(all_extrusions.size());   // Each extrusion contains a vector of extrusions that are blocked by this extrusion.
+        std::unordered_map<const Arachne::ExtrusionLine *, size_t> map_extrusion_to_idx;
+        for (size_t idx = 0; idx < all_extrusions.size(); idx++)
+            map_extrusion_to_idx.emplace(all_extrusions[idx], idx);
+
+        auto extrusions_constrains = Arachne::WallToolPaths::getRegionOrder(all_extrusions, this->config->external_perimeters_first);
+        for (auto [before, after] : extrusions_constrains) {
+            auto after_it = map_extrusion_to_idx.find(after);
+            ++blocked[after_it->second];
+            blocking[map_extrusion_to_idx.find(before)->second].emplace_back(after_it->second);
+        }
+
+        std::vector<bool> processed(all_extrusions.size(), false);                // Indicate that the extrusion was already processed.
+        Point             current_position = all_extrusions.empty() ? Point::Zero() : all_extrusions.front()->junctions.front().p; // Some starting position.
+        std::vector<const Arachne::ExtrusionLine *> ordered_extrusions;                   // To store our result in. At the end we'll std::swap.
+        ordered_extrusions.reserve(all_extrusions.size());
+
+        while (ordered_extrusions.size() < all_extrusions.size()) {
+            size_t best_candidate    = 0;
+            double best_distance_sqr = std::numeric_limits<double>::max();
+            bool   is_best_closed    = false;
+
+            std::vector<size_t> available_candidates;
+            for (size_t candidate = 0; candidate < all_extrusions.size(); ++candidate) {
+                if (processed[candidate] || blocked[candidate])
+                    continue; // Not a valid candidate.
+                available_candidates.push_back(candidate);
+            }
+
+            std::sort(available_candidates.begin(), available_candidates.end(), [&all_extrusions](const size_t a_idx, const size_t b_idx) -> bool {
+                return all_extrusions[a_idx]->is_closed < all_extrusions[b_idx]->is_closed;
+            });
+
+            for (const size_t candidate_path_idx : available_candidates) {
+                auto& path = all_extrusions[candidate_path_idx];
+
+                if (path->junctions.empty()) { // No vertices in the path. Can't find the start position then or really plan it in. Put that at the end.
+                    if (best_distance_sqr == std::numeric_limits<double>::max()) {
+                        best_candidate = candidate_path_idx;
+                        is_best_closed = path->is_closed;
+                    }
+                    continue;
+                }
+
+                const Point candidate_position = path->junctions.front().p;
+                double      distance_sqr       = (current_position - candidate_position).cast<double>().norm();
+                if (distance_sqr < best_distance_sqr) { // Closer than the best candidate so far.
+                    if (path->is_closed || (!path->is_closed && best_distance_sqr != std::numeric_limits<double>::max()) || (!path->is_closed && !is_best_closed)) {
+                        best_candidate    = candidate_path_idx;
+                        best_distance_sqr = distance_sqr;
+                        is_best_closed    = path->is_closed;
+                    }
+                }
+            }
+
+            auto &best_path = all_extrusions[best_candidate];
+            ordered_extrusions.push_back(best_path);
+            processed[best_candidate] = true;
+            for (size_t unlocked_idx : blocking[best_candidate])
+                blocked[unlocked_idx]--;
+
+            if(!best_path->junctions.empty()) { //If all paths were empty, the best path is still empty. We don't upate the current position then.
+                if(best_path->is_closed)
+                    current_position = best_path->junctions[0].p; //We end where we started.
+                else
+                    current_position = best_path->junctions.back().p; //Pick the other end from where we started.
+            }
+        }
+
+        for (const Arachne::ExtrusionLine *extrusion : ordered_extrusions) {
+            if (extrusion->empty())
+                continue;
+
+            ExtrusionEntityCollection entities_coll;
+
+            ThickPolyline  thick_polyline = Arachne::to_thick_polyline(*extrusion);
+            bool           ext_perimeter  = extrusion->inset_idx == 0;
+            ExtrusionPaths paths          = thick_polyline_to_extrusion_paths(thick_polyline, ext_perimeter ? erExternalPerimeter : erPerimeter,
+                                                                              ext_perimeter ? this->ext_perimeter_flow : this->perimeter_flow, scaled<float>(0.05), 0);
+            // Append paths to collection.
+            if (!paths.empty()) {
+                if (paths.front().first_point() == paths.back().last_point())
+                    entities_coll.entities.emplace_back(new ExtrusionLoop(std::move(paths)));
+                else
+                    for (ExtrusionPath &path : paths)
+                        entities_coll.entities.emplace_back(new ExtrusionPath(std::move(path)));
+            }
+
+            this->loops->append(entities_coll);
+        }
+
+        ExPolygons infill_contour = union_ex(wallToolPaths.getInnerContour());
+        // create one more offset to be used as boundary for fill
+        // we offset by half the perimeter spacing (to get to the actual infill boundary)
+        // and then we offset back and forth by half the infill spacing to only consider the
+        // non-collapsing regions
+        coord_t inset =
+            (loop_number < 0) ? 0 :
+            (loop_number == 0) ?
+                                // one loop
+                ext_perimeter_spacing:
+                // two or more loops?
+                perimeter_spacing;
+
+        inset = coord_t(scale_(this->config->get_abs_value("infill_overlap", unscale<double>(inset))));
+        Polygons pp;
+        for (ExPolygon &ex : infill_contour)
+            ex.simplify_p(m_scaled_resolution, &pp);
+        // collapse too narrow infill areas
+        const auto    min_perimeter_infill_spacing = coord_t(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE));
+        const coord_t spacing                      = (perimeters.size() == 1) ? ext_perimeter_spacing2 : perimeter_spacing;
+        // append infill areas to fill_surfaces
+        this->fill_surfaces->append(
+            offset2_ex(
+                union_ex(pp),
+                float(- min_perimeter_infill_spacing / 2. - spacing / 2.),
+                float(inset + min_perimeter_infill_spacing / 2. + spacing / 2.)),
+            stInternal);
+    }
+}
+
+void PerimeterGenerator::process_classic()
 {
     // other perimeters
     m_mm3_per_mm               		= this->perimeter_flow.mm3_per_mm();

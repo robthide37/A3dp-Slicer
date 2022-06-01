@@ -64,7 +64,7 @@ public:
     const Point& leftmost_point() const;
     Lines lines() const override;
 
-    void clip_end(double distance);
+    virtual void clip_end(double distance);
     void clip_start(double distance);
     void extend_end(double distance);
     void extend_start(double distance);
@@ -172,9 +172,23 @@ public:
         std::swap(this->endpoints.first, this->endpoints.second);
     }
 
+    void clip_end(double distance) override;
+
     std::vector<coordf_t> width;
     std::pair<bool,bool>  endpoints;
 };
+
+inline ThickPolylines to_thick_polylines(Polylines &&polylines, const coordf_t width)
+{
+    ThickPolylines out;
+    out.reserve(polylines.size());
+    for (Polyline &polyline : polylines) {
+        out.emplace_back();
+        out.back().width.assign((polyline.points.size() - 1) * 2, width);
+        out.back().points = std::move(polyline.points);
+    }
+    return out;
+}
 
 class Polyline3 : public MultiPoint3
 {
