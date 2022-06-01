@@ -38,22 +38,24 @@ class PlaterWorker: public Worker {
 
                 void update_status(int st, const std::string &msg = "") override
                 {
-                    wxWakeUpIdle();
                     ctl.update_status(st, msg);
 
                     // If the worker is not using additional threads, the UI
                     // is refreshed with this call. If the worker is running
-                    // in it's own thread, the yield should not have any
-                    // visible effects.
-                    wxYieldIfNeeded();
+                    // in it's own thread, this will be one additional
+                    // evaluation of the event loop which should have no visible
+                    // effects.
+                    call_on_main_thread([] { wxYieldIfNeeded(); });
                 }
 
                 bool was_canceled() const override { return ctl.was_canceled(); }
 
                 std::future<void> call_on_main_thread(std::function<void()> fn) override
                 {
+                    auto ftr = ctl.call_on_main_thread(std::move(fn));
                     wxWakeUpIdle();
-                    return ctl.call_on_main_thread(std::move(fn));
+
+                    return ftr;
                 }
 
             } wctl{c};
