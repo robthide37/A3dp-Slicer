@@ -1,11 +1,10 @@
+#include "tmesh.h"
+
 #include "FixModelByMeshFix.hpp"
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Model.hpp"
 
-#include "tmesh.h"
-#include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include <atomic>
 #include <chrono>
