@@ -1501,7 +1501,7 @@ class TBBLocalesSetter : public tbb::task_scheduler_observer
 {
 public:
     TBBLocalesSetter() { this->observe(true); }
-    ~TBBLocalesSetter() override = default;
+    ~TBBLocalesSetter() override { this->observe(false); };
 
     void on_scheduler_entry(bool is_worker) override
     {
@@ -1513,7 +1513,7 @@ public:
     }
 
 private:
-    tbb::enumerable_thread_specific<bool, tbb::cache_aligned_allocator<bool>, tbb::ets_key_usage_type::ets_key_per_instance> m_is_locales_sets;
+    tbb::enumerable_thread_specific<bool, tbb::cache_aligned_allocator<bool>, tbb::ets_key_usage_type::ets_key_per_instance> m_is_locales_sets{false};
 };
 
 // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
