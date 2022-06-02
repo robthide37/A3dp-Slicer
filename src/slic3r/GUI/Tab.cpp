@@ -2539,6 +2539,7 @@ void TabPrinter::build_sla()
     line = { L("Tilt time"), "" };
     line.append_option(optgroup->get_option("fast_tilt_time"));
     line.append_option(optgroup->get_option("slow_tilt_time"));
+    line.append_option(optgroup->get_option("high_viscosity_tilt_time"));
     optgroup->append_line(line);
     optgroup->append_single_option_line("area_fill");
 
@@ -3679,6 +3680,9 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
 
     // update preset comboboxes in DiffPresetDlg
     wxGetApp().mainframe->diff_dialog.update_presets(m_type);
+
+    if (detach)
+        update_description_lines();
 }
 
 // Called for a currently selected preset.
