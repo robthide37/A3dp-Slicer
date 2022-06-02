@@ -117,12 +117,6 @@ private:
     void do_rotate(float relative_z_angle);
 
     /// <summary>
-    /// Choose valid source Volume to project on(cut surface from).
-    /// </summary>
-    /// <returns>ModelVolume to project on</returns>
-    const ModelVolume *get_volume_to_cut_surface_from();
-
-    /// <summary>
     /// Reversible input float with option to restor default value
     /// TODO: make more general, static and move to ImGuiWrapper 
     /// </summary>

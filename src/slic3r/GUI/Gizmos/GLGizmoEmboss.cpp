@@ -116,7 +116,6 @@ static bool is_text_empty(const std::string &text){
     return text.empty() ||
            text.find_first_not_of(" \n\t\r") == std::string::npos;
 }
-
 } // namespace
 
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
@@ -909,6 +908,32 @@ static inline void execute_job(std::shared_ptr<Job> j)
     });
 }
 
+static UseSurfaceData::ModelSources get_sources_to_cut_surface_from(
+    const ModelVolume *text_volume)
+{
+    if (text_volume == nullptr) return {};
+    if (!text_volume->text_configuration.has_value()) return {};
+    const auto &volumes = text_volume->get_object()->volumes;
+    // no other volume in object
+    if (volumes.size() <= 1) return {};
+
+    UseSurfaceData::ModelSources result;
+    // Improve create object from part or use gl_volume
+    // Get first model part in object
+    for (const ModelVolume *v : volumes) {
+        if (v->id() == text_volume->id()) continue;
+        if (!v->is_model_part()) continue;
+        const TriangleMesh &tm = v->mesh();
+        if (tm.empty()) continue;
+        if (tm.its.empty()) continue;
+        UseSurfaceData::ModelSource ms = {tm.its,
+                                          v->get_transformation().get_matrix(),
+                                          tm.bounding_box()};
+        result.push_back(std::move(ms));
+    }
+    return result;
+}
+
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
@@ -940,8 +965,8 @@ bool GLGizmoEmboss::process()
     const TextConfiguration &tc = data.text_configuration;
     if (tc.font_item.prop.use_surface) {
         // Model to cut surface from.
-        const ModelVolume *mesh = get_volume_to_cut_surface_from();
-        if (mesh == nullptr) return false;
+        auto sources = get_sources_to_cut_surface_from(m_volume);
+        if (sources.empty()) return false;
 
         Transform3d text_tr = m_volume->get_matrix();
         auto& fix_3mf = m_volume->text_configuration->fix_3mf_tr;
@@ -952,12 +977,8 @@ bool GLGizmoEmboss::process()
         // check that there is not unexpected volume type
         assert(is_outside || m_volume->is_negative_volume() ||
                m_volume->is_modifier());
-        UseSurfaceData surface_data{std::move(data),
-                                    text_tr,
-                                    is_outside,
-                                    mesh->mesh().its /*copy*/,
-                                    mesh->get_matrix(),
-                                    mesh->mesh().bounding_box()};
+        UseSurfaceData surface_data{std::move(data), text_tr, is_outside,
+                                    std::move(sources)};
         job = std::make_unique<UseSurfaceJob>(std::move(surface_data));                  
     } else {
         job = std::make_unique<EmbossUpdateJob>(std::move(data));
@@ -1022,29 +1043,6 @@ void GLGizmoEmboss::select_stored_font_item()
     }
     m_stored_font_item = it->second;
     m_stored_wx_font = WxFontUtils::load_wxFont(m_stored_font_item->path);
-}
-
-const ModelVolume * GLGizmoEmboss::get_volume_to_cut_surface_from()
-{
-    if (m_volume == nullptr) return nullptr;
-    if (!m_volume->text_configuration.has_value()) return nullptr;
-    const auto &volumes = m_volume->get_object()->volumes;
-    // no other volume in object
-    if (volumes.size() <= 1) return nullptr;
-
-    // Improve create object from part or use gl_volume
-    // Get first model part in object
-    for (const ModelVolume *v : volumes) {
-        if (v->id() == m_volume->id()) continue;
-        if (!v->is_model_part()) continue;
-        const TriangleMesh &tm = v->mesh();
-        if (tm.empty()) continue;
-        if (tm.its.empty()) continue;
-        return v;
-    }
-
-    // No valid source volume in objct volumes
-    return nullptr;
 }
 
 void GLGizmoEmboss::draw_window()

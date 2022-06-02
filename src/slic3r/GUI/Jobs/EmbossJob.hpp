@@ -33,6 +33,7 @@ struct EmbossDataBase
 /// <summary>
 /// Hold neccessary data to create ModelVolume in job
 /// Volume is created on the surface of existing volume in object.
+/// NOTE: EmbossDataBase::font_file doesn't have to be valid !!!
 /// </summary>
 struct EmbossDataCreateVolume : public EmbossDataBase
 {
@@ -57,6 +58,7 @@ struct EmbossDataCreateVolume : public EmbossDataBase
 /// <summary>
 /// Create new TextVolume on the surface of ModelObject
 /// Should not be stopped
+/// NOTE: EmbossDataBase::font_file doesn't have to be valid !!!
 /// </summary>
 class EmbossCreateVolumeJob : public Job
 {
@@ -67,7 +69,7 @@ class EmbossCreateVolumeJob : public Job
 public:
     EmbossCreateVolumeJob(EmbossDataCreateVolume&& input);
     void process(Ctl &ctl) override;
-    void finalize(bool canceled, std::exception_ptr &) override;
+    void finalize(bool canceled, std::exception_ptr &eptr) override;
 };
 
 /// <summary>
@@ -99,7 +101,7 @@ class EmbossCreateObjectJob : public Job
 public:
     EmbossCreateObjectJob(EmbossDataCreateObject&& input);
     void process(Ctl &ctl) override;
-    void finalize(bool canceled, std::exception_ptr &) override;
+    void finalize(bool canceled, std::exception_ptr &eptr) override;
 };
 
 /// <summary>
@@ -141,7 +143,7 @@ public:
     /// NOTE: Be carefull it doesn't care about
     /// time between finished process and started finalize part.</param>
     /// <param name="">unused</param>
-    void finalize(bool canceled, std::exception_ptr &) override;
+    void finalize(bool canceled, std::exception_ptr &eptr) override;
 };
 
 /// <summary>
@@ -157,13 +159,28 @@ struct UseSurfaceData : public EmbossDataUpdate
     // False (engraved).. move into object
     bool is_outside;
 
-    // IMPROVE: copy of source mesh tringles
-    // copy could slow down on big meshes
-    indexed_triangle_set mesh_its;
-    // Transformation of volume inside of object
-    Transform3d          mesh_tr;
-    // extract bounds for projection
-    BoundingBoxf3        mesh_bb;
+    struct ModelSource
+    {
+        // IMPROVE: copy of source mesh tringles
+        // copy could slow down on big meshes
+        // but proccessing on thread need it
+        indexed_triangle_set its;
+        // Transformation of volume inside of object
+        Transform3d tr;
+        // extract bounds for projection
+        BoundingBoxf3 bb;
+    };
+    using ModelSources = std::vector<ModelSource>;
+    ModelSources sources;
+
+    //// IMPROVE: copy of source mesh tringles
+    //// copy could slow down on big meshes
+    //// but proccess on thread need it
+    //indexed_triangle_set object_volumes;
+    //// Transformation of volume inside of object
+    //Transform3d          mesh_tr;
+    //// extract bounds for projection
+    //BoundingBoxf3        mesh_bb;
 };
 
 /// <summary>
@@ -178,7 +195,7 @@ public:
     // move params to private variable
     UseSurfaceJob(UseSurfaceData &&input);
     void process(Ctl &ctl) override;
-    void finalize(bool canceled, std::exception_ptr &) override;
+    void finalize(bool canceled, std::exception_ptr &eptr) override;
 };
 
 } // namespace Slic3r::GUI
