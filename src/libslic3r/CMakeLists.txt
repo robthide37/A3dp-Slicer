@@ -384,7 +384,7 @@ target_link_libraries(libslic3r
     boost_libs
     clipper
     nowide
-    ${EXPAT_LIBRARIES}
+    libexpat
     glu-libtess
     qhull
     semver

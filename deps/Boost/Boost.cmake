@@ -70,7 +70,9 @@ file(TO_NATIVE_PATH ${DESTDIR}/usr/local/ _prefix)
 set(_boost_flags "")
 if (UNIX) 
     set(_boost_flags "cflags=-fPIC;cxxflags=-fPIC")
-elseif(APPLE)
+endif ()
+
+if(APPLE)
     set(_boost_flags 
         "cflags=-fPIC -mmacosx-version-min=${DEP_OSX_TARGET};"
         "cxxflags=-fPIC -mmacosx-version-min=${DEP_OSX_TARGET};"
@@ -100,11 +102,16 @@ if (NOT _boost_variants)
     set(_boost_variants release)
 endif()
 
+set(_boost_layout system)
+if (MSVC)
+    set(_boost_layout versioned)
+endif ()
+
 set(_build_cmd ${_build_cmd}
                ${_boost_flags}
                -j${NPROC}
                ${_libs}
-               --layout=versioned
+               --layout=${_boost_layout}
                --debug-configuration
                toolset=${_boost_toolset}
                address-model=${_bits}
