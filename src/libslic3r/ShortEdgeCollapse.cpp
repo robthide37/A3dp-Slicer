@@ -18,8 +18,7 @@ void its_short_edge_collpase(indexed_triangle_set &mesh, size_t target_triangle_
     std::vector<Vec3f> vertex_normals; // Vertex normal in this algorithm is normal of any! triangle that contains the vertex
 
     std::vector<size_t> face_indices; //vector if indices, serves only the purpose of randomised traversal of the faces
-    std::random_device rd;
-    std::mt19937 generator(rd());
+    std::mt19937_64 generator {  };
 
     float decimation_ratio = 1.0f; // decimation ratio updated in each iteration. it is number of removed triangles / number of all
     float edge_size = 0.2f; // Allowed collapsible edge size. Starts low, but is gradually increased
