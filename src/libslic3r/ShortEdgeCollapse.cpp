@@ -167,7 +167,7 @@ void its_short_edge_collpase(indexed_triangle_set &mesh, size_t target_triangle_
 
         decimation_ratio = float(faces_to_remove.size()) / float(mesh.indices.size());
 
-        std::cout << " DECIMATION RATIO: " << decimation_ratio << std::endl;
+//        std::cout << " DECIMATION RATIO: " << decimation_ratio << std::endl;
 
         // finally update the mesh
         mesh.vertices = new_vertices;
