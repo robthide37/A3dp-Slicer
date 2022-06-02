@@ -39,13 +39,7 @@ class PlaterWorker: public Worker {
                 void update_status(int st, const std::string &msg = "") override
                 {
                     ctl.update_status(st, msg);
-
-                    // If the worker is not using additional threads, the UI
-                    // is refreshed with this call. If the worker is running
-                    // in it's own thread, this will be one additional
-                    // evaluation of the event loop which should have no visible
-                    // effects.
-                    call_on_main_thread([] { wxYieldIfNeeded(); });
+                    wxWakeUpIdle();
                 }
 
                 bool was_canceled() const override { return ctl.was_canceled(); }
