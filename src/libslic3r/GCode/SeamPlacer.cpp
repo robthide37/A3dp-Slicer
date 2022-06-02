@@ -17,7 +17,7 @@
 #include "libslic3r/Layer.hpp"
 
 #include "libslic3r/Geometry/Curves.hpp"
-#include "libslic3r/QuadricEdgeCollapse.hpp"
+#include "libslic3r/ShortEdgeCollapse.hpp"
 #include "libslic3r/TriangleSetSampling.hpp"
 
 #include "libslic3r/Utils.hpp"
@@ -585,7 +585,8 @@ std::pair<size_t, size_t> find_previous_and_next_perimeter_point(const std::vect
 }
 
 // Computes all global model info - transforms object, performs raycasting
-void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po, std::function<void(void)> throw_if_canceled) {
+void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po,
+        std::function<void(void)> throw_if_canceled) {
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: gather occlusion meshes: start";
     auto obj_transform = po->trafo_centered();
@@ -607,20 +608,19 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po, st
     }
     throw_if_canceled();
 
-    size_t negative_volumes_start_index = triangle_set.indices.size();
-    its_merge(triangle_set, negative_volumes_set);
-    its_transform(triangle_set, obj_transform);
-
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: gather occlusion meshes: end";
 
     BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: decimate: start";
-    float target_error = 1.0f;
-    its_quadric_edge_collapse(triangle_set, 0, &target_error, throw_if_canceled);
-    BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: decimate: end";
+    << "SeamPlacer: decimate: start";
+    its_short_edge_collpase(triangle_set, 25000);
+    its_short_edge_collpase(negative_volumes_set, 25000);
 
+    size_t negative_volumes_start_index = triangle_set.indices.size();
+    its_merge(triangle_set, negative_volumes_set);
+    its_transform(triangle_set, obj_transform);
+    BOOST_LOG_TRIVIAL(debug)
+    << "SeamPlacer: decimate: end";
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: Compute visibility sample points: start";

@@ -205,6 +205,8 @@ add_library(libslic3r STATIC
     QuadricEdgeCollapse.cpp
     QuadricEdgeCollapse.hpp
     Semver.cpp
+    ShortEdgeCollapse.cpp
+    ShortEdgeCollapse.hpp
     ShortestPath.cpp
     ShortestPath.hpp
     SLAPrint.cpp

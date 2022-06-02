@@ -122,9 +122,9 @@ struct PrintObjectSeamData
 class SeamPlacer {
 public:
     // Number of samples generated on the mesh. There are sqr_rays_per_sample_point*sqr_rays_per_sample_point rays casted from each samples
-    static constexpr size_t raycasting_visibility_samples_count = 25000;
+    static constexpr size_t raycasting_visibility_samples_count = 30000;
     //square of number of rays per sample point
-    static constexpr size_t sqr_rays_per_sample_point = 8;
+    static constexpr size_t sqr_rays_per_sample_point = 5;
 
     // arm length used during angles computation
     static constexpr float polygon_local_angles_arm_distance = 0.3f;
