@@ -61,6 +61,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Gizmos/GLGizmoSimplify.hpp
     GUI/Gizmos/GLGizmoMmuSegmentation.cpp
     GUI/Gizmos/GLGizmoMmuSegmentation.hpp
+    GUI/Gizmos/GLGizmoMeasure.cpp
+    GUI/Gizmos/GLGizmoMeasure.hpp
     GUI/GLSelectionRectangle.cpp
     GUI/GLSelectionRectangle.hpp
     GUI/GLModel.hpp

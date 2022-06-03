@@ -80,6 +80,7 @@ public:
         Seam,
         MmuSegmentation,
         Simplify,
+        Measure,
         Undefined
     };
 
