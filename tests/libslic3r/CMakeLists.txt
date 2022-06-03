@@ -24,6 +24,7 @@ add_executable(${_TEST_NAME}_tests
 	test_voronoi.cpp
     test_optimizers.cpp
     test_png_io.cpp
+    test_surface_mesh.cpp
     test_timeutils.cpp
     test_indexed_triangle_set.cpp
     test_astar.cpp
