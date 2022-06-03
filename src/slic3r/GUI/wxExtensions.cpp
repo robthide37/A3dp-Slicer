@@ -108,10 +108,10 @@ wxMenuItem* append_submenu(wxMenu* menu, wxMenu* sub_menu, int id, const wxStrin
     wxMenuItem* item = new wxMenuItem(menu, id, string, description);
     if (!icon.empty()) {
         item->SetBitmap(*get_bmp_bundle(icon));
-//#ifdef __WXMSW__
-#ifndef __WXGTK__
+
+#ifndef __linux__
         msw_menuitem_bitmaps[id] = icon;
-#endif /* __WXMSW__ */
+#endif // no __linux__
     }
 
     item->SetSubMenu(sub_menu);
@@ -409,8 +409,19 @@ int mode_icon_px_size()
 #endif
 }
 
+#ifdef __WXGTK2__
+static int scale() 
+{
+    return int(em_unit(nullptr) * 0.1f + 0.5f);
+}
+#endif // __WXGTK2__
+
 wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name_in, int px_cnt/* = 16*/)
 {
+#ifdef __WXGTK2__
+    px_cnt *= scale();
+#endif // __WXGTK2__
+
     static Slic3r::GUI::BitmapCache cache;
 
     std::string bmp_name = bmp_name_in;
@@ -430,13 +441,21 @@ wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name_in, int px_cnt/* = 16
 wxBitmapBundle* get_empty_bmp_bundle(int width, int height)
 {
     static Slic3r::GUI::BitmapCache cache;
+#ifdef __WXGTK2__
+    return cache.mkclear_bndl(width * scale(), height * scale());
+#else
     return cache.mkclear_bndl(width, height);
+#endif // __WXGTK2__
 }
 
 wxBitmapBundle* get_solid_bmp_bundle(int width, int height, const std::string& color )
 {
     static Slic3r::GUI::BitmapCache cache;
+#ifdef __WXGTK2__
+    return cache.mksolid_bndl(width * scale(), height * scale(), color, 1, Slic3r::GUI::wxGetApp().dark_mode());
+#else
     return cache.mksolid_bndl(width, height, color, 1, Slic3r::GUI::wxGetApp().dark_mode());
+#endif // __WXGTK2__
 }
 
 // win is used to get a correct em_unit value
@@ -485,8 +504,6 @@ std::vector<wxBitmapBundle*> get_extruder_color_icons(bool thin_icon/* = false*/
 
     if (colors.empty())
         return bmps;
-
-    bool dark_mode = Slic3r::GUI::wxGetApp().dark_mode();
 
     for (const std::string& color : colors)
         bmps.emplace_back(get_solid_bmp_bundle(thin_icon ? 16 : 32, 16, color));

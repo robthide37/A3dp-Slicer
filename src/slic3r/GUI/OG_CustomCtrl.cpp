@@ -21,10 +21,10 @@ static bool is_point_in_rect(const wxPoint& pt, const wxRect& rect)
 
 static wxSize get_bitmap_size(const wxBitmapBundle* bmp, wxWindow* parent)
 {
-#ifdef __APPLE__
-    return bmp->GetDefaultSize();
-#else
+#ifdef __WIN32__
     return bmp->GetBitmapFor(parent).GetSize();
+#else
+    return bmp->GetDefaultSize();
 #endif
 }
 
