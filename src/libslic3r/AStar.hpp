@@ -1,6 +1,7 @@
 #ifndef ASTAR_HPP
 #define ASTAR_HPP
 
+#include <cmath> // std::isinf() is here
 #include <unordered_map>
 
 #include "libslic3r/Point.hpp"
@@ -83,23 +84,23 @@ size_t unique_id(const T &tracer, const TracerNodeT<T> &n)
 
 } // namespace astar_detail
 
-constexpr size_t UNASSIGNED = size_t(-1);
+constexpr size_t Unassigned = size_t(-1);
 
 template<class Tracer>
 struct QNode // Queue node. Keeps track of scores g, and h
 {
-    TracerNodeT<Tracer>  node;      // The actual node itself
-    size_t queue_id;  // Position in the open queue or UNASSIGNED if closed
-    size_t parent;    // unique id of the parent or UNASSIGNED
+    TracerNodeT<Tracer> node; // The actual node itself
+    size_t queue_id; // Position in the open queue or Unassigned if closed
+    size_t parent;   // unique id of the parent or Unassigned
 
-    float  g, h;
+    float g, h;
     float f() const { return g + h; }
 
-    QNode(TracerNodeT<Tracer> n = {},
-          size_t              p    = UNASSIGNED,
+    QNode(TracerNodeT<Tracer> n    = {},
+          size_t              p    = Unassigned,
           float               gval = std::numeric_limits<float>::infinity(),
           float               hval = 0.f)
-        : node{std::move(n)}, parent{p}, queue_id{UNASSIGNED}, g{gval}, h{hval}
+        : node{std::move(n)}, parent{p}, queue_id{Unassigned}, g{gval}, h{hval}
     {}
 };
 
@@ -143,15 +144,15 @@ bool search_route(const Tracer              &tracer,
         },
         LessPred{cached_nodes});
 
-    QNode initial{source, /*parent = */ UNASSIGNED, /*g = */0.f};
+    QNode initial{source, /*parent = */ Unassigned, /*g = */0.f};
     size_t source_id = unique_id(tracer, source);
     cached_nodes[source_id] = initial;
     qopen.push(source_id);
 
     size_t goal_id = goal_heuristic(tracer, source) < 0.f ? source_id :
-                                                            UNASSIGNED;
+                                                            Unassigned;
 
-    while (goal_id == UNASSIGNED && !qopen.empty()) {
+    while (goal_id == Unassigned && !qopen.empty()) {
         size_t q_id = qopen.top();
         qopen.pop();
         QNode &q = cached_nodes[q_id];
@@ -160,7 +161,7 @@ bool search_route(const Tracer              &tracer,
         assert(!std::isinf(q.g));
 
         foreach_reachable(tracer, q.node, [&](const Node &succ_nd) {
-            if (goal_id != UNASSIGNED)
+            if (goal_id != Unassigned)
                 return true;
 
             float  h       = goal_heuristic(tracer, succ_nd);
@@ -184,7 +185,7 @@ bool search_route(const Tracer              &tracer,
                     // The cache needs to be updated either way
                     prev_nd = qsucc_nd;
 
-                    if (queue_id == UNASSIGNED)
+                    if (queue_id == decltype(qopen)::invalid_id())
                         // was in closed or unqueued, rescheduling
                         qopen.push(succ_id);
                     else // was in open, updating
@@ -192,24 +193,23 @@ bool search_route(const Tracer              &tracer,
                 }
             }
 
-            return goal_id != UNASSIGNED;
+            return goal_id != Unassigned;
         });
     }
 
     // Write the output, do not reverse. Clients can do so if they need to.
-    if (goal_id != UNASSIGNED) {
+    if (goal_id != Unassigned) {
         const QNode *q = &cached_nodes[goal_id];
-        while (!std::isinf(q->g) && q->parent != UNASSIGNED) {
+        while (q->parent != Unassigned) {
+            assert(!std::isinf(q->g)); // Uninitialized nodes are NOT allowed
+
             *out = q->node;
             ++out;
             q = &cached_nodes[q->parent];
         }
-
-        if (std::isinf(q->g)) // Something went wrong
-            goal_id = UNASSIGNED;
     }
 
-    return goal_id != UNASSIGNED;
+    return goal_id != Unassigned;
 }
 
 }} // namespace Slic3r::astar

@@ -384,11 +384,11 @@ TEST_CASE("Zero heuristic function should result in dijsktra's algo", "[AStar]")
     REQUIRE(out.empty());
 
     // Source node should have it's parent unset
-    REQUIRE(graph.nodes[0].parent == astar::UNASSIGNED);
+    REQUIRE(graph.nodes[0].parent == astar::Unassigned);
 
     // All other nodes should have their parents set
     for (size_t i = 1; i < graph.nodes.size(); ++i)
-        REQUIRE(graph.nodes[i].parent != astar::UNASSIGNED);
+        REQUIRE(graph.nodes[i].parent != astar::Unassigned);
 
     std::array<float, 9> ref_distances = {0.f,  4.f, 12.f, 19.f, 21.f,
                                           11.f, 9.f, 8.f,  14.f};
@@ -398,9 +398,9 @@ TEST_CASE("Zero heuristic function should result in dijsktra's algo", "[AStar]")
     for (size_t i = 0, k = 0; i < graph.nodes.size(); ++i, k = 0) {
         GraphTracer::QNode *q = &graph.nodes[i];
         REQUIRE(q->g == Approx(ref_distances[i]));
-        while (k++ < graph.nodes.size() && q->parent != astar::UNASSIGNED)
+        while (k++ < graph.nodes.size() && q->parent != astar::Unassigned)
             q = &graph.nodes[q->parent];
 
-        REQUIRE(q->parent == astar::UNASSIGNED);
+        REQUIRE(q->parent == astar::Unassigned);
     }
 }
