@@ -157,10 +157,10 @@ public:
     int                 px_cnt()  const { return m_px_cnt;}
 
     wxSize              GetSize()   const {
-#ifdef __APPLE__
-        return m_bmp.GetDefaultSize();
-#else
+#ifdef __WIN32__
         return m_bmp.GetPreferredBitmapSizeFor(m_parent);
+#else
+        return m_bmp.GetDefaultSize();
 #endif
     }
     int                 GetWidth()  const { return GetSize().GetWidth(); }
