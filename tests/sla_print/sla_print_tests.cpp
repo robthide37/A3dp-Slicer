@@ -173,6 +173,15 @@ TEST_CASE("DefaultSupports::FloorSupportsDoNotPierceModel", "[SLASupportGenerati
 //    for (auto &fname: SUPPORT_TEST_MODELS) test_supports(fname, supportcfg);
 //}
 
+bool is_outside_support_cone(const Vec3f &supp, const Vec3f &pt, float angle)
+{
+    Vec3d D = (pt - supp).cast<double>();
+    double dot_sq = -D.z() * std::abs(-D.z());
+
+    return dot_sq <
+           D.squaredNorm() * std::cos(angle) * std::abs(std::cos(angle));
+}
+
 TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branching]") {
     SECTION("Identical points have the same merge point") {
         Vec3f a{0.f, 0.f, 0.f}, b = a;
@@ -215,6 +224,8 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branchi
         float D = std::abs((*mergept - b).squaredNorm() - (*mergept - a).squaredNorm());
 
         REQUIRE(D < EPSILON);
+        REQUIRE(!is_outside_support_cone(a, *mergept, slope));
+        REQUIRE(!is_outside_support_cone(b, *mergept, slope));
     }
 
     // -|---------> Y
@@ -233,6 +244,8 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branchi
         float D = std::abs((*mergept - b).squaredNorm() - (*mergept - a).squaredNorm());
 
         REQUIRE(D < EPSILON);
+        REQUIRE(!is_outside_support_cone(a, *mergept, slope));
+        REQUIRE(!is_outside_support_cone(b, *mergept, slope));
     }
 
     SECTION("Points separated by less than critical angle have the lower point as mergept") {
