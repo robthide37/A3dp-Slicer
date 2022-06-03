@@ -53,37 +53,6 @@ template<class T> struct TracerTraits_
 template<class T>
 using TracerNodeT = typename TracerTraits_<remove_cvref_t<T>>::Node;
 
-namespace detail {
-// Helper functions dispatching calls through the TracerTraits_ interface
-
-template<class T> using TracerTraits = TracerTraits_<remove_cvref_t<T>>;
-
-template<class T, class Fn>
-void foreach_reachable(const T &tracer, const TracerNodeT<T> &from, Fn &&fn)
-{
-    TracerTraits<T>::foreach_reachable(tracer, from, fn);
-}
-
-template<class T>
-float trace_distance(const T &tracer, const TracerNodeT<T> &a, const TracerNodeT<T> &b)
-{
-    return TracerTraits<T>::distance(tracer, a, b);
-}
-
-template<class T>
-float goal_heuristic(const T &tracer, const TracerNodeT<T> &n)
-{
-    return TracerTraits<T>::goal_heuristic(tracer, n);
-}
-
-template<class T>
-size_t unique_id(const T &tracer, const TracerNodeT<T> &n)
-{
-    return TracerTraits<T>::unique_id(tracer, n);
-}
-
-} // namespace astar_detail
-
 constexpr size_t Unassigned = size_t(-1);
 
 template<class Tracer>
@@ -126,10 +95,9 @@ bool search_route(const Tracer              &tracer,
                   It                         out,
                   NodeMap                  &&cached_nodes = {})
 {
-    using namespace detail;
-
-    using Node  = TracerNodeT<Tracer>;
-    using QNode = QNode<Tracer>;
+    using Node         = TracerNodeT<Tracer>;
+    using QNode        = QNode<Tracer>;
+    using TracerTraits = TracerTraits_<remove_cvref_t<Tracer>>;
 
     struct LessPred { // Comparison functor needed by the priority queue
         NodeMap &m;
@@ -145,12 +113,13 @@ bool search_route(const Tracer              &tracer,
         LessPred{cached_nodes});
 
     QNode initial{source, /*parent = */ Unassigned, /*g = */0.f};
-    size_t source_id = unique_id(tracer, source);
+    size_t source_id = TracerTraits::unique_id(tracer, source);
     cached_nodes[source_id] = initial;
     qopen.push(source_id);
 
-    size_t goal_id = goal_heuristic(tracer, source) < 0.f ? source_id :
-                                                            Unassigned;
+    size_t goal_id = TracerTraits::goal_heuristic(tracer, source) < 0.f ?
+                         source_id :
+                         Unassigned;
 
     while (goal_id == Unassigned && !qopen.empty()) {
         size_t q_id = qopen.top();
@@ -160,13 +129,13 @@ bool search_route(const Tracer              &tracer,
         // This should absolutely be initialized in the cache already
         assert(!std::isinf(q.g));
 
-        foreach_reachable(tracer, q.node, [&](const Node &succ_nd) {
+        TracerTraits::foreach_reachable(tracer, q.node, [&](const Node &succ_nd) {
             if (goal_id != Unassigned)
                 return true;
 
-            float  h       = goal_heuristic(tracer, succ_nd);
-            float  dst     = trace_distance(tracer, q.node, succ_nd);
-            size_t succ_id = unique_id(tracer, succ_nd);
+            float  h       = TracerTraits::goal_heuristic(tracer, succ_nd);
+            float  dst     = TracerTraits::distance(tracer, q.node, succ_nd);
+            size_t succ_id = TracerTraits::unique_id(tracer, succ_nd);
             QNode  qsucc_nd{succ_nd, q_id, q.g + dst, h};
 
             if (h < 0.f) {
