@@ -894,7 +894,6 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     const double init_exp_time = material_config.initial_exposure_time.getFloat();
     const double exp_time      = material_config.exposure_time.getFloat();
 
-    const double layer_height = m_print->m_default_object_config.layer_height.getFloat();
     const int fade_layers_cnt = m_print->m_default_object_config.faded_layers.getInt();// 10 // [3;20]
 
     const auto width          = scaled<double>(printer_config.display_width.getFloat());

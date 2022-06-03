@@ -5811,7 +5811,7 @@ void Plater::export_stl(bool extended, bool selection_only)
                 mesh.merge(m);
             }
         }
-        else if (0 <= instance_id && instance_id < mo.instances.size())
+        else if (0 <= instance_id && instance_id < int(mo.instances.size()))
             mesh.transform(mo.instances[instance_id]->get_matrix(), true);
 
         return mesh;
