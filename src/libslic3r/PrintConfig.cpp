@@ -1804,7 +1804,8 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("max_volumetric_extrusion_rate_slope_positive", coFloat);
     def->label = L("Max volumetric slope positive");
-    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate. "
+    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate"
+                       "for a transition from lower speed to higher speed. "
                    "A value of 1.8 mm³/s² ensures, that a change from the extrusion rate "
                    "of 1.8 mm³/s (0.45mm extrusion width, 0.2mm extrusion height, feedrate 20 mm/s) "
                    "to 5.4 mm³/s (feedrate 60 mm/s) will take at least 2 seconds.");
@@ -1815,10 +1816,11 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("max_volumetric_extrusion_rate_slope_negative", coFloat);
     def->label = L("Max volumetric slope negative");
-    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate. "
+    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate"
+                       "for a transition from higher speed to lower speed. "
                    "A value of 1.8 mm³/s² ensures, that a change from the extrusion rate "
-                   "of 1.8 mm³/s (0.45mm extrusion width, 0.2mm extrusion height, feedrate 20 mm/s) "
-                   "to 5.4 mm³/s (feedrate 60 mm/s) will take at least 2 seconds.");
+                   "of 1.8 mm³/s (0.45mm extrusion width, 0.2mm extrusion height, feedrate 60 mm/s) "
+                   "to 5.4 mm³/s (feedrate 20 mm/s) will take at least 2 seconds.");
     def->sidetext = L("mm³/s²");
     def->min = 0;
     def->mode = comExpert;
