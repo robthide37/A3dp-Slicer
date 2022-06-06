@@ -722,7 +722,7 @@ int Basic_TMesh::saveVRML1(const char *fname, const int mode)
    fprintf(fp,"Material {\n diffuseColor [\n");
    FOREACHTRIANGLE(t, n)
    {
-    pkc = (unsigned int)((j_voidint)t->info);
+    pkc = ((intWrapper*)(t->info))->operator int();
     fprintf(fp,"  %f %f %f,\n",((pkc>>24)&0x000000ff)/255.0,((pkc>>16)&0x000000ff)/255.0,((pkc>>8)&0x000000ff)/255.0);
    }
    fprintf(fp," ]\n}\nMaterialBinding {\n value PER_FACE_INDEXED\n}\n");
@@ -731,7 +731,7 @@ int Basic_TMesh::saveVRML1(const char *fname, const int mode)
    fprintf(fp,"Material {\n diffuseColor [\n");
    FOREACHVERTEX(v, n)
    {
-    pkc = (unsigned int)((j_voidint)v->info);
+    pkc = ((intWrapper*)(v->info))->operator int();
     fprintf(fp,"  %f %f %f,\n",((pkc>>24)&0x000000ff)/255.0,((pkc>>16)&0x000000ff)/255.0,((pkc>>8)&0x000000ff)/255.0);
    }
    fprintf(fp," ]\n}\nMaterialBinding {\n value PER_VERTEX_INDEXED\n}\n");
@@ -893,7 +893,7 @@ int Basic_TMesh::saveVerTri(const char *fname)
  ocds = new coord[V.numels()];
  i=0; FOREACHVERTEX(v, n) ocds[i++] = v->x;
  i=0; FOREACHVERTEX(v, n) v->x = ++i;
- i=0; FOREACHTRIANGLE(t, n) {i++; t->info = (void *)(intptr_t)i;}
+ i=0; FOREACHTRIANGLE(t, n) {i++; t->info = new intWrapper(i);}
 
  fprintf(fpt,"%d\n",T.numels());
  FOREACHTRIANGLE(t, n)
@@ -1460,7 +1460,7 @@ int Basic_TMesh::loadSTL(const char *fname)
 {
  FILE *fp;
  int nt=0, i=0;
- char kw[64]="", kw2[64]="", *line, facet[50];
+ char kw[65]="", kw2[65]="", *line, facet[50];
  float x,y,z;
  bool binary=0;
  Vertex *v, *v1=NULL, *v2=NULL, *v3=NULL;

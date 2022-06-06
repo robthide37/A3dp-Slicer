@@ -72,7 +72,7 @@ class Point : public Data
 {
  public :
  coord x,y,z;					//!< Coordinates
- void *info;					//!< Further information
+ Data *info;					//!< Further information
 
  //! Creates a new point with coordinates (0,0,0).
  Point() {x = y = z = 0; info = NULL;}

@@ -77,7 +77,7 @@ class mc_cell : public Data
  }
 
  void polygonize(Basic_TMesh *tin);
- static int compare(const void *e1, const void *e2);
+ static int compare(const Data *e1, const Data *e2);
 
  void merge(mc_cell *m);
 

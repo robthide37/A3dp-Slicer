@@ -39,14 +39,14 @@ bool joinClosestComponents(Basic_TMesh *tin)
 	{
 		i++;
 		triList.appendHead(t);
-		t->info = (void *)(intptr_t)i;
+		t->info = new intWrapper(i);
 
 		while (triList.numels())
 		{
 			t = (Triangle *)triList.popHead();
-			if ((s = t->t1()) != NULL && s->info == NULL) { triList.appendHead(s); s->info = (void *)(intptr_t)i; }
-			if ((s = t->t2()) != NULL && s->info == NULL) { triList.appendHead(s); s->info = (void *)(intptr_t)i; }
-			if ((s = t->t3()) != NULL && s->info == NULL) { triList.appendHead(s); s->info = (void *)(intptr_t)i; }
+			if ((s = t->t1()) != NULL && s->info == NULL) { triList.appendHead(s); s->info = new intWrapper(i); }
+			if ((s = t->t2()) != NULL && s->info == NULL) { triList.appendHead(s); s->info = new intWrapper(i); }
+			if ((s = t->t3()) != NULL && s->info == NULL) { triList.appendHead(s); s->info = new intWrapper(i); }
 		}
 	}
 

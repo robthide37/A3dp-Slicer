@@ -50,6 +50,8 @@ namespace detail {
 
 using namespace T_MESH;
 
+static int ensure_tmesh_initialization = (TMesh::init(), 0);
+
 double closestPair(List *bl1, List *bl2, Vertex **closest_on_bl1, Vertex **closest_on_bl2)
         {
     Node *n, *m;
@@ -84,14 +86,14 @@ bool joinClosestComponents(Basic_TMesh *tin)
     {
         i++;
         triList.appendHead(t);
-        t->info = (void *)(intptr_t)i;
+        t->info = new intWrapper(i);
 
         while (triList.numels())
         {
             t = (Triangle *)triList.popHead();
-            if ((s = t->t1()) != NULL && s->info == NULL) {triList.appendHead(s); s->info = (void *)(intptr_t)i;}
-            if ((s = t->t2()) != NULL && s->info == NULL) {triList.appendHead(s); s->info = (void *)(intptr_t)i;}
-            if ((s = t->t3()) != NULL && s->info == NULL) {triList.appendHead(s); s->info = (void *)(intptr_t)i;}
+            if ((s = t->t1()) != NULL && s->info == NULL) {triList.appendHead(s); s->info = new intWrapper(i);}
+            if ((s = t->t2()) != NULL && s->info == NULL) {triList.appendHead(s); s->info = new intWrapper(i);}
+            if ((s = t->t3()) != NULL && s->info == NULL) {triList.appendHead(s); s->info = new intWrapper(i);}
         }
     }
 
@@ -298,7 +300,8 @@ bool fix_model_by_meshfix(ModelObject &model_object, int volume_idx, wxProgressD
                             tin.deselectTriangles();
                             tin.boundaries();
                             // Keep only the largest component (i.e. with most triangles)
-                            on_progress(L("Remove smallest components"), unsigned(progress_part_base + 0.2 * percent_per_part));
+                            on_progress(L("Remove smallest components"),
+                                    unsigned(progress_part_base + 0.2 * percent_per_part));
                             if (canceled)
                                 throw RepairCanceledException();
                             tin.removeSmallestComponents();
@@ -308,7 +311,8 @@ bool fix_model_by_meshfix(ModelObject &model_object, int volume_idx, wxProgressD
                             if (canceled)
                                 throw RepairCanceledException();
                             if (tin.boundaries()) {
-                                on_progress(L("Patch small holes"), unsigned(progress_part_base + 0.4 * percent_per_part));
+                                on_progress(L("Patch small holes"),
+                                        unsigned(progress_part_base + 0.4 * percent_per_part));
                                 if (canceled)
                                     throw RepairCanceledException();
                                 tin.fillSmallBoundaries(0, true);
@@ -320,22 +324,25 @@ bool fix_model_by_meshfix(ModelObject &model_object, int volume_idx, wxProgressD
                             // Run geometry correction
                             if (!tin.boundaries()) {
                                 int iteration = 0;
-                                on_progress(L("Start iterative correction"), unsigned(progress_part_base + 0.55 * percent_per_part));
+                                on_progress(L("Start iterative correction"),
+                                        unsigned(progress_part_base + 0.55 * percent_per_part));
                                 tin.deselectTriangles();
                                 tin.invertSelection();
                                 bool fixed = false;
                                 while (iteration < 10 && !fixed) { //default constants taken from TMesh library
                                     fixed = tin.meshclean_single_iteration(3, canceled);
-                                    on_progress(L("Fixing geometry"), progress_part_base + percent_per_part * std::min(0.9, 0.6 + iteration*0.08)); // majority of objects should finish in 4 iterations
+                                    on_progress(L("Fixing geometry"),
+                                            progress_part_base
+                                                    + percent_per_part * std::min(0.9, 0.6 + iteration * 0.08)); // majority of objects will finish in 4 iterations
                                     if (canceled)
                                         throw RepairCanceledException();
                                     iteration++;
                                 }
                             }
 
-                            if (tin.boundaries() || tin.T.numels() == 0) {
-                                throw RepairFailedException();
-                            }
+//                            if (tin.boundaries() || tin.T.numels() == 0) {
+//                                throw RepairFailedException();
+//                            }
                             parts[part_idx] = tin.to_indexed_triangle_set();
                         }
 

@@ -253,7 +253,7 @@ void TMesh::printElapsedTime(bool reset)
 {
 	static clock_t beginning_time;
 	if (reset) beginning_time = clock();
-	else printf("\n\n********** PARTIAL ELAPSED: %d msecs\n\n", (clock() - beginning_time));
+	else printf("\n\n********** PARTIAL ELAPSED: %d msecs\n\n", int((clock() - beginning_time)));
 }
 
 } //namespace T_MESH

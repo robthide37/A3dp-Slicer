@@ -31,6 +31,4 @@ target_include_directories(meshfix PUBLIC
 		include/Kernel
 )
 
-target_compile_options(meshfix PRIVATE -fpermissive)
-
 ################################################################################

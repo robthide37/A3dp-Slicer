@@ -282,7 +282,7 @@ int Basic_TMesh::mergeCoincidentEdges()
 		if (e->v2->info != e->v2) e->v2 = (Vertex *)e->v2->info;
 		e->v1->e0 = e->v2->e0 = e;
 	}
-	int rv = removeVertices();
+	removeVertices();
 
 	// At this point the mesh should no longer have duplicated vertices, but may have duplicated edges
 	E.sort(&vtxEdgeCompare);
@@ -296,7 +296,6 @@ int Basic_TMesh::mergeCoincidentEdges()
 	{
 		Triangle *t1 = e->getBoundaryTriangle();
 		Edge *f = ((Edge *)e->info);
-		Triangle *t2 = f->getBoundaryTriangle();
 		t1->replaceEdge(e, f);
 		((f->t1 == NULL) ? (f->t1) : (f->t2)) = t1;
 		e->v1 = e->v2 = NULL;
@@ -355,14 +354,14 @@ bool Basic_TMesh::rebuildConnectivity(bool fixconnectivity) //!< AMF_CHANGE 1.1>
  Triangle *t;
  ExtVertex **var = new ExtVertex *[V.numels()];
  int i=0;
- FOREACHVERTEX(v, n) { v->e0 = NULL; var[i] = new ExtVertex(v); v->info = (void *)(intptr_t)i; i++; }
+ FOREACHVERTEX(v, n) { v->e0 = NULL; var[i] = new ExtVertex(v); v->info = new intWrapper(i); i++; }
  int nt = T.numels();
  int *triangles = new int[nt*3];
  i = 0; FOREACHTRIANGLE(t, n)
  {
-  triangles[i * 3] = (j_voidint)t->v1()->info;
-  triangles[i*3+1] = (j_voidint)t->v2()->info;
-  triangles[i*3+2] = (j_voidint)t->v3()->info;
+  triangles[i * 3] = ((intWrapper*)t->v1()->info)->operator int();
+  triangles[i*3+1] = ((intWrapper*)t->v2()->info)->operator int();
+  triangles[i*3+2] = ((intWrapper*)t->v3()->info)->operator int();
   i++;
  }
  T.freeNodes();
@@ -450,7 +449,7 @@ int multiSplitEdge(Basic_TMesh *tin, Edge *e)
 	while (splitVertices.numels())
 	{
 		coord ad, mind = DBL_MAX;
-		Vertex *gv;
+		Vertex *gv = nullptr;
 		FOREACHVVVERTEX((&splitVertices), v, n) if ((ad = v->squaredDistance(e->v2)) < mind) { gv = v; mind = ad; }
 		splitVertices.removeNode(gv);
 		tin->splitEdge(e, gv);

@@ -187,11 +187,11 @@ void Basic_TMesh::init(const Basic_TMesh *tin, const bool clone_info)
  Triangle *t, *nt;
  
  int i;
- void **t_info = new void *[tin->T.numels()];
+ Data **t_info = new Data *[tin->T.numels()];
  i=0; FOREACHVTTRIANGLE((&(tin->T)), t, n) t_info[i++]=t->info;
- void **e_info = new void *[tin->E.numels()];
+ Data **e_info = new Data *[tin->E.numels()];
  i=0; FOREACHVEEDGE((&(tin->E)), e, n) e_info[i++]=e->info;
- void **v_info = new void *[tin->V.numels()];
+ Data **v_info = new Data *[tin->V.numels()];
  i=0; FOREACHVVVERTEX((&(tin->V)), v, n) v_info[i++]=v->info;
 
  FOREACHVVVERTEX((&(tin->V)), v, n)
@@ -838,14 +838,14 @@ Basic_TMesh *Basic_TMesh::createSubMeshFromSelection(Triangle *t0, bool keep_ref
  FOREACHVEEDGE((&sE), e, n) e->v1->e0 = e->v2->e0 = e;
 
  int i;
- void **v_info = NULL, **e_info = NULL, **t_info = NULL;
+ Data **v_info = NULL, **e_info = NULL, **t_info = NULL;
  if (!keep_ref)
  {
-  v_info = new void *[sV.numels()];
+  v_info = new Data *[sV.numels()];
   i=0; FOREACHVVVERTEX((&sV), v, n) v_info[i++] = v->info;
-  e_info = new void *[sE.numels()];
+  e_info = new Data *[sE.numels()];
   i=0; FOREACHVEEDGE((&sE), e, n) e_info[i++] = e->info;
-  t_info = new void *[sT.numels()];
+  t_info = new Data *[sT.numels()];
   i=0; FOREACHVTTRIANGLE((&sT), t, n) t_info[i++] = t->info;
  }
 

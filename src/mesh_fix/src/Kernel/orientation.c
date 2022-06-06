@@ -31,7 +31,7 @@
 // This code is inspired on ideas first published in the following paper:
 // Jonathan Richard Shewchuk. Adaptive Precision Floating-Point Arithmetic 
 // and Fast Robust Geometric Predicates, Discrete & Computational Geometry
-// 18(3):305–363, October 1997.
+// 18(3):305Â–363, October 1997.
 //
 
 #include <math.h>
@@ -171,8 +171,8 @@ double _estm(int elen, double *e)
 double _adaptive2dorientation(double *pa, double *pb, double *pc, double detsum)
 {
  double acx, acy, bcx, bcy,acxtail, acytail, bcxtail, bcytail, detleft, detright;
- double detlefttail, detrighttail, det, errbound, B[4], C1[8], C2[12], D[16];
- double B3, u[4], u3, s1, t1, s0, t0, _bvr, _avr, _brn, _arn, c;
+ double detlefttail, detrighttail, det, errbound, B[5], C1[8], C2[12], D[16];
+ double B3, u[5], u3, s1, t1, s0, t0, _bvr, _avr, _brn, _arn, c;
  double abig, ahi, alo, bhi, blo, err1, err2, err3, _i, _j, _0;
  int C1length, C2length, Dlength;
 

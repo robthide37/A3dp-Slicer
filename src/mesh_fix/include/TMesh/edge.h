@@ -55,7 +55,7 @@ class Edge : public Data
  Vertex *v1,*v2;			//!< End-points
  class Triangle *t1,*t2;	//!< Incident triangles
  unsigned char mask;		//!< bit-mask for marking purposes
- void *info;				//!< Further information
+ Data *info;				//!< Further information
 
  
  Edge();						//!< AMF_ADD 1.1-2 >

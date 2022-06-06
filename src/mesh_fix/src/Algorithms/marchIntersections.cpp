@@ -134,7 +134,7 @@ UBYTE mc_cell::lookdown()
 	return i;
 }
 
-int mc_cell::compare(const void *e1, const void *e2)
+int mc_cell::compare(const Data *e1, const Data *e2)
 {
  mc_cell *a = (mc_cell *)e1;
  mc_cell *b = (mc_cell *)e2;
@@ -680,7 +680,7 @@ void mc_cell::merge(mc_cell *m)
 
 List *mc_grid::createCells()
 {
- int i,j,k,numcells=numrays+1;
+ int i,j,k=numrays+1;
  mc_ints *m;
  Node *n;
  List *ac = new List;

@@ -580,7 +580,7 @@ int Basic_TMesh::refineSelectedHolePatches(Triangle *t0)
  Edge *e, *f;
  Vertex *v;
  List *ve, toswap, reg, all_edges, interior_edges, boundary_edges, boundary_vertices, interior_vertices;
- coord sigma, l, sv1, sv2, sv3, dv1, dv2, dv3;
+ doubleWrapper sigma, l, sv1, sv2, sv3, dv1, dv2, dv3;
  int swaps, totits, nee, ntb, nnt=-1, pnnt, gits=0;
  const double alpha = sqrt(2.0);
  Point vc;
@@ -630,7 +630,7 @@ int Basic_TMesh::refineSelectedHolePatches(Triangle *t0)
  {
   ve = v->VE();
   sigma=0; nee=0; FOREACHVEEDGE(ve, e, m) if (!IS_BIT(e, 5)) {nee++; sigma += e->length();}
-  sigma /= nee; v->info = new coord(sigma);
+  sigma /= double(nee); v->info = new doubleWrapper(sigma);
   delete(ve);
  }
 
@@ -644,9 +644,9 @@ int Basic_TMesh::refineSelectedHolePatches(Triangle *t0)
   FOREACHVTTRIANGLE((&reg), t, n)
   {
    vc = t->getCenter();
-   sv1 = (*(coord *)t->v1()->info);
-   sv2 = (*(coord *)t->v2()->info);
-   sv3 = (*(coord *)t->v3()->info);
+   sv1 = (*(doubleWrapper *)t->v1()->info);
+   sv2 = (*(doubleWrapper *)t->v2()->info);
+   sv3 = (*(doubleWrapper *)t->v3()->info);
    sigma = (sv1+sv2+sv3)/3.0;
    dv1 = alpha*(t->v1()->distance(&vc));
    dv2 = alpha*(t->v2()->distance(&vc));
@@ -658,7 +658,7 @@ int Basic_TMesh::refineSelectedHolePatches(Triangle *t0)
     nnt += (T.numels()-ntb);
     if (T.numels() == ntb+2)
     {
-     v->info = new coord(sigma);
+     v->info = new doubleWrapper(sigma);
      interior_vertices.appendHead(v);
      interior_edges.appendHead(v->e0);
      interior_edges.appendHead(v->e0->leftTriangle(v)->prevEdge(v->e0));
@@ -700,8 +700,8 @@ int Basic_TMesh::refineSelectedHolePatches(Triangle *t0)
  } while (nnt && gits<10);
 
  //FOREACHVEEDGE((&boundary_edges), e, n) UNMARK_BIT(e, 6);													
- FOREACHVVVERTEX((&boundary_vertices), v, n) { delete((coord *)v->info); v->info = NULL; MARK_BIT(v, 5);}	
- FOREACHVVVERTEX((&interior_vertices), v, n) { delete((coord *)v->info); v->info = NULL; MARK_BIT(v, 6);}	
+ FOREACHVVVERTEX((&boundary_vertices), v, n) { delete((Data *)v->info); v->info = NULL; MARK_BIT(v, 5);}
+ FOREACHVVVERTEX((&interior_vertices), v, n) { delete((Data *)v->info); v->info = NULL; MARK_BIT(v, 6);}
 
  if (gits>=10) {TMesh::warning("Fill holes: Refinement stage failed to converge. Breaking.\n"); return 1;}
 

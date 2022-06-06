@@ -51,7 +51,7 @@ class Triangle : public Data
  public :
  
  Edge *e1, *e2, *e3; 		//!< Edges of the triangle
- void *info;			//!< Further information
+ Data* info;			//!< Further information
  unsigned char mask;		//!< bit-mask for marking purposes
 
  Triangle();
