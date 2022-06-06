@@ -312,7 +312,7 @@ void GLGizmoCut::perform_cut(const Selection& selection)
     wxCHECK_RET(instance_idx >= 0 && object_idx >= 0, "GLGizmoCut: Invalid object selection");
 
     // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
-    const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* first_glvolume = selection.get_first_volume();
     const double object_cut_z = m_cut_z - first_glvolume->get_sla_shift_z();
 
     if (0.0 < object_cut_z && object_cut_z < m_max_z)
@@ -365,7 +365,7 @@ BoundingBoxf3 GLGizmoCut::bounding_box() const
 void GLGizmoCut::update_contours()
 {
     const Selection& selection = m_parent.get_selection();
-    const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* first_glvolume = selection.get_first_volume();
     const BoundingBoxf3& box = first_glvolume->transformed_convex_hull_bounding_box();
 
     const ModelObject* model_object = wxGetApp().model().objects[selection.get_object_idx()];

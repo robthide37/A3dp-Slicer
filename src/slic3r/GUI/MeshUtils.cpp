@@ -112,7 +112,11 @@ void MeshClipper::render_cut()
 
 void MeshClipper::recalculate_triangles()
 {
+#if ENABLE_WORLD_COORDINATE
+    const Transform3f instance_matrix_no_translation_no_scaling = m_trafo.get_rotation_matrix().cast<float>();
+#else
     const Transform3f& instance_matrix_no_translation_no_scaling = m_trafo.get_matrix(true,false,true).cast<float>();
+#endif // ENABLE_WORLD_COORDINATE
     // Calculate clipping plane normal in mesh coordinates.
     const Vec3f up_noscale = instance_matrix_no_translation_no_scaling.inverse() * m_plane.get_normal().cast<float>();
     const Vec3d up = up_noscale.cast<double>().cwiseProduct(m_trafo.get_scaling_factor());
@@ -303,7 +307,11 @@ std::vector<unsigned> MeshRaycaster::get_unobscured_idxs(const Geometry::Transfo
 {
     std::vector<unsigned> out;
 
+#if ENABLE_WORLD_COORDINATE
+    const Transform3d instance_matrix_no_translation_no_scaling = trafo.get_rotation_matrix();
+#else
     const Transform3d& instance_matrix_no_translation_no_scaling = trafo.get_matrix(true,false,true);
+#endif // ENABLE_WORLD_COORDINATE
     Vec3d direction_to_camera = -camera.get_dir_forward();
     Vec3d direction_to_camera_mesh = (instance_matrix_no_translation_no_scaling.inverse() * direction_to_camera).normalized().eval();
     direction_to_camera_mesh = direction_to_camera_mesh.cwiseProduct(trafo.get_scaling_factor());

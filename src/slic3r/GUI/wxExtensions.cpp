@@ -581,8 +581,12 @@ void LockButton::OnButton(wxCommandEvent& event)
     if (m_disabled)
         return;
 
+#if ENABLE_WORLD_COORDINATE
+    SetLock(!m_is_pushed);
+#else
     m_is_pushed = !m_is_pushed;
     update_button_bitmaps();
+#endif // ENABLE_WORLD_COORDINATE
 
     event.Skip();
 }

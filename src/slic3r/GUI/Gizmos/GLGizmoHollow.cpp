@@ -94,7 +94,7 @@ void GLGizmoHollow::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
 //#if ENABLE_RENDER_PICKING_PASS
-//    m_z_shift = selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z();
+//    m_z_shift = selection.get_first_volume()->get_sla_shift_z();
 //#endif
 
     glsafe(::glEnable(GL_DEPTH_TEST));
@@ -117,12 +117,16 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
     ScopeGuard guard([shader]() { if (shader) shader->stop_using(); });
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-    const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* vol = selection.get_first_volume();
     Geometry::Transformation trafo =  vol->get_instance_transformation() * vol->get_volume_transformation();
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_WORLD_COORDINATE
+    const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_scaling_factor_matrix().inverse();
+#else
     const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
-    const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * trafo.get_matrix();
+#endif // ENABLE_WORLD_COORDINATE
+    const Transform3d instance_matrix = Geometry::translation_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * trafo.get_matrix();
 
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
@@ -238,7 +242,7 @@ bool GLGizmoHollow::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, V
 
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Selection& selection = m_parent.get_selection();
-    const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* volume = selection.get_first_volume();
     Geometry::Transformation trafo = volume->get_instance_transformation() * volume->get_volume_transformation();
     trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., m_c->selection_info()->get_sla_shift()));
 

@@ -545,6 +545,10 @@ namespace cereal {
 
 	template<class Archive> void load(Archive& archive, Slic3r::Matrix2f &m) { archive.loadBinary((char*)m.data(), sizeof(float) * 4); }
 	template<class Archive> void save(Archive& archive, Slic3r::Matrix2f &m) { archive.saveBinary((char*)m.data(), sizeof(float) * 4); }
+#if ENABLE_WORLD_COORDINATE
+    template<class Archive> void load(Archive& archive, Slic3r::Transform3d& m)       { archive.loadBinary((char*)m.data(), sizeof(double) * 16); }
+    template<class Archive> void save(Archive& archive, const Slic3r::Transform3d& m) { archive.saveBinary((char*)m.data(), sizeof(double) * 16); }
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 // To be able to use Vec<> and Mat<> in range based for loops:
