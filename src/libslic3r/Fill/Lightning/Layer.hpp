@@ -80,7 +80,7 @@ public:
         coord_t wall_supporting_radius
     );
 
-    Polylines convertToLines(const Polygons& limit_to_outline, coord_t line_width) const;
+    Polylines convertToLines(const Polygons& limit_to_outline, coord_t line_overlap) const;
 
     coord_t getWeightedDistance(const Point& boundary_loc, const Point& unsupported_location);
 
