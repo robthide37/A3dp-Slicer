@@ -172,6 +172,43 @@ static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuz
         poly.points = std::move(out);
 }
 
+// Thanks Cura developers for this function.
+static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy_skin_thickness, double fuzzy_skin_point_dist)
+{
+    const double min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
+    const double range_random_point_dist = fuzzy_skin_point_dist / 2.;
+    double dist_left_over = double(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
+
+    auto * p0 = &ext_lines.junctions.back();
+    std::vector<Arachne::ExtrusionJunction> out;
+    out.reserve(ext_lines.size());
+    for (auto &p1 : ext_lines)
+    { // 'a' is the (next) new point between p0 and p1
+        Vec2d  p0p1      = (p1.p - p0->p).cast<double>();
+        double p0p1_size = p0p1.norm();
+        // so that p0p1_size - dist_last_point evaulates to dist_left_over - p0p1_size
+        double dist_last_point = dist_left_over + p0p1_size * 2.;
+        for (double p0pa_dist = dist_left_over; p0pa_dist < p0p1_size;
+             p0pa_dist += min_dist_between_points + double(rand()) * range_random_point_dist / double(RAND_MAX))
+        {
+            double r = double(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
+            out.emplace_back(p0->p + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>(), p1.w, p1.perimeter_index);
+            dist_last_point = p0pa_dist;
+        }
+        dist_left_over = p0p1_size - dist_last_point;
+        p0 = &p1;
+    }
+    while (out.size() < 3) {
+        size_t point_idx = ext_lines.size() - 2;
+        out.emplace_back(ext_lines[point_idx].p, ext_lines[point_idx].w, ext_lines[point_idx].perimeter_index);
+        if (point_idx == 0)
+            break;
+        -- point_idx;
+    }
+    if (out.size() >= 3)
+        ext_lines.junctions = std::move(out);
+}
+
 using PerimeterGeneratorLoops = std::vector<PerimeterGeneratorLoop>;
 
 static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perimeter_generator, const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls)
@@ -314,15 +351,26 @@ static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Path &subject, con
     return clipped_paths;
 }
 
-static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator &perimeter_generator, const std::vector<const Arachne::ExtrusionLine *> &extrusions)
+struct PerimeterGeneratorArachneExtrusion
+{
+    Arachne::ExtrusionLine *extrusion = nullptr;
+    // Should this extrusion be fuzzyfied on path generation?
+    bool fuzzify = false;
+};
+
+static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator &perimeter_generator, std::vector<PerimeterGeneratorArachneExtrusion> &pg_extrusions)
 {
     ExtrusionEntityCollection extrusion_coll;
-    for (const Arachne::ExtrusionLine *extrusion : extrusions) {
+    for (PerimeterGeneratorArachneExtrusion &pg_extrusion : pg_extrusions) {
+        Arachne::ExtrusionLine *extrusion = pg_extrusion.extrusion;
         if (extrusion->empty())
             continue;
 
         const bool    is_external = extrusion->inset_idx == 0;
         ExtrusionRole role        = is_external ? erExternalPerimeter : erPerimeter;
+
+        if (pg_extrusion.fuzzify)
+            fuzzy_extrusion_line(*extrusion, scaled<float>(perimeter_generator.config->fuzzy_skin_thickness.value), scaled<float>(perimeter_generator.config->fuzzy_skin_point_dist.value));
 
         ExtrusionPaths paths;
         // detect overhanging/bridging perimeters
@@ -425,11 +473,11 @@ void PerimeterGenerator::process_arachne()
             direction       = 1;
         }
 
-        std::vector<const Arachne::ExtrusionLine *> all_extrusions;
+        std::vector<Arachne::ExtrusionLine *> all_extrusions;
         for (int perimeter_idx = start_perimeter; perimeter_idx != end_perimeter; perimeter_idx += direction) {
             if (perimeters[perimeter_idx].empty())
                 continue;
-            for (const Arachne::ExtrusionLine &wall : perimeters[perimeter_idx])
+            for (Arachne::ExtrusionLine &wall : perimeters[perimeter_idx])
                 all_extrusions.emplace_back(&wall);
         }
 
@@ -447,9 +495,9 @@ void PerimeterGenerator::process_arachne()
             blocking[map_extrusion_to_idx.find(before)->second].emplace_back(after_it->second);
         }
 
-        std::vector<bool> processed(all_extrusions.size(), false);                // Indicate that the extrusion was already processed.
+        std::vector<bool> processed(all_extrusions.size(), false);          // Indicate that the extrusion was already processed.
         Point             current_position = all_extrusions.empty() ? Point::Zero() : all_extrusions.front()->junctions.front().p; // Some starting position.
-        std::vector<const Arachne::ExtrusionLine *> ordered_extrusions;                   // To store our result in. At the end we'll std::swap.
+        std::vector<PerimeterGeneratorArachneExtrusion> ordered_extrusions;         // To store our result in. At the end we'll std::swap.
         ordered_extrusions.reserve(all_extrusions.size());
 
         while (ordered_extrusions.size() < all_extrusions.size()) {
@@ -491,7 +539,7 @@ void PerimeterGenerator::process_arachne()
             }
 
             auto &best_path = all_extrusions[best_candidate];
-            ordered_extrusions.push_back(best_path);
+            ordered_extrusions.push_back({best_path, false});
             processed[best_candidate] = true;
             for (size_t unlocked_idx : blocking[best_candidate])
                 blocked[unlocked_idx]--;
@@ -501,6 +549,46 @@ void PerimeterGenerator::process_arachne()
                     current_position = best_path->junctions[0].p; //We end where we started.
                 else
                     current_position = best_path->junctions.back().p; //Pick the other end from where we started.
+            }
+        }
+
+        if (this->layer_id > 0 && this->config->fuzzy_skin != FuzzySkinType::None) {
+            std::vector<PerimeterGeneratorArachneExtrusion *> closed_loop_extrusions;
+            for (PerimeterGeneratorArachneExtrusion &extrusion : ordered_extrusions)
+                if (extrusion.extrusion->inset_idx == 0) {
+                    if (extrusion.extrusion->is_closed && this->config->fuzzy_skin == FuzzySkinType::External) {
+                        closed_loop_extrusions.emplace_back(&extrusion);
+                    } else {
+                        extrusion.fuzzify = true;
+                    }
+                }
+
+            if (this->config->fuzzy_skin == FuzzySkinType::External) {
+                ClipperLib_Z::Paths loops_paths;
+                loops_paths.reserve(closed_loop_extrusions.size());
+                for (const auto &cl_extrusion : closed_loop_extrusions) {
+                    assert(cl_extrusion->extrusion->junctions.front() == cl_extrusion->extrusion->junctions.back());
+                    size_t             loop_idx = &cl_extrusion - &closed_loop_extrusions.front();
+                    ClipperLib_Z::Path loop_path;
+                    loop_path.reserve(cl_extrusion->extrusion->junctions.size() - 1);
+                    for (auto junction_it = cl_extrusion->extrusion->junctions.begin(); junction_it != std::prev(cl_extrusion->extrusion->junctions.end()); ++junction_it)
+                        loop_path.emplace_back(junction_it->p.x(), junction_it->p.y(), loop_idx);
+                    loops_paths.emplace_back(loop_path);
+                }
+
+                ClipperLib_Z::Clipper clipper;
+                clipper.AddPaths(loops_paths, ClipperLib_Z::ptSubject, true);
+                ClipperLib_Z::PolyTree loops_polytree;
+                clipper.Execute(ClipperLib_Z::ctUnion, loops_polytree, ClipperLib_Z::pftEvenOdd, ClipperLib_Z::pftEvenOdd);
+
+                for (const ClipperLib_Z::PolyNode *child_node : loops_polytree.Childs) {
+                    // The whole contour must have the same index.
+                    coord_t polygon_idx  = child_node->Contour.front().z();
+                    bool    has_same_idx = std::all_of(child_node->Contour.begin(), child_node->Contour.end(),
+                                                       [&polygon_idx](const ClipperLib_Z::IntPoint &point) -> bool { return polygon_idx == point.z(); });
+                    if (has_same_idx)
+                        closed_loop_extrusions[polygon_idx]->fuzzify = true;
+                }
             }
         }
 
