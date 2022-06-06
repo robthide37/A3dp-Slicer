@@ -106,6 +106,7 @@ enum class BridgeType : uint8_t {
 enum class FuzzySkinType {
     None,
     External,
+    Shell,
     All,
 };
 

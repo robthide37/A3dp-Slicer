@@ -127,6 +127,7 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(BridgeType)
 static const t_config_enum_values s_keys_map_FuzzySkinType{
     { "none",           int(FuzzySkinType::None) },
     { "external",       int(FuzzySkinType::External) },
+    { "shell",          int(FuzzySkinType::Shell) },
     { "all",            int(FuzzySkinType::All) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FuzzySkinType)
@@ -2561,14 +2562,20 @@ void PrintConfigDef::init_fff_params()
     def = this->add("fuzzy_skin", coEnum);
     def->label = L("Fuzzy Skin");
     def->category = OptionCategory::fuzzy_skin;
-    def->tooltip = L("Fuzzy skin type.");
+    def->tooltip = L("Fuzzy skin type."
+        "\nNone: setting disabled."
+        "\Outside walls: Apply fuzzy skin only on the external perimeters of the outside (not the holes)."
+        "\External walls: Apply fuzzy skin only on all external perimeters."
+        "\All perimeters: Apply fuzzy skin on all perimeters (external, internal and gapfill).");
     def->enum_keys_map = &ConfigOptionEnum<FuzzySkinType>::get_enum_values();
     def->enum_values.push_back("none");
     def->enum_values.push_back("external");
+    def->enum_values.push_back("shell");
     def->enum_values.push_back("all");
     def->enum_labels.push_back(L("None"));
     def->enum_labels.push_back(L("Outside walls"));
-    def->enum_labels.push_back(L("All walls"));
+    def->enum_labels.push_back(L("External walls"));
+    def->enum_labels.push_back(L("All perimeters"));
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<FuzzySkinType>(FuzzySkinType::None));
 

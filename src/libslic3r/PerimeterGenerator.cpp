@@ -77,6 +77,44 @@ static void fuzzy_polygon(Polygon& poly, coordf_t fuzzy_skin_thickness, coordf_t
         poly.points = std::move(out);
 }
 
+// Thanks Cura developers for this function.
+//supermerill: doesn't work
+static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy_skin_thickness, double fuzzy_skin_point_dist)
+{
+    const double min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
+    const double range_random_point_dist = fuzzy_skin_point_dist / 2.;
+    double dist_left_over = double(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
+
+    auto * p0 = &ext_lines.junctions.back();
+    std::vector<Arachne::ExtrusionJunction> out;
+    out.reserve(ext_lines.size());
+    for (auto &p1 : ext_lines)
+    { // 'a' is the (next) new point between p0 and p1
+        Vec2d  p0p1      = (p1.p - p0->p).cast<double>();
+        double p0p1_size = p0p1.norm();
+        // so that p0p1_size - dist_last_point evaulates to dist_left_over - p0p1_size
+        double dist_last_point = dist_left_over + p0p1_size * 2.;
+        for (double p0pa_dist = dist_left_over; p0pa_dist < p0p1_size;
+             p0pa_dist += min_dist_between_points + double(rand()) * range_random_point_dist / double(RAND_MAX))
+        {
+            double r = double(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
+            out.emplace_back(p0->p + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>(), p1.w, p1.perimeter_index);
+            dist_last_point = p0pa_dist;
+        }
+        dist_left_over = p0p1_size - dist_last_point;
+        p0 = &p1;
+    }
+    while (out.size() < 3) {
+        size_t point_idx = ext_lines.size() - 2;
+        out.emplace_back(ext_lines[point_idx].p, ext_lines[point_idx].w, ext_lines[point_idx].perimeter_index);
+        if (point_idx == 0)
+            break;
+        -- point_idx;
+    }
+    if (out.size() >= 3)
+        ext_lines.junctions = std::move(out);
+}
+
 static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Paths &subject, const ClipperLib_Z::Paths &clip, ClipperLib_Z::ClipType clipType)
 {
     ClipperLib_Z::Clipper clipper;
@@ -110,9 +148,6 @@ static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Paths &subject, co
 
     return clipped_paths;
 }
-
-
-
 
 void convert_to_clipperpath(const Polygons& source, ClipperLib_Z::Paths& dest) {
     dest.clear();
@@ -235,11 +270,11 @@ void PerimeterGenerator::process_arachne()
             direction       = 1;
         }
 
-        std::vector<const Arachne::ExtrusionLine *> all_extrusions;
+        std::vector<Arachne::ExtrusionLine *> all_extrusions;
         for (int perimeter_idx = start_perimeter; perimeter_idx != end_perimeter; perimeter_idx += direction) {
             if (perimeters[perimeter_idx].empty())
                 continue;
-            for (const Arachne::ExtrusionLine &wall : perimeters[perimeter_idx])
+            for (Arachne::ExtrusionLine &wall : perimeters[perimeter_idx])
                 all_extrusions.emplace_back(&wall);
         }
 
@@ -257,9 +292,9 @@ void PerimeterGenerator::process_arachne()
             blocking[map_extrusion_to_idx.find(before)->second].emplace_back(after_it->second);
         }
 
-        std::vector<bool> processed(all_extrusions.size(), false);                // Indicate that the extrusion was already processed.
+        std::vector<bool> processed(all_extrusions.size(), false);          // Indicate that the extrusion was already processed.
         Point             current_position = all_extrusions.empty() ? Point::Zero() : all_extrusions.front()->junctions.front().p; // Some starting position.
-        std::vector<const Arachne::ExtrusionLine *> ordered_extrusions;                   // To store our result in. At the end we'll std::swap.
+        std::vector<PerimeterGeneratorArachneExtrusion> ordered_extrusions;         // To store our result in. At the end we'll std::swap.
         ordered_extrusions.reserve(all_extrusions.size());
 
         while (ordered_extrusions.size() < all_extrusions.size()) {
@@ -301,7 +336,7 @@ void PerimeterGenerator::process_arachne()
             }
 
             auto &best_path = all_extrusions[best_candidate];
-            ordered_extrusions.push_back(best_path);
+            ordered_extrusions.push_back({best_path, false});
             processed[best_candidate] = true;
             for (size_t unlocked_idx : blocking[best_candidate])
                 blocked[unlocked_idx]--;
@@ -311,6 +346,47 @@ void PerimeterGenerator::process_arachne()
                     current_position = best_path->junctions[0].p; //We end where we started.
                 else
                     current_position = best_path->junctions.back().p; //Pick the other end from where we started.
+            }
+        }
+
+        // fuzzify
+        if (this->layer->id() > 0 && this->config->fuzzy_skin != FuzzySkinType::None) {
+            std::vector<PerimeterGeneratorArachneExtrusion *> closed_loop_extrusions;
+            for (PerimeterGeneratorArachneExtrusion &extrusion : ordered_extrusions)
+                if (extrusion.extrusion->inset_idx == 0 || this->config->fuzzy_skin == FuzzySkinType::All) {
+                    if (extrusion.extrusion->is_closed && this->config->fuzzy_skin == FuzzySkinType::External) {
+                        closed_loop_extrusions.emplace_back(&extrusion);
+                    } else {
+                        extrusion.fuzzify = true;
+                    }
+                }
+
+            if (this->config->fuzzy_skin == FuzzySkinType::External) {
+                ClipperLib_Z::Paths loops_paths;
+                loops_paths.reserve(closed_loop_extrusions.size());
+                for (const auto &cl_extrusion : closed_loop_extrusions) {
+                    assert(cl_extrusion->extrusion->junctions.front() == cl_extrusion->extrusion->junctions.back());
+                    size_t             loop_idx = &cl_extrusion - &closed_loop_extrusions.front();
+                    ClipperLib_Z::Path loop_path;
+                    loop_path.reserve(cl_extrusion->extrusion->junctions.size() - 1);
+                    for (auto junction_it = cl_extrusion->extrusion->junctions.begin(); junction_it != std::prev(cl_extrusion->extrusion->junctions.end()); ++junction_it)
+                        loop_path.emplace_back(junction_it->p.x(), junction_it->p.y(), loop_idx);
+                    loops_paths.emplace_back(loop_path);
+                }
+
+                ClipperLib_Z::Clipper clipper;
+                clipper.AddPaths(loops_paths, ClipperLib_Z::ptSubject, true);
+                ClipperLib_Z::PolyTree loops_polytree;
+                clipper.Execute(ClipperLib_Z::ctUnion, loops_polytree, ClipperLib_Z::pftEvenOdd, ClipperLib_Z::pftEvenOdd);
+
+                for (const ClipperLib_Z::PolyNode *child_node : loops_polytree.Childs) {
+                    // The whole contour must have the same index.
+                    coord_t polygon_idx  = child_node->Contour.front().z();
+                    bool    has_same_idx = std::all_of(child_node->Contour.begin(), child_node->Contour.end(),
+                                                       [&polygon_idx](const ClipperLib_Z::IntPoint &point) -> bool { return polygon_idx == point.z(); });
+                    if (has_same_idx)
+                        closed_loop_extrusions[polygon_idx]->fuzzify = true;
+                }
             }
         }
 
@@ -1065,14 +1141,15 @@ void PerimeterGenerator::process_classic()
 
                 // fuzzify
                 const bool fuzzify_contours = this->config->fuzzy_skin != FuzzySkinType::None && perimeter_idx == 0 && this->layer->id() > 0;
-                const bool fuzzify_holes = this->layer->id() > 0 && this->config->fuzzy_skin == FuzzySkinType::All;
+                const bool fuzzify_holes = this->config->fuzzy_skin == FuzzySkinType::Shell && perimeter_idx == 0 && this->layer->id() > 0 ;
+                const bool fuzzify_all = this->config->fuzzy_skin == FuzzySkinType::All && this->layer->id() > 0 ;
                 for (const ExPolygon& expolygon : next_onion) {
                     //TODO: add width here to allow variable width (if we want to extrude a sightly bigger perimeter, see thin wall)
-                    contours[perimeter_idx].emplace_back(expolygon.contour, perimeter_idx, true, has_steep_overhang, fuzzify_contours || fuzzify_holes);
+                    contours[perimeter_idx].emplace_back(expolygon.contour, perimeter_idx, true, has_steep_overhang, fuzzify_contours || fuzzify_all);
                     if (!expolygon.holes.empty()) {
                         holes[perimeter_idx].reserve(holes[perimeter_idx].size() + expolygon.holes.size());
                         for (const Polygon& hole : expolygon.holes)
-                            holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang, fuzzify_holes);
+                            holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang, fuzzify_holes || fuzzify_all);
                     }
                 }
 
@@ -2228,7 +2305,8 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& lo
     return paths;
 }
 
-static void fuzzy_polygon(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, coordf_t fuzzy_skin_point_dist)
+// Thanks Cura developers for this function.
+static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, coordf_t fuzzy_skin_point_dist)
 {
     const coordf_t min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
     const coordf_t range_random_point_dist = fuzzy_skin_point_dist / 2.;
@@ -2333,7 +2411,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
             double nozle_diameter = is_external ? this->ext_perimeter_flow.nozzle_diameter() : this->perimeter_flow.nozzle_diameter();
             double fuzzy_skin_thickness = config->fuzzy_skin_thickness.get_abs_value(nozle_diameter);
             double fuzzy_skin_point_dist = config->fuzzy_skin_point_dist.get_abs_value(nozle_diameter);
-            fuzzy_polygon(paths, scale_d(fuzzy_skin_thickness), scale_d(fuzzy_skin_point_dist));
+            fuzzy_paths(paths, scale_d(fuzzy_skin_thickness), scale_d(fuzzy_skin_point_dist));
         }
 
         coll.push_back(new ExtrusionLoop(paths, loop_role));
@@ -2411,23 +2489,26 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
     return coll_out;
 }
 
-ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const std::vector<const Arachne::ExtrusionLine*>& extrusions)
+ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<PerimeterGeneratorArachneExtrusion>& pg_extrusions)
 {
     ExtrusionEntityCollection extrusion_coll;
-    for (const Arachne::ExtrusionLine* extrusion : extrusions) {
+    for (PerimeterGeneratorArachneExtrusion& pg_extrusion : pg_extrusions) {
+        Arachne::ExtrusionLine* extrusion = pg_extrusion.extrusion;
         if (extrusion->empty())
             continue;
 
         const bool    is_external = extrusion->inset_idx == 0;
         ExtrusionRole role = is_external ? erExternalPerimeter : erPerimeter;
 
+        // fuzzy_extrusion_line() don't work. I can use fuzzy_paths() anyway, not a big deal.
+        //if (pg_extrusion.fuzzify)
+        //    fuzzy_extrusion_line(*extrusion, scale_d(this->config->fuzzy_skin_thickness.value), scale_d(this->config->fuzzy_skin_point_dist.value));
+
         ExtrusionPaths paths;
         // detect overhanging/bridging perimeters
         if (this->config->overhangs_width_speed > 0 && this->layer->id() > this->object_config->raft_layers
             && !((this->object_config->support_material || this->object_config->support_material_enforce_layers > 0) &&
                 this->object_config->support_material_contact_distance.value == 0)) {
-
-
             ClipperLib_Z::Path extrusion_path;
             extrusion_path.reserve(extrusion->size());
             for (const Arachne::ExtrusionJunction& ej : extrusion->junctions)
@@ -2443,6 +2524,14 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const std::ve
                 is_external ? this->ext_perimeter_flow : this->perimeter_flow,
                 std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
                 (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10));
+        }
+
+        // Apply fuzzify
+        if (pg_extrusion.fuzzify) {
+            double nozle_diameter = is_external ? this->ext_perimeter_flow.nozzle_diameter() : this->perimeter_flow.nozzle_diameter();
+            double fuzzy_skin_thickness = config->fuzzy_skin_thickness.get_abs_value(nozle_diameter);
+            double fuzzy_skin_point_dist = config->fuzzy_skin_point_dist.get_abs_value(nozle_diameter);
+            fuzzy_paths(paths, scale_d(fuzzy_skin_thickness), scale_d(fuzzy_skin_point_dist));
         }
 
         // Append paths to collection.

@@ -25,6 +25,13 @@ struct PerimeterIntersectionPoint {
     coord_t distance;
 };
 
+struct PerimeterGeneratorArachneExtrusion
+{
+    Arachne::ExtrusionLine* extrusion = nullptr;
+    // Should this extrusion be fuzzyfied on path generation?
+    bool fuzzify = false;
+};
+
 // Hierarchy of perimeters.
 class PerimeterGeneratorLoop {
 public:
@@ -128,7 +135,7 @@ private:
 
     // transform loops into ExtrusionEntityCollection, adding also thin walls into it.
     ExtrusionEntityCollection _traverse_loops(const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls) const;
-    ExtrusionEntityCollection _traverse_extrusions(const std::vector<const Arachne::ExtrusionLine*>& extrusions);
+    ExtrusionEntityCollection _traverse_extrusions(std::vector<PerimeterGeneratorArachneExtrusion>& pg_extrusions);
     // try to merge thin walls to a current periemter exrusion or just add it to the end of the list.
     void _merge_thin_walls(ExtrusionEntityCollection &extrusions, ThickPolylines &thin_walls) const;
     // like _traverse_loops but with merging all periemter into one continuous loop
