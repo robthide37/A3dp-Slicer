@@ -408,14 +408,14 @@ class Transformation
 public:
 #if ENABLE_WORLD_COORDINATE
     Transformation() = default;
-    explicit Transformation(const Transform3d & transform) : m_matrix(transform) {}
+    explicit Transformation(const Transform3d& transform) : m_matrix(transform) {}
 
     Vec3d get_offset() const { return m_matrix.translation(); }
     double get_offset(Axis axis) const { return get_offset()[axis]; }
 
     Transform3d get_offset_matrix() const;
 
-    void set_offset(const Vec3d & offset) { m_matrix.translation() = offset; }
+    void set_offset(const Vec3d& offset) { m_matrix.translation() = offset; }
     void set_offset(Axis axis, double offset) { m_matrix.translation()[axis] = offset; }
 
     Vec3d get_rotation() const;
@@ -424,12 +424,12 @@ public:
     Transform3d get_rotation_matrix() const;
 #else
     Transformation();
-    explicit Transformation(const Transform3d & transform);
+    explicit Transformation(const Transform3d& transform);
 
     const Vec3d& get_offset() const { return m_offset; }
     double get_offset(Axis axis) const { return m_offset(axis); }
 
-    void set_offset(const Vec3d & offset);
+    void set_offset(const Vec3d& offset);
     void set_offset(Axis axis, double offset);
 
     const Vec3d& get_rotation() const { return m_rotation; }

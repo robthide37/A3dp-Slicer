@@ -408,7 +408,8 @@ bool GLGizmosManager::gizmos_toolbar_on_mouse(const wxMouseEvent &mouse_event) {
             // at this moment is enebled to process mouse move under gizmo
             // tools bar e.g. Do not interupt dragging. 
             return false;
-        } else if (mc.exist_tooltip) {
+        }
+        else if (mc.exist_tooltip) {
             // first move out of gizmo tool bar - unselect tooltip
             mc.exist_tooltip = false;
             update_hover_state(Undefined);
@@ -423,10 +424,12 @@ bool GLGizmosManager::gizmos_toolbar_on_mouse(const wxMouseEvent &mouse_event) {
             mc.left = true;
             open_gizmo(gizmo);
             return true;
-        } else if (mouse_event.RightDown()) {
+        }
+        else if (mouse_event.RightDown()) {
             mc.right  = true;
             return true;
-        } else if (mouse_event.MiddleDown()) {
+        }
+        else if (mouse_event.MiddleDown()) {
             mc.middle = true;
             return true;
         }
@@ -441,14 +444,17 @@ bool GLGizmosManager::gizmos_toolbar_on_mouse(const wxMouseEvent &mouse_event) {
                 update_hover_state(Undefined);
             }
             // draging start on toolbar so no propagation into scene
-            return true;            
-        } else if (mc.left && mouse_event.LeftUp()) {
+            return true;
+        }
+        else if (mc.left && mouse_event.LeftUp()) {
             mc.left = false;
             return true;
-        } else if (mc.right && mouse_event.RightUp()) {
+        }
+        else if (mc.right && mouse_event.RightUp()) {
             mc.right = false;
             return true;
-        } else if (mc.middle && mouse_event.MiddleUp()) {
+        }
+        else if (mc.middle && mouse_event.MiddleUp()) {
             mc.middle = false;
             return true;
         }

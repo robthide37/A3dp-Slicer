@@ -11,7 +11,7 @@
 
 #include <GL/glew.h>
 
-#include <wx/utils.h> 
+#include <wx/utils.h>
 
 namespace Slic3r {
 namespace GUI {
@@ -166,26 +166,25 @@ bool GLGizmoScale3D::on_is_activable() const
 
 void GLGizmoScale3D::on_start_dragging()
 {
-    if (m_hover_id != -1) {
-        m_starting.ctrl_down = wxGetKeyState(WXK_CONTROL);
+    assert(m_hover_id != -1);
+    m_starting.ctrl_down = wxGetKeyState(WXK_CONTROL);
 #if ENABLE_WORLD_COORDINATE
-        m_starting.drag_position = m_grabbers_transform * m_grabbers[m_hover_id].center;
-        m_starting.box = m_bounding_box;
-        m_starting.center = m_center;
-        m_starting.instance_center = m_instance_center;
+    m_starting.drag_position = m_grabbers_transform * m_grabbers[m_hover_id].center;
+    m_starting.box = m_bounding_box;
+    m_starting.center = m_center;
+    m_starting.instance_center = m_instance_center;
 #else
-        m_starting.drag_position = m_grabbers[m_hover_id].center;
-        m_starting.box = (m_starting.ctrl_down && m_hover_id < 6) ? m_bounding_box : m_parent.get_selection().get_bounding_box();
+    m_starting.drag_position = m_grabbers[m_hover_id].center;
+    m_starting.box = (m_starting.ctrl_down && m_hover_id < 6) ? m_bounding_box : m_parent.get_selection().get_bounding_box();
 
-        const Vec3d center = m_starting.box.center();
-        m_starting.pivots[0] = m_transform * Vec3d(m_starting.box.max.x(), center.y(), center.z());
-        m_starting.pivots[1] = m_transform * Vec3d(m_starting.box.min.x(), center.y(), center.z());
-        m_starting.pivots[2] = m_transform * Vec3d(center.x(), m_starting.box.max.y(), center.z());
-        m_starting.pivots[3] = m_transform * Vec3d(center.x(), m_starting.box.min.y(), center.z());
-        m_starting.pivots[4] = m_transform * Vec3d(center.x(), center.y(), m_starting.box.max.z());
-        m_starting.pivots[5] = m_transform * Vec3d(center.x(), center.y(), m_starting.box.min.z());
+    const Vec3d& center = m_starting.box.center();
+    m_starting.pivots[0] = m_transform * Vec3d(m_starting.box.max.x(), center.y(), center.z());
+    m_starting.pivots[1] = m_transform * Vec3d(m_starting.box.min.x(), center.y(), center.z());
+    m_starting.pivots[2] = m_transform * Vec3d(center.x(), m_starting.box.max.y(), center.z());
+    m_starting.pivots[3] = m_transform * Vec3d(center.x(), m_starting.box.min.y(), center.z());
+    m_starting.pivots[4] = m_transform * Vec3d(center.x(), center.y(), m_starting.box.max.z());
+    m_starting.pivots[5] = m_transform * Vec3d(center.x(), center.y(), m_starting.box.min.z());
 #endif // ENABLE_WORLD_COORDINATE
-    }
 }
 
 void GLGizmoScale3D::on_stop_dragging() {
@@ -230,11 +229,7 @@ void GLGizmoScale3D::on_render()
         const Selection::IndicesList& idxs = selection.get_volume_idxs();
         for (unsigned int idx : idxs) {
             const GLVolume& v = *selection.get_volume(idx);
-#if ENABLE_WORLD_COORDINATE
             m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
-#else
-            m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
-#endif // ENABLE_WORLD_COORDINATE
         }
 
 #if ENABLE_WORLD_COORDINATE
@@ -303,7 +298,7 @@ void GLGizmoScale3D::on_render()
     const Vec3d offset_y = offsets_transform * Vec3d(0.0, (double)Offset, 0.0);
     const Vec3d offset_z = offsets_transform * Vec3d(0.0, 0.0, (double)Offset);
 
-    bool ctrl_down = m_dragging && m_starting.ctrl_down || !m_dragging && wxGetKeyState(WXK_CONTROL);
+    const bool ctrl_down = (m_dragging && m_starting.ctrl_down) || (!m_dragging && wxGetKeyState(WXK_CONTROL));
 #endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_WORLD_COORDINATE
@@ -361,6 +356,7 @@ void GLGizmoScale3D::on_render()
     m_grabbers[7].center = m_transform * Vec3d(m_bounding_box.max.x(), m_bounding_box.min.y(), center.z()) + offset_x - offset_y;
     m_grabbers[8].center = m_transform * Vec3d(m_bounding_box.max.x(), m_bounding_box.max.y(), center.z()) + offset_x + offset_y;
     m_grabbers[9].center = m_transform * Vec3d(m_bounding_box.min.x(), m_bounding_box.max.y(), center.z()) - offset_x + offset_y;
+
     for (int i = 6; i < 10; ++i) {
         m_grabbers[i].color = m_highlight_color;
     }
@@ -383,7 +379,7 @@ void GLGizmoScale3D::on_render()
     transform_to_local(selection);
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-    float grabber_mean_size = (float)((m_bounding_box.size().x() + m_bounding_box.size().y() + m_bounding_box.size().z()) / 3.0);
+    const float grabber_mean_size = (float)((m_bounding_box.size().x() + m_bounding_box.size().y() + m_bounding_box.size().z()) / 3.0);
 #else
     const BoundingBoxf3& selection_box = selection.get_bounding_box();
     const float grabber_mean_size = (float)((selection_box.size().x() + selection_box.size().y() + selection_box.size().z()) / 3.0);
@@ -597,7 +593,9 @@ void GLGizmoScale3D::on_render()
     }
 
 #if ENABLE_WORLD_COORDINATE
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // ENABLE_WORLD_COORDINATE
 }
 
@@ -621,7 +619,7 @@ void GLGizmoScale3D::on_render_for_picking()
 #else
     render_grabbers_for_picking(m_parent.get_selection().get_bounding_box());
 #endif // ENABLE_WORLD_COORDINATE
-    }
+}
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color)

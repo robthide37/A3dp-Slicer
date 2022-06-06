@@ -393,7 +393,7 @@ void GLGizmoRotate::render_circle() const
 #else
     ::glBegin(GL_LINE_LOOP);
     for (unsigned int i = 0; i < ScaleStepsCount; ++i) {
-        const float angle = (float)i * ScaleStepRad;
+        const float angle = float(i) * ScaleStepRad;
         const float x = ::cos(angle) * m_radius;
         const float y = ::sin(angle) * m_radius;
         const float z = 0.0f;
@@ -595,7 +595,7 @@ void GLGizmoRotate::render_angle() const
 #else
     ::glBegin(GL_LINE_STRIP);
     for (unsigned int i = 0; i <= AngleResolution; ++i) {
-        const float angle = (float)i * step_angle;
+        const float angle = float(i) * step_angle;
         const float x = ::cos(angle) * ex_radius;
         const float y = ::sin(angle) * ex_radius;
         const float z = 0.0f;

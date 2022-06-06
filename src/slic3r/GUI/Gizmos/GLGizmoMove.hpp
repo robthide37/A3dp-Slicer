@@ -57,16 +57,15 @@ public:
     /// Detect reduction of move for wipetover on selection change
     /// </summary>
     void data_changed() override;
-
 protected:
-    virtual bool on_init() override;
-    virtual std::string on_get_name() const override;
-    virtual bool on_is_activable() const override;
-    virtual void on_start_dragging() override;
-    virtual void on_stop_dragging() override;
-    virtual void on_dragging(const UpdateData& data) override;
-    virtual void on_render() override;
-    virtual void on_render_for_picking() override;
+    bool on_init() override;
+    std::string on_get_name() const override;
+    bool on_is_activable() const override;
+    void on_start_dragging() override;
+    void on_stop_dragging() override;
+    void on_dragging(const UpdateData& data) override;
+    void on_render() override;
+    void on_render_for_picking() override;
 
 private:
     double calc_projection(const UpdateData& data) const;
@@ -79,9 +78,15 @@ private:
     void calc_selection_box_and_center();
 #endif // ENABLE_WORLD_COORDINATE
 #if !ENABLE_GIZMO_GRABBER_REFACTOR
+#if ENABLE_WORLD_COORDINATE && ENABLE_GL_SHADERS_ATTRIBUTES
+    void render_grabber_extension(Axis axis, const Transform3d& base_matrix, const BoundingBoxf3& box, bool picking);
+#else
     void render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking);
+#endif // ENABLE_WORLD_COORDINATE && ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 };
+
+
 
 } // namespace GUI
 } // namespace Slic3r

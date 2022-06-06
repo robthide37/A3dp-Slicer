@@ -9,7 +9,6 @@
 #include "GUI_ObjectList.hpp"
 #include "Camera.hpp"
 #include "Plater.hpp"
-
 #if ENABLE_WORLD_COORDINATE
 #include "MsgDialog.hpp"
 #endif // ENABLE_WORLD_COORDINATE
@@ -786,7 +785,7 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
                 assert(false);
         }
         else {
-            const Vec3d offset = transformation_type.local() ?
+            const Vec3d offset = transformation_type.local() ? 
                 (Vec3d)(volume_data.get_volume_transform().get_rotation_matrix() * displacement) : displacement;
             transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(offset));
         }
@@ -966,7 +965,6 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                         const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), new_rotation);
                         volume.set_instance_offset(m_cache.dragging_center + Eigen::AngleAxisd(z_diff, Vec3d::UnitZ()) * (m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center));
                     }
-
                     volume.set_instance_rotation(new_rotation);
                     object_instance_first[volume.object_idx()] = i;
                 }
@@ -1048,7 +1046,7 @@ void Selection::flattening_rotate(const Vec3d& normal)
 #else
         const auto& voldata = m_cache.volumes_data[i];
         Vec3d tnormal = (Geometry::assemble_transform(
-            Vec3d::Zero(), voldata.get_instance_rotation(),
+            Vec3d::Zero(), voldata.get_instance_rotation(), 
             voldata.get_instance_scaling_factor().cwiseInverse(), voldata.get_instance_mirror()) * normal).normalized();
         // Additional rotation to align tnormal with the down vector in the world coordinate space.
         auto  extra_rotation = Eigen::Quaterniond().setFromTwoVectors(tnormal, -Vec3d::UnitZ());
@@ -1897,6 +1895,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         render_sidebar_scale_hints(sidebar_field, *shader, base_matrix * orient_matrix);
     else if (boost::starts_with(sidebar_field, "layer"))
         render_sidebar_layers_hints(sidebar_field, *shader);
+
 #if ENABLE_WORLD_COORDINATE
     if (!boost::starts_with(sidebar_field, "layer")) {
         if (!wxGetApp().obj_manipul()->is_world_coordinates())
@@ -2014,8 +2013,7 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_object(unsigned int ob
 {
     std::vector<unsigned int> idxs;
 
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i)
-    {
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
         if ((*m_volumes)[i]->object_idx() == (int)object_idx)
             idxs.push_back(i);
     }
@@ -2027,10 +2025,9 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_instance(unsigned int 
 {
     std::vector<unsigned int> idxs;
 
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i)
-    {
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
         const GLVolume* v = (*m_volumes)[i];
-        if ((v->object_idx() == (int)object_idx) && (v->instance_idx() == (int)instance_idx))
+        if (v->object_idx() == (int)object_idx && v->instance_idx() == (int)instance_idx)
             idxs.push_back(i);
     }
 
@@ -2044,9 +2041,8 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_volume(unsigned int ob
     for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i)
     {
         const GLVolume* v = (*m_volumes)[i];
-        if ((v->object_idx() == (int)object_idx) && (v->volume_idx() == (int)volume_idx))
-        {
-            if (((int)instance_idx != -1) && (v->instance_idx() == (int)instance_idx))
+        if (v->object_idx() == (int)object_idx && v->volume_idx() == (int)volume_idx) {
+            if ((int)instance_idx != -1 && v->instance_idx() == (int)instance_idx)
                 idxs.push_back(i);
         }
     }
@@ -2058,8 +2054,7 @@ std::vector<unsigned int> Selection::get_missing_volume_idxs_from(const std::vec
 {
     std::vector<unsigned int> idxs;
 
-    for (unsigned int i : m_list)
-    {
+    for (unsigned int i : m_list) {
         std::vector<unsigned int>::const_iterator it = std::find(volume_idxs.begin(), volume_idxs.end(), i);
         if (it == volume_idxs.end())
             idxs.push_back(i);
@@ -2105,7 +2100,8 @@ void Selection::update_type()
 
     if (!m_valid)
         m_type = Invalid;
-    else {
+    else
+    {
         if (m_list.empty())
             m_type = Empty;
         else if (m_list.size() == 1) {
@@ -2203,8 +2199,7 @@ void Selection::update_type()
 
     int object_idx = get_object_idx();
     int instance_idx = get_instance_idx();
-    for (GLVolume* v : *m_volumes)
-    {
+    for (GLVolume* v : *m_volumes) {
         v->disabled = requires_disable ? (v->object_idx() != object_idx) || (v->instance_idx() != instance_idx) : false;
     }
 
@@ -2393,7 +2388,7 @@ void Selection::render_synchronized_volumes()
             if (coordinates_type == ECoordinatesType::World) {
                 box = v.transformed_convex_hull_bounding_box();
                 trafo = Transform3d::Identity();
-        }
+            }
             else if (coordinates_type == ECoordinatesType::Local) {
                 box = v.bounding_box();
                 trafo = v.world_matrix();
@@ -2437,6 +2432,7 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     const BoundingBoxf3& curr_box = m_box.get_bounding_box();
+
     if (!m_box.is_initialized() || !is_approx(box.min, curr_box.min) || !is_approx(box.max, curr_box.max)) {
         m_box.reset();
 
@@ -3046,10 +3042,11 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
             const Geometry::Transformation& curr_inst_trafo_j = volume_j->get_instance_transformation();
             const Vec3d curr_inst_rotation_j = curr_inst_trafo_j.get_rotation();
             Vec3d new_inst_offset_j = curr_inst_trafo_j.get_offset();
-            Vec3d new_inst_rotation_j = curr_inst_rotation_j; 
+            Vec3d new_inst_rotation_j = curr_inst_rotation_j;
 #else
             assert(is_rotation_xy_synchronized(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation()));
 #endif // ENABLE_WORLD_COORDINATE
+
             switch (sync_rotation_type) {
             case SyncRotationType::NONE: {
                 // z only rotation -> synch instance z
