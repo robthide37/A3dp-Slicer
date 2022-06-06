@@ -79,7 +79,7 @@ void its_short_edge_collpase(indexed_triangle_set &mesh, size_t target_triangle_
             }
     };
 
-    std::mt19937_64 generator { }; // default constant seed! so that results are deterministic
+    std::mt19937_64 generator { 27644437 };// default constant seed! so that results are deterministic
     std::vector<size_t> face_indices(mesh.indices.size());
     for (size_t idx = 0; idx < face_indices.size(); ++idx) {
         face_indices[idx] = idx;

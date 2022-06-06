@@ -28,7 +28,7 @@ TriangleSetSamples sample_its_uniform_parallel(size_t samples_count, const index
         area_sum_to_triangle_idx[area_sum] = t_idx;
     }
 
-    std::mt19937_64 mersenne_engine {  };
+    std::mt19937_64 mersenne_engine { 27644437 };
     // random numbers on interval [0, 1)
     std::uniform_real_distribution<double> fdistribution;
 

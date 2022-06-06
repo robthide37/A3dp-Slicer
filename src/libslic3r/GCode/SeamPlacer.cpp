@@ -687,8 +687,10 @@ void gather_enforcers_blockers(GlobalModelInfo &result, const PrintObject *po) {
 
 struct SeamComparator {
     SeamPosition setup;
+    float angle_importance;
     SeamComparator(SeamPosition setup) :
             setup(setup) {
+        angle_importance = setup == spNearest ? SeamPlacer::angle_importance_nearest : SeamPlacer::angle_importance_aligned;
     }
 
     // Standard comparator, must respect the requirements of comparators (e.g. give same result on same inputs) for sorting usage
@@ -734,10 +736,10 @@ struct SeamComparator {
 
         // the penalites are kept close to range [0-1.x] however, it should not be relied upon
         float penalty_a = a.visibility +
-                SeamPlacer::angle_importance * compute_angle_penalty(a.local_ccw_angle)
+                angle_importance * compute_angle_penalty(a.local_ccw_angle)
                 + distance_penalty_a;
         float penalty_b = b.visibility +
-                SeamPlacer::angle_importance * compute_angle_penalty(b.local_ccw_angle)
+                angle_importance * compute_angle_penalty(b.local_ccw_angle)
                 + distance_penalty_b;
 
         return penalty_a < penalty_b;
@@ -791,9 +793,9 @@ struct SeamComparator {
         }
 
         float penalty_a = a.visibility
-                + SeamPlacer::angle_importance * compute_angle_penalty(a.local_ccw_angle);
+                + angle_importance * compute_angle_penalty(a.local_ccw_angle);
         float penalty_b = b.visibility +
-                SeamPlacer::angle_importance * compute_angle_penalty(b.local_ccw_angle);
+                angle_importance * compute_angle_penalty(b.local_ccw_angle);
 
         return penalty_a <= penalty_b || penalty_a - penalty_b < SeamPlacer::seam_align_score_tolerance;
     }
@@ -1071,9 +1073,14 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                 }
 
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-                    bool layer_has_multiple_loops =
-                            layers[layer_idx].points[0].perimeter.end_index
-                                    < layers[layer_idx].points.size() - 1;
+                    size_t regions_with_perimeter = 0;
+                    for (const LayerRegion *region : po->layers()[layer_idx]->regions()) {
+                        if (region->perimeters.entities.size() > 0) {
+                            regions_with_perimeter++;
+                        }
+                    };
+                    bool should_compute_layer_embedding = regions_with_perimeter > 1;
+                    layers[layer_idx].points[0].perimeter.end_index < layers[layer_idx].points.size() - 1;
                     std::unique_ptr<PerimeterDistancer> current_layer_distancer = std::make_unique<PerimeterDistancer>(po->layers()[layer_idx]);
 
                     for (SeamCandidate &perimeter_point : layers[layer_idx].points) {
@@ -1082,7 +1089,7 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                             perimeter_point.overhang = prev_layer_distancer->distance_from_perimeter(point);
                         }
 
-                        if (layer_has_multiple_loops) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
+                        if (should_compute_layer_embedding) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
                             perimeter_point.embedded_distance = current_layer_distancer->distance_from_perimeter(point);
                         }
                     }

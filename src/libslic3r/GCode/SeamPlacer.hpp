@@ -133,7 +133,8 @@ public:
     static constexpr float overhang_distance_tolerance_factor = 0.5f;
 
     // determines angle importance compared to visibility ( neutral value is 1.0f. )
-    static constexpr float angle_importance = 0.6f;
+    static constexpr float angle_importance_aligned = 0.6f;
+    static constexpr float angle_importance_nearest = 2.0f; // use much higher angle importance for nearest mode, to combat the visiblity info noise
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
     static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
