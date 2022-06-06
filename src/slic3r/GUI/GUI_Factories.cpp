@@ -703,6 +703,8 @@ wxMenuItem* MenuFactory::append_menu_item_fix_through_netfabb(wxMenu* menu)
 
 wxMenuItem* MenuFactory::append_menu_item_fix_through_meshfix(wxMenu* menu)
 {
+    if (is_windows10())
+        return nullptr;
     wxMenuItem* menu_item = append_menu_item(menu, wxID_ANY, _L("Fix through MeshFix (experimental)"), "",
         [](wxCommandEvent&) { obj_list()->repair_mesh(ObjectList::rmaMeshfix); }, "", menu,
         []() {return plater()->can_repair_mesh(); }, m_parent);
