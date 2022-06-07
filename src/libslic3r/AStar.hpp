@@ -53,7 +53,7 @@ template<class T> struct TracerTraits_
 template<class T>
 using TracerNodeT = typename TracerTraits_<remove_cvref_t<T>>::Node;
 
-constexpr size_t Unassigned = size_t(-1);
+constexpr auto Unassigned = std::numeric_limits<size_t>::max();
 
 template<class Tracer>
 struct QNode // Queue node. Keeps track of scores g, and h
@@ -69,7 +69,11 @@ struct QNode // Queue node. Keeps track of scores g, and h
           size_t              p    = Unassigned,
           float               gval = std::numeric_limits<float>::infinity(),
           float               hval = 0.f)
-        : node{std::move(n)}, parent{p}, queue_id{Unassigned}, g{gval}, h{hval}
+        : node{std::move(n)}
+        , parent{p}
+        , queue_id{InvalidQueueID}
+        , g{gval}
+        , h{hval}
     {}
 };
 
@@ -154,7 +158,7 @@ bool search_route(const Tracer              &tracer,
                     // The cache needs to be updated either way
                     prev_nd = qsucc_nd;
 
-                    if (queue_id == decltype(qopen)::invalid_id())
+                    if (queue_id == InvalidQueueID)
                         // was in closed or unqueued, rescheduling
                         qopen.push(succ_id);
                     else // was in open, updating

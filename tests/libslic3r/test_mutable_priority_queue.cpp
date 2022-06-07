@@ -4,6 +4,8 @@
 
 #include "libslic3r/MutablePriorityQueue.hpp"
 
+using namespace Slic3r;
+
 // based on https://raw.githubusercontent.com/rollbear/prio_queue/master/self_test.cpp
 // original source Copyright Björn Fahller 2015, Boost Software License, Version 1.0, http://www.boost.org/LICENSE_1_0.txt
 
