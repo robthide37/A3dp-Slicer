@@ -128,10 +128,12 @@ add_library(libslic3r STATIC
     GCodeWriter.hpp
     Geometry.cpp
     Geometry.hpp
+    Geometry/Bicubic.hpp
     Geometry/Circle.cpp
     Geometry/Circle.hpp
     Geometry/ConvexHull.cpp
     Geometry/ConvexHull.hpp
+    Geometry/Curves.hpp
     Geometry/MedialAxis.cpp
     Geometry/MedialAxis.hpp
     Geometry/Voronoi.hpp
@@ -164,6 +166,8 @@ add_library(libslic3r STATIC
     MultiPoint.cpp
     MultiPoint.hpp
     MutablePriorityQueue.hpp
+    NormalUtils.cpp
+    NormalUtils.hpp
     ObjectID.cpp
     ObjectID.hpp
     PerimeterGenerator.cpp
@@ -203,6 +207,8 @@ add_library(libslic3r STATIC
     QuadricEdgeCollapse.cpp
     QuadricEdgeCollapse.hpp
     Semver.cpp
+    ShortEdgeCollapse.cpp
+    ShortEdgeCollapse.hpp
     ShortestPath.cpp
     ShortestPath.hpp
     SLAPrint.cpp
@@ -215,6 +221,8 @@ add_library(libslic3r STATIC
     SlicesToTriangleMesh.cpp
     SlicingAdaptive.cpp
     SlicingAdaptive.hpp
+    Subdivide.cpp
+    Subdivide.hpp
     SupportMaterial.cpp
     SupportMaterial.hpp
     Surface.cpp
@@ -241,6 +249,8 @@ add_library(libslic3r STATIC
     Thread.hpp
     TriangleSelector.cpp
     TriangleSelector.hpp
+    TriangleSetSampling.cpp
+    TriangleSetSampling.hpp
     MTUtils.hpp
     Zipper.hpp
     Zipper.cpp
