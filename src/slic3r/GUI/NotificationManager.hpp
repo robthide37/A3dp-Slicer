@@ -109,8 +109,8 @@ enum class NotificationType
 	// Give user advice to simplify object with big amount of triangles
 	// Contains ObjectID for closing when object is deleted
 	SimplifySuggestion,
-	// information about netfabb is finished repairing model (blocking proccess)
-	NetfabbFinished,
+	// information about finished model repairing (blocking proccess)
+	RepairMeshFinished,
 	// Short meesage to fill space between start and finish of export
 	ExportOngoing,
 };

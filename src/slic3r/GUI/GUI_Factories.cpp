@@ -694,8 +694,20 @@ wxMenuItem* MenuFactory::append_menu_item_fix_through_netfabb(wxMenu* menu)
     if (!is_windows10())
         return nullptr;
     wxMenuItem* menu_item = append_menu_item(menu, wxID_ANY, _L("Fix through the Netfabb"), "",
-        [](wxCommandEvent&) { obj_list()->fix_through_netfabb(); }, "", menu,
-        []() {return plater()->can_fix_through_netfabb(); }, m_parent);
+        [](wxCommandEvent&) { obj_list()->repair_mesh(ObjectList::rmaNetfabb); }, "", menu,
+        []() {return plater()->can_repair_mesh(); }, m_parent);
+
+    return menu_item;
+}
+
+
+wxMenuItem* MenuFactory::append_menu_item_fix_through_meshfix(wxMenu* menu)
+{
+    if (is_windows10())
+        return nullptr;
+    wxMenuItem* menu_item = append_menu_item(menu, wxID_ANY, _L("Fix through MeshFix (experimental)"), "",
+        [](wxCommandEvent&) { obj_list()->repair_mesh(ObjectList::rmaMeshfix); }, "", menu,
+        []() {return plater()->can_repair_mesh(); }, m_parent);
 
     return menu_item;
 }
@@ -923,6 +935,7 @@ void MenuFactory::create_common_object_menu(wxMenu* menu)
     append_menu_item_scale_selection_to_fit_print_volume(menu);
 
     append_menu_item_fix_through_netfabb(menu);
+    append_menu_item_fix_through_meshfix(menu);
     append_menu_item_simplify(menu);
     append_menu_items_mirror(menu);
 }
