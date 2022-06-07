@@ -85,6 +85,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/GUI_App.hpp
     GUI/GUI_Utils.cpp
     GUI/GUI_Utils.hpp
+    GUI/GUI_Geometry.cpp
+    GUI/GUI_Geometry.hpp
     GUI/I18N.cpp
     GUI/I18N.hpp
     GUI/MainFrame.cpp
@@ -129,6 +131,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/2DBed.hpp
     GUI/3DBed.cpp
     GUI/3DBed.hpp
+    GUI/CoordAxes.cpp
+    GUI/CoordAxes.hpp
     GUI/Camera.cpp
     GUI/Camera.hpp
     GUI/wxExtensions.cpp

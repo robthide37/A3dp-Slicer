@@ -122,8 +122,8 @@ void GLGizmoCut::on_render()
         // Z changed when move with cut plane
         // X and Y changed when move with cutted object
         bool  is_changed = std::abs(diff.x()) > EPSILON ||
-            std::abs(diff.y()) > EPSILON ||
-            std::abs(diff.z()) > EPSILON;
+                           std::abs(diff.y()) > EPSILON ||
+                           std::abs(diff.z()) > EPSILON;
 #endif // !ENABLE_GL_CORE_PROFILE
         m_old_center = plane_center;
 
@@ -132,7 +132,7 @@ void GLGizmoCut::on_render()
 
             GLModel::Geometry init_data;
             init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
-            init_data.color = { 0.8f, 0.8f, 0.8f, 0.5f };
+            init_data.color  = { 0.8f, 0.8f, 0.8f, 0.5f };
             init_data.reserve_vertices(4);
             init_data.reserve_indices(6);
 
@@ -344,7 +344,7 @@ void GLGizmoCut::perform_cut(const Selection& selection)
     wxCHECK_RET(instance_idx >= 0 && object_idx >= 0, "GLGizmoCut: Invalid object selection");
 
     // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
-    const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* first_glvolume = selection.get_first_volume();
     const double object_cut_z = m_cut_z - first_glvolume->get_sla_shift_z();
 
     if (0.0 < object_cut_z && object_cut_z < m_max_z)
@@ -397,7 +397,7 @@ BoundingBoxf3 GLGizmoCut::bounding_box() const
 void GLGizmoCut::update_contours()
 {
     const Selection& selection = m_parent.get_selection();
-    const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* first_glvolume = selection.get_first_volume();
     const BoundingBoxf3& box = first_glvolume->transformed_convex_hull_bounding_box();
 
     const ModelObject* model_object = wxGetApp().model().objects[selection.get_object_idx()];

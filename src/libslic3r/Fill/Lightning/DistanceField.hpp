@@ -176,7 +176,7 @@ protected:
             const Point  offset_loc = loc - m_grid_range.min;
             const size_t flat_idx   = m_grid_size.x() * offset_loc.y() + offset_loc.x();
             assert(offset_loc.x() >= 0 && offset_loc.y() >= 0);
-            assert(flat_idx < m_grid_size.y() * m_grid_size.x());
+            assert(flat_idx < size_t(m_grid_size.y() * m_grid_size.x()));
             return flat_idx;
         }
     };
