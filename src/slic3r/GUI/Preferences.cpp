@@ -697,7 +697,6 @@ void PreferencesDialog::revert(wxEvent&)
 
 
 	for (auto value : m_values) {
-		bool reverted = false;
 		const std::string& key = value.first;
 
 		if (key == "default_action_on_dirty_project") {

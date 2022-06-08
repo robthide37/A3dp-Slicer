@@ -311,6 +311,9 @@ void OptionsSearcher::check_and_update(PrinterTechnology pt_in, ConfigOptionMode
 
     for (auto i : input_values)
         append_options(i.config, i.type);
+
+    options.insert(options.end(), preferences_options.begin(), preferences_options.end());
+
     sort_options();
 
     search(search_line, true);
