@@ -43,7 +43,7 @@ static t_config_enum_values s_keys_map_PrinterTechnology {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrinterTechnology)
 
-static t_config_enum_values s_keys_map_GCodeFlavor {
+static const t_config_enum_values s_keys_map_GCodeFlavor {
     { "reprap",         gcfRepRapSprinter },
     { "reprapfirmware", gcfRepRapFirmware },
     { "repetier",       gcfRepetier },
@@ -59,14 +59,14 @@ static t_config_enum_values s_keys_map_GCodeFlavor {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(GCodeFlavor)
 
-static t_config_enum_values s_keys_map_MachineLimitsUsage {
+static const t_config_enum_values s_keys_map_MachineLimitsUsage {
     { "emit_to_gcode",      int(MachineLimitsUsage::EmitToGCode) },
     { "time_estimate_only", int(MachineLimitsUsage::TimeEstimateOnly) },
     { "ignore",             int(MachineLimitsUsage::Ignore) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(MachineLimitsUsage)
 
-static t_config_enum_values s_keys_map_PrintHostType {
+static const t_config_enum_values s_keys_map_PrintHostType {
     { "prusalink",      htPrusaLink },
     { "octoprint",      htOctoPrint },
     { "duet",           htDuet },
@@ -77,20 +77,20 @@ static t_config_enum_values s_keys_map_PrintHostType {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrintHostType)
 
-static t_config_enum_values s_keys_map_AuthorizationType {
+static const t_config_enum_values s_keys_map_AuthorizationType {
     { "key",            atKeyPassword },
     { "user",           atUserPassword }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(AuthorizationType)
 
-static t_config_enum_values s_keys_map_FuzzySkinType {
+static const t_config_enum_values s_keys_map_FuzzySkinType {
     { "none",           int(FuzzySkinType::None) },
     { "external",       int(FuzzySkinType::External) },
     { "all",            int(FuzzySkinType::All) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FuzzySkinType)
 
-static t_config_enum_values s_keys_map_InfillPattern {
+static const t_config_enum_values s_keys_map_InfillPattern {
     { "rectilinear",        ipRectilinear },
     { "monotonic",          ipMonotonic },
     { "alignedrectilinear", ipAlignedRectilinear },
@@ -112,41 +112,41 @@ static t_config_enum_values s_keys_map_InfillPattern {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(InfillPattern)
 
-static t_config_enum_values s_keys_map_IroningType {
+static const t_config_enum_values s_keys_map_IroningType {
     { "top",            int(IroningType::TopSurfaces) },
     { "topmost",        int(IroningType::TopmostOnly) },
     { "solid",          int(IroningType::AllSolid) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(IroningType)
 
-static t_config_enum_values s_keys_map_SlicingMode {
+static const t_config_enum_values s_keys_map_SlicingMode {
     { "regular",        int(SlicingMode::Regular) },
     { "even_odd",       int(SlicingMode::EvenOdd) },
     { "close_holes",    int(SlicingMode::CloseHoles) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SlicingMode)
 
-static t_config_enum_values s_keys_map_SupportMaterialPattern {
+static const t_config_enum_values s_keys_map_SupportMaterialPattern {
     { "rectilinear",        smpRectilinear },
     { "rectilinear-grid",   smpRectilinearGrid },
     { "honeycomb",          smpHoneycomb }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialPattern)
 
-static t_config_enum_values s_keys_map_SupportMaterialStyle {
+static const t_config_enum_values s_keys_map_SupportMaterialStyle {
     { "grid",           smsGrid },
     { "snug",           smsSnug }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialStyle)
 
-static t_config_enum_values s_keys_map_SupportMaterialInterfacePattern {
+static const t_config_enum_values s_keys_map_SupportMaterialInterfacePattern {
     { "auto",           smipAuto },
     { "rectilinear",    smipRectilinear },
     { "concentric",     smipConcentric }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialInterfacePattern)
 
-static t_config_enum_values s_keys_map_SeamPosition {
+static const t_config_enum_values s_keys_map_SeamPosition {
     { "random",         spRandom },
     { "nearest",        spNearest },
     { "aligned",        spAligned },
@@ -188,6 +188,13 @@ static const t_config_enum_values s_keys_map_DraftShield = {
     { "enabled",  dsEnabled  }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(DraftShield)
+
+static const t_config_enum_values s_keys_map_GCodeThumbnailsFormat = {
+    { "PNG", int(GCodeThumbnailsFormat::PNG) },
+    { "JPG", int(GCodeThumbnailsFormat::JPG) },
+    { "QOI", int(GCodeThumbnailsFormat::QOI) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(GCodeThumbnailsFormat)
 
 static const t_config_enum_values s_keys_map_ForwardCompatibilitySubstitutionRule = {
     { "disable",        ForwardCompatibilitySubstitutionRule::Disable },
@@ -263,6 +270,16 @@ void PrintConfigDef::init_common_params()
     def->mode = comExpert;
     def->gui_type = ConfigOptionDef::GUIType::one_string;
     def->set_default_value(new ConfigOptionPoints());
+
+    def = this->add("thumbnails_format", coEnum);
+    def->label = L("Format of G-code thumbnails");
+    def->tooltip = L("Format of G-code thumbnails: PNG for best quality, JPG for smallest size, QOI for low memory firmware");
+    def->mode = comExpert;
+    def->enum_keys_map = &ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_values();
+    def->enum_values.push_back("PNG");
+    def->enum_values.push_back("JPG");
+    def->enum_values.push_back("QOI");
+    def->set_default_value(new ConfigOptionEnum<GCodeThumbnailsFormat>(GCodeThumbnailsFormat::PNG));
 
     def = this->add("layer_height", coFloat);
     def->label = L("Layer height");
