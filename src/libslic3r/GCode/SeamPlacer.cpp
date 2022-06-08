@@ -178,7 +178,7 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
                             // FIXME: This AABBTTreeIndirect query will not compile for float ray origin and
                             // direction.
                             Vec3d final_ray_dir_d = final_ray_dir.cast<double>();
-                            Vec3d ray_origin_d = (center + normal * 0.03).cast<double>(); // start above surface.
+                            Vec3d ray_origin_d = (center + normal * 1.0f).cast<double>(); // start above surface.
                             bool hit = AABBTreeIndirect::intersect_ray_first_hit(triangles.vertices,
                                     triangles.indices, raycasting_tree, ray_origin_d, final_ray_dir_d, hitpoint);
                             if (hit && its_face_normal(triangles, hitpoint.id).dot(final_ray_dir) <= 0) {
@@ -188,10 +188,10 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
                             bool casting_from_negative_volume = samples.triangle_indices[s_idx]
                                     >= negative_volumes_start_index;
 
-                            Vec3d ray_origin_d = (center + normal * 0.1).cast<double>(); // start above surface.
+                            Vec3d ray_origin_d = (center + normal * 1.0f).cast<double>(); // start above surface.
                             if (casting_from_negative_volume) { // if casting from negative volume face, invert direction, change start pos
                                 final_ray_dir = -1.0 * final_ray_dir;
-                                ray_origin_d = (center - normal * 0.03).cast<double>();
+                                ray_origin_d = (center - normal * 1.0f).cast<double>();
                             }
                             Vec3d final_ray_dir_d = final_ray_dir.cast<double>();
                             bool some_hit = AABBTreeIndirect::intersect_ray_all_hits(triangles.vertices,
@@ -327,12 +327,22 @@ struct GlobalModelInfo {
             return 1.0f;
         }
 
+        auto compute_dist_to_plane = [](const Vec3f& position, const Vec3f& plane_origin, const Vec3f& plane_normal) {
+            Vec3f orig_to_point = position - plane_origin;
+            return std::abs(orig_to_point.dot(plane_normal));
+        };
+
+
         float total_weight = 0;
         float total_visibility = 0;
         for (size_t i = 0; i < points.size(); ++i) {
             size_t sample_idx = points[i];
-            float weight = 1.0f;      // SeamPlacer::visibility_samples_radius * SeamPlacer::visibility_samples_radius -
-            //(position - mesh_samples.positions[sample_idx]).squaredNorm();
+
+            Vec3f sample_point = this->mesh_samples.positions[sample_idx];
+            Vec3f sample_normal = this->mesh_samples.normals[sample_idx];
+
+            float weight = mesh_samples_radius - compute_dist_to_plane(position, sample_point, sample_normal);
+            weight += (mesh_samples_radius - (position - sample_point).norm());
             total_visibility += weight * mesh_samples_visibility[sample_idx];
             total_weight += weight;
         }
@@ -449,9 +459,9 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
 
     std::vector<float> lengths { };
     for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
-        lengths.push_back(std::max((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm(), 0.01));
+        lengths.push_back(std::max((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm(), 0.001));
     }
-    lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.01));
+    lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.001));
 
     std::vector<float> local_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
             SeamPlacer::polygon_local_angles_arm_distance);
@@ -712,11 +722,11 @@ struct SeamComparator {
             return a.overhang < b.overhang;
         }
 
-        // prefer hidden points (more than 1 mm inside)
-        if (a.embedded_distance < -1.0f && b.embedded_distance > -1.0f) {
+        // prefer hidden points (more than 0.5 mm inside)
+        if (a.embedded_distance < -0.5f && b.embedded_distance > -0.5f) {
             return true;
         }
-        if (b.embedded_distance < -1.0f && a.embedded_distance > -1.0f) {
+        if (b.embedded_distance < -0.5f && a.embedded_distance > -0.5f) {
             return false;
         }
 
@@ -773,11 +783,11 @@ struct SeamComparator {
             return a.overhang < b.overhang;
         }
 
-        // prefer hidden points (more than 1 mm inside)
-        if (a.embedded_distance < -1.0f && b.embedded_distance > -1.0f) {
+        // prefer hidden points (more than 0.5 mm inside)
+        if (a.embedded_distance < -0.5f && b.embedded_distance > -0.5f) {
             return true;
         }
-        if (b.embedded_distance < -1.0f && a.embedded_distance > -1.0f) {
+        if (b.embedded_distance < -0.5f && a.embedded_distance > -0.5f) {
             return false;
         }
 
