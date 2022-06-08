@@ -37,9 +37,8 @@
 #endif // ENABLE_GL_IMGUI_SHADERS
 
 #include "../Utils/MacDarkMode.hpp"
-
-#include "nanosvg/nanosvg.h"
-#include "nanosvg/nanosvgrast.h"
+#include <nanosvg/nanosvg.h>
+#include <nanosvg/nanosvgrast.h>
 
 namespace Slic3r {
 namespace GUI {
