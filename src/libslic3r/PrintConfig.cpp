@@ -3676,7 +3676,7 @@ void PrintConfigDef::init_sla_params()
     def->min = 0;
     def->max = 1;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(0.1));
+    def->set_default_value(new ConfigOptionFloat(0.15));
 
     def = this->add("support_base_diameter", coFloat);
     def->label = L("Support base diameter");

@@ -20,7 +20,7 @@ class BranchingTreeBuilder: public branchingtree::Builder {
 
     // Scaling of the input value 'widening_factor:<0, 1>' to produce resonable
     // widening behaviour
-    static constexpr double WIDENING_SCALE = 0.2;
+    static constexpr double WIDENING_SCALE = 0.08;
 
     double get_radius(const branchingtree::Node &j)
     {
@@ -206,11 +206,15 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
 
     execution::for_each(
         ex_tbb, size_t(0), nondup_idx.size(),
-        [&sm, &heads, &nondup_idx](size_t i) {
-            heads[i] = calculate_pinhead_placement(ex_seq, sm, nondup_idx[i]);
+        [&sm, &heads, &nondup_idx, &builder](size_t i) {
+            if (!builder.ctl().stopcondition())
+                heads[i] = calculate_pinhead_placement(ex_tbb, sm, nondup_idx[i]);
         },
         execution::max_concurrency(ex_tbb)
     );
+
+    if (builder.ctl().stopcondition())
+        return;
 
     for (auto &h : heads)
         if (h && h->is_valid()) {
