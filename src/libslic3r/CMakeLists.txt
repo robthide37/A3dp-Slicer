@@ -29,6 +29,7 @@ set(SLIC3R_SOURCES
     Brim.hpp
     BuildVolume.cpp
     BuildVolume.hpp
+    BoostAdapter.hpp
     clipper.cpp
     clipper.hpp
     ClipperUtils.cpp
@@ -292,7 +293,6 @@ set(SLIC3R_SOURCES
 #    SLA/SupportTreeIGL.cpp
     SLA/Rotfinder.hpp
     SLA/Rotfinder.cpp
-    SLA/BoostAdapter.hpp
     SLA/SpatIndex.hpp
     SLA/SpatIndex.cpp
     SLA/RasterBase.hpp
