@@ -114,6 +114,20 @@ public:
     static const std::vector<std::string>& get() { return Colors; }
 };
 
+struct LayerResult {
+    std::string gcode;
+    size_t      layer_id;
+    // Is spiral vase post processing enabled for this layer?
+    bool        spiral_vase_enable { false };
+    // Should the cooling buffer content be flushed at the end of this layer?
+    bool        cooling_buffer_flush { false };
+    // Is indicating if this LayerResult should be processed, or it is just inserted artificial LayerResult.
+    // It is used for the pressure equalizer because it needs to buffer one layer back.
+    bool        nop_layer_result { false };
+
+    static LayerResult make_nop_layer_result() { return {"", std::numeric_limits<coord_t>::max(), false, false, true}; }
+};
+
 class GCode {
 public:        
     GCode() : 
@@ -226,16 +240,6 @@ private:
     static std::vector<LayerToPrint>        		                   collect_layers_to_print(const PrintObject &object);
     static std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> collect_layers_to_print(const Print &print);
 
-    struct LayerResult {
-        std::string gcode;
-        size_t      layer_id;
-        // Is spiral vase post processing enabled for this layer?
-        bool        spiral_vase_enable { false };
-        // Should the cooling buffer content be flushed at the end of this layer?
-        bool        cooling_buffer_flush { false };
-        // Should the PressureEqualizer buffer content be flushed at the end of this layer?
-        bool        pressure_equalizer_buffer_flush { false };
-    };
     LayerResult process_layer(
         const Print                     &print,
         // Set of object & print layers of the same PrintObject and with the same print_z.
@@ -446,6 +450,7 @@ private:
 
     friend class Wipe;
     friend class WipeTowerIntegration;
+    friend class PressureEqualizer;
 };
 
 std::vector<const PrintInstance*> sort_object_instances_by_model_order(const Print& print);
