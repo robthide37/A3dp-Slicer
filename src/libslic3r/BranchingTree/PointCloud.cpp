@@ -175,11 +175,15 @@ float PointCloud::get_distance(const Vec3f &p, size_t node_id) const
     case LEAF:
     case JUNCTION:{
         auto mergept = find_merge_pt(p, node.pos, m_props.max_slope());
+        double maxL2 = m_props.max_branch_length() * m_props.max_branch_length();
+
         if (!mergept || mergept->z() < (m_props.ground_level() + 2 * node.Rmin))
             ret = std::numeric_limits<float>::infinity();
-        else if ( (node.pos - *mergept).norm() < m_props.max_branch_length())
-            ret = (p - *mergept).norm();
-        
+        else if (double a = (node.pos - *mergept).squaredNorm(),
+                 b        = (p - *mergept).squaredNorm();
+                 a < maxL2 && b < maxL2)
+            ret = std::sqrt(b);
+
         break;
     }
     case NONE:
@@ -187,7 +191,7 @@ float PointCloud::get_distance(const Vec3f &p, size_t node_id) const
     }
     
     // Setting the ret val to infinity will effectively discard this
-    // connection of nodes. max_branch_length property if used here
+    // connection of nodes. max_branch_length property is used here
     // to discard node=>node and node=>mesh connections longer than this
     // property.
     if (t != BED && ret > m_props.max_branch_length())
