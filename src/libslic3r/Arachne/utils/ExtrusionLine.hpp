@@ -9,6 +9,8 @@
 #include "../../Polyline.hpp"
 #include "../../Polygon.hpp"
 #include "../../BoundingBox.hpp"
+#include "../../ExtrusionEntity.hpp"
+#include "../../../clipper/clipper_z.hpp"
 
 namespace Slic3r {
 class ThickPolyline;
@@ -201,6 +203,26 @@ static inline Slic3r::ThickPolyline to_thick_polyline(const Arachne::ExtrusionLi
     for (auto it = line_junctions.begin() + 2; it != line_junctions.end(); ++it) {
         out.points.emplace_back(it->p);
         out.points_width.emplace_back(it->w);
+        it_prev = it;
+    }
+
+    return out;
+}
+
+static inline Slic3r::ThickPolyline to_thick_polyline(const ClipperLib_Z::Path &path)
+{
+    assert(path.size() >= 2);
+    Slic3r::ThickPolyline out;
+    out.points.emplace_back(path.front().x(), path.front().y());
+    out.points_width.emplace_back(path.front().z());
+    out.points.emplace_back(path[1].x(), path[1].y());
+    out.points_width.emplace_back(path[1].z());
+
+    auto it_prev = path.begin() + 1;
+    for (auto it = path.begin() + 2; it != path.end(); ++it) {
+        out.points.emplace_back(it->x(), it->y());
+        out.points_width.emplace_back(it_prev->z());
+        out.points_width.emplace_back(it->z());
         it_prev = it;
     }
 

@@ -5,7 +5,10 @@
 #include "ExtrusionEntityCollection.hpp"
 #include "Geometry.hpp"
 #include "ShortestPath.hpp"
+#include "clipper/clipper_z.hpp"
+
 #include "Arachne/WallToolPaths.hpp"
+#include "Arachne/utils/ExtrusionLine.hpp"
 
 #include <cmath>
 #include <cassert>
@@ -72,6 +75,107 @@ static void fuzzy_polygon(Polygon& poly, coordf_t fuzzy_skin_thickness, coordf_t
     }
     if (out.size() >= 3)
         poly.points = std::move(out);
+}
+
+static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Path &subject, const ClipperLib_Z::Paths &clip, ClipperLib_Z::ClipType clipType)
+{
+    ClipperLib_Z::Clipper clipper;
+    clipper.ZFillFunction([](const ClipperLib_Z::IntPoint &e1bot, const ClipperLib_Z::IntPoint &e1top, const ClipperLib_Z::IntPoint &e2bot,
+                             const ClipperLib_Z::IntPoint &e2top, ClipperLib_Z::IntPoint &pt) {
+        ClipperLib_Z::IntPoint start = e1bot;
+        ClipperLib_Z::IntPoint end   = e1top;
+
+        if (start.z() <= 0 && end.z() <= 0) {
+            start = e2bot;
+            end   = e2top;
+        }
+
+        assert(start.z() > 0 && end.z() > 0);
+
+        // Interpolate extrusion line width.
+        double length_sqr = (end - start).cast<double>().squaredNorm();
+        double dist_sqr   = (pt - start).cast<double>().squaredNorm();
+        double t          = std::sqrt(dist_sqr / length_sqr);
+
+        pt.z() = start.z() + coord_t((end.z() - start.z()) * t);
+    });
+
+    clipper.AddPath(subject, ClipperLib_Z::ptSubject, false);
+    clipper.AddPaths(clip, ClipperLib_Z::ptClip, true);
+
+    ClipperLib_Z::PolyTree clipped_polytree;
+    ClipperLib_Z::Paths    clipped_paths;
+    clipper.Execute(clipType, clipped_polytree, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
+    ClipperLib_Z::PolyTreeToPaths(clipped_polytree, clipped_paths);
+
+    return clipped_paths;
+}
+
+
+static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator &perimeter_generator, const std::vector<const Arachne::ExtrusionLine *> &extrusions)
+{
+    ExtrusionEntityCollection extrusion_coll;
+    for (const Arachne::ExtrusionLine *extrusion : extrusions) {
+        if (extrusion->empty())
+            continue;
+
+        const bool    is_external = extrusion->inset_idx == 0;
+        ExtrusionRole role        = is_external ? erExternalPerimeter : erPerimeter;
+
+        // detect overhanging/bridging perimeters
+        if (perimeter_generator.config->overhangs_width_speed > 0 && perimeter_generator.layer->id() > perimeter_generator.object_config->raft_layers
+            && ! ((perimeter_generator.object_config->support_material || perimeter_generator.object_config->support_material_enforce_layers > 0) &&
+                 perimeter_generator.object_config->support_material_contact_distance.value == 0)) {
+
+            ClipperLib_Z::Path extrusion_path;
+            extrusion_path.reserve(extrusion->size());
+            for (const Arachne::ExtrusionJunction &ej : extrusion->junctions)
+                extrusion_path.emplace_back(ej.p.x(), ej.p.y(), ej.w);
+
+            ClipperLib_Z::Paths lower_slices_paths;
+            lower_slices_paths.reserve(perimeter_generator.lower_slices_polygons().size());
+            for (const Polygon &poly : perimeter_generator.lower_slices_polygons()) {
+                lower_slices_paths.emplace_back();
+                ClipperLib_Z::Path &out = lower_slices_paths.back();
+                out.reserve(poly.points.size());
+                for (const Point &pt : poly.points)
+                    out.emplace_back(pt.x(), pt.y(), 0);
+            }
+
+            // get non-overhang paths by intersecting this loop with the grown lower slices
+            for (const ClipperLib_Z::Path& extrusion_path : clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctIntersection)) {
+                extrusion_coll.append(Geometry::thin_variable_width(
+                    { Arachne::to_thick_polyline(extrusion_path) },
+                    role,
+                    is_external ? perimeter_generator.ext_perimeter_flow : perimeter_generator.perimeter_flow,
+                    std::max(perimeter_generator.ext_perimeter_flow.scaled_width() / 4, scale_t(perimeter_generator.print_config->resolution))));
+            }
+
+            // get overhang paths by checking what parts of this loop fall
+            // outside the grown lower slices (thus where the distance between
+            // the loop centerline and original lower slices is >= half nozzle diameter
+            for (const ClipperLib_Z::Path& extrusion_path : clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctDifference)) {
+                extrusion_coll.append(Geometry::thin_variable_width(
+                    { Arachne::to_thick_polyline(extrusion_path) },
+                    erOverhangPerimeter,
+                    perimeter_generator.overhang_flow,
+                    std::max(perimeter_generator.ext_perimeter_flow.scaled_width() / 4, scale_t(perimeter_generator.print_config->resolution))));
+            }
+
+            // Reapply the nearest point search for starting point.
+            // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
+            //chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
+        } else {
+            extrusion_coll.append(Geometry::thin_variable_width(
+                { Arachne::to_thick_polyline(*extrusion) },
+                role,
+                is_external ? perimeter_generator.ext_perimeter_flow : perimeter_generator.perimeter_flow,
+                std::max(perimeter_generator.ext_perimeter_flow.scaled_width() / 4, scale_t(perimeter_generator.print_config->resolution))));
+        }
+
+    }
+
+    return extrusion_coll;
 }
 
 // Thanks, Cura developers, for implementing an algorithm for generating perimeters with variable width (Arachne) that is based on the paper
@@ -209,22 +313,8 @@ void PerimeterGenerator::process_arachne()
             }
         }
 
-        for (const Arachne::ExtrusionLine *extrusion : ordered_extrusions) {
-            if (extrusion->empty())
-                continue;
-
-            ExtrusionEntityCollection entities_coll;
-
-            ThickPolyline  thick_polyline = Arachne::to_thick_polyline(*extrusion);
-            bool           ext_perimeter  = extrusion->inset_idx == 0;
-            entities_coll.append(Geometry::thin_variable_width(
-                { thick_polyline },
-                ext_perimeter ? erExternalPerimeter : erPerimeter,
-                ext_perimeter ? this->ext_perimeter_flow : this->perimeter_flow,
-                std::max(ext_perimeter_width / 4, scale_t(this->print_config->resolution))));
-
-            this->loops->append(entities_coll);
-        }
+        if (ExtrusionEntityCollection extrusion_coll = traverse_extrusions(*this, ordered_extrusions); !extrusion_coll.empty())
+            this->loops->append(extrusion_coll);
 
         ExPolygons infill_contour = union_ex(wallToolPaths.getInnerContour());
         // create one more offset to be used as boundary for fill
