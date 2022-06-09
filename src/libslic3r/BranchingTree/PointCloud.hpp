@@ -185,8 +185,11 @@ public:
 
     size_t reachable_count() const { return m_reachable_cnt; }
 
-    template<size_t K, class Fn>
-    void foreach_reachable(const Vec3f &pos, Fn &&visitor, double min_dist = 0.)
+    template<class Fn>
+    void foreach_reachable(const Vec3f &pos,
+                           Fn         &&visitor,
+                           size_t       k,
+                           double       min_dist = 0.)
     {
         // Fake output iterator
         struct Output {
@@ -203,14 +206,15 @@ public:
 
         namespace bgi = boost::geometry::index;
 
-        size_t cnt = 0;
-        auto filter = bgi::satisfies([this, &pos, min_dist, &cnt](const PointIndexEl &e) {
-            double d = get_distance(pos, e.second);
-            cnt++;
-            return m_searchable_indices[e.second] && !isinf(d) && d > min_dist;
-        });
+        size_t cnt    = 0;
+        auto   filter = bgi::satisfies(
+              [this, &pos, min_dist, &cnt](const PointIndexEl &e) {
+                cnt++;
+                double d = get_distance(pos, e.second);
+                return m_searchable_indices[e.second] && !isinf(d) && d > min_dist;
+              });
 
-        m_ktree.query(bgi::nearest(pos, K) && filter, Output{this, pos, visitor});
+        m_ktree.query(bgi::nearest(pos, k) && filter, Output{this, pos, visitor});
     }
 
     auto start_queue()
