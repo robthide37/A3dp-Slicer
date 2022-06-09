@@ -169,6 +169,8 @@ public:
 
     void mark_unreachable(size_t node_id)
     {
+        assert(node_id < m_searchable_indices.size());
+
         m_searchable_indices[node_id] = false;
         m_queue_indices[node_id] = UNQUEUED;
         --m_reachable_cnt;
@@ -195,7 +197,7 @@ public:
 
     auto start_queue()
     {
-        auto ptsqueue = make_mutable_priority_queue<size_t, false>(
+        auto ptsqueue = make_mutable_priority_queue<size_t, true>(
             [this](size_t el, size_t idx) { m_queue_indices[el] = idx; },
             ZCompareFn{this});
 

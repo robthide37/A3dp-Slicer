@@ -120,7 +120,7 @@ bool BranchingTreeBuilder::add_bridge(const branchingtree::Node &from,
     double fromR = get_radius(from), toR = get_radius(to);
     Beam beam{Ball{fromd, fromR}, Ball{tod, toR}};
     auto   hit = beam_mesh_hit(ex_tbb, m_sm.emesh, beam,
-                               m_sm.cfg.head_back_radius_mm);
+                               m_sm.cfg.safety_distance_mm);
 
     bool ret = hit.distance() > (tod - fromd).norm();
 
