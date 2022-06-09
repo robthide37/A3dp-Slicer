@@ -206,10 +206,8 @@ public:
 
         namespace bgi = boost::geometry::index;
 
-        size_t cnt    = 0;
         auto   filter = bgi::satisfies(
-              [this, &pos, min_dist, &cnt](const PointIndexEl &e) {
-                cnt++;
+              [this, &pos, min_dist](const PointIndexEl &e) {
                 double d = get_distance(pos, e.second);
                 return m_searchable_indices[e.second] && !isinf(d) && d > min_dist;
               });
