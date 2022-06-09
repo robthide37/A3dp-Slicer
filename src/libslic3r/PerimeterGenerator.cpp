@@ -67,7 +67,7 @@ ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_poly
             path.polyline.append(line.b);
             // Convert from spacing to extrusion width based on the extrusion model
             // of a square extrusion ended with semi circles.
-            Flow new_flow = flow.with_width(unscale<float>(w) + flow.height() * float(1. - 0.25 * PI));
+            Flow new_flow = (role == erOverhangPerimeter && flow.bridge()) ? flow : flow.with_width(unscale<float>(w) + flow.height() * float(1. - 0.25 * PI));
             #ifdef SLIC3R_DEBUG
             printf("  filling %f gap\n", flow.width);
             #endif
