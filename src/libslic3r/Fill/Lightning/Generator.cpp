@@ -62,7 +62,7 @@ void Generator::generateInitialInternalOverhangs(const PrintObject &print_object
         for (const LayerRegion* layerm : print_object.get_layer(layer_nr)->regions())
             for (const Surface& surface : layerm->fill_surfaces.surfaces)
                 if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
-                    infill_area_here.emplace_back(surface.expolygon);
+                    append(infill_area_here, to_polygons(surface.expolygon));
 
         //Remove the part of the infill area that is already supported by the walls.
         Polygons overhang = diff(offset(infill_area_here, -float(m_wall_supporting_radius)), infill_area_above);
@@ -90,7 +90,7 @@ void Generator::generateTrees(const PrintObject &print_object, const std::functi
         for (const LayerRegion *layerm : print_object.get_layer(layer_id)->regions())
             for (const Surface &surface : layerm->fill_surfaces.surfaces)
                 if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
-                    infill_outlines[layer_id].emplace_back(surface.expolygon);
+                    append(infill_outlines[layer_id], to_polygons(surface.expolygon));
     }
 
     // For various operations its beneficial to quickly locate nearby features on the polygon:
