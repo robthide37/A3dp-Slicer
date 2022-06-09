@@ -140,7 +140,7 @@ PointCloud::PointCloud(std::vector<Node> meshpts,
     , LEAFS_BEGIN{MESHPTS_BEGIN + m_meshpoints.size()}
     , JUNCTIONS_BEGIN{LEAFS_BEGIN + m_leafs.size()}
     , m_searchable_indices(JUNCTIONS_BEGIN + m_junctions.size(), true)
-    , m_queue_indices(JUNCTIONS_BEGIN + m_junctions.size(), UNQUEUED)
+    , m_queue_indices(JUNCTIONS_BEGIN + m_junctions.size(), Unqueued)
     , m_reachable_cnt{JUNCTIONS_BEGIN + m_junctions.size()}
     , m_ktree{CoordFn{this}, LEAFS_BEGIN} // Only for bed and mesh points
 {

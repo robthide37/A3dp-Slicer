@@ -106,7 +106,11 @@ bool build_tree(PointCloud &nodes, Builder &builder)
                             mergenode.right = closest_node_id;
                             size_t new_idx = nodes.insert_junction(mergenode);
                             ptsqueue.push(new_idx);
-                            ptsqueue.remove(nodes.get_queue_idx(closest_node_id));
+                            size_t qid = nodes.get_queue_idx(closest_node_id);
+
+                            if (qid != PointCloud::Unqueued)
+                                ptsqueue.remove(nodes.get_queue_idx(closest_node_id));
+
                             nodes.mark_unreachable(closest_node_id);
                         }
                     } else if (closest_node.pos.z() < node.pos.z() &&

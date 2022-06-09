@@ -67,8 +67,6 @@ private:
         return dot_sq < D.squaredNorm() * cos2bridge_slope;
     }
 
-    static constexpr auto UNQUEUED = size_t(-1);
-
     template<class PC>
     static auto *get_node(PC &&pc, size_t id)
     {
@@ -86,6 +84,8 @@ private:
     }
 
 public:
+
+    static constexpr auto Unqueued = size_t(-1);
 
     struct ZCompareFn
     {
@@ -155,7 +155,7 @@ public:
         m_junctions.emplace_back(p);
         m_junctions.back().id = int(new_id);
         m_searchable_indices.emplace_back(true);
-        m_queue_indices.emplace_back(UNQUEUED);
+        m_queue_indices.emplace_back(Unqueued);
         ++m_reachable_cnt;
 
         return new_id;
@@ -172,7 +172,7 @@ public:
         assert(node_id < m_searchable_indices.size());
 
         m_searchable_indices[node_id] = false;
-        m_queue_indices[node_id] = UNQUEUED;
+        m_queue_indices[node_id] = Unqueued;
         --m_reachable_cnt;
     }
 
