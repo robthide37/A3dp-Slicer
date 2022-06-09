@@ -20,7 +20,7 @@ class BranchingTreeBuilder: public branchingtree::Builder {
 
     // Scaling of the input value 'widening_factor:<0, 1>' to produce resonable
     // widening behaviour
-    static constexpr double WIDENING_SCALE = 0.08;
+    static constexpr double WIDENING_SCALE = 0.02;
 
     double get_radius(const branchingtree::Node &j)
     {
@@ -128,8 +128,8 @@ bool BranchingTreeBuilder::add_bridge(const branchingtree::Node &from,
 }
 
 bool BranchingTreeBuilder::add_merger(const branchingtree::Node &node,
-                                  const branchingtree::Node &closest,
-                                  const branchingtree::Node &merge_node)
+                                      const branchingtree::Node &closest,
+                                      const branchingtree::Node &merge_node)
 {
     Vec3d from1d = node.pos.cast<double>(),
           from2d = closest.pos.cast<double>(),
@@ -152,7 +152,7 @@ bool BranchingTreeBuilder::add_merger(const branchingtree::Node &node,
 }
 
 bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
-                                         const branchingtree::Node &to)
+                                             const branchingtree::Node &to)
 {
     bool ret = search_ground_route(ex_tbb, m_builder, m_sm,
                                    sla::Junction{from.pos.cast<double>(),
@@ -232,7 +232,18 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
                      .max_slope(sm.cfg.bridge_slope)
                      .max_branch_length(sm.cfg.max_bridge_length_mm);
 
-    branchingtree::PointCloud nodes{its, std::move(leafs), props};
+    auto meshpts = sm.cfg.ground_facing_only ?
+                       std::vector<branchingtree::Node>{} :
+                       branchingtree::sample_mesh(its,
+                                                  props.sampling_radius());
+
+    auto bedpts  = branchingtree::sample_bed(props.bed_shape(),
+                                             props.ground_level(),
+                                             props.sampling_radius());
+
+    branchingtree::PointCloud nodes{std::move(meshpts), std::move(bedpts),
+                                    std::move(leafs), props};
+
     BranchingTreeBuilder vbuilder{builder, sm, nodes};
     branchingtree::build_tree(nodes, vbuilder);
 
