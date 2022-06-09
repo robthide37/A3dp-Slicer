@@ -111,6 +111,8 @@ public:
     {
         return m_unroutable_pinheads;
     }
+
+    bool is_valid() const override { return !m_builder.ctl().stopcondition(); }
 };
 
 bool BranchingTreeBuilder::add_bridge(const branchingtree::Node &from,

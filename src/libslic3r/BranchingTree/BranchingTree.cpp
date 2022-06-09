@@ -20,7 +20,7 @@ void build_tree(PointCloud &nodes, Builder &builder)
     auto distances = reserve_vector<NodeDistance>(ReachablesToExamine);
     double prev_dist_max = 0.;
 
-    while (!ptsqueue.empty()) {
+    while (!ptsqueue.empty() && builder.is_valid()) {
         size_t node_id = ptsqueue.top();
 
         Node node = nodes.get(node_id);
@@ -49,7 +49,7 @@ void build_tree(PointCloud &nodes, Builder &builder)
 
         auto closest_it = distances.begin();
         bool routed = false;
-        while (closest_it != distances.end() && !routed) {
+        while (closest_it != distances.end() && !routed && builder.is_valid()) {
             size_t closest_node_id = closest_it->node_id;
             Node closest_node = nodes.get(closest_node_id);
 

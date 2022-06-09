@@ -102,6 +102,9 @@ public:
 
     // Report nodes that can not be routed to an endpoint (model or ground)
     virtual void report_unroutable(const Node &j) = 0;
+
+    // If returns false, the tree building process shall stop
+    virtual bool is_valid() const { return true; }
 };
 
 // Build the actual tree.
