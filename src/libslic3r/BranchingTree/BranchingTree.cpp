@@ -9,7 +9,7 @@
 
 namespace Slic3r { namespace branchingtree {
 
-bool build_tree(PointCloud &nodes, Builder &builder)
+void build_tree(PointCloud &nodes, Builder &builder)
 {
     constexpr size_t ReachablesToExamine = 5;
 
@@ -149,18 +149,16 @@ bool build_tree(PointCloud &nodes, Builder &builder)
         }
 
     }
-
-    return true;
 }
 
-bool build_tree(const indexed_triangle_set & its,
-                const std::vector<Node> &support_roots,
-                Builder &                    builder,
-                const Properties &           properties)
+void build_tree(const indexed_triangle_set &its,
+                const std::vector<Node>    &support_roots,
+                Builder                    &builder,
+                const Properties           &properties)
 {
     PointCloud nodes(its, support_roots, properties);
 
-    return build_tree(nodes, builder);
+    build_tree(nodes, builder);
 }
 
 ExPolygon make_bed_poly(const indexed_triangle_set &its)

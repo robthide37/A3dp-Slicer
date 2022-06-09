@@ -119,22 +119,18 @@ public:
 // cannot be inserted. If a particular path is unavailable, the algorithm
 // will try a few other paths as well. If all of them fail, one of the
 // report_unroutable_* methods will be called as a last resort.
-bool build_tree(const indexed_triangle_set & its,
-                const std::vector<Node> &support_leafs,
-                Builder &                    builder,
-                const Properties &           properties = {});
+void build_tree(const indexed_triangle_set &its,
+                const std::vector<Node>    &support_leafs,
+                Builder                    &builder,
+                const Properties           &properties = {});
 
-inline bool build_tree(const indexed_triangle_set & its,
-                       const std::vector<Node> &support_leafs,
-                       Builder &&                   builder,
-                       const Properties &           properties = {})
+inline void build_tree(const indexed_triangle_set &its,
+                       const std::vector<Node>    &support_leafs,
+                       Builder                   &&builder,
+                       const Properties           &properties = {})
 {
-    return build_tree(its, support_leafs, builder, properties);
+    build_tree(its, support_leafs, builder, properties);
 }
-
-//class PointCloud;
-
-//bool build_tree(PointCloud &pcloud, Builder &builder);
 
 // Helper function to derive a bed polygon only from the model bounding box.
 ExPolygon make_bed_poly(const indexed_triangle_set &its);
