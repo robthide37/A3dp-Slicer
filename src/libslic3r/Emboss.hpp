@@ -183,6 +183,14 @@ public:
     static std::string create_range_text(const std::string &text, const FontFile &font, unsigned int font_index, bool* exist_unknown = nullptr);    
 
     /// <summary>
+    /// calculate scale for glyph shape convert from shape points to mm
+    /// </summary>
+    /// <param name="fp"></param>
+    /// <param name="ff"></param>
+    /// <returns>Conversion to mm</returns>
+    static double get_shape_scale(const FontProp &fp, const FontFile &ff);
+
+    /// <summary>
     /// Project spatial point
     /// </summary>
     class IProject3f

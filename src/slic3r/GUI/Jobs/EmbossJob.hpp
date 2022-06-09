@@ -173,14 +173,20 @@ struct UseSurfaceData : public EmbossDataUpdate
     using ModelSources = std::vector<ModelSource>;
     ModelSources sources;
 
-    //// IMPROVE: copy of source mesh tringles
-    //// copy could slow down on big meshes
-    //// but proccess on thread need it
-    //indexed_triangle_set object_volumes;
-    //// Transformation of volume inside of object
-    //Transform3d          mesh_tr;
-    //// extract bounds for projection
-    //BoundingBoxf3        mesh_bb;
+    /// <summary>
+    /// Copied triangles from object to be able create mesh for cut surface
+    /// </summary>
+    /// <param name="text_volume">Define text in object</param>
+    /// <returns>Source data for cut surface from</returns>
+    static ModelSources get_sources_to_cut_surface_from(
+        const ModelVolume *text_volume);
+
+    /// <summary>
+    /// Merging of source together
+    /// </summary>
+    /// <param name="sources">Define input by multiple triangle models</param>
+    /// <returns>Create one Source</returns>
+    static ModelSource merge(ModelSources& sources);
 };
 
 /// <summary>

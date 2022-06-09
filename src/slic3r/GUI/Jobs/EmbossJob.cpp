@@ -72,13 +72,6 @@ static void update_volume(TriangleMesh &&mesh, const EmbossDataUpdate &data);
 /// <returns>Pointer to volume when exist otherwise nullptr</returns>
 static ModelVolume *get_volume(ModelObjectPtrs &objects,
                                const ObjectID  &volume_id);
-/// <summary>
-/// extract scale in 2d
-/// </summary>
-/// <param name="fp">Property of font style</param>
-/// <param name="ff">Font file for size --> unit per em</param>
-/// <returns>scaling factor</returns>
-static double get_shape_scale(const FontProp &fp, const Emboss::FontFile &ff);
 
 /// <summary>
 /// Create projection for cut surface from mesh
@@ -324,6 +317,64 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &eptr)
     priv::update_volume(std::move(m_result), m_input);    
 }
 
+UseSurfaceData::ModelSources UseSurfaceData::get_sources_to_cut_surface_from(
+    const ModelVolume *text_volume)
+{
+    if (text_volume == nullptr) return {};
+    if (!text_volume->text_configuration.has_value()) return {};
+    const auto &volumes = text_volume->get_object()->volumes;
+    // no other volume in object
+    if (volumes.size() <= 1) return {};
+
+    UseSurfaceData::ModelSources result;
+    // Improve create object from part or use gl_volume
+    // Get first model part in object
+    for (const ModelVolume *v : volumes) {
+        if (v->id() == text_volume->id()) continue;
+        if (!v->is_model_part()) continue;
+        const TriangleMesh &tm = v->mesh();
+        if (tm.empty()) continue;
+        if (tm.its.empty()) continue;
+        UseSurfaceData::ModelSource ms = {tm.its,
+                                          v->get_transformation().get_matrix(),
+                                          tm.bounding_box()};
+        result.push_back(std::move(ms));
+    }
+    return result;
+}
+
+UseSurfaceData::ModelSource UseSurfaceData::merge(ModelSources &sources)
+{
+    if (sources.size() == 1) return sources.front();
+    // find biggest its
+    size_t max_index = 0;
+    size_t max_vertices = 0;
+    // calc sum of counts for resize
+    size_t count_vertices = 0;
+    size_t count_indices  = 0;
+    for (const ModelSource &source : sources) { 
+        count_vertices += source.its.vertices.size();
+        count_indices += source.its.indices.size();
+        if (max_vertices < source.its.vertices.size()) {
+            max_vertices = source.its.vertices.size();
+            max_index    = &source - &sources.front();
+        }
+    }
+
+    ModelSource &result = sources[max_index];
+    result.its.vertices.reserve(count_vertices);
+    result.its.indices.reserve(count_indices);
+    for (size_t i = 0; i < sources.size(); i++) { 
+        if (i == max_index) continue;
+        ModelSource &source = sources[i];
+        Transform3f tr(result.tr * source.tr.inverse());
+        its_transform(source.its, tr);
+        its_merge(result.its, std::move(source.its));
+    }
+    result.bb = bounding_box(result.its);
+    return result;
+}
+
 /////////////////
 /// Cut Surface
 UseSurfaceJob::UseSurfaceJob(UseSurfaceData &&input)
@@ -353,8 +404,7 @@ void UseSurfaceJob::process(Ctl &ctl) {
     if (was_canceled()) return;
 
     BoundingBox bb = get_extents(shapes);
-    // TODO: merge input sources somehow
-    const UseSurfaceData::ModelSource &source = m_input.sources[0];
+    const UseSurfaceData::ModelSource &source = UseSurfaceData::merge(m_input.sources);
 
     Transform3d   mesh_tr_inv       = source.tr.inverse();
     Transform3d   cut_projection_tr = mesh_tr_inv * m_input.text_tr;
@@ -363,12 +413,12 @@ void UseSurfaceJob::process(Ctl &ctl) {
     std::pair<float, float> z_range{mesh_bb_tr.min.z(), mesh_bb_tr.max.z()};
 
     const Emboss::FontFile &ff = *m_input.font_file.font_file;
-    double shape_scale =  priv::get_shape_scale(fp, ff);
+    double shape_scale =  Emboss::get_shape_scale(fp, ff);
     Emboss::OrthoProject cut_projection = priv::create_projection_for_cut(
         cut_projection_tr, shape_scale, bb, z_range);
-
+    float projection_ratio = -z_range.first / (z_range.second - z_range.first);
     // Use CGAL to cut surface from triangle mesh
-    SurfaceCut cut = cut_surface(source.its, shapes, cut_projection);
+    SurfaceCut cut = cut_surface(source.its, shapes, cut_projection, projection_ratio);
     if (cut.empty())
         throw priv::EmbossJobException(
             _u8L("There is no valid surface for text projection.").c_str());
@@ -591,17 +641,6 @@ ModelVolume *priv::get_volume(ModelObjectPtrs &objects,
             if (vol->id() == volume_id) return vol;
     return nullptr;
 };
-
-
-double priv::get_shape_scale(const FontProp &fp, const Emboss::FontFile &ff)
-{
-    const auto  &cn          = fp.collection_number;
-    unsigned int font_index  = (cn.has_value()) ? *cn : 0;
-    int          unit_per_em = ff.infos[font_index].unit_per_em;
-    double       scale       = fp.size_in_mm / unit_per_em;
-    // Shape is scaled for store point coordinate as integer
-    return scale * Emboss::SHAPE_SCALE;
-}
 
 Emboss::OrthoProject priv::create_projection_for_cut(
     Transform3d                    tr,

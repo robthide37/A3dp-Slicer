@@ -56,10 +56,16 @@ SurfaceCut merge(SurfaceCuts&& cuts);
 /// <param name="model">Mesh to cut</param>
 /// <param name="shapes">Multiple shape to cut from model</param>
 /// <param name="projection">Define transformation from 2d coordinate of shape to 3d</param>
+/// <param name="projection_ratio">Define ideal ratio between front and back projection to cut
+/// 0 .. means use closest to front projection
+/// 1 .. means use closest to back projection
+/// value from <0, 1>
+/// </param>
 /// <returns>Cutted surface from model</returns>
 SurfaceCut cut_surface(const indexed_triangle_set &model,
                        const ExPolygons           &shapes,
-                       const Emboss::IProjection  &projection);
+                       const Emboss::IProjection  &projection,
+                       float projection_ratio = 0);
 
 /// <summary>
 /// Create model from surface cuts by projection

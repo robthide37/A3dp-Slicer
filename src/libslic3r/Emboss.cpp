@@ -767,6 +767,15 @@ std::string Emboss::create_range_text(const std::string &text,
     return boost::nowide::narrow(ws);
 }
 
+double Emboss::get_shape_scale(const FontProp &fp, const FontFile &ff)
+{
+    const auto  &cn          = fp.collection_number;
+    unsigned int font_index  = (cn.has_value()) ? *cn : 0;
+    int          unit_per_em = ff.infos[font_index].unit_per_em;
+    double       scale       = fp.size_in_mm / unit_per_em;
+    // Shape is scaled for store point coordinate as integer
+    return scale * Emboss::SHAPE_SCALE;
+}
 
 indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
                                             const IProjection &projection)

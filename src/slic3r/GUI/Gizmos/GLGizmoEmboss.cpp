@@ -908,32 +908,6 @@ static inline void execute_job(std::shared_ptr<Job> j)
     });
 }
 
-static UseSurfaceData::ModelSources get_sources_to_cut_surface_from(
-    const ModelVolume *text_volume)
-{
-    if (text_volume == nullptr) return {};
-    if (!text_volume->text_configuration.has_value()) return {};
-    const auto &volumes = text_volume->get_object()->volumes;
-    // no other volume in object
-    if (volumes.size() <= 1) return {};
-
-    UseSurfaceData::ModelSources result;
-    // Improve create object from part or use gl_volume
-    // Get first model part in object
-    for (const ModelVolume *v : volumes) {
-        if (v->id() == text_volume->id()) continue;
-        if (!v->is_model_part()) continue;
-        const TriangleMesh &tm = v->mesh();
-        if (tm.empty()) continue;
-        if (tm.its.empty()) continue;
-        UseSurfaceData::ModelSource ms = {tm.its,
-                                          v->get_transformation().get_matrix(),
-                                          tm.bounding_box()};
-        result.push_back(std::move(ms));
-    }
-    return result;
-}
-
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
@@ -965,7 +939,7 @@ bool GLGizmoEmboss::process()
     const TextConfiguration &tc = data.text_configuration;
     if (tc.font_item.prop.use_surface) {
         // Model to cut surface from.
-        auto sources = get_sources_to_cut_surface_from(m_volume);
+        auto sources = UseSurfaceData::get_sources_to_cut_surface_from(m_volume);
         if (sources.empty()) return false;
 
         Transform3d text_tr = m_volume->get_matrix();
@@ -1088,7 +1062,7 @@ void GLGizmoEmboss::draw_window()
         m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_font_manager.get_font_item().path);
 #endif // SHOW_WX_FONT_DESCRIPTOR
         
-    if (ImGui::Button(_u8L("Close").c_str())) close();   
+    if (ImGui::Button(_u8L("Close").c_str())) close();
 
     // Option to create text volume when reselecting volumes
     m_imgui->disabled_begin(!exist_font_file);
@@ -1493,16 +1467,15 @@ void GLGizmoEmboss::draw_model_type()
     if (m_volume != nullptr && new_type.has_value() && !is_last_solid_part) {
         GUI_App &app    = wxGetApp();
         Plater * plater = app.plater();
-        Plater::TakeSnapshot snapshot(plater, _L("Change Part Type"), UndoRedo::SnapshotType::GizmoAction);
+        Plater::TakeSnapshot snapshot(plater, _L("Change Text Type"), UndoRedo::SnapshotType::GizmoAction);
         m_volume->set_type(*new_type);
 
         // inspiration in ObjectList::change_part_type()
         // how to view correct side panel with objects
         ObjectList *obj_list = app.obj_list();
-        ModelVolume * volume = m_volume;
         wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection(
             obj_list->get_selected_obj_idx(),
-            [volume](const ModelVolume *vol) { return vol == volume; });
+            [volume = m_volume](const ModelVolume *vol) { return vol == volume; });
         if (!sel.IsEmpty()) obj_list->select_item(sel.front());
 
         // Update volume position when switch from part or into part
