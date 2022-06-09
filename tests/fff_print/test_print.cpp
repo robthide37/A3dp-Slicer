@@ -20,10 +20,7 @@ SCENARIO("PrintObject: Perimeter generation", "[PrintObject]") {
             }
             THEN("Every layer in region 0 has 1 island of perimeters") {
                 for (const Layer *layer : object.layers())
-                    if (object.config().perimeter_generator == PerimeterGeneratorType::Arachne)
-                        REQUIRE(layer->regions().front()->perimeters.entities.size() == 3);
-                    else
-                        REQUIRE(layer->regions().front()->perimeters.entities.size() == 1);
+                    REQUIRE(layer->regions().front()->perimeters.entities.size() == 1);
             }
             THEN("Every layer in region 0 has 3 paths in its perimeters list.") {
                 for (const Layer *layer : object.layers())

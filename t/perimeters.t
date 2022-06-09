@@ -257,8 +257,6 @@ use Slic3r::Test;
         $config->set('bridge_fan_speed', [ 100 ]);
         $config->set('bridge_flow_ratio', 33);  # arbitrary value
         $config->set('overhangs', 1);
-        # FIXME Lukas H.: For now, this unit test is disabled for Arachne because of an issue with detecting overhang when Arachne is enabled.
-        $config->set('perimeter_generator', 'classic');
         my $print = Slic3r::Test::init_print('overhang', config => $config);
         my %layer_speeds = ();  # print Z => [ speeds ]
         my $fan_speed = 0;
@@ -397,8 +395,6 @@ use Slic3r::Test;
     $config->set('overhangs', 1);
     $config->set('cooling', [ 0 ]);                 # to prevent speeds from being altered
     $config->set('first_layer_speed', '100%');      # to prevent speeds from being altered
-    # FIXME Lukas H.: For now, this unit test is disabled for Arachne because of an issue with detecting overhang when Arachne is enabled.
-    $config->set('perimeter_generator', 'classic');
     
     my $test = sub {
         my ($print) = @_;
