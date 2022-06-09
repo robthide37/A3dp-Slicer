@@ -5,6 +5,7 @@
 
 #include "ExtrusionLine.hpp"
 #include "linearAlg2D.hpp"
+#include "../../PerimeterGenerator.hpp"
 
 namespace Slic3r::Arachne
 {
@@ -231,4 +232,20 @@ int64_t ExtrusionLine::calculateExtrusionAreaDeviationError(ExtrusionJunction A,
     }
 }
 
+} // namespace Slic3r::Arachne
+
+namespace Slic3r {
+void extrusion_paths_append(ExtrusionPaths &dst, const ClipperLib_Z::Paths &extrusion_paths, const ExtrusionRole role, const Flow &flow)
+{
+    for (const ClipperLib_Z::Path &extrusion_path : extrusion_paths) {
+        ThickPolyline thick_polyline = Arachne::to_thick_polyline(extrusion_path);
+        Slic3r::append(dst, thick_polyline_to_extrusion_paths(thick_polyline, role, flow, scaled<float>(0.05), 0));
+    }
 }
+
+void extrusion_paths_append(ExtrusionPaths &dst, const Arachne::ExtrusionLine &extrusion, const ExtrusionRole role, const Flow &flow)
+{
+    ThickPolyline thick_polyline = Arachne::to_thick_polyline(extrusion);
+    Slic3r::append(dst, thick_polyline_to_extrusion_paths(thick_polyline, role, flow, scaled<float>(0.05), 0));
+}
+} // namespace Slic3r
