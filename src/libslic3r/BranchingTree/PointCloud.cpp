@@ -142,16 +142,23 @@ PointCloud::PointCloud(std::vector<Node> meshpts,
     , m_searchable_indices(JUNCTIONS_BEGIN + m_junctions.size(), true)
     , m_queue_indices(JUNCTIONS_BEGIN + m_junctions.size(), Unqueued)
     , m_reachable_cnt{JUNCTIONS_BEGIN + m_junctions.size()}
-    , m_ktree{CoordFn{this}, LEAFS_BEGIN} // Only for bed and mesh points
 {
-    for (size_t i = 0; i < m_bedpoints.size(); ++i)
+    for (size_t i = 0; i < m_bedpoints.size(); ++i) {
         m_bedpoints[i].id = int(i);
+        m_ktree.insert({m_bedpoints[i].pos, i});
+    }
     
-    for (size_t i = 0; i < m_meshpoints.size(); ++i)
-        m_meshpoints[i].id = int(MESHPTS_BEGIN + i);
+    for (size_t i = 0; i < m_meshpoints.size(); ++i) {
+        Node &n = m_meshpoints[i];
+        n.id = int(MESHPTS_BEGIN + i);
+        m_ktree.insert({n.pos, n.id});
+    }
     
-    for (size_t i = 0; i < m_leafs.size(); ++i)
-        m_leafs[i].id = int(LEAFS_BEGIN + i);
+    for (size_t i = 0; i < m_leafs.size(); ++i) {
+        Node &n = m_leafs[i];
+        n.id = int(LEAFS_BEGIN + i);
+        m_ktree.insert({n.pos, n.id});
+    }
 }
 
 float PointCloud::get_distance(const Vec3f &p, size_t node_id) const

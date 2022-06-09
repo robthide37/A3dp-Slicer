@@ -6,8 +6,10 @@
 #include "BranchingTree.hpp"
 
 #include "libslic3r/Execution/Execution.hpp"
-#include "libslic3r/KDTreeIndirect.hpp"
 #include "libslic3r/MutablePriorityQueue.hpp"
+
+#include "libslic3r/BoostAdapter.hpp"
+#include "boost/geometry/index/rtree.hpp"
 
 namespace Slic3r { namespace branchingtree {
 
@@ -57,7 +59,11 @@ private:
         }
     };
 
-    KDTreeIndirect<3, float, CoordFn> m_ktree;
+    using PointIndexEl = std::pair<Vec3f, unsigned>;
+
+    boost::geometry::index::
+        rtree<PointIndexEl, boost::geometry::index::rstar<16, 4> /* ? */>
+            m_ktree;
 
     bool is_outside_support_cone(const Vec3f &supp, const Vec3f &pt) const
     {
@@ -97,9 +103,9 @@ public:
         }
     };
 
-    PointCloud(const indexed_triangle_set & M,
-               std::vector<Node>        support_leafs,
-               const Properties &           props);
+    PointCloud(const indexed_triangle_set &M,
+               std::vector<Node>           support_leafs,
+               const Properties           &props);
 
     PointCloud(std::vector<Node> meshpts,
                std::vector<Node> bedpts,
@@ -154,6 +160,7 @@ public:
         size_t new_id = next_junction_id();
         m_junctions.emplace_back(p);
         m_junctions.back().id = int(new_id);
+        m_ktree.insert({m_junctions.back().pos, new_id});
         m_searchable_indices.emplace_back(true);
         m_queue_indices.emplace_back(Unqueued);
         ++m_reachable_cnt;
@@ -178,21 +185,32 @@ public:
 
     size_t reachable_count() const { return m_reachable_cnt; }
 
-    template<class Fn> void foreach_reachable(const Vec3f &pos, Fn &&visitor)
+    template<size_t K, class Fn>
+    void foreach_reachable(const Vec3f &pos, Fn &&visitor, double min_dist = 0.)
     {
-        auto closest_anchors =
-            find_closest_points<5>(m_ktree, pos, [this, &pos](size_t id) {
-                return m_searchable_indices[id] &&
-                       !is_outside_support_cone(pos, get(id).pos);
-            });
+        // Fake output iterator
+        struct Output {
+            const PointCloud *self;
+            Vec3f p;
+            Fn &visitorfn;
 
-        for (size_t anchor : closest_anchors)
-            if (anchor != m_ktree.npos)
-                visitor(anchor, get_distance(pos, anchor));
+            Output& operator *() { return *this; }
+            void operator=(const PointIndexEl &el) {
+                visitorfn(el.second, self->get_distance(p, el.second));
+            }
+            Output& operator++() { return *this; }
+        };
 
-        for (size_t i = LEAFS_BEGIN; i < m_searchable_indices.size(); ++i)
-            if (m_searchable_indices[i])
-                visitor(i, get_distance(pos, i));
+        namespace bgi = boost::geometry::index;
+
+        size_t cnt = 0;
+        auto filter = bgi::satisfies([this, &pos, min_dist, &cnt](const PointIndexEl &e) {
+            double d = get_distance(pos, e.second);
+            cnt++;
+            return m_searchable_indices[e.second] && !isinf(d) && d > min_dist;
+        });
+
+        m_ktree.query(bgi::nearest(pos, K) && filter, Output{this, pos, visitor});
     }
 
     auto start_queue()

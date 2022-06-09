@@ -11,34 +11,41 @@ namespace Slic3r { namespace branchingtree {
 
 bool build_tree(PointCloud &nodes, Builder &builder)
 {
+    constexpr size_t ReachablesToExamine = 5;
+
     auto ptsqueue = nodes.start_queue();
     auto &properties = nodes.properties();
 
-    struct NodeDistance { size_t node_id; float distance; };
-    auto distances = reserve_vector<NodeDistance>(nodes.reachable_count());
+    struct NodeDistance { size_t node_id = Node::ID_NONE; float distance = NaNf; };
+    auto distances = reserve_vector<NodeDistance>(ReachablesToExamine);
+    double prev_dist_max = 0.;
 
     while (!ptsqueue.empty()) {
         size_t node_id = ptsqueue.top();
-        ptsqueue.pop();
 
         Node node = nodes.get(node_id);
         nodes.mark_unreachable(node_id);
 
         distances.clear();
-        distances.reserve(nodes.reachable_count());
 
-        nodes.foreach_reachable(node.pos, [&distances](size_t id, float distance) {
-            if (!std::isinf(distance))
+        nodes.foreach_reachable<ReachablesToExamine>(
+            node.pos,
+            [&distances](size_t id, float distance) {
                 distances.emplace_back(NodeDistance{id, distance});
-        });
+            },
+            prev_dist_max);
 
         std::sort(distances.begin(), distances.end(),
                   [](auto &a, auto &b) { return a.distance < b.distance; });
 
         if (distances.empty()) {
             builder.report_unroutable(node);
+            ptsqueue.pop();
+            prev_dist_max = 0.;
             continue;
         }
+
+        prev_dist_max = distances.back().distance;
 
         auto closest_it = distances.begin();
         bool routed = false;
@@ -136,8 +143,11 @@ bool build_tree(PointCloud &nodes, Builder &builder)
             ++closest_it;
         }
 
-        if (!routed)
-            builder.report_unroutable(node);
+        if (routed) {
+            ptsqueue.pop();
+            prev_dist_max = 0.;
+        }
+
     }
 
     return true;
