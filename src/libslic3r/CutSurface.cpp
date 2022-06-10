@@ -456,6 +456,25 @@ ProjectionDistances choose_best_distance(
     const ShapePoint2index                &shape_point_2_index);
 
 /// <summary>
+/// Merge 2 cuts together, cut off inner part
+/// </summary>
+/// <param name="cut1">[In/Out] surface cut</param>
+/// <param name="cut2">Cut to intersect with</param>
+/// <param name="mesh">Source of surface</param>
+/// <returns>True when merge otherwise False</returns>
+bool merge_cut(CutAOI &cut1, const CutAOI &cut2, const CutMesh &mesh);
+
+/// <summary>
+/// Merge cuts together
+/// </summary>
+/// <param name="cuts">[In/Out] cutted surface of model</param>
+/// <param name="mesh">Source of surface</param>
+/// <param name="use_cut_indices">Filtered indicies of Cut from best projection distances</param>
+void merge_cuts(CutAOIs       &cuts,
+                const CutMesh &mesh,
+                const std::vector<size_t> &use_cut_indices);
+
+/// <summary>
 /// Filter out cuts which are behind another.
 /// Prevent overlapping embossed shape in space.
 /// </summary>
@@ -707,6 +726,9 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
     // for each point collect all projection distances
     std::vector<priv::ProjectionDistances> distances =
         priv::create_distances(cutAOIs, cgal_model, shapes_points, cgal_shape, projection_ratio, vert_shape_map);
+
+    // NOTE: it will be fine to calc AOIs range,
+    // not only outline but all vertices in direction of emboss - faster check on intersection
     
 #ifdef DEBUG_OUTPUT_DIR
     auto [front,back] = projection.create_front_back(shapes_bb.center());
@@ -722,6 +744,20 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::store(best_projection, cutAOIs, cgal_model, DEBUG_OUTPUT_DIR + "best_projection.obj"); // only debug
 #endif // DEBUG_OUTPUT_DIR
 
+    std::vector<bool> is_best_cut(cutAOIs.size(), {false});
+    for (const priv::ProjectionDistance &d : best_projection)
+        is_best_cut[d.aoi_index] = true;
+    std::vector<size_t> best_cut_indices;
+    for (size_t i = 0; i < cutAOIs.size(); ++i)
+        if (is_best_cut[i]) best_cut_indices.push_back(i);
+
+    // cut off part + filtrate cutAOIs
+    priv::merge_cuts(cutAOIs, cgal_model, best_cut_indices);
+#ifdef DEBUG_OUTPUT_DIR
+    priv::store(cutAOIs, cgal_model, DEBUG_OUTPUT_DIR + "merged-aois/");
+    // only debug
+#endif // DEBUG_OUTPUT_DIR
+    
     // Filter out NO top one cuts
     priv::filter_cuts(cutAOIs, cgal_model, shapes,
                       shape_point_2_index, projection, vert_shape_map);
@@ -1877,14 +1913,13 @@ std::vector<priv::ProjectionDistances> priv::create_distances(
         for (size_t i = 0; i < 3; i++) { 
             float val = start[i] - end[i];
             // abs value
-            if (val < 0.f) val *= -1;
+            if (val < 0.f) val *= -1.f;
             if (max_val < val) { 
                 max_val = val;
                 max_i   = i;
             }
         }
-        float ratio = (p[max_i] - start[max_i]) / max_val;
-        return (ratio - projection_ratio) * max_val;
+        return (p[max_i] - start[max_i]) - projection_ratio * (end[max_i] - start[max_i]);
     };
 
     std::vector<ProjectionDistances> distances(shapes_points);    
@@ -1902,47 +1937,12 @@ std::vector<priv::ProjectionDistances> priv::create_distances(
             ProjectionDistance pd;
             pd.aoi_index = &cut - &cuts.front();
             pd.hi_index  = &hi - &cut.second.front();
-            // Option to not calculate distance when exist only one AOI
-            //if (pds.empty()) {
-            //    // first is without calc of distance
-            //    pds.push_back(std::move(pd));
-            //    continue;
-            //} else if (pds.size() == 1) {
-            //    // calculate distance first item
-            //    ProjectionDistance &prev = pds.front();
-            //    HI hi = cuts[prev.aoi_index].second[prev.hi_index];
-            //    prev.distance = calc_distance(pi, mesh.source(hi));
-            //}
             pd.distance = calc_distance(pi, vi);
             pds.push_back(std::move(pd));
         }        
     }
     return distances;
 }
-
-//uint32_t get_closest_point_id(const ExPolygons &shapes, const Point &p) {
-//    float distance_sq = std::numeric_limits<float>::max();
-//    uint32_t closest_id{0};
-//    uint32_t id{0};
-//    auto get_closest = [&p, &id, &closest_id, &distance_sq](const Points &pts) {
-//        for (const Point &p_ : pts) {
-//            Point dp = p - p_;
-//            float d  = dp.x() * dp.x() + dp.y() * dp.y();
-//            if (distance_sq > d) {
-//                distance_sq = d;
-//                closest_id  = id;
-//            }
-//            ++id; 
-//        }        
-//    };
-//
-//    for (const ExPolygon &shape : shapes) {
-//        get_closest(shape.contour.points);
-//        for (const Polygon &hole : shape.holes)
-//            get_closest(hole.points);
-//    }
-//    return closest_id;
-//}
 
 priv::ProjectionDistances priv::choose_best_distance(
     const std::vector<ProjectionDistances> &distances,
@@ -2315,6 +2315,100 @@ void priv::store(const Vec3f       &vertex,
     }
     its.indices.emplace_back(0, flatten, 1);
     its_write_obj(its, file.c_str());
+}
+
+bool priv::merge_cut(CutAOI &cut1, const CutAOI &cut2, const CutMesh &mesh)
+{
+    // create cgal model and merge it together
+
+    return false;
+}
+
+void priv::merge_cuts(CutAOIs                   &cuts,
+                      const CutMesh             &mesh,
+                      const std::vector<size_t> &use_cut_indices)
+{
+    auto create_bb = [&mesh](const CutAOI &cut) -> BoundingBoxf3 {
+        Vec3f min(std::numeric_limits<float>::min(),
+                  std::numeric_limits<float>::min(),
+                  std::numeric_limits<float>::min());
+        Vec3f max(std::numeric_limits<float>::max(),
+                  std::numeric_limits<float>::max(),
+                  std::numeric_limits<float>::max());
+        for (const FI &fi : cut.first) {
+            HI hi = mesh.halfedge(fi);
+            for (VI vi : {mesh.source(hi), mesh.target(hi),
+                          mesh.target(mesh.next(hi))}) {
+                const P3 &p = mesh.point(vi);
+                for (size_t i = 0; i < 3; i++) {
+                    if (min[i] > p[i]) min[i] = p[i];
+                    if (max[i] < p[i]) max[i] = p[i];
+                }
+            }
+        }
+        return BoundingBoxf3(min.cast<double>(), max.cast<double>());
+    };
+
+    // create bounding boxes for cuts
+    std::vector<BoundingBoxf3> bbs;
+    bbs.reserve(cuts.size());    
+    for (const CutAOI &cut : cuts)
+        bbs.push_back(create_bb(cut));
+    // extend used bb by intersecting bb
+    // NOTE: after merge 2 cuts could appear new intersection on surface of merged in
+
+    std::vector<std::pair<size_t, size_t>> merge_order;
+    std::vector<bool> del_cuts(cuts.size(), {true});
+    for (size_t cut_index : use_cut_indices) del_cuts[cut_index] = false;
+
+    // find intersection of cuts by Bounding boxes intersection
+    for (size_t cut_index : use_cut_indices) {
+        // check if cut is merged into another one
+        if (del_cuts[cut_index]) continue;
+        BoundingBoxf3& result_bb = bbs[cut_index];
+        CutAOI &cut = cuts[cut_index];
+        // all merged cuts into cut_index
+        std::vector<bool> merged(cuts.size(), {false});
+
+        // merged in last iteration
+        std::vector<bool> new_merged;
+        bool exist_new_extension;
+        bool is_first = true;
+        do {
+            exist_new_extension = false;
+            new_merged = std::vector<bool>(cuts.size(), {false});
+            for (const BoundingBoxf3 &bb : bbs) {
+                size_t bb_index = &bb - &bbs.front();
+                // do not merge itself
+                if (cut_index == bb_index) continue;
+                if (!is_first && merged[cut_index]) continue;
+                if (!bb.intersects(result_bb)) {
+                    if (is_first) continue;
+                    bool has_new_intersection = false;
+                    for (size_t i = 0; i < cuts.size(); i++) {
+                        if (!new_merged[i]) continue;
+                        if (!bbs[i].intersects(bb)) continue;
+                        has_new_intersection = true;
+                    }
+                    if (!has_new_intersection) continue;
+                }
+                if(!merge_cut(cut, cuts[bb_index], mesh)) continue;
+                result_bb = create_bb(cut);
+                merged[bb_index]     = true;
+                del_cuts[bb_index]   = true;
+                new_merged[bb_index] = true;
+                // extend result_bb
+                exist_new_extension = true;
+            }
+            is_first = false;
+        } while (exist_new_extension);        
+    }
+
+    // remove flagged cuts
+    for (size_t i = del_cuts.size(); i > 0; --i) {
+        size_t index = i - 1;
+        if (del_cuts[index]) cuts.erase(cuts.begin() + index);
+    }
 }
 
 void priv::filter_cuts(CutAOIs              &cuts,
