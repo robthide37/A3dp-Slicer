@@ -405,7 +405,9 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator &p
 
             // Reapply the nearest point search for starting point.
             // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
-            chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
+            // Arachne sometimes creates extrusion with zero-length (just two same endpoints);
+            if (!paths.empty())
+                chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
         } else {
             extrusion_paths_append(paths, *extrusion, role, is_external ? perimeter_generator.ext_perimeter_flow : perimeter_generator.perimeter_flow);
         }
@@ -462,6 +464,13 @@ void PerimeterGenerator::process_arachne()
 
         Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, *this->object_config, *this->print_config);
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
+
+        if (perimeters.size() == 1 && perimeters.front().size() == 2 && perimeters.front().front().junctions.size() == 2) {
+            for (const Point &pt : last_p.front().points) {
+                std::cout << "(" << pt.x() << ", " << pt.y() << ")," << std::endl;
+            }
+            std::cout << "" << std::endl;
+        }
 
         int start_perimeter = int(perimeters.size()) - 1;
         int end_perimeter   = -1;
