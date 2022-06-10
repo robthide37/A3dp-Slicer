@@ -3043,14 +3043,18 @@ Polylines FillSupportBase::fill_surface(const Surface *surface, const FillParams
     return polylines_out;
 }
 
-Points sample_grid_pattern(const ExPolygon &expolygon, coord_t spacing)
+// Lightning infill assumes that the distance between any two sampled points is always
+// at least equal to the value of spacing. To meet this assumption, we need to use
+// BoundingBox for whole layers instead of bounding box just around processing ExPolygon.
+// Using just BoundingBox around processing ExPolygon could produce two points closer
+// than spacing (in cases where two ExPolygon are closer than spacing).
+Points sample_grid_pattern(const ExPolygon &expolygon, coord_t spacing, const BoundingBox &global_bounding_box)
 {
     ExPolygonWithOffset poly_with_offset(expolygon, 0, 0, 0);
-    BoundingBox bounding_box = poly_with_offset.bounding_box_src();
     std::vector<SegmentedIntersectionLine> segs = slice_region_by_vertical_lines(
         poly_with_offset, 
-        (bounding_box.max.x() - bounding_box.min.x() + spacing - 1) / spacing, 
-        bounding_box.min.x(),
+        (global_bounding_box.max.x() - global_bounding_box.min.x() + spacing - 1) / spacing,
+        global_bounding_box.min.x(),
         spacing);
 
     Points out;
@@ -3066,17 +3070,17 @@ Points sample_grid_pattern(const ExPolygon &expolygon, coord_t spacing)
     return out;
 }
 
-Points sample_grid_pattern(const ExPolygons &expolygons, coord_t spacing)
+Points sample_grid_pattern(const ExPolygons &expolygons, coord_t spacing, const BoundingBox &global_bounding_box)
 {
     Points out;
     for (const ExPolygon &expoly : expolygons)
-        append(out, sample_grid_pattern(expoly, spacing));
+        append(out, sample_grid_pattern(expoly, spacing, global_bounding_box));
     return out;
 }
 
-Points sample_grid_pattern(const Polygons &polygons, coord_t spacing)
+Points sample_grid_pattern(const Polygons &polygons, coord_t spacing, const BoundingBox &global_bounding_box)
 {
-    return sample_grid_pattern(union_ex(polygons), spacing);
+    return sample_grid_pattern(union_ex(polygons), spacing, global_bounding_box);
 }
 
 } // namespace Slic3r
