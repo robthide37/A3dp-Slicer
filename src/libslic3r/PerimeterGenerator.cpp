@@ -2517,7 +2517,9 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
 
             // Reapply the nearest point search for starting point.
             // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
-            chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
+            // Arachne sometimes creates extrusion with zero-length (just two same endpoints);
+            if (!paths.empty())
+                chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
         } else {
             append(paths, Geometry::variable_width(Arachne::to_thick_polyline(*extrusion),
                 role,
@@ -2527,7 +2529,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
         }
 
         // Apply fuzzify
-        if (pg_extrusion.fuzzify) {
+        if (!paths.empty() && pg_extrusion.fuzzify) {
             double nozle_diameter = is_external ? this->ext_perimeter_flow.nozzle_diameter() : this->perimeter_flow.nozzle_diameter();
             double fuzzy_skin_thickness = config->fuzzy_skin_thickness.get_abs_value(nozle_diameter);
             double fuzzy_skin_point_dist = config->fuzzy_skin_point_dist.get_abs_value(nozle_diameter);
