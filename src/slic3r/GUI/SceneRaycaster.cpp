@@ -112,7 +112,9 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
         return ret;
     };
 
+#if ENABLE_RAYCAST_PICKING_DEBUG
     m_last_hit.reset();
+#endif // ENABLE_RAYCAST_PICKING_DEBUG
 
     HitResult ret;
 
@@ -148,7 +150,9 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
     if (ret.is_valid())
         ret.raycaster_id = decode_id(ret.type, ret.raycaster_id);
 
+#if ENABLE_RAYCAST_PICKING_DEBUG
     m_last_hit = ret;
+#endif // ENABLE_RAYCAST_PICKING_DEBUG
     return ret;
 }
 
@@ -172,7 +176,7 @@ void SceneRaycaster::render_hit(const Camera& camera)
     Transform3d m = Transform3d::Identity();
     m.matrix().block(0, 0, 3, 3) = q.setFromTwoVectors(Vec3d::UnitZ(), m_last_hit.value().normal.cast<double>()).toRotationMatrix();
 
-    const Transform3d line_view_model_matrix = sphere_view_model_matrix * m * Geometry::scale_transform(6.25);
+    const Transform3d line_view_model_matrix = sphere_view_model_matrix * m * Geometry::scale_transform(10.0);
     shader->set_uniform("view_model_matrix", line_view_model_matrix);
     m_line.render();
 

@@ -2229,6 +2229,9 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 #else
 #if ENABLE_LEGACY_OPENGL_REMOVAL
                                 volume.model.init_from(mesh);
+#if ENABLE_RAYCAST_PICKING
+                                volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(mesh));
+#endif // ENABLE_RAYCAST_PICKING
 #else
                                 volume.indexed_vertex_array.load_mesh(mesh);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -2244,7 +2247,13 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #else
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+                                const TriangleMesh& new_mesh = m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh();
+                                volume.model.init_from(new_mesh);
+                                volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(new_mesh));
+#else
                                 volume.model.init_from(m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh());
+#endif // ENABLE_RAYCAST_PICKING
 #else
                                 volume.indexed_vertex_array.load_mesh(m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -2391,6 +2400,15 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         if (manip != nullptr)
             manip->set_dirty();
     }
+
+#if ENABLE_RAYCAST_PICKING
+    // refresh volume raycasters for picking
+    m_scene_raycaster.reset(SceneRaycaster::EType::Volume);
+    for (size_t i = 0; i < m_volumes.volumes.size(); ++i) {
+        assert(m_volumes.volumes[i]->mesh_raycaster != nullptr);
+        add_raycaster_for_picking(SceneRaycaster::EType::Volume, i, *m_volumes.volumes[i]->mesh_raycaster, m_volumes.volumes[i]->world_matrix());
+    }
+#endif // ENABLE_RAYCAST_PICKING
 
     // and force this canvas to be redrawn.
     m_dirty = true;
@@ -3658,6 +3676,10 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
     }
     else if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp()) {
+#if ENABLE_RAYCAST_PICKING
+        m_mouse.position = pos.cast<double>();
+#endif // ENABLE_RAYCAST_PICKING
+
         if (m_layers_editing.state != LayersEditing::Unknown) {
             m_layers_editing.state = LayersEditing::Unknown;
             _stop_timer();
@@ -3682,7 +3704,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 deselect_all();
         }
         else if (evt.RightUp()) {
+#if !ENABLE_RAYCAST_PICKING
             m_mouse.position = pos.cast<double>();
+#endif // !ENABLE_RAYCAST_PICKING
             // forces a frame render to ensure that m_hover_volume_idxs is updated even when the user right clicks while
             // the context menu is already shown
             render();
