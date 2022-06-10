@@ -465,13 +465,6 @@ void PerimeterGenerator::process_arachne()
         Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, *this->object_config, *this->print_config);
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
-        if (perimeters.size() == 1 && perimeters.front().size() == 2 && perimeters.front().front().junctions.size() == 2) {
-            for (const Point &pt : last_p.front().points) {
-                std::cout << "(" << pt.x() << ", " << pt.y() << ")," << std::endl;
-            }
-            std::cout << "" << std::endl;
-        }
-
         int start_perimeter = int(perimeters.size()) - 1;
         int end_perimeter   = -1;
         int direction       = -1;
