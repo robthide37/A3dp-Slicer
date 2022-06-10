@@ -38,7 +38,6 @@ public:
     // (254 is choosen to leave some space for forward compatibility)
     static const unsigned int BASE_ID = 255 * 255 * 254;
 
-#if ENABLE_GIZMO_GRABBER_REFACTOR
     enum class EGrabberExtension
     {
         None = 0,
@@ -49,7 +48,6 @@ public:
         PosZ = 1 << 4,
         NegZ = 1 << 5,
     };
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 
 protected:
     struct Grabber
@@ -66,14 +64,10 @@ protected:
         Transform3d matrix{ Transform3d::Identity() };
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
         ColorRGBA color{ ColorRGBA::WHITE() };
-#if ENABLE_GIZMO_GRABBER_REFACTOR
         EGrabberExtension extensions{ EGrabberExtension::None };
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 
         Grabber() = default;
-#if ENABLE_GIZMO_GRABBER_REFACTOR
         ~Grabber();
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 
         void render(bool hover, float size) { render(size, hover ? complementary(color) : color, false); }
         void render_for_picking(float size) { render(size, color, true); }
@@ -84,12 +78,8 @@ protected:
     private:
         void render(float size, const ColorRGBA& render_color, bool picking);
 
-#if ENABLE_GIZMO_GRABBER_REFACTOR
         static GLModel s_cube;
         static GLModel s_cone;
-#else
-        GLModel m_cube;
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
     };
 
 public:

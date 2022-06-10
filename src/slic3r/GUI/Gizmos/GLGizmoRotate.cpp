@@ -94,9 +94,7 @@ void GLGizmoRotate::disable_grabber() { m_grabbers[0].enabled = false; }
 bool GLGizmoRotate::on_init()
 {
     m_grabbers.push_back(Grabber());
-#if ENABLE_GIZMO_GRABBER_REFACTOR
     m_grabbers.back().extensions = (GLGizmoBase::EGrabberExtension)(int(GLGizmoBase::EGrabberExtension::PosY) | int(GLGizmoBase::EGrabberExtension::NegY));
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
     return true;
 }
 
@@ -151,11 +149,6 @@ void GLGizmoRotate::on_render()
 {
     if (!m_grabbers.front().enabled)
         return;
-
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    if (!m_cone.is_initialized())
-        m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 12.0));
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
     const Selection& selection = m_parent.get_selection();
 #if !ENABLE_WORLD_COORDINATE
@@ -249,14 +242,8 @@ void GLGizmoRotate::on_render()
 
 #if ENABLE_WORLD_COORDINATE
     render_grabber(m_bounding_box);
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    render_grabber_extension(m_bounding_box, false);
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #else
     render_grabber(box);
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    render_grabber_extension(box, false);
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #endif // ENABLE_WORLD_COORDINATE
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
@@ -279,15 +266,9 @@ void GLGizmoRotate::on_render_for_picking()
 
 #if ENABLE_WORLD_COORDINATE
     render_grabbers_for_picking(m_bounding_box);
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    render_grabber_extension(m_bounding_box, true);
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #else
     const BoundingBoxf3& box = selection.get_bounding_box();
     render_grabbers_for_picking(box);
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    render_grabber_extension(box, true);
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #endif // ENABLE_WORLD_COORDINATE
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
@@ -661,81 +642,6 @@ void GLGizmoRotate::render_grabber(const BoundingBoxf3& box)
     m_grabbers.front().color = m_highlight_color;
     render_grabbers(box);
 }
-
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool picking)
-{
-    const float mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 3.0);
-    const double size = m_dragging ? double(m_grabbers.front().get_dragging_half_size(mean_size)) : double(m_grabbers.front().get_half_size(mean_size));
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
-    if (shader == nullptr)
-        return;
-
-    m_cone.set_color((!picking && m_hover_id != -1) ? complementary(m_grabbers.front().color) : m_grabbers.front().color);
-
-    shader->start_using();
-    shader->set_uniform("emission_factor", 0.1f);
-#else
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-    if (shader == nullptr)
-        return;
-
-    m_cone.set_color(-1, (!picking && m_hover_id != -1) ? complementary(m_grabbers.front().color) : m_grabbers.front().color);
-    if (!picking) {
-        shader->start_using();
-        shader->set_uniform("emission_factor", 0.1f);
-    }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-    const Vec3d& center = m_grabbers.front().center;
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    const Camera& camera = wxGetApp().plater()->get_camera();
-    const Transform3d& view_matrix = camera.get_view_matrix();
-    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-
-    Transform3d model_matrix = m_grabbers.front().matrix * Geometry::assemble_transform(center, Vec3d(0.5 * PI, 0.0, m_angle)) *
-        Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
-
-    shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
-    Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-    shader->set_uniform("view_normal_matrix", view_normal_matrix);
-#else
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(center.x(), center.y(), center.z()));
-    glsafe(::glRotated(Geometry::rad2deg(m_angle), 0.0, 0.0, 1.0));
-    glsafe(::glRotated(90.0, 1.0, 0.0, 0.0));
-    glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
-    glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-    m_cone.render();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    model_matrix = m_grabbers.front().matrix * Geometry::assemble_transform(center, Vec3d(-0.5 * PI, 0.0, m_angle)) *
-        Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
-
-    shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
-    view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-    shader->set_uniform("view_normal_matrix", view_normal_matrix);
-#else
-    glsafe(::glPopMatrix());
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(center.x(), center.y(), center.z()));
-    glsafe(::glRotated(Geometry::rad2deg(m_angle), 0.0, 0.0, 1.0));
-    glsafe(::glRotated(-90.0, 1.0, 0.0, 0.0));
-    glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
-    glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-    m_cone.render();
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPopMatrix());
-    if (! picking)
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-        shader->stop_using();
-}
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
