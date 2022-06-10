@@ -16,6 +16,9 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GCodeViewer.hpp"
 #include "Camera.hpp"
+#if ENABLE_RAYCAST_PICKING
+#include "SceneRaycaster.hpp"
+#endif // ENABLE_RAYCAST_PICKING
 
 #include "libslic3r/Slicing.hpp"
 
@@ -479,6 +482,9 @@ public:
 private:
     wxGLCanvas* m_canvas;
     wxGLContext* m_context;
+#if ENABLE_RAYCAST_PICKING
+    SceneRaycaster m_scene_raycaster;
+#endif // ENABLE_RAYCAST_PICKING
     Bed3D &m_bed;
 #if ENABLE_RETINA_GL
     std::unique_ptr<RetinaHelper> m_retina_helper;
@@ -655,6 +661,15 @@ public:
 
     bool init();
     void post_event(wxEvent &&event);
+
+#if ENABLE_RAYCAST_PICKING
+    int add_raycaster_for_picking(SceneRaycaster::EType type, int id, const MeshRaycaster& raycaster, const Transform3d& trafo) {
+        return m_scene_raycaster.add_raycaster(type, id, raycaster, trafo);
+    }
+    void remove_all_picking_raycasters(SceneRaycaster::EType type) {
+        m_scene_raycaster.reset(type);
+    }
+#endif // ENABLE_RAYCAST_PICKING
 
     void set_as_dirty();
     void requires_check_outside_state() { m_requires_check_outside_state = true; }
@@ -958,7 +973,9 @@ private:
     void _render_background();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     void _render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes);
+#if !ENABLE_RAYCAST_PICKING
     void _render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom);
+#endif // !ENABLE_RAYCAST_PICKING
 #else
     void _render_bed(bool bottom, bool show_axes);
     void _render_bed_for_picking(bool bottom);

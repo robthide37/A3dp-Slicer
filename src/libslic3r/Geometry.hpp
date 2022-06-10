@@ -366,9 +366,11 @@ void rotation_transform(Transform3d& transform, const Vec3d& rotation);
 Transform3d rotation_transform(const Vec3d& rotation);
 
 // Sets the given transform by assembling the given scale factors
+void scale_transform(Transform3d& transform, double scale);
 void scale_transform(Transform3d& transform, const Vec3d& scale);
 
 // Returns the transform obtained by assembling the given scale factors
+Transform3d scale_transform(double scale);
 Transform3d scale_transform(const Vec3d& scale);
 
 // Returns the euler angles extracted from the given rotation matrix

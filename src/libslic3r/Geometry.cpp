@@ -351,10 +351,20 @@ Transform3d rotation_transform(const Vec3d& rotation)
     return transform;
 }
 
+void scale_transform(Transform3d& transform, double scale)
+{
+    return scale_transform(transform, scale * Vec3d::Ones());
+}
+
 void scale_transform(Transform3d& transform, const Vec3d& scale)
 {
     transform = Transform3d::Identity();
     transform.scale(scale);
+}
+
+Transform3d scale_transform(double scale)
+{
+    return scale_transform(scale * Vec3d::Ones());
 }
 
 Transform3d scale_transform(const Vec3d& scale)

@@ -24,7 +24,9 @@
 
 static const float GROUND_Z = -0.02f;
 static const Slic3r::ColorRGBA DEFAULT_MODEL_COLOR             = Slic3r::ColorRGBA::DARK_GRAY();
+#if !ENABLE_RAYCAST_PICKING
 static const Slic3r::ColorRGBA PICKING_MODEL_COLOR             = Slic3r::ColorRGBA::BLACK();
+#endif // !ENABLE_RAYCAST_PICKING
 static const Slic3r::ColorRGBA DEFAULT_SOLID_GRID_COLOR        = { 0.9f, 0.9f, 0.9f, 1.0f };
 static const Slic3r::ColorRGBA DEFAULT_TRANSPARENT_GRID_COLOR  = { 0.9f, 0.9f, 0.9f, 0.6f };
 
@@ -249,6 +251,11 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
     m_axes.set_origin({ 0.0, 0.0, static_cast<double>(GROUND_Z) });
     m_axes.set_stem_length(0.1f * static_cast<float>(m_build_volume.bounding_volume().max_size()));
 
+#if ENABLE_RAYCAST_PICKING
+    // unregister from picking
+    wxGetApp().plater()->canvas3D()->remove_all_picking_raycasters(SceneRaycaster::EType::Bed);
+#endif // ENABLE_RAYCAST_PICKING
+
     // Let the calee to update the UI.
     return true;
 }
@@ -266,13 +273,19 @@ Point Bed3D::point_projection(const Point& point) const
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes, bool show_texture)
 {
+#if ENABLE_RAYCAST_PICKING
+    render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture);
+#else
     render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture, false);
+#endif // ENABLE_RAYCAST_PICKING
 }
 
+#if !ENABLE_RAYCAST_PICKING
 void Bed3D::render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor)
 {
     render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, false, false, true);
 }
+#endif // !ENABLE_RAYCAST_PICKING
 #else
 void Bed3D::render(GLCanvas3D& canvas, bool bottom, float scale_factor, bool show_axes, bool show_texture)
 {
@@ -286,8 +299,13 @@ void Bed3D::render_for_picking(GLCanvas3D& canvas, bool bottom, float scale_fact
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
+    bool show_axes, bool show_texture)
+#else
 void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
     bool show_axes, bool show_texture, bool picking)
+#endif // ENABLE_RAYCAST_PICKING
 #else
 void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
     bool show_axes, bool show_texture, bool picking)
@@ -301,7 +319,9 @@ void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
     glsafe(::glEnable(GL_DEPTH_TEST));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if !ENABLE_RAYCAST_PICKING
     m_model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
+#endif // !ENABLE_RAYCAST_PICKING
 #else
     m_model.set_color(-1, picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -311,7 +331,11 @@ void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     case Type::System: { render_system(canvas, view_matrix, projection_matrix, bottom, show_texture); break; }
     default:
+#if ENABLE_RAYCAST_PICKING
+    case Type::Custom: { render_custom(canvas, view_matrix, projection_matrix, bottom, show_texture); break; }
+#else
     case Type::Custom: { render_custom(canvas, view_matrix, projection_matrix, bottom, show_texture, picking); break; }
+#endif // ENABLE_RAYCAST_PICKING
 #else
     case Type::System: { render_system(canvas, bottom, show_texture); break; }
     default:
@@ -341,7 +365,11 @@ BoundingBoxf3 Bed3D::calc_extended_bounding_box() const
     out.merge(out.min + Vec3d(-Axes::DefaultTipRadius, -Axes::DefaultTipRadius, out.max.z()));
 #endif // ENABLE_WORLD_COORDINATE
     // extend to contain model, if any
+#if ENABLE_RAYCAST_PICKING
+    BoundingBoxf3 model_bb = m_model.model.get_bounding_box();
+#else
     BoundingBoxf3 model_bb = m_model.get_bounding_box();
+#endif // ENABLE_RAYCAST_PICKING
     if (model_bb.defined) {
         model_bb.translate(m_model_offset);
         out.merge(model_bb);
@@ -391,7 +419,16 @@ void Bed3D::init_triangles()
             init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
     }
 
+#if ENABLE_RAYCAST_PICKING
+    if (m_model.model.get_filename().empty() && m_model.mesh_raycaster == nullptr)
+        // register for picking
+        register_raycasters_for_picking(init_data, Transform3d::Identity());
+#endif // ENABLE_RAYCAST_PICKING
+
     m_triangles.init_from(std::move(init_data));
+#if ENABLE_RAYCAST_PICKING
+    m_triangles.set_color(DEFAULT_MODEL_COLOR);
+#endif // ENABLE_RAYCAST_PICKING
 }
 
 void Bed3D::init_gridlines()
@@ -581,7 +618,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
     if (m_texture_filename.empty()) {
         m_texture.reset();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+        render_default(bottom, true, view_matrix, projection_matrix);
+#else
         render_default(bottom, false, true, view_matrix, projection_matrix);
+#endif // ENABLE_RAYCAST_PICKING
 #else
         render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -598,7 +639,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
                 // generate a temporary lower resolution texture to show while no main texture levels have been compressed
                 if (!m_temp_texture.load_from_svg_file(m_texture_filename, false, false, false, max_tex_size / 8)) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+                    render_default(bottom, true, view_matrix, projection_matrix);
+#else
                     render_default(bottom, false, true, view_matrix, projection_matrix);
+#endif // ENABLE_RAYCAST_PICKING
 #else
                     render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -610,7 +655,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             // starts generating the main texture, compression will run asynchronously
             if (!m_texture.load_from_svg_file(m_texture_filename, true, true, true, max_tex_size)) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+                render_default(bottom, true, view_matrix, projection_matrix);
+#else
                 render_default(bottom, false, true, view_matrix, projection_matrix);
+#endif // ENABLE_RAYCAST_PICKING
 #else
                 render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -622,7 +671,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             if (m_temp_texture.get_id() == 0 || m_temp_texture.get_source() != m_texture_filename) {
                 if (!m_temp_texture.load_from_file(m_texture_filename, false, GLTexture::None, false)) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+                    render_default(bottom, true, view_matrix, projection_matrix);
+#else
                     render_default(bottom, false, true, view_matrix, projection_matrix);
+#endif // ENABLE_RAYCAST_PICKING
 #else
                     render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -634,7 +687,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             // starts generating the main texture, compression will run asynchronously
             if (!m_texture.load_from_file(m_texture_filename, true, GLTexture::MultiThreaded, true)) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+                render_default(bottom, true, view_matrix, projection_matrix);
+#else
                 render_default(bottom, false, true, view_matrix, projection_matrix);
+#endif // ENABLE_RAYCAST_PICKING
 #else
                 render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -643,7 +700,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
         }
         else {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+            render_default(bottom, true, view_matrix, projection_matrix);
+#else
             render_default(bottom, false, true, view_matrix, projection_matrix);
+#endif // ENABLE_RAYCAST_PICKING
 #else
             render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -771,9 +832,17 @@ void Bed3D::render_model()
     if (m_model_filename.empty())
         return;
 
+#if ENABLE_RAYCAST_PICKING
+    if (m_model.model.get_filename() != m_model_filename && m_model.model.init_from_file(m_model_filename)) {
+#else
     if (m_model.get_filename() != m_model_filename && m_model.init_from_file(m_model_filename)) {
+#endif // ENABLE_RAYCAST_PICKING
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+        m_model.model.set_color(DEFAULT_MODEL_COLOR);
+#else
         m_model.set_color(DEFAULT_MODEL_COLOR);
+#endif // ENABLE_RAYCAST_PICKING
 #else
         m_model.set_color(-1, DEFAULT_MODEL_COLOR);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -781,11 +850,20 @@ void Bed3D::render_model()
         // move the model so that its origin (0.0, 0.0, 0.0) goes into the bed shape center and a bit down to avoid z-fighting with the texture quad
         m_model_offset = to_3d(m_build_volume.bounding_volume2d().center(), -0.03);
 
+#if ENABLE_RAYCAST_PICKING
+        // register for picking
+        register_raycasters_for_picking(m_model.model.get_geometry(), Geometry::assemble_transform(m_model_offset));
+#endif // ENABLE_RAYCAST_PICKING
+
         // update extended bounding box
         m_extended_bounding_box = this->calc_extended_bounding_box();
     }
 
+#if ENABLE_RAYCAST_PICKING
+    if (!m_model.model.get_filename().empty()) {
+#else
     if (!m_model.get_filename().empty()) {
+#endif // ENABLE_RAYCAST_PICKING
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
         if (shader != nullptr) {
             shader->start_using();
@@ -800,7 +878,11 @@ void Bed3D::render_model()
             glsafe(::glPushMatrix());
             glsafe(::glTranslated(m_model_offset.x(), m_model_offset.y(), m_model_offset.z()));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+            m_model.model.render();
+#else
             m_model.render();
+#endif // ENABLE_RAYCAST_PICKING
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
             glsafe(::glPopMatrix());
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
@@ -810,14 +892,22 @@ void Bed3D::render_model()
 }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+void Bed3D::render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture)
+#else
 void Bed3D::render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking)
+#endif // ENABLE_RAYCAST_PICKING
 #else
 void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (m_texture_filename.empty() && m_model_filename.empty()) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+        render_default(bottom, show_texture, view_matrix, projection_matrix);
+#else
         render_default(bottom, picking, show_texture, view_matrix, projection_matrix);
+#endif // ENABLE_RAYCAST_PICKING
 #else
         render_default(bottom, picking, show_texture);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -844,7 +934,11 @@ void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bo
 }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+void Bed3D::render_default(bool bottom, bool show_texture, const Transform3d& view_matrix, const Transform3d& projection_matrix)
+#else
 void Bed3D::render_default(bool bottom, bool picking, bool show_texture, const Transform3d& view_matrix, const Transform3d& projection_matrix)
+#endif // ENABLE_RAYCAST_PICKING
 #else
 void Bed3D::render_default(bool bottom, bool picking, bool show_texture)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -866,16 +960,35 @@ void Bed3D::render_default(bool bottom, bool picking, bool show_texture)
         glsafe(::glEnable(GL_BLEND));
         glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
+#if ENABLE_RAYCAST_PICKING
+        const bool has_model = !m_model.model.get_filename().empty();
+#else
         const bool has_model = !m_model.get_filename().empty();
+#endif // ENABLE_RAYCAST_PICKING
 
         if (!has_model && !bottom) {
             // draw background
             glsafe(::glDepthMask(GL_FALSE));
+#if !ENABLE_RAYCAST_PICKING
             m_triangles.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
+#endif // !ENABLE_RAYCAST_PICKING
             m_triangles.render();
             glsafe(::glDepthMask(GL_TRUE));
         }
 
+#if ENABLE_RAYCAST_PICKING
+        if (show_texture) {
+            // draw grid
+#if ENABLE_GL_CORE_PROFILE
+            if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+                glsafe(::glLineWidth(1.5f * m_scale_factor));
+            m_gridlines.set_color(has_model && !bottom ? DEFAULT_SOLID_GRID_COLOR : DEFAULT_TRANSPARENT_GRID_COLOR);
+            m_gridlines.render();
+        }
+        else
+            render_contour(view_matrix, projection_matrix);
+#else
         if (!picking && show_texture) {
             // draw grid
 #if ENABLE_GL_CORE_PROFILE
@@ -887,6 +1000,7 @@ void Bed3D::render_default(bool bottom, bool picking, bool show_texture)
         }
         else if (!show_texture)
             render_contour(view_matrix, projection_matrix);
+#endif // ENABLE_RAYCAST_PICKING
 
         glsafe(::glDisable(GL_BLEND));
 
@@ -978,6 +1092,27 @@ void Bed3D::release_VBOs()
     }
 }
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
+
+#if ENABLE_RAYCAST_PICKING
+void Bed3D::register_raycasters_for_picking(const GLModel::Geometry& geometry, const Transform3d& trafo)
+{
+    assert(m_model.mesh_raycaster == nullptr);
+
+    indexed_triangle_set its;
+    its.vertices.reserve(geometry.vertices_count());
+    for (size_t i = 0; i < geometry.vertices_count(); ++i) {
+        its.vertices.emplace_back(geometry.extract_position_3(i));
+    }
+    its.indices.reserve(geometry.indices_count() / 3);
+    for (size_t i = 0; i < geometry.indices_count() / 3; ++i) {
+        const size_t tri_id = i * 3;
+        its.indices.emplace_back(geometry.extract_index(tri_id), geometry.extract_index(tri_id + 1), geometry.extract_index(tri_id + 2));
+    }
+
+    m_model.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
+    wxGetApp().plater()->canvas3D()->add_raycaster_for_picking(SceneRaycaster::EType::Bed, 0, *m_model.mesh_raycaster, trafo);
+}
+#endif // ENABLE_RAYCAST_PICKING
 
 } // GUI
 } // Slic3r
