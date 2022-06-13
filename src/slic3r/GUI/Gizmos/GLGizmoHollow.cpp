@@ -90,6 +90,7 @@ void GLGizmoHollow::on_render()
 }
 
 
+#if !ENABLE_RAYCAST_PICKING
 void GLGizmoHollow::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
@@ -100,6 +101,7 @@ void GLGizmoHollow::on_render_for_picking()
     glsafe(::glEnable(GL_DEPTH_TEST));
     render_points(selection, true);
 }
+#endif // !ENABLE_RAYCAST_PICKING
 
 void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 {

@@ -90,7 +90,9 @@ protected:
     void on_start_dragging() override;
     void on_dragging(const UpdateData &data) override;
     void on_render() override;
+#if !ENABLE_RAYCAST_PICKING
     void on_render_for_picking() override;
+#endif // !ENABLE_RAYCAST_PICKING
 
 private:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -175,11 +177,13 @@ protected:
     void on_dragging(const UpdateData &data) override;
         
     void on_render() override;
+#if !ENABLE_RAYCAST_PICKING
     void on_render_for_picking() override {
         for (GLGizmoRotate& g : m_gizmos) {
             g.render_for_picking();
         }
     }
+#endif // !ENABLE_RAYCAST_PICKING
 
     void on_render_input_window(float x, float y, float bottom_limit) override;
 

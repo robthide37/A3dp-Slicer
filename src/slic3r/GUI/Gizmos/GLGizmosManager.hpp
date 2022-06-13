@@ -213,7 +213,9 @@ public:
     bool is_hiding_instances() const;
 
     void render_current_gizmo() const;
+#if !ENABLE_RAYCAST_PICKING
     void render_current_gizmo_for_picking_pass() const;
+#endif // !ENABLE_RAYCAST_PICKING
     void render_painter_gizmo();
 
     void render_overlay();

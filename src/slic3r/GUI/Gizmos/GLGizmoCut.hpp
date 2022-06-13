@@ -68,7 +68,9 @@ protected:
     virtual void on_start_dragging() override;
     virtual void on_dragging(const UpdateData& data) override;
     virtual void on_render() override;
+#if !ENABLE_RAYCAST_PICKING
     virtual void on_render_for_picking() override;
+#endif // !ENABLE_RAYCAST_PICKING
     virtual void on_render_input_window(float x, float y, float bottom_limit) override;
 
 private:

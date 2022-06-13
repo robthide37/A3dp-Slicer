@@ -33,28 +33,48 @@ SceneRaycaster::SceneRaycaster() {
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 }
 
-int SceneRaycaster::add_raycaster(EType type, PickingId id, const MeshRaycaster& raycaster, const Transform3d& trafo)
+void SceneRaycaster::add_raycaster(EType type, PickingId id, const MeshRaycaster& raycaster, const Transform3d& trafo)
 {
     switch (type) {
     case EType::Bed: {
         m_bed.emplace_back(encode_id(type, id), raycaster, trafo);
-        return m_bed.size() - 1;
+        break;
     }
     case EType::Volume: {
         m_volumes.emplace_back(encode_id(type, id), raycaster, trafo);
-        return m_volumes.size() - 1;
+        break;
     }
     case EType::Gizmo: {
         m_gizmos.emplace_back(encode_id(type, id), raycaster, trafo);
-        return m_gizmos.size() - 1;
+        break;
     }
+    default: { break; }
     };
-
-    // signal error
-    return -1;
 }
 
-void SceneRaycaster::set_raycaster_active_state(EType type, int id, bool active)
+void SceneRaycaster::remove_raycasters(EType type, PickingId id)
+{
+    std::vector<SceneRaycasterItem>* raycasters = get_raycasters(type);
+    auto it = raycasters->begin();
+    while (it != raycasters->end()) {
+        if (it->get_id() == encode_id(type, id))
+            it = raycasters->erase(it);
+        else
+            ++it;
+    }
+}
+
+void SceneRaycaster::remove_raycasters(EType type)
+{
+    switch (type) {
+    case EType::Bed:    { m_bed.clear(); break; }
+    case EType::Volume: { m_volumes.clear(); break; }
+    case EType::Gizmo:  { m_gizmos.clear(); break; }
+    default:            { break; }
+    };
+}
+
+void SceneRaycaster::set_raycaster_active_state(EType type, PickingId id, bool active)
 {
     std::vector<SceneRaycasterItem>* raycasters = get_raycasters(type);
     for (SceneRaycasterItem& item : *raycasters) {
@@ -65,7 +85,7 @@ void SceneRaycaster::set_raycaster_active_state(EType type, int id, bool active)
     }
 }
 
-void SceneRaycaster::set_raycaster_transform(EType type, int id, const Transform3d& trafo)
+void SceneRaycaster::set_raycaster_transform(EType type, PickingId id, const Transform3d& trafo)
 {
     std::vector<SceneRaycasterItem>* raycasters = get_raycasters(type);
     for (SceneRaycasterItem& item : *raycasters) {
@@ -74,31 +94,6 @@ void SceneRaycaster::set_raycaster_transform(EType type, int id, const Transform
             break;
         }
     }
-}
-
-void SceneRaycaster::remove_raycaster(EType type, int id)
-{
-    std::vector<SceneRaycasterItem>* raycasters = get_raycasters(type);
-    if (0 <= id && id < raycasters->size())
-        raycasters->erase(raycasters->begin() + id);
-}
-
-void SceneRaycaster::reset(EType type)
-{
-    switch (type) {
-    case EType::Bed: {
-        m_bed.clear();
-        break;
-    }
-    case EType::Volume: {
-        m_volumes.clear();
-        break;
-    }
-    case EType::Gizmo: {
-        m_gizmos.clear();
-        break;
-    }
-    };
 }
 
 SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Camera& camera, const ClippingPlane* clipping_plane)
@@ -140,11 +135,14 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
         }
     };
 
-    test_raycasters(EType::Gizmo);
-    if (!m_gizmos_on_top || ret.is_valid()) {
-        if (camera.is_looking_downward())
+    if (!m_gizmos.empty())
+        test_raycasters(EType::Gizmo);
+
+    if (!m_gizmos_on_top || !ret.is_valid()) {
+        if (camera.is_looking_downward() && !m_bed.empty())
             test_raycasters(EType::Bed);
-        test_raycasters(EType::Volume);
+        if (!m_volumes.empty())
+            test_raycasters(EType::Volume);
     }
 
     if (ret.is_valid())

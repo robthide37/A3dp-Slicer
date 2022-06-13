@@ -154,6 +154,7 @@ void GLGizmoFlatten::on_render()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
+#if !ENABLE_RAYCAST_PICKING
 void GLGizmoFlatten::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
@@ -204,6 +205,7 @@ void GLGizmoFlatten::on_render_for_picking()
     shader->stop_using();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
+#endif // !ENABLE_RAYCAST_PICKING
 
 void GLGizmoFlatten::set_flattening_data(const ModelObject* model_object)
 {

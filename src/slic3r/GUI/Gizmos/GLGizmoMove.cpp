@@ -360,6 +360,18 @@ void GLGizmoMove3D::on_render()
 #endif // ENABLE_WORLD_COORDINATE
 }
 
+#if ENABLE_RAYCAST_PICKING
+void GLGizmoMove3D::on_register_raycasters_for_picking()
+{
+    // this gizmo is rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(true);
+}
+
+void GLGizmoMove3D::on_unregister_raycasters_for_picking()
+{
+    m_parent.set_raycaster_gizmos_on_top(false);
+}
+#else
 void GLGizmoMove3D::on_render_for_picking()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
@@ -384,6 +396,7 @@ void GLGizmoMove3D::on_render_for_picking()
     render_grabbers_for_picking(box);
 #endif // ENABLE_WORLD_COORDINATE
 }
+#endif // ENABLE_RAYCAST_PICKING
 
 double GLGizmoMove3D::calc_projection(const UpdateData& data) const
 {

@@ -251,6 +251,7 @@ void GLGizmoRotate::on_render()
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
+#if !ENABLE_RAYCAST_PICKING
 void GLGizmoRotate::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
@@ -275,6 +276,7 @@ void GLGizmoRotate::on_render_for_picking()
     glsafe(::glPopMatrix());
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
+#endif // !ENABLE_RAYCAST_PICKING
 
 #if ENABLE_WORLD_COORDINATE
 void GLGizmoRotate::init_data_from_selection(const Selection& selection)

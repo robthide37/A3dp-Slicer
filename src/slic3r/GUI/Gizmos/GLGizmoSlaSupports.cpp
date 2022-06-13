@@ -111,12 +111,14 @@ void GLGizmoSlaSupports::on_render()
 }
 
 
+#if !ENABLE_RAYCAST_PICKING
 void GLGizmoSlaSupports::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
     //glsafe(::glEnable(GL_DEPTH_TEST));
     render_points(selection, true);
 }
+#endif // !ENABLE_RAYCAST_PICKING
 
 void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 {

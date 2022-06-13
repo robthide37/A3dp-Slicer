@@ -80,7 +80,9 @@ public:
 private:
     bool on_init() override;
     void on_render() override;
+#if !ENABLE_RAYCAST_PICKING
     void on_render_for_picking() override;
+#endif // !ENABLE_RAYCAST_PICKING
 
     void render_points(const Selection& selection, bool picking = false);
     bool unsaved_changes() const;

@@ -253,7 +253,7 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
 
 #if ENABLE_RAYCAST_PICKING
     // unregister from picking
-    wxGetApp().plater()->canvas3D()->remove_all_picking_raycasters(SceneRaycaster::EType::Bed);
+    wxGetApp().plater()->canvas3D()->remove_raycasters_for_picking(SceneRaycaster::EType::Bed);
 #endif // ENABLE_RAYCAST_PICKING
 
     // Let the calee to update the UI.

@@ -138,7 +138,10 @@ private:
     ObjectID m_old_mo_id;
     size_t m_old_volumes_size = 0;
     void on_render() override {}
+#if !ENABLE_RAYCAST_PICKING
     void on_render_for_picking() override {}
+#endif // !ENABLE_RAYCAST_PICKING
+
 public:
     GLGizmoPainterBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
     ~GLGizmoPainterBase() override;

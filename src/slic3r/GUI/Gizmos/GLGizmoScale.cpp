@@ -643,6 +643,7 @@ void GLGizmoScale3D::on_render()
 #endif // ENABLE_WORLD_COORDINATE
 }
 
+#if !ENABLE_RAYCAST_PICKING
 void GLGizmoScale3D::on_render_for_picking()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
@@ -664,6 +665,7 @@ void GLGizmoScale3D::on_render_for_picking()
     render_grabbers_for_picking(m_parent.get_selection().get_bounding_box());
 #endif // ENABLE_WORLD_COORDINATE
 }
+#endif // !ENABLE_RAYCAST_PICKING
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color)

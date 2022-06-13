@@ -83,15 +83,12 @@ private:
 public:
     SceneRaycaster();
 
-    // returns the internal index of the added raycaster
-    // can be used with remove_raycaster()
-    int add_raycaster(EType type, PickingId picking_id, const MeshRaycaster& raycaster, const Transform3d& trafo);
+    void add_raycaster(EType type, PickingId picking_id, const MeshRaycaster& raycaster, const Transform3d& trafo);
+    void remove_raycasters(EType type, PickingId id);
+    void remove_raycasters(EType type);
+
     void set_raycaster_active_state(EType type, PickingId picking_id, bool active);
     void set_raycaster_transform(EType type, PickingId picking_id, const Transform3d& trafo);
-    // id: the value returned by add_raycaster()
-    void remove_raycaster(EType type, int id);
-
-    void reset(EType type);
 
     void set_gizmos_on_top(bool value) { m_gizmos_on_top = value; }
 

@@ -663,11 +663,18 @@ public:
     void post_event(wxEvent &&event);
 
 #if ENABLE_RAYCAST_PICKING
-    int add_raycaster_for_picking(SceneRaycaster::EType type, int id, const MeshRaycaster& raycaster, const Transform3d& trafo) {
-        return m_scene_raycaster.add_raycaster(type, id, raycaster, trafo);
+    void add_raycaster_for_picking(SceneRaycaster::EType type, PickingId id, const MeshRaycaster& raycaster, const Transform3d& trafo) {
+        m_scene_raycaster.add_raycaster(type, id, raycaster, trafo);
     }
-    void remove_all_picking_raycasters(SceneRaycaster::EType type) {
-        m_scene_raycaster.reset(type);
+    void remove_raycasters_for_picking(SceneRaycaster::EType type, PickingId id) {
+        m_scene_raycaster.remove_raycasters(type, id);
+    }
+    void remove_raycasters_for_picking(SceneRaycaster::EType type) {
+        m_scene_raycaster.remove_raycasters(type);
+    }
+
+    void set_raycaster_gizmos_on_top(bool value) {
+        m_scene_raycaster.set_gizmos_on_top(value);
     }
 #endif // ENABLE_RAYCAST_PICKING
 
