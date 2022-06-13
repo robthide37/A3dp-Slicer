@@ -8,6 +8,7 @@
 #include "slic3r/GUI/GLModel.hpp"
 #if ENABLE_RAYCAST_PICKING
 #include "slic3r/GUI/MeshUtils.hpp"
+#include "slic3r/GUI/SceneRaycaster.hpp"
 #endif // ENABLE_RAYCAST_PICKING
 
 #include <cereal/archives/binary.hpp>
@@ -77,10 +78,12 @@ protected:
         Grabber() = default;
         ~Grabber();
 
+#if ENABLE_RAYCAST_PICKING
+        void render(bool hover, float size) { render(size, hover ? complementary(color) : color); }
+#else
         void render(bool hover, float size) { render(size, hover ? complementary(color) : color, false); }
-#if !ENABLE_RAYCAST_PICKING
         void render_for_picking(float size) { render(size, color, true); }
-#endif // !ENABLE_RAYCAST_PICKING
+#endif // ENABLE_RAYCAST_PICKING
 
         float get_half_size(float size) const;
         float get_dragging_half_size(float size) const;
@@ -91,7 +94,11 @@ protected:
 #endif // ENABLE_RAYCAST_PICKING
 
     private:
+#if ENABLE_RAYCAST_PICKING
+        void render(float size, const ColorRGBA& render_color);
+#else
         void render(float size, const ColorRGBA& render_color, bool picking);
+#endif // ENABLE_RAYCAST_PICKING
 
 #if ENABLE_RAYCAST_PICKING
         static PickingModel s_cube;
@@ -200,7 +207,7 @@ public:
     virtual bool on_mouse(const wxMouseEvent &mouse_event) { return false; }
 
 #if ENABLE_RAYCAST_PICKING
-    void register_raycasters_for_picking()   { register_grabbers_for_picking(); on_register_raycasters_for_picking(); }
+    void register_raycasters_for_picking(bool use_group_id = false) { register_grabbers_for_picking(use_group_id); on_register_raycasters_for_picking(); }
     void unregister_raycasters_for_picking() { unregister_grabbers_for_picking(); on_unregister_raycasters_for_picking(); }
 #endif // ENABLE_RAYCAST_PICKING
 
@@ -229,7 +236,7 @@ protected:
     virtual void on_render_input_window(float x, float y, float bottom_limit) {}
 
 #if ENABLE_RAYCAST_PICKING
-    void register_grabbers_for_picking();
+    void register_grabbers_for_picking(bool use_group_id = false);
     void unregister_grabbers_for_picking();
     virtual void on_register_raycasters_for_picking() {}
     virtual void on_unregister_raycasters_for_picking() {}

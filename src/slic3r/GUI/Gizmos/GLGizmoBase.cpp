@@ -68,7 +68,11 @@ void GLGizmoBase::Grabber::unregister_raycasters_for_picking()
 }
 #endif // ENABLE_RAYCAST_PICKING
 
+#if ENABLE_RAYCAST_PICKING
+void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color)
+#else
 void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, bool picking)
+#endif // ENABLE_RAYCAST_PICKING
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_current_shader();
@@ -316,10 +320,10 @@ bool GLGizmoBase::update_items_state()
 }
 
 #if ENABLE_RAYCAST_PICKING
-void GLGizmoBase::register_grabbers_for_picking()
+void GLGizmoBase::register_grabbers_for_picking(bool use_group_id)
 {
     for (size_t i = 0; i < m_grabbers.size(); ++i) {
-        m_grabbers[i].register_raycasters_for_picking(i);
+        m_grabbers[i].register_raycasters_for_picking(use_group_id ? m_group_id : i);
     }
 }
 

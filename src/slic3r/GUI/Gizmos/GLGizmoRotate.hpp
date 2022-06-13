@@ -6,6 +6,7 @@
 namespace Slic3r {
 namespace GUI {
 class Selection;
+
 class GLGizmoRotate : public GLGizmoBase
 {
     static const float Offset;
@@ -84,6 +85,7 @@ public:
     /// <returns>Return True when use the information otherwise False.</returns>
     bool on_mouse(const wxMouseEvent &mouse_event) override;
     void dragging(const UpdateData &data);
+
 protected:
     bool on_init() override;
     std::string on_get_name() const override { return ""; }
@@ -177,13 +179,16 @@ protected:
     void on_dragging(const UpdateData &data) override;
         
     void on_render() override;
-#if !ENABLE_RAYCAST_PICKING
+#if ENABLE_RAYCAST_PICKING
+    virtual void on_register_raycasters_for_picking() override;
+    virtual void on_unregister_raycasters_for_picking() override;
+#else
     void on_render_for_picking() override {
         for (GLGizmoRotate& g : m_gizmos) {
             g.render_for_picking();
         }
     }
-#endif // !ENABLE_RAYCAST_PICKING
+#endif // ENABLE_RAYCAST_PICKING
 
     void on_render_input_window(float x, float y, float bottom_limit) override;
 
