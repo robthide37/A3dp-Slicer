@@ -497,12 +497,12 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
 
         if (global_model_info.is_enforced(position, SeamPlacer::enforcer_blocker_distance_tolerance)) {
             type = EnforcedBlockedSeamPoint::Enforced;
-            some_point_enforced = true;
         }
 
         if (global_model_info.is_blocked(position, SeamPlacer::enforcer_blocker_distance_tolerance)) {
             type = EnforcedBlockedSeamPoint::Blocked;
         }
+        some_point_enforced = some_point_enforced || type == EnforcedBlockedSeamPoint::Enforced;
 
         if (orig_point) {
             Vec3f pos_of_next = orig_polygon_points.empty() ? first : orig_polygon_points.front();
