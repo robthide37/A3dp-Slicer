@@ -3627,8 +3627,15 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
         name = dlg.get_name();
     }
 
+    if (detach && m_type == Preset::TYPE_PRINTER)
+        m_config->opt_string("printer_model", true) = "";
+
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
     m_presets->save_current_preset(name, detach);
+
+    if (detach && m_type == Preset::TYPE_PRINTER)
+        wxGetApp().mainframe->on_config_changed(m_config);
+
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     // If saving the preset changes compatibility with other presets, keep the now incompatible dependent presets selected, however with a "red flag" icon showing that they are no more compatible.
     m_preset_bundle->update_compatible(PresetSelectCompatibleType::Never);
