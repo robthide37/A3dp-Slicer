@@ -133,8 +133,8 @@ public:
     static constexpr float overhang_distance_tolerance_factor = 0.5f;
 
     // determines angle importance compared to visibility ( neutral value is 1.0f. )
-    static constexpr float angle_importance_aligned = 1.0f;
-    static constexpr float angle_importance_nearest = 2.0f; // use much higher angle importance for nearest mode, to combat the visiblity info noise
+    static constexpr float angle_importance_aligned = 0.5f;
+    static constexpr float angle_importance_nearest = 1.0f; // use much higher angle importance for nearest mode, to combat the visiblity info noise
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
     static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
@@ -143,7 +143,7 @@ public:
 
     // When searching for seam clusters for alignment:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
-    static constexpr float seam_align_score_tolerance = 0.45f;
+    static constexpr float seam_align_score_tolerance = 0.27f;
     // seam_align_tolerable_dist - if next layer closest point is too far away, skip layer
     static constexpr float seam_align_tolerable_dist = 1.0f;
     // if the seam of the current layer is too far away, and the closest seam candidate is not very good, layer is skipped.

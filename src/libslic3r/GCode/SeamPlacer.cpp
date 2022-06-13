@@ -178,7 +178,7 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
                             // FIXME: This AABBTTreeIndirect query will not compile for float ray origin and
                             // direction.
                             Vec3d final_ray_dir_d = final_ray_dir.cast<double>();
-                            Vec3d ray_origin_d = (center + normal * 1.0f).cast<double>(); // start above surface.
+                            Vec3d ray_origin_d = (center + normal * 0.01f).cast<double>(); // start above surface.
                             bool hit = AABBTreeIndirect::intersect_ray_first_hit(triangles.vertices,
                                     triangles.indices, raycasting_tree, ray_origin_d, final_ray_dir_d, hitpoint);
                             if (hit && its_face_normal(triangles, hitpoint.id).dot(final_ray_dir) <= 0) {
@@ -188,10 +188,10 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
                             bool casting_from_negative_volume = samples.triangle_indices[s_idx]
                                     >= negative_volumes_start_index;
 
-                            Vec3d ray_origin_d = (center + normal * 1.0f).cast<double>(); // start above surface.
+                            Vec3d ray_origin_d = (center + normal * 0.01f).cast<double>(); // start above surface.
                             if (casting_from_negative_volume) { // if casting from negative volume face, invert direction, change start pos
                                 final_ray_dir = -1.0 * final_ray_dir;
-                                ray_origin_d = (center - normal * 1.0f).cast<double>();
+                                ray_origin_d = (center - normal * 0.01f).cast<double>();
                             }
                             Vec3d final_ray_dir_d = final_ray_dir.cast<double>();
                             bool some_hit = AABBTreeIndirect::intersect_ray_all_hits(triangles.vertices,
@@ -455,14 +455,13 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     }
 
     Polygon polygon = orig_polygon;
-    bool was_clockwise = polygon.make_counter_clockwise();
-
     std::vector<float> lengths { };
     for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
-        lengths.push_back(std::max((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm(), 0.001));
+        lengths.push_back((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm());
     }
-    lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.001));
+    lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
 
+    bool was_clockwise = polygon.make_counter_clockwise();
     std::vector<float> local_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
             SeamPlacer::polygon_local_angles_arm_distance);
 
@@ -640,8 +639,20 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po,
     result.mesh_samples_coordinate_functor = CoordinateFunctor(&result.mesh_samples.positions);
     result.mesh_samples_tree = KDTreeIndirect<3, float, CoordinateFunctor>(result.mesh_samples_coordinate_functor,
             result.mesh_samples.positions.size());
-    result.mesh_samples_radius = sqrt(
-            10.0f * (result.mesh_samples.total_area / SeamPlacer::raycasting_visibility_samples_count) / PI);
+
+    // The following code determines search area for random visibility samples on the mesh when calculating visibility of each perimeter point
+    // number of random samples in the given radius (area) is approximately poisson distribution
+    // to compute ideal search radius (area), we use exponential distribution (complementary distr to poisson)
+    // parameters of exponential distribution to compute area that will have with probability="probability" more than given number of samples="samples"
+    float probability = 0.9f;
+    float samples = 3;
+    float density = SeamPlacer::raycasting_visibility_samples_count / result.mesh_samples.total_area;
+    // exponential probability distrubtion function is : f(x) = P(X > x) = e^(l*x) where l is the rate parameter (computed as 1/u where u is mean value)
+    // probability that sampled area A with S samples contains more than samples count:
+    //  P(S > samples in A) = e^-(samples/(density*A));   express A:
+    float search_area = samples / (-logf(probability) * density);
+    float search_radius = sqrt(search_area / PI);
+    result.mesh_samples_radius = search_radius;
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: Compute visiblity sample points: end";
@@ -1090,7 +1101,6 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                         }
                     };
                     bool should_compute_layer_embedding = regions_with_perimeter > 1;
-                    layers[layer_idx].points[0].perimeter.end_index < layers[layer_idx].points.size() - 1;
                     std::unique_ptr<PerimeterDistancer> current_layer_distancer = std::make_unique<PerimeterDistancer>(po->layers()[layer_idx]);
 
                     for (SeamCandidate &perimeter_point : layers[layer_idx].points) {
