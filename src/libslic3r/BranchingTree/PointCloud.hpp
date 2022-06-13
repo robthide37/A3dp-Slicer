@@ -29,6 +29,19 @@ std::vector<Node> sample_bed(const ExPolygons &bed,
 
 enum PtType { LEAF, MESH, BED, JUNCTION, NONE };
 
+inline BoundingBox3Base<Vec3f> get_support_cone_bb(const Vec3f &p, const Properties &props)
+{
+    double gnd = props.ground_level() - EPSILON;
+    double h   = p.z() - gnd;
+    double phi = PI / 2 - props.max_slope();
+    double r   = std::min(h * std::tan(phi), props.max_branch_length() * std::sin(phi));
+
+    Vec3f bb_min = {p.x() - r, p.y() - r, gnd};
+    Vec3f bb_max = {p.x() + r, p.y() + r, p.z()};
+
+    return {bb_min, bb_max};
+}
+
 // A cloud of points including support points, mesh points, junction points
 // and anchor points on the bed. Junction points can be added or removed, all
 // the other point types are established on creation and remain unchangeable.
@@ -199,20 +212,32 @@ public:
 
             Output& operator *() { return *this; }
             void operator=(const PointIndexEl &el) {
-                visitorfn(el.second, self->get_distance(p, el.second));
+                visitorfn(el.second, self->get_distance(p, el.second),
+                             (p - el.first).squaredNorm());
             }
             Output& operator++() { return *this; }
         };
 
         namespace bgi = boost::geometry::index;
+        float brln = 2 * m_props.max_branch_length();
+        BoundingBox3Base<Vec3f> bb{{pos.x() - brln, pos.y() - brln,
+                                    m_props.ground_level() - EPSILON},
+                                   {pos.x() + brln, pos.y() + brln,
+                                    m_ktree.bounds().max_corner().get<Z>()}};
 
-        auto   filter = bgi::satisfies(
-              [this, &pos, min_dist](const PointIndexEl &e) {
-                double d = get_distance(pos, e.second);
-                return m_searchable_indices[e.second] && !isinf(d) && d > min_dist;
-              });
+        // Extend upwards to find mergable junctions and support points
+        bb.max.z() = m_ktree.bounds().max_corner().get<Z>();
 
-        m_ktree.query(bgi::nearest(pos, k) && filter, Output{this, pos, visitor});
+        auto filter = bgi::satisfies(
+                          [this, &pos, min_dist](const PointIndexEl &e) {
+                              double D_branching = get_distance(pos, e.second);
+                              double D_euql      = (pos - e.first).squaredNorm() ;
+                              return m_searchable_indices[e.second] &&
+                                     !std::isinf(D_branching) && D_euql > min_dist;
+                          });
+
+        m_ktree.query(bgi::intersects(bb) && filter && bgi::nearest(pos, k),
+                      Output{this, pos, visitor});
     }
 
     auto start_queue()
