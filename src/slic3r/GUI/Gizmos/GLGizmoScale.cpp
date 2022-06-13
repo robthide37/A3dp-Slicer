@@ -643,6 +643,19 @@ void GLGizmoScale3D::on_render()
 #endif // ENABLE_WORLD_COORDINATE
 }
 
+#if ENABLE_RAYCAST_PICKING
+void GLGizmoScale3D::on_register_raycasters_for_picking()
+{
+    // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(true);
+}
+
+void GLGizmoScale3D::on_unregister_raycasters_for_picking()
+{
+    m_parent.set_raycaster_gizmos_on_top(false);
+}
+#endif // ENABLE_RAYCAST_PICKING
+
 #if !ENABLE_RAYCAST_PICKING
 void GLGizmoScale3D::on_render_for_picking()
 {
