@@ -654,9 +654,7 @@ void GLGizmoScale3D::on_unregister_raycasters_for_picking()
 {
     m_parent.set_raycaster_gizmos_on_top(false);
 }
-#endif // ENABLE_RAYCAST_PICKING
-
-#if !ENABLE_RAYCAST_PICKING
+#else
 void GLGizmoScale3D::on_render_for_picking()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
