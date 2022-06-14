@@ -6011,7 +6011,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Classic));
 
     def = this->add("wall_transition_length", coFloat);
-    def->label = L("Wall Transition Length");
+    def->label = L("Wall transition length");
     def->category = OptionCategory::advanced;
     def->tooltip = L("When transitioning between different numbers of walls as the part becomes"
         "thinner, a certain amount of space is allotted to split or join the wall lines.");
@@ -6021,7 +6021,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0.4));
 
     def = this->add("wall_transition_filter_deviation", coFloatOrPercent);
-    def->label = L("Wall Transitioning Filter Margin");
+    def->label = L("Wall transitioning filter margin");
     def->category = OptionCategory::advanced;
     def->tooltip  = L("Prevent transitioning back and forth between one extra wall and one less. This "
                        "margin extends the range of line widths which follow to [Minimum Wall Line "
@@ -6036,7 +6036,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(25, true));
 
     def = this->add("wall_transition_angle", coFloat);
-    def->label = L("Wall Transitioning Threshold Angle");
+    def->label = L("Wall transitioning threshold angle");
     def->category = OptionCategory::advanced;
     def->tooltip  = L("When to create transitions between even and odd numbers of walls. A wedge shape with"
                        " an angle greater than this setting will not have transitions and no walls will be "
@@ -6049,7 +6049,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(10.));
 
     def = this->add("wall_distribution_count", coInt);
-    def->label = L("Wall Distribution Count");
+    def->label = L("Wall distribution count");
     def->category = OptionCategory::advanced;
     def->tooltip = L("The number of walls, counted from the center, over which the variation needs to be "
         "spread. Lower values mean that the outer walls don't change in width.");
@@ -6058,7 +6058,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionInt(1));
 
     def = this->add("wall_split_middle_threshold", coPercent);
-    def->label = L("Split Middle Line Threshold");
+    def->label = L("Split middle line threshold");
     def->category = OptionCategory::advanced;
     def->tooltip = L("The smallest line width, as a factor of the normal line width, above which the middle "
         "line (if there is one) will be split into two. Reduce this setting to use more, thinner "
@@ -6073,7 +6073,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionPercent(50));
 
     def = this->add("wall_add_middle_threshold", coPercent);
-    def->label = L("Add Middle Line Threshold");
+    def->label = L("Add middle line threshold");
     def->category = OptionCategory::advanced;
     def->tooltip = L("The smallest line width, as a factor of the normal line width, above which a middle "
         "line (if there wasn't one already) will be added. Reduce this setting to use more, "
@@ -6088,7 +6088,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionPercent(75));
 
     def = this->add("min_feature_size", coFloat);
-    def->label = L("Minimum Feature Size");
+    def->label = L("Minimum feature size");
     def->category = OptionCategory::advanced;
     def->tooltip = L("Minimum thickness of thin features. Model features that are thinner than this value will "
         "not be printed, while features thicker than the Minimum Feature Size will be widened to "
@@ -6099,7 +6099,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0.1));
 
     def = this->add("min_bead_width", coFloatOrPercent);
-    def->label = L("Minimum Wall Line Width");
+    def->label = L("Minimum wall line width");
     def->category = OptionCategory::advanced;
     def->tooltip  = L("Width of the wall that will replace thin features (according to the Minimum Feature Size) "
                        "of the model. If the Minimum Wall Line Width is thinner than the thickness of the feature,"

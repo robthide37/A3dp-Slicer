@@ -99,7 +99,7 @@ group:External perimeter first
 	end_line
 	setting:external_perimeters_vase
 	setting:perimeter_bonding
-group:Arachne (variable width)
+group:Arachne perimeter generator (variable width)
 	setting:perimeter_generator
 	line:Wall treshold
 		setting:wall_split_middle_threshold
