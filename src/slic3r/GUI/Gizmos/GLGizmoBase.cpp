@@ -54,17 +54,17 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
 }
 
 #if ENABLE_RAYCAST_PICKING
-void GLGizmoBase::Grabber::register_raycasters_for_picking(int id)
+void GLGizmoBase::Grabber::register_raycasters_for_picking(PickingId id)
 {
     picking_id = id;
-    assert(elements_registered_for_picking == false);
+    // registration will happen on next call to render()
 }
 
 void GLGizmoBase::Grabber::unregister_raycasters_for_picking()
 {
     wxGetApp().plater()->canvas3D()->remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, picking_id);
     picking_id = -1;
-    elements_registered_for_picking = false;
+    raycasters = { nullptr };
 }
 #endif // ENABLE_RAYCAST_PICKING
 
@@ -128,7 +128,7 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #if ENABLE_RAYCAST_PICKING
     const Transform3d& view_matrix = camera.get_view_matrix();
     const Matrix3d view_matrix_no_offset = view_matrix.matrix().block(0, 0, 3, 3);
-    std::vector<Transform3d> elements_matrices(7, Transform3d::Identity()); // 1 + count of EGrabberExtensions == 7
+    std::vector<Transform3d> elements_matrices(GRABBER_ELEMENTS_MAX_COUNT, Transform3d::Identity());
     elements_matrices[0] = matrix * Geometry::assemble_transform(center, angles, 2.0 * half_size * Vec3d::Ones());
     Transform3d view_model_matrix = view_matrix * elements_matrices[0];
 #else
@@ -271,22 +271,27 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_RAYCAST_PICKING
-    if (!elements_registered_for_picking) {
+    if (raycasters[0] == nullptr) {
         GLCanvas3D& canvas = *wxGetApp().plater()->canvas3D();
-        canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cube.mesh_raycaster, elements_matrices[0]);
+        raycasters[0] = canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cube.mesh_raycaster, elements_matrices[0]);
         if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosX)) != 0)
-            canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[1]);
+            raycasters[1] = canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[1]);
         if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegX)) != 0)
-            canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[2]);
+            raycasters[2] = canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[2]);
         if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosY)) != 0)
-            canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[3]);
+            raycasters[3] = canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[3]);
         if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegY)) != 0)
-            canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[4]);
+            raycasters[4] = canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[4]);
         if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosZ)) != 0)
-            canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[5]);
+            raycasters[5] = canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[5]);
         if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegZ)) != 0)
-            canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[6]);
-        elements_registered_for_picking = true;
+            raycasters[6] = canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cone.mesh_raycaster, elements_matrices[6]);
+    }
+    else {
+        for (size_t i = 0; i < GRABBER_ELEMENTS_MAX_COUNT; ++i) {
+            if (raycasters[i] != nullptr)
+                raycasters[i]->set_transform(elements_matrices[i]);
+        }
     }
 #endif // ENABLE_RAYCAST_PICKING
 }
@@ -320,10 +325,10 @@ bool GLGizmoBase::update_items_state()
 }
 
 #if ENABLE_RAYCAST_PICKING
-void GLGizmoBase::register_grabbers_for_picking(bool use_group_id)
+void GLGizmoBase::register_grabbers_for_picking()
 {
     for (size_t i = 0; i < m_grabbers.size(); ++i) {
-        m_grabbers[i].register_raycasters_for_picking(use_group_id ? m_group_id : i);
+        m_grabbers[i].register_raycasters_for_picking((m_group_id >= 0) ? m_group_id : i);
     }
 }
 

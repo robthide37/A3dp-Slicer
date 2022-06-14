@@ -41,6 +41,7 @@ public:
     // Starting value for ids to avoid clashing with ids used by GLVolumes
     // (254 is choosen to leave some space for forward compatibility)
     static const unsigned int BASE_ID = 255 * 255 * 254;
+    static const unsigned int GRABBER_ELEMENTS_MAX_COUNT = 7;
 
     enum class EGrabberExtension
     {
@@ -71,8 +72,8 @@ protected:
         EGrabberExtension extensions{ EGrabberExtension::None };
 #if ENABLE_RAYCAST_PICKING
         // the picking id shared by all the elements
-        int picking_id{ -1 };
-        bool elements_registered_for_picking{ false };
+        PickingId picking_id{ -1 };
+        std::array<std::shared_ptr<SceneRaycasterItem>, GRABBER_ELEMENTS_MAX_COUNT> raycasters = { nullptr };
 #endif // ENABLE_RAYCAST_PICKING
 
         Grabber() = default;
@@ -89,7 +90,7 @@ protected:
         float get_dragging_half_size(float size) const;
 
 #if ENABLE_RAYCAST_PICKING
-        void register_raycasters_for_picking(int id);
+        void register_raycasters_for_picking(PickingId id);
         void unregister_raycasters_for_picking();
 #endif // ENABLE_RAYCAST_PICKING
 
@@ -207,7 +208,7 @@ public:
     virtual bool on_mouse(const wxMouseEvent &mouse_event) { return false; }
 
 #if ENABLE_RAYCAST_PICKING
-    void register_raycasters_for_picking(bool use_group_id = false) { register_grabbers_for_picking(use_group_id); on_register_raycasters_for_picking(); }
+    void register_raycasters_for_picking()   { register_grabbers_for_picking(); on_register_raycasters_for_picking(); }
     void unregister_raycasters_for_picking() { unregister_grabbers_for_picking(); on_unregister_raycasters_for_picking(); }
 #endif // ENABLE_RAYCAST_PICKING
 
@@ -236,7 +237,7 @@ protected:
     virtual void on_render_input_window(float x, float y, float bottom_limit) {}
 
 #if ENABLE_RAYCAST_PICKING
-    void register_grabbers_for_picking(bool use_group_id = false);
+    void register_grabbers_for_picking();
     void unregister_grabbers_for_picking();
     virtual void on_register_raycasters_for_picking() {}
     virtual void on_unregister_raycasters_for_picking() {}
