@@ -1671,7 +1671,7 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Other"));
         optgroup->append_single_option_line("clip_multipart_objects");
 
-        optgroup = page->new_optgroup(L("Arachne"));
+        optgroup = page->new_optgroup(L("Arachne perimeter generator"));
         optgroup->append_single_option_line("wall_add_middle_threshold");
         optgroup->append_single_option_line("wall_split_middle_threshold");
         optgroup->append_single_option_line("wall_transition_angle");
