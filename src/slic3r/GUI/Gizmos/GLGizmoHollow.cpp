@@ -515,6 +515,10 @@ void GLGizmoHollow::delete_selected_points()
         }
     }
 
+#if ENABLE_RAYCAST_PICKING
+    on_unregister_raycasters_for_picking();
+    on_register_raycasters_for_picking();
+#endif // ENABLE_RAYCAST_PICKING
     select_point(NoPoints);
 }
 
