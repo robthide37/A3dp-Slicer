@@ -189,6 +189,10 @@ struct ExtrusionLine
      * \param weighted_average_width The weighted average of the widths of the two colinear extrusion segments
      * */
     static int64_t calculateExtrusionAreaDeviationError(ExtrusionJunction A, ExtrusionJunction B, ExtrusionJunction C, coord_t& weighted_average_width);
+
+    bool is_contour() const;
+
+    double area() const;
 };
 
 static inline Slic3r::ThickPolyline to_thick_polyline(const Arachne::ExtrusionLine &line_junctions)

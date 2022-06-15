@@ -232,6 +232,35 @@ int64_t ExtrusionLine::calculateExtrusionAreaDeviationError(ExtrusionJunction A,
     }
 }
 
+bool ExtrusionLine::is_contour() const
+{
+    if (!this->is_closed)
+        return false;
+
+    Polygon poly;
+    poly.points.reserve(this->junctions.size());
+    for (const ExtrusionJunction &junction : this->junctions)
+        poly.points.emplace_back(junction.p);
+
+    // Arachne produces contour with clockwise orientation and holes with counterclockwise orientation.
+    return poly.is_clockwise();
+}
+
+double ExtrusionLine::area() const
+{
+    assert(this->is_closed);
+    double a = 0.;
+    if (this->junctions.size() >= 3) {
+        Vec2d p1 = this->junctions.back().p.cast<double>();
+        for (const ExtrusionJunction &junction : this->junctions) {
+            Vec2d p2 = junction.p.cast<double>();
+            a += cross2(p1, p2);
+            p1 = p2;
+        }
+    }
+    return 0.5 * a;
+}
+
 } // namespace Slic3r::Arachne
 
 namespace Slic3r {
