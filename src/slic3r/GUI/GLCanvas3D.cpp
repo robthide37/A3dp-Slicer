@@ -1958,12 +1958,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
     m_hover_volume_idxs.clear();
 
-#if ENABLE_RAYCAST_PICKING
-    GLGizmoBase* curr_gizmo = m_gizmos.get_current();
-    if (curr_gizmo != nullptr)
-        curr_gizmo->unregister_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
-
     struct ModelVolumeState {
         ModelVolumeState(const GLVolume* volume) :
             model_volume(nullptr), geometry_id(volume->geometry_id), volume_idx(-1) {}
@@ -2416,6 +2410,9 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     }
 
     // refresh gizmo elements raycasters for picking
+    GLGizmoBase* curr_gizmo = m_gizmos.get_current();
+    if (curr_gizmo != nullptr)
+        curr_gizmo->unregister_raycasters_for_picking();
     m_scene_raycaster.remove_raycasters(SceneRaycaster::EType::Gizmo);
     if (curr_gizmo != nullptr && !m_selection.is_empty())
         curr_gizmo->register_raycasters_for_picking();

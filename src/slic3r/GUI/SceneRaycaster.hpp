@@ -88,6 +88,8 @@ public:
     void remove_raycasters(EType type);
     void remove_raycaster(std::shared_ptr<SceneRaycasterItem> item);
 
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* get_raycasters(EType type);
+
     void set_gizmos_on_top(bool value) { m_gizmos_on_top = value; }
 
     HitResult hit(const Vec2d& mouse_pos, const Camera& camera, const ClippingPlane* clipping_plane = nullptr);
@@ -101,8 +103,6 @@ public:
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 
 private:
-    std::vector<std::shared_ptr<SceneRaycasterItem>>* get_raycasters(EType type);
-
     static PickingId encode_id(EType type, PickingId id);
     static PickingId decode_id(EType type, PickingId id);
     static PickingId base_id(EType type);

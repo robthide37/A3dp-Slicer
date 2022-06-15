@@ -673,6 +673,10 @@ public:
         m_scene_raycaster.remove_raycasters(type);
     }
 
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* get_raycasters_for_picking(SceneRaycaster::EType type) {
+        return m_scene_raycaster.get_raycasters(type);
+    }
+
     void set_raycaster_gizmos_on_top(bool value) {
         m_scene_raycaster.set_gizmos_on_top(value);
     }

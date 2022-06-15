@@ -28,8 +28,7 @@ private:
 
 public:
     GLGizmoHollow(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
-    virtual ~GLGizmoHollow() = default;
-    void data_changed() override; 
+    void data_changed() override;
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
     void delete_selected_points();    
     bool is_selection_rectangle_dragging() const {
@@ -43,20 +42,37 @@ public:
     /// <param name="mouse_event">Keep information about mouse click</param>
     /// <returns>Return True when use the information otherwise False.</returns>
     bool on_mouse(const wxMouseEvent &mouse_event) override;
-private:
+
+protected:
     bool on_init() override;
     void on_render() override;
-#if !ENABLE_RAYCAST_PICKING
+#if ENABLE_RAYCAST_PICKING
+    virtual void on_register_raycasters_for_picking() override;
+    virtual void on_unregister_raycasters_for_picking() override;
+#else
     void on_render_for_picking() override;
-#endif // !ENABLE_RAYCAST_PICKING
+#endif // ENABLE_RAYCAST_PICKING
 
+private:
+#if ENABLE_RAYCAST_PICKING
+    void render_points(const Selection& selection);
+#else
     void render_points(const Selection& selection, bool picking = false);
+#endif // ENABLE_RAYCAST_PICKING
     void hollow_mesh(bool postpone_error_messages = false);
-    bool unsaved_changes() const;
+#if ENABLE_RAYCAST_PICKING
+    void set_sla_auxiliary_volumes_picking_state(bool state);
+    void update_raycasters_for_picking_transform();
+#endif // ENABLE_RAYCAST_PICKING
 
     ObjectID m_old_mo_id = -1;
 
+#if ENABLE_RAYCAST_PICKING
+    PickingModel m_cylinder;
+    std::vector<std::shared_ptr<SceneRaycasterItem>> m_raycasters;
+#else
     GLModel m_cylinder;
+#endif // ENABLE_RAYCAST_PICKING
 
     float m_new_hole_radius = 2.f;        // Size of a new hole.
     float m_new_hole_height = 6.f;
