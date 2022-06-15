@@ -336,7 +336,7 @@ void PerimeterGenerator::process_arachne()
             }
 
             auto &best_path = all_extrusions[best_candidate];
-            ordered_extrusions.push_back({best_path, false});
+            ordered_extrusions.push_back({best_path, best_path->is_contour(), false});
             processed[best_candidate] = true;
             for (size_t unlocked_idx : blocking[best_candidate])
                 blocked[unlocked_idx]--;
@@ -2538,11 +2538,19 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
 
         // Append paths to collection.
         if (!paths.empty()) {
-            if (extrusion->is_closed)
-                extrusion_coll.append(ExtrusionLoop(std::move(paths)));
-            else
+            if (extrusion->is_closed) {
+                ExtrusionLoop extrusion_loop(std::move(paths));
+                // Restore the orientation of the extrusion loop.
+                //TODO: use if (loop.is_steep_overhang && this->layer->id() % 2 == 1) to make_clockwise => need to detect is_steep_overhang on the arachne path
+                if (pg_extrusion.is_contour)
+                    extrusion_loop.make_counter_clockwise();
+                else
+                    extrusion_loop.make_clockwise();
+
+                extrusion_coll.append(std::move(extrusion_loop));
+            } else
                 for (ExtrusionPath& path : paths)
-                    extrusion_coll.append(std::move(path));
+                    extrusion_coll.append(ExtrusionPath(std::move(path)));
         }
     }
 

@@ -28,6 +28,8 @@ struct PerimeterIntersectionPoint {
 struct PerimeterGeneratorArachneExtrusion
 {
     Arachne::ExtrusionLine* extrusion = nullptr;
+    // Indicates if closed ExtrusionLine is a contour or a hole. Used it only when ExtrusionLine is a closed loop.
+    bool is_contour = false;
     // Should this extrusion be fuzzyfied on path generation?
     bool fuzzify = false;
 };
