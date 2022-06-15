@@ -133,10 +133,6 @@ void GLGizmoHollow::on_unregister_raycasters_for_picking()
 void GLGizmoHollow::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
-//#if ENABLE_RENDER_PICKING_PASS
-//    m_z_shift = selection.get_first_volume()->get_sla_shift_z();
-//#endif
-
     glsafe(::glEnable(GL_DEPTH_TEST));
     render_points(selection, true);
 }
