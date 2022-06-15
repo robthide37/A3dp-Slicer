@@ -5499,6 +5499,7 @@ void GLCanvas3D::_picking_pass()
             object_type = "Volume";
         break;
     }
+    default: { break; }
     }
     char buf[1024];
     if (hit.type != SceneRaycaster::EType::None) {

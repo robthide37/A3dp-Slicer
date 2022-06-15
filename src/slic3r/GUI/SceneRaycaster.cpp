@@ -117,7 +117,6 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
             if (item->get_raycaster()->closest_hit(mouse_pos, trafo, camera, current_hit.position, current_hit.normal, clip_plane)) {
                 current_hit.position = (trafo * current_hit.position.cast<double>()).cast<float>();
                 if (is_closest(camera, current_hit.position)) {
-                    const Transform3d matrix = camera.get_view_matrix() * trafo;
                     const Matrix3d normal_matrix = (Matrix3d)trafo.matrix().block(0, 0, 3, 3).inverse().transpose();
                     current_hit.normal = (normal_matrix * current_hit.normal.cast<double>()).normalized().cast<float>();
                     ret = current_hit;
@@ -148,7 +147,7 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
 #if ENABLE_RAYCAST_PICKING_DEBUG
 void SceneRaycaster::render_hit(const Camera& camera)
 {
-    if (!m_last_hit.has_value() || !m_last_hit.value().is_valid())
+    if (!m_last_hit.has_value() || !(*m_last_hit).is_valid())
         return;
 
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
@@ -156,14 +155,14 @@ void SceneRaycaster::render_hit(const Camera& camera)
 
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
-    const Transform3d sphere_view_model_matrix = camera.get_view_matrix() * Geometry::translation_transform(m_last_hit.value().position.cast<double>()) *
+    const Transform3d sphere_view_model_matrix = camera.get_view_matrix() * Geometry::translation_transform((*m_last_hit).position.cast<double>()) *
         Geometry::scale_transform(4.0 * camera.get_inv_zoom());
     shader->set_uniform("view_model_matrix", sphere_view_model_matrix);
     m_sphere.render();
 
     Eigen::Quaterniond q;
     Transform3d m = Transform3d::Identity();
-    m.matrix().block(0, 0, 3, 3) = q.setFromTwoVectors(Vec3d::UnitZ(), m_last_hit.value().normal.cast<double>()).toRotationMatrix();
+    m.matrix().block(0, 0, 3, 3) = q.setFromTwoVectors(Vec3d::UnitZ(), (*m_last_hit).normal.cast<double>()).toRotationMatrix();
 
     const Transform3d line_view_model_matrix = sphere_view_model_matrix * m * Geometry::scale_transform(10.0);
     shader->set_uniform("view_model_matrix", line_view_model_matrix);
@@ -194,6 +193,7 @@ PickingId SceneRaycaster::base_id(EType type)
     case EType::Bed:    { return PickingId(EPickingIdBase::Bed); }
     case EType::Volume: { return PickingId(EPickingIdBase::Volume); }
     case EType::Gizmo:  { return PickingId(EPickingIdBase::Gizmo); }
+    default:            { break; }
     };
 
     assert(false);

@@ -1055,9 +1055,12 @@ int GLVolumeCollection::load_wipe_tower_preview(
         };
 
         TriangleMesh tooth_mesh;
-        tooth_mesh.merge(TriangleMesh(std::move(generate_lateral(0.0f, 38.453f))));
-        tooth_mesh.merge(TriangleMesh(std::move(generate_central())));
-        tooth_mesh.merge(TriangleMesh(std::move(generate_lateral(61.547f, 100.0f))));
+        indexed_triangle_set its = generate_lateral(0.0f, 38.453f);
+        tooth_mesh.merge(TriangleMesh(std::move(its)));
+        its = generate_central();
+        tooth_mesh.merge(TriangleMesh(std::move(its)));
+        its = generate_lateral(61.547f, 100.0f);
+        tooth_mesh.merge(TriangleMesh(std::move(its)));
 #else
         float out_points_idx[][3] = { { 0, -depth, 0 }, { 0, 0, 0 }, { 38.453f, 0, 0 }, { 61.547f, 0, 0 }, { 100.0f, 0, 0 }, { 100.0f, -depth, 0 }, { 55.7735f, -10.0f, 0 }, { 44.2265f, 10.0f, 0 },
         { 38.453f, 0, 1 }, { 0, 0, 1 }, { 0, -depth, 1 }, { 100.0f, -depth, 1 }, { 100.0f, 0, 1 }, { 61.547f, 0, 1 }, { 55.7735f, -10.0f, 1 }, { 44.2265f, 10.0f, 1 } };
