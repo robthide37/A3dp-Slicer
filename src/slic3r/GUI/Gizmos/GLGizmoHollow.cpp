@@ -111,10 +111,10 @@ void GLGizmoHollow::on_render()
 void GLGizmoHollow::on_register_raycasters_for_picking()
 {
     assert(m_raycasters.empty());
-
     set_sla_auxiliary_volumes_picking_state(false);
+
     const CommonGizmosDataObjects::SelectionInfo* info = m_c->selection_info();
-    if (info != nullptr && info->model_object()->sla_drain_holes.size() > 0) {
+    if (info != nullptr && !info->model_object()->sla_drain_holes.empty()) {
         const sla::DrainHoles& drain_holes = info->model_object()->sla_drain_holes;
         for (int i = 0; i < (int)drain_holes.size(); ++i) {
             m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_cylinder.mesh_raycaster, Transform3d::Identity()));
@@ -167,7 +167,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const GLVolume* vol = selection.get_first_volume();
-    Geometry::Transformation trafo =  vol->get_instance_transformation() * vol->get_volume_transformation();
+    const Transform3d trafo = vol->world_matrix();
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WORLD_COORDINATE
@@ -175,13 +175,9 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 #else
     const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
 #endif // ENABLE_WORLD_COORDINATE
-    const Transform3d instance_matrix = Geometry::translation_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * trafo.get_matrix();
-
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
-    const Transform3d& projection_matrix = camera.get_projection_matrix();
-
-    shader->set_uniform("projection_matrix", projection_matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
     const Transform3d& instance_scaling_matrix_inverse = trafo.get_matrix(true, true, false, true).inverse();
     const Transform3d& instance_matrix = trafo.get_matrix();
@@ -235,7 +231,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
         m_cylinder.set_color(render_color);
 #endif // ENABLE_RAYCAST_PICKING
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
-        const Transform3d hole_matrix = Geometry::assemble_transform(drain_hole.pos.cast<double>()) * instance_scaling_matrix_inverse;
+        const Transform3d hole_matrix = Geometry::translation_transform(drain_hole.pos.cast<double>()) * instance_scaling_matrix_inverse;
 #else
         const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
@@ -252,8 +248,8 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
         q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
         const Eigen::AngleAxisd aa(q);
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        const Transform3d model_matrix = instance_matrix * hole_matrix * Transform3d(aa.toRotationMatrix()) *
-            Geometry::assemble_transform(-drain_hole.height * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
+        const Transform3d model_matrix = trafo * hole_matrix * Transform3d(aa.toRotationMatrix()) *
+            Geometry::translation_transform(-drain_hole.height * Vec3d::UnitZ()) * Geometry::scale_transform(Vec3d(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
         shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
@@ -385,7 +381,7 @@ bool GLGizmoHollow::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_pos
         if (m_selection_empty) {
             std::pair<Vec3f, Vec3f> pos_and_normal;
             if (unproject_on_mesh(mouse_position, pos_and_normal)) { // we got an intersection
-                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _(L("Add drainage hole")));
+                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add drainage hole"));
 
                 mo->sla_drain_holes.emplace_back(pos_and_normal.first,
                                                 -pos_and_normal.second, m_new_hole_radius, m_new_hole_height);
@@ -618,6 +614,8 @@ void GLGizmoHollow::update_raycasters_for_picking_transform()
     if (info != nullptr) {
         const sla::DrainHoles& drain_holes = info->model_object()->sla_drain_holes;
         if (!drain_holes.empty()) {
+            assert(!m_raycasters.empty());
+
             const GLVolume* vol = m_parent.get_selection().get_first_volume();
             const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_scaling_factor_matrix().inverse();
 
