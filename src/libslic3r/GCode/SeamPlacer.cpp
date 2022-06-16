@@ -411,8 +411,17 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
             if (ex_entity->is_collection()) { //collection of inner, outer, and overhang perimeters
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-                    if (perimeter->role() == ExtrusionRole::erExternalPerimeter
-                            || (perimeter->role() == ExtrusionRole::erPerimeter
+                    ExtrusionRole role = perimeter->role();
+                    if (perimeter->is_loop()){
+                        for (const ExtrusionPath& path : static_cast<const ExtrusionLoop*>(perimeter)->paths){
+                            if (path.role() == ExtrusionRole::erExternalPerimeter){
+                                role = ExtrusionRole::erExternalPerimeter;
+                            }
+                        }
+                    }
+
+                    if (role == ExtrusionRole::erExternalPerimeter
+                            || (is_perimeter(role)
                                     && configured_seam_preference == spRandom)) { //for random seam alignment, extract all perimeters
                         Points p;
                         perimeter->collect_points(p);
