@@ -473,6 +473,7 @@ void PerimeterGenerator::process_arachne()
 
         Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, *this->object_config, *this->print_config);
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
+        loop_number = int(perimeters.size()) - 1;
 
         int start_perimeter = int(perimeters.size()) - 1;
         int end_perimeter   = -1;
@@ -606,7 +607,11 @@ void PerimeterGenerator::process_arachne()
         if (ExtrusionEntityCollection extrusion_coll = traverse_extrusions(*this, ordered_extrusions); !extrusion_coll.empty())
             this->loops->append(extrusion_coll);
 
-        ExPolygons infill_contour = union_ex(wallToolPaths.getInnerContour());
+        ExPolygons    infill_contour = union_ex(wallToolPaths.getInnerContour());
+        const coord_t spacing        = (perimeters.size() == 1) ? ext_perimeter_spacing2 : perimeter_spacing;
+        if (offset_ex(infill_contour, -float(spacing / 2.)).empty())
+            infill_contour.clear(); // Infill region is too small, so let's filter it out.
+
         // create one more offset to be used as boundary for fill
         // we offset by half the perimeter spacing (to get to the actual infill boundary)
         // and then we offset back and forth by half the infill spacing to only consider the
@@ -625,13 +630,12 @@ void PerimeterGenerator::process_arachne()
             ex.simplify_p(m_scaled_resolution, &pp);
         // collapse too narrow infill areas
         const auto    min_perimeter_infill_spacing = coord_t(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE));
-        const coord_t spacing                      = (perimeters.size() == 1) ? ext_perimeter_spacing2 : perimeter_spacing;
         // append infill areas to fill_surfaces
         this->fill_surfaces->append(
             offset2_ex(
                 union_ex(pp),
-                float(- min_perimeter_infill_spacing / 2. - spacing / 2.),
-                float(inset + min_perimeter_infill_spacing / 2. + spacing / 2.)),
+                float(- min_perimeter_infill_spacing / 2.),
+                float(inset + min_perimeter_infill_spacing / 2.)),
             stInternal);
     }
 }

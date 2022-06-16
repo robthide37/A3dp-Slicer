@@ -376,13 +376,7 @@ use Slic3r::Test;
             ],
         );
     }
-
-    # Because of Arachne and the method for detecting non-covered areas, four areas are falsely recognized as non-covered.
-    if ($config->perimeter_generator eq 'arachne') {
-        is scalar(grep { $_->area > ($iflow->scaled_width**2) } @$non_covered), 4, 'no gap between perimeters and infill';
-    } else {
-        ok !(defined first { $_->area > ($iflow->scaled_width**2) } @$non_covered), 'no gap between perimeters and infill';
-    }
+    ok !(defined first { $_->area > ($iflow->scaled_width**2) } @$non_covered), 'no gap between perimeters and infill';
 }
 
 {
