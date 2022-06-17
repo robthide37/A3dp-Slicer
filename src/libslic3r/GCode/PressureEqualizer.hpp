@@ -68,8 +68,6 @@ private:
     ExtrusionRateSlope              m_max_volumetric_extrusion_rate_slopes[erCount];
     float                           m_max_volumetric_extrusion_rate_slope_positive;
     float                           m_max_volumetric_extrusion_rate_slope_negative;
-    // Maximum segment length to split a long segment, if the initial and the final flow rate differ.
-    float                           m_max_segment_length;
 
     // Configuration extracted from config.
     // Area of the crossestion of each filament. Necessary to calculate the volumetric flow rate.
