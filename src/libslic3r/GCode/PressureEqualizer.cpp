@@ -338,7 +338,7 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
         break;
     }
     case 'M': {
-        int mcode = parse_int(line);
+        /*int mcode = */parse_int(line);
         eatws(line);
         // Ignore the rest of the M-codes.
         break;
