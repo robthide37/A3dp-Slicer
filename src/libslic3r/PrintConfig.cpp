@@ -1804,10 +1804,10 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("max_volumetric_extrusion_rate_slope_positive", coFloat);
     def->label = L("Max volumetric slope positive");
-    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate"
+    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate "
                        "for a transition from lower speed to higher speed. "
                    "A value of 1.8 mm³/s² ensures, that a change from the extrusion rate "
-                   "of 1.8 mm³/s (0.45mm extrusion width, 0.2mm extrusion height, feedrate 20 mm/s) "
+                   "of 1.8 mm³/s (0.45 mm extrusion width, 0.2 mm extrusion height, feedrate 20 mm/s) "
                    "to 5.4 mm³/s (feedrate 60 mm/s) will take at least 2 seconds.");
     def->sidetext = L("mm³/s²");
     def->min = 0;
@@ -1816,10 +1816,10 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("max_volumetric_extrusion_rate_slope_negative", coFloat);
     def->label = L("Max volumetric slope negative");
-    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate"
+    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate "
                        "for a transition from higher speed to lower speed. "
                    "A value of 1.8 mm³/s² ensures, that a change from the extrusion rate "
-                   "of 1.8 mm³/s (0.45mm extrusion width, 0.2mm extrusion height, feedrate 60 mm/s) "
+                   "of 1.8 mm³/s (0.45 mm extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) "
                    "to 5.4 mm³/s (feedrate 20 mm/s) will take at least 2 seconds.");
     def->sidetext = L("mm³/s²");
     def->min = 0;
@@ -3064,9 +3064,9 @@ void PrintConfigDef::init_fff_params()
     def = this->add("perimeter_generator", coEnum);
     def->label = L("Perimeter generator");
     def->category = L("Layers and Perimeters");
-    def->tooltip = L("Classic perimeter generator produces perimeters with constant extrusion width and for"
-                      " very thing areas is used gap-fill."
-                      "Arachne produces perimeters with variable extrusion width.");
+    def->tooltip = L("Classic perimeter generator produces perimeters with constant extrusion width and for "
+                      "very thing areas is used gap-fill. "
+                      "Arachne engine produces perimeters with variable extrusion width.");
     def->enum_keys_map = &ConfigOptionEnum<PerimeterGeneratorType>::get_enum_values();
     def->enum_values.push_back("classic");
     def->enum_values.push_back("arachne");
@@ -3305,7 +3305,7 @@ void PrintConfigDef::init_sla_params()
 
     def = this->add("high_viscosity_tilt_time", coFloat);
     def->label = L("High viscosity");
-    def->full_label = L("High viscosity tilt");
+    def->full_label = L("Tilt for high viscosity resin");
     def->tooltip = L("Time of the super slow tilt");
     def->sidetext = L("s");
     def->min = 0;
@@ -3922,7 +3922,7 @@ void PrintConfigDef::init_sla_params()
     def->enum_values.push_back("high_viscosity");
     def->enum_labels.push_back(L("Slow"));
     def->enum_labels.push_back(L("Fast"));
-    def->enum_labels.push_back(L("High Viscosity"));
+    def->enum_labels.push_back(L("High viscosity"));
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<SLAMaterialSpeed>(slamsFast));
 }
