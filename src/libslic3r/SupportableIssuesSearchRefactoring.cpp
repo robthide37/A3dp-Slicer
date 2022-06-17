@@ -91,10 +91,9 @@ public:
     }
 
     // negative sign means inside
-    float signed_distance_from_lines(const Point &point, size_t &nearest_line_index_out,
+    float signed_distance_from_lines(const Vec2f &point, size_t &nearest_line_index_out,
             Vec2f &nearest_point_out) const {
-        Vec2f p = unscaled(point).cast<float>();
-        auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, p, nearest_line_index_out,
+        auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, point, nearest_line_index_out,
                 nearest_point_out);
         if (distance < 0)
             return std::numeric_limits<float>::infinity();
@@ -102,7 +101,7 @@ public:
         distance = sqrt(distance);
         const ExtrusionLine &line = lines[nearest_line_index_out];
         Vec2f v1 = line.b - line.a;
-        Vec2f v2 = p - line.a;
+        Vec2f v2 = point - line.a;
         if ((v1.x() * v2.y()) - (v1.y() * v2.x()) > 0.0) {
             distance *= -1;
         }
@@ -114,30 +113,30 @@ public:
     }
 };
 
-class SupportedSegmentAccumulator {
+class StabilityAccumulator {
 private:
     Polygon base_convex_hull { };
-    Points supported_points { };
+    Points support_points { };
     Vec3f centroid_accumulator = Vec3f::Zero();
     float accumulated_volume { };
     float base_area { };
     float base_height { };
 
 public:
-    explicit SupportedSegmentAccumulator(float base_height) :
+    explicit StabilityAccumulator(float base_height) :
             base_height(base_height) {
     }
 
     void add_base_extrusion(const ExtrusionLine &line, float width, float print_z, float cross_section) {
         base_area += line.len * width;
-        supported_points.push_back(Point::new_scale(line.a));
-        supported_points.push_back(Point::new_scale(line.b));
+        support_points.push_back(Point::new_scale(line.a));
+        support_points.push_back(Point::new_scale(line.b));
         base_convex_hull.clear();
         add_extrusion(line, print_z, cross_section);
     }
 
     void add_support_point(const Point &position, float area) {
-        supported_points.push_back(position);
+        support_points.push_back(position);
         base_convex_hull.clear();
         base_area += area;
     }
@@ -149,57 +148,68 @@ public:
         centroid_accumulator += volume * Vec3f(center.x(), center.y(), print_z);
     }
 
+    Vec3f get_centroid() const {
+        return centroid_accumulator / accumulated_volume;
+    }
+
+    float get_base_area() const {
+        return base_area;
+    }
+    float get_base_height() const {
+          return base_height;
+      }
+
     const Polygon& segment_base_hull() {
         if (this->base_convex_hull.empty()) {
-            this->base_convex_hull = Geometry::convex_hull(this->supported_points);
+            this->base_convex_hull = Geometry::convex_hull(this->support_points);
         }
         return this->base_convex_hull;
     }
 
-    void add_from(const SupportedSegmentAccumulator &acc) {
-        this->supported_points.insert(this->supported_points.end(), acc.supported_points.begin(),
-                acc.supported_points.end());
+    const Points& get_support_points() {
+        return support_points;
+    }
+
+    void add_from(const StabilityAccumulator &acc) {
+        this->support_points.insert(this->support_points.end(), acc.support_points.begin(),
+                acc.support_points.end());
         base_convex_hull.clear();
         this->centroid_accumulator += acc.centroid_accumulator;
         this->accumulated_volume += acc.accumulated_volume;
         this->base_area += acc.base_area;
     }
-
-    bool check_stability() {
-        return true;
-    }
 };
 
-struct SupportedSegmentAccumulators {
+struct StabilityAccumulators {
 private:
     size_t next_id = 0;
     std::unordered_map<size_t, size_t> mapping;
-    std::vector<SupportedSegmentAccumulator> acccumulators;
+    std::vector<StabilityAccumulator> acccumulators;
 
     void merge_to(size_t from_id, size_t to_id) {
-        SupportedSegmentAccumulator &from_acc = this->access(from_id);
-        SupportedSegmentAccumulator &to_acc = this->access(to_id);
+        StabilityAccumulator &from_acc = this->access(from_id);
+        StabilityAccumulator &to_acc = this->access(to_id);
         if (&from_acc == &to_acc) {
             return;
         }
         to_acc.add_from(from_acc);
         mapping[from_id] = mapping[to_id];
-        from_acc = SupportedSegmentAccumulator { 0.0f };
+        from_acc = StabilityAccumulator { 0.0f };
 
     }
 
 public:
-    SupportedSegmentAccumulators() = default;
+    StabilityAccumulators() = default;
 
     int create_accumulator(float base_height) {
         size_t id = next_id;
         next_id++;
         mapping[id] = acccumulators.size();
-        acccumulators.push_back(SupportedSegmentAccumulator { base_height });
+        acccumulators.push_back(StabilityAccumulator { base_height });
         return id;
     }
 
-    SupportedSegmentAccumulator& access(size_t id) {
+    StabilityAccumulator& access(size_t id) {
         return acccumulators[mapping[id]];
     }
 
@@ -207,23 +217,37 @@ public:
         if (from_id == NULL_ACC_ID || to_id == NULL_ACC_ID) {
             return;
         }
-        SupportedSegmentAccumulator &from_acc = this->access(from_id);
-        SupportedSegmentAccumulator &to_acc = this->access(to_id);
+        StabilityAccumulator &from_acc = this->access(from_id);
+        StabilityAccumulator &to_acc = this->access(to_id);
         if (&from_acc == &to_acc) {
             return;
         }
         to_acc.add_from(from_acc);
         mapping[from_id] = mapping[to_id];
-        from_acc = SupportedSegmentAccumulator { 0.0f };
+        from_acc = StabilityAccumulator { 0.0f };
     }
 
-    std::unordered_set<size_t> get_active_acc_indices() const {
-        std::unordered_set<size_t> result;
-        for (const auto &pair : mapping) {
-            result.insert(pair.second);
+#ifdef DEBUG_FILES
+    Vec3f get_emerging_color(size_t id) {
+        if (mapping.find(id) == mapping.end()) {
+            std::cerr << " ERROR: uknown accumulator ID: " << id << std::endl;
+            return Vec3f(1.0f, 1.0f, 1.0f);
         }
-        return result;
+
+        size_t pseudornd = ((id + 127) * 33331 + 6907) % 13;
+        return value_to_rgbf(0.0f, 13.0f, float(pseudornd));
     }
+
+    Vec3f get_final_color(size_t id) {
+        if (mapping.find(id) == mapping.end()) {
+            std::cerr << " ERROR: uknown accumulator ID: " << id << std::endl;
+            return Vec3f(1.0f, 1.0f, 1.0f);
+        }
+
+        size_t pseudornd = ((mapping[id] + 127) * 33331 + 6907) % 13;
+        return value_to_rgbf(0.0f, 13.0f, float(pseudornd));
+    }
+#endif DEBUG_FILES
 };
 
 float get_flow_width(const LayerRegion *region, ExtrusionRole role) {
@@ -244,16 +268,6 @@ float get_flow_width(const LayerRegion *region, ExtrusionRole role) {
             return region->flow(FlowRole::frTopSolidInfill).width();
         default:
             return region->flow(FlowRole::frPerimeter).width();
-    }
-}
-
-float get_max_allowed_distance(ExtrusionRole role, float flow_width, bool external_perimeters_first,
-        const Params &params) { // <= distance / flow_width (can be larger for perimeter, if not external perimeter first)
-    if ((role == ExtrusionRole::erExternalPerimeter || role == ExtrusionRole::erOverhangPerimeter)
-            && (external_perimeters_first)) {
-        return params.max_first_ex_perim_unsupported_distance_factor * flow_width;
-    } else {
-        return params.max_unsupported_distance_factor * flow_width;
     }
 }
 
@@ -279,7 +293,7 @@ struct ExtrusionPropertiesAccumulator {
 };
 
 void check_extrusion_entity_stability(const ExtrusionEntity *entity,
-        SupportedSegmentAccumulators &stability_accs,
+        StabilityAccumulators &stability_accs,
         Issues &issues,
         std::vector<ExtrusionLine> &checked_lines,
         float print_z,
@@ -305,7 +319,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         lines.emplace_back(unscaled(points[0]).cast<float>(), unscaled(points[0]).cast<float>());
         for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
             Vec2f start = unscaled(points[point_idx]).cast<float>();
-            Vec2f next = unscaled(points[point_idx]).cast<float>();
+            Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
             Vec2f v = next - start; // vector from next to current
             float dist_to_next = v.norm();
             v.normalize();
@@ -318,37 +332,32 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
         }
 
-        checked_lines.insert(checked_lines.end(), lines.begin(), lines.end());
-
         size_t current_stability_acc = NULL_ACC_ID;
         ExtrusionPropertiesAccumulator bridging_acc { };
         bridging_acc.add_distance(params.bridge_distance + 1.0f); // Initialise unsupported distance with larger than tolerable distance ->
         // -> it prevents extruding perimeter start and short loops into air.
         const float flow_width = get_flow_width(layer_region, entity->role());
         const float region_height = layer_region->layer()->height;
-        const float max_allowed_dist_from_prev_layer = get_max_allowed_distance(entity->role(), flow_width,
-                layer_region->region().config().external_perimeters_first, params);
+        const float max_allowed_dist_from_prev_layer = flow_width;
 
         for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
-            ExtrusionLine current_line = lines[line_idx];
+            ExtrusionLine &current_line = lines[line_idx];
             Point current = Point::new_scale(current_line.b);
             float cross_section = region_height * flow_width * 0.7071f;
 
-            float angle = 0;
+            float curr_angle = 0;
             if (line_idx + 1 < lines.size()) {
                 const Vec2f v1 = current_line.b - current_line.a;
                 const Vec2f v2 = lines[line_idx + 1].b - lines[line_idx + 1].a;
-                float dot = v1(0) * v2(0) + v1(1) * v2(1);
-                float cross = v1(0) * v2(1) - v1(1) * v2(0);
-                angle = float(atan2(float(cross), float(dot))); // ccw angle, TODO replace with angle func, once it gets into master
+                curr_angle = angle(v1, v2);
             }
-            bridging_acc.add_angle(angle);
+            bridging_acc.add_angle(curr_angle);
 
             size_t nearest_line_idx;
             Vec2f nearest_point;
-            float dist_from_prev_layer = prev_layer_lines.signed_distance_from_lines(current, nearest_line_idx,
+            float dist_from_prev_layer = prev_layer_lines.signed_distance_from_lines(current_line.b, nearest_line_idx,
                     nearest_point);
-            if (dist_from_prev_layer - flow_width < max_allowed_dist_from_prev_layer) {
+            if (dist_from_prev_layer < max_allowed_dist_from_prev_layer) {
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
                 size_t acc_id = nearest_line.supported_segment_accumulator_id;
                 stability_accs.merge_accumulators(std::max(acc_id, current_stability_acc),
@@ -360,29 +369,110 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 // TODO curving here
             } else {
                 bridging_acc.add_distance(current_line.len);
-                if (current_stability_acc < 0) {
-                    size_t acc_id = stability_accs.create_accumulator(print_z);
-                    stability_accs.merge_accumulators(std::max(acc_id, current_stability_acc),
-                            std::min(acc_id, current_stability_acc));
-                    current_stability_acc = std::min(acc_id, current_stability_acc);
+                if (current_stability_acc == NULL_ACC_ID) {
+                    current_stability_acc = stability_accs.create_accumulator(print_z);
                 }
-                SupportedSegmentAccumulator &current_segment = stability_accs.access(current_stability_acc);
+                StabilityAccumulator &current_segment = stability_accs.access(current_stability_acc);
+                current_line.supported_segment_accumulator_id = current_stability_acc;
                 current_segment.add_extrusion(current_line, print_z, cross_section);
                 if (bridging_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
                 > params.bridge_distance
                         / (1.0f + (bridging_acc.max_curvature
                                 * params.bridge_distance_decrease_by_curvature_factor / PI))) {
-                    current_segment.add_support_point(current, 5.0f);
+                    current_segment.add_support_point(current, params.support_points_interface_area);
                     issues.supports_nedded.emplace_back(to_vec3f(current), 1.0);
                     bridging_acc.reset();
                 }
             }
         }
+        checked_lines.insert(checked_lines.end(), lines.begin(), lines.end());
+    }
+}
+
+void check_layer_global_stability(StabilityAccumulators &stability_accs,
+        Issues &issues,
+        const std::vector<ExtrusionLine> &checked_lines,
+        float print_z,
+        const Params &params) {
+    std::unordered_map<StabilityAccumulator*, std::vector<size_t>> layer_accs_lines;
+    for (size_t i = 0; i < checked_lines.size(); ++i) {
+        layer_accs_lines[&stability_accs.access(checked_lines[i].supported_segment_accumulator_id)].push_back(i);
+    }
+
+    for (auto &acc_lines : layer_accs_lines) {
+        StabilityAccumulator *acc = acc_lines.first;
+        Vec3f centroid = acc->get_centroid();
+        Vec2f hull_centroid = unscaled(acc->segment_base_hull().centroid()).cast<float>();
+        std::vector<ExtrusionLine> hull_lines;
+        for (const Line &line : acc->segment_base_hull().lines()) {
+            Vec2f start = unscaled(line.a).cast<float>();
+            Vec2f next = unscaled(line.b).cast<float>();
+            hull_lines.push_back( { start, next });
+        }
+        if (hull_lines.empty()) {
+            if (acc->get_support_points().empty()) {
+                acc->add_support_point(Point::new_scale(checked_lines[acc_lines.second[0]].a),
+                        params.support_points_interface_area);
+                issues.supports_nedded.emplace_back(to_3d(checked_lines[acc_lines.second[0]].a, print_z), 1.0);
+            }
+            hull_lines.push_back( { unscaled(acc->get_support_points()[0]).cast<float>(),
+                    unscaled(acc->get_support_points()[0]).cast<float>() });
+            hull_centroid = unscaled(acc->get_support_points()[0]).cast<float>();
+        }
+
+        LayerLinesDistancer hull_distancer(std::move(hull_lines));
+
+        size_t _li;
+        Vec2f _p;
+        bool centroid_inside_hull = hull_distancer.signed_distance_from_lines(centroid.head<2>(), _li, _p) < 0;
+
+        float sticking_force = acc->get_base_area()
+                     * (acc->get_base_height() == 0 ? params.base_adhesion : params.support_adhesion);
+//        float weight = acc-> * params.filament_density * params.gravity_constant;
+//           float weight_torque = embedded_distance * weight;
+//           if (!inside) {
+//               weight_torque *= -1;
+//           }
+
+        for (size_t line_idx : acc_lines.second){
+            const ExtrusionLine &line = checked_lines[line_idx];
+
+            size_t nearest_line_idx;
+            Vec2f nearest_hull_point;
+            float hull_distance = hull_distancer.signed_distance_from_lines(line.b, nearest_line_idx,
+                    nearest_hull_point);
+
+            float sticking_torque = (nearest_hull_point - hull_centroid).norm() * sticking_force;
+
+            std::cout << "sticking_torque: " << sticking_torque << std::endl;
+
+
+            Vec3f extruder_pressure_direction = to_3d(Vec2f(line.b - line.a), 0.0f).normalized();
+            if (hull_distance > 0) {
+                extruder_pressure_direction.z() = -0.333f;
+                extruder_pressure_direction.normalize();
+            }
+            float pressure_torque_arm = (to_3d(Vec2f(nearest_hull_point - line.b), print_z).cross(extruder_pressure_direction)).norm();
+
+            float extruder_conflict_torque = params.tolerable_extruder_conflict_force * pressure_torque_arm;
+
+            std::cout << "extruder_conflict_torque: " << extruder_conflict_torque << std::endl;
+
+            if (extruder_conflict_torque > sticking_torque) {
+                acc->add_support_point(Point::new_scale(line.b), params.support_points_interface_area);
+                issues.supports_nedded.emplace_back(to_3d(line.b, print_z), extruder_conflict_torque - sticking_torque);
+            }
+
+        }
     }
 }
 
 Issues check_object_stability(const PrintObject *po, const Params &params) {
-    SupportedSegmentAccumulators stability_accs;
+#ifdef DEBUG_FILES
+    FILE *eacc = boost::nowide::fopen(debug_out_path("emerging_accumulators.obj").c_str(), "w");
+    FILE *facc = boost::nowide::fopen(debug_out_path("final_accumulators.obj").c_str(), "w");
+#endif DEBUG_FILES
+    StabilityAccumulators stability_accs;
     LayerLinesDistancer prev_layer_lines { { } };
     Issues issues { };
     std::vector<ExtrusionLine> checked_lines;
@@ -396,15 +486,15 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 const float region_height = layer_region->layer()->height;
                 const float cross_section = region_height * flow_width * 0.7071f;
                 int id = stability_accs.create_accumulator(base_print_z);
-                SupportedSegmentAccumulator &acc = stability_accs.access(id);
+                StabilityAccumulator &acc = stability_accs.access(id);
                 Points points { };
                 perimeter->collect_points(points);
                 for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
                     Vec2f start = unscaled(points[point_idx]).cast<float>();
-                    Vec2f next = unscaled(points[point_idx]).cast<float>();
-                    ExtrusionLine line{start, next};
+                    Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
+                    ExtrusionLine line { start, next };
                     line.supported_segment_accumulator_id = id;
-                    acc.add_base_extrusion( line, flow_width, base_print_z, cross_section);
+                    acc.add_base_extrusion(line, flow_width, base_print_z, cross_section);
                     checked_lines.push_back(line);
                 }
             } // perimeter
@@ -415,22 +505,37 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 const float region_height = layer_region->layer()->height;
                 const float cross_section = region_height * flow_width * 0.7071f;
                 int id = stability_accs.create_accumulator(base_print_z);
-                SupportedSegmentAccumulator &acc = stability_accs.access(id);
+                StabilityAccumulator &acc = stability_accs.access(id);
                 Points points { };
                 fill->collect_points(points);
                 for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
                     Vec2f start = unscaled(points[point_idx]).cast<float>();
-                    Vec2f next = unscaled(points[point_idx]).cast<float>();
-                    acc.add_base_extrusion( { start, next }, flow_width, base_print_z, cross_section);
+                    Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
+                    ExtrusionLine line { start, next };
+                    line.supported_segment_accumulator_id = id;
+                    acc.add_base_extrusion(line, flow_width, base_print_z, cross_section);
+                    checked_lines.push_back(line);
                 }
             } // fill
         } // ex_entity
     } // region
 
+#ifdef DEBUG_FILES
+    for (const auto &line : checked_lines) {
+        Vec3f ecolor = stability_accs.get_emerging_color(line.supported_segment_accumulator_id);
+        fprintf(eacc, "v %f %f %f  %f %f %f\n", line.b[0],
+                line.b[1], base_print_z, ecolor[0], ecolor[1], ecolor[2]);
+
+        Vec3f fcolor = stability_accs.get_final_color(line.supported_segment_accumulator_id);
+        fprintf(facc, "v %f %f %f  %f %f %f\n", line.b[0],
+                line.b[1], base_print_z, fcolor[0], fcolor[1], fcolor[2]);
+    }
+#endif DEBUG_FILES
+
     for (size_t layer_idx = 1; layer_idx < po->layer_count(); ++layer_idx) {
         const Layer *layer = po->layers()[layer_idx];
-        prev_layer_lines = LayerLinesDistancer{std::move(checked_lines)};
-        checked_lines = std::vector<ExtrusionLine>{};
+        prev_layer_lines = LayerLinesDistancer { std::move(checked_lines) };
+        checked_lines = std::vector<ExtrusionLine> { };
 
         float print_z = layer->print_z;
         for (const LayerRegion *layer_region : layer->regions()) {
@@ -452,17 +557,34 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 } // fill
             } // ex_entity
         } // region
+
+        check_layer_global_stability(stability_accs, issues, checked_lines, print_z, params);
+
+#ifdef DEBUG_FILES
+        for (const auto &line : checked_lines) {
+            Vec3f ecolor = stability_accs.get_emerging_color(line.supported_segment_accumulator_id);
+            fprintf(eacc, "v %f %f %f  %f %f %f\n", line.b[0],
+                    line.b[1], print_z, ecolor[0], ecolor[1], ecolor[2]);
+
+            Vec3f fcolor = stability_accs.get_final_color(line.supported_segment_accumulator_id);
+            fprintf(facc, "v %f %f %f  %f %f %f\n", line.b[0],
+                    line.b[1], print_z, fcolor[0], fcolor[1], fcolor[2]);
+        }
+#endif DEBUG_FILES
     }
+
+#ifdef DEBUG_FILES
+    fclose(eacc);
+    fclose(facc);
+#endif DEBUG_FILES
 
     std::cout << " SUPP: " << issues.supports_nedded.size() << std::endl;
     return issues;
 }
 
-
 #ifdef DEBUG_FILES
 void debug_export(Issues issues, std::string file_name) {
     Slic3r::CNumericLocalesSetter locales_setter;
-
     {
         FILE *fp = boost::nowide::fopen(debug_out_path((file_name + "_supports.obj").c_str()).c_str(), "w");
         if (fp == nullptr) {
@@ -494,7 +616,6 @@ void debug_export(Issues issues, std::string file_name) {
         }
         fclose(fp);
     }
-
 }
 #endif
 

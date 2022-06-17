@@ -12,8 +12,6 @@ struct Params {
 
 
     float bridge_distance = 10.0f; //mm
-    float max_first_ex_perim_unsupported_distance_factor = 0.0f; // if external perim first, return tighter max allowed distance from previous layer extrusion
-    float max_unsupported_distance_factor = 1.0f; // For internal perimeters, infill, bridges etc, allow gap of [extrusion width] size, these extrusions have usually something to stick to.
     float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / ( 1 + this factor * (curvature / PI) )
 
     float base_adhesion = 2000.0f; // adhesion per mm^2 of first layer; Force needed to remove the object from the bed, divided by the adhesion area (g/mm*s^2)
