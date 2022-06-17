@@ -297,7 +297,7 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
             // G92 : Set Position
             // Set a logical coordinate position to a new value without actually moving the machine motors.
             // Which axes to set?
-            bool set = false;
+            [[maybe_unused]]bool set = false;
             while (!is_eol(*line)) {
                 char axis = toupper(*line++);
                 switch (axis) {
@@ -340,11 +340,7 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
     case 'M': {
         int mcode = parse_int(line);
         eatws(line);
-        switch (mcode) {
-        default:
-            // Ignore the rest of the M-codes.
-        break;
-        }
+        // Ignore the rest of the M-codes.
         break;
     }
     case 'T':
