@@ -23,6 +23,8 @@ class GLGizmoFlatten : public GLGizmoBase
 
 private:
 
+    GLModel arrow;
+
     struct PlaneData {
         std::vector<Vec3d> vertices; // should be in fact local in update_planes()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
