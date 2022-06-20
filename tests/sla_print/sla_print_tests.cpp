@@ -185,7 +185,7 @@ bool is_outside_support_cone(const Vec3f &supp, const Vec3f &pt, float angle)
 TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branching]") {
     SECTION("Identical points have the same merge point") {
         Vec3f a{0.f, 0.f, 0.f}, b = a;
-        float slope = PI / 4.f;
+        auto slope = float(PI / 4.);
 
         auto mergept = branchingtree::find_merge_pt(a, b, slope);
 
@@ -200,7 +200,7 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branchi
     // | b * <= mergept
     SECTION("Points at different heights have the lower point as mergepoint") {
         Vec3f a{0.f, 0.f, 0.f}, b = {0.f, 0.f, -1.f};
-        float slope = PI / 4.f;
+        auto slope = float(PI / 4.);
 
         auto mergept = branchingtree::find_merge_pt(a, b, slope);
 
@@ -214,7 +214,7 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branchi
     //      * <= mergept
     SECTION("Points at different X have mergept in the middle at lower Z") {
         Vec3f a{0.f, 0.f, 0.f}, b = {1.f, 0.f, 0.f};
-        float slope = PI / 4.f;
+        auto slope = float(PI / 4.);
 
         auto mergept = branchingtree::find_merge_pt(a, b, slope);
 
@@ -234,7 +234,7 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branchi
     //      * <= mergept
     SECTION("Points at different Y have mergept in the middle at lower Z") {
         Vec3f a{0.f, 0.f, 0.f}, b = {0.f, 1.f, 0.f};
-        float slope = PI / 4.f;
+        auto slope = float(PI / 4.);
 
         auto mergept = branchingtree::find_merge_pt(a, b, slope);
 
@@ -250,7 +250,7 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branchi
 
     SECTION("Points separated by less than critical angle have the lower point as mergept") {
         Vec3f a{0.f, 0.f, 0.f}, b = {-0.5f, -0.5f, -1.f};
-        float slope = PI / 4.f;
+        auto slope = float(PI / 4.);
 
         auto mergept = branchingtree::find_merge_pt(a, b, slope);
 

@@ -34,9 +34,9 @@ inline BoundingBox3Base<Vec3f> get_support_cone_bb(const Vec3f &p, const Propert
     double gnd = props.ground_level() - EPSILON;
     double h   = p.z() - gnd;
     double phi = PI / 2 - props.max_slope();
-    double r   = std::min(h * std::tan(phi), props.max_branch_length() * std::sin(phi));
+    auto   r   = float(std::min(h * std::tan(phi), props.max_branch_length() * std::sin(phi)));
 
-    Vec3f bb_min = {p.x() - r, p.y() - r, gnd};
+    Vec3f bb_min = {p.x() - r, p.y() - r, float(gnd)};
     Vec3f bb_max = {p.x() + r, p.y() + r, p.z()};
 
     return {bb_min, bb_max};
@@ -221,7 +221,7 @@ public:
         namespace bgi = boost::geometry::index;
         float brln = 2 * m_props.max_branch_length();
         BoundingBox3Base<Vec3f> bb{{pos.x() - brln, pos.y() - brln,
-                                    m_props.ground_level() - EPSILON},
+                                    float(m_props.ground_level() - EPSILON)},
                                    {pos.x() + brln, pos.y() + brln,
                                     m_ktree.bounds().max_corner().get<Z>()}};
 

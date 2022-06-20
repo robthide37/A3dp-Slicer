@@ -77,7 +77,7 @@ void build_tree(PointCloud &nodes, Builder &builder)
             case BED: {
                 closest_node.weight = w;
                 if (closest_it->dst_branching > nodes.properties().max_branch_length()) {
-                    auto hl_br_len = float(nodes.properties().max_branch_length()) / 2.;
+                    auto hl_br_len = float(nodes.properties().max_branch_length()) / 2.f;
                     Node new_node {{node.pos.x(), node.pos.y(), node.pos.z() - hl_br_len}, node.Rmin};
                     new_node.id = int(nodes.next_junction_id());
                     new_node.weight = nodes.get(node_id).weight + hl_br_len;
