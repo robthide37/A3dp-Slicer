@@ -342,18 +342,26 @@ LayerRangeEditor::LayerRangeEditor( ObjectLayers* parent,
     this->Bind(wxEVT_TEXT_ENTER, [this, edit_fn](wxEvent&)
     {
         m_enter_pressed     = true;
-        // If LayersList wasn't updated/recreated, we can call wxEVT_KILL_FOCUS.Skip()
-        if (m_type&etLayerHeight) {
-            if (!edit_fn(get_value(), true, false))
+        // Workaround! Under Linux we have to use CallAfter() to avoid crash after pressing ENTER key
+        // see #7531, #8055, #8408
+#ifdef __linux__
+        wxTheApp->CallAfter([this, edit_fn]() {
+#endif
+            // If LayersList wasn't updated/recreated, we can call wxEVT_KILL_FOCUS.Skip()
+            if (m_type & etLayerHeight) {
+                if (!edit_fn(get_value(), true, false))
+                    SetValue(m_valid_value);
+                else
+                    m_valid_value = double_to_string(get_value());
+                m_call_kill_focus = true;
+            }
+            else if (!edit_fn(get_value(), true, false)) {
                 SetValue(m_valid_value);
-            else
-                m_valid_value = double_to_string(get_value());
-            m_call_kill_focus = true;
-        }
-        else if (!edit_fn(get_value(), true, false)) {
-            SetValue(m_valid_value);
-            m_call_kill_focus = true;
-        }
+                m_call_kill_focus = true;
+            }
+#ifdef __linux__
+        });
+#endif 
     }, this->GetId());
 
     this->Bind(wxEVT_KILL_FOCUS, [this, edit_fn](wxFocusEvent& e)
