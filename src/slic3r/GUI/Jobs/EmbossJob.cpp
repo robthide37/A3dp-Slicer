@@ -22,6 +22,9 @@ using namespace GUI;
 
 // private namespace
 namespace priv{
+// create sure that emboss object is bigger than source object [in mm]
+constexpr float safe_extension = 1.0f;
+
 /// <summary>
 /// Assert check of inputs data
 /// </summary>
@@ -416,7 +419,8 @@ void UseSurfaceJob::process(Ctl &ctl) {
     double shape_scale =  Emboss::get_shape_scale(fp, ff);
     Emboss::OrthoProject cut_projection = priv::create_projection_for_cut(
         cut_projection_tr, shape_scale, bb, z_range);
-    float projection_ratio = -z_range.first / (z_range.second - z_range.first);
+    float projection_ratio = (-z_range.first + priv::safe_extension) /
+                             (z_range.second - z_range.first + 2 * priv::safe_extension);
     // Use CGAL to cut surface from triangle mesh
     SurfaceCut cut = cut_surface(source.its, shapes, cut_projection, projection_ratio);
     if (cut.empty())
@@ -648,10 +652,8 @@ Emboss::OrthoProject priv::create_projection_for_cut(
     const BoundingBox             &shape_bb,
     const std::pair<float, float> &z_range)
 {
-    // create sure that emboss object is bigger than source object
-    const float safe_extension = 1.0f;
-    float min_z = z_range.first - safe_extension;
-    float max_z = z_range.second + safe_extension;
+    float min_z = z_range.first - priv::safe_extension;
+    float max_z = z_range.second + priv::safe_extension;
     assert(min_z < max_z);
     // range between min and max value
     double projection_size = max_z - min_z; 
