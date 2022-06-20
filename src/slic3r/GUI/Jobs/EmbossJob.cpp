@@ -367,10 +367,11 @@ UseSurfaceData::ModelSource UseSurfaceData::merge(ModelSources &sources)
     ModelSource &result = sources[max_index];
     result.its.vertices.reserve(count_vertices);
     result.its.indices.reserve(count_indices);
+    Transform3d result_tr_inv = result.tr.inverse(); 
     for (size_t i = 0; i < sources.size(); i++) { 
         if (i == max_index) continue;
         ModelSource &source = sources[i];
-        Transform3f tr(result.tr * source.tr.inverse());
+        Transform3d  tr     = source.tr * result_tr_inv;
         its_transform(source.its, tr);
         its_merge(result.its, std::move(source.its));
     }
