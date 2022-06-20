@@ -1819,8 +1819,8 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate "
                        "for a transition from higher speed to lower speed. "
                    "A value of 1.8 mm³/s² ensures, that a change from the extrusion rate "
-                   "of 1.8 mm³/s (0.45 mm extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) "
-                   "to 5.4 mm³/s (feedrate 20 mm/s) will take at least 2 seconds.");
+                   "of 5.4 mm³/s (0.45 mm extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) "
+                   "to 1.8 mm³/s (feedrate 20 mm/s) will take at least 2 seconds.");
     def->sidetext = L("mm³/s²");
     def->min = 0;
     def->mode = comExpert;
@@ -3078,7 +3078,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("wall_transition_length", coFloat);
     def->label = L("Perimeter transition length");
     def->category = L("Advanced");
-    def->tooltip  = L("When transitioning between different numbers of perimeters as the part becomes"
+    def->tooltip  = L("When transitioning between different numbers of perimeters as the part becomes "
                        "thinner, a certain amount of space is allotted to split or join the perimeter segments.");
     def->sidetext = L("mm");
     def->mode = comExpert;
@@ -3093,9 +3093,9 @@ void PrintConfigDef::init_fff_params()
                        "- margin, 2 * Minimum perimeter width + margin]. Increasing this margin "
                        "reduces the number of transitions, which reduces the number of extrusion "
                        "starts/stops and travel time. However, large extrusion width variation can lead to "
-                       "under- or overextrusion problems."
-                       "If expressed as percentage (for example 25%), it will be computed over nozzle diameter.");
-    def->sidetext = L("mm");
+                       "under- or overextrusion problems. "
+                       "If expressed as a percentage (for example 25%), it will be computed based on the nozzle diameter.");
+    def->sidetext = L("mm or %");
     def->mode = comExpert;
     def->min = 0;
     def->set_default_value(new ConfigOptionFloatOrPercent(25, true));
@@ -3169,7 +3169,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip  = L("Width of the perimeter that will replace thin features (according to the Minimum feature size) "
                        "of the model. If the Minimum perimeter width is thinner than the thickness of the feature,"
                        " the perimeter will become as thick as the feature itself. "
-                       "If expressed as percentage (for example 85%), it will be computed over nozzle diameter.");
+                       "If expressed as a percentage (for example 85%), it will be computed based on the nozzle diameter.");
     def->sidetext = L("mm or %");
     def->mode = comExpert;
     def->min = 0;
