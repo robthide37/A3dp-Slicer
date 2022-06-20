@@ -2708,6 +2708,7 @@ void priv::store(const ProjectionDistances &pds,
     its.vertices.reserve(4 * pds.size());
     its.indices.reserve(2 * pds.size());
     for (const ProjectionDistance &pd : pds) {
+        if (pd.aoi_index == std::numeric_limits<uint32_t>::max()) continue;
         HI hi  = aois[pd.aoi_index].second[pd.hi_index];
         VI vi1 = mesh.source(hi);
         VI vi2 = mesh.target(hi);
