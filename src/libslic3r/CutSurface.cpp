@@ -745,22 +745,32 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
 #endif // DEBUG_OUTPUT_DIR
 
     std::vector<bool> is_best_cut(cutAOIs.size(), {false});
-    for (const priv::ProjectionDistance &d : best_projection)
+    for (const priv::ProjectionDistance &d : best_projection) {
+        if (d.aoi_index == std::numeric_limits<uint32_t>::max()) continue;
         is_best_cut[d.aoi_index] = true;
-    std::vector<size_t> best_cut_indices;
-    for (size_t i = 0; i < cutAOIs.size(); ++i)
-        if (is_best_cut[i]) best_cut_indices.push_back(i);
+    }
 
-    // cut off part + filtrate cutAOIs
-    priv::merge_cuts(cutAOIs, cgal_model, best_cut_indices);
-#ifdef DEBUG_OUTPUT_DIR
-    priv::store(cutAOIs, cgal_model, DEBUG_OUTPUT_DIR + "merged-aois/");
-    // only debug
-#endif // DEBUG_OUTPUT_DIR
+    // Filter cuts - No best cuts are removed
+    for (size_t i = cutAOIs.size(); i > 0; --i) { 
+        size_t index = i - 1;
+        if (is_best_cut[index]) continue;
+        cutAOIs.erase(cutAOIs.begin() + index);
+    }
+
+//    std::vector<size_t> best_cut_indices;
+//    for (size_t i = 0; i < cutAOIs.size(); ++i)
+//        if (is_best_cut[i]) best_cut_indices.push_back(i);
+//
+//    // cut off part + filtrate cutAOIs
+//    priv::merge_cuts(cutAOIs, cgal_model, best_cut_indices);
+//#ifdef DEBUG_OUTPUT_DIR
+//    priv::store(cutAOIs, cgal_model, DEBUG_OUTPUT_DIR + "merged-aois/");
+//    // only debug
+//#endif // DEBUG_OUTPUT_DIR
     
-    // Filter out NO top one cuts
-    priv::filter_cuts(cutAOIs, cgal_model, shapes,
-                      shape_point_2_index, projection, vert_shape_map);
+    //// Filter out NO top one cuts
+    //priv::filter_cuts(cutAOIs, cgal_model, shapes,
+    //                  shape_point_2_index, projection, vert_shape_map);
 
     // conversion map between vertex index in cgal_model and indices in result
     // used instead of std::map
