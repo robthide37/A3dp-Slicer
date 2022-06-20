@@ -332,7 +332,6 @@ struct GlobalModelInfo {
             return std::abs(orig_to_point.dot(plane_normal));
         };
 
-
         float total_weight = 0;
         float total_visibility = 0;
         for (size_t i = 0; i < points.size(); ++i) {
@@ -561,7 +560,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
                 break;
             }
             viable_points_indices.push_back(last_enforced_idx);
-            if (abs(result.points[last_enforced_idx].local_ccw_angle) > 0.3 * PI) {
+            if (abs(result.points[last_enforced_idx].local_ccw_angle) > SeamPlacer::sharp_angle_snapping_threshold) {
                 orig_large_angle_points_indices.push_back(last_enforced_idx);
             }
             last_enforced_idx = next_index(last_enforced_idx);
@@ -654,7 +653,7 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po,
     // to compute ideal search radius (area), we use exponential distribution (complementary distr to poisson)
     // parameters of exponential distribution to compute area that will have with probability="probability" more than given number of samples="samples"
     float probability = 0.9f;
-    float samples = 3;
+    float samples = 4;
     float density = SeamPlacer::raycasting_visibility_samples_count / result.mesh_samples.total_area;
     // exponential probability distrubtion function is : f(x) = P(X > x) = e^(l*x) where l is the rate parameter (computed as 1/u where u is mean value)
     // probability that sampled area A with S samples contains more than samples count:
@@ -718,7 +717,7 @@ void gather_enforcers_blockers(GlobalModelInfo &result, const PrintObject *po) {
 struct SeamComparator {
     SeamPosition setup;
     float angle_importance;
-    SeamComparator(SeamPosition setup) :
+    explicit SeamComparator(SeamPosition setup) :
             setup(setup) {
         angle_importance = setup == spNearest ? SeamPlacer::angle_importance_nearest : SeamPlacer::angle_importance_aligned;
     }
@@ -750,10 +749,7 @@ struct SeamComparator {
             return false;
         }
 
-        if (setup == SeamPosition::spRear) {
-            if (a.position.y() == b.position.y()) {
-                return a.position.x() > b.position.x();
-            }
+        if (setup == SeamPosition::spRear && a.position.y() != b.position.y()) {
             return a.position.y() > b.position.y();
         }
 
@@ -816,10 +812,7 @@ struct SeamComparator {
         }
 
         if (setup == SeamPosition::spRear) {
-            if (a.position.y() == b.position.y()) {
-                return a.position.x() > b.position.x();
-            }
-            return a.position.y() > b.position.y();
+            return a.position.y() + SeamPlacer::seam_align_score_tolerance * 5.0f > b.position.y();
         }
 
         float penalty_a = a.visibility
@@ -842,6 +835,10 @@ struct SeamComparator {
         // https://github.com/prusa3d/PrusaSlicer/tree/master/doc/seam_placement/corner_penalty_function.png
         return gauss(ccw_angle, 0.0f, 1.0f, 3.0f) +
                 1.0f / (2 + std::exp(-ccw_angle));
+    }
+
+    float weight(const SeamCandidate &a) const {
+        return a.visibility + angle_importance * compute_angle_penalty(a.local_ccw_angle) / (1.0f + angle_importance);
     }
 };
 
@@ -1214,13 +1211,12 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
     int seam_index = start_seam.second;
 
     //initialize searching for seam string - cluster of nearby seams on previous and next layers
-    int skips = SeamPlacer::seam_align_tolerable_skips / 2;
     int next_layer = layer_idx + 1;
     std::pair<size_t, size_t> prev_point_index = start_seam;
     std::vector<std::pair<size_t, size_t>> seam_string { start_seam };
 
     //find seams or potential seams in forward direction; there is a budget of skips allowed
-    while (skips >= 0 && next_layer < int(layers.size())) {
+    while (next_layer < int(layers.size())) {
         auto maybe_next_seam = find_next_seam_in_layer(layers, prev_point_index, next_layer,
                 float(po->get_layer(next_layer)->slice_z), comparator);
         if (maybe_next_seam.has_value()) {
@@ -1240,17 +1236,15 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
         } else {
-            // Layer skipped, reduce number of available skips
-            skips--;
+            break;
         }
         next_layer++;
     }
 
     //do additional check in back direction
     next_layer = layer_idx - 1;
-    skips = SeamPlacer::seam_align_tolerable_skips / 2;
     prev_point_index = std::pair<size_t, size_t>(layer_idx, seam_index);
-    while (skips >= 0 && next_layer >= 0) {
+    while (next_layer >= 0) {
         auto maybe_next_seam = find_next_seam_in_layer(layers, prev_point_index, next_layer,
                 float(po->get_layer(next_layer)->slice_z), comparator);
         if (maybe_next_seam.has_value()) {
@@ -1269,8 +1263,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
         } else {
-            // Layer skipped, reduce number of available skips
-            skips--;
+            break;
         }
         next_layer--;
     }
@@ -1385,10 +1378,8 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 Vec3f pos = layers[seam_string[index].first].points[seam_string[index].second].position;
                 observations[index] = pos.head<2>();
                 observation_points[index] = pos.z();
-                weights[index] =
-                        (comparator.compute_angle_penalty(
-                                layers[seam_string[index].first].points[seam_string[index].second].local_ccw_angle)
-                                < comparator.compute_angle_penalty(0.4f * float(PI))) ? 1.0f : 0.1f;
+                weights[index] = std::min(1.0f,
+                        comparator.weight(layers[seam_string[index].first].points[seam_string[index].second]));
             }
 
             // Curve Fitting
@@ -1400,7 +1391,10 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             // Perimeter structure of the point; also set flag aligned to true
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const auto &pair = seam_string[index];
-                const float t = weights[index];
+                const float t =
+                        abs(layers[pair.first].points[pair.second].local_ccw_angle)
+                                > SeamPlacer::sharp_angle_snapping_threshold
+                                ? 1.0 : 0.0f;
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
                 Vec2f fitted_pos = curve.get_fitted_value(current_pos.z());
 
@@ -1504,7 +1498,7 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
             << "SeamPlacer: pick_seam_point : end";
         }
         throw_if_canceled_func();
-        if (configured_seam_preference == spAligned) {
+        if (configured_seam_preference == spAligned || configured_seam_preference == spRear) {
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: align_seam_points : start";
             align_seam_points(po, comparator);
