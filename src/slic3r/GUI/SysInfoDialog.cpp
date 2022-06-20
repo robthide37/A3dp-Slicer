@@ -7,6 +7,8 @@
 
 #include <string>
 
+#include <boost/algorithm/string/replace.hpp>
+
 #include <Eigen/Core>
 
 #include <wx/clipbrd.h>
