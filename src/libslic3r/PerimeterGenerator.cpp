@@ -83,27 +83,31 @@ static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy
 {
     const double min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
     const double range_random_point_dist = fuzzy_skin_point_dist / 2.;
-    double dist_left_over = double(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
+    double       dist_left_over          = double(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
 
-    auto * p0 = &ext_lines.junctions.back();
+    auto                                   *p0 = &ext_lines.front();
     std::vector<Arachne::ExtrusionJunction> out;
     out.reserve(ext_lines.size());
-    for (auto &p1 : ext_lines)
-    { // 'a' is the (next) new point between p0 and p1
+    for (auto &p1 : ext_lines) {
+        if (p0->p == p1.p) { // Connect endpoints.
+            out.emplace_back(p1.p, p1.w, p1.perimeter_index);
+            continue;
+        }
+
+        // 'a' is the (next) new point between p0 and p1
         Vec2d  p0p1      = (p1.p - p0->p).cast<double>();
         double p0p1_size = p0p1.norm();
         // so that p0p1_size - dist_last_point evaulates to dist_left_over - p0p1_size
         double dist_last_point = dist_left_over + p0p1_size * 2.;
-        for (double p0pa_dist = dist_left_over; p0pa_dist < p0p1_size;
-             p0pa_dist += min_dist_between_points + double(rand()) * range_random_point_dist / double(RAND_MAX))
-        {
+        for (double p0pa_dist = dist_left_over; p0pa_dist < p0p1_size; p0pa_dist += min_dist_between_points + double(rand()) * range_random_point_dist / double(RAND_MAX)) {
             double r = double(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
             out.emplace_back(p0->p + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>(), p1.w, p1.perimeter_index);
             dist_last_point = p0pa_dist;
         }
         dist_left_over = p0p1_size - dist_last_point;
-        p0 = &p1;
+        p0             = &p1;
     }
+
     while (out.size() < 3) {
         size_t point_idx = ext_lines.size() - 2;
         out.emplace_back(ext_lines[point_idx].p, ext_lines[point_idx].w, ext_lines[point_idx].perimeter_index);
@@ -111,6 +115,10 @@ static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy
             break;
         -- point_idx;
     }
+
+    if (ext_lines.back().p == ext_lines.front().p) // Connect endpoints.
+        out.back().p = out.front().p;
+
     if (out.size() >= 3)
         ext_lines.junctions = std::move(out);
 }
