@@ -2111,7 +2111,7 @@ priv::ProjectionDistances priv::choose_best_distance(
         // Negative iteration inside polygon
         do {
             uint32_t nxt_index = (act_index == first_index) ? 
-                last_index : (act_index - 1);
+                (last_index-1) : (act_index - 1);
             // When iterate negative it must be split to parts
             // and can't iterate in circle
             assert(nxt_index != index);
