@@ -210,7 +210,7 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
         ex_tbb, size_t(0), nondup_idx.size(),
         [&sm, &heads, &nondup_idx, &builder](size_t i) {
             if (!builder.ctl().stopcondition())
-                heads[i] = calculate_pinhead_placement(ex_tbb, sm, nondup_idx[i]);
+                heads[i] = calculate_pinhead_placement(ex_seq, sm, nondup_idx[i]);
         },
         execution::max_concurrency(ex_tbb)
     );
