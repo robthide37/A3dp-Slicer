@@ -14,15 +14,15 @@ struct Params {
     float bridge_distance = 10.0f; //mm
     float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / ( 1 + this factor * (curvature / PI) )
 
-    float base_adhesion = 2000.0f; // adhesion per mm^2 of first layer; Force needed to remove the object from the bed, divided by the adhesion area (g/mm*s^2)
-    float support_adhesion = 1000.0f; // adhesion per mm^2 of support interface layer
-    float support_points_interface_area = 5.0f; // mm^2
+    // Adhesion computation : from experiment, PLA holds about 3g per mm^2 of base area (with reserve); So it can withstand about 3*gravity_constant force per mm^2
+    float base_adhesion = 3.0f * gravity_constant; // adhesion per mm^2 of first layer
+    float support_adhesion = 1.0f * gravity_constant; // adhesion per mm^2 of support interface layer
+    float support_points_interface_area = 2.0f; // mm^2
     float max_acceleration = 1000.0f; // mm/s^2 ; max acceleration of object (bed) in XY
     float filament_density = 1.25f * 0.001f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
 
     float tolerable_extruder_conflict_force = 50.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... ); current value corresponds to weight of 50g
-    float max_curled_conflict_extruder_force = 200.0f * gravity_constant; // for areas with possible high layered curled filaments, max force to account fo ; current value corresponds to weight of 200g
-
+    float max_curled_conflict_extruder_force = 200.0f * gravity_constant; // for areas with possible high layered curled filaments, max force to account for; current value corresponds to weight of 200g
 };
 
 struct SupportPoint {

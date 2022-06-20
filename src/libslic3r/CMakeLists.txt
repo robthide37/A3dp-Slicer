@@ -245,8 +245,7 @@ set(SLIC3R_SOURCES
     SlicingAdaptive.hpp
     Subdivide.cpp
     Subdivide.hpp
-#    SupportableIssuesSearch.cpp
-    SupportableIssuesSearchRefactoring.cpp
+    SupportableIssuesSearch.cpp
     SupportableIssuesSearch.hpp
     SupportMaterial.cpp
     SupportMaterial.hpp
