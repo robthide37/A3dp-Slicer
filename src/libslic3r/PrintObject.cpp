@@ -423,27 +423,29 @@ void PrintObject::find_supportable_issues()
             SupportableIssues::Issues issues = SupportableIssues::full_search(this);
             //TODO fix
 //            if (!issues.supports_nedded.empty()) {
-                auto obj_transform = this->trafo_centered();
-                for (ModelVolume *model_volume : this->model_object()->volumes) {
-                    if (model_volume->type() == ModelVolumeType::MODEL_PART) {
-                        Transform3d model_transformation = model_volume->get_matrix();
-                        Transform3d inv_transform = (obj_transform * model_transformation).inverse();
-                        TriangleSelectorWrapper selector { model_volume->mesh() };
+            auto obj_transform = this->trafo_centered();
+            for (ModelVolume *model_volume : this->model_object()->volumes) {
+                if (model_volume->type() == ModelVolumeType::MODEL_PART) {
+                    Transform3d model_transformation = model_volume->get_matrix();
+                    Transform3f inv_transform = (obj_transform * model_transformation).inverse().cast<float>();
+                    TriangleSelectorWrapper selector { model_volume->mesh() };
 
-                        for (const SupportableIssues::SupportPoint &support_point : issues.supports_nedded) {
-                            selector.enforce_spot(Vec3f(inv_transform.cast<float>() * support_point.position), 0.5f);
-                        }
-
-                        model_volume->supported_facets.set(selector.selector);
-
-#if 1
-                        indexed_triangle_set copy = model_volume->mesh().its;
-                        its_transform(copy, obj_transform * model_transformation);
-                        its_write_obj(copy,
-                                debug_out_path("model.obj").c_str());
-#endif
+                    for (const SupportableIssues::SupportPoint &support_point : issues.supports_nedded) {
+                        Vec3f point = Vec3f(inv_transform * support_point.position);
+                        Vec3f origin = Vec3f(
+                                inv_transform * Vec3f(support_point.position.x(), support_point.position.y(), 0.0f));
+                        selector.enforce_spot(point, origin, 0.5f);
                     }
+
+                    model_volume->supported_facets.set(selector.selector);
+#if 1
+                    indexed_triangle_set copy = model_volume->mesh().its;
+                    its_transform(copy, obj_transform * model_transformation);
+                    its_write_obj(copy,
+                            debug_out_path("model.obj").c_str());
+#endif
                 }
+            }
 //            }
         }
 

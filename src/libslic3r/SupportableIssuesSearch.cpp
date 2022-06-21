@@ -191,7 +191,7 @@ struct StabilityAccumulators {
 private:
     size_t next_id = 0;
     std::unordered_map<size_t, size_t> mapping;
-    std::vector<StabilityAccumulator> acccumulators;
+    std::vector<StabilityAccumulator> accumulators;
 
     void merge_to(size_t from_id, size_t to_id) {
         StabilityAccumulator &from_acc = this->access(from_id);
@@ -211,13 +211,13 @@ public:
     int create_accumulator(float base_height) {
         size_t id = next_id;
         next_id++;
-        mapping[id] = acccumulators.size();
-        acccumulators.push_back(StabilityAccumulator { base_height });
+        mapping[id] = accumulators.size();
+        accumulators.push_back(StabilityAccumulator { base_height });
         return id;
     }
 
     StabilityAccumulator& access(size_t id) {
-        return acccumulators[mapping[id]];
+        return accumulators[mapping[id]];
     }
 
     void merge_accumulators(size_t from_id, size_t to_id) {
@@ -235,24 +235,14 @@ public:
     }
 
 #ifdef DEBUG_FILES
-    Vec3f get_emerging_color(size_t id) {
+    Vec3f get_accumulator_color(size_t id) {
         if (mapping.find(id) == mapping.end()) {
             std::cerr << " ERROR: uknown accumulator ID: " << id << std::endl;
             return Vec3f(1.0f, 1.0f, 1.0f);
         }
 
-        size_t pseudornd = ((id + 127) * 33331 + 6907) % 13;
-        return value_to_rgbf(0.0f, 13.0f, float(pseudornd));
-    }
-
-    Vec3f get_final_color(size_t id) {
-        if (mapping.find(id) == mapping.end()) {
-            std::cerr << " ERROR: uknown accumulator ID: " << id << std::endl;
-            return Vec3f(1.0f, 1.0f, 1.0f);
-        }
-
-        size_t pseudornd = ((mapping[id] + 127) * 33331 + 6907) % 13;
-        return value_to_rgbf(0.0f, 13.0f, float(pseudornd));
+        size_t pseudornd = ((mapping[id] + 127) * 33331 + 6907) % 987;
+        return value_to_rgbf(0.0f, float(987), float(pseudornd));
     }
 #endif
 };
@@ -345,10 +335,12 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         // -> it prevents extruding perimeter start and short loops into air.
         const float flow_width = get_flow_width(layer_region, entity->role());
         const float max_allowed_dist_from_prev_layer = flow_width;
+        float distance_from_last_support_point = params.min_distance_between_support_points * 2.0f;
 
         for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
             ExtrusionLine &current_line = lines[line_idx];
             Point current = Point::new_scale(current_line.b);
+            distance_from_last_support_point += current_line.len;
             float mm3_per_mm = float(entity->min_mm3_per_mm());
 
             float curr_angle = 0;
@@ -381,13 +373,15 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 StabilityAccumulator &current_segment = stability_accs.access(current_stability_acc);
                 current_line.stability_accumulator_id = current_stability_acc;
                 current_segment.add_extrusion(current_line, print_z, mm3_per_mm);
-                if (bridging_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
-                > params.bridge_distance
-                        / (1.0f + (bridging_acc.max_curvature
-                                * params.bridge_distance_decrease_by_curvature_factor / PI))) {
-                    current_segment.add_support_point(current, params.support_points_interface_area);
+                if (distance_from_last_support_point > params.min_distance_between_support_points &&
+                        bridging_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
+                        > params.bridge_distance
+                                / (1.0f + (bridging_acc.max_curvature
+                                        * params.bridge_distance_decrease_by_curvature_factor / PI))) {
+                    current_segment.add_support_point(current, params.extrusion_support_points_area);
                     issues.supports_nedded.emplace_back(to_vec3f(current), 1.0);
                     bridging_acc.reset();
+                    distance_from_last_support_point = 0.0f;
                 }
             }
         }
@@ -430,10 +424,13 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
 
         float sticking_force = acc->get_base_area()
                 * (acc->get_base_height() == 0 ? params.base_adhesion : params.support_adhesion);
-        float weight = acc->get_accumulated_volume() * params.filament_density * params.gravity_constant;
+        float mass = acc->get_accumulated_volume() * params.filament_density;
+        float weight = mass * params.gravity_constant;
 
+        float distance_from_last_support_point = params.min_distance_between_support_points * 2.0f;
         for (size_t line_idx : acc_lines.second) {
             const ExtrusionLine &line = checked_lines[line_idx];
+            distance_from_last_support_point += line.len;
 
             Vec3f extruder_pressure_direction = to_3d(Vec2f(line.b - line.a), 0.0f).normalized();
             Vec2f pivot_site_search = line.b + extruder_pressure_direction.head<2>() * 1000.0f;
@@ -457,7 +454,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
             std::cout << "weight_torque: " << weight_torque << std::endl;
 
             float bed_movement_arm = centroid.z() - acc->get_base_height();
-            float bed_movement_force = params.max_acceleration * weight;
+            float bed_movement_force = params.max_acceleration * mass;
             float bed_movement_torque = bed_movement_force * bed_movement_arm;
 
             std::cout << "bed_movement_arm: " << bed_movement_arm << std::endl;
@@ -475,8 +472,9 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
             std::cout << "total_torque: " << total_torque << "   printz: " << print_z << std::endl;
 
             if (total_torque > 0) {
-                acc->add_support_point(Point::new_scale(line.b), params.support_points_interface_area);
+                acc->add_support_point(Point::new_scale(line.b), std::min(params.support_points_interface_area, (pivot - line.b).squaredNorm()));
                 issues.supports_nedded.emplace_back(to_3d(line.b, print_z), extruder_conflict_torque - sticking_torque);
+                distance_from_last_support_point = 0.0f;
             }
 
         }
@@ -485,8 +483,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
 
 Issues check_object_stability(const PrintObject *po, const Params &params) {
 #ifdef DEBUG_FILES
-    FILE *eacc = boost::nowide::fopen(debug_out_path("emerging_accumulators.obj").c_str(), "w");
-    FILE *facc = boost::nowide::fopen(debug_out_path("final_accumulators.obj").c_str(), "w");
+    FILE *debug_acc = boost::nowide::fopen(debug_out_path("accumulators.obj").c_str(), "w");
 #endif
     StabilityAccumulators stability_accs;
     LayerLinesDistancer prev_layer_lines { { } };
@@ -548,15 +545,11 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
 
 #ifdef DEBUG_FILES
     for (const auto &line : checked_lines) {
-        Vec3f ecolor = stability_accs.get_emerging_color(line.stability_accumulator_id);
-        fprintf(eacc, "v %f %f %f  %f %f %f\n", line.b[0],
-                line.b[1], base_print_z, ecolor[0], ecolor[1], ecolor[2]);
-
-        Vec3f fcolor = stability_accs.get_final_color(line.stability_accumulator_id);
-        fprintf(facc, "v %f %f %f  %f %f %f\n", line.b[0],
-                line.b[1], base_print_z, fcolor[0], fcolor[1], fcolor[2]);
+        Vec3f color = stability_accs.get_accumulator_color(line.stability_accumulator_id);
+        fprintf(debug_acc, "v %f %f %f  %f %f %f\n", line.b[0],
+                line.b[1], base_print_z, color[0], color[1], color[2]);
     }
-#endif DEBUG_FILES
+#endif
 
     //MERGE BASE LAYER STABILITY ACCS
     prev_layer_lines = LayerLinesDistancer { std::move(checked_lines) };
@@ -564,7 +557,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
         size_t nearest_line_idx;
         Vec2f nearest_pt;
         float dist = prev_layer_lines.signed_distance_from_lines(l.a, nearest_line_idx, nearest_pt);
-        if (std::abs(dist) < max_flow_width) {
+        if (std::abs(dist) < max_flow_width*1.1f) {
             size_t other_line_acc_id = prev_layer_lines.get_line(nearest_line_idx).stability_accumulator_id;
             size_t from_id = std::max(other_line_acc_id, l.stability_accumulator_id);
             size_t to_id = std::min(other_line_acc_id, l.stability_accumulator_id);
@@ -646,20 +639,15 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
 
 #ifdef DEBUG_FILES
         for (const auto &line : prev_layer_lines.get_lines()) {
-            Vec3f ecolor = stability_accs.get_emerging_color(line.stability_accumulator_id);
-            fprintf(eacc, "v %f %f %f  %f %f %f\n", line.b[0],
-                    line.b[1], print_z, ecolor[0], ecolor[1], ecolor[2]);
-
-            Vec3f fcolor = stability_accs.get_final_color(line.stability_accumulator_id);
-            fprintf(facc, "v %f %f %f  %f %f %f\n", line.b[0],
-                    line.b[1], print_z, fcolor[0], fcolor[1], fcolor[2]);
+            Vec3f color = stability_accs.get_accumulator_color(line.stability_accumulator_id);
+            fprintf(debug_acc, "v %f %f %f  %f %f %f\n", line.b[0],
+                    line.b[1], print_z, color[0], color[1], color[2]);
         }
 #endif
     }
 
 #ifdef DEBUG_FILES
-    fclose(eacc);
-    fclose(facc);
+    fclose(debug_acc);
 #endif
 
     std::cout << " SUPP: " << issues.supports_nedded.size() << std::endl;

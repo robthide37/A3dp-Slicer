@@ -20,7 +20,7 @@ public:
 
     TriangleSelectorWrapper(const TriangleMesh &mesh);
 
-    void enforce_spot(const Vec3f &point, float radius);
+    void enforce_spot(const Vec3f &point, const Vec3f& origin, float radius);
 
 };
 
