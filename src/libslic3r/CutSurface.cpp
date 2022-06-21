@@ -11,7 +11,7 @@
 /// reduction.off - Visualization of reduced and non-reduced Vertices
 /// aois/cutAOI{N}.obj - Cuted Area of interest from corefined model
 /// cuts/cut{N}.obj - Filtered surface cuts + Reduced vertices made by e2 (text_edge_2)
-#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
+//#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
 
 using namespace Slic3r;
 
