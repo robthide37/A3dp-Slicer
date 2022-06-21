@@ -1651,11 +1651,7 @@ void GLCanvas3D::render()
     wxGetApp().imgui()->new_frame();
 
     if (m_picking_enabled) {
-#if ENABLE_NEW_RECTANGLE_SELECTION
         if (m_rectangle_selection.is_dragging() && !m_rectangle_selection.is_empty())
-#else
-        if (m_rectangle_selection.is_dragging())
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
             // picking pass using rectangle selection
             _rectangular_selection_picking_pass();
         else if (!m_volumes.empty())
@@ -2952,13 +2948,8 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                         _update_selection_from_hover();
                         m_rectangle_selection.stop_dragging();
                         m_mouse.ignore_left_up = true;
-#if !ENABLE_NEW_RECTANGLE_SELECTION
-                        m_dirty = true;
-#endif // !ENABLE_NEW_RECTANGLE_SELECTION
                     }
-#if ENABLE_NEW_RECTANGLE_SELECTION
                     m_dirty = true;
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
 //                    set_cursor(Standard);
                 }
                 else if (keyCode == WXK_ALT) {
@@ -3015,9 +3006,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                         m_mouse.ignore_left_up = false;
 //                        set_cursor(Cross);
                     }
-#if ENABLE_NEW_RECTANGLE_SELECTION
                     m_dirty = true;
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
                 }
                 else if (keyCode == WXK_ALT) {
                     if (m_picking_enabled && (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports)) {
@@ -3439,19 +3428,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             m_layers_editing.state = LayersEditing::Editing;
             _perform_layer_editing_action(&evt);
         }
-#if !ENABLE_NEW_RECTANGLE_SELECTION
-        else if (evt.LeftDown() && (evt.ShiftDown() || evt.AltDown()) && m_picking_enabled) {
-            if (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports
-             && m_gizmos.get_current_type() != GLGizmosManager::FdmSupports
-             && m_gizmos.get_current_type() != GLGizmosManager::Seam
-             && m_gizmos.get_current_type() != GLGizmosManager::MmuSegmentation) {
-                m_rectangle_selection.start_dragging(m_mouse.position, evt.ShiftDown() ? GLSelectionRectangle::Select : GLSelectionRectangle::Deselect);
-                m_dirty = true;
-            }
-        }
-#endif // !ENABLE_NEW_RECTANGLE_SELECTION
         else {
-#if ENABLE_NEW_RECTANGLE_SELECTION
             const bool rectangle_selection_dragging = m_rectangle_selection.is_dragging();
             if (evt.LeftDown() && (evt.ShiftDown() || evt.AltDown()) && m_picking_enabled) {
                 if (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports &&
@@ -3462,39 +3439,23 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     m_dirty = true;
                 }
             }
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
 
             // Select volume in this 3D canvas.
             // Don't deselect a volume if layer editing is enabled or any gizmo is active. We want the object to stay selected
             // during the scene manipulation.
 
-#if ENABLE_NEW_RECTANGLE_SELECTION
             if (m_picking_enabled && (!any_gizmo_active || !evt.CmdDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) && !rectangle_selection_dragging) {
-#else
-            if (m_picking_enabled && (!any_gizmo_active || !evt.CmdDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled())) {
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
                 if (evt.LeftDown() && !m_hover_volume_idxs.empty()) {
                     int volume_idx = get_first_hover_volume_idx();
                     bool already_selected = m_selection.contains_volume(volume_idx);
-#if ENABLE_NEW_RECTANGLE_SELECTION
                     bool shift_down = evt.ShiftDown();
-#else
-                    bool ctrl_down = evt.CmdDown();
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
 
                     Selection::IndicesList curr_idxs = m_selection.get_volume_idxs();
 
-#if ENABLE_NEW_RECTANGLE_SELECTION
                     if (already_selected && shift_down)
                         m_selection.remove(volume_idx);
                     else {
                         m_selection.add(volume_idx, !shift_down, true);
-#else
-                    if (already_selected && ctrl_down)
-                        m_selection.remove(volume_idx);
-                    else {
-                        m_selection.add(volume_idx, !ctrl_down, true);
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
                         m_mouse.drag.move_requires_threshold = !already_selected;
                         if (already_selected)
                             m_mouse.set_move_start_threshold_position_2D_as_invalid();
@@ -3516,11 +3477,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 }
             }
 
-#if ENABLE_NEW_RECTANGLE_SELECTION
             if (!m_hover_volume_idxs.empty() && !m_rectangle_selection.is_dragging()) {
-#else
-            if (!m_hover_volume_idxs.empty()) {
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
                 if (evt.LeftDown() && m_moving_enabled && m_mouse.drag.move_volume_idx == -1) {
                     // Only accept the initial position, if it is inside the volume bounding box.
                     const int volume_idx = get_first_hover_volume_idx();
@@ -3597,13 +3554,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
     }
     else if (evt.Dragging() && evt.LeftIsDown() && m_picking_enabled && m_rectangle_selection.is_dragging()) {
-#if ENABLE_NEW_RECTANGLE_SELECTION
         // keeps the mouse position updated while dragging the selection rectangle
         m_mouse.position = pos.cast<double>();
         m_rectangle_selection.dragging(m_mouse.position);
-#else
-        m_rectangle_selection.dragging(pos.cast<double>());
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
         m_dirty = true;
     }
     else if (evt.Dragging()) {
@@ -6593,10 +6546,6 @@ void GLCanvas3D::_update_volumes_hover_state()
         return;
     }
 
-#if !ENABLE_NEW_RECTANGLE_SELECTION
-    bool selection_modifiers_only = m_selection.is_empty() || m_selection.is_any_modifier();
-#endif // !ENABLE_NEW_RECTANGLE_SELECTION
-
     bool hover_modifiers_only = true;
     for (int i : m_hover_volume_idxs) {
         if (!m_volumes.volumes[i]->is_modifier) {
@@ -6624,14 +6573,8 @@ void GLCanvas3D::_update_volumes_hover_state()
         if (volume.hover != GLVolume::HS_None)
             continue;
 
-#if ENABLE_NEW_RECTANGLE_SELECTION
         bool deselect = volume.selected && ((shift_pressed && m_rectangle_selection.is_empty()) || (alt_pressed && !m_rectangle_selection.is_empty()));
         bool select   = !volume.selected && (m_rectangle_selection.is_empty() || (shift_pressed && !m_rectangle_selection.is_empty()));
-#else
-        bool deselect = volume.selected && ((ctrl_pressed && !shift_pressed) || alt_pressed);
-        // (volume->is_modifier && !selection_modifiers_only && !is_ctrl_pressed) -> allows hovering on selected modifiers belonging to selection of type Instance
-        bool select = (!volume.selected || (volume.is_modifier && !selection_modifiers_only && !ctrl_pressed)) && !alt_pressed;
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
 
         if (select || deselect) {
             bool as_volume =
@@ -7566,42 +7509,38 @@ void GLCanvas3D::_update_selection_from_hover()
         }
     }
 
-#if ENABLE_NEW_RECTANGLE_SELECTION
     if (!m_rectangle_selection.is_empty()) {
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
-    if (state == GLSelectionRectangle::EState::Select) {
-        bool contains_all = true;
-        for (int i : m_hover_volume_idxs) {
-            if (!m_selection.contains_volume((unsigned int)i)) {
-                contains_all = false;
-                break;
+        if (state == GLSelectionRectangle::EState::Select) {
+            bool contains_all = true;
+            for (int i : m_hover_volume_idxs) {
+                if (!m_selection.contains_volume((unsigned int)i)) {
+                    contains_all = false;
+                    break;
+                }
+            }
+
+            // the selection is going to be modified (Add)
+            if (!contains_all) {
+                wxGetApp().plater()->take_snapshot(_L("Selection-Add from rectangle"), UndoRedo::SnapshotType::Selection);
+                selection_changed = true;
             }
         }
+        else {
+            bool contains_any = false;
+            for (int i : m_hover_volume_idxs) {
+                if (m_selection.contains_volume((unsigned int)i)) {
+                    contains_any = true;
+                    break;
+                }
+            }
 
-        // the selection is going to be modified (Add)
-        if (!contains_all) {
-            wxGetApp().plater()->take_snapshot(_L("Selection-Add from rectangle"), UndoRedo::SnapshotType::Selection);
-            selection_changed = true;
-        }
-    }
-    else {
-        bool contains_any = false;
-        for (int i : m_hover_volume_idxs) {
-            if (m_selection.contains_volume((unsigned int)i)) {
-                contains_any = true;
-                break;
+            // the selection is going to be modified (Remove)
+            if (contains_any) {
+                wxGetApp().plater()->take_snapshot(_L("Selection-Remove from rectangle"), UndoRedo::SnapshotType::Selection);
+                selection_changed = true;
             }
         }
-
-        // the selection is going to be modified (Remove)
-        if (contains_any) {
-            wxGetApp().plater()->take_snapshot(_L("Selection-Remove from rectangle"), UndoRedo::SnapshotType::Selection);
-            selection_changed = true;
-        }
     }
-#if ENABLE_NEW_RECTANGLE_SELECTION
-    }
-#endif // ENABLE_NEW_RECTANGLE_SELECTION
 
     if (!selection_changed)
         return;
