@@ -149,7 +149,7 @@ static inline int parse_int(const char *&line)
     char *endptr = nullptr;
     long result = strtol(line, &endptr, 10);
     if (endptr == nullptr || !is_ws_or_eol(*endptr))
-        throw Slic3r::RuntimeError("PressureEqualizer: Error parsing an int");
+        throw Slic3r::InvalidArgument("PressureEqualizer: Error parsing an int");
     line = endptr;
     return int(result);
 };
@@ -212,7 +212,16 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
     // Parse the G-code line, store the result into the buf.
     switch (toupper(*line ++)) {
     case 'G': {
-        int gcode = parse_int(line);
+        int gcode = -1;
+        try {
+            gcode = parse_int(line);
+        } catch (Slic3r::InvalidArgument &ex) {
+            // Ignore invalid GCodes.
+            eatws(line);
+            break;
+        }
+
+        assert(gcode != -1);
         eatws(line);
         switch (gcode) {
         case 0:
@@ -223,7 +232,7 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
             memcpy(new_pos, m_current_pos, sizeof(float)*5);
             bool  changed[5] = { false, false, false, false, false };
             while (!is_eol(*line)) {
-                char axis = toupper(*line++);
+                const char axis = toupper(*line++);
                 int  i = -1;
                 switch (axis) {
                 case 'X':
@@ -238,16 +247,16 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
                     i = 4;
                     break;
                 default:
-                    assert(false);
+                    break;
                 }
-                if (i == -1)
-                    throw Slic3r::RuntimeError(std::string("GCode::PressureEqualizer: Invalid axis for G0/G1: ") + axis);
-                buf.pos_provided[i] = true;
-                new_pos[i] = parse_float(line, line_end - line);
-                if (i == 3 && m_use_relative_e_distances)
-                    new_pos[i] += m_current_pos[i];
-                changed[i] = new_pos[i] != m_current_pos[i];
-                eatws(line);
+                if (i != -1) {
+                    buf.pos_provided[i] = true;
+                    new_pos[i] = parse_float(line, line_end - line);
+                    if (i == 3 && m_use_relative_e_distances)
+                        new_pos[i] += m_current_pos[i];
+                    changed[i] = new_pos[i] != m_current_pos[i];
+                    eatws(line);
+                }
             }
             if (changed[3]) {
                 // Extrusion, retract or unretract.
@@ -297,26 +306,22 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
             // G92 : Set Position
             // Set a logical coordinate position to a new value without actually moving the machine motors.
             // Which axes to set?
-            [[maybe_unused]]bool set = false;
             while (!is_eol(*line)) {
-                char axis = toupper(*line++);
+                const char axis = toupper(*line++);
                 switch (axis) {
                 case 'X':
                 case 'Y':
                 case 'Z':
                     m_current_pos[axis - 'X'] = (!is_ws_or_eol(*line)) ? parse_float(line, line_end - line) : 0.f;
-                    set = true;
                     break;
                 case 'E':
                     m_current_pos[3] = (!is_ws_or_eol(*line)) ? parse_float(line, line_end - line) : 0.f;
-                    set = true;
                     break;
                 default:
-                    throw Slic3r::RuntimeError(std::string("GCode::PressureEqualizer: Incorrect axis in a G92 G-code: ") + axis);
+                    break;
                 }
                 eatws(line);
             }
-            assert(set);
             break;
         }
         case 10:
@@ -338,7 +343,6 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
         break;
     }
     case 'M': {
-        /*int mcode = */parse_int(line);
         eatws(line);
         // Ignore the rest of the M-codes.
         break;
