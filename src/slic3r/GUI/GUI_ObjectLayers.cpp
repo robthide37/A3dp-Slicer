@@ -427,16 +427,13 @@ coordf_t LayerRangeEditor::get_value()
     const char dec_sep = is_decimal_separator_point() ? '.' : ',';
     const char dec_sep_alt = dec_sep == '.' ? ',' : '.';
     // Replace the first incorrect separator in decimal number.
-    if (str.Replace(dec_sep_alt, dec_sep, false) != 0)
-        SetValue(str);
+    str.Replace(dec_sep_alt, dec_sep, false);
 
     if (str == ".")
         layer_height = 0.0;
-    else {
-        if (!str.ToDouble(&layer_height) || layer_height < 0.0f) {
-            show_error(m_parent, _L("Invalid numeric input."));
-            SetValue(double_to_string(layer_height));
-        }
+    else if (!str.ToDouble(&layer_height) || layer_height < 0.0f) {
+        show_error(m_parent, _L("Invalid numeric input."));
+        assert(m_valid_value.ToDouble(&layer_height));
     }
 
     return layer_height;
