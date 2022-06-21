@@ -1,5 +1,7 @@
 #include "EmbossJob.hpp"
 
+#include <stdexcept>
+
 #include <libslic3r/Model.hpp>
 #include <libslic3r/Format/OBJ.hpp> // load_obj for default mesh
 #include <libslic3r/CutSurface.hpp> // use surface cuts
@@ -104,12 +106,10 @@ static Emboss::OrthoProject3f create_emboss_projection(
 static void create_message(const std::string &message); // only in finalize
 static bool process(std::exception_ptr &eptr);
 
-class EmbossJobException: public std::exception {
-public: EmbossJobException(char const *const message)
-        : std::exception(message)
-    {}
-};
-}
+class EmbossJobException : public std::runtime_error 
+{ public: EmbossJobException(const char* message):runtime_error(message){}};
+
+}// namespace priv
 
 /////////////////
 /// Create Volume
