@@ -45,6 +45,8 @@ TEST_CASE("Cut character from surface", "[]")
     // its_write_obj(its, "C:/data/temp/projected.obj");
 }
 
+#ifdef DEBUG_3MF
+
 // Test load of 3mf
 #include "libslic3r/Format/3mf.hpp"
 #include "libslic3r/Model.hpp"
@@ -114,11 +116,11 @@ TEST_CASE("CutSurface in 3mf", "[]")
     ConfigSubstitutionContext ctxt{ForwardCompatibilitySubstitutionRule::Disable};
     CHECK(load_3mf(path_to_3mf.c_str(), config, ctxt, &model, false));
     CHECK(object_id >= 0);
-    CHECK(object_id < model.objects.size());
+    CHECK((size_t)object_id < model.objects.size());
     ModelObject* mo = model.objects[object_id];
     CHECK(mo != nullptr);
     CHECK(text_volume_id >= 0);
-    CHECK(text_volume_id < mo->volumes.size());
+    CHECK((size_t)text_volume_id < mo->volumes.size());
     ModelVolume *mv_text = mo->volumes[text_volume_id];
     CHECK(mv_text != nullptr);
     CHECK(mv_text->text_configuration.has_value());
@@ -154,3 +156,4 @@ TEST_CASE("CutSurface in 3mf", "[]")
     float projection_ratio = -z_range.first / (z_range.second - z_range.first);
     cut_surface(its, shapes, projection, projection_ratio);
 }
+#endif // DEBUG_3MF
