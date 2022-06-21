@@ -215,7 +215,7 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
         int gcode = -1;
         try {
             gcode = parse_int(line);
-        } catch (Slic3r::InvalidArgument &ex) {
+        } catch (Slic3r::InvalidArgument &) {
             // Ignore invalid GCodes.
             eatws(line);
             break;
