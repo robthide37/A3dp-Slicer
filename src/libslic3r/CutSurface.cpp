@@ -748,19 +748,7 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
     
     // Self Intersection of surface cuts
     // It is made by damaged models and multi volumes
-
-    priv::merge_intersections(result);
-    
-    //    std::vector<size_t> best_cut_indices;
-    //    for (size_t i = 0; i < cutAOIs.size(); ++i)
-    //        if (is_best_cut[i]) best_cut_indices.push_back(i);
-    //
-    //    // cut off part + filtrate cutAOIs
-    //    priv::merge_cuts(cutAOIs, cgal_model, best_cut_indices);
-    //#ifdef DEBUG_OUTPUT_DIR
-    //    priv::store(cutAOIs, cgal_model, DEBUG_OUTPUT_DIR + "merged-aois/");
-    //    // only debug
-    //#endif // DEBUG_OUTPUT_DIR
+    //priv::merge_intersections(result);
 
     // TODO: fill skipped source triangles to surface of cut
     return merge(std::move(result));
@@ -2275,39 +2263,6 @@ priv::ProjectionDistances priv::choose_best_distance(
     return result;
 }
 
-// store projection center as circle
-void priv::store(const Vec3f       &vertex,
-                 const Vec3f       &normal,
-                 const std::string &file,
-                 float              size)
-{
-    int flatten = 20;
-    size_t min_i = 0;
-    for (size_t i = 1; i < 3; i++)
-        if (normal[min_i] > normal[i]) 
-            min_i = i;
-    Vec3f up_ = Vec3f::Zero();
-    up_[min_i] = 1.f;
-    Vec3f side = normal.cross(up_).normalized() * size;
-    Vec3f up = side.cross(normal).normalized() * size;
-
-    indexed_triangle_set its;
-    its.vertices.reserve(flatten + 1);
-    its.indices.reserve(flatten);
-
-    its.vertices.push_back(vertex);
-    its.vertices.push_back(vertex + up);
-    size_t max_i = static_cast<size_t>(flatten);
-    for (size_t i = 1; i < max_i; i++) {
-        float angle = i * 2 * M_PI / flatten;
-        Vec3f v     = vertex + sin(angle) * side + cos(angle) * up;
-        its.vertices.push_back(v);
-        its.indices.emplace_back(0, i, i + 1);
-    }
-    its.indices.emplace_back(0, flatten, 1);
-    its_write_obj(its, file.c_str());
-}
-
 bool priv::merge_intersection(SurfaceCut &cut1, const SurfaceCut &cut2) {
     return false;
 }
@@ -2409,6 +2364,38 @@ SurfaceCuts priv::create_surface_cuts(const CutAOIs      &cuts,
 }
 
 #ifdef DEBUG_OUTPUT_DIR
+// store projection center as circle
+void priv::store(const Vec3f       &vertex,
+                 const Vec3f       &normal,
+                 const std::string &file,
+                 float              size)
+{
+    int    flatten = 20;
+    size_t min_i   = 0;
+    for (size_t i = 1; i < 3; i++)
+        if (normal[min_i] > normal[i]) min_i = i;
+    Vec3f up_  = Vec3f::Zero();
+    up_[min_i] = 1.f;
+    Vec3f side = normal.cross(up_).normalized() * size;
+    Vec3f up   = side.cross(normal).normalized() * size;
+
+    indexed_triangle_set its;
+    its.vertices.reserve(flatten + 1);
+    its.indices.reserve(flatten);
+
+    its.vertices.push_back(vertex);
+    its.vertices.push_back(vertex + up);
+    size_t max_i = static_cast<size_t>(flatten);
+    for (size_t i = 1; i < max_i; i++) {
+        float angle = i * 2 * M_PI / flatten;
+        Vec3f v     = vertex + sin(angle) * side + cos(angle) * up;
+        its.vertices.push_back(v);
+        its.indices.emplace_back(0, i, i + 1);
+    }
+    its.indices.emplace_back(0, flatten, 1);
+    its_write_obj(its, file.c_str());
+}
+
 void priv::store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string& file)
 {
     auto face_colors = mesh.add_property_map<priv::FI, CGAL::Color>("f:color").first;    
