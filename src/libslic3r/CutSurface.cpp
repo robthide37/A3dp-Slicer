@@ -2297,7 +2297,8 @@ void priv::store(const Vec3f       &vertex,
 
     its.vertices.push_back(vertex);
     its.vertices.push_back(vertex + up);
-    for (size_t i = 1; i < flatten; i++) {
+    size_t max_i = static_cast<size_t>(flatten);
+    for (size_t i = 1; i < max_i; i++) {
         float angle = i * 2 * M_PI / flatten;
         Vec3f v     = vertex + sin(angle) * side + cos(angle) * up;
         its.vertices.push_back(v);
