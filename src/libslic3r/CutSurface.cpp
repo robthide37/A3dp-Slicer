@@ -2620,6 +2620,7 @@ void priv::store(const SurfaceCuts &cut, const std::string &dir) {
             }
             // triangle with indices vi1 and vi2 doesnt exist
             assert(false);
+            return Vec3f::Zero();
         };
 
         indexed_triangle_set result;
