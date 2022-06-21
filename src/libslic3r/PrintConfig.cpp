@@ -4007,8 +4007,7 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         "standby_temperature", "scale", "rotate", "duplicate", "duplicate_grid",
         "start_perimeters_at_concave_points", "start_perimeters_at_non_overhang", "randomize_start",
         "seal_position", "vibration_limit", "bed_size",
-        "print_center", "g0", "threads", "pressure_advance", "wipe_tower_per_color_wipe"
-        , "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative",
+        "print_center", "g0", "threads", "pressure_advance", "wipe_tower_per_color_wipe",
         "serial_port", "serial_speed",
         // Introduced in some PrusaSlicer 2.3.1 alpha, later renamed or removed.
         "fuzzy_skin_perimeter_mode", "fuzzy_skin_shape",
