@@ -127,6 +127,7 @@ void GLGizmoMeasure::on_render()
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glEnable(GL_BLEND));
+    glsafe(::glLineWidth(5.f));
 
     if (selection.is_single_full_instance()) {
         const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
@@ -227,15 +228,14 @@ void GLGizmoMeasure::update_planes()
 
     // Now we'll go through all the facets and append Points of facets sharing the same normal.
     // This part is still performed in mesh coordinate system.
-    const int                num_of_facets  = ch.facets_count();
-    std::vector<size_t>      face_to_plane(num_of_facets, 0);
+    const size_t             num_of_facets  = ch.facets_count();
+    std::vector<size_t>      face_to_plane(num_of_facets, size_t(-1));
     const std::vector<Vec3f> face_normals   = its_face_normals(ch.its);
     const std::vector<Vec3i> face_neighbors = its_face_neighbors(ch.its);
     std::vector<int>         facet_queue(num_of_facets, 0);
-    std::vector<bool>        facet_visited(num_of_facets, false);
     int                      facet_queue_cnt = 0;
     const stl_normal*        normal_ptr      = nullptr;
-    int facet_idx = 0;
+    size_t seed_facet_idx = 0;
 
     auto is_same_normal = [](const stl_normal& a, const stl_normal& b) -> bool {
         return (std::abs(a(0) - b(0)) < 0.001 && std::abs(a(1) - b(1)) < 0.001 && std::abs(a(2) - b(2)) < 0.001);
@@ -243,16 +243,15 @@ void GLGizmoMeasure::update_planes()
 
     while (1) {
         // Find next unvisited triangle:
-        for (; facet_idx < num_of_facets; ++ facet_idx)
-            if (!facet_visited[facet_idx]) {
-                facet_queue[facet_queue_cnt ++] = facet_idx;
-                facet_visited[facet_idx] = true;
-                normal_ptr = &face_normals[facet_idx];
-                face_to_plane[facet_idx] = m_planes.size();
+        for (; seed_facet_idx < num_of_facets; ++ seed_facet_idx)
+            if (face_to_plane[seed_facet_idx] == size_t(-1)) {
+                facet_queue[facet_queue_cnt ++] = seed_facet_idx;
+                normal_ptr = &face_normals[seed_facet_idx];
+                face_to_plane[seed_facet_idx] = m_planes.size();
                 m_planes.emplace_back();                
                 break;
             }
-        if (facet_idx == num_of_facets)
+        if (seed_facet_idx == num_of_facets)
             break; // Everything was visited already
 
         while (facet_queue_cnt > 0) {
@@ -260,70 +259,69 @@ void GLGizmoMeasure::update_planes()
             const stl_normal& this_normal = face_normals[facet_idx];
             if (is_same_normal(this_normal, *normal_ptr)) {
                 const Vec3i& face = ch.its.indices[facet_idx];
-                for (int j=0; j<3; ++j)
-                    m_planes.back().vertices.emplace_back(ch.its.vertices[face[j]].cast<double>());
 
-                facet_visited[facet_idx] = true;
                 face_to_plane[facet_idx] = m_planes.size() - 1;
+                m_planes.back().facets.emplace_back(facet_idx);
                 for (int j = 0; j < 3; ++ j)
-                    if (int neighbor_idx = face_neighbors[facet_idx][j]; neighbor_idx >= 0 && ! facet_visited[neighbor_idx])
+                    if (int neighbor_idx = face_neighbors[facet_idx][j]; neighbor_idx >= 0 && face_to_plane[neighbor_idx] == size_t(-1))
                         facet_queue[facet_queue_cnt ++] = neighbor_idx;
             }
         }
-        m_planes.back().normal = normal_ptr->cast<double>();
 
-        Pointf3s& verts = m_planes.back().vertices;
-        // Now we'll transform all the points into world coordinates, so that the areas, angles and distances
-        // make real sense.
-        verts = transform(verts, inst_matrix);
+        m_planes.back().normal = normal_ptr->cast<double>();
     }
+
+    assert(std::none_of(face_to_plane.begin(), face_to_plane.end(), [](size_t val) { return val == size_t(-1); }));
+
+    SurfaceMesh sm(ch.its);
+    for (int plane_id=0; plane_id < m_planes.size(); ++plane_id) {
+    //int plane_id = 5; {
+        const auto& facets = m_planes[plane_id].facets;
+        std::vector<stl_vertex> pts;
+        for (int face_id=0; face_id<facets.size(); ++face_id) {
+            assert(face_to_plane[facets[face_id]] == plane_id);
+
+            int j = 0;
+            for (j=0; j<3; ++j)
+                if (face_to_plane[face_neighbors[facets[face_id]][j]] != plane_id)
+                    break;
+            if (j == 3)
+                continue;
+            Halfedge_index he = sm.halfedge(Face_index(facets[face_id]));
+            for (int i=0; i<j; ++i)
+                he = sm.next(he);
+            
+            // he is the first halfedge on the border. Now walk around and append the points.
+            const Halfedge_index he_orig = he;
+            m_planes[plane_id].borders.emplace_back(std::vector<Vec3d>{ sm.point(sm.source(he)).cast<double>() });
+            Vertex_index target = sm.target(he);
+            const Halfedge_index he_start = he;
+
+            do {
+                const Halfedge_index he_orig = he;
+                he = sm.next_around_target(he);
+                while ( face_to_plane[sm.face(he)] == plane_id && he != he_orig)
+                    he = sm.next_around_target(he);
+                he = sm.opposite(he);
+                m_planes[plane_id].borders.back().emplace_back(sm.point(sm.source(he)).cast<double>());
+            } while (he != he_start);
+        }
+    }
+
+
+    // DEBUGGING:
+    //m_planes.erase(std::remove_if(m_planes.begin(), m_planes.end(), [](const PlaneData& p) { return p.borders.empty(); }), m_planes.end());
+
+
+
+
 
     // Let's prepare transformation of the normal vector from mesh to instance coordinates.
     Geometry::Transformation t(inst_matrix);
     Vec3d scaling = t.get_scaling_factor();
     t.set_scaling_factor(Vec3d(1./scaling(0), 1./scaling(1), 1./scaling(2)));
 
-    // Now we'll go through all the polygons, transform the points into xy plane to process them:
-    for (unsigned int polygon_id=0; polygon_id < m_planes.size(); ++polygon_id) {
-        Pointf3s& polygon = m_planes[polygon_id].vertices;
-        const Vec3d& normal = m_planes[polygon_id].normal;
-
-        // transform the normal according to the instance matrix:
-        Vec3d normal_transformed = t.get_matrix() * normal;
-
-        // We are going to rotate about z and y to flatten the plane
-        Eigen::Quaterniond q;
-        Transform3d m = Transform3d::Identity();
-        m.matrix().block(0, 0, 3, 3) = q.setFromTwoVectors(normal_transformed, Vec3d::UnitZ()).toRotationMatrix();
-        polygon = transform(polygon, m);
-
-        // Now to remove the inner points. We'll misuse Geometry::convex_hull for that, but since
-        // it works in fixed point representation, we will rescale the polygon to avoid overflows.
-        // And yes, it is a nasty thing to do. Whoever has time is free to refactor.
-        Vec3d bb_size = BoundingBoxf3(polygon).size();
-        float sf = std::min(1./bb_size(0), 1./bb_size(1));
-        Transform3d tr = Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), Vec3d(sf, sf, 1.f));
-        polygon = transform(polygon, tr);
-        polygon = Slic3r::Geometry::convex_hull(polygon);
-        polygon = transform(polygon, tr.inverse());
-
-        // We will shrink the polygon a little bit so it does not touch the object edges:
-        Vec3d centroid = std::accumulate(polygon.begin(), polygon.end(), Vec3d(0.0, 0.0, 0.0));
-        centroid /= (double)polygon.size();
-        for (auto& vertex : polygon)
-            vertex = 0.95f*vertex + 0.05f*centroid;
-
-        // Raise a bit above the object surface to avoid flickering:
-        for (auto& b : polygon)
-            b(2) += 0.1f;
-
-        // Transform back to 3D (and also back to mesh coordinates)
-        polygon = transform(polygon, inst_matrix.inverse() * m.inverse());
-    }
-
-    // We'll sort the planes by area and only keep the 254 largest ones (because of the picking pass limitations):
-    std::sort(m_planes.rbegin(), m_planes.rend(), [](const PlaneData& a, const PlaneData& b) { return a.area < b.area; });
-    m_planes.resize(std::min((int)m_planes.size(), 254));
+    
 
     // Planes are finished - let's save what we calculated it from:
     m_volumes_matrices.clear();
@@ -339,21 +337,23 @@ void GLGizmoMeasure::update_planes()
     // And finally create respective VBOs. The polygon is convex with
     // the vertices in order, so triangulation is trivial.
     for (auto& plane : m_planes) {
-        GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::TriangleFan, GLModel::Geometry::EVertexLayout::P3N3 };
-        init_data.reserve_vertices(plane.vertices.size());
-        init_data.reserve_indices(plane.vertices.size());
-        // vertices + indices
-        for (size_t i = 0; i < plane.vertices.size(); ++i) {
-            init_data.add_vertex((Vec3f)plane.vertices[i].cast<float>(), (Vec3f)plane.normal.cast<float>());
-            init_data.add_index((unsigned int)i);
+        for (auto& vertices : plane.borders) {
+            GLModel::Geometry init_data;
+            init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3N3 };
+            init_data.reserve_vertices(vertices.size());
+            init_data.reserve_indices(vertices.size());
+            // vertices + indices
+            for (size_t i = 0; i < vertices.size(); ++i) {
+                init_data.add_vertex((Vec3f)vertices[i].cast<float>(), (Vec3f)plane.normal.cast<float>());
+                init_data.add_index((unsigned int)i);
+            }
+            plane.vbo.init_from(std::move(init_data));
         }
-        plane.vbo.init_from(std::move(init_data));
 
         // FIXME: vertices should really be local, they need not
         // persist now when we use VBOs
-        plane.vertices.clear();
-        plane.vertices.shrink_to_fit();
+        plane.borders.clear();
+        plane.borders.shrink_to_fit();
     }
 
     m_planes_valid = true;
