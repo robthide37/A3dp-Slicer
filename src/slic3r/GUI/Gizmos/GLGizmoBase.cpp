@@ -338,8 +338,7 @@ void GLGizmoBase::unregister_grabbers_for_picking()
         m_grabbers[i].unregister_raycasters_for_picking();
     }
 }
-#endif // ENABLE_RAYCAST_PICKING
-
+#else
 ColorRGBA GLGizmoBase::picking_color_component(unsigned int id) const
 {
     id = BASE_ID - id;
@@ -348,6 +347,7 @@ ColorRGBA GLGizmoBase::picking_color_component(unsigned int id) const
 
     return picking_decode(id);
 }
+#endif // ENABLE_RAYCAST_PICKING
 
 void GLGizmoBase::render_grabbers(const BoundingBoxf3& box) const
 {

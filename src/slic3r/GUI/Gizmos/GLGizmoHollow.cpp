@@ -214,7 +214,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
                        m_c->hollowed_mesh()->get_drainholes()[i].failed) {
                 render_color = { 1.0f, 0.0f, 0.0f, 0.5f };
             }
-            else  // neither hover nor picking
+            else 
                 render_color = point_selected ? ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
 #if !ENABLE_RAYCAST_PICKING
         }

@@ -241,11 +241,11 @@ protected:
     void unregister_grabbers_for_picking();
     virtual void on_register_raycasters_for_picking() {}
     virtual void on_unregister_raycasters_for_picking() {}
-#endif // ENABLE_RAYCAST_PICKING
-
+#else
     // Returns the picking color for the given id, based on the BASE_ID constant
     // No check is made for clashing with other picking color (i.e. GLVolumes)
     ColorRGBA picking_color_component(unsigned int id) const;
+#endif // ENABLE_RAYCAST_PICKING
 
     void render_grabbers(const BoundingBoxf3& box) const;
     void render_grabbers(float size) const;

@@ -1717,7 +1717,7 @@ void GLCanvas3D::render()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_RAYCAST_PICKING_DEBUG
-    if (m_picking_enabled && !m_mouse.dragging)
+    if (m_picking_enabled && !m_mouse.dragging && !m_gizmos.is_dragging())
         m_scene_raycaster.render_hit(camera);
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 
@@ -5603,6 +5603,11 @@ void GLCanvas3D::_picking_pass()
 }
 #endif // ENABLE_RAYCAST_PICKING
 
+#if ENABLE_RAYCAST_PICKING
+void GLCanvas3D::_rectangular_selection_picking_pass()
+{
+}
+#else
 void GLCanvas3D::_rectangular_selection_picking_pass()
 {
     m_gizmos.set_hover_id(-1);
@@ -5621,10 +5626,8 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
 
         _render_volumes_for_picking();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_RAYCAST_PICKING
         const Camera& camera = wxGetApp().plater()->get_camera();
         _render_bed_for_picking(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward());
-#endif // !ENABLE_RAYCAST_PICKING
 #else
         _render_bed_for_picking(!wxGetApp().plater()->get_camera().is_looking_downward());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -5686,6 +5689,7 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
     m_hover_volume_idxs.assign(idxs.begin(), idxs.end());
     _update_volumes_hover_state();
 }
+#endif // ENABLE_RAYCAST_PICKING
 
 void GLCanvas3D::_render_background()
 {
@@ -6085,6 +6089,7 @@ void GLCanvas3D::_render_overlays()
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
+#if !ENABLE_RAYCAST_PICKING
 void GLCanvas3D::_render_volumes_for_picking() const
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -6136,6 +6141,7 @@ void GLCanvas3D::_render_volumes_for_picking() const
 
     glsafe(::glEnable(GL_CULL_FACE));
 }
+#endif // !ENABLE_RAYCAST_PICKING
 
 void GLCanvas3D::_render_current_gizmo() const
 {
