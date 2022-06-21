@@ -40,7 +40,7 @@ private:
         Vec3d normal;
         float area;
 #if ENABLE_RAYCAST_PICKING
-        PickingId picking_id{ -1 };
+        int picking_id{ -1 };
 #endif // ENABLE_RAYCAST_PICKING
     };
 

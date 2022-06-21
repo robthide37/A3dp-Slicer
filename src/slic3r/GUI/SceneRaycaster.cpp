@@ -33,7 +33,7 @@ SceneRaycaster::SceneRaycaster() {
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 }
 
-std::shared_ptr<SceneRaycasterItem> SceneRaycaster::add_raycaster(EType type, PickingId id, const MeshRaycaster& raycaster, const Transform3d& trafo)
+std::shared_ptr<SceneRaycasterItem> SceneRaycaster::add_raycaster(EType type, int id, const MeshRaycaster& raycaster, const Transform3d& trafo)
 {
     switch (type) {
     case EType::Bed:    { return m_bed.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo)); }
@@ -43,7 +43,7 @@ std::shared_ptr<SceneRaycasterItem> SceneRaycaster::add_raycaster(EType type, Pi
     };
 }
 
-void SceneRaycaster::remove_raycasters(EType type, PickingId id)
+void SceneRaycaster::remove_raycasters(EType type, int id)
 {
     std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters(type);
     auto it = raycasters->begin();
@@ -186,13 +186,13 @@ std::vector<std::shared_ptr<SceneRaycasterItem>>* SceneRaycaster::get_raycasters
     return ret;
 }
 
-PickingId SceneRaycaster::base_id(EType type)
+int SceneRaycaster::base_id(EType type)
 {
     switch (type)
     {
-    case EType::Bed:    { return PickingId(EPickingIdBase::Bed); }
-    case EType::Volume: { return PickingId(EPickingIdBase::Volume); }
-    case EType::Gizmo:  { return PickingId(EPickingIdBase::Gizmo); }
+    case EType::Bed:    { return int(EIdBase::Bed); }
+    case EType::Volume: { return int(EIdBase::Volume); }
+    case EType::Gizmo:  { return int(EIdBase::Gizmo); }
     default:            { break; }
     };
 
@@ -200,15 +200,8 @@ PickingId SceneRaycaster::base_id(EType type)
     return -1;
 }
 
-PickingId SceneRaycaster::encode_id(EType type, PickingId id)
-{
-    return base_id(type) + id;
-}
-
-PickingId SceneRaycaster::decode_id(EType type, PickingId id)
-{
-    return id - base_id(type);
-}
+int SceneRaycaster::encode_id(EType type, int id) { return base_id(type) + id; }
+int SceneRaycaster::decode_id(EType type, int id) { return id - base_id(type); }
 
 } // namespace GUI
 } // namespace Slic3r

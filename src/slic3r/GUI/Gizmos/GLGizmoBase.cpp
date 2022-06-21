@@ -54,7 +54,7 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
 }
 
 #if ENABLE_RAYCAST_PICKING
-void GLGizmoBase::Grabber::register_raycasters_for_picking(PickingId id)
+void GLGizmoBase::Grabber::register_raycasters_for_picking(int id)
 {
     picking_id = id;
     // registration will happen on next call to render()

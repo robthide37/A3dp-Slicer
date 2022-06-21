@@ -659,10 +659,10 @@ public:
     void post_event(wxEvent &&event);
 
 #if ENABLE_RAYCAST_PICKING
-    std::shared_ptr<SceneRaycasterItem> add_raycaster_for_picking(SceneRaycaster::EType type, PickingId id, const MeshRaycaster& raycaster, const Transform3d& trafo) {
+    std::shared_ptr<SceneRaycasterItem> add_raycaster_for_picking(SceneRaycaster::EType type, int id, const MeshRaycaster& raycaster, const Transform3d& trafo) {
         return m_scene_raycaster.add_raycaster(type, id, raycaster, trafo);
     }
-    void remove_raycasters_for_picking(SceneRaycaster::EType type, PickingId id) {
+    void remove_raycasters_for_picking(SceneRaycaster::EType type, int id) {
         m_scene_raycaster.remove_raycasters(type, id);
     }
     void remove_raycasters_for_picking(SceneRaycaster::EType type) {

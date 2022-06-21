@@ -72,7 +72,7 @@ protected:
         EGrabberExtension extensions{ EGrabberExtension::None };
 #if ENABLE_RAYCAST_PICKING
         // the picking id shared by all the elements
-        PickingId picking_id{ -1 };
+        int picking_id{ -1 };
         std::array<std::shared_ptr<SceneRaycasterItem>, GRABBER_ELEMENTS_MAX_COUNT> raycasters = { nullptr };
 #endif // ENABLE_RAYCAST_PICKING
 
@@ -90,7 +90,7 @@ protected:
         float get_dragging_half_size(float size) const;
 
 #if ENABLE_RAYCAST_PICKING
-        void register_raycasters_for_picking(PickingId id);
+        void register_raycasters_for_picking(int id);
         void unregister_raycasters_for_picking();
 #endif // ENABLE_RAYCAST_PICKING
 

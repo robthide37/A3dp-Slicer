@@ -15,21 +15,19 @@ namespace GUI {
 
 struct Camera;
 
-using PickingId = int;
-
 class SceneRaycasterItem
 {
-    PickingId m_id{ -1 };
+    int m_id{ -1 };
     bool m_active{ true };
     const MeshRaycaster* m_raycaster;
     Transform3d m_trafo;
 
 public:
-    SceneRaycasterItem(PickingId id, const MeshRaycaster& raycaster, const Transform3d& trafo)
+    SceneRaycasterItem(int id, const MeshRaycaster& raycaster, const Transform3d& trafo)
         : m_id(id), m_raycaster(&raycaster), m_trafo(trafo)
     {}
 
-    PickingId get_id() const { return m_id; }
+    int get_id() const { return m_id; }
     bool is_active() const { return m_active; }
     void set_active(bool active) { m_active = active; }
     const MeshRaycaster* get_raycaster() const { return m_raycaster; }
@@ -48,7 +46,7 @@ public:
         Gizmo
     };
 
-    enum class EPickingIdBase
+    enum class EIdBase
     {
         Bed    = 0,
         Volume = 1000,
@@ -58,7 +56,7 @@ public:
     struct HitResult
     {
         EType type{ EType::None };
-        PickingId raycaster_id{ -1 };
+        int raycaster_id{ -1 };
         Vec3f position{ Vec3f::Zero() };
         Vec3f normal{ Vec3f::Zero() };
 
@@ -83,8 +81,8 @@ private:
 public:
     SceneRaycaster();
 
-    std::shared_ptr<SceneRaycasterItem> add_raycaster(EType type, PickingId picking_id, const MeshRaycaster& raycaster, const Transform3d& trafo);
-    void remove_raycasters(EType type, PickingId id);
+    std::shared_ptr<SceneRaycasterItem> add_raycaster(EType type, int picking_id, const MeshRaycaster& raycaster, const Transform3d& trafo);
+    void remove_raycasters(EType type, int id);
     void remove_raycasters(EType type);
     void remove_raycaster(std::shared_ptr<SceneRaycasterItem> item);
 
@@ -103,9 +101,9 @@ public:
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 
 private:
-    static PickingId encode_id(EType type, PickingId id);
-    static PickingId decode_id(EType type, PickingId id);
-    static PickingId base_id(EType type);
+    static int encode_id(EType type, int id);
+    static int decode_id(EType type, int id);
+    static int base_id(EType type);
 };
 
 } // namespace GUI
