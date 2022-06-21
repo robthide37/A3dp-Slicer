@@ -2606,11 +2606,12 @@ void priv::store(const SurfaceCuts &cut, const std::string &dir) {
                                        unsigned int vi2) -> const Vec3f& { 
             for (const auto &t : its.indices) { 
                 unsigned int tvi = std::numeric_limits<unsigned int>::max();
-                for (const auto &vi : t) { 
-                    if (vi == vi1) continue;
-                    if (vi == vi2) continue;
+                for (const auto &vi : t) {
+                    unsigned int vi_ = static_cast<unsigned int>(vi);
+                    if (vi_ == vi1) continue;
+                    if (vi_ == vi2) continue;
                     if (tvi == std::numeric_limits<unsigned int>::max()) {
-                        tvi = vi;
+                        tvi = vi_;
                     } else {
                         tvi = std::numeric_limits<unsigned int>::max();
                         break;
