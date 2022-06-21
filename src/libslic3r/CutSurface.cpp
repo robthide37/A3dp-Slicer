@@ -455,42 +455,6 @@ ProjectionDistances choose_best_distance(
     const BoundingBox                     &shapes_bb,
     const ShapePoint2index                &shape_point_2_index);
 
-/// <summary>
-/// Merge 2 cuts together, cut off inner part
-/// </summary>
-/// <param name="cut1">[In/Out] surface cut</param>
-/// <param name="cut2">Cut to intersect with</param>
-/// <param name="mesh">Source of surface</param>
-/// <returns>True when merge otherwise False</returns>
-bool merge_cut(CutAOI &cut1, const CutAOI &cut2, const CutMesh &mesh);
-
-/// <summary>
-/// Merge cuts together
-/// </summary>
-/// <param name="cuts">[In/Out] cutted surface of model</param>
-/// <param name="mesh">Source of surface</param>
-/// <param name="use_cut_indices">Filtered indicies of Cut from best projection distances</param>
-void merge_cuts(CutAOIs       &cuts,
-                const CutMesh &mesh,
-                const std::vector<size_t> &use_cut_indices);
-
-/// <summary>
-/// Filter out cuts which are behind another.
-/// Prevent overlapping embossed shape in space.
-/// </summary>
-/// <param name="cuts">AOIs</param>
-/// <param name="mesh">triangle model</param>
-/// <param name="shapes">2d cutted shapes</param>
-/// <param name="shape_point_2_index">2d cutted shapes</param>
-/// <param name="projection">Projection from 2d to 3d</param>
-/// <param name="vert_shape_map">Identify source of intersection</param>
-void filter_cuts(CutAOIs              &cuts,
-                 const CutMesh        &mesh,
-                 const ExPolygons       &shapes,
-                 const ShapePoint2index &shape_point_2_index,
-                 const Project        &projection,
-                 const VertexShapeMap &vert_shape_map);
-
 using ConvertMap = CutMesh::Property_map<VI, SurfaceCut::Index>;
 /// <summary>
 /// Create surface cuts from mesh model
@@ -508,7 +472,6 @@ SurfaceCuts create_surface_cuts(const CutAOIs      &cutAOIs,
                                 const CutMesh      &mesh,
                                 const ReductionMap &reduction_map,
                                 ConvertMap         &convert_map);
-
 
 /// <summary>
 /// Collect connected inside faces
@@ -601,6 +564,23 @@ SurfaceCut::CutContour create_cut(const std::vector<HI> &outlines,
                                const CutMesh         &mesh,
                                const ReductionMap &reduction_map,
                                const ConvertMap      &v2v);
+
+/// <summary>
+/// Self Intersection of surface cuts are made by 
+/// damaged models OR multi volumes emboss
+/// </summary>
+/// <param name="cuts">Surface cuts to merge
+/// NOTE: Merge process move data from cuts to result</param>
+/// <returns>Merged all surface cuts into one</returns>
+SurfaceCut merge_intersections(SurfaceCuts &cuts);
+
+/// <summary>
+/// Merge 2 Cuts when has intersection
+/// </summary>
+/// <param name="cut1">In/Out cut to merge into</param>
+/// <param name="cut2">Cut to merge from</param>
+/// <returns>Has intersection</returns>
+bool merge_intersection(SurfaceCut &cut1, const SurfaceCut &cut2);
 
 #ifdef DEBUG_OUTPUT_DIR
 indexed_triangle_set create_indexed_triangle_set(const std::vector<FI> &faces,
@@ -757,31 +737,31 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
         cutAOIs.erase(cutAOIs.begin() + index);
     }
 
-//    std::vector<size_t> best_cut_indices;
-//    for (size_t i = 0; i < cutAOIs.size(); ++i)
-//        if (is_best_cut[i]) best_cut_indices.push_back(i);
-//
-//    // cut off part + filtrate cutAOIs
-//    priv::merge_cuts(cutAOIs, cgal_model, best_cut_indices);
-//#ifdef DEBUG_OUTPUT_DIR
-//    priv::store(cutAOIs, cgal_model, DEBUG_OUTPUT_DIR + "merged-aois/");
-//    // only debug
-//#endif // DEBUG_OUTPUT_DIR
-    
-    //// Filter out NO top one cuts
-    //priv::filter_cuts(cutAOIs, cgal_model, shapes,
-    //                  shape_point_2_index, projection, vert_shape_map);
-
     // conversion map between vertex index in cgal_model and indices in result
     // used instead of std::map
     std::string vertec_convert_map_name = "v:convert";
     priv::ConvertMap vertex_convert_map = cgal_model.add_property_map<priv::VI, SurfaceCut::Index>(vertec_convert_map_name).first;    
-    SurfaceCuts result = priv::create_surface_cuts(cutAOIs, cgal_model, vertex_reduction_map, vertex_convert_map);
-    
+    SurfaceCuts result = priv::create_surface_cuts(cutAOIs, cgal_model, vertex_reduction_map, vertex_convert_map);    
 #ifdef DEBUG_OUTPUT_DIR
     priv::store(result, DEBUG_OUTPUT_DIR + "cuts/"); // only debug
 #endif // DEBUG_OUTPUT_DIR
     
+    // Self Intersection of surface cuts
+    // It is made by damaged models and multi volumes
+
+    priv::merge_intersections(result);
+    
+    //    std::vector<size_t> best_cut_indices;
+    //    for (size_t i = 0; i < cutAOIs.size(); ++i)
+    //        if (is_best_cut[i]) best_cut_indices.push_back(i);
+    //
+    //    // cut off part + filtrate cutAOIs
+    //    priv::merge_cuts(cutAOIs, cgal_model, best_cut_indices);
+    //#ifdef DEBUG_OUTPUT_DIR
+    //    priv::store(cutAOIs, cgal_model, DEBUG_OUTPUT_DIR + "merged-aois/");
+    //    // only debug
+    //#endif // DEBUG_OUTPUT_DIR
+
     // TODO: fill skipped source triangles to surface of cut
     return merge(std::move(result));
 }
@@ -2327,66 +2307,43 @@ void priv::store(const Vec3f       &vertex,
     its_write_obj(its, file.c_str());
 }
 
-bool priv::merge_cut(CutAOI &cut1, const CutAOI &cut2, const CutMesh &mesh)
-{
-    // create cgal model and merge it together
-
+bool priv::merge_intersection(SurfaceCut &cut1, const SurfaceCut &cut2) {
     return false;
 }
 
-void priv::merge_cuts(CutAOIs                   &cuts,
-                      const CutMesh             &mesh,
-                      const std::vector<size_t> &use_cut_indices)
+SurfaceCut priv::merge_intersections(SurfaceCuts &cuts)
 {
-    auto create_bb = [&mesh](const CutAOI &cut) -> BoundingBoxf3 {
-        Vec3f min(std::numeric_limits<float>::min(),
-                  std::numeric_limits<float>::min(),
-                  std::numeric_limits<float>::min());
-        Vec3f max(std::numeric_limits<float>::max(),
-                  std::numeric_limits<float>::max(),
-                  std::numeric_limits<float>::max());
-        for (const FI &fi : cut.first) {
-            HI hi = mesh.halfedge(fi);
-            for (VI vi : {mesh.source(hi), mesh.target(hi),
-                          mesh.target(mesh.next(hi))}) {
-                const P3 &p = mesh.point(vi);
-                for (size_t i = 0; i < 3; i++) {
-                    if (min[i] > p[i]) min[i] = p[i];
-                    if (max[i] < p[i]) max[i] = p[i];
-                }
-            }
-        }
-        return BoundingBoxf3(min.cast<double>(), max.cast<double>());
-    };
-
     // create bounding boxes for cuts
     std::vector<BoundingBoxf3> bbs;
-    bbs.reserve(cuts.size());    
-    for (const CutAOI &cut : cuts)
-        bbs.push_back(create_bb(cut));
-    // extend used bb by intersecting bb
-    // NOTE: after merge 2 cuts could appear new intersection on surface of merged in
+    bbs.reserve(cuts.size());
+    for (const SurfaceCut &cut : cuts) bbs.push_back(bounding_box(cut));
 
-    std::vector<std::pair<size_t, size_t>> merge_order;
-    std::vector<bool> del_cuts(cuts.size(), {true});
-    for (size_t cut_index : use_cut_indices) del_cuts[cut_index] = false;
+    // extend used bb by intersecting bb
+    // NOTE: after merge 2 cuts could appears
+    // new intersection on surface of merged in
+
+    std::vector<bool> finished(cuts.size(), {true});
 
     // find intersection of cuts by Bounding boxes intersection
-    for (size_t cut_index : use_cut_indices) {
-        // check if cut is merged into another one
-        if (del_cuts[cut_index]) continue;
-        BoundingBoxf3& result_bb = bbs[cut_index];
-        CutAOI &cut = cuts[cut_index];
+    for (size_t cut_index = 0; cut_index < cuts.size(); ++cut_index)
+    {
+        if (finished[cut_index]) continue;
+        BoundingBoxf3 &result_bb = bbs[cut_index];
+        SurfaceCut    &cut       = cuts[cut_index];
+
         // all merged cuts into cut_index
         std::vector<bool> merged(cuts.size(), {false});
 
         // merged in last iteration
         std::vector<bool> new_merged;
+
         bool exist_new_extension;
         bool is_first = true;
+        // while exist bb intersection
         do {
             exist_new_extension = false;
             new_merged = std::vector<bool>(cuts.size(), {false});
+            // check when exist intersection with result_bb
             for (const BoundingBoxf3 &bb : bbs) {
                 size_t bb_index = &bb - &bbs.front();
                 // do not merge itself
@@ -2398,146 +2355,32 @@ void priv::merge_cuts(CutAOIs                   &cuts,
                     for (size_t i = 0; i < cuts.size(); i++) {
                         if (!new_merged[i]) continue;
                         if (!bbs[i].intersects(bb)) continue;
+                        // TODO: check that really intersect by merging
                         has_new_intersection = true;
                     }
                     if (!has_new_intersection) continue;
                 }
-                if(!merge_cut(cut, cuts[bb_index], mesh)) continue;
-                result_bb = create_bb(cut);
+                if (!merge_intersection(cut, cuts[bb_index])) continue;
+
+                result_bb            = bounding_box(cut);
                 merged[bb_index]     = true;
-                del_cuts[bb_index]   = true;
+                finished[bb_index]   = true;
                 new_merged[bb_index] = true;
-                // extend result_bb
-                exist_new_extension = true;
+                exist_new_extension  = true;
             }
             is_first = false;
-        } while (exist_new_extension);        
+        } while (exist_new_extension);
     }
 
-    // remove flagged cuts
-    for (size_t i = del_cuts.size(); i > 0; --i) {
-        size_t index = i - 1;
-        if (del_cuts[index]) cuts.erase(cuts.begin() + index);
+    // Cuts merged in are signed in finished vector as TRUE
+    // All rest cuts must be merged simple way
+    SurfaceCut result;
+    for (size_t cut_index = 0; cut_index < cuts.size(); ++cut_index) {
+        if (finished[cut_index]) continue;
+        append(result, std::move(cuts[cut_index]));
     }
+    return result;
 }
-
-void priv::filter_cuts(CutAOIs              &cuts,
-                       const CutMesh        &mesh,
-                       const ExPolygons     &shapes,
-                       const ShapePoint2index &shape_point_2_index,
-                       const Project        &projection,
-                       const VertexShapeMap &vert_shape_map)
-{
-    auto get_point = [&shapes, &shape_point_2_index]
-    (const IntersectingElement &intersection) -> Point {
-        assert(intersection.shape_point_index != std::numeric_limits<uint32_t>::max());
-        ShapePointId point_id = shape_point_2_index.calc_id(intersection.shape_point_index);
-        const ExPolygon& shape = shapes[point_id.expolygons_index];
-        const Polygon   &p     = (point_id.polygon_index == 0) ?
-                                     shape.contour :
-                                     shape.holes[point_id.polygon_index - 1];
-        return p[point_id.point_index];
-    };
-
-    struct CutIndex
-    {
-        // index in vector into cuts
-        size_t cut_index = std::numeric_limits<size_t>::max();
-        // vertex index inside of mesh
-        VI vi;
-    };
-    size_t count = count_points(shapes);
-    // each source point from shapes could has only one nearest projection
-    std::vector<CutIndex> indices(count);
-
-    // flags which cut is not first
-    std::vector<bool> del_cuts(cuts.size(), false);
-
-    // check whether vertex is behind another cut
-    auto is_behind = [&vert_shape_map, &indices, &del_cuts, &get_point,
-                      &projection, &mesh]
-                      (VI vi, size_t cut_index) -> bool {
-        const IntersectingElement *i = vert_shape_map[vi];
-
-        // Is vertex made by corefine?
-        if (i == nullptr) return false;
-        
-        assert(i->shape_point_index != std::numeric_limits<uint32_t>::max());
-        assert(i->attr != (unsigned char)IntersectingElement::Type::undefined);
-
-        // Use only straigh edge
-        if (i->get_type() != IntersectingElement::Type::edge_1)
-            return false;
-    
-        CutIndex &ci = indices[i->shape_point_index];
-
-        // is first cut for vertex OR
-        // is remembred cut is deleted?
-        if (ci.cut_index == std::numeric_limits<size_t>::max() || 
-            del_cuts[ci.cut_index] ) {
-            ci.cut_index = cut_index;
-            ci.vi         = vi;
-            return false;
-        }
-
-        if (ci.cut_index == cut_index) { 
-            // In one connected triangles area are more points 
-            // with same source point from text contour
-            //assert(ci.vi == vi);
-            return false;
-        }
-
-        // compare distances of vertices
-        Point p = get_point(*i);
-        Vec3f source_point = projection.create_front_back(p).first;
-        const auto &prev = mesh.point(ci.vi);
-        Vec3f prev_point(prev.x(), prev.y(), prev.z());
-        float prev_sq_norm = (source_point - prev_point).squaredNorm();
-
-        const auto &act = mesh.point(vi);
-        Vec3f act_point(act.x(), act.y(), act.z());
-        float act_sq_norm = (source_point - act_point).squaredNorm();
-        
-        if (act_sq_norm < prev_sq_norm) {
-            del_cuts[cut_index] = true;
-            return true;
-        }
-
-        // previous cut is behind actual one
-        del_cuts[ci.cut_index] = true;
-        ci.cut_index = cut_index;
-        ci.vi = vi;
-        return false;
-    };
-
-    // filter small pieces
-    for (const CutAOI &cut : cuts) {
-        if (!has_minimal_contour_points(cut.second, vert_shape_map, mesh)) { 
-            size_t index = &cut - &cuts.front();
-            del_cuts[index] = true;
-        }
-    }
-
-    // filter top one cuts
-    for (const CutAOI &cut : cuts) {
-        size_t cut_index = &cut - &cuts.front();
-        if (del_cuts[cut_index]) continue;
-        const std::vector<HI> &outlines = cut.second;
-        for (HI hi : outlines) {
-            if (is_behind(mesh.source(hi), cut_index) ||
-                is_behind(mesh.target(hi), cut_index))
-                break;
-        }
-    }
-
-    // remove flagged cuts
-    for (size_t i = del_cuts.size(); i > 0; --i) { 
-        size_t index = i - 1;
-        if (del_cuts[index])
-            cuts.erase(cuts.begin() + index);
-    }
-}
-
 
 SurfaceCuts priv::create_surface_cuts(const CutAOIs      &cuts,
                                       const CutMesh      &mesh,
