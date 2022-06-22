@@ -23,10 +23,12 @@ class GLGizmoMeasure : public GLGizmoBase
 
 private:
 
+    int m_currently_shown_plane = 0;
+
     struct PlaneData {
         std::vector<std::vector<Vec3d>> borders; // should be in fact local in update_planes()
         std::vector<int> facets;
-        GLModel vbo;
+        std::vector<GLModel> vbos;
         Vec3d normal;
         float area;
     };

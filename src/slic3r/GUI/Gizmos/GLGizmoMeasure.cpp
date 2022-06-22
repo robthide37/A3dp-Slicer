@@ -17,14 +17,12 @@
 namespace Slic3r {
 namespace GUI {
 
-static const Slic3r::ColorRGBA DEFAULT_PLANE_COLOR       = { 0.9f, 0.9f, 0.9f, 0.5f };
-static const Slic3r::ColorRGBA DEFAULT_HOVER_PLANE_COLOR = { 0.9f, 0.9f, 0.9f, 0.75f };
+static const Slic3r::ColorRGBA DEFAULT_PLANE_COLOR       = { 0.9f, 0.9f, 0.9f, 0.9f };
+static const Slic3r::ColorRGBA DEFAULT_HOVER_PLANE_COLOR = { 0.9f, 0.2f, 0.2f, 1.f };
 
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {}
-
-
 
 bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
 {
@@ -139,9 +137,29 @@ void GLGizmoMeasure::on_render()
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         if (this->is_plane_update_necessary())
             update_planes();
-        for (int i = 0; i < (int)m_planes.size(); ++i) {
-            m_planes[i].vbo.set_color(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
-            m_planes[i].vbo.render();
+
+        m_imgui->begin(std::string("DEBUG"));
+        if (m_imgui->button("<-"))
+            --m_currently_shown_plane;
+        ImGui::SameLine();
+        if (m_imgui->button("->"))
+            ++m_currently_shown_plane;
+        m_currently_shown_plane = std::clamp(m_currently_shown_plane, 0, int(m_planes.size())-1);
+        m_imgui->text(std::to_string(m_currently_shown_plane)); 
+        m_imgui->end();
+
+
+        //for (int i = 0; i < (int)m_planes.size(); ++i) {
+        int i = m_currently_shown_plane;
+        std::cout << m_hover_id << "\t" << m_currently_shown_plane << "\t" << std::endl;
+        if (i < m_planes.size()) {
+            for (int j=0; j<(int)m_planes[i].vbos.size(); ++j) {
+                m_planes[i].vbos[j].set_color(j == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
+                if (j == m_hover_id)
+                m_planes[i].vbos[j].render();
+                std::cout << " * " << j;
+            }
+            std::cout <<std::endl;
         }
     }
 
@@ -178,6 +196,7 @@ void GLGizmoMeasure::on_render_for_picking()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_BLEND));
+    glsafe(::glLineWidth(5.f));
 
     if (selection.is_single_full_instance() && !wxGetKeyState(WXK_CONTROL)) {
         const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
@@ -189,9 +208,13 @@ void GLGizmoMeasure::on_render_for_picking()
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         if (this->is_plane_update_necessary())
             update_planes();
-        for (int i = 0; i < (int)m_planes.size(); ++i) {
-            m_planes[i].vbo.set_color(picking_color_component(i));
-            m_planes[i].vbo.render();
+        //for (int i = 0; i < (int)m_planes.size(); ++i) {
+        int i = m_currently_shown_plane;
+        if (i < m_planes.size()) {
+            for (int j=0; j<(int)m_planes[i].vbos.size(); ++j) {
+                m_planes[i].vbos[j].set_color(picking_color_component(j));
+                m_planes[i].vbos[j].render();
+            }
         }
     }
 
@@ -277,7 +300,7 @@ void GLGizmoMeasure::update_planes()
     for (int plane_id=0; plane_id < m_planes.size(); ++plane_id) {
     //int plane_id = 5; {
         const auto& facets = m_planes[plane_id].facets;
-        std::vector<stl_vertex> pts;
+        std::vector<Vec3d> pts;
         for (int face_id=0; face_id<facets.size(); ++face_id) {
             assert(face_to_plane[facets[face_id]] == plane_id);
 
@@ -293,7 +316,7 @@ void GLGizmoMeasure::update_planes()
             
             // he is the first halfedge on the border. Now walk around and append the points.
             const Halfedge_index he_orig = he;
-            m_planes[plane_id].borders.emplace_back(std::vector<Vec3d>{ sm.point(sm.source(he)).cast<double>() });
+            pts.emplace_back(sm.point(sm.source(he)).cast<double>());
             Vertex_index target = sm.target(he);
             const Halfedge_index he_start = he;
 
@@ -303,14 +326,20 @@ void GLGizmoMeasure::update_planes()
                 while ( face_to_plane[sm.face(he)] == plane_id && he != he_orig)
                     he = sm.next_around_target(he);
                 he = sm.opposite(he);
-                m_planes[plane_id].borders.back().emplace_back(sm.point(sm.source(he)).cast<double>());
+                pts.emplace_back(sm.point(sm.source(he)).cast<double>());
             } while (he != he_start);
+
+            if (pts.size() != 1) {
+                m_planes[plane_id].borders.emplace_back(pts);
+                pts.clear();
+            }
+            
         }
     }
 
 
     // DEBUGGING:
-    //m_planes.erase(std::remove_if(m_planes.begin(), m_planes.end(), [](const PlaneData& p) { return p.borders.empty(); }), m_planes.end());
+    m_planes.erase(std::remove_if(m_planes.begin(), m_planes.end(), [](const PlaneData& p) { return p.borders.empty(); }), m_planes.end());
 
 
 
@@ -337,7 +366,7 @@ void GLGizmoMeasure::update_planes()
     // And finally create respective VBOs. The polygon is convex with
     // the vertices in order, so triangulation is trivial.
     for (auto& plane : m_planes) {
-        for (auto& vertices : plane.borders) {
+        for (const auto& vertices : plane.borders) {
             GLModel::Geometry init_data;
             init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3N3 };
             init_data.reserve_vertices(vertices.size());
@@ -347,7 +376,8 @@ void GLGizmoMeasure::update_planes()
                 init_data.add_vertex((Vec3f)vertices[i].cast<float>(), (Vec3f)plane.normal.cast<float>());
                 init_data.add_index((unsigned int)i);
             }
-            plane.vbo.init_from(std::move(init_data));
+            plane.vbos.emplace_back();
+            plane.vbos.back().init_from(std::move(init_data));
         }
 
         // FIXME: vertices should really be local, they need not
