@@ -106,7 +106,8 @@ namespace GUI {
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_CORE_PROFILE
-        if (!OpenGLManager::get_gl_info().is_core_profile())
+        const bool core_profile = OpenGLManager::get_gl_info().is_core_profile();
+        if (!core_profile)
 #endif // ENABLE_GL_CORE_PROFILE
             glsafe(::glLineWidth(1.5f));
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
@@ -129,15 +130,19 @@ namespace GUI {
         glsafe(::glScaled(gui_scale, gui_scale, 1.0));
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+        if (!core_profile) {
+#endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glPushAttrib(GL_ENABLE_BIT));
         glsafe(::glLineStipple(4, 0xAAAA));
         glsafe(::glEnable(GL_LINE_STIPPLE));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+        }
+#endif // ENABLE_GL_CORE_PROFILE
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+        GLShaderProgram* shader = core_profile ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -206,11 +211,13 @@ namespace GUI {
             shader->set_uniform("view_model_matrix", Transform3d::Identity());
             shader->set_uniform("projection_matrix", Transform3d::Identity());
 #if ENABLE_GL_CORE_PROFILE
+            if (core_profile) {
             const std::array<int, 4>& viewport = wxGetApp().plater()->get_camera().get_viewport();
             shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
             shader->set_uniform("width", 0.25f);
             shader->set_uniform("dash_size", 0.01f);
             shader->set_uniform("gap_size", 0.0075f);
+            }
 #endif // ENABLE_GL_CORE_PROFILE
 
             m_rectangle.set_color(ColorRGBA((m_state == EState::Select) ? 0.3f : 1.0f, (m_state == EState::Select) ? 1.0f : 0.3f, 0.3f, 1.0f));
@@ -226,9 +233,10 @@ namespace GUI {
         glsafe(::glEnd());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+        if (!core_profile)
+#endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glPopAttrib());
-#endif // !ENABLE_GL_CORE_PROFILE
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopMatrix());
