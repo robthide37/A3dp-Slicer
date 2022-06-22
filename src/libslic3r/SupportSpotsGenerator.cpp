@@ -123,26 +123,23 @@ private:
     Points support_points { };
     Vec3f centroid_accumulator = Vec3f::Zero();
     float accumulated_volume { };
-    float base_area { };
-    float base_height { };
+    float accumulated_sticking_force { };
 
 public:
-    explicit StabilityAccumulator(float base_height) :
-            base_height(base_height) {
-    }
+    StabilityAccumulator() = default;
 
-    void add_base_extrusion(const ExtrusionLine &line, float width, float print_z, float mm3_per_mm) {
-        base_area += line.len * width;
+    void add_base_extrusion(const ExtrusionLine &line, float sticking_force, float print_z, float mm3_per_mm) {
+        accumulated_sticking_force += sticking_force;
         support_points.push_back(Point::new_scale(line.a));
         support_points.push_back(Point::new_scale(line.b));
         base_convex_hull.clear();
         add_extrusion(line, print_z, mm3_per_mm);
     }
 
-    void add_support_point(const Point &position, float area) {
+    void add_support_point(const Point &position, float sticking_force) {
         support_points.push_back(position);
         base_convex_hull.clear();
-        base_area += area;
+        accumulated_sticking_force += sticking_force;
     }
 
     void add_extrusion(const ExtrusionLine &line, float print_z, float mm3_per_mm) {
@@ -156,12 +153,10 @@ public:
         return centroid_accumulator / accumulated_volume;
     }
 
-    float get_base_area() const {
-        return base_area;
+    float get_sticking_force() const {
+        return accumulated_sticking_force;
     }
-    float get_base_height() const {
-        return base_height;
-    }
+
     float get_accumulated_volume() const {
         return accumulated_volume;
     }
@@ -173,7 +168,7 @@ public:
         return this->base_convex_hull;
     }
 
-    const Points& get_support_points() {
+    const Points& get_support_points() const {
         return support_points;
     }
 
@@ -183,7 +178,7 @@ public:
         base_convex_hull.clear();
         this->centroid_accumulator += acc.centroid_accumulator;
         this->accumulated_volume += acc.accumulated_volume;
-        this->base_area += acc.base_area;
+        this->accumulated_sticking_force += acc.accumulated_sticking_force;
     }
 };
 
@@ -201,18 +196,18 @@ private:
         }
         to_acc.add_from(from_acc);
         mapping[from_id] = mapping[to_id];
-        from_acc = StabilityAccumulator { 0.0f };
+        from_acc = StabilityAccumulator { };
 
     }
 
 public:
     StabilityAccumulators() = default;
 
-    int create_accumulator(float base_height) {
+    int create_accumulator() {
         size_t id = next_id;
         next_id++;
         mapping[id] = accumulators.size();
-        accumulators.push_back(StabilityAccumulator { base_height });
+        accumulators.push_back(StabilityAccumulator { });
         return id;
     }
 
@@ -231,7 +226,7 @@ public:
         }
         to_acc.add_from(from_acc);
         mapping[from_id] = mapping[to_id];
-        from_acc = StabilityAccumulator { 0.0f };
+        from_acc = StabilityAccumulator { };
     }
 
 #ifdef DEBUG_FILES
@@ -244,6 +239,18 @@ public:
 
         size_t pseudornd = ((mapping[id] + 127) * 33331 + 6907) % 987;
         return value_to_rgbf(0.0f, float(987), float(pseudornd));
+    }
+
+    void log_accumulators(){
+       for (size_t i = 0; i < accumulators.size(); ++i) {
+           const auto& acc = accumulators[i];
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: accumulator POS: " << i << "\n"
+            << "SSG: get_accumulated_volume: " << acc.get_accumulated_volume() << "\n"
+            << "SSG: get_sticking_force: " << acc.get_sticking_force() << "\n"
+            << "SSG: support points count: " << acc.get_support_points().size() << "\n";
+
+        }
     }
 #endif
 };
@@ -369,7 +376,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             } else {
                 bridging_acc.add_distance(current_line.len);
                 if (current_stability_acc == NULL_ACC_ID) {
-                    current_stability_acc = stability_accs.create_accumulator(print_z);
+                    current_stability_acc = stability_accs.create_accumulator();
                 }
                 StabilityAccumulator &current_segment = stability_accs.access(current_stability_acc);
                 current_line.stability_accumulator_id = current_stability_acc;
@@ -379,7 +386,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                         > params.bridge_distance
                                 / (bridging_acc.max_curvature
                                         * params.bridge_distance_decrease_by_curvature_factor / PI)) {
-                    current_segment.add_support_point(current, 0.0f); // Do not count extrusion supports into the support area. They can be very densely placed, causing algorithm to overestimate stickiness.
+                    current_segment.add_support_point(current, 0.0f); // Do not count extrusion supports into the sticking force. They can be very densely placed, causing algorithm to overestimate stickiness.
                     issues.supports_nedded.emplace_back(to_vec3f(current), 1.0);
                     bridging_acc.reset();
                     distance_from_last_support_point = 0.0f;
@@ -413,7 +420,8 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
         if (hull_lines.empty()) {
             if (acc->get_support_points().empty()) {
                 acc->add_support_point(Point::new_scale(checked_lines[accumulator.second[0]].a),
-                        params.support_points_interface_radius*params.support_points_interface_radius* float(PI) );
+                        params.support_points_interface_radius * params.support_points_interface_radius * float(PI)
+                                * params.support_adhesion);
                 issues.supports_nedded.emplace_back(to_3d(checked_lines[accumulator.second[0]].a, print_z), 1.0);
             }
             hull_lines.push_back( { unscaled(acc->get_support_points()[0]).cast<float>(),
@@ -423,8 +431,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
 
         LayerLinesDistancer hull_distancer(std::move(hull_lines));
 
-        float sticking_force = acc->get_base_area()
-                * (acc->get_base_height() == 0 ? params.base_adhesion : params.support_adhesion);
+        float sticking_force = acc->get_sticking_force();
         float mass = acc->get_accumulated_volume() * params.filament_density;
         float weight = mass * params.gravity_constant;
 
@@ -435,7 +442,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
 
             Vec3f extruder_pressure_direction = to_3d(Vec2f(line.b - line.a), 0.0f).normalized();
             Vec2f pivot_site_search = line.b + extruder_pressure_direction.head<2>() * 1000.0f;
-            extruder_pressure_direction.z() = -0.1f;
+            extruder_pressure_direction.z() = -0.3f;
             extruder_pressure_direction.normalize();
 
             size_t nearest_line_idx;
@@ -448,7 +455,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
             float weight_arm = (pivot - centroid.head<2>()).norm();
             float weight_torque = weight_arm * weight;
 
-            float bed_movement_arm = centroid.z() - acc->get_base_height();
+            float bed_movement_arm = centroid.z();
             float bed_movement_force = params.max_acceleration * mass;
             float bed_movement_torque = bed_movement_force * bed_movement_arm;
 
@@ -460,13 +467,14 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
             if (total_torque > 0) {
                 size_t _nearest_idx;
                 Vec2f _nearest_pt;
-                float area = params.support_points_interface_radius* params.support_points_interface_radius * float(PI);
+                float area = params.support_points_interface_radius * params.support_points_interface_radius
+                        * float(PI);
                 float dist_from_hull = hull_distancer.signed_distance_from_lines(line.b, _nearest_idx, _nearest_pt);
                 if (dist_from_hull < params.support_points_interface_radius) {
-                    area = std::max(0.0f, dist_from_hull*params.support_points_interface_radius * float(PI));
+                    area = std::max(0.0f, dist_from_hull * params.support_points_interface_radius * float(PI));
                 }
-
-                acc->add_support_point(Point::new_scale(line.b), area);
+                float sticking_force = area * params.support_adhesion;
+                acc->add_support_point(Point::new_scale(line.b), sticking_force);
                 issues.supports_nedded.emplace_back(to_3d(line.b, print_z), extruder_conflict_torque - sticking_torque);
                 distance_from_last_support_point = 0.0f;
             }
@@ -513,7 +521,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 const float flow_width = get_flow_width(layer_region, perimeter->role());
                 max_flow_width = std::max(flow_width, max_flow_width);
                 const float mm3_per_mm = float(perimeter->min_mm3_per_mm());
-                int id = stability_accs.create_accumulator(base_print_z);
+                int id = stability_accs.create_accumulator();
                 StabilityAccumulator &acc = stability_accs.access(id);
                 Points points { };
                 perimeter->collect_points(points);
@@ -522,7 +530,8 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                     Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
                     ExtrusionLine line { start, next };
                     line.stability_accumulator_id = id;
-                    acc.add_base_extrusion(line, flow_width, base_print_z, mm3_per_mm);
+                    float line_sticking_force = line.len * flow_width * params.base_adhesion;
+                    acc.add_base_extrusion(line, line_sticking_force, base_print_z, mm3_per_mm);
                     checked_lines.push_back(line);
                 }
                 if (perimeter->is_loop()) {
@@ -530,7 +539,8 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                     Vec2f next = unscaled(points[0]).cast<float>();
                     ExtrusionLine line { start, next };
                     line.stability_accumulator_id = id;
-                    acc.add_base_extrusion(line, flow_width, base_print_z, mm3_per_mm);
+                    float line_sticking_force = line.len * flow_width * params.base_adhesion;
+                    acc.add_base_extrusion(line, line_sticking_force, base_print_z, mm3_per_mm);
                     checked_lines.push_back(line);
                 }
             } // perimeter
@@ -540,7 +550,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 const float flow_width = get_flow_width(layer_region, fill->role());
                 max_flow_width = std::max(flow_width, max_flow_width);
                 const float mm3_per_mm = float(fill->min_mm3_per_mm());
-                int id = stability_accs.create_accumulator(base_print_z);
+                int id = stability_accs.create_accumulator();
                 StabilityAccumulator &acc = stability_accs.access(id);
                 Points points { };
                 fill->collect_points(points);
@@ -549,27 +559,22 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                     Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
                     ExtrusionLine line { start, next };
                     line.stability_accumulator_id = id;
-                    acc.add_base_extrusion(line, flow_width, base_print_z, mm3_per_mm);
+                    float line_sticking_force = line.len * flow_width * params.base_adhesion;
+                    acc.add_base_extrusion(line, line_sticking_force, base_print_z, mm3_per_mm);
                     checked_lines.push_back(line);
                 }
             } // fill
         } // ex_entity
     } // region
 
-#ifdef DEBUG_FILES
-    for (const auto &line : checked_lines) {
-        Vec3f color = stability_accs.get_accumulator_color(line.stability_accumulator_id);
-        fprintf(debug_acc, "v %f %f %f  %f %f %f\n", line.b[0],
-                line.b[1], base_print_z, color[0], color[1], color[2]);
-    }
-#endif
-
     //MERGE BASE LAYER STABILITY ACCS
     prev_layer_lines = LayerLinesDistancer { std::move(checked_lines) };
     for (const ExtrusionLine &l : prev_layer_lines.get_lines()) {
         size_t nearest_line_idx;
         Vec2f nearest_pt;
-        float dist = prev_layer_lines.signed_distance_from_lines(l.a, nearest_line_idx, nearest_pt);
+        Vec2f line_dir = (l.b - l.a).normalized();
+        Vec2f site_search_location = l.a + Vec2f(line_dir.y(), -line_dir.x()) * max_flow_width;
+        float dist = prev_layer_lines.signed_distance_from_lines(site_search_location, nearest_line_idx, nearest_pt);
         if (std::abs(dist) < max_flow_width) {
             size_t other_line_acc_id = prev_layer_lines.get_line(nearest_line_idx).stability_accumulator_id;
             size_t from_id = std::max(other_line_acc_id, l.stability_accumulator_id);
@@ -577,6 +582,16 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
             stability_accs.merge_accumulators(from_id, to_id);
         }
     }
+
+#ifdef DEBUG_FILES
+    for (const auto &line : prev_layer_lines.get_lines()) {
+        Vec3f color = stability_accs.get_accumulator_color(line.stability_accumulator_id);
+        fprintf(debug_acc, "v %f %f %f  %f %f %f\n", line.b[0],
+                line.b[1], base_print_z, color[0], color[1], color[2]);
+    }
+
+    stability_accs.log_accumulators();
+#endif
 
     //CHECK STABILITY OF ALL LAYERS
     for (size_t layer_idx = 1; layer_idx < po->layer_count(); ++layer_idx) {
@@ -656,6 +671,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
             fprintf(debug_acc, "v %f %f %f  %f %f %f\n", line.b[0],
                     line.b[1], print_z, color[0], color[1], color[2]);
         }
+        stability_accs.log_accumulators();
 #endif
     }
 
