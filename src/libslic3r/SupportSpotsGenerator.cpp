@@ -1,4 +1,4 @@
-#include "SupportableIssuesSearch.hpp"
+#include "SupportSpotsGenerator.hpp"
 
 #include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
@@ -55,7 +55,7 @@ auto get_b(ExtrusionLine &&l) {
     return l.b;
 }
 
-namespace SupportableIssues {
+namespace SupportSpotsGenerator {
 
 void Issues::add(const Issues &layer_issues) {
     supports_nedded.insert(supports_nedded.end(), layer_issues.supports_nedded.begin(),
@@ -237,7 +237,8 @@ public:
 #ifdef DEBUG_FILES
     Vec3f get_accumulator_color(size_t id) {
         if (mapping.find(id) == mapping.end()) {
-            std::cerr << " ERROR: uknown accumulator ID: " << id << std::endl;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: ERROR: uknown accumulator ID: " << id;
             return Vec3f(1.0f, 1.0f, 1.0f);
         }
 
@@ -332,7 +333,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         size_t current_stability_acc = NULL_ACC_ID;
         ExtrusionPropertiesAccumulator bridging_acc { };
         bridging_acc.add_distance(params.bridge_distance + 1.0f); // Initialise unsupported distance with larger than tolerable distance ->
-        // -> it prevents extruding perimeter start and short loops into air.
+        // -> it prevents extruding perimeter starts and short loops into air.
         const float flow_width = get_flow_width(layer_region, entity->role());
         const float max_allowed_dist_from_prev_layer = flow_width;
         float distance_from_last_support_point = params.min_distance_between_support_points * 2.0f;
@@ -376,9 +377,9 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 if (distance_from_last_support_point > params.min_distance_between_support_points &&
                         bridging_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
                         > params.bridge_distance
-                                / (1.0f + (bridging_acc.max_curvature
-                                        * params.bridge_distance_decrease_by_curvature_factor / PI))) {
-                    current_segment.add_support_point(current, params.extrusion_support_points_area);
+                                / (bridging_acc.max_curvature
+                                        * params.bridge_distance_decrease_by_curvature_factor / PI)) {
+                    current_segment.add_support_point(current, 0.0f); // Do not count extrusion supports into the support area. They can be very densely placed, causing algorithm to overestimate stickiness.
                     issues.supports_nedded.emplace_back(to_vec3f(current), 1.0);
                     bridging_acc.reset();
                     distance_from_last_support_point = 0.0f;
@@ -394,13 +395,13 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
         const std::vector<ExtrusionLine> &checked_lines,
         float print_z,
         const Params &params) {
-    std::unordered_map<StabilityAccumulator*, std::vector<size_t>> layer_accs_lines;
+    std::unordered_map<StabilityAccumulator*, std::vector<size_t>> layer_accs_w_lines;
     for (size_t i = 0; i < checked_lines.size(); ++i) {
-        layer_accs_lines[&stability_accs.access(checked_lines[i].stability_accumulator_id)].push_back(i);
+        layer_accs_w_lines[&stability_accs.access(checked_lines[i].stability_accumulator_id)].push_back(i);
     }
 
-    for (auto &acc_lines : layer_accs_lines) {
-        StabilityAccumulator *acc = acc_lines.first;
+    for (auto &accumulator : layer_accs_w_lines) {
+        StabilityAccumulator *acc = accumulator.first;
         Vec3f centroid = acc->get_centroid();
         Vec2f hull_centroid = unscaled(acc->segment_base_hull().centroid()).cast<float>();
         std::vector<ExtrusionLine> hull_lines;
@@ -411,9 +412,9 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
         }
         if (hull_lines.empty()) {
             if (acc->get_support_points().empty()) {
-                acc->add_support_point(Point::new_scale(checked_lines[acc_lines.second[0]].a),
-                        params.support_points_interface_area);
-                issues.supports_nedded.emplace_back(to_3d(checked_lines[acc_lines.second[0]].a, print_z), 1.0);
+                acc->add_support_point(Point::new_scale(checked_lines[accumulator.second[0]].a),
+                        params.support_points_interface_radius*params.support_points_interface_radius* float(PI) );
+                issues.supports_nedded.emplace_back(to_3d(checked_lines[accumulator.second[0]].a, print_z), 1.0);
             }
             hull_lines.push_back( { unscaled(acc->get_support_points()[0]).cast<float>(),
                     unscaled(acc->get_support_points()[0]).cast<float>() });
@@ -428,7 +429,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
         float weight = mass * params.gravity_constant;
 
         float distance_from_last_support_point = params.min_distance_between_support_points * 2.0f;
-        for (size_t line_idx : acc_lines.second) {
+        for (size_t line_idx : accumulator.second) {
             const ExtrusionLine &line = checked_lines[line_idx];
             distance_from_last_support_point += line.len;
 
@@ -444,39 +445,51 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
             float sticking_arm = (pivot - hull_centroid).norm();
             float sticking_torque = sticking_arm * sticking_force;
 
-            std::cout << "sticking_arm: " << sticking_arm << std::endl;
-            std::cout << "sticking_torque: " << sticking_torque << std::endl;
-
             float weight_arm = (pivot - centroid.head<2>()).norm();
             float weight_torque = weight_arm * weight;
-
-            std::cout << "weight_arm: " << sticking_arm << std::endl;
-            std::cout << "weight_torque: " << weight_torque << std::endl;
 
             float bed_movement_arm = centroid.z() - acc->get_base_height();
             float bed_movement_force = params.max_acceleration * mass;
             float bed_movement_torque = bed_movement_force * bed_movement_arm;
 
-            std::cout << "bed_movement_arm: " << bed_movement_arm << std::endl;
-            std::cout << "bed_movement_torque: " << bed_movement_torque << std::endl;
-
             float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), print_z).cross(
                     extruder_pressure_direction)).norm();
             float extruder_conflict_torque = params.tolerable_extruder_conflict_force * conflict_torque_arm;
-
-            std::cout << "conflict_torque_arm: " << conflict_torque_arm << std::endl;
-            std::cout << "extruder_conflict_torque: " << extruder_conflict_torque << std::endl;
-
             float total_torque = bed_movement_torque + extruder_conflict_torque - weight_torque - sticking_torque;
 
-            std::cout << "total_torque: " << total_torque << "   printz: " << print_z << std::endl;
-
             if (total_torque > 0) {
-                acc->add_support_point(Point::new_scale(line.b), std::min(params.support_points_interface_area, (pivot - line.b).squaredNorm()));
+                size_t _nearest_idx;
+                Vec2f _nearest_pt;
+                float area = params.support_points_interface_radius* params.support_points_interface_radius * float(PI);
+                float dist_from_hull = hull_distancer.signed_distance_from_lines(line.b, _nearest_idx, _nearest_pt);
+                if (dist_from_hull < params.support_points_interface_radius) {
+                    area = std::max(0.0f, dist_from_hull*params.support_points_interface_radius * float(PI));
+                }
+
+                acc->add_support_point(Point::new_scale(line.b), area);
                 issues.supports_nedded.emplace_back(to_3d(line.b, print_z), extruder_conflict_torque - sticking_torque);
                 distance_from_last_support_point = 0.0f;
             }
-
+#if 0
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: sticking_arm: " << sticking_arm;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: sticking_torque: " << sticking_torque;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: weight_arm: " << sticking_arm;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: weight_torque: " << weight_torque;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: bed_movement_arm: " << bed_movement_arm;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: bed_movement_torque: " << bed_movement_torque;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: conflict_torque_arm: " << conflict_torque_arm;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: extruder_conflict_torque: " << extruder_conflict_torque;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: total_torque: " << total_torque << "   printz: " << print_z;
+#endif
         }
     }
 }
@@ -557,7 +570,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
         size_t nearest_line_idx;
         Vec2f nearest_pt;
         float dist = prev_layer_lines.signed_distance_from_lines(l.a, nearest_line_idx, nearest_pt);
-        if (std::abs(dist) < max_flow_width*1.1f) {
+        if (std::abs(dist) < max_flow_width) {
             size_t other_line_acc_id = prev_layer_lines.get_line(nearest_line_idx).stability_accumulator_id;
             size_t from_id = std::max(other_line_acc_id, l.stability_accumulator_id);
             size_t to_id = std::min(other_line_acc_id, l.stability_accumulator_id);
@@ -610,8 +623,8 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                             }
                             fill_points.emplace_back(start, acc_id);
                         } else {
-                            std::cout << " SUPPORTS POINT GEN, start infill in the air? on printz: " << print_z
-                                    << std::endl;
+                            BOOST_LOG_TRIVIAL(debug)
+                            << "SSG: ERROR: seem that infill starts in the air? on printz: " << print_z;
                         }
                     }
                 } // fill
@@ -630,8 +643,8 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 size_t to_id = std::min(other_line_acc_id, fill_point.second);
                 stability_accs.merge_accumulators(from_id, to_id);
             } else {
-                std::cout << " SUPPORTS POINT GEN, no connection on current layer for infill? on printz: " << print_z
-                        << std::endl;
+                BOOST_LOG_TRIVIAL(debug)
+                << "SSG: ERROR: seem that infill starts in the air? on printz: " << print_z;
             }
         }
 
@@ -698,7 +711,9 @@ std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
 
 Issues full_search(const PrintObject *po, const Params &params) {
     auto issues = check_object_stability(po, params);
+#ifdef DEBUG_FILES
     debug_export(issues, "issues");
+#endif
     return issues;
 
 }

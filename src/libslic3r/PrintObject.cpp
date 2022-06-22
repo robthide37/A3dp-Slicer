@@ -16,7 +16,7 @@
 #include "Fill/FillAdaptive.hpp"
 #include "Fill/FillLightning.hpp"
 #include "Format/STL.hpp"
-#include "SupportableIssuesSearch.hpp"
+#include "SupportSpotsGenerator.hpp"
 #include "TriangleSelectorWrapper.hpp"
 #include "format.hpp"
 
@@ -399,15 +399,15 @@ void PrintObject::ironing()
 }
 
 
-void PrintObject::find_supportable_issues()
+void PrintObject::generate_support_spots()
 {
-    if (this->set_started(posSupportableIssuesSearch)) {
+    if (this->set_started(posSupportSpotsSearch)) {
         BOOST_LOG_TRIVIAL(debug)
-        << "Searching supportable issues - start";
-        m_print->set_status(75, L("Searching supportable issues"));
+        << "Searching support spots - start";
+        m_print->set_status(75, L("Searching support spots"));
 
         if (!this->m_config.support_material) {
-            std::vector<size_t> problematic_layers = SupportableIssues::quick_search(this);
+            std::vector<size_t> problematic_layers = SupportSpotsGenerator::quick_search(this);
             if (!problematic_layers.empty()) {
                 std::cout << "Object needs supports" << std::endl;
                 this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
@@ -420,7 +420,7 @@ void PrintObject::find_supportable_issues()
                 }
             }
         } else {
-            SupportableIssues::Issues issues = SupportableIssues::full_search(this);
+            SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this);
             //TODO fix
 //            if (!issues.supports_nedded.empty()) {
             auto obj_transform = this->trafo_centered();
@@ -430,7 +430,7 @@ void PrintObject::find_supportable_issues()
                     Transform3f inv_transform = (obj_transform * model_transformation).inverse().cast<float>();
                     TriangleSelectorWrapper selector { model_volume->mesh() };
 
-                    for (const SupportableIssues::SupportPoint &support_point : issues.supports_nedded) {
+                    for (const SupportSpotsGenerator::SupportPoint &support_point : issues.supports_nedded) {
                         Vec3f point = Vec3f(inv_transform * support_point.position);
                         Vec3f origin = Vec3f(
                                 inv_transform * Vec3f(support_point.position.x(), support_point.position.y(), 0.0f));
@@ -451,8 +451,8 @@ void PrintObject::find_supportable_issues()
 
         m_print->throw_if_canceled();
         BOOST_LOG_TRIVIAL(debug)
-        << "Searching supportable issues - end";
-        this->set_done(posSupportableIssuesSearch);
+           << "Searching support spots - end";
+        this->set_done(posSupportSpotsSearch);
     }
 }
 
