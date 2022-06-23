@@ -1036,6 +1036,11 @@ msgstr "Adresa"
 msgid "Advanced"
 msgstr "Pokročilý"
 
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
+msgctxt "Mode"
+msgid "Advanced"
+msgstr "Pokročilý"
+
 #: src/slic3r/GUI/GUI_App.cpp:2261
 msgid "Advanced View Mode"
 msgstr "Pokročilý režim"
@@ -1688,6 +1693,14 @@ msgstr "Hmotnost láhve"
 msgctxt "Layers"
 msgid "Bottom"
 msgstr "Spodních"
+
+#. TRN To be shown in the main menu View->Bottom
+#. TRN To be shown in Print Settings "Bottom solid layers"
+#. TRN To be shown in Print Settings "Top solid layers"
+#: src/slic3r/GUI/MainFrame.cpp:1121 src/libslic3r/PrintConfig.cpp:423
+#: src/libslic3r/PrintConfig.cpp:432
+msgid "Bottom"
+msgstr "Zespod"
 
 #: src/slic3r/GUI/MainFrame.cpp:1124
 msgid "Bottom View"
@@ -11287,6 +11300,12 @@ msgstr "Potopení"
 #: src/slic3r/GUI/PrintHostDialogs.cpp:251
 msgctxt "OfFile"
 msgid "Size"
+msgstr "Velikost"
+
+#: src/slic3r/GUI/BedShapeDialog.cpp:31
+#: src/slic3r/GUI/GUI_ObjectManipulation.cpp:218 src/slic3r/GUI/Plater.cpp:204
+#: src/slic3r/GUI/Tab.cpp:2726
+msgid "Size"
 msgstr "Rozměr"
 
 #: src/slic3r/GUI/Tab.cpp:2290 src/slic3r/GUI/Tab.cpp:2517
@@ -13323,13 +13342,13 @@ msgstr ""
 msgid ""
 "This experimental setting is used to limit the speed of change in extrusion "
 "rate for a transition from higher speed to lower speed. A value of 1.8 mm³/"
-"s² ensures, that a change from the extrusion rate of 1.8 mm³/s (0.45 mm "
-"extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) to 5.4 mm³/s "
+"s² ensures, that a change from the extrusion rate of 5.4 mm³/s (0.45 mm "
+"extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) to 1.8 mm³/s "
 "(feedrate 20 mm/s) will take at least 2 seconds."
 msgstr ""
 "Toto experimentální nastavení se používá k omezení rychlosti změny rychlosti "
-"vytlačování při přechodu z vyšší rychlosti na nižší. Hodnota 5,4 mm³/s² "
-"zajišťuje, že změna rychlosti vytlačování z 1,8 mm³/s (šířka vytlačování "
+"vytlačování při přechodu z vyšší rychlosti na nižší. Hodnota 1,8 mm³/s² "
+"zajišťuje, že změna rychlosti vytlačování z 5,4 mm³/s (šířka vytlačování "
 "0,45 mm, výška vytlačování 0,2 mm, rychlost posuvu 20 mm/s) na 1,8 mm³/s "
 "(rychlost posuvu 60 mm/s) bude trvat nejméně 2 sekundy."
 
@@ -14003,6 +14022,13 @@ msgstr "Parametry při výměně (Multi Material s jedním extruderem)"
 
 #: src/slic3r/GUI/OptionsGroup.cpp:352
 msgctxt "Layers"
+msgid "Top"
+msgstr "Vrchních"
+
+#. TRN To be shown in the main menu View->Top
+#. TRN To be shown in Print Settings "Top solid layers"
+#: src/slic3r/GUI/MainFrame.cpp:1118 src/libslic3r/PrintConfig.cpp:2861
+#: src/libslic3r/PrintConfig.cpp:2870
 msgid "Top"
 msgstr "Shora"
 
@@ -17350,10 +17376,6 @@ msgstr "Okraj"
 #: ../src/richtext/richtextformatdlg.cpp:379
 msgid "Borders"
 msgstr "Okraje"
-
-#: ../src/richtext/richtextsizepage.cpp:288 ../src/common/stockitem.cpp:144
-msgid "Bottom"
-msgstr "Dolů"
 
 #: ../src/generic/prntdlgg.cpp:893
 msgid "Bottom margin (mm):"
@@ -21980,11 +22002,6 @@ msgstr "Jednoduchý jednobarevný vzhled"
 msgid "Single"
 msgstr "Jednoduché"
 
-#: ../src/generic/filectrlg.cpp:425 ../src/richtext/richtextformatdlg.cpp:369
-#: ../src/richtext/richtextsizepage.cpp:299
-msgid "Size"
-msgstr "Velikost"
-
 #: ../src/osx/carbon/fontdlg.cpp:339
 msgid "Size:"
 msgstr "Velikost:"
@@ -22725,11 +22742,6 @@ msgstr "Popisek"
 #: ../src/propgrid/advprops.cpp:892
 msgid "TooltipText"
 msgstr "Text popisku"
-
-#: ../src/richtext/richtextsizepage.cpp:286
-#: ../src/richtext/richtextsizepage.cpp:290 ../src/common/stockitem.cpp:200
-msgid "Top"
-msgstr "Nahoru"
 
 #: ../src/generic/prntdlgg.cpp:881
 msgid "Top margin (mm):"

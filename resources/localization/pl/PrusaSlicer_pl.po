@@ -1043,6 +1043,11 @@ msgstr "Adres"
 #: src/libslic3r/PrintConfig.cpp:3157 src/libslic3r/PrintConfig.cpp:3168
 #: src/libslic3r/PrintConfig.cpp:3365
 msgid "Advanced"
+msgstr "Zaawansowane"
+
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
+msgctxt "Mode"
+msgid "Advanced"
 msgstr "Zaawansowany"
 
 #: src/slic3r/GUI/GUI_App.cpp:2261
@@ -1702,6 +1707,14 @@ msgstr "Waga butelki"
 msgctxt "Layers"
 msgid "Bottom"
 msgstr "Spód"
+
+#. TRN To be shown in the main menu View->Bottom
+#. TRN To be shown in Print Settings "Bottom solid layers"
+#. TRN To be shown in Print Settings "Top solid layers"
+#: src/slic3r/GUI/MainFrame.cpp:1121 src/libslic3r/PrintConfig.cpp:423
+#: src/libslic3r/PrintConfig.cpp:432
+msgid "Bottom"
+msgstr "Dolne"
 
 #: src/slic3r/GUI/MainFrame.cpp:1124
 msgid "Bottom View"
@@ -2625,6 +2638,10 @@ msgstr "Kopie wybranego modelu"
 msgctxt "PresetName"
 msgid "Copy"
 msgstr "Kopia"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4542
+msgid "Copy"
+msgstr "Kopiuj"
 
 #: src/slic3r/GUI/AboutDialog.cpp:308
 msgid "Copy Version Info"
@@ -13399,8 +13416,8 @@ msgstr ""
 msgid ""
 "This experimental setting is used to limit the speed of change in extrusion "
 "rate for a transition from higher speed to lower speed. A value of 1.8 mm³/"
-"s² ensures, that a change from the extrusion rate of 1.8 mm³/s (0.45 mm "
-"extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) to 5.4 mm³/s "
+"s² ensures, that a change from the extrusion rate of 5.4 mm³/s (0.45 mm "
+"extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) to 1.8 mm³/s "
 "(feedrate 20 mm/s) will take at least 2 seconds."
 msgstr ""
 "To ustawienie eksperymentalne służy do ograniczenia tempa zmiany szybkości "
@@ -14095,6 +14112,13 @@ msgstr "Parametry zmiany narzędzia dla drukarek MM z jednym ekstruderem"
 
 #: src/slic3r/GUI/OptionsGroup.cpp:352
 msgctxt "Layers"
+msgid "Top"
+msgstr "Góra"
+
+#. TRN To be shown in the main menu View->Top
+#. TRN To be shown in Print Settings "Top solid layers"
+#: src/slic3r/GUI/MainFrame.cpp:1118 src/libslic3r/PrintConfig.cpp:2861
+#: src/libslic3r/PrintConfig.cpp:2870
 msgid "Top"
 msgstr "Górne"
 
@@ -17482,10 +17506,6 @@ msgstr "Obramowanie"
 msgid "Borders"
 msgstr "Ramki"
 
-#: ../src/richtext/richtextsizepage.cpp:288 ../src/common/stockitem.cpp:144
-msgid "Bottom"
-msgstr "Dolny"
-
 #: ../src/generic/prntdlgg.cpp:893
 msgid "Bottom margin (mm):"
 msgstr "Dolny margines (mm):"
@@ -18298,10 +18318,6 @@ msgstr "Skopiowano do schowka:\"%s\""
 #: ../src/generic/prntdlgg.cpp:247
 msgid "Copies:"
 msgstr "Kopie:"
-
-#: ../src/common/stockitem.cpp:150 ../src/stc/stc_i18n.cpp:18
-msgid "Copy"
-msgstr "Kopiuj"
 
 #: ../src/common/stockitem.cpp:258
 msgid "Copy selection"
@@ -22974,11 +22990,6 @@ msgstr ""
 #: ../src/propgrid/advprops.cpp:892
 msgid "TooltipText"
 msgstr ""
-
-#: ../src/richtext/richtextsizepage.cpp:286
-#: ../src/richtext/richtextsizepage.cpp:290 ../src/common/stockitem.cpp:200
-msgid "Top"
-msgstr "Góra"
 
 #: ../src/generic/prntdlgg.cpp:881
 msgid "Top margin (mm):"

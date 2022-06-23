@@ -1009,6 +1009,11 @@ msgstr "Indirizzo"
 #: src/libslic3r/PrintConfig.cpp:3157 src/libslic3r/PrintConfig.cpp:3168
 #: src/libslic3r/PrintConfig.cpp:3365
 msgid "Advanced"
+msgstr "Avanzate"
+
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
+msgctxt "Mode"
+msgid "Advanced"
 msgstr "Avanzata"
 
 #: src/slic3r/GUI/GUI_App.cpp:2261
@@ -1669,6 +1674,14 @@ msgstr "Peso bottiglia"
 
 #: src/slic3r/GUI/OptionsGroup.cpp:352
 msgctxt "Layers"
+msgid "Bottom"
+msgstr "Inferiore"
+
+#. TRN To be shown in the main menu View->Bottom
+#. TRN To be shown in Print Settings "Bottom solid layers"
+#. TRN To be shown in Print Settings "Top solid layers"
+#: src/slic3r/GUI/MainFrame.cpp:1121 src/libslic3r/PrintConfig.cpp:423
+#: src/libslic3r/PrintConfig.cpp:432
 msgid "Bottom"
 msgstr "Inferiore"
 
@@ -2609,6 +2622,10 @@ msgstr "Copie dell'oggetto selezionato"
 
 #: src/slic3r/GUI/SavePresetDialog.cpp:221
 msgctxt "PresetName"
+msgid "Copy"
+msgstr "Copia"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4542
 msgid "Copy"
 msgstr "Copia"
 
@@ -13437,15 +13454,15 @@ msgstr ""
 msgid ""
 "This experimental setting is used to limit the speed of change in extrusion "
 "rate for a transition from higher speed to lower speed. A value of 1.8 mm³/"
-"s² ensures, that a change from the extrusion rate of 1.8 mm³/s (0.45 mm "
-"extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) to 5.4 mm³/s "
+"s² ensures, that a change from the extrusion rate of 5.4 mm³/s (0.45 mm "
+"extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) to 1.8 mm³/s "
 "(feedrate 20 mm/s) will take at least 2 seconds."
 msgstr ""
 "Questa impostazione sperimentale viene utilizzata per limitare la variazione "
 "della velocità di estrusione nel passaggio da una velocità inferiore a una "
 "superiore. Un valore di 1,8 mm³/s² garantisce che il passaggio dalla "
-"velocità di estrusione di 1,8 mm³/s (larghezza di estrusione 0,45 mm, "
-"altezza di estrusione 0,2 mm, velocità di avanzamento 20 mm/s) a 5,4 mm³/s "
+"velocità di estrusione di 5,4 mm³/s (larghezza di estrusione 0,45 mm, "
+"altezza di estrusione 0,2 mm, velocità di avanzamento 20 mm/s) a 1,8 mm³/s "
 "(velocità di avanzamento 60 mm/s) richieda almeno 2 secondi."
 
 #: src/libslic3r/PrintConfig.cpp:1807
@@ -14151,6 +14168,13 @@ msgstr "Parametri di cambio strumento per stampanti MM con estrusore singolo"
 
 #: src/slic3r/GUI/OptionsGroup.cpp:352
 msgctxt "Layers"
+msgid "Top"
+msgstr "Superiore"
+
+#. TRN To be shown in the main menu View->Top
+#. TRN To be shown in Print Settings "Top solid layers"
+#: src/slic3r/GUI/MainFrame.cpp:1118 src/libslic3r/PrintConfig.cpp:2861
+#: src/libslic3r/PrintConfig.cpp:2870
 msgid "Top"
 msgstr "Superiore"
 
@@ -17534,10 +17558,6 @@ msgstr "Bordo"
 msgid "Borders"
 msgstr "Bordi"
 
-#: ../src/richtext/richtextsizepage.cpp:288 ../src/common/stockitem.cpp:144
-msgid "Bottom"
-msgstr "Basso"
-
 #: ../src/generic/prntdlgg.cpp:893
 msgid "Bottom margin (mm):"
 msgstr "Margine inferiore (mm):"
@@ -18348,10 +18368,6 @@ msgstr "Copiato negli Appunti:\"%s\""
 #: ../src/generic/prntdlgg.cpp:247
 msgid "Copies:"
 msgstr "Copie:"
-
-#: ../src/common/stockitem.cpp:150 ../src/stc/stc_i18n.cpp:18
-msgid "Copy"
-msgstr "Copia"
 
 #: ../src/common/stockitem.cpp:258
 msgid "Copy selection"
@@ -22957,11 +22973,6 @@ msgstr "Suggerimento"
 #: ../src/propgrid/advprops.cpp:892
 msgid "TooltipText"
 msgstr "Testo suggerimento"
-
-#: ../src/richtext/richtextsizepage.cpp:286
-#: ../src/richtext/richtextsizepage.cpp:290 ../src/common/stockitem.cpp:200
-msgid "Top"
-msgstr "Alto"
 
 #: ../src/generic/prntdlgg.cpp:881
 msgid "Top margin (mm):"
