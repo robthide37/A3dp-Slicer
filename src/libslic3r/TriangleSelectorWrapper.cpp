@@ -29,6 +29,14 @@ void TriangleSelectorWrapper::enforce_spot(const Vec3f &point, const Vec3f &orig
                 break;
             }
         }
+    } else {
+        size_t hit_idx_out;
+        Vec3f hit_point_out;
+        AABBTreeIndirect::squared_distance_to_indexed_triangle_set(mesh.its.vertices, mesh.its.indices, triangles_tree, point, hit_idx_out, hit_point_out);
+        std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::Sphere>(
+                point, origin, radius, Transform3d::Identity(), TriangleSelector::ClippingPlane { });
+        selector.select_patch(hit_idx_out, std::move(cursor), EnforcerBlockerType::ENFORCER, Transform3d::Identity(),
+                true, 0.0f);
     }
 }
 

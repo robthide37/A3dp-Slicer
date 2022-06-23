@@ -11,7 +11,7 @@ struct Params {
     const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.
 
     float bridge_distance = 10.0f; //mm
-    float bridge_distance_decrease_by_curvature_factor = 5.0f; // >0 REQUIRED; allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
+    float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
 
     float min_distance_between_support_points = 0.5f;
 
@@ -21,7 +21,7 @@ struct Params {
 
     float support_points_interface_radius = 0.5f; // mm
 
-    float max_acceleration = 1000.0f; // mm/s^2 ; max acceleration of object (bed) in XY
+    float max_acceleration = 9*1000.0f; // mm/s^2 ; max acceleration of object (bed) in XY (NOTE: The max hit is received by the object in the jerk phase, so the usual machine limits are too low)
     float filament_density = 1.25f * 0.001f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
 
     float tolerable_extruder_conflict_force = 50.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... ); current value corresponds to weight of X grams

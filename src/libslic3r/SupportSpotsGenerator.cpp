@@ -119,7 +119,6 @@ public:
 
 class StabilityAccumulator {
 private:
-    Polygon base_convex_hull { };
     Points support_points { };
     Vec3f centroid_accumulator = Vec3f::Zero();
     float accumulated_volume { };
@@ -384,7 +383,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 if (distance_from_last_support_point > params.min_distance_between_support_points &&
                         bridging_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
                         > params.bridge_distance
-                                / (bridging_acc.max_curvature
+                                / (1.0f + bridging_acc.max_curvature
                                         * params.bridge_distance_decrease_by_curvature_factor / PI)) {
                     current_segment.add_support_point(current, 0.0f); // Do not count extrusion supports into the sticking force. They can be very densely placed, causing algorithm to overestimate stickiness.
                     issues.supports_nedded.emplace_back(to_vec3f(current), 1.0);
