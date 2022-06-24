@@ -11,7 +11,7 @@
 /// reduction.off - Visualization of reduced and non-reduced Vertices
 /// aois/cutAOI{N}.obj - Cuted Area of interest from corefined model
 /// cuts/cut{N}.obj - Filtered surface cuts + Reduced vertices made by e2 (text_edge_2)
-//#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
+#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
 
 using namespace Slic3r;
 
@@ -34,7 +34,8 @@ void Slic3r::append(SurfaceCut &sc, SurfaceCut &&sc_add)
     its_merge(sc, std::move(sc_add));
 }
 
-SurfaceCut Slic3r::merge(SurfaceCuts &&cuts) { 
+SurfaceCut Slic3r::merge(SurfaceCuts &&cuts)
+{ 
     SurfaceCut result; 
     for (SurfaceCut &cut : cuts) 
         append(result, std::move(cut));
@@ -188,6 +189,14 @@ void set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
 /// <returns>CGAL mesh - half edge mesh</returns>
 CutMesh to_cgal(const indexed_triangle_set &its,
                 const std::vector<bool> &skip_indicies);
+
+/// <summary>
+/// Convert triangle mesh model to CGAL Surface_mesh
+/// </summary>
+/// <param name="its">Input mesh model</param>
+/// <param name="edges_count">It depends on count of opened edge</param>
+/// <returns>CGAL mesh - half edge mesh</returns>
+CutMesh to_cgal(const indexed_triangle_set &its, size_t edges_count = 0);
 
 /// <summary>
 /// Covert 2d shape (e.g. Glyph) to CGAL model
@@ -422,6 +431,9 @@ struct ProjectionDistance
 // addresed by ShapePoint2index
 using ProjectionDistances =  std::vector<ProjectionDistance>;
 
+// each point in shapes has its ProjectionDistances
+using VDistances = std::vector<ProjectionDistances>;
+
 /// <summary>
 /// Calculate distances from CutAOI contour points to ProjectionOrigin
 /// </summary>
@@ -433,13 +445,12 @@ using ProjectionDistances =  std::vector<ProjectionDistance>;
 /// <param name="vert_shape_map">Know source of new vertices</param>
 /// <param name="shape_point_2_index">Convert shapepoint to index</param>
 /// <returns>distances</returns>
-std::vector<ProjectionDistances> create_distances(
-    const CutAOIs        &cuts,
-    const CutMesh        &mesh,
-    uint32_t              shapes_points,
-    const CutMesh        &shapes_mesh,
-    float                 projection_ratio,
-    const VertexShapeMap &vert_shape_map);
+VDistances create_distances(const CutAOIs        &cuts,
+                            const CutMesh        &mesh,
+                            uint32_t              shapes_points,
+                            const CutMesh        &shapes_mesh,
+                            float                 projection_ratio,
+                            const VertexShapeMap &vert_shape_map);
 
 /// <summary>
 /// Select distances in similar depth between expolygons
@@ -459,19 +470,13 @@ using ConvertMap = CutMesh::Property_map<VI, SurfaceCut::Index>;
 /// <summary>
 /// Create surface cuts from mesh model
 /// </summary>
-/// <param name="mesh">Model</param>
-/// <param name="shapes">Cutted shapes</param>
+/// <param name="cutAOIs">Areas of interests from model surface</param>
+/// <param name="mesh">Model - can't be const because of create temporary property map</param>
 /// <param name="reduction_map">Reduction of vertices</param>
-/// <param name="face_type_map">Define Triangles of interest.
-/// Edge between inside / outside.
-/// NOTE: Not const because it need to flag proccessed faces</param>
-/// <param name="convert_map">Used only inside function. 
-/// Store conversion from mesh to result.</param>
 /// <returns>Created surface cuts</returns>
 SurfaceCuts create_surface_cuts(const CutAOIs      &cutAOIs,
-                                const CutMesh      &mesh,
-                                const ReductionMap &reduction_map,
-                                ConvertMap         &convert_map);
+                                CutMesh            &mesh,
+                                const ReductionMap &reduction_map);
 
 /// <summary>
 /// Collect connected inside faces
@@ -571,8 +576,23 @@ SurfaceCut::CutContour create_cut(const std::vector<HI> &outlines,
 /// </summary>
 /// <param name="cuts">Surface cuts to merge
 /// NOTE: Merge process move data from cuts to result</param>
+/// <param name="use_cut">Mask for wanted cuts [Same size as cuts]</param>
 /// <returns>Merged all surface cuts into one</returns>
-SurfaceCut merge_intersections(SurfaceCuts &cuts);
+SurfaceCut merge_intersections(SurfaceCuts &cuts, const CutAOIs& cutAOIs, const std::vector<bool>& use_cut);
+
+/// <summary>
+/// Merge area of interests together
+/// </summary>
+/// <param name="cuts">Patches from mesh</param>
+/// <param name="use_cut">Define wanted cuts</param>
+/// <param name="mesh">source CGAL model</param>
+void merge_aois(CutAOIs &cuts, const std::vector<bool> &use_cut, const CutMesh& mesh);
+
+// keep CGAL Mesh for next processing
+struct SurfaceCutWithMesh : public SurfaceCut{
+    CutMesh cgalMesh = CutMesh();
+};
+
 
 /// <summary>
 /// Merge 2 Cuts when has intersection
@@ -704,8 +724,8 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
     uint32_t shapes_points = shape_point_2_index.get_count();
 
     // for each point collect all projection distances
-    std::vector<priv::ProjectionDistances> distances =
-        priv::create_distances(cutAOIs, cgal_model, shapes_points, cgal_shape, projection_ratio, vert_shape_map);
+    priv::VDistances distances = priv::create_distances
+    (cutAOIs, cgal_model, shapes_points, cgal_shape, projection_ratio, vert_shape_map);
 
     // NOTE: it will be fine to calc AOIs range,
     // not only outline but all vertices in direction of emboss - faster check on intersection
@@ -724,34 +744,30 @@ SurfaceCut Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::store(best_projection, cutAOIs, cgal_model, DEBUG_OUTPUT_DIR + "best_projection.obj"); // only debug
 #endif // DEBUG_OUTPUT_DIR
 
+    // Create mask for wanted AOIs
     std::vector<bool> is_best_cut(cutAOIs.size(), {false});
-    for (const priv::ProjectionDistance &d : best_projection) {
-        if (d.aoi_index == std::numeric_limits<uint32_t>::max()) continue;
-        is_best_cut[d.aoi_index] = true;
-    }
+    for (const priv::ProjectionDistance &d : best_projection)
+        if (d.aoi_index != std::numeric_limits<uint32_t>::max()) 
+            is_best_cut[d.aoi_index] = true;
 
-    // Filter cuts - No best cuts are removed
-    for (size_t i = cutAOIs.size(); i > 0; --i) { 
-        size_t index = i - 1;
-        if (is_best_cut[index]) continue;
-        cutAOIs.erase(cutAOIs.begin() + index);
-    }
-
-    // conversion map between vertex index in cgal_model and indices in result
-    // used instead of std::map
-    std::string vertec_convert_map_name = "v:convert";
-    priv::ConvertMap vertex_convert_map = cgal_model.add_property_map<priv::VI, SurfaceCut::Index>(vertec_convert_map_name).first;    
-    SurfaceCuts result = priv::create_surface_cuts(cutAOIs, cgal_model, vertex_reduction_map, vertex_convert_map);    
+    // NOTE: It is not neccessary to convert all AOIs to SurfaceCut
+    // but exist case where AOI intersect best AOI without edge intersection
+    // So filtering is made from SurfaceCuts in merge function
+   
+    SurfaceCuts surface_cuts = priv::create_surface_cuts(cutAOIs, cgal_model, vertex_reduction_map);    
 #ifdef DEBUG_OUTPUT_DIR
-    priv::store(result, DEBUG_OUTPUT_DIR + "cuts/"); // only debug
+    priv::store(surface_cuts, DEBUG_OUTPUT_DIR + "cuts/"); // only debug
 #endif // DEBUG_OUTPUT_DIR
     
-    // Self Intersection of surface cuts
-    // It is made by damaged models and multi volumes
-    //priv::merge_intersections(result);
+    priv::merge_aois(cutAOIs, is_best_cut, cgal_model);
 
-    // TODO: fill skipped source triangles to surface of cut
-    return merge(std::move(result));
+    // Self Intersection of surface cuts are
+    // made by damaged models AND multi volumes
+    SurfaceCut result = priv::merge_intersections(surface_cuts, cutAOIs, is_best_cut);
+#ifdef DEBUG_OUTPUT_DIR
+    its_write_obj(result, (DEBUG_OUTPUT_DIR + "resultCut.obj").c_str()); // only debug
+#endif // DEBUG_OUTPUT_DIR
+    return result;
 }
 
 indexed_triangle_set Slic3r::cuts2model(const SurfaceCuts        &cuts,
@@ -1070,6 +1086,29 @@ void priv::set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
         if (is_all_on_one_side(t)) 
             skip_indicies[i] = true;
     }
+}
+
+priv::CutMesh priv::to_cgal(const indexed_triangle_set &its, size_t edges_count)
+{
+    CutMesh result;
+    if (its.empty()) return result;
+
+    const std::vector<stl_vertex>                  &vertices = its.vertices;
+    const std::vector<stl_triangle_vertex_indices> &indices  = its.indices;
+
+    size_t vertices_count = vertices.size();
+    size_t faces_count    = indices.size();
+    if (edges_count == 0) edges_count = (faces_count * 3) / 2;
+    result.reserve(vertices_count, edges_count, faces_count);
+
+    for (const stl_vertex &v : vertices)
+        result.add_vertex(CutMesh::Point{v.x(), v.y(), v.z()});
+
+    for (const stl_triangle_vertex_indices &f : indices)
+        result.add_face(static_cast<VI>(f[0]), static_cast<VI>(f[1]),
+                        static_cast<VI>(f[2]));
+
+    return result;
 }
 
 priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
@@ -1922,303 +1961,358 @@ std::vector<priv::ProjectionDistances> priv::create_distances(
     return distances;
 }
 
+// functions for choose_best_distance
+namespace priv {
+
+// euler square size of vector stored in Point
+float calc_size_sq(const Point &p);
+
+// structure to store index and distance together
+struct ClosePoint
+{
+    // index of closest point from another shape
+    uint32_t index = std::numeric_limits<uint32_t>::max();
+    // squere distance to index
+    float dist_sq = std::numeric_limits<float>::max();
+};
+
+// search in all shapes points to found closest point to given point
+uint32_t get_closest_point_index(const Point &p, const ExPolygons &shapes, const VDistances &distances);
+
+// Search for closest projection to wanted distance
+const ProjectionDistance *get_closest_projection(const ProjectionDistances &distance, float wanted_distance);
+
+// return neighbor projection distance when exists
+const ProjectionDistance *get_next(const ProjectionDistance  &from_pd,
+                                   const ProjectionDistances &from,
+                                   const ProjectionDistances &to);
+
+// fill result around known index inside one polygon
+void fill_polygon_distances(const ProjectionDistance &pd, uint32_t index, const ShapePointId &id, ProjectionDistances & result, const ExPolygons &shapes, const VDistances &distances);
+
+// choose correct cut by source point
+void fill_shape_distances(uint32_t known_point, const ProjectionDistance &pd, ProjectionDistances &result, std::vector<bool>& finished_shapes, const ShapePoint2index &s2i, const ExPolygons &shapes, const VDistances &distances);
+
+// find close points between finished and unfinished ExPolygons
+ClosePoint find_close_point(const Point &p, ProjectionDistances &result, std::vector<bool>& finished_shapes,const ShapePoint2index &s2i, const ExPolygons &shapes);
+
+}
+
+float priv::calc_size_sq(const Point &p){
+    return (float) p.x() * p.x() + (float) p.y() * p.y();
+}
+
+uint32_t priv::get_closest_point_index(const Point      &p,
+                                       const ExPolygons &shapes,
+                                       const VDistances &distances)
+{
+    ClosePoint cp;
+    uint32_t id{0};
+    auto get_closest = [&distances, &p, &id, &cp]
+    (const Points &pts) {
+        for (const Point &p_ : pts) {
+            if (distances[id].empty()) { 
+                ++id;
+                continue;
+            }
+            float d = calc_size_sq(p - p_);
+            if (cp.dist_sq > d) {
+                cp.dist_sq = d;
+                cp.index  = id;
+            }
+            ++id;
+        }
+    };
+    for (const ExPolygon &shape : shapes) {
+        get_closest(shape.contour.points);
+        for (const Polygon &hole : shape.holes) 
+            get_closest(hole.points);
+    }
+    return cp.index;
+}
+
+const priv::ProjectionDistance *priv::get_closest_projection(
+    const ProjectionDistances &distance, float wanted_distance)
+{
+    // minimal distance
+    float min_d = std::numeric_limits<float>::max();
+    const ProjectionDistance *min_pd = nullptr;
+    for (const ProjectionDistance &pd : distance) { 
+        float d = std::fabs(pd.distance - wanted_distance);
+        // There should be limit for maximal distance
+        if (min_d > d) { 
+            min_d = d;
+            min_pd = &pd;
+        }
+    }
+    return min_pd;
+}
+
+const priv::ProjectionDistance *priv::get_next(
+    const ProjectionDistance  &from_pd,
+    const ProjectionDistances &from,
+    const ProjectionDistances &to)
+{
+    // exist some projection?
+    if (to.empty()) return {};
+
+    // find next same aoi (closest one)
+    const ProjectionDistance* to_pd = nullptr;
+    for (const ProjectionDistance &t : to) { 
+        if (t.aoi_index != from_pd.aoi_index) continue;            
+        if (to_pd != nullptr) {
+            // when exist more than one use closest to previous
+            float distance_prev = std::fabs(to_pd->distance - from_pd.distance);
+            float distance = std::fabs(t.distance - from_pd.distance);
+            if (distance < distance_prev) 
+                to_pd = &t;
+        } else {
+            to_pd = &t;
+        }            
+    }
+
+    if (to_pd != nullptr) {
+        // detect crossing aois
+        const ProjectionDistance* cross_pd = nullptr;
+        for (const ProjectionDistance &t : to) { 
+            if (t.distance > to_pd->distance) continue;
+            for (const ProjectionDistance &f : from) { 
+                if (f.aoi_index != t.aoi_index) continue;
+                if (f.distance < from_pd.distance) continue;
+                if (cross_pd!=nullptr) {
+                    // multiple crossing
+                    if (cross_pd->distance > f.distance) 
+                        cross_pd = &f;
+                } else {
+                    cross_pd = &f;
+                }
+            }
+        }
+        // TODO: Detect opposit crossing - should be fixed
+        if (cross_pd!=nullptr) return cross_pd;
+    } else {
+        // Try find another closest AOI 
+        return get_closest_projection(to, from_pd.distance);
+    }
+    return to_pd;
+}
+
+void priv::fill_polygon_distances(const ProjectionDistance &pd,
+                                  uint32_t                  index,
+                                  const ShapePointId       &id,
+                                  ProjectionDistances      &result,
+                                  const ExPolygons         &shapes,
+                                  const VDistances         &distances)
+{
+    const ExPolygon &shape = shapes[id.expolygons_index];
+    const Points  & points = (id.polygon_index == 0) ?
+                                            shape.contour.points :
+                                            shape.holes[id.polygon_index - 1].points;
+    // border of indexes for Polygon
+    uint32_t first_index = index - id.point_index;
+    uint32_t last_index  = first_index + points.size();        
+
+    uint32_t act_index = index;
+    const ProjectionDistance* act_pd = &pd;
+    const ProjectionDistances* act_distances = &distances[act_index];
+
+    // Copy starting pd to result
+    result[act_index] = pd;
+
+    auto exist_next = [&distances, &act_index, &act_pd, &act_distances, &result]
+    (uint32_t nxt_index) {
+        const ProjectionDistances* nxt_distances = &distances[nxt_index];
+        const ProjectionDistance *nxt_pd = get_next(*act_pd, *act_distances, *nxt_distances);
+        // exist next projection distance ?
+        if (nxt_pd == nullptr) return false;
+
+        // check no rewrite result
+        assert(result[nxt_index].aoi_index == std::numeric_limits<uint32_t>::max());
+        // copy founded projection to result
+        result[nxt_index] = *nxt_pd; // copy
+
+        // next
+        act_index = nxt_index;
+        act_pd        = &result[nxt_index];
+        act_distances = nxt_distances;
+        return true;
+    };
+
+    // last index in circle
+    uint32_t finish_index = (index == first_index) ? (last_index - 1) :
+                                                        (index - 1);
+    // Positive iteration inside polygon
+    do {
+        uint32_t nxt_index = act_index + 1;
+        // close loop of indexes inside of contour
+        if (nxt_index == last_index) nxt_index = first_index;
+        // check that exist next 
+        if (!exist_next(nxt_index)) break;            
+    } while (act_index != finish_index);
+
+    // when all results for polygon are set no neccessary to iterate negative
+    if (act_index == finish_index) return;
+
+    act_index     = index;
+    act_pd        = &pd;
+    act_distances = &distances[act_index];
+    // Negative iteration inside polygon
+    do {
+        uint32_t nxt_index = (act_index == first_index) ? 
+            (last_index-1) : (act_index - 1);
+        // When iterate negative it must be split to parts
+        // and can't iterate in circle
+        assert(nxt_index != index);
+        // check that exist next 
+        if (!exist_next(nxt_index)) break;
+    } while (true);
+}
+
+void priv::fill_shape_distances(uint32_t                  known_point,
+                                const ProjectionDistance &pd,
+                                ProjectionDistances      &result,
+                                std::vector<bool>        &finished_shapes,
+                                const ShapePoint2index   &s2i,
+                                const ExPolygons         &shapes,
+                                const VDistances         &distances)
+{
+    const ProjectionDistance *start_pd = &pd;
+    uint32_t start_index = known_point;
+    uint32_t expolygons_index = s2i.calc_id(known_point).expolygons_index;
+    uint32_t first_shape_index = s2i.calc_index({expolygons_index, 0, 0});
+    const ExPolygon &shape = shapes[expolygons_index];
+    do {
+        fill_polygon_distances(*start_pd, start_index, s2i.calc_id(start_index),result, shapes, distances);
+        // seaching only inside shape, return index of closed finished point
+        auto find_close_finished_point = [&first_shape_index, &shape, &result]
+        (const Point &p) -> ClosePoint {
+            uint32_t index = first_shape_index;                
+            ClosePoint cp;
+            auto check_finished_points = [&cp, &result, &index, &p]
+            (const Points& pts) { 
+                for (const Point &p_ : pts) {
+                    // finished point with some distances
+                    if (result[index].aoi_index == std::numeric_limits<uint32_t>::max()) {
+                        ++index;
+                        continue;
+                    }
+                    float distance = calc_size_sq(p_ - p);
+                    if (cp.dist_sq > distance) { 
+                        cp.dist_sq = distance;
+                        cp.index   = index;
+                    }
+                    ++index;
+                }
+            };
+            check_finished_points(shape.contour.points);
+            for (const Polygon &h : shape.holes)
+                check_finished_points(h.points);
+            return cp;
+        };
+                        
+        // find next closest pair of points
+        // (finished + unfinished) in ExPolygon
+        start_index = std::numeric_limits<uint32_t>::max(); // unfinished_index
+        uint32_t finished_index = std::numeric_limits<uint32_t>::max();
+        float dist_sq = std::numeric_limits<float>::max();
+
+        // first index in shape
+        uint32_t index = first_shape_index;
+        auto check_unfinished_points = [&index, &result, &distances, &find_close_finished_point, &dist_sq, &start_index, &finished_index]
+        (const Points& pts) { 
+            for (const Point &p : pts) {
+                // try find unfinished
+                if (result[index].aoi_index !=
+                    std::numeric_limits<uint32_t>::max() ||
+                    distances[index].empty()) {
+                    ++index;
+                    continue;
+                }
+                ClosePoint cp = find_close_finished_point(p);
+                if (dist_sq > cp.dist_sq) { 
+                    dist_sq = cp.dist_sq;
+                    start_index = index;
+                    finished_index = cp.index;
+                }
+                ++index;
+            }
+        };
+        // for each unfinished points
+        check_unfinished_points(shape.contour.points);
+        for (const Polygon &h : shape.holes)
+            check_unfinished_points(h.points);
+    } while (start_index != std::numeric_limits<uint32_t>::max());
+    finished_shapes[expolygons_index] = true;
+}
+
+priv::ClosePoint priv::find_close_point(const Point         &p,
+                                        ProjectionDistances &result,
+                                        std::vector<bool>   &finished_shapes,
+                                        const ShapePoint2index &s2i,
+                                        const ExPolygons       &shapes)
+{
+    // result
+    ClosePoint cp;
+    // for all finished points
+    for (uint32_t shape_index = 0; shape_index < shapes.size(); ++shape_index) {
+        if (!finished_shapes[shape_index]) continue;
+        const ExPolygon &shape = shapes[shape_index];
+        uint32_t index = s2i.calc_index({shape_index, 0, 0});
+        auto find_close_point_in_points = [&p, &cp, &index, &result]
+        (const Points &pts){
+            for (const Point &p_ : pts) {
+                // Exist result (is finished) ?
+                if (result[index].aoi_index ==
+                    std::numeric_limits<uint32_t>::max()) {
+                    ++index;
+                    continue;
+                }
+                float distance_sq = calc_size_sq(p - p_);
+                if (cp.dist_sq > distance_sq) { 
+                    cp.dist_sq = distance_sq;
+                    cp.index = index;
+                }
+                ++index;
+            }
+        };
+        find_close_point_in_points(shape.contour.points);
+        // shape could be inside of another shape's hole
+        for (const Polygon& h:shape.holes)
+            find_close_point_in_points(h.points);
+    }
+    return cp;
+}
+
+// IMPROVE: create better structure to find closest points e.g. Tree
 priv::ProjectionDistances priv::choose_best_distance(
     const std::vector<ProjectionDistances> &distances,
     const ExPolygons                       &shapes,
     const BoundingBox                      &shapes_bb,
     const ShapePoint2index                 &s2i)
 {
-    // euler square size of vector stored in just created Point
-    auto calc_size_sq = [](const Point &p) -> float {
-        return (float)p.x() * p.x() + (float)p.y() * p.y();
-    };
-    struct ClosePoint{
-        // index of closest point from another shape
-        uint32_t index = std::numeric_limits<uint32_t>::max();
-        // squere distance to index
-        float dist_sq = std::numeric_limits<float>::max();
-    };
-    // search in all shapes points to found closest point to given point
-    auto get_closest_point_index = [&shapes, &distances, &calc_size_sq]
-    (const Point &p)->uint32_t{
-        ClosePoint cp;
-        uint32_t id{0};
-        auto get_closest = [&distances, &p, &id, &cp, &calc_size_sq]
-        (const Points &pts) {
-            for (const Point &p_ : pts) {
-                if (distances[id].empty()) { 
-                    ++id;
-                    continue;
-                }
-                float d = calc_size_sq(p - p_);
-                if (cp.dist_sq > d) {
-                    cp.dist_sq = d;
-                    cp.index  = id;
-                }
-                ++id;
-            }
-        };
-        for (const ExPolygon &shape : shapes) {
-            get_closest(shape.contour.points);
-            for (const Polygon &hole : shape.holes) 
-                get_closest(hole.points);
-        }
-        return cp.index;
-    };
-    // Search for closest projection to wanted distance
-    auto get_closest_projection = []
-    (const ProjectionDistances& distance, float wanted_distance) -> const ProjectionDistance *{
-        // minimal distance
-        float min_d = std::numeric_limits<float>::max();
-        const ProjectionDistance *min_pd = nullptr;
-        for (const ProjectionDistance &pd : distance) { 
-            float d = std::fabs(pd.distance - wanted_distance);
-            // There should be limit for maximal distance
-            if (min_d > d) { 
-                min_d = d;
-                min_pd = &pd;
-            }
-        }
-        return min_pd;
-    };
-
-    // return neighbor projection distance when exists
-    auto get_next = [&get_closest_projection]
-    (const ProjectionDistance &from_pd, const ProjectionDistances &from,
-    const ProjectionDistances &to) -> const ProjectionDistance* {
-        // exist some projection?
-        if (to.empty()) return {};
-
-        // find next same aoi (closest one)
-        const ProjectionDistance* to_pd = nullptr;
-        for (const ProjectionDistance &t : to) { 
-            if (t.aoi_index != from_pd.aoi_index) continue;            
-            if (to_pd != nullptr) {
-                // when exist more than one use closest to previous
-                float distance_prev = std::fabs(to_pd->distance - from_pd.distance);
-                float distance = std::fabs(t.distance - from_pd.distance);
-                if (distance < distance_prev) 
-                    to_pd = &t;
-            } else {
-                to_pd = &t;
-            }            
-        }
-
-        if (to_pd != nullptr) {
-            // detect crossing aois
-            const ProjectionDistance* cross_pd = nullptr;
-            for (const ProjectionDistance &t : to) { 
-                if (t.distance > to_pd->distance) continue;
-                for (const ProjectionDistance &f : from) { 
-                    if (f.aoi_index != t.aoi_index) continue;
-                    if (f.distance < from_pd.distance) continue;
-                    if (cross_pd!=nullptr) {
-                        // multiple crossing
-                        if (cross_pd->distance > f.distance) 
-                            cross_pd = &f;
-                    } else {
-                        cross_pd = &f;
-                    }
-                }
-            }
-            // TODO: Detect opposit crossing - should be fixed
-            if (cross_pd!=nullptr) return cross_pd;
-        } else {
-            // Try find another closest AOI 
-            return get_closest_projection(to, from_pd.distance);
-        }
-        return to_pd;
-    };
-
+    // collect one closest projection for each outline point
     ProjectionDistances result(distances.size());
-    // fill result around known index inside one polygon
-    auto fill_polygon_distances = [&distances, &shapes, &result, &get_next]
-    (const ProjectionDistance &pd, uint32_t index, const ShapePointId& id){        
-        const ExPolygon &shape = shapes[id.expolygons_index];
-        const Points  & points = (id.polygon_index == 0) ?
-                                                shape.contour.points :
-                                                shape.holes[id.polygon_index - 1].points;
-        // border of indexes for Polygon
-        uint32_t first_index = index - id.point_index;
-        uint32_t last_index  = first_index + points.size();        
 
-        uint32_t act_index = index;
-        const ProjectionDistance* act_pd = &pd;
-        const ProjectionDistances* act_distances = &distances[act_index];
-
-        // Copy starting pd to result
-        result[act_index] = pd;
-
-        auto exist_next = [&distances, &act_index, &act_pd, &act_distances, get_next, &result]
-        (uint32_t nxt_index) {
-            const ProjectionDistances* nxt_distances = &distances[nxt_index];
-            const ProjectionDistance *nxt_pd = get_next(*act_pd, *act_distances, *nxt_distances);
-            // exist next projection distance ?
-            if (nxt_pd == nullptr) return false;
-
-            // check no rewrite result
-            assert(result[nxt_index].aoi_index == std::numeric_limits<uint32_t>::max());
-            // copy founded projection to result
-            result[nxt_index] = *nxt_pd; // copy
-
-            // next
-            act_index = nxt_index;
-            act_pd        = &result[nxt_index];
-            act_distances = nxt_distances;
-            return true;
-        };
-
-        // last index in circle
-        uint32_t finish_index = (index == first_index) ? (last_index - 1) :
-                                                         (index - 1);
-        // Positive iteration inside polygon
-        do {
-            uint32_t nxt_index = act_index + 1;
-            // close loop of indexes inside of contour
-            if (nxt_index == last_index) nxt_index = first_index;
-            // check that exist next 
-            if (!exist_next(nxt_index)) break;            
-        } while (act_index != finish_index);
-
-        // when all results for polygon are set no neccessary to iterate negative
-        if (act_index == finish_index) return;
-
-        act_index     = index;
-        act_pd        = &pd;
-        act_distances = &distances[act_index];
-        // Negative iteration inside polygon
-        do {
-            uint32_t nxt_index = (act_index == first_index) ? 
-                (last_index-1) : (act_index - 1);
-            // When iterate negative it must be split to parts
-            // and can't iterate in circle
-            assert(nxt_index != index);
-            // check that exist next 
-            if (!exist_next(nxt_index)) break;
-        } while (true);
-    };
-
+    // store info about finished shapes
     std::vector<bool> finished_shapes(shapes.size(), {false});
-    // choose correct cut by source point
-    auto fill_shape_distances = [&distances, &s2i, &shapes, &result, &fill_polygon_distances, &calc_size_sq, &finished_shapes]
-    (uint32_t known_point, const ProjectionDistance &pd) {
-        const ProjectionDistance *start_pd = &pd;
-        uint32_t start_index = known_point;
-        uint32_t expolygons_index = s2i.calc_id(known_point).expolygons_index;
-        uint32_t first_shape_index = s2i.calc_index({expolygons_index, 0, 0});
-        const ExPolygon &shape = shapes[expolygons_index];
-        do {
-            fill_polygon_distances(*start_pd, start_index, s2i.calc_id(start_index));
-            // seaching only inside shape, return index of closed finished point
-            auto find_close_finished_point = [&first_shape_index, &shape, &result, &calc_size_sq]
-            (const Point &p) -> ClosePoint {
-                uint32_t index = first_shape_index;                
-                ClosePoint cp;
-                auto check_finished_points = [&cp, &result, &index, &p, &calc_size_sq]
-                (const Points& pts) { 
-                    for (const Point &p_ : pts) {
-                        // finished point with some distances
-                        if (result[index].aoi_index == std::numeric_limits<uint32_t>::max()) {
-                            ++index;
-                            continue;
-                        }
-                        float distance = calc_size_sq(p_ - p);
-                        if (cp.dist_sq > distance) { 
-                            cp.dist_sq = distance;
-                            cp.index   = index;
-                        }
-                        ++index;
-                    }
-                };
-                check_finished_points(shape.contour.points);
-                for (const Polygon &h : shape.holes)
-                    check_finished_points(h.points);
-                return cp;
-            };
-                        
-            // find next closest pair of points
-            // (finished + unfinished) in ExPolygon
-            start_index = std::numeric_limits<uint32_t>::max(); // unfinished_index
-            uint32_t finished_index = std::numeric_limits<uint32_t>::max();
-            float dist_sq = std::numeric_limits<float>::max();
-
-            // first index in shape
-            uint32_t index = first_shape_index;
-            auto check_unfinished_points = [&index, &result, &distances, &find_close_finished_point, &dist_sq, &start_index, &finished_index]
-            (const Points& pts) { 
-                for (const Point &p : pts) {
-                    // try find unfinished
-                    if (result[index].aoi_index !=
-                        std::numeric_limits<uint32_t>::max() ||
-                        distances[index].empty()) {
-                        ++index;
-                        continue;
-                    }
-                    ClosePoint cp = find_close_finished_point(p);
-                    if (dist_sq > cp.dist_sq) { 
-                        dist_sq = cp.dist_sq;
-                        start_index = index;
-                        finished_index = cp.index;
-                    }
-                    ++index;
-                }
-            };
-            // for each unfinished points
-            check_unfinished_points(shape.contour.points);
-            for (const Polygon &h : shape.holes)
-                check_unfinished_points(h.points);
-        } while (start_index != std::numeric_limits<uint32_t>::max());
-        finished_shapes[expolygons_index] = true;
-    };    
-
-    // find close points between finished and unfinished ExPolygons
-    auto find_close_point = [&shapes, &finished_shapes, &s2i, &calc_size_sq, &result]
-    (const Point &p) -> ClosePoint {
-        // result
-        ClosePoint cp;
-        // for all finished points
-        for (uint32_t shape_index = 0; shape_index < shapes.size(); ++shape_index) {
-            if (!finished_shapes[shape_index]) continue;
-            const ExPolygon &shape = shapes[shape_index];
-            uint32_t index = s2i.calc_index({shape_index, 0, 0});
-            auto find_close_point_in_points = [&p, &cp, &index, &calc_size_sq, &result]
-            (const Points &pts){
-                for (const Point &p_ : pts) {
-                    // Exist result (is finished) ?
-                    if (result[index].aoi_index ==
-                        std::numeric_limits<uint32_t>::max()) {
-                        ++index;
-                        continue;
-                    }
-                    float distance_sq = calc_size_sq(p - p_);
-                    if (cp.dist_sq > distance_sq) { 
-                        cp.dist_sq = distance_sq;
-                        cp.index = index;
-                    }
-                    ++index;
-                }
-            };
-            find_close_point_in_points(shape.contour.points);
-            // shape could be inside of another shape's hole
-            for (const Polygon& h:shape.holes)
-                find_close_point_in_points(h.points);
-        }
-        return cp;
-    };
-
     
     // wanted distance from ideal projection
+    // Distances are relative to projection distance
+    // so first wanted distance is the closest one (ZERO)
     float wanted_distance = 0.f;
+
     // NOTE: it should be dependent on allign of text
     Point center = shapes_bb.center();
 
-    // Select first point of shapes
-    uint32_t unfinished_index = get_closest_point_index(center);
-    // selection of closest_id should proove that pd has value
+    // Select point from shapes(text contour) which is closest to center (all in 2d)
+    uint32_t unfinished_index = get_closest_point_index(center, shapes, distances);
+
     do {
         const ProjectionDistance* pd = get_closest_projection(distances[unfinished_index], wanted_distance);
+        // selection of closest_id should proove that pd has value 
+        // (functions: get_closest_point_index and find_close_point_in_points)
         assert(pd != nullptr);
-        fill_shape_distances(unfinished_index, *pd);
+        fill_shape_distances(unfinished_index, *pd, result, finished_shapes, s2i, shapes, distances);
 
         // The most close points between finished and unfinished shapes
         unfinished_index = std::numeric_limits<uint32_t>::max();
@@ -2231,14 +2325,14 @@ priv::ProjectionDistances priv::choose_best_distance(
             uint32_t index = s2i.calc_index({shape_index, 0, 0});
             auto find_close_point_in_points =
                 [&unfinished_index, &best_cp,
-                &index, &find_close_point, &distances]
+                &index, &result, &finished_shapes, &distances, &s2i, &shapes]
             (const Points &pts) {
                 for (const Point &p : pts) {
                     if (distances[index].empty()){ 
                         ++index;
                         continue;
                     }
-                    ClosePoint cp = find_close_point(p);
+                    ClosePoint cp = find_close_point(p, result, finished_shapes, s2i, shapes);
                     if (cp.index != std::numeric_limits<uint32_t>::max() &&
                         best_cp.dist_sq > cp.dist_sq) {
                         best_cp = cp; // copy
@@ -2263,11 +2357,559 @@ priv::ProjectionDistances priv::choose_best_distance(
     return result;
 }
 
-bool priv::merge_intersection(SurfaceCut &cut1, const SurfaceCut &cut2) {
-    return false;
+// functions to help 'merge_intersection'
+namespace priv {
+const VI default_vi(std::numeric_limits<uint32_t>::max());
+
+/// <summary>
+/// Corefine visitor
+/// Store intersection vertices pairs
+/// </summary>
+struct Store_VI_pairs
+{
+    const CutMesh *tm1;
+    const CutMesh *tm2;
+
+    // keep source of intersection for each intersection
+    // used to copy data into vert_shape_map
+    using Pair = std::pair<VI, VI>;
+    using Pairs = std::vector<Pair>;
+    Pairs *intersections;
+
+    size_t max_intersection_id = 0;
+
+    /// <summary>
+    /// Store VI to intersections by i_id
+    /// </summary>
+    /// <param name="i_id">Order number of intersection point</param>
+    /// <param name="v">New added vertex</param>
+    /// <param name="tm">Affected mesh</param>
+    void new_vertex_added(std::size_t i_id, VI v, const CutMesh &tm) {
+        if (intersections->empty()) {
+            assert(max_intersection_id > 0);
+            *intersections = std::vector<std::pair<VI, VI>>
+                (max_intersection_id+1, {default_vi,default_vi} );        
+        }
+        assert(i_id <= max_intersection_id);
+        std::pair<VI, VI> &intersection = intersections->at(i_id);
+        assert(&tm == tm1 || &tm == tm2);
+        VI &inte_vi = (&tm == tm1) ? intersection.first : intersection.second;
+        assert(inte_vi == default_vi);
+        inte_vi = v;
+    }
+
+    // count intersections
+    void intersection_point_detected(std::size_t i_id, int sdim, HI h_f, HI h_e, 
+        const CutMesh &tm_f, const CutMesh &tm_e, bool is_target_coplanar, bool is_source_coplanar){
+        if (max_intersection_id < i_id) max_intersection_id = i_id;
+    }
+
+    // Not used visitor functions
+    void before_subface_creations(FI /* f_old */, CutMesh & /* mesh */) {}
+    void after_subface_created(FI /* f_new */, CutMesh & /* mesh */) {}
+    void after_subface_creations(CutMesh &) {}
+    void before_subface_created(CutMesh &) {}
+    void before_edge_split(HI /* h */, CutMesh & /* tm */) {}
+    void edge_split(HI /* hnew */, CutMesh & /* tm */) {}
+    void after_edge_split() {}
+    void add_retriangulation_edge(HI /* h */, CutMesh & /* tm */) {}
+};
+
+// Convert one Vertex index into another
+using V2V_map = CutMesh::Property_map<VI, VI>;
+V2V_map create_map_from_vi1_to_vi2(CutMesh &tm1, const Store_VI_pairs::Pairs& intersections, const std::string &map_name);
+
+/// <summary>
+/// Create map1 and map2
+/// </summary>
+/// <param name="tm1">First mesh</param>
+/// <param name="map1">First map</param>
+/// <param name="tm2">Second mesh</param>
+/// <param name="map2">Second map</param>
+/// <param name="vi1_to_vi2">Cvt vertex 1 to vertex 2</param>
+/// <param name="ecm1">Identify constrainde edge</param>
+void create_face_types(const CutMesh &tm1, FaceTypeMap& map1, const CutMesh &tm2, FaceTypeMap &map2, const V2V_map &vi1_to_vi2, const EcmType &ecm1);
+
+// Convert vertex index to indexed_triangle_set::index (index of vertext)
+using V2I_map = CutMesh::Property_map<VI, SurfaceCut::Index>;
+
+// Create its from merged CGAL models(without outline)
+indexed_triangle_set create_merged_its(
+    const CutMesh &tm1, const FaceTypeMap &map1, V2I_map &vi1_to_res,
+    const CutMesh &tm2, const FaceTypeMap &map2, V2I_map &vi2_to_res, const V2V_map &vi1_to_vi2);
 }
 
-SurfaceCut priv::merge_intersections(SurfaceCuts &cuts)
+priv::V2V_map priv::create_map_from_vi1_to_vi2(
+    CutMesh                     &tm1,
+    const Store_VI_pairs::Pairs &intersections,
+    const std::string           &map_name)
+{
+    // Create conversion map from tm1.vertex to tm2.vertex on constrained edge
+    V2V_map vi2vi_map = tm1.add_property_map<VI, VI>(map_name).first;
+    // initialize to default value
+    for (VI vi : tm1.vertices()) vi2vi_map[vi] = default_vi;
+    // fill data by intersections
+    for (const std::pair<VI, VI> &intersection : intersections) {
+        // weird intersection?? what does it mean ??
+        if (intersection.first == default_vi ||
+            intersection.second == default_vi)
+            continue;
+
+        // is intersection point used only once?
+        assert(vi2vi_map[intersection.first] == default_vi);
+        vi2vi_map[intersection.first] = intersection.second;
+    }
+    return vi2vi_map;
+}
+
+void priv::create_face_types(const CutMesh &tm1,
+                             FaceTypeMap   &map1,
+                             const CutMesh &tm2,
+                             FaceTypeMap   &map2,
+                             const V2V_map &vi1_to_vi2,
+                             const EcmType &ecm1)
+{
+    // initialize maps
+    for (FI fi : tm1.faces()) map1[fi] = FaceType::not_constrained;
+    for (FI fi : tm2.faces()) map2[fi] = FaceType::not_constrained;
+
+    for (EI ei1 : tm1.edges()) { 
+        if (!get(ecm1, ei1)) continue;
+
+        // get faces from tm1 (f1a + f1b)
+        HI hi1 = tm1.halfedge(ei1);
+        assert(hi1.is_valid());
+        FI f1a = tm1.face(hi1);
+        assert(f1a.is_valid());
+        HI hi_op = tm1.opposite(hi1);
+        assert(hi_op.is_valid());
+        FI f1b = tm1.face(hi_op);
+        assert(f1b.is_valid());
+
+        // get faces from tm2 (f2a + f2b)
+        VI vi1_source = tm1.source(hi1);
+        assert(vi1_source.is_valid());
+        VI vi1_target = tm1.target(hi1);
+        assert(vi1_target.is_valid());
+
+        VI vi2_source = vi1_to_vi2[vi1_source];
+        assert(vi2_source != default_vi);
+        assert(vi2_source.is_valid());
+        VI vi2_target = vi1_to_vi2[vi1_target];
+        assert(vi2_target != default_vi);
+        assert(vi2_target.is_valid());
+
+        // target(halfedge(v)) == v
+        HI hi2_target = tm2.halfedge(vi2_target);
+        HI hi2; // half edge on tm2 in same position as hi
+        for (HI hi : tm2.halfedges_around_target(hi2_target)) { 
+            if (tm2.source(hi) != vi2_source) continue;            
+            hi2 = hi;
+            break;            
+        }
+
+        assert(hi2.is_valid());
+        FI f2a = tm2.face(hi2);
+        assert(f2a.is_valid());
+        HI hi2_op = tm2.opposite(hi2);
+        assert(hi2_op.is_valid());
+        FI f2b = tm2.face(hi2_op);
+        assert(f2a.is_valid());
+
+        // check orientation
+        const P3 &a = tm1.point(vi1_source);
+        const P3 &b = tm1.point(vi1_target);
+        // triangle tip from face f1a
+        VI vi1a_tip = tm1.target(tm1.next(hi1));
+        assert(vi1a_tip.is_valid());
+        const P3 &c = tm1.point(vi1a_tip);
+        // triangle tip from face f2a
+        VI vi2a_tip = tm2.target(tm2.next(hi2));
+        const P3 &p = tm2.point(vi2a_tip);
+
+        // check if f1a is behinde f2a
+        // inside mean it will be used
+        // outside will be discarded
+        if (CGAL::orientation(a, b, c, p) == CGAL::POSITIVE) {
+            map1[f1a] = FaceType::outside;
+            map1[f1b] = FaceType::inside;
+            map2[f2a] = FaceType::inside;
+            map2[f2b] = FaceType::outside;
+        } else {
+            map1[f1a] = FaceType::inside;
+            map1[f1b] = FaceType::outside;
+            map2[f2a] = FaceType::outside;
+            map2[f2b] = FaceType::inside;
+        }
+    }
+}
+
+indexed_triangle_set priv::create_merged_its(
+    const CutMesh &tm1, const FaceTypeMap &map1, V2I_map &vi1_to_res,
+    const CutMesh &tm2, const FaceTypeMap &map2, V2I_map &vi2_to_res, const V2V_map &vi1_to_vi2)
+{
+    // clear for sure
+    const SurfaceCut::Index invalid = std::numeric_limits<SurfaceCut::Index>::max();
+    for (VI vi:tm1.vertices()) vi1_to_res[vi] = invalid;    
+    for (VI vi:tm2.vertices()) vi2_to_res[vi] = invalid;
+
+    // count result triangles
+    size_t indices_size = 0;
+    for (FI fi : tm1.faces()) if (map1[fi] == FaceType::inside) ++indices_size;
+    for (FI fi : tm2.faces()) if (map2[fi] == FaceType::inside) ++indices_size;
+    
+    // approx maximal count
+    size_t vertices_count = 3 * indices_size;
+
+    indexed_triangle_set result;
+    result.indices.reserve(indices_size);
+    result.vertices.reserve(vertices_count);
+
+    // Start with tm2 because of convert map vi1_to_vi2 not vice versa
+    for (FI fi : tm2.faces()) {
+        if (map2[fi] != FaceType::inside) continue;
+        Vec3i t;
+        int   i = 0;
+        for (VI vi : tm2.vertices_around_face(tm2.halfedge(fi))) {
+            SurfaceCut::Index &si = vi2_to_res[vi];
+            if (si == invalid) {
+                si = result.vertices.size();
+                const P3 &p = tm2.point(vi);
+                Vec3f p_(p.x(), p.y(), p.z());
+                result.vertices.push_back(p_);
+            }
+            t[i++] = si;
+        }
+        result.indices.push_back(t);
+    }
+
+    // convert tm1 without same points from tm2 defined in map vi1_to_vi2
+    for (FI fi : tm1.faces()) {
+        if (map1[fi] != FaceType::inside) continue;
+        Vec3i t;
+        int i = 0;
+        for (VI vi : tm1.vertices_around_face(tm1.halfedge(fi))) {
+            SurfaceCut::Index &si = vi1_to_res[vi];
+            if (si == invalid) {
+                // check if it is not already created from tm2
+                VI vi2 = vi1_to_vi2[vi];
+                if (vi2 == default_vi) {
+                    si = result.vertices.size();
+                    const P3 &p = tm1.point(vi);
+                    Vec3f p_(p.x(), p.y(), p.z());
+                    result.vertices.push_back(p_);
+                } else {
+                    // constrained vertex copied from tm2
+                    si = vi2_to_res[vi2];
+                    assert(si != invalid);
+                }
+            }
+            t[i++] = si;
+        }
+        result.indices.push_back(t);
+    }
+    // fix approx of vertices count
+    result.vertices.shrink_to_fit();
+    return result;
+}
+
+bool priv::merge_intersection(SurfaceCut &cut1, const SurfaceCut &cut2) {
+    auto cut_to_cgal = [](const SurfaceCut &cut) {
+        size_t count_edges = (cut.indices.size() * 3 + cut.contours.size()) / 2;
+        return to_cgal(cut, count_edges);
+    };
+    CutMesh tm1 = cut_to_cgal(cut1);
+    CutMesh tm2 = cut_to_cgal(cut2);
+
+    Store_VI_pairs::Pairs intersections;
+    Store_VI_pairs visitor = {&tm1, &tm2, &intersections};
+
+    // bool map for affected edge
+    EcmType ecm1 = get(DynamicEdgeProperty(), tm1);
+    const auto &p = CGAL::parameters::visitor(visitor)
+        .edge_is_constrained_map(ecm1)
+        .throw_on_self_intersection(false);
+    const auto &q = CGAL::parameters::throw_on_self_intersection(false);
+
+    CGAL::Polygon_mesh_processing::corefine(tm1, tm2, p, q);
+    // when no intersection detected than no result surface cut
+    if (intersections.empty()) return false;
+
+    // Create conversion map from tm1.vertex to tm2.vertex on constrained edge
+    std::string vi1_to_vi2_name = "v:vi1_to_vi2";
+    V2V_map vi1_to_vi2 = create_map_from_vi1_to_vi2(tm1, intersections, vi1_to_vi2_name);
+
+    std::string face_type_map_name = "f:side";
+    FaceTypeMap face_type_map1 = tm1.add_property_map<FI, FaceType>(face_type_map_name).first;
+    FaceTypeMap face_type_map2 = tm2.add_property_map<FI, FaceType>(face_type_map_name).first;
+    create_face_types(tm1, face_type_map1, tm2, face_type_map2, vi1_to_vi2, ecm1);
+    
+    std::string dir = "C:/data/temp/out/";
+    store(tm1, face_type_map1, dir + "tm1_constrained.off");
+    store(tm2, face_type_map2, dir + "tm2_constrained.off");
+    flood_fill_inner(tm1, face_type_map1);
+    flood_fill_inner(tm2, face_type_map2);
+    store(tm1, face_type_map1, dir + "tm1_filled.off");
+    store(tm2, face_type_map2, dir + "tm2_filled.off");
+
+    std::string vi_to_res_name = "v:vertex_to_result";
+    V2I_map vi1_to_res = tm1.add_property_map<VI, SurfaceCut::Index>(vi_to_res_name).first;
+    V2I_map vi2_to_res = tm2.add_property_map<VI, SurfaceCut::Index>(vi_to_res_name).first;
+    indexed_triangle_set its = create_merged_its(
+        tm1, face_type_map1, vi1_to_res,
+        tm2, face_type_map2, vi2_to_res, vi1_to_vi2);
+    its_write_obj(its, (dir + "merged_result.obj").c_str());
+
+    // calculate contours:
+    
+
+
+    // set result into cut1
+    cut1.indices = std::move(its.indices);
+    cut1.vertices = std::move(its.vertices);
+    return true;
+}
+
+namespace priv {
+struct ExtendAOI{
+    // source for extend
+    const CutAOI *source;
+    // converted cut to CGAL mesh
+    CutMesh mesh;
+};
+
+bool merge(ExtendAOI &cut1, ExtendAOI &cut2);
+
+BoundingBoxf3 bounding_box(const CutAOI &cut, const CutMesh &mesh);
+BoundingBoxf3 bounding_box(const ExtendAOI &ecut);
+
+ExtendAOI create_extend_aoi(CutAOI &cut, const CutMesh &mesh);
+} // namespace priv
+
+bool priv::merge(ExtendAOI &cut1, ExtendAOI &cut2)
+{
+    auto cut_to_cgal = [](const SurfaceCut &cut) {
+        size_t count_edges = (cut.indices.size() * 3 + cut.contours.size()) /
+                             2;
+        return to_cgal(cut, count_edges);
+    };
+    CutMesh& tm1 = cut1.mesh;
+    CutMesh& tm2 = cut2.mesh;
+
+    Store_VI_pairs::Pairs intersections;
+    Store_VI_pairs        visitor = {&tm1, &tm2, &intersections};
+
+    // bool map for affected edge
+    EcmType     ecm1 = get(DynamicEdgeProperty(), tm1);
+    const auto &p    = CGAL::parameters::visitor(visitor)
+                        .edge_is_constrained_map(ecm1)
+                        .throw_on_self_intersection(false);
+    const auto &q = CGAL::parameters::throw_on_self_intersection(false);
+
+    CGAL::Polygon_mesh_processing::corefine(tm1, tm2, p, q);
+    // when no intersection detected than no result surface cut
+    if (intersections.empty()) return false;
+
+    // Create conversion map from tm1.vertex to tm2.vertex on constrained edge
+    std::string vi1_to_vi2_name = "v:vi1_to_vi2";
+    V2V_map     vi1_to_vi2 = create_map_from_vi1_to_vi2(tm1, intersections,
+                                                        vi1_to_vi2_name);
+
+    std::string face_type_map_name = "f:side";
+    FaceTypeMap face_type_map1 =
+        tm1.add_property_map<FI, FaceType>(face_type_map_name).first;
+    FaceTypeMap face_type_map2 =
+        tm2.add_property_map<FI, FaceType>(face_type_map_name).first;
+    create_face_types(tm1, face_type_map1, tm2, face_type_map2, vi1_to_vi2,
+                      ecm1);
+
+    std::string dir = "C:/data/temp/out/";
+    store(tm1, face_type_map1, dir + "tm1_constrained.off");
+    store(tm2, face_type_map2, dir + "tm2_constrained.off");
+    flood_fill_inner(tm1, face_type_map1);
+    flood_fill_inner(tm2, face_type_map2);
+    store(tm1, face_type_map1, dir + "tm1_filled.off");
+    store(tm2, face_type_map2, dir + "tm2_filled.off");
+
+    std::string vi_to_res_name = "v:vertex_to_result";
+    V2I_map     vi1_to_res =
+        tm1.add_property_map<VI, SurfaceCut::Index>(vi_to_res_name).first;
+    V2I_map vi2_to_res =
+        tm2.add_property_map<VI, SurfaceCut::Index>(vi_to_res_name).first;
+    indexed_triangle_set its = create_merged_its(tm1, face_type_map1,
+                                                 vi1_to_res, tm2,
+                                                 face_type_map2, vi2_to_res,
+                                                 vi1_to_vi2);
+    its_write_obj(its, (dir + "merged_result.obj").c_str());
+
+    // calculate contours:
+
+    // set result into cut1
+    //cut1.indices  = std::move(its.indices);
+    //cut1.vertices = std::move(its.vertices);
+    return true;
+}
+
+BoundingBoxf3 priv::bounding_box(const CutAOI &cut, const CutMesh &mesh) {
+    const P3& p_from_cut = mesh.point(mesh.target(mesh.halfedge(cut.first.front())));
+    Vec3d min(p_from_cut.x(), p_from_cut.y(), p_from_cut.z());
+    Vec3d max = min;
+    for (FI fi : cut.first) { 
+        for(VI vi: mesh.vertices_around_face(mesh.halfedge(fi))){
+            const P3& p = mesh.point(vi);
+            for (size_t i = 0; i < 3; ++i) { 
+                if (min[i] > p[i]) min[i] = p[i];
+                if (max[i] < p[i]) max[i] = p[i];
+            }
+        } 
+    }
+    return BoundingBoxf3(min, max);
+}
+
+BoundingBoxf3 priv::bounding_box(const ExtendAOI &ecut) {
+    const CutMesh& mesh = ecut.mesh;
+    const P3      &p_from_cut = *mesh.points().begin();
+    Vec3d min(p_from_cut.x(), p_from_cut.y(), p_from_cut.z());
+    Vec3d max = min;
+    for (VI vi: mesh.vertices()) { 
+        const P3& p = mesh.point(vi);
+        for (size_t i = 0; i < 3; ++i) { 
+            if (min[i] > p[i]) min[i] = p[i];
+            if (max[i] < p[i]) max[i] = p[i];
+        }
+    }
+    return BoundingBoxf3(min, max);
+}
+
+priv::ExtendAOI priv::create_extend_aoi(CutAOI &cut, const CutMesh &mesh)
+{
+    std::vector<bool> is_counted(mesh.vertices().size(), {false});
+    uint32_t count_vertices = 0;
+    for (FI fi : cut.first) { 
+        for (VI vi : mesh.vertices_around_face(mesh.halfedge(fi))) { 
+            if (!is_counted[vi.idx()]) { 
+                is_counted[vi.idx()] = true;
+                ++count_vertices;
+            }
+        }
+    }
+
+    uint32_t count_faces = cut.first.size();    
+    // NOTE: It is more than neccessary, guess it better
+    uint32_t count_edges = count_faces*3; 
+
+    CutMesh cm;
+    cm.reserve(count_vertices, count_edges, count_faces);
+
+    // vertex conversion function
+    constexpr uint32_t def_val = std::numeric_limits<uint32_t>::max();       
+    std::vector<uint32_t> v_cvt(mesh.vertices().size(), {def_val});
+    for (FI fi : cut.first) {
+        std::array<VI, 3> t;
+        int index = 0;
+        for (VI vi : mesh.vertices_around_face(mesh.halfedge(fi))) {
+            uint32_t &cvt = v_cvt[vi.idx()];
+            if (cvt == def_val) {
+                cvt = cm.vertices().size(); 
+                cm.add_vertex(mesh.point(vi));
+            }
+            t[index++] = VI(cvt);
+        }
+        cm.add_face(t[0], t[1], t[2]);
+    }
+    return {&cut, cm};
+}
+
+void priv::merge_aois(CutAOIs &cuts, const std::vector<bool> &use_cut, const CutMesh& mesh)
+{
+    // create bounding boxes for cuts
+    std::vector<BoundingBoxf3> bbs;
+    bbs.reserve(cuts.size());
+    for (const CutAOI &cut : cuts) bbs.push_back(bounding_box(cut, mesh));
+
+    // extend used bb by intersecting bb
+    // NOTE: after merge 2 cuts could appears
+    // new intersection on surface of merged in
+    std::vector<bool> finished(cuts.size(), {false});
+
+    // keep converted AOI to extend form
+    std::vector<std::optional<ExtendAOI>> ecuts(cuts.size());
+
+    // find intersection of cuts by Bounding boxes intersection
+    for (size_t cut_index = 0; cut_index < cuts.size(); ++cut_index)
+    {
+        if (finished[cut_index]) continue;
+        if (!use_cut[cut_index]) continue;
+
+        BoundingBoxf3 &result_bb = bbs[cut_index];
+        std::optional<ExtendAOI> &ecut = ecuts[cut_index];
+        if (!ecut.has_value()) {
+            CutAOI &cut = cuts[cut_index];
+            ecut = create_extend_aoi(cut, mesh);
+        }
+
+        // all merged cuts into cut_index
+        std::vector<bool> merged(cuts.size(), {false});
+
+        // merged in last iteration
+        std::vector<bool> new_merged;
+
+        bool exist_new_extension;
+        bool is_first = true;
+        // while exist bb intersection
+        do {
+            exist_new_extension = false;
+            new_merged = std::vector<bool>(cuts.size(), {false});
+            // check when exist intersection with result_bb
+            for (const BoundingBoxf3 &bb : bbs) {
+                size_t bb_index = &bb - &bbs.front();
+                // do not merge itself
+                if (cut_index == bb_index) continue;
+                if (!is_first && merged[bb_index]) continue;
+                if (!bb.intersects(result_bb)) {
+                    if (is_first) continue;
+                    bool has_new_intersection = false;
+                    for (size_t i = 0; i < cuts.size(); i++) {
+                        if (!new_merged[i]) continue;
+                        if (!bbs[i].intersects(bb)) continue;
+                        // TODO: check that really intersect by merging
+                        has_new_intersection = true;
+                    }
+                    if (!has_new_intersection) continue;
+                }
+                std::optional<ExtendAOI> &ecut2 = ecuts[bb_index];
+                if (!ecut2.has_value()) {
+                    CutAOI &cut = cuts[bb_index];
+                    ecut2 = create_extend_aoi(cut, mesh);
+                }
+                if (!priv::merge(*ecut, *ecut2)) continue;
+
+                result_bb            = bounding_box(*ecut);
+                merged[bb_index]     = true;
+                finished[bb_index]   = true;
+                new_merged[bb_index] = true;
+                exist_new_extension  = true;
+            }
+            is_first = false;
+        } while (exist_new_extension);
+    }
+
+    // Cuts merged in are signed in finished vector as TRUE
+    // All rest cuts must be merged simple way
+    //SurfaceCut result;
+    //for (size_t cut_index = 0; cut_index < cuts.size(); ++cut_index) {
+    //    if (finished[cut_index]) continue;
+    //    append(result, std::move(cuts[cut_index]));
+    //}
+    //return result;
+}
+
+bool Slic3r::merge_intersection(SurfaceCut& sc1, const SurfaceCut& sc2) {
+    return priv::merge_intersection(sc1, sc2);
+}
+
+SurfaceCut priv::merge_intersections(
+    SurfaceCuts &cuts, const CutAOIs& cutAOIs, const std::vector<bool> &use_cut)
 {
     // create bounding boxes for cuts
     std::vector<BoundingBoxf3> bbs;
@@ -2278,12 +2920,14 @@ SurfaceCut priv::merge_intersections(SurfaceCuts &cuts)
     // NOTE: after merge 2 cuts could appears
     // new intersection on surface of merged in
 
-    std::vector<bool> finished(cuts.size(), {true});
+    std::vector<bool> finished(cuts.size(), {false});
 
     // find intersection of cuts by Bounding boxes intersection
     for (size_t cut_index = 0; cut_index < cuts.size(); ++cut_index)
     {
         if (finished[cut_index]) continue;
+        if (!use_cut[cut_index]) continue;
+
         BoundingBoxf3 &result_bb = bbs[cut_index];
         SurfaceCut    &cut       = cuts[cut_index];
 
@@ -2304,7 +2948,7 @@ SurfaceCut priv::merge_intersections(SurfaceCuts &cuts)
                 size_t bb_index = &bb - &bbs.front();
                 // do not merge itself
                 if (cut_index == bb_index) continue;
-                if (!is_first && merged[cut_index]) continue;
+                if (!is_first && merged[bb_index]) continue;
                 if (!bb.intersects(result_bb)) {
                     if (is_first) continue;
                     bool has_new_intersection = false;
@@ -2316,7 +2960,7 @@ SurfaceCut priv::merge_intersections(SurfaceCuts &cuts)
                     }
                     if (!has_new_intersection) continue;
                 }
-                if (!merge_intersection(cut, cuts[bb_index])) continue;
+                if (!priv::merge_intersection(cut, cuts[bb_index])) continue;
 
                 result_bb            = bounding_box(cut);
                 merged[bb_index]     = true;
@@ -2339,10 +2983,15 @@ SurfaceCut priv::merge_intersections(SurfaceCuts &cuts)
 }
 
 SurfaceCuts priv::create_surface_cuts(const CutAOIs      &cuts,
-                                      const CutMesh      &mesh,
-                                      const ReductionMap &reduction_map,
-                                      ConvertMap         &convert_map)
-{
+                                      CutMesh            &mesh,
+                                      const ReductionMap &reduction_map)
+{    
+    // conversion map between vertex index in cgal_model and indices in result
+    // used instead of std::map
+    // NOTE: can't be used outside because it is rewrited during create_index_triangle_set
+    std::string convert_map_name = "v:convert";
+    priv::ConvertMap convert_map = mesh.add_property_map<priv::VI, SurfaceCut::Index>(convert_map_name).first;
+
     // initialize convert_map to MAX values
     for (VI vi : mesh.vertices())
         convert_map[vi] = std::numeric_limits<SurfaceCut::Index>::max();
@@ -2360,6 +3009,8 @@ SurfaceCuts priv::create_surface_cuts(const CutAOIs      &cuts,
         sc.contours = create_cut(outlines, mesh, reduction_map, convert_map);
         result.emplace_back(std::move(sc));
     }
+
+    mesh.remove_property_map(convert_map);
     return result;
 }
 
@@ -2609,7 +3260,7 @@ void priv::store(const SurfaceCuts &cut, const std::string &dir) {
             }
             // triangle with indices vi1 and vi2 doesnt exist
             assert(false);
-            return Vec3f::Zero();
+            return its.vertices[vi1];
         };
 
         indexed_triangle_set result;

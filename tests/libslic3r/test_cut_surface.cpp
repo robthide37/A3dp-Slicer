@@ -104,7 +104,7 @@ static Emboss::OrthoProject create_projection_for_cut(
     return Emboss::OrthoProject(tr, project_direction);
 }
 
-TEST_CASE("CutSurface in 3mf", "[]")
+TEST_CASE("CutSurface in 3mf", "[Emboss]")
 {
     std::string path_to_3mf = "C:/Users/filip/Downloads/MultiObj.3mf";
     
@@ -154,6 +154,11 @@ TEST_CASE("CutSurface in 3mf", "[]")
         cut_projection_tr, shape_scale, get_extents(shapes), z_range);
 
     float projection_ratio = -z_range.first / (z_range.second - z_range.first);
-    cut_surface(its, shapes, projection, projection_ratio);
+    SurfaceCut cut = cut_surface(its, shapes, projection, projection_ratio);
+    its_write_obj(cut, "C:/data/temp/cutSurface/result_cut.obj");
+}
+
+TEST_CASE("Merge Cuts", "[Emboss]") {
+    Slic3r::merge_intersection(); 
 }
 #endif // DEBUG_3MF

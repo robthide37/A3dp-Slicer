@@ -42,6 +42,10 @@ using SurfaceCuts = std::vector<SurfaceCut>;
 /// <param name="sc_add">Surface cut to consume</param>
 void append(SurfaceCut &sc, SurfaceCut &&sc_add);
 
+// call private function with same name to test it
+bool merge_intersection(SurfaceCut &sc1, const SurfaceCut &sc2);
+
+
 /// <summary>
 /// Merge surface cuts int one
 /// </summary>
