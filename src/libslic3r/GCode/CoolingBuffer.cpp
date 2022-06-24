@@ -136,6 +136,7 @@ struct PerExtruderAdjustments
                 assert(line.time_max >= 0.f && line.time_max < FLT_MAX);
                 line.slowdown = true;
                 line.time     = line.time_max;
+                assert(line.time > 0);
                 line.feedrate = line.length / line.time;
             }
             time_total += line.time;
@@ -151,6 +152,7 @@ struct PerExtruderAdjustments
             if (line.adjustable(slowdown_external_perimeters)) {
                 line.slowdown = true;
                 line.time     = std::min(line.time_max, line.time * factor);
+                assert(line.time > 0);
                 line.feedrate = line.length / line.time;
             }
             time_total += line.time;
@@ -182,8 +184,10 @@ struct PerExtruderAdjustments
         assert(this->min_print_speed < min_feedrate + EPSILON);
         for (size_t i = 0; i < n_lines_adjustable; ++ i) {
             const CoolingLine &line = lines[i];
-            if (line.feedrate > min_feedrate)
+            if (line.feedrate > min_feedrate) {
+                assert(min_feedrate > 0);
                 time_stretch += line.time * (line.feedrate / min_feedrate - 1.f);
+            }
         }
         return time_stretch;
     }
@@ -196,6 +200,7 @@ struct PerExtruderAdjustments
         for (size_t i = 0; i < n_lines_adjustable; ++ i) {
             CoolingLine &line = lines[i];
             if (line.feedrate > min_feedrate) {
+                assert(min_feedrate > 0);
                 line.time *= std::max(1.f, line.feedrate / min_feedrate);
                 line.feedrate = min_feedrate;
                 line.slowdown = true;
@@ -250,7 +255,7 @@ float new_feedrate_to_reach_time_stretch(
             }
         }
         assert(denom > 0);
-        if (denom < 0)
+        if (denom <= 0)
             return min_feedrate;
         new_feedrate = nomin / denom;
         assert(new_feedrate > min_feedrate - EPSILON);
@@ -404,11 +409,16 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                 }
                 line.feedrate = new_pos[4];
                 assert((line.type & CoolingLine::TYPE_ADJUSTABLE) == 0 || line.feedrate > 0.f);
-                if (line.length > 0)
+                if (line.length > 0) {
+                    assert(line.feedrate > 0);
                     line.time = line.length / line.feedrate;
+                    assert(line.time > 0);
+                }
                 line.time_max = line.time;
-                if ((line.type & CoolingLine::TYPE_ADJUSTABLE) || active_speed_modifier != size_t(-1))
+                if ((line.type & CoolingLine::TYPE_ADJUSTABLE) || active_speed_modifier != size_t(-1)) {
+                    assert(adjustment->min_print_speed >= 0);
                     line.time_max = (adjustment->min_print_speed == 0.f) ? FLT_MAX : std::max(line.time, line.length / adjustment->min_print_speed);
+                }
                 if (active_speed_modifier < adjustment->lines.size() && (line.type & CoolingLine::TYPE_G1)) {
                     // Inside the ";_EXTRUDE_SET_SPEED" blocks, there must not be a G1 Fxx entry.
                     assert((line.type & CoolingLine::TYPE_HAS_F) == 0);
@@ -428,7 +438,23 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             }
             current_pos = std::move(new_pos);
         } else if (boost::starts_with(sline, ";_EXTRUDE_END")) {
+            // Closing a block of non-zero length extrusion moves.
             line.type = CoolingLine::TYPE_EXTRUDE_END;
+            if (active_speed_modifier != size_t(-1)) {
+#ifndef _NDEBUG
+                assert(active_speed_modifier < adjustment->lines.size());
+                CoolingLine &sm = adjustment->lines[active_speed_modifier];
+                // There should be at least some extrusion move inside the adjustment block.
+                // However if the block has no extrusion (which is wrong), fix it for the cooling buffer to work.
+                assert(sm.length > 0);
+                assert(sm.time > 0);
+                if (sm.time <= 0) {
+                    // Likely a zero length extrusion, it should not be emitted, however the zero extrusions should not confuse firmware either.
+                    // Prohibit time adjustment of a block of zero length extrusions by the cooling buffer.
+                    sm.type &= ~CoolingLine::TYPE_ADJUSTABLE;
+                }
+#endif // _NDEBUG
+            }
             active_speed_modifier = size_t(-1);
         } else if (boost::starts_with(sline, m_toolchange_prefix)) {
             unsigned int new_extruder = (unsigned int)atoi(sline.c_str() + m_toolchange_prefix.size());
@@ -568,6 +594,7 @@ static inline void extruder_range_slow_down_non_proportional(
                 float time_adjustable = 0.f;
                 for (auto it = adj; it != by_min_print_speed.end(); ++ it)
                     time_adjustable += (*it)->adjustable_time(true);
+                assert(time_adjustable > 0);
                 float rate = (time_adjustable + time_stretch) / time_adjustable;
                 for (auto it = adj; it != by_min_print_speed.end(); ++ it)
                     (*it)->slow_down_proportional(rate, true);
