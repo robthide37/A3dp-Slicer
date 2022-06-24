@@ -9,6 +9,7 @@
 #include <stack>
 
 #include "AABBTreeLines.hpp"
+#include "KDTreeIndirect.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
@@ -119,9 +120,10 @@ public:
 
 class StabilityAccumulator {
 private:
-    Points support_points { };
+    std::vector<Vec2f> support_points { };
     Vec3f centroid_accumulator = Vec3f::Zero();
     float accumulated_volume { };
+    Vec2f sticking_centroid_accumulator = Vec2f::Zero();
     float accumulated_sticking_force { };
 
 public:
@@ -129,16 +131,16 @@ public:
 
     void add_base_extrusion(const ExtrusionLine &line, float sticking_force, float print_z, float mm3_per_mm) {
         accumulated_sticking_force += sticking_force;
-        support_points.push_back(Point::new_scale(line.a));
-        support_points.push_back(Point::new_scale(line.b));
-        base_convex_hull.clear();
+        sticking_centroid_accumulator += sticking_force * ((line.a + line.b) / 2.0f);
+        support_points.push_back(line.a);
+        support_points.push_back(line.b);
         add_extrusion(line, print_z, mm3_per_mm);
     }
 
-    void add_support_point(const Point &position, float sticking_force) {
+    void add_support_point(const Vec2f &position, float sticking_force) {
         support_points.push_back(position);
-        base_convex_hull.clear();
         accumulated_sticking_force += sticking_force;
+        sticking_centroid_accumulator += sticking_force * position;
     }
 
     void add_extrusion(const ExtrusionLine &line, float print_z, float mm3_per_mm) {
@@ -149,6 +151,9 @@ public:
     }
 
     Vec3f get_centroid() const {
+        if (accumulated_volume <= 0.0f) {
+            return Vec3f::Zero();
+        }
         return centroid_accumulator / accumulated_volume;
     }
 
@@ -160,24 +165,24 @@ public:
         return accumulated_volume;
     }
 
-    const Polygon& segment_base_hull() {
-        if (this->base_convex_hull.empty()) {
-            this->base_convex_hull = Geometry::convex_hull(this->support_points);
-        }
-        return this->base_convex_hull;
+    const std::vector<Vec2f>& get_support_points() const {
+        return support_points;
     }
 
-    const Points& get_support_points() const {
-        return support_points;
+    Vec2f get_sticking_centroid() const {
+        if (accumulated_sticking_force <= 0.0f) {
+            return Vec2f::Zero();
+        }
+        return sticking_centroid_accumulator / accumulated_sticking_force;
     }
 
     void add_from(const StabilityAccumulator &acc) {
         this->support_points.insert(this->support_points.end(), acc.support_points.begin(),
                 acc.support_points.end());
-        base_convex_hull.clear();
         this->centroid_accumulator += acc.centroid_accumulator;
         this->accumulated_volume += acc.accumulated_volume;
         this->accumulated_sticking_force += acc.accumulated_sticking_force;
+        this->sticking_centroid_accumulator += acc.sticking_centroid_accumulator;
     }
 };
 
@@ -240,14 +245,14 @@ public:
         return value_to_rgbf(0.0f, float(987), float(pseudornd));
     }
 
-    void log_accumulators(){
-       for (size_t i = 0; i < accumulators.size(); ++i) {
-           const auto& acc = accumulators[i];
+    void log_accumulators() {
+        for (size_t i = 0; i < accumulators.size(); ++i) {
+            const auto &acc = accumulators[i];
             BOOST_LOG_TRIVIAL(debug)
             << "SSG: accumulator POS: " << i << "\n"
-            << "SSG: get_accumulated_volume: " << acc.get_accumulated_volume() << "\n"
-            << "SSG: get_sticking_force: " << acc.get_sticking_force() << "\n"
-            << "SSG: support points count: " << acc.get_support_points().size() << "\n";
+                    << "SSG: get_accumulated_volume: " << acc.get_accumulated_volume() << "\n"
+                    << "SSG: get_sticking_force: " << acc.get_sticking_force() << "\n"
+                    << "SSG: support points count: " << acc.get_support_points().size() << "\n";
 
         }
     }
@@ -312,9 +317,8 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                     params);
         }
     } else { //single extrusion path, with possible varying parameters
-        const auto to_vec3f = [print_z](const Point &point) {
-            Vec2f tmp = unscale(point).cast<float>();
-            return Vec3f(tmp.x(), tmp.y(), print_z);
+        const auto to_vec3f = [print_z](const Vec2f &point) {
+            return Vec3f(point.x(), point.y(), print_z);
         };
         Points points { };
         entity->collect_points(points);
@@ -342,12 +346,9 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         // -> it prevents extruding perimeter starts and short loops into air.
         const float flow_width = get_flow_width(layer_region, entity->role());
         const float max_allowed_dist_from_prev_layer = flow_width;
-        float distance_from_last_support_point = params.min_distance_between_support_points * 2.0f;
 
         for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
             ExtrusionLine &current_line = lines[line_idx];
-            Point current = Point::new_scale(current_line.b);
-            distance_from_last_support_point += current_line.len;
             float mm3_per_mm = float(entity->min_mm3_per_mm());
 
             float curr_angle = 0;
@@ -380,15 +381,13 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 StabilityAccumulator &current_segment = stability_accs.access(current_stability_acc);
                 current_line.stability_accumulator_id = current_stability_acc;
                 current_segment.add_extrusion(current_line, print_z, mm3_per_mm);
-                if (distance_from_last_support_point > params.min_distance_between_support_points &&
-                        bridging_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
+                if (bridging_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
                         > params.bridge_distance
                                 / (1.0f + bridging_acc.max_curvature
                                         * params.bridge_distance_decrease_by_curvature_factor / PI)) {
-                    current_segment.add_support_point(current, 0.0f); // Do not count extrusion supports into the sticking force. They can be very densely placed, causing algorithm to overestimate stickiness.
-                    issues.supports_nedded.emplace_back(to_vec3f(current), 1.0);
+                    current_segment.add_support_point(current_line.b, 0.0f); // Do not count extrusion supports into the sticking force. They can be very densely placed, causing algorithm to overestimate stickiness.
+                    issues.supports_nedded.emplace_back(to_vec3f(current_line.b), 1.0);
                     bridging_acc.reset();
-                    distance_from_last_support_point = 0.0f;
                 }
             }
         }
@@ -398,6 +397,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
 
 void check_layer_global_stability(StabilityAccumulators &stability_accs,
         Issues &issues,
+        float flow_width,
         const std::vector<ExtrusionLine> &checked_lines,
         float print_z,
         const Params &params) {
@@ -408,53 +408,50 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
 
     for (auto &accumulator : layer_accs_w_lines) {
         StabilityAccumulator *acc = accumulator.first;
-        Vec3f centroid = acc->get_centroid();
-        Vec2f hull_centroid = unscaled(acc->segment_base_hull().centroid()).cast<float>();
-        std::vector<ExtrusionLine> hull_lines;
-        for (const Line &line : acc->segment_base_hull().lines()) {
-            Vec2f start = unscaled(line.a).cast<float>();
-            Vec2f next = unscaled(line.b).cast<float>();
-            hull_lines.push_back( { start, next });
-        }
-        if (hull_lines.empty()) {
-            if (acc->get_support_points().empty()) {
-                acc->add_support_point(Point::new_scale(checked_lines[accumulator.second[0]].a),
-                        params.support_points_interface_radius * params.support_points_interface_radius * float(PI)
-                                * params.support_adhesion);
-                issues.supports_nedded.emplace_back(to_3d(checked_lines[accumulator.second[0]].a, print_z), 1.0);
-            }
-            hull_lines.push_back( { unscaled(acc->get_support_points()[0]).cast<float>(),
-                    unscaled(acc->get_support_points()[0]).cast<float>() });
-            hull_centroid = unscaled(acc->get_support_points()[0]).cast<float>();
-        }
 
-        LayerLinesDistancer hull_distancer(std::move(hull_lines));
+        if (acc->get_support_points().empty()) {
+            acc->add_support_point(checked_lines[accumulator.second[0]].a, 0.0f);
+            issues.supports_nedded.emplace_back(to_3d(checked_lines[accumulator.second[0]].a, print_z), 0.0);
+        }
+        const std::vector<Vec2f> &support_points = acc->get_support_points();
 
-        float sticking_force = acc->get_sticking_force();
-        float mass = acc->get_accumulated_volume() * params.filament_density;
-        float weight = mass * params.gravity_constant;
+        auto coord_fn = [&support_points](size_t idx, size_t dim) {
+            return support_points[idx][dim];
+        };
+        KDTreeIndirect<2, float, decltype(coord_fn)> tree(coord_fn, support_points.size());
 
         float distance_from_last_support_point = params.min_distance_between_support_points * 2.0f;
         for (size_t line_idx : accumulator.second) {
             const ExtrusionLine &line = checked_lines[line_idx];
             distance_from_last_support_point += line.len;
 
+            if (distance_from_last_support_point < params.min_distance_between_support_points) {
+                continue;
+            }
+            size_t nearest_supp_point_idx = find_closest_point(tree, line.b);
+            if ((line.b - support_points[nearest_supp_point_idx]).norm() < params.min_distance_between_support_points) {
+                continue;
+            }
+
             Vec3f extruder_pressure_direction = to_3d(Vec2f(line.b - line.a), 0.0f).normalized();
             Vec2f pivot_site_search = line.b + extruder_pressure_direction.head<2>() * 1000.0f;
             extruder_pressure_direction.z() = -0.3f;
             extruder_pressure_direction.normalize();
 
-            size_t nearest_line_idx;
-            Vec2f pivot;
-            hull_distancer.signed_distance_from_lines(pivot_site_search, nearest_line_idx, pivot);
+            size_t pivot_idx = find_closest_point(tree, pivot_site_search);
+            const Vec2f &pivot = support_points[pivot_idx];
 
-            float sticking_arm = (pivot - hull_centroid).norm();
-            float sticking_torque = sticking_arm * sticking_force;
+            const Vec2f &sticking_centroid = acc->get_sticking_centroid();
+            float sticking_arm = (pivot - sticking_centroid).norm();
+            float sticking_torque = sticking_arm * acc->get_sticking_force();
 
-            float weight_arm = (pivot - centroid.head<2>()).norm();
+            float mass = acc->get_accumulated_volume() * params.filament_density;
+            const Vec3f &mass_centorid = acc->get_centroid();
+            float weight = mass * params.gravity_constant;
+            float weight_arm = (pivot - mass_centorid.head<2>()).norm();
             float weight_torque = weight_arm * weight;
 
-            float bed_movement_arm = centroid.z();
+            float bed_movement_arm = mass_centorid.z();
             float bed_movement_force = params.max_acceleration * mass;
             float bed_movement_torque = bed_movement_force * bed_movement_arm;
 
@@ -464,20 +461,14 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
             float total_torque = bed_movement_torque + extruder_conflict_torque - weight_torque - sticking_torque;
 
             if (total_torque > 0) {
-                size_t _nearest_idx;
-                Vec2f _nearest_pt;
                 float area = params.support_points_interface_radius * params.support_points_interface_radius
                         * float(PI);
-                float dist_from_hull = hull_distancer.signed_distance_from_lines(line.b, _nearest_idx, _nearest_pt);
-                if (dist_from_hull < params.support_points_interface_radius) {
-                    area = std::max(0.0f, dist_from_hull * params.support_points_interface_radius * float(PI));
-                }
                 float sticking_force = area * params.support_adhesion;
-                acc->add_support_point(Point::new_scale(line.b), sticking_force);
+                acc->add_support_point(line.b, sticking_force);
                 issues.supports_nedded.emplace_back(to_3d(line.b, print_z), extruder_conflict_torque - sticking_torque);
                 distance_from_last_support_point = 0.0f;
             }
-#if 0
+#if 1
             BOOST_LOG_TRIVIAL(debug)
             << "SSG: sticking_arm: " << sticking_arm;
             BOOST_LOG_TRIVIAL(debug)
@@ -662,7 +653,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
             }
         }
 
-        check_layer_global_stability(stability_accs, issues, prev_layer_lines.get_lines(), print_z, params);
+        check_layer_global_stability(stability_accs, issues, max_flow_width, prev_layer_lines.get_lines(), print_z, params);
 
 #ifdef DEBUG_FILES
         for (const auto &line : prev_layer_lines.get_lines()) {
