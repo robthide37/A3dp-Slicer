@@ -132,10 +132,15 @@ template void Polyline::simplify_by_visibility<ExPolygonCollection>(const ExPoly
 
 void Polyline::split_at(const Point &point, Polyline* p1, Polyline* p2) const
 {
-    if (this->size() < 2 || this->points.front() == point) {
+    if (this->size() < 2) {
         *p1 = *this;
         p2->clear();
         return;
+    }
+
+    if (this->points.front() == point) {
+        *p1 = point;
+        *p2 = *this;
     }
 
     auto  min_dist2    = std::numeric_limits<double>::max();
