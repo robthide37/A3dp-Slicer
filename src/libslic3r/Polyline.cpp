@@ -132,37 +132,33 @@ template void Polyline::simplify_by_visibility<ExPolygonCollection>(const ExPoly
 
 void Polyline::split_at(const Point &point, Polyline* p1, Polyline* p2) const
 {
-    if (this->points.empty()) return;
-    
-    // find the line to split at
-    size_t line_idx = 0;
-    Point p = this->first_point();
-    double min = (p - point).cast<double>().norm();
-    Lines lines = this->lines();
-    for (Lines::const_iterator line = lines.begin(); line != lines.end(); ++line) {
-        Point p_tmp = point.projection_onto(*line);
-        if ((p_tmp - point).cast<double>().norm() < min) {
-	        p = p_tmp;
-	        min = (p - point).cast<double>().norm();
-	        line_idx = line - lines.begin();
+    if (this->size() < 2 || this->points.front() == point) {
+        *p1 = *this;
+        p2->clear();
+        return;
+    }
+
+    auto  min_dist2    = std::numeric_limits<double>::max();
+    auto  min_point_it = this->points.cbegin();
+    Point prev         = this->points.front();
+    for (auto it = this->points.cbegin() + 1; it != this->points.cend(); ++ it) {
+        Point proj = point.projection_onto(Line(prev, *it));
+        auto  d2 = (proj - point).cast<double>().squaredNorm();
+        if (d2 < min_dist2) {
+	        min_dist2    = d2;
+	        min_point_it = it;
         }
+        prev = *it;
     }
+
+    p1->points.assign(this->points.cbegin(), min_point_it);
+    if (p1->points.back() != point)
+        p1->points.emplace_back(point);
     
-    // create first half
-    p1->points.clear();
-    for (Lines::const_iterator line = lines.begin(); line != lines.begin() + line_idx + 1; ++line)
-        if (line->a != p) 
-            p1->points.push_back(line->a);
-    // we add point instead of p because they might differ because of numerical issues
-    // and caller might want to rely on point belonging to result polylines
-    p1->points.push_back(point);
-    
-    // create second half
-    p2->points.clear();
-    p2->points.push_back(point);
-    for (Lines::const_iterator line = lines.begin() + line_idx; line != lines.end(); ++line) {
-        p2->points.push_back(line->b);
-    }
+    p2->points = { point };
+    if (*min_point_it == point)
+        ++ min_point_it;
+    p2->points.insert(p2->points.end(), min_point_it, this->points.cend());
 }
 
 bool Polyline::is_straight() const
