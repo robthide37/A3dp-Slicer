@@ -118,6 +118,11 @@ public:
     }
 };
 
+// StabilityAccumulator accumulates extrusions for each connected model part from bed to current printed layer.
+//  If the originaly disconected parts meet in the layer, their stability accumulators get merged and continue as one.
+// (think legs of table, which get connected when the top desk is being printed).
+// The class gathers mass, centroid mass, sticking force (bed extrusions, support points) and sticking centroid for the
+// connected part. These values are then used to check global part stability.
 class StabilityAccumulator {
 private:
     std::vector<Vec2f> support_points { };
@@ -186,6 +191,9 @@ public:
     }
 };
 
+// StabilityAccumulators class is wrapper over the vector of stability accumualtors. It provides a level of indirection
+// between accumulator ID and the accumulator instance itself. While each extrusion line has one id, which is asigned
+// when algorithm reaches the line's layer, the accumulator this id points to can change due to merging.
 struct StabilityAccumulators {
 private:
     size_t next_id = 0;
@@ -280,6 +288,9 @@ float get_flow_width(const LayerRegion *region, ExtrusionRole role) {
     }
 }
 
+// Accumulator of current extruion path properties
+// It remembers unsuported distance and maximum accumulated curvature over that distance.
+// Used to determine local stability issues (too long bridges, extrusion curves into air)
 struct ExtrusionPropertiesAccumulator {
     float distance = 0; //accumulated distance
     float curvature = 0; //accumulated signed ccw angles
@@ -301,6 +312,14 @@ struct ExtrusionPropertiesAccumulator {
     }
 };
 
+// check_extrusion_entity_stability checks each extrusion for local issues, appends the extrusion
+// into checked lines, and gives it a stability accumulator id. If support is needed it pushes it
+// into issues as well.
+// Rules for stability accumulator id assigment:
+    // If there is close extrusion under, use min extrusion id between the id of the previous line,
+    //      and id of line under. Also merge the accumulators of those two ids!
+    // If there is no close extrusion under, use id of the previous extrusion line.
+    // If there is no previous line, create new stability accumulator.
 void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         StabilityAccumulators &stability_accs,
         Issues &issues,
@@ -395,6 +414,11 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
     }
 }
 
+//check_layer_global_stability checks stability of the accumulators that are still present on the current line
+// ( this is determined from the gathered checked_lines vector)
+// For each accumulator and each its extrusion, forces and torques (weight, bed movement, extruder pressure, stickness to bed)
+// are computed and if stability is not sufficient, support points are added
+// accumualtors are filtered by their pointer address, since one accumulator can have multiple IDs due to merging
 void check_layer_global_stability(StabilityAccumulators &stability_accs,
         Issues &issues,
         float flow_width,
