@@ -54,6 +54,9 @@ struct CoolingLine
         TYPE_WIPE               = 1 << 9,
         TYPE_G4                 = 1 << 10,
         TYPE_G92                = 1 << 11,
+        // Would be TYPE_ADJUSTABLE, but the block of G-code lines has zero extrusion length, thus the block
+        // cannot have its speed adjusted. This should not happen (sic!).
+        TYPE_ADJUSTABLE_EMPTY   = 1 << 12,
     };
 
     CoolingLine(unsigned int type, size_t  line_start, size_t  line_end) :
@@ -441,7 +444,6 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             // Closing a block of non-zero length extrusion moves.
             line.type = CoolingLine::TYPE_EXTRUDE_END;
             if (active_speed_modifier != size_t(-1)) {
-#ifndef _NDEBUG
                 assert(active_speed_modifier < adjustment->lines.size());
                 CoolingLine &sm = adjustment->lines[active_speed_modifier];
                 // There should be at least some extrusion move inside the adjustment block.
@@ -452,8 +454,9 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                     // Likely a zero length extrusion, it should not be emitted, however the zero extrusions should not confuse firmware either.
                     // Prohibit time adjustment of a block of zero length extrusions by the cooling buffer.
                     sm.type &= ~CoolingLine::TYPE_ADJUSTABLE;
+                    // But the start / end comment shall be removed.
+                    sm.type |= CoolingLine::TYPE_ADJUSTABLE_EMPTY;
                 }
-#endif // _NDEBUG
             }
             active_speed_modifier = size_t(-1);
         } else if (boost::starts_with(sline, m_toolchange_prefix)) {
@@ -789,7 +792,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed);
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_END) {
             // Just remove this comment.
-        } else if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE | CoolingLine::TYPE_HAS_F)) {
+        } else if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE | CoolingLine::TYPE_HAS_F)) {
             // Find the start of a comment, or roll to the end of line.
             const char *end = line_start;
             for (; end < line_end && *end != ';'; ++ end);
@@ -804,7 +807,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             new_feedrate = line->slowdown ? int(floor(60. * line->feedrate + 0.5)) : atoi(fpos);
             if (new_feedrate == current_feedrate) {
                 // No need to change the F value.
-                if ((line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE)) || line->length == 0.)
+                if ((line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE)) || line->length == 0.)
                     // Feedrate does not change and this line does not move the print head. Skip the complete G-code line including the G-code comment.
                     end = line_end;
                 else
@@ -849,7 +852,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             }
             // Process the rest of the line.
             if (end < line_end) {
-                if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE)) {
+                if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE)) {
                     // Process comments, remove ";_EXTRUDE_SET_SPEED", ";_EXTERNAL_PERIMETER", ";_WIPE"
                     std::string comment(end, line_end);
                     boost::replace_all(comment, ";_EXTRUDE_SET_SPEED", "");
