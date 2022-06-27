@@ -81,6 +81,61 @@ CurledFilament::CurledFilament(const Vec3f &position) :
         position(position), estimated_height(0.0f) {
 }
 
+struct VoxelGrid {
+private:
+    Vec3f cell_size;
+    Vec3f origin;
+    Vec3f size;
+    Vec3i cell_count;
+
+    std::unordered_set<size_t> taken_cells { };
+
+public:
+    VoxelGrid(const PrintObject *po, float voxel_size) {
+        cell_size = Vec3f(voxel_size, voxel_size, voxel_size);
+
+        Vec2crd size_half = po->size().head<2>().cwiseQuotient(Vec2crd(2, 2)) + Vec2crd::Ones();
+        Vec3f min = unscale(Vec3crd(-size_half.x(), -size_half.y(), 0)).cast<float>() - cell_size;
+        Vec3f max = unscale(Vec3crd(size_half.x(), size_half.y(), po->height())).cast<float>() + cell_size;
+
+        origin = min;
+        size = max - min;
+        cell_count = size.cwiseQuotient(cell_size).cast<int>() + Vec3i::Ones();
+    }
+
+    Vec3i to_cell_coords(const Vec3f &position) const {
+        Vec3i cell_coords = (position - this->origin).cwiseQuotient(this->cell_size).cast<int>();
+        return cell_coords;
+    }
+
+    size_t to_cell_index(const Vec3i &cell_coords) const {
+        assert(cell_coords.x() >= 0);
+        assert(cell_coords.x() < cell_count.x());
+        assert(cell_coords.y() >= 0);
+        assert(cell_coords.y() < cell_count.y());
+        assert(cell_coords.z() >= 0);
+        assert(cell_coords.z() < cell_count.z());
+
+        return cell_coords.z() * cell_count.x() * cell_count.y()
+                + cell_coords.y() * cell_count.x()
+                + cell_coords.x();
+    }
+
+    Vec3f get_cell_center(const Vec3i &cell_coords) const {
+        return origin + cell_coords.cast<float>().cwiseProduct(this->cell_size)
+                + this->cell_size.cwiseQuotient(Vec3f(2.0f, 2.0f, 2.0));
+    }
+
+    void take_position(const Vec3f &position) {
+        taken_cells.insert(to_cell_index(to_cell_coords(position)));
+    }
+
+    bool position_taken(const Vec3f &position) const {
+        return taken_cells.find(to_cell_index(to_cell_coords(position))) != taken_cells.end();
+    }
+
+};
+
 class LayerLinesDistancer {
 private:
     std::vector<ExtrusionLine> lines;
@@ -317,10 +372,10 @@ struct ExtrusionPropertiesAccumulator {
 // into checked lines, and gives it a stability accumulator id. If support is needed it pushes it
 // into issues as well.
 // Rules for stability accumulator id assigment:
-    // If there is close extrusion under, use min extrusion id between the id of the previous line,
-    //      and id of line under. Also merge the accumulators of those two ids!
-    // If there is no close extrusion under, use id of the previous extrusion line.
-    // If there is no previous line, create new stability accumulator.
+// If there is close extrusion under, use min extrusion id between the id of the previous line,
+//      and id of line under. Also merge the accumulators of those two ids!
+// If there is no close extrusion under, use id of the previous extrusion line.
+// If there is no previous line, create new stability accumulator.
 void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         StabilityAccumulators &stability_accs,
         Issues &issues,
@@ -404,9 +459,9 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 current_line.stability_accumulator_id = current_stability_acc;
                 current_segment.add_extrusion(current_line, print_z, mm3_per_mm);
                 if (bridging_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
-                        > params.bridge_distance
-                                / (1.0f + bridging_acc.max_curvature
-                                        * params.bridge_distance_decrease_by_curvature_factor / PI)) {
+                > params.bridge_distance
+                        / (1.0f + bridging_acc.max_curvature
+                                * params.bridge_distance_decrease_by_curvature_factor / PI)) {
                     current_segment.add_support_point(current_line.b, 0.0f); // Do not count extrusion supports into the sticking force. They can be very densely placed, causing algorithm to overestimate stickiness.
                     issues.supports_nedded.emplace_back(to_vec3f(current_line.b), 1.0);
                     bridging_acc.reset();
@@ -414,7 +469,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
 
             //malformation
-            if (fabs(dist_from_prev_layer) < flow_width*2.0f) {
+            if (fabs(dist_from_prev_layer) < flow_width * 2.0f) {
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
                 current_line.malformation += 0.7 * nearest_line.malformation;
             }
@@ -434,18 +489,22 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
 // are computed and if stability is not sufficient, support points are added
 // accumualtors are filtered by their pointer address, since one accumulator can have multiple IDs due to merging
 void check_layer_global_stability(StabilityAccumulators &stability_accs,
+        VoxelGrid &supports_presence_grid,
         Issues &issues,
         float flow_width,
         const std::vector<ExtrusionLine> &checked_lines,
         float print_z,
-        const Params &params) {
+        const Params &params,
+        std::mt19937_64& generator) {
     std::unordered_map<StabilityAccumulator*, std::vector<ExtrusionLine>> layer_accs_w_lines;
     for (size_t i = 0; i < checked_lines.size(); ++i) {
-        layer_accs_w_lines[&stability_accs.access(checked_lines[i].stability_accumulator_id)].push_back(checked_lines[i]);
+        layer_accs_w_lines[&stability_accs.access(checked_lines[i].stability_accumulator_id)].push_back(
+                checked_lines[i]);
     }
 
     for (auto &accumulator : layer_accs_w_lines) {
         StabilityAccumulator *acc = accumulator.first;
+        std::shuffle(accumulator.second.begin(), accumulator.second.end(), generator);
         LayerLinesDistancer acc_lines(std::move(accumulator.second));
 
         if (acc->get_support_points().empty()) {
@@ -458,23 +517,12 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
         auto coord_fn = [&support_points](size_t idx, size_t dim) {
             return support_points[idx][dim];
         };
-        KDTreeIndirect<2, float, decltype(coord_fn)> tree(coord_fn, support_points.size());
+        KDTreeIndirect<2, float, decltype(coord_fn)> supports_tree(coord_fn, support_points.size());
 
-        float distance_from_last_support_point = params.min_distance_between_support_points * 2.0f;
-        for (const ExtrusionLine& line : acc_lines.get_lines()) {
-            distance_from_last_support_point += line.len;
-
-            if (distance_from_last_support_point < params.min_distance_between_support_points) {
-                continue;
-            }
-            size_t nearest_supp_point_idx = find_closest_point(tree, line.b);
-            if ((line.b - support_points[nearest_supp_point_idx]).norm() < params.min_distance_between_support_points) {
-                continue;
-            }
-
+        for (const ExtrusionLine &line : acc_lines.get_lines()) {
             Vec2f line_dir = (line.b - line.a).normalized();
             Vec2f pivot_site_search_point = line.b + line_dir * 300.0f;
-            size_t pivot_idx = find_closest_point(tree, pivot_site_search_point);
+            size_t pivot_idx = find_closest_point(supports_tree, pivot_site_search_point);
             const Vec2f &pivot = support_points[pivot_idx];
 
             const Vec2f &sticking_centroid = acc->get_sticking_centroid();
@@ -496,7 +544,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
             extruder_pressure_direction.normalize();
             float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), print_z).cross(
                     extruder_pressure_direction)).norm();
-            float extruder_conflict_force =  params.tolerable_extruder_conflict_force +
+            float extruder_conflict_force = params.tolerable_extruder_conflict_force +
                     line.malformation * params.malformations_additive_conflict_extruder_force;
             float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
 
@@ -506,12 +554,15 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
                 Vec2f target_point;
                 size_t _idx;
                 acc_lines.signed_distance_from_lines(pivot_site_search_point, _idx, target_point);
-                float area = params.support_points_interface_radius * params.support_points_interface_radius
-                        * float(PI);
-                float sticking_force = area * params.support_adhesion;
-                acc->add_support_point(target_point, sticking_force);
-                issues.supports_nedded.emplace_back(to_3d(line.b, print_z), extruder_conflict_torque - sticking_torque);
-                distance_from_last_support_point = 0.0f;
+                if (!supports_presence_grid.position_taken(to_3d(target_point, print_z))) {
+                    float area = params.support_points_interface_radius * params.support_points_interface_radius
+                            * float(PI);
+                    float sticking_force = area * params.support_adhesion;
+                    acc->add_support_point(target_point, sticking_force);
+                    issues.supports_nedded.emplace_back(to_3d(target_point, print_z),
+                            extruder_conflict_torque - sticking_torque);
+                    supports_presence_grid.take_position(to_3d(target_point, print_z));
+                }
             }
 #if 1
             BOOST_LOG_TRIVIAL(debug)
@@ -546,6 +597,8 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
     LayerLinesDistancer prev_layer_lines { { } };
     Issues issues { };
     std::vector<ExtrusionLine> checked_lines;
+    VoxelGrid supports_presence_grid { po, params.min_distance_between_support_points };
+    std::mt19937_64 generator { 27644437 };
 
     // PREPARE BASE LAYER
     float max_flow_width = 0.0f;
@@ -699,14 +752,21 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
             }
         }
 
-        check_layer_global_stability(stability_accs, issues, max_flow_width, prev_layer_lines.get_lines(), print_z, params);
+        check_layer_global_stability(stability_accs,
+                supports_presence_grid,
+                issues,
+                max_flow_width,
+                prev_layer_lines.get_lines(),
+                print_z,
+                params,
+                generator);
 
 #ifdef DEBUG_FILES
         for (const auto &line : prev_layer_lines.get_lines()) {
-                Vec3f color = value_to_rgbf(0, 5.0f, line.malformation);
-                fprintf(malform_f, "v %f %f %f  %f %f %f\n", line.b[0],
-                        line.b[1], print_z, color[0], color[1], color[2]);
-            }
+            Vec3f color = value_to_rgbf(0, 5.0f, line.malformation);
+            fprintf(malform_f, "v %f %f %f  %f %f %f\n", line.b[0],
+                    line.b[1], print_z, color[0], color[1], color[2]);
+        }
         for (const auto &line : prev_layer_lines.get_lines()) {
             Vec3f color = stability_accs.get_accumulator_color(line.stability_accumulator_id);
             fprintf(debug_acc, "v %f %f %f  %f %f %f\n", line.b[0],

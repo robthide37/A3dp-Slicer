@@ -13,7 +13,7 @@ struct Params {
     float bridge_distance = 10.0f; //mm
     float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
 
-    float min_distance_between_support_points = 1.5f;
+    float min_distance_between_support_points = 3.0f;
 
     // Adhesion computation : from experiment, PLA holds about 3g per mm^2 of base area (with reserve); So it can withstand about 3*gravity_constant force per mm^2
     float base_adhesion = 3.0f * gravity_constant; // adhesion per mm^2 of first layer
