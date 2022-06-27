@@ -139,7 +139,7 @@ void Polyline::split_at(const Point &point, Polyline* p1, Polyline* p2) const
     }
 
     if (this->points.front() == point) {
-        *p1 = point;
+        *p1 = { point };
         *p2 = *this;
     }
 
