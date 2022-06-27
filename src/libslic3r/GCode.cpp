@@ -2638,7 +2638,9 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
         assert(m_layer != nullptr);
         m_seam_placer.place_seam(m_layer, loop, m_config.external_perimeters_first, this->last_pos());
     } else
-        loop.split_at(last_pos, false);
+        // Because the G-code export has 1um resolution, don't generate segments shorter than 1.5 microns,
+        // thus empty path segments will not be produced by G-code export.
+        loop.split_at(last_pos, false, scaled<double>(0.0015));
 
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so

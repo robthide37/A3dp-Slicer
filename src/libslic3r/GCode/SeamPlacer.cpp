@@ -1573,16 +1573,18 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
                         + (perimeter_point.position - layer_perimeters.points[index_of_next].position).head<2>().normalized())
                         * 0.5;
 
-        auto [_, projected_point] = loop.get_closest_path_and_point(seam_point, true);
+        ExtrusionLoop::ClosestPathPoint projected_point = loop.get_closest_path_and_point(seam_point, true);
         //get closest projected point, determine depth of the seam point.
-        float depth = (float) unscale(Point(seam_point - projected_point)).norm();
+        float depth = (float) unscale(Point(seam_point - projected_point.foot_pt)).norm();
         float angle_factor = cos(-perimeter_point.local_ccw_angle / 2.0f); // There are some nice geometric identities in determination of the correct depth of new seam point.
         //overshoot the target depth, in concave angles it will correctly snap to the corner; TODO: find out why such big overshoot is needed.
         Vec2f final_pos = perimeter_point.position.head<2>() + (1.4142 * depth / angle_factor) * dir_to_middle;
         seam_point = Point::new_scale(final_pos.x(), final_pos.y());
     }
 
-    if (!loop.split_at_vertex(seam_point)) {
+    // Because the G-code export has 1um resolution, don't generate segments shorter than 1.5 microns,
+    // thus empty path segments will not be produced by G-code export.
+    if (!loop.split_at_vertex(seam_point, scaled<double>(0.0015))) {
         // The point is not in the original loop.
         // Insert it.
         loop.split_at(seam_point, true);
