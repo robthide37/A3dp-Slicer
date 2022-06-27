@@ -43,6 +43,7 @@ public:
     Vec2f b;
     float len;
 
+    float malformation = 0.0f;
     size_t stability_accumulator_id = NULL_ACC_ID;
 
     static const constexpr int Dim = 2;
@@ -88,7 +89,7 @@ private:
 public:
     explicit LayerLinesDistancer(std::vector<ExtrusionLine> &&lines) :
             lines(lines) {
-        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
+        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(this->lines);
     }
 
     // negative sign means inside
@@ -361,10 +362,10 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
 
         size_t current_stability_acc = NULL_ACC_ID;
         ExtrusionPropertiesAccumulator bridging_acc { };
+        ExtrusionPropertiesAccumulator malformation_acc { };
         bridging_acc.add_distance(params.bridge_distance + 1.0f); // Initialise unsupported distance with larger than tolerable distance ->
         // -> it prevents extruding perimeter starts and short loops into air.
         const float flow_width = get_flow_width(layer_region, entity->role());
-        const float max_allowed_dist_from_prev_layer = flow_width;
 
         for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
             ExtrusionLine &current_line = lines[line_idx];
@@ -377,12 +378,14 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 curr_angle = angle(v1, v2);
             }
             bridging_acc.add_angle(curr_angle);
+            malformation_acc.add_angle(curr_angle);
 
             size_t nearest_line_idx;
             Vec2f nearest_point;
             float dist_from_prev_layer = prev_layer_lines.signed_distance_from_lines(current_line.b, nearest_line_idx,
                     nearest_point);
-            if (dist_from_prev_layer < max_allowed_dist_from_prev_layer) {
+
+            if (dist_from_prev_layer < flow_width) {
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
                 size_t acc_id = nearest_line.stability_accumulator_id;
                 stability_accs.merge_accumulators(std::max(acc_id, current_stability_acc),
@@ -409,6 +412,17 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                     bridging_acc.reset();
                 }
             }
+
+            //malformation
+            if (fabs(dist_from_prev_layer) < flow_width*2.0f) {
+                const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
+                current_line.malformation += 0.7 * nearest_line.malformation;
+            }
+            if (dist_from_prev_layer > flow_width * 0.3) {
+                current_line.malformation += 0.6 + 0.4 * malformation_acc.max_curvature / PI;
+            } else {
+                malformation_acc.reset();
+            }
         }
         checked_lines.insert(checked_lines.end(), lines.begin(), lines.end());
     }
@@ -425,17 +439,19 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
         const std::vector<ExtrusionLine> &checked_lines,
         float print_z,
         const Params &params) {
-    std::unordered_map<StabilityAccumulator*, std::vector<size_t>> layer_accs_w_lines;
+    std::unordered_map<StabilityAccumulator*, std::vector<ExtrusionLine>> layer_accs_w_lines;
     for (size_t i = 0; i < checked_lines.size(); ++i) {
-        layer_accs_w_lines[&stability_accs.access(checked_lines[i].stability_accumulator_id)].push_back(i);
+        layer_accs_w_lines[&stability_accs.access(checked_lines[i].stability_accumulator_id)].push_back(checked_lines[i]);
     }
 
     for (auto &accumulator : layer_accs_w_lines) {
         StabilityAccumulator *acc = accumulator.first;
+        LayerLinesDistancer acc_lines(std::move(accumulator.second));
 
         if (acc->get_support_points().empty()) {
-            acc->add_support_point(checked_lines[accumulator.second[0]].a, 0.0f);
-            issues.supports_nedded.emplace_back(to_3d(checked_lines[accumulator.second[0]].a, print_z), 0.0);
+            // acc_lines cannot be empty - if the accumulator has no extrusion in the current layer, it is not considered in stability computation
+            acc->add_support_point(acc_lines.get_line(0).a, 0.0f);
+            issues.supports_nedded.emplace_back(to_3d(acc_lines.get_line(0).a, print_z), 0.0);
         }
         const std::vector<Vec2f> &support_points = acc->get_support_points();
 
@@ -445,8 +461,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
         KDTreeIndirect<2, float, decltype(coord_fn)> tree(coord_fn, support_points.size());
 
         float distance_from_last_support_point = params.min_distance_between_support_points * 2.0f;
-        for (size_t line_idx : accumulator.second) {
-            const ExtrusionLine &line = checked_lines[line_idx];
+        for (const ExtrusionLine& line : acc_lines.get_lines()) {
             distance_from_last_support_point += line.len;
 
             if (distance_from_last_support_point < params.min_distance_between_support_points) {
@@ -457,12 +472,9 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
                 continue;
             }
 
-            Vec3f extruder_pressure_direction = to_3d(Vec2f(line.b - line.a), 0.0f).normalized();
-            Vec2f pivot_site_search = line.b + extruder_pressure_direction.head<2>() * 1000.0f;
-            extruder_pressure_direction.z() = -0.3f;
-            extruder_pressure_direction.normalize();
-
-            size_t pivot_idx = find_closest_point(tree, pivot_site_search);
+            Vec2f line_dir = (line.b - line.a).normalized();
+            Vec2f pivot_site_search_point = line.b + line_dir * 300.0f;
+            size_t pivot_idx = find_closest_point(tree, pivot_site_search_point);
             const Vec2f &pivot = support_points[pivot_idx];
 
             const Vec2f &sticking_centroid = acc->get_sticking_centroid();
@@ -479,16 +491,25 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
             float bed_movement_force = params.max_acceleration * mass;
             float bed_movement_torque = bed_movement_force * bed_movement_arm;
 
+            Vec3f extruder_pressure_direction = to_3d(line_dir, 0.0f);
+            extruder_pressure_direction.z() = -0.2 - line.malformation * 0.5;
+            extruder_pressure_direction.normalize();
             float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), print_z).cross(
                     extruder_pressure_direction)).norm();
-            float extruder_conflict_torque = params.tolerable_extruder_conflict_force * conflict_torque_arm;
+            float extruder_conflict_force =  params.tolerable_extruder_conflict_force +
+                    line.malformation * params.malformations_additive_conflict_extruder_force;
+            float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
+
             float total_torque = bed_movement_torque + extruder_conflict_torque - weight_torque - sticking_torque;
 
             if (total_torque > 0) {
+                Vec2f target_point;
+                size_t _idx;
+                acc_lines.signed_distance_from_lines(pivot_site_search_point, _idx, target_point);
                 float area = params.support_points_interface_radius * params.support_points_interface_radius
                         * float(PI);
                 float sticking_force = area * params.support_adhesion;
-                acc->add_support_point(line.b, sticking_force);
+                acc->add_support_point(target_point, sticking_force);
                 issues.supports_nedded.emplace_back(to_3d(line.b, print_z), extruder_conflict_torque - sticking_torque);
                 distance_from_last_support_point = 0.0f;
             }
@@ -519,6 +540,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
 Issues check_object_stability(const PrintObject *po, const Params &params) {
 #ifdef DEBUG_FILES
     FILE *debug_acc = boost::nowide::fopen(debug_out_path("accumulators.obj").c_str(), "w");
+    FILE *malform_f = boost::nowide::fopen(debug_out_path("malformations.obj").c_str(), "w");
 #endif
     StabilityAccumulators stability_accs;
     LayerLinesDistancer prev_layer_lines { { } };
@@ -681,6 +703,11 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
 
 #ifdef DEBUG_FILES
         for (const auto &line : prev_layer_lines.get_lines()) {
+                Vec3f color = value_to_rgbf(0, 5.0f, line.malformation);
+                fprintf(malform_f, "v %f %f %f  %f %f %f\n", line.b[0],
+                        line.b[1], print_z, color[0], color[1], color[2]);
+            }
+        for (const auto &line : prev_layer_lines.get_lines()) {
             Vec3f color = stability_accs.get_accumulator_color(line.stability_accumulator_id);
             fprintf(debug_acc, "v %f %f %f  %f %f %f\n", line.b[0],
                     line.b[1], print_z, color[0], color[1], color[2]);
@@ -691,6 +718,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
 
 #ifdef DEBUG_FILES
     fclose(debug_acc);
+    fclose(malform_f);
 #endif
 
     std::cout << " SUPP: " << issues.supports_nedded.size() << std::endl;

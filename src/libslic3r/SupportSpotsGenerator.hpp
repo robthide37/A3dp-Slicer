@@ -13,7 +13,7 @@ struct Params {
     float bridge_distance = 10.0f; //mm
     float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
 
-    float min_distance_between_support_points = 3.0f;
+    float min_distance_between_support_points = 1.5f;
 
     // Adhesion computation : from experiment, PLA holds about 3g per mm^2 of base area (with reserve); So it can withstand about 3*gravity_constant force per mm^2
     float base_adhesion = 3.0f * gravity_constant; // adhesion per mm^2 of first layer
@@ -25,7 +25,8 @@ struct Params {
     float filament_density = 1.25f * 0.001f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
     float tensile_strength = 33000.0f; // mN/mm^2;    33 MPa is tensile strength of ABS, which has the lowest tensile strength from common materials.
     float tolerable_extruder_conflict_force = 50.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... ); current value corresponds to weight of X grams
-    float max_curled_conflict_extruder_force = 300.0f * gravity_constant; // for areas with possible high layered curled filaments, max force to account for;
+    float malformations_additive_conflict_extruder_force = 100.0f * gravity_constant; // for areas with possible high layered curled filaments
+
 };
 
 struct SupportPoint {
