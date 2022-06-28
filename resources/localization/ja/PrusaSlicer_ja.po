@@ -4696,7 +4696,7 @@ msgstr "NetFabbで修正"
 
 #: src/slic3r/GUI/GUI_App.cpp:2273
 msgid "Flash Printer &Firmware"
-msgstr "プリンターフェームウェアの書込み&F"
+msgstr "プリンターファームウェアの書込み&F"
 
 #: src/slic3r/GUI/FirmwareDialog.cpp:152
 msgid "Flash!"
@@ -8767,7 +8767,7 @@ msgstr ""
 "後処理スクリプトは、Gコードファイルを%2%変更する予定ですが、Gコードファイルが"
 "削除され、新しい名前で保存されている可能性があります。\n"
 "後処理スクリプトを調整してGコードを変更し、オプションで後処理されたGコード"
-"ファイルの名前を変更する方法についてマニュアルを参照してください。"
+"ファイルの名前を変更する方法についてマニュアルを参照してください。\n"
 
 #: src/slic3r/GUI/Tab.cpp:1711 src/libslic3r/PrintConfig.cpp:2010
 msgid "Post-processing scripts"
