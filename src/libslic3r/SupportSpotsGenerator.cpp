@@ -494,8 +494,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
         float flow_width,
         const std::vector<ExtrusionLine> &checked_lines,
         float print_z,
-        const Params &params,
-        std::mt19937_64& generator) {
+        const Params &params) {
     std::unordered_map<StabilityAccumulator*, std::vector<ExtrusionLine>> layer_accs_w_lines;
     for (size_t i = 0; i < checked_lines.size(); ++i) {
         layer_accs_w_lines[&stability_accs.access(checked_lines[i].stability_accumulator_id)].push_back(
@@ -504,7 +503,6 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
 
     for (auto &accumulator : layer_accs_w_lines) {
         StabilityAccumulator *acc = accumulator.first;
-        std::shuffle(accumulator.second.begin(), accumulator.second.end(), generator);
         LayerLinesDistancer acc_lines(std::move(accumulator.second));
 
         if (acc->get_support_points().empty()) {
@@ -598,7 +596,6 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
     Issues issues { };
     std::vector<ExtrusionLine> checked_lines;
     VoxelGrid supports_presence_grid { po, params.min_distance_between_support_points };
-    std::mt19937_64 generator { 27644437 };
 
     // PREPARE BASE LAYER
     float max_flow_width = 0.0f;
@@ -758,8 +755,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 max_flow_width,
                 prev_layer_lines.get_lines(),
                 print_z,
-                params,
-                generator);
+                params);
 
 #ifdef DEBUG_FILES
         for (const auto &line : prev_layer_lines.get_lines()) {
