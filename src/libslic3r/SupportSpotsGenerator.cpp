@@ -473,7 +473,8 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 current_line.malformation += 0.9 * nearest_line.malformation;
             }
             if (dist_from_prev_layer > flow_width * 0.3) {
-                current_line.malformation += 0.15 * (0.6 + 0.4 * malformation_acc.max_curvature / PI);
+                malformation_acc.add_distance(current_line.len);
+                current_line.malformation += 0.15 * (0.8 + 0.2 * malformation_acc.max_curvature / (1.0f + 0.5f*malformation_acc.distance));
             } else {
                 malformation_acc.reset();
             }
