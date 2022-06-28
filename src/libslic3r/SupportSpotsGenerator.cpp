@@ -433,7 +433,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 curr_angle = angle(v1, v2);
             }
             bridging_acc.add_angle(curr_angle);
-            malformation_acc.add_angle(curr_angle);
+            malformation_acc.add_angle(std::max(0.0f,curr_angle));
 
             size_t nearest_line_idx;
             Vec2f nearest_point;
@@ -449,7 +449,6 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 current_line.stability_accumulator_id = current_stability_acc;
                 stability_accs.access(current_stability_acc).add_extrusion(current_line, print_z, mm3_per_mm);
                 bridging_acc.reset();
-                // TODO curving here
             } else {
                 bridging_acc.add_distance(current_line.len);
                 if (current_stability_acc == NULL_ACC_ID) {
@@ -460,8 +459,8 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 current_segment.add_extrusion(current_line, print_z, mm3_per_mm);
                 if (bridging_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
                 > params.bridge_distance
-                        / (1.0f + bridging_acc.max_curvature
-                                * params.bridge_distance_decrease_by_curvature_factor / PI)) {
+                        / (1.0f + (bridging_acc.max_curvature
+                                * params.bridge_distance_decrease_by_curvature_factor / PI))) {
                     current_segment.add_support_point(current_line.b, 0.0f); // Do not count extrusion supports into the sticking force. They can be very densely placed, causing algorithm to overestimate stickiness.
                     issues.supports_nedded.emplace_back(to_vec3f(current_line.b), 1.0);
                     bridging_acc.reset();
@@ -471,10 +470,10 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             //malformation
             if (fabs(dist_from_prev_layer) < flow_width * 2.0f) {
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
-                current_line.malformation += 0.7 * nearest_line.malformation;
+                current_line.malformation += 0.9 * nearest_line.malformation;
             }
             if (dist_from_prev_layer > flow_width * 0.3) {
-                current_line.malformation += 0.6 + 0.4 * malformation_acc.max_curvature / PI;
+                current_line.malformation += 0.15 * (0.6 + 0.4 * malformation_acc.max_curvature / PI);
             } else {
                 malformation_acc.reset();
             }
@@ -545,7 +544,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
             float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), print_z).cross(
                     extruder_pressure_direction)).norm();
             float extruder_conflict_force = params.tolerable_extruder_conflict_force +
-                    line.malformation * params.malformations_additive_conflict_extruder_force;
+                    std::min(line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
             float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
 
             float total_torque = bed_movement_torque + extruder_conflict_torque - weight_torque - sticking_torque;
@@ -763,7 +762,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
 
 #ifdef DEBUG_FILES
         for (const auto &line : prev_layer_lines.get_lines()) {
-            Vec3f color = value_to_rgbf(0, 5.0f, line.malformation);
+            Vec3f color = value_to_rgbf(0, 1.0f, line.malformation);
             fprintf(malform_f, "v %f %f %f  %f %f %f\n", line.b[0],
                     line.b[1], print_z, color[0], color[1], color[2]);
         }
