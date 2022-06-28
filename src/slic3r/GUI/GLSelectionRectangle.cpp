@@ -29,19 +29,25 @@ namespace GUI {
         m_end_corner = mouse_position;
     }
 
+#if ENABLE_RAYCAST_PICKING
+    std::vector<unsigned int> GLSelectionRectangle::contains(const std::vector<Vec3d>& points) const
+#else
     std::vector<unsigned int> GLSelectionRectangle::stop_dragging(const GLCanvas3D& canvas, const std::vector<Vec3d>& points)
+#endif // ENABLE_RAYCAST_PICKING
     {
         std::vector<unsigned int> out;
 
+#if !ENABLE_RAYCAST_PICKING
         if (!is_dragging())
             return out;
 
         m_state = EState::Off;
+#endif // !ENABLE_RAYCAST_PICKING
 
         const Camera& camera = wxGetApp().plater()->get_camera();
-        Matrix4d modelview = camera.get_view_matrix().matrix();
-        Matrix4d projection= camera.get_projection_matrix().matrix();
-        Vec4i viewport(camera.get_viewport().data());
+        const Matrix4d modelview = camera.get_view_matrix().matrix();
+        const Matrix4d projection= camera.get_projection_matrix().matrix();
+        const Vec4i viewport(camera.get_viewport().data());
 
         // Convert our std::vector to Eigen dynamic matrix.
         Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::DontAlign> pts(points.size(), 3);
@@ -53,11 +59,15 @@ namespace GUI {
         igl::project(pts, modelview, projection, viewport, projections);
 
         // bounding box created from the rectangle corners - will take care of order of the corners
-        BoundingBox rectangle(Points{ Point(m_start_corner.cast<coord_t>()), Point(m_end_corner.cast<coord_t>()) });
+        const BoundingBox rectangle(Points{ Point(m_start_corner.cast<coord_t>()), Point(m_end_corner.cast<coord_t>()) });
 
         // Iterate over all points and determine whether they're in the rectangle.
         for (int i = 0; i<projections.rows(); ++i)
+#if ENABLE_RAYCAST_PICKING
+            if (rectangle.contains(Point(projections(i, 0), viewport[3] - projections(i, 1))))
+#else
             if (rectangle.contains(Point(projections(i, 0), canvas.get_canvas_size().get_height() - projections(i, 1))))
+#endif // ENABLE_RAYCAST_PICKING
                 out.push_back(i);
 
         return out;

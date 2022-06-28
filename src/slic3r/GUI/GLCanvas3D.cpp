@@ -1713,7 +1713,7 @@ void GLCanvas3D::render()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_RAYCAST_PICKING_DEBUG
-    if (m_picking_enabled && !m_mouse.dragging && !m_gizmos.is_dragging())
+    if (m_picking_enabled && !m_mouse.dragging && !m_gizmos.is_dragging() && !m_rectangle_selection.is_dragging())
         m_scene_raycaster.render_hit(camera);
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 
@@ -5375,6 +5375,7 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
 #if ENABLE_RAYCAST_PICKING
 void GLCanvas3D::_picking_pass()
 {
+#if ENABLE_RAYCAST_PICKING_DEBUG
     if (!m_picking_enabled || m_mouse.dragging || m_mouse.position == Vec2d(DBL_MAX, DBL_MAX) || m_gizmos.is_dragging()) {
         ImGuiWrapper& imgui = *wxGetApp().imgui();
         imgui.begin(std::string("Hit result"), ImGuiWindowFlags_AlwaysAutoResize);
@@ -5382,6 +5383,7 @@ void GLCanvas3D::_picking_pass()
         imgui.end();
         return;
     }
+#endif // ENABLE_RAYCAST_PICKING_DEBUG
 
     m_hover_volume_idxs.clear();
 
@@ -5443,13 +5445,15 @@ void GLCanvas3D::_picking_pass()
     case SceneRaycaster::EType::Volume:
     {
         if (m_volumes.volumes[hit.raycaster_id]->is_wipe_tower)
-            object_type = "Wipe tower";
+            object_type = "Volume (Wipe tower)";
         else if (m_volumes.volumes[hit.raycaster_id]->volume_idx() == -int(slaposPad))
-            object_type = "SLA pad";
+            object_type = "Volume (SLA pad)";
         else if (m_volumes.volumes[hit.raycaster_id]->volume_idx() == -int(slaposSupportTree))
-            object_type = "SLA supports";
+            object_type = "Volume (SLA supports)";
+        else if (m_volumes.volumes[hit.raycaster_id]->is_modifier)
+            object_type = "Volume (Modifier)";
         else
-            object_type = "Volume";
+            object_type = "Volume (Part)";
         break;
     }
     default: { break; }
@@ -5556,11 +5560,6 @@ void GLCanvas3D::_picking_pass()
 }
 #endif // ENABLE_RAYCAST_PICKING
 
-#if ENABLE_RAYCAST_PICKING
-void GLCanvas3D::_rectangular_selection_picking_pass()
-{
-}
-#else
 void GLCanvas3D::_rectangular_selection_picking_pass()
 {
     m_gizmos.set_hover_id(-1);
@@ -5642,7 +5641,6 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
     m_hover_volume_idxs.assign(idxs.begin(), idxs.end());
     _update_volumes_hover_state();
 }
-#endif // ENABLE_RAYCAST_PICKING
 
 void GLCanvas3D::_render_background()
 {
@@ -5746,7 +5744,6 @@ void GLCanvas3D::_render_bed(bool bottom, bool show_axes)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if !ENABLE_RAYCAST_PICKING
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLCanvas3D::_render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom)
 #else
@@ -5764,7 +5761,6 @@ void GLCanvas3D::_render_bed_for_picking(bool bottom)
     m_bed.render_for_picking(*this, bottom, scale_factor);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
-#endif // !ENABLE_RAYCAST_PICKING
 
 void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
 {
@@ -6042,7 +6038,6 @@ void GLCanvas3D::_render_overlays()
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if !ENABLE_RAYCAST_PICKING
 void GLCanvas3D::_render_volumes_for_picking() const
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -6094,7 +6089,6 @@ void GLCanvas3D::_render_volumes_for_picking() const
 
     glsafe(::glEnable(GL_CULL_FACE));
 }
-#endif // !ENABLE_RAYCAST_PICKING
 
 void GLCanvas3D::_render_current_gizmo() const
 {

@@ -104,7 +104,7 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
 
     HitResult ret;
 
-    auto test_raycasters = [&](EType type) {
+    auto test_raycasters = [this, is_closest, clipping_plane](EType type, const Vec2d& mouse_pos, const Camera& camera, HitResult& ret) {
         const ClippingPlane* clip_plane = (clipping_plane != nullptr && type == EType::Volume) ? clipping_plane : nullptr;
         std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters(type);
         HitResult current_hit = { type };
@@ -126,13 +126,13 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
     };
 
     if (!m_gizmos.empty())
-        test_raycasters(EType::Gizmo);
+        test_raycasters(EType::Gizmo, mouse_pos, camera, ret);
 
     if (!m_gizmos_on_top || !ret.is_valid()) {
         if (camera.is_looking_downward() && !m_bed.empty())
-            test_raycasters(EType::Bed);
+            test_raycasters(EType::Bed, mouse_pos, camera, ret);
         if (!m_volumes.empty())
-            test_raycasters(EType::Volume);
+            test_raycasters(EType::Volume, mouse_pos, camera, ret);
     }
 
     if (ret.is_valid())

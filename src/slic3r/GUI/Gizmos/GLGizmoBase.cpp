@@ -156,9 +156,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_RAYCAST_PICKING
     s_cube.model.render();
-#else
-    s_cube.render();
-#endif // ENABLE_RAYCAST_PICKING
 
     auto render_extension = [&view_matrix, &view_matrix_no_offset, shader](const Transform3d& matrix) {
         const Transform3d view_model_matrix = view_matrix * matrix;
@@ -167,6 +164,9 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
         s_cone.model.render();
     };
+#else
+    s_cube.render();
+#endif // ENABLE_RAYCAST_PICKING
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosX)) != 0) {

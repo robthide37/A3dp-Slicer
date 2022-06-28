@@ -379,7 +379,6 @@ ColorRGB to_rgb(const ColorRGBA& other_rgba) { return { other_rgba.r(), other_rg
 ColorRGBA to_rgba(const ColorRGB& other_rgb) { return { other_rgb.r(), other_rgb.g(), other_rgb.b(), 1.0f }; }
 ColorRGBA to_rgba(const ColorRGB& other_rgb, float alpha) { return { other_rgb.r(), other_rgb.g(), other_rgb.b(), alpha }; }
 
-#if !ENABLE_RAYCAST_PICKING
 ColorRGBA picking_decode(unsigned int id)
 {
 	return {
@@ -404,7 +403,6 @@ unsigned char picking_checksum_alpha_channel(unsigned char red, unsigned char gr
 	b ^= 0x55;
 	return b;
 }
-#endif // !ENABLE_RAYCAST_PICKING
 
 } // namespace Slic3r
 

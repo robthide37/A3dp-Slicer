@@ -5,7 +5,6 @@
 
 #include "MeshUtils.hpp"
 #include "GLModel.hpp"
-
 #include <vector>
 #include <string>
 #include <optional>

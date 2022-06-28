@@ -413,7 +413,12 @@ bool GLGizmoHollow::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_pos
 
         // Now ask the rectangle which of the points are inside.
         std::vector<Vec3f> points_inside;
+#if ENABLE_RAYCAST_PICKING
+        std::vector<unsigned int> points_idxs = m_selection_rectangle.contains(points);
+        m_selection_rectangle.stop_dragging();
+#else
         std::vector<unsigned int> points_idxs = m_selection_rectangle.stop_dragging(m_parent, points);
+#endif // ENABLE_RAYCAST_PICKING
         for (size_t idx : points_idxs)
             points_inside.push_back(points[idx].cast<float>());
 

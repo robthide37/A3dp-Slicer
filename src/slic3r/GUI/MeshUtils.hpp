@@ -136,7 +136,11 @@ public:
         , m_emesh(*mesh, true) // calculate epsilon for triangle-ray intersection from an average edge length
         , m_normals(its_face_normals(mesh->its))
     {
+        assert(m_mesh != nullptr);
     }
+
+    static void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
+        Vec3d& point, Vec3d& direction);
 #else
     // The class references extern TriangleMesh, which must stay alive
     // during MeshRaycaster existence.
@@ -145,10 +149,10 @@ public:
         , m_normals(its_face_normals(mesh.its))
     {
     }
-#endif // ENABLE_RAYCAST_PICKING
 
     void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                             Vec3d& point, Vec3d& direction) const;
+        Vec3d& point, Vec3d& direction) const;
+#endif // ENABLE_RAYCAST_PICKING
 
     // Given a mouse position, this returns true in case it is on the mesh.
     bool unproject_on_mesh(

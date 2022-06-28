@@ -234,8 +234,13 @@ Vec3f MeshRaycaster::get_triangle_normal(size_t facet_idx) const
     return m_normals[facet_idx];
 }
 
+#if ENABLE_RAYCAST_PICKING
+void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
+                                        Vec3d& point, Vec3d& direction)
+#else
 void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                         Vec3d& point, Vec3d& direction) const
+#endif // ENABLE_RAYCAST_PICKING
 {
     Matrix4d modelview = camera.get_view_matrix().matrix();
     Matrix4d projection= camera.get_projection_matrix().matrix();
@@ -243,9 +248,9 @@ void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3
 
     Vec3d pt1;
     Vec3d pt2;
-    igl::unproject(Vec3d(mouse_pos(0), viewport[3] - mouse_pos(1), 0.),
+    igl::unproject(Vec3d(mouse_pos.x(), viewport[3] - mouse_pos.y(), 0.),
                    modelview, projection, viewport, pt1);
-    igl::unproject(Vec3d(mouse_pos(0), viewport[3] - mouse_pos(1), 1.),
+    igl::unproject(Vec3d(mouse_pos.x(), viewport[3] - mouse_pos.y(), 1.),
                    modelview, projection, viewport, pt2);
 
     Transform3d inv = trafo.inverse();

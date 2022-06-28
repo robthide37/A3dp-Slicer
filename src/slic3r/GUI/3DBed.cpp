@@ -24,9 +24,7 @@
 
 static const float GROUND_Z = -0.02f;
 static const Slic3r::ColorRGBA DEFAULT_MODEL_COLOR             = Slic3r::ColorRGBA::DARK_GRAY();
-#if !ENABLE_RAYCAST_PICKING
 static const Slic3r::ColorRGBA PICKING_MODEL_COLOR             = Slic3r::ColorRGBA::BLACK();
-#endif // !ENABLE_RAYCAST_PICKING
 static const Slic3r::ColorRGBA DEFAULT_SOLID_GRID_COLOR        = { 0.9f, 0.9f, 0.9f, 1.0f };
 static const Slic3r::ColorRGBA DEFAULT_TRANSPARENT_GRID_COLOR  = { 0.9f, 0.9f, 0.9f, 0.6f };
 
@@ -273,19 +271,13 @@ Point Bed3D::point_projection(const Point& point) const
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes, bool show_texture)
 {
-#if ENABLE_RAYCAST_PICKING
-    render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture);
-#else
     render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture, false);
-#endif // ENABLE_RAYCAST_PICKING
 }
 
-#if !ENABLE_RAYCAST_PICKING
 void Bed3D::render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor)
 {
     render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, false, false, true);
 }
-#endif // !ENABLE_RAYCAST_PICKING
 #else
 void Bed3D::render(GLCanvas3D& canvas, bool bottom, float scale_factor, bool show_axes, bool show_texture)
 {
@@ -299,13 +291,8 @@ void Bed3D::render_for_picking(GLCanvas3D& canvas, bool bottom, float scale_fact
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
-    bool show_axes, bool show_texture)
-#else
 void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
     bool show_axes, bool show_texture, bool picking)
-#endif // ENABLE_RAYCAST_PICKING
 #else
 void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
     bool show_axes, bool show_texture, bool picking)
@@ -319,9 +306,11 @@ void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
     glsafe(::glEnable(GL_DEPTH_TEST));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_RAYCAST_PICKING
+#if ENABLE_RAYCAST_PICKING
+    m_model.model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
+#else
     m_model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
-#endif // !ENABLE_RAYCAST_PICKING
+#endif // ENABLE_RAYCAST_PICKING
 #else
     m_model.set_color(-1, picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -331,11 +320,7 @@ void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     case Type::System: { render_system(canvas, view_matrix, projection_matrix, bottom, show_texture); break; }
     default:
-#if ENABLE_RAYCAST_PICKING
-    case Type::Custom: { render_custom(canvas, view_matrix, projection_matrix, bottom, show_texture); break; }
-#else
     case Type::Custom: { render_custom(canvas, view_matrix, projection_matrix, bottom, show_texture, picking); break; }
-#endif // ENABLE_RAYCAST_PICKING
 #else
     case Type::System: { render_system(canvas, bottom, show_texture); break; }
     default:
@@ -618,11 +603,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
     if (m_texture_filename.empty()) {
         m_texture.reset();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-        render_default(bottom, true, view_matrix, projection_matrix);
-#else
         render_default(bottom, false, true, view_matrix, projection_matrix);
-#endif // ENABLE_RAYCAST_PICKING
 #else
         render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -639,11 +620,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
                 // generate a temporary lower resolution texture to show while no main texture levels have been compressed
                 if (!m_temp_texture.load_from_svg_file(m_texture_filename, false, false, false, max_tex_size / 8)) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-                    render_default(bottom, true, view_matrix, projection_matrix);
-#else
                     render_default(bottom, false, true, view_matrix, projection_matrix);
-#endif // ENABLE_RAYCAST_PICKING
 #else
                     render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -655,11 +632,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             // starts generating the main texture, compression will run asynchronously
             if (!m_texture.load_from_svg_file(m_texture_filename, true, true, true, max_tex_size)) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-                render_default(bottom, true, view_matrix, projection_matrix);
-#else
                 render_default(bottom, false, true, view_matrix, projection_matrix);
-#endif // ENABLE_RAYCAST_PICKING
 #else
                 render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -671,11 +644,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             if (m_temp_texture.get_id() == 0 || m_temp_texture.get_source() != m_texture_filename) {
                 if (!m_temp_texture.load_from_file(m_texture_filename, false, GLTexture::None, false)) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-                    render_default(bottom, true, view_matrix, projection_matrix);
-#else
                     render_default(bottom, false, true, view_matrix, projection_matrix);
-#endif // ENABLE_RAYCAST_PICKING
 #else
                     render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -687,11 +656,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             // starts generating the main texture, compression will run asynchronously
             if (!m_texture.load_from_file(m_texture_filename, true, GLTexture::MultiThreaded, true)) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-                render_default(bottom, true, view_matrix, projection_matrix);
-#else
                 render_default(bottom, false, true, view_matrix, projection_matrix);
-#endif // ENABLE_RAYCAST_PICKING
 #else
                 render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -700,11 +665,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
         }
         else {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-            render_default(bottom, true, view_matrix, projection_matrix);
-#else
             render_default(bottom, false, true, view_matrix, projection_matrix);
-#endif // ENABLE_RAYCAST_PICKING
 #else
             render_default(bottom, false, true);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -892,22 +853,14 @@ void Bed3D::render_model()
 }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-void Bed3D::render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture)
-#else
 void Bed3D::render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking)
-#endif // ENABLE_RAYCAST_PICKING
 #else
 void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (m_texture_filename.empty() && m_model_filename.empty()) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-        render_default(bottom, show_texture, view_matrix, projection_matrix);
-#else
         render_default(bottom, picking, show_texture, view_matrix, projection_matrix);
-#endif // ENABLE_RAYCAST_PICKING
 #else
         render_default(bottom, picking, show_texture);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -934,11 +887,7 @@ void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bo
 }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-void Bed3D::render_default(bool bottom, bool show_texture, const Transform3d& view_matrix, const Transform3d& projection_matrix)
-#else
 void Bed3D::render_default(bool bottom, bool picking, bool show_texture, const Transform3d& view_matrix, const Transform3d& projection_matrix)
-#endif // ENABLE_RAYCAST_PICKING
 #else
 void Bed3D::render_default(bool bottom, bool picking, bool show_texture)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL

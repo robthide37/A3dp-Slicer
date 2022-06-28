@@ -181,13 +181,11 @@ inline Vec3i value_to_rgbi(float minimum, float maximum, float value)
     return (value_to_rgbf(minimum, maximum, value) * 255).cast<int>();
 }
 
-#if !ENABLE_RAYCAST_PICKING
 ColorRGBA picking_decode(unsigned int id);
 unsigned int picking_encode(unsigned char r, unsigned char g, unsigned char b);
 // Produce an alpha channel checksum for the red green blue components. The alpha channel may then be used to verify, whether the rgb components
 // were not interpolated by alpha blending or multi sampling.
 unsigned char picking_checksum_alpha_channel(unsigned char red, unsigned char green, unsigned char blue);
-#endif // !ENABLE_RAYCAST_PICKING
 
 } // namespace Slic3r
 

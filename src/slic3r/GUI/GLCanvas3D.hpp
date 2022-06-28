@@ -980,9 +980,7 @@ private:
     void _render_background();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     void _render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes);
-#if !ENABLE_RAYCAST_PICKING
     void _render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom);
-#endif // !ENABLE_RAYCAST_PICKING
 #else
     void _render_bed(bool bottom, bool show_axes);
     void _render_bed_for_picking(bool bottom);
@@ -999,9 +997,7 @@ private:
 #endif // ENABLE_RENDER_SELECTION_CENTER
     void _check_and_update_toolbar_icon_scale();
     void _render_overlays();
-#if !ENABLE_RAYCAST_PICKING
     void _render_volumes_for_picking() const;
-#endif // !ENABLE_RAYCAST_PICKING
     void _render_current_gizmo() const;
     void _render_gizmos_overlay();
     void _render_main_toolbar();

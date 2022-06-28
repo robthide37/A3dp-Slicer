@@ -26,9 +26,15 @@ public:
     // To be called on mouse move.
     void dragging(const Vec2d& mouse_position);
 
+#if ENABLE_RAYCAST_PICKING
+    // Given a vector of points in world coordinates, the function returns indices of those
+    // that are in the rectangle.
+    std::vector<unsigned int> contains(const std::vector<Vec3d>& points) const;
+#else
     // Given a vector of points in world coordinates, the function returns indices of those
     // that are in the rectangle. It then disables the rectangle.
     std::vector<unsigned int> stop_dragging(const GLCanvas3D& canvas, const std::vector<Vec3d>& points);
+#endif // ENABLE_RAYCAST_PICKING
 
     // Disables the rectangle.
     void stop_dragging();
