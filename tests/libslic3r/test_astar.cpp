@@ -134,7 +134,7 @@ struct CellGridTracer2D_AllDirs {
     template<class Fn>
     void foreach_reachable(const Vec2i &src, Fn &&fn) const
     {
-        auto is_inside = [](const Vec2i& v) { return v.x() >= 0 && v.x() < Cols && v.y() >= 0 && v.y() < Rows; };
+        auto is_inside = [](const Vec2i& v) { return v.x() >= 0 && v.x() < int(Cols) && v.y() >= 0 && v.y() < int(Rows); };
         if (Vec2i crd = src + Vec2i{0, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
         if (Vec2i crd = src + Vec2i{1, 0}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
         if (Vec2i crd = src + Vec2i{1, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
@@ -171,7 +171,7 @@ struct CellGridTracer2D_Axis {
     template<class Fn>
     void foreach_reachable(const Vec2i &src, Fn &&fn) const
     {
-        auto is_inside = [](const Vec2i& v) { return v.x() >= 0 && v.x() < Cols && v.y() >= 0 && v.y() < Rows; };
+        auto is_inside = [](const Vec2i& v) { return v.x() >= 0 && v.x() < int(Cols) && v.y() >= 0 && v.y() < int(Rows); };
         if (Vec2i crd = src + Vec2i{0, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
         if (Vec2i crd = src + Vec2i{0, -1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
         if (Vec2i crd = src + Vec2i{1, 0}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
