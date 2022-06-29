@@ -317,10 +317,8 @@ set(SLIC3R_SOURCES
     SLA/Clustering.hpp
     SLA/Clustering.cpp
     SLA/ReprojectPointsOnMesh.hpp
-<<<<<<< HEAD
     SLA/DefaultSupportTree.hpp
     SLA/DefaultSupportTree.cpp
-=======
 
     Arachne/BeadingStrategy/BeadingStrategy.hpp
     Arachne/BeadingStrategy/BeadingStrategy.cpp
@@ -362,7 +360,6 @@ set(SLIC3R_SOURCES
     Arachne/SkeletalTrapezoidationJoint.hpp
     Arachne/WallToolPaths.hpp
     Arachne/WallToolPaths.cpp
->>>>>>> master_250
 )
 
 add_library(libslic3r STATIC ${SLIC3R_SOURCES})
@@ -453,11 +450,7 @@ endif()
 
 if (APPLE)
     # This flag prevents the need for minimum SDK version 10.14
-<<<<<<< HEAD
-    # currently, PS targets v10.10
-=======
     # currently, PS targets v10.12
->>>>>>> master_250
     target_compile_options(libslic3r PUBLIC "-fno-aligned-allocation")
 endif ()
 

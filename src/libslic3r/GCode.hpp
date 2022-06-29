@@ -278,17 +278,10 @@ private:
     void            set_extruders(const std::vector<unsigned int> &extruder_ids);
     std::string     preamble();
     std::string     change_layer(coordf_t print_z);
-<<<<<<< HEAD
     std::string     extrude_entity(const ExtrusionEntity &entity, const std::string_view description, double speed = -1.);
     std::string     extrude_loop(ExtrusionLoop loop, const std::string_view description, double speed = -1.);
     std::string     extrude_multi_path(ExtrusionMultiPath multipath, const std::string_view description, double speed = -1.);
     std::string     extrude_path(ExtrusionPath path, const std::string_view description, double speed = -1.);
-=======
-    std::string     extrude_entity(const ExtrusionEntity &entity, std::string description = "", double speed = -1.);
-    std::string     extrude_loop(ExtrusionLoop loop, std::string description, double speed = -1.);
-    std::string     extrude_multi_path(ExtrusionMultiPath multipath, std::string description = "", double speed = -1.);
-    std::string     extrude_path(ExtrusionPath path, std::string description = "", double speed = -1.);
->>>>>>> master_250
 
     // Extruding multiple objects with soluble / non-soluble / combined supports
     // on a multi-material printer, trying to minimize tool switches.

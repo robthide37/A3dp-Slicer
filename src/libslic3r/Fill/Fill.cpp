@@ -13,10 +13,8 @@
 #include "FillBase.hpp"
 #include "FillRectilinear.hpp"
 #include "FillLightning.hpp"
-<<<<<<< HEAD
-=======
 #include "FillConcentric.hpp"
->>>>>>> master_250
+
 
 namespace Slic3r {
 
@@ -358,8 +356,6 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         if (surface_fill.params.pattern == ipLightning)
             dynamic_cast<FillLightning::Filler*>(f.get())->generator = lightning_generator;
 
-<<<<<<< HEAD
-=======
         if (perimeter_generator.value == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) {
             FillConcentric *fill_concentric = dynamic_cast<FillConcentric *>(f.get());
             assert(fill_concentric != nullptr);
@@ -367,7 +363,6 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
             fill_concentric->print_object_config = &this->object()->config();
         }
 
->>>>>>> master_250
         // calculate flow spacing for infill pattern generation
         bool using_internal_flow = ! surface_fill.surface.is_solid() && ! surface_fill.params.bridge;
         double link_max_length = 0.;
