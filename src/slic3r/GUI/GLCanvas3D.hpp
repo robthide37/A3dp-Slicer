@@ -997,7 +997,11 @@ private:
 #endif // ENABLE_RENDER_SELECTION_CENTER
     void _check_and_update_toolbar_icon_scale();
     void _render_overlays();
+#if ENABLE_RAYCAST_PICKING
+    void _render_volumes_for_picking(const Camera& camera) const;
+#else
     void _render_volumes_for_picking() const;
+#endif // ENABLE_RAYCAST_PICKING
     void _render_current_gizmo() const;
     void _render_gizmos_overlay();
     void _render_main_toolbar();
