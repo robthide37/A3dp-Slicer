@@ -267,7 +267,15 @@ SCENARIO("Infill only where needed", "[Fill]")
     });
 
     auto test = [&config]() -> double {
-        std::string gcode = Slic3r::Test::slice({ Slic3r::Test::TestMesh::pyramid }, config);
+        TriangleMesh pyramid = Test::mesh(Slic3r::Test::TestMesh::pyramid);
+        // Arachne doesn't use "Detect thin walls," and because of this, it filters out tiny infill areas differently.
+        // So, for Arachne, we cut the pyramid model to achieve similar results.
+        if (config.opt_enum<PerimeterGeneratorType>("perimeter_generator") == Slic3r::PerimeterGeneratorType::Arachne) {
+            indexed_triangle_set lower{};
+            cut_mesh(pyramid.its, 35, nullptr, &lower);
+            pyramid = TriangleMesh(lower);
+        }
+        std::string gcode = Slic3r::Test::slice({ pyramid }, config);
         THEN("gcode not empty") {
             REQUIRE(! gcode.empty());
         }
