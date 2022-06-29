@@ -257,6 +257,21 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branchi
         REQUIRE(bool(mergept));
         REQUIRE((*mergept - b).norm() < 2 * EPSILON);
     }
+
+    // -|----------------------------> Y
+    //  a                          b
+    //  *            * <= mergept  *
+    //
+    SECTION("Points at same height have mergepoint in the middle if critical angle is zero ") {
+        Vec3f a{-1.f, -1.f, -1.f}, b = {-1.5f, -1.5f, -1.f};
+        auto slope = EPSILON;
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        Vec3f middle = (b + a) / 2.;
+        REQUIRE((*mergept - middle).norm() < 4 * EPSILON);
+    }
 }
 
 TEST_CASE("BranchingSupports::ElevatedSupportsDoNotPierceModel", "[SLASupportGeneration][Branching]") {

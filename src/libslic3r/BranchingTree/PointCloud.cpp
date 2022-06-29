@@ -15,8 +15,8 @@ std::optional<Vec3f> find_merge_pt(const Vec3f &A,
     // for the intersection of these support cones is difficult and its enough
     // to reduce this problem to 2D and search for the intersection of two
     // rays that merge somewhere between A and B. The 2D plane is a vertical
-    // slice of the 3D scene where the X axis is determined by the XY direction
-    // of the AB vector.
+    // slice of the 3D scene where the 2D Y axis is equal to the 3D Z axis and
+    // the 2D X axis is determined by the XY direction of the AB vector.
     //
     // Z^
     //  |    A *
@@ -24,7 +24,7 @@ std::optional<Vec3f> find_merge_pt(const Vec3f &A,
     //  |    .   .   . .
     //  |   .     . .   .
     //  |  .       x     .
-    //  -------------------> X
+    //  -------------------> XY
 
     // Determine the transformation matrix for the 2D projection:
     Vec3f diff = {B.x() - A.x(), B.y() - A.y(), 0.f};
@@ -38,24 +38,33 @@ std::optional<Vec3f> find_merge_pt(const Vec3f &A,
     // omit 'a', pretend that its the origin and use BA as the vector b.
     Vec2f b = tr2D * (B - A);
 
-    // Get the slope of the ray emanating from 'a' towards 'b'. This ray might
+    // Get the square sine of the ray emanating from 'a' towards 'b'. This ray might
     // exceed the allowed angle but that is corrected subsequently.
-    // if b.x() is 0, slope is (+/-) pi/2 depending on b.y() sign
-    float slope_a = std::atan2(b.y(), b.x());
+    // The sign of the original sine is also needed, hence b.y is multiplied by
+    // abs(b.y)
+    float b_sqn = b.squaredNorm();
+    float sin2sig_a = b_sqn > EPSILON ? (b.y() * std::abs(b.y())) / b_sqn : 0.f;
 
-    // slope from 'b' to 'a' is the opposite of slope_a, the angle will also
-    // be corrected later.
-    float slope_b = -slope_a;
+    // sine2 from 'b' to 'a' is the opposite of sine2 from a to b
+    float sin2sig_b = -sin2sig_a;
 
     // Derive the allowed angles from the given critical angle.
     // critical_angle is measured from the horizontal X axis.
     // The rays need to go downwards which corresponds to negative angles
 
-    float min_angle = critical_angle - float(PI) / 2.f;
-    slope_a = std::min(slope_a, min_angle);
-    slope_b = std::min(slope_b, min_angle);
-    Vec2f Da = {std::cos(slope_a), std::sin(slope_a)};
-    Vec2f Db = {-std::cos(slope_b), std::sin(slope_b)};
+    float sincrit = std::sin(critical_angle);  // sine of the critical angle
+    float sin2crit = -sincrit * sincrit;       // signed sine squared
+    sin2sig_a = std::min(sin2sig_a, sin2crit); // Do the angle saturation of both rays
+    sin2sig_b = std::min(sin2sig_b, sin2crit); //
+    float sin2_a = std::abs(sin2sig_a);        // Get cosine squared values
+    float sin2_b = std::abs(sin2sig_b);
+    float cos2_a = 1.f - sin2_a;
+    float cos2_b = 1.f - sin2_b;
+
+    // Derive the new direction vectors. This is by square rooting the sin2
+    // and cos2 values and restoring the original signs
+    Vec2f Da = {std::copysign(std::sqrt(cos2_a), b.x()), std::copysign(std::sqrt(sin2_a), sin2sig_a)};
+    Vec2f Db = {-std::copysign(std::sqrt(cos2_b), b.x()), std::copysign(std::sqrt(sin2_b), sin2sig_b)};
 
     // Determine where two rays ([0, 0], Da), (b, Db) intersect.
     // Based on
