@@ -123,8 +123,6 @@ enum DraftShield {
     dsDisabled, dsLimited, dsEnabled
 };
 
-<<<<<<< HEAD
-=======
 enum class PerimeterGeneratorType
 {
     // Classic perimeter generator using Clipper offsets with constant extrusion width.
@@ -134,7 +132,6 @@ enum class PerimeterGeneratorType
     Arachne
 };
 
->>>>>>> master_250
 enum class GCodeThumbnailsFormat {
     PNG, JPG, QOI
 };

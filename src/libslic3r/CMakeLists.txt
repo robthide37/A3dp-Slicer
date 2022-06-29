@@ -317,10 +317,8 @@ set(SLIC3R_SOURCES
     SLA/Clustering.hpp
     SLA/Clustering.cpp
     SLA/ReprojectPointsOnMesh.hpp
-<<<<<<< HEAD
     SLA/DefaultSupportTree.hpp
     SLA/DefaultSupportTree.cpp
-=======
 
     Arachne/BeadingStrategy/BeadingStrategy.hpp
     Arachne/BeadingStrategy/BeadingStrategy.cpp
@@ -362,7 +360,6 @@ set(SLIC3R_SOURCES
     Arachne/SkeletalTrapezoidationJoint.hpp
     Arachne/WallToolPaths.hpp
     Arachne/WallToolPaths.cpp
->>>>>>> master_250
 )
 
 add_library(libslic3r STATIC ${SLIC3R_SOURCES})

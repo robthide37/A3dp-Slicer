@@ -2613,7 +2613,6 @@ std::string GCode::change_layer(coordf_t print_z)
     return gcode;
 }
 
-<<<<<<< HEAD
 static const auto comment_perimeter = "perimeter"sv;
 // Comparing string_view pointer & length for speed.
 static inline bool comment_is_perimeter(const std::string_view comment) {
@@ -2621,9 +2620,6 @@ static inline bool comment_is_perimeter(const std::string_view comment) {
 }
 
 std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view description, double speed)
-=======
-std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, double speed)
->>>>>>> master_250
 {
     // get a copy; don't modify the orientation of the original loop object otherwise
     // next copies (if any) would not detect the correct orientation
@@ -2634,21 +2630,14 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
     // find the point of the loop that is closest to the current extruder position
     // or randomize if requested
     Point last_pos = this->last_pos();
-<<<<<<< HEAD
+
     if (! m_config.spiral_vase && comment_is_perimeter(description)) {
-        assert(m_layer != nullptr);
-        m_seam_placer.place_seam(m_layer, loop, m_config.external_perimeters_first, this->last_pos());
-    } else
-        loop.split_at(last_pos, false);
-=======
-    if (! m_config.spiral_vase && description == "perimeter") {
         assert(m_layer != nullptr);
         m_seam_placer.place_seam(m_layer, loop, m_config.external_perimeters_first, this->last_pos());
     } else
         // Because the G-code export has 1um resolution, don't generate segments shorter than 1.5 microns,
         // thus empty path segments will not be produced by G-code export.
         loop.split_at(last_pos, false, scaled<double>(0.0015));
->>>>>>> master_250
 
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
@@ -2735,11 +2724,7 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, const std::s
     return gcode;
 }
 
-<<<<<<< HEAD
 std::string GCode::extrude_entity(const ExtrusionEntity &entity, const std::string_view description, double speed)
-=======
-std::string GCode::extrude_entity(const ExtrusionEntity &entity, std::string description, double speed)
->>>>>>> master_250
 {
     if (const ExtrusionPath* path = dynamic_cast<const ExtrusionPath*>(&entity))
         return this->extrude_path(*path, description, speed);
@@ -2774,11 +2759,7 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
             m_config.apply(print.get_print_region(&region - &by_region.front()).config());
 
             for (const ExtrusionEntity* ee : region.perimeters)
-<<<<<<< HEAD
                 gcode += this->extrude_entity(*ee, comment_perimeter, -1.);
-=======
-                gcode += this->extrude_entity(*ee, "perimeter", -1.);
->>>>>>> master_250
         }
     return gcode;
 }
