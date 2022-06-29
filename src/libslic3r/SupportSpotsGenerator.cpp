@@ -29,10 +29,10 @@ class ExtrusionLine
 {
 public:
     ExtrusionLine() :
-            a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0f) {
+            a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0f), external_perimeter(false) {
     }
-    ExtrusionLine(const Vec2f &_a, const Vec2f &_b) :
-            a(_a), b(_b), len((_a - _b).norm()) {
+    ExtrusionLine(const Vec2f &_a, const Vec2f &_b, bool external_perimeter) :
+            a(_a), b(_b), len((_a - _b).norm()), external_perimeter(external_perimeter) {
     }
 
     float length() {
@@ -42,6 +42,7 @@ public:
     Vec2f a;
     Vec2f b;
     float len;
+    bool external_perimeter;
 
     float malformation = 0.0f;
     size_t stability_accumulator_id = NULL_ACC_ID;
@@ -172,6 +173,10 @@ public:
     const std::vector<ExtrusionLine>& get_lines() const {
         return lines;
     }
+
+    void set_new_acc_id(size_t line_idx, size_t acc_id) {
+        lines[line_idx].stability_accumulator_id = acc_id;
+    }
 };
 
 // StabilityAccumulator accumulates extrusions for each connected model part from bed to current printed layer.
@@ -271,7 +276,7 @@ private:
 public:
     StabilityAccumulators() = default;
 
-    int create_accumulator() {
+    size_t create_accumulator() {
         size_t id = next_id;
         next_id++;
         mapping[id] = accumulators.size();
@@ -283,7 +288,9 @@ public:
         return accumulators[mapping[id]];
     }
 
-    void merge_accumulators(size_t from_id, size_t to_id) {
+    void merge_accumulators(size_t id_a, size_t id_b) {
+        size_t from_id = std::max(id_a, id_b);
+        size_t to_id = std::min(id_a, id_b);
         if (from_id == NULL_ACC_ID || to_id == NULL_ACC_ID) {
             return;
         }
@@ -399,7 +406,8 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         entity->collect_points(points);
         std::vector<ExtrusionLine> lines;
         lines.reserve(points.size() * 1.5);
-        lines.emplace_back(unscaled(points[0]).cast<float>(), unscaled(points[0]).cast<float>());
+        bool is_ex_perimeter = entity->role() == erExternalPerimeter;
+        lines.emplace_back(unscaled(points[0]).cast<float>(), unscaled(points[0]).cast<float>(), is_ex_perimeter);
         for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
             Vec2f start = unscaled(points[point_idx]).cast<float>();
             Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
@@ -411,7 +419,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             for (int i = 0; i < lines_count; ++i) {
                 Vec2f a(start + v * (i * step_size));
                 Vec2f b(start + v * ((i + 1) * step_size));
-                lines.emplace_back(a, b);
+                lines.emplace_back(a, b, is_ex_perimeter);
             }
         }
 
@@ -433,7 +441,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 curr_angle = angle(v1, v2);
             }
             bridging_acc.add_angle(curr_angle);
-            malformation_acc.add_angle(std::max(0.0f,curr_angle));
+            malformation_acc.add_angle(std::max(0.0f, curr_angle));
 
             size_t nearest_line_idx;
             Vec2f nearest_point;
@@ -443,8 +451,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             if (dist_from_prev_layer < flow_width) {
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
                 size_t acc_id = nearest_line.stability_accumulator_id;
-                stability_accs.merge_accumulators(std::max(acc_id, current_stability_acc),
-                        std::min(acc_id, current_stability_acc));
+                stability_accs.merge_accumulators(acc_id, current_stability_acc);
                 current_stability_acc = std::min(acc_id, current_stability_acc);
                 current_line.stability_accumulator_id = current_stability_acc;
                 stability_accs.access(current_stability_acc).add_extrusion(current_line, print_z, mm3_per_mm);
@@ -474,7 +481,8 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
             if (dist_from_prev_layer > flow_width * 0.3) {
                 malformation_acc.add_distance(current_line.len);
-                current_line.malformation += 0.15 * (0.8 + 0.2 * malformation_acc.max_curvature / (1.0f + 0.5f*malformation_acc.distance));
+                current_line.malformation += 0.15
+                        * (0.8 + 0.2 * malformation_acc.max_curvature / (1.0f + 0.5f * malformation_acc.distance));
             } else {
                 malformation_acc.reset();
             }
@@ -562,7 +570,7 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
                     supports_presence_grid.take_position(to_3d(target_point, print_z));
                 }
             }
-#if 1
+#if 0
             BOOST_LOG_TRIVIAL(debug)
             << "SSG: sticking_arm: " << sticking_arm;
             BOOST_LOG_TRIVIAL(debug)
@@ -586,7 +594,114 @@ void check_layer_global_stability(StabilityAccumulators &stability_accs,
     }
 }
 
-Issues check_object_stability(const PrintObject *po, const Params &params) {
+void reckon_thin_islands(StabilityAccumulators &stability_accs,
+        float flow_width,
+        float mm3_per_mm,
+        float print_z,
+        LayerLinesDistancer &layer_lines,
+        const Params& params) {
+    const std::vector<ExtrusionLine> &lines = layer_lines.get_lines();
+    std::vector<std::pair<size_t,size_t>> extrusions; //start and end idx (one beyond last extrusion) [start,end)
+    Vec2f current_pt = lines[0].a;
+    std::pair<size_t,size_t> current_ext(0,1);
+    for (size_t lidx = 0; lidx < lines.size(); ++lidx) {
+        const ExtrusionLine& line = lines[lidx];
+        if (line.a == current_pt) {
+            current_ext.second = lidx + 1;
+        } else {
+            extrusions.push_back(current_ext);
+            current_ext.first = lidx;
+            current_ext.second = lidx + 1;
+        }
+        current_pt = line.b;
+    }
+
+    std::vector<LayerLinesDistancer> islands;
+    std::vector<std::vector<size_t>> island_extrusions;
+    for (size_t e = 0; e < extrusions.size(); ++e) {
+        if (lines[extrusions[e].first].external_perimeter) {
+            std::vector<ExtrusionLine> copy(extrusions[e].second - extrusions[e].first);
+            for (size_t ex_line_idx = extrusions[e].first; ex_line_idx < extrusions[e].second; ++ex_line_idx) {
+                copy[ex_line_idx-extrusions[e].first] = lines[ex_line_idx];
+            }
+            islands.emplace_back(std::move(copy));
+            island_extrusions.push_back({e});
+        }
+    }
+
+    for (size_t i = 0; i < islands.size(); ++i) {
+        for (size_t e = 0; e < extrusions.size(); ++e) {
+            if (!lines[extrusions[e].first].external_perimeter){
+                size_t _idx;
+                Vec2f _pt;
+                if (islands[i].signed_distance_from_lines(lines[extrusions[e].first].a, _idx, _pt) < 0) {
+                    island_extrusions[i].push_back(e);
+                }
+            }
+        }
+    }
+
+    for (size_t i = 0; i < islands.size(); ++i) {
+        if (islands[i].get_lines().empty()) {
+            continue;
+        }
+        for (size_t j = 0; j < islands.size(); ++j) {
+            if (islands[j].get_lines().empty() || i == j) {
+                continue;
+            }
+            size_t _idx;
+            Vec2f _pt;
+            if (islands[i].signed_distance_from_lines(islands[j].get_line(0).a, _idx, _pt) < 0) {
+                island_extrusions[i].insert(island_extrusions[i].end(), island_extrusions[j].begin(),
+                        island_extrusions[j].end());
+                island_extrusions[j].clear();
+            }
+        }
+    }
+
+    size_t islands_count = 0;
+    for (const std::vector<size_t>& island_ex : island_extrusions) {
+        if (island_ex.empty()) {
+            continue;
+        }
+        islands_count++;
+        float cross_section = 0.0f;
+        size_t acc_id = NULL_ACC_ID;
+        for (size_t extrusion_idx : island_ex) {
+            for (size_t lidx = extrusions[extrusion_idx].first; lidx < extrusions[extrusion_idx].second; ++lidx) {
+                const ExtrusionLine& line = lines[lidx];
+                cross_section += line.len * flow_width;
+                stability_accs.merge_accumulators(acc_id, line.stability_accumulator_id);
+                acc_id = std::min(acc_id, line.stability_accumulator_id);
+            }
+        }
+
+        float max_force = cross_section * params.tensile_strength;
+
+        if (stability_accs.access(acc_id).get_sticking_force() > max_force) {
+            BOOST_LOG_TRIVIAL(debug) << "SSG: Forking new accumulator for island because tensile strenth is too low: " << max_force;
+            BOOST_LOG_TRIVIAL(debug) << "SSG: sticking force: " << stability_accs.access(acc_id).get_sticking_force();
+
+            size_t new_acc_id = stability_accs.create_accumulator();
+            StabilityAccumulator& acc = stability_accs.access(new_acc_id);
+
+            for (size_t extrusion_idx : island_ex) {
+                for (size_t lidx = extrusions[extrusion_idx].first; lidx < extrusions[extrusion_idx].second; ++lidx) {
+                    const ExtrusionLine& line = lines[lidx];
+                    float tensile_strength = params.tensile_strength * line.len * flow_width;
+                    acc.add_base_extrusion(line, tensile_strength, print_z, mm3_per_mm);
+                    layer_lines.set_new_acc_id(lidx, new_acc_id);
+                }
+            }
+        }
+    }
+
+    BOOST_LOG_TRIVIAL(debug) << "SSG: There are " << islands_count << " islands on printz: " << print_z;
+
+}
+
+Issues
+check_object_stability(const PrintObject *po, const Params &params) {
 #ifdef DEBUG_FILES
     FILE *debug_acc = boost::nowide::fopen(debug_out_path("accumulators.obj").c_str(), "w");
     FILE *malform_f = boost::nowide::fopen(debug_out_path("malformations.obj").c_str(), "w");
@@ -614,7 +729,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
                     Vec2f start = unscaled(points[point_idx]).cast<float>();
                     Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
-                    ExtrusionLine line { start, next };
+                    ExtrusionLine line { start, next, perimeter->role() == erExternalPerimeter };
                     line.stability_accumulator_id = id;
                     float line_sticking_force = line.len * flow_width * params.base_adhesion;
                     acc.add_base_extrusion(line, line_sticking_force, base_print_z, mm3_per_mm);
@@ -623,7 +738,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 if (perimeter->is_loop()) {
                     Vec2f start = unscaled(points[points.size() - 1]).cast<float>();
                     Vec2f next = unscaled(points[0]).cast<float>();
-                    ExtrusionLine line { start, next };
+                    ExtrusionLine line { start, next, perimeter->role() == erExternalPerimeter };
                     line.stability_accumulator_id = id;
                     float line_sticking_force = line.len * flow_width * params.base_adhesion;
                     acc.add_base_extrusion(line, line_sticking_force, base_print_z, mm3_per_mm);
@@ -643,7 +758,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
                     Vec2f start = unscaled(points[point_idx]).cast<float>();
                     Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
-                    ExtrusionLine line { start, next };
+                    ExtrusionLine line { start, next, false };
                     line.stability_accumulator_id = id;
                     float line_sticking_force = line.len * flow_width * params.base_adhesion;
                     acc.add_base_extrusion(line, line_sticking_force, base_print_z, mm3_per_mm);
@@ -663,9 +778,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
         float dist = prev_layer_lines.signed_distance_from_lines(site_search_location, nearest_line_idx, nearest_pt);
         if (std::abs(dist) < max_flow_width) {
             size_t other_line_acc_id = prev_layer_lines.get_line(nearest_line_idx).stability_accumulator_id;
-            size_t from_id = std::max(other_line_acc_id, l.stability_accumulator_id);
-            size_t to_id = std::min(other_line_acc_id, l.stability_accumulator_id);
-            stability_accs.merge_accumulators(from_id, to_id);
+            stability_accs.merge_accumulators(other_line_acc_id, l.stability_accumulator_id);
         }
     }
 
@@ -718,7 +831,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                             for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
                                 Vec2f start = unscaled(points[point_idx]).cast<float>();
                                 Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
-                                ExtrusionLine line { start, next };
+                                ExtrusionLine line { start, next, false };
                                 line.stability_accumulator_id = acc_id;
                                 acc.add_extrusion(line, print_z, mm3_per_mm);
                             }
@@ -740,22 +853,24 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
             float dist = prev_layer_lines.signed_distance_from_lines(fill_point.first, nearest_line_idx, nearest_pt);
             if (dist < max_fill_flow_width) {
                 size_t other_line_acc_id = prev_layer_lines.get_line(nearest_line_idx).stability_accumulator_id;
-                size_t from_id = std::max(other_line_acc_id, fill_point.second);
-                size_t to_id = std::min(other_line_acc_id, fill_point.second);
-                stability_accs.merge_accumulators(from_id, to_id);
+                stability_accs.merge_accumulators(other_line_acc_id, fill_point.second);
             } else {
                 BOOST_LOG_TRIVIAL(debug)
                 << "SSG: ERROR: seem that infill starts in the air? on printz: " << print_z;
             }
         }
 
+        float flow_width = get_flow_width(layer->regions()[0], erExternalPerimeter);
+
         check_layer_global_stability(stability_accs,
                 supports_presence_grid,
                 issues,
-                max_flow_width,
+                flow_width,
                 prev_layer_lines.get_lines(),
                 print_z,
                 params);
+
+//        reckon_thin_islands(stability_accs, flow_width, flow_width*layer->height, print_z, prev_layer_lines, params);
 
 #ifdef DEBUG_FILES
         for (const auto &line : prev_layer_lines.get_lines()) {
@@ -823,7 +938,8 @@ std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
     return {};
 }
 
-Issues full_search(const PrintObject *po, const Params &params) {
+Issues
+full_search(const PrintObject *po, const Params &params) {
     auto issues = check_object_stability(po, params);
 #ifdef DEBUG_FILES
     debug_export(issues, "issues");
