@@ -242,6 +242,9 @@ private:
     // cancel for previous update of volume to cancel finalize part
     std::shared_ptr<std::atomic<bool>> m_update_job_cancel;
 
+    // cancel for rendering font name
+    bool m_allow_update_rendered_font;
+
     // actual volume
     ModelVolume *m_volume; 
 

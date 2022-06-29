@@ -125,6 +125,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
     , m_font_manager(m_imgui->get_glyph_ranges())
     , m_update_job_cancel(nullptr)
+    , m_allow_update_rendered_font(false)
 {
     m_rotate_gizmo.set_group_id(0);
     // TODO: add suggestion to use https://fontawesome.com/
@@ -1332,6 +1333,7 @@ void GLGizmoEmboss::draw_font_list()
     const char * selected = (!actual_face_name.empty()) ?
         actual_face_name.ToUTF8().data() : " --- ";
     wxString del_facename;
+    static bool was_opened = false;
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if (!m_face_names.is_init) init_face_names();
         init_texture();
@@ -1361,7 +1363,9 @@ void GLGizmoEmboss::draw_font_list()
                                    m_face_names.encoding,
                                    m_face_names.texture_id,
                                    index,
-                                   m_gui_cfg->face_name_size};
+                                   m_gui_cfg->face_name_size,
+                                   &m_allow_update_rendered_font
+                };
                 auto job = std::make_unique<CreateFontImageJob>(std::move(data));
                 auto& worker = wxGetApp().plater()->get_ui_job_worker();
                 queue_job(worker, std::move(job));
@@ -1379,8 +1383,10 @@ void GLGizmoEmboss::draw_font_list()
                            static_cast<int>(m_face_names.names.size()));
 #endif // SHOW_FONT_COUNT
         ImGui::EndCombo();
-    } else {
+        m_allow_update_rendered_font = true;
+    } else if (m_allow_update_rendered_font) { 
         // free texture and set id to zero
+        m_allow_update_rendered_font = false;
         glsafe(::glDeleteTextures(1, &m_face_names.texture_id));
         m_face_names.texture_id = 0;
     }

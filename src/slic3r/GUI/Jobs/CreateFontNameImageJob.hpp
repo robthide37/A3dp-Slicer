@@ -29,6 +29,9 @@ struct FontImageData
     // And Limit for width
     Vec2i  size; // in px
 
+    // cancel, can be used only in finalize
+    bool *allow_update;
+
     // bigger value create darker image
     // divide value 255
     unsigned char gray_level = 5;

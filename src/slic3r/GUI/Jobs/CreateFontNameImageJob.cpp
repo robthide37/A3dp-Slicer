@@ -95,6 +95,7 @@ void CreateFontImageJob::process(Ctl &ctl)
 void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
 {
     if (canceled) return;
+    if (! (* m_input.allow_update)) return;
     
     // upload texture on GPU
     const GLenum target = GL_TEXTURE_2D;
