@@ -1,5 +1,8 @@
 #include "MeshNormals.hpp"
 
+#include <numeric>
+#include <boost/container/small_vector.hpp>
+
 namespace Slic3r {
 
 static bool point_on_edge(const Vec3d& p, const Vec3d& e1, const Vec3d& e2,
