@@ -1,7 +1,7 @@
 #include <catch2/catch.hpp>
 #include <test_utils.hpp>
 
-#include <libslic3r/SLA/IndexedMesh.hpp>
+#include <libslic3r/AABBMesh.hpp>
 #include <libslic3r/SLA/Hollowing.hpp>
 
 #include "sla_test_utils.hpp"

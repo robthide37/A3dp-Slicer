@@ -2,6 +2,8 @@
 #include "Config.hpp"
 #include "I18N.hpp"
 
+#include "SLA/SupportTree.hpp"
+
 #include <set>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
@@ -161,9 +163,9 @@ static const t_config_enum_values s_keys_map_SLADisplayOrientation = {
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLADisplayOrientation)
 
 static const t_config_enum_values s_keys_map_SLAPillarConnectionMode = {
-    {"zigzag",          slapcmZigZag},
-    {"cross",           slapcmCross},
-    {"dynamic",         slapcmDynamic}
+    {"zigzag",          int(SLAPillarConnectionMode::zigzag)},
+    {"cross",           int(SLAPillarConnectionMode::cross)},
+    {"dynamic",         int(SLAPillarConnectionMode::dynamic)}
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLAPillarConnectionMode)
 
@@ -3498,14 +3500,14 @@ void PrintConfigDef::init_sla_params()
                      " will automatically switch between the first two depending"
                      " on the distance of the two pillars.");
     def->enum_keys_map = &ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_values();
-    def->enum_values.push_back("zigzag");
-    def->enum_values.push_back("cross");
-    def->enum_values.push_back("dynamic");
-    def->enum_labels.push_back(L("Zig-Zag"));
-    def->enum_labels.push_back(L("Cross"));
-    def->enum_labels.push_back(L("Dynamic"));
+    def->enum_keys_map = &ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_values();
+    def->enum_values = ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_names();
+    def->enum_labels = ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_names();
+    def->enum_labels[0] = L("Zig-Zag");
+    def->enum_labels[1] = L("Cross");
+    def->enum_labels[2] = L("Dynamic");
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionEnum<SLAPillarConnectionMode>(slapcmDynamic));
+    def->set_default_value(new ConfigOptionEnum(SLAPillarConnectionMode::dynamic));
 
     def = this->add("support_buildplate_only", coBool);
     def->label = L("Support on build plate only");

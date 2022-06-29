@@ -1,5 +1,5 @@
-#include "IndexedMesh.hpp"
-#include "Concurrency.hpp"
+#include "AABBMesh.hpp"
+#include <Execution/ExecutionTBB.hpp>
 
 #include <libslic3r/AABBTreeIndirect.hpp>
 #include <libslic3r/TriangleMesh.hpp>
@@ -12,9 +12,7 @@
 
 namespace Slic3r {
 
-namespace sla {
-
-class IndexedMesh::AABBImpl {
+class AABBMesh::AABBImpl {
 private:
     AABBTreeIndirect::Tree3f m_tree;
     double                   m_triangle_ray_epsilon;
@@ -68,7 +66,7 @@ public:
     }
 };
 
-template<class M> void IndexedMesh::init(const M &mesh, bool calculate_epsilon)
+template<class M> void AABBMesh::init(const M &mesh, bool calculate_epsilon)
 {
     BoundingBoxf3 bb = bounding_box(mesh);
     m_ground_level += bb.min(Z);
@@ -77,73 +75,86 @@ template<class M> void IndexedMesh::init(const M &mesh, bool calculate_epsilon)
     m_aabb->init(*m_tm, calculate_epsilon);
 }
 
-IndexedMesh::IndexedMesh(const indexed_triangle_set& tmesh, bool calculate_epsilon)
-    : m_aabb(new AABBImpl()), m_tm(&tmesh)
+AABBMesh::AABBMesh(const indexed_triangle_set &tmesh, bool calculate_epsilon)
+    : m_tm(&tmesh)
+    , m_aabb(new AABBImpl())
+    , m_vfidx{tmesh}
+    , m_fnidx{its_face_neighbors(tmesh)}
 {
     init(tmesh, calculate_epsilon);
 }
 
-IndexedMesh::IndexedMesh(const TriangleMesh &mesh, bool calculate_epsilon)
-    : m_aabb(new AABBImpl()), m_tm(&mesh.its)
+AABBMesh::AABBMesh(const TriangleMesh &mesh, bool calculate_epsilon)
+    : m_tm(&mesh.its)
+    , m_aabb(new AABBImpl())
+    , m_vfidx{mesh.its}
+    , m_fnidx{its_face_neighbors(mesh.its)}
 {
     init(mesh, calculate_epsilon);
 }
 
-IndexedMesh::~IndexedMesh() {}
+AABBMesh::~AABBMesh() {}
 
-IndexedMesh::IndexedMesh(const IndexedMesh &other):
-    m_tm(other.m_tm), m_ground_level(other.m_ground_level),
-    m_aabb( new AABBImpl(*other.m_aabb) ) {}
+AABBMesh::AABBMesh(const AABBMesh &other)
+    : m_tm(other.m_tm)
+    , m_ground_level(other.m_ground_level)
+    , m_aabb(new AABBImpl(*other.m_aabb))
+    , m_vfidx{other.m_vfidx}
+    , m_fnidx{other.m_fnidx}
+{}
 
-
-IndexedMesh &IndexedMesh::operator=(const IndexedMesh &other)
+AABBMesh &AABBMesh::operator=(const AABBMesh &other)
 {
     m_tm = other.m_tm;
     m_ground_level = other.m_ground_level;
-    m_aabb.reset(new AABBImpl(*other.m_aabb)); return *this;
+    m_aabb.reset(new AABBImpl(*other.m_aabb));
+    m_vfidx = other.m_vfidx;
+    m_fnidx = other.m_fnidx;
+
+    return *this;
 }
 
-IndexedMesh &IndexedMesh::operator=(IndexedMesh &&other) = default;
+AABBMesh &AABBMesh::operator=(AABBMesh &&other) = default;
 
-IndexedMesh::IndexedMesh(IndexedMesh &&other) = default;
+AABBMesh::AABBMesh(AABBMesh &&other) = default;
 
 
 
-const std::vector<Vec3f>& IndexedMesh::vertices() const
+const std::vector<Vec3f>& AABBMesh::vertices() const
 {
     return m_tm->vertices;
 }
 
 
 
-const std::vector<Vec3i>& IndexedMesh::indices()  const
+const std::vector<Vec3i>& AABBMesh::indices()  const
 {
     return m_tm->indices;
 }
 
 
 
-const Vec3f& IndexedMesh::vertices(size_t idx) const
+const Vec3f& AABBMesh::vertices(size_t idx) const
 {
     return m_tm->vertices[idx];
 }
 
 
 
-const Vec3i& IndexedMesh::indices(size_t idx) const
+const Vec3i& AABBMesh::indices(size_t idx) const
 {
     return m_tm->indices[idx];
 }
 
 
-Vec3d IndexedMesh::normal_by_face_id(int face_id) const {
+Vec3d AABBMesh::normal_by_face_id(int face_id) const {
 
     return its_unnormalized_normal(*m_tm, face_id).cast<double>().normalized();
 }
 
 
-IndexedMesh::hit_result
-IndexedMesh::query_ray_hit(const Vec3d &s, const Vec3d &dir) const
+AABBMesh::hit_result
+AABBMesh::query_ray_hit(const Vec3d &s, const Vec3d &dir) const
 {
     assert(is_approx(dir.norm(), 1.));
     igl::Hit hit{-1, -1, 0.f, 0.f, 0.f};
@@ -171,10 +182,10 @@ IndexedMesh::query_ray_hit(const Vec3d &s, const Vec3d &dir) const
     return ret;
 }
 
-std::vector<IndexedMesh::hit_result>
-IndexedMesh::query_ray_hits(const Vec3d &s, const Vec3d &dir) const
+std::vector<AABBMesh::hit_result>
+AABBMesh::query_ray_hits(const Vec3d &s, const Vec3d &dir) const
 {
-    std::vector<IndexedMesh::hit_result> outs;
+    std::vector<AABBMesh::hit_result> outs;
     std::vector<igl::Hit> hits;
     m_aabb->intersect_ray(*m_tm, s, dir, hits);
 
@@ -192,7 +203,7 @@ IndexedMesh::query_ray_hits(const Vec3d &s, const Vec3d &dir) const
     //  Convert the igl::Hit into hit_result
     outs.reserve(hits.size());
     for (const igl::Hit& hit : hits) {
-        outs.emplace_back(IndexedMesh::hit_result(*this));
+        outs.emplace_back(AABBMesh::hit_result(*this));
         outs.back().m_t = double(hit.t);
         outs.back().m_dir = dir;
         outs.back().m_source = s;
@@ -207,8 +218,8 @@ IndexedMesh::query_ray_hits(const Vec3d &s, const Vec3d &dir) const
 
 
 #ifdef SLIC3R_HOLE_RAYCASTER
-IndexedMesh::hit_result IndexedMesh::filter_hits(
-    const std::vector<IndexedMesh::hit_result>& object_hits) const
+AABBMesh::hit_result IndexedMesh::filter_hits(
+    const std::vector<AABBMesh::hit_result>& object_hits) const
 {
     assert(! m_holes.empty());
     hit_result out(*this);
@@ -304,7 +315,7 @@ IndexedMesh::hit_result IndexedMesh::filter_hits(
 #endif
 
 
-double IndexedMesh::squared_distance(const Vec3d &p, int& i, Vec3d& c) const {
+double AABBMesh::squared_distance(const Vec3d &p, int& i, Vec3d& c) const {
     double sqdst = 0;
     Eigen::Matrix<double, 1, 3> pp = p;
     Eigen::Matrix<double, 1, 3> cc;
@@ -313,143 +324,4 @@ double IndexedMesh::squared_distance(const Vec3d &p, int& i, Vec3d& c) const {
     return sqdst;
 }
 
-
-static bool point_on_edge(const Vec3d& p, const Vec3d& e1, const Vec3d& e2,
-                          double eps = 0.05)
-{
-    using Line3D = Eigen::ParametrizedLine<double, 3>;
-
-    auto line = Line3D::Through(e1, e2);
-    double d = line.distance(p);
-    return std::abs(d) < eps;
-}
-
-PointSet normals(const PointSet& points,
-                 const IndexedMesh& mesh,
-                 double eps,
-                 std::function<void()> thr, // throw on cancel
-                 const std::vector<unsigned>& pt_indices)
-{
-    if (points.rows() == 0 || mesh.vertices().empty() || mesh.indices().empty())
-        return {};
-
-    std::vector<unsigned> range = pt_indices;
-    if (range.empty()) {
-        range.resize(size_t(points.rows()), 0);
-        std::iota(range.begin(), range.end(), 0);
-    }
-
-    PointSet ret(range.size(), 3);
-
-    //    for (size_t ridx = 0; ridx < range.size(); ++ridx)
-    ccr::for_each(size_t(0), range.size(),
-        [&ret, &mesh, &points, thr, eps, &range](size_t ridx) {
-            thr();
-            unsigned el = range[ridx];
-            auto  eidx   = Eigen::Index(el);
-            int   faceid = 0;
-            Vec3d p;
-
-            mesh.squared_distance(points.row(eidx), faceid, p);
-
-            auto trindex = mesh.indices(faceid);
-
-            const Vec3d &p1 = mesh.vertices(trindex(0)).cast<double>();
-            const Vec3d &p2 = mesh.vertices(trindex(1)).cast<double>();
-            const Vec3d &p3 = mesh.vertices(trindex(2)).cast<double>();
-
-            // We should check if the point lies on an edge of the hosting
-            // triangle. If it does then all the other triangles using the
-            // same two points have to be searched and the final normal should
-            // be some kind of aggregation of the participating triangle
-            // normals. We should also consider the cases where the support
-            // point lies right on a vertex of its triangle. The procedure is
-            // the same, get the neighbor triangles and calculate an average
-            // normal.
-
-            // mark the vertex indices of the edge. ia and ib marks and edge
-            // ic will mark a single vertex.
-            int ia = -1, ib = -1, ic = -1;
-
-            if (std::abs((p - p1).norm()) < eps) {
-                ic = trindex(0);
-            } else if (std::abs((p - p2).norm()) < eps) {
-                ic = trindex(1);
-            } else if (std::abs((p - p3).norm()) < eps) {
-                ic = trindex(2);
-            } else if (point_on_edge(p, p1, p2, eps)) {
-                ia = trindex(0);
-                ib = trindex(1);
-            } else if (point_on_edge(p, p2, p3, eps)) {
-                ia = trindex(1);
-                ib = trindex(2);
-            } else if (point_on_edge(p, p1, p3, eps)) {
-                ia = trindex(0);
-                ib = trindex(2);
-            }
-
-            // vector for the neigboring triangles including the detected one.
-            std::vector<size_t> neigh;
-            if (ic >= 0) { // The point is right on a vertex of the triangle
-                for (size_t n = 0; n < mesh.indices().size(); ++n) {
-                    thr();
-                    Vec3i ni = mesh.indices(n);
-                    if ((ni(X) == ic || ni(Y) == ic || ni(Z) == ic))
-                        neigh.emplace_back(n);
-                }
-            } else if (ia >= 0 && ib >= 0) { // the point is on and edge
-                // now get all the neigboring triangles
-                for (size_t n = 0; n < mesh.indices().size(); ++n) {
-                    thr();
-                    Vec3i ni = mesh.indices(n);
-                    if ((ni(X) == ia || ni(Y) == ia || ni(Z) == ia) &&
-                        (ni(X) == ib || ni(Y) == ib || ni(Z) == ib))
-                        neigh.emplace_back(n);
-                }
-            }
-
-            // Calculate the normals for the neighboring triangles
-            std::vector<Vec3d> neighnorms;
-            neighnorms.reserve(neigh.size());
-            for (size_t &tri_id : neigh)
-                neighnorms.emplace_back(mesh.normal_by_face_id(tri_id));
-
-            // Throw out duplicates. They would cause trouble with summing. We
-            // will use std::unique which works on sorted ranges. We will sort
-            // by the coefficient-wise sum of the normals. It should force the
-            // same elements to be consecutive.
-            std::sort(neighnorms.begin(), neighnorms.end(),
-                      [](const Vec3d &v1, const Vec3d &v2) {
-                          return v1.sum() < v2.sum();
-                      });
-
-            auto lend = std::unique(neighnorms.begin(), neighnorms.end(),
-                                    [](const Vec3d &n1, const Vec3d &n2) {
-                                        // Compare normals for equivalence.
-                                        // This is controvers stuff.
-                                        auto deq = [](double a, double b) {
-                                            return std::abs(a - b) < 1e-3;
-                                        };
-                                        return deq(n1(X), n2(X)) &&
-                                               deq(n1(Y), n2(Y)) &&
-                                               deq(n1(Z), n2(Z));
-                                    });
-
-            if (!neighnorms.empty()) { // there were neighbors to count with
-                // sum up the normals and then normalize the result again.
-                // This unification seems to be enough.
-                Vec3d sumnorm(0, 0, 0);
-                sumnorm = std::accumulate(neighnorms.begin(), lend, sumnorm);
-                sumnorm.normalize();
-                ret.row(long(ridx)) = sumnorm;
-            } else { // point lies safely within its triangle
-                Eigen::Vector3d U   = p2 - p1;
-                Eigen::Vector3d V   = p3 - p1;
-                ret.row(long(ridx)) = U.cross(V).normalized();
-            }
-        });
-
-    return ret;
-}
-
-}} // namespace Slic3r::sla
+} // namespace Slic3r

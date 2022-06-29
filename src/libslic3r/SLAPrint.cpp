@@ -55,14 +55,7 @@ sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfig& c)
     scfg.bridge_slope = c.support_critical_angle.getFloat() * PI / 180.0 ;
     scfg.max_bridge_length_mm = c.support_max_bridge_length.getFloat();
     scfg.max_pillar_link_distance_mm = c.support_max_pillar_link_distance.getFloat();
-    switch(c.support_pillar_connection_mode.getInt()) {
-    case slapcmZigZag:
-        scfg.pillar_connection_mode = sla::PillarConnectionMode::zigzag; break;
-    case slapcmCross:
-        scfg.pillar_connection_mode = sla::PillarConnectionMode::cross; break;
-    case slapcmDynamic:
-        scfg.pillar_connection_mode = sla::PillarConnectionMode::dynamic; break;
-    }
+    scfg.pillar_connection_mode = c.support_pillar_connection_mode.value;
     scfg.ground_facing_only = c.support_buildplate_only.getBool();
     scfg.pillar_widening_factor = c.support_pillar_widening_factor.getFloat();
     scfg.base_radius_mm = 0.5*c.support_base_diameter.getFloat();
@@ -844,6 +837,7 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             || opt_key == "support_head_penetration"
             || opt_key == "support_head_width"
             || opt_key == "support_pillar_diameter"
+            || opt_key == "support_pillar_widening_factor"
             || opt_key == "support_small_pillar_diameter_percent"
             || opt_key == "support_max_bridges_on_pillar"
             || opt_key == "support_pillar_connection_mode"
@@ -854,6 +848,7 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             || opt_key == "support_max_bridge_length"
             || opt_key == "support_max_pillar_link_distance"
             || opt_key == "support_base_safety_distance"
+            || opt_key == "pad_object_gap"
             ) {
             steps.emplace_back(slaposSupportTree);
         } else if (
@@ -862,7 +857,6 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             || opt_key == "pad_max_merge_distance"
             || opt_key == "pad_wall_slope"
             || opt_key == "pad_edge_radius"
-            || opt_key == "pad_object_gap"
             || opt_key == "pad_object_connector_stride"
             || opt_key == "pad_object_connector_width"
             || opt_key == "pad_object_connector_penetration"
@@ -978,7 +972,7 @@ const SliceRecord SliceRecord::EMPTY(0, std::nanf(""), 0.f);
 
 const std::vector<sla::SupportPoint>& SLAPrintObject::get_support_points() const
 {
-    return m_supportdata? m_supportdata->pts : EMPTY_SUPPORT_POINTS;
+    return m_supportdata? m_supportdata->input.pts : EMPTY_SUPPORT_POINTS;
 }
 
 const std::vector<ExPolygons> &SLAPrintObject::get_support_slices() const
