@@ -980,7 +980,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
             // for (Axis axis : {X, Y, Z})
             //     render_rotation_input(axis);
-            // m_imgui->text(_L("Â°"));
+            // m_imgui->text(_L("°"));
 
             // ImGui::Separator();
 
@@ -1289,7 +1289,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     wxCHECK_RET(instance_idx >= 0 && object_idx >= 0, "GLGizmoCut: Invalid object selection");
 
     // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
-    const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* first_glvolume = selection.get_first_volume();
     const double object_cut_z = m_plane_center.z() - first_glvolume->get_sla_shift_z();
 
     const Vec3d& instance_offset = wxGetApp().plater()->model().objects[object_idx]->instances[instance_idx]->get_offset();
@@ -1412,6 +1412,9 @@ void GLGizmoCut3D::update_connector_shape()
 
 void GLGizmoCut3D::update_model_object() const
 {
+/*    const Selection& selection = m_parent.get_selection();
+    const GLVolume* first_glvolume = selection.get_first_volume();
+    const BoundingBoxf3& box = first_glvolume->transformed_convex_hull_bounding_box();*/
     const ModelObjectPtrs& mos = wxGetApp().model().objects;
     ModelObject* mo = m_c->selection_info()->model_object();
     wxGetApp().obj_list()->update_info_items(std::find(mos.begin(), mos.end(), mo) - mos.begin());

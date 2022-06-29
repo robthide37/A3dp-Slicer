@@ -85,6 +85,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/GUI_App.hpp
     GUI/GUI_Utils.cpp
     GUI/GUI_Utils.hpp
+    GUI/GUI_Geometry.cpp
+    GUI/GUI_Geometry.hpp
     GUI/I18N.cpp
     GUI/I18N.hpp
     GUI/MainFrame.cpp
@@ -129,6 +131,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/2DBed.hpp
     GUI/3DBed.cpp
     GUI/3DBed.hpp
+    GUI/CoordAxes.cpp
+    GUI/CoordAxes.hpp
     GUI/Camera.cpp
     GUI/Camera.hpp
     GUI/wxExtensions.cpp
@@ -172,6 +176,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/Worker.hpp
     GUI/Jobs/BoostThreadWorker.hpp
     GUI/Jobs/BoostThreadWorker.cpp
+    GUI/Jobs/UIThreadWorker.hpp
     GUI/Jobs/BusyCursorJob.hpp
     GUI/Jobs/PlaterWorker.hpp
     GUI/Jobs/ArrangeJob.hpp
@@ -246,7 +251,11 @@ set(SLIC3R_GUI_SOURCES
     Utils/TCPConsole.hpp
     Utils/MKS.cpp
     Utils/MKS.hpp
+    Utils/WinRegistry.cpp
+    Utils/WinRegistry.hpp
 )
+
+find_package(NanoSVG REQUIRED)
 
 if (APPLE)
     list(APPEND SLIC3R_GUI_SOURCES
@@ -272,7 +281,7 @@ endforeach()
 
 encoding_check(libslic3r_gui)
 
-target_link_libraries(libslic3r_gui libslic3r avrdude libcereal imgui GLEW::GLEW OpenGL::GL hidapi libcurl ${wxWidgets_LIBRARIES})
+target_link_libraries(libslic3r_gui libslic3r avrdude libcereal imgui GLEW::GLEW OpenGL::GL hidapi libcurl ${wxWidgets_LIBRARIES} NanoSVG::nanosvg NanoSVG::nanosvgrast)
 
 if (MSVC)
     target_link_libraries(libslic3r_gui Setupapi.lib)

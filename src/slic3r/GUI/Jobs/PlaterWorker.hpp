@@ -38,16 +38,18 @@ class PlaterWorker: public Worker {
 
                 void update_status(int st, const std::string &msg = "") override
                 {
-                    wxWakeUpIdle();
                     ctl.update_status(st, msg);
+                    wxWakeUpIdle();
                 }
 
                 bool was_canceled() const override { return ctl.was_canceled(); }
 
                 std::future<void> call_on_main_thread(std::function<void()> fn) override
                 {
+                    auto ftr = ctl.call_on_main_thread(std::move(fn));
                     wxWakeUpIdle();
-                    return ctl.call_on_main_thread(std::move(fn));
+
+                    return ftr;
                 }
 
             } wctl{c};

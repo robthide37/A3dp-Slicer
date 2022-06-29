@@ -18,4 +18,4 @@ local-lib
 build-linux/*
 deps/build-linux/*
 **/.DS_Store
-/.idea/
+**/.idea/

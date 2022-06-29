@@ -458,9 +458,8 @@ if (NOT EIGEN3_FOUND)
 endif ()
 include_directories(BEFORE SYSTEM ${EIGEN3_INCLUDE_DIR})
 
-# Find expat or use bundled version
-# Always use the system libexpat on Linux.
-
+# Find expat. We have our overriden FindEXPAT which exports libexpat target
+# no matter what.
 find_package(EXPAT REQUIRED)
 
 add_library(libexpat INTERFACE)

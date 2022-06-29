@@ -44,7 +44,8 @@ public:
         const BoundingBox& current_outlines_bbox,
         const EdgeGrid::Grid& outline_locator,
         coord_t supporting_radius,
-        coord_t wall_supporting_radius
+        coord_t wall_supporting_radius,
+        const std::function<void()> &throw_on_cancel_callback
     );
 
     /*! Determine & connect to connection point in tree/outline.
@@ -79,7 +80,7 @@ public:
         coord_t wall_supporting_radius
     );
 
-    Polylines convertToLines(const Polygons& limit_to_outline, coord_t line_width) const;
+    Polylines convertToLines(const Polygons& limit_to_outline, coord_t line_overlap) const;
 
     coord_t getWeightedDistance(const Point& boundary_loc, const Point& unsupported_location);
 

@@ -86,24 +86,24 @@ Control::Control( wxWindow *parent,
 
     m_bmp_thumb_higher = (style == wxSL_HORIZONTAL ? ScalableBitmap(this, "thumb_right") : ScalableBitmap(this, "thumb_up"));
     m_bmp_thumb_lower  = (style == wxSL_HORIZONTAL ? ScalableBitmap(this, "thumb_left")  : ScalableBitmap(this, "thumb_down"));
-    m_thumb_size = m_bmp_thumb_lower.GetBmpSize();
+    m_thumb_size = m_bmp_thumb_lower.GetSize();
 
     m_bmp_add_tick_on  = ScalableBitmap(this, "colorchange_add");
     m_bmp_add_tick_off = ScalableBitmap(this, "colorchange_add_f");
     m_bmp_del_tick_on  = ScalableBitmap(this, "colorchange_del");
     m_bmp_del_tick_off = ScalableBitmap(this, "colorchange_del_f");
-    m_tick_icon_dim = m_bmp_add_tick_on.GetBmpWidth();
+    m_tick_icon_dim = m_bmp_add_tick_on.GetWidth();
 
     m_bmp_one_layer_lock_on    = ScalableBitmap(this, "lock_closed");
     m_bmp_one_layer_lock_off   = ScalableBitmap(this, "lock_closed_f");
     m_bmp_one_layer_unlock_on  = ScalableBitmap(this, "lock_open");
     m_bmp_one_layer_unlock_off = ScalableBitmap(this, "lock_open_f");
-    m_lock_icon_dim   = m_bmp_one_layer_lock_on.GetBmpWidth();
+    m_lock_icon_dim   = m_bmp_one_layer_lock_on.GetWidth();
 
     m_bmp_revert               = ScalableBitmap(this, "undo");
-    m_revert_icon_dim = m_bmp_revert.GetBmpWidth();
+    m_revert_icon_dim = m_bmp_revert.GetWidth();
     m_bmp_cog                  = ScalableBitmap(this, "cog");
-    m_cog_icon_dim    = m_bmp_cog.GetBmpWidth();
+    m_cog_icon_dim    = m_bmp_cog.GetWidth();
 
     m_selection = ssUndef;
     m_ticks.set_pause_print_msg(_utf8(L("Place bearings in slots and resume printing")));
@@ -155,26 +155,11 @@ void Control::msw_rescale()
 {
     m_font = GUI::wxGetApp().normal_font();
 
-    m_bmp_thumb_higher.msw_rescale();
-    m_bmp_thumb_lower .msw_rescale();
-    m_thumb_size = m_bmp_thumb_lower.bmp().GetSize();
-
-    m_bmp_add_tick_on .msw_rescale();
-    m_bmp_add_tick_off.msw_rescale();
-    m_bmp_del_tick_on .msw_rescale();
-    m_bmp_del_tick_off.msw_rescale();
-    m_tick_icon_dim = m_bmp_add_tick_on.bmp().GetSize().x;
-
-    m_bmp_one_layer_lock_on   .msw_rescale();
-    m_bmp_one_layer_lock_off  .msw_rescale();
-    m_bmp_one_layer_unlock_on .msw_rescale();
-    m_bmp_one_layer_unlock_off.msw_rescale();
-    m_lock_icon_dim = m_bmp_one_layer_lock_on.bmp().GetSize().x;
-
-    m_bmp_revert.msw_rescale();
-    m_revert_icon_dim = m_bmp_revert.bmp().GetSize().x;
-    m_bmp_cog.msw_rescale();
-    m_cog_icon_dim = m_bmp_cog.bmp().GetSize().x;
+    m_thumb_size = m_bmp_thumb_lower.GetSize();
+    m_tick_icon_dim     = m_bmp_add_tick_on.GetWidth();
+    m_lock_icon_dim     = m_bmp_one_layer_lock_on.GetWidth();
+    m_revert_icon_dim   = m_bmp_revert.GetWidth();
+    m_cog_icon_dim      = m_bmp_cog.GetWidth();
 
     SLIDER_MARGIN = 4 + GUI::wxGetApp().em_unit();
 
@@ -189,22 +174,18 @@ void Control::sys_color_changed()
 {
     GUI::wxGetApp().UpdateDarkUI(GetParent());
 
-    m_bmp_add_tick_on .msw_rescale();
-    m_bmp_add_tick_off.msw_rescale();
-    m_bmp_del_tick_on .msw_rescale();
-    m_bmp_del_tick_off.msw_rescale();
-    m_tick_icon_dim = m_bmp_add_tick_on.GetBmpWidth();
+    m_bmp_add_tick_on .sys_color_changed();
+    m_bmp_add_tick_off.sys_color_changed();
+    m_bmp_del_tick_on .sys_color_changed();
+    m_bmp_del_tick_off.sys_color_changed();
 
-    m_bmp_one_layer_lock_on   .msw_rescale();
-    m_bmp_one_layer_lock_off  .msw_rescale();
-    m_bmp_one_layer_unlock_on .msw_rescale();
-    m_bmp_one_layer_unlock_off.msw_rescale();
-    m_lock_icon_dim = m_bmp_one_layer_lock_on.GetBmpWidth();
+    m_bmp_one_layer_lock_on   .sys_color_changed();
+    m_bmp_one_layer_lock_off  .sys_color_changed();
+    m_bmp_one_layer_unlock_on .sys_color_changed();
+    m_bmp_one_layer_unlock_off.sys_color_changed();
 
-    m_bmp_revert.msw_rescale();
-    m_revert_icon_dim = m_bmp_revert.GetBmpWidth();
-    m_bmp_cog.msw_rescale();
-    m_cog_icon_dim = m_bmp_cog.GetBmpWidth();
+    m_bmp_revert.sys_color_changed();
+    m_bmp_cog   .sys_color_changed();
 }
 
 int Control::GetActiveValue() const
@@ -604,9 +585,12 @@ void Control::draw_action_icon(wxDC& dc, const wxPoint pt_beg, const wxPoint pt_
         return;
     }
 
-    wxBitmap* icon = m_focus == fiActionIcon ? &m_bmp_add_tick_off.bmp() : &m_bmp_add_tick_on.bmp();
+    //wxBitmap* icon = m_focus == fiActionIcon ? &m_bmp_add_tick_off.bmp() : &m_bmp_add_tick_on.bmp();
+    //if (m_ticks.ticks.find(TickCode{tick}) != m_ticks.ticks.end())
+    //    icon = m_focus == fiActionIcon ? &m_bmp_del_tick_off.bmp() : &m_bmp_del_tick_on.bmp();
+    ScalableBitmap* icon = m_focus == fiActionIcon ? &m_bmp_add_tick_off : &m_bmp_add_tick_on;
     if (m_ticks.ticks.find(TickCode{tick}) != m_ticks.ticks.end())
-        icon = m_focus == fiActionIcon ? &m_bmp_del_tick_off.bmp() : &m_bmp_del_tick_on.bmp();
+        icon = m_focus == fiActionIcon ? &m_bmp_del_tick_off : &m_bmp_del_tick_on;
 
     wxCoord x_draw, y_draw;
     is_horizontal() ? x_draw = pt_beg.x - 0.5*m_tick_icon_dim : y_draw = pt_beg.y - 0.5*m_tick_icon_dim;
@@ -615,10 +599,12 @@ void Control::draw_action_icon(wxDC& dc, const wxPoint pt_beg, const wxPoint pt_
     else
         is_horizontal() ? y_draw = pt_beg.y - m_tick_icon_dim-2 : x_draw = pt_end.x + 3;
 
-    if (m_draw_mode == dmSequentialFffPrint)
-        dc.DrawBitmap(create_scaled_bitmap("colorchange_add", nullptr, 16, true), x_draw, y_draw);
+    if (m_draw_mode == dmSequentialFffPrint) {
+        wxBitmap disabled_add = get_bmp_bundle("colorchange_add")->GetBitmapFor(this).ConvertToDisabled();
+        dc.DrawBitmap(disabled_add, x_draw, y_draw);
+    }
     else
-        dc.DrawBitmap(*icon, x_draw, y_draw);
+        dc.DrawBitmap((*icon).get_bitmap(), x_draw, y_draw);
 
     //update rect of the tick action icon
     m_rect_tick_action = wxRect(x_draw, y_draw, m_tick_icon_dim, m_tick_icon_dim);
@@ -851,7 +837,7 @@ void Control::draw_thumb_item(wxDC& dc, const wxPoint& pos, const SelectedSlider
 {
     wxCoord x_draw = pos.x - int(0.5 * m_thumb_size.x);
     wxCoord y_draw = pos.y - int(0.5 * m_thumb_size.y);
-    dc.DrawBitmap(selection == ssLower ? m_bmp_thumb_lower.bmp() : m_bmp_thumb_higher.bmp(), x_draw, y_draw);
+    dc.DrawBitmap(selection == ssLower ? m_bmp_thumb_lower.get_bitmap() : m_bmp_thumb_higher.get_bitmap(), x_draw, y_draw);
 
     // Update thumb rect
     update_thumb_rect(x_draw, y_draw, selection);
@@ -945,12 +931,12 @@ void Control::draw_ticks(wxDC& dc)
 
         // Draw icon for "Pause print", "Custom Gcode" or conflict tick
         if (!icon_name.empty())  {
-            wxBitmap icon = create_scaled_bitmap(icon_name);
+            wxBitmapBundle* icon = get_bmp_bundle(icon_name);
             wxCoord x_draw, y_draw;
             is_horizontal() ? x_draw = pos - 0.5 * m_tick_icon_dim : y_draw = pos - 0.5 * m_tick_icon_dim;
             is_horizontal() ? y_draw = mid + 22 : x_draw = mid + m_thumb_size.x + 3;
 
-            dc.DrawBitmap(icon, x_draw, y_draw);
+            dc.DrawBitmap(icon->GetBitmapFor(this), x_draw, y_draw);
         }
     }
 }
@@ -1262,9 +1248,12 @@ void Control::draw_one_layer_icon(wxDC& dc)
     if (m_draw_mode == dmSequentialGCodeView)
         return;
 
-    const wxBitmap& icon = m_is_one_layer ?
-                     m_focus == fiOneLayerIcon ? m_bmp_one_layer_lock_off.bmp()   : m_bmp_one_layer_lock_on.bmp() :
-                     m_focus == fiOneLayerIcon ? m_bmp_one_layer_unlock_off.bmp() : m_bmp_one_layer_unlock_on.bmp();
+    //const wxBitmap& icon = m_is_one_layer ?
+    //                 m_focus == fiOneLayerIcon ? m_bmp_one_layer_lock_off.bmp()   : m_bmp_one_layer_lock_on.bmp() :
+    //                 m_focus == fiOneLayerIcon ? m_bmp_one_layer_unlock_off.bmp() : m_bmp_one_layer_unlock_on.bmp();
+    const ScalableBitmap& icon = m_is_one_layer ?
+                     m_focus == fiOneLayerIcon ? m_bmp_one_layer_lock_off   : m_bmp_one_layer_lock_on :
+                     m_focus == fiOneLayerIcon ? m_bmp_one_layer_unlock_off : m_bmp_one_layer_unlock_on;
 
     int width, height;
     get_size(&width, &height);
@@ -1273,7 +1262,7 @@ void Control::draw_one_layer_icon(wxDC& dc)
     is_horizontal() ? x_draw = width-2 : x_draw = 0.5*width - 0.5*m_lock_icon_dim;
     is_horizontal() ? y_draw = 0.5*height - 0.5*m_lock_icon_dim : y_draw = height-2;
 
-    dc.DrawBitmap(icon, x_draw, y_draw);
+    dc.DrawBitmap(icon.bmp().GetBitmapFor(this), x_draw, y_draw);
 
     //update rect of the lock/unlock icon
     m_rect_one_layer_icon = wxRect(x_draw, y_draw, m_lock_icon_dim, m_lock_icon_dim);
@@ -1291,7 +1280,7 @@ void Control::draw_revert_icon(wxDC& dc)
     is_horizontal() ? x_draw = width-2 : x_draw = 0.25*SLIDER_MARGIN;
     is_horizontal() ? y_draw = 0.25*SLIDER_MARGIN: y_draw = height-2;
 
-    dc.DrawBitmap(m_bmp_revert.bmp(), x_draw, y_draw);
+    dc.DrawBitmap(m_bmp_revert.get_bitmap(), x_draw, y_draw);
 
     //update rect of the lock/unlock icon
     m_rect_revert_icon = wxRect(x_draw, y_draw, m_revert_icon_dim, m_revert_icon_dim);
@@ -1315,7 +1304,7 @@ void Control::draw_cog_icon(wxDC& dc)
         is_horizontal() ? y_draw = height - m_cog_icon_dim - 2 : y_draw = height - 2;
     }
 
-    dc.DrawBitmap(m_bmp_cog.bmp(), x_draw, y_draw);
+    dc.DrawBitmap(m_bmp_cog.get_bitmap(), x_draw, y_draw);
 
     //update rect of the lock/unlock icon
     m_rect_cog_icon = wxRect(x_draw, y_draw, m_cog_icon_dim, m_cog_icon_dim);
@@ -1673,7 +1662,7 @@ void Control::append_change_extruder_menu_item(wxMenu* menu, bool switch_current
     if (extruders_cnt > 1) {
         std::array<int, 2> active_extruders = get_active_extruders_for_tick(m_selection == ssLower ? m_lower_value : m_higher_value);
 
-        std::vector<wxBitmap*> icons = get_extruder_color_icons(true);
+        std::vector<wxBitmapBundle*> icons = get_extruder_color_icons(true);
 
         wxMenu* change_extruder_menu = new wxMenu();
 
@@ -1684,7 +1673,7 @@ void Control::append_change_extruder_menu_item(wxMenu* menu, bool switch_current
 
             if (m_mode == MultiAsSingle)
                 append_menu_item(change_extruder_menu, wxID_ANY, item_name, "",
-                    [this, i](wxCommandEvent&) { add_code_as_tick(ToolChange, i); }, *icons[i-1], menu,
+                    [this, i](wxCommandEvent&) { add_code_as_tick(ToolChange, i); }, icons[i-1], menu,
                     [is_active_extruder]() { return !is_active_extruder; }, GUI::wxGetApp().plater());
         }
 
@@ -1722,7 +1711,7 @@ void Control::append_add_color_change_menu_item(wxMenu* menu, bool switch_curren
                                    format_wxstr(_L("Switch code to Color change (%1%) for:"), gcode(ColorChange)) : 
                                    format_wxstr(_L("Add color change (%1%) for:"), gcode(ColorChange));
         wxMenuItem* add_color_change_menu_item = menu->AppendSubMenu(add_color_change_menu, menu_name, "");
-        add_color_change_menu_item->SetBitmap(create_menu_bitmap("colorchange_add_m"));
+        add_color_change_menu_item->SetBitmap(*get_bmp_bundle("colorchange_add_m"));
     }
 }
 

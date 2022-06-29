@@ -323,7 +323,8 @@ bool arrange(
 // 4) rotate Y
 // 5) rotate Z
 // 6) translate
-void assemble_transform(Transform3d& transform, const Vec3d& translation = Vec3d::Zero(), const Vec3d& rotation = Vec3d::Zero(), const Vec3d& scale = Vec3d::Ones(), const Vec3d& mirror = Vec3d::Ones());
+void assemble_transform(Transform3d& transform, const Vec3d& translation = Vec3d::Zero(), const Vec3d& rotation = Vec3d::Zero(),
+    const Vec3d& scale = Vec3d::Ones(), const Vec3d& mirror = Vec3d::Ones());
 
 // Returns the transform obtained by assembling the given transformations in the following order:
 // 1) mirror
@@ -332,7 +333,43 @@ void assemble_transform(Transform3d& transform, const Vec3d& translation = Vec3d
 // 4) rotate Y
 // 5) rotate Z
 // 6) translate
-Transform3d assemble_transform(const Vec3d& translation = Vec3d::Zero(), const Vec3d& rotation = Vec3d::Zero(), const Vec3d& scale = Vec3d::Ones(), const Vec3d& mirror = Vec3d::Ones());
+Transform3d assemble_transform(const Vec3d& translation = Vec3d::Zero(), const Vec3d& rotation = Vec3d::Zero(),
+    const Vec3d& scale = Vec3d::Ones(), const Vec3d& mirror = Vec3d::Ones());
+
+// Sets the given transform by multiplying the given transformations in the following order:
+// T = translation * rotation * scale * mirror
+void assemble_transform(Transform3d& transform, const Transform3d& translation = Transform3d::Identity(),
+    const Transform3d& rotation = Transform3d::Identity(), const Transform3d& scale = Transform3d::Identity(),
+    const Transform3d& mirror = Transform3d::Identity());
+
+// Returns the transform obtained by multiplying the given transformations in the following order:
+// T = translation * rotation * scale * mirror
+Transform3d assemble_transform(const Transform3d& translation = Transform3d::Identity(), const Transform3d& rotation = Transform3d::Identity(),
+    const Transform3d& scale = Transform3d::Identity(), const Transform3d& mirror = Transform3d::Identity());
+
+// Sets the given transform by assembling the given translation
+void translation_transform(Transform3d& transform, const Vec3d& translation);
+
+// Returns the transform obtained by assembling the given translation
+Transform3d translation_transform(const Vec3d& translation);
+
+// Sets the given transform by assembling the given rotations in the following order:
+// 1) rotate X
+// 2) rotate Y
+// 3) rotate Z
+void rotation_transform(Transform3d& transform, const Vec3d& rotation);
+
+// Returns the transform obtained by assembling the given rotations in the following order:
+// 1) rotate X
+// 2) rotate Y
+// 3) rotate Z
+Transform3d rotation_transform(const Vec3d& rotation);
+
+// Sets the given transform by assembling the given scale factors
+void scale_transform(Transform3d& transform, const Vec3d& scale);
+
+// Returns the transform obtained by assembling the given scale factors
+Transform3d scale_transform(const Vec3d& scale);
 
 // Returns the euler angles extracted from the given rotation matrix
 // Warning -> The matrix should not contain any scale or shear !!!
@@ -344,6 +381,9 @@ Vec3d extract_euler_angles(const Transform3d& transform);
 
 class Transformation
 {
+#if ENABLE_WORLD_COORDINATE
+    Transform3d m_matrix{ Transform3d::Identity() };
+#else
     struct Flags
     {
         bool dont_translate{ true };
@@ -363,8 +403,26 @@ class Transformation
     mutable Transform3d m_matrix{ Transform3d::Identity() };
     mutable Flags m_flags;
     mutable bool m_dirty{ false };
+#endif // ENABLE_WORLD_COORDINATE
 
 public:
+#if ENABLE_WORLD_COORDINATE
+    Transformation() = default;
+    explicit Transformation(const Transform3d& transform) : m_matrix(transform) {}
+
+    Vec3d get_offset() const { return m_matrix.translation(); }
+    double get_offset(Axis axis) const { return get_offset()[axis]; }
+
+    Transform3d get_offset_matrix() const;
+
+    void set_offset(const Vec3d& offset) { m_matrix.translation() = offset; }
+    void set_offset(Axis axis, double offset) { m_matrix.translation()[axis] = offset; }
+
+    Vec3d get_rotation() const;
+    double get_rotation(Axis axis) const { return get_rotation()[axis]; }
+
+    Transform3d get_rotation_matrix() const;
+#else
     Transformation();
     explicit Transformation(const Transform3d& transform);
 
@@ -376,47 +434,103 @@ public:
 
     const Vec3d& get_rotation() const { return m_rotation; }
     double get_rotation(Axis axis) const { return m_rotation(axis); }
+#endif // ENABLE_WORLD_COORDINATE
 
     void set_rotation(const Vec3d& rotation);
     void set_rotation(Axis axis, double rotation);
 
+#if ENABLE_WORLD_COORDINATE
+    Vec3d get_scaling_factor() const;
+    double get_scaling_factor(Axis axis) const { return get_scaling_factor()[axis]; }
+
+    Transform3d get_scaling_factor_matrix() const;
+
+    bool is_scaling_uniform() const {
+        const Vec3d scale = get_scaling_factor();
+        return std::abs(scale.x() - scale.y()) < 1e-8 && std::abs(scale.x() - scale.z()) < 1e-8;
+    }
+#else
     const Vec3d& get_scaling_factor() const { return m_scaling_factor; }
     double get_scaling_factor(Axis axis) const { return m_scaling_factor(axis); }
+#endif // ENABLE_WORLD_COORDINATE
 
     void set_scaling_factor(const Vec3d& scaling_factor);
     void set_scaling_factor(Axis axis, double scaling_factor);
+
+#if ENABLE_WORLD_COORDINATE
+    Vec3d get_mirror() const;
+    double get_mirror(Axis axis) const { return get_mirror()[axis]; }
+
+    Transform3d get_mirror_matrix() const;
+
+    bool is_left_handed() const {
+        const Vec3d mirror = get_mirror();
+        return mirror.x() * mirror.y() * mirror.z() < 0.0;
+    }
+#else
     bool is_scaling_uniform() const { return std::abs(m_scaling_factor.x() - m_scaling_factor.y()) < 1e-8 && std::abs(m_scaling_factor.x() - m_scaling_factor.z()) < 1e-8; }
 
     const Vec3d& get_mirror() const { return m_mirror; }
     double get_mirror(Axis axis) const { return m_mirror(axis); }
     bool is_left_handed() const { return m_mirror.x() * m_mirror.y() * m_mirror.z() < 0.; }
+#endif // ENABLE_WORLD_COORDINATE
 
     void set_mirror(const Vec3d& mirror);
     void set_mirror(Axis axis, double mirror);
 
+#if ENABLE_WORLD_COORDINATE
+    bool has_skew() const;
+#else
     void set_from_transform(const Transform3d& transform);
+#endif // ENABLE_WORLD_COORDINATE
 
     void reset();
+#if ENABLE_WORLD_COORDINATE
+    void reset_offset() { set_offset(Vec3d::Zero()); }
+    void reset_rotation() { set_rotation(Vec3d::Zero()); }
+    void reset_scaling_factor() { set_scaling_factor(Vec3d::Ones()); }
+    void reset_mirror() { set_mirror(Vec3d::Ones()); }
+    void reset_skew();
 
+    const Transform3d& get_matrix() const { return m_matrix; }
+    Transform3d get_matrix_no_offset() const;
+    Transform3d get_matrix_no_scaling_factor() const;
+
+    void set_matrix(const Transform3d& transform) { m_matrix = transform; }
+#else
     const Transform3d& get_matrix(bool dont_translate = false, bool dont_rotate = false, bool dont_scale = false, bool dont_mirror = false) const;
+#endif // ENABLE_WORLD_COORDINATE
 
     Transformation operator * (const Transformation& other) const;
 
+#if !ENABLE_WORLD_COORDINATE
     // Find volume transformation, so that the chained (instance_trafo * volume_trafo) will be as close to identity
     // as possible in least squares norm in regard to the 8 corners of bbox.
     // Bounding box is expected to be centered around zero in all axes.
     static Transformation volume_to_bed_transformation(const Transformation& instance_transformation, const BoundingBoxf3& bbox);
+#endif // !ENABLE_WORLD_COORDINATE
 
 private:
-	friend class cereal::access;
-	template<class Archive> void serialize(Archive & ar) { ar(m_offset, m_rotation, m_scaling_factor, m_mirror); }
-	explicit Transformation(int) : m_dirty(true) {}
-	template <class Archive> static void load_and_construct(Archive &ar, cereal::construct<Transformation> &construct)
-	{
-		// Calling a private constructor with special "int" parameter to indicate that no construction is necessary.
-		construct(1);
-		ar(construct.ptr()->m_offset, construct.ptr()->m_rotation, construct.ptr()->m_scaling_factor, construct.ptr()->m_mirror);
-	}
+    friend class cereal::access;
+#if ENABLE_WORLD_COORDINATE
+    template<class Archive> void serialize(Archive& ar) { ar(m_matrix); }
+    explicit Transformation(int) {}
+    template <class Archive> static void load_and_construct(Archive& ar, cereal::construct<Transformation>& construct)
+    {
+        // Calling a private constructor with special "int" parameter to indicate that no construction is necessary.
+        construct(1);
+        ar(construct.ptr()->m_matrix);
+    }
+#else
+    template<class Archive> void serialize(Archive& ar) { ar(m_offset, m_rotation, m_scaling_factor, m_mirror); }
+    explicit Transformation(int) : m_dirty(true) {}
+    template <class Archive> static void load_and_construct(Archive& ar, cereal::construct<Transformation>& construct)
+    {
+        // Calling a private constructor with special "int" parameter to indicate that no construction is necessary.
+        construct(1);
+        ar(construct.ptr()->m_offset, construct.ptr()->m_rotation, construct.ptr()->m_scaling_factor, construct.ptr()->m_mirror);
+    }
+#endif // ENABLE_WORLD_COORDINATE
 };
 
 // For parsing a transformation matrix from 3MF / AMF.

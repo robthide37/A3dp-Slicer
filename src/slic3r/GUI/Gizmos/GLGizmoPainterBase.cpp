@@ -291,7 +291,11 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
         return;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if ENABLE_WORLD_COORDINATE
+    const Transform3d complete_scaling_matrix_inverse = Geometry::Transformation(trafo).get_scaling_factor_matrix().inverse();
+#else
     const Transform3d complete_scaling_matrix_inverse = Geometry::Transformation(trafo).get_matrix(true, true, false, true).inverse();
+#endif // ENABLE_WORLD_COORDINATE
     const bool is_left_handed = Geometry::Transformation(trafo).is_left_handed();
 
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
@@ -508,7 +512,11 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
                     const Selection     &selection                 = m_parent.get_selection();
                     const ModelObject   *mo                        = m_c->selection_info()->model_object();
                     const ModelInstance *mi                        = mo->instances[selection.get_instance_idx()];
+#if ENABLE_WORLD_COORDINATE
+                    const Transform3d   trafo_matrix_not_translate = mi->get_transformation().get_matrix_no_offset() * mo->volumes[m_rr.mesh_id]->get_matrix_no_offset();
+#else
                     const Transform3d   trafo_matrix_not_translate = mi->get_transformation().get_matrix(true) * mo->volumes[m_rr.mesh_id]->get_matrix(true);
+#endif // ENABLE_WORLD_COORDINATE
                     const Transform3d   trafo_matrix = mi->get_transformation().get_matrix() * mo->volumes[m_rr.mesh_id]->get_matrix();
                     m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), trafo_matrix_not_translate, this->get_clipping_plane_in_volume_coordinates(trafo_matrix), m_smart_fill_angle,
                                                                                    m_paint_on_overhangs_only ? m_highlight_by_angle_threshold_deg : 0.f, true);
@@ -547,7 +555,11 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         const ModelObject   *mo                          = m_c->selection_info()->model_object();
         const ModelInstance *mi                          = mo->instances[selection.get_instance_idx()];
         const Transform3d   instance_trafo               = mi->get_transformation().get_matrix();
+#if ENABLE_WORLD_COORDINATE
+        const Transform3d   instance_trafo_not_translate = mi->get_transformation().get_matrix_no_offset();
+#else
         const Transform3d   instance_trafo_not_translate = mi->get_transformation().get_matrix(true);
+#endif // ENABLE_WORLD_COORDINATE
 
         // Precalculate transformations of individual meshes.
         std::vector<Transform3d> trafo_matrices;
@@ -555,7 +567,11 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         for (const ModelVolume *mv : mo->volumes)
             if (mv->is_model_part()) {
                 trafo_matrices.emplace_back(instance_trafo * mv->get_matrix());
+#if ENABLE_WORLD_COORDINATE
+                trafo_matrices_not_translate.emplace_back(instance_trafo_not_translate * mv->get_matrix_no_offset());
+#else
                 trafo_matrices_not_translate.emplace_back(instance_trafo_not_translate * mv->get_matrix(true));
+#endif // ENABLE_WORLD_COORDINATE
             }
 
         std::vector<std::vector<ProjectedMousePosition>> projected_mouse_positions_by_mesh = get_projected_mouse_positions(mouse_position, 1., trafo_matrices);
@@ -637,7 +653,11 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         const ModelObject   *mo                           = m_c->selection_info()->model_object();
         const ModelInstance *mi                           = mo->instances[selection.get_instance_idx()];
         const Transform3d    instance_trafo               = mi->get_transformation().get_matrix();
+#if ENABLE_WORLD_COORDINATE
+        const Transform3d    instance_trafo_not_translate = mi->get_transformation().get_matrix_no_offset();
+#else
         const Transform3d    instance_trafo_not_translate = mi->get_transformation().get_matrix(true);
+#endif // ENABLE_WORLD_COORDINATE
 
         // Precalculate transformations of individual meshes.
         std::vector<Transform3d> trafo_matrices;
@@ -645,7 +665,11 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         for (const ModelVolume *mv : mo->volumes)
             if (mv->is_model_part()) {
                 trafo_matrices.emplace_back(instance_trafo * mv->get_matrix());
+#if ENABLE_WORLD_COORDINATE
+                trafo_matrices_not_translate.emplace_back(instance_trafo_not_translate * mv->get_matrix_no_offset());
+#else
                 trafo_matrices_not_translate.emplace_back(instance_trafo_not_translate * mv->get_matrix(true));
+#endif // ENABLE_WORLD_COORDINATE
             }
 
         // Now "click" into all the prepared points and spill paint around them.

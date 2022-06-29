@@ -46,7 +46,7 @@ public:
     {
         struct EnableMakeShared : public Node
         {
-            EnableMakeShared(Arg&&...arg) : Node(std::forward<Arg>(arg)...) {}
+            explicit EnableMakeShared(Arg&&...arg) : Node(std::forward<Arg>(arg)...) {}
         };
         return std::make_shared<EnableMakeShared>(std::forward<Arg>(arg)...);
     }
@@ -179,16 +179,16 @@ public:
      */
     bool hasOffspring(const NodeSPtr& to_be_checked) const;
 
-protected:
     Node() = delete; // Don't allow empty contruction
 
+protected:
     /*!
      * Construct a new node, either for insertion in a tree or as root.
      * \param p The physical location in the 2D layer that this node represents.
      * Connecting other nodes to this node indicates that a line segment should
      * be drawn between those two physical positions.
      */
-    Node(const Point& p, const std::optional<Point>& last_grounding_location = std::nullopt);
+    explicit Node(const Point& p, const std::optional<Point>& last_grounding_location = std::nullopt);
 
     /*!
      * Copy this node and its entire sub-tree.
@@ -239,7 +239,7 @@ public:
      * 
      * \param output all branches in this tree connected into polylines
      */
-    void convertToPolylines(Polylines &output, coord_t line_width) const;
+    void convertToPolylines(Polylines &output, coord_t line_overlap) const;
 
     /*! If this was ever a direct child of the root, it'll have a previous grounding location.
      *
@@ -260,7 +260,7 @@ protected:
      */
     void convertToPolylines(size_t long_line_idx, Polylines &output) const;
 
-    void removeJunctionOverlap(Polylines &polylines, coord_t line_width) const;
+    void removeJunctionOverlap(Polylines &polylines, coord_t line_overlap) const;
 
     bool m_is_root;
     Point m_p;
@@ -268,6 +268,9 @@ protected:
     std::vector<NodeSPtr> m_children;
 
     std::optional<Point> m_last_grounding_location;  //<! The last known grounding location, see 'getLastGroundingLocation()'.
+
+    friend BoundingBox get_extents(const NodeSPtr &root_node);
+    friend BoundingBox get_extents(const std::vector<NodeSPtr> &tree_roots);
 
 #ifdef LIGHTNING_TREE_NODE_DEBUG_OUTPUT
     friend void export_to_svg(const NodeSPtr &root_node, Slic3r::SVG &svg);
@@ -277,6 +280,23 @@ protected:
 
 bool inside(const Polygons &polygons, const Point &p);
 bool lineSegmentPolygonsIntersection(const Point& a, const Point& b, const EdgeGrid::Grid& outline_locator, Point& result, coord_t within_max_dist);
+
+inline BoundingBox get_extents(const NodeSPtr &root_node)
+{
+    BoundingBox bbox;
+    for (const NodeSPtr &children : root_node->m_children)
+        bbox.merge(get_extents(children));
+    bbox.merge(root_node->getLocation());
+    return bbox;
+}
+
+inline BoundingBox get_extents(const std::vector<NodeSPtr> &tree_roots)
+{
+    BoundingBox bbox;
+    for (const NodeSPtr &root_node : tree_roots)
+        bbox.merge(get_extents(root_node));
+    return bbox;
+}
 
 #ifdef LIGHTNING_TREE_NODE_DEBUG_OUTPUT
 void export_to_svg(const NodeSPtr &root_node, SVG &svg);

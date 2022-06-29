@@ -146,9 +146,13 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
     });
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-    const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* vol = selection.get_first_volume();
     Geometry::Transformation transformation(vol->get_instance_transformation().get_matrix() * vol->get_volume_transformation().get_matrix());
+#if ENABLE_WORLD_COORDINATE
+    const Transform3d instance_scaling_matrix_inverse = transformation.get_scaling_factor_matrix().inverse();
+#else
     const Transform3d& instance_scaling_matrix_inverse = transformation.get_matrix(true, true, false, true).inverse();
+#endif // ENABLE_WORLD_COORDINATE
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * transformation.get_matrix();
     const Camera& camera = wxGetApp().plater()->get_camera();
@@ -357,7 +361,7 @@ bool GLGizmoSlaSupports::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec
 
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Selection& selection = m_parent.get_selection();
-    const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* volume = selection.get_first_volume();
     Geometry::Transformation trafo = volume->get_instance_transformation() * volume->get_volume_transformation();
     trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., m_c->selection_info()->get_sla_shift()));
 

@@ -79,9 +79,11 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 	m_custom_toolbar_size		= atoi(get_app_config()->get("custom_toolbar_size").c_str());
 	m_use_custom_toolbar_size	= get_app_config()->get("use_custom_toolbar_size") == "1";
 
-	// update colors for color pickers
-	update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
-	update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
+	if (wxGetApp().is_editor()) {
+		// update colors for color pickers
+		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
+		update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
+	}
 
 	this->ShowModal();
 }
@@ -695,7 +697,6 @@ void PreferencesDialog::revert(wxEvent&)
 
 
 	for (auto value : m_values) {
-		bool reverted = false;
 		const std::string& key = value.first;
 
 		if (key == "default_action_on_dirty_project") {
@@ -712,14 +713,17 @@ void PreferencesDialog::revert(wxEvent&)
 		}
 		if (key == "old_settings_layout_mode") {
 			m_rb_old_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			m_settings_layout_changed = false;
 			continue;
 		}
 		if (key == "new_settings_layout_mode") {
 			m_rb_new_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			m_settings_layout_changed = false;
 			continue;
 		}
 		if (key == "dlg_settings_layout_mode") {
 			m_rb_dlg_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			m_settings_layout_changed = false;
 			continue;
 		}
 

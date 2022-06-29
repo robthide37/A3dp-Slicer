@@ -99,9 +99,10 @@ void MsgDialog::apply_style(long style)
     if (style & wxNO)       add_button(wxID_NO,     (style & wxNO_DEFAULT));
     if (style & wxCANCEL)   add_button(wxID_CANCEL, (style & wxCANCEL_DEFAULT));
 
-    logo->SetBitmap( create_scaled_bitmap(style & wxICON_WARNING        ? "exclamation" :
-                                          style & wxICON_INFORMATION    ? "info"        :
-                                          style & wxICON_QUESTION       ? "question"    : "PrusaSlicer", this, 64, style & wxICON_ERROR));
+    std::string icon_name = style & wxICON_WARNING        ? "exclamation" :
+                            style & wxICON_INFORMATION    ? "info"        :
+                            style & wxICON_QUESTION       ? "question"    : "PrusaSlicer";
+    logo->SetBitmap(*get_bmp_bundle(icon_name, 64));
 }
 
 void MsgDialog::finalize()
@@ -230,7 +231,7 @@ ErrorDialog::ErrorDialog(wxWindow *parent, const wxString &msg, bool monospaced_
     add_msg_content(this, content_sizer, msg, monospaced_font);
 
 	// Use a small bitmap with monospaced font, as the error text will not be wrapped.
-	logo->SetBitmap(create_scaled_bitmap("PrusaSlicer_192px_grayscale.png", this, monospaced_font ? 48 : /*1*/84));
+	logo->SetBitmap(*get_bmp_bundle("PrusaSlicer_192px_grayscale.png", monospaced_font ? 48 : /*1*/84));
 
     SetMaxSize(wxSize(-1, CONTENT_MAX_HEIGHT*wxGetApp().em_unit()));
 

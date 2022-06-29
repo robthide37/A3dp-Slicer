@@ -1609,7 +1609,7 @@ ConfigWizardIndex::ConfigWizardIndex(wxWindow *parent)
 #ifndef __WXOSX__ 
     SetDoubleBuffered(true);// SetDoubleBuffered exists on Win and Linux/GTK, but is missing on OSX
 #endif //__WXOSX__
-    SetMinSize(bg.bmp().GetSize());
+    SetMinSize(bg.GetSize());
 
     const wxSize size = GetTextExtent("m");
     em_w = size.x;
@@ -1734,8 +1734,8 @@ void ConfigWizardIndex::on_paint(wxPaintEvent & evt)
    
     wxPaintDC dc(this);
     
-    const auto bullet_w = bullet_black.bmp().GetSize().GetWidth();
-    const auto bullet_h = bullet_black.bmp().GetSize().GetHeight();
+    const auto bullet_w = bullet_black.GetWidth();
+    const auto bullet_h = bullet_black.GetHeight();
     const int yoff_icon = bullet_h < em_h ? (em_h - bullet_h) / 2 : 0;
     const int yoff_text = bullet_h > em_h ? (bullet_h - em_h) / 2 : 0;
     const int yinc = item_height();
@@ -1748,10 +1748,10 @@ void ConfigWizardIndex::on_paint(wxPaintEvent & evt)
         unsigned x = em_w/2 + item.indent * em_w;
 
         if (i == item_active || (item_hover >= 0 && i == (size_t)item_hover)) {
-            dc.DrawBitmap(bullet_blue.bmp(), x, y + yoff_icon, false);
+            dc.DrawBitmap(bullet_blue.get_bitmap(), x, y + yoff_icon, false);
         }
-        else if (i < item_active)  { dc.DrawBitmap(bullet_black.bmp(), x, y + yoff_icon, false); }
-        else if (i > item_active)  { dc.DrawBitmap(bullet_white.bmp(), x, y + yoff_icon, false); }
+        else if (i < item_active)  { dc.DrawBitmap(bullet_black.get_bitmap(), x, y + yoff_icon, false); }
+        else if (i > item_active)  { dc.DrawBitmap(bullet_white.get_bitmap(), x, y + yoff_icon, false); }
 
         x += + bullet_w + em_w/2;
         const auto text_size = dc.GetTextExtent(item.label);
@@ -1763,9 +1763,9 @@ void ConfigWizardIndex::on_paint(wxPaintEvent & evt)
     }
     
     //draw logo
-    if (int y = size.y - bg.GetBmpHeight(); y>=0) {
-        dc.DrawBitmap(bg.bmp(), 0, y, false);
-        index_width = std::max(index_width, bg.GetBmpWidth() + em_w / 2);
+    if (int y = size.y - bg.GetHeight(); y>=0) {
+        dc.DrawBitmap(bg.get_bitmap(), 0, y, false);
+        index_width = std::max(index_width, bg.GetWidth() + em_w / 2);
     }
 
     if (GetMinSize().x < index_width) {
@@ -1797,12 +1797,8 @@ void ConfigWizardIndex::msw_rescale()
     em_w = size.x;
     em_h = size.y;
 
-    bg.msw_rescale();
-    SetMinSize(bg.bmp().GetSize());
+    SetMinSize(bg.GetSize());
 
-    bullet_black.msw_rescale();
-    bullet_blue.msw_rescale();
-    bullet_white.msw_rescale();
     Refresh();
 }
 
@@ -2761,7 +2757,6 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 //        if (page_files_association->associate_gcode())
 //            wxGetApp().associate_gcode_files();
 //    }
-
 #endif // _WIN32
 
     page_mode->serialize_mode(app_config);
@@ -2780,6 +2775,10 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         page_bed->apply_custom_config(*custom_config);
         page_diams->apply_custom_config(*custom_config);
         page_temps->apply_custom_config(*custom_config);
+
+#if ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
+        copy_bed_model_and_texture_if_needed(*custom_config);
+#endif // ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
 
         const std::string profile_name = page_custom->profile_name();
         preset_bundle->load_config_from_wizard(profile_name, *custom_config);

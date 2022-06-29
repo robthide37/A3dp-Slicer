@@ -57,6 +57,9 @@
 #include "GUI_ObjectManipulation.hpp"
 #include "GUI_ObjectLayers.hpp"
 #include "GUI_Utils.hpp"
+#if ENABLE_WORLD_COORDINATE
+#include "GUI_Geometry.hpp"
+#endif // ENABLE_WORLD_COORDINATE
 #include "GUI_Factories.hpp"
 #include "wxExtensions.hpp"
 #include "MainFrame.hpp"
@@ -177,7 +180,6 @@ public:
 
     bool        showing_manifold_warning_icon;
     void        show_sizer(bool show);
-    void        msw_rescale();
     void        update_warning_icon(const std::string& warning_icon_name);
 };
 
@@ -207,7 +209,7 @@ ObjectInfo::ObjectInfo(wxWindow *parent) :
 
     init_info_label(&info_size, _L("Size"));
 
-    info_icon = new wxStaticBitmap(parent, wxID_ANY, create_scaled_bitmap("info"));
+    info_icon = new wxStaticBitmap(parent, wxID_ANY, *get_bmp_bundle("info"));
     info_icon->SetToolTip(_L("For a multipart object, this value isn't accurate.\n"
                              "It doesn't take account of intersections and negative volumes."));
     auto* volume_info_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -220,7 +222,7 @@ ObjectInfo::ObjectInfo(wxWindow *parent) :
 
     info_manifold = new wxStaticText(parent, wxID_ANY, "");
     info_manifold->SetFont(wxGetApp().small_font());
-    manifold_warning_icon = new wxStaticBitmap(parent, wxID_ANY, create_scaled_bitmap(m_warning_icon_name));
+    manifold_warning_icon = new wxStaticBitmap(parent, wxID_ANY, *get_bmp_bundle(m_warning_icon_name));
     auto *sizer_manifold = new wxBoxSizer(wxHORIZONTAL);
     sizer_manifold->Add(manifold_warning_icon, 0, wxLEFT, 2);
     sizer_manifold->Add(info_manifold, 0, wxLEFT, 2);
@@ -239,17 +241,11 @@ void ObjectInfo::show_sizer(bool show)
         manifold_warning_icon->Show(showing_manifold_warning_icon && show);
 }
 
-void ObjectInfo::msw_rescale()
-{
-    manifold_warning_icon->SetBitmap(create_scaled_bitmap(m_warning_icon_name));
-    info_icon->SetBitmap(create_scaled_bitmap("info"));
-}
-
 void ObjectInfo::update_warning_icon(const std::string& warning_icon_name)
 {
     if ((showing_manifold_warning_icon = !warning_icon_name.empty())) {
         m_warning_icon_name = warning_icon_name;
-        manifold_warning_icon->SetBitmap(create_scaled_bitmap(m_warning_icon_name));
+        manifold_warning_icon->SetBitmap(*get_bmp_bundle(m_warning_icon_name));
     }
 }
 
@@ -347,9 +343,6 @@ void FreqChangedParams::msw_rescale()
 {
     m_og->msw_rescale();
     m_og_sla->msw_rescale();
-
-    for (auto btn: m_empty_buttons)
-        btn->msw_rescale();
 }
 
 void FreqChangedParams::sys_color_changed()
@@ -358,7 +351,7 @@ void FreqChangedParams::sys_color_changed()
     m_og_sla->sys_color_changed();
 
     for (auto btn: m_empty_buttons)
-        btn->msw_rescale();
+        btn->sys_color_changed();
 
     wxGetApp().UpdateDarkUI(m_wiping_dialog_button, true);
 }
@@ -447,7 +440,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
      */
     auto empty_widget = [this] (wxWindow* parent) {
         auto sizer = new wxBoxSizer(wxHORIZONTAL);
-        auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_transparent.png", wxEmptyString,
+        auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_transparent", wxEmptyString,
             wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER | wxTRANSPARENT_WINDOW);
         sizer->Add(btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, int(0.3 * wxGetApp().em_unit()));
         m_empty_buttons.push_back(btn);
@@ -505,7 +498,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
             }
         }));
 
-        auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_transparent.png", wxEmptyString,
+        auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_transparent", wxEmptyString,
                                       wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER | wxTRANSPARENT_WINDOW);
         sizer->Add(btn , 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT,
             int(0.3 * wxGetApp().em_unit()));
@@ -1100,9 +1093,6 @@ void Sidebar::msw_rescale()
 {
     SetMinSize(wxSize(40 * wxGetApp().em_unit(), -1));
 
-    if (p->mode_sizer)
-        p->mode_sizer->msw_rescale();
-
     for (PlaterPresetComboBox* combo : std::vector<PlaterPresetComboBox*> { p->combo_print,
                                                                 p->combo_sla_print,
                                                                 p->combo_sla_material,
@@ -1114,14 +1104,8 @@ void Sidebar::msw_rescale()
     p->frequently_changed_parameters->msw_rescale();
     p->object_list->msw_rescale();
     p->object_manipulation->msw_rescale();
-    p->object_settings->msw_rescale();
     p->object_layers->msw_rescale();
 
-    p->object_info->msw_rescale();
-
-    p->btn_send_gcode->msw_rescale();
-//    p->btn_eject_device->msw_rescale();
-	p->btn_export_gcode_removable->msw_rescale();
 #ifdef _WIN32
     const int scaled_height = p->btn_export_gcode_removable->GetBitmapHeight();
 #else
@@ -1142,14 +1126,13 @@ void Sidebar::sys_color_changed()
 
     for (wxWindow* win : std::vector<wxWindow*>{ this, p->sliced_info->GetStaticBox(), p->object_info->GetStaticBox(), p->btn_reslice, p->btn_export_gcode })
         wxGetApp().UpdateDarkUI(win);
-    p->object_info->msw_rescale();
     for (wxWindow* win : std::vector<wxWindow*>{ p->scrolled, p->presets_panel })
         wxGetApp().UpdateAllStaticTextDarkUI(win);
     for (wxWindow* btn : std::vector<wxWindow*>{ p->btn_reslice, p->btn_export_gcode })
         wxGetApp().UpdateDarkUI(btn, true);
 
     if (p->mode_sizer)
-        p->mode_sizer->msw_rescale();
+        p->mode_sizer->sys_color_changed();
     p->frequently_changed_parameters->sys_color_changed();
     p->object_settings->sys_color_changed();
 #endif
@@ -1167,11 +1150,12 @@ void Sidebar::sys_color_changed()
     p->object_layers->sys_color_changed();
 
     // btn...->msw_rescale() updates icon on button, so use it
-    p->btn_send_gcode->msw_rescale();
+    p->btn_send_gcode->sys_color_changed();
 //    p->btn_eject_device->msw_rescale();
-    p->btn_export_gcode_removable->msw_rescale();
+    p->btn_export_gcode_removable->sys_color_changed();
 
     p->scrolled->Layout();
+    p->scrolled->Refresh();
 
     p->searcher.dlg_sys_color_changed();
 }
@@ -1514,6 +1498,11 @@ void Sidebar::update_mode()
 
     wxWindowUpdateLocker noUpdates(this);
 
+#if ENABLE_WORLD_COORDINATE
+    if (m_mode == comSimple)
+        p->object_manipulation->set_coordinates_type(ECoordinatesType::World);
+#endif // ENABLE_WORLD_COORDINATE
+
     p->object_list->get_sizer()->Show(m_mode > comSimple);
 
     p->object_list->unselect_objects();
@@ -1578,12 +1567,15 @@ std::string& Sidebar::get_search_line()
 class PlaterDropTarget : public wxFileDropTarget
 {
 public:
-    PlaterDropTarget(Plater* plater) : m_plater(plater) { this->SetDefaultAction(wxDragCopy); }
+    PlaterDropTarget(MainFrame& mainframe, Plater& plater) : m_mainframe(mainframe), m_plater(plater) {
+        this->SetDefaultAction(wxDragCopy);
+    }
 
     virtual bool OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &filenames);
 
 private:
-    Plater* m_plater;
+    MainFrame& m_mainframe;
+    Plater& m_plater;
 };
 
 bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &filenames)
@@ -1593,8 +1585,11 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &fi
     this->MSWUpdateDragImageOnLeave();
 #endif // WIN32
 
-    bool res = (m_plater != nullptr) ? m_plater->load_files(filenames) : false;
-    wxGetApp().mainframe->update_title();
+    m_mainframe.Raise();
+    m_mainframe.select_tab(size_t(0));
+    m_plater.select_view_3D("3D");
+    bool res = m_plater.load_files(filenames);
+    m_mainframe.update_title();
     return res;
 }
 
@@ -1648,6 +1643,9 @@ struct Plater::priv
     // objects would be frozen for the user. In case of arrange, an animation
     // could be shown, or with the optimize orientations, partial results
     // could be displayed.
+    //
+    // UIThreadWorker can be used as a replacement for BoostThreadWorker if
+    // no additional worker threads are desired (useful for debugging or profiling)
     PlaterWorker<BoostThreadWorker> m_worker;
     SLAImportDialog *               m_sla_import_dlg;
 
@@ -2074,6 +2072,9 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         view3D_canvas->Bind(EVT_GLCANVAS_WIPETOWER_MOVED, &priv::on_wipetower_moved, this);
         view3D_canvas->Bind(EVT_GLCANVAS_WIPETOWER_ROTATED, &priv::on_wipetower_rotated, this);
         view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_ROTATED, [this](SimpleEvent&) { update(); });
+#if ENABLE_WORLD_COORDINATE
+        view3D_canvas->Bind(EVT_GLCANVAS_RESET_SKEW, [this](SimpleEvent&) { update(); });
+#endif // ENABLE_WORLD_COORDINATE
         view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_SCALED, [this](SimpleEvent&) { update(); });
         view3D_canvas->Bind(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, [this](Event<bool>& evt) { this->sidebar->enable_buttons(evt.data); });
         view3D_canvas->Bind(EVT_GLCANVAS_UPDATE_GEOMETRY, &priv::on_update_geometry, this);
@@ -2130,7 +2131,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     }
 
     // Drop target:
-    q->SetDropTarget(new PlaterDropTarget(q));   // if my understanding is right, wxWindow takes the owenership
+    main_frame->SetDropTarget(new PlaterDropTarget(*main_frame, *q));   // if my understanding is right, wxWindow takes the owenership
     q->Layout();
 
     set_current_panel(wxGetApp().is_editor() ? static_cast<wxPanel*>(view3D) : static_cast<wxPanel*>(preview));
@@ -2920,7 +2921,7 @@ int Plater::priv::get_selected_volume_idx() const
     if ((0 > idx) || (idx > 1000))
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         return-1;
-    const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* v = selection.get_first_volume();
     if (model.objects[idx]->volumes.size() > 1)
         return v->volume_idx();
     return -1;
@@ -3499,7 +3500,11 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
     new_volume->set_type(old_volume->type());
     new_volume->set_material_id(old_volume->material_id());
     new_volume->set_transformation(old_volume->get_transformation());
+#if ENABLE_WORLD_COORDINATE
+    new_volume->translate(new_volume->get_transformation().get_matrix_no_offset() * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+#else
     new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+#endif // ENABLE_WORLD_COORDINATE
     assert(!old_volume->source.is_converted_from_inches || !old_volume->source.is_converted_from_meters);
     if (old_volume->source.is_converted_from_inches)
         new_volume->convert_from_imperial_units();
@@ -3536,7 +3541,7 @@ void Plater::priv::replace_with_stl()
     if (selection.is_wipe_tower() || get_selection().get_volume_idxs().size() != 1)
         return;
 
-    const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* v = selection.get_first_volume();
     int object_idx = v->object_idx();
     int volume_idx = v->volume_idx();
 
@@ -3854,10 +3859,16 @@ void Plater::priv::reload_from_disk()
                 new_volume->config.apply(old_volume->config);
                 new_volume->set_type(old_volume->type());
                 new_volume->set_material_id(old_volume->material_id());
+#if ENABLE_WORLD_COORDINATE
+                new_volume->set_transformation(Geometry::translation_transform(old_volume->source.transform.get_offset()) *
+                    old_volume->get_transformation().get_matrix_no_offset() * old_volume->source.transform.get_matrix_no_offset());
+                new_volume->translate(new_volume->get_transformation().get_matrix_no_offset() * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+#else
                 new_volume->set_transformation(Geometry::assemble_transform(old_volume->source.transform.get_offset()) *
                                                old_volume->get_transformation().get_matrix(true) *
                                                old_volume->source.transform.get_matrix(true));
                 new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+#endif // ENABLE_WORLD_COORDINATE
                 new_volume->source.object_idx = old_volume->source.object_idx;
                 new_volume->source.volume_idx = old_volume->source.volume_idx;
                 assert(!old_volume->source.is_converted_from_inches || !old_volume->source.is_converted_from_meters);
@@ -4463,8 +4474,12 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
             const bool is_some_full_instances = selection.is_single_full_instance() || 
                                                 selection.is_single_full_object() || 
                                                 selection.is_multiple_full_instance();
+#if ENABLE_WORLD_COORDINATE
+            const bool is_part = selection.is_single_volume_or_modifier();
+#else
             const bool is_part = selection.is_single_volume() || selection.is_single_modifier();
-            menu = is_some_full_instances   ? menus.object_menu() : 
+#endif // ENABLE_WORLD_COORDINATE
+            menu = is_some_full_instances   ? menus.object_menu() :
                    is_part                  ? menus.part_menu()   : menus.multi_selection_menu();
         }
     }
@@ -6079,7 +6094,7 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
             if (selection.get_mode() == Selection::Instance)
                 mesh = mesh_to_export(*model_object, (selection.is_single_full_object() && model_object->instances.size() > 1) ? -1 : selection.get_instance_idx());
             else {
-                const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+                const GLVolume* volume = selection.get_first_volume();
                 mesh = model_object->volumes[volume->volume_idx()]->mesh();
                 mesh.transform(volume->get_volume_transformation().get_matrix(), true);
             }
@@ -6988,8 +7003,6 @@ void Plater::msw_rescale()
     p->view3D->get_canvas3d()->msw_rescale();
 
     p->sidebar->msw_rescale();
-
-    p->menus.msw_rescale();
 
     Layout();
     GetParent()->Layout();

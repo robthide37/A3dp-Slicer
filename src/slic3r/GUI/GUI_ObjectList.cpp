@@ -973,12 +973,11 @@ void ObjectList::extruder_editing()
     if (!item || !(m_objects_model->GetItemType(item) & (itVolume | itObject)))
         return;
 
-    const int column_width = GetColumn(colExtruder)->GetWidth() + wxSystemSettings::GetMetric(wxSYS_VSCROLL_X) + 5;
-
-    wxPoint pos = this->get_mouse_position_in_control();
-    wxSize size = wxSize(column_width, -1);
-    pos.x = GetColumn(colName)->GetWidth() + GetColumn(colPrint)->GetWidth() + 5;
-    pos.y -= GetTextExtent("m").y;
+    wxRect rect = this->GetItemRect(item, GetColumn(colExtruder));
+    wxPoint pos = rect.GetPosition();
+    pos.y -= 4;
+    wxSize size = rect.GetSize();
+    size.SetWidth(size.GetWidth() + 8);
 
     apply_extruder_selector(&m_extruder_editor, this, L("default"), pos, size);
 
@@ -1541,9 +1540,13 @@ void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& mo
     const BoundingBoxf3 instance_bb = model_object.instance_bounding_box(instance_idx);
 
     // First (any) GLVolume of the selected instance. They all share the same instance matrix.
-    const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* v = selection.get_first_volume();
     const Geometry::Transformation inst_transform = v->get_instance_transformation();
+#if ENABLE_WORLD_COORDINATE
+    const Transform3d inv_inst_transform = inst_transform.get_matrix_no_offset().inverse();
+#else
     const Transform3d inv_inst_transform = inst_transform.get_matrix(true).inverse();
+#endif // ENABLE_WORLD_COORDINATE
     const Vec3d instance_offset = v->get_instance_offset();
 
     for (size_t i = 0; i < input_files.size(); ++i) {
@@ -1591,9 +1594,15 @@ void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& mo
             new_volume->source.mesh_offset = model.objects.front()->volumes.front()->source.mesh_offset;
 
         if (from_galery) {
+#if ENABLE_WORLD_COORDINATE
+            // Transform the new modifier to be aligned with the print bed.
+            new_volume->set_transformation(v->get_instance_transformation().get_matrix_no_offset().inverse());
+            const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
+#else
             // Transform the new modifier to be aligned with the print bed.
             const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
             new_volume->set_transformation(Geometry::Transformation::volume_to_bed_transformation(inst_transform, mesh_bb));
+#endif // ENABLE_WORLD_COORDINATE
             // Set the modifier position.
             // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
             const Vec3d offset = Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - instance_offset;
@@ -1661,17 +1670,27 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
     ModelVolume *new_volume = model_object.add_volume(std::move(mesh), type);
 
     // First (any) GLVolume of the selected instance. They all share the same instance matrix.
-    const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* v = selection.get_first_volume();
+#if ENABLE_WORLD_COORDINATE
     // Transform the new modifier to be aligned with the print bed.
-	const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
+    new_volume->set_transformation(v->get_instance_transformation().get_matrix_no_offset().inverse());
+    const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
+#else
+    // Transform the new modifier to be aligned with the print bed.
+    const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
     new_volume->set_transformation(Geometry::Transformation::volume_to_bed_transformation(v->get_instance_transformation(), mesh_bb));
+#endif // ENABLE_WORLD_COORDINATE
     // Set the modifier position.
     auto offset = (type_name == "Slab") ?
         // Slab: Lift to print bed
 		Vec3d(0., 0., 0.5 * mesh_bb.size().z() + instance_bb.min.z() - v->get_instance_offset().z()) :
         // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
         Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - v->get_instance_offset();
+#if ENABLE_WORLD_COORDINATE
+    new_volume->set_offset(v->get_instance_transformation().get_matrix_no_offset().inverse() * offset);
+#else
     new_volume->set_offset(v->get_instance_transformation().get_matrix(true).inverse() * offset);
+#endif // ENABLE_WORLD_COORDINATE
 
     const wxString name = _L("Generic") + "-" + _(type_name);
     new_volume->name = into_u8(name);
@@ -2444,6 +2463,21 @@ bool ObjectList::can_merge_to_single_object() const
     return (*m_objects)[obj_idx]->volumes.size() > 1;
 }
 
+wxPoint ObjectList::get_mouse_position_in_control() const
+{
+    wxPoint pt = wxGetMousePosition() - this->GetScreenPosition();
+
+#ifdef __APPLE__
+    // Workaround for OSX. From wxWidgets 3.1.6 Hittest doesn't respect to the header of wxDataViewCtrl
+    if (wxDataViewItem top_item = this->GetTopItem(); top_item.IsOk()) {
+        auto rect = this->GetItemRect(top_item, this->GetColumn(0));
+        pt.y -= rect.y;
+    }
+#endif // __APPLE__
+
+    return pt;
+}
+
 // NO_PARAMETERS function call means that changed object index will be determine from Selection() 
 void ObjectList::changed_object(const int obj_idx/* = -1*/) const 
 {
@@ -2627,8 +2661,14 @@ void ObjectList::part_selection_changed()
     Sidebar& panel = wxGetApp().sidebar();
     panel.Freeze();
 
+#if ENABLE_WORLD_COORDINATE
+    const ManipulationEditor* const editor = wxGetApp().obj_manipul()->get_focused_editor();
+    const std::string opt_key = (editor != nullptr) ? editor->get_full_opt_name() : "";
+    wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event(opt_key, !opt_key.empty());
+#else
     wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event("", false);
-    wxGetApp().plater()->canvas3D()->enable_moving(enable_manipulation);
+#endif // ENABLE_WORLD_COORDINATE
+    wxGetApp().plater()->canvas3D()->enable_moving(enable_manipulation); // ysFIXME
     wxGetApp().obj_manipul() ->UpdateAndShow(update_and_show_manipulations);
     wxGetApp().obj_settings()->UpdateAndShow(update_and_show_settings);
     wxGetApp().obj_layers()  ->UpdateAndShow(update_and_show_layers);
@@ -3373,8 +3413,12 @@ void ObjectList::update_selections()
                 return;
             sels.Add(m_objects_model->GetItemById(selection.get_object_idx()));
         }
+#if ENABLE_WORLD_COORDINATE
+        else if (selection.is_single_volume_or_modifier()) {
+#else
         else if (selection.is_single_volume() || selection.is_any_modifier()) {
-            const auto gl_vol = selection.get_volume(*selection.get_volume_idxs().begin());
+#endif // ENABLE_WORLD_COORDINATE
+            const auto gl_vol = selection.get_first_volume();
             if (m_objects_model->GetVolumeIdByItem(m_objects_model->GetParent(item)) == gl_vol->volume_idx())
                 return;
         }
@@ -4388,9 +4432,6 @@ void ObjectList::msw_rescale()
     GetColumn(colExtruder)->SetWidth( 8 * em);
     GetColumn(colEditing )->SetWidth( 3 * em);
 
-    // rescale/update existing items with bitmaps
-    m_objects_model->Rescale();
-
     Layout();
 }
 
@@ -4398,7 +4439,10 @@ void ObjectList::sys_color_changed()
 {
     wxGetApp().UpdateDVCDarkUI(this, true);
 
-    msw_rescale();
+    // update existing items with bitmaps
+    m_objects_model->UpdateBitmaps();
+
+    Layout();
 }
 
 void ObjectList::ItemValueChanged(wxDataViewEvent &event)
