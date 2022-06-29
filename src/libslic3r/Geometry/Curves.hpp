@@ -142,7 +142,11 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
         //find corresponding segment index; expects kernels to be centered
         int middle_right_segment_index = floor((observation_point - result.start) / result.segment_size);
         //find index of first segment that is affected by the point i; this can be deduced from kernel_span
+<<<<<<< HEAD
         int start_segment_idx = middle_right_segment_index - Kernel::kernel_span / 2 + 1;
+=======
+        int start_segment_idx = middle_right_segment_index - int(Kernel::kernel_span / 2) + 1;
+>>>>>>> master_250
         for (int segment_index = start_segment_idx; segment_index < int(start_segment_idx + Kernel::kernel_span);
                 segment_index++) {
             NumberType segment_start = result.start + segment_index * result.segment_size;

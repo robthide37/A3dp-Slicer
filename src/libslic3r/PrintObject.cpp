@@ -662,6 +662,17 @@ bool PrintObject::invalidate_state_by_config_options(
 	            steps.emplace_back(posSupportMaterial);
 	        }
         } else if (
+            opt_key == "perimeter_generator"
+            || opt_key == "wall_transition_length"
+            || opt_key == "wall_transition_filter_deviation"
+            || opt_key == "wall_transition_angle"
+            || opt_key == "wall_distribution_count"
+            || opt_key == "wall_split_middle_threshold"
+            || opt_key == "wall_add_middle_threshold"
+            || opt_key == "min_feature_size"
+            || opt_key == "min_bead_width") {
+            steps.emplace_back(posSlice);
+        } else if (
                opt_key == "seam_position"
             || opt_key == "seam_preferred_direction"
             || opt_key == "seam_preferred_direction_jitter"

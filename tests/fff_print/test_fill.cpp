@@ -131,6 +131,7 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
         auto flow = Slic3r::Flow(0.69f, 0.4f, 0.5f);
 
 		FillParams fill_params;
+<<<<<<< HEAD
         for (auto density : { 0.4, 1.0 }) {
             fill_params.density = density;
             filler->spacing = flow.spacing();
@@ -140,6 +141,15 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
                 // one continuous path
                 REQUIRE(paths.size() == 1);
             }
+=======
+		fill_params.density = 1.0;
+		filler->spacing = flow.spacing();
+        REQUIRE(!fill_params.use_arachne); // Make this test fail when Arachne is used because this test is not ready for it.
+        for (auto angle : { 0.0, 45.0}) {
+            surface.expolygon.rotate(angle, Point(0,0));
+            Polylines paths = filler->fill_surface(&surface, fill_params);
+            REQUIRE(paths.size() == 1);
+>>>>>>> master_250
         }
     }
 
@@ -541,8 +551,10 @@ bool test_if_solid_surface_filled(const ExPolygon& expolygon, double flow_spacin
 	fill_params.density = float(density);
 	fill_params.dont_adjust = false;
 
-	Surface surface(stBottom, expolygon);
-	Slic3r::Polylines paths = filler->fill_surface(&surface, fill_params);
+    Surface surface(stBottom, expolygon);
+    if (fill_params.use_arachne) // Make this test fail when Arachne is used because this test is not ready for it.
+        return false;
+    Slic3r::Polylines paths = filler->fill_surface(&surface, fill_params);
 
     // check whether any part was left uncovered
     Polygons grown_paths;

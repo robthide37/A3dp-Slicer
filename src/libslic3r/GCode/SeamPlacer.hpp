@@ -20,16 +20,44 @@ class PrintObject;
 class ExtrusionLoop;
 class Print;
 class Layer;
+<<<<<<< HEAD
+=======
 
 namespace EdgeGrid {
 class Grid;
 }
 
 namespace SeamPlacerImpl {
+>>>>>>> master_250
+
+namespace EdgeGrid {
+class Grid;
+}
+
+<<<<<<< HEAD
+namespace SeamPlacerImpl {
 
 struct GlobalModelInfo;
 struct SeamComparator;
 
+=======
+// ************  FOR BACKPORT COMPATIBILITY ONLY ***************
+// Angle from v1 to v2, returning double atan2(y, x) normalized to <-PI, PI>.
+template<typename Derived, typename Derived2>
+inline double angle(const Eigen::MatrixBase<Derived> &v1, const Eigen::MatrixBase<Derived2> &v2) {
+    static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "angle(): first parameter is not a 2D vector");
+    static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "angle(): second parameter is not a 2D vector");
+    auto v1d = v1.template cast<double>();
+    auto v2d = v2.template cast<double>();
+    return atan2(cross2(v1d, v2d), v1d.dot(v2d));
+}
+// ***************************
+
+
+struct GlobalModelInfo;
+struct SeamComparator;
+
+>>>>>>> master_250
 enum class EnforcedBlockedSeamPoint {
     Blocked = 0,
     Neutral = 1,
@@ -73,10 +101,13 @@ struct SeamCandidate {
     bool central_enforcer; //marks this candidate as central point of enforced segment on the perimeter - important for alignment
 };
 
+<<<<<<< HEAD
 struct FaceVisibilityInfo {
     float visibility;
 };
 
+=======
+>>>>>>> master_250
 struct SeamCandidateCoordinateFunctor {
     SeamCandidateCoordinateFunctor(const std::vector<SeamCandidate> &seam_candidates) :
             seam_candidates(seam_candidates) {
@@ -94,9 +125,15 @@ struct PrintObjectSeamData
 
     struct LayerSeams
     {
+<<<<<<< HEAD
         Slic3r::deque<SeamPlacerImpl::Perimeter>    perimeters;
         std::vector<SeamPlacerImpl::SeamCandidate>  points;
         std::unique_ptr<SeamCandidatesTree>         points_tree;
+=======
+        Slic3r::deque<SeamPlacerImpl::Perimeter> perimeters;
+        std::vector<SeamPlacerImpl::SeamCandidate> points;
+        std::unique_ptr<SeamCandidatesTree> points_tree;
+>>>>>>> master_250
     };
     // Map of PrintObjects (PO) -> vector of layers of PO -> vector of perimeter
     std::vector<LayerSeams> layers;
@@ -111,6 +148,7 @@ struct PrintObjectSeamData
 
 class SeamPlacer {
 public:
+<<<<<<< HEAD
     static constexpr size_t raycasting_decimation_target_triangle_count = 10000;
     static constexpr float raycasting_subdivision_target_length = 2.0f;
     //square of number of rays per triangle
@@ -144,6 +182,43 @@ public:
     std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
 
     void init(const Print &print);
+=======
+    // Number of samples generated on the mesh. There are sqr_rays_per_sample_point*sqr_rays_per_sample_point rays casted from each samples
+    static constexpr size_t raycasting_visibility_samples_count = 30000;
+    //square of number of rays per sample point
+    static constexpr size_t sqr_rays_per_sample_point = 5;
+
+    // arm length used during angles computation
+    static constexpr float polygon_local_angles_arm_distance = 0.3f;
+    static constexpr float sharp_angle_snapping_threshold = 0.3f * float(PI);
+
+    // max tolerable distance from the previous layer is overhang_distance_tolerance_factor * flow_width
+    static constexpr float overhang_distance_tolerance_factor = 0.5f;
+
+    // determines angle importance compared to visibility ( neutral value is 1.0f. )
+    static constexpr float angle_importance_aligned = 0.6f;
+    static constexpr float angle_importance_nearest = 1.0f; // use much higher angle importance for nearest mode, to combat the visiblity info noise
+
+    // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
+    static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
+    // For long polygon sides, if they are close to the custom seam drawings, they are oversampled with this step size
+    static constexpr float enforcer_oversampling_distance = 0.2f;
+
+    // When searching for seam clusters for alignment:
+    // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
+    static constexpr float seam_align_score_tolerance = 0.3f;
+    // seam_align_tolerable_dist - if next layer closest point is too far away, break aligned string
+    static constexpr float seam_align_tolerable_dist = 1.0f;
+    // minimum number of seams needed in cluster to make alignment happen
+    static constexpr size_t seam_align_minimum_string_seams = 10;
+    // points covered by spline; determines number of splines for the given string
+    static constexpr size_t seam_align_seams_per_segment = 16;
+
+    //The following data structures hold all perimeter points for all PrintObject.
+    std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
+
+    void init(const Print &print, std::function<void(void)> throw_if_canceled_func);
+>>>>>>> master_250
 
     void place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first, const Point &last_pos) const;
 
@@ -154,12 +229,25 @@ private:
             const SeamPlacerImpl::GlobalModelInfo &global_model_info);
     void calculate_overhangs_and_layer_embedding(const PrintObject *po);
     void align_seam_points(const PrintObject *po, const SeamPlacerImpl::SeamComparator &comparator);
+<<<<<<< HEAD
     bool find_next_seam_in_layer(
             const std::vector<PrintObjectSeamData::LayerSeams> &layers,
             std::pair<size_t, size_t> &last_point_indexes,
             const size_t layer_idx, const float slice_z,
             const SeamPlacerImpl::SeamComparator &comparator,
             std::vector<std::pair<size_t, size_t>> &seam_string) const;
+=======
+    std::vector<std::pair<size_t, size_t>> find_seam_string(const PrintObject *po,
+            std::pair<size_t, size_t> start_seam,
+            const SeamPlacerImpl::SeamComparator &comparator,
+            std::optional<std::pair<size_t, size_t>> &out_best_moved_seam,
+            size_t& out_moved_seams_count) const;
+    std::optional<std::pair<size_t, size_t>> find_next_seam_in_layer(
+            const std::vector<PrintObjectSeamData::LayerSeams> &layers,
+            const std::pair<size_t, size_t> &prev_point_index,
+            const size_t layer_idx, const float slice_z,
+            const SeamPlacerImpl::SeamComparator &comparator) const;
+>>>>>>> master_250
 };
 
 } // namespace Slic3r

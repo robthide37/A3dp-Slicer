@@ -3,7 +3,14 @@
 
 set(SLIC3R_APP_NAME "PrusaSlicer")
 set(SLIC3R_APP_KEY "PrusaSlicer")
+<<<<<<< HEAD
 set(SLIC3R_VERSION "2.6.0-alpha0")
 set(SLIC3R_BUILD_ID "PrusaSlicer-${SLIC3R_VERSION}+UNKNOWN")
 set(SLIC3R_RC_VERSION "2,6,0,0")
 set(SLIC3R_RC_VERSION_DOTS "2.6.0.0")
+=======
+set(SLIC3R_VERSION "2.5.0-alpha2")
+set(SLIC3R_BUILD_ID "PrusaSlicer-${SLIC3R_VERSION}+UNKNOWN")
+set(SLIC3R_RC_VERSION "2,5,0,0")
+set(SLIC3R_RC_VERSION_DOTS "2.5.0.0")
+>>>>>>> master_250
