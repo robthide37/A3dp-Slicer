@@ -980,7 +980,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
             // for (Axis axis : {X, Y, Z})
             //     render_rotation_input(axis);
-            // m_imgui->text(_L("°"));
+            // m_imgui->text(_L("Â°"));
 
             // ImGui::Separator();
 

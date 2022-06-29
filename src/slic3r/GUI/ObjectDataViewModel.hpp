@@ -101,7 +101,6 @@ public:
     ObjectDataViewModelNode(ObjectDataViewModelNode* parent,
                             const wxString& sub_obj_name,
                             Slic3r::ModelVolumeType type,
-                            const wxBitmapBundle& bmp,
                             const wxString& extruder,
                             const int idx = -1 );
 
@@ -182,7 +181,7 @@ public:
     void            SetVolumeType(ModelVolumeType type) { m_volume_type = type; }
     void            SetBitmap(const wxBitmapBundle &icon) { m_bmp = icon; }
     void            SetExtruder(const wxString &extruder) { m_extruder = extruder; }
-    void            SetWarningBitmap(const wxBitmapBundle& icon, const std::string& warning_icon_name) { /*m_bmp = icon; */m_warning_icon_name = warning_icon_name; }
+    void            SetWarningIconName(const std::string& warning_icon_name) { m_warning_icon_name = warning_icon_name; }
     void            SetLock(bool has_lock)                                   { m_has_lock = has_lock; }
     const wxBitmapBundle& GetBitmap() const         { return m_bmp; }
     const wxString& GetName() const                 { return m_name; }
@@ -264,7 +263,7 @@ class ObjectDataViewModel :public wxDataViewModel
     wxBitmapBundle                              m_empty_bmp;
     wxBitmapBundle                              m_warning_bmp;
     wxBitmapBundle                              m_warning_manifold_bmp;
-    wxBitmap                                    m_lock_bmp;
+    wxBitmapBundle                              m_lock_bmp;
 
     wxDataViewCtrl*                             m_ctrl { nullptr };
 
@@ -408,7 +407,6 @@ private:
     wxDataViewItem  AddInstanceRoot(const wxDataViewItem& parent_item);
     void            AddAllChildren(const wxDataViewItem& parent);
 
-//    wxBitmapBundle& GetWarningBitmap(const std::string& warning_icon_name);
     void            UpdateBitmapForNode(ObjectDataViewModelNode* node);
     void            UpdateBitmapForNode(ObjectDataViewModelNode* node, const std::string& warning_icon_name, bool has_lock);
 };

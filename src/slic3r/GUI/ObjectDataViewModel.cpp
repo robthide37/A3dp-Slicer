@@ -58,7 +58,6 @@ const std::map<InfoItemType, InfoItemAtributes> INFO_ITEMS{
 ObjectDataViewModelNode::ObjectDataViewModelNode(ObjectDataViewModelNode*   parent,
                                                  const wxString&            sub_obj_name,
                                                  Slic3r::ModelVolumeType    type,
-                                                 const wxBitmapBundle&      bmp,
                                                  const wxString&            extruder,
                                                  const int                  idx/* = -1*/) :
     m_parent(parent),
@@ -319,7 +318,7 @@ ObjectDataViewModel::ObjectDataViewModel()
     m_volume_bmps = MenuFactory::get_volume_bitmaps();
     m_warning_bmp = *get_bmp_bundle(WarningIcon);
     m_warning_manifold_bmp = *get_bmp_bundle(WarningManifoldIcon);
-    m_lock_bmp    = create_scaled_bitmap(LockIcon);
+    m_lock_bmp    = *get_bmp_bundle(LockIcon);
 
     for (auto item : INFO_ITEMS)
         m_info_bmps[item.first] = get_bmp_bundle(item.second.bmp_name);
@@ -333,14 +332,13 @@ ObjectDataViewModel::~ObjectDataViewModel()
     m_bitmap_cache = nullptr;
 }
 
-//wxBitmapBundle& ObjectDataViewModel::GetWarningBitmap(const std::string& warning_icon_name)
 void ObjectDataViewModel::UpdateBitmapForNode(ObjectDataViewModelNode* node)
 {
     int vol_type = static_cast<int>(node->GetVolumeType());
     bool is_volume_node = vol_type >= 0;
 
     if (!node->has_warning_icon() && !node->has_lock()) {
-        node->SetBitmap(is_volume_node ? m_volume_bmps[vol_type] : m_empty_bmp);
+        node->SetBitmap(is_volume_node ? *m_volume_bmps.at(vol_type) : m_empty_bmp);
         return;
     }
 
@@ -351,18 +349,18 @@ void ObjectDataViewModel::UpdateBitmapForNode(ObjectDataViewModelNode* node)
         scaled_bitmap_name += LockIcon;
     if (is_volume_node)
         scaled_bitmap_name += std::to_string(vol_type);
-    scaled_bitmap_name += "-em" + std::to_string(wxGetApp().em_unit()) + (wxGetApp().dark_mode() ? "-dm" : "-lm");
+    scaled_bitmap_name += (wxGetApp().dark_mode() ? "-dm" : "-lm");
 
-    wxBitmap* bmp = m_bitmap_cache->find(scaled_bitmap_name);
+    wxBitmapBundle* bmp = m_bitmap_cache->find_bndl(scaled_bitmap_name);
     if (!bmp) {
-        std::vector<wxBitmap> bmps;
+        std::vector<wxBitmapBundle*> bmps;
         if (node->has_warning_icon())
-            bmps.emplace_back(node->warning_icon_name() == WarningIcon ? m_warning_bmp : m_warning_manifold_bmp);
+            bmps.emplace_back(node->warning_icon_name() == WarningIcon ? &m_warning_bmp : &m_warning_manifold_bmp);
         if (node->has_lock())
-            bmps.emplace_back(m_lock_bmp);
+            bmps.emplace_back(&m_lock_bmp);
         if (is_volume_node)
             bmps.emplace_back(m_volume_bmps[vol_type]);
-        bmp = m_bitmap_cache->insert(scaled_bitmap_name, bmps);
+        bmp = m_bitmap_cache->insert_bndl(scaled_bitmap_name, bmps);
     }
 
     node->SetBitmap(*bmp);
@@ -1716,7 +1714,7 @@ void ObjectDataViewModel::UpdateBitmaps()
     m_volume_bmps = MenuFactory::get_volume_bitmaps();
     m_warning_bmp = *get_bmp_bundle(WarningIcon);
     m_warning_manifold_bmp = *get_bmp_bundle(WarningManifoldIcon);
-    m_lock_bmp    = create_scaled_bitmap(LockIcon);
+    m_lock_bmp    = *get_bmp_bundle(LockIcon);
 
     for (auto item : INFO_ITEMS)
         m_info_bmps[item.first] = get_bmp_bundle(item.second.bmp_name);
@@ -1751,28 +1749,7 @@ void ObjectDataViewModel::UpdateBitmaps()
         ItemChanged(item);
     }
 }
-/*
-wxBitmapBundle ObjectDataViewModel::GetVolumeIcon(const Slic3r::ModelVolumeType vol_type, const std::string& warning_icon_name/* = std::string()*/)
-{
-    if (warning_icon_name.empty())
-        return *m_volume_bmps[static_cast<int>(vol_type)];
 
-    std::string scaled_bitmap_name = warning_icon_name + std::to_string(static_cast<int>(vol_type));
-    scaled_bitmap_name += "-em" + std::to_string(wxGetApp().em_unit()) + (wxGetApp().dark_mode() ? "-dm" : "-lm");
-
-    wxBitmapBundle *bmp = m_bitmap_cache->find_bndl(scaled_bitmap_name);
-    if (bmp == nullptr) {
-        std::vector<wxBitmapBundle*> bmps;
-
-        bmps.emplace_back(&GetWarningBitmap(warning_icon_name));
-        bmps.emplace_back(m_volume_bmps[static_cast<int>(vol_type)]);
-
-        bmp = m_bitmap_cache->insert_bndl(scaled_bitmap_name, bmps);
-    }
-
-    return *bmp;
-}
-*/
 void ObjectDataViewModel::AddWarningIcon(const wxDataViewItem& item, const std::string& warning_icon_name)
 {
     if (!item.IsOk())
@@ -1804,10 +1781,6 @@ void ObjectDataViewModel::DeleteWarningIcon(const wxDataViewItem& item, const bo
 
     node->SetWarningIconName(std::string());
     UpdateBitmapForNode(node);
-/*    if (node->GetType() & itVolume) {
-        node->SetWarningBitmap(*m_volume_bmps[static_cast<int>(node->volume_type())], "");
-        return;
-    }*/
 
     if (unmark_object)
     {
