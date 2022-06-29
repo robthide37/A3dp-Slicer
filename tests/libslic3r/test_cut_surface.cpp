@@ -33,7 +33,7 @@ TEST_CASE("Cut character from surface", "[]")
     its_merge(object, std::move(cube2));
 
     // Call core function for cut surface
-    auto surfaces = cut_surface(object, shape, cut_projection);
+    auto surfaces = cut_surface(shape, {object}, cut_projection, 0);
     CHECK(!surfaces.empty());
 
     Emboss::OrthoProject projection(Transform3d::Identity(),
@@ -45,15 +45,17 @@ TEST_CASE("Cut character from surface", "[]")
     // its_write_obj(its, "C:/data/temp/projected.obj");
 }
 
+#define DEBUG_3MF
 #ifdef DEBUG_3MF
 
 // Test load of 3mf
 #include "libslic3r/Format/3mf.hpp"
 #include "libslic3r/Model.hpp"
 
-static indexed_triangle_set merge_object(ModelVolume *mv) {
+static std::vector<indexed_triangle_set> transform_volumes(ModelVolume *mv) {
     const auto &volumes = mv->get_object()->volumes;
-    indexed_triangle_set result;
+    std::vector<indexed_triangle_set> results;
+    results.reserve(volumes.size());
 
     // Improve create object from part or use gl_volume
     // Get first model part in object
@@ -63,11 +65,11 @@ static indexed_triangle_set merge_object(ModelVolume *mv) {
         const TriangleMesh &tm = v->mesh();
         if (tm.empty()) continue;
         if (tm.its.empty()) continue;
-        indexed_triangle_set its = tm.its;
+        results.push_back(tm.its); // copy: indexed_triangle_set
+        indexed_triangle_set& its = results.back();
         its_transform(its,v->get_matrix());
-        its_merge(result, std::move(its));
     }
-    return result;
+    return results;
 }
 
 static Emboss::OrthoProject create_projection_for_cut(
@@ -137,12 +139,13 @@ TEST_CASE("CutSurface in 3mf", "[Emboss]")
     Emboss::FontFileWithCache ff(Emboss::create_font_file(font_path.c_str()));
     // */ // end use fake font
     CHECK(ff.has_value());
-    
-    indexed_triangle_set its = merge_object(mv_text);
-    BoundingBoxf3 bb = Slic3r::bounding_box(its);    
-    Transform3d   cut_projection_tr = mv_text->get_matrix()*tc.fix_3mf_tr->inverse();
-    Transform3d   emboss_tr         = cut_projection_tr.inverse();
-    BoundingBoxf3 mesh_bb_tr        = bb.transformed(emboss_tr);
+    std::vector<indexed_triangle_set> its = transform_volumes(mv_text);
+    BoundingBoxf3 bb;
+    for (auto &i : its) bb.merge(Slic3r::bounding_box(i));
+
+    Transform3d cut_projection_tr = mv_text->get_matrix() * tc.fix_3mf_tr->inverse();
+    Transform3d emboss_tr = cut_projection_tr.inverse();
+    BoundingBoxf3 mesh_bb_tr = bb.transformed(emboss_tr);
 
     std::pair<float, float> z_range{mesh_bb_tr.min.z(), mesh_bb_tr.max.z()};
 
@@ -154,11 +157,24 @@ TEST_CASE("CutSurface in 3mf", "[Emboss]")
         cut_projection_tr, shape_scale, get_extents(shapes), z_range);
 
     float projection_ratio = -z_range.first / (z_range.second - z_range.first);
-    SurfaceCut cut = cut_surface(its, shapes, projection, projection_ratio);
+    SurfaceCut cut = cut_surface(shapes, its, projection, projection_ratio);
     its_write_obj(cut, "C:/data/temp/cutSurface/result_cut.obj");
 }
 
+#include "libslic3r/Format/OBJ.hpp"
 TEST_CASE("Merge Cuts", "[Emboss]") {
-    Slic3r::merge_intersection(); 
+    std::string  dir = "C:/data/temp/";
+    TriangleMesh tm1, tm2;
+    load_obj((dir + "aoi3.obj").c_str(), &tm1);
+    load_obj((dir + "aoi6.obj").c_str(), &tm2);
+    auto create_sc = [](TriangleMesh &tm) -> SurfaceCut {
+        SurfaceCut sc;
+        sc.vertices = std::move(tm.its.vertices);
+        sc.indices  = std::move(tm.its.indices);
+        // sc.contours = ???
+        return sc;
+    };
+    SurfaceCut sc1 = create_sc(tm1), sc2 = create_sc(tm2);
+    assert(merge_intersection(sc1, sc2));
 }
 #endif // DEBUG_3MF

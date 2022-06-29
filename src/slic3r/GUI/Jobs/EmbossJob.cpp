@@ -83,13 +83,11 @@ static ModelVolume *get_volume(ModelObjectPtrs &objects,
 /// </summary>
 /// <param name="tr">Volume transformation in object</param>
 /// <param name="shape_scale">Convert shape to milimeters</param>
-/// <param name="shape_bb">Bounding box 2d of shape to center result</param>
 /// <param name="z_range">Bounding box 3d of model volume for projection ranges</param> 
 /// <returns>Orthogonal cut_projection</returns>
 static Emboss::OrthoProject create_projection_for_cut(
     Transform3d                    tr,
     double                         shape_scale,
-    const BoundingBox             &shape_bb,
     const std::pair<float, float> &z_range);
 
 /// <summary>
@@ -407,7 +405,6 @@ void UseSurfaceJob::process(Ctl &ctl) {
     
     if (was_canceled()) return;
 
-    BoundingBox bb = get_extents(shapes);
     const UseSurfaceData::ModelSource &source = UseSurfaceData::merge(m_input.sources);
 
     Transform3d   mesh_tr_inv       = source.tr.inverse();
@@ -419,11 +416,20 @@ void UseSurfaceJob::process(Ctl &ctl) {
     const Emboss::FontFile &ff = *m_input.font_file.font_file;
     double shape_scale =  Emboss::get_shape_scale(fp, ff);
     Emboss::OrthoProject cut_projection = priv::create_projection_for_cut(
-        cut_projection_tr, shape_scale, bb, z_range);
+        cut_projection_tr, shape_scale, z_range);
     float projection_ratio = (-z_range.first + priv::safe_extension) /
                              (z_range.second - z_range.first + 2 * priv::safe_extension);
+
+    // Define alignment of text - left, right, center, top bottom, ....
+    BoundingBox bb = get_extents(shapes);
+    Point projection_center = bb.center();
+    for (ExPolygon &shape : shapes) 
+        shape.translate(-projection_center);
+
+    // TODO: prepare multi model -> source.its
+    
     // Use CGAL to cut surface from triangle mesh
-    SurfaceCut cut = cut_surface(source.its, shapes, cut_projection, projection_ratio);
+    SurfaceCut cut = cut_surface(shapes, {source.its}, cut_projection,  projection_ratio);
     if (cut.empty())
         throw priv::EmbossJobException(
             _u8L("There is no valid surface for text projection.").c_str());
@@ -650,7 +656,6 @@ ModelVolume *priv::get_volume(ModelObjectPtrs &objects,
 Emboss::OrthoProject priv::create_projection_for_cut(
     Transform3d                    tr,
     double                         shape_scale,
-    const BoundingBox             &shape_bb,
     const std::pair<float, float> &z_range)
 {
     float min_z = z_range.first - priv::safe_extension;
@@ -670,12 +675,7 @@ Emboss::OrthoProject priv::create_projection_for_cut(
 
     // Projection is in direction from far plane
     tr.translate(Vec3d(0., 0., min_z));
-
     tr.scale(shape_scale);
-    // Text alignemnt to center 2D
-    Vec2d move = -(shape_bb.max + shape_bb.min).cast<double>() / 2.;
-    //Vec2d move = -shape_bb.center().cast<double>(); // not precisse
-    tr.translate(Vec3d(move.x(), move.y(), 0.));
     return Emboss::OrthoProject(tr, project_direction);
 }
 

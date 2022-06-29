@@ -299,17 +299,19 @@ TEST_CASE("Italic check", "[Emboss]")
 #include "libslic3r/CutSurface.hpp"
 TEST_CASE("Cut surface", "[]")
 {
-    std::string font_path = get_font_filepath();
-    char        letter    = '%';
-    float       flatness  = 2.;
-    unsigned int font_index = 0; // collection
-    float z_depth = 50.f; // projection size
+    std::string  font_path  = get_font_filepath();
+    char         letter     = '%';
+    float        flatness   = 2.;
+    unsigned int font_index = 0;    // collection
+    float        z_depth    = 50.f; // projection size
 
     auto font = Emboss::create_font_file(font_path.c_str());
     REQUIRE(font != nullptr);
 
-    std::optional<Emboss::Glyph> glyph = 
-        Emboss::letter2glyph(*font, font_index, letter, flatness);
+    std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font,
+                                                              font_index,
+                                                              letter,
+                                                              flatness);
     REQUIRE(glyph.has_value());
 
     ExPolygons shape = glyph->shape;
@@ -326,7 +328,7 @@ TEST_CASE("Cut surface", "[]")
     its_translate(cube2, Vec3f(100, -40, 7.5));
     its_merge(object, std::move(cube2));
 
-    auto surfaces = cut_surface(object, shape, cut_projection);
+    auto surfaces = cut_surface(shape, {object}, cut_projection, 0);
     CHECK(!surfaces.empty());
 
     Emboss::OrthoProject projection(Transform3d::Identity(), Vec3f(0.f, 0.f, 10.f));

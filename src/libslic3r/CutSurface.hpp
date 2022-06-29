@@ -53,23 +53,22 @@ bool merge_intersection(SurfaceCut &sc1, const SurfaceCut &sc2);
 SurfaceCut merge(SurfaceCuts&& cuts);
 
 /// <summary>
-/// Cut surface shape from model.
-/// IMPROVE1: It is possible to prefiltrate model triangles befor cut.(AABB)
-/// IMPROVE2: Make a cut by quad. Two triangles are possible slower but it is question for profiler.
+/// Cut surface shape from models.
 /// </summary>
-/// <param name="model">Mesh to cut</param>
 /// <param name="shapes">Multiple shape to cut from model</param>
-/// <param name="projection">Define transformation from 2d coordinate of shape to 3d</param>
+/// <param name="models">Multi mesh to cut, need to be in same coordinate system</param>
+/// <param name="projection">Define transformation 2d shape into 3d</param>
 /// <param name="projection_ratio">Define ideal ratio between front and back projection to cut
 /// 0 .. means use closest to front projection
 /// 1 .. means use closest to back projection
 /// value from <0, 1>
 /// </param>
 /// <returns>Cutted surface from model</returns>
-SurfaceCut cut_surface(const indexed_triangle_set &model,
-                       const ExPolygons           &shapes,
-                       const Emboss::IProjection  &projection,
-                       float projection_ratio = 0);
+SurfaceCut cut_surface(const ExPolygons                        &shapes,
+                       const std::vector<indexed_triangle_set> &models,
+                       const Emboss::IProjection               &projection,
+                       float projection_ratio);
+
 
 /// <summary>
 /// Create model from surface cuts by projection
