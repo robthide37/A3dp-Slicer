@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // FIXME: extract absolute units -> em
 
 #include "ConfigWizard_private.hpp"
@@ -1485,7 +1484,7 @@ PageDiameters::PageDiameters(ConfigWizard *parent)
     auto *unit_filam = new wxStaticText(this, wxID_ANY, _L("mm"));
     sizer_filam->AddGrowableCol(0, 1);
     sizer_filam->Add(text_filam, 0, wxALIGN_CENTRE_VERTICAL);
-    sizer_filam->Add(diam_filam);
+    sizer_filam->Add(diam_filam, 0, wxALIGN_CENTRE_VERTICAL);
     sizer_filam->Add(unit_filam, 0, wxALIGN_CENTRE_VERTICAL);
     append(sizer_filam);
 }
