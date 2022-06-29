@@ -2872,8 +2872,38 @@ void priv::create_face_types(FaceTypeMap           &map,
                              const EcmType         &ecm,
                              const VertexSourceMap &sources)
 {
-    auto get_intersection_source = [](const Source& s1, const Source& s2)->FI{
-        /// todo
+    auto get_intersection_source = [&tm2](const Source& s1, const Source& s2)->FI{        
+        // when one of sources is face than return it
+        FI fi1 = tm2.face(s1.hi);
+        if (s1.sdim == 2) return fi1;
+        FI fi2 = tm2.face(s2.hi);
+        if (s2.sdim == 2) return fi2;
+        // both vertices are made by same source triangle
+        if (fi1 == fi2) return fi1;
+
+        // when one from sources is edge second one decide side of triangle triangle
+        HI hi1_opposit = tm2.opposite(s1.hi);
+        FI fi1_opposit;
+        if (hi1_opposit.is_valid())
+            fi1_opposit = tm2.face(hi1_opposit);
+        if (fi2 == fi1_opposit) return fi2;
+
+        HI hi2_opposit = tm2.opposite(s2.hi);
+        FI fi2_opposit;
+        if (hi2_opposit.is_valid())
+            fi2_opposit = tm2.face(hi2_opposit);
+        if (fi1 == fi2_opposit) return fi1;
+        if (fi1_opposit.is_valid() && fi1_opposit == fi2_opposit)
+            return fi1_opposit;
+
+        // when intersection is vertex need loop over neighbor
+        for (FI fi_around_hi1 : tm2.faces_around_target(s1.hi)) {
+            for (FI fi_around_hi2 : tm2.faces_around_target(s2.hi)) { 
+                if (fi_around_hi1 == fi_around_hi2) 
+                    return fi_around_hi1;
+            }
+        }
+        return FI();
     };
 
     for (FI fi : tm1.faces()) map[fi] = FaceType::not_constrained;
