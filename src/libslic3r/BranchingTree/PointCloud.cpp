@@ -9,32 +9,65 @@ namespace Slic3r { namespace branchingtree {
 
 std::optional<Vec3f> find_merge_pt(const Vec3f &A,
                                    const Vec3f &B,
-                                   float        max_slope)
+                                   float        critical_angle)
 {
-    Vec3f Da = (B - A).normalized(), Db = -Da;
-    auto [polar_da, azim_da] = Geometry::dir_to_spheric(Da);
-    auto [polar_db, azim_db] = Geometry::dir_to_spheric(Db);
-    polar_da = std::max(polar_da, float(PI) / 2.f + max_slope);
-    polar_db = std::max(polar_db, float(PI) / 2.f + max_slope);
+    // The idea is that A and B both have their support cones. But searching
+    // for the intersection of these support cones is difficult and its enough
+    // to reduce this problem to 2D and search for the intersection of two
+    // rays that merge somewhere between A and B. The 2D plane is a vertical
+    // slice of the 3D scene where the X axis is determined by the XY direction
+    // of the AB vector.
+    //
+    // Z^
+    //  |    A *
+    //  |     . .   B *
+    //  |    .   .   . .
+    //  |   .     . .   .
+    //  |  .       x     .
+    //  -------------------> X
 
-    Da = Geometry::spheric_to_dir<float>(polar_da, azim_da);
-    Db = Geometry::spheric_to_dir<float>(polar_db, azim_db);
+    // Determine the transformation matrix for the 2D projection:
+    Vec3f diff = {B.x() - A.x(), B.y() - A.y(), 0.f};
+    Vec3f dir  = diff.normalized(); // TODO: avoid normalization
 
-    // This formula is based on
+    Eigen::Matrix<float, 2, 3> tr2D;
+    tr2D.row(0) = Vec3f{dir.x(), dir.y(), dir.z()};
+    tr2D.row(1) = Vec3f{0.f, 0.f, 1.f};
+
+    // Transform the 2 vectors A and B into 2D vector 'a' and 'b'. Here we can
+    // omit 'a', pretend that its the origin and use BA as the vector b.
+    Vec2f b = tr2D * (B - A);
+
+    // Get the slope of the ray emanating from 'a' towards 'b'. This ray might
+    // exceed the allowed angle but that is corrected subsequently.
+    // if b.x() is 0, slope is (+/-) pi/2 depending on b.y() sign
+    float slope_a = std::atan2(b.y(), b.x());
+
+    // slope from 'b' to 'a' is the opposite of slope_a, the angle will also
+    // be corrected later.
+    float slope_b = -slope_a;
+
+    // Derive the allowed angles from the given critical angle.
+    // critical_angle is measured from the horizontal X axis.
+    // The rays need to go downwards which corresponds to negative angles
+
+    float min_angle = critical_angle - float(PI) / 2.f;
+    slope_a = std::min(slope_a, min_angle);
+    slope_b = std::min(slope_b, min_angle);
+    Vec2f Da = {std::cos(slope_a), std::sin(slope_a)};
+    Vec2f Db = {-std::cos(slope_b), std::sin(slope_b)};
+
+    // Determine where two rays ([0, 0], Da), (b, Db) intersect.
+    // Based on
     // https://stackoverflow.com/questions/27459080/given-two-points-and-two-direction-vectors-find-the-point-where-they-intersect
-    double t1 =
-        (A.z() * Db.x() + Db.z() * B.x() - B.z() * Db.x() - Db.z() * A.x()) /
-        (Da.x() * Db.z() - Da.z() * Db.x());
+    // One ray is emanating from (0, 0) so the formula is simplified
+    double t1 = (Db.y() * b.x() - b.y() * Db.x()) /
+                (Da.x() * Db.y() - Da.y() * Db.x());
 
-    if (std::isnan(t1) || std::abs(t1) < EPSILON)
-        t1 = (A.z() * Db.y() + Db.z() * B.y() - B.z() * Db.y() - Db.z() * A.y()) /
-             (Da.y() * Db.z() - Da.z() * Db.y());
+    Vec2f mp = t1 * Da;
+    Vec3f Mp = A + tr2D.transpose() * mp;
 
-    Vec3f m1 = A + t1 * Da;
-
-    double t2 = (m1.z() - B.z()) / Db.z();
-
-    return t1 >= 0. && t2 >= 0. ? m1 : std::optional<Vec3f>{};
+    return t1 >= 0.f ? Mp : Vec3f{};
 }
 
 void to_eigen_mesh(const indexed_triangle_set &its,

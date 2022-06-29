@@ -205,7 +205,7 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branchi
         auto mergept = branchingtree::find_merge_pt(a, b, slope);
 
         REQUIRE(bool(mergept));
-        REQUIRE((*mergept - b).squaredNorm() < EPSILON);
+        REQUIRE((*mergept - b).squaredNorm() < 2 * EPSILON);
     }
 
     // -|---------> X
@@ -249,13 +249,13 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branchi
     }
 
     SECTION("Points separated by less than critical angle have the lower point as mergept") {
-        Vec3f a{0.f, 0.f, 0.f}, b = {-0.5f, -0.5f, -1.f};
+        Vec3f a{-1.f, -1.f, -1.f}, b = {-1.5f, -1.5f, -2.f};
         auto slope = float(PI / 4.);
 
         auto mergept = branchingtree::find_merge_pt(a, b, slope);
 
         REQUIRE(bool(mergept));
-        REQUIRE((*mergept - b).norm() < EPSILON);
+        REQUIRE((*mergept - b).norm() < 2 * EPSILON);
     }
 }
 
