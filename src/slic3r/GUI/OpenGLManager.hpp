@@ -86,6 +86,9 @@ private:
     wxGLContext* m_context{ nullptr };
 #if ENABLE_GL_CORE_PROFILE
     std::pair<int, int> m_required_version{ 0, 0 };
+#if ENABLE_OPENGL_DEBUG_OPTION
+    bool m_debug_enabled{ false };
+#endif // ENABLE_OPENGL_DEBUG_OPTION
 #endif // ENABLE_GL_CORE_PROFILE
     GLShadersManager m_shaders_manager;
     static GLInfo s_gl_info;
@@ -103,7 +106,11 @@ public:
 
     bool init_gl();
 #if ENABLE_GL_CORE_PROFILE
+#if ENABLE_OPENGL_DEBUG_OPTION
+    wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version, bool enable_debug);
+#else
     wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version);
+#endif // ENABLE_OPENGL_DEBUG_OPTION
 #else
     wxGLContext* init_glcontext(wxGLCanvas& canvas);
 #endif // ENABLE_GL_CORE_PROFILE

@@ -23,6 +23,9 @@ struct GUI_InitParams
 	bool	                    start_as_gcodeviewer;
 #if ENABLE_GL_CORE_PROFILE
 	std::pair<int, int>         opengl_version;
+#if ENABLE_OPENGL_DEBUG_OPTION
+	bool                        opengl_debug;
+#endif // ENABLE_OPENGL_DEBUG_OPTION
 #endif // ENABLE_GL_CORE_PROFILE
 };
 

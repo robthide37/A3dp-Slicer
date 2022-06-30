@@ -57,6 +57,8 @@
 #define ENABLE_LEGACY_OPENGL_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable OpenGL core profile context (tested against Mesa 20.1.8 on Windows)
 #define ENABLE_GL_CORE_PROFILE (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
+// Enable OpenGL debug messages using debug context
+#define ENABLE_OPENGL_DEBUG_OPTION (1 && ENABLE_GL_CORE_PROFILE)
 // Shows an imgui dialog with GLModel statistics data
 #define ENABLE_GLMODEL_STATISTICS (0 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable show non-manifold edges

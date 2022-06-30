@@ -122,6 +122,9 @@ int CLI::run(int argc, char **argv)
 #endif // _WIN32
 #if ENABLE_GL_CORE_PROFILE
     std::pair<int, int>              opengl_version = { 0, 0 };
+#if ENABLE_OPENGL_DEBUG_OPTION
+    bool                             opengl_debug = false;
+#endif // ENABLE_OPENGL_DEBUG_OPTION
 #endif // ENABLE_GL_CORE_PROFILE
 
     const std::vector<std::string>              &load_configs		      = m_config.option<ConfigOptionStrings>("load", true)->values;
@@ -173,7 +176,7 @@ int CLI::run(int argc, char **argv)
     it = std::find(m_actions.begin(), m_actions.end(), "opengl-core");
     if (it != m_actions.end()) {
         std::string opengl_version_str = m_config.opt_string("opengl-core");
-        const std::vector<std::string> valid_versions = { "3.3", "4.0", "4.1", "4.2", "4.3", "4.4", "4.5", "4.6" };
+        const std::vector<std::string> valid_versions = { "3.2", "3.3", "4.0", "4.1", "4.2", "4.3", "4.4", "4.5", "4.6" };
         if (std::find(valid_versions.begin(), valid_versions.end(), opengl_version_str) == valid_versions.end()) {
             boost::nowide::cerr << "Found invalid OpenGL version: " << opengl_version_str << std::endl;
             opengl_version_str.clear();
@@ -188,6 +191,15 @@ int CLI::run(int argc, char **argv)
         start_gui = true;
         m_actions.erase(it);
     }
+
+#if ENABLE_OPENGL_DEBUG_OPTION
+    it = std::find(m_actions.begin(), m_actions.end(), "opengl-debug");
+    if (it != m_actions.end()) {
+        start_gui = true;
+        opengl_debug = true;
+        m_actions.erase(it);
+    }
+#endif // ENABLE_OPENGL_DEBUG_OPTION
 #else
     // are we starting as gcodeviewer ?
     for (auto it = m_actions.begin(); it != m_actions.end(); ++it) {
@@ -650,6 +662,9 @@ int CLI::run(int argc, char **argv)
         params.start_as_gcodeviewer = start_as_gcodeviewer;
 #if ENABLE_GL_CORE_PROFILE
         params.opengl_version = opengl_version;
+#if ENABLE_OPENGL_DEBUG_OPTION
+        params.opengl_debug = opengl_debug;
+#endif // ENABLE_OPENGL_DEBUG_OPTION
 #endif // ENABLE_GL_CORE_PROFILE
         return Slic3r::GUI::GUI_Run(params);
 #else // SLIC3R_GUI
