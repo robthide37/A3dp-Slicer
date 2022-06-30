@@ -849,7 +849,8 @@ wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
 {
 #if ENABLE_GL_CORE_PROFILE
 #if ENABLE_OPENGL_DEBUG_OPTION
-    return m_opengl_mgr.init_glcontext(canvas, init_params != nullptr ? init_params->opengl_version : std::make_pair(0, 0), init_params->opengl_debug);
+    return m_opengl_mgr.init_glcontext(canvas, init_params != nullptr ? init_params->opengl_version : std::make_pair(0, 0),
+        init_params != nullptr ? init_params->opengl_debug : false);
 #else
     return m_opengl_mgr.init_glcontext(canvas, init_params != nullptr ? init_params->opengl_version : std::make_pair(0, 0));
 #endif // ENABLE_OPENGL_DEBUG_OPTION
