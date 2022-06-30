@@ -430,7 +430,7 @@ void PrintObject::generate_support_spots()
                     Transform3f inv_transform = (obj_transform * model_transformation).inverse().cast<float>();
                     TriangleSelectorWrapper selector { model_volume->mesh() };
 
-                    for (const SupportSpotsGenerator::SupportPoint &support_point : issues.supports_nedded) {
+                    for (const SupportSpotsGenerator::SupportPoint &support_point : issues.support_points) {
                         Vec3f point = Vec3f(inv_transform * support_point.position);
                         Vec3f origin = Vec3f(
                                 inv_transform * Vec3f(support_point.position.x(), support_point.position.y(), 0.0f));

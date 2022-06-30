@@ -30,24 +30,14 @@ struct Params {
 };
 
 struct SupportPoint {
-    SupportPoint(const Vec3f &position, float weight);
+    SupportPoint(const Vec3f &position, float force,const Vec3f& direction);
     Vec3f position;
-    float weight;
-};
-
-struct CurledFilament {
-    CurledFilament(const Vec3f &position, float estimated_height);
-    explicit CurledFilament(const Vec3f &position);
-    Vec3f position;
-    float estimated_height;
+    float force;
+    Vec3f direction;
 };
 
 struct Issues {
-    std::vector<SupportPoint> supports_nedded;
-    std::vector<CurledFilament> curling_up;
-
-    void add(const Issues &layer_issues);
-    bool empty() const;
+    std::vector<SupportPoint> support_points;
 };
 
 std::vector<size_t> quick_search(const PrintObject *po, const Params &params = Params { });

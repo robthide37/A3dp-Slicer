@@ -870,7 +870,7 @@ check_object_stability(const PrintObject *po, const Params &params) {
                 print_z,
                 params);
 
-//        reckon_thin_islands(stability_accs, flow_width, flow_width*layer->height, print_z, prev_layer_lines, params);
+        reckon_thin_islands(stability_accs, flow_width, flow_width*layer->height, print_z, prev_layer_lines, params);
 
 #ifdef DEBUG_FILES
         for (const auto &line : prev_layer_lines.get_lines()) {
