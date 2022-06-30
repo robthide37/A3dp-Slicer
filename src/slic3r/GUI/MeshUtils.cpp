@@ -234,8 +234,13 @@ Vec3f MeshRaycaster::get_triangle_normal(size_t facet_idx) const
     return m_normals[facet_idx];
 }
 
+#if ENABLE_RAYCAST_PICKING
+void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
+                                        Vec3d& point, Vec3d& direction)
+#else
 void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                         Vec3d& point, Vec3d& direction) const
+#endif // ENABLE_RAYCAST_PICKING
 {
     Matrix4d modelview = camera.get_view_matrix().matrix();
     Matrix4d projection= camera.get_projection_matrix().matrix();
@@ -243,9 +248,9 @@ void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3
 
     Vec3d pt1;
     Vec3d pt2;
-    igl::unproject(Vec3d(mouse_pos(0), viewport[3] - mouse_pos(1), 0.),
+    igl::unproject(Vec3d(mouse_pos.x(), viewport[3] - mouse_pos.y(), 0.),
                    modelview, projection, viewport, pt1);
-    igl::unproject(Vec3d(mouse_pos(0), viewport[3] - mouse_pos(1), 1.),
+    igl::unproject(Vec3d(mouse_pos.x(), viewport[3] - mouse_pos.y(), 1.),
                    modelview, projection, viewport, pt2);
 
     Transform3d inv = trafo.inverse();
@@ -350,6 +355,40 @@ std::vector<unsigned> MeshRaycaster::get_unobscured_idxs(const Geometry::Transfo
     return out;
 }
 
+#if ENABLE_RAYCAST_PICKING
+bool MeshRaycaster::closest_hit(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
+    Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane, size_t* facet_idx) const
+{
+    Vec3d point;
+    Vec3d direction;
+    line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
+
+    const std::vector<sla::IndexedMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction.normalized());
+
+    if (hits.empty())
+        return false; // no intersection found
+
+    size_t hit_id = 0;
+    if (clipping_plane != nullptr) {
+        while (hit_id < hits.size() && clipping_plane->is_point_clipped(trafo * hits[hit_id].position())) {
+            ++hit_id;
+        }
+    }
+
+    if (hit_id == hits.size())
+        return false; // all points are obscured or cut by the clipping plane.
+
+    const sla::IndexedMesh::hit_result& hit = hits[hit_id];
+
+    position = hit.position().cast<float>();
+    normal = hit.normal().cast<float>();
+
+    if (facet_idx != nullptr)
+        *facet_idx = hit.face();
+
+    return true;
+}
+#endif // ENABLE_RAYCAST_PICKING
 
 Vec3f MeshRaycaster::get_closest_point(const Vec3f& point, Vec3f* normal) const
 {

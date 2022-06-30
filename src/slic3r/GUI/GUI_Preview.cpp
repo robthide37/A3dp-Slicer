@@ -63,7 +63,7 @@ bool View3D::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig
     m_canvas->set_context(wxGetApp().init_glcontext(*m_canvas_widget));
 
     m_canvas->allow_multisample(OpenGLManager::can_multisample());
-    // XXX: If have OpenGL
+
     m_canvas->enable_picking(true);
     m_canvas->enable_moving(true);
     // XXX: more config from 3D.pm

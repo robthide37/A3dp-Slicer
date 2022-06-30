@@ -133,8 +133,13 @@ void GLGizmoFlatten::on_render()
             update_planes();
         for (int i = 0; i < (int)m_planes.size(); ++i) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+            m_planes[i].vbo.model.set_color(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
+            m_planes[i].vbo.model.render();
+#else
             m_planes[i].vbo.set_color(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
             m_planes[i].vbo.render();
+#endif // ENABLE_RAYCAST_PICKING
 #else
             glsafe(::glColor4fv(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR.data() : DEFAULT_PLANE_COLOR.data()));
             if (m_planes[i].vbo.has_VBOs())
@@ -154,6 +159,29 @@ void GLGizmoFlatten::on_render()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
+#if ENABLE_RAYCAST_PICKING
+void GLGizmoFlatten::on_register_raycasters_for_picking()
+{
+    // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(true);
+
+    if (!m_planes.empty()) {
+        const Selection& selection = m_parent.get_selection();
+        const Transform3d matrix = Geometry::assemble_transform(selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z() * Vec3d::UnitZ()) *
+            selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
+
+        for (int i = 0; i < (int)m_planes.size(); ++i) {
+            m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_planes[i].vbo.mesh_raycaster, matrix);
+        }
+    }
+}
+
+void GLGizmoFlatten::on_unregister_raycasters_for_picking()
+{
+    m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo);
+    m_parent.set_raycaster_gizmos_on_top(false);
+}
+#else
 void GLGizmoFlatten::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
@@ -204,12 +232,16 @@ void GLGizmoFlatten::on_render_for_picking()
     shader->stop_using();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
+#endif // ENABLE_RAYCAST_PICKING
 
 void GLGizmoFlatten::set_flattening_data(const ModelObject* model_object)
 {
     if (model_object != m_old_model_object) {
         m_planes.clear();
         m_planes_valid = false;
+#if ENABLE_RAYCAST_PICKING
+        on_unregister_raycasters_for_picking();
+#endif // ENABLE_RAYCAST_PICKING
     }
 }
 
@@ -226,6 +258,9 @@ void GLGizmoFlatten::update_planes()
     }
     ch = ch.convex_hull_3d();
     m_planes.clear();
+#if ENABLE_RAYCAST_PICKING
+    on_unregister_raycasters_for_picking();
+#endif // ENABLE_RAYCAST_PICKING
 #if ENABLE_WORLD_COORDINATE
     const Transform3d inst_matrix = mo->instances.front()->get_matrix_no_offset();
 #else
@@ -422,6 +457,19 @@ void GLGizmoFlatten::update_planes()
     // the vertices in order, so triangulation is trivial.
     for (auto& plane : m_planes) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+        indexed_triangle_set its;
+        its.vertices.reserve(plane.vertices.size());
+        its.indices.reserve(plane.vertices.size() / 3);
+        for (size_t i = 0; i < plane.vertices.size(); ++i) {
+            its.vertices.emplace_back((Vec3f)plane.vertices[i].cast<float>());
+        }
+        for (size_t i = 1; i < plane.vertices.size() - 1; ++i) {
+            its.indices.emplace_back(0, i, i + 1); // triangle fan
+        }
+        plane.vbo.model.init_from(its);
+        plane.vbo.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
+#else
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::TriangleFan, GLModel::Geometry::EVertexLayout::P3N3 };
         init_data.reserve_vertices(plane.vertices.size());
@@ -432,6 +480,7 @@ void GLGizmoFlatten::update_planes()
             init_data.add_index((unsigned int)i);
         }
         plane.vbo.init_from(std::move(init_data));
+#endif // ENABLE_RAYCAST_PICKING
 #else
         plane.vbo.reserve(plane.vertices.size());
         for (const auto& vert : plane.vertices)
@@ -446,6 +495,9 @@ void GLGizmoFlatten::update_planes()
         plane.vertices.shrink_to_fit();
     }
 
+#if ENABLE_RAYCAST_PICKING
+    on_register_raycasters_for_picking();
+#endif // ENABLE_RAYCAST_PICKING
     m_planes_valid = true;
 }
 

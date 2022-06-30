@@ -351,7 +351,11 @@ void Raycaster::on_update()
     if (meshes != m_old_meshes) {
         m_raycasters.clear();
         for (const TriangleMesh* mesh : meshes)
+#if ENABLE_RAYCAST_PICKING
+            m_raycasters.emplace_back(new MeshRaycaster(std::make_shared<const TriangleMesh>(*mesh)));
+#else
             m_raycasters.emplace_back(new MeshRaycaster(*mesh));
+#endif // ENABLE_RAYCAST_PICKING
         m_old_meshes = meshes;
     }
 }

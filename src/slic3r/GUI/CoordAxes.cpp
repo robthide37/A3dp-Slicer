@@ -29,10 +29,11 @@ void CoordAxes::render(float emission_factor)
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     auto render_axis = [this](GLShaderProgram& shader, const Transform3d& transform) {
         const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d matrix = camera.get_view_matrix() * transform;
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        const Transform3d matrix = view_matrix * transform;
         shader.set_uniform("view_model_matrix", matrix);
         shader.set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader.set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        shader.set_uniform("view_normal_matrix", (Matrix3d)(view_matrix.matrix().block(0, 0, 3, 3) * transform.matrix().block(0, 0, 3, 3).inverse().transpose()));
         m_arrow.render();
 #else
     auto render_axis = [this](const Transform3f& transform) {

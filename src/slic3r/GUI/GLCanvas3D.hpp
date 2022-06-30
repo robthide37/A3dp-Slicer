@@ -16,6 +16,9 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GCodeViewer.hpp"
 #include "Camera.hpp"
+#if ENABLE_RAYCAST_PICKING
+#include "SceneRaycaster.hpp"
+#endif // ENABLE_RAYCAST_PICKING
 
 #include "libslic3r/Slicing.hpp"
 
@@ -479,6 +482,9 @@ public:
 private:
     wxGLCanvas* m_canvas;
     wxGLContext* m_context;
+#if ENABLE_RAYCAST_PICKING
+    SceneRaycaster m_scene_raycaster;
+#endif // ENABLE_RAYCAST_PICKING
     Bed3D &m_bed;
 #if ENABLE_RETINA_GL
     std::unique_ptr<RetinaHelper> m_retina_helper;
@@ -532,10 +538,6 @@ private:
     bool m_render_sla_auxiliaries;
 
     bool m_reload_delayed;
-
-#if ENABLE_RENDER_PICKING_PASS
-    bool m_show_picking_texture;
-#endif // ENABLE_RENDER_PICKING_PASS
 
     RenderStats m_render_stats;
 
@@ -655,6 +657,26 @@ public:
 
     bool init();
     void post_event(wxEvent &&event);
+
+#if ENABLE_RAYCAST_PICKING
+    std::shared_ptr<SceneRaycasterItem> add_raycaster_for_picking(SceneRaycaster::EType type, int id, const MeshRaycaster& raycaster, const Transform3d& trafo) {
+        return m_scene_raycaster.add_raycaster(type, id, raycaster, trafo);
+    }
+    void remove_raycasters_for_picking(SceneRaycaster::EType type, int id) {
+        m_scene_raycaster.remove_raycasters(type, id);
+    }
+    void remove_raycasters_for_picking(SceneRaycaster::EType type) {
+        m_scene_raycaster.remove_raycasters(type);
+    }
+
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* get_raycasters_for_picking(SceneRaycaster::EType type) {
+        return m_scene_raycaster.get_raycasters(type);
+    }
+
+    void set_raycaster_gizmos_on_top(bool value) {
+        m_scene_raycaster.set_gizmos_on_top(value);
+    }
+#endif // ENABLE_RAYCAST_PICKING
 
     void set_as_dirty();
     void requires_check_outside_state() { m_requires_check_outside_state = true; }
@@ -975,7 +997,11 @@ private:
 #endif // ENABLE_RENDER_SELECTION_CENTER
     void _check_and_update_toolbar_icon_scale();
     void _render_overlays();
+#if ENABLE_RAYCAST_PICKING
+    void _render_volumes_for_picking(const Camera& camera) const;
+#else
     void _render_volumes_for_picking() const;
+#endif // ENABLE_RAYCAST_PICKING
     void _render_current_gizmo() const;
     void _render_gizmos_overlay();
     void _render_main_toolbar();

@@ -12,8 +12,6 @@
 #define ENABLE_RENDER_SELECTION_CENTER 0
 // Shows an imgui dialog with camera related data
 #define ENABLE_CAMERA_STATISTICS 0
-// Render the picking pass instead of the main scene (use [T] key to toggle between regular rendering and picking pass only rendering)
-#define ENABLE_RENDER_PICKING_PASS 0
 // Enable extracting thumbnails from selected gcode and save them as png files
 #define ENABLE_THUMBNAIL_GENERATOR_DEBUG 0
 // Disable synchronization of unselected instances
@@ -73,17 +71,17 @@
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
 // Enable modified camera control using mouse
 #define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
-// Enable modified rectangle selection
-#define ENABLE_NEW_RECTANGLE_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
 // Enable alternative version of file_wildcards()
 #define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_5_0_ALPHA1)
 // Enable processing of gcode G2 and G3 lines
 #define ENABLE_PROCESS_G2_G3_LINES (1 && ENABLE_2_5_0_ALPHA1)
 // Enable fix of used filament data exported to gcode file
 #define ENABLE_USED_FILAMENT_POST_PROCESS (1 && ENABLE_2_5_0_ALPHA1)
-// Enable gizmo grabbers to share common models
-#define ENABLE_GIZMO_GRABBER_REFACTOR (1 && ENABLE_2_5_0_ALPHA1)
 // Enable copy of custom bed model and texture
 #define ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE (1 && ENABLE_2_5_0_ALPHA1)
+// Enable picking using raytracing
+#define ENABLE_RAYCAST_PICKING (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
+#define ENABLE_RAYCAST_PICKING_DEBUG (0 && ENABLE_RAYCAST_PICKING)
+
 
 #endif // _prusaslicer_technologies_h_

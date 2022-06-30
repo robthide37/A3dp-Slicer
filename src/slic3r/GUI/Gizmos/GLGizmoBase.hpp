@@ -6,6 +6,10 @@
 
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/GLModel.hpp"
+#if ENABLE_RAYCAST_PICKING
+#include "slic3r/GUI/MeshUtils.hpp"
+#include "slic3r/GUI/SceneRaycaster.hpp"
+#endif // ENABLE_RAYCAST_PICKING
 
 #include <cereal/archives/binary.hpp>
 
@@ -37,8 +41,8 @@ public:
     // Starting value for ids to avoid clashing with ids used by GLVolumes
     // (254 is choosen to leave some space for forward compatibility)
     static const unsigned int BASE_ID = 255 * 255 * 254;
+    static const unsigned int GRABBER_ELEMENTS_MAX_COUNT = 7;
 
-#if ENABLE_GIZMO_GRABBER_REFACTOR
     enum class EGrabberExtension
     {
         None = 0,
@@ -49,7 +53,6 @@ public:
         PosZ = 1 << 4,
         NegZ = 1 << 5,
     };
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 
 protected:
     struct Grabber
@@ -66,30 +69,45 @@ protected:
         Transform3d matrix{ Transform3d::Identity() };
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
         ColorRGBA color{ ColorRGBA::WHITE() };
-#if ENABLE_GIZMO_GRABBER_REFACTOR
         EGrabberExtension extensions{ EGrabberExtension::None };
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
+#if ENABLE_RAYCAST_PICKING
+        // the picking id shared by all the elements
+        int picking_id{ -1 };
+        std::array<std::shared_ptr<SceneRaycasterItem>, GRABBER_ELEMENTS_MAX_COUNT> raycasters = { nullptr };
+#endif // ENABLE_RAYCAST_PICKING
 
         Grabber() = default;
-#if ENABLE_GIZMO_GRABBER_REFACTOR
         ~Grabber();
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 
+#if ENABLE_RAYCAST_PICKING
+        void render(bool hover, float size) { render(size, hover ? complementary(color) : color); }
+#else
         void render(bool hover, float size) { render(size, hover ? complementary(color) : color, false); }
         void render_for_picking(float size) { render(size, color, true); }
+#endif // ENABLE_RAYCAST_PICKING
 
         float get_half_size(float size) const;
         float get_dragging_half_size(float size) const;
 
-    private:
-        void render(float size, const ColorRGBA& render_color, bool picking);
+#if ENABLE_RAYCAST_PICKING
+        void register_raycasters_for_picking(int id);
+        void unregister_raycasters_for_picking();
+#endif // ENABLE_RAYCAST_PICKING
 
-#if ENABLE_GIZMO_GRABBER_REFACTOR
+    private:
+#if ENABLE_RAYCAST_PICKING
+        void render(float size, const ColorRGBA& render_color);
+#else
+        void render(float size, const ColorRGBA& render_color, bool picking);
+#endif // ENABLE_RAYCAST_PICKING
+
+#if ENABLE_RAYCAST_PICKING
+        static PickingModel s_cube;
+        static PickingModel s_cone;
+#else
         static GLModel s_cube;
         static GLModel s_cone;
-#else
-        GLModel m_cube;
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
+#endif // ENABLE_RAYCAST_PICKING
     };
 
 public:
@@ -112,17 +130,19 @@ public:
 
 protected:
     GLCanvas3D& m_parent;
-    int m_group_id; // TODO: remove only for rotate
-    EState m_state;
-    int m_shortcut_key;
+
+    int m_group_id{ -1 }; // TODO: remove only for rotate
+    EState m_state{ Off };
+    int m_shortcut_key{ 0 };
     std::string m_icon_filename;
     unsigned int m_sprite_id;
-    int m_hover_id;
-    bool m_dragging;
+    int m_hover_id{ -1 };
+    bool m_dragging{ false };
     mutable std::vector<Grabber> m_grabbers;
     ImGuiWrapper* m_imgui;
-    bool m_first_input_window_render;
-    CommonGizmosDataPool* m_c;
+    bool m_first_input_window_render{ true };
+    CommonGizmosDataPool* m_c{ nullptr };
+
 public:
     GLGizmoBase(GLCanvas3D& parent,
                 const std::string& icon_filename,
@@ -163,7 +183,9 @@ public:
     bool update_items_state();
 
     void render() { on_render(); }
+#if !ENABLE_RAYCAST_PICKING
     void render_for_picking() { on_render_for_picking(); }
+#endif // !ENABLE_RAYCAST_PICKING
     void render_input_window(float x, float y, float bottom_limit);
 
     /// <summary>
@@ -184,6 +206,12 @@ public:
     /// <param name="mouse_event">Keep information about mouse click</param>
     /// <returns>Return True when use the information and don't want to propagate it otherwise False.</returns>
     virtual bool on_mouse(const wxMouseEvent &mouse_event) { return false; }
+
+#if ENABLE_RAYCAST_PICKING
+    void register_raycasters_for_picking()   { register_grabbers_for_picking(); on_register_raycasters_for_picking(); }
+    void unregister_raycasters_for_picking() { unregister_grabbers_for_picking(); on_unregister_raycasters_for_picking(); }
+#endif // ENABLE_RAYCAST_PICKING
+
 protected:
     virtual bool on_init() = 0;
     virtual void on_load(cereal::BinaryInputArchive& ar) {}
@@ -203,16 +231,27 @@ protected:
     virtual void on_dragging(const UpdateData& data) {}
 
     virtual void on_render() = 0;
+#if !ENABLE_RAYCAST_PICKING
     virtual void on_render_for_picking() = 0;
+#endif // !ENABLE_RAYCAST_PICKING
     virtual void on_render_input_window(float x, float y, float bottom_limit) {}
 
+#if ENABLE_RAYCAST_PICKING
+    void register_grabbers_for_picking();
+    void unregister_grabbers_for_picking();
+    virtual void on_register_raycasters_for_picking() {}
+    virtual void on_unregister_raycasters_for_picking() {}
+#else
     // Returns the picking color for the given id, based on the BASE_ID constant
     // No check is made for clashing with other picking color (i.e. GLVolumes)
     ColorRGBA picking_color_component(unsigned int id) const;
+#endif // ENABLE_RAYCAST_PICKING
 
     void render_grabbers(const BoundingBoxf3& box) const;
     void render_grabbers(float size) const;
+#if !ENABLE_RAYCAST_PICKING
     void render_grabbers_for_picking(const BoundingBoxf3& box) const;
+#endif // !ENABLE_RAYCAST_PICKING
 
     std::string format(float value, unsigned int decimals) const;
 
@@ -235,7 +274,7 @@ protected:
 private:
     // Flag for dirty visible state of Gizmo
     // When True then need new rendering
-    bool m_dirty;
+    bool m_dirty{ false };
 };
 
 } // namespace GUI

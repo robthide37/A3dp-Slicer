@@ -25,9 +25,6 @@ class GLGizmoMove3D : public GLGizmoBase
     Vec3d m_starting_box_center{ Vec3d::Zero() };
     Vec3d m_starting_box_bottom_center{ Vec3d::Zero() };
 
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    GLModel m_cone;
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     struct GrabberConnection
     {
@@ -65,7 +62,12 @@ protected:
     void on_stop_dragging() override;
     void on_dragging(const UpdateData& data) override;
     void on_render() override;
+#if ENABLE_RAYCAST_PICKING
+    virtual void on_register_raycasters_for_picking() override;
+    virtual void on_unregister_raycasters_for_picking() override;
+#else
     void on_render_for_picking() override;
+#endif // ENABLE_RAYCAST_PICKING
 
 private:
     double calc_projection(const UpdateData& data) const;
@@ -77,15 +79,7 @@ private:
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void calc_selection_box_and_center();
 #endif // ENABLE_WORLD_COORDINATE
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-#if ENABLE_WORLD_COORDINATE && ENABLE_LEGACY_OPENGL_REMOVAL
-    void render_grabber_extension(Axis axis, const Transform3d& base_matrix, const BoundingBoxf3& box, bool picking);
-#else
-    void render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking);
-#endif // ENABLE_WORLD_COORDINATE && ENABLE_LEGACY_OPENGL_REMOVAL
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 };
-
 
 
 } // namespace GUI
