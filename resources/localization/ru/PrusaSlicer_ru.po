@@ -8,8 +8,8 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-06-23 10:47+0200\n"
-"PO-Revision-Date: 2021-12-15 15:35+0700\n"
-"Last-Translator: Andylg andylg@yandex.ru\n"
+"PO-Revision-Date: 2022-06-30 00:16+0700\n"
+"Last-Translator: Andylg <andylg@yandex.ru>\n"
 "Language-Team: \n"
 "Language: ru\n"
 "MIME-Version: 1.0\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
 "%10<=4 && (n%100<12 || n%100>14) ? 1 : 2);\n"
-"X-Generator: Poedit 3.0\n"
+"X-Generator: Poedit 3.0.1\n"
 
 #: src/slic3r/GUI/AboutDialog.cpp:45 src/slic3r/GUI/AboutDialog.cpp:303
 msgid "Portions copyright"
@@ -92,7 +92,7 @@ msgstr ""
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:84
 #, boost-format
 msgid "PrusaSlicer has encountered a fatal error: \"%1%\""
-msgstr ""
+msgstr "PrusaSlicer столкнулся с фатальной ошибкой: \"%1%\""
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:85
 msgid ""
@@ -1881,7 +1881,7 @@ msgstr "Файл прошивки (*.hex):"
 
 #: src/slic3r/GUI/FirmwareDialog.cpp:813
 msgid "Select a file"
-msgstr ""
+msgstr "Выберите файл"
 
 #: src/slic3r/GUI/FirmwareDialog.cpp:815
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:297
@@ -3424,7 +3424,7 @@ msgstr "Не импортировать"
 
 #: src/slic3r/GUI/GUI_App.cpp:989
 msgid "Continue and import newer configuration?"
-msgstr ""
+msgstr "Продолжить и импортировать новую конфигурацию?"
 
 #: src/slic3r/GUI/GUI_App.cpp:1050
 msgid ""
@@ -3484,11 +3484,11 @@ msgstr "Подготовка вкладок настроек"
 
 #: src/slic3r/GUI/GUI_App.cpp:1335 src/slic3r/GUI/Preferences.cpp:287
 msgid "Restore window position on start"
-msgstr ""
+msgstr "Восстанавливать положение окна при запуске"
 
 #: src/slic3r/GUI/GUI_App.cpp:1337
 msgid "PrusaSlicer started after a crash"
-msgstr ""
+msgstr "PrusaSlicer запустился после аварийного завершения"
 
 #: src/slic3r/GUI/GUI_App.cpp:1338
 #, boost-format
@@ -3502,16 +3502,27 @@ msgid ""
 "To avoid this problem, consider disabling \"%4%\" in \"Preferences\". "
 "Otherwise, the application will most likely crash again next time."
 msgstr ""
+"В последний раз при попытке задать положение окна, PrusaSlicer аварийно "
+"завершил свою работу.\n"
+"К сожалению, это происходит при определенных настройках при работе с "
+"несколькими мониторами.\n"
+"Более точная причина сбоя: \"%1%\".\n"
+"Для получения дополнительной информации смотрите наш трекер проблем на "
+"GitHub: \"%2%\" и \"%3%\"\n"
+"\n"
+"Чтобы избежать этой проблемы, попробуйте отключить «%4%» в «Настройках». В "
+"противном случае приложение, скорее всего, снова аварийно завершил свою "
+"работу."
 
 #: src/slic3r/GUI/GUI_App.cpp:1350
 #, boost-format
 msgid "Disable \"%1%\""
-msgstr ""
+msgstr "Отключите \"%1%\""
 
 #: src/slic3r/GUI/GUI_App.cpp:1351
 #, boost-format
 msgid "Leave \"%1%\" enabled"
-msgstr ""
+msgstr "Оставьте \"%1%\" включённым"
 
 #: src/slic3r/GUI/GUI_App.cpp:1678
 msgid ""
@@ -3789,7 +3800,7 @@ msgstr "PrusaSlicer запомнит ваш выбор."
 
 #: src/slic3r/GUI/GUI_App.cpp:3107
 msgid "You will not be asked about it again on hyperlinks hovering."
-msgstr ""
+msgstr "Вас больше не спросят об этом при наведении курсора на гиперссылки."
 
 #: src/slic3r/GUI/GUI_App.cpp:3108 src/slic3r/GUI/Plater.cpp:1736
 #, boost-format
@@ -5107,7 +5118,7 @@ msgstr "Импорт завершён."
 
 #: src/slic3r/GUI/Jobs/SLAImportJob.cpp:187
 msgid "The file does not exist."
-msgstr ""
+msgstr "Файл не существует."
 
 #: src/slic3r/GUI/Jobs/SLAImportJob.cpp:221
 msgid ""
@@ -6772,7 +6783,7 @@ msgstr "Имя не задано. Невозможно сохранить."
 
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:634
 msgid "You have to enter a printer name."
-msgstr "Пожалуйста, введите имя вашего принтера."
+msgstr "Введите имя принтера."
 
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:642
 #, boost-format
@@ -7003,7 +7014,7 @@ msgstr "Вы хотите сохранить изменения в \"%1%\"?"
 
 #: src/slic3r/GUI/Plater.cpp:1730 src/slic3r/GUI/Preferences.cpp:222
 msgid "Ask for unsaved changes in project"
-msgstr ""
+msgstr "Спрашивать о несохранённых изменениях в проекте"
 
 #: src/slic3r/GUI/Plater.cpp:1733
 msgid ""
@@ -7011,6 +7022,9 @@ msgid ""
 "- Closing PrusaSlicer,\n"
 "- Loading or creating a new project"
 msgstr ""
+"В следующий раз не будут появляться запросы при: \n"
+"- Закрытии PrusaSlicer\n"
+"- Загрузке или создании нового проекта"
 
 #: src/slic3r/GUI/Plater.cpp:2198
 #, c-format, boost-format
@@ -7643,6 +7657,9 @@ msgid ""
 "- Closing PrusaSlicer,\n"
 "- Loading or creating a new project"
 msgstr ""
+"Всегда спрашивать о несохранённых изменениях в проекте, при:\n"
+"- Закрытии PrusaSlicer\n"
+"- Загрузки или создании нового проекта"
 
 #: src/slic3r/GUI/Preferences.cpp:233
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:897
@@ -7650,6 +7667,8 @@ msgid ""
 "Ask to save unsaved changes in presets when closing the application or when "
 "loading a new project"
 msgstr ""
+"Спрашивать о несохранённых изменениях в профилях при закрытии приложения или "
+"загрузке нового проекта"
 
 #: src/slic3r/GUI/Preferences.cpp:235
 msgid ""
@@ -7657,26 +7676,35 @@ msgid ""
 "- Closing PrusaSlicer while some presets are modified,\n"
 "- Loading a new project while some presets are modified"
 msgstr ""
+"Всегда спрашивать о несохранённых изменениях в профилях при: \n"
+"- Закрытии PrusaSlicer, при имеющихся изменениях в профилях\n"
+"- Загрузки нового проекта при существующих изменениях в профилях"
 
 #: src/slic3r/GUI/Preferences.cpp:242
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:896
 msgid "Ask for unsaved changes in presets when selecting new preset"
 msgstr ""
+"Спрашивать о несохранённых изменениях в профилях при выборе нового профиля"
 
 #: src/slic3r/GUI/Preferences.cpp:244
 msgid ""
 "Always ask for unsaved changes in presets when selecting new preset or "
 "resetting a preset"
 msgstr ""
+"Всегда спрашивать о несохранённых изменениях в профилях при выборе нового "
+"профиля или сбросе профиля."
 
 #: src/slic3r/GUI/Preferences.cpp:249
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:895
 msgid "Ask for unsaved changes in presets when creating new project"
 msgstr ""
+"Спрашивать о несохранённых изменениях в профилях при создании нового проекта"
 
 #: src/slic3r/GUI/Preferences.cpp:251
 msgid "Always ask for unsaved changes in presets when creating new project"
 msgstr ""
+"Всегда спрашивать о несохранённых изменениях в профилях при создании нового "
+"проекта."
 
 #: src/slic3r/GUI/Preferences.cpp:258
 msgid "Associate .gcode files to PrusaSlicer G-code Viewer"
@@ -7710,6 +7738,8 @@ msgstr "Показывать заставку при запуске програ
 #: src/slic3r/GUI/Preferences.cpp:289
 msgid "If enabled, PrusaSlicer will be open at the position it was closed"
 msgstr ""
+"Если включено, окно приложения будет открыто в том положении, в котором было "
+"закрыто."
 
 #: src/slic3r/GUI/Preferences.cpp:295
 msgid "Clear Undo / Redo stack on new project"
@@ -7801,6 +7831,8 @@ msgstr ""
 #: src/slic3r/GUI/Preferences.cpp:384
 msgid "If enabled, PrusaSlicer will not open hyperlinks in your browser."
 msgstr ""
+"Если включено, то работа гиперссылок описаний параметров во вкладках "
+"настроек будет отключена."
 
 #: src/slic3r/GUI/Preferences.cpp:391
 msgid "Use colors for axes values in Manipulation panel"
@@ -8750,7 +8782,7 @@ msgstr "Качество (замедляет нарезку)"
 
 #: src/slic3r/GUI/Tab.cpp:1497
 msgid "Fuzzy skin (experimental)"
-msgstr "Нечёткая оболочка (ЭКСПЕРИМЕНТАЛЬНО)"
+msgstr "Нечёткая оболочка (экспериментально)"
 
 #: src/slic3r/GUI/Tab.cpp:1520
 msgid "Reducing printing time"
@@ -8790,7 +8822,7 @@ msgstr "Автоматическое управление скоростью (д
 
 #: src/slic3r/GUI/Tab.cpp:1615
 msgid "Pressure equalizer (experimental)"
-msgstr ""
+msgstr "Выравнивание давления (экспериментально)"
 
 #: src/slic3r/GUI/Tab.cpp:1619
 msgid "Multiple Extruders"
@@ -8818,7 +8850,7 @@ msgstr "Прочее"
 
 #: src/slic3r/GUI/Tab.cpp:1674
 msgid "Arachne perimeter generator"
-msgstr ""
+msgstr "Генератор периметра на движке Arachne"
 
 #: src/slic3r/GUI/Tab.cpp:1684 src/slic3r/GUI/Tab.cpp:4733
 msgid "Output options"
@@ -9267,15 +9299,15 @@ msgstr "Найти"
 
 #: src/slic3r/GUI/Tab.cpp:3955
 msgid "Replace with"
-msgstr ""
+msgstr "Заменить на"
 
 #: src/slic3r/GUI/Tab.cpp:4044
 msgid "Regular expression"
-msgstr ""
+msgstr "Регулярное выражение"
 
 #: src/slic3r/GUI/Tab.cpp:4048
 msgid "Case insensitive"
-msgstr ""
+msgstr "Не учитывать регистр"
 
 #: src/slic3r/GUI/Tab.cpp:4052
 msgid "Whole word"
@@ -9283,11 +9315,11 @@ msgstr "Слово целиком"
 
 #: src/slic3r/GUI/Tab.cpp:4056
 msgid "Match single line"
-msgstr ""
+msgstr "Совпадение в одной строке"
 
 #: src/slic3r/GUI/Tab.cpp:4159
 msgid "Are you sure you want to delete all substitutions?"
-msgstr ""
+msgstr "Вы действительно хотите удалить все замены?"
 
 #: src/slic3r/GUI/Tab.cpp:4291
 msgid ""
@@ -9550,12 +9582,16 @@ msgid ""
 "You will not be asked about the unsaved changes in presets the next time you "
 "create new project"
 msgstr ""
+"В следующий раз не будут появляться запросы о несохранённых изменениях в "
+"профилях при создании нового профиля"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:899
 msgid ""
 "You will not be asked about the unsaved changes in presets the next time you "
 "switch a preset"
 msgstr ""
+"В следующий раз не будут появляться запросы о несохранённых изменениях в "
+"профилях при переключении профиля"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:900
 msgid ""
@@ -9564,6 +9600,10 @@ msgid ""
 "- Closing PrusaSlicer while some presets are modified,\n"
 "- Loading a new project while some presets are modified"
 msgstr ""
+"В следующий раз не будут появляться запросы о несохранённых изменениях в "
+"профилях при: \n"
+"- Закрытие PrusaSlicer, при имеющихся изменениях в профилях\n"
+"- Загрузки нового проекта, если имеются изменения в профилях"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:903
 msgid "PrusaSlicer will remember your action."
@@ -10273,24 +10313,25 @@ msgstr ""
 
 #: src/slic3r/Config/Snapshot.cpp:584
 msgid "Taking a configuration snapshot failed."
-msgstr ""
+msgstr "Не удалось сделать резервную копию конфигурации."
 
 #: src/slic3r/Config/Snapshot.cpp:598
 msgid ""
 "PrusaSlicer has encountered an error while taking a configuration snapshot."
 msgstr ""
+"PrusaSlicer столкнулся с ошибкой при создании резервной копии конфигурации."
 
 #: src/slic3r/Config/Snapshot.cpp:599
 msgid "PrusaSlicer error"
-msgstr ""
+msgstr "Ошибка PrusaSlicer"
 
 #: src/slic3r/Config/Snapshot.cpp:601
 msgid "Continue"
-msgstr ""
+msgstr "Продолжить"
 
 #: src/slic3r/Config/Snapshot.cpp:601
 msgid "Abort"
-msgstr ""
+msgstr "Прервать"
 
 #: src/libslic3r/GCode.cpp:539
 msgid "There is an object with no extrusions in the first layer."
@@ -10341,7 +10382,7 @@ msgstr ""
 
 #: src/libslic3r/GCode.cpp:1200 src/libslic3r/GCode.cpp:1211
 msgid "No extrusions were generated for objects."
-msgstr ""
+msgstr "Экструзия для моделей не была сгенерирована."
 
 #: src/libslic3r/GCode.cpp:1406
 msgid ""
@@ -10736,18 +10777,25 @@ msgid ""
 "each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to "
 "layer_gcode."
 msgstr ""
+"При относительной адресации экструдера его положение необходимо "
+"корректировать на каждом слое, чтобы предотвратить потерю точности с "
+"плавающей запятой. Добавьте \"G92 E0\" в layer_gcode."
 
 #: src/libslic3r/Print.cpp:679
 msgid ""
 "\"G92 E0\" was found in before_layer_gcode, which is incompatible with "
 "absolute extruder addressing."
 msgstr ""
+"В before_layer_gcode была найдена команда \"G92 E0\", которая несовместима с "
+"абсолютной адресацией экструдера."
 
 #: src/libslic3r/Print.cpp:681
 msgid ""
 "\"G92 E0\" was found in layer_gcode, which is incompatible with absolute "
 "extruder addressing."
 msgstr ""
+"В layer_gcode была найдена команда \"G92 E0\", которая несовместима с "
+"абсолютной адресацией экструдера."
 
 #: src/libslic3r/Print.cpp:823
 msgid "Infilling layers"
@@ -10941,13 +10989,15 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:275
 msgid "Format of G-code thumbnails"
-msgstr ""
+msgstr "Формат эскизов G-кода"
 
 #: src/libslic3r/PrintConfig.cpp:276
 msgid ""
 "Format of G-code thumbnails: PNG for best quality, JPG for smallest size, "
 "QOI for low memory firmware"
 msgstr ""
+"Формат эскизов G-кода: PNG для наилучшего качества, JPG для наименьшего "
+"размера, QOI для прошивки с малым объемом памяти."
 
 #: src/libslic3r/PrintConfig.cpp:287
 msgid ""
@@ -12179,7 +12229,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:1247
 msgid "Speed of object first layer over raft interface"
-msgstr "Скорость печати первого слоя модели по подложке"
+msgstr "Скорость печати первого слоя модели на подложке"
 
 #: src/libslic3r/PrintConfig.cpp:1248
 msgid ""
@@ -12339,11 +12389,11 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:1379
 msgid "G-code substitutions"
-msgstr ""
+msgstr "Замена G-кода"
 
 #: src/libslic3r/PrintConfig.cpp:1380
 msgid "Find / replace patterns in G-code lines and substitute them."
-msgstr ""
+msgstr "Поиск и замена кода в строках G-кода."
 
 #: src/libslic3r/PrintConfig.cpp:1385
 msgid "High extruder current on filament swap"
@@ -12885,6 +12935,11 @@ msgid ""
 "extrusion width, 0.2 mm extrusion height, feedrate 20 mm/s) to 5.4 mm³/s "
 "(feedrate 60 mm/s) will take at least 2 seconds."
 msgstr ""
+"Этот экспериментальный параметр используется для ограничения скорости "
+"изменения экструзии при переходе от более низкой скорости к более высокой. "
+"Значение 1.8 мм³/с² гарантирует, что изменение скорости экструзии с 1.8 мм³/"
+"с (ширина экструзии 0.45 мм, высота экструзии 0.2 мм, скорость подачи 20 мм/"
+"с) до 5.4 мм³/с (скорость подачи 60 мм/с) займёт не менее 2-х секунд."
 
 #: src/libslic3r/PrintConfig.cpp:1812 src/libslic3r/PrintConfig.cpp:1824
 msgid "mm³/s²"
@@ -12902,6 +12957,11 @@ msgid ""
 "extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) to 1.8 mm³/s "
 "(feedrate 20 mm/s) will take at least 2 seconds."
 msgstr ""
+"Этот экспериментальный параметр используется для ограничения скорости "
+"изменения экструзии при переходе от более высокой скорости к более низкой. "
+"Значение 5.4 мм³/с² гарантирует, что изменение скорости экструзии с 1.8 мм³/"
+"с (ширина экструзии 0.45 мм, высота экструзии 0.2 мм, скорость подачи 60 мм/"
+"с) до 1.8 мм³/с (скорость подачи 20 мм/с) займёт не менее 2-х секунд."
 
 #: src/libslic3r/PrintConfig.cpp:1830 src/libslic3r/PrintConfig.cpp:1839
 msgid "Min"
@@ -13751,7 +13811,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:2489
 msgid "No sparse layers (EXPERIMENTAL)"
-msgstr "Отсутствие разреженных слоёв (ЭКСПЕРИМЕНТАЛЬНО)"
+msgstr "Отсутствие разреженных слоёв (экспериментально)"
 
 #: src/libslic3r/PrintConfig.cpp:2490
 msgid ""
@@ -14294,7 +14354,7 @@ msgid ""
 "handle the retraction. This is only supported in recent Marlin."
 msgstr ""
 "Эта экспериментальная опция использует команды G10 и G11, чтобы прошивка "
-"обрабатывала ретракт. Поддерживается только в последних версиях Marlin. "
+"обрабатывала ретракт. Поддерживается только в последних версиях Marlin."
 
 #: src/libslic3r/PrintConfig.cpp:2930
 msgid "Use relative E distances"
@@ -14490,7 +14550,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:3065
 msgid "Perimeter generator"
-msgstr ""
+msgstr "Генератор периметров"
 
 #: src/libslic3r/PrintConfig.cpp:3067
 msgid ""
@@ -14498,18 +14558,22 @@ msgid ""
 "width and for very thin areas is used gap-fill. Arachne engine produces "
 "perimeters with variable extrusion width."
 msgstr ""
+"Движок классического генератора периметров создает их с постоянной шириной "
+"экструзии, а для очень тонких участков используется параметр «Заполнение "
+"пробелов». Движок Arachne же создает периметры с переменной шириной "
+"экструзии."
 
 #: src/libslic3r/PrintConfig.cpp:3073
 msgid "Classic"
-msgstr ""
+msgstr "Классический движок"
 
 #: src/libslic3r/PrintConfig.cpp:3074
 msgid "Arachne"
-msgstr ""
+msgstr "Движок Arachne"
 
 #: src/libslic3r/PrintConfig.cpp:3079
 msgid "Perimeter transition length"
-msgstr ""
+msgstr "Длина перехода к периметру"
 
 #: src/libslic3r/PrintConfig.cpp:3081
 msgid ""
@@ -14517,10 +14581,13 @@ msgid ""
 "becomes thinner, a certain amount of space is allotted to split or join the "
 "perimeter segments."
 msgstr ""
+"При переходе между разным количеством периметров по мере того, как деталь "
+"становится тоньше, выделяется определенное пространство для разделения или "
+"соединения линий периметров."
 
 #: src/libslic3r/PrintConfig.cpp:3089
 msgid "Perimeter transitioning filter margin"
-msgstr ""
+msgstr "Поле фильтра при переходе между периметрами"
 
 #: src/libslic3r/PrintConfig.cpp:3091
 msgid ""
@@ -14533,10 +14600,19 @@ msgid ""
 "as a percentage (for example 25%), it will be computed based on the nozzle "
 "diameter."
 msgstr ""
+"Предотвращает переход туда и обратно между одним лишним периметром и одним "
+"недостающим. Это поле расширяет диапазон значений ширины экструзии, который "
+"определяется как [Минимальная ширина периметра - Поле, 2 * Минимальная "
+"ширина периметра + Поле]. Расширение этого поля позволяет сократить "
+"количество переходов, что в свою очередь позволяет сократить количество "
+"запусков/остановок экструдирования и время перемещения. Однако большой "
+"разброс значений ширины экструзии может привести к проблемам недо/"
+"переэкструзии материала. Если задано в процентах, то расчёт производится "
+"относительно диаметра сопла."
 
 #: src/libslic3r/PrintConfig.cpp:3104
 msgid "Perimeter transitioning threshold angle"
-msgstr ""
+msgstr "Пороговый угол перехода между периметрами"
 
 #: src/libslic3r/PrintConfig.cpp:3106
 msgid ""
@@ -14546,10 +14622,16 @@ msgid ""
 "remaining space. Reducing this setting reduces the number and length of "
 "these center perimeters, but may leave gaps or overextrude."
 msgstr ""
+"Когда требуется создавать переходы между чётным и нечётным количеством "
+"периметров. Клиновидная форма с углом, превышающим этот параметр, не будет "
+"иметь переходов, и периметры не будут напечатаны в центре для заполнения "
+"оставшегося пространства. Уменьшение значения этого параметра позволяет "
+"сократить количество и длину этих центральных периметров, но при этом могут "
+"остаться зазоры или произойти чрезмерное экструдирование."
 
 #: src/libslic3r/PrintConfig.cpp:3117
 msgid "Perimeter distribution count"
-msgstr ""
+msgstr "Счетчик распределений по периметрам"
 
 #: src/libslic3r/PrintConfig.cpp:3119
 msgid ""
@@ -14557,10 +14639,13 @@ msgid ""
 "needs to be spread. Lower values mean that the outer perimeters don't change "
 "in width."
 msgstr ""
+"Количество периметров, отсчитываемое от центра, на которые необходимо "
+"распространить изменения. Более низкое значение означает, что ширина внешних "
+"периметров не изменяется."
 
 #: src/libslic3r/PrintConfig.cpp:3126
 msgid "Split middle perimeter threshold"
-msgstr ""
+msgstr "Порог разделения среднего периметра"
 
 #: src/libslic3r/PrintConfig.cpp:3128
 msgid ""
@@ -14572,10 +14657,17 @@ msgid ""
 "between two outer edges of the shape, even if there actually is infill or "
 "other extrusion types in the print instead of the perimeter."
 msgstr ""
+"Минимальное значение ширины экструзии в процентах от нормальной, при "
+"превышении которой средний периметр (если он есть) будет разделён на два. "
+"Уменьшение этого параметра, сделает периметры более тонкими, увеличение - "
+"более широкими. Примечание: это применимо, когда вся фигура заполняется "
+"периметром, поэтому серединой в данном случае является середина объекта "
+"между двумя внешними краями фигуры, даже если на самом деле в печати вместо "
+"периметра присутствует заполнение или другие виды экструзии."
 
 #: src/libslic3r/PrintConfig.cpp:3141
 msgid "Add middle perimeter threshold"
-msgstr ""
+msgstr "Добавление порога среднего периметра"
 
 #: src/libslic3r/PrintConfig.cpp:3143
 msgid ""
@@ -14587,10 +14679,17 @@ msgid ""
 "between two outer edges of the shape, even if there actually is infill or "
 "other extrusion types in the print instead of the perimeter."
 msgstr ""
+"Минимальное значение ширины экструзии в процентах от нормальной, при "
+"превышении которой будет добавлен средний периметр (если его еще не было). "
+"Уменьшение этого параметра, сделает периметры более тонкими, увеличение - "
+"более широкими. Примечание: это применимо, когда вся фигура заполняется "
+"периметром, поэтому серединой в данном случае является середина объекта "
+"между двумя внешними краями фигуры, даже если на самом деле в печати вместо "
+"периметра присутствует заполнение или другие виды экструзии."
 
 #: src/libslic3r/PrintConfig.cpp:3156
 msgid "Minimum feature size"
-msgstr ""
+msgstr "Минимальный размер элемента"
 
 #: src/libslic3r/PrintConfig.cpp:3158
 msgid ""
@@ -14598,10 +14697,14 @@ msgid ""
 "this value will not be printed, while features thicker than the Minimum "
 "feature size will be widened to the Minimum perimeter width."
 msgstr ""
+"Минимальная толщина тонких элементов. Элементы модели, которые тоньше этого "
+"значения, не будут напечатаны, в то время как элементы, толщина которых "
+"превышает Минимальный размер элемента, будут расширены до минимальной ширины "
+"периметра."
 
 #: src/libslic3r/PrintConfig.cpp:3167
 msgid "Minimum perimeter width"
-msgstr ""
+msgstr "Минимальная ширина периметра"
 
 #: src/libslic3r/PrintConfig.cpp:3169
 msgid ""
@@ -14611,6 +14714,11 @@ msgid ""
 "thick as the feature itself. If expressed as a percentage (for example 85%), "
 "it will be computed based on the nozzle diameter."
 msgstr ""
+"Ширина периметра, которая заменит тонкие элементы (в соответствии с "
+"минимальным размера элемента) модели. Если минимальная ширина периметра "
+"меньше толщины элемента, толщина периметра будет приведена к толщине самого "
+"элемента. Если задано в процентах, то расчёт производится относительно "
+"диаметра сопла."
 
 #: src/libslic3r/PrintConfig.cpp:3237
 msgid "Display width"
@@ -14712,15 +14820,15 @@ msgstr "Время медленного наклона."
 
 #: src/libslic3r/PrintConfig.cpp:3307 src/libslic3r/PrintConfig.cpp:3925
 msgid "High viscosity"
-msgstr ""
+msgstr "Высокая вязкость"
 
 #: src/libslic3r/PrintConfig.cpp:3308
 msgid "Tilt for high viscosity resin"
-msgstr ""
+msgstr "Наклон ванночки для смолы с высокой вязкостью"
 
 #: src/libslic3r/PrintConfig.cpp:3309
 msgid "Time of the super slow tilt"
-msgstr ""
+msgstr "Время очень медленного наклона ванночки."
 
 #: src/libslic3r/PrintConfig.cpp:3316
 msgid "Area fill"
@@ -15821,9 +15929,9 @@ msgid ""
 msgstr ""
 "Заполнение площади, меньше указанной\n"
 "Знаете ли вы, что части модели с небольшим поперечным сечением можно "
-"автоматически заполнять сплошным заполнением? Установите необходимое "
-"значение в<a>Заполнение площади меньше указанной</a>. (только в режиме "
-"продвинутый)."
+"автоматически заполнять сплошным заполнением? \n"
+"Установите необходимое значение в<a>Заполнение площади меньше указанной</"
+"a>(только в режиме продвинутый)."
 
 #: resources/data/hints.ini: [hint:Search functionality]
 msgid ""
@@ -15892,7 +16000,7 @@ msgid ""
 "around the Z-axis clockwise or counter-clockwise by pressing <b>Page Up</b> "
 "or <b>Page Down</b> respectively?"
 msgstr ""
-"Быстрый поворот на 45 градусов\\n\n"
+"Быстрый поворот на 45 градусов\n"
 "Знали ли вы, что что можно быстро повернуть выбранные модели на 45 градусов "
 "вокруг оси Z по часовой стрелке или против часовой стрелки, нажав <b>Page "
 "Up</b> или <b>Page Down</b> соответственно?"
@@ -15988,6 +16096,11 @@ msgid ""
 "user profiles? You can view and move back and forth between snapshots using "
 "the Configuration - <a>Configuration snapshots menu</a>."
 msgstr ""
+"Резервные копии конфигурации (снапшот)\n"
+"Знаете ли вы, что возможен откат всех системных и пользовательских профилей "
+"из полной резервной копии? Вы можете просматривать и перемещаться между "
+"снимками состояния с помощью меню <a>Настройки - Резервные копии "
+"конфигурации (снапшот)</a>."
 
 #: resources/data/hints.ini: [hint:Minimum shell thickness]
 msgid ""
