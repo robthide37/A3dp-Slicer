@@ -85,6 +85,7 @@ private:
         Vec3d scale;
         Vec3d scale_rounded;
         Vec3d size;
+        Vec3d size_inches;
         Vec3d size_rounded;
 
         wxString move_label_string;

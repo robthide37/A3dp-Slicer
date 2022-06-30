@@ -590,7 +590,10 @@ void ObjectManipulation::update_ui_from_settings()
 
         for (int i = 0; i < 3; ++i) {
             auto update = [this, i](/*ManipulationEditorKey*/int key_id, const Vec3d& new_value) {
-                wxString new_text = double_to_string(m_imperial_units ? new_value(i) * mm_to_in : new_value(i), 2);
+                double value = new_value(i);
+                if (m_imperial_units)
+                    value *= mm_to_in;
+                wxString new_text = double_to_string(value, m_imperial_units && key_id == 3/*meSize*/ ? 4 : 2);
                 const int id = key_id * 3 + i;
                 if (id >= 0) m_editors[id]->set_value(new_text);
             };
@@ -776,14 +779,22 @@ void ObjectManipulation::update_if_dirty()
 
     for (int i = 0; i < 3; ++ i) {
         auto update = [this, i](Vec3d &cached, Vec3d &cached_rounded, ManipulationEditorKey key_id, const Vec3d &new_value) {
-			wxString new_text = double_to_string(new_value(i), 2);
+			wxString new_text = double_to_string(new_value(i), m_imperial_units && key_id == meSize ? 4 : 2);
 			double new_rounded;
 			new_text.ToDouble(&new_rounded);
 			if (std::abs(cached_rounded(i) - new_rounded) > EPSILON) {
 				cached_rounded(i) = new_rounded;
                 const int id = key_id*3+i;
-                if (m_imperial_units && (key_id == mePosition || key_id == meSize))
-                    new_text = double_to_string(new_value(i)*mm_to_in, 2);
+                if (m_imperial_units) {
+                    double inch_value = new_value(i) * mm_to_in;
+                    if (key_id == mePosition)
+                        new_text = double_to_string(inch_value, 2);
+                    if (key_id == meSize) {
+                        if(std::abs(m_cache.size_inches(i) - inch_value) > EPSILON)
+                            m_cache.size_inches(i) = inch_value;
+                        new_text = double_to_string(inch_value, 4);
+                    }
+                }
                 if (id >= 0) m_editors[id]->set_value(new_text);
             }
 			cached(i) = new_value(i);
@@ -1137,6 +1148,13 @@ void ObjectManipulation::change_size_value(int axis, double value)
     if (value <= 0.0)
         return;
 
+    if (m_imperial_units) {
+        if (std::abs(m_cache.size_inches(axis) - value) < EPSILON)
+            return;
+        m_cache.size_inches(axis) = value;
+        value *= in_to_mm;
+    }
+
     if (std::abs(m_cache.size_rounded(axis) - value) < EPSILON)
         return;
 
@@ -1237,11 +1255,11 @@ void ObjectManipulation::on_change(const std::string& opt_key, int axis, double 
     if (!m_cache.is_valid())
         return;
 
-    if (m_imperial_units && (opt_key == "position" || opt_key == "size"))
-        new_value *= in_to_mm;
-
-    if (opt_key == "position")
+    if (opt_key == "position") {
+        if (m_imperial_units)
+            new_value *= in_to_mm;
         change_position_value(axis, new_value);
+    }
     else if (opt_key == "rotation")
         change_rotation_value(axis, new_value);
     else if (opt_key == "scale") {
