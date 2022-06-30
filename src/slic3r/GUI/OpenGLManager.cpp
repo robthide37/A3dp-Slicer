@@ -274,7 +274,11 @@ OpenGLManager::~OpenGLManager()
 }
 
 #if ENABLE_OPENGL_DEBUG_OPTION
+#ifdef _WIN32
 static void APIENTRY CustomGLDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity, GLsizei length, const char* message, const void* userParam)
+#else
+static void CustomGLDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity, GLsizei length, const char* message, const void* userParam)
+#endif // _WIN32
 {
     if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
         return;
