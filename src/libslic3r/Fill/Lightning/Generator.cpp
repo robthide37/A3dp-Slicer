@@ -24,7 +24,7 @@
 
 namespace Slic3r::FillLightning {
 
-Generator::Generator(const PrintObject &print_object, const std::function<void()> &throw_on_cancel_callback)
+Generator::Generator(const PrintObject &print_object, const coordf_t fill_density, const std::function<void()> &throw_on_cancel_callback)
 {
     const PrintConfig         &print_config         = print_object.print()->config();
     const PrintObjectConfig   &object_config        = print_object.config();
@@ -39,7 +39,7 @@ Generator::Generator(const PrintObject &print_object, const std::function<void()
     m_infill_extrusion_width = scaled<float>(region_config.infill_extrusion_width.percent ? default_infill_extrusion_width * 0.01 * region_config.infill_extrusion_width :
                                              region_config.infill_extrusion_width != 0.   ? region_config.infill_extrusion_width :
                                                                                             default_infill_extrusion_width);
-    m_supporting_radius      = coord_t(m_infill_extrusion_width) * 100 / coord_t(region_config.fill_density.value);
+    m_supporting_radius      = coord_t(m_infill_extrusion_width * 100. / fill_density);
 
     const double lightning_infill_overhang_angle      = M_PI / 4; // 45 degrees
     const double lightning_infill_prune_angle         = M_PI / 4; // 45 degrees
