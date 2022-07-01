@@ -6770,6 +6770,19 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
     if (m_canvas == nullptr)
         return Vec3d(DBL_MAX, DBL_MAX, DBL_MAX);
 
+#if ENABLE_RAYCAST_PICKING
+    if (z == nullptr) {
+        const SceneRaycaster::HitResult hit = m_scene_raycaster.hit(mouse_pos.cast<double>(), wxGetApp().plater()->get_camera(), nullptr);
+        return hit.is_valid() ? hit.position.cast<double>() : _mouse_to_bed_3d(mouse_pos);
+    }
+    else {
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Vec4i viewport(camera.get_viewport().data());
+        Vec3d out;
+        igl::unproject(Vec3d(mouse_pos.x(), viewport[3] - mouse_pos.y(), *z), camera.get_view_matrix().matrix(), camera.get_projection_matrix().matrix(), viewport, out);
+        return out;
+    }
+#else
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Matrix4d modelview  = camera.get_view_matrix().matrix();
     const Matrix4d projection = camera.get_projection_matrix().matrix();
@@ -6785,6 +6798,7 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
     Vec3d out;
     igl::unproject(Vec3d(mouse_pos.x(), y, mouse_z), modelview, projection, viewport, out);
     return out;
+#endif // ENABLE_RAYCAST_PICKING
 }
 
 Vec3d GLCanvas3D::_mouse_to_bed_3d(const Point& mouse_pos)
