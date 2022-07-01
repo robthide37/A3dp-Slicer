@@ -562,8 +562,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
         std::remove_if(layer_lines.begin(), layer_lines.end(), [](const ExtrusionLine &line) {
             return !line.external_perimeter;
         });
-        layer_lines = std::vector<ExtrusionLine>();
-        LinesDistancer external_lines(layer_lines);
+        external_lines = LinesDistancer(layer_lines);
         layer_lines.clear();
         prev_layer_grid = layer_grid;
     }
@@ -605,8 +604,8 @@ full_search(const PrintObject *po, const Params &params) {
     debug_export(issues, "issues");
 #endif
     return issues;
-
 }
+
 } //SupportableIssues End
 }
 
