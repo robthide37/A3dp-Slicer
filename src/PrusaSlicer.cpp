@@ -192,6 +192,10 @@ int CLI::run(int argc, char **argv)
         m_actions.erase(it);
     }
 
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    std::cout << "CLI::run(): required OpenGL version: " << opengl_version.first << "." << opengl_version.second << "\n";
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
 #if ENABLE_OPENGL_DEBUG_OPTION
     it = std::find(m_actions.begin(), m_actions.end(), "opengl-debug");
     if (it != m_actions.end()) {
