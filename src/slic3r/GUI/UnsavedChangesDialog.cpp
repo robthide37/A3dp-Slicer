@@ -1300,6 +1300,9 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
                 get_string_value(opt_key, old_config), get_string_value(opt_key, new_config), category_icon_map.at(option.category));
         }
     }
+
+    // Revert sort of searcher back
+    searcher.sort_options_by_label();
 }
 
 void UnsavedChangesDialog::on_dpi_changed(const wxRect& suggested_rect)
@@ -1709,6 +1712,9 @@ void DiffPresetDialog::update_tree()
         Fit();
         Refresh();
     }
+
+    // Revert sort of searcher back
+    searcher.sort_options_by_label();
 }
 
 void DiffPresetDialog::on_dpi_changed(const wxRect&)
