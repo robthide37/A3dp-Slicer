@@ -1613,8 +1613,8 @@ void TabPrint::build()
         optgroup->append_single_option_line("max_volumetric_speed", "max-volumetric-speed_127176");
 
         optgroup = page->new_optgroup(L("Pressure equalizer (experimental)"));
-        optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope_positive");
-        optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope_negative");
+        optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope_positive", "pressure-equlizer_331504");
+        optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope_negative", "pressure-equlizer_331504");
 
     page = add_options_page(L("Multiple Extruders"), "funnel");
         optgroup = page->new_optgroup(L("Extruders"));
