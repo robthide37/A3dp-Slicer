@@ -28,20 +28,25 @@ class ExtrusionLine
 {
 public:
     ExtrusionLine() :
-            a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0f), external_perimeter(false) {
+            a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0f), origin_entity(nullptr) {
     }
-    ExtrusionLine(const Vec2f &_a, const Vec2f &_b, bool external_perimeter) :
-            a(_a), b(_b), len((_a - _b).norm()), external_perimeter(external_perimeter) {
+    ExtrusionLine(const Vec2f &_a, const Vec2f &_b, const ExtrusionEntity* origin_entity) :
+            a(_a), b(_b), len((_a - _b).norm()), origin_entity(origin_entity) {
     }
 
     float length() {
         return (a - b).norm();
     }
 
+    bool is_external_perimeter() const {
+        assert(origin_entity != nullptr);
+        return origin_entity->role() == erExternalPerimeter;
+    }
+
     Vec2f a;
     Vec2f b;
     float len;
-    bool external_perimeter;
+    const ExtrusionEntity* origin_entity;
 
     bool support_point_generated = false;
     float malformation = 0.0f;
@@ -262,8 +267,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         entity->collect_points(points);
         std::vector<ExtrusionLine> lines;
         lines.reserve(points.size() * 1.5);
-        bool is_ex_perimeter = entity->role() == erExternalPerimeter;
-        lines.emplace_back(unscaled(points[0]).cast<float>(), unscaled(points[0]).cast<float>(), is_ex_perimeter);
+        lines.emplace_back(unscaled(points[0]).cast<float>(), unscaled(points[0]).cast<float>(), entity);
         for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
             Vec2f start = unscaled(points[point_idx]).cast<float>();
             Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
@@ -275,7 +279,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             for (int i = 0; i < lines_count; ++i) {
                 Vec2f a(start + v * (i * step_size));
                 Vec2f b(start + v * ((i + 1) * step_size));
-                lines.emplace_back(a, b, is_ex_perimeter);
+                lines.emplace_back(a, b, entity);
             }
         }
 
@@ -342,26 +346,28 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
     BOOST_LOG_TRIVIAL(debug) << "SSG: reckon islands on printz: " << layer->print_z;
 
     std::vector<std::pair<size_t, size_t>> extrusions; //start and end idx (one beyond last extrusion) [start,end)
-    Vec2f current_pt = layer_lines[0].a;
-    std::pair<size_t, size_t> current_ext(0, 1);
-    for (size_t lidx = 0; lidx < layer_lines.size(); ++lidx) {
+    const ExtrusionEntity* current_ex = nullptr;
+    for (size_t lidx = 1; lidx < layer_lines.size(); ++lidx) {
         const ExtrusionLine &line = layer_lines[lidx];
-        if (line.a == current_pt) {
-            current_ext.second = lidx + 1;
+        if (line.origin_entity == current_ex) {
+            extrusions.back().second = lidx + 1;
         } else {
-            extrusions.push_back(current_ext);
-            current_ext.first = lidx;
-            current_ext.second = lidx + 1;
+            extrusions.emplace_back(lidx, lidx + 1);
+            current_ex = line.origin_entity;
         }
-        current_pt = line.b;
     }
 
     BOOST_LOG_TRIVIAL(debug) << "SSG: layer_lines size: " << layer_lines.size();
+    BOOST_LOG_TRIVIAL(debug) << "SSG: extrusions count: " << extrusions.size();
+    BOOST_LOG_TRIVIAL(debug) << "SSG: extrusions sizes: ";
+    for (const auto& ext: extrusions) {
+        BOOST_LOG_TRIVIAL(debug) << "SSG: " << ext.second - ext.first;
+    }
 
     std::vector<LinesDistancer> islands;
     std::vector<std::vector<size_t>> island_extrusions;
     for (size_t e = 0; e < extrusions.size(); ++e) {
-        if (layer_lines[extrusions[e].first].external_perimeter) {
+        if (layer_lines[extrusions[e].first].is_external_perimeter()) {
             std::vector<ExtrusionLine> copy(extrusions[e].second - extrusions[e].first);
             for (size_t ex_line_idx = extrusions[e].first; ex_line_idx < extrusions[e].second; ++ex_line_idx) {
                 copy[ex_line_idx - extrusions[e].first] = layer_lines[ex_line_idx];
@@ -375,7 +381,7 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
 
     for (size_t i = 0; i < islands.size(); ++i) {
         for (size_t e = 0; e < extrusions.size(); ++e) {
-            if (!layer_lines[extrusions[e].first].external_perimeter) {
+            if (!layer_lines[extrusions[e].first].is_external_perimeter()) {
                 size_t _idx;
                 Vec2f _pt;
                 if (islands[i].signed_distance_from_lines(layer_lines[extrusions[e].first].a, _idx, _pt) < 0) {
@@ -428,7 +434,7 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                     island.sticking_force += sticking_force;
                     island.sticking_centroid += sticking_force
                             * to_3d(Vec2f((line.a + line.b) / 2.0f), float(layer->print_z));
-                    if (line.external_perimeter) {
+                    if (line.is_external_perimeter()) {
                         island.pivot_points.push_back(to_3d(Vec2f(line.b), float(layer->print_z)));
                     }
                 } else if (layer_lines[lidx].support_point_generated) {
@@ -496,13 +502,13 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
                     Vec2f start = unscaled(points[point_idx]).cast<float>();
                     Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
-                    ExtrusionLine line { start, next, perimeter->role() == erExternalPerimeter };
+                    ExtrusionLine line { start, next, perimeter };
                     layer_lines.push_back(line);
                 }
                 if (perimeter->is_loop()) {
                     Vec2f start = unscaled(points[points.size() - 1]).cast<float>();
                     Vec2f next = unscaled(points[0]).cast<float>();
-                    ExtrusionLine line { start, next, perimeter->role() == erExternalPerimeter };
+                    ExtrusionLine line { start, next, perimeter };
                     layer_lines.push_back(line);
                 }
             } // perimeter
@@ -514,7 +520,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                 for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
                     Vec2f start = unscaled(points[point_idx]).cast<float>();
                     Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
-                    ExtrusionLine line { start, next, false };
+                    ExtrusionLine line { start, next, fill };
                     layer_lines.push_back(line);
                 }
             } // fill
@@ -523,7 +529,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
 
     auto [layer_islands, layer_grid] = reckon_islands(layer, true, 0, prev_layer_grid, layer_lines, params);
     std::remove_if(layer_lines.begin(), layer_lines.end(), [](const ExtrusionLine &line) {
-        return !line.external_perimeter;
+        return !line.is_external_perimeter();
     });
     LinesDistancer external_lines(layer_lines);
     layer_lines.clear();
@@ -550,7 +556,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
                         for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
                             Vec2f start = unscaled(points[point_idx]).cast<float>();
                             Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
-                            ExtrusionLine line { start, next, false };
+                            ExtrusionLine line { start, next, fill };
                             layer_lines.push_back(line);
                         }
                     }
@@ -560,7 +566,7 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
 
         auto [layer_islands, layer_grid] = reckon_islands(layer, true, 0, prev_layer_grid, layer_lines, params);
         std::remove_if(layer_lines.begin(), layer_lines.end(), [](const ExtrusionLine &line) {
-            return !line.external_perimeter;
+            return !line.is_external_perimeter();
         });
         external_lines = LinesDistancer(layer_lines);
         layer_lines.clear();
