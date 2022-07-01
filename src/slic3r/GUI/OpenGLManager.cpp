@@ -467,12 +467,30 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
 
 #if ENABLE_OPENGL_DEBUG_OPTION
         if (m_context == nullptr) {
-            wxGLContextAttrs attrs;
-            if (m_debug_enabled)
-                attrs.DebugCtx();
-            attrs.EndList();
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
             // if no valid context was created use the default one
-            m_context = new wxGLContext(&canvas, nullptr, &attrs);
+            if (m_debug_enabled) {
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                std::cout << "OpenGLManager::init_glcontext(): create debug compatibility profile (" << required_opengl_version.first << "." << required_opengl_version.second << ")\n";
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                wxGLContextAttrs attrs;
+                attrs.DebugCtx().EndList();
+                m_context = new wxGLContext(&canvas, nullptr, &attrs);
+            }
+            else {
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                std::cout << "OpenGLManager::init_glcontext(): create compatibility profile (" << required_opengl_version.first << "." << required_opengl_version.second << ")\n";
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                m_context = new wxGLContext(&canvas);
+            }
+
+//            wxGLContextAttrs attrs;
+//            if (m_debug_enabled)
+//                attrs.DebugCtx();
+//            attrs.EndList();
+//            // if no valid context was created use the default one
+//            m_context = new wxGLContext(&canvas, nullptr, &attrs);
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         }
 #else
         if (m_context == nullptr)
