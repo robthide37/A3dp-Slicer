@@ -5389,15 +5389,15 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
 #if ENABLE_RAYCAST_PICKING
 void GLCanvas3D::_picking_pass()
 {
-#if ENABLE_RAYCAST_PICKING_DEBUG
     if (!m_picking_enabled || m_mouse.dragging || m_mouse.position == Vec2d(DBL_MAX, DBL_MAX) || m_gizmos.is_dragging()) {
+#if ENABLE_RAYCAST_PICKING_DEBUG
         ImGuiWrapper& imgui = *wxGetApp().imgui();
         imgui.begin(std::string("Hit result"), ImGuiWindowFlags_AlwaysAutoResize);
         imgui.text("Picking disabled");
         imgui.end();
+#endif // ENABLE_RAYCAST_PICKING_DEBUG
         return;
     }
-#endif // ENABLE_RAYCAST_PICKING_DEBUG
 
     m_hover_volume_idxs.clear();
 
