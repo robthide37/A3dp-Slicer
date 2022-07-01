@@ -24,14 +24,32 @@ class GLGizmoMeasure : public GLGizmoBase
 private:
 
     int m_currently_shown_plane = 0;
+    bool m_show_all = false;
+
+    GLModel m_vbo_sphere;
+    GLModel m_vbo_cylinder;
+
+    struct SurfaceFeature {
+        enum Type {
+            Circle,
+            Line
+        };
+        Type type;
+        Vec3d pos;
+        Vec3d endpoint; // for type == Line
+        double radius;  // for type == Circle;
+    };
 
     struct PlaneData {
-        std::vector<std::vector<Vec3d>> borders; // should be in fact local in update_planes()
         std::vector<int> facets;
+        std::vector<std::vector<Vec3d>> borders; // should be in fact local in update_planes()
+        std::vector<SurfaceFeature> surface_features;        
         std::vector<GLModel> vbos;
         Vec3d normal;
         float area;
     };
+
+    static void extract_features(PlaneData& plane);
 
     // This holds information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;

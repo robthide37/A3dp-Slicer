@@ -22,7 +22,10 @@ static const Slic3r::ColorRGBA DEFAULT_HOVER_PLANE_COLOR = { 0.9f, 0.2f, 0.2f, 1
 
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-{}
+{
+    m_vbo_sphere.init_from(its_make_sphere(1., M_PI/32.));
+    m_vbo_cylinder.init_from(its_make_cylinder(1., 1.));
+}
 
 bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
 {
@@ -125,7 +128,7 @@ void GLGizmoMeasure::on_render()
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glEnable(GL_BLEND));
-    glsafe(::glLineWidth(5.f));
+    glsafe(::glLineWidth(2.f));
 
     if (selection.is_single_full_instance()) {
         const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
@@ -144,22 +147,47 @@ void GLGizmoMeasure::on_render()
         ImGui::SameLine();
         if (m_imgui->button("->"))
             ++m_currently_shown_plane;
-        m_currently_shown_plane = std::clamp(m_currently_shown_plane, 0, int(m_planes.size())-1);
-        m_imgui->text(std::to_string(m_currently_shown_plane)); 
+        m_currently_shown_plane = std::clamp(m_currently_shown_plane, 0, std::max(0, int(m_planes.size())-1));
+        m_imgui->text(std::to_string(m_currently_shown_plane));
+        m_imgui->checkbox(wxString("Show all"), m_show_all);
         m_imgui->end();
 
 
-        //for (int i = 0; i < (int)m_planes.size(); ++i) {
-        int i = m_currently_shown_plane;
-        std::cout << m_hover_id << "\t" << m_currently_shown_plane << "\t" << std::endl;
-        if (i < m_planes.size()) {
+        int i = m_show_all ? 0 : m_currently_shown_plane;
+        for (int i = 0; i < (int)m_planes.size(); ++i) {
+            // Render all the borders.
             for (int j=0; j<(int)m_planes[i].vbos.size(); ++j) {
                 m_planes[i].vbos[j].set_color(j == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
-                if (j == m_hover_id)
                 m_planes[i].vbos[j].render();
-                std::cout << " * " << j;
             }
-            std::cout <<std::endl;
+
+
+            // Render features:
+            for (const SurfaceFeature& feature : m_planes[i].surface_features) {
+                Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(feature.pos));
+                if (feature.type == SurfaceFeature::Line) {
+                    auto q  = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), feature.endpoint - feature.pos);
+                    view_feature_matrix *= q;
+                    view_feature_matrix.scale(Vec3d(0.3, 0.3, (feature.endpoint - feature.pos).norm()));
+                    shader->set_uniform("view_model_matrix", view_feature_matrix);
+                    m_vbo_cylinder.set_color(ColorRGBA(0.7f, 0.7f, 0.f, 1.f));
+                    m_vbo_cylinder.render();
+                }
+
+                view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(feature.pos));
+                view_feature_matrix.scale(0.5);
+                shader->set_uniform("view_model_matrix", view_feature_matrix);
+                m_vbo_sphere.set_color(feature.type == SurfaceFeature::Line
+                                           ? ColorRGBA(1.f, 0.f, 0.f, 1.f)
+                                           : ColorRGBA(0.f, 1.f, 0.f, 1.f));
+                m_vbo_sphere.render();
+
+                
+                shader->set_uniform("view_model_matrix", view_model_matrix);
+            }
+
+            if (! m_show_all)
+                break;
         }
     }
 
@@ -196,7 +224,7 @@ void GLGizmoMeasure::on_render_for_picking()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_BLEND));
-    glsafe(::glLineWidth(5.f));
+    glsafe(::glLineWidth(2.f));
 
     if (selection.is_single_full_instance() && !wxGetKeyState(WXK_CONTROL)) {
         const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
@@ -231,6 +259,73 @@ void GLGizmoMeasure::set_flattening_data(const ModelObject* model_object)
         m_planes.clear();
         m_planes_valid = false;
     }
+}
+
+
+
+void GLGizmoMeasure::extract_features(GLGizmoMeasure::PlaneData& plane)
+{
+    plane.surface_features.clear();
+    const Vec3d& normal = plane.normal;
+
+    const double edge_threshold = 10. * (M_PI/180.);
+
+    
+    
+    for (const std::vector<Vec3d>& border : plane.borders) {
+        assert(border.size() > 1);
+        assert(! border.front().isApprox(border.back()));
+        double last_angle = 0.;
+        size_t first_idx = 0;
+
+        for (size_t i=0; i<border.size(); ++i) {
+            const Vec3d& v2 = (i == 0 ? border[0] - border[border.size()-1]
+                                      : border[i] - border[i-1]);
+            const Vec3d& v1 = i == border.size()-1 ? border[0] - border.back()
+                                                   : border[i+1] - border[i];
+            double angle = -atan2(normal.dot(v1.cross(v2)), v1.dot(v2));
+            if (angle < -M_PI/2.)
+                angle += M_PI;
+            std::cout << (180./M_PI) * angle << std::endl;
+                            
+            if (i != 0) {
+                // This is not the first corner.
+                if (std::abs(angle) > edge_threshold || i == border.size() - 1) {
+                    // Current feature ended. Save it and remember current point as beginning of the next.
+                    bool is_line = (i == first_idx + 1);
+                    plane.surface_features.emplace_back(SurfaceFeature{
+                        is_line ? SurfaceFeature::Line : SurfaceFeature::Circle,
+                        is_line ? border[first_idx] : border[first_idx], // FIXME
+                        border[i],
+                        0. // FIXME
+                    });
+                    first_idx = i;
+                } else if (Slic3r::is_approx(angle, last_angle)) {
+                    // possibly a segment of a circle
+                } else {
+                    first_idx = i;
+
+                }
+            }
+            last_angle = angle;            
+        }
+
+        // FIXME: Possibly merge the first and last feature.
+
+
+
+        std::cout << "==================== " << std::endl;
+    }
+
+
+     for (const SurfaceFeature& f : plane.surface_features) {
+            std::cout << "- detected " << (f.type == SurfaceFeature::Line ? "Line" : "Circle") << std::endl;
+            std::cout<< f.pos << std::endl << std::endl << f.endpoint << std::endl;
+            std::cout << "----------------" << std::endl;
+        }
+
+
+
 }
 
 
@@ -292,6 +387,7 @@ void GLGizmoMeasure::update_planes()
         }
 
         m_planes.back().normal = normal_ptr->cast<double>();
+        std::sort(m_planes.back().facets.begin(), m_planes.back().facets.end());
     }
 
     assert(std::none_of(face_to_plane.begin(), face_to_plane.end(), [](size_t val) { return val == size_t(-1); }));
@@ -300,40 +396,57 @@ void GLGizmoMeasure::update_planes()
     for (int plane_id=0; plane_id < m_planes.size(); ++plane_id) {
     //int plane_id = 5; {
         const auto& facets = m_planes[plane_id].facets;
-        std::vector<Vec3d> pts;
+        m_planes[plane_id].borders.clear();
+        std::vector<std::array<bool, 3>> visited(facets.size(), {false, false, false});
+        
         for (int face_id=0; face_id<facets.size(); ++face_id) {
             assert(face_to_plane[facets[face_id]] == plane_id);
+            for (int edge_id=0; edge_id<3; ++edge_id) {
+                if (visited[face_id][edge_id] || face_to_plane[face_neighbors[facets[face_id]][edge_id]] == plane_id) {
+                    visited[face_id][edge_id] = true;
+                    continue;
+                }
 
-            int j = 0;
-            for (j=0; j<3; ++j)
-                if (face_to_plane[face_neighbors[facets[face_id]][j]] != plane_id)
-                    break;
-            if (j == 3)
-                continue;
-            Halfedge_index he = sm.halfedge(Face_index(facets[face_id]));
-            for (int i=0; i<j; ++i)
-                he = sm.next(he);
+                Halfedge_index he = sm.halfedge(Face_index(facets[face_id]));
+                while (he.side() != edge_id)
+                    he = sm.next(he);
             
-            // he is the first halfedge on the border. Now walk around and append the points.
-            const Halfedge_index he_orig = he;
-            pts.emplace_back(sm.point(sm.source(he)).cast<double>());
-            Vertex_index target = sm.target(he);
-            const Halfedge_index he_start = he;
-
-            do {
+                // he is the first halfedge on the border. Now walk around and append the points.
                 const Halfedge_index he_orig = he;
-                he = sm.next_around_target(he);
-                while ( face_to_plane[sm.face(he)] == plane_id && he != he_orig)
-                    he = sm.next_around_target(he);
-                he = sm.opposite(he);
-                pts.emplace_back(sm.point(sm.source(he)).cast<double>());
-            } while (he != he_start);
+                m_planes[plane_id].borders.emplace_back();
+                m_planes[plane_id].borders.back().emplace_back(sm.point(sm.source(he)).cast<double>());
+                Vertex_index target = sm.target(he);
+                const Halfedge_index he_start = he;
+                
+                Face_index fi = he.face();
+                auto face_it = std::lower_bound(facets.begin(), facets.end(), int(fi));
+                assert(face_it != facets.end());
+                assert(*face_it == int(fi));
+                visited[face_it - facets.begin()][he.side()] = true;
 
-            if (pts.size() != 1) {
-                m_planes[plane_id].borders.emplace_back(pts);
-                pts.clear();
+                do {
+                    const Halfedge_index he_orig = he;
+                    he = sm.next_around_target(he);
+                    while ( face_to_plane[sm.face(he)] == plane_id && he != he_orig)
+                        he = sm.next_around_target(he);
+                    he = sm.opposite(he);
+                    
+                    Face_index fi = he.face();
+                    auto face_it = std::lower_bound(facets.begin(), facets.end(), int(fi));
+                    assert(face_it != facets.end());
+                    assert(*face_it == int(fi));
+                    if (visited[face_it - facets.begin()][he.side()] && he != he_start) {
+                        m_planes[plane_id].borders.back().resize(1);
+                        break;
+                    }
+                    visited[face_it - facets.begin()][he.side()] = true;
+
+                    m_planes[plane_id].borders.back().emplace_back(sm.point(sm.source(he)).cast<double>());
+                } while (he != he_start);
+
+                if (m_planes[plane_id].borders.back().size() == 1)
+                    m_planes[plane_id].borders.pop_back();
             }
-            
         }
     }
 
@@ -365,8 +478,8 @@ void GLGizmoMeasure::update_planes()
 
     // And finally create respective VBOs. The polygon is convex with
     // the vertices in order, so triangulation is trivial.
-    for (auto& plane : m_planes) {
-        for (const auto& vertices : plane.borders) {
+    for (PlaneData& plane : m_planes) {
+        for (std::vector<Vec3d>& vertices : plane.borders) {
             GLModel::Geometry init_data;
             init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3N3 };
             init_data.reserve_vertices(vertices.size());
@@ -378,7 +491,16 @@ void GLGizmoMeasure::update_planes()
             }
             plane.vbos.emplace_back();
             plane.vbos.back().init_from(std::move(init_data));
+            vertices.pop_back(); // first and last are the same
         }
+
+        static int n=0;
+        std::cout << "==================== " << std::endl;
+        std::cout << "==================== " << std::endl;
+        std::cout << "==================== " << std::endl;
+        std::cout << "Plane num. " << n++ << std::endl;
+        extract_features(plane);
+
 
         // FIXME: vertices should really be local, they need not
         // persist now when we use VBOs
