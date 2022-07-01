@@ -21,7 +21,7 @@ void TriangleSelectorWrapper::enforce_spot(const Vec3f &point, const Vec3f &orig
             const igl::Hit &hit = hits[hit_idx];
             Vec3f pos = origin + dir * hit.t;
             Vec3f face_normal = its_face_normal(mesh.its, hit.id);
-            if (point.z() + radius > pos.z() && face_normal.dot(dir) < 0) {
+            if ((point - pos).norm() < radius && face_normal.dot(dir) < 0) {
                 std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::Sphere>(
                         pos, origin, radius, Transform3d::Identity(), TriangleSelector::ClippingPlane { });
                 selector.select_patch(hit.id, std::move(cursor), EnforcerBlockerType::ENFORCER, Transform3d::Identity(),
@@ -32,11 +32,15 @@ void TriangleSelectorWrapper::enforce_spot(const Vec3f &point, const Vec3f &orig
     } else {
         size_t hit_idx_out;
         Vec3f hit_point_out;
-        AABBTreeIndirect::squared_distance_to_indexed_triangle_set(mesh.its.vertices, mesh.its.indices, triangles_tree, point, hit_idx_out, hit_point_out);
-        std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::Sphere>(
-                point, origin, radius, Transform3d::Identity(), TriangleSelector::ClippingPlane { });
-        selector.select_patch(hit_idx_out, std::move(cursor), EnforcerBlockerType::ENFORCER, Transform3d::Identity(),
-                true, 0.0f);
+        float dist = AABBTreeIndirect::squared_distance_to_indexed_triangle_set(mesh.its.vertices, mesh.its.indices,
+                triangles_tree, point, hit_idx_out, hit_point_out);
+        if (dist < radius) {
+            std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::Sphere>(
+                    point, origin, radius, Transform3d::Identity(), TriangleSelector::ClippingPlane { });
+            selector.select_patch(hit_idx_out, std::move(cursor), EnforcerBlockerType::ENFORCER,
+                    Transform3d::Identity(),
+                    true, 0.0f);
+        }
     }
 }
 

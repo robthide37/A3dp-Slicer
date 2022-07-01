@@ -30,7 +30,7 @@ public:
     ExtrusionLine() :
             a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0f), origin_entity(nullptr) {
     }
-    ExtrusionLine(const Vec2f &_a, const Vec2f &_b, const ExtrusionEntity* origin_entity) :
+    ExtrusionLine(const Vec2f &_a, const Vec2f &_b, const ExtrusionEntity *origin_entity) :
             a(_a), b(_b), len((_a - _b).norm()), origin_entity(origin_entity) {
     }
 
@@ -46,7 +46,7 @@ public:
     Vec2f a;
     Vec2f b;
     float len;
-    const ExtrusionEntity* origin_entity;
+    const ExtrusionEntity *origin_entity;
 
     bool support_point_generated = false;
     float malformation = 0.0f;
@@ -168,6 +168,11 @@ public:
         return pixel_count;
     }
 
+    Vec2f get_pixel_center(const Vec2i &coords) const {
+        return origin + coords.cast<float>().cwiseProduct(this->pixel_size)
+                + this->pixel_size.cwiseQuotient(Vec2f(2.0f, 2.0f));
+    }
+
 private:
     Vec2i to_pixel_coords(const Vec2f &position) const {
         Vec2i pixel_coords = (position - this->origin).cwiseQuotient(this->pixel_size).cast<int>();
@@ -192,9 +197,9 @@ struct Island {
     std::unordered_map<size_t, float> islands_under_with_connection_area;
     std::vector<Vec3f> pivot_points;
     float volume;
-    Vec3f volume_centroid;
+    Vec3f volume_centroid_accumulator;
     float sticking_force; // for support points present on this layer (or bed extrusions)
-    Vec3f sticking_centroid;
+    Vec3f sticking_centroid_accumulator;
 };
 
 struct LayerIslands {
@@ -305,7 +310,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             float dist_from_prev_layer = prev_layer_lines.signed_distance_from_lines(current_line.b, nearest_line_idx,
                     nearest_point);
 
-            if (dist_from_prev_layer < flow_width) {
+            if (fabs(dist_from_prev_layer) < flow_width) {
                 bridging_acc.reset();
             } else {
                 bridging_acc.add_distance(current_line.len);
@@ -336,17 +341,18 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
     }
 }
 
-std::tuple<LayerIslands, PixelGrid> reckon_islands(
+std::tuple<LayerIslands, PixelGrid, std::vector<size_t>> reckon_islands(
         const Layer *layer, bool first_layer,
         size_t prev_layer_islands_count,
         const PixelGrid &prev_layer_grid,
         const std::vector<ExtrusionLine> &layer_lines,
         const Params &params) {
 
-    BOOST_LOG_TRIVIAL(debug) << "SSG: reckon islands on printz: " << layer->print_z;
+    BOOST_LOG_TRIVIAL(debug)
+    << "SSG: reckon islands on printz: " << layer->print_z;
 
     std::vector<std::pair<size_t, size_t>> extrusions; //start and end idx (one beyond last extrusion) [start,end)
-    const ExtrusionEntity* current_ex = nullptr;
+    const ExtrusionEntity *current_ex = nullptr;
     for (size_t lidx = 1; lidx < layer_lines.size(); ++lidx) {
         const ExtrusionLine &line = layer_lines[lidx];
         if (line.origin_entity == current_ex) {
@@ -357,11 +363,15 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
         }
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SSG: layer_lines size: " << layer_lines.size();
-    BOOST_LOG_TRIVIAL(debug) << "SSG: extrusions count: " << extrusions.size();
-    BOOST_LOG_TRIVIAL(debug) << "SSG: extrusions sizes: ";
-    for (const auto& ext: extrusions) {
-        BOOST_LOG_TRIVIAL(debug) << "SSG: " << ext.second - ext.first;
+    BOOST_LOG_TRIVIAL(debug)
+    << "SSG: layer_lines size: " << layer_lines.size();
+    BOOST_LOG_TRIVIAL(debug)
+    << "SSG: extrusions count: " << extrusions.size();
+    BOOST_LOG_TRIVIAL(debug)
+    << "SSG: extrusions sizes: ";
+    for (const auto &ext : extrusions) {
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: " << ext.second - ext.first;
     }
 
     std::vector<LinesDistancer> islands;
@@ -377,7 +387,8 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
         }
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SSG: external perims: " << islands.size();
+    BOOST_LOG_TRIVIAL(debug)
+    << "SSG: external perims: " << islands.size();
 
     for (size_t i = 0; i < islands.size(); ++i) {
         for (size_t e = 0; e < extrusions.size(); ++e) {
@@ -409,7 +420,8 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
         }
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SSG: filter islands";
+    BOOST_LOG_TRIVIAL(debug)
+    << "SSG: filter islands";
 
     float flow_width = get_flow_width(layer->regions()[0], erExternalPerimeter);
 
@@ -427,12 +439,12 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                 const ExtrusionLine &line = layer_lines[lidx];
                 float volume = line.len * flow_width * layer->height * 0.7; // 1/sqrt(2) compensation for cylindrical shape
                 island.volume += volume;
-                island.volume_centroid += to_3d(Vec2f((line.a + line.b) / 2.0f), float(layer->print_z)) * volume;
+                island.volume_centroid_accumulator += to_3d(Vec2f((line.a + line.b) / 2.0f), float(layer->print_z)) * volume;
 
                 if (first_layer) {
                     float sticking_force = line.len * flow_width * params.base_adhesion;
                     island.sticking_force += sticking_force;
-                    island.sticking_centroid += sticking_force
+                    island.sticking_centroid_accumulator += sticking_force
                             * to_3d(Vec2f((line.a + line.b) / 2.0f), float(layer->print_z));
                     if (line.is_external_perimeter()) {
                         island.pivot_points.push_back(to_3d(Vec2f(line.b), float(layer->print_z)));
@@ -443,7 +455,7 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                             * float(PI);
                     float sticking_force = support_interface_area * params.support_adhesion;
                     island.sticking_force += sticking_force;
-                    island.sticking_centroid += sticking_force * to_3d(Vec2f(line.b), float(layer->print_z));
+                    island.sticking_centroid_accumulator += sticking_force * to_3d(Vec2f(line.b), float(layer->print_z));
                     island.pivot_points.push_back(to_3d(Vec2f(line.b), float(layer->print_z)));
                 }
             }
@@ -467,30 +479,165 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                 }
             });
 
-    BOOST_LOG_TRIVIAL(debug) << "SSG: rasterized";
+    BOOST_LOG_TRIVIAL(debug)
+    << "SSG: rasterized";
 
     for (size_t x = 0; x < size_t(current_layer_grid.get_pixel_count().x()); ++x) {
         for (size_t y = 0; y < size_t(current_layer_grid.get_pixel_count().y()); ++y) {
             Vec2i coords = Vec2i(x, y);
             if (current_layer_grid.get_pixel(coords) != NULL_ISLAND
                     && prev_layer_grid.get_pixel(coords) != NULL_ISLAND) {
-                result.islands[current_layer_grid.get_pixel(coords)].islands_under_with_connection_area[prev_layer_grid.get_pixel(coords)] +=
+                result.islands[current_layer_grid.get_pixel(coords)].islands_under_with_connection_area[prev_layer_grid.get_pixel(
+                        coords)] +=
                         current_layer_grid.pixel_area();
             }
         }
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SSG: connection area computed";
+    BOOST_LOG_TRIVIAL(debug)
+    << "SSG: connection area computed";
 
-    return {result, current_layer_grid};
+    return {result, current_layer_grid, line_to_island_mapping};
+}
+
+void check_global_stability(
+        float print_z,
+        std::vector<LayerIslands>& islands_graph,
+        const std::vector<ExtrusionLine> &layer_lines,
+        const std::vector<size_t> &line_to_island_mapping,
+        Issues& issues,
+        const Params& params
+        ) {
+    std::vector<std::vector<size_t>> islands_lines(islands_graph.back().islands.size());
+    for (int lidx = 0; lidx < layer_lines.size(); ++lidx) {
+        if (layer_lines[lidx].origin_entity->role() == erExternalPerimeter) {
+            islands_lines[line_to_island_mapping[lidx]].push_back(lidx);
+        }
+    }
+
+    using Accumulator = Island;
+
+    for (size_t island_idx = 0; island_idx < islands_graph.back().islands.size(); ++island_idx) {
+        Island& island = islands_graph.back().islands[island_idx];
+
+        std::vector<ExtrusionLine> island_external_lines;
+        for (size_t lidx : islands_lines[island_idx]) {
+            island_external_lines.push_back(layer_lines[lidx]);
+        }
+        LinesDistancer island_lines_dist(island_external_lines);
+
+        Accumulator acc = island;
+        int layer_idx = islands_graph.size() -1;
+        while (acc.islands_under_with_connection_area.size() > 0) {
+            //TEST for break between layer_idx and layer_idx -1;
+            LayerIslands below = islands_graph[layer_idx-1];
+            std::vector<Vec2f> pivot_points;
+            Vec2f sticking_centroid;
+            float connection_area = 0;
+            for (const auto& pair : acc.islands_under_with_connection_area) {
+                const Island& below_i = below.islands[pair.first];
+                Vec2f centroid = (below_i.volume_centroid_accumulator / below_i.volume).head<2>();
+                pivot_points.push_back(centroid);
+                sticking_centroid += centroid * pair.second;
+                connection_area += pair.second;
+            }
+
+            sticking_centroid /= connection_area;
+
+            auto coord_fn = [&pivot_points](size_t idx, size_t dim) {
+                return pivot_points[idx][dim];
+            };
+            KDTreeIndirect<2, float, decltype(coord_fn)> supports_tree(coord_fn, pivot_points.size());
+
+            for (const ExtrusionLine& line : island_external_lines){
+                Vec2f line_dir = (line.b - line.a).normalized();
+                Vec2f pivot_site_search_point = line.b + line_dir * 300.0f;
+                size_t pivot_idx = find_closest_point(supports_tree, pivot_site_search_point);
+                const Vec2f &pivot = pivot_points[pivot_idx];
+
+                float sticking_arm = (pivot - sticking_centroid).norm();
+                float sticking_torque = sticking_arm * connection_area * params.tensile_strength;
+
+                float mass = acc.volume * params.filament_density;
+                const Vec3f &mass_centorid = acc.volume_centroid_accumulator / acc.volume;
+                float weight = mass * params.gravity_constant;
+                float weight_arm = (pivot - mass_centorid.head<2>()).norm();
+                float weight_torque = weight_arm * weight;
+
+                float bed_movement_arm = mass_centorid.z();
+                float bed_movement_force = params.max_acceleration * mass;
+                float bed_movement_torque = bed_movement_force * bed_movement_arm;
+
+                Vec3f extruder_pressure_direction = to_3d(line_dir, 0.0f);
+                extruder_pressure_direction.z() = -0.2 - line.malformation * 0.5;
+                extruder_pressure_direction.normalize();
+                float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), print_z).cross(
+                        extruder_pressure_direction)).norm();
+                float extruder_conflict_force = params.tolerable_extruder_conflict_force +
+                        std::min(line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
+                float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
+
+                float total_torque = bed_movement_torque + extruder_conflict_torque - weight_torque - sticking_torque;
+
+                if (total_torque > 0) {
+                    Vec2f target_point;
+                    size_t _idx;
+                    island_lines_dist.signed_distance_from_lines(pivot_site_search_point, _idx, target_point);
+//                    if (!supports_presence_grid.position_taken(to_3d(target_point, print_z))) {
+                        float area = params.support_points_interface_radius * params.support_points_interface_radius
+                                * float(PI);
+                        float sticking_force = area * params.support_adhesion;
+                        Vec3f support_point = to_3d(target_point, print_z);
+                       island.pivot_points.push_back(support_point);
+                       island.sticking_force += sticking_force;
+                       island.sticking_centroid_accumulator += sticking_force*support_point;
+                        issues.support_points.emplace_back(support_point,
+                                extruder_conflict_torque - sticking_torque, extruder_pressure_direction);
+//                        supports_presence_grid.take_position(to_3d(target_point, print_z));
+//                    }
+                }
+    #if 0
+                BOOST_LOG_TRIVIAL(debug)
+                << "SSG: sticking_arm: " << sticking_arm;
+                BOOST_LOG_TRIVIAL(debug)
+                << "SSG: sticking_torque: " << sticking_torque;
+                BOOST_LOG_TRIVIAL(debug)
+                << "SSG: weight_arm: " << sticking_arm;
+                BOOST_LOG_TRIVIAL(debug)
+                << "SSG: weight_torque: " << weight_torque;
+                BOOST_LOG_TRIVIAL(debug)
+                << "SSG: bed_movement_arm: " << bed_movement_arm;
+                BOOST_LOG_TRIVIAL(debug)
+                << "SSG: bed_movement_torque: " << bed_movement_torque;
+                BOOST_LOG_TRIVIAL(debug)
+                << "SSG: conflict_torque_arm: " << conflict_torque_arm;
+                BOOST_LOG_TRIVIAL(debug)
+                << "SSG: extruder_conflict_torque: " << extruder_conflict_torque;
+                BOOST_LOG_TRIVIAL(debug)
+                << "SSG: total_torque: " << total_torque << "   printz: " << print_z;
+    #endif
+            }
+
+            //TODO add stuf to accumulator
+
+
+        }
+    }
 }
 
 Issues check_object_stability(const PrintObject *po, const Params &params) {
+#ifdef DEBUG_FILES
+    FILE *segmentation_f = boost::nowide::fopen(debug_out_path("segmentation.obj").c_str(), "w");
+    FILE *malform_f = boost::nowide::fopen(debug_out_path("malformations.obj").c_str(), "w");
+#endif
+
     Issues issues { };
+    std::vector<LayerIslands> islands_graph;
     std::vector<ExtrusionLine> layer_lines;
-    float flow_width = get_flow_width(po->layers()[po->layer_count()-1]->regions()[0], erExternalPerimeter);
+    float flow_width = get_flow_width(po->layers()[po->layer_count() - 1]->regions()[0], erExternalPerimeter);
     PixelGrid prev_layer_grid(po, flow_width);
-    BOOST_LOG_TRIVIAL(debug) << "SSG: flow width: " << flow_width;
+    BOOST_LOG_TRIVIAL(debug)
+    << "SSG: flow width: " << flow_width;
 
     // PREPARE BASE LAYER
     const Layer *layer = po->layers()[0];
@@ -527,10 +674,31 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
         } // ex_entity
     } // region
 
-    auto [layer_islands, layer_grid] = reckon_islands(layer, true, 0, prev_layer_grid, layer_lines, params);
-    std::remove_if(layer_lines.begin(), layer_lines.end(), [](const ExtrusionLine &line) {
-        return !line.is_external_perimeter();
-    });
+    auto [layer_islands, layer_grid, line_to_island_mapping] = reckon_islands(layer, true, 0, prev_layer_grid,
+            layer_lines, params);
+    islands_graph.push_back(std::move(layer_islands));
+#ifdef DEBUG_FILES
+    for (size_t x = 0; x < size_t(layer_grid.get_pixel_count().x()); ++x) {
+        for (size_t y = 0; y < size_t(layer_grid.get_pixel_count().y()); ++y) {
+            Vec2i coords = Vec2i(x, y);
+            size_t island_idx = layer_grid.get_pixel(coords);
+            if (layer_grid.get_pixel(coords) != NULL_ISLAND) {
+                Vec2f pos = layer_grid.get_pixel_center(coords);
+                size_t pseudornd = ((island_idx + 127) * 33331 + 6907) % 23;
+                Vec3f color = value_to_rgbf(0.0f, float(23), float(pseudornd));
+                fprintf(segmentation_f, "v %f %f %f  %f %f %f\n", pos[0],
+                        pos[1], layer->print_z, color[0], color[1], color[2]);
+            }
+        }
+    }
+    for (const auto &line : layer_lines) {
+        if (line.malformation > 0.0f) {
+            Vec3f color = value_to_rgbf(0, 1.0f, line.malformation);
+            fprintf(malform_f, "v %f %f %f  %f %f %f\n", line.b[0],
+                    line.b[1], layer->print_z, color[0], color[1], color[2]);
+        }
+    }
+#endif
     LinesDistancer external_lines(layer_lines);
     layer_lines.clear();
     prev_layer_grid = layer_grid;
@@ -564,14 +732,40 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
             } // ex_entity
         } // region
 
-        auto [layer_islands, layer_grid] = reckon_islands(layer, true, 0, prev_layer_grid, layer_lines, params);
-        std::remove_if(layer_lines.begin(), layer_lines.end(), [](const ExtrusionLine &line) {
-            return !line.is_external_perimeter();
-        });
+        auto [layer_islands, layer_grid, line_to_island_mapping] = reckon_islands(layer, true, 0, prev_layer_grid,
+                layer_lines, params);
+        islands_graph.push_back(std::move(layer_islands));
+#ifdef DEBUG_FILES
+        for (size_t x = 0; x < size_t(layer_grid.get_pixel_count().x()); ++x) {
+            for (size_t y = 0; y < size_t(layer_grid.get_pixel_count().y()); ++y) {
+                Vec2i coords = Vec2i(x, y);
+                size_t island_idx = layer_grid.get_pixel(coords);
+                if (layer_grid.get_pixel(coords) != NULL_ISLAND) {
+                    Vec2f pos = layer_grid.get_pixel_center(coords);
+                    size_t pseudornd = ((island_idx + 127) * 33331 + 6907) % 23;
+                    Vec3f color = value_to_rgbf(0.0f, float(23), float(pseudornd));
+                    fprintf(segmentation_f, "v %f %f %f  %f %f %f\n", pos[0],
+                            pos[1], layer->print_z, color[0], color[1], color[2]);
+                }
+            }
+        }
+        for (const auto &line : layer_lines) {
+            if (line.malformation > 0.0f) {
+                Vec3f color = value_to_rgbf(0, 1.0f, line.malformation);
+                fprintf(malform_f, "v %f %f %f  %f %f %f\n", line.b[0],
+                        line.b[1], layer->print_z, color[0], color[1], color[2]);
+            }
+        }
+#endif
         external_lines = LinesDistancer(layer_lines);
         layer_lines.clear();
         prev_layer_grid = layer_grid;
     }
+
+#ifdef DEBUG_FILES
+    fclose(segmentation_f);
+    fclose(malform_f);
+#endif
 
     return issues;
 }
