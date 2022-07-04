@@ -22,7 +22,7 @@
 
 #include "libslic3r/Utils.hpp"
 
-#define DEBUG_FILES
+//#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -1217,9 +1217,8 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
     while (next_layer < int(layers.size())) {
         std::optional<std::pair<size_t, size_t>> maybe_next_seam;
         float z_distance = float(po->get_layer(next_layer)->slice_z) - origin_position.z();
-        float f = 2.71828f - logf(po->get_layer(next_layer)->height);
-        float max_distance = SeamPlacer::seam_align_tolerable_dist_factor * f * f;
-        if (fabs(next_layer - layer_idx) > 3){
+        float max_distance = SeamPlacer::seam_align_tolerable_dist;
+        if (fabs(next_layer - layer_idx) >= SeamPlacer::seam_align_min_seams_for_linear_projection){
             Vec3f projected_position = origin_position + z_distance * surface_line_dir;
             maybe_next_seam = find_next_seam_in_layer(layers, projected_position, next_layer, max_distance,
                     comparator);
@@ -1246,9 +1245,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             seam_string.push_back(maybe_next_seam.operator*());
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
-            Vec3f line_dir = next_seam.position - origin_position;
-            surface_line_dir += line_dir / line_dir.z();
-            surface_line_dir /= surface_line_dir.z();
+            surface_line_dir += (next_seam.position - origin_position).normalized();
         } else {
             break;
         }
@@ -1261,10 +1258,9 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
     while (next_layer >= 0) {
         std::optional<std::pair<size_t, size_t>> maybe_next_seam;
         float z_distance = float(po->get_layer(next_layer)->slice_z) - origin_position.z();
-        float f = 2.71828f - logf(po->get_layer(next_layer)->height);
-        float max_distance = SeamPlacer::seam_align_tolerable_dist_factor * f * f;
-        if (fabs(next_layer - layer_idx) > 3){
-            Vec3f projected_position = origin_position + z_distance * surface_line_dir;
+        float max_distance = SeamPlacer::seam_align_tolerable_dist;
+        if (fabs(next_layer - layer_idx) >= SeamPlacer::seam_align_min_seams_for_linear_projection){
+            Vec3f projected_position = origin_position + z_distance * (surface_line_dir / surface_line_dir.z());
             maybe_next_seam = find_next_seam_in_layer(layers, projected_position, next_layer, max_distance,
                     comparator);
         }
@@ -1290,9 +1286,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             seam_string.push_back(maybe_next_seam.operator*());
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
-            Vec3f line_dir = next_seam.position - origin_position;
-            surface_line_dir += line_dir / line_dir.z();
-            surface_line_dir /= surface_line_dir.z();
+            surface_line_dir += (next_seam.position - origin_position).normalized();
         } else {
             break;
         }
@@ -1402,20 +1396,20 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             weights.resize(seam_string.size());
 
             //gather points positions and weights
-            // The algorithm uses only angle to compute penalty, to enforce snapping to sharp corners, if they are present
-            // after several experiments approach that gives best results is to snap the weight to one for sharp corners, and
-            //  leave it small for others. However, this can result in non-smooth line over area with a lot of unaligned sharp corners.
+            float total_length = 0.0f;
+            Vec3f last_point_pos = layers[seam_string[0].first].points[seam_string[0].second].position;
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 Vec3f pos = layers[seam_string[index].first].points[seam_string[index].second].position;
+                total_length += (last_point_pos - pos).norm();
+                last_point_pos = pos;
                 observations[index] = pos.head<2>();
                 observation_points[index] = pos.z();
-                weights[index] = std::min(1.0f,
-                        comparator.weight(layers[seam_string[index].first].points[seam_string[index].second]));
+                weights[index] = comparator.weight(layers[seam_string[index].first].points[seam_string[index].second]);
             }
 
             // Curve Fitting
             size_t number_of_segments = std::max(size_t(1),
-                    size_t(observations.size() / SeamPlacer::seam_align_seams_per_segment));
+                    size_t(total_length / SeamPlacer::seam_align_mm_per_segment));
             auto curve = Geometry::fit_cubic_bspline(observations, observation_points, weights, number_of_segments);
 
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into

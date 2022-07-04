@@ -128,7 +128,7 @@ public:
 
     // arm length used during angles computation
     static constexpr float polygon_local_angles_arm_distance = 0.3f;
-    static constexpr float sharp_angle_snapping_threshold = 0.25f * float(PI);
+    static constexpr float sharp_angle_snapping_threshold = 0.3f * float(PI);
 
     // max tolerable distance from the previous layer is overhang_distance_tolerance_factor * flow_width
     static constexpr float overhang_distance_tolerance_factor = 0.5f;
@@ -143,13 +143,15 @@ public:
     static constexpr float enforcer_oversampling_distance = 0.2f;
 
     // When searching for seam clusters for alignment:
+    static constexpr size_t seam_align_min_seams_for_linear_projection = 1;
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
     static constexpr float seam_align_score_tolerance = 0.3f;
-    static constexpr float seam_align_tolerable_dist_factor = 0.3f;
+    // seam_align_tolerable_dist - if next layer closest point is too far away, break aligned string
+    static constexpr float seam_align_tolerable_dist = 3.0f;
     // minimum number of seams needed in cluster to make alignment happen
-    static constexpr size_t seam_align_minimum_string_seams = 10;
-    // points covered by spline; determines number of splines for the given string
-    static constexpr size_t seam_align_seams_per_segment = 16;
+    static constexpr size_t seam_align_minimum_string_seams = 6;
+    // millimeters covered by spline; determines number of splines for the given string
+    static constexpr size_t seam_align_mm_per_segment = 8.0f;
 
     //The following data structures hold all perimeter points for all PrintObject.
     std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
