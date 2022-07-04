@@ -128,7 +128,7 @@ public:
 
     // arm length used during angles computation
     static constexpr float polygon_local_angles_arm_distance = 0.3f;
-    static constexpr float sharp_angle_snapping_threshold = 0.3f * float(PI);
+    static constexpr float sharp_angle_snapping_threshold = 0.25f * float(PI);
 
     // max tolerable distance from the previous layer is overhang_distance_tolerance_factor * flow_width
     static constexpr float overhang_distance_tolerance_factor = 0.5f;
@@ -145,8 +145,7 @@ public:
     // When searching for seam clusters for alignment:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
     static constexpr float seam_align_score_tolerance = 0.3f;
-    // seam_align_tolerable_dist - if next layer closest point is too far away, break aligned string
-    static constexpr float seam_align_tolerable_dist = 1.0f;
+    static constexpr float seam_align_tolerable_dist_factor = 0.3f;
     // minimum number of seams needed in cluster to make alignment happen
     static constexpr size_t seam_align_minimum_string_seams = 10;
     // points covered by spline; determines number of splines for the given string
@@ -173,8 +172,8 @@ private:
             size_t& out_moved_seams_count) const;
     std::optional<std::pair<size_t, size_t>> find_next_seam_in_layer(
             const std::vector<PrintObjectSeamData::LayerSeams> &layers,
-            const std::pair<size_t, size_t> &prev_point_index,
-            const size_t layer_idx, const float slice_z,
+            const Vec3f& projected_position,
+            const size_t layer_idx, const float max_distance,
             const SeamPlacerImpl::SeamComparator &comparator) const;
 };
 
