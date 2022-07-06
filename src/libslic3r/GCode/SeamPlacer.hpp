@@ -171,7 +171,7 @@ private:
             std::pair<size_t, size_t> start_seam,
             const SeamPlacerImpl::SeamComparator &comparator,
             std::optional<std::pair<size_t, size_t>> &out_best_moved_seam,
-            size_t& out_moved_seams_count) const;
+            float& seam_variance_out) const;
     std::optional<std::pair<size_t, size_t>> find_next_seam_in_layer(
             const std::vector<PrintObjectSeamData::LayerSeams> &layers,
             const Vec3f& projected_position,

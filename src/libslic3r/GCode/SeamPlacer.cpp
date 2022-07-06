@@ -1199,9 +1199,9 @@ std::optional<std::pair<size_t, size_t>> SeamPlacer::find_next_seam_in_layer(
 
 std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintObject *po,
         std::pair<size_t, size_t> start_seam, const SeamPlacerImpl::SeamComparator &comparator,
-        std::optional<std::pair<size_t, size_t>> &out_best_moved_seam, size_t &out_moved_seams_count) const {
+        std::optional<std::pair<size_t, size_t>> &out_best_moved_seam, float& seam_variance_out) const {
     out_best_moved_seam.reset();
-    out_moved_seams_count = 0;
+    seam_variance_out = 0.0f;
     const std::vector<PrintObjectSeamData::LayerSeams> &layers = m_seam_per_object.find(po)->second.layers;
     int layer_idx = start_seam.first;
     int seam_index = start_seam.second;
@@ -1210,7 +1210,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
     int next_layer = layer_idx + 1;
     std::pair<size_t, size_t> prev_point_index = start_seam;
     std::vector<std::pair<size_t, size_t>> seam_string { start_seam };
-    Vec3f surface_line_dir { 0.0f, 0.0f, 20.0f };
+    Vec3f surface_line_dir { 0.0f, 0.0f, 1.0f };
     Vec3f origin_position = layers[start_seam.first].points[start_seam.second].position;
 
     //find seams or potential seams in forward direction; there is a budget of skips allowed
@@ -1218,9 +1218,9 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
         std::optional<std::pair<size_t, size_t>> maybe_next_seam;
         float z_distance = float(po->get_layer(next_layer)->slice_z) - origin_position.z();
         float max_distance = SeamPlacer::seam_align_tolerable_dist;
+        Vec3f linear_position = origin_position + z_distance * (surface_line_dir / surface_line_dir.z());
         if (fabs(next_layer - layer_idx) >= SeamPlacer::seam_align_min_seams_for_linear_projection){
-            Vec3f projected_position = origin_position + z_distance * (surface_line_dir / surface_line_dir.z());
-            maybe_next_seam = find_next_seam_in_layer(layers, projected_position, next_layer, max_distance,
+            maybe_next_seam = find_next_seam_in_layer(layers, linear_position, next_layer, max_distance,
                     comparator);
         }
         if (!maybe_next_seam.has_value()) {
@@ -1235,7 +1235,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.operator*();
             const auto &next_seam = layers[next_seam_coords.first].points[next_seam_coords.second];
             bool is_moved = next_seam.perimeter.seam_index != next_seam_coords.second;
-            out_moved_seams_count += is_moved;
+            seam_variance_out += next_seam.visibility * (linear_position - next_seam.position).squaredNorm();
             if (is_moved && (!out_best_moved_seam.has_value() ||
                     comparator.is_first_better(next_seam,
                             layers[out_best_moved_seam.operator*().first].points[out_best_moved_seam.operator*().second]))) {
@@ -1259,9 +1259,9 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
         std::optional<std::pair<size_t, size_t>> maybe_next_seam;
         float z_distance = float(po->get_layer(next_layer)->slice_z) - origin_position.z();
         float max_distance = SeamPlacer::seam_align_tolerable_dist;
+        Vec3f linear_position = origin_position + z_distance * (surface_line_dir / surface_line_dir.z());
         if (fabs(next_layer - layer_idx) >= SeamPlacer::seam_align_min_seams_for_linear_projection){
-            Vec3f projected_position = origin_position + z_distance * (surface_line_dir / surface_line_dir.z());
-            maybe_next_seam = find_next_seam_in_layer(layers, projected_position, next_layer, max_distance,
+            maybe_next_seam = find_next_seam_in_layer(layers, linear_position, next_layer, max_distance,
                     comparator);
         }
         if (!maybe_next_seam.has_value()) {
@@ -1272,11 +1272,10 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
         }
 
         if (maybe_next_seam.has_value()) {
-
             std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.operator*();
             const auto &next_seam = layers[next_seam_coords.first].points[next_seam_coords.second];
             bool is_moved = next_seam.perimeter.seam_index != next_seam_coords.second;
-            out_moved_seams_count += is_moved;
+            seam_variance_out += next_seam.visibility * (linear_position - next_seam.position).squaredNorm();
             if (is_moved && (!out_best_moved_seam.has_value() ||
                     comparator.is_first_better(next_seam,
                             layers[out_best_moved_seam.operator*().first].points[out_best_moved_seam.operator*().second]))) {
@@ -1292,6 +1291,8 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
         }
         next_layer--;
     }
+
+    seam_variance_out /= float(seam_string.size());
 
     return seam_string;
 }
@@ -1363,17 +1364,17 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             continue;
         } else {
             std::optional<std::pair<size_t, size_t>> best_moved_seam;
-            size_t moved_seams_count;
+            float seam_variance;
             seam_string = this->find_seam_string(po, { layer_idx, seam_index }, comparator, best_moved_seam,
-                    moved_seams_count);
+                    seam_variance);
             if (best_moved_seam.has_value()) {
-                size_t alternative_moved_seams_count;
+                float alternative_seam_variance;
                 alternative_seam_string = this->find_seam_string(po, best_moved_seam.operator*(), comparator,
-                        best_moved_seam, alternative_moved_seams_count);
+                        best_moved_seam, alternative_seam_variance);
                 if (alternative_seam_string.size() >= SeamPlacer::seam_align_minimum_string_seams &&
-                        alternative_moved_seams_count < moved_seams_count) {
+                        alternative_seam_variance < seam_variance) {
                     seam_string = std::move(alternative_seam_string);
-                    // finish loop. but repeat the alignment for the current seam, since it could be skipped due to alternative path being aligned.
+                    //repeat the alignment for the current seam, since it could be skipped due to alternative path being aligned.
                     global_index--;
                 }
             }
@@ -1414,12 +1415,16 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
 
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
             // Perimeter structure of the point; also set flag aligned to true
+            auto sigmoid_angle_snapping_func = [](float angle){
+            	float steepness = 10.0f;
+            	float exp_val = steepness * (abs(angle) - SeamPlacer::sharp_angle_snapping_threshold);
+            	float sig_term = exp(exp_val);
+            	return sig_term / (sig_term + 1.0f);
+            };
+
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const auto &pair = seam_string[index];
-                const float t =
-                        abs(layers[pair.first].points[pair.second].local_ccw_angle)
-                                > SeamPlacer::sharp_angle_snapping_threshold
-                                ? 1.0 : 0.0f;
+                float t = sigmoid_angle_snapping_func(layers[pair.first].points[pair.second].local_ccw_angle);
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
                 Vec2f fitted_pos = curve.get_fitted_value(current_pos.z());
 
