@@ -1210,7 +1210,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
     int next_layer = layer_idx + 1;
     std::pair<size_t, size_t> prev_point_index = start_seam;
     std::vector<std::pair<size_t, size_t>> seam_string { start_seam };
-    Vec3f surface_line_dir { 0.0f, 0.0f, 1.0f };
+    Vec3f surface_line_dir { 0.0f, 0.0f, 20.0f };
     Vec3f origin_position = layers[start_seam.first].points[start_seam.second].position;
 
     //find seams or potential seams in forward direction; there is a budget of skips allowed
@@ -1219,7 +1219,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
         float z_distance = float(po->get_layer(next_layer)->slice_z) - origin_position.z();
         float max_distance = SeamPlacer::seam_align_tolerable_dist;
         if (fabs(next_layer - layer_idx) >= SeamPlacer::seam_align_min_seams_for_linear_projection){
-            Vec3f projected_position = origin_position + z_distance * surface_line_dir;
+            Vec3f projected_position = origin_position + z_distance * (surface_line_dir / surface_line_dir.z());
             maybe_next_seam = find_next_seam_in_layer(layers, projected_position, next_layer, max_distance,
                     comparator);
         }
@@ -1286,7 +1286,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             seam_string.push_back(maybe_next_seam.operator*());
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
-            surface_line_dir += (next_seam.position - origin_position).normalized();
+            surface_line_dir -= (next_seam.position - origin_position).normalized();
         } else {
             break;
         }

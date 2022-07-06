@@ -147,7 +147,7 @@ public:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
     static constexpr float seam_align_score_tolerance = 0.3f;
     // seam_align_tolerable_dist - if next layer closest point is too far away, break aligned string
-    static constexpr float seam_align_tolerable_dist = 3.0f;
+    static constexpr float seam_align_tolerable_dist = 1.5f;
     // minimum number of seams needed in cluster to make alignment happen
     static constexpr size_t seam_align_minimum_string_seams = 6;
     // millimeters covered by spline; determines number of splines for the given string
