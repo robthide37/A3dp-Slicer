@@ -838,6 +838,9 @@ struct SeamComparator {
     }
 
     float weight(const SeamCandidate &a) const {
+    	if (setup == SeamPosition::spAligned && a.central_enforcer) {
+    		return 3.0f;
+    	}
         return a.visibility + angle_importance * compute_angle_penalty(a.local_ccw_angle) / (1.0f + angle_importance);
     }
 };
@@ -1210,7 +1213,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
     int next_layer = layer_idx + 1;
     std::pair<size_t, size_t> prev_point_index = start_seam;
     std::vector<std::pair<size_t, size_t>> seam_string { start_seam };
-    Vec3f surface_line_dir { 0.0f, 0.0f, 1.0f };
+    Vec3f surface_line_dir { 0.0f, 0.0f, 3.0f };
     Vec3f origin_position = layers[start_seam.first].points[start_seam.second].position;
 
     //find seams or potential seams in forward direction; there is a budget of skips allowed
@@ -1235,7 +1238,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.operator*();
             const auto &next_seam = layers[next_seam_coords.first].points[next_seam_coords.second];
             bool is_moved = next_seam.perimeter.seam_index != next_seam_coords.second;
-            seam_variance_out += next_seam.visibility * (linear_position - next_seam.position).squaredNorm();
+            seam_variance_out += (linear_position - next_seam.position).squaredNorm() * next_seam.visibility;
             if (is_moved && (!out_best_moved_seam.has_value() ||
                     comparator.is_first_better(next_seam,
                             layers[out_best_moved_seam.operator*().first].points[out_best_moved_seam.operator*().second]))) {
@@ -1275,7 +1278,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.operator*();
             const auto &next_seam = layers[next_seam_coords.first].points[next_seam_coords.second];
             bool is_moved = next_seam.perimeter.seam_index != next_seam_coords.second;
-            seam_variance_out += next_seam.visibility * (linear_position - next_seam.position).squaredNorm();
+            seam_variance_out += (linear_position - next_seam.position).squaredNorm() * next_seam.visibility;
             if (is_moved && (!out_best_moved_seam.has_value() ||
                     comparator.is_first_better(next_seam,
                             layers[out_best_moved_seam.operator*().first].points[out_best_moved_seam.operator*().second]))) {
@@ -1337,7 +1340,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
     }
 
     //sort them before alignment. Alignment is sensitive to initializaion, this gives it better chance to choose something nice
-    std::sort(seams.begin(), seams.end(),
+    std::stable_sort(seams.begin(), seams.end(),
             [&comparator, &layers](const std::pair<size_t, size_t> &left,
                     const std::pair<size_t, size_t> &right) {
                 return comparator.is_first_better(layers[left.first].points[left.second],
