@@ -1249,7 +1249,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
             Vec3f dir = (next_seam.position - prev_position);
-            straightening_dir = Vec3f(-dir.x()* 0.5f , -dir.y() * 0.5f, dir.z());
+            straightening_dir = Vec3f(-dir.x()*0.7, -dir.y()*0.7, dir.z());
         } else {
             if (step == 1) {
                 reverse_lookup_direction();
