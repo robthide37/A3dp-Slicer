@@ -149,12 +149,15 @@ void GLGizmoMeasure::on_render()
             ++m_currently_shown_plane;
         m_currently_shown_plane = std::clamp(m_currently_shown_plane, 0, std::max(0, int(m_planes.size())-1));
         m_imgui->text(std::to_string(m_currently_shown_plane));
-        m_imgui->checkbox(wxString("Show all"), m_show_all);
+        m_imgui->checkbox(wxString("Show all"), m_show_all_planes);
+        m_imgui->checkbox(wxString("Show points"), m_show_points);
+        m_imgui->checkbox(wxString("Show edges"), m_show_edges);
+        m_imgui->checkbox(wxString("Show circles"), m_show_circles);
         m_imgui->end();
 
 
-        int i = m_show_all ? 0 : m_currently_shown_plane;
-        for (int i = 0; i < (int)m_planes.size(); ++i) {
+        int i = m_show_all_planes ? 0 : m_currently_shown_plane;
+        for (; i < (int)m_planes.size(); ++i) {
             // Render all the borders.
             for (int j=0; j<(int)m_planes[i].vbos.size(); ++j) {
                 m_planes[i].vbos[j].set_color(j == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
@@ -165,7 +168,7 @@ void GLGizmoMeasure::on_render()
             // Render features:
             for (const SurfaceFeature& feature : m_planes[i].surface_features) {
                 Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(feature.pos));
-                if (feature.type == SurfaceFeature::Line) {
+                if (m_show_edges && feature.type == SurfaceFeature::Line) {
                     auto q  = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), feature.endpoint - feature.pos);
                     view_feature_matrix *= q;
                     view_feature_matrix.scale(Vec3d(0.3, 0.3, (feature.endpoint - feature.pos).norm()));
@@ -174,19 +177,21 @@ void GLGizmoMeasure::on_render()
                     m_vbo_cylinder.render();
                 }
 
-                view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(feature.pos));
-                view_feature_matrix.scale(0.5);
-                shader->set_uniform("view_model_matrix", view_feature_matrix);
-                m_vbo_sphere.set_color(feature.type == SurfaceFeature::Line
-                                           ? ColorRGBA(1.f, 0.f, 0.f, 1.f)
-                                           : ColorRGBA(0.f, 1.f, 0.f, 1.f));
-                m_vbo_sphere.render();
+                if (m_show_points && feature.type == SurfaceFeature::Line || m_show_circles && feature.type == SurfaceFeature::Circle) {
+                    view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(feature.pos));
+                    view_feature_matrix.scale(0.5);
+                    shader->set_uniform("view_model_matrix", view_feature_matrix);
+                    m_vbo_sphere.set_color(feature.type == SurfaceFeature::Line
+                                            ? ColorRGBA(1.f, 0.f, 0.f, 1.f)
+                                            : ColorRGBA(0.f, 1.f, 0.f, 1.f));
+                    m_vbo_sphere.render();
+                }
 
                 
                 shader->set_uniform("view_model_matrix", view_model_matrix);
             }
 
-            if (! m_show_all)
+            if (! m_show_all_planes)
                 break;
         }
     }
@@ -268,7 +273,7 @@ void GLGizmoMeasure::extract_features(GLGizmoMeasure::PlaneData& plane)
     plane.surface_features.clear();
     const Vec3d& normal = plane.normal;
 
-    const double edge_threshold = 10. * (M_PI/180.);
+    const double edge_threshold = 25. * (M_PI/180.);
 
     
     
@@ -276,9 +281,10 @@ void GLGizmoMeasure::extract_features(GLGizmoMeasure::PlaneData& plane)
         assert(border.size() > 1);
         assert(! border.front().isApprox(border.back()));
         double last_angle = 0.;
-        size_t first_idx = 0;
+        int first_idx = 0;
+        bool circle = false;
 
-        for (size_t i=0; i<border.size(); ++i) {
+        for (int i=0; i<int(border.size()); ++i) {
             const Vec3d& v2 = (i == 0 ? border[0] - border[border.size()-1]
                                       : border[i] - border[i-1]);
             const Vec3d& v1 = i == border.size()-1 ? border[0] - border.back()
@@ -287,10 +293,12 @@ void GLGizmoMeasure::extract_features(GLGizmoMeasure::PlaneData& plane)
             if (angle < -M_PI/2.)
                 angle += M_PI;
             std::cout << (180./M_PI) * angle << std::endl;
-                            
+ 
             if (i != 0) {
                 // This is not the first corner.
-                if (std::abs(angle) > edge_threshold || i == border.size() - 1) {
+                bool same_as_last = Slic3r::is_approx(angle, last_angle);
+
+                if (std::abs(angle) > edge_threshold || (! same_as_last && circle) || i == border.size() - 1) {
                     // Current feature ended. Save it and remember current point as beginning of the next.
                     bool is_line = (i == first_idx + 1);
                     plane.surface_features.emplace_back(SurfaceFeature{
@@ -300,11 +308,13 @@ void GLGizmoMeasure::extract_features(GLGizmoMeasure::PlaneData& plane)
                         0. // FIXME
                     });
                     first_idx = i;
-                } else if (Slic3r::is_approx(angle, last_angle)) {
+                    circle = false;
+                } else if (same_as_last && ! circle) {
                     // possibly a segment of a circle
-                } else {
+                    first_idx = std::max(i-2, 0);
+                    circle = true;
+                } else if (! circle) {
                     first_idx = i;
-
                 }
             }
             last_angle = angle;            
