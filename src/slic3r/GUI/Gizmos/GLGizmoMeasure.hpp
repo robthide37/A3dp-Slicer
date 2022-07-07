@@ -24,7 +24,10 @@ class GLGizmoMeasure : public GLGizmoBase
 private:
 
     int m_currently_shown_plane = 0;
-    bool m_show_all = false;
+    bool m_show_all_planes = false;
+    bool m_show_points = true;
+    bool m_show_edges = true;
+    bool m_show_circles = true;
 
     GLModel m_vbo_sphere;
     GLModel m_vbo_cylinder;
