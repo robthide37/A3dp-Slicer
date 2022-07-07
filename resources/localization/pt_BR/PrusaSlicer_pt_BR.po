@@ -7937,8 +7937,8 @@ msgid ""
 "because we will be able to focus our effort more efficiently and spend time on features that are needed the "
 "most."
 msgstr ""
-"Se conhecermos seu hardware, sistema operacional etc., isso nos ajudará muito no desenvolvimento e na priorização",
-"porque poderemos concentrar nossos esforços de forma mais eficiente e gastar tempo em recursos que são necessários"
+"Se conhecermos seu hardware, sistema operacional etc., isso nos ajudará muito no desenvolvimento e na priorização, "
+"porque poderemos concentrar nossos esforços de forma mais eficiente e gastar tempo em recursos que são necessários "
 "a maioria."
 
 #: src/slic3r/GUI/SendSystemInfoDialog.cpp:588
@@ -12861,7 +12861,7 @@ msgid ""
 "supports, while snug support towers will save material and reduce object scarring."
 msgstr ""
 "Estilo e forma das torres de suporte. Projetar os suportes em uma grade regular criará suportes mais "
-"estáveis, enquanto as torres de suporte confortáveis economizarão material e reduzirão as cicatrizes de objetos".
+"estáveis, enquanto as torres de suporte confortáveis economizarão material e reduzirão as cicatrizes de objetos."
 
 #: src/libslic3r/PrintConfig.cpp:2772
 msgid "Snug"
