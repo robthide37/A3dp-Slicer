@@ -11,6 +11,7 @@
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/LocaleUtils.hpp"
 #include "libslic3r/Technologies.hpp"
 #include "libslic3r/Tesselate.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -1152,13 +1153,13 @@ void GLCanvas3D::load_arrange_settings()
         wxGetApp().app_config->get("arrange", "enable_rotation_sla");
 
     if (!dist_fff_str.empty())
-        m_arrange_settings_fff.distance = std::stof(dist_fff_str);
+        m_arrange_settings_fff.distance = string_to_float_decimal_point(dist_fff_str);
 
     if (!dist_fff_seq_print_str.empty())
-        m_arrange_settings_fff_seq_print.distance = std::stof(dist_fff_seq_print_str);
+        m_arrange_settings_fff_seq_print.distance = string_to_float_decimal_point(dist_fff_seq_print_str);
 
     if (!dist_sla_str.empty())
-        m_arrange_settings_sla.distance = std::stof(dist_sla_str);
+        m_arrange_settings_sla.distance = string_to_float_decimal_point(dist_sla_str);
 
     if (!en_rot_fff_str.empty())
         m_arrange_settings_fff.enable_rotation = (en_rot_fff_str == "1" || en_rot_fff_str == "yes");
