@@ -1210,80 +1210,57 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
 
     //initialize searching for seam string - cluster of nearby seams on previous and next layers
     int next_layer = layer_idx + 1;
+    int step = 1;
     std::pair<size_t, size_t> prev_point_index = start_seam;
     std::vector<std::pair<size_t, size_t>> seam_string { start_seam };
-    Vec3f surface_line_dir { 0.0f, 0.0f, 1.0f };
-    Vec3f origin_position = layers[start_seam.first].points[start_seam.second].position;
+    Vec3f straightening_dir { 0.0f, 0.0f, 1.0f };
 
-    //find seams or potential seams in forward direction; there is a budget of skips allowed
-    while (next_layer < int(layers.size())) {
-        std::optional<std::pair<size_t, size_t>> maybe_next_seam;
-        float z_distance = float(po->get_layer(next_layer)->slice_z) - origin_position.z();
-        float max_distance = SeamPlacer::seam_align_tolerable_dist;
-        Vec3f linear_position = origin_position + z_distance * (surface_line_dir / surface_line_dir.z());
+    auto reverse_lookup_direction = [&]() {
+        step = -1;
+        prev_point_index = start_seam;
+        straightening_dir = Vec3f(0.0f, 0.0f, -1.0f);
+        next_layer = layer_idx - 1;
+    };
+
+    while (next_layer >= 0) {
+        if (next_layer >= layers.size()) {
+            reverse_lookup_direction();
+            if (next_layer < 0) {
+                break;
+            }
+        }
+        float max_distance = SeamPlacer::seam_align_tolerable_dist + straightening_dir.head<2>().norm();
         Vec3f prev_position = layers[prev_point_index.first].points[prev_point_index.second].position;
-        Vec3f projected_position(prev_position.x(), prev_position.y(), float(po->get_layer(next_layer)->slice_z));
+        float z_diff = fabs(float(po->get_layer(next_layer)->slice_z) - prev_position.z());
+        Vec3f projected_position = prev_position + z_diff * straightening_dir / fabs(straightening_dir.z());
 
-        if ((projected_position - linear_position).squaredNorm() < max_distance*max_distance){
-            maybe_next_seam = find_next_seam_in_layer(layers, linear_position, next_layer, max_distance,
-                    comparator);
-        }
-        if (!maybe_next_seam.has_value()) {
-            maybe_next_seam = find_next_seam_in_layer(layers, projected_position, next_layer,
-                    max_distance, comparator);
-        }
+        std::optional<std::pair<size_t, size_t>> maybe_next_seam = find_next_seam_in_layer(layers, projected_position,
+                next_layer,
+                max_distance, comparator);
 
         if (maybe_next_seam.has_value()) {
             // For old macOS (pre 10.14), std::optional does not have .value() method, so the code is using operator*() instead.
             std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.operator*();
             const auto &next_seam = layers[next_seam_coords.first].points[next_seam_coords.second];
             bool is_moved = next_seam.perimeter.seam_index != next_seam_coords.second;
-            string_weight += comparator.weight(next_seam) - (linear_position - next_seam.position).squaredNorm();
+            string_weight += comparator.weight(next_seam) -
+                    is_moved ? comparator.weight(layers[next_seam_coords.first].points[next_seam.perimeter.seam_index]) : 0.0f;
             seam_string.push_back(maybe_next_seam.operator*());
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
-            surface_line_dir += (next_seam.position - origin_position).normalized();
+            Vec3f dir = (next_seam.position - prev_position);
+            straightening_dir = Vec3f(-dir.x()* 0.5f , -dir.y() * 0.5f, dir.z());
         } else {
-            break;
+            if (step == 1) {
+                reverse_lookup_direction();
+                if (next_layer < 0) {
+                     break;
+                 }
+            } else {
+                break;
+            }
         }
-        next_layer++;
-    }
-
-    //do additional check in back direction
-    next_layer = layer_idx - 1;
-    prev_point_index = std::pair<size_t, size_t>(layer_idx, seam_index);
-    while (next_layer >= 0) {
-        std::optional<std::pair<size_t, size_t>> maybe_next_seam;
-        float z_distance = float(po->get_layer(next_layer)->slice_z) - origin_position.z();
-        float max_distance = SeamPlacer::seam_align_tolerable_dist;
-        Vec3f linear_position = origin_position + z_distance * (surface_line_dir / surface_line_dir.z());
-        Vec3f prev_position = layers[prev_point_index.first].points[prev_point_index.second].position;
-        Vec3f projected_position(prev_position.x(), prev_position.y(), float(po->get_layer(next_layer)->slice_z));
-
-        if ((projected_position - linear_position).squaredNorm() < max_distance*max_distance){
-            maybe_next_seam = find_next_seam_in_layer(layers, linear_position, next_layer, max_distance,
-                    comparator);
-        }
-        if (!maybe_next_seam.has_value()) {
-            Vec3f prev_position = layers[prev_point_index.first].points[prev_point_index.second].position;
-            Vec3f projected_position(prev_position.x(), prev_position.y(), float(po->get_layer(next_layer)->slice_z));
-            maybe_next_seam = find_next_seam_in_layer(layers, projected_position, next_layer,
-                    max_distance, comparator);
-        }
-
-        if (maybe_next_seam.has_value()) {
-            std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.operator*();
-            const auto &next_seam = layers[next_seam_coords.first].points[next_seam_coords.second];
-            bool is_moved = next_seam.perimeter.seam_index != next_seam_coords.second;
-            string_weight += comparator.weight(next_seam) - (linear_position - next_seam.position).squaredNorm();
-            seam_string.push_back(maybe_next_seam.operator*());
-            prev_point_index = seam_string.back();
-            //String added, prev_point_index updated
-            surface_line_dir -= (next_seam.position - origin_position).normalized();
-        } else {
-            break;
-        }
-        next_layer--;
+        next_layer += step;
     }
 
     return seam_string;
