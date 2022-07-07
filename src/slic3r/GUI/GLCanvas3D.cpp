@@ -1111,11 +1111,20 @@ void GLCanvas3D::load_arrange_settings()
     std::string dist_fff_str =
         wxGetApp().app_config->get("arrange", "min_object_distance_fff");
 
+    std::string dist_bed_fff_str =
+        wxGetApp().app_config->get("arrange", "min_bed_distance_fff");
+
     std::string dist_fff_seq_print_str =
         wxGetApp().app_config->get("arrange", "min_object_distance_fff_seq_print");
 
+    std::string dist_bed_fff_seq_print_str =
+        wxGetApp().app_config->get("arrange", "min_bed_distance_fff_seq_print");
+
     std::string dist_sla_str =
         wxGetApp().app_config->get("arrange", "min_object_distance_sla");
+
+    std::string dist_bed_sla_str =
+        wxGetApp().app_config->get("arrange", "min_bed_distance_sla");
 
     std::string en_rot_fff_str =
         wxGetApp().app_config->get("arrange", "enable_rotation_fff");
@@ -1129,11 +1138,20 @@ void GLCanvas3D::load_arrange_settings()
     if (!dist_fff_str.empty())
         m_arrange_settings_fff.distance = string_to_float_decimal_point(dist_fff_str);
 
+    if (!dist_bed_fff_str.empty())
+        m_arrange_settings_fff.distance_from_bed = string_to_float_decimal_point(dist_bed_fff_str);
+
     if (!dist_fff_seq_print_str.empty())
         m_arrange_settings_fff_seq_print.distance = string_to_float_decimal_point(dist_fff_seq_print_str);
 
+    if (!dist_bed_fff_seq_print_str.empty())
+        m_arrange_settings_fff_seq_print.distance_from_bed = string_to_float_decimal_point(dist_bed_fff_seq_print_str);
+
     if (!dist_sla_str.empty())
         m_arrange_settings_sla.distance = string_to_float_decimal_point(dist_sla_str);
+
+    if (!dist_bed_sla_str.empty())
+        m_arrange_settings_sla.distance_from_bed = string_to_float_decimal_point(dist_bed_sla_str);
 
     if (!en_rot_fff_str.empty())
         m_arrange_settings_fff.enable_rotation = (en_rot_fff_str == "1" || en_rot_fff_str == "yes");
@@ -4525,11 +4543,13 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
 
     bool settings_changed = false;
     float dist_min = 0.f;
-    std::string dist_key = "min_object_distance", rot_key = "enable_rotation";
+    float dist_bed_min = 0.f;
+    std::string dist_key = "min_object_distance";
+    std::string dist_bed_key = "min_bed_distance";
+    std::string rot_key = "enable_rotation";
     std::string postfix;
 
     if (ptech == ptSLA) {
-        dist_min     = 0.f;
         postfix      = "_sla";
     } else if (ptech == ptFFF) {
         auto co_opt = m_config->option<ConfigOptionBool>("complete_objects");
@@ -4543,7 +4563,8 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     }
 
     dist_key += postfix;
-    rot_key  += postfix;
+    dist_bed_key += postfix;
+    rot_key += postfix;
 
     imgui->text(GUI::format_wxstr(_L("Press %1%left mouse button to enter the exact value"), shortkey_ctrl_prefix()));
 
@@ -4551,6 +4572,13 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
         settings.distance = std::max(dist_min, settings.distance);
         settings_out.distance = settings.distance;
         appcfg->set("arrange", dist_key.c_str(), float_to_string_decimal_point(settings_out.distance));
+        settings_changed = true;
+    }
+
+    if (imgui->slider_float(_L("Spacing from bed"), &settings.distance_from_bed, dist_bed_min, 100.0f, "%5.2f") || dist_bed_min > settings.distance_from_bed) {
+        settings.distance_from_bed = std::max(dist_bed_min, settings.distance_from_bed);
+        settings_out.distance_from_bed = settings.distance_from_bed;
+        appcfg->set("arrange", dist_bed_key.c_str(), float_to_string_decimal_point(settings_out.distance_from_bed));
         settings_changed = true;
     }
 
@@ -4566,6 +4594,7 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
         settings_out = ArrangeSettings{};
         settings_out.distance = std::max(dist_min, settings_out.distance);
         appcfg->set("arrange", dist_key.c_str(), float_to_string_decimal_point(settings_out.distance));
+        appcfg->set("arrange", dist_bed_key.c_str(), float_to_string_decimal_point(settings_out.distance_from_bed));
         appcfg->set("arrange", rot_key.c_str(), settings_out.enable_rotation? "1" : "0");
         settings_changed = true;
     }
