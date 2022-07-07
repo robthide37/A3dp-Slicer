@@ -640,19 +640,38 @@ SurfaceCut::CutContour create_cut(const std::vector<HI> &outlines,
 /// <returns>Merged all surface cuts into one</returns>
 SurfaceCut merge_intersections(SurfaceCuts &cuts, const CutAOIs& cutAOIs, const std::vector<bool>& use_cut);
 
+// To track what was cutted of 
+struct SurfacePatch
+{
+    // converted cut to CGAL mesh
+    CutMesh mesh;
+    // converted source.second to mesh half edges
+    std::vector<HI> outline;
+
+    BoundingBoxf3 bb;
+
+    /// used during process
+    // flag that part will be deleted
+    bool full_inside = false;
+    // flag that Patch could contain more than one part
+    bool just_cliped = false;
+};
+using SurfacePatches = std::vector<SurfacePatch>;
+
 /// <summary>
 /// Differenciate other models
 /// </summary>
 /// <param name="cuts">Patches from meshes</param>
-/// <param name="use_cut">Define wanted cuts (addressing by m2i)</param>
 /// <param name="m2i">Convert model_index and cut_index into one index</param>
 /// <param name="cut_models">Source points for Cutted AOIs</param>
 /// <param name="models">Original models without cut modifications used for differenciate</param>
-void diff_models(VCutAOIs                &cuts,
-                 const std::vector<bool> &use_cut,
-                 const ModelCut2index    &m2i,
-                 const CutMeshes         &cut_models,
-                 /*const*/ CutMeshes     &models);
+/// <param name="projection">Define projection direction</param>
+/// <returns>Cuts differenciate by models - Patch</returns>
+SurfacePatches diff_models(VCutAOIs                 &cuts,
+                           const ModelCut2index     &m2i,
+                           const CutMeshes          &cut_models,
+                           /*const*/ CutMeshes      &models,
+                           const Emboss::IProject3f &projection);
 
 // keep CGAL Mesh for next processing
 struct SurfaceCutWithMesh : public SurfaceCut{
@@ -682,6 +701,7 @@ indexed_triangle_set create_indexed_triangle_set(const std::vector<FI> &faces,
 void store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string &file);
 void store(CutMesh &mesh, const ReductionMap &reduction_map, const std::string &file);
 void store(const CutAOIs &aois, const CutMesh &mesh, const std::string &dir);
+void store(const SurfacePatches &patches, const std::string &dir);
 void store(const Vec3f &vertex, const Vec3f &normal, const std::string &file, float size = 2.f);
 void store(const ProjectionDistances &pds, const VCutAOIs &aois, const CutMeshes &meshes, const std::string &file, float width = 0.2f/* [in mm] */);
 void store(const SurfaceCuts &cut, const std::string &dir);
@@ -758,6 +778,12 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
         model_cuts.push_back(std::move(cutAOIs));
     }
 
+    priv::ModelCut2index m2i(model_cuts);
+    priv::SurfacePatches patches = priv::diff_models(model_cuts, m2i, cgal_models, cgal_neg_models, projection);
+#ifdef DEBUG_OUTPUT_DIR
+    priv::store(patches, DEBUG_OUTPUT_DIR + "patches/");
+#endif // DEBUG_OUTPUT_DIR
+
     // calc distance to projection for all outline points of cutAOI(shape)
     // it is used for distiguish the top one
     uint32_t shapes_points = s2i.get_count();
@@ -773,14 +799,12 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     store(best_projection, model_cuts, cgal_models, DEBUG_OUTPUT_DIR + "best_projection.obj"); // only debug
 #endif // DEBUG_OUTPUT_DIR
 
-    priv::ModelCut2index m2i(model_cuts);
     // Create mask for wanted AOIs
     std::vector<bool> is_best_cut(m2i.get_count(), {false});  
     for (const priv::ProjectionDistance& d : best_projection)
         if (d.model_index != std::numeric_limits<uint32_t>::max())
             is_best_cut[m2i.calc_index({d.model_index, d.aoi_index})] = true; 
 
-    priv::diff_models(model_cuts, is_best_cut, m2i, cgal_models, cgal_neg_models);
     
     // IMPROVE: create reduce map on demand - may be model do not need it (when it is not used for result)
     // Reduction prepare
@@ -2632,27 +2656,20 @@ void create_face_types(FaceTypeMap           &map,
                        const EcmType         &ecm,
                        const VertexSourceMap &sources);
 
-// To track what was cutted of 
-struct ExtendAOI
-{
-    // source for extend
-    const CutAOI *source;
-    // converted cut to CGAL mesh
-    CutMesh mesh;
-};
-
 /// <summary>
 /// Implement 'cut' Minus 'clipper', where clipper is reverse input Volume
 /// NOTE: clipper will be modified (corefined by cut) !!!
 /// </summary>
 /// <param name="cut">differ from</param>
 /// <param name="clipper">differ what</param>
-void clip_cut(ExtendAOI &cut, CutMesh clipper);
+/// <returns>True on succes, otherwise FALSE</returns>
+bool clip_cut(SurfacePatch &cut, CutMesh clipper);
 
 BoundingBoxf3 bounding_box(const CutAOI &cut, const CutMesh &mesh);
-BoundingBoxf3 bounding_box(const ExtendAOI &ecut);
+BoundingBoxf3 bounding_box(const CutMesh &mesh);
+BoundingBoxf3 bounding_box(const SurfacePatch &ecut);
 
-ExtendAOI create_extend_aoi(CutAOI &cut, const CutMesh &mesh);
+SurfacePatch create_surface_patch(CutAOI &cut, const CutMesh &mesh);
 
 } // namespace priv
 
@@ -2760,10 +2777,11 @@ void priv::create_face_types(FaceTypeMap           &map,
 
 #include <CGAL/Polygon_mesh_processing/clip.h>
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
-void priv::clip_cut(ExtendAOI &cut, CutMesh clipper)
+bool priv::clip_cut(SurfacePatch &cut, CutMesh clipper)
 {
+    CutMesh& tm = cut.mesh; 
     // create backup for case that there is no intersection
-    CutMesh backup_copy = cut.mesh; 
+    CutMesh backup_copy = tm; 
 
     class ExistIntersectionClipVisitor: public CGAL::Polygon_mesh_processing::Corefinement::Default_visitor<CutMesh>
     {
@@ -2774,24 +2792,30 @@ void priv::clip_cut(ExtendAOI &cut, CutMesh clipper)
         { *exist_intersection = true;}
     };
     bool exist_intersection = false;
-    ExistIntersectionClipVisitor visitor{&exist_intersection};
+    ExistIntersectionClipVisitor visitor{&exist_intersection};    
+    
+    // bool map for affected edge
+    EcmType ecm = get(DynamicEdgeProperty(), tm);
 
     // namep parameters for model tm and function clip
     const auto &np_tm = CGAL::parameters::visitor(visitor)
+                            .edge_is_constrained_map(ecm)
                             .throw_on_self_intersection(false);
     
     // name parameters for model clipper and function clip
-    // Can't use 'do_not_modify' need clipper to be closed
-    //const auto &np_c = CGAL::parameters::do_not_modify(true);
+    const auto &np_c = CGAL::parameters::throw_on_self_intersection(false);
+    // Can't use 'do_not_modify', when Ture than clipper has to be closed !!
+    // .do_not_modify(true);
     // .throw_on_self_intersection(false); is set automaticaly by param 'do_not_modify'
     // .clip_volume(false); is set automaticaly by param 'do_not_modify'
+        
 
     std::string dir = "C:/data/temp/out/";
     static int i = 0;
-    CGAL::IO::write_OFF(dir + "in_patch"+std::to_string(i)+".off", cut.mesh);
+    CGAL::IO::write_OFF(dir + "in_patch"+std::to_string(i)+".off", tm);
     CGAL::IO::write_OFF(dir + "in_model"+std::to_string(i)+".off", clipper);
-    bool suc = CGAL::Polygon_mesh_processing::clip(cut.mesh, clipper, np_tm);
-    CGAL::IO::write_OFF(dir + "out_patch"+std::to_string(i)+".off", cut.mesh);
+    bool suc = CGAL::Polygon_mesh_processing::clip(tm, clipper, np_tm, np_c);
+    CGAL::IO::write_OFF(dir + "out_patch"+std::to_string(i)+".off", tm);
     CGAL::IO::write_OFF(dir + "out_model"+std::to_string(i++)+".off", clipper);
 
     // true if the output surface mesh is manifold. 
@@ -2801,12 +2825,13 @@ void priv::clip_cut(ExtendAOI &cut, CutMesh clipper)
     if (!exist_intersection  || !suc) {
         // TODO: test if cut is fully in or fully out!!
         cut.mesh = backup_copy;
-        return;
+        return false;
     }
 
     // TODO: fix outlines list
+    // Need to trace clip (corefine line)
 
-    return;
+    return true;
     //Store_VI_pairs::Pairs intersections;
     //std::string vertex_source_map_name = "v:source_intersections";
     //VertexSourceMap vmap = tm1.add_property_map<VI, Source>(vertex_source_map_name).first;
@@ -2869,14 +2894,14 @@ BoundingBoxf3 priv::bounding_box(const CutAOI &cut, const CutMesh &mesh) {
     return BoundingBoxf3(min, max);
 }
 
-BoundingBoxf3 priv::bounding_box(const ExtendAOI &ecut) {
-    const CutMesh& mesh = ecut.mesh;
+BoundingBoxf3 priv::bounding_box(const CutMesh &mesh)
+{
     const P3      &p_from_cut = *mesh.points().begin();
-    Vec3d min(p_from_cut.x(), p_from_cut.y(), p_from_cut.z());
-    Vec3d max = min;
-    for (VI vi: mesh.vertices()) { 
-        const P3& p = mesh.point(vi);
-        for (size_t i = 0; i < 3; ++i) { 
+    Vec3d          min(p_from_cut.x(), p_from_cut.y(), p_from_cut.z());
+    Vec3d          max = min;
+    for (VI vi : mesh.vertices()) {
+        const P3 &p = mesh.point(vi);
+        for (size_t i = 0; i < 3; ++i) {
             if (min[i] > p[i]) min[i] = p[i];
             if (max[i] < p[i]) max[i] = p[i];
         }
@@ -2884,7 +2909,11 @@ BoundingBoxf3 priv::bounding_box(const ExtendAOI &ecut) {
     return BoundingBoxf3(min, max);
 }
 
-priv::ExtendAOI priv::create_extend_aoi(CutAOI &cut, const CutMesh &mesh)
+BoundingBoxf3 priv::bounding_box(const SurfacePatch &ecut) {
+    return bounding_box(ecut.mesh);
+}
+
+priv::SurfacePatch priv::create_surface_patch(CutAOI &cut, const CutMesh &mesh)
 {
     std::vector<bool> is_counted(mesh.vertices().size(), {false});
     uint32_t count_vertices = 0;
@@ -2920,14 +2949,29 @@ priv::ExtendAOI priv::create_extend_aoi(CutAOI &cut, const CutMesh &mesh)
         }
         cm.add_face(t[0], t[1], t[2]);
     }
-    return {&cut, cm};
+    
+    // converted source.second to mesh half edges
+    std::vector<HI> outline;
+    outline.reserve(cut.second.size());
+    for (HI hi : cut.second) {
+        VI vi_s = mesh.source(hi);
+        VI vi_t = mesh.target(hi);
+
+        VI vi_s2(v_cvt[vi_s.idx()]);
+        VI vi_t2(v_cvt[vi_t.idx()]);
+        // converted half edge
+        HI hi_cvt = cm.halfedge(vi_s2, vi_t2);
+        outline.push_back(hi_cvt);
+    }
+
+    return {std::move(cm), std::move(outline)};
 }
 
-void priv::diff_models(VCutAOIs                &cuts,
-                       const std::vector<bool> &use_cut,
-                       const ModelCut2index    &m2i,
-                       const CutMeshes         &cut_models,
-                       /*const*/ CutMeshes     &models)
+priv::SurfacePatches priv::diff_models(VCutAOIs                 &cuts,
+                                       const ModelCut2index     &m2i,
+                                       const CutMeshes          &cut_models,
+                                       /*const*/ CutMeshes      &models,
+                                       const Emboss::IProject3f &projection)
 {
     // create bounding boxes for cuts
     std::vector<BoundingBoxf3> bbs;    
@@ -2941,53 +2985,170 @@ void priv::diff_models(VCutAOIs                &cuts,
         }
     }
 
-    // keep converted AOI to extend from
-    std::vector<std::optional<ExtendAOI>> ecuts(m2i.get_count());
+    // check whether cut has intersection with model
+    auto has_bb_intersection = [&bbs, &m2i, &cuts]
+    (const BoundingBoxf3 &bb, size_t model_index) -> bool {
+        // for cut index with model_index2
+        size_t start = m2i.calc_index({uint32_t(model_index), 0});
+        size_t end   = start + cuts[model_index].size();
+        for (size_t bb_index = start; bb_index < end; bb_index++)
+            if (bb.intersects(bbs[bb_index])) return true;
+        return false;        
+    };
 
-    // NOTE: bad model could have self intersection but this can't solve it
-    // find intersection of cuts by Bounding boxes intersection
+    // Do not make Tree twice, when exist out of cut function
+    using Primitive = CGAL::AABB_face_graph_triangle_primitive<CutMesh>;
+    using Traits = CGAL::AABB_traits<EpicKernel, Primitive>;
+    using Ray = EpicKernel::Ray_3;
+    using Tree = CGAL::AABB_tree<Traits>;
+    using Trees = std::vector<Tree>;
+    Trees trees;
+    trees.reserve(models.size());
+    for (CutMesh &model: models) {
+        Tree tree;
+        tree.insert(faces(model).first, faces(model).second, model);
+        tree.build();
+        trees.emplace_back(std::move(tree));
+    }
+
+    // only for model without intersection
+    // use ray from any point in projection direction
+    auto is_patch_inside_of_model = [&trees, &projection]
+    (SurfacePatch &patch, size_t model_index) {
+        // TODO: Solve model with hole in projection direction !!!
+        const P3 &a = patch.mesh.point(VI(0));
+        Vec3f a_(a.x(), a.y(), a.z());
+        Vec3f b_ = projection.project(a_);
+        P3 b(b_.x(), b_.y(), b_.z());
+        Tree &tree = trees[model_index];
+
+        Ray ray_query(a, b);
+        size_t count = tree.number_of_intersected_primitives(ray_query);
+        bool is_in = (count % 2) == 1;
+
+        // try opposit direction result should be same, otherwise open model is used
+        //Vec3f c_ = a_ - (b_ - a_); // opposit direction
+        //P3 c(c_.x(), c_.y(), c_.z());
+        //Ray ray_query2(a, b);
+        //size_t count2 = tree.number_of_intersected_primitives(ray_query2);
+        //bool is_in2 = (count2 % 2) == 1;
+        assert(((tree.number_of_intersected_primitives(
+                     Ray(a, P3(2 * a.x() - b.x(), 
+                               2 * a.y() - b.y(),
+                               2 * a.z() - b.z()))) %
+                 2) == 1) == is_in);
+        return is_in;        
+    };
+
+    // separate connected triangles into it's own patches
+    // new patches are added to back of input patches
+    auto divide_patch = [](size_t i, SurfacePatches &patches) {
+        SurfacePatch &patch = patches[i];
+        assert(patch.just_cliped);
+        patch.just_cliped = false;
+
+        constexpr size_t def_value = std::numeric_limits<size_t>::max();
+
+        CutMesh& cm = patch.mesh;
+        std::string patch_number_name = "f:patch_number";
+        auto patch_number = cm.add_property_map<FI, size_t>(patch_number_name, {def_value}).first;        
+
+        size_t number = 0;
+        std::vector<FI> queue;
+        // IMPROVE: create groups around triangles and than connect groups
+        for (FI fi_cm : cm.faces()) {
+            if (patch_number[fi_cm] != def_value) continue;
+            assert(queue.empty());
+            queue.push_back(fi_cm);
+            // flood fill from triangle fi_cm to surrounding
+            do {
+                FI fi_q = queue.back();
+                queue.pop_back();
+                if (patch_number[fi_q] != def_value) { 
+                    assert(patch_number[fi_q] == number);
+                    continue; 
+                }
+                patch_number[fi_q] = number;
+                HI hi = cm.halfedge(fi_q);
+                for (FI fi : cm.faces_around_face(hi)) {
+                    // by documentation The face descriptor may be the null face, and it may be several times the same face descriptor.
+                    if (!fi.is_valid()) continue;
+                    if (patch_number[fi] == def_value) queue.push_back(fi);
+                }
+            } while (!queue.empty());
+            ++number;
+        }
+
+        // speed up for only one patch - no dividing (the most common)
+        if (number == 1) {
+            cm.remove_property_map(patch_number);
+            patch.bb = bounding_box(cm);
+            return;
+        }
+
+        auto separate_patch = [&patch_number, &cm](size_t n) -> SurfacePatch {
+            CutAOI cut;
+            for (FI fi_cm : cm.faces())
+                if (patch_number[fi_cm] == n) cut.first.push_back(fi_cm);
+            SurfacePatch patch = create_surface_patch(cut, cm);
+            patch.bb = bounding_box(patch.mesh);
+            return patch;
+        };
+
+        for (size_t n = 1; n < number; n++)
+            patches.push_back(separate_patch(n));
+        patch = separate_patch(0);
+    };
+
+    std::vector<bool> removed(m2i.get_count(), {false});
+    SurfacePatches patches;
+    // queue of patches for one AOI (permanent with respect to for loop)
+    SurfacePatches aoi_patches;
+    patches.reserve(m2i.get_count()); // only approximation of count
     size_t index = 0;
     for (size_t model_index = 0; model_index < models.size(); ++model_index) {
         CutAOIs &model_cuts = cuts[model_index];
-        for (size_t cut_index = 0; cut_index < model_cuts.size(); ++cut_index, ++index)
-        {
-            if (!use_cut[index]) continue;
-            BoundingBoxf3 &result_bb = bbs[index];
-            std::optional<ExtendAOI> &ecut = ecuts[index];
-            if (!ecut.has_value()) {
-                CutAOI &cut = model_cuts[cut_index];
-                const CutMesh &cut_model = cut_models[model_index];
-                ecut = create_extend_aoi(cut, cut_model);
-            }
-
-            // all differenced models from this model
-            std::vector<bool> differenced(models.size(), {false});
-            // do not merge itself 
-            differenced[model_index] = true;
-                        
-            // check when exist intersection with result_bb
-            size_t index2 = 0;
+        const CutMesh &cut_model = cut_models[model_index];
+        for (size_t cut_index = 0; cut_index < model_cuts.size(); ++cut_index, ++index) {
+            CutAOI &cut = model_cuts[cut_index];
+            SurfacePatch patch = create_surface_patch(cut, cut_model);
+            patch.bb = bbs[index];
+            aoi_patches.clear();
+            aoi_patches.push_back(patch);
             for (size_t model_index2 = 0; model_index2 < models.size(); ++model_index2) {
-                if (differenced[model_index2]) {
-                    if ((model_index2+1) < models.size())
-                        index2 = m2i.calc_index({uint32_t(model_index2 + 1), 0});
-                    continue; 
+                // do not clip source model itself
+                if (model_index == model_index2) continue;
+                for (SurfacePatch &patch : aoi_patches) {
+                    if (has_bb_intersection(patch.bb, model_index2) &&
+                        clip_cut(patch, models[model_index2])){
+                        patch.just_cliped = true;
+                    } else if (is_patch_inside_of_model(patch, model_index2))
+                        patch.full_inside = true;
                 }
-                size_t count_cuts = cuts[model_index2].size();
-                for (size_t cut_index2 = 0; cut_index2 < count_cuts; ++cut_index2, ++index2){
-                    const BoundingBoxf3 &bb = bbs[index2];
-                    if (!bb.intersects(result_bb)) continue;
-                    priv::clip_cut(*ecut, models[model_index2]);
-                    differenced[model_index2] = true;
-                    if ((model_index2+1) < models.size())
-                        index2 = m2i.calc_index({uint32_t(model_index2 + 1), 0});
+                // erase full inside
+                for (size_t i = aoi_patches.size(); i != 0; --i) {
+                    auto it = aoi_patches.begin() + (i - 1);
+                    if (it->full_inside) aoi_patches.erase(it);
+                }
+                if (aoi_patches.empty()) {
+                    removed[index] = true;
                     break;
                 }
+                // divide cliped into parts
+                size_t end = aoi_patches.size();
+                for (size_t i = 0; i < end; ++i)
+                    if (aoi_patches[i].just_cliped)
+                        divide_patch(i, aoi_patches);
             }
-        }    
-    }
-
-    // TODO: convert ecuts to CutSurface
+            if (!removed[index])
+                patches.insert(patches.end(), 
+                    aoi_patches.begin(),
+                    aoi_patches.end());
+        }
+    }    
+    return patches;
+    // TODO: reduce outlines
+    // TODO: add cutting edge
 
     // TODO: merge AOIs without intersection - only append
     
@@ -3283,6 +3444,14 @@ void priv::store(const CutAOIs &aois, const CutMesh &mesh, const std::string &di
         std::string file_outline = dir + "outline" + std::to_string(index) + ".obj";
         indexed_triangle_set outline = create_outline_its(aoi.second);
         its_write_obj(outline, file_outline.c_str());
+    }
+}
+
+void priv::store(const SurfacePatches &patches, const std::string &dir) {
+    for (const priv::SurfacePatch &patch : patches) {
+        size_t index = &patch - &patches.front();
+        if (patch.mesh.faces().empty()) continue;
+        CGAL::IO::write_OFF(dir + "patch" + std::to_string(index) + ".off", patch.mesh);
     }
 }
 
