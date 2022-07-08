@@ -839,7 +839,7 @@ struct SeamComparator {
 
     float weight(const SeamCandidate &a) const {
     	if (setup == SeamPosition::spAligned && a.central_enforcer) {
-    		return 3.0f;
+    		return 2.0f;
     	}
         return a.visibility + angle_importance * compute_angle_penalty(a.local_ccw_angle) / (1.0f + angle_importance);
     }
@@ -1206,7 +1206,6 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
     string_weight = 0.0f;
     const std::vector<PrintObjectSeamData::LayerSeams> &layers = m_seam_per_object.find(po)->second.layers;
     int layer_idx = start_seam.first;
-    int seam_index = start_seam.second;
 
     //initialize searching for seam string - cluster of nearby seams on previous and next layers
     int next_layer = layer_idx + 1;
@@ -1223,7 +1222,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
     };
 
     while (next_layer >= 0) {
-        if (next_layer >= layers.size()) {
+        if (next_layer >= int(layers.size())) {
             reverse_lookup_direction();
             if (next_layer < 0) {
                 break;
@@ -1249,7 +1248,7 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
             Vec3f dir = (next_seam.position - prev_position);
-            straightening_dir = Vec3f(-dir.x()*0.7, -dir.y()*0.7, dir.z());
+            straightening_dir = Vec3f(-dir.x()*0.0, -dir.y()*0.0, dir.z());
         } else {
             if (step == 1) {
                 reverse_lookup_direction();
@@ -1387,16 +1386,12 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
 
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
             // Perimeter structure of the point; also set flag aligned to true
-            auto sigmoid_angle_snapping_func = [](float angle){
-            	float steepness = 10.0f;
-            	float exp_val = steepness * (abs(angle) - SeamPlacer::sharp_angle_snapping_threshold);
-            	float sig_term = exp(exp_val);
-            	return sig_term / (sig_term + 1.0f);
-            };
-
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const auto &pair = seam_string[index];
-                float t = sigmoid_angle_snapping_func(layers[pair.first].points[pair.second].local_ccw_angle);
+                const float t =
+                        abs(layers[pair.first].points[pair.second].local_ccw_angle)
+                                > SeamPlacer::sharp_angle_snapping_threshold
+                                ? 1.0 : 0.0f;
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
                 Vec2f fitted_pos = curve.get_fitted_value(current_pos.z());
 
