@@ -342,6 +342,8 @@ BoundingBoxf3 Bed3D::calc_extended_bounding_box() const
     // Reset the build volume Z, we don't want to zoom to the top of the build volume if it is empty.
     out.min.z() = 0.0;
     out.max.z() = 0.0;
+    // extend to origin in case origin is off bed
+    out.merge(m_axes.get_origin());
     // extend to contain axes
     out.merge(m_axes.get_origin() + m_axes.get_total_length() * Vec3d::Ones());
 #if ENABLE_WORLD_COORDINATE
