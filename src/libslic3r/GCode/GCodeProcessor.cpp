@@ -3237,8 +3237,17 @@ void GCodeProcessor::process_M83(const GCodeReader::GCodeLine& line)
 void GCodeProcessor::process_M104(const GCodeReader::GCodeLine& line)
 {
     float new_temp;
-    if (line.has_value('S', new_temp))
-        m_extruder_temps[m_extruder_id] = new_temp;
+    if (line.has_value('S', new_temp)) {
+        size_t id = m_extruder_id;
+        float val;
+        if (line.has_value('T', val)) {
+            const size_t eid = static_cast<size_t>(val);
+            if (eid < m_extruder_temps.size())
+                id = eid;
+        }
+
+        m_extruder_temps[id] = new_temp;
+    }
 }
 
 void GCodeProcessor::process_M106(const GCodeReader::GCodeLine& line)
@@ -3279,7 +3288,7 @@ void GCodeProcessor::process_M109(const GCodeReader::GCodeLine& line)
     if (line.has_value('R', new_temp)) {
         float val;
         if (line.has_value('T', val)) {
-            size_t eid = static_cast<size_t>(val);
+            const size_t eid = static_cast<size_t>(val);
             if (eid < m_extruder_temps.size())
                 m_extruder_temps[eid] = new_temp;
         }
