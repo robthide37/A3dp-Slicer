@@ -69,15 +69,6 @@ SurfaceCut cut_surface(const ExPolygons                        &shapes,
                        const Emboss::IProjection               &projection,
                        float projection_ratio);
 
-
-/// <summary>
-/// Create model from surface cuts by projection
-/// </summary>
-/// <param name="cuts">Surfaces from model</param>
-/// <param name="projection">Way of emboss</param>
-/// <returns>Mesh</returns>
-indexed_triangle_set cuts2model(const SurfaceCuts        &cuts,
-                                const Emboss::IProject3f &projection);
 /// <summary>
 /// Create model from surface cuts by projection
 /// </summary>
@@ -86,7 +77,6 @@ indexed_triangle_set cuts2model(const SurfaceCuts        &cuts,
 /// <returns>Mesh</returns>
 indexed_triangle_set cut2model(const SurfaceCut         &cut,
                                const Emboss::IProject3f &projection);
-
 
 } // namespace Slic3r
 #endif // slic3r_CutSurface_hpp_
