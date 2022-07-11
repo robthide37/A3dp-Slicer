@@ -471,29 +471,24 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
     std::vector<float> polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
             SeamPlacer::polygon_local_angles_arm_distance);
-    std::vector<float> global_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
-            SeamPlacer::polygon_global_angles_arm_distance);
-    for (size_t angle_index = 0; angle_index < polygon_angles.size(); ++angle_index) {
-		if (fabs(global_angles[angle_index] > fabs(polygon_angles[angle_index]))){
-			polygon_angles[angle_index] = global_angles[angle_index];
-		}
-	}
 
     // resample smooth surfaces, so that alignment finds short path down, and does not create unnecesary curves
     if (std::all_of(polygon_angles.begin(), polygon_angles.end(), [](float angle) {
     	return fabs(angle) < SeamPlacer::sharp_angle_snapping_threshold;
     })) {
-    	float avg_dist = std::accumulate(lengths.begin(), lengths.end(), 0.0f) / float(lengths.size());
-    	coord_t sampling_dist = scaled(avg_dist*0.2f);
+    	float total_dist = std::accumulate(lengths.begin(), lengths.end(), 0.0f);
+    	float avg_dist = total_dist / float(lengths.size());
+    	if (avg_dist < SeamPlacer::seam_align_tolerable_dist * 2.0f){
+			coord_t sampling_dist = scaled(avg_dist*0.2f);
 
-    	polygon.points = polygon.equally_spaced_points(sampling_dist);
-    	lengths.clear();
-    	for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
-			lengths.push_back((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm());
+			polygon.points = polygon.equally_spaced_points(sampling_dist);
+			lengths.clear();
+			for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
+				lengths.push_back((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm());
+			}
+			lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
+			polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths, avg_dist);
 		}
-		lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
-    	polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
-    	            SeamPlacer::polygon_global_angles_arm_distance);
     }
 
 
