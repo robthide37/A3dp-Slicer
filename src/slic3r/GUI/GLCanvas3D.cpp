@@ -1382,6 +1382,8 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
             && (instance_idx == -1 || vol->composite_id.instance_id == instance_idx)
             && (mv == nullptr || m_model->objects[vol->composite_id.object_id]->volumes[vol->composite_id.volume_id] == mv)) {
                 vol->is_active = visible;
+                if (!vol->is_modifier)
+                    vol->color.a(1.f);
 
                 if (instance_idx == -1) {
                     vol->force_native_color = false;
@@ -1390,9 +1392,13 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
                     const GLGizmosManager& gm = get_gizmos_manager();
                     auto gizmo_type = gm.get_current_type();
                     if (    (gizmo_type == GLGizmosManager::FdmSupports
-                          || gizmo_type == GLGizmosManager::Seam)
-                        && ! vol->is_modifier)
+                          || gizmo_type == GLGizmosManager::Seam
+                          || gizmo_type == GLGizmosManager::Cut)
+                        && ! vol->is_modifier) {
                         vol->force_neutral_color = true;
+                        if (gizmo_type == GLGizmosManager::Cut)
+                            vol->color.a(0.95f);
+                    }
                     else if (gizmo_type == GLGizmosManager::MmuSegmentation)
                         vol->is_active = false;
                     else

@@ -11,6 +11,7 @@
 #include "GalleryDialog.hpp"
 #include "MainFrame.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
+#include "Gizmos/GLGizmoCut.hpp"
 
 #include "OptionsGroup.hpp"
 #include "Tab.hpp"
@@ -2579,6 +2580,10 @@ void ObjectList::part_selection_changed()
                         GLGizmosManager& gizmos_mgr = wxGetApp().plater()->canvas3D()->get_gizmos_manager();
                         if (gizmos_mgr.get_current_type() != gizmo_type)
                             gizmos_mgr.open_gizmo(gizmo_type);
+                        if (info_type == InfoItemType::Cut) {
+                            GLGizmoCut3D* cut = dynamic_cast<GLGizmoCut3D*>(gizmos_mgr.get_current());
+                            cut->set_connectors_editing();
+                        }
                         break;
                     }
                     case InfoItemType::Sinking: { break; }

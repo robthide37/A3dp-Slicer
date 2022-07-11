@@ -124,6 +124,7 @@ public:
     void put_connetors_on_cut_plane(const Vec3d& cp_normal, double cp_offset);
     void update_clipper();
     void update_clipper_on_render();
+    void set_connectors_editing() { m_connectors_editing = true; }
 
     BoundingBoxf3   bounding_box() const;
     BoundingBoxf3   transformed_bounding_box(bool revert_move = false) const;
@@ -153,6 +154,7 @@ private:
     void set_center(const Vec3d& center);
     bool render_combo(const std::string& label, const std::vector<std::string>& lines, size_t& selection_idx);
     bool render_double_input(const std::string& label, double& value_in);
+    bool render_slicer_double_input(const std::string& label, double& value_in);
     void render_move_center_input(int axis);
     void render_rotation_input(int axis);
     void render_connect_mode_radio_button(CutConnectorMode mode);

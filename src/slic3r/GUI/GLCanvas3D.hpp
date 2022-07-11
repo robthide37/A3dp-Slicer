@@ -855,6 +855,7 @@ public:
     Linef3 mouse_ray(const Point& mouse_pos);
 
     bool is_mouse_dragging() const { return m_mouse.dragging; }
+    void set_mouse_as_dragging() { m_mouse.dragging = true; }
 
     double get_size_proportional_to_max_bed_size(double factor) const;
 
