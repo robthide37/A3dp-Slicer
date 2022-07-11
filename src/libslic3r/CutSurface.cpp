@@ -270,6 +270,7 @@ using CvtVI2VI = CutMesh::Property_map<VI, VI>;
 const std::string patch_source_name = "v:patch_source";
 const std::string vertex_reduction_map_name = "v:reduction";
 using ReductionMap = CvtVI2VI;
+
 /// <summary>
 /// Create map to reduce unnecesary triangles,
 /// Triangles are made by divided quad to two triangles
@@ -330,6 +331,7 @@ struct SurfacePatch
     // converted source.second to mesh half edges
     std::vector<HI> outline;
 
+    // bounding box of mesh
     BoundingBoxf3 bb;
 
     //// Data needed to find best projection distances
@@ -337,10 +339,8 @@ struct SurfacePatch
     size_t model_id;
     // index of source CutAOI
     size_t aoi_id;
-
     // index of shape from ExPolygons
     size_t shape_id = 0;
-    // TODO: fill by point from AOI outline
 
     //// Used only during clipping phase
     // flag that part will be deleted
@@ -577,8 +577,7 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     BoundingBox shapes_bb = get_extents(shapes);
 #ifdef DEBUG_OUTPUT_DIR
     Point projection_center = shapes_bb.center();
-    priv::store(projection, projection_center, projection_ratio,
-                DEBUG_OUTPUT_DIR + "projection_center.obj");
+    priv::store(projection, projection_center, projection_ratio, DEBUG_OUTPUT_DIR + "projection_center.obj");
 #endif // DEBUG_OUTPUT_DIR
 
     // for filttrate opposite triangles and a little more
@@ -980,10 +979,10 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
             bool    is_last   = size_t(i + 2) >= indices.size();
             int32_t j = is_last ? 0 : (i + 2);
             
-            auto fi1 = result.add_face(indices[i], indices[j], indices[i + 1]);
-            auto ei1 = find_edge(fi1, indices[i + 1], indices[i]);
-            auto ei2 = find_edge(fi1, indices[j], indices[i + 1]);
-            auto fi2 = result.add_face(indices[j], indices[j + 1], indices[i + 1]);
+            FI fi1 = result.add_face(indices[i], indices[j], indices[i + 1]);
+            EI ei1 = find_edge(fi1, indices[i + 1], indices[i]);
+            EI ei2 = find_edge(fi1, indices[j], indices[i + 1]);
+            FI fi2 = result.add_face(indices[j], indices[j + 1], indices[i + 1]);
             IntersectingElement element {contour_index, (unsigned char)IntersectingElement::Type::undefined};
             if (is_first) element.set_is_first();
             if (is_last) element.set_is_last();
@@ -1008,6 +1007,104 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
     }
     return result;
 }
+
+priv::ShapePoint2index::ShapePoint2index(const ExPolygons &shapes)
+{
+    // prepare offsets
+    m_offsets.reserve(shapes.size());
+    uint32_t offset = 0;
+    for (const auto &shape : shapes) {
+        assert(!shape.contour.points.empty());
+        std::vector<uint32_t> shape_offsets(shape.holes.size() + 1);
+
+        shape_offsets[0] = offset;
+        offset += shape.contour.points.size();
+
+        for (uint32_t i = 0; i < shape.holes.size(); i++) {
+            shape_offsets[i + 1] = offset;
+            offset += shape.holes[i].points.size();
+        }
+        m_offsets.push_back(std::move(shape_offsets));
+    }
+    m_count = offset;
+}
+
+uint32_t priv::ShapePoint2index::calc_index(const ShapePointId &id) const
+{
+    assert(id.expolygons_index < m_offsets.size());
+    const std::vector<uint32_t> &shape_offset = m_offsets[id.expolygons_index];
+    assert(id.polygon_index < shape_offset.size());
+    uint32_t res = shape_offset[id.polygon_index] + id.point_index;
+    assert(res < m_count);
+    return res;
+}
+
+priv::ShapePointId priv::ShapePoint2index::calc_id(uint32_t index) const
+{
+    assert(index < m_count);
+    ShapePointId result;
+    // find shape index
+    result.expolygons_index = 0;
+    for (size_t i = 1; i < m_offsets.size(); i++) {
+        if (m_offsets[i][0] > index) break;
+        result.expolygons_index = i;
+    }
+
+    // find contour index
+    const std::vector<uint32_t> &shape_offset =
+        m_offsets[result.expolygons_index];
+    result.polygon_index = 0;
+    for (size_t i = 1; i < shape_offset.size(); i++) {
+        if (shape_offset[i] > index) break;
+        result.polygon_index = i;
+    }
+
+    // calculate point index
+    uint32_t polygon_offset = shape_offset[result.polygon_index];
+    assert(index >= polygon_offset);
+    result.point_index = index - polygon_offset;
+    return result;
+}
+
+uint32_t priv::ShapePoint2index::get_count() const { return m_count; }
+
+priv::ModelCut2index::ModelCut2index(const VCutAOIs &cuts)
+{
+    // prepare offsets
+    m_offsets.reserve(cuts.size());
+    uint32_t offset = 0;
+    for (const CutAOIs &model_cuts: cuts) {
+        m_offsets.push_back(offset);
+        offset += model_cuts.size();
+    }
+    m_count = offset;
+}
+
+uint32_t priv::ModelCut2index::calc_index(const ModelCutId &id) const
+{
+    assert(id.model_index < m_offsets.size());
+    uint32_t offset = m_offsets[id.model_index];
+    uint32_t res = offset + id.cut_index;
+    assert(((id.model_index+1) < m_offsets.size() && res < m_offsets[id.model_index+1]) ||
+           ((id.model_index+1) == m_offsets.size() && res < m_count));
+    return res;
+}
+
+priv::ModelCutId priv::ModelCut2index::calc_id(uint32_t index) const
+{
+    assert(index < m_count);
+    ModelCutId result;
+    // find shape index
+    result.model_index = 0;
+    for (size_t model_index = 1; model_index < m_offsets.size(); ++model_index) {
+        if (m_offsets[model_index] > index) break;
+        result.model_index = model_index;
+    }
+    result.cut_index = index - m_offsets[result.model_index];
+    return result;
+}
+
+uint32_t priv::ModelCut2index::get_count() const { return m_count; }
 
 // cut_from_model help functions
 namespace priv {
@@ -1299,22 +1396,6 @@ void priv::set_face_type(FaceTypeMap            &face_type_map,
         if (!fi_op.is_valid()) continue;
         face_type_map[fi_op] = (!is_inside) ? FaceType::inside : FaceType::outside;
     }
-
-    //for (const FI& fi : mesh.faces()) {
-    //    FaceType face_type = FaceType::not_constrained;
-    //    HI hi_end = mesh.halfedge(fi);
-    //    HI hi     = hi_end;
-    //    do {
-    //        // is edge new created - constrained?
-    //        if (get(ecm, mesh.edge(hi))) {
-    //            face_type = get_face_type(hi, mesh, shape_mesh, vertex_shape_map, shape2index);
-    //            break;
-    //        }
-    //        // next half edge index inside of face
-    //        hi = mesh.next(hi);
-    //    } while (hi != hi_end);
-    //    face_type_map[fi] = face_type;
-    //}
 }
 
 priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
@@ -1362,104 +1443,6 @@ priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
     // IMPROVE: AOIs area could be created during flood fill
     return create_cut_area_of_interests(cgal_model, shapes, face_type_map);
 }
-
-priv::ShapePoint2index::ShapePoint2index(const ExPolygons &shapes) {
-    // prepare offsets
-    m_offsets.reserve(shapes.size());
-    uint32_t offset = 0;
-    for (const auto &shape : shapes) {
-        assert(!shape.contour.points.empty());
-        std::vector<uint32_t> shape_offsets(shape.holes.size() + 1);
-
-        shape_offsets[0] = offset;
-        offset += shape.contour.points.size();
-
-        for (uint32_t i = 0; i < shape.holes.size(); i++) { 
-            shape_offsets[i + 1] = offset;
-            offset += shape.holes[i].points.size();
-        }
-        m_offsets.push_back(std::move(shape_offsets));
-    }
-    m_count = offset;
-}
-
-
-uint32_t priv::ShapePoint2index::calc_index(const ShapePointId &id) const {
-    assert(id.expolygons_index < m_offsets.size());
-    const std::vector<uint32_t> &shape_offset =
-        m_offsets[id.expolygons_index];
-    assert(id.polygon_index < shape_offset.size());
-    uint32_t res = shape_offset[id.polygon_index] + id.point_index;
-    assert(res < m_count);
-    return res;
-}
-
-priv::ShapePointId priv::ShapePoint2index::calc_id(uint32_t index) const {
-    assert(index < m_count);
-    ShapePointId result;
-    // find shape index
-    result.expolygons_index = 0;
-    for (size_t i = 1; i < m_offsets.size(); i++) { 
-        if (m_offsets[i][0] > index) break;
-        result.expolygons_index = i;
-    }
-
-    // find contour index
-    const std::vector<uint32_t> &shape_offset =
-        m_offsets[result.expolygons_index];
-    result.polygon_index = 0;
-    for (size_t i = 1; i < shape_offset.size(); i++) {
-        if (shape_offset[i] > index) break;
-        result.polygon_index = i;     
-    }
-
-    // calculate point index
-    uint32_t polygon_offset = shape_offset[result.polygon_index];
-    assert(index >= polygon_offset);
-    result.point_index = index - polygon_offset;
-    return result;
-}
-
-uint32_t priv::ShapePoint2index::get_count() const { return m_count; }
-
-priv::ModelCut2index::ModelCut2index(const VCutAOIs &cuts)
-{
-    // prepare offsets
-    m_offsets.reserve(cuts.size());
-    uint32_t offset = 0;
-    for (const CutAOIs &model_cuts: cuts) {
-        m_offsets.push_back(offset);
-        offset += model_cuts.size();
-    }
-    m_count = offset;
-}
-
-uint32_t priv::ModelCut2index::calc_index(const ModelCutId &id) const
-{
-    assert(id.model_index < m_offsets.size());
-    uint32_t offset = m_offsets[id.model_index];
-    uint32_t res = offset + id.cut_index;
-    assert(((id.model_index+1) < m_offsets.size() && res < m_offsets[id.model_index+1]) ||
-           ((id.model_index+1) == m_offsets.size() && res < m_count));
-    return res;
-}
-
-priv::ModelCutId priv::ModelCut2index::calc_id(uint32_t index) const
-{
-    assert(index < m_count);
-    ModelCutId result;
-    // find shape index
-    result.model_index = 0;
-    for (size_t model_index = 1; model_index < m_offsets.size(); ++model_index) {
-        if (m_offsets[model_index] > index) break;
-        result.model_index = model_index;
-    }
-    result.cut_index = index - m_offsets[result.model_index];
-    return result;
-}
-
-uint32_t priv::ModelCut2index::get_count() const { return m_count; }
-
 
 void priv::flood_fill_inner(const CutMesh &mesh,
                             FaceTypeMap   &face_type_map)
