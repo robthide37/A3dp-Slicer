@@ -1,5 +1,7 @@
 #include "CutSurface.hpp"
 
+/// models_input.obj - Check transormation of model to each others
+/// projection_center.obj - circle representing center of projection with correct distance
 /// {M} .. model index
 /// model/model{M}.off - CGAL model created from index_triangle_set
 /// model_neg/model{M}.off - CGAL model created for differenciate (multi volume object)
@@ -11,13 +13,12 @@
 /// (only along constrained edge)
 /// filled.off - flood fill green triangles inside of red area
 ///            - Same meaning of color as constrained
-/// reduction.off - Visualization of reduced and non-reduced Vertices
 /// {N} .. Order of cutted Area of Interestmodel from model surface
 /// model_AOIs/{M}/cutAOI{N}.obj - Extracted Area of interest from corefined model
 /// model_AOIs/{M}/outline{N}.obj - Outline of Cutted Area
 /// cuts/cut{N}.obj - Filtered surface cuts + Reduced vertices made by e2 (text_edge_2)
-/// 
-/// result_contours/{O}.obj - 
+/// result.obj - Merged result its
+/// result_contours/{O}.obj - visualization of contours for result patches
 #define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
 
 using namespace Slic3r;
@@ -106,6 +107,30 @@ using FI = CGAL::SM_Face_index;
 using P3 = CGAL::Epick::Point_3;
 
 /// <summary>
+/// Convert triangle mesh model to CGAL Surface_mesh
+/// Filtrate out opposite triangles
+/// Add property map for source face index
+/// </summary>
+/// <param name="its">Model</param>
+/// <param name="skip_indicies">Flags that triangle should be skiped</param>
+/// <param name="flip">When true triangle will flip normal</param>
+/// <returns>CGAL mesh - half edge mesh</returns>
+CutMesh to_cgal(const indexed_triangle_set &its,
+                const std::vector<bool>    &skip_indicies,
+                bool                        flip = false);
+
+/// <summary>
+/// Covert 2d shape (e.g. Glyph) to CGAL model
+/// NOTE: internaly create
+/// edge_shape_map .. Property map to store conversion from edge to contour
+/// face_shape_map .. Property map to store conversion from face to contour
+/// </summary>
+/// <param name="shapes">2d shapes to project</param>
+/// <param name="projection">Define transformation 2d point into 3d</param>
+/// <returns>CGAL model of extruded shape</returns>
+CutMesh to_cgal(const ExPolygons &shapes, const Project &projection);
+
+/// <summary>
 /// IntersectingElement
 ///
 /// Adress polygon inside of ExPolygon
@@ -192,31 +217,6 @@ const std::string face_shape_map_name = "f:IntersectingElement";
 const std::string vert_shape_map_name = "v:IntersectingElement";
 
 /// <summary>
-/// Convert triangle mesh model to CGAL Surface_mesh
-/// Filtrate out opposite triangles
-/// Add property map for source face index
-/// </summary>
-/// <param name="its">Model</param>
-/// <param name="skip_indicies">Flags that triangle should be skiped</param>
-/// <param name="flip">When true triangle will flip normal</param>
-/// <returns>CGAL mesh - half edge mesh</returns>
-CutMesh to_cgal(const indexed_triangle_set &its,
-                const std::vector<bool>    &skip_indicies,
-                bool                        flip = false);
-
-/// <summary>
-/// Covert 2d shape (e.g. Glyph) to CGAL model
-/// NOTE: internaly create 
-/// edge_shape_map .. Property map to store conversion from edge to contour
-/// face_shape_map .. Property map to store conversion from face to contour
-/// </summary>
-/// <param name="shapes">2d shapes to project</param>
-/// <param name="projection">Define transformation 2d point into 3d</param>
-/// <returns>CGAL model of extruded shape</returns>
-CutMesh to_cgal(const ExPolygons &shapes,
-                const Project    &projection);
-
-/// <summary>
 /// Identify contour (or hole) point from ExPolygons
 /// </summary>
 struct ShapePointId
@@ -230,91 +230,11 @@ struct ShapePointId
 };
 
 /// <summary>
-/// Track source of intersection 
-/// Help for anotate inner and outer faces
-/// </summary>
-struct Visitor {
-    const CutMesh &object;
-    const CutMesh &shape;
-
-    // Properties of the shape mesh:
-    EdgeShapeMap edge_shape_map;
-    FaceShapeMap face_shape_map;
-
-    // Properties of the object mesh.
-    VertexShapeMap vert_shape_map;
-
-    // check for anomalities
-    bool* is_valid;
-
-    // keep source of intersection for each intersection
-    // used to copy data into vert_shape_map
-    std::vector<const IntersectingElement*> intersections;
-
-    /// <summary>
-    /// Called when a new intersection point is detected.
-    /// The intersection is detected using a face of tm_f and an edge of tm_e.
-    /// Intersecting an edge hh_edge from tm_f with a face h_e of tm_e.
-    /// https://doc.cgal.org/latest/Polygon_mesh_processing/classPMPCorefinementVisitor.html#a00ee0ca85db535a48726a92414acda7f
-    /// </summary>
-    /// <param name="i_id">The id of the intersection point, starting at 0. Ids are consecutive.</param>
-    /// <param name="sdim">Dimension of a simplex part of face(h_e) that is intersected by edge(h_f):
-    /// 0 for vertex: target(h_e)
-    /// 1 for edge: h_e
-    /// 2 for the interior of face: face(h_e) </param>
-    /// <param name="h_f">
-    /// A halfedge from tm_f indicating the simplex intersected: 
-    /// if sdim==0 the target of h_f is the intersection point, 
-    /// if sdim==1 the edge of h_f contains the intersection point in its interior,
-    /// if sdim==2 the face of h_f contains the intersection point in its interior.
-    /// @Vojta: Edge of tm_f, see is_target_coplanar & is_source_coplanar whether any vertex of h_f is coplanar with face(h_e).
-    /// </param>
-    /// <param name="h_e">A halfedge from tm_e
-    /// @Vojta: Vertex, halfedge or face of tm_e intersected by h_f, see comment at sdim.
-    /// </param>
-    /// <param name="tm_f">Mesh containing h_f</param>
-    /// <param name="tm_e">Mesh containing h_e</param>
-    /// <param name="is_target_coplanar">True if the target of h_e is the intersection point
-    /// @Vojta: source(h_f) is coplanar with face(made by h_e).</param>
-    /// <param name="is_source_coplanar">True if the source of h_e is the intersection point
-    /// @Vojta: target(h_f) is coplanar with face(h_e).</param>
-    void intersection_point_detected(std::size_t    i_id,
-                                     int            sdim,
-                                     HI             h_f,
-                                     HI             h_e,
-                                     const CutMesh &tm_f,
-                                     const CutMesh &tm_e,
-                                     bool           is_target_coplanar,
-                                     bool           is_source_coplanar);
-
-    /// <summary>
-    /// Called when a new vertex is added in tm (either an edge split or a vertex inserted in the interior of a face).
-    /// Fill vertex_shape_map by intersections
-    /// </summary>
-    /// <param name="i_id">Order number of intersection point</param>
-    /// <param name="v">New added vertex</param>
-    /// <param name="tm">Affected mesh</param>
-    void new_vertex_added(std::size_t i_id, VI v, const CutMesh &tm);
-
-    // Not used visitor functions
-    void before_subface_creations(FI /* f_old */, CutMesh &/* mesh */){}
-    void after_subface_created(FI /* f_new */, CutMesh &/* mesh */) {}
-    void after_subface_creations(CutMesh&) {}
-    void before_subface_created(CutMesh&) {}
-    void before_edge_split(HI /* h */, CutMesh& /* tm */) {}
-    void edge_split(HI /* hnew */, CutMesh& /* tm */) {}
-    void after_edge_split() {}
-    void add_retriangulation_edge(HI /* h */, CutMesh& /* tm */) {}
-};
-
-/// <summary>
 /// Flag for faces in CGAL mesh
 /// </summary>
 enum class FaceType {
     // face inside of the cutted shape
     inside,
-    // face, inside but almost in direction of projection
-    inside_parallel,
     // face outside of the cutted shape
     outside,
     // face without constrained edge (In or Out)
@@ -343,32 +263,6 @@ public:
     ShapePointId calc_id(uint32_t index) const;
     uint32_t     get_count() const;
 };
-
-/// <summary>
-/// Face with constrained edge are inside/outside by type of intersection
-/// Other set to not_constrained(still it could be inside/outside)
-/// </summary>
-/// <param name="face_type_map">[Output] property map with type of faces</param>
-/// <param name="mesh">Mesh to process</param>
-/// <param name="vertex_shape_map">Keep information about source of created vertex</param>
-/// <param name="ecm">Dynamic Edge Constrained Map of bool</param>
-/// <param name="shape_mesh">Vertices of mesh made by shapes</param>
-/// <param name="shape2index">Convert index to shape point from ExPolygons</param>
-void set_face_type(FaceTypeMap          &face_type_map,
-                   const CutMesh        &mesh,
-                   const VertexShapeMap &vertex_shape_map,
-                   const EcmType        &ecm,
-                   const CutMesh          &shape_mesh,
-                   const ShapePoint2index &shape2index);
-
-/// <summary>
-/// Change FaceType from not_constrained to inside
-/// For neighbor(or neighbor of neighbor of ...) of inside triangles.
-/// Process only not_constrained triangles
-/// </summary>
-/// <param name="mesh">Corefined mesh</param>
-/// <param name="face_type_map">In/Out map with faces type</param>
-void flood_fill_inner(const CutMesh &mesh, FaceTypeMap &face_type_map);
 
 // Conversion one vertex index to another
 using CvtVI2VI = CutMesh::Property_map<VI, VI>;
@@ -423,19 +317,6 @@ CutAOIs cut_from_model(CutMesh                &cgal_model,
                        /*const*/ CutMesh      &cgal_shape,
                        float                   projection_ratio,
                        const ShapePoint2index &s2i);
-
-/// <summary>
-/// Create areas from mesh surface
-/// </summary>
-/// <param name="mesh">Model</param>
-/// <param name="shapes">Cutted shapes</param>
-/// <param name="face_type_map">Define Triangles of interest.
-/// Edge between inside / outside.
-/// NOTE: Not const because it need to flag proccessed faces</param>
-/// <returns>Areas of interest from mesh</returns>
-CutAOIs create_cut_area_of_interests(const CutMesh    &mesh,
-                                     const ExPolygons &shapes,
-                                     FaceTypeMap      &face_type_map);
 
 // To track during diff_models,
 // what was cutted off, from CutAOI
@@ -657,9 +538,6 @@ SurfaceCut merge_intersections(SurfaceCuts &cuts, const CutAOIs& cutAOIs, const 
 bool merge_intersection(SurfaceCut &cut1, const SurfaceCut &cut2);
 
 #ifdef DEBUG_OUTPUT_DIR
-indexed_triangle_set create_indexed_triangle_set(const std::vector<FI> &faces,
-                                                 const CutMesh         &mesh);
-
 /// <summary>
 /// Debug purpose store of mesh with colored face by face type
 /// </summary>
@@ -1131,6 +1009,314 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
     return result;
 }
 
+// cut_from_model help functions
+namespace priv {
+
+/// <summary>
+/// Track source of intersection 
+/// Help for anotate inner and outer faces
+/// </summary>
+struct Visitor {
+    const CutMesh &object;
+    const CutMesh &shape;
+
+    // Properties of the shape mesh:
+    EdgeShapeMap edge_shape_map;
+    FaceShapeMap face_shape_map;
+
+    // Properties of the object mesh.
+    VertexShapeMap vert_shape_map;
+
+    // check for anomalities
+    bool* is_valid;
+
+    // keep source of intersection for each intersection
+    // used to copy data into vert_shape_map
+    std::vector<const IntersectingElement*> intersections;
+
+    /// <summary>
+    /// Called when a new intersection point is detected.
+    /// The intersection is detected using a face of tm_f and an edge of tm_e.
+    /// Intersecting an edge hh_edge from tm_f with a face h_e of tm_e.
+    /// https://doc.cgal.org/latest/Polygon_mesh_processing/classPMPCorefinementVisitor.html#a00ee0ca85db535a48726a92414acda7f
+    /// </summary>
+    /// <param name="i_id">The id of the intersection point, starting at 0. Ids are consecutive.</param>
+    /// <param name="sdim">Dimension of a simplex part of face(h_e) that is intersected by edge(h_f):
+    /// 0 for vertex: target(h_e)
+    /// 1 for edge: h_e
+    /// 2 for the interior of face: face(h_e) </param>
+    /// <param name="h_f">
+    /// A halfedge from tm_f indicating the simplex intersected: 
+    /// if sdim==0 the target of h_f is the intersection point, 
+    /// if sdim==1 the edge of h_f contains the intersection point in its interior,
+    /// if sdim==2 the face of h_f contains the intersection point in its interior.
+    /// @Vojta: Edge of tm_f, see is_target_coplanar & is_source_coplanar whether any vertex of h_f is coplanar with face(h_e).
+    /// </param>
+    /// <param name="h_e">A halfedge from tm_e
+    /// @Vojta: Vertex, halfedge or face of tm_e intersected by h_f, see comment at sdim.
+    /// </param>
+    /// <param name="tm_f">Mesh containing h_f</param>
+    /// <param name="tm_e">Mesh containing h_e</param>
+    /// <param name="is_target_coplanar">True if the target of h_e is the intersection point
+    /// @Vojta: source(h_f) is coplanar with face(made by h_e).</param>
+    /// <param name="is_source_coplanar">True if the source of h_e is the intersection point
+    /// @Vojta: target(h_f) is coplanar with face(h_e).</param>
+    void intersection_point_detected(std::size_t    i_id,
+                                     int            sdim,
+                                     HI             h_f,
+                                     HI             h_e,
+                                     const CutMesh &tm_f,
+                                     const CutMesh &tm_e,
+                                     bool           is_target_coplanar,
+                                     bool           is_source_coplanar);
+
+    /// <summary>
+    /// Called when a new vertex is added in tm (either an edge split or a vertex inserted in the interior of a face).
+    /// Fill vertex_shape_map by intersections
+    /// </summary>
+    /// <param name="i_id">Order number of intersection point</param>
+    /// <param name="v">New added vertex</param>
+    /// <param name="tm">Affected mesh</param>
+    void new_vertex_added(std::size_t i_id, VI v, const CutMesh &tm);
+
+    // Not used visitor functions
+    void before_subface_creations(FI /* f_old */, CutMesh &/* mesh */){}
+    void after_subface_created(FI /* f_new */, CutMesh &/* mesh */) {}
+    void after_subface_creations(CutMesh&) {}
+    void before_subface_created(CutMesh&) {}
+    void before_edge_split(HI /* h */, CutMesh& /* tm */) {}
+    void edge_split(HI /* hnew */, CutMesh& /* tm */) {}
+    void after_edge_split() {}
+    void add_retriangulation_edge(HI /* h */, CutMesh& /* tm */) {}
+};
+
+/// <summary>
+/// Distiquish face type for half edge
+/// </summary>
+/// <param name="hi">Define face</param>
+/// <param name="mesh">Mesh to process</param>
+/// <param name="shape_mesh">Vertices of mesh made by shapes</param>
+/// <param name="vertex_shape_map">Keep information about source of created vertex</param>
+/// <param name="shape2index"></param>
+/// <param name="shape2index">Convert index to shape point from ExPolygons</param>
+/// <returns>Face type defined by hi</returns>
+bool is_face_inside(HI                      hi,
+                    const CutMesh          &mesh,
+                    const CutMesh          &shape_mesh,
+                    const VertexShapeMap   &vertex_shape_map,
+                    const ShapePoint2index &shape2index);
+
+/// <summary>
+/// Face with constrained edge are inside/outside by type of intersection
+/// Other set to not_constrained(still it could be inside/outside)
+/// </summary>
+/// <param name="face_type_map">[Output] property map with type of faces</param>
+/// <param name="mesh">Mesh to process</param>
+/// <param name="vertex_shape_map">Keep information about source of created vertex</param>
+/// <param name="ecm">Dynamic Edge Constrained Map of bool</param>
+/// <param name="shape_mesh">Vertices of mesh made by shapes</param>
+/// <param name="shape2index">Convert index to shape point from ExPolygons</param>
+void set_face_type(FaceTypeMap            &face_type_map,
+                   const CutMesh          &mesh,
+                   const VertexShapeMap   &vertex_shape_map,
+                   const EcmType          &ecm,
+                   const CutMesh          &shape_mesh,
+                   const ShapePoint2index &shape2index);
+
+/// <summary>
+/// Change FaceType from not_constrained to inside
+/// For neighbor(or neighbor of neighbor of ...) of inside triangles.
+/// Process only not_constrained triangles
+/// </summary>
+/// <param name="mesh">Corefined mesh</param>
+/// <param name="face_type_map">In/Out map with faces type</param>
+void flood_fill_inner(const CutMesh &mesh, FaceTypeMap &face_type_map);
+
+/// <summary>
+/// Create areas from mesh surface
+/// </summary>
+/// <param name="mesh">Model</param>
+/// <param name="shapes">Cutted shapes</param>
+/// <param name="face_type_map">Define Triangles of interest.
+/// Edge between inside / outside.
+/// NOTE: Not const because it need to flag proccessed faces</param>
+/// <returns>Areas of interest from mesh</returns>
+CutAOIs create_cut_area_of_interests(const CutMesh    &mesh,
+                                     const ExPolygons &shapes,
+                                     FaceTypeMap      &face_type_map);
+
+} // namespace priv
+
+void priv::Visitor::intersection_point_detected(std::size_t    i_id,
+                                                int            sdim,
+                                                HI             h_f,
+                                                HI             h_e,
+                                                const CutMesh &tm_f,
+                                                const CutMesh &tm_e,
+                                                bool is_target_coplanar,
+                                                bool is_source_coplanar)
+{
+    if (i_id >= intersections.size()) {
+        size_t capacity = Slic3r::next_highest_power_of_2(i_id + 1);
+        intersections.reserve(capacity);
+        intersections.resize(capacity);
+    }
+
+    const IntersectingElement *intersection_ptr = nullptr;
+    if (&tm_e == &shape) {
+        assert(&tm_f == &object);
+        switch (sdim) {
+        case 1:
+            // edge x edge intersection
+            intersection_ptr = &edge_shape_map[shape.edge(h_e)];
+            break;
+        case 2:
+            // edge x face intersection
+            intersection_ptr = &face_shape_map[shape.face(h_e)];
+            break;
+        default: assert(false);
+        }
+        if (is_target_coplanar)
+            vert_shape_map[object.source(h_f)] = intersection_ptr;
+        if (is_source_coplanar)
+            vert_shape_map[object.target(h_f)] = intersection_ptr;
+    } else {
+        assert(&tm_f == &shape && &tm_e == &object);
+        assert(!is_target_coplanar);
+        assert(!is_source_coplanar);
+        intersection_ptr = &edge_shape_map[shape.edge(h_f)];
+        if (sdim == 0) vert_shape_map[object.target(h_e)] = intersection_ptr;
+    }
+
+    if (intersection_ptr->shape_point_index == std::numeric_limits<uint32_t>::max()) {
+        // there is unexpected intersection
+        // Top (or Bottom) shape contour edge (or vertex) intersection
+        // Suggest to change projection min/max limits
+        *is_valid = false;
+    }
+    intersections[i_id] = intersection_ptr;
+}
+
+void priv::Visitor::new_vertex_added(std::size_t i_id, VI v, const CutMesh &tm)
+{
+    assert(&tm == &object);
+    assert(i_id < intersections.size());
+    const IntersectingElement *intersection_ptr = intersections[i_id];
+    assert(intersection_ptr != nullptr);
+    // intersection was not filled in function intersection_point_detected
+    //assert(intersection_ptr->point_index != std::numeric_limits<uint32_t>::max());
+    vert_shape_map[v] = intersection_ptr;
+}
+
+bool priv::is_face_inside(HI                      hi,
+                          const CutMesh          &mesh,
+                          const CutMesh          &shape_mesh,
+                          const VertexShapeMap   &vertex_shape_map,
+                          const ShapePoint2index &shape2index)
+{
+    VI vi_from = mesh.source(hi);
+    VI vi_to   = mesh.target(hi);
+    // This face has a constrained edge.
+    const IntersectingElement &shape_from = *vertex_shape_map[vi_from];
+    const IntersectingElement &shape_to   = *vertex_shape_map[vi_to];
+    assert(shape_from.shape_point_index != std::numeric_limits<uint32_t>::max());
+    assert(shape_from.attr != (unsigned char) IntersectingElement::Type::undefined);
+    assert(shape_to.shape_point_index != std::numeric_limits<uint32_t>::max());
+    assert(shape_to.attr != (unsigned char) IntersectingElement::Type::undefined);
+
+    // index into contour
+    uint32_t                  i_from    = shape_from.shape_point_index;
+    uint32_t                  i_to      = shape_to.shape_point_index;
+    IntersectingElement::Type type_from = shape_from.get_type();
+    IntersectingElement::Type type_to   = shape_to.get_type();
+    if (i_from == i_to && type_from == type_to) {
+        // intersecting element must be face
+        assert(type_from == IntersectingElement::Type::face_1 ||
+                type_from == IntersectingElement::Type::face_2);
+
+        // count of vertices is twice as count of point in the contour
+        uint32_t i = i_from * 2;
+        // j is next contour point in vertices
+        uint32_t j = i + 2;
+        if (shape_from.is_last()) {
+            ShapePointId point_id = shape2index.calc_id(i_from);
+            point_id.point_index  = 0;
+            j = shape2index.calc_index(point_id)*2;
+        }
+
+        // opposit point(in triangle face) to edge
+        const P3 &p = mesh.point(mesh.target(mesh.next(hi)));
+
+        // abc is source triangle face
+        CGAL::Sign abcp = type_from == IntersectingElement::Type::face_1 ?
+                        CGAL::orientation(shape_mesh.point(VI(i)),
+                                            shape_mesh.point(VI(i + 1)),
+                                            shape_mesh.point(VI(j)), p) :
+                        // type_from == IntersectingElement::Type::face_2
+                        CGAL::orientation(shape_mesh.point(VI(j)),
+                                            shape_mesh.point(VI(i + 1)),
+                                            shape_mesh.point(VI(j + 1)), p);
+        return abcp == CGAL::POSITIVE;
+    } else if (i_from < i_to || (i_from == i_to && type_from < type_to)) {
+        bool is_last = shape_to.is_last() && shape_from.is_first();
+        // check continuity of indicies
+        assert(i_from == i_to || is_last || (i_from + 1) == i_to);
+        return !is_last;
+    } else {
+        assert(i_from > i_to || (i_from == i_to && type_from > type_to));
+        bool is_last = shape_to.is_first() && shape_from.is_last();
+        // check continuity of indicies
+        assert(i_from == i_to || is_last || (i_to + 1) == i_from);
+        return is_last;
+    }
+
+    assert(false);
+    return false;
+}
+
+void priv::set_face_type(FaceTypeMap            &face_type_map,
+                         const CutMesh          &mesh,
+                         const VertexShapeMap   &vertex_shape_map,
+                         const EcmType          &ecm,
+                         const CutMesh          &shape_mesh,
+                         const ShapePoint2index &shape2index)
+{
+    // clean types
+    for (FI fi : mesh.faces())
+        face_type_map[fi] = FaceType::not_constrained;
+
+    for (EI ei : mesh.edges()) {
+        if (!get(ecm, ei)) continue;
+        HI hi = mesh.halfedge(ei);
+        FI fi = mesh.face(hi);
+        bool is_inside = is_face_inside(hi, mesh, shape_mesh, vertex_shape_map, shape2index);        
+        face_type_map[fi] = is_inside ? FaceType::inside : FaceType::outside;
+        HI hi_op = mesh.opposite(hi);
+        assert(hi_op.is_valid());
+        if (!hi_op.is_valid()) continue;
+        FI fi_op = mesh.face(hi_op);
+        assert(fi_op.is_valid());
+        if (!fi_op.is_valid()) continue;
+        face_type_map[fi_op] = (!is_inside) ? FaceType::inside : FaceType::outside;
+    }
+
+    //for (const FI& fi : mesh.faces()) {
+    //    FaceType face_type = FaceType::not_constrained;
+    //    HI hi_end = mesh.halfedge(fi);
+    //    HI hi     = hi_end;
+    //    do {
+    //        // is edge new created - constrained?
+    //        if (get(ecm, mesh.edge(hi))) {
+    //            face_type = get_face_type(hi, mesh, shape_mesh, vertex_shape_map, shape2index);
+    //            break;
+    //        }
+    //        // next half edge index inside of face
+    //        hi = mesh.next(hi);
+    //    } while (hi != hi_end);
+    //    face_type_map[fi] = face_type;
+    //}
+}
+
 priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
                                    const ExPolygons       &shapes,
                                    CutMesh                &cgal_shape,
@@ -1165,12 +1351,6 @@ priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
 #ifdef DEBUG_OUTPUT_DIR
     store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrained.off"); // only debug
 #endif // DEBUG_OUTPUT_DIR
-
-    // It is neccesary when almost parallel face are contained in projection
-    // set_almost_parallel_type(face_type_map, cgal_model, projection);
-//#ifdef DEBUG_OUTPUT_DIR
-//    store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrainedWithAlmostParallel.off"); // only debug
-//#endif // DEBUG_OUTPUT_DIR
     
     // flood fill the other faces inside the region.
     flood_fill_inner(cgal_model, face_type_map);
@@ -1181,90 +1361,6 @@ priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
         
     // IMPROVE: AOIs area could be created during flood fill
     return create_cut_area_of_interests(cgal_model, shapes, face_type_map);
-}
-
-void priv::set_face_type(FaceTypeMap            &face_type_map,
-                         const CutMesh          &mesh,
-                         const VertexShapeMap   &vertex_shape_map,
-                         const EcmType          &ecm,
-                         const CutMesh          &shape_mesh,
-                         const ShapePoint2index &shape2index)
-{
-    auto get_face_type = [&mesh, &shape_mesh, &vertex_shape_map, &shape2index](HI hi) -> FaceType {
-        VI vi_from = mesh.source(hi);
-        VI vi_to   = mesh.target(hi);
-        // This face has a constrained edge.
-        const IntersectingElement &shape_from = *vertex_shape_map[vi_from];
-        const IntersectingElement &shape_to   = *vertex_shape_map[vi_to];
-        assert(shape_from.shape_point_index != std::numeric_limits<uint32_t>::max());
-        assert(shape_from.attr != (unsigned char) IntersectingElement::Type::undefined);
-        assert(shape_to.shape_point_index != std::numeric_limits<uint32_t>::max());
-        assert(shape_to.attr != (unsigned char) IntersectingElement::Type::undefined);
-
-        bool is_inside = false;
-        // index into contour
-        uint32_t                  i_from    = shape_from.shape_point_index;
-        uint32_t                  i_to      = shape_to.shape_point_index;
-        IntersectingElement::Type type_from = shape_from.get_type();
-        IntersectingElement::Type type_to   = shape_to.get_type();
-        if (i_from == i_to && type_from == type_to) {
-            // intersecting element must be face
-            assert(type_from == IntersectingElement::Type::face_1 ||
-                   type_from == IntersectingElement::Type::face_2);
-
-            // count of vertices is twice as count of point in the contour
-            uint32_t i = i_from * 2;
-            // j is next contour point in vertices
-            uint32_t j = i + 2;
-            if (shape_from.is_last()) {
-                ShapePointId point_id = shape2index.calc_id(i_from);
-                point_id.point_index  = 0;
-                j = shape2index.calc_index(point_id)*2;
-            }
-
-            // opposit point(in triangle face) to edge
-            const auto &p = mesh.point(mesh.target(mesh.next(hi)));
-
-            // abc is source triangle face
-            auto abcp = type_from == IntersectingElement::Type::face_1 ?
-                            CGAL::orientation(shape_mesh.point(VI(i)),
-                                              shape_mesh.point(VI(i + 1)),
-                                              shape_mesh.point(VI(j)), p) :
-                            // type_from == IntersectingElement::Type::face_2
-                            CGAL::orientation(shape_mesh.point(VI(j)),
-                                              shape_mesh.point(VI(i + 1)),
-                                              shape_mesh.point(VI(j + 1)), p);
-            is_inside = abcp == CGAL::POSITIVE;
-        } else if (i_from < i_to || (i_from == i_to && type_from < type_to)) {
-            bool is_last = shape_to.is_last() && shape_from.is_first();
-            // check continuity of indicies
-            assert(i_from == i_to || is_last || (i_from + 1) == i_to);
-            if (!is_last) is_inside = true;
-        } else {
-            assert(i_from > i_to || (i_from == i_to && type_from > type_to));
-            bool is_last = shape_to.is_first() && shape_from.is_last();
-            // check continuity of indicies
-            assert(i_from == i_to || is_last || (i_to + 1) == i_from);
-            if (is_last) is_inside = true;
-        }
-        return (is_inside) ? FaceType::inside : FaceType::outside;
-    };
-
-    for (const FI& fi : mesh.faces()) {
-        FaceType face_type = FaceType::not_constrained;
-        HI hi_end = mesh.halfedge(fi);
-        HI hi     = hi_end;
-        do {
-            // is edge new created - constrained?
-            if (get(ecm, mesh.edge(hi))) {
-                face_type = get_face_type(hi);
-                break;
-            }
-            // next half edge index inside of face
-            hi = mesh.next(hi);
-        } while (hi != hi_end);
-        face_type_map[fi] = face_type;
-    }
 }
 
 priv::ShapePoint2index::ShapePoint2index(const ExPolygons &shapes) {
@@ -1395,8 +1491,7 @@ void priv::flood_fill_inner(const CutMesh &mesh,
 
     for (FI fi : mesh.faces()) {
         FaceType type = face_type_map[fi];
-        if (type != FaceType::not_constrained &&
-            type != FaceType::inside_parallel) continue;
+        if (type != FaceType::not_constrained) continue;
         if (!has_inside_neighbor(fi)) continue;
         assert(process.empty());
         process.push_back(fi); 
@@ -1424,73 +1519,11 @@ void priv::flood_fill_inner(const CutMesh &mesh,
                 FI fi_opposite = mesh.face(hi_opposite);
                 if (!fi_opposite.is_valid()) continue;                
                 FaceType type_opposite = face_type_map[fi_opposite];
-                if (type_opposite == FaceType::not_constrained || 
-                    type_opposite == FaceType::inside_parallel)
+                if (type_opposite == FaceType::not_constrained)
                     process.push_back(fi_opposite);
             } while (exist_next());
         }
     }
-}
-
-void priv::Visitor::intersection_point_detected(std::size_t    i_id,
-                                                int            sdim,
-                                                HI             h_f,
-                                                HI             h_e,
-                                                const CutMesh &tm_f,
-                                                const CutMesh &tm_e,
-                                                bool is_target_coplanar,
-                                                bool is_source_coplanar)
-{
-    if (i_id >= intersections.size()) {
-        size_t capacity = Slic3r::next_highest_power_of_2(i_id + 1);
-        intersections.reserve(capacity);
-        intersections.resize(capacity);
-    }
-
-    const IntersectingElement *intersection_ptr = nullptr;
-    if (&tm_e == &shape) {
-        assert(&tm_f == &object);
-        switch (sdim) {
-        case 1:
-            // edge x edge intersection
-            intersection_ptr = &edge_shape_map[shape.edge(h_e)];
-            break;
-        case 2:
-            // edge x face intersection
-            intersection_ptr = &face_shape_map[shape.face(h_e)];
-            break;
-        default: assert(false);
-        }
-        if (is_target_coplanar)
-            vert_shape_map[object.source(h_f)] = intersection_ptr;
-        if (is_source_coplanar)
-            vert_shape_map[object.target(h_f)] = intersection_ptr;
-    } else {
-        assert(&tm_f == &shape && &tm_e == &object);
-        assert(!is_target_coplanar);
-        assert(!is_source_coplanar);
-        intersection_ptr = &edge_shape_map[shape.edge(h_f)];
-        if (sdim == 0) vert_shape_map[object.target(h_e)] = intersection_ptr;
-    }
-
-    if (intersection_ptr->shape_point_index == std::numeric_limits<uint32_t>::max()) {
-        // there is unexpected intersection
-        // Top (or Bottom) shape contour edge (or vertex) intersection
-        // Suggest to change projection min/max limits
-        *is_valid = false;
-    }
-    intersections[i_id] = intersection_ptr;
-}
-
-void priv::Visitor::new_vertex_added(std::size_t i_id, VI v, const CutMesh &tm)
-{
-    assert(&tm == &object);
-    assert(i_id < intersections.size());
-    const IntersectingElement *intersection_ptr = intersections[i_id];
-    assert(intersection_ptr != nullptr);
-    // intersection was not filled in function intersection_point_detected
-    //assert(intersection_ptr->point_index != std::numeric_limits<uint32_t>::max());
-    vert_shape_map[v] = intersection_ptr;
 }
 
 void priv::collect_surface_data(std::queue<FI>  &process,
@@ -3295,6 +3328,7 @@ SurfaceCuts priv::create_surface_cuts(const CutAOIs      &cuts,
 }
 
 #ifdef DEBUG_OUTPUT_DIR
+
 // store projection center as circle
 void priv::store(const Vec3f       &vertex,
                  const Vec3f       &normal,
@@ -3334,7 +3368,6 @@ void priv::store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::str
         auto &color = face_colors[fi];
         switch (face_type_map[fi]) {
         case FaceType::inside: color = CGAL::Color{100, 250, 100}; break; // light green
-        case FaceType::inside_parallel: color = CGAL::Color{255, 0, 0}; break; // red
         case FaceType::inside_processed: color = CGAL::Color{170, 0, 0}; break; // dark red
         case FaceType::outside: color = CGAL::Color{100, 0, 100}; break; // purple
         case FaceType::not_constrained: color = CGAL::Color{127, 127, 127}; break; // gray
@@ -3362,6 +3395,11 @@ void priv::store(CutMesh &mesh, const ReductionMap &reduction_map, const std::st
     CGAL::IO::write_OFF(file, mesh);
     mesh.remove_property_map(vertex_colors);
 }
+
+namespace priv {
+indexed_triangle_set create_indexed_triangle_set(const std::vector<FI> &faces,
+                                                 const CutMesh         &mesh);
+} // namespace priv
 
 indexed_triangle_set priv::create_indexed_triangle_set(
     const std::vector<FI> &faces, const CutMesh &mesh)
