@@ -21,7 +21,8 @@ ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_poly
     
     for (int i = 0; i < (int)lines.size(); ++i) {
         const ThickLine& line = lines[i];
-        
+        assert(line.a_width >= SCALED_EPSILON && line.b_width >= SCALED_EPSILON);
+
         const coordf_t line_len = line.length();
         if (line_len < SCALED_EPSILON) continue;
         
@@ -355,6 +356,50 @@ static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Path &subject, con
     ClipperLib_Z::Paths    clipped_paths;
     clipper.Execute(clipType, clipped_polytree, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
     ClipperLib_Z::PolyTreeToPaths(clipped_polytree, clipped_paths);
+
+    // Clipped path could contain vertices from the clip with a Z coordinate equal to zero.
+    // For those vertices, we must assign value based on the subject.
+    // This happens only in sporadic cases.
+    for (ClipperLib_Z::Path &path : clipped_paths)
+        for (ClipperLib_Z::IntPoint &c_pt : path)
+            if (c_pt.z() == 0) {
+                // Now we must find the corresponding line on with this point is located and compute line width (Z coordinate).
+                if (subject.size() <= 2)
+                    continue;
+
+                const Point pt(c_pt.x(), c_pt.y());
+                Point       projected_pt_min;
+                auto        it_min       = subject.begin();
+                auto        dist_sqr_min = std::numeric_limits<double>::max();
+                Point       prev(subject.front().x(), subject.front().y());
+                for (auto it = std::next(subject.begin()); it != subject.end(); ++it) {
+                    Point curr(it->x(), it->y());
+                    Point projected_pt = pt.projection_onto(Line(prev, curr));
+                    if (double dist_sqr = (projected_pt - pt).cast<double>().squaredNorm(); dist_sqr < dist_sqr_min) {
+                        dist_sqr_min     = dist_sqr;
+                        projected_pt_min = projected_pt;
+                        it_min           = std::prev(it);
+                    }
+                    prev = curr;
+                }
+
+                assert(dist_sqr_min <= SCALED_EPSILON);
+                assert(std::next(it_min) != subject.end());
+
+                const Point  pt_a(it_min->x(), it_min->y());
+                const Point  pt_b(std::next(it_min)->x(), std::next(it_min)->y());
+                const double line_len = (pt_b - pt_a).cast<double>().norm();
+                const double dist     = (projected_pt_min - pt_a).cast<double>().norm();
+                c_pt.z()              = coord_t(double(it_min->z()) + (dist / line_len) * double(std::next(it_min)->z() - it_min->z()));
+            }
+
+    assert([&clipped_paths = std::as_const(clipped_paths)]() -> bool {
+        for (const ClipperLib_Z::Path &path : clipped_paths)
+            for (const ClipperLib_Z::IntPoint &pt : path)
+                if (pt.z() <= 0)
+                    return false;
+        return true;
+    }());
 
     return clipped_paths;
 }
