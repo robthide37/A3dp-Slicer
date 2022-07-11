@@ -398,7 +398,12 @@ bool is_almost_parallel(FI                        fi,
 /// <param name="face_type_map">In/Out map with faces type</param>
 void flood_fill_inner(const CutMesh &mesh, FaceTypeMap &face_type_map);
 
-using ReductionMap = CutMesh::Property_map<VI, VI>;
+// Conversion one vertex index to another
+using CvtVI2VI = CutMesh::Property_map<VI, VI>;
+// Each Patch track outline vertex conversion to tource model
+const std::string patch_source_name = "v:patch_source";
+
+using ReductionMap = CvtVI2VI;
 /// <summary>
 /// Create map to reduce unnecesary triangles,
 /// Triangles are made by divided quad to two triangles
@@ -474,6 +479,53 @@ CutAOIs create_cut_area_of_interests(const CutMesh    &mesh,
                                      const ExPolygons &shapes,
                                      FaceTypeMap      &face_type_map);
 
+// To track during diff_models,
+// what was cutted off, from CutAOI
+struct SurfacePatch
+{
+    // converted cut to CGAL mesh
+    CutMesh mesh;
+    // CvtVI2VI cvt = mesh.property_map<VI, VI>(patch_source_name);
+    // Conversion VI from this patch to source VI(model) is stored in mesh property
+    
+    // converted source.second to mesh half edges
+    std::vector<HI> outline;
+
+    BoundingBoxf3 bb;
+
+    //// Data needed to find best projection distances
+    // index of source model in models
+    size_t model_id;
+    // index of source CutAOI
+    size_t aoi_id;
+
+    // index of shape from ExPolygons
+    size_t shape_id = 0;
+    // TODO: fill by point from AOI outline
+
+    //// Used only during clipping phase
+    // flag that part will be deleted
+    bool full_inside = false;
+    // flag that Patch could contain more than one part
+    bool just_cliped = false;
+};
+using SurfacePatches = std::vector<SurfacePatch>;
+
+/// <summary>
+/// Differenciate other models
+/// </summary>
+/// <param name="cuts">Patches from meshes</param>
+/// <param name="m2i">Convert model_index and cut_index into one index</param>
+/// <param name="cut_models">Source points for Cutted AOIs</param>
+/// <param name="models">Original models without cut modifications used for
+/// differenciate</param> <param name="projection">Define projection
+/// direction</param> <returns>Cuts differenciate by models - Patch</returns>
+SurfacePatches diff_models(VCutAOIs                 &cuts,
+                           const ModelCut2index     &m2i,
+                           const CutMeshes          &cut_models,
+                           /*const*/ CutMeshes      &models,
+                           const Emboss::IProject3f &projection);
+
 /// <summary>
 /// To select correct area
 /// </summary>
@@ -484,6 +536,9 @@ struct ProjectionDistance
 
     // index of CutAOI
     uint32_t aoi_index = std::numeric_limits<uint32_t>::max();
+
+    // index of Patch
+    uint32_t patch_index = std::numeric_limits<uint32_t>::max();
 
     // index of half edge in AOI
     uint32_t hi_index = std::numeric_limits<uint32_t>::max();
@@ -498,23 +553,23 @@ using ProjectionDistances =  std::vector<ProjectionDistance>;
 using VDistances = std::vector<ProjectionDistances>;
 
 /// <summary>
-/// Calculate distances from CutAOI contour points to ProjectionOrigin
+/// Calculate distances for SurfacePatches outline points
 /// NOTE:
 /// each model has to have "vert_shape_map" .. Know source of new vertices
 /// </summary>
-/// <param name="cuts">models AOIs</param>
-/// <param name="count_shapes_points">Count of contour points in shapes</param>
+/// <param name="patches">Part of surface</param>
 /// <param name="models">Vertices position</param>
 /// <param name="shapes_mesh">Mesh created by shapes</param>
+/// <param name="count_shapes_points">Count of contour points in shapes</param>
 /// <param name="projection_ratio">Define best distnace</param>
-/// <param name="vert_shape_map">Know source of new vertices</param>
 /// <returns>Projection distances of cutted shape points</returns>
-VDistances calc_distances(const VCutAOIs       &cuts,
-                          size_t                count_shapes_points,
+VDistances calc_distances(const SurfacePatches &patches,
                           const CutMeshes      &models,
                           const CutMesh        &shapes_mesh,
+                          size_t                count_shapes_points,
                           float                 projection_ratio);
-    /// <summary>
+
+/// <summary>
 /// Select distances in similar depth between expolygons
 /// </summary>
 /// <param name="distances">All distances</param>
@@ -525,6 +580,27 @@ ProjectionDistances choose_best_distance(
     const std::vector<ProjectionDistances> &distances,
     const ExPolygons                      &shapes,
     const ShapePoint2index                &shape_point_2_index);
+
+/// <summary>
+/// Create mask for patches
+/// </summary>
+/// <param name="best_distances"></param>
+/// <param name="patches"></param>
+/// <param name="cuts"></param>
+/// <returns>Mask of used patch</returns>
+std::vector<bool> select_patches(const ProjectionDistances &best_distances,
+                                 const SurfacePatches      &patches,
+                                 const VCutAOIs            &cuts);
+
+/// <summary>
+/// Merge masked patches to one surface cut
+/// </summary>
+/// <param name="patches">All patches
+/// NOTE: need add property for transform</param>
+/// <param name="mask">Mash for using patch</param>
+/// <returns>Result surface cut</returns>
+SurfaceCut merge_patches(/*const*/ SurfacePatches &patches,
+                         std::vector<bool>          mask);
 
 using ConvertMap = CutMesh::Property_map<VI, SurfaceCut::Index>;
 /// <summary>
@@ -640,45 +716,6 @@ SurfaceCut::CutContour create_cut(const std::vector<HI> &outlines,
 /// <returns>Merged all surface cuts into one</returns>
 SurfaceCut merge_intersections(SurfaceCuts &cuts, const CutAOIs& cutAOIs, const std::vector<bool>& use_cut);
 
-// To track what was cutted of 
-struct SurfacePatch
-{
-    // converted cut to CGAL mesh
-    CutMesh mesh;
-    // converted source.second to mesh half edges
-    std::vector<HI> outline;
-
-    BoundingBoxf3 bb;
-
-    /// used during process
-    // flag that part will be deleted
-    bool full_inside = false;
-    // flag that Patch could contain more than one part
-    bool just_cliped = false;
-};
-using SurfacePatches = std::vector<SurfacePatch>;
-
-/// <summary>
-/// Differenciate other models
-/// </summary>
-/// <param name="cuts">Patches from meshes</param>
-/// <param name="m2i">Convert model_index and cut_index into one index</param>
-/// <param name="cut_models">Source points for Cutted AOIs</param>
-/// <param name="models">Original models without cut modifications used for differenciate</param>
-/// <param name="projection">Define projection direction</param>
-/// <returns>Cuts differenciate by models - Patch</returns>
-SurfacePatches diff_models(VCutAOIs                 &cuts,
-                           const ModelCut2index     &m2i,
-                           const CutMeshes          &cut_models,
-                           /*const*/ CutMeshes      &models,
-                           const Emboss::IProject3f &projection);
-
-// keep CGAL Mesh for next processing
-struct SurfaceCutWithMesh : public SurfaceCut{
-    CutMesh cgalMesh = CutMesh();
-};
-
-
 /// <summary>
 /// Merge 2 Cuts when has intersection
 /// </summary>
@@ -707,7 +744,7 @@ void store(const ProjectionDistances &pds, const VCutAOIs &aois, const CutMeshes
 void store(const SurfaceCuts &cut, const std::string &dir);
 
 void store(const std::vector<indexed_triangle_set> &models, const std::string &obj_filename);
-void store(const std::vector<CutMesh>&models, const std::string &off_filename);
+void store(const std::vector<CutMesh>&models, const std::string &dir);
 void store(const Emboss::IProjection &projection, const Point &point_to_project, float projection_ratio, const std::string &obj_filename);
 #endif // DEBUG_OUTPUT_DIR
 } // namespace privat
@@ -755,7 +792,8 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     }
 
 #ifdef DEBUG_OUTPUT_DIR
-    priv::store(cgal_models, DEBUG_OUTPUT_DIR + "model");// model[0-N].off
+    priv::store(cgal_models, DEBUG_OUTPUT_DIR + "model/");// model[0-N].off
+    priv::store(cgal_neg_models, DEBUG_OUTPUT_DIR + "model_neg/"); // model[0-N].off
 #endif // DEBUG_OUTPUT_DIR
 
     priv::CutMesh cgal_shape = priv::to_cgal(shapes, projection);
@@ -778,33 +816,35 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
         model_cuts.push_back(std::move(cutAOIs));
     }
 
+    // Differenciate other models from CutAOI (Cutted Area of Interest)
     priv::ModelCut2index m2i(model_cuts);
     priv::SurfacePatches patches = priv::diff_models(model_cuts, m2i, cgal_models, cgal_neg_models, projection);
 #ifdef DEBUG_OUTPUT_DIR
     priv::store(patches, DEBUG_OUTPUT_DIR + "patches/");
 #endif // DEBUG_OUTPUT_DIR
 
+    // fix - convert shape_point_id to expolygon index 
+    // save 1 param(s2i) from diff_models call
+    for (priv::SurfacePatch &patch : patches)
+        patch.shape_id = s2i.calc_id(patch.shape_id).expolygons_index;
+
     // calc distance to projection for all outline points of cutAOI(shape)
     // it is used for distiguish the top one
     uint32_t shapes_points = s2i.get_count();
     // for each point collect all projection distances
-    priv::VDistances distances = priv::calc_distances(
-        model_cuts, shapes_points, cgal_models, cgal_shape, projection_ratio);
+    priv::VDistances distances = priv::calc_distances(patches, cgal_models, cgal_shape, shapes_points, projection_ratio);
 
     // for each point select best projection
-    priv::ProjectionDistances best_projection =
-        priv::choose_best_distance(distances, shapes, s2i);
-
+    priv::ProjectionDistances best_projection = priv::choose_best_distance(distances, shapes, s2i);
 #ifdef DEBUG_OUTPUT_DIR
-    store(best_projection, model_cuts, cgal_models, DEBUG_OUTPUT_DIR + "best_projection.obj"); // only debug
+    // TODO: fix by using of patches
+    //store(best_projection, model_cuts, cgal_models, DEBUG_OUTPUT_DIR + "best_projection.obj"); // only debug
 #endif // DEBUG_OUTPUT_DIR
 
-    // Create mask for wanted AOIs
-    std::vector<bool> is_best_cut(m2i.get_count(), {false});  
-    for (const priv::ProjectionDistance& d : best_projection)
-        if (d.model_index != std::numeric_limits<uint32_t>::max())
-            is_best_cut[m2i.calc_index({d.model_index, d.aoi_index})] = true; 
+    std::vector<bool> use_patch = priv::select_patches(best_projection, patches, model_cuts);
 
+    SurfaceCut result = merge_patches(patches, use_patch);
+    return result;
     
     // IMPROVE: create reduce map on demand - may be model do not need it (when it is not used for result)
     // Reduction prepare
@@ -842,8 +882,6 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     // Self Intersection of surface cuts are
     // made by damaged models AND multi volumes
     //SurfaceCut result = priv::merge_intersections(surface_cuts, cutAOIs, is_best_cut);
-
-    SurfaceCut result;
     //for (SurfaceCuts &cuts : model_cuts)
     //    for (SurfaceCut &cut : cuts) append(result, std::move(cut));
 //#ifdef DEBUG_OUTPUT_DIR
@@ -2087,60 +2125,86 @@ priv::CutAOIs priv::create_cut_area_of_interests(const CutMesh    &mesh,
     return result;
 }
 
-priv::VDistances priv::calc_distances(const std::vector<CutAOIs> &cuts,
-                                      size_t count_shapes_points,
-                                      const std::vector<CutMesh> &models,
-                                      const CutMesh              &shapes_mesh,
-                                      float                 projection_ratio)
+namespace priv {
+
+/// <summary>
+/// Calculate projection distance of point [in mm]
+/// </summary>
+/// <param name="p">Point to calc distance</param>
+/// <param name="pi">Index of point on contour</param>
+/// <param name="shapes_mesh">Model of cutting shape</param>
+/// <param name="projection_ratio">Ratio for best projection distance</param>
+/// <returns>Distance of point from best projection</returns>
+float calc_distance(const P3 &p,
+                    uint32_t  pi,                    
+                    const CutMesh &shapes_mesh,
+                    float          projection_ratio);
+
+}
+
+float priv::calc_distance(const P3 &p,
+                          uint32_t  pi,                          
+                          const CutMesh &shapes_mesh,
+                          float          projection_ratio)
 {
-    // calculate distance from projection ration [in mm]
-    auto calc_distance = [&models, &shapes_mesh, projection_ratio](uint32_t pi, VI vi, uint32_t model_index) -> float {
-        const P3& p = models[model_index].point(vi);
-        
-        // It is known because shapes_mesh is created inside of private space
-        VI vi_start(2 * pi);
-        VI vi_end(2 * pi + 1);
+    // It is known because shapes_mesh is created inside of private space
+    VI vi_start(2 * pi);
+    VI vi_end(2 * pi + 1);
 
-        // Get range for intersection
-        const P3 &start = shapes_mesh.point(vi_start);
-        const P3 &end   = shapes_mesh.point(vi_end);
+    // Get range for intersection
+    const P3 &start = shapes_mesh.point(vi_start);
+    const P3 &end   = shapes_mesh.point(vi_end);
 
-        size_t max_i = 0;
-        float  max_val = 0.f;
-        for (size_t i = 0; i < 3; i++) { 
-            float val = start[i] - end[i];
-            // abs value
-            if (val < 0.f) val *= -1.f;
-            if (max_val < val) { 
-                max_val = val;
-                max_i   = i;
-            }
+    // find index in vector with biggest difference
+    size_t max_i   = 0;
+    float  max_val = 0.f;
+    for (size_t i = 0; i < 3; i++) {
+        float val = start[i] - end[i];
+        // abs value
+        if (val < 0.f) val *= -1.f;
+        if (max_val < val) {
+            max_val = val;
+            max_i   = i;
         }
-        return (p[max_i] - start[max_i]) - projection_ratio * (end[max_i] - start[max_i]);
-    };
+    }
 
+    float from_start    = p[max_i] - start[max_i];
+    float best_distance = projection_ratio * (end[max_i] - start[max_i]);
+    return from_start - best_distance;
+}
+
+priv::VDistances priv::calc_distances(const SurfacePatches &patches,
+                                      const CutMeshes &models,
+                                      const CutMesh &shapes_mesh,
+                                      size_t count_shapes_points,
+                                      float projection_ratio)
+{
     priv::VDistances result(count_shapes_points);
-    for (uint32_t model_index = 0; model_index < cuts.size(); model_index++) {
-        const CutAOIs& model_cuts = cuts[model_index];
+    for (const SurfacePatch &patch : patches) {
         // map is created during intersection by corefine visitor
         const VertexShapeMap &vert_shape_map = 
-            models[model_index].property_map<VI, const IntersectingElement*>(vert_shape_map_name).first;
-        for (const CutAOI &cut : model_cuts) {
-            // for each half edge of outline
-            for (const HI& hi : cut.second) {
-                VI vi = models[model_index].source(hi);
-                const IntersectingElement * ie = vert_shape_map[vi];
-                if (ie == nullptr) continue;
-                assert(ie->shape_point_index != std::numeric_limits<uint32_t>::max());
-                assert(ie->attr != (unsigned char) IntersectingElement::Type::undefined);
-                uint32_t pi = ie->shape_point_index;
-                assert(pi <= count_shapes_points);
-                std::vector<ProjectionDistance> &pds = result[pi];
-                uint32_t aoi_index = &cut - &model_cuts.front();
-                uint32_t hi_index = &hi - &cut.second.front();
-                float distance = calc_distance(pi, vi, model_index);
-                pds.push_back({model_index, aoi_index, hi_index, distance});
-            }        
+            models[patch.model_id].property_map<VI, const IntersectingElement *>(vert_shape_map_name).first;
+        uint32_t patch_index = &patch - &patches.front();
+        // map is created during patch creation / dividing
+        const CvtVI2VI& cvt = patch.mesh.property_map<VI, VI>(patch_source_name).first;
+        // for each half edge of outline
+        for (const HI& hi : patch.outline) {
+            VI vi_patch = patch.mesh.source(hi);
+            VI vi_model = cvt[vi_patch];
+            if (!vi_model.is_valid()) continue;            
+            const IntersectingElement *ie = vert_shape_map[vi_model];
+            if (ie == nullptr) continue;
+            assert(ie->shape_point_index != std::numeric_limits<uint32_t>::max());
+            assert(ie->attr != (unsigned char) IntersectingElement::Type::undefined);
+            uint32_t pi = ie->shape_point_index;
+            assert(pi <= count_shapes_points);
+            std::vector<ProjectionDistance> &pds = result[pi];
+            uint32_t model_index = patch.model_id;
+            uint32_t  aoi_index = patch.aoi_id;
+            uint32_t  hi_index  = &hi - &patch.outline.front();
+            const P3 &p = patch.mesh.point(vi_patch);
+            float distance = calc_distance(p, pi, shapes_mesh, projection_ratio);
+            pds.push_back({model_index, aoi_index, patch_index, hi_index, distance});
         }
     }
     return result;
@@ -2166,11 +2230,6 @@ uint32_t get_closest_point_index(const Point &p, const ExPolygons &shapes, const
 
 // Search for closest projection to wanted distance
 const ProjectionDistance *get_closest_projection(const ProjectionDistances &distance, float wanted_distance);
-
-// return neighbor projection distance when exists
-const ProjectionDistance *get_next(const ProjectionDistance  &from_pd,
-                                   const ProjectionDistances &from,
-                                   const ProjectionDistances &to);
 
 // fill result around known index inside one polygon
 void fill_polygon_distances(const ProjectionDistance &pd, uint32_t index, const ShapePointId &id, ProjectionDistances & result, const ExPolygons &shapes, const VDistances &distances);
@@ -2233,55 +2292,6 @@ const priv::ProjectionDistance *priv::get_closest_projection(
     return min_pd;
 }
 
-const priv::ProjectionDistance *priv::get_next(
-    const ProjectionDistance  &from_pd,
-    const ProjectionDistances &from,
-    const ProjectionDistances &to)
-{
-    // exist some projection?
-    if (to.empty()) return {};
-
-    // find next same aoi (closest one)
-    const ProjectionDistance* to_pd = nullptr;
-    for (const ProjectionDistance &t : to) { 
-        if (t.aoi_index != from_pd.aoi_index) continue;            
-        if (to_pd != nullptr) {
-            // when exist more than one use closest to previous
-            float distance_prev = std::fabs(to_pd->distance - from_pd.distance);
-            float distance = std::fabs(t.distance - from_pd.distance);
-            if (distance < distance_prev) 
-                to_pd = &t;
-        } else {
-            to_pd = &t;
-        }            
-    }
-
-    if (to_pd != nullptr) {
-        // detect crossing aois
-        const ProjectionDistance* cross_pd = nullptr;
-        for (const ProjectionDistance &t : to) { 
-            if (t.distance > to_pd->distance) continue;
-            for (const ProjectionDistance &f : from) { 
-                if (f.aoi_index != t.aoi_index) continue;
-                if (f.distance < from_pd.distance) continue;
-                if (cross_pd!=nullptr) {
-                    // multiple crossing
-                    if (cross_pd->distance > f.distance) 
-                        cross_pd = &f;
-                } else {
-                    cross_pd = &f;
-                }
-            }
-        }
-        // TODO: Detect opposit crossing - should be fixed
-        if (cross_pd!=nullptr) return cross_pd;
-    } else {
-        // Try find another closest AOI 
-        return get_closest_projection(to, from_pd.distance);
-    }
-    return to_pd;
-}
-
 void priv::fill_polygon_distances(const ProjectionDistance &pd,
                                   uint32_t                  index,
                                   const ShapePointId       &id,
@@ -2299,15 +2309,13 @@ void priv::fill_polygon_distances(const ProjectionDistance &pd,
 
     uint32_t act_index = index;
     const ProjectionDistance* act_pd = &pd;
-    const ProjectionDistances* act_distances = &distances[act_index];
 
     // Copy starting pd to result
     result[act_index] = pd;
 
-    auto exist_next = [&distances, &act_index, &act_pd, &act_distances, &result]
+    auto exist_next = [&distances, &act_index, &act_pd, &result]
     (uint32_t nxt_index) {
-        const ProjectionDistances* nxt_distances = &distances[nxt_index];
-        const ProjectionDistance *nxt_pd = get_next(*act_pd, *act_distances, *nxt_distances);
+        const ProjectionDistance *nxt_pd = get_closest_projection(distances[nxt_index] ,act_pd->distance);
         // exist next projection distance ?
         if (nxt_pd == nullptr) return false;
 
@@ -2318,8 +2326,7 @@ void priv::fill_polygon_distances(const ProjectionDistance &pd,
 
         // next
         act_index = nxt_index;
-        act_pd        = &result[nxt_index];
-        act_distances = nxt_distances;
+        act_pd    = &result[nxt_index];
         return true;
     };
 
@@ -2338,9 +2345,8 @@ void priv::fill_polygon_distances(const ProjectionDistance &pd,
     // when all results for polygon are set no neccessary to iterate negative
     if (act_index == finish_index) return;
 
-    act_index     = index;
-    act_pd        = &pd;
-    act_distances = &distances[act_index];
+    act_index = index;
+    act_pd    = &pd;
     // Negative iteration inside polygon
     do {
         uint32_t nxt_index = (act_index == first_index) ? 
@@ -2677,9 +2683,6 @@ bool priv::merge_intersection(SurfaceCut &cut1, const SurfaceCut &cut2) {
     return false;
 }
 
-namespace priv {
-} // namespace priv
-
 void priv::create_face_types(FaceTypeMap           &map,
                              const CutMesh         &tm1,
                              const CutMesh         &tm2,
@@ -2927,7 +2930,7 @@ priv::SurfacePatch priv::create_surface_patch(CutAOI &cut, const CutMesh &mesh)
     }
 
     uint32_t count_faces = cut.first.size();    
-    // NOTE: It is more than neccessary, guess it better
+    // IMPROVE: Value is greater than neccessary, guess it better
     uint32_t count_edges = count_faces*3; 
 
     CutMesh cm;
@@ -2964,7 +2967,127 @@ priv::SurfacePatch priv::create_surface_patch(CutAOI &cut, const CutMesh &mesh)
         outline.push_back(hi_cvt);
     }
 
+    // convert VI from this patch to source VI, when exist
+    CvtVI2VI& cvt = cm.add_property_map<VI, VI>(patch_source_name).first;
+    // vi_s .. VertexIndex into mesh (source)
+    // vi_d .. new VertexIndex in cm (destination)
+    for (uint32_t vi_s = 0; vi_s < v_cvt.size(); ++vi_s) { 
+        uint32_t vi_d = v_cvt[vi_s];
+        if (vi_d == def_val) continue;
+        // check only one conversion
+        assert(!cvt[VI(vi_d)].is_valid());
+        cvt[VI(vi_d)] = VI(vi_s);
+    }
+
     return {std::move(cm), std::move(outline)};
+}
+
+namespace priv {
+/// <summary>
+/// Create bounding boxes for AOI
+/// </summary>
+/// <param name="cuts">Cutted AOI from models</param>
+/// <param name="cut_models">Source points of cuts</param>
+/// <returns>Bounding boxes</returns>
+std::vector<BoundingBoxf3> create_bbs(const VCutAOIs  &cuts,
+                                      const CutMeshes &cut_models);
+
+/// <summary>
+/// Separate connected triangles into it's own patches
+/// new patches are added to back of input patches
+/// </summary>
+/// <param name="i">index into patches</param>
+/// <param name="patches">In/Out Patches</param>
+void divide_patch(size_t i, SurfacePatches &patches);
+
+}
+
+std::vector<BoundingBoxf3> priv::create_bbs(const VCutAOIs        &cuts,
+                                            const CutMeshes &cut_models)
+{
+    size_t count = 0;
+    for (const CutAOIs &cut : cuts) count += cut.size();
+
+    std::vector<BoundingBoxf3> bbs;
+    bbs.reserve(count);
+    for (size_t model_index = 0; model_index < cut_models.size(); ++model_index) {
+        const CutMesh &cut_model = cut_models[model_index];
+        const CutAOIs &cutAOIs   = cuts[model_index];
+        for (size_t cut_index = 0; cut_index < cutAOIs.size(); ++cut_index) {
+            const CutAOI &cut = cutAOIs[cut_index];
+            bbs.push_back(bounding_box(cut, cut_model));
+        }
+    }
+    return bbs;
+}
+
+void priv::divide_patch(size_t i, SurfacePatches &patches) {
+    SurfacePatch &patch = patches[i];
+    assert(patch.just_cliped);
+    patch.just_cliped = false;
+
+    constexpr size_t def_value = std::numeric_limits<size_t>::max();
+
+    CutMesh& cm = patch.mesh;
+    std::string patch_number_name = "f:patch_number";
+    auto patch_number = cm.add_property_map<FI, size_t>(patch_number_name, {def_value}).first;        
+
+    size_t number = 0;
+    std::vector<FI> queue;
+    // IMPROVE: create groups around triangles and than connect groups
+    for (FI fi_cm : cm.faces()) {
+        if (patch_number[fi_cm] != def_value) continue;
+        assert(queue.empty());
+        queue.push_back(fi_cm);
+        // flood fill from triangle fi_cm to surrounding
+        do {
+            FI fi_q = queue.back();
+            queue.pop_back();
+            if (patch_number[fi_q] != def_value) { 
+                assert(patch_number[fi_q] == number);
+                continue; 
+            }
+            patch_number[fi_q] = number;
+            HI hi = cm.halfedge(fi_q);
+            for (FI fi : cm.faces_around_face(hi)) {
+                // by documentation The face descriptor may be the null face, and it may be several times the same face descriptor.
+                if (!fi.is_valid()) continue;
+                if (patch_number[fi] == def_value) queue.push_back(fi);
+            }
+        } while (!queue.empty());
+        ++number;
+    }
+
+    // speed up for only one patch - no dividing (the most common)
+    if (number == 1) {
+        cm.remove_property_map(patch_number);
+        patch.bb = bounding_box(cm);
+        // TODO: fix outline
+        return;
+    }
+
+    const CvtVI2VI& cvt_from = patch.mesh.property_map<VI, VI>(patch_source_name).first;
+    auto separate_patch = [&patch_number, &patch, &cvt_from](size_t n) -> SurfacePatch {
+        CutAOI cut;
+        for (FI fi_cm : patch.mesh.faces())
+            if (patch_number[fi_cm] == n) cut.first.push_back(fi_cm);
+        SurfacePatch patch_new = create_surface_patch(cut, patch.mesh);
+        patch_new.bb = bounding_box(patch_new.mesh);
+        patch_new.aoi_id = patch.aoi_id;
+        patch_new.model_id = patch.model_id;
+        patch_new.shape_id = patch.shape_id;
+        // fix cvt        
+        CvtVI2VI& cvt = patch_new.mesh.property_map<VI, VI>(patch_source_name).first;
+        for (VI &vi : cvt) { 
+            if (!vi.is_valid()) continue;
+            vi = cvt_from[vi];
+        }
+        return patch_new;
+    };
+
+    for (size_t n = 1; n < number; n++)
+        patches.push_back(separate_patch(n));
+    patch = separate_patch(0);
 }
 
 priv::SurfacePatches priv::diff_models(VCutAOIs                 &cuts,
@@ -2974,16 +3097,7 @@ priv::SurfacePatches priv::diff_models(VCutAOIs                 &cuts,
                                        const Emboss::IProject3f &projection)
 {
     // create bounding boxes for cuts
-    std::vector<BoundingBoxf3> bbs;    
-    bbs.reserve(m2i.get_count());
-    for (size_t model_index = 0; model_index < models.size(); ++model_index) {
-        const CutMesh &cut_model = cut_models[model_index];
-        const CutAOIs &cutAOIs = cuts[model_index];
-        for (size_t cut_index = 0; cut_index < cutAOIs.size(); ++cut_index) {
-            const CutAOI &cut = cutAOIs[cut_index];
-            bbs.push_back(bounding_box(cut, cut_model));
-        }
-    }
+    std::vector<BoundingBoxf3> bbs = create_bbs(cuts, cut_models);
 
     // check whether cut has intersection with model
     auto has_bb_intersection = [&bbs, &m2i, &cuts]
@@ -2996,7 +3110,7 @@ priv::SurfacePatches priv::diff_models(VCutAOIs                 &cuts,
         return false;        
     };
 
-    // Do not make Tree twice, when exist out of cut function
+    // IMPROVE: Do not make Tree twice, when exist out of cut function
     using Primitive = CGAL::AABB_face_graph_triangle_primitive<CutMesh>;
     using Traits = CGAL::AABB_traits<EpicKernel, Primitive>;
     using Ray = EpicKernel::Ray_3;
@@ -3012,7 +3126,8 @@ priv::SurfacePatches priv::diff_models(VCutAOIs                 &cuts,
     }
 
     // only for model without intersection
-    // use ray from any point in projection direction
+    // use ray (in projection direction) from a point from patch
+    // and count intersections: pair .. outside | odd .. inside
     auto is_patch_inside_of_model = [&trees, &projection]
     (SurfacePatch &patch, size_t model_index) {
         // TODO: Solve model with hole in projection direction !!!
@@ -3040,67 +3155,24 @@ priv::SurfacePatches priv::diff_models(VCutAOIs                 &cuts,
         return is_in;        
     };
 
-    // separate connected triangles into it's own patches
-    // new patches are added to back of input patches
-    auto divide_patch = [](size_t i, SurfacePatches &patches) {
-        SurfacePatch &patch = patches[i];
-        assert(patch.just_cliped);
-        patch.just_cliped = false;
-
-        constexpr size_t def_value = std::numeric_limits<size_t>::max();
-
-        CutMesh& cm = patch.mesh;
-        std::string patch_number_name = "f:patch_number";
-        auto patch_number = cm.add_property_map<FI, size_t>(patch_number_name, {def_value}).first;        
-
-        size_t number = 0;
-        std::vector<FI> queue;
-        // IMPROVE: create groups around triangles and than connect groups
-        for (FI fi_cm : cm.faces()) {
-            if (patch_number[fi_cm] != def_value) continue;
-            assert(queue.empty());
-            queue.push_back(fi_cm);
-            // flood fill from triangle fi_cm to surrounding
-            do {
-                FI fi_q = queue.back();
-                queue.pop_back();
-                if (patch_number[fi_q] != def_value) { 
-                    assert(patch_number[fi_q] == number);
-                    continue; 
-                }
-                patch_number[fi_q] = number;
-                HI hi = cm.halfedge(fi_q);
-                for (FI fi : cm.faces_around_face(hi)) {
-                    // by documentation The face descriptor may be the null face, and it may be several times the same face descriptor.
-                    if (!fi.is_valid()) continue;
-                    if (patch_number[fi] == def_value) queue.push_back(fi);
-                }
-            } while (!queue.empty());
-            ++number;
+    // used to find expolygon index
+    auto get_shape_point_index = []
+    (const CutAOI &cut, const CutMesh &model) -> uint32_t{
+         // map is created during intersection by corefine visitor
+        const VertexShapeMap &vert_shape_map = model.property_map<VI, const IntersectingElement *>(vert_shape_map_name).first;
+        // for each half edge of outline
+        for (HI hi : cut.second) {
+            VI vi = model.source(hi);
+            const IntersectingElement *ie = vert_shape_map[vi];
+            if (ie == nullptr) continue;
+            assert(ie->shape_point_index != std::numeric_limits<uint32_t>::max());
+            return ie->shape_point_index;
         }
-
-        // speed up for only one patch - no dividing (the most common)
-        if (number == 1) {
-            cm.remove_property_map(patch_number);
-            patch.bb = bounding_box(cm);
-            return;
-        }
-
-        auto separate_patch = [&patch_number, &cm](size_t n) -> SurfacePatch {
-            CutAOI cut;
-            for (FI fi_cm : cm.faces())
-                if (patch_number[fi_cm] == n) cut.first.push_back(fi_cm);
-            SurfacePatch patch = create_surface_patch(cut, cm);
-            patch.bb = bounding_box(patch.mesh);
-            return patch;
-        };
-
-        for (size_t n = 1; n < number; n++)
-            patches.push_back(separate_patch(n));
-        patch = separate_patch(0);
+        // can't found any intersecting element in cut
+        assert(false);
+        return 0;
     };
 
-    std::vector<bool> removed(m2i.get_count(), {false});
     SurfacePatches patches;
     // queue of patches for one AOI (permanent with respect to for loop)
     SurfacePatches aoi_patches;
@@ -3113,6 +3185,10 @@ priv::SurfacePatches priv::diff_models(VCutAOIs                 &cuts,
             CutAOI &cut = model_cuts[cut_index];
             SurfacePatch patch = create_surface_patch(cut, cut_model);
             patch.bb = bbs[index];
+            patch.aoi_id = index;
+            patch.model_id = model_index;
+            patch.shape_id = get_shape_point_index(cut, cut_model);
+
             aoi_patches.clear();
             aoi_patches.push_back(patch);
             for (size_t model_index2 = 0; model_index2 < models.size(); ++model_index2) {
@@ -3130,36 +3206,112 @@ priv::SurfacePatches priv::diff_models(VCutAOIs                 &cuts,
                     auto it = aoi_patches.begin() + (i - 1);
                     if (it->full_inside) aoi_patches.erase(it);
                 }
-                if (aoi_patches.empty()) {
-                    removed[index] = true;
-                    break;
-                }
+
+                // detection of full AOI inside of model
+                if (aoi_patches.empty()) break;
+
                 // divide cliped into parts
                 size_t end = aoi_patches.size();
                 for (size_t i = 0; i < end; ++i)
                     if (aoi_patches[i].just_cliped)
                         divide_patch(i, aoi_patches);
             }
-            if (!removed[index])
+            if (!aoi_patches.empty())
                 patches.insert(patches.end(), 
                     aoi_patches.begin(),
                     aoi_patches.end());
         }
-    }    
+    }
+
+    // fill outlines
+    // Also use outline inside of patches(made by non manifold models)
+    // IMPROVE: trace outline from AOIs 
+    for (SurfacePatch &patch : patches) {
+        patch.outline.clear();
+        const CutMesh &mesh = patch.mesh;
+        for (FI fi : mesh.faces()) {
+            HI hi1 = mesh.halfedge(fi);
+            assert(hi1.is_valid());
+            HI hi2 = mesh.next(hi1);
+            assert(hi2.is_valid());
+            HI hi3 = mesh.next(hi2);
+            assert(hi3.is_valid());
+            // Is fi triangle?
+            assert(mesh.next(hi3) == hi1);
+            for (HI hi : {hi1, hi2, hi3}) {
+                HI hi_op = mesh.opposite(hi);
+                FI fi_op = mesh.face(hi_op);
+                if (!fi_op.is_valid()) 
+                    patch.outline.push_back(hi);
+            }
+        }
+    }
+
     return patches;
     // TODO: reduce outlines
     // TODO: add cutting edge
-
+    // 
     // TODO: merge AOIs without intersection - only append
-    
-    // Cuts merged in are signed in finished vector as TRUE
-    // All rest cuts must be merged simple way
-    //SurfaceCut result;
-    //for (size_t cut_index = 0; cut_index < cuts.size(); ++cut_index) {
-    //    if (finished[cut_index]) continue;
-    //    append(result, std::move(cuts[cut_index]));
-    //}
-    //return result;
+}
+
+
+std::vector<bool> priv::select_patches(
+    const ProjectionDistances &best_distances,
+    const SurfacePatches      &patches,
+    const VCutAOIs            &cuts)
+{
+    std::vector<bool> in_distances(patches.size(), {false});
+    for (const ProjectionDistance &d : best_distances) 
+        in_distances[d.patch_index] = true;
+
+    // For sure of the bounding boxes intersection
+    const double bb_extension = 1e-10;
+    const Vec3d bb_ext(bb_extension, bb_extension, bb_extension);
+    auto extend_bb = [&bb_ext](const BoundingBoxf3 &bb) {
+        return BoundingBoxf3(
+            bb.min - bb_ext,
+            bb.max + bb_ext);
+    };
+
+    // queue to flood fill by patches
+    std::vector<size_t> patch_indices;
+
+    std::vector<bool> result(patches.size(), {false});
+    for (const ProjectionDistance &d : best_distances) { 
+        if (result[d.patch_index]) continue;
+        // Add all connected patches
+        // This is way to add patche without source shape point
+        // 1. Patches inside of shape
+        // 2. Patches crossing outline between shape points
+
+        assert(patch_indices.empty());
+        patch_indices.push_back(d.patch_index);
+        do {
+            size_t patch_index = patch_indices.back();
+            patch_indices.pop_back();
+            if (result[patch_index]) continue;
+            result[patch_index] = true;
+            const SurfacePatch &patch = patches[patch_index];
+            BoundingBoxf3 bb = extend_bb(patch.bb);
+            for (const SurfacePatch &patch2 : patches) {
+                // IMPROVE: check patches only from same shape (ExPolygon)
+                size_t patch_index2 = &patch2 - &patches.front();
+                // is already filled?
+                if (result[patch_index2]) continue;
+                // only patches made by same shape could be connected
+                if (patch.shape_id != patch2.shape_id) continue;
+                BoundingBoxf3 bb2 = extend_bb(patch2.bb);
+                if (!bb.intersects(bb2)) continue;
+
+                if (!in_distances[patch_index2]) {
+                    // TODO: check that really exist shared outline between patches
+                    
+                }
+                patch_indices.push_back(patch_index2);
+            }        
+        } while (!patch_indices.empty());
+    }
+    return result;
 }
 
 bool Slic3r::merge_intersection(SurfaceCut& sc1, const SurfaceCut& sc2) {
@@ -3237,6 +3389,75 @@ SurfaceCut priv::merge_intersections(
         if (finished[cut_index]) continue;
         append(result, std::move(cuts[cut_index]));
     }
+    return result;
+}
+
+// help function to 'merge_patches'
+namespace priv {
+/// <summary>
+/// Convert patch to indexed_triangle_set
+/// </summary>
+/// <param name="patch">Part of surface</param>
+/// <returns>Converted patch</returns>
+SurfaceCut patch2cut(SurfacePatch &patch);
+} // namespace priv
+
+SurfaceCut priv::patch2cut(SurfacePatch &patch)
+{
+    CutMesh &mesh = patch.mesh;
+
+    std::string convert_map_name = "v:convert";
+    priv::ConvertMap convert_map = mesh.add_property_map<priv::VI, SurfaceCut::Index>(convert_map_name).first;
+
+    size_t indices_size  = mesh.faces().size();
+    size_t vertices_size = mesh.vertices().size();
+
+    SurfaceCut sc;
+    sc.indices.reserve(indices_size);
+    sc.vertices.reserve(vertices_size);
+
+    std::vector<uint32_t> v_cvt;
+    v_cvt.reserve(vertices_size);
+
+    for (VI vi : mesh.vertices()) {
+        // vi order is is not sorted
+        // assert(vi.idx() == sc.vertices.size());
+        // vi is not continous
+        // assert(vi.idx() < vertices_size);
+        convert_map[vi] = sc.vertices.size();
+        const P3 &p = mesh.point(vi);
+        sc.vertices.emplace_back(p.x(), p.y(), p.z());
+    }
+
+    for (FI fi : mesh.faces()) {
+        HI hi = mesh.halfedge(fi);
+        assert(mesh.next(hi).is_valid());
+        assert(mesh.next(mesh.next(hi)).is_valid());
+        // Is fi triangle?
+        assert(mesh.next(mesh.next(mesh.next(hi))) == hi);
+
+        // triangle indicies
+        Vec3i ti;
+        size_t i = 0;
+        for (VI vi : { mesh.source(hi), 
+                       mesh.target(hi), 
+                       mesh.target(mesh.next(hi))})
+            ti[i++] = convert_map[vi];
+        sc.indices.push_back(ti);
+    }
+    // Not neccessary, clean and free
+    mesh.remove_property_map(convert_map);
+    return sc;
+}
+
+SurfaceCut priv::merge_patches(SurfacePatches &patches, std::vector<bool> mask)
+{
+    SurfaceCut result;
+    for (SurfacePatch &patch : patches) {
+        size_t index = &patch - &patches.front();
+        if (!mask[index]) continue;
+        append(result, patch2cut(patch));
+    }    
     return result;
 }
 
@@ -3592,11 +3813,17 @@ void priv::store(const std::vector<indexed_triangle_set> &models,
 }
 
 void priv::store(const std::vector<priv::CutMesh> &models,
-                 const std::string                &off_filename)
+                 const std::string                &dir)
 {
+    prepare_dir(dir);
+    if (models.empty()) return;
+    if (models.size() == 1) {
+        CGAL::IO::write_OFF(dir + "model.off", models.front());
+        return;
+    }
     size_t model_index = 0;
     for (const priv::CutMesh& model : models) {
-        std::string filename = off_filename + std::to_string(model_index++) + ".off";
+        std::string filename = dir + "model" + std::to_string(model_index++) + ".off";
         CGAL::IO::write_OFF(filename, model);
     }
 }
