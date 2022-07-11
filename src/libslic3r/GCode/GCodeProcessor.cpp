@@ -38,6 +38,8 @@ static const float DEFAULT_FILAMENT_DENSITY = 1.245f;
 static const float DEFAULT_FILAMENT_COST = 0.0f;
 #endif // ENABLE_USED_FILAMENT_POST_PROCESS
 static const Slic3r::Vec3f DEFAULT_EXTRUDER_OFFSET = Slic3r::Vec3f::Zero();
+// taken from PrusaResearch.ini - [printer:Original Prusa i3 MK2.5 MMU2]
+static const std::vector<std::string> DEFAULT_EXTRUDER_COLORS = { "#FF8000", "#DB5182", "#3EC0FF", "#FF4F4F", "#FBEB7D" };
 
 #if ENABLE_PROCESS_G2_G3_LINES
 static const std::string INTERNAL_G2G3_TAG = "!#!#! internal only - from G2/G3 expansion !#!#!";
@@ -775,7 +777,8 @@ void GCodeProcessorResult::reset() {
     max_print_height = 0.0f;
     settings_ids.reset();
     extruders_count = 0;
-    extruder_colors = std::vector<std::string>();
+    extruder_colors = DEFAULT_EXTRUDER_COLORS;
+    assert(extruder_colors.size() == MIN_EXTRUDERS_COUNT);
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
 #if ENABLE_USED_FILAMENT_POST_PROCESS
@@ -3548,7 +3551,7 @@ void GCodeProcessor::process_T(const std::string_view command)
         } else {
             unsigned char id = static_cast<unsigned char>(eid);
             if (m_extruder_id != id) {
-                if (id >= m_result.extruders_count)
+                if (id >= m_result.extruder_colors.size())
                     BOOST_LOG_TRIVIAL(error) << "GCodeProcessor encountered an invalid toolchange, maybe from a custom gcode.";
                 else {
                     unsigned char old_extruder_id = m_extruder_id;
@@ -3562,6 +3565,8 @@ void GCodeProcessor::process_T(const std::string_view command)
                     m_time_processor.extruder_unloaded = false;
                     extra_time += get_filament_load_time(static_cast<size_t>(m_extruder_id));
                     simulate_st_synchronize(extra_time);
+
+                    m_result.extruders_count = std::max<size_t>(m_result.extruders_count, m_extruder_id + 1);
                 }
 
                 // store tool change move
