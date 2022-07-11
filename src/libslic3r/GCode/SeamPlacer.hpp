@@ -127,8 +127,9 @@ public:
     static constexpr size_t sqr_rays_per_sample_point = 5;
 
     // arm length used during angles computation
-    static constexpr float polygon_local_angles_arm_distance = 1.5f;
-    static constexpr float sharp_angle_snapping_threshold = 0.4f * float(PI);
+    static constexpr float polygon_local_angles_arm_distance = 0.3f;
+    static constexpr float polygon_global_angles_arm_distance = 1.5f;
+    static constexpr float sharp_angle_snapping_threshold = (60.0f / 180.0f) * float(PI);
 
     // max tolerable distance from the previous layer is overhang_distance_tolerance_factor * flow_width
     static constexpr float overhang_distance_tolerance_factor = 0.5f;

@@ -461,17 +461,41 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     if (orig_polygon.size() == 0) {
         return;
     }
-
     Polygon polygon = orig_polygon;
+    bool was_clockwise = polygon.make_counter_clockwise();
+
     std::vector<float> lengths { };
     for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
         lengths.push_back((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm());
     }
     lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
-
-    bool was_clockwise = polygon.make_counter_clockwise();
-    std::vector<float> local_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
+    std::vector<float> polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
             SeamPlacer::polygon_local_angles_arm_distance);
+    std::vector<float> global_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
+            SeamPlacer::polygon_global_angles_arm_distance);
+    for (size_t angle_index = 0; angle_index < polygon_angles.size(); ++angle_index) {
+		if (fabs(global_angles[angle_index] > fabs(polygon_angles[angle_index]))){
+			polygon_angles[angle_index] = global_angles[angle_index];
+		}
+	}
+
+    // resample smooth surfaces, so that alignment finds short path down, and does not create unnecesary curves
+    if (std::all_of(polygon_angles.begin(), polygon_angles.end(), [](float angle) {
+    	return fabs(angle) < SeamPlacer::sharp_angle_snapping_threshold;
+    })) {
+    	float avg_dist = std::accumulate(lengths.begin(), lengths.end(), 0.0f) / float(lengths.size());
+    	coord_t sampling_dist = scaled(avg_dist*0.2f);
+
+    	polygon.points = polygon.equally_spaced_points(sampling_dist);
+    	lengths.clear();
+    	for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
+			lengths.push_back((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm());
+		}
+		lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
+    	polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
+    	            SeamPlacer::polygon_global_angles_arm_distance);
+    }
+
 
     result.perimeters.push_back( { });
     Perimeter &perimeter = result.perimeters.back();
@@ -498,7 +522,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
         } else {
             position = orig_polygon_points.front();
             orig_polygon_points.pop();
-            local_ccw_angle = was_clockwise ? -local_angles[orig_angle_index] : local_angles[orig_angle_index];
+            local_ccw_angle = was_clockwise ? -polygon_angles[orig_angle_index] : polygon_angles[orig_angle_index];
             orig_angle_index++;
             orig_point = true;
         }
@@ -1212,12 +1236,10 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
     int step = 1;
     std::pair<size_t, size_t> prev_point_index = start_seam;
     std::vector<std::pair<size_t, size_t>> seam_string { start_seam };
-    Vec3f straightening_dir { 0.0f, 0.0f, 1.0f };
 
     auto reverse_lookup_direction = [&]() {
         step = -1;
         prev_point_index = start_seam;
-        straightening_dir = Vec3f(0.0f, 0.0f, -1.0f);
         next_layer = layer_idx - 1;
     };
 
@@ -1228,10 +1250,10 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
                 break;
             }
         }
-        float max_distance = SeamPlacer::seam_align_tolerable_dist + straightening_dir.head<2>().norm();
+        float max_distance = SeamPlacer::seam_align_tolerable_dist;
         Vec3f prev_position = layers[prev_point_index.first].points[prev_point_index.second].position;
-        float z_diff = fabs(float(po->get_layer(next_layer)->slice_z) - prev_position.z());
-        Vec3f projected_position = prev_position + z_diff * straightening_dir / fabs(straightening_dir.z());
+        Vec3f projected_position = prev_position;
+        projected_position.z() = float(po->get_layer(next_layer)->slice_z);
 
         std::optional<std::pair<size_t, size_t>> maybe_next_seam = find_next_seam_in_layer(layers, projected_position,
                 next_layer,
@@ -1247,8 +1269,6 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
             seam_string.push_back(maybe_next_seam.operator*());
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
-            Vec3f dir = (next_seam.position - prev_position);
-            straightening_dir = Vec3f(-dir.x()*0.0, -dir.y()*0.0, dir.z());
         } else {
             if (step == 1) {
                 reverse_lookup_direction();
