@@ -57,7 +57,7 @@ void Generator::generateInitialInternalOverhangs(const PrintObject &print_object
     m_overhang_per_layer.resize(print_object.layers().size());
 
     Polygons infill_area_above;
-    //Iterate from top to bottom, to subtract the overhang areas above from the overhang areas on the layer below, to get only overhang in the top layer where it is overhanging.
+    // Iterate from top to bottom, to subtract the overhang areas above from the overhang areas on the layer below, to get only overhang in the top layer where it is overhanging.
     for (int layer_nr = int(print_object.layers().size()) - 1; layer_nr >= 0; --layer_nr) {
         throw_on_cancel_callback();
         Polygons infill_area_here;
@@ -66,8 +66,10 @@ void Generator::generateInitialInternalOverhangs(const PrintObject &print_object
                 if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
                     append(infill_area_here, to_polygons(surface.expolygon));
 
-        //Remove the part of the infill area that is already supported by the walls.
+        // Remove the part of the infill area that is already supported by the walls.
         Polygons overhang = diff(offset(infill_area_here, -float(m_wall_supporting_radius)), infill_area_above);
+        // Filter out unprintable polygons and near degenerated polygons (three almost collinear points and so).
+        overhang = opening(std::move(overhang), SCALED_EPSILON, SCALED_EPSILON);
 
         m_overhang_per_layer[layer_nr] = overhang;
         infill_area_above = std::move(infill_area_here);
