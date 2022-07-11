@@ -123,7 +123,7 @@ static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy
         ext_lines.junctions = std::move(out);
 }
 
-static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Paths &subject, const ClipperLib_Z::Paths &clip, ClipperLib_Z::ClipType clipType)
+static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Paths &subjects, const ClipperLib_Z::Paths &clip, ClipperLib_Z::ClipType clipType)
 {
     ClipperLib_Z::Clipper clipper;
     clipper.ZFillFunction([](const ClipperLib_Z::IntPoint &e1bot, const ClipperLib_Z::IntPoint &e1top, const ClipperLib_Z::IntPoint &e2bot,
@@ -146,13 +146,64 @@ static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Paths &subject, co
         pt.z() = start.z() + coord_t((end.z() - start.z()) * t);
     });
 
-    clipper.AddPaths(subject, ClipperLib_Z::ptSubject, false);
+    clipper.AddPaths(subjects, ClipperLib_Z::ptSubject, false);
     clipper.AddPaths(clip, ClipperLib_Z::ptClip, true);
 
     ClipperLib_Z::PolyTree clipped_polytree;
     ClipperLib_Z::Paths    clipped_paths;
     clipper.Execute(clipType, clipped_polytree, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
     ClipperLib_Z::PolyTreeToPaths(clipped_polytree, clipped_paths);
+
+    // Clipped path could contain vertices from the clip with a Z coordinate equal to zero.
+    // For those vertices, we must assign value based on the subject.
+    // This happens only in sporadic cases.
+    for (ClipperLib_Z::Path &path : clipped_paths)
+        for (ClipperLib_Z::IntPoint &c_pt : path)
+            if (c_pt.z() == 0) {
+                const Point pt(c_pt.x(), c_pt.y());
+                Point       projected_pt_min;
+                const ClipperLib_Z::IntPoint* it_a = nullptr;
+                const ClipperLib_Z::IntPoint* it_b = nullptr;
+                auto        dist_sqr_min = std::numeric_limits<double>::max();
+                Point      prev(0,0);
+                for (const ClipperLib_Z::Path& subject : subjects) {
+                    // Now we must find the corresponding line on with this point is located and compute line width (Z coordinate).
+                    if (subject.size() <= 2)
+                        continue;
+
+                    for (auto it = std::next(subject.begin()); it != subject.end(); ++it) {
+                        Point curr(it->x(), it->y());
+                        if (it_a == nullptr) {
+                            assert(std::prev(it) == subject.begin());
+                            prev = Point(subject.front().x(), subject.front().y());
+                        } 
+                        Point projected_pt = pt.projection_onto(Line(prev, curr));
+                        if (double dist_sqr = (projected_pt - pt).cast<double>().squaredNorm(); dist_sqr < dist_sqr_min) {
+                            dist_sqr_min = dist_sqr;
+                            projected_pt_min = projected_pt;
+                            it_a = &*std::prev(it);
+                            it_b = &*it;
+                        }
+                        prev = curr;
+                    }
+
+                    assert(dist_sqr_min <= SCALED_EPSILON);
+                    assert(std::next(it_a) != subject.end());
+                }
+
+                const Point  pt_a(it_a->x(), it_a->y());
+                const Point  pt_b(it_b->x(), it_b->y());
+                const double line_len = (pt_b - pt_a).cast<double>().norm();
+                const double dist = (projected_pt_min - pt_a).cast<double>().norm();
+                c_pt.z() = coord_t(double(it_a->z()) + (dist / line_len) * double(it_b->z() - it_a->z()));
+            }
+    assert([&clipped_paths = std::as_const(clipped_paths)]() -> bool {
+        for (const ClipperLib_Z::Path &path : clipped_paths)
+            for (const ClipperLib_Z::IntPoint &pt : path)
+                if (pt.z() <= 0)
+                    return false;
+        return true;
+    }());
 
     return clipped_paths;
 }

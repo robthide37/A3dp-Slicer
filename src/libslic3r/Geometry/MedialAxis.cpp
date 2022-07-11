@@ -3059,8 +3059,8 @@ variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Fl
         const coordf_t prev_line_len = saved_line_len;
         saved_line_len = line_len;
 
-        assert(line.a_width >= 0 && !std::isnan(line.a_width));
-        assert(line.b_width >= 0 && !std::isnan(line.b_width));
+        assert(line.a_width > SCALED_EPSILON && !std::isnan(line.a_width));
+        assert(line.b_width > SCALED_EPSILON && !std::isnan(line.b_width));
         coord_t thickness_delta = std::abs(line.a_width - line.b_width);
 
         // split lines ?
