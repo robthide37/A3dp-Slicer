@@ -167,7 +167,7 @@ struct IntersectingElement
     uint32_t shape_point_index{std::numeric_limits<uint32_t>::max()};
 
     // store together type, is_first, is_last
-    unsigned char attr;
+    unsigned char attr{std::numeric_limits<unsigned char>::max()};
 
     // vertex or edge ID, where edge ID is the index of the source point.
     // There are 4 consecutive indices generated for a single contour edge:
@@ -1047,9 +1047,8 @@ uint32_t priv::ShapePoint2index::calc_index(const ShapePointId &id) const
 priv::ShapePointId priv::ShapePoint2index::calc_id(uint32_t index) const
 {
     assert(index < m_count);
-    ShapePointId result;
+    ShapePointId result{0,0,0};
     // find shape index
-    result.expolygons_index = 0;
     for (size_t i = 1; i < m_offsets.size(); i++) {
         if (m_offsets[i][0] > index) break;
         result.expolygons_index = i;
@@ -1058,7 +1057,6 @@ priv::ShapePointId priv::ShapePoint2index::calc_id(uint32_t index) const
     // find contour index
     const std::vector<uint32_t> &shape_offset =
         m_offsets[result.expolygons_index];
-    result.polygon_index = 0;
     for (size_t i = 1; i < shape_offset.size(); i++) {
         if (shape_offset[i] > index) break;
         result.polygon_index = i;
@@ -1098,9 +1096,8 @@ uint32_t priv::ModelCut2index::calc_index(const ModelCutId &id) const
 priv::ModelCutId priv::ModelCut2index::calc_id(uint32_t index) const
 {
     assert(index < m_count);
-    ModelCutId result;
+    ModelCutId result{0,0};
     // find shape index
-    result.model_index = 0;
     for (size_t model_index = 1; model_index < m_offsets.size(); ++model_index) {
         if (m_offsets[model_index] > index) break;
         result.model_index = model_index;
@@ -2229,11 +2226,8 @@ priv::ProjectionDistances priv::choose_best_distance(
 namespace priv {
 const VI default_vi(std::numeric_limits<uint32_t>::max());
 
-struct Source
-{
-    HI  hi;
-    int sdim;
-};
+// Keep info about intersection source
+struct Source{ HI  hi; int sdim=0;};
 using Sources                            = std::vector<Source>;
 const std::string vertex_source_map_name = "v:SourceIntersecting";
 using VertexSourceMap                    = CutMesh::Property_map<VI, Source>;
@@ -2482,7 +2476,7 @@ bool priv::clip_cut(SurfacePatch &cut, CutMesh clipper)
         bool* exist_intersection;
     public:
         ExistIntersectionClipVisitor(bool *exist_intersection): exist_intersection(exist_intersection){}
-        void  intersection_point_detected(std::size_t, int , HI, HI, const CutMesh&, const CutMesh&, bool, bool)
+        void intersection_point_detected(std::size_t, int , HI, HI, const CutMesh&, const CutMesh&, bool, bool)
         { *exist_intersection = true;}
     };
     bool exist_intersection = false;
@@ -3061,7 +3055,7 @@ SurfaceCut priv::merge_intersections(
         // merged in last iteration
         std::vector<bool> new_merged;
 
-        bool exist_new_extension;
+        bool exist_new_extension= false;
         bool is_first = true;
         // while exist bb intersection
         do {
