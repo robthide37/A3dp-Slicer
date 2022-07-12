@@ -522,11 +522,11 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
             orig_point = true;
         }
 
-        if (global_model_info.is_enforced(position, SeamPlacer::enforcer_blocker_distance_tolerance)) {
+        if (global_model_info.is_enforced(position, perimeter.flow_width)) {
             type = EnforcedBlockedSeamPoint::Enforced;
         }
 
-        if (global_model_info.is_blocked(position, SeamPlacer::enforcer_blocker_distance_tolerance)) {
+        if (global_model_info.is_blocked(position, perimeter.flow_width)) {
             type = EnforcedBlockedSeamPoint::Blocked;
         }
         some_point_enforced = some_point_enforced || type == EnforcedBlockedSeamPoint::Enforced;

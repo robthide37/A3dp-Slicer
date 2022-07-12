@@ -135,10 +135,8 @@ public:
 
     // determines angle importance compared to visibility ( neutral value is 1.0f. )
     static constexpr float angle_importance_aligned = 0.6f;
-    static constexpr float angle_importance_nearest = 1.0f; // use much higher angle importance for nearest mode, to combat the visiblity info noise
+    static constexpr float angle_importance_nearest = 1.0f; // use much higher angle importance for nearest mode, to combat the visibility info noise
 
-    // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
-    static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
     // For long polygon sides, if they are close to the custom seam drawings, they are oversampled with this step size
     static constexpr float enforcer_oversampling_distance = 0.2f;
 
