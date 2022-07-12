@@ -295,8 +295,6 @@ bool SkeletalTrapezoidation::computePointCellRange(vd_t::cell_type& cell, Point&
     // Copy whole cell into graph or not at all
 
     // If the cell.incident_edge()->vertex0() is far away so much that it doesn't even fit into Vec2i64, then there is no way that it will be inside the input polygon.
-    assert(x <= double(std::numeric_limits<int64_t>::max()) && x >= std::numeric_limits<int64_t>::lowest());
-    assert(y <= double(std::numeric_limits<int64_t>::max()) && y >= std::numeric_limits<int64_t>::lowest());
     if (const vd_t::vertex_type &vert = *cell.incident_edge()->vertex0();
         vert.x() >= double(std::numeric_limits<int64_t>::max()) || vert.x() <= double(std::numeric_limits<int64_t>::lowest()) ||
         vert.y() >= double(std::numeric_limits<int64_t>::max()) || vert.y() <= double(std::numeric_limits<int64_t>::lowest()))
