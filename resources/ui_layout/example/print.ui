@@ -175,7 +175,10 @@ group:sidetext_width$5:Advanced
 		setting:label_width$8:width$5:external_infill_margin
 		setting:label_width$6:width$5:bridged_infill_margin
 	end_line
-	setting:only_retract_when_crossing_perimeters
+	line:Only retract when crossing perimeters
+		setting:label_width$0:label$_:only_retract_when_crossing_perimeters
+		setting:enforce_retract_first_layer
+	end_line
 	setting:infill_first
 group:Advanced Infill options
 	line:Ironing infill pattern tuning

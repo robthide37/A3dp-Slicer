@@ -79,6 +79,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "deretract_speed",
         "disable_fan_first_layers",
         "duplicate_distance",
+        "enforce_retract_first_layer",
         "end_gcode",
         "end_filament_gcode",
         "external_perimeter_acceleration",

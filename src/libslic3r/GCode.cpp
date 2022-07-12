@@ -5145,7 +5145,7 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
 
     // check whether a straight travel move would need retraction
     bool needs_retraction = this->needs_retraction(travel, role);
-    if (m_config.only_retract_when_crossing_perimeters)
+    if (m_config.only_retract_when_crossing_perimeters && !(m_config.enforce_retract_first_layer && m_layer_index == 0))
         needs_retraction = needs_retraction && will_cross_perimeter;
 
     // Re-allow avoid_crossing_perimeters for the next travel moves
@@ -5296,7 +5296,7 @@ bool GCode::needs_retraction(const Polyline& travel, ExtrusionRole role /*=erNon
 bool GCode::can_cross_perimeter(const Polyline& travel, bool offset)
 {
     if(m_layer != nullptr)
-    if ( (m_config.only_retract_when_crossing_perimeters && m_config.fill_density.value > 0) || m_config.avoid_crossing_perimeters)
+    if ( ( (m_config.only_retract_when_crossing_perimeters && !(m_config.enforce_retract_first_layer && m_layer_index == 0)) && m_config.fill_density.value > 0) || m_config.avoid_crossing_perimeters)
          {
         //test && m_layer->any_internal_region_slice_contains(travel)
         // Skip retraction if travel is contained in an internal slice *and*

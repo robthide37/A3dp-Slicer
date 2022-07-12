@@ -1102,6 +1102,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionInts,                 disable_fan_first_layers))
     ((ConfigOptionEnum<DraftShield>,    draft_shield))
     ((ConfigOptionFloat,                duplicate_distance))
+    ((ConfigOptionBool,                 enforce_retract_first_layer))
     ((ConfigOptionFloatOrPercent,       external_perimeter_acceleration))
     ((ConfigOptionInts,                 external_perimeter_fan_speed))
     ((ConfigOptionFloat,                extruder_clearance_height))
