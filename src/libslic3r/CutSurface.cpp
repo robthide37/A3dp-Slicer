@@ -6,17 +6,18 @@
 /// model/model{M}.off - CGAL model created from index_triangle_set
 /// model_neg/model{M}.off - CGAL model created for differenciate (multi volume object)
 /// shape.off - CGAL model created from shapes
-/// constrained.off - Visualization of inside and outside triangles
+/// constrained/model{M}.off - Visualization of inside and outside triangles
 ///    Green - not along constrained edge
 ///    Red - sure that are inside
 ///    Purple - sure that are outside
 /// (only along constrained edge)
-/// filled.off - flood fill green triangles inside of red area
-///            - Same meaning of color as constrained
+/// filled/model{M}.off - flood fill green triangles inside of red area
+///                     - Same meaning of color as constrained
 /// {N} .. Order of cutted Area of Interestmodel from model surface
 /// model_AOIs/{M}/cutAOI{N}.obj - Extracted Area of interest from corefined model
 /// model_AOIs/{M}/outline{N}.obj - Outline of Cutted Area
-/// cuts/cut{N}.obj - Filtered surface cuts + Reduced vertices made by e2 (text_edge_2)
+/// {O} .. Order number of patch
+/// patches/patch{O}.off
 /// result.obj - Merged result its
 /// result_contours/{O}.obj - visualization of contours for result patches
 #define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
@@ -95,15 +96,10 @@ using EpicKernel = CGAL::Exact_predicates_inexact_constructions_kernel;
 using CutMesh = CGAL::Surface_mesh<EpicKernel::Point_3>;
 using CutMeshes = std::vector<CutMesh>;
 
-using DynamicEdgeProperty = CGAL::dynamic_edge_property_t<bool>;
-using SMPM = boost::property_map<priv::CutMesh, DynamicEdgeProperty>::SMPM; 
-using EcmType = CGAL::internal::Dynamic<priv::CutMesh, SMPM>;
-
 using VI = CGAL::SM_Vertex_index;
 using HI = CGAL::SM_Halfedge_index;
 using EI = CGAL::SM_Edge_index;
 using FI = CGAL::SM_Face_index;
-
 using P3 = CGAL::Epick::Point_3;
 
 /// <summary>
@@ -268,8 +264,14 @@ public:
 using CvtVI2VI = CutMesh::Property_map<VI, VI>;
 // Each Patch track outline vertex conversion to tource model
 const std::string patch_source_name = "v:patch_source";
-const std::string vertex_reduction_map_name = "v:reduction";
+
 using ReductionMap = CvtVI2VI;
+const std::string vertex_reduction_map_name = "v:reduction";
+
+// A property map containing the constrained-or-not status of each edge
+using EdgeBoolMap = CutMesh::Property_map<EI, bool>;
+const std::string is_constrained_edge_name = "e:is_constrained";
+
 
 /// <summary>
 /// Create map to reduce unnecesary triangles,
@@ -300,6 +302,7 @@ struct ModelCutId
     // index of cut inside model
     uint32_t cut_index;
 };
+
 
 /// <summary>
 /// Create AOIs(area of interest) on model surface
@@ -538,6 +541,7 @@ SurfaceCut merge_intersections(SurfaceCuts &cuts, const CutAOIs& cutAOIs, const 
 bool merge_intersection(SurfaceCut &cut1, const SurfaceCut &cut2);
 
 #ifdef DEBUG_OUTPUT_DIR
+void initialize_store(const std::string& dir_to_clear);
 /// <summary>
 /// Debug purpose store of mesh with colored face by face type
 /// </summary>
@@ -545,8 +549,8 @@ bool merge_intersection(SurfaceCut &cut1, const SurfaceCut &cut2);
 /// NOTE: Not const because need to [optionaly] append color property map</param>
 /// <param name="face_type_map">Color source</param>
 /// <param name="file">File to store</param>
-void store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string &file);
-void store(CutMesh &mesh, const ReductionMap &reduction_map, const std::string &file);
+void store(const CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string &dir, bool is_filled = false);
+void store(const CutMesh &mesh, const ReductionMap &reduction_map, const std::string &dir);
 void store(const CutAOIs &aois, const CutMesh &mesh, const std::string &dir);
 void store(const SurfacePatches &patches, const std::string &dir);
 void store(const Vec3f &vertex, const Vec3f &normal, const std::string &file, float size = 2.f);
@@ -570,14 +574,14 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     if (models.empty() || shapes.empty() ) return {};
 
 #ifdef DEBUG_OUTPUT_DIR
+    priv::initialize_store(DEBUG_OUTPUT_DIR);
     priv::store(models, DEBUG_OUTPUT_DIR + "models_input.obj");
 #endif // DEBUG_OUTPUT_DIR
 
     // for filter out triangles out of bounding box
     BoundingBox shapes_bb = get_extents(shapes);
 #ifdef DEBUG_OUTPUT_DIR
-    Point projection_center = shapes_bb.center();
-    priv::store(projection, projection_center, projection_ratio, DEBUG_OUTPUT_DIR + "projection_center.obj");
+    priv::store(projection, shapes_bb.center(), projection_ratio, DEBUG_OUTPUT_DIR + "projection_center.obj");
 #endif // DEBUG_OUTPUT_DIR
 
     // for filttrate opposite triangles and a little more
@@ -626,6 +630,7 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
 #ifdef DEBUG_OUTPUT_DIR
     priv::store(patches, DEBUG_OUTPUT_DIR + "patches/");
 #endif // DEBUG_OUTPUT_DIR
+    if (patches.empty()) return {};    
 
     // fix - convert shape_point_id to expolygon index 
     // save 1 param(s2i) from diff_models call
@@ -1216,7 +1221,7 @@ bool is_face_inside(HI                      hi,
 void set_face_type(FaceTypeMap            &face_type_map,
                    const CutMesh          &mesh,
                    const VertexShapeMap   &vertex_shape_map,
-                   const EcmType          &ecm,
+                   const EdgeBoolMap          &ecm,
                    const CutMesh          &shape_mesh,
                    const ShapePoint2index &shape2index);
 
@@ -1374,7 +1379,7 @@ bool priv::is_face_inside(HI                      hi,
 void priv::set_face_type(FaceTypeMap            &face_type_map,
                          const CutMesh          &mesh,
                          const VertexShapeMap   &vertex_shape_map,
-                         const EcmType          &ecm,
+                         const EdgeBoolMap      &ecm,
                          const CutMesh          &shape_mesh,
                          const ShapePoint2index &shape2index)
 {
@@ -1383,7 +1388,7 @@ void priv::set_face_type(FaceTypeMap            &face_type_map,
         face_type_map[fi] = FaceType::not_constrained;
 
     for (EI ei : mesh.edges()) {
-        if (!get(ecm, ei)) continue;
+        if (!ecm[ei]) continue;
         HI hi = mesh.halfedge(ei);
         FI fi = mesh.face(hi);
         bool is_inside = is_face_inside(hi, mesh, shape_mesh, vertex_shape_map, shape2index);        
@@ -1414,9 +1419,8 @@ priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
     const FaceShapeMap& face_shape_map = cgal_shape.property_map<FI, IntersectingElement>(face_shape_map_name).first;
     Visitor visitor{cgal_model, cgal_shape, edge_shape_map, face_shape_map, vert_shape_map, &is_valid};
 
-    // bool map for affected edge
-    EcmType ecm = get(DynamicEdgeProperty(), cgal_model);
-
+    // a property map containing the constrained-or-not status of each edge
+    EdgeBoolMap &ecm = cgal_model.add_property_map<EI, bool>(is_constrained_edge_name).first;
     const auto &p = CGAL::parameters::visitor(visitor)
                         .edge_is_constrained_map(ecm)
                         .throw_on_self_intersection(false);
@@ -1430,14 +1434,14 @@ priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
     // Select inside and outside face in model
     set_face_type(face_type_map, cgal_model, vert_shape_map, ecm, cgal_shape, s2i);
 #ifdef DEBUG_OUTPUT_DIR
-    store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrained.off"); // only debug
+    store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "constrained/"); // only debug
 #endif // DEBUG_OUTPUT_DIR
     
     // flood fill the other faces inside the region.
     flood_fill_inner(cgal_model, face_type_map);
 
 #ifdef DEBUG_OUTPUT_DIR
-    store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "filled.off"); // only debug
+    store(cgal_model, face_type_map, DEBUG_OUTPUT_DIR + "filled/", true); // only debug
 #endif // DEBUG_OUTPUT_DIR
         
     // IMPROVE: AOIs area could be created during flood fill
@@ -1561,8 +1565,8 @@ void priv::collect_surface_data(std::queue<FI>  &process,
 
 void priv::create_reduce_map(ReductionMap &reduction_map, const CutMesh &mesh)
 {
-    const FaceTypeMap &face_type_map = mesh.property_map<FI, FaceType>(face_type_map_name).first;
     const VertexShapeMap &vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name).first;
+    const EdgeBoolMap &ecm = mesh.property_map<EI, bool>(is_constrained_edge_name).first;
 
     // IMPROVE: find better way to initialize
     // initialize reduction map
@@ -1589,13 +1593,6 @@ void priv::create_reduce_map(ReductionMap &reduction_map, const CutMesh &mesh)
         VI left = mesh.source(hi);
         assert(is_reducible_vertex(erase));
         assert(!is_reducible_vertex(left));
-        assert((
-            FaceType::outside == face_type_map[mesh.face(hi)] && 
-            FaceType::inside_processed  == face_type_map[mesh.face(mesh.opposite(hi))] 
-            ) || (
-            FaceType::outside == face_type_map[mesh.face(mesh.opposite(hi))] && 
-            FaceType::inside_processed == face_type_map[mesh.face(hi)]
-        ));
         bool is_first = reduction_map[erase] == erase;
         if (is_first)
             reduction_map[erase] = left;
@@ -1604,30 +1601,19 @@ void priv::create_reduce_map(ReductionMap &reduction_map, const CutMesh &mesh)
         // But it could be use only one of them
     };
 
-    for (FI fi : mesh.faces()) {
-        if (face_type_map[fi] != FaceType::inside_processed) continue;
-
-        // find all reducible edges
-        HI hi     = mesh.halfedge(fi);
-        HI hi_end = hi;
-        do {
-            VI reduction_from = mesh.target(hi);
-            if (is_reducible_vertex(reduction_from)) {
-                // halfedges connected with reduction_from
-                HI hi1 = hi;
-                HI hi2 = mesh.next(hi);
-                // faces connected with reduction_from
-                FI fi1 = mesh.face(mesh.opposite(hi1));
-                FI fi2 = mesh.face(mesh.opposite(hi2));
-
-                if (face_type_map[fi1] == FaceType::outside)
-                    add_reduction(hi1);
-                if (face_type_map[fi2] == FaceType::outside)
-                    add_reduction(mesh.opposite(hi2));
-            }
-            hi = mesh.next(hi);
-        } while (hi != hi_end);        
+    for (EI ei : mesh.edges()) { 
+        if (!ecm[ei]) continue;
+        HI hi = mesh.halfedge(ei);
+        VI vi = mesh.target(hi);
+        if (is_reducible_vertex(vi)) add_reduction(hi);
+        
+        HI hi_op = mesh.opposite(hi);
+        VI vi_op = mesh.target(hi_op);
+        if (is_reducible_vertex(vi_op)) add_reduction(hi_op);
     }
+#ifdef DEBUG_OUTPUT_DIR
+    store(mesh, reduction_map, DEBUG_OUTPUT_DIR + "reduces/");
+#endif // DEBUG_OUTPUT_DIR
 }
 
 SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
@@ -2352,7 +2338,7 @@ struct IntersectionSources
 void create_face_types(FaceTypeMap           &map,
                        const CutMesh         &tm1,
                        const CutMesh         &tm2,
-                       const EcmType         &ecm,
+                       const EdgeBoolMap         &ecm,
                        const VertexSourceMap &sources);
 
 /// <summary>
@@ -2391,7 +2377,7 @@ bool priv::merge_intersection(SurfaceCut &cut1, const SurfaceCut &cut2) {
 void priv::create_face_types(FaceTypeMap           &map,
                              const CutMesh         &tm1,
                              const CutMesh         &tm2,
-                             const EcmType         &ecm,
+                             const EdgeBoolMap         &ecm,
                              const VertexSourceMap &sources)
 {
     auto get_intersection_source = [&tm2](const Source& s1, const Source& s2)->FI{        
@@ -2502,12 +2488,8 @@ bool priv::clip_cut(SurfacePatch &cut, CutMesh clipper)
     bool exist_intersection = false;
     ExistIntersectionClipVisitor visitor{&exist_intersection};    
     
-    // bool map for affected edge
-    EcmType ecm = get(DynamicEdgeProperty(), tm);
-
     // namep parameters for model tm and function clip
     const auto &np_tm = CGAL::parameters::visitor(visitor)
-                            .edge_is_constrained_map(ecm)
                             .throw_on_self_intersection(false);
     
     // name parameters for model clipper and function clip
@@ -3312,7 +3294,32 @@ SurfaceCuts priv::create_surface_cuts(const CutAOIs      &cuts,
 
 #ifdef DEBUG_OUTPUT_DIR
 
-// store projection center as circle
+#include <filesystem>
+namespace priv{
+void prepare_dir(const std::string &dir){
+    namespace fs = std::filesystem;
+    if (fs::exists(dir)) {
+        for (auto &path : fs::directory_iterator(dir)) fs::remove_all(path);
+    } else {
+        fs::create_directories(dir);
+    }
+}
+
+int reduction_order = 0;
+int filled_order    = 0;
+int constrained_order = 0;
+
+} // namespace priv
+
+void priv::initialize_store(const std::string& dir)
+{
+    // clear previous output
+    prepare_dir(dir);
+    reduction_order   = 0;
+    filled_order      = 0;
+    constrained_order = 0;
+}
+
 void priv::store(const Vec3f       &vertex,
                  const Vec3f       &normal,
                  const std::string &file,
@@ -3344,9 +3351,19 @@ void priv::store(const Vec3f       &vertex,
     its_write_obj(its, file.c_str());
 }
 
-void priv::store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string& file)
+void priv::store(const CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string& dir, bool is_filled)
 {
-    auto face_colors = mesh.add_property_map<priv::FI, CGAL::Color>("f:color").first;    
+    std::string off_file;
+    if (is_filled) {
+        if (filled_order == 0) prepare_dir(dir);
+        off_file = dir + "model" + std::to_string(filled_order++) + ".off";
+    }else{
+        if (constrained_order == 0) prepare_dir(dir);
+        off_file = dir + "model" + std::to_string(constrained_order++) + ".off";
+    }
+
+    CutMesh &mesh_ = const_cast<CutMesh &>(mesh);
+    auto face_colors = mesh_.add_property_map<priv::FI, CGAL::Color>("f:color").first;    
     for (FI fi : mesh.faces()) { 
         auto &color = face_colors[fi];
         switch (face_type_map[fi]) {
@@ -3357,13 +3374,17 @@ void priv::store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::str
         default: color = CGAL::Color{0, 0, 255}; // blue
         }
     }
-    CGAL::IO::write_OFF(file, mesh);
-    mesh.remove_property_map(face_colors);
+    CGAL::IO::write_OFF(off_file, mesh);
+    mesh_.remove_property_map(face_colors);
 }
 
-void priv::store(CutMesh &mesh, const ReductionMap &reduction_map, const std::string& file)
+void priv::store(const CutMesh &mesh, const ReductionMap &reduction_map, const std::string& dir)
 {
-    auto vertex_colors = mesh.add_property_map<priv::VI, CGAL::Color>("v:color").first;    
+    if (reduction_order == 0) prepare_dir(dir);
+    std::string off_file = dir + "model" + std::to_string(reduction_order++) + ".off";
+
+    CutMesh &mesh_ = const_cast<CutMesh &>(mesh);
+    auto vertex_colors = mesh_.add_property_map<priv::VI, CGAL::Color>("v:color").first;    
     // initialize to gray color
     for (VI vi: mesh.vertices())
         vertex_colors[vi] = CGAL::Color{127, 127, 127};
@@ -3375,8 +3396,9 @@ void priv::store(CutMesh &mesh, const ReductionMap &reduction_map, const std::st
             vertex_colors[reduction_to] = CGAL::Color{0, 0, 255};
         }
     }
-    CGAL::IO::write_OFF(file, mesh);
-    mesh.remove_property_map(vertex_colors);
+    
+    CGAL::IO::write_OFF(off_file, mesh);
+    mesh_.remove_property_map(vertex_colors);
 }
 
 namespace priv {
@@ -3418,18 +3440,6 @@ indexed_triangle_set priv::create_indexed_triangle_set(
     return its;
 }
 
-#include <filesystem>
-namespace {
-static void prepare_dir(const std::string &dir)
-{
-    namespace fs = std::filesystem;
-    if (fs::exists(dir)) {
-        for (auto &path : fs::directory_iterator(dir)) fs::remove_all(path);
-    } else {
-        fs::create_directories(dir);
-    }
-}
-} // namespace
 void priv::store(const CutAOIs &aois, const CutMesh &mesh, const std::string &dir) {
     auto create_outline_its =
         [&mesh](const std::vector<HI> &outlines) -> indexed_triangle_set {
@@ -3491,6 +3501,7 @@ void priv::store(const CutAOIs &aois, const CutMesh &mesh, const std::string &di
 }
 
 void priv::store(const SurfacePatches &patches, const std::string &dir) {
+    prepare_dir(dir);
     for (const priv::SurfacePatch &patch : patches) {
         size_t index = &patch - &patches.front();
         if (patch.mesh.faces().empty()) continue;
