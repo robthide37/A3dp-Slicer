@@ -1050,21 +1050,22 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
         }
     }
     islands = bigger_islands;
+    ExPolygons last_islands;
     for (size_t i = 0; i < num_loops; ++i) {
         loops.emplace_back();
         print.throw_if_canceled();
         // only grow the contour, not holes
         bigger_islands.clear();
         if (i > 0) {
-            for (ExPolygon& expoly : islands) {
-                for (Polygon& big_contour : offset(expoly.contour, double(scaled_spacing)* i, jtSquare)) {
-                    bigger_islands.emplace_back(expoly);
-                    bigger_islands.back().contour = big_contour;
+            for (ExPolygon& expoly : last_islands) {
+                for (Polygon& big_contour : offset(expoly.contour, double(scaled_spacing), jtSquare)) {
+                    bigger_islands.emplace_back();
+                    bigger_islands.back().contour = big_contour.simplify(scaled_resolution / 10)[0];
                 }
             }
         } else bigger_islands = islands;
-        bigger_islands = union_ex(bigger_islands);
-        for (ExPolygon& expoly : bigger_islands) {
+        last_islands = union_ex(bigger_islands);
+        for (ExPolygon& expoly : last_islands) {
             loops[i].emplace_back(expoly.contour);
             // buggy
             ////also add hole, in case of it's merged with a contour. <= HOW? if there's an island inside a hole! (in the same object)
@@ -1077,7 +1078,10 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
 
     std::reverse(loops.begin(), loops.end());
 
+    // Using offset(expoly.contour, num_loops* scaled_spacing, jtSquare) create a different result than the incremental 'loops' creation.
+    //   so i have to restrict with the biggest (first) loop from loops (last_islands).
     //intersection
+    brimmable_areas = intersection_ex(brimmable_areas, offset_ex(last_islands, double(scaled_spacing) * 0.5, jtSquare));
     Polygons frontiers;
     //use contour from brimmable_areas (external frontier)
     for (ExPolygon& expoly : brimmable_areas) {

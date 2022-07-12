@@ -169,6 +169,17 @@ void ImGuiWrapper::set_language(const std::string &language)
         0x27E8, 0x27E9, // hungarian
         0,
     };
+    static const ImWchar ranges_lithuanian[] = {
+        0x0020, 0x01FF, // Basic Latin + Latin Supplement
+        0x2010, 0x2011, // ranges_lithuanian https://character-table.netlify.app/lithuanian/
+        0x2013, 0x2014, // ranges_lithuanian
+        0x201C, 0x201E, // ranges_lithuanian
+        0x2026, 0x2026, // ranges_lithuanian
+        0x2030, 0x2030, // ranges_lithuanian
+        0x20AC, 0x20AC, // ranges_lithuanian
+        0x2212, 0x2212, // ranges_lithuanian
+        0,
+    };
     static const ImWchar ranges_vietnamese[] =
     {
         0x0020, 0x00FF, // Basic Latin
@@ -182,7 +193,7 @@ void ImGuiWrapper::set_language(const std::string &language)
         0,
     };
     m_font_cjk = false;
-    if (lang == "cs" || lang == "pl" || lang == "hu") {
+    if (lang == "cs" || lang == "pl" || lang == "hu" || lang == "li") {
         ranges = ranges_latin2;
     } else if (lang == "ru" || lang == "uk") {
         ranges = ImGui::GetIO().Fonts->GetGlyphRangesCyrillic(); // Default + about 400 Cyrillic characters
@@ -192,6 +203,8 @@ void ImGuiWrapper::set_language(const std::string &language)
         ranges = ranges_vietnamese;
     } else if (lang == "hu") {
         ranges = ranges_hungarian;
+    } else if (lang == "li") {
+        ranges = ranges_lithuanian;
     } else if (lang == "ja") {
         ranges = ImGui::GetIO().Fonts->GetGlyphRangesJapanese(); // Default + Hiragana, Katakana, Half-Width, Selection of 1946 Ideographs
         m_font_cjk = true;

@@ -17,7 +17,7 @@ Useful tools:
 
 * windows:
   * [python](https://www.python.org/)
-  * [gettext](http://gnuwin32.sourceforge.net/downlinks/gettext.php)
+  * [gettext](https://sourceforge.net/projects/cppcms/files/boost_locale/gettext_for_windows/gettext-tools-static-0.18.1.1.zip/download). Note: You need to add it to your PATH afteward (or copy all files into your C:\Windows\system32)
 * linux:
   * python: make sure you can execute python3, install it if it isn't here.
   * gettext: if you can't execute msgfmt, install the package 'gettext'

@@ -3415,7 +3415,7 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
     ExtrusionPaths &paths = loop_to_seam.paths;
     if (false && m_enable_loop_clipping && m_writer.tool_is_extruder()) {
         coordf_t clip_length = scale_(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
-    coordf_t min_clip_length = scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)) * 0.15;
+        coordf_t min_clip_length = scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)) * 0.15;
 
         // get paths
         ExtrusionPaths clipped;
@@ -3848,15 +3848,19 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
 
     std::string gcode;
 
-    // generate the unretracting/wipe start move (same thign than for the end, but on the other side)
+    // generate the unretracting/wipe start move (same thing than for the end, but on the other side)
     assert(!paths.empty() && paths.front().size() > 1 && !paths.back().empty());
-    if (EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_start, true) && !paths.empty() && paths.front().size() > 1 && !paths.back().empty() && paths.front().role() == erExternalPerimeter) {
+    if (EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_start, true) && !paths.empty() && paths.front().size() > 1 && paths.back().size() > 1 && paths.front().role() == erExternalPerimeter) {
         //note: previous & next are inverted to extrude "in the opposite direction, ans we are "rewinding"
         //Point previous_point = paths.back().polyline.points.back();
         Point previous_point = paths.front().polyline.points[1];
         Point current_point = paths.front().polyline.points.front();
         //Point next_point = paths.front().polyline.points[1];
         Point next_point = paths.back().polyline.points.back();
+        if (next_point == current_point) {
+            //can happen if seam_gap is null
+            next_point = paths.back().polyline.points[paths.back().polyline.points.size()-2];
+        }
         Point a = next_point;  // second point
         Point b = previous_point;  // second to last point
         if (is_hole_loop ? (!is_full_loop_ccw) : (is_full_loop_ccw)) {
@@ -5141,7 +5145,7 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
 
     // check whether a straight travel move would need retraction
     bool needs_retraction = this->needs_retraction(travel, role);
-    if (m_config.only_retract_when_crossing_perimeters)
+    if (m_config.only_retract_when_crossing_perimeters && !(m_config.enforce_retract_first_layer && m_layer_index == 0))
         needs_retraction = needs_retraction && will_cross_perimeter;
 
     // Re-allow avoid_crossing_perimeters for the next travel moves
@@ -5292,7 +5296,7 @@ bool GCode::needs_retraction(const Polyline& travel, ExtrusionRole role /*=erNon
 bool GCode::can_cross_perimeter(const Polyline& travel, bool offset)
 {
     if(m_layer != nullptr)
-    if ( (m_config.only_retract_when_crossing_perimeters && m_config.fill_density.value > 0) || m_config.avoid_crossing_perimeters)
+    if ( ( (m_config.only_retract_when_crossing_perimeters && !(m_config.enforce_retract_first_layer && m_layer_index == 0)) && m_config.fill_density.value > 0) || m_config.avoid_crossing_perimeters)
          {
         //test && m_layer->any_internal_region_slice_contains(travel)
         // Skip retraction if travel is contained in an internal slice *and*

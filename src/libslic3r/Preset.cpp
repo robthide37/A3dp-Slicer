@@ -499,8 +499,10 @@ static std::vector<std::string> s_Preset_print_options {
         "ironing_angle",
         "fill_angle",
         "fill_angle_increment",
-        "bridge_angle", 
-        "solid_infill_below_area", "only_retract_when_crossing_perimeters", "infill_first", 
+        "bridge_angle",
+        "solid_infill_below_area",
+        "only_retract_when_crossing_perimeters", "enforce_retract_first_layer",
+        "infill_first",
         "avoid_crossing_perimeters_max_detour",
 #ifdef HAS_PRESSURE_EQUALIZER
         "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative", 
