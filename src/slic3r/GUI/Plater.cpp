@@ -5933,7 +5933,7 @@ public:
     bool with_modifers() { return m_with_modifiers->GetValue(); }
     bool with_config() { return m_with_config->GetValue(); }
 private:
-
+#ifndef __linux__
     void OnUpdateLabelUI(wxUpdateUIEvent& event)
     {
         wxFileDialogBase* const dialog = wxStaticCast(GetParent(), wxFileDialogBase);
@@ -5945,6 +5945,7 @@ private:
         m_with_modifiers->Enable(filter > 0);
         m_with_config->Enable(filter == 1);
     }
+#endif
 
     wxCheckBox* m_with_supports;
     wxCheckBox* m_sel_only;
@@ -5960,12 +5961,19 @@ OptionForExportPlatter::OptionForExportPlatter(wxWindow* parent)
     m_with_modifiers = new wxCheckBox(this, -1, _L("Include modifiers"));
     m_with_config = new wxCheckBox(this, -1, _L("Include presets"));
 
+    m_with_supports->SetToolTip("Only for sla printers");
+    m_sel_only->SetToolTip("Only when an object is selected");
+    m_with_modifiers->SetToolTip("Only for 3mf and amf");
+    m_with_config->SetToolTip("Only for 3mf");
+
     m_with_supports->Enable(OptionForExportPlatter_can_support);
     m_sel_only->Enable(OptionForExportPlatter_can_select);
+#ifndef __linux__
     m_with_modifiers->Enable(false);
     m_with_config->Enable(false);
 
     this->Bind(wxEVT_UPDATE_UI, &OptionForExportPlatter::OnUpdateLabelUI, this);
+#endif
 
     wxBoxSizer* sizerTop = new wxBoxSizer(wxHORIZONTAL);
     sizerTop->Add(m_with_supports, wxSizerFlags().Centre().Border());
@@ -6026,9 +6034,9 @@ void Plater::export_platter()
     wxGetApp().app_config->update_last_output_dir(path.parent_path().string());
     std::string path_u8 = into_u8(out_path);
 
-    if (dlg.GetCurrentlySelectedFilterIndex() == 0) {
+    if (dlg.GetFilterIndex() == 0) {
         this->export_stl(path_u8, extra_options->with_support(), extra_options->only_selection());
-    } else if (dlg.GetCurrentlySelectedFilterIndex() > 0) {
+    } else if (dlg.GetFilterIndex() > 0) {
         //export 3mf
         wxBusyCursor wait;
 
@@ -6078,7 +6086,7 @@ void Plater::export_platter()
             }
         }
         DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config_secure();
-        if (dlg.GetCurrentlySelectedFilterIndex() == 1) {
+        if (dlg.GetFilterIndex() == 1) {
 
             //thumbnail
             ThumbnailData thumbnail_data;
@@ -6108,7 +6116,7 @@ void Plater::export_platter()
                 .set_export_config(extra_options->with_config())
                 .set_export_modifiers(extra_options->with_modifers())
             );
-        } else if (dlg.GetCurrentlySelectedFilterIndex() == 2) {
+        } else if (dlg.GetFilterIndex() == 2) {
             //store amf
             bool ret = Slic3r::store_amf(path_u8,
                 &model_to_save,
