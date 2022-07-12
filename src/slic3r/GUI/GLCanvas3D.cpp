@@ -5909,6 +5909,19 @@ void GLCanvas3D::_load_skirt_brim_preview_toolpaths(const BuildVolume &build_vol
     skirt_height = std::min(skirt_height, print_zs.size());
     print_zs.erase(print_zs.begin() + skirt_height, print_zs.end());
 
+    // Ensure that no volume grows over the limits. If the volume is too large, allocate a new one. (on-demand)
+    auto ensure_volume_is_ready = [&build_volume, this](GLVolume* volume) -> GLVolume*{
+        if (volume->indexed_vertex_array.vertices_and_normals_interleaved.size() > MAX_VERTEX_BUFFER_SIZE) {
+            //update is_outside before creating the new one
+            volume->is_outside = !build_volume.all_paths_inside_vertices_and_normals_interleaved(volume->indexed_vertex_array.vertices_and_normals_interleaved, volume->indexed_vertex_array.bounding_box());
+            //create the new one
+            GLVolume& vol = *volume;
+            volume = this->m_volumes.new_toolpath_volume(vol.color);
+            reserve_new_volume_finalize_old_volume(*volume, vol, this->m_initialized);
+        }
+        return volume;
+    };
+
     GLVolume *volume = m_volumes.new_toolpath_volume(color, VERTEX_BUFFER_RESERVE_SIZE);
     for (size_t i = 0; i < skirt_height; ++ i) {
         volume->print_zs.emplace_back(print_zs[i]);
@@ -5916,33 +5929,38 @@ void GLCanvas3D::_load_skirt_brim_preview_toolpaths(const BuildVolume &build_vol
         volume->offsets.emplace_back(volume->indexed_vertex_array.triangle_indices.size());
         if (i == 0) {
             //skirt & brim from print
+            if (!print->brim().empty()) volume = ensure_volume_is_ready(volume);
             _3DScene::extrusionentity_to_verts(print->brim(), print_zs[i], Point(0, 0), *volume);
-            if(print->skirt_first_layer())
+            if (print->skirt_first_layer()) {
+                if (!print->skirt_first_layer()->empty()) volume = ensure_volume_is_ready(volume);
                 _3DScene::extrusionentity_to_verts(*print->skirt_first_layer(), print_zs[i], Point(0, 0), *volume);
+            }
             //skirt & brim from objects
             for (const PrintObject* print_object : print->objects()) {
                 if (!print_object->brim().empty())
-                    for(const PrintInstance& inst : print_object->instances())
+                    for (const PrintInstance& inst : print_object->instances()) {
+                        if (!print_object->brim().empty()) volume = ensure_volume_is_ready(volume);
                         _3DScene::extrusionentity_to_verts(print_object->brim(), print_zs[i], inst.shift, *volume);
+                    }
                 if (print_object->skirt_first_layer())
-                    for (const PrintInstance& inst : print_object->instances())
+                    for (const PrintInstance& inst : print_object->instances()) {
+                        if (!print_object->skirt_first_layer()->empty()) volume = ensure_volume_is_ready(volume);
                         _3DScene::extrusionentity_to_verts(*print_object->skirt_first_layer(), print_zs[i], inst.shift, *volume);
+                    }
             }
         }
         //skirts from print
-        if (i != 0 || !print->skirt_first_layer())
+        if (i != 0 || !print->skirt_first_layer()) {
+            if (!print->skirt().empty()) volume = ensure_volume_is_ready(volume);
             _3DScene::extrusionentity_to_verts(print->skirt(), print_zs[i], Point(0, 0), *volume);
+        }
         //skirts from objects
         for (const PrintObject* print_object : print->objects()) {
             if ( !print_object->skirt().empty() && (i != 0 || !print_object->skirt_first_layer()))
-                for (const PrintInstance& inst : print_object->instances())
+                for (const PrintInstance& inst : print_object->instances()) {
+                    if (!print_object->skirt().empty()) volume = ensure_volume_is_ready(volume);
                     _3DScene::extrusionentity_to_verts(print_object->skirt(), print_zs[i], inst.shift, *volume);
-        }
-        // Ensure that no volume grows over the limits. If the volume is too large, allocate a new one.
-        if (volume->indexed_vertex_array.vertices_and_normals_interleaved.size() > MAX_VERTEX_BUFFER_SIZE) {
-        	GLVolume &vol = *volume;
-            volume = m_volumes.new_toolpath_volume(vol.color);
-            reserve_new_volume_finalize_old_volume(*volume, vol, m_initialized);
+                }
         }
     }
     volume->is_outside = ! build_volume.all_paths_inside_vertices_and_normals_interleaved(volume->indexed_vertex_array.vertices_and_normals_interleaved, volume->indexed_vertex_array.bounding_box());
