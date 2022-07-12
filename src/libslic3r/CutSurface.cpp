@@ -20,7 +20,7 @@
 /// patches/patch{O}.off
 /// result.obj - Merged result its
 /// result_contours/{O}.obj - visualization of contours for result patches
-#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
+//#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
 
 using namespace Slic3r;
 
