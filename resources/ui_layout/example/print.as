@@ -1,7 +1,7 @@
 //////////////////////////////////////////
 // Api for SuperSlicer scripted widgets:
 //
-//// Functions callable ////
+//////// callable Functions //////
 //
 // -- to print on the console, for debugging --
 // void print(string &out)
@@ -36,7 +36,7 @@
 //  ask_for_refresh()
 //    ask for a OPTNAME_set() if in a OPTNAME_get()
 //
-//// Functions to define for each script widget //// 
+//////// Functions to define for each script widget //////// 
 //
 // note that you can't call set_thing() in an OPTNAME_get(), you can only call these in an OPTNAME_set()
 //
