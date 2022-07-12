@@ -45,7 +45,7 @@ TEST_CASE("Cut character from surface", "[]")
     // its_write_obj(its, "C:/data/temp/projected.obj");
 }
 
-#define DEBUG_3MF
+//#define DEBUG_3MF
 #ifdef DEBUG_3MF
 
 // Test load of 3mf
@@ -108,7 +108,7 @@ static Emboss::OrthoProject create_projection_for_cut(
 
 TEST_CASE("CutSurface in 3mf", "[Emboss]")
 {
-    std::string path_to_3mf = "C:/Users/filip/Downloads/MultiObj.3mf";
+    std::string path_to_3mf = "C:/Users/Filip Sykala/Downloads/EmbossFromMultiVolumes.3mf";
     
     int object_id      = 0;
     int text_volume_id = 2;
