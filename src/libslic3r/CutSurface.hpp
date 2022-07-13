@@ -17,40 +17,14 @@ namespace Slic3r{
 /// </summary>
 struct SurfaceCut : public indexed_triangle_set
 {
-    // connected cutted surface --> inheritance is used
-    //indexed_triangle_set mesh;
-
     // vertex indices(index to mesh vertices)
     using Index = unsigned int;
-    using CutContour = std::vector<std::vector<Index>>;
+    using Contour = std::vector<Index>;
+    using Contours = std::vector<Contour>;
     // list of circulated open surface
-    CutContour contours;
-
-    // Conversion map from vertex index to contour point
-    // Could be used for filtration of surface cuts
-    // Still I don't have an idea how to filtrate it.
-    // What is wanted result on wave?
-    // std::map<Index, ExPolygonsPoint> vertex2contour;
+    Contours contours;
 };
 using SurfaceCuts = std::vector<SurfaceCut>;
-
-/// <summary>
-/// Merge two surface cuts together
-/// Added surface cut will be consumed
-/// </summary>
-/// <param name="sc">Surface cut to extend</param>
-/// <param name="sc_add">Surface cut to consume</param>
-void append(SurfaceCut &sc, SurfaceCut &&sc_add);
-
-// call private function with same name to test it
-bool merge_intersection(SurfaceCut &sc1, const SurfaceCut &sc2);
-
-
-/// <summary>
-/// Merge surface cuts int one
-/// </summary>
-/// <param name="cuts">input</param>
-SurfaceCut merge(SurfaceCuts&& cuts);
 
 /// <summary>
 /// Cut surface shape from models.

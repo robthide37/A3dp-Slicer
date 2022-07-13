@@ -162,20 +162,4 @@ TEST_CASE("CutSurface in 3mf", "[Emboss]")
     its_write_obj(cut, "C:/data/temp/cutSurface/result_cut.obj");
 }
 
-#include "libslic3r/Format/OBJ.hpp"
-TEST_CASE("Merge Cuts", "[Emboss]") {
-    std::string  dir = "C:/data/temp/";
-    TriangleMesh tm1, tm2;
-    load_obj((dir + "aoi3.obj").c_str(), &tm1);
-    load_obj((dir + "aoi6.obj").c_str(), &tm2);
-    auto create_sc = [](TriangleMesh &tm) -> SurfaceCut {
-        SurfaceCut sc;
-        sc.vertices = std::move(tm.its.vertices);
-        sc.indices  = std::move(tm.its.indices);
-        // sc.contours = ???
-        return sc;
-    };
-    SurfaceCut sc1 = create_sc(tm1), sc2 = create_sc(tm2);
-    assert(merge_intersection(sc1, sc2));
-}
 #endif // DEBUG_3MF
