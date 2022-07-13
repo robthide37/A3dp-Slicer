@@ -112,6 +112,19 @@ void GLModel::Geometry::add_vertex(const Vec3f& position, const Vec3f& normal)
     vertices.emplace_back(normal.z());
 }
 
+void GLModel::Geometry::add_vertex(const Vec3f& position, const Vec3f& normal, const Vec2f& tex_coord)
+{
+    assert(format.vertex_layout == EVertexLayout::P3N3T2);
+    vertices.emplace_back(position.x());
+    vertices.emplace_back(position.y());
+    vertices.emplace_back(position.z());
+    vertices.emplace_back(normal.x());
+    vertices.emplace_back(normal.y());
+    vertices.emplace_back(normal.z());
+    vertices.emplace_back(tex_coord.x());
+    vertices.emplace_back(tex_coord.y());
+}
+
 void GLModel::Geometry::add_vertex(const Vec4f& position)
 {
     assert(format.vertex_layout == EVertexLayout::P4);
@@ -253,13 +266,14 @@ size_t GLModel::Geometry::vertex_stride_floats(const Format& format)
 {
     switch (format.vertex_layout)
     {
-    case EVertexLayout::P2:   { return 2; }
-    case EVertexLayout::P2T2: { return 4; }
-    case EVertexLayout::P3:   { return 3; }
-    case EVertexLayout::P3T2: { return 5; }
-    case EVertexLayout::P3N3: { return 6; }
-    case EVertexLayout::P4:   { return 4; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P2:     { return 2; }
+    case EVertexLayout::P2T2:   { return 4; }
+    case EVertexLayout::P3:     { return 3; }
+    case EVertexLayout::P3T2:   { return 5; }
+    case EVertexLayout::P3N3:   { return 6; }
+    case EVertexLayout::P3N3T2: { return 8; }
+    case EVertexLayout::P4:     { return 4; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -268,12 +282,13 @@ size_t GLModel::Geometry::position_stride_floats(const Format& format)
     switch (format.vertex_layout)
     {
     case EVertexLayout::P2:
-    case EVertexLayout::P2T2: { return 2; }
+    case EVertexLayout::P2T2:   { return 2; }
     case EVertexLayout::P3:
     case EVertexLayout::P3T2:
-    case EVertexLayout::P3N3: { return 3; }
-    case EVertexLayout::P4:   { return 4; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2: { return 3; }
+    case EVertexLayout::P4:     { return 4; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -286,6 +301,7 @@ size_t GLModel::Geometry::position_offset_floats(const Format& format)
     case EVertexLayout::P3:
     case EVertexLayout::P3T2:
     case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2:
     case EVertexLayout::P4:   { return 0; }
     default:                  { assert(false); return 0; }
     };
@@ -295,8 +311,9 @@ size_t GLModel::Geometry::normal_stride_floats(const Format& format)
 {
     switch (format.vertex_layout)
     {
-    case EVertexLayout::P3N3: { return 3; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2: { return 3; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -304,8 +321,9 @@ size_t GLModel::Geometry::normal_offset_floats(const Format& format)
 {
     switch (format.vertex_layout)
     {
-    case EVertexLayout::P3N3: { return 3; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2: { return 3; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -314,8 +332,9 @@ size_t GLModel::Geometry::tex_coord_stride_floats(const Format& format)
     switch (format.vertex_layout)
     {
     case EVertexLayout::P2T2:
-    case EVertexLayout::P3T2: { return 2; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P3T2:
+    case EVertexLayout::P3N3T2: { return 2; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -323,9 +342,10 @@ size_t GLModel::Geometry::tex_coord_offset_floats(const Format& format)
 {
     switch (format.vertex_layout)
     {
-    case EVertexLayout::P2T2: { return 2; }
-    case EVertexLayout::P3T2: { return 3; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P2T2:   { return 2; }
+    case EVertexLayout::P3T2:   { return 3; }
+    case EVertexLayout::P3N3T2: { return 6; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -349,6 +369,7 @@ bool GLModel::Geometry::has_position(const Format& format)
     case EVertexLayout::P3:
     case EVertexLayout::P3T2:
     case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2:
     case EVertexLayout::P4:   { return true; }
     default:                  { assert(false); return false; }
     };
@@ -362,9 +383,10 @@ bool GLModel::Geometry::has_normal(const Format& format)
     case EVertexLayout::P2T2:
     case EVertexLayout::P3:
     case EVertexLayout::P3T2:
-    case EVertexLayout::P4:   { return false; }
-    case EVertexLayout::P3N3: { return true; }
-    default:                  { assert(false); return false; }
+    case EVertexLayout::P4:     { return false; }
+    case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2: { return true; }
+    default:                    { assert(false); return false; }
     };
 }
 
@@ -373,12 +395,13 @@ bool GLModel::Geometry::has_tex_coord(const Format& format)
     switch (format.vertex_layout)
     {
     case EVertexLayout::P2T2:
-    case EVertexLayout::P3T2: { return true; }
+    case EVertexLayout::P3T2:
+    case EVertexLayout::P3N3T2: { return true; }
     case EVertexLayout::P2:
     case EVertexLayout::P3:
     case EVertexLayout::P3N3:
-    case EVertexLayout::P4:   { return false; }
-    default:                  { assert(false); return false; }
+    case EVertexLayout::P4:     { return false; }
+    default:                    { assert(false); return false; }
     };
 }
 #else
