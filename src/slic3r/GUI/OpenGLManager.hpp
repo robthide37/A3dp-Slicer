@@ -44,7 +44,7 @@ public:
         const std::string& get_vendor() const;
         const std::string& get_renderer() const;
 
-        bool is_core_profile() const;
+        bool is_core_profile() const { return m_core_profile; }
         void set_core_profile(bool value) { m_core_profile = value; }
 
         bool is_mesa() const;

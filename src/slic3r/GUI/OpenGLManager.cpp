@@ -66,11 +66,6 @@ const std::string& OpenGLManager::GLInfo::get_renderer() const
     return m_renderer;
 }
 
-bool OpenGLManager::GLInfo::is_core_profile() const
-{
-    return !GLEW_ARB_compatibility;
-}
-
 bool OpenGLManager::GLInfo::is_mesa() const
 {
     return boost::icontains(m_version, "mesa");
@@ -392,7 +387,7 @@ bool OpenGLManager::init_gl()
                 wxMessageBox(message, wxString("PrusaSlicer - ") + _L("Error loading shaders"), wxOK | wxICON_ERROR);
             }
 #if ENABLE_OPENGL_DEBUG_OPTION
-            if (m_debug_enabled) {
+            if (m_debug_enabled && GLEW_KHR_debug) {
                 ::glEnable(GL_DEBUG_OUTPUT);
                 ::glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
                 ::glDebugMessageCallback(CustomGLDebugOutput, nullptr);

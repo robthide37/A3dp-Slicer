@@ -192,16 +192,14 @@ int CLI::run(int argc, char **argv)
         m_actions.erase(it);
     }
 
-#if ENABLE_OPENGL_DEBUG_OPTION
-#ifndef __APPLE__
     it = std::find(m_actions.begin(), m_actions.end(), "opengl-debug");
     if (it != m_actions.end()) {
         start_gui = true;
+#if ENABLE_OPENGL_DEBUG_OPTION
         opengl_debug = true;
+#endif // ENABLE_OPENGL_DEBUG_OPTION
         m_actions.erase(it);
     }
-#endif // __APPLE__
-#endif // ENABLE_OPENGL_DEBUG_OPTION
 #else
     // are we starting as gcodeviewer ?
     for (auto it = m_actions.begin(); it != m_actions.end(); ++it) {
