@@ -1416,7 +1416,7 @@ priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
     Visitor visitor{cgal_model, cgal_shape, edge_shape_map, face_shape_map, vert_shape_map, &is_valid};
 
     // a property map containing the constrained-or-not status of each edge
-    EdgeBoolMap &ecm = cgal_model.add_property_map<EI, bool>(is_constrained_edge_name).first;
+    EdgeBoolMap ecm = cgal_model.add_property_map<EI, bool>(is_constrained_edge_name).first;
     const auto &p = CGAL::parameters::visitor(visitor)
                         .edge_is_constrained_map(ecm)
                         .throw_on_self_intersection(false);
@@ -2738,7 +2738,7 @@ priv::SurfacePatch priv::separate_patch(size_t              n,
     patch_new.model_id     = patch.model_id;
     patch_new.shape_id     = patch.shape_id;
     // fix cvt
-    CvtVI2VI &cvt = patch_new.mesh.property_map<VI, VI>(patch_source_name).first;
+    CvtVI2VI cvt = patch_new.mesh.property_map<VI, VI>(patch_source_name).first;
     for (VI &vi : cvt) {
         if (!vi.is_valid()) continue;
         vi = cvt_from[vi];
@@ -2755,7 +2755,7 @@ void priv::divide_patch(size_t i, SurfacePatches &patches) {
 
     CutMesh& cm = patch.mesh;
     std::string patch_number_name = "f:patch_number";
-    PatchNumber patch_number = cm.add_property_map<FI, size_t>(patch_number_name, {def_value}).first;
+    PatchNumber patch_number = cm.add_property_map<FI, size_t>(patch_number_name, def_value).first;
 
     size_t number = 0;
     std::vector<FI> queue;
