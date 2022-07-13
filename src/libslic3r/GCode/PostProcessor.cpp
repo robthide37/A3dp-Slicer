@@ -12,13 +12,60 @@
 #include <boost/nowide/cenv.hpp>
 #include <boost/nowide/fstream.hpp>
 
+#include <cstdlib>   // getenv()
 #ifdef WIN32
-
 // The standard Windows includes.
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
 #include <shellapi.h>
+#else
+// POSIX
+#include <sstream>
+#include <boost/process.hpp>
+#include <unistd.h>     //readlink
+#endif
+
+// Try to find where the file can be.
+// First try without any modification, for absolute apth and relative path fromt he current directory
+// Then try from the slic3r.exe directory
+// Then from the configuration directory
+// Then from the USER directory
+static boost::filesystem::path find_file(boost::filesystem::path filename) {
+    boost::filesystem::path ret = filename;
+    if (!boost::filesystem::exists(filename)) {
+        // try from our install directory 
+#ifdef WIN32
+        wchar_t wpath_exe[_MAX_PATH + 1];
+        ::GetModuleFileNameW(nullptr, wpath_exe, _MAX_PATH);
+        boost::filesystem::path local_dir = boost::filesystem::path(wpath_exe).parent_path();
+#else
+        char result[PATH_MAX + 1];
+        size_t count = readlink("/proc/self/exe", result, sizeof(result)-1);
+        boost::filesystem::path local_dir = boost::filesystem::path(std::string(result, (count > 0) ? count : 0)).parent_path();
+#endif
+        if (!boost::filesystem::exists(local_dir / filename)) {
+            //try with configuration directory
+            local_dir = boost::filesystem::path(Slic3r::data_dir());
+        }
+        if (!boost::filesystem::exists(local_dir / filename)) {
+            //try with configuration directory
+#ifdef WIN32
+            local_dir = boost::filesystem::path(::getenv("USERPROFILE"));
+#else
+            local_dir = boost::filesystem::path(::getenv("HOME"));
+#endif
+        }
+        if (!boost::filesystem::exists(local_dir / filename)) {
+            throw Slic3r::RuntimeError(std::string("The configured post-processing script does not exist: ") + filename.string());
+        } else {
+            ret = local_dir / filename;
+        }
+    }
+    return ret;
+}
+
+#ifdef WIN32
 
 // https://blogs.msdn.microsoft.com/twistylittlepassagesallalike/2011/04/23/everyone-quotes-command-line-arguments-the-wrong-way/
 // This routine appends the given argument to a command line such that CommandLineToArgvW will return the argument string unchanged.
@@ -108,66 +155,75 @@ static int run_script(const std::string &script, const std::string &gcode, std::
     }
 
     std::wstring command_line;
-    std::wstring command = szArglist[0];
-	if (! boost::filesystem::exists(boost::filesystem::path(command)))
-		throw Slic3r::RuntimeError(std::string("The configured post-processing script does not exist: ") + boost::nowide::narrow(command));
+    const std::wstring command = szArglist[0];
+    // for perl and python, hope that the os can find it in the path.
     if (boost::iends_with(command, L".pl")) {
+        BOOST_LOG_TRIVIAL(debug) << boost::format("Executing script : detecting perl script");
         // This is a perl script. Run it through the perl interpreter.
-        // The current process may be slic3r.exe or slic3r-console.exe.
-        // Find the path of the process:
-        wchar_t wpath_exe[_MAX_PATH + 1];
-        ::GetModuleFileNameW(nullptr, wpath_exe, _MAX_PATH);
-        boost::filesystem::path path_exe(wpath_exe);
-        boost::filesystem::path path_perl = path_exe.parent_path() / "perl" / "perl.exe";
-        if (! boost::filesystem::exists(path_perl)) {
-			LocalFree(szArglist);
-			throw Slic3r::RuntimeError(std::string("Perl interpreter ") + path_perl.string() + " does not exist.");
-        }
-        // Replace it with the current perl interpreter.
-        quote_argv_winapi(boost::nowide::widen(path_perl.string()), command_line);
+        quote_argv_winapi(boost::nowide::widen("perl.exe"), command_line);
+        command_line += L" ";
+    } else if (boost::iends_with(command, L".py")) {
+        BOOST_LOG_TRIVIAL(debug) << boost::format("Executing script : detecting python script");
+        // This is a python script. Run it through the python interpreter.
+        quote_argv_winapi(boost::nowide::widen("python.exe"), command_line);
         command_line += L" ";
     } else if (boost::iends_with(command, ".bat")) {
+        BOOST_LOG_TRIVIAL(debug) << boost::format("Executing script : detecting bat script");
         // Run a batch file through the command line interpreter.
         command_line = L"cmd.exe /C ";
     }
+    
+    //try to find the file, in different directories
+    quote_argv_winapi(find_file(boost::filesystem::path(command)).wstring(), command_line);
+    command_line += L" ";
 
-    for (int i = 0; i < nArgs; ++ i) {
+    for (int i = 1; i < nArgs; ++ i) {
         quote_argv_winapi(szArglist[i], command_line);
         command_line += L" ";
     }
     LocalFree(szArglist);
 	quote_argv_winapi(boost::nowide::widen(gcode), command_line);
+    BOOST_LOG_TRIVIAL(debug) << (boost::format("Executing script : %1%") % boost::nowide::narrow(command_line));
     return (int)execute_process_winapi(command_line);
 }
 
 #else
-    // POSIX
-
-#include <cstdlib>   // getenv()
-#include <sstream>
-#include <boost/process.hpp>
 
 namespace process = boost::process;
 
 static int run_script(const std::string &script, const std::string &gcode, std::string &std_err)
 {
     // Try to obtain user's default shell
-    const char *shell = ::getenv("SHELL");
+    const char* shell = ::getenv("SHELL");
     if (shell == nullptr) { shell = "sh"; }
 
     // Quote and escape the gcode path argument
-    std::string command { script };
-    command.append(" '");
-    for (char c : gcode) {
-        if (c == '\'') { command.append("'\\''"); }
-        else { command.push_back(c); }
+    std::string command_line;
+    size_t first_space = script.find(' ');
+    const std::string command = (std::string::npos != first_space) ? script.substr(0, first_space) : script;
+    const std::string args = (std::string::npos != first_space) ? script.substr(first_space) : "";
+    if (boost::iends_with(command, L".pl")) {
+        BOOST_LOG_TRIVIAL(trace) << boost::format("Executing script : detecting perl script");
+        // This is a perl script. Run it through the perl interpreter.
+        command_line = "perl ";
+    } else if (boost::iends_with(command, L".py")) {
+        BOOST_LOG_TRIVIAL(trace) << boost::format("Executing script : detecting python script");
+        // This is a python script. Run it through the python interpreter.
+        command_line = "python ";
     }
-    command.push_back('\'');
+    command_line += find_file(boost::filesystem::path(command)).string();
+    command_line += args;
 
-    BOOST_LOG_TRIVIAL(debug) << boost::format("Executing script, shell: %1%, command: %2%") % shell % command;
+    command_line.append(" '");
+    for (char c : gcode) {
+        if (c == '\'') { command_line.append("'\\''"); }
+        else { command_line.push_back(c); }
+    }
+    command_line.push_back('\'');
 
+    BOOST_LOG_TRIVIAL(trace) << boost::format("Executing script, shell: %1%, command: %2%") % shell % command_line;
     process::ipstream istd_err;
-    process::child child(shell, "-c", command, process::std_err > istd_err);
+    process::child child(shell, "-c", command_line, process::std_err > istd_err);
 
     std_err.clear();
     std::string line;
