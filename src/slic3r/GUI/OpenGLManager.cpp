@@ -492,6 +492,10 @@ wxGLCanvas* OpenGLManager::create_wxglcanvas(wxWindow& parent)
 #if ENABLE_GL_CORE_PROFILE
     wxGLAttributes attribList;
     attribList.PlatformDefaults().RGBA().DoubleBuffer().MinRGBA(8, 8, 8, 8).Depth(24).SampleBuffers(1).Samplers(4).EndList();
+#ifdef __APPLE__
+    // on MAC the method RGBA() has no effect
+    attribList.SetNeedsARB(true);
+#endif // __APPLE__
 #else
     int attribList[] = {
         WX_GL_RGBA,
@@ -521,6 +525,10 @@ wxGLCanvas* OpenGLManager::create_wxglcanvas(wxWindow& parent)
     {
         attribList.Reset();
         attribList.PlatformDefaults().RGBA().DoubleBuffer().MinRGBA(8, 8, 8, 8).Depth(24).EndList();
+#ifdef __APPLE__
+        // on MAC the method RGBA() has no effect
+        attribList.SetNeedsARB(true);
+#endif // __APPLE__
     }
 
     return new wxGLCanvas(&parent, attribList, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxWANTS_CHARS);
