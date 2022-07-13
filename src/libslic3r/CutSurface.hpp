@@ -2,12 +2,9 @@
 #define slic3r_CutSurface_hpp_
 
 #include <vector>
-#include <optional>
-#include <memory>
 #include <admesh/stl.h> // indexed_triangle_set
-#include "Polygon.hpp"
 #include "ExPolygon.hpp"
-#include "Emboss.hpp"
+#include "Emboss.hpp" // IProjection
 
 namespace Slic3r{
 
@@ -24,7 +21,6 @@ struct SurfaceCut : public indexed_triangle_set
     // list of circulated open surface
     Contours contours;
 };
-using SurfaceCuts = std::vector<SurfaceCut>;
 
 /// <summary>
 /// Cut surface shape from models.

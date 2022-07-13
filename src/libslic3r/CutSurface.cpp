@@ -2741,7 +2741,6 @@ priv::SurfacePatches priv::diff_models(VCutAOIs             &cuts,
     return patches;
 }
 
-
 std::vector<bool> priv::select_patches(
     const ProjectionDistances &best_distances,
     const SurfacePatches      &patches,
