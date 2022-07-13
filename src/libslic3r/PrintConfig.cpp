@@ -4310,6 +4310,12 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def->tooltip = L("Select the specified OpenGL version supporting core profile");
     def->cli = "opengl-core";
     def->set_default_value(new ConfigOptionString());
+
+    def = this->add("opengl-debug", coBool);
+    def->label = L("OpenGL debug output");
+    def->tooltip = L("Activate OpenGL debug output on graphic cards which support it");
+    def->cli = "opengl-debug";
+    def->set_default_value(new ConfigOptionBool(false));
 #endif // ENABLE_GL_CORE_PROFILE
 
     def = this->add("slice", coBool);

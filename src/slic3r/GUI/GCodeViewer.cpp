@@ -758,11 +758,6 @@ void GCodeViewer::init()
     // initializes tool marker
     m_sequential_view.marker.init();
 
-    // initializes point sizes
-    std::array<int, 2> point_sizes;
-    ::glGetIntegerv(GL_ALIASED_POINT_SIZE_RANGE, point_sizes.data());
-    m_detected_point_sizes = { static_cast<float>(point_sizes[0]), static_cast<float>(point_sizes[1]) };
-
     m_gl_data_initialized = true;
 }
 
@@ -2065,8 +2060,10 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
 #if ENABLE_GL_CORE_PROFILE
                 GLuint vao_id = 0;
-                glsafe(::glGenVertexArrays(1, &vao_id));
-                glsafe(::glBindVertexArray(vao_id));
+                if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0)) {
+                    glsafe(::glGenVertexArrays(1, &vao_id));
+                    glsafe(::glBindVertexArray(vao_id));
+                }
 #endif // ENABLE_GL_CORE_PROFILE
 
                 GLuint vbo_id = 0;
@@ -2076,9 +2073,10 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 
 #if ENABLE_GL_CORE_PROFILE
-                glsafe(::glBindVertexArray(0));
-
-                t_buffer.vertices.vaos.push_back(static_cast<unsigned int>(vao_id));
+                if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0)) {
+                    glsafe(::glBindVertexArray(0));
+                    t_buffer.vertices.vaos.push_back(static_cast<unsigned int>(vao_id));
+                }
 #endif // ENABLE_GL_CORE_PROFILE
                 t_buffer.vertices.vbos.push_back(static_cast<unsigned int>(vbo_id));
                 t_buffer.vertices.sizes.push_back(size_bytes);
@@ -2160,10 +2158,11 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         if (i_multibuffer.empty()) {
             i_multibuffer.push_back(IndexBuffer());
 #if ENABLE_GL_CORE_PROFILE
-            if (!t_buffer.vertices.vaos.empty()) {
+            if (!t_buffer.vertices.vaos.empty() && OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
                 vao_index_list.push_back(t_buffer.vertices.vaos[curr_vertex_buffer.first]);
+
+            if (!t_buffer.vertices.vbos.empty())
                 vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
-            }
 #else
             if (!t_buffer.vertices.vbos.empty())
                 vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
@@ -2176,7 +2175,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         if (i_multibuffer.back().size() * sizeof(IBufferType) >= IBUFFER_THRESHOLD_BYTES - indiced_size_to_add) {
             i_multibuffer.push_back(IndexBuffer());
 #if ENABLE_GL_CORE_PROFILE
-            vao_index_list.push_back(t_buffer.vertices.vaos[curr_vertex_buffer.first]);
+            if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+                vao_index_list.push_back(t_buffer.vertices.vaos[curr_vertex_buffer.first]);
 #endif // ENABLE_GL_CORE_PROFILE
             vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
             if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
@@ -2194,7 +2194,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             ++curr_vertex_buffer.first;
             curr_vertex_buffer.second = 0;
 #if ENABLE_GL_CORE_PROFILE
-            vao_index_list.push_back(t_buffer.vertices.vaos[curr_vertex_buffer.first]);
+            if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+                vao_index_list.push_back(t_buffer.vertices.vaos[curr_vertex_buffer.first]);
 #endif // ENABLE_GL_CORE_PROFILE
             vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
 
@@ -2254,7 +2255,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 IBuffer& ibuf = t_buffer.indices.back();
                 ibuf.count = size_elements;
 #if ENABLE_GL_CORE_PROFILE
-                ibuf.vao = vao_indices[i][t_buffer.indices.size() - 1];
+                if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+                    ibuf.vao = vao_indices[i][t_buffer.indices.size() - 1];
 #endif // ENABLE_GL_CORE_PROFILE
                 ibuf.vbo = vbo_indices[i][t_buffer.indices.size() - 1];
 
@@ -2886,7 +2888,8 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
                 const IBuffer& i_buffer = buffer.indices[ibuffer_id];
                 cap.buffer = &buffer;
 #if ENABLE_GL_CORE_PROFILE
-                cap.vao = i_buffer.vao;
+                if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+                    cap.vao = i_buffer.vao;
 #endif // ENABLE_GL_CORE_PROFILE
                 cap.vbo = i_buffer.vbo;
 
@@ -2934,7 +2937,8 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
                 const IBuffer& i_buffer = buffer.indices[ibuffer_id];
                 cap.buffer = &buffer;
 #if ENABLE_GL_CORE_PROFILE
-                cap.vao = i_buffer.vao;
+                if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+                    cap.vao = i_buffer.vao;
 #endif // ENABLE_GL_CORE_PROFILE
                 cap.vbo = i_buffer.vbo;
 
@@ -3113,7 +3117,8 @@ void GCodeViewer::render_toolpaths()
             const IBuffer& i_buffer = buffer.indices[j];
             buffer_range.last = buffer_range.first + i_buffer.count / indices_per_instance;
 #if ENABLE_GL_CORE_PROFILE
-            glsafe(::glBindVertexArray(i_buffer.vao));
+            if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+                glsafe(::glBindVertexArray(i_buffer.vao));
 #endif // ENABLE_GL_CORE_PROFILE
             glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -3172,7 +3177,8 @@ void GCodeViewer::render_toolpaths()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
             glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 #if ENABLE_GL_CORE_PROFILE
-            glsafe(::glBindVertexArray(0));
+            if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+                glsafe(::glBindVertexArray(0));
 #endif // ENABLE_GL_CORE_PROFILE
 
             buffer_range.first = buffer_range.last;
@@ -3239,7 +3245,8 @@ void GCodeViewer::render_toolpaths()
                     continue;
 
 #if ENABLE_GL_CORE_PROFILE
-                glsafe(::glBindVertexArray(i_buffer.vao));
+                if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+                    glsafe(::glBindVertexArray(i_buffer.vao));
 #endif // ENABLE_GL_CORE_PROFILE
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -3301,7 +3308,8 @@ void GCodeViewer::render_toolpaths()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 #if ENABLE_GL_CORE_PROFILE
-                glsafe(::glBindVertexArray(0));
+                if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+                    glsafe(::glBindVertexArray(0));
 #endif // ENABLE_GL_CORE_PROFILE
             }
         }
@@ -3332,7 +3340,8 @@ void GCodeViewer::render_toolpaths()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_CORE_PROFILE
-        glsafe(::glBindVertexArray(cap.vao));
+        if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+            glsafe(::glBindVertexArray(cap.vao));
 #endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, cap.vbo));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -3381,7 +3390,8 @@ void GCodeViewer::render_toolpaths()
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 #if ENABLE_GL_CORE_PROFILE
-        glsafe(::glBindVertexArray(0));
+        if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+            glsafe(::glBindVertexArray(0));
 #endif // ENABLE_GL_CORE_PROFILE
 
         shader->stop_using();

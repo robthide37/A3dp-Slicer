@@ -27,6 +27,7 @@ public:
     class GLInfo
     {
         bool m_detected{ false };
+        bool m_core_profile{ false };
         int m_max_tex_size{ 0 };
         float m_max_anisotropy{ 0.0f };
 
@@ -43,7 +44,9 @@ public:
         const std::string& get_vendor() const;
         const std::string& get_renderer() const;
 
-        bool is_core_profile() const;
+        bool is_core_profile() const { return m_core_profile; }
+        void set_core_profile(bool value) { m_core_profile = value; }
+
         bool is_mesa() const;
 
         int get_max_tex_size() const;
@@ -84,9 +87,9 @@ private:
 
     bool m_gl_initialized{ false };
     wxGLContext* m_context{ nullptr };
-#if ENABLE_GL_CORE_PROFILE
-    std::pair<int, int> m_required_version{ 0, 0 };
-#endif // ENABLE_GL_CORE_PROFILE
+#if ENABLE_OPENGL_DEBUG_OPTION
+    bool m_debug_enabled{ false };
+#endif // ENABLE_OPENGL_DEBUG_OPTION
     GLShadersManager m_shaders_manager;
     static GLInfo s_gl_info;
 #ifdef __APPLE__ 
@@ -103,7 +106,11 @@ public:
 
     bool init_gl();
 #if ENABLE_GL_CORE_PROFILE
+#if ENABLE_OPENGL_DEBUG_OPTION
+    wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version, bool enable_debug);
+#else
     wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version);
+#endif // ENABLE_OPENGL_DEBUG_OPTION
 #else
     wxGLContext* init_glcontext(wxGLCanvas& canvas);
 #endif // ENABLE_GL_CORE_PROFILE

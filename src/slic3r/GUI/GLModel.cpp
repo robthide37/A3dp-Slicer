@@ -112,6 +112,19 @@ void GLModel::Geometry::add_vertex(const Vec3f& position, const Vec3f& normal)
     vertices.emplace_back(normal.z());
 }
 
+void GLModel::Geometry::add_vertex(const Vec3f& position, const Vec3f& normal, const Vec2f& tex_coord)
+{
+    assert(format.vertex_layout == EVertexLayout::P3N3T2);
+    vertices.emplace_back(position.x());
+    vertices.emplace_back(position.y());
+    vertices.emplace_back(position.z());
+    vertices.emplace_back(normal.x());
+    vertices.emplace_back(normal.y());
+    vertices.emplace_back(normal.z());
+    vertices.emplace_back(tex_coord.x());
+    vertices.emplace_back(tex_coord.y());
+}
+
 void GLModel::Geometry::add_vertex(const Vec4f& position)
 {
     assert(format.vertex_layout == EVertexLayout::P4);
@@ -253,13 +266,14 @@ size_t GLModel::Geometry::vertex_stride_floats(const Format& format)
 {
     switch (format.vertex_layout)
     {
-    case EVertexLayout::P2:   { return 2; }
-    case EVertexLayout::P2T2: { return 4; }
-    case EVertexLayout::P3:   { return 3; }
-    case EVertexLayout::P3T2: { return 5; }
-    case EVertexLayout::P3N3: { return 6; }
-    case EVertexLayout::P4:   { return 4; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P2:     { return 2; }
+    case EVertexLayout::P2T2:   { return 4; }
+    case EVertexLayout::P3:     { return 3; }
+    case EVertexLayout::P3T2:   { return 5; }
+    case EVertexLayout::P3N3:   { return 6; }
+    case EVertexLayout::P3N3T2: { return 8; }
+    case EVertexLayout::P4:     { return 4; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -268,12 +282,13 @@ size_t GLModel::Geometry::position_stride_floats(const Format& format)
     switch (format.vertex_layout)
     {
     case EVertexLayout::P2:
-    case EVertexLayout::P2T2: { return 2; }
+    case EVertexLayout::P2T2:   { return 2; }
     case EVertexLayout::P3:
     case EVertexLayout::P3T2:
-    case EVertexLayout::P3N3: { return 3; }
-    case EVertexLayout::P4:   { return 4; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2: { return 3; }
+    case EVertexLayout::P4:     { return 4; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -286,6 +301,7 @@ size_t GLModel::Geometry::position_offset_floats(const Format& format)
     case EVertexLayout::P3:
     case EVertexLayout::P3T2:
     case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2:
     case EVertexLayout::P4:   { return 0; }
     default:                  { assert(false); return 0; }
     };
@@ -295,8 +311,9 @@ size_t GLModel::Geometry::normal_stride_floats(const Format& format)
 {
     switch (format.vertex_layout)
     {
-    case EVertexLayout::P3N3: { return 3; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2: { return 3; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -304,8 +321,9 @@ size_t GLModel::Geometry::normal_offset_floats(const Format& format)
 {
     switch (format.vertex_layout)
     {
-    case EVertexLayout::P3N3: { return 3; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2: { return 3; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -314,8 +332,9 @@ size_t GLModel::Geometry::tex_coord_stride_floats(const Format& format)
     switch (format.vertex_layout)
     {
     case EVertexLayout::P2T2:
-    case EVertexLayout::P3T2: { return 2; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P3T2:
+    case EVertexLayout::P3N3T2: { return 2; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -323,9 +342,10 @@ size_t GLModel::Geometry::tex_coord_offset_floats(const Format& format)
 {
     switch (format.vertex_layout)
     {
-    case EVertexLayout::P2T2: { return 2; }
-    case EVertexLayout::P3T2: { return 3; }
-    default:                  { assert(false); return 0; }
+    case EVertexLayout::P2T2:   { return 2; }
+    case EVertexLayout::P3T2:   { return 3; }
+    case EVertexLayout::P3N3T2: { return 6; }
+    default:                    { assert(false); return 0; }
     };
 }
 
@@ -349,6 +369,7 @@ bool GLModel::Geometry::has_position(const Format& format)
     case EVertexLayout::P3:
     case EVertexLayout::P3T2:
     case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2:
     case EVertexLayout::P4:   { return true; }
     default:                  { assert(false); return false; }
     };
@@ -362,9 +383,10 @@ bool GLModel::Geometry::has_normal(const Format& format)
     case EVertexLayout::P2T2:
     case EVertexLayout::P3:
     case EVertexLayout::P3T2:
-    case EVertexLayout::P4:   { return false; }
-    case EVertexLayout::P3N3: { return true; }
-    default:                  { assert(false); return false; }
+    case EVertexLayout::P4:     { return false; }
+    case EVertexLayout::P3N3:
+    case EVertexLayout::P3N3T2: { return true; }
+    default:                    { assert(false); return false; }
     };
 }
 
@@ -373,12 +395,13 @@ bool GLModel::Geometry::has_tex_coord(const Format& format)
     switch (format.vertex_layout)
     {
     case EVertexLayout::P2T2:
-    case EVertexLayout::P3T2: { return true; }
+    case EVertexLayout::P3T2:
+    case EVertexLayout::P3N3T2: { return true; }
     case EVertexLayout::P2:
     case EVertexLayout::P3:
     case EVertexLayout::P3N3:
-    case EVertexLayout::P4:   { return false; }
-    default:                  { assert(false); return false; }
+    case EVertexLayout::P4:     { return false; }
+    default:                    { assert(false); return false; }
     };
 }
 #else
@@ -853,11 +876,7 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
         return;
 
     // sends data to gpu if not done yet
-#if ENABLE_GL_CORE_PROFILE
-    if (m_render_data.vao_id == 0) {
-#else
     if (m_render_data.vbo_id == 0 || m_render_data.ibo_id == 0) {
-#endif // ENABLE_GL_CORE_PROFILE
         if (m_render_data.geometry.vertices_count() > 0 && m_render_data.geometry.indices_count() > 0 && !send_to_gpu())
             return;
     }
@@ -873,7 +892,8 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
     const bool tex_coord = Geometry::has_tex_coord(data.format);
 
 #if ENABLE_GL_CORE_PROFILE
-    glsafe(::glBindVertexArray(m_render_data.vao_id));
+    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+        glsafe(::glBindVertexArray(m_render_data.vao_id));
     // the following binding is needed to set the vertex attributes
 #endif // ENABLE_GL_CORE_PROFILE
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.vbo_id));
@@ -906,9 +926,10 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
 
     shader->set_uniform("uniform_color", data.color);
 
-#if !ENABLE_GL_CORE_PROFILE
-    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+    if (!OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
     glsafe(::glDrawElements(mode, range.second - range.first, index_type, (const void*)(range.first * Geometry::index_stride_bytes(data))));
 #if !ENABLE_GL_CORE_PROFILE
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
@@ -923,7 +944,8 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 #if ENABLE_GL_CORE_PROFILE
-    glsafe(::glBindVertexArray(0));
+    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+        glsafe(::glBindVertexArray(0));
 #endif // ENABLE_GL_CORE_PROFILE
 
 #if ENABLE_GLMODEL_STATISTICS
@@ -958,11 +980,7 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
     if (offset_id == -1 || scales_id == -1)
         return;
 
-#if ENABLE_GL_CORE_PROFILE
-    if (m_render_data.vao_id == 0) {
-#else
     if (m_render_data.vbo_id == 0 || m_render_data.ibo_id == 0) {
-#endif // ENABLE_GL_CORE_PROFILE
         if (!send_to_gpu())
             return;
     }
@@ -981,7 +999,8 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_CORE_PROFILE
-    glsafe(::glBindVertexArray(m_render_data.vao_id));
+    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+        glsafe(::glBindVertexArray(m_render_data.vao_id));
 #endif // ENABLE_GL_CORE_PROFILE
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, instances_vbo));
@@ -1097,7 +1116,8 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 #if ENABLE_GL_CORE_PROFILE
-    glsafe(::glBindVertexArray(0));
+    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+        glsafe(::glBindVertexArray(0));
 #endif // ENABLE_GL_CORE_PROFILE
 
 #if ENABLE_GLMODEL_STATISTICS
@@ -1120,8 +1140,10 @@ bool GLModel::send_to_gpu()
     }
 
 #if ENABLE_GL_CORE_PROFILE
-    glsafe(::glGenVertexArrays(1, &m_render_data.vao_id));
-    glsafe(::glBindVertexArray(m_render_data.vao_id));
+    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0)) {
+        glsafe(::glGenVertexArrays(1, &m_render_data.vao_id));
+        glsafe(::glBindVertexArray(m_render_data.vao_id));
+    }
 #endif // ENABLE_GL_CORE_PROFILE
 
     // vertices
@@ -1163,9 +1185,11 @@ bool GLModel::send_to_gpu()
         glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, data.indices_size_bytes(), data.indices.data(), GL_STATIC_DRAW));
     }
 
-#if !ENABLE_GL_CORE_PROFILE
-    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
-#endif // !ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE
+    if (!OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
     m_render_data.indices_count = indices_count;
 #if ENABLE_GLMODEL_STATISTICS
     s_statistics.gpu_memory.indices.current += data.indices_size_bytes();
@@ -1174,7 +1198,8 @@ bool GLModel::send_to_gpu()
     data.indices = std::vector<unsigned int>();
 
 #if ENABLE_GL_CORE_PROFILE
-    glsafe(::glBindVertexArray(0));
+    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+        glsafe(::glBindVertexArray(0));
 #endif // ENABLE_GL_CORE_PROFILE
 
     return true;

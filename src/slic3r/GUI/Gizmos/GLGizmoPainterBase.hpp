@@ -213,7 +213,9 @@ protected:
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
+#if !ENABLE_GL_CORE_PROFILE
     Vec2d m_old_center{ Vec2d::Zero() };
+#endif // !ENABLE_GL_CORE_PROFILE
     float m_old_cursor_radius{ 0.0f };
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
