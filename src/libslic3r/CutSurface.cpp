@@ -2747,9 +2747,11 @@ std::vector<bool> priv::select_patches(
     const VCutAOIs            &cuts)
 {
     std::vector<bool> in_distances(patches.size(), {false});
-    for (const ProjectionDistance &d : best_distances) 
+    for (const ProjectionDistance &d : best_distances) {
+        // exist valid projection for shape point?
+        if (d.patch_index == std::numeric_limits<uint32_t>::max()) continue;
         in_distances[d.patch_index] = true;
-
+    }
     // For sure of the bounding boxes intersection
     const double bb_extension = 1e-10;
     const Vec3d bb_ext(bb_extension, bb_extension, bb_extension);
@@ -2763,7 +2765,9 @@ std::vector<bool> priv::select_patches(
     std::vector<size_t> patch_indices;
 
     std::vector<bool> result(patches.size(), {false});
-    for (const ProjectionDistance &d : best_distances) { 
+    for (const ProjectionDistance &d : best_distances) {
+        // exist valid projection for shape point?
+        if (d.patch_index == std::numeric_limits<uint32_t>::max()) continue;
         if (result[d.patch_index]) continue;
         // Add all connected patches
         // This is way to add patche without source shape point
