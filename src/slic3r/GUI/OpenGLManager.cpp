@@ -363,6 +363,7 @@ bool OpenGLManager::init_gl()
 #else
         bool valid_version = s_gl_info.is_version_greater_or_equal_to(2, 0);
 #endif // ENABLE_GL_CORE_PROFILE
+
         if (!valid_version) {
             // Complain about the OpenGL version.
             wxString message = from_u8((boost::format(
@@ -420,10 +421,6 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
         m_debug_enabled = enable_debug;
 #endif // ENABLE_OPENGL_DEBUG_OPTION
 
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-        std::cout << "OpenGLManager::init_glcontext(): required OpenGL version: " << required_opengl_version.first << "." << required_opengl_version.second << "\n";
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-
         if (required_opengl_version != std::make_pair(0, 0)) { // the user specified a required version in the command line using --opengl-core=M.m
             const bool supports_core_profile = (required_opengl_version.first < 3) ? false :
                 (required_opengl_version.first > 3) ? true : required_opengl_version.second >= 2;
@@ -445,7 +442,9 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
                     delete m_context;
                     m_context = nullptr;
                 }
-            }
+                else
+                    s_gl_info.set_core_profile(true);
+        }
         }
         //else {
         //    // try to get the highest supported OpenGL version with core profile
@@ -467,30 +466,12 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
 
 #if ENABLE_OPENGL_DEBUG_OPTION
         if (m_context == nullptr) {
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            wxGLContextAttrs attrs;
+            if (m_debug_enabled)
+                attrs.DebugCtx();
+            attrs.EndList();
             // if no valid context was created use the default one
-            if (m_debug_enabled) {
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                std::cout << "OpenGLManager::init_glcontext(): create debug compatibility profile (" << required_opengl_version.first << "." << required_opengl_version.second << ")\n";
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                wxGLContextAttrs attrs;
-                attrs.DebugCtx().EndList();
-                m_context = new wxGLContext(&canvas, nullptr, &attrs);
-            }
-            else {
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                std::cout << "OpenGLManager::init_glcontext(): create compatibility profile (" << required_opengl_version.first << "." << required_opengl_version.second << ")\n";
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                m_context = new wxGLContext(&canvas);
-            }
-
-//            wxGLContextAttrs attrs;
-//            if (m_debug_enabled)
-//                attrs.DebugCtx();
-//            attrs.EndList();
-//            // if no valid context was created use the default one
-//            m_context = new wxGLContext(&canvas, nullptr, &attrs);
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            m_context = new wxGLContext(&canvas, nullptr, &attrs);
         }
 #else
         if (m_context == nullptr)

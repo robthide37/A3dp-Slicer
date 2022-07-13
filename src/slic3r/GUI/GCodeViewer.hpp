@@ -364,11 +364,7 @@ class GCodeViewer
             {
             case ERenderPrimitiveType::Line:
             case ERenderPrimitiveType::Triangle: {
-#if ENABLE_GL_CORE_PROFILE
-                return !vertices.vaos.empty() && vertices.vaos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
-#else
                 return !vertices.vbos.empty() && vertices.vbos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
-#endif // ENABLE_GL_CORE_PROFILE
             }
             case ERenderPrimitiveType::InstancedModel: { return model.model.is_initialized() && !model.instances.buffer.empty(); }
             case ERenderPrimitiveType::BatchedModel: {
@@ -377,11 +373,7 @@ class GCodeViewer
 #else
                 return model.data.vertices_count() > 0 && model.data.indices_count() &&
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_CORE_PROFILE
-                    !vertices.vaos.empty() && vertices.vaos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
-#else
                     !vertices.vbos.empty() && vertices.vbos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
-#endif // ENABLE_GL_CORE_PROFILE
             }
             default: { return false; }
             }

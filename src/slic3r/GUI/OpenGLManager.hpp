@@ -27,6 +27,7 @@ public:
     class GLInfo
     {
         bool m_detected{ false };
+        bool m_core_profile{ false };
         int m_max_tex_size{ 0 };
         float m_max_anisotropy{ 0.0f };
 
@@ -44,6 +45,8 @@ public:
         const std::string& get_renderer() const;
 
         bool is_core_profile() const;
+        void set_core_profile(bool value) { m_core_profile = value; }
+
         bool is_mesa() const;
 
         int get_max_tex_size() const;
