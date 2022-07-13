@@ -758,11 +758,6 @@ void GCodeViewer::init()
     // initializes tool marker
     m_sequential_view.marker.init();
 
-    // initializes point sizes
-    std::array<int, 2> point_sizes;
-    ::glGetIntegerv(GL_ALIASED_POINT_SIZE_RANGE, point_sizes.data());
-    m_detected_point_sizes = { static_cast<float>(point_sizes[0]), static_cast<float>(point_sizes[1]) };
-
     m_gl_data_initialized = true;
 }
 
