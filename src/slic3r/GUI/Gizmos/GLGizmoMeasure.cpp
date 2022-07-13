@@ -9,6 +9,7 @@
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/SurfaceMesh.hpp"
+#include "libslic3r/Geometry/Circle.hpp"
 
 #include <numeric>
 
@@ -177,7 +178,7 @@ void GLGizmoMeasure::on_render()
                     m_vbo_cylinder.render();
                 }
 
-                if (m_show_points && feature.type == SurfaceFeature::Line || m_show_circles && feature.type == SurfaceFeature::Circle) {
+                if ((m_show_points && feature.type == SurfaceFeature::Line) || m_show_circles && feature.type == SurfaceFeature::Circle) {
                     view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(feature.pos));
                     view_feature_matrix.scale(0.5);
                     shader->set_uniform("view_model_matrix", view_feature_matrix);
@@ -185,6 +186,14 @@ void GLGizmoMeasure::on_render()
                                             ? ColorRGBA(1.f, 0.f, 0.f, 1.f)
                                             : ColorRGBA(0.f, 1.f, 0.f, 1.f));
                     m_vbo_sphere.render();
+
+                    /*view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(feature.endpoint));
+                    view_feature_matrix.scale(0.5);
+                    shader->set_uniform("view_model_matrix", view_feature_matrix);
+                    m_vbo_sphere.set_color(feature.type == SurfaceFeature::Line
+                                            ? ColorRGBA(1.f, 0.f, 0.f, 1.f)
+                                            : ColorRGBA(1.f, 1.f, 0.f, 1.f));
+                    m_vbo_sphere.render();*/
                 }
 
                 
@@ -243,7 +252,7 @@ void GLGizmoMeasure::on_render_for_picking()
             update_planes();
         //for (int i = 0; i < (int)m_planes.size(); ++i) {
         int i = m_currently_shown_plane;
-        if (i < m_planes.size()) {
+        if (i < int(m_planes.size())) {
             for (int j=0; j<(int)m_planes[i].vbos.size(); ++j) {
                 m_planes[i].vbos[j].set_color(picking_color_component(j));
                 m_planes[i].vbos[j].render();
@@ -268,60 +277,84 @@ void GLGizmoMeasure::set_flattening_data(const ModelObject* model_object)
 
 
 
+static std::pair<Vec3d, double> get_center_and_radius(const std::vector<Vec3d>& border, int start_idx, int end_idx, const Transform3d& trafo)
+{
+    Vec2ds pts;
+    double z = 0.;
+    for (int i=start_idx; i<=end_idx; ++i) {
+        Vec3d pt_transformed = trafo * border[i];
+        z = pt_transformed.z();
+        pts.emplace_back(pt_transformed.x(), pt_transformed.y());        
+    }
+
+    auto circle = Geometry::circle_ransac(pts, 20); // FIXME: iterations?
+
+    return std::make_pair(trafo.inverse() * Vec3d(circle.center.x(), circle.center.y(), z), circle.radius);
+}
+
+
+
 void GLGizmoMeasure::extract_features(GLGizmoMeasure::PlaneData& plane)
 {
     plane.surface_features.clear();
     const Vec3d& normal = plane.normal;
 
     const double edge_threshold = 25. * (M_PI/180.);
+    std::vector<double> angles;
+
+    Eigen::Quaterniond q;
+    q.setFromTwoVectors(plane.normal, Vec3d::UnitZ());
+    Transform3d trafo = Transform3d::Identity();
+    trafo.rotate(q);
 
     
     
     for (const std::vector<Vec3d>& border : plane.borders) {
         assert(border.size() > 1);
         assert(! border.front().isApprox(border.back()));
-        double last_angle = 0.;
-        int first_idx = 0;
-        bool circle = false;
+        int start_idx = -1;
 
+
+        // First calculate angles at all the vertices.
+        angles.clear();
         for (int i=0; i<int(border.size()); ++i) {
             const Vec3d& v2 = (i == 0 ? border[0] - border[border.size()-1]
-                                      : border[i] - border[i-1]);
+                                    : border[i] - border[i-1]);
             const Vec3d& v1 = i == border.size()-1 ? border[0] - border.back()
-                                                   : border[i+1] - border[i];
+                                                : border[i+1] - border[i];
             double angle = -atan2(normal.dot(v1.cross(v2)), v1.dot(v2));
             if (angle < -M_PI/2.)
                 angle += M_PI;
-            std::cout << (180./M_PI) * angle << std::endl;
- 
-            if (i != 0) {
-                // This is not the first corner.
-                bool same_as_last = Slic3r::is_approx(angle, last_angle);
+            angles.push_back(angle);
+        }
+        assert(border.size() == angles.size());
 
-                if (std::abs(angle) > edge_threshold || (! same_as_last && circle) || i == border.size() - 1) {
-                    // Current feature ended. Save it and remember current point as beginning of the next.
-                    bool is_line = (i == first_idx + 1);
-                    plane.surface_features.emplace_back(SurfaceFeature{
-                        is_line ? SurfaceFeature::Line : SurfaceFeature::Circle,
-                        is_line ? border[first_idx] : border[first_idx], // FIXME
-                        border[i],
-                        0. // FIXME
-                    });
-                    first_idx = i;
-                    circle = false;
-                } else if (same_as_last && ! circle) {
-                    // possibly a segment of a circle
-                    first_idx = std::max(i-2, 0);
+
+        bool circle = false;
+        std::vector<std::pair<size_t, size_t>> circles;
+        for (int i=1; i<angles.size(); ++i) {
+            if (angles[i] < edge_threshold && Slic3r::is_approx(angles[i], angles[i-1]) && i != angles.size()-1 ) {
+                // circle
+                if (! circle) {
                     circle = true;
-                } else if (! circle) {
-                    first_idx = i;
+                    start_idx = std::max(0, i-2);
+                }
+            } else {
+                if (circle) {
+                    circles.emplace_back(start_idx, i);
+                    circle = false;
                 }
             }
-            last_angle = angle;            
         }
 
-        // FIXME: Possibly merge the first and last feature.
-
+        for (const auto& [start_idx, end_idx] : circles) {
+            std::pair<Vec3d, double> center_and_radius = get_center_and_radius(border, start_idx, end_idx, trafo);
+            plane.surface_features.emplace_back(SurfaceFeature{
+                SurfaceFeature::Circle,
+                // border[start_idx], border[end_idx],
+                center_and_radius.first, center_and_radius.first, center_and_radius.second                
+            });
+        }
 
 
         std::cout << "==================== " << std::endl;
@@ -352,7 +385,7 @@ void GLGizmoMeasure::update_planes()
         ch.merge(vol_ch);
     }
     m_planes.clear();
-    const Transform3d& inst_matrix = mo->instances.front()->get_matrix();
+    
 
     // Now we'll go through all the facets and append Points of facets sharing the same normal.
     // This part is still performed in mesh coordinate system.
@@ -403,13 +436,13 @@ void GLGizmoMeasure::update_planes()
     assert(std::none_of(face_to_plane.begin(), face_to_plane.end(), [](size_t val) { return val == size_t(-1); }));
 
     SurfaceMesh sm(ch.its);
-    for (int plane_id=0; plane_id < m_planes.size(); ++plane_id) {
+    for (int plane_id=0; plane_id < int(m_planes.size()); ++plane_id) {
     //int plane_id = 5; {
         const auto& facets = m_planes[plane_id].facets;
         m_planes[plane_id].borders.clear();
         std::vector<std::array<bool, 3>> visited(facets.size(), {false, false, false});
         
-        for (int face_id=0; face_id<facets.size(); ++face_id) {
+        for (int face_id=0; face_id<int(facets.size()); ++face_id) {
             assert(face_to_plane[facets[face_id]] == plane_id);
             for (int edge_id=0; edge_id<3; ++edge_id) {
                 if (visited[face_id][edge_id] || face_to_plane[face_neighbors[facets[face_id]][edge_id]] == plane_id) {
@@ -422,10 +455,11 @@ void GLGizmoMeasure::update_planes()
                     he = sm.next(he);
             
                 // he is the first halfedge on the border. Now walk around and append the points.
-                const Halfedge_index he_orig = he;
+                //const Halfedge_index he_orig = he;
                 m_planes[plane_id].borders.emplace_back();
-                m_planes[plane_id].borders.back().emplace_back(sm.point(sm.source(he)).cast<double>());
-                Vertex_index target = sm.target(he);
+                std::vector<Vec3d>& last_border = m_planes[plane_id].borders.back();
+                last_border.emplace_back(sm.point(sm.source(he)).cast<double>());
+                //Vertex_index target = sm.target(he);
                 const Halfedge_index he_start = he;
                 
                 Face_index fi = he.face();
@@ -446,15 +480,15 @@ void GLGizmoMeasure::update_planes()
                     assert(face_it != facets.end());
                     assert(*face_it == int(fi));
                     if (visited[face_it - facets.begin()][he.side()] && he != he_start) {
-                        m_planes[plane_id].borders.back().resize(1);
+                        last_border.resize(1);
                         break;
                     }
                     visited[face_it - facets.begin()][he.side()] = true;
 
-                    m_planes[plane_id].borders.back().emplace_back(sm.point(sm.source(he)).cast<double>());
+                    last_border.emplace_back(sm.point(sm.source(he)).cast<double>());
                 } while (he != he_start);
 
-                if (m_planes[plane_id].borders.back().size() == 1)
+                if (last_border.size() == 1)
                     m_planes[plane_id].borders.pop_back();
             }
         }
@@ -468,11 +502,7 @@ void GLGizmoMeasure::update_planes()
 
 
 
-    // Let's prepare transformation of the normal vector from mesh to instance coordinates.
-    Geometry::Transformation t(inst_matrix);
-    Vec3d scaling = t.get_scaling_factor();
-    t.set_scaling_factor(Vec3d(1./scaling(0), 1./scaling(1), 1./scaling(2)));
-
+ 
     
 
     // Planes are finished - let's save what we calculated it from:
