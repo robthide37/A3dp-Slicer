@@ -20,7 +20,7 @@
 /// patches/patch{O}.off
 /// result.obj - Merged result its
 /// result_contours/{O}.obj - visualization of contours for result patches
-//#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
+#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
 
 using namespace Slic3r;
 
@@ -943,11 +943,11 @@ priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
 priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
                             const Project     &projection)
 {
-    CutMesh result;
-    if (shapes.empty()) return result;
+    if (shapes.empty()) return {};
         
-    EdgeShapeMap& edge_shape_map = result.add_property_map<EI, IntersectingElement>(edge_shape_map_name).first;
-    FaceShapeMap& face_shape_map = result.add_property_map<FI, IntersectingElement>(face_shape_map_name).first;
+    CutMesh result;
+    EdgeShapeMap edge_shape_map = result.add_property_map<EI, IntersectingElement>(edge_shape_map_name).first;
+    FaceShapeMap face_shape_map = result.add_property_map<FI, IntersectingElement>(face_shape_map_name).first;
 
     std::vector<VI> indices;
     auto insert_contour = [&projection, &indices, &result, 
@@ -956,18 +956,17 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
         indices.clear();
         indices.reserve(polygon.points.size() * 2);
         size_t  num_vertices_old = result.number_of_vertices();
-        for (const Point &p2 : polygon.points) {
-            auto p  = projection.create_front_back(p2);
-            CutMesh::Point v_first{p.first.x(), p.first.y(), p.first.z()};
-            CutMesh::Point v_second{p.second.x(), p.second.y(), p.second.z()};
+        for (const Point &polygon_point : polygon.points) {
+            auto [front, back] = projection.create_front_back(polygon_point);
+            P3 v_front{front.x(), front.y(), front.z()};
+            VI vi1 = result.add_vertex(v_front);
+            assert(vi1.idx() == (indices.size() + num_vertices_old));
+            indices.push_back(vi1);
 
-            VI reduction_from = result.add_vertex(v_first);
-            assert(size_t(reduction_from) == (indices.size() + num_vertices_old));
-            indices.emplace_back(reduction_from);
-
-            reduction_from = result.add_vertex(v_second);
-            assert(size_t(reduction_from) == (indices.size() + num_vertices_old));
-            indices.emplace_back(reduction_from);
+            P3 v_back{back.x(), back.y(), back.z()};
+            VI vi2 = result.add_vertex(v_back);
+            assert(vi2.idx() == (indices.size() + num_vertices_old));
+            indices.push_back(vi2);
         }
 
         auto find_edge = [&result](FI fi, VI from, VI to) {
@@ -2603,7 +2602,7 @@ priv::SurfacePatch priv::create_reduced_patch(CutAOI             &cut,
     assert(count_edges >= cm.edges().size());
 
     // convert VI from this patch to source VI, when exist
-    CvtVI2VI &cvt = cm.add_property_map<VI, VI>(patch_source_name).first;
+    CvtVI2VI cvt = cm.add_property_map<VI, VI>(patch_source_name).first;
     // vi_s .. VertexIndex into mesh (source)
     // vi_d .. new VertexIndex in cm (destination)
     for (uint32_t vi_s = 0; vi_s < v_cvt.size(); ++vi_s) {
@@ -2658,7 +2657,7 @@ priv::SurfacePatch priv::create_surface_patch(const std::vector<FI> &fis, const 
     assert(count_edges >= cm.edges().size());
 
     // convert VI from this patch to source VI, when exist
-    CvtVI2VI& cvt = cm.add_property_map<VI, VI>(patch_source_name).first;
+    CvtVI2VI cvt = cm.add_property_map<VI, VI>(patch_source_name).first;
     // vi_s .. VertexIndex into mesh (source)
     // vi_d .. new VertexIndex in cm (destination)
     for (uint32_t vi_s = 0; vi_s < v_cvt.size(); ++vi_s) { 
@@ -2756,7 +2755,7 @@ void priv::divide_patch(size_t i, SurfacePatches &patches) {
 
     CutMesh& cm = patch.mesh;
     std::string patch_number_name = "f:patch_number";
-    PatchNumber& patch_number = cm.add_property_map<FI, size_t>(patch_number_name, {def_value}).first;
+    PatchNumber patch_number = cm.add_property_map<FI, size_t>(patch_number_name, {def_value}).first;
 
     size_t number = 0;
     std::vector<FI> queue;
@@ -2889,7 +2888,7 @@ priv::SurfacePatches priv::diff_models(VCutAOIs                 &cuts,
         CutAOIs &model_cuts = cuts[model_index];
         CutMesh &cut_model_ = cut_models[model_index];
         const CutMesh &cut_model = cut_model_;
-        ReductionMap& vertex_reduction_map = cut_model_.add_property_map<VI, VI>(vertex_reduction_map_name).first;
+        ReductionMap vertex_reduction_map = cut_model_.add_property_map<VI, VI>(vertex_reduction_map_name).first;
         create_reduce_map(vertex_reduction_map, cut_model);
 
         for (size_t cut_index = 0; cut_index < model_cuts.size(); ++cut_index, ++index) {

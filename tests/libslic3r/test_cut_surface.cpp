@@ -18,8 +18,8 @@ TEST_CASE("Cut character from surface", "[]")
     std::optional<Emboss::Glyph> glyph = 
         Emboss::letter2glyph(*font, font_index, letter, flatness);
     REQUIRE(glyph.has_value());
-    ExPolygons shape = glyph->shape;
-    REQUIRE(!shape.empty());
+    ExPolygons shapes = glyph->shape;
+    REQUIRE(!shapes.empty());
 
     Transform3d tr = Transform3d::Identity();
     tr.translate(Vec3d(0., 0., -z_depth));
@@ -32,8 +32,9 @@ TEST_CASE("Cut character from surface", "[]")
     its_translate(cube2, Vec3f(100, -40, 7.5));
     its_merge(object, std::move(cube2));
 
+    std::vector<indexed_triangle_set> objects{object};
     // Call core function for cut surface
-    auto surfaces = cut_surface(shape, {object}, cut_projection, 0);
+    auto surfaces = cut_surface(shapes, objects, cut_projection, 0.5);
     CHECK(!surfaces.empty());
 
     Emboss::OrthoProject projection(Transform3d::Identity(),
