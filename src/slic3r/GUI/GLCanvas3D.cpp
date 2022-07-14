@@ -2968,7 +2968,11 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                 }
                 else if (keyCode == WXK_CONTROL) {
 #if ENABLE_NEW_CAMERA_MOVEMENTS
+#if ENABLE_RAYCAST_PICKING
+                    if (m_mouse.dragging && !m_moving) {
+#else
                     if (m_mouse.dragging) {
+#endif // ENABLE_RAYCAST_PICKING
                         // if the user releases CTRL while rotating the 3D scene
                         // prevent from moving the selected volume
                         m_mouse.drag.move_volume_idx = -1;
@@ -3498,7 +3502,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS
                             m_mouse.drag.start_position_3D = m_mouse.scene_position;
                         m_sequential_print_clearance_first_displacement = true;
+#if !ENABLE_RAYCAST_PICKING
                         m_moving = true;
+#endif // !ENABLE_RAYCAST_PICKING
                     }
                 }
             }
@@ -3510,7 +3516,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 #else
     else if (evt.Dragging() && evt.LeftIsDown() && m_layers_editing.state == LayersEditing::Unknown && m_mouse.drag.move_volume_idx != -1) {
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS
-    if (!m_mouse.drag.move_requires_threshold) {
+        if (!m_mouse.drag.move_requires_threshold) {
             m_mouse.dragging = true;
             Vec3d cur_pos = m_mouse.drag.start_position_3D;
             // we do not want to translate objects if the user just clicked on an object while pressing shift to remove it from the selection and then drag
@@ -3546,6 +3552,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
 
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_RAYCAST_PICKING
+            m_moving = true;
+#endif // ENABLE_RAYCAST_PICKING
             TransformationType trafo_type;
             trafo_type.set_relative();
             m_selection.translate(cur_pos - m_mouse.drag.start_position_3D, trafo_type);
@@ -3577,29 +3586,35 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 #if ENABLE_NEW_CAMERA_MOVEMENTS
         else if (evt.LeftIsDown()) {
             // if dragging over blank area with left button, rotate
-            if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
+#if ENABLE_RAYCAST_PICKING
+            if (!m_moving) {
+#endif // ENABLE_RAYCAST_PICKING
+                if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
 #else
             // if dragging over blank area with left button, rotate
         else if (evt.LeftIsDown()) {
             if ((any_gizmo_active || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS
-                const Vec3d rot = (Vec3d(pos.x(), pos.y(), 0.0) - m_mouse.drag.start_position_3D) * (PI * TRACKBALLSIZE / 180.0);
-                if (wxGetApp().app_config->get("use_free_camera") == "1")
-                    // Virtual track ball (similar to the 3DConnexion mouse).
-                    wxGetApp().plater()->get_camera().rotate_local_around_target(Vec3d(rot.y(), rot.x(), 0.0));
-                else {
-                    // Forces camera right vector to be parallel to XY plane in case it has been misaligned using the 3D mouse free rotation.
-                    // It is cheaper to call this function right away instead of testing wxGetApp().plater()->get_mouse3d_controller().connected(),
-                    // which checks an atomics (flushes CPU caches).
-                    // See GH issue #3816.
-                    Camera& camera = wxGetApp().plater()->get_camera();
-                    camera.recover_from_free_camera();
-                    camera.rotate_on_sphere(rot.x(), rot.y(), current_printer_technology() != ptSLA);
-                }
+                    const Vec3d rot = (Vec3d(pos.x(), pos.y(), 0.0) - m_mouse.drag.start_position_3D) * (PI * TRACKBALLSIZE / 180.0);
+                    if (wxGetApp().app_config->get("use_free_camera") == "1")
+                        // Virtual track ball (similar to the 3DConnexion mouse).
+                        wxGetApp().plater()->get_camera().rotate_local_around_target(Vec3d(rot.y(), rot.x(), 0.0));
+                    else {
+                        // Forces camera right vector to be parallel to XY plane in case it has been misaligned using the 3D mouse free rotation.
+                        // It is cheaper to call this function right away instead of testing wxGetApp().plater()->get_mouse3d_controller().connected(),
+                        // which checks an atomics (flushes CPU caches).
+                        // See GH issue #3816.
+                        Camera& camera = wxGetApp().plater()->get_camera();
+                        camera.recover_from_free_camera();
+                        camera.rotate_on_sphere(rot.x(), rot.y(), current_printer_technology() != ptSLA);
+                    }
 
-                m_dirty = true;
+                    m_dirty = true;
+                }
+                m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
+#if ENABLE_RAYCAST_PICKING
             }
-            m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
+#endif // ENABLE_RAYCAST_PICKING
         }
         else if (evt.MiddleIsDown() || evt.RightIsDown()) {
             // If dragging over blank area with right/middle button, pan.
