@@ -161,32 +161,22 @@ struct UseSurfaceData : public EmbossDataUpdate
 
     struct ModelSource
     {
-        // IMPROVE: copy of source mesh tringles
-        // copy could slow down on big meshes
-        // but proccessing on thread need it
-        indexed_triangle_set its;
+        // IMPROVE: Copy only AOI by shapes and projection
+        // NOTE: copy of source mesh tringles and it slows down on big meshes
+        std::vector<indexed_triangle_set> its;
         // Transformation of volume inside of object
         Transform3d tr;
         // extract bounds for projection
         BoundingBoxf3 bb;
     };
-    using ModelSources = std::vector<ModelSource>;
-    ModelSources sources;
+    ModelSource source;
 
     /// <summary>
-    /// Copied triangles from object to be able create mesh for cut surface
+    /// Copied triangles from object to be able create mesh for cut surface from
     /// </summary>
     /// <param name="text_volume">Define text in object</param>
     /// <returns>Source data for cut surface from</returns>
-    static ModelSources get_sources_to_cut_surface_from(
-        const ModelVolume *text_volume);
-
-    /// <summary>
-    /// Merging of source together
-    /// </summary>
-    /// <param name="sources">Define input by multiple triangle models</param>
-    /// <returns>Create one Source</returns>
-    static ModelSource merge(ModelSources& sources);
+    static ModelSource create_source(const ModelVolume *text_volume);
 };
 
 /// <summary>
@@ -202,6 +192,8 @@ public:
     UseSurfaceJob(UseSurfaceData &&input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &eptr) override;
+    // prepare multi volume input
+    static std::vector<indexed_triangle_set> transform_volumes(ModelVolume *mv);
 };
 
 } // namespace Slic3r::GUI
