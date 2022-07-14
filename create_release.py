@@ -68,14 +68,14 @@ with urlopen("https://api.github.com/repos/"+repo+"/actions/artifacts") as f:
 			z = zipfile.ZipFile(io.BytesIO(resp.content));
 			z.extractall(release_path);
 			os.rename(release_path+"/"+program_name+".dmg", release_path+"/"+program_name+"_"+version+"_macos_"+date_str+".dmg");
-		if entry["name"] == "rc_arm_macos.dmg" and not found_macos_arm:
-			found_macos_arm = True;
-			print("ask for: "+entry["archive_download_url"]);
-			resp = requests.get(entry["archive_download_url"], headers={'Authorization': 'token ' + github_auth_token,}, allow_redirects=True);
-			print("macos-arm: " +str(resp));
-			z = zipfile.ZipFile(io.BytesIO(resp.content));
-			z.extractall(release_path);
-			os.rename(release_path+"/"+program_name+".dmg", release_path+"/"+program_name+"_"+version+"_macos_arm_"+date_str+".dmg");
+		# if entry["name"] == "rc_arm_macos.dmg" and not found_macos_arm:
+			# found_macos_arm = True;
+			# print("ask for: "+entry["archive_download_url"]);
+			# resp = requests.get(entry["archive_download_url"], headers={'Authorization': 'token ' + github_auth_token,}, allow_redirects=True);
+			# print("macos-arm: " +str(resp));
+			# z = zipfile.ZipFile(io.BytesIO(resp.content));
+			# z.extractall(release_path);
+			# os.rename(release_path+"/"+program_name+".dmg", release_path+"/"+program_name+"_"+version+"_macos_arm_"+date_str+".dmg");
 		if entry["name"] == "rc-"+program_name+"-gtk2.AppImage" and not found_linux_appimage_gtk2:
 			found_linux_appimage_gtk2 = True;
 			print("ask for: "+entry["archive_download_url"]);
