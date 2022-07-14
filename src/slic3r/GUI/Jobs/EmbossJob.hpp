@@ -192,8 +192,6 @@ public:
     UseSurfaceJob(UseSurfaceData &&input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &eptr) override;
-    // prepare multi volume input
-    static std::vector<indexed_triangle_set> transform_volumes(ModelVolume *mv);
 };
 
 } // namespace Slic3r::GUI
