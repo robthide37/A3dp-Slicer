@@ -467,7 +467,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
 //each SeamCandidate also contains pointer to shared Perimeter structure representing the polygon
 // if Custom Seam modifiers are present, oversamples the polygon if necessary to better fit user intentions
 void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const LayerRegion *region,
-        const GlobalModelInfo &global_model_info, PrintObjectSeamData::LayerSeams &result) {
+        bool arachne_generated, const GlobalModelInfo &global_model_info, PrintObjectSeamData::LayerSeams &result) {
     if (orig_polygon.size() == 0) {
         return;
     }
@@ -482,8 +482,8 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     std::vector<float> polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
             SeamPlacer::polygon_local_angles_arm_distance);
 
-    // resample smooth surfaces, so that alignment finds short path down, and does not create unnecesary curves
-    if (std::all_of(polygon_angles.begin(), polygon_angles.end(), [](float angle) {
+    // resample smooth surfaces from arachne, so that alignment finds short path down, and does not create unnecesary curves
+    if (arachne_generated && std::all_of(polygon_angles.begin(), polygon_angles.end(), [](float angle) {
     	return compute_angle_penalty(angle) > SeamPlacer::sharp_angle_penalty_snapping_threshold;
     })) {
     	float total_dist = std::accumulate(lengths.begin(), lengths.end(), 0.0f);
@@ -1069,12 +1069,14 @@ public:
 void SeamPlacer::gather_seam_candidates(const PrintObject *po,
         const SeamPlacerImpl::GlobalModelInfo &global_model_info, const SeamPosition configured_seam_preference) {
     using namespace SeamPlacerImpl;
+    bool arachne_generated = po->config().perimeter_generator == PerimeterGeneratorType::Arachne;
 
     PrintObjectSeamData &seam_data = m_seam_per_object.emplace(po, PrintObjectSeamData { }).first->second;
     seam_data.layers.resize(po->layer_count());
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
-            [po, configured_seam_preference, &global_model_info, &seam_data](tbb::blocked_range<size_t> r) {
+            [po, configured_seam_preference, arachne_generated, &global_model_info, &seam_data]
+			 (tbb::blocked_range<size_t> r) {
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
                     PrintObjectSeamData::LayerSeams &layer_seams = seam_data.layers[layer_idx];
                     const Layer *layer = po->get_layer(layer_idx);
@@ -1084,7 +1086,7 @@ void SeamPlacer::gather_seam_candidates(const PrintObject *po,
                     Polygons polygons = extract_perimeter_polygons(layer, configured_seam_preference, regions);
                     for (size_t poly_index = 0; poly_index < polygons.size(); ++poly_index) {
                         process_perimeter_polygon(polygons[poly_index], unscaled_z,
-                                regions[poly_index], global_model_info, layer_seams);
+                                regions[poly_index], arachne_generated, global_model_info, layer_seams);
                     }
                     auto functor = SeamCandidateCoordinateFunctor { layer_seams.points };
                     seam_data.layers[layer_idx].points_tree =
