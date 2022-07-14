@@ -109,9 +109,16 @@ static Emboss::OrthoProject create_projection_for_cut(
 
 TEST_CASE("CutSurface in 3mf", "[Emboss]")
 {
-    std::string path_to_3mf = "C:/Users/Filip Sykala/Downloads/EmbossFromMultiVolumes.3mf";
-    
-    int object_id      = 0;
+    //std::string path_to_3mf = "C:/Users/Filip Sykala/Downloads/EmbossFromMultiVolumes.3mf";
+    //int         object_id      = 0;
+    //int         text_volume_id = 2;
+
+    //std::string path_to_3mf = "C:/Users/Filip Sykala/Downloads/treefrog.3mf";    
+    //int object_id      = 0;
+    //int text_volume_id = 1;
+
+    std::string path_to_3mf = "C:/Users/Filip Sykala/Downloads/cube_test.3mf";    
+    int object_id      = 1;
     int text_volume_id = 2;
 
     Model model;

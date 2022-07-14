@@ -454,7 +454,6 @@ void store(const CutAOIs &aois, const CutMesh &mesh, const std::string &dir);
 void store(const SurfacePatches &patches, const std::string &dir);
 void store(const Vec3f &vertex, const Vec3f &normal, const std::string &file, float size = 2.f);
 void store(const ProjectionDistances &pds, const VCutAOIs &aois, const CutMeshes &meshes, const std::string &file, float width = 0.2f/* [in mm] */);
-void store(const SurfaceCuts &cut, const std::string &dir);
 void store(const SurfaceCut &cut, const std::string &file, const std::string &contour_dir);
 
 void store(const std::vector<indexed_triangle_set> &models, const std::string &obj_filename);
@@ -3082,10 +3081,9 @@ void priv::store(const CutMesh &mesh, const ReductionMap &reduction_map, const s
 
     for (VI reduction_from : mesh.vertices()) {
         VI reduction_to = reduction_map[reduction_from];
-        if (reduction_to != reduction_from) {
-            vertex_colors[reduction_from] = CGAL::Color{255, 0, 0};
-            vertex_colors[reduction_to] = CGAL::Color{0, 0, 255};
-        }
+        if (!reduction_to.is_valid()) continue;
+        vertex_colors[reduction_from] = CGAL::Color{255, 0, 0};
+        vertex_colors[reduction_to] = CGAL::Color{0, 0, 255};
     }
     
     CGAL::IO::write_OFF(off_file, mesh);
@@ -3337,21 +3335,21 @@ indexed_triangle_set priv::create_contour_its(
     return result;
 }
 
-void priv::store(const SurfaceCuts &cut, const std::string &dir) {
-    prepare_dir(dir);
-    for (const auto &c : cut) {
-        size_t index = &c - &cut.front();
-        std::string file  = dir + "cut" + std::to_string(index) + ".obj";
-        its_write_obj(c, file.c_str());
-        for (const auto& contour : c.contours) {
-            size_t c_index = &contour - &c.contours.front();
-            std::string c_file = dir + "cut" + std::to_string(index) + 
-                "contour" + std::to_string(c_index) + ".obj";
-            indexed_triangle_set c_its = create_contour_its(c, contour);
-            its_write_obj(c_its, c_file.c_str());
-        }
-    }
-}
+//void priv::store(const SurfaceCuts &cut, const std::string &dir) {
+//    prepare_dir(dir);
+//    for (const auto &c : cut) {
+//        size_t index = &c - &cut.front();
+//        std::string file  = dir + "cut" + std::to_string(index) + ".obj";
+//        its_write_obj(c, file.c_str());
+//        for (const auto& contour : c.contours) {
+//            size_t c_index = &contour - &c.contours.front();
+//            std::string c_file = dir + "cut" + std::to_string(index) + 
+//                "contour" + std::to_string(c_index) + ".obj";
+//            indexed_triangle_set c_its = create_contour_its(c, contour);
+//            its_write_obj(c_its, c_file.c_str());
+//        }
+//    }
+//}
 
 void priv::store(const SurfaceCut &cut, const std::string &file, const std::string &contour_dir) {
     prepare_dir(contour_dir);
