@@ -68,16 +68,10 @@ void GLGizmoHollow::data_changed()
 
 void GLGizmoHollow::on_render()
 {
-#if ENABLE_RAYCAST_PICKING
-    if (!m_cylinder.model.is_initialized()) {
-        indexed_triangle_set its = its_make_cylinder(1.0, 1.0);
-        m_cylinder.model.init_from(its);
-        m_cylinder.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
-    }
-#else
+#if !ENABLE_RAYCAST_PICKING
     if (!m_cylinder.is_initialized())
         m_cylinder.init_from(its_make_cylinder(1.0, 1.0));
-#endif // ENABLE_RAYCAST_PICKING
+#endif // !ENABLE_RAYCAST_PICKING
 
     const Selection& selection = m_parent.get_selection();
     const CommonGizmosDataObjects::SelectionInfo* sel_info = m_c->selection_info();
@@ -111,6 +105,9 @@ void GLGizmoHollow::on_render()
 void GLGizmoHollow::on_register_raycasters_for_picking()
 {
     assert(m_raycasters.empty());
+
+    init_cylinder_model();
+
     set_sla_auxiliary_volumes_picking_state(false);
 
     const CommonGizmosDataObjects::SelectionInfo* info = m_c->selection_info();
@@ -1098,6 +1095,16 @@ void GLGizmoHollow::on_set_hover_id()
         m_hover_id = -1;
 }
 
+#if ENABLE_RAYCAST_PICKING
+void GLGizmoHollow::init_cylinder_model()
+{
+    if (!m_cylinder.model.is_initialized()) {
+        indexed_triangle_set its = its_make_cylinder(1.0, 1.0);
+        m_cylinder.model.init_from(its);
+        m_cylinder.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
+    }
+}
+#endif // ENABLE_RAYCAST_PICKING
 
 
 
