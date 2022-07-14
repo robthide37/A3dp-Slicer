@@ -64,6 +64,16 @@ float gauss(float value, float mean_x_coord, float mean_value, float falloff_spe
     return mean_value * (std::exp(exponent) - 1.0f) / (std::exp(1.0f) - 1.0f);
 }
 
+float compute_angle_penalty(float ccw_angle) {
+    // This function is used:
+    // ((ℯ^(((1)/(x^(2)*3+1)))-1)/(ℯ-1))*1+((1)/(2+ℯ^(-x)))
+    // looks scary, but it is gaussian combined with sigmoid,
+    // so that concave points have much smaller penalty over convex ones
+    // https://github.com/prusa3d/PrusaSlicer/tree/master/doc/seam_placement/corner_penalty_function.png
+    return gauss(ccw_angle, 0.0f, 1.0f, 3.0f) +
+            1.0f / (2 + std::exp(-ccw_angle));
+}
+
 /// Coordinate frame
 class Frame {
 public:
@@ -474,7 +484,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
 
     // resample smooth surfaces, so that alignment finds short path down, and does not create unnecesary curves
     if (std::all_of(polygon_angles.begin(), polygon_angles.end(), [](float angle) {
-    	return fabs(angle) < SeamPlacer::sharp_angle_snapping_threshold;
+    	return compute_angle_penalty(angle) > SeamPlacer::sharp_angle_penalty_snapping_threshold;
     })) {
     	float total_dist = std::accumulate(lengths.begin(), lengths.end(), 0.0f);
     	float avg_dist = total_dist / float(lengths.size());
@@ -579,7 +589,8 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
                 break;
             }
             viable_points_indices.push_back(last_enforced_idx);
-            if (abs(result.points[last_enforced_idx].local_ccw_angle) > SeamPlacer::sharp_angle_snapping_threshold) {
+            if (compute_angle_penalty(result.points[last_enforced_idx].local_ccw_angle)
+            		< SeamPlacer::sharp_angle_penalty_snapping_threshold) {
                 orig_large_angle_points_indices.push_back(last_enforced_idx);
             }
             last_enforced_idx = next_index(last_enforced_idx);
@@ -844,16 +855,6 @@ struct SeamComparator {
 
     bool are_similar(const SeamCandidate &a, const SeamCandidate &b) const {
         return is_first_not_much_worse(a, b) && is_first_not_much_worse(b, a);
-    }
-
-    float compute_angle_penalty(float ccw_angle) const {
-        // This function is used:
-        // ((ℯ^(((1)/(x^(2)*3+1)))-1)/(ℯ-1))*1+((1)/(2+ℯ^(-x)))
-        // looks scary, but it is gaussian combined with sigmoid,
-        // so that concave points have much smaller penalty over convex ones
-        // https://github.com/prusa3d/PrusaSlicer/tree/master/doc/seam_placement/corner_penalty_function.png
-        return gauss(ccw_angle, 0.0f, 1.0f, 3.0f) +
-                1.0f / (2 + std::exp(-ccw_angle));
     }
 
     float weight(const SeamCandidate &a) const {
@@ -1390,8 +1391,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 last_point_pos = pos;
                 observations[index] = pos.head<2>();
                 observation_points[index] = pos.z();
-                weights[index] = std::min(1.0f,
-                        comparator.weight(layers[seam_string[index].first].points[seam_string[index].second]));
+                weights[index] = comparator.weight(layers[seam_string[index].first].points[seam_string[index].second]);
             }
 
             // Curve Fitting
@@ -1404,14 +1404,14 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const auto &pair = seam_string[index];
                 const float t =
-                        abs(layers[pair.first].points[pair.second].local_ccw_angle)
-                                > SeamPlacer::sharp_angle_snapping_threshold
-                                ? 1.0 : 0.0f;
+                        compute_angle_penalty(layers[pair.first].points[pair.second].local_ccw_angle)
+                                < SeamPlacer::sharp_angle_penalty_snapping_threshold
+                                ? 0.8f : 0.0f;
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
                 Vec2f fitted_pos = curve.get_fitted_value(current_pos.z());
 
                 //interpolate between current and fitted position, prefer current pos for large weights.
-                Vec3f final_position = t * current_pos + (1 - t) * to_3d(fitted_pos, current_pos.z());
+                Vec3f final_position = t * current_pos + (1.0f - t) * to_3d(fitted_pos, current_pos.z());
 
                 Perimeter &perimeter = layers[pair.first].points[pair.second].perimeter;
                 perimeter.seam_index = pair.second;

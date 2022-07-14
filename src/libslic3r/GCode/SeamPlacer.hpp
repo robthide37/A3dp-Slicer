@@ -128,7 +128,8 @@ public:
 
     // arm length used during angles computation
     static constexpr float polygon_local_angles_arm_distance = 0.3f;
-    static constexpr float sharp_angle_snapping_threshold = (60.0f / 180.0f) * float(PI);
+    // value for angles with penalty lower than this threshold - such angles will be snapped to their original position instead of spline interpolated position
+    static constexpr float sharp_angle_penalty_snapping_threshold = 0.6f;
 
     // max tolerable distance from the previous layer is overhang_distance_tolerance_factor * flow_width
     static constexpr float overhang_distance_tolerance_factor = 0.5f;
