@@ -2106,13 +2106,14 @@ BoundingBoxf3 bounding_box(const SurfacePatch &ecut);
 /// Create patch
 /// </summary>
 /// <param name="fis">Define patch faces</param>
-/// <param name="mesh">Source of fis</param>
+/// <param name="mesh">Source of fis
+/// NOTE: Need temporary add property map for convert vertices</param>
 /// <param name="rmap">Options to reduce vertices from fis.
 /// NOTE: Used for skip vertices made by diagonal edge in rectangle of shape side</param>
 /// <returns>Patch</returns>
 SurfacePatch create_surface_patch(const std::vector<FI> &fis,
-                                  const CutMesh         &mesh,
-                                  const ReductionMap *rmap = nullptr);
+                                  /*const*/ CutMesh     &mesh,
+                                  const ReductionMap    *rmap = nullptr);
 
 } // namespace priv
 
@@ -2291,16 +2292,16 @@ BoundingBoxf3 priv::bounding_box(const SurfacePatch &ecut) {
 }
 
 priv::SurfacePatch priv::create_surface_patch(const std::vector<FI> &fis,
-                                              const CutMesh         &mesh,
+                                              /* const */ CutMesh   &mesh,
                                               const ReductionMap    *rmap)
 {
-    std::vector<bool> is_counted(mesh.vertices().size(), {false});
+    auto is_counted = mesh.add_property_map<VI, bool>("v:is_counted").first;
     uint32_t count_vertices = 0;
     if (rmap == nullptr) {
         for (FI fi : fis) 
             for (VI vi : mesh.vertices_around_face(mesh.halfedge(fi))) 
-                if (!is_counted[vi.idx()]) { 
-                    is_counted[vi.idx()] = true;
+                if (!is_counted[vi]) { 
+                    is_counted[vi] = true;
                     ++count_vertices;
                 }
     } else {
@@ -2308,12 +2309,13 @@ priv::SurfacePatch priv::create_surface_patch(const std::vector<FI> &fis,
             for (VI vi : mesh.vertices_around_face(mesh.halfedge(fi))) {
                 // Will vertex be reduced?
                 if ((*rmap)[vi].is_valid()) continue;
-                if (!is_counted[vi.idx()]) {
-                    is_counted[vi.idx()] = true;
+                if (!is_counted[vi]) {
+                    is_counted[vi] = true;
                     ++count_vertices;
                 }
             }        
     }
+    mesh.remove_property_map(is_counted);
 
     uint32_t count_faces = fis.size();    
     // IMPROVE: Value is greater than neccessary, count edges used twice
@@ -2322,21 +2324,20 @@ priv::SurfacePatch priv::create_surface_patch(const std::vector<FI> &fis,
     CutMesh cm;
     cm.reserve(count_vertices, count_edges, count_faces);
 
-    // vertex conversion function
-    constexpr uint32_t def_val = std::numeric_limits<uint32_t>::max();       
-    std::vector<uint32_t> v_cvt(mesh.vertices().size(), {def_val});
+    // vertex conversion function from mesh VI to result VI
+    CvtVI2VI mesh2result = mesh.add_property_map<VI,VI>("v:mesh2result").first;
 
     if (rmap == nullptr) {
         for (FI fi : fis) {
             std::array<VI, 3> t;
             int index = 0;
             for (VI vi : mesh.vertices_around_face(mesh.halfedge(fi))) {
-                uint32_t &cvt = v_cvt[vi.idx()];
-                if (cvt == def_val) {
-                    cvt = cm.vertices().size(); 
+                VI &vi_cvt = mesh2result[vi];
+                if (!vi_cvt.is_valid()) {
+                    vi_cvt = VI(cm.vertices().size());
                     cm.add_vertex(mesh.point(vi));
                 }
-                t[index++] = VI(cvt);
+                t[index++] = vi_cvt;
             }
             cm.add_face(t[0], t[1], t[2]);
         }
@@ -2351,14 +2352,12 @@ priv::SurfacePatch priv::create_surface_patch(const std::vector<FI> &fis,
                     exist_reduction = true;
                     vi = vi_r;
                 }
-
-                assert(vi.idx() < v_cvt.size());
-                uint32_t &cvt = v_cvt[vi.idx()];
-                if (cvt == def_val) {
-                    cvt = cm.vertices().size();
+                VI &vi_cvt = mesh2result[vi];
+                if (!vi_cvt.is_valid()) {
+                    vi_cvt = VI(cm.vertices().size());
                     cm.add_vertex(mesh.point(vi));
                 }
-                t[index++] = VI(cvt);
+                t[index++] = vi_cvt;
             }
 
             // prevent add reduced triangle
@@ -2371,24 +2370,22 @@ priv::SurfacePatch priv::create_surface_patch(const std::vector<FI> &fis,
             cm.add_face(t[0], t[1], t[2]);
         }
     }
+    
     assert(count_vertices == cm.vertices().size());
     assert((rmap == nullptr && count_faces == cm.faces().size()) ||
            (rmap != nullptr && count_faces >= cm.faces().size()));
     assert(count_edges >= cm.edges().size());
     
-
     // convert VI from this patch to source VI, when exist
     CvtVI2VI cvt = cm.add_property_map<VI, VI>(patch_source_name).first;
     // vi_s .. VertexIndex into mesh (source)
     // vi_d .. new VertexIndex in cm (destination)
-    for (uint32_t vi_s = 0; vi_s < v_cvt.size(); ++vi_s) { 
-        uint32_t vi_d = v_cvt[vi_s];
-        if (vi_d == def_val) continue;
-        // check only one conversion
-        assert(!cvt[VI(vi_d)].is_valid());
-        cvt[VI(vi_d)] = VI(vi_s);
+    for (VI vi_s : mesh.vertices()) { 
+        VI vi_d = mesh2result[vi_s];
+        if (!vi_d.is_valid()) continue;
+        cvt[vi_d] = vi_s;
     }
-
+    mesh.remove_property_map(mesh2result);
     return {std::move(cm)};
 }
 
@@ -2458,12 +2455,13 @@ using PatchNumber = CutMesh::Property_map<FI, size_t>;
 /// </summary>
 /// <param name="n">Order number of patch to separate</param>
 /// <param name="patch_number">Number for each triangle</param>
-/// <param name="patch">Original patch</param>
+/// <param name="patch">Original patch
+/// NOTE: Can't be const. For indexing vetices need temporary add property map</param>
 /// <param name="cvt_from">conversion map</param>
 /// <returns>Just separated patch</returns>
 SurfacePatch separate_patch(size_t              n,
                             const PatchNumber  &patch_number,
-                            const SurfacePatch &patch,
+                            /* const*/ SurfacePatch &patch,
                             const CvtVI2VI     &cvt_from);
 
 /// <summary>
@@ -2576,7 +2574,7 @@ uint32_t priv::get_shape_point_index(const CutAOI &cut, const CutMesh &model)
 
 priv::SurfacePatch priv::separate_patch(size_t              n,
                                         const PatchNumber  &patch_number,
-                                        const SurfacePatch &patch,
+                                        SurfacePatch &patch,
                                         const CvtVI2VI     &cvt_from)
 {
     std::vector<FI> fis;
@@ -2694,7 +2692,7 @@ priv::SurfacePatches priv::diff_models(VCutAOIs             &cuts,
 
         for (size_t cut_index = 0; cut_index < model_cuts.size(); ++cut_index, ++index) {
             const CutAOI &cut = model_cuts[cut_index];
-            SurfacePatch patch = create_surface_patch(cut.first, cut_model, &vertex_reduction_map);
+            SurfacePatch patch = create_surface_patch(cut.first, cut_model_, &vertex_reduction_map);
             patch.bb = bbs[index];
             patch.aoi_id = index;
             patch.model_id = model_index;
@@ -2902,10 +2900,6 @@ SurfaceCut priv::patch2cut(SurfacePatch &patch)
     SurfaceCut sc;
     sc.indices.reserve(indices_size);
     sc.vertices.reserve(vertices_size);
-
-    std::vector<uint32_t> v_cvt;
-    v_cvt.reserve(vertices_size);
-
     for (VI vi : mesh.vertices()) {
         // vi order is is not sorted
         // assert(vi.idx() == sc.vertices.size());
@@ -2944,7 +2938,6 @@ SurfaceCut priv::patch2cut(SurfacePatch &patch)
 
     // Not neccessary, clean and free memory
     mesh.remove_property_map(convert_map);
-
     return sc;
 }
 
