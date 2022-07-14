@@ -455,7 +455,6 @@ void store(const SurfacePatches &patches, const std::string &dir);
 void store(const Vec3f &vertex, const Vec3f &normal, const std::string &file, float size = 2.f);
 void store(const ProjectionDistances &pds, const VCutAOIs &aois, const CutMeshes &meshes, const std::string &file, float width = 0.2f/* [in mm] */);
 void store(const SurfaceCut &cut, const std::string &file, const std::string &contour_dir);
-
 void store(const std::vector<indexed_triangle_set> &models, const std::string &obj_filename);
 void store(const std::vector<CutMesh>&models, const std::string &dir);
 void store(const Emboss::IProjection &projection, const Point &point_to_project, float projection_ratio, const std::string &obj_filename);
@@ -2452,14 +2451,12 @@ using PatchNumber = CutMesh::Property_map<FI, size_t>;
 /// <summary>
 /// Separate triangles singned with number n
 /// </summary>
-/// <param name="n">Order number of patch to separate</param>
-/// <param name="patch_number">Number for each triangle</param>
+/// <param name="fis">Face indices owned by separate patch</param>
 /// <param name="patch">Original patch
 /// NOTE: Can't be const. For indexing vetices need temporary add property map</param>
 /// <param name="cvt_from">conversion map</param>
 /// <returns>Just separated patch</returns>
-SurfacePatch separate_patch(size_t              n,
-                            const PatchNumber  &patch_number,
+SurfacePatch separate_patch(const std::vector<FI>   &fis,
                             /* const*/ SurfacePatch &patch,
                             const CvtVI2VI     &cvt_from);
 
@@ -2571,14 +2568,11 @@ uint32_t priv::get_shape_point_index(const CutAOI &cut, const CutMesh &model)
     return 0;
 }
 
-priv::SurfacePatch priv::separate_patch(size_t              n,
-                                        const PatchNumber  &patch_number,
+priv::SurfacePatch priv::separate_patch(const std::vector<FI>& fis,
                                         SurfacePatch &patch,
                                         const CvtVI2VI     &cvt_from)
 {
-    std::vector<FI> fis;
-    for (FI fi_cm : patch.mesh.faces())
-        if (patch_number[fi_cm] == n) fis.push_back(fi_cm);
+    assert(patch.mesh.is_valid());    
     SurfacePatch patch_new = create_surface_patch(fis, patch.mesh);
     patch_new.bb           = bounding_box(patch_new.mesh);
     patch_new.aoi_id       = patch.aoi_id;
@@ -2595,52 +2589,61 @@ priv::SurfacePatch priv::separate_patch(size_t              n,
 
 void priv::divide_patch(size_t i, SurfacePatches &patches) {
     SurfacePatch &patch = patches[i];
-    assert(patch.just_cliped);
+    assert(patch.just_cliped); 
     patch.just_cliped = false;
 
     constexpr size_t def_value = std::numeric_limits<size_t>::max();
 
     CutMesh& cm = patch.mesh;
+    assert(!cm.faces().empty());
     std::string patch_number_name = "f:patch_number";
-    PatchNumber patch_number = cm.add_property_map<FI, size_t>(patch_number_name, def_value).first;
+    CutMesh::Property_map<FI,bool> is_processed = cm.add_property_map<FI, bool>(patch_number_name, false).first;
+    
+    const CvtVI2VI& cvt_from = patch.mesh.property_map<VI, VI>(patch_source_name).first;
 
-    size_t number = 0;
+    std::vector<FI> fis;
+    fis.reserve(cm.faces().size());
+
+    SurfacePatches  new_patches;
     std::vector<FI> queue;
     // IMPROVE: create groups around triangles and than connect groups
     for (FI fi_cm : cm.faces()) {
-        if (patch_number[fi_cm] != def_value) continue;
+        if (is_processed[fi_cm]) continue;
         assert(queue.empty());
         queue.push_back(fi_cm);
+        if (!fis.empty()) {
+            // Be carefull after push to patches,
+            // all ref on patch contain non valid values
+            SurfacePatch patch_n = separate_patch(fis, patches[i], cvt_from);
+            new_patches.emplace_back(patch_n);
+            fis.clear();
+        }
         // flood fill from triangle fi_cm to surrounding
         do {
             FI fi_q = queue.back();
             queue.pop_back();
-            if (patch_number[fi_q] != def_value) { 
-                assert(patch_number[fi_q] == number);
-                continue; 
-            }
-            patch_number[fi_q] = number;
+            if (is_processed[fi_q]) continue;             
+            is_processed[fi_q] = true;
+            fis.push_back(fi_q);
             HI hi = cm.halfedge(fi_q);
             for (FI fi : cm.faces_around_face(hi)) {
                 // by documentation The face descriptor may be the null face, and it may be several times the same face descriptor.
                 if (!fi.is_valid()) continue;
-                if (patch_number[fi] == def_value) queue.push_back(fi);
+                if (!is_processed[fi]) queue.push_back(fi);
             }
         } while (!queue.empty());
-        ++number;
     }
+    cm.remove_property_map(is_processed);
+    assert(!fis.empty());
 
     // speed up for only one patch - no dividing (the most common)
-    if (number == 1) {
-        cm.remove_property_map(patch_number);
+    if (new_patches.empty()) {
         patch.bb = bounding_box(cm);
         return;
+    } else {
+        patch = separate_patch(fis, patch, cvt_from);
+        patches.insert(patches.end(), new_patches.begin(), new_patches.end());
     }
-
-    const CvtVI2VI& cvt_from = patch.mesh.property_map<VI, VI>(patch_source_name).first;
-    for (size_t n = 1; n < number; n++)
-        patches.push_back(separate_patch(n, patch_number, patch, cvt_from));
-    patch = separate_patch(0, patch_number, patch, cvt_from);
 }
 
 void priv::collect_open_edges(SurfacePatches &patches) {
@@ -2693,7 +2696,7 @@ priv::SurfacePatches priv::diff_models(VCutAOIs             &cuts,
             const CutAOI &cut = model_cuts[cut_index];
             SurfacePatch patch = create_surface_patch(cut.first, cut_model_, &vertex_reduction_map);
             patch.bb = bbs[index];
-            patch.aoi_id = index;
+            patch.aoi_id   = cut_index;
             patch.model_id = model_index;
             patch.shape_id = get_shape_point_index(cut, cut_model);
 
@@ -2998,6 +3001,7 @@ void prepare_dir(const std::string &dir){
 int reduction_order = 0;
 int filled_order    = 0;
 int constrained_order = 0;
+int diff_patch_order  = 0;
 
 } // namespace priv
 
@@ -3008,6 +3012,7 @@ void priv::initialize_store(const std::string& dir)
     reduction_order   = 0;
     filled_order      = 0;
     constrained_order = 0;
+    diff_patch_order  = 0;
 }
 
 void priv::store(const Vec3f       &vertex,
