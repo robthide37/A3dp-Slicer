@@ -3350,13 +3350,14 @@ bool _3MF_Exporter::_add_custom_gcode_per_print_z_file_to_archive( mz_zip_archiv
 //FIXME provide a version of PrusaSlicer that stored the project file (3MF).
 static void handle_legacy_project_loaded(unsigned int version_project_file, DynamicPrintConfig& config)
 {
-    if (! config.has("brim_separation")) {
-        if (auto *opt_elephant_foot   = config.option<ConfigOptionFloat>("first_layer_size_compensation", false); opt_elephant_foot) {
-            // Conversion from older PrusaSlicer which applied brim separation equal to elephant foot compensation.
-            auto *opt_brim_separation = config.option<ConfigOptionFloat>("brim_separation", true);
-            opt_brim_separation->value = opt_elephant_foot->value;
-        }
-    }
+    // SuSi: don't do that. It's hidden behavior.
+    //if (! config.has("brim_separation")) {
+    //    if (auto *opt_elephant_foot   = config.option<ConfigOptionFloat>("first_layer_size_compensation", false); opt_elephant_foot) {
+    //        // Conversion from older PrusaSlicer which applied brim separation equal to elephant foot compensation.
+    //        auto *opt_brim_separation = config.option<ConfigOptionFloat>("brim_separation", true);
+    //        opt_brim_separation->value = -opt_elephant_foot->value;
+    //    }
+    //}
 }
 
 bool is_project_3mf(const std::string& filename)

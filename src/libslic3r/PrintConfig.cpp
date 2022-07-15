@@ -6979,6 +6979,16 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     }
 
     if (! print_config_def.has(opt_key)) {
+        //check the aliases
+        for(const auto& entry : print_config_def.options) {
+            for (const std::string& alias : entry.second.aliases) {
+                if (alias == opt_key) {
+                    // translate
+                    opt_key = entry.first;
+                    return;
+                }
+            }
+        }
         opt_key = "";
         return;
     }
