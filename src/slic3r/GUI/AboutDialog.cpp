@@ -124,7 +124,9 @@ void CopyrightsDialog::fill_entries()
         { "lib_fts"
                             , "Forrest Smith"                               , "https://www.forrestthewoods.com/" },
         { "fast_float"
-                            , "Daniel Lemire, João Paulo Magalhaes and contributors", "https://github.com/fastfloat/fast_float" }
+                            , "Daniel Lemire, João Paulo Magalhaes and contributors", "https://github.com/fastfloat/fast_float" },
+        { "CuraEngine (Arachne, etc.)"
+                            , "Ultimaker", "https://github.com/Ultimaker/CuraEngine" }
     };
 }
 
@@ -151,7 +153,7 @@ wxString CopyrightsDialog::get_html_text()
         , text_clr_str
         , header_str);
 
-    for (auto& entry : m_entries) {
+    for (const auto& entry : m_entries) {
         text += wxString::Format(
                     "<a href=\"%s\">%s</a><br/>"
                     , entry.link, entry.lib_name);
