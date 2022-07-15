@@ -1747,8 +1747,8 @@ msgstr "Überbrückung"
 msgid "Bridge flow ratio"
 msgstr "Brückenflussverhältnis"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:246 src/libslic3r/ExtrusionEntity.cpp:325
-#: src/libslic3r/ExtrusionEntity.cpp:354
+#: src/slic3r/GUI/GUI_Preview.cpp:246 src/libslic3r/ExtrusionEntity.cpp:337
+#: src/libslic3r/ExtrusionEntity.cpp:366
 msgid "Bridge infill"
 msgstr "Überbrückungs-Infill"
 
@@ -2879,7 +2879,7 @@ msgid "Current version:"
 msgstr "Aktuelle Version:"
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:81 src/slic3r/GUI/GUI_Preview.cpp:252
-#: src/libslic3r/ExtrusionEntity.cpp:331 src/libslic3r/ExtrusionEntity.cpp:366
+#: src/libslic3r/ExtrusionEntity.cpp:343 src/libslic3r/ExtrusionEntity.cpp:378
 msgid "Custom"
 msgstr "Benutzerdefiniert"
 
@@ -4349,8 +4349,8 @@ msgstr "Belichtung"
 msgid "Exposure time"
 msgstr "Belichtungszeit"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:240 src/libslic3r/ExtrusionEntity.cpp:319
-#: src/libslic3r/ExtrusionEntity.cpp:342
+#: src/slic3r/GUI/GUI_Preview.cpp:240 src/libslic3r/ExtrusionEntity.cpp:331
+#: src/libslic3r/ExtrusionEntity.cpp:354
 msgid "External perimeter"
 msgstr "Außenkontur"
 
@@ -5113,8 +5113,8 @@ msgstr "GUI"
 msgid "Gallery"
 msgstr "Gallerie"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:247 src/libslic3r/ExtrusionEntity.cpp:326
-#: src/libslic3r/ExtrusionEntity.cpp:356 src/libslic3r/PrintConfig.cpp:1320
+#: src/slic3r/GUI/GUI_Preview.cpp:247 src/libslic3r/ExtrusionEntity.cpp:338
+#: src/libslic3r/ExtrusionEntity.cpp:368 src/libslic3r/PrintConfig.cpp:1320
 msgid "Gap fill"
 msgstr "Lückenfüllung"
 
@@ -6380,8 +6380,8 @@ msgstr "Schnittstellenshells"
 msgid "Internal error: %1%"
 msgstr "Interner Fehler: %1%"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:242 src/libslic3r/ExtrusionEntity.cpp:321
-#: src/libslic3r/ExtrusionEntity.cpp:346
+#: src/slic3r/GUI/GUI_Preview.cpp:242 src/libslic3r/ExtrusionEntity.cpp:333
+#: src/libslic3r/ExtrusionEntity.cpp:358
 msgid "Internal infill"
 msgstr "Internes Infill"
 
@@ -6418,8 +6418,8 @@ msgid "Invalid pinhead diameter"
 msgstr "Ungültiger Nadelkopfdurchmesser"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:129 src/slic3r/GUI/GUI_Preview.cpp:245
-#: src/slic3r/GUI/Tab.cpp:1513 src/libslic3r/ExtrusionEntity.cpp:324
-#: src/libslic3r/ExtrusionEntity.cpp:352 src/libslic3r/PrintConfig.cpp:1555
+#: src/slic3r/GUI/Tab.cpp:1513 src/libslic3r/ExtrusionEntity.cpp:336
+#: src/libslic3r/ExtrusionEntity.cpp:364 src/libslic3r/PrintConfig.cpp:1555
 #: src/libslic3r/PrintConfig.cpp:1561 src/libslic3r/PrintConfig.cpp:1575
 #: src/libslic3r/PrintConfig.cpp:1585 src/libslic3r/PrintConfig.cpp:1593
 #: src/libslic3r/PrintConfig.cpp:1595
@@ -6745,6 +6745,18 @@ msgstr ""
 #: src/libslic3r/PrintConfig.cpp:1180
 msgid "Lightning"
 msgstr "Lightning"
+
+#: resources/data/hints.ini: [hint:Lightning infill]
+msgid ""
+"Lightning infill\n"
+"Did you know that you can use the Lightning infill to support only the top "
+"surfaces, save a lot of the filament, and decrease the print time? Read more "
+"in the documentation."
+msgstr ""
+"Lightning Infill\n"
+"Wussten Sie, dass Sie das Lightning Infill verwenden können, um nur die "
+"Oberseiten zu unterstützen, viel Filament zu sparen und die Druckzeit zu "
+"verkürzen? Lesen Sie mehr in der Dokumentation."
 
 #: src/libslic3r/PrintConfig.cpp:2293
 msgid "Limited"
@@ -7498,7 +7510,7 @@ msgstr "Vertikal spiegeln"
 msgid "Mismatched type of print host: %s"
 msgstr "Nicht übereinstimmender Typ des Druckhosts: %s"
 
-#: src/libslic3r/ExtrusionEntity.cpp:332 src/libslic3r/ExtrusionEntity.cpp:368
+#: src/libslic3r/ExtrusionEntity.cpp:344 src/libslic3r/ExtrusionEntity.cpp:380
 msgid "Mixed"
 msgstr "Gemischt"
 
@@ -8499,8 +8511,8 @@ msgstr "Äußere Wände"
 msgid "Overflow"
 msgstr "Überlauf"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:241 src/libslic3r/ExtrusionEntity.cpp:320
-#: src/libslic3r/ExtrusionEntity.cpp:344
+#: src/slic3r/GUI/GUI_Preview.cpp:241 src/libslic3r/ExtrusionEntity.cpp:332
+#: src/libslic3r/ExtrusionEntity.cpp:356
 msgid "Overhang perimeter"
 msgstr "Überhängende Kontur"
 
@@ -8818,8 +8830,8 @@ msgstr ""
 "Die Durchführung der Desktop-Integration ist fehlgeschlagen, da das "
 "Anwendungsverzeichnis nicht gefunden wurde."
 
-#: src/slic3r/GUI/GUI_Preview.cpp:239 src/libslic3r/ExtrusionEntity.cpp:318
-#: src/libslic3r/ExtrusionEntity.cpp:340
+#: src/slic3r/GUI/GUI_Preview.cpp:239 src/libslic3r/ExtrusionEntity.cpp:330
+#: src/libslic3r/ExtrusionEntity.cpp:352
 msgid "Perimeter"
 msgstr "Kontur"
 
@@ -11497,7 +11509,7 @@ msgstr "Größe und Koordinaten"
 msgid "Size in X and Y of the rectangular plate."
 msgstr "Größe der rechteckigen Platte in X und Y."
 
-#: src/slic3r/GUI/Tab.cpp:1535 src/libslic3r/ExtrusionEntity.cpp:358
+#: src/slic3r/GUI/Tab.cpp:1535 src/libslic3r/ExtrusionEntity.cpp:370
 msgid "Skirt"
 msgstr "Schürze"
 
@@ -11515,8 +11527,8 @@ msgstr "Schürze und Rand"
 msgid "Skirt height"
 msgstr "Schürzenhöhe"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:248 src/libslic3r/ExtrusionEntity.cpp:327
-#: src/libslic3r/ExtrusionEntity.cpp:358
+#: src/slic3r/GUI/GUI_Preview.cpp:248 src/libslic3r/ExtrusionEntity.cpp:339
+#: src/libslic3r/ExtrusionEntity.cpp:370
 msgid "Skirt/Brim"
 msgstr "Schürze/Rand"
 
@@ -11703,8 +11715,8 @@ msgstr "Nahtlos"
 msgid "Software &Releases"
 msgstr "Software &Release"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:243 src/libslic3r/ExtrusionEntity.cpp:322
-#: src/libslic3r/ExtrusionEntity.cpp:348 src/libslic3r/PrintConfig.cpp:2360
+#: src/slic3r/GUI/GUI_Preview.cpp:243 src/libslic3r/ExtrusionEntity.cpp:334
+#: src/libslic3r/ExtrusionEntity.cpp:360 src/libslic3r/PrintConfig.cpp:2360
 #: src/libslic3r/PrintConfig.cpp:2372
 msgid "Solid infill"
 msgstr "Massives Infill"
@@ -12214,8 +12226,8 @@ msgstr "Stützkopf"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:56 src/slic3r/GUI/GUI_Factories.cpp:131
 #: src/slic3r/GUI/GUI_Preview.cpp:249 src/slic3r/GUI/Tab.cpp:1547
-#: src/slic3r/GUI/Tab.cpp:1549 src/libslic3r/ExtrusionEntity.cpp:328
-#: src/libslic3r/ExtrusionEntity.cpp:360 src/libslic3r/PrintConfig.cpp:669
+#: src/slic3r/GUI/Tab.cpp:1549 src/libslic3r/ExtrusionEntity.cpp:340
+#: src/libslic3r/ExtrusionEntity.cpp:372 src/libslic3r/PrintConfig.cpp:669
 #: src/libslic3r/PrintConfig.cpp:2063 src/libslic3r/PrintConfig.cpp:2072
 #: src/libslic3r/PrintConfig.cpp:2081 src/libslic3r/PrintConfig.cpp:2091
 #: src/libslic3r/PrintConfig.cpp:2100 src/libslic3r/PrintConfig.cpp:2522
@@ -12234,8 +12246,8 @@ msgstr "Stützkopf"
 msgid "Support material"
 msgstr "Stützmaterial"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:250 src/libslic3r/ExtrusionEntity.cpp:329
-#: src/libslic3r/ExtrusionEntity.cpp:362 src/libslic3r/PrintConfig.cpp:2704
+#: src/slic3r/GUI/GUI_Preview.cpp:250 src/libslic3r/ExtrusionEntity.cpp:341
+#: src/libslic3r/ExtrusionEntity.cpp:374 src/libslic3r/PrintConfig.cpp:2704
 msgid "Support material interface"
 msgstr "Schnittstellenmaterial zum Stützmaterial"
 
@@ -14306,8 +14318,8 @@ msgstr "Oben ist offen."
 msgid "Top shell is %1% mm thick for layer height %2% mm."
 msgstr "Die obere Schale ist %1% mm stark für eine Schichthöhe von %2% mm."
 
-#: src/slic3r/GUI/GUI_Preview.cpp:244 src/libslic3r/ExtrusionEntity.cpp:323
-#: src/libslic3r/ExtrusionEntity.cpp:350 src/libslic3r/PrintConfig.cpp:2857
+#: src/slic3r/GUI/GUI_Preview.cpp:244 src/libslic3r/ExtrusionEntity.cpp:335
+#: src/libslic3r/ExtrusionEntity.cpp:362 src/libslic3r/PrintConfig.cpp:2857
 #: src/libslic3r/PrintConfig.cpp:2870
 msgid "Top solid infill"
 msgstr "Oberes massives Infill"
@@ -14517,7 +14529,7 @@ msgstr ""
 "Aktionen auf einmal rückgängig zu machen oder wiederherzustellen?"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:28
-#: src/slic3r/GUI/GUI_Preview.cpp:238 src/libslic3r/ExtrusionEntity.cpp:317
+#: src/slic3r/GUI/GUI_Preview.cpp:238 src/libslic3r/ExtrusionEntity.cpp:329
 msgid "Unknown"
 msgstr "Unbekannt"
 
@@ -15210,7 +15222,7 @@ msgid "Wipe options"
 msgstr "Wischoptionen"
 
 #: src/slic3r/GUI/GUI_Preview.cpp:251 src/slic3r/GUI/Tab.cpp:1631
-#: src/libslic3r/ExtrusionEntity.cpp:330 src/libslic3r/ExtrusionEntity.cpp:364
+#: src/libslic3r/ExtrusionEntity.cpp:342 src/libslic3r/ExtrusionEntity.cpp:376
 msgid "Wipe tower"
 msgstr "Reinigungsturm"
 

@@ -15,8 +15,8 @@ template<int Dimension, typename NumberType>
 struct PolynomialCurve {
     Eigen::MatrixXf coefficients;
 
-    Vec3f get_fitted_value(const NumberType value) const {
-        auto result = Vec<Dimension, NumberType>::Zero();
+    Vec<Dimension, NumberType> get_fitted_value(const NumberType& value) const {
+        Vec<Dimension, NumberType> result = Vec<Dimension, NumberType>::Zero();
         size_t order = this->coefficients.rows() - 1;
         auto x = NumberType(1.);
         for (size_t index = 0; index < order + 1; ++index, x *= value)

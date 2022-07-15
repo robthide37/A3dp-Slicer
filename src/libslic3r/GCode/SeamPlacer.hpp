@@ -115,17 +115,16 @@ public:
 
     // arm length used during angles computation
     static constexpr float polygon_local_angles_arm_distance = 0.3f;
-    static constexpr float sharp_angle_snapping_threshold = 0.3f * float(PI);
+    // value for angles with penalty lower than this threshold - such angles will be snapped to their original position instead of spline interpolated position
+    static constexpr float sharp_angle_penalty_snapping_threshold = 0.6f;
 
     // max tolerable distance from the previous layer is overhang_distance_tolerance_factor * flow_width
     static constexpr float overhang_distance_tolerance_factor = 0.5f;
 
     // determines angle importance compared to visibility ( neutral value is 1.0f. )
     static constexpr float angle_importance_aligned = 0.6f;
-    static constexpr float angle_importance_nearest = 1.0f; // use much higher angle importance for nearest mode, to combat the visiblity info noise
+    static constexpr float angle_importance_nearest = 1.0f; // use much higher angle importance for nearest mode, to combat the visibility info noise
 
-    // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
-    static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
     // For long polygon sides, if they are close to the custom seam drawings, they are oversampled with this step size
     static constexpr float enforcer_oversampling_distance = 0.2f;
 
@@ -135,9 +134,9 @@ public:
     // seam_align_tolerable_dist - if next layer closest point is too far away, break aligned string
     static constexpr float seam_align_tolerable_dist = 1.0f;
     // minimum number of seams needed in cluster to make alignment happen
-    static constexpr size_t seam_align_minimum_string_seams = 10;
-    // points covered by spline; determines number of splines for the given string
-    static constexpr size_t seam_align_seams_per_segment = 16;
+    static constexpr size_t seam_align_minimum_string_seams = 6;
+    // millimeters covered by spline; determines number of splines for the given string
+    static constexpr size_t seam_align_mm_per_segment = 4.0f;
 
     //The following data structures hold all perimeter points for all PrintObject.
     std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
@@ -156,12 +155,11 @@ private:
     std::vector<std::pair<size_t, size_t>> find_seam_string(const PrintObject *po,
             std::pair<size_t, size_t> start_seam,
             const SeamPlacerImpl::SeamComparator &comparator,
-            std::optional<std::pair<size_t, size_t>> &out_best_moved_seam,
-            size_t& out_moved_seams_count) const;
+            float& string_weight) const;
     std::optional<std::pair<size_t, size_t>> find_next_seam_in_layer(
             const std::vector<PrintObjectSeamData::LayerSeams> &layers,
-            const std::pair<size_t, size_t> &prev_point_index,
-            const size_t layer_idx, const float slice_z,
+            const Vec3f& projected_position,
+            const size_t layer_idx, const float max_distance,
             const SeamPlacerImpl::SeamComparator &comparator) const;
 };
 
