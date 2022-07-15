@@ -976,7 +976,10 @@ void WipeTower::toolchange_Unload(
         }
     }
 
-    writer.disable_linear_advance();
+    // Disable linear/pressure advance for ramming, as it can mess up the ramming procedure
+    if (i < m_filpar[m_current_tool].ramming_speed.size()) {
+        writer.disable_linear_advance();
+    }
 
     // now the ramming itself:
     while (i < m_filpar[m_current_tool].ramming_speed.size())
