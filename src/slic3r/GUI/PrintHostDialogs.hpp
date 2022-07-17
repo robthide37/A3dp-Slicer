@@ -108,6 +108,7 @@ private:
     EventGuard on_progress_evt;
     EventGuard on_error_evt;
     EventGuard on_cancel_evt;
+    EventGuard on_resolve_evt;
 
     JobState get_state(int idx);
     void set_state(int idx, JobState);
@@ -115,6 +116,7 @@ private:
     void on_progress(Event&);
     void on_error(Event&);
     void on_cancel(Event&);
+    void on_resolve(Event&);
     // This vector keep adress and filename of uploads. It is used when checking for running uploads during exit.
     std::vector<std::pair<std::string, std::string>> upload_names;
     void save_user_data(int);
@@ -124,7 +126,7 @@ private:
 wxDECLARE_EVENT(EVT_PRINTHOST_PROGRESS, PrintHostQueueDialog::Event);
 wxDECLARE_EVENT(EVT_PRINTHOST_ERROR, PrintHostQueueDialog::Event);
 wxDECLARE_EVENT(EVT_PRINTHOST_CANCEL, PrintHostQueueDialog::Event);
-
+wxDECLARE_EVENT(EVT_PRINTHOST_RESOLVE, PrintHostQueueDialog::Event);
 }}
 
 #endif

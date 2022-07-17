@@ -4,6 +4,7 @@
 #include <string>
 #include <wx/string.h>
 #include <boost/optional.hpp>
+#include <boost/asio/ip/address.hpp>
 
 #include "PrintHost.hpp"
 #include "libslic3r/PrintConfig.hpp"
@@ -25,7 +26,7 @@ public:
     bool test(wxString &curl_msg) const override;
     wxString get_test_ok_msg () const override;
     wxString get_test_failed_msg (wxString &msg) const override;
-    bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const override;
+    bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn) const override;
     bool has_auto_discovery() const override { return true; }
     bool can_test() const override { return true; }
     PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint; }
@@ -35,6 +36,11 @@ public:
 
 protected:
     virtual bool validate_version_text(const boost::optional<std::string> &version_text) const;
+#ifdef WIN32
+    virtual bool upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn, const boost::asio::ip::address& resolved_addr) const;
+    virtual bool test_with_resolved_ip(wxString& curl_msg) const;
+#endif
+    virtual bool upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn) const;
 
 private:
     std::string m_host;
