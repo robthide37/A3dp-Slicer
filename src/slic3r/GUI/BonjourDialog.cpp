@@ -251,7 +251,7 @@ IPListDialog::IPListDialog(wxWindow* parent, const wxString& hostname, const std
 	m_list->AppendColumn(_(L("Address")), wxLIST_FORMAT_LEFT, 40 * em);
 
 	for (size_t i = 0; i < ips.size(); i++) 
-		auto item = m_list->InsertItem(i, boost::nowide::widen(ips[i].to_string()));
+		m_list->InsertItem(i, boost::nowide::widen(ips[i].to_string()));
 
 	m_list->Select(0);
 
