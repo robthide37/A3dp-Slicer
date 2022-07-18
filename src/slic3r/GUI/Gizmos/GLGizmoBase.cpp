@@ -318,9 +318,6 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
             
             on_start_dragging();
 
-            // prevent change of hover_id during dragging
-            m_parent.set_mouse_as_dragging();
-
             // Let the plater know that the dragging started
             m_parent.post_event(SimpleEvent(EVT_GLCANVAS_MOUSE_DRAGGING_STARTED));
             m_parent.set_as_dirty();
@@ -330,7 +327,6 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
         // when mouse cursor leave window than finish actual dragging operation
         bool is_leaving = mouse_event.Leaving();
         if (mouse_event.Dragging()) {
-            m_parent.set_mouse_as_dragging();
             Point      mouse_coord(mouse_event.GetX(), mouse_event.GetY());
             auto       ray = m_parent.mouse_ray(mouse_coord);
             UpdateData data(ray, mouse_coord);

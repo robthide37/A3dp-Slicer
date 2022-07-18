@@ -20,7 +20,7 @@ enum class SLAGizmoEventType : unsigned char;
 
 class GLGizmoCut3D : public GLGizmoBase
 {
-    GLGizmoRotate3D             m_rotation_gizmo;
+    Transform3d                 m_rotation_m{ Transform3d::Identity() };
     double                      m_snap_step{ 1.0 };
     int                         m_connectors_group_id;
 
@@ -35,6 +35,13 @@ class GLGizmoCut3D : public GLGizmoBase
     Vec3d m_bb_center{ Vec3d::Zero() };
     Vec3d m_center_offset{ Vec3d::Zero() };
 
+    // values from RotationGizmo
+    float m_radius{ 0.0f };
+    float m_snap_coarse_in_radius{ 0.0f };
+    float m_snap_coarse_out_radius{ 0.0f };
+    float m_snap_fine_in_radius{ 0.0f };
+    float m_snap_fine_out_radius{ 0.0f };
+
     GLModel         m_connector_shape;
     TriangleMesh    m_connector_mesh;
     // workaround for using of the clipping plane normal
@@ -45,6 +52,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_plane;
+    GLModel m_grabber_connection;
     GLModel m_cut_line;
     GLModel m_cone;
     GLModel m_sphere;
@@ -138,6 +146,7 @@ protected:
     CommonGizmosDataID on_get_requirements() const override;
     void on_set_hover_id() override;
     bool on_is_activable() const override;
+    Vec3d mouse_position_in_local_plane(Axis axis, const Linef3& mouse_ray) const;
     void on_dragging(const UpdateData& data) override;
     void on_start_dragging() override;
     void on_stop_dragging() override;
@@ -156,7 +165,6 @@ private:
     bool render_double_input(const std::string& label, double& value_in);
     bool render_slicer_double_input(const std::string& label, double& value_in);
     void render_move_center_input(int axis);
-    void render_rotation_input(int axis);
     void render_connect_mode_radio_button(CutConnectorMode mode);
     bool render_revert_button(const std::string& label);
     void render_connect_type_radio_button(CutConnectorType type);
@@ -167,7 +175,7 @@ private:
     bool cut_line_processing() const;
 
     void render_cut_plane();
-    void render_cut_center_graber();
+    void render_cut_center_graber(bool picking = false);
     void render_cut_line();
     void perform_cut(const Selection& selection);
     void set_center_pos(const Vec3d& center_pos, bool force = false);
