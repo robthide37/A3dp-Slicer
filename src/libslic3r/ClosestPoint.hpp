@@ -6,12 +6,12 @@
 namespace Slic3r {
 
 /// <summary>
-/// Sort points and use sweep line algo to find closest point in points
+/// Sort points and use find_closest_in_sorted
 /// </summary>
 /// <param name="p">Seach for closest index to this point</param>
 /// <param name="pts">Search inside of thoose points</param>
 /// <returns>Index of closest point from sorted_pts</returns>
-// size_t find_closest(const Point &p, const Points& pts);
+template<class P> size_t find_closest(const P &p, const std::vector<P> &pts);
 
 /// <summary>
 /// Use a plane sweep algorithm to find closest point in sorted points
@@ -29,8 +29,10 @@ size_t find_closest_in_sorted(const P &p, const std::vector<P> &sorted_pts);
 /// </summary>
 /// <param name="pts">Seach for closest index to thoose points</param>
 /// <param name="sorted_pts">Sorted points by X coordinate</param>
-/// <returns>Index of closest point from sorted_pts</returns>
-// size_t find_closest_in_sorted(const Point &pts, const Points &sorted_pts);
+/// <returns>Indices to pts(first) and sorted_pts(second)</returns>
+template<class P>
+std::pair<size_t, size_t> find_closest_in_sorted(
+    const std::vector<P> &pts, const std::vector<P> &sorted_pts);
 
 namespace closestPoint {
 /// <summary>
@@ -46,9 +48,36 @@ template<class P, typename V> bool upper_fnc(V value, const P &p){ return value 
 /// <summary> Function used to find lower bound in sorted points. </summary>
 template<class P, typename V> bool lower_fnc(const P &p, V value){ return value > p.x(); }
 /// <summary> Calc manhatn size of point. Mainly to explain meaning</summary>
-template<class P> uint32_t manhattan_size(const P &p){ return std::abs(p.x()) + abs(p.y()); }
+template<class P> uint32_t manhattan_size(const P &p1, const P &p2)
+{ return std::abs(p1.x()-p2.x()) + abs(p1.y()-p2.y()); }
 } // namespace closestPoint
 } // namespace Slic3r
+
+template<class P> 
+size_t Slic3r::find_closest(const P &p, const std::vector<P> &pts)
+{
+    // check input
+    if (pts.empty()) return std::numeric_limits<size_t>::max();
+    if (pts.size() == 1) return 0;
+
+    using V = decltype(p.x());
+    // extend P with order
+    struct PP
+    {
+        size_t ord;
+        const P* p;
+        V x() const { return p->x(); }
+        V y() const { return p->y(); }
+    };
+    std::vector<PP> pts_ord;
+    pts_ord.reserve(pts.size());
+    size_t ord = 0;
+    for (const P &pp : pts) pts_ord.push_back({ord++, &pp});
+    std::stable_sort(pts_ord.begin(), pts_ord.end(), closestPoint::sort_fnc<PP>);
+    PP pp{0, &p};
+    size_t closest_index = find_closest_in_sorted(pp, pts_ord);
+    return pts_ord[closest_index].ord;
+}
 
 template<class P>
 size_t Slic3r::find_closest_in_sorted(const P &p, const std::vector<P> &pts)
@@ -62,17 +91,17 @@ size_t Slic3r::find_closest_in_sorted(const P &p, const std::vector<P> &pts)
     if (pts.size() == 1) return 0;
 
     using V = decltype(p.x());
-
+    using It = std::vector<P>::const_iterator;
     // closest point node in X
-    Points::const_iterator it_x = std::upper_bound(pts.begin(), pts.end(), p.x(), upper_fnc<P,V>);
+    It it_x = std::upper_bound(pts.begin(), pts.end(), p.x(), upper_fnc<P,V>);
     bool is_it_x_end = it_x == pts.end();
     // it_x can't pointing to end so change to last point
     if (is_it_x_end) --it_x;
     // manhatn distance to closest point
-    uint32_t manhattan_dist = manhattan_size(*it_x - p);
+    uint32_t manhattan_dist = manhattan_size(*it_x, p);
 
     // node for lower bound
-    Points::const_iterator it_l;
+    It it_l;
     if (it_x == pts.begin()) { 
         it_l = it_x;
     } else {
@@ -90,7 +119,7 @@ size_t Slic3r::find_closest_in_sorted(const P &p, const std::vector<P> &pts)
     }
 
     // node for upper bound
-    Points::const_iterator it_u;
+    It it_u;
     if (is_it_x_end) { 
         it_u = pts.end();
     } else {
@@ -111,7 +140,7 @@ size_t Slic3r::find_closest_in_sorted(const P &p, const std::vector<P> &pts)
     // find closest by squer distance
     float dist_sq = std::numeric_limits<float>::max();
     size_t result = it_x - pts.begin();
-    for (Points::const_iterator it = it_l; it < it_u; ++it) {
+    for (It it = it_l; it < it_u; ++it) {
         uint32_t diff_y = std::abs(it->y() - p.y());
         if (diff_y > manhattan_dist) continue;
         float diff_x = it->x() - p.x();
@@ -123,6 +152,13 @@ size_t Slic3r::find_closest_in_sorted(const P &p, const std::vector<P> &pts)
         }
     }
     return result;
+}
+
+template<class P>
+std::pair<size_t, size_t> find_closest_in_sorted(
+    const std::vector<P> &pts, const std::vector<P> &sorted_pts)
+{
+    return {0, 0};
 }
 
 #endif // slic3r_ClosestPoint_hpp_
