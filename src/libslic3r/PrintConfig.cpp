@@ -7409,9 +7409,14 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         if (std::set<std::string>{"extrusion_width", "first_layer_extrusion_width", "perimeter_extrusion_width", "external_perimeter_extrusion_width", 
             "infill_extrusion_width", "solid_infill_extrusion_width", "top_infill_extrusion_width"}.count(opt_key) > 0) {
             const ConfigOptionFloatOrPercent* opt = all_conf.option<ConfigOptionFloatOrPercent>(opt_key);
-            if (opt->is_phony()) {
-                //bypass the phony kill switch from Config::opt_serialize
-                value = opt->serialize();
+            if (opt->is_phony() || opt->percent) {
+                if (opt->percent) {
+                    ConfigOptionFloat opt_temp{ opt->get_abs_value(all_conf.option<ConfigOptionFloats>("nozzle_diameter")->values.front()) };
+                    value = opt_temp.serialize();
+                } else {
+                    //bypass the phony kill switch from Config::opt_serialize
+                    value = opt->serialize();
+                }
             }
         }
     }
