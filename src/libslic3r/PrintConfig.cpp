@@ -4305,10 +4305,10 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def->set_default_value(new ConfigOptionBool(false));
 
 #if ENABLE_GL_CORE_PROFILE
-    def = this->add("opengl-core", coString);
-    def->label = L("OpenGL core version");
-    def->tooltip = L("Select the specified OpenGL version supporting core profile");
-    def->cli = "opengl-core";
+    def = this->add("opengl-version", coString);
+    def->label = L("OpenGL version");
+    def->tooltip = L("Select the specified OpenGL version");
+    def->cli = "opengl-version";
     def->set_default_value(new ConfigOptionString());
 
     def = this->add("opengl-debug", coBool);
