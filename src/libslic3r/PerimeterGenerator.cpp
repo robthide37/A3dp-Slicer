@@ -101,8 +101,9 @@ void PerimeterGenerator::process_arachne()
         // We consider overhang any part where the entire nozzle diameter is not supported by the
         // lower layer, so we take lower slices and offset them by half the nozzle diameter used
         // in the current layer
-        double nozzle_diameter = this->print_config->nozzle_diameter.get_at(this->config->perimeter_extruder-1);
-        m_lower_slices_polygons = offset(*this->lower_slices, float(scale_(+nozzle_diameter/2)));
+        const double overhangs_width = this->config->overhangs_width.get_abs_value(this->overhang_flow.nozzle_diameter());
+        //const double overhangs_width_speed = this->config->overhangs_width_speed.get_abs_value(this->overhang_flow.nozzle_diameter());
+        m_lower_slices_polygons = offset(*this->lower_slices, float(scale_d(overhangs_width)));
     }
 
     // we need to process each island separately because we might have different
@@ -1490,7 +1491,9 @@ void PerimeterGenerator::process_classic()
 
 ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygons, ExtrusionRole role, bool is_external) const {
     ExtrusionPaths paths;
-    if (this->config->overhangs_width.get_abs_value(this->overhang_flow.nozzle_diameter()) == 0 && 0 == this->config->overhangs_width_speed.get_abs_value(this->overhang_flow.nozzle_diameter())) {
+    const double overhangs_width = this->config->overhangs_width.get_abs_value(this->overhang_flow.nozzle_diameter());
+    const double overhangs_width_speed = this->config->overhangs_width_speed.get_abs_value(this->overhang_flow.nozzle_diameter());
+    if ( 0 == overhangs_width && 0 == overhangs_width_speed) {
         //error
         ExtrusionPath path(role);
         path.polyline = loop_polygons;
@@ -1519,7 +1522,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
 #endif
 
     Polylines* previous = &ok_polylines;
-    if (this->config->overhangs_width_speed.value > 0 && (this->config->overhangs_width_speed.value < this->config->overhangs_width.value || this->config->overhangs_width.value == 0)) {
+    if (overhangs_width_speed > 0 && (overhangs_width_speed < overhangs_width || overhangs_width == 0)) {
         if (!this->_lower_slices_bridge_speed_small.empty()) {
             small_speed = diff_pl(*previous, this->_lower_slices_bridge_speed_small);
 #ifdef _DEBUG
@@ -1555,7 +1558,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
             }
         }
     }
-    if (this->config->overhangs_width.value > 0) {
+    if (overhangs_width > 0) {
         if (!this->_lower_slices_bridge_flow_small.empty()) {
             small_flow = diff_pl(*previous, this->_lower_slices_bridge_flow_small);
 #ifdef _DEBUG
