@@ -205,7 +205,7 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
             ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
 
             // to paths
-            ExtrusionEntitiesPtr all_new_paths;
+            ExtrusionEntityCollection* all_new_paths = new ExtrusionEntityCollection();
             double extruded_volume = 0;
             for (const ThickPolyline& thick_polyline : thick_polylines) {
                 ExtrusionEntitiesPtr entities = Geometry::thin_variable_width(
@@ -218,7 +218,7 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                     extruded_volume += entity->total_volume();
                 }
                 //append
-                all_new_paths.insert(all_new_paths.end(), entities.begin(), entities.end());
+                all_new_paths->append(entities);
             }
             thick_polylines.clear();
 
@@ -248,13 +248,15 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                         path3D.width *= mult_flow;
                     }
                 } flow_multiplier(mult_flow);
-                for (ExtrusionEntity* entity : all_new_paths) {
-                    entity->visit(flow_multiplier);
-                }
+                all_new_paths->visit(flow_multiplier);
             }
 
             //save into layer
-            out.insert(out.end(), all_new_paths.begin(), all_new_paths.end());
+            if (all_new_paths->entities().size() > 0) {
+                out.push_back(all_new_paths);
+            } else {
+                delete all_new_paths;
+            }
 
         } else {
             Polylines simple_polylines = this->fill_surface(surface, params);

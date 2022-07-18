@@ -233,11 +233,14 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
             ThickPolyline thick_polyline = Arachne::to_thick_polyline(*extrusion);
             if (extrusion->is_closed && thick_polyline.points.front() == thick_polyline.points.back() && thick_polyline.points_width.front() == thick_polyline.points_width.back()) {
                 thick_polyline.points.pop_back();
+                thick_polyline.points_width.pop_back();
                 assert(thick_polyline.points.size() == thick_polyline.points_width.size());
                 int nearest_idx = last_pos.nearest_point_index(thick_polyline.points);
                 std::rotate(thick_polyline.points.begin(), thick_polyline.points.begin() + nearest_idx, thick_polyline.points.end());
                 std::rotate(thick_polyline.points_width.begin(), thick_polyline.points_width.begin() + nearest_idx, thick_polyline.points_width.end());
                 thick_polyline.points.emplace_back(thick_polyline.points.front());
+                thick_polyline.points_width.emplace_back(thick_polyline.points_width.front());
+                assert(thick_polyline.points.size() == thick_polyline.points_width.size());
             }
             thick_polylines_out.emplace_back(std::move(thick_polyline));
         }

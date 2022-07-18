@@ -243,14 +243,17 @@ ThickLines ThickPolyline::thicklines() const
 // Removes the given distance from the end of the ThickPolyline
 void ThickPolyline::clip_end(coordf_t distance)
 {
+    assert(this->points_width.size() == this->points.size());
     while (distance > 0) {
         Vec2d    last_point = this->last_point().cast<double>();
         coord_t last_width = this->points_width.back();
+        assert(this->points_width.size() == this->points.size());
         this->points.pop_back();
         this->points_width.pop_back();
         if (this->points.empty())
             break;
 
+        assert(this->points_width.size() == this->points.size());
         Vec2d    vec            = this->last_point().cast<double>() - last_point;
         coordf_t width_diff     = this->points_width.back() - last_width;
         coordf_t   vec_length_sqr = vec.squaredNorm();

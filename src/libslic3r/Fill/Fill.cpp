@@ -642,9 +642,12 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         for (const ExtrusionEntity *thin_fill : layerm->thin_fills.entities()) {
             ExtrusionEntityCollection *collection = new ExtrusionEntityCollection();
             if (!layerm->fills.can_sort() && layerm->fills.entities().size() > 0 && layerm->fills.entities()[0]->is_collection()) {
+                //for dense_infill58c73b1, to print fills in the right sequence. Seems weird,  TODO: check & test it.
                 ExtrusionEntityCollection* no_sort_fill = static_cast<ExtrusionEntityCollection*>(layerm->fills.entities()[0]);
                 if (!no_sort_fill->can_sort() && no_sort_fill->entities().size() > 0 && no_sort_fill->entities()[0]->is_collection())
                     static_cast<ExtrusionEntityCollection*>(no_sort_fill->entities()[0])->append(ExtrusionEntitiesPtr{ collection });
+                else
+                    layerm->fills.append(ExtrusionEntitiesPtr{ collection });
             } else
                 layerm->fills.append(ExtrusionEntitiesPtr{ collection });
             collection->append(*thin_fill);
