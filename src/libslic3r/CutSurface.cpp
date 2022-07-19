@@ -409,14 +409,14 @@ VDistances calc_distances(const SurfacePatches &patches,
 /// <summary>
 /// Select distances in similar depth between expolygons
 /// </summary>
-/// <param name="distances">All distances</param>
+/// <param name="distances">All distances - Vector distances for each shape point</param>
 /// <param name="shapes">Vector of letters</param>
 /// <param name="shape_point_2_index">Convert index to addresss inside of shape</param>
 /// <returns>Best projection distances</returns>
 ProjectionDistances choose_best_distance(
-    const std::vector<ProjectionDistances> &distances,
-    const ExPolygons                      &shapes,
-    const ShapePoint2index                &shape_point_2_index);
+    const VDistances       &distances,
+    const ExPolygons       &shapes,
+    const ShapePoint2index &shape_point_2_index);
 
 /// <summary>
 /// Create mask for patches
@@ -667,7 +667,6 @@ void priv::set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
                                    const BoundingBox          &shapes_bb)
 {
     assert(skip_indicies.size() == its.indices.size());
-
     //   1`*----* 2`
     //    /  2 /|
     // 1 *----* |
@@ -739,6 +738,59 @@ void priv::set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
     }
 }
 
+indexed_triangle_set Slic3r::its_mask(const indexed_triangle_set &its,
+                                      const std::vector<bool>    &mask)
+{
+    if (its.indices.size() != mask.size()) {
+        assert(false);
+        return {};
+    }
+
+    std::vector<uint32_t> cvt_vetices(its.vertices.size(), {std::numeric_limits<uint32_t>::max()});
+    size_t vertices_count = 0;
+    size_t faces_count    = 0;
+    for (const auto &t : its.indices) {
+        size_t index = &t - &its.indices.front();
+        if (!mask[index]) continue;
+        ++faces_count;
+        for (const auto vi : t) {
+            uint32_t &cvt = cvt_vetices[vi];
+            if (cvt == std::numeric_limits<uint32_t>::max())
+                cvt = vertices_count++;
+        }
+    }
+    if (faces_count == 0) return {};
+    assert(vertices_count <= vertices.size());
+    assert(faces_count <= indices.size());
+    
+    indexed_triangle_set result;
+    result.indices.reserve(faces_count);
+    result.vertices = std::vector<Vec3f>(vertices_count);
+    for (size_t i = 0; i < its.vertices.size(); ++i) {
+        uint32_t index = cvt_vetices[i];
+        if (index == std::numeric_limits<uint32_t>::max()) continue;
+        result.vertices[index] = its.vertices[i];
+    }
+
+    for (const stl_triangle_vertex_indices &f : its.indices)
+        if (mask[&f - &its.indices.front()])        
+            result.indices.push_back(stl_triangle_vertex_indices(
+                cvt_vetices[f[0]], cvt_vetices[f[1]], cvt_vetices[f[2]]));
+    
+    return result;    
+}
+
+indexed_triangle_set Slic3r::its_cut_AoI(const indexed_triangle_set &its,
+                                         const BoundingBox          &bb,
+                                         const Emboss::IProjection &projection)
+{
+    std::vector<bool> skip_indicies(its.indices.size(), false);
+    priv::set_skip_for_out_of_aoi(skip_indicies, its, projection, bb);
+    // invert values in vector of bool
+    skip_indicies.flip();
+    return its_mask(its, skip_indicies);
+}
+
 void priv::set_skip_by_angle(std::vector<bool>          &skip_indicies,
                              const indexed_triangle_set &its,
                              const Project3f            &projection,
@@ -769,7 +821,6 @@ priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
     const std::vector<stl_vertex>                  &vertices = its.vertices;
     const std::vector<stl_triangle_vertex_indices> &indices = its.indices;
 
-    std::vector<bool> use_indices(indices.size(), {false});
     std::vector<bool> use_vetices(vertices.size(), {false});
 
     size_t vertices_count = 0;
@@ -780,7 +831,6 @@ priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
         size_t index = &t - &indices.front();
         if (skip_indicies[index]) continue;        
         ++faces_count;
-        use_indices[index] = true;
         size_t count_used_vertices = 0;
         for (const auto vi : t) {
             if (!use_vetices[vi]) {
@@ -820,14 +870,14 @@ priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
 
     if (!flip) {
         for (const stl_triangle_vertex_indices &f : indices) {
-            if (!use_indices[&f - &indices.front()]) continue;
+            if (skip_indicies[&f - &indices.front()]) continue;
             result.add_face(to_filtrated_vertices_index[f[0]],
                             to_filtrated_vertices_index[f[1]],
                             to_filtrated_vertices_index[f[2]]);
         }
     } else {
         for (const stl_triangle_vertex_indices &f : indices) {
-            if (!use_indices[&f - &indices.front()]) continue;
+            if (skip_indicies[&f - &indices.front()]) continue;
             result.add_face(to_filtrated_vertices_index[f[2]],
                             to_filtrated_vertices_index[f[1]],
                             to_filtrated_vertices_index[f[0]]);
@@ -1655,6 +1705,18 @@ struct ClosePoint
 // search in all shapes points to found closest point to given point
 uint32_t get_closest_point_index(const Point &p, const ExPolygons &shapes, const VDistances &distances);
 
+using PNode = std::pair<Point, uint32_t>;
+using PNodes = std::vector<PNode>;
+PNodes create_nodes(const ExPolygons &shapes, const VDistances &distances, size_t shapes_point_count);
+
+/// <summary>
+/// Search in all shapes points(nodes) to found closest point to given point
+/// </summary>
+/// <param name="p">Point to search closest</param>
+/// <param name="nodes">Points sorted by X</param>
+/// <returns>Index into shapes of point closest to given point</returns>
+uint32_t get_closest_point_index2(const Point &p, const PNodes& nodes);
+
 // Search for closest projection to wanted distance
 const ProjectionDistance *get_closest_projection(const ProjectionDistances &distance, float wanted_distance);
 
@@ -1698,6 +1760,105 @@ uint32_t priv::get_closest_point_index(const Point      &p,
         get_closest(shape.contour.points);
         for (const Polygon &hole : shape.holes) 
             get_closest(hole.points);
+    }
+    return cp.index;
+}
+
+priv::PNodes priv::create_nodes(const ExPolygons &shapes, const VDistances &distances, size_t shapes_point_count) {
+    PNodes pts;
+    pts.reserve(shapes_point_count);
+    uint32_t index = 0;
+    auto  add_polygon = [&pts, &index, &distances](const Polygon &poly) {
+        for (const Point &p : poly.points) {
+            // skip empty distances
+            if (distances[index].empty()) {
+                ++index;
+                continue;
+            }
+            pts.emplace_back(p, index++);
+        }
+    };
+    for (const ExPolygon s : shapes) {
+        add_polygon(s.contour);
+        for (const Polygon &h : s.holes) add_polygon(h);
+    }
+    
+    std::sort(pts.begin(), pts.end(), [](const PNode &n1, const PNode &n2) {
+        return n1.first.x() < n2.first.x();
+    });
+    return pts;
+}
+
+uint32_t priv::get_closest_point_index2(const Point &p, const PNodes &nodes)
+{
+    assert(!nodes.empty());
+    
+    // function to find upper point node
+    auto f_u = [](coord_t value, const PNode& n) {
+        return value < n.first.x();
+    };
+
+    // function to find lower point node
+    auto f_l = [](const PNode &n, coord_t value) {
+        return value > n.first.x();
+    };
+
+    // closest point node in X
+    auto it_x = std::upper_bound(nodes.begin(), nodes.end(), p.x(), f_u);
+    // manhatn distance to closest point
+    auto manhattan_size = [](const Point &p) -> uint32_t {
+        return std::abs(p.x()) + abs(p.y());
+    };
+    uint32_t manhattan_dist = (it_x != nodes.end())?
+        manhattan_size(it_x->first - p) :
+        manhattan_size(nodes.back().first - p);
+    // node for lower bound
+    auto  it_l = std::lower_bound(nodes.begin(), it_x, p.x() - manhattan_dist, f_l);
+    auto it = it_x;
+    while (it > it_l) {
+        uint32_t diff_y = std::abs(it->first.y() - p.y());
+        if (diff_y > manhattan_dist) {
+            --it;
+            continue;
+        }
+        uint32_t diff_x   = std::abs(it->first.x() - p.x());
+        uint32_t act_dist = diff_y + diff_x;
+        if (manhattan_dist > act_dist) {
+            manhattan_dist = act_dist;
+            it_l = std::lower_bound(it_l, it_x, p.x() - manhattan_dist, f_l);
+        }
+        --it;
+    }
+
+    // node for upper bound
+    auto  it_u = std::upper_bound(it_x, nodes.end(), p.x() + manhattan_dist, f_u);
+    it = it_x;
+    while (it < it_u) { 
+        ++it;
+        uint32_t diff_y = std::abs(it->first.y() - p.y());
+        if (diff_y > manhattan_dist) continue;
+        uint32_t diff_x = std::abs(it->first.x() - p.x());
+        uint32_t act_dist = diff_y + diff_x;
+        if (manhattan_dist > act_dist) {
+            // IMPROVE: calc euclid distance when e.g. (diff_Biggery < 2*diff_smaller)
+            manhattan_dist = act_dist;
+            it_u = std::upper_bound(it_x, it_u, p.x() + manhattan_dist, f_u);
+        }
+    }
+
+    // find closest by squer distance
+    it = it_l;
+    ClosePoint cp;
+    for (it = it_l; it < it_u; ++it) {
+        uint32_t diff_y = std::abs(it->first.y() - p.y());
+        if (diff_y > manhattan_dist) continue;
+        float diff_x = it->first.x() - p.x();
+        // calculate square distance
+        float d = (float) diff_y * diff_y + diff_x * diff_x;
+        if (cp.dist_sq > d) {
+            cp.dist_sq = d;
+            cp.index   = it->second;
+        }
     }
     return cp.index;
 }
@@ -1904,9 +2065,9 @@ priv::ClosePoint priv::find_close_point(const Point         &p,
 // IMPROVE: create better structure to find closest points e.g. Tree
 // IMPROVE2: when select distance fill in all distances from Patch
 priv::ProjectionDistances priv::choose_best_distance(
-    const std::vector<ProjectionDistances> &distances,
-    const ExPolygons                       &shapes,
-    const ShapePoint2index                 &s2i)
+    const VDistances       &distances,
+    const ExPolygons       &shapes,
+    const ShapePoint2index &s2i)
 {
     // collect one closest projection for each outline point
     ProjectionDistances result(distances.size());
@@ -1923,6 +2084,9 @@ priv::ProjectionDistances priv::choose_best_distance(
     Point center(0, 0);
     // Select point from shapes(text contour) which is closest to center (all in 2d)
     uint32_t unfinished_index = get_closest_point_index(center, shapes, distances);
+
+    //PNodes pts = create_nodes(shapes, distances, s2i.get_count());
+    //uint32_t unfinished_index2 = get_closest_point_index2(center, pts);
 
     do {
         const ProjectionDistance* pd = get_closest_projection(distances[unfinished_index], wanted_distance);

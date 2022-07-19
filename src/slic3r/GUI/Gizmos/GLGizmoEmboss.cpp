@@ -940,8 +940,8 @@ bool GLGizmoEmboss::process()
     const TextConfiguration &tc = data.text_configuration;
     if (tc.font_item.prop.use_surface) {
         // Model to cut surface from.
-        UseSurfaceData::ModelSource source = UseSurfaceData::create_source(m_volume);
-        if (source.its.empty()) return false;
+        UseSurfaceData::ModelSources sources = UseSurfaceData::create_sources(m_volume);
+        if (sources.empty()) return false;
 
         Transform3d text_tr = m_volume->get_matrix();
         auto& fix_3mf = m_volume->text_configuration->fix_3mf_tr;
@@ -953,7 +953,7 @@ bool GLGizmoEmboss::process()
         assert(is_outside || m_volume->is_negative_volume() ||
                m_volume->is_modifier());
         UseSurfaceData surface_data{std::move(data), text_tr, is_outside,
-                                    std::move(source)};
+                                    std::move(sources)};
         job = std::make_unique<UseSurfaceJob>(std::move(surface_data));                  
     } else {
         job = std::make_unique<EmbossUpdateJob>(std::move(data));

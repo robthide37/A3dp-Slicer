@@ -53,7 +53,7 @@ public:
     PointClass size() const;
     double radius() const;
     void translate(coordf_t x, coordf_t y) { assert(this->defined); PointClass v(x, y); this->min += v; this->max += v; }
-    void translate(const Vec2d &v) { this->min += v; this->max += v; }
+    void translate(const PointClass &v) { this->min += v; this->max += v; }
     void offset(coordf_t delta);
     BoundingBoxBase<PointClass> inflated(coordf_t delta) const throw() { BoundingBoxBase<PointClass> out(*this); out.offset(delta); return out; }
     PointClass center() const;

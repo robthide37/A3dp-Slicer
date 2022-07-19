@@ -161,22 +161,20 @@ struct UseSurfaceData : public EmbossDataUpdate
 
     struct ModelSource
     {
-        // IMPROVE: Copy only AOI by shapes and projection
-        // NOTE: copy of source mesh tringles and it slows down on big meshes
-        std::vector<indexed_triangle_set> its;
+        // source volumes
+        std::shared_ptr<const TriangleMesh> mesh;
         // Transformation of volume inside of object
         Transform3d tr;
-        // extract bounds for projection
-        BoundingBoxf3 bb;
     };
-    ModelSource source;
+    using ModelSources = std::vector<ModelSource>;
+    ModelSources sources;
 
     /// <summary>
     /// Copied triangles from object to be able create mesh for cut surface from
     /// </summary>
     /// <param name="text_volume">Define text in object</param>
     /// <returns>Source data for cut surface from</returns>
-    static ModelSource create_source(const ModelVolume *text_volume);
+    static ModelSources create_sources(const ModelVolume *text_volume);
 };
 
 /// <summary>

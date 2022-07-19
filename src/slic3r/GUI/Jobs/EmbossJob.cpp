@@ -318,7 +318,7 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &eptr)
     priv::update_volume(std::move(m_result), m_input);    
 }
 
-UseSurfaceData::ModelSource UseSurfaceData::create_source(
+UseSurfaceData::ModelSources UseSurfaceData::create_sources(
     const ModelVolume *text_volume)
 {
     if (text_volume == nullptr) return {};
@@ -326,54 +326,17 @@ UseSurfaceData::ModelSource UseSurfaceData::create_source(
     const ModelVolumePtrs &volumes = text_volume->get_object()->volumes;
     // no other volume in object
     if (volumes.size() <= 1) return {};
-        
-    // One volume transformation is used for transform others
-    // Most common cut is into one volume so it is cheaper to do not transform this volume
-    // NOTE: Preparation is made on Main thred!
-    auto find_biggest = [&text_volume]
-    (const ModelVolumePtrs& volumes, const ObjectID& text_volume_id)->const ModelVolume * {
-        const ModelVolume *biggest = nullptr;
-        size_t biggest_size = 0;
-        for (const ModelVolume *v: volumes) {
-            if (v->id() == text_volume_id) continue;
-            if (!v->is_model_part()) continue;
-            const TriangleMesh &tm = v->mesh();
-            if (tm.empty()) continue;
-            if (tm.its.empty()) continue;
-            if (biggest_size > tm.its.indices.size()) continue;
-            biggest_size = tm.its.indices.size();
-            biggest = v;
-        }
-        assert(biggest != nullptr);
-        return biggest;
-    };
 
-    const ModelVolume *biggest_volume = find_biggest(volumes, text_volume->id());
-    const TriangleMesh &biggest_tm = biggest_volume->mesh();
-
-    // IMPROVE: Copy only AOI by shapes and projection
-    // NOTE: copy of source mesh tringles and it slows down on big meshes
-    ModelSource result{
-        {biggest_tm.its}, // copy !!!
-        biggest_volume->get_transformation().get_matrix(),
-        biggest_tm.bounding_box()
-    };
-
-    Transform3d tr_inv = result.tr.inverse();
-    // Improve create object from part or use gl_volume
-    // Get first model part in object
+    ModelSources result;
+    result.reserve(volumes.size() - 1);
     for (const ModelVolume *v : volumes) {
         if (v->id() == text_volume->id()) continue;
-        if (v->id() == biggest_volume->id()) continue;
+        // skip modifiers and negative volumes, ...
         if (!v->is_model_part()) continue;
         const TriangleMesh &tm = v->mesh();
         if (tm.empty()) continue;
         if (tm.its.empty()) continue;
-
-        Transform3d tr = v->get_matrix() * tr_inv;
-        indexed_triangle_set its = tm.its; // copy !!!
-        its_transform(its, tr);
-        result.its.emplace_back(std::move(its));
+        result.push_back({v->get_mesh_shared_ptr(), v->get_matrix()});
     }
     return result;
 }
@@ -384,6 +347,22 @@ UseSurfaceJob::UseSurfaceJob(UseSurfaceData &&input)
     : m_input(std::move(input))
 {
     assert(priv::check(m_input, true));
+}
+
+static const UseSurfaceData::ModelSource* get_biggest(
+    const UseSurfaceData::ModelSources &sources)
+{
+    const UseSurfaceData::ModelSource *biggest = nullptr;
+    for (const UseSurfaceData::ModelSource &s : sources) { 
+        if (biggest == nullptr) {
+            biggest = &s;
+            continue;
+        }
+        if (biggest->mesh->its.indices.size() < s.mesh->its.indices.size()) {
+            biggest = &s;
+        }        
+    }
+    return biggest;
 }
 
 void UseSurfaceJob::process(Ctl &ctl) {
@@ -406,28 +385,66 @@ void UseSurfaceJob::process(Ctl &ctl) {
     
     if (was_canceled()) return;
 
-    Transform3d   mesh_tr_inv       = m_input.source.tr.inverse();
-    Transform3d   cut_projection_tr = mesh_tr_inv * m_input.text_tr;
-    Transform3d   emboss_tr         = cut_projection_tr.inverse();
-    BoundingBoxf3 mesh_bb_tr = m_input.source.bb.transformed(emboss_tr);
-    std::pair<float, float> z_range{mesh_bb_tr.min.z(), mesh_bb_tr.max.z()};
+    // Define alignment of text - left, right, center, top bottom, ....
+    BoundingBox bb                = get_extents(shapes);
+    Point       projection_center = bb.center();
+    for (ExPolygon &shape : shapes) shape.translate(-projection_center);
+    bb.translate(-projection_center);
 
     const Emboss::FontFile &ff = *m_input.font_file.font_file;
-    double shape_scale =  Emboss::get_shape_scale(fp, ff);
+    double shape_scale = Emboss::get_shape_scale(fp, ff);
+    
+    size_t biggest_count = 0;
+    size_t biggest_index = 0;
+    const UseSurfaceData::ModelSource *biggest = nullptr;
+    std::vector<size_t> s_to_itss(m_input.sources.size(), std::numeric_limits<size_t>::max());
+    std::vector<indexed_triangle_set> itss;
+    itss.reserve(m_input.sources.size());
+    for (const UseSurfaceData::ModelSource &s : m_input.sources) {
+        Transform3d mesh_tr_inv = s.tr.inverse();
+        Transform3d cut_projection_tr = mesh_tr_inv * m_input.text_tr;
+        std::pair<float, float> z_range{0., 1.};
+        Emboss::OrthoProject cut_projection =
+            priv::create_projection_for_cut(cut_projection_tr, shape_scale, z_range);
+        // copy only part of source model
+        indexed_triangle_set its = its_cut_AoI(s.mesh->its, bb, cut_projection);        
+        if (its.indices.empty()) continue;
+        if (biggest_count < its.vertices.size()) {
+            biggest_count = its.vertices.size();
+            biggest = &s; 
+        }
+        s_to_itss[&s - &m_input.sources.front()] = itss.size();
+        itss.emplace_back(std::move(its));
+    }
+    if (itss.empty())
+        throw priv::EmbossJobException(_u8L("There is no volume in projection direction.").c_str());
+        
+    Transform3d tr_inv = biggest->tr.inverse();
+    size_t itss_index = s_to_itss[biggest - &m_input.sources.front()];
+    BoundingBoxf3 mesh_bb = bounding_box(itss[itss_index]);
+    for (const UseSurfaceData::ModelSource &s : m_input.sources) {
+        if (&s == biggest) continue;
+        size_t itss_index = s_to_itss[&s - &m_input.sources.front()];
+        if (itss_index == std::numeric_limits<size_t>::max()) continue;
+        Transform3d tr = s.tr * tr_inv;
+        indexed_triangle_set &its = itss[itss_index];
+        its_transform(its, tr);
+        BoundingBoxf3 bb = bounding_box(its);
+        mesh_bb.merge(bb);
+    }
+
+    Transform3d   mesh_tr_inv       = tr_inv;
+    Transform3d   cut_projection_tr = mesh_tr_inv * m_input.text_tr;
+    Transform3d   emboss_tr         = cut_projection_tr.inverse();
+    BoundingBoxf3 mesh_bb_tr = mesh_bb.transformed(emboss_tr);
+    std::pair<float, float> z_range{mesh_bb_tr.min.z(), mesh_bb_tr.max.z()};
     Emboss::OrthoProject cut_projection = priv::create_projection_for_cut(
         cut_projection_tr, shape_scale, z_range);
     float projection_ratio = (-z_range.first + priv::safe_extension) /
                              (z_range.second - z_range.first + 2 * priv::safe_extension);
 
-    // Define alignment of text - left, right, center, top bottom, ....
-    BoundingBox bb = get_extents(shapes);
-    Point projection_center = bb.center();
-    for (ExPolygon &shape : shapes) 
-        shape.translate(-projection_center);
-
     // Use CGAL to cut surface from triangle mesh
-    SurfaceCut cut = cut_surface(shapes, m_input.source.its,
-        cut_projection, projection_ratio);
+    SurfaceCut cut = cut_surface(shapes, itss, cut_projection, projection_ratio);
     if (cut.empty())
         throw priv::EmbossJobException(
             _u8L("There is no valid surface for text projection.").c_str());
@@ -512,8 +529,8 @@ bool priv::check(const EmbossDataUpdate &input, bool is_main_thread){
 }
 bool priv::check(const UseSurfaceData &input, bool is_main_thread){
     bool res = check((EmbossDataUpdate) input, is_main_thread);
-    assert(!input.source.its.empty());
-    res &= !input.source.its.empty();
+    assert(!input.sources.empty());
+    res &= !input.sources.empty();
     return res;
 }
 

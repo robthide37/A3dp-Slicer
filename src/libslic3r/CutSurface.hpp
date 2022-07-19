@@ -48,5 +48,25 @@ SurfaceCut cut_surface(const ExPolygons                        &shapes,
 indexed_triangle_set cut2model(const SurfaceCut         &cut,
                                const Emboss::IProject3f &projection);
 
+/// <summary>
+/// Separate (A)rea (o)f (I)nterest .. AoI from model
+/// NOTE: Only 2d filtration, do not filtrate by Z coordinate
+/// </summary>
+/// <param name="its">Input model</param>
+/// <param name="bb">Bounding box to project into space</param>
+/// <param name="projection">Define tranformation of BB into space</param>
+/// <returns>Triangles lay at least partialy inside of projected Bounding box</returns>
+indexed_triangle_set its_cut_AoI(const indexed_triangle_set &its,
+                                 const BoundingBox          &bb,
+                                 const Emboss::IProjection  &projection);
+
+/// <summary>
+/// Separate triangles by mask
+/// </summary>
+/// <param name="its">Input model</param>
+/// <param name="mask">Mask - same size as its::indices</param>
+/// <returns>Copy of indices by mask(with their vertices)</returns>
+indexed_triangle_set its_mask(const indexed_triangle_set &its, const std::vector<bool> &mask);
+
 } // namespace Slic3r
 #endif // slic3r_CutSurface_hpp_
