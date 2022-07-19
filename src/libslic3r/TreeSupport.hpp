@@ -6,15 +6,11 @@
 // Copyright (c) 2021 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
-#ifndef TREESUPPORT_H
-#define TREESUPPORT_H
+#ifndef slic3r_TreeSupport_hpp
+#define slic3r_TreeSupport_hpp
 
-#include "TreeModelVolumes.h"
-#include "boost/functional/hash.hpp" // For combining hashes
-#include "polyclipping/clipper.hpp"
-#include "settings/EnumSettings.h"
-#include "sliceDataStorage.h"
-#include "utils/polygon.h"
+#include "TreeModelVolumes.hpp"
+#include <boost/functional/hash.hpp> // For combining hashes
 
 
 #define SUPPORT_TREE_CIRCLE_RESOLUTION 25 // The number of vertices in each circle.
@@ -42,7 +38,7 @@
 
 #define SUPPORT_TREE_MAX_DEVIATION 0
 
-namespace cura
+namespace Slic3r
 {
 
 
@@ -1015,20 +1011,20 @@ class TreeSupport
 };
 
 
-} // namespace cura
+} // namespace Slic3r
 
 namespace std
 {
 template <>
-struct hash<cura::TreeSupport::SupportElement>
+struct hash<Slic3r::TreeSupport::SupportElement>
 {
-    size_t operator()(const cura::TreeSupport::SupportElement& node) const
+    size_t operator()(const Slic3r::TreeSupport::SupportElement& node) const
     {
-        size_t hash_node = hash<cura::Point>()(node.target_position);
+        size_t hash_node = hash<Slic3r::Point>()(node.target_position);
         boost::hash_combine(hash_node, size_t(node.target_height));
         return hash_node;
     }
 };
 } // namespace std
 
-#endif /* TREESUPPORT_H */
+#endif /* slic3r_TreeSupport_hpp */

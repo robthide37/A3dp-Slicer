@@ -6,20 +6,14 @@
 // Copyright (c) 2021 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
-#ifndef TREEMODELVOLUMES_H
-#define TREEMODELVOLUMES_H
+#ifndef slic3r_TreeModelVolumes_hpp
+#define slic3r_TreeModelVolumes_hpp
 
-#include <future>
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 
-#include "settings/EnumSettings.h" //To store whether X/Y or Z distance gets priority.
-#include "settings/types/LayerIndex.h" //Part of the RadiusLayerPair.
-#include "sliceDataStorage.h"
-#include "utils/polygon.h" //For polygon parameters.
-
-namespace cura
+namespace Slic3r
 {
 
 class TreeModelVolumes
@@ -432,4 +426,4 @@ class TreeModelVolumes
 
 }
 
-#endif //TREEMODELVOLUMES_H
+#endif //slic3r_TreeModelVolumes_hpp

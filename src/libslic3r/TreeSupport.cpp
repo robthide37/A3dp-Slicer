@@ -6,26 +6,16 @@
 // Copyright (c) 2021 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
-#include "TreeSupport.h"
-#include "Application.h" //To get settings.
-#include "infill.h"
-#include "infill/SierpinskiFillProvider.h"
-#include "progress/Progress.h"
-#include "settings/EnumSettings.h"
-#include "support.h" //For precomputeCrossInfillTree
-#include "utils/logoutput.h"
-#include "utils/math.h" //For round_up_divide and PI.
-#include "utils/polygonUtils.h" //For moveInside.
+#include "TreeSupport.hpp"
+
 #include <chrono>
 #include <fstream>
 #include <optional>
 #include <stdio.h>
 #include <string>
-#include <thread>
-#include <utils/algorithm.h>
 #include <windows.h> //todo Remove!  ONLY FOR PUBLIC BETA!!
 
-namespace cura
+namespace Slic3r
 {
 
 TreeSupport::TreeSupport(const SliceDataStorage& storage)
@@ -2279,7 +2269,7 @@ void TreeSupport::smoothBranchAreas(std::vector<std::unordered_map<SupportElemen
         });
 
         updated_last_iteration.clear();
-        for (std::pair<cura::TreeSupport::SupportElement*, Polygons> data_pair : update_next)
+        for (std::pair<Slic3r::TreeSupport::SupportElement*, Polygons> data_pair : update_next)
         {
             if (data_pair.first != nullptr)
             {
@@ -2486,4 +2476,4 @@ void TreeSupport::drawAreas(std::vector<std::set<SupportElement*>>& move_bounds,
 
 
 
-} // namespace cura
+} // namespace Slic3r

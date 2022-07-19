@@ -6,13 +6,10 @@
 // Copyright (c) 2021 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
-#include "TreeModelVolumes.h"
-#include "TreeSupport.h"
-#include "progress/Progress.h"
-#include "sliceDataStorage.h"
-#include "utils/algorithm.h"
-#include "utils/logoutput.h"
-namespace cura
+#include "TreeModelVolumes.hpp"
+#include "TreeSupport.hpp"
+
+namespace Slic3r
 {
 
 TreeModelVolumes::TreeModelVolumes(const SliceDataStorage& storage, const coord_t max_move, const coord_t max_move_slow, size_t current_mesh_idx, double progress_multiplier, double progress_offset, const std::vector<Polygons>& additional_excluded_areas) : max_move_{ std::max(max_move - 2, coord_t(0)) }, max_move_slow_{ std::max(max_move_slow - 2, coord_t(0)) }, progress_multiplier{ progress_multiplier }, progress_offset{ progress_offset }, machine_border_{ calculateMachineBorderCollision(storage.getMachineBorder()) } // -2 to avoid rounding errors
