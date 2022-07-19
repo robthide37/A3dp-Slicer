@@ -117,7 +117,11 @@ void GLGizmoRotate::on_start_dragging()
 
 void GLGizmoRotate::on_dragging(const UpdateData &data)
 {
+#if ENABLE_WORLD_COORDINATE
+    const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray));
+#else
     const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray, m_parent.get_selection()));
+#endif // ENABLE_WORLD_COORDINATE
 
     const Vec2d orig_dir = Vec2d::UnitX();
     const Vec2d new_dir = mouse_pos.normalized();
@@ -808,7 +812,11 @@ void GLGizmoRotate::transform_to_local(const Selection& selection) const
 }
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if ENABLE_WORLD_COORDINATE
+Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray) const
+#else
 Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const
+#endif // ENABLE_WORLD_COORDINATE
 {
     double half_pi = 0.5 * double(PI);
 
@@ -844,7 +852,6 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
 #endif // ENABLE_WORLD_COORDINATE
 
     m.translate(-m_center);
-
     return transform(mouse_ray, m).intersect_plane(0.0);
 }
 
