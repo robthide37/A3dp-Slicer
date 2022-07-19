@@ -1494,19 +1494,9 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
         instances[instance]->get_mirror()
     );
 
-    const auto cut_matrix = Geometry::assemble_transform(
-        -cut_center,
-        Vec3d::Zero(),
-        Vec3d::Ones(),
-        Vec3d::Ones()
-    );
+    const auto cut_matrix = Geometry::assemble_transform(-cut_center);
 
-    const auto invert_cut_matrix = Geometry::assemble_transform(
-        cut_center,
-        cut_rotation,
-        Vec3d::Ones(),
-        Vec3d::Ones()
-    );
+    const auto invert_cut_matrix = Geometry::assemble_transform(cut_center, cut_rotation);
 
     // Displacement (in instance coordinates) to be applied to place the upper parts
     Vec3d local_displace = Vec3d::Zero();
@@ -1522,11 +1512,22 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
         if (!volume->is_model_part()) {
             if (volume->source.is_connector) {
                 if (attributes.has(ModelObjectCutAttribute::KeepUpper)) {
+
+                    Transform3d m = attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper) ?
+                        Geometry::rotation_transform(cut_rotation).inverse() * cut_matrix * instance_matrix * volume_matrix :
+                        instance_matrix * volume_matrix;
+                    volume->set_transformation(m);
+
                     ModelVolume* vol = upper->add_volume(*volume);
                     // make a "hole" dipper
                     vol->set_scaling_factor(Z, 1.1 * vol->get_scaling_factor(Z));
                 }
                 if (attributes.has(ModelObjectCutAttribute::KeepLower)) {
+
+                    Transform3d m = attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) ?
+                        Geometry::rotation_transform(Geometry::deg2rad(180.0) * Vec3d::UnitX()) * Geometry::rotation_transform(cut_rotation).inverse() * cut_matrix * instance_matrix * volume_matrix :
+                        instance_matrix * volume_matrix;
+                    volume->set_transformation(m);
                     ModelVolume* vol = lower->add_volume(*volume);
                     if (attributes.has(ModelObjectCutAttribute::CreateDowels))
                         // make a "hole" dipper
@@ -1567,10 +1568,7 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
             // Transform the mesh by the combined transformation matrix.
             // Flip the triangles in case the composite transformation is left handed.
             TriangleMesh mesh(volume->mesh());
-            mesh.transform(cut_matrix * instance_matrix * volume_matrix, true);
-            mesh.rotate(-cut_rotation.z(), Z);
-            mesh.rotate(-cut_rotation.y(), Y);
-            mesh.rotate(-cut_rotation.x(), X);
+            mesh.transform(Geometry::rotation_transform(cut_rotation).inverse() * cut_matrix * instance_matrix * volume_matrix, true);
 
             volume->reset_mesh();
             // Reset volume transformation except for offset
@@ -1590,7 +1588,8 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
             }
 
             if (attributes.has(ModelObjectCutAttribute::KeepUpper) && !upper_mesh.empty()) {
-                upper_mesh.transform(invert_cut_matrix);
+                if (!attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper))
+                    upper_mesh.transform(invert_cut_matrix);
 
                 ModelVolume* vol = upper->add_volume(upper_mesh);
                 vol->name = volume->name;
@@ -1601,7 +1600,10 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
                 vol->set_material(volume->material_id(), *volume->material());
             }
             if (attributes.has(ModelObjectCutAttribute::KeepLower) && !lower_mesh.empty()) {
-                lower_mesh.transform(invert_cut_matrix);
+                if (attributes.has(ModelObjectCutAttribute::PlaceOnCutLower))
+                    lower_mesh.transform(Geometry::assemble_transform(Vec3d::Zero(), Geometry::deg2rad(180.0)*Vec3d::UnitX()));
+                else
+                    lower_mesh.transform(invert_cut_matrix);
 
                 ModelVolume* vol = lower->add_volume(lower_mesh);
                 vol->name = volume->name;

@@ -1121,10 +1121,17 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
             m_imgui->disabled_begin(!connectors.empty());
             m_imgui->checkbox(_L("Keep") + "##upper", connectors.empty() ? m_keep_upper : keep);
             m_imgui->disabled_end();
-            ImGui::SameLine();
+            ImGui::SameLine(3 * m_label_width);
+
             m_imgui->disabled_begin(!m_keep_upper);
             m_imgui->disabled_begin(is_approx(Geometry::Transformation(m_rotation_m).get_rotation().x(), 0.) && is_approx(Geometry::Transformation(m_rotation_m).get_rotation().y(), 0.));
-            m_imgui->checkbox(_L("Place on cut") + "##upper", m_rotate_upper); // #ysTODO implement place on cut instead of Flip?
+
+            if (m_imgui->checkbox(_L("Place on cut") + "##upper", m_place_on_cut_upper))
+                m_rotate_upper = false;
+            ImGui::SameLine();
+            if (m_imgui->checkbox(_L("Flip") + "##upper", m_rotate_upper))
+                m_place_on_cut_upper = false;
+
             m_imgui->disabled_end();
             m_imgui->disabled_end();
 
@@ -1134,11 +1141,18 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
             ImGui::SameLine(2 * m_label_width);
 
             m_imgui->disabled_begin(!connectors.empty());
+
             m_imgui->checkbox(_L("Keep") + "##lower", connectors.empty() ? m_keep_lower : keep);
             m_imgui->disabled_end();
-            ImGui::SameLine();
+            ImGui::SameLine(3 * m_label_width);
             m_imgui->disabled_begin(!m_keep_lower);
-            m_imgui->checkbox(_L("Place on cut") + "##lower", m_rotate_lower); // #ysTODO implement place on cut instead of Flip?
+
+            if (m_imgui->checkbox(_L("Place on cut") + "##lower", m_place_on_cut_lower)) 
+                m_rotate_lower = false;
+            ImGui::SameLine();
+            if (m_imgui->checkbox(_L("Flip") + "##lower", m_rotate_lower))
+                m_place_on_cut_lower = false;
+
             m_imgui->disabled_end();
         }
 
@@ -1451,6 +1465,8 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         plater->cut(object_idx, instance_idx, cut_center_offset, rotation,
             only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
             only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
+            only_if(m_place_on_cut_upper, ModelObjectCutAttribute::PlaceOnCutUpper) | 
+            only_if(m_place_on_cut_lower, ModelObjectCutAttribute::PlaceOnCutLower) | 
             only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) | 
             only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) | 
             only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));

@@ -61,6 +61,8 @@ class GLGizmoCut3D : public GLGizmoBase
 
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };
+    bool m_place_on_cut_upper{ true };
+    bool m_place_on_cut_lower{ true };
     bool m_rotate_upper{ false };
     bool m_rotate_lower{ false };
 
