@@ -196,9 +196,8 @@ class TreeModelVolumes
      * The result is a 2D area that would cause nodes of radius \p radius to
      * collide with the model. Result is saved in the cache.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
-     * \return A future that has to be waited on
      */
-    [[nodiscard]] std::future<void> calculateAvoidance(std::deque<RadiusLayerPair> keys);
+    void calculateAvoidance(std::deque<RadiusLayerPair> keys);
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model.
@@ -226,10 +225,8 @@ class TreeModelVolumes
      * \brief Creates the areas where a branch of a given radius can be placed on the model.
      * Result is saved in the cache.
      * \param keys RadiusLayerPair of the requested areas. The radius will be calculated up to the provided layer.
-     *
-     * \return A future that has to be waited on
      */
-    [[nodiscard]] std::future<void> calculatePlaceables(std::deque<RadiusLayerPair> keys);
+    void calculatePlaceables(std::deque<RadiusLayerPair> keys);
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model without being able to place a branch with given radius on a single layer.
@@ -237,10 +234,8 @@ class TreeModelVolumes
      * The result is a 2D area that would cause nodes of radius \p radius to
      * collide with the model in a not wanted way. Result is saved in the cache.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
-     *
-     * \return A future that has to be waited on
      */
-    [[nodiscard]] std::future<void> calculateAvoidanceToModel(std::deque<RadiusLayerPair> keys);
+    void calculateAvoidanceToModel(std::deque<RadiusLayerPair> keys);
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model without being able to place a branch with given radius on a single layer.
@@ -259,10 +254,8 @@ class TreeModelVolumes
      * These areas are at least xy_min_dist wide. When calculating it is always assumed that every wall is printed on top of another (as in has an overlap with the wall a layer below). Result is saved in the corresponding cache.
      *
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
-     *
-     * \return A future that has to be waited on
      */
-    [[nodiscard]] std::future<void> calculateWallRestrictions(std::deque<RadiusLayerPair> keys);
+    void calculateWallRestrictions(std::deque<RadiusLayerPair> keys);
 
     /*!
      * \brief Creates the areas that can not be passed when expanding an area downwards. As such these areas are an somewhat abstract representation of a wall (as in a printed object).
