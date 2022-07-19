@@ -2452,7 +2452,7 @@ void GUI_App::update_mode()
 void GUI_App::add_config_menu(wxMenuBar *menu)
 {
     auto local_menu = new wxMenu();
-    wxWindowID config_id_base = wxWindow::NewControlId(int(ConfigMenuCnt + Slic3r::GUI::get_app_config()->tags().size()));
+    wxWindowID config_id_base = wxWindow::NewControlId(int(ConfigMenuCnt + Slic3r::GUI::get_app_config()->tags().size()*2));
 
     const auto config_wizard_name = _(ConfigWizard::name(true));
     const auto config_wizard_tooltip = from_u8((boost::format(_utf8(L("Run %s"))) % config_wizard_name).str());
@@ -2476,6 +2476,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
 #endif
         _L("Application preferences"));
     wxMenu* mode_menu = nullptr;
+    wxMenu* tag_menu = nullptr;
     if (is_editor()) {
         local_menu->AppendSeparator();
         mode_menu = new wxMenu();
@@ -2487,6 +2488,15 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
         }
 
         local_menu->AppendSubMenu(mode_menu, _L("Mode"), wxString::Format(_L("%s View Mode"), SLIC3R_APP_NAME));
+
+        tag_menu = new wxMenu();
+        for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
+            tag_menu->AppendCheckItem(config_id_base + ConfigMenuCnt + config_menu_idx, _(tag.name), _(tag.description));
+            Bind(wxEVT_UPDATE_UI, [this, tag](wxUpdateUIEvent& evt) { evt.Check((get_mode() & tag.tag) != 0); }, config_id_base + ConfigMenuCnt + config_menu_idx);
+            config_menu_idx++;
+        }
+
+        local_menu->AppendSubMenu(tag_menu, _L("Tags"), wxString::Format(_L("%s View Mode"), SLIC3R_APP_NAME));
     }
     local_menu->AppendSeparator();
     local_menu->Append(config_id_base + ConfigMenuLanguage, _L("&Language"));
@@ -2632,11 +2642,18 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     using std::placeholders::_1;
 
     if (mode_menu != nullptr) {
-        auto modfn = [this](ConfigOptionMode mode, wxCommandEvent&) { if (get_mode() != mode) save_mode(get_mode() ^ mode); };
+        auto modefn = [this](ConfigOptionMode mode, wxCommandEvent&) { if (get_mode() != mode) save_mode(mode); };
         int config_menu_idx = 0;
         for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
-            mode_menu->Bind(wxEVT_MENU, std::bind(modfn, tag.tag, _1), config_id_base + ConfigMenuCnt + config_menu_idx);
+            mode_menu->Bind(wxEVT_MENU, std::bind(modefn, tag.tag, _1), config_id_base + ConfigMenuCnt + config_menu_idx);
             config_menu_idx++;
+        }
+        if (tag_menu != nullptr) {
+            auto tagfn = [this](ConfigOptionMode mode, wxCommandEvent&) { if (get_mode() != mode) save_mode(get_mode() ^ mode); };
+            for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
+                tag_menu->Bind(wxEVT_MENU, std::bind(tagfn, tag.tag, _1), config_id_base + ConfigMenuCnt + config_menu_idx);
+                config_menu_idx++;
+            }
         }
         //mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comSimple, _1), config_id_base + ConfigMenuModeSimple);
         //mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comAdvanced, _1), config_id_base + ConfigMenuModeAdvanced);

@@ -74,6 +74,12 @@ then
         echo -e "\nFind libgtk-3, installing: libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
         apt install libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git
     fi
+    # for ubuntu 22.04:
+    ubu_version="$(cat /etc/issue)" 
+    if [[ $ubu_version == "Ubuntu 22.04"* ]]
+    then
+        apt install curl libssl-dev libcurl4-openssl-dev m4
+    fi
     if [[ -n "$BUILD_DEBUG" ]]
     then
         echo -e "\nInstalling: libssl-dev libcurl4-openssl-dev\n"

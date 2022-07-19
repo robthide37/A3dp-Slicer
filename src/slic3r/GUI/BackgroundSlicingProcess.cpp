@@ -20,6 +20,7 @@
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/GCode/PostProcessor.hpp"
+#include "libslic3r/Format/Format.hpp"
 #include "libslic3r/Format/SL1.hpp"
 #include "libslic3r/Thread.hpp"
 #include "libslic3r/libslic3r.h"
@@ -196,7 +197,7 @@ void BackgroundSlicingProcess::process_sla()
                 ThumbnailsParams{current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, true, true, true});
 
             Zipper zipper(export_path);
-            m_sla_archive.export_print(zipper, *m_sla_print);
+            m_sla_archive->export_print(zipper, *m_sla_print);
                 for (const ThumbnailData& data : thumbnails)
                     if (data.is_valid())
                         write_thumbnail(zipper, data);
@@ -593,6 +594,10 @@ Print::ApplyStatus BackgroundSlicingProcess::apply(const Model &model, const Dyn
 		if (m_gcode_result != nullptr)
 			m_gcode_result->reset();
 	}
+	if (invalidated && m_print->technology() == ptSLA) {
+			m_sla_archive = Slic3r::get_output_format(config);
+			m_sla_print->set_printer(m_sla_archive);
+	}
 	return invalidated;
 }
 
@@ -764,7 +769,7 @@ void BackgroundSlicingProcess::prepare_upload()
         	ThumbnailsParams{current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, true, true, true});
 																												 // true, false, true, true); // renders also supports and pad
         Zipper zipper{source_path.string()};
-        m_sla_archive.export_print(zipper, *m_sla_print, m_upload_job.upload_data.upload_path.string());
+        m_sla_archive->export_print(zipper, *m_sla_print, m_upload_job.upload_data.upload_path.string());
             for (const ThumbnailData& data : thumbnails)
                 if (data.is_valid())
                     write_thumbnail(zipper, data);

@@ -2,6 +2,7 @@
 #include "Config.hpp"
 #include "Flow.hpp"
 #include "I18N.hpp"
+#include "Utils.hpp"
 
 #include <set>
 #include <unordered_set>
@@ -3521,7 +3522,8 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::speed;
     def->tooltip = L("If a top surface has to be printed and it's partially covered by another layer, it won't be considered at a top layer where its width is below this value."
         " This can be useful to not let the 'one perimeter on top' trigger on surface that should be covered only by perimeters."
-        " This value can be a mm or a % of the perimeter extrusion width.");
+        " This value can be a mm or a % of the perimeter extrusion width."
+        "\nWarning: If enabled, artifacts can be created is you have some thin features on the next layer, like letters. Set this setting to 0 to remove these artifacts.");
     def->sidetext = L("mm or %");
     def->ratio_over = "perimeter_extrusion_width";
     def->min = 0;
@@ -3914,7 +3916,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Round corners for perimeters");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Internal perimeters will go around sharp corners by turning around instead of making the same sharp corner."
-                        " This can help when there are visible holes in sharp corners on perimeters. It also help to print the letters on the benchy stern."
+                        " This can help when there are visible holes in sharp corners on internal perimeters."
                         "\nCan incur some more processing time, and corners are a bit less sharp.");
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
@@ -3954,7 +3956,9 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("If you want to process the output G-code through custom scripts, "
                    "just list their absolute paths here. Separate multiple scripts with a semicolon. "
                    "Scripts will be passed the absolute path to the G-code file as the first argument, "
-                   "and they can access the Slic3r config settings by reading environment variables.");
+                   "and they can access the Slic3r config settings by reading environment variables."
+                   "\nThe script, if passed as a relative path, will also be searched from the slic3r directory, "
+                   "the slic3r configuration directory and the user directory.");
     def->gui_flags = "serialized";
     def->multiline = true;
     def->full_width = true;
@@ -6756,7 +6760,7 @@ void PrintConfigDef::init_sla_params()
     def->enum_labels.push_back(L("Masked CWS"));
     def->enum_labels.push_back(L("Prusa SL1"));
     def->mode = comAdvancedE | comSuSi; // output_format should be preconfigured in profiles;
-    def->set_default_value(new ConfigOptionEnum<OutputFormat>(ofMaskedCWS));
+    def->set_default_value(new ConfigOptionEnum<OutputFormat>(ofSL1));
 
     def = this->add("sla_output_precision", coFloat);
     def->label = L("SLA output precision");
@@ -7408,9 +7412,14 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         if (std::set<std::string>{"extrusion_width", "first_layer_extrusion_width", "perimeter_extrusion_width", "external_perimeter_extrusion_width", 
             "infill_extrusion_width", "solid_infill_extrusion_width", "top_infill_extrusion_width"}.count(opt_key) > 0) {
             const ConfigOptionFloatOrPercent* opt = all_conf.option<ConfigOptionFloatOrPercent>(opt_key);
-            if (opt->is_phony()) {
-                //bypass the phony kill switch from Config::opt_serialize
-                value = opt->serialize();
+            if (opt->is_phony() || opt->percent) {
+                if (opt->percent) {
+                    ConfigOptionFloat opt_temp{ opt->get_abs_value(all_conf.option<ConfigOptionFloats>("nozzle_diameter")->values.front()) };
+                    value = opt_temp.serialize();
+                } else {
+                    //bypass the phony kill switch from Config::opt_serialize
+                    value = opt->serialize();
+                }
             }
         }
     }
@@ -7437,10 +7446,13 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
     if ("host_type" == opt_key) {
         if ("klipper" == value || "mpmdv2" == value || "monoprice" == value) value = "octoprint";
     }
-    if ("fan_below_layer_time" == opt_key)
+    if ("fan_below_layer_time" == opt_key) {
         if (value.find('.') != std::string::npos)
             value = value.substr(0, value.find('.'));
-
+    }
+    if ("bed_custom_texture" == opt_key || "Bed custom texture" == opt_key) {
+        value = Slic3r::find_full_path(value, value).generic_string();
+    }
     return new_entries;
 }
 

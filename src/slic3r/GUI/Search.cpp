@@ -112,7 +112,8 @@ static Option create_option(const std::string& opt_key, Preset::Type type, const
                                     (label + suffix).ToStdWstring(), (local_label + suffix_local).ToStdWstring(),
                                     gc.group.ToStdWstring(), _(gc.group).ToStdWstring(),
                                     category.ToStdWstring(), GUI::Tab::translate_category(category, type).ToStdWstring() ,
-                                    wxString(opt.tooltip).ToStdWstring(), (_(opt.tooltip)).ToStdWstring() };
+                                    wxString(opt.tooltip).ToStdWstring(), (_(opt.tooltip)).ToStdWstring(),
+                                    boost::algorithm::to_lower_copy(wxString(opt.tooltip).ToStdWstring()), boost::algorithm::to_lower_copy((_(opt.tooltip)).ToStdWstring()) };
     return Option{};
 
 }
@@ -385,26 +386,29 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
 
         std::wstring wsearch       = boost::nowide::widen(search);
         boost::trim_left(wsearch);
+        boost::algorithm::to_lower(wsearch);
         std::wstring label         = get_label(opt, false);
         std::wstring label_english = get_label_english(opt, false);
+        std::wstring label_lowercase         = boost::algorithm::to_lower_copy(label);
+        std::wstring label_english_lowercase = boost::algorithm::to_lower_copy(label_english);
         int score = std::numeric_limits<int>::min();
         int score2;
         matches.clear();
         
         //search for label
         if(view_params.exact)
-            strong_match(wsearch, label, score, matches);
+            strong_match(wsearch, label_lowercase, score, matches);
         else
-            fuzzy_match(wsearch, label, score, matches);
+            fuzzy_match(wsearch, label_lowercase, score, matches);
 
         //search in english label
-        if (view_params.english && (view_params.exact ? strong_match(wsearch, label_english, score2, matches2) : fuzzy_match(wsearch, label_english, score2, matches2)) && score2 > score) {
+        if (view_params.english && (view_params.exact ? strong_match(wsearch, label_english_lowercase, score2, matches2) : fuzzy_match(wsearch, label_english_lowercase, score2, matches2)) && score2 > score) {
         	label   = std::move(label_english);
         	matches = std::move(matches2);
         	score   = score2;
         }
 
-        //search in opt_key
+        //search in opt_key (key is always lowercase)
         if ((view_params.exact ? strong_match(wsearch, opt.key, score2, matches2) : fuzzy_match(wsearch, opt.key, score2, matches2)) && (view_params.exact || score2 > score)) {
             for (fts::pos_type& pos : matches2)
                 pos += label.size() + 1;
@@ -417,9 +421,10 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
         size_t find_in_tooltip = std::wstring::npos;
         if (score <= 90) {
             //strong_match(wsearch, opt.tooltip_local, score2, matches2);  //Too slow
-            find_in_tooltip = opt.tooltip_local.find(wsearch);
+            std::wstring tooltip_lowercase = opt.tooltip_local;
+            find_in_tooltip = opt.tooltip_local_lowercase.find(wsearch);
             if (find_in_tooltip == std::wstring::npos && view_params.english) {
-                find_in_tooltip = opt.tooltip.find(wsearch);
+                find_in_tooltip = opt.tooltip_lowercase.find(wsearch);
             }
         }
         if (score > 90/*std::numeric_limits<int>::min()*/ || find_in_tooltip != std::wstring::npos) {
