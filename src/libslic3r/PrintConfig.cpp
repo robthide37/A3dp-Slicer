@@ -2,6 +2,7 @@
 #include "Config.hpp"
 #include "Flow.hpp"
 #include "I18N.hpp"
+#include "Utils.hpp"
 
 #include <set>
 #include <unordered_set>
@@ -3955,7 +3956,9 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("If you want to process the output G-code through custom scripts, "
                    "just list their absolute paths here. Separate multiple scripts with a semicolon. "
                    "Scripts will be passed the absolute path to the G-code file as the first argument, "
-                   "and they can access the Slic3r config settings by reading environment variables.");
+                   "and they can access the Slic3r config settings by reading environment variables."
+                   "\nThe script, if passed as a relative path, will also be searched from the slic3r directory, "
+                   "the slic3r configuration directory and the user directory.");
     def->gui_flags = "serialized";
     def->multiline = true;
     def->full_width = true;
@@ -7443,10 +7446,13 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
     if ("host_type" == opt_key) {
         if ("klipper" == value || "mpmdv2" == value || "monoprice" == value) value = "octoprint";
     }
-    if ("fan_below_layer_time" == opt_key)
+    if ("fan_below_layer_time" == opt_key) {
         if (value.find('.') != std::string::npos)
             value = value.substr(0, value.find('.'));
-
+    }
+    if ("bed_custom_texture" == opt_key || "Bed custom texture" == opt_key) {
+        value = Slic3r::find_full_path(value, value).generic_string();
+    }
     return new_entries;
 }
 
