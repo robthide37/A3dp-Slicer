@@ -1,4 +1,9 @@
-// Copyright (c) 2019 Ultimaker B.V.
+// Tree supports by Thomas Rahm, losely based on Tree Supports by CuraEngine.
+// Original source of Thomas Rahm's tree supports:
+// https://github.com/ThomasRahm/CuraEngine
+//
+// Original CuraEngine copyright:
+// Copyright (c) 2021 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "TreeSupport.h"
