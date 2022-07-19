@@ -403,9 +403,6 @@ std::tuple<LayerIslands, PixelGrid, std::vector<size_t>> reckon_islands(
         const std::vector<ExtrusionLine> &layer_lines,
         const Params &params) {
 
-    BOOST_LOG_TRIVIAL(debug)
-    << "SSG: reckon islands on printz: " << layer->print_z;
-
     //extract extrusions (connected paths from multiple lines) from the layer_lines. belonging to single polyline is determined by origin_entity ptr.
     // result is a vector of [start, end) index pairs into the layer_lines vector
     std::vector<std::pair<size_t, size_t>> extrusions; //start and end idx (one beyond last extrusion) [start,end)
@@ -418,17 +415,6 @@ std::tuple<LayerIslands, PixelGrid, std::vector<size_t>> reckon_islands(
             extrusions.emplace_back(lidx, lidx + 1);
             current_ex = line.origin_entity;
         }
-    }
-
-    BOOST_LOG_TRIVIAL(debug)
-    << "SSG: layer_lines size: " << layer_lines.size();
-    BOOST_LOG_TRIVIAL(debug)
-    << "SSG: extrusions count: " << extrusions.size();
-    BOOST_LOG_TRIVIAL(debug)
-    << "SSG: extrusions sizes: ";
-    for (const auto &ext : extrusions) {
-        BOOST_LOG_TRIVIAL(debug)
-        << "SSG: " << ext.second - ext.first;
     }
 
     std::vector<LinesDistancer> islands; // these search trees will be used to determine to which island does the extrusion begin
@@ -457,8 +443,6 @@ std::tuple<LayerIslands, PixelGrid, std::vector<size_t>> reckon_islands(
         island_extrusions.push_back( { 0 });
     }
 
-    BOOST_LOG_TRIVIAL(debug)
-    << "SSG: external perims: " << islands.size();
     // assign non external extrusions to islands
     for (size_t e = 0; e < extrusions.size(); ++e) {
         if (!layer_lines[extrusions[e].first].is_external_perimeter()) {
@@ -496,9 +480,6 @@ std::tuple<LayerIslands, PixelGrid, std::vector<size_t>> reckon_islands(
             }
         }
     }
-
-    BOOST_LOG_TRIVIAL(debug)
-    << "SSG: filter islands";
 
     float flow_width = get_flow_width(layer->regions()[0], erExternalPerimeter);
     // after filtering the layer lines into islands, build the result LayerIslands structure.
@@ -542,9 +523,6 @@ std::tuple<LayerIslands, PixelGrid, std::vector<size_t>> reckon_islands(
         result.islands.push_back(island);
     }
 
-    BOOST_LOG_TRIVIAL(debug)
-    << "SSG: There are " << result.islands.size() << " islands on printz: " << layer->print_z;
-
     //LayerIslands structure built. Now determine connections and their areas to the previous layer using raterization.
     PixelGrid current_layer_grid = prev_layer_grid;
     current_layer_grid.clear();
@@ -559,9 +537,6 @@ std::tuple<LayerIslands, PixelGrid, std::vector<size_t>> reckon_islands(
                 }
             });
 
-    BOOST_LOG_TRIVIAL(debug)
-    << "SSG: rasterized";
-
     //compare the image of previous layer with the current layer. For each pair of overlapping valid pixels, add pixel area to the respecitve island connection
     for (size_t x = 0; x < size_t(current_layer_grid.get_pixel_count().x()); ++x) {
         for (size_t y = 0; y < size_t(current_layer_grid.get_pixel_count().y()); ++y) {
@@ -574,10 +549,6 @@ std::tuple<LayerIslands, PixelGrid, std::vector<size_t>> reckon_islands(
             }
         }
     }
-
-    BOOST_LOG_TRIVIAL(debug)
-    << "SSG: connection area computed";
-
     return {result, current_layer_grid, line_to_island_mapping};
 }
 
@@ -590,11 +561,6 @@ void check_global_stability(
         Issues &issues,
         const Params &params
         ) {
-
-    std::cout << "there are " << islands_graph.back().islands.size() << " islands, " << layer_lines.size() << " lines" << std::endl;
-    for (int i = 0; i < line_to_island_mapping.size(); ++i) {
-        std::cout << "line " << i << " belongs to island " << line_to_island_mapping[i] << std::endl;
-    }
     // vector of islands, where each contains vector of line indices (to layer_lines vector)
     // basically reverse of line_to_island_mapping
     std::vector<std::vector<size_t>> islands_lines(islands_graph.back().islands.size());
@@ -610,8 +576,6 @@ void check_global_stability(
     for (size_t island_idx = 0; island_idx < islands_graph.back().islands.size(); ++island_idx) {
         Island &island = islands_graph.back().islands[island_idx];
 
-        std::cout << "TOP LEVEL ITERATION FOR ISLAND: " << island_idx << std::endl;
-
         std::vector<ExtrusionLine> island_external_lines;
         for (size_t lidx : islands_lines[island_idx]) {
             island_external_lines.push_back(layer_lines[lidx]);
@@ -623,7 +587,6 @@ void check_global_stability(
         int layer_idx = islands_graph.size() - 1;
         // traverse the islands graph down, and for each connection area, calculate if it holds or breaks
         while (acc.islands_under_with_connection_area.size() > 0) {
-            std::cout << "PARTIAL ITERATION FOR LAYER: " << layer_idx << std::endl;
             //test for break between layer_idx and layer_idx -1;
             LayerIslands below = islands_graph[layer_idx - 1]; // must exist, see while condition
             layer_idx--;
@@ -738,7 +701,6 @@ void check_global_stability(
             }
         }
 
-        std::cout << "FINAL ITERATION FOR THE BED LEVEL: " << acc.volume << std::endl;
         // We have arrived to the bed level, now check for stability of the object part on the bed
         std::vector<Vec2f> pivot_points;
         for (const Vec3f &p_point : acc.pivot_points) {
@@ -833,9 +795,6 @@ Issues check_object_stability(const PrintObject *po, const Params &params) {
     float flow_width = get_flow_width(po->layers()[po->layer_count() - 1]->regions()[0], erExternalPerimeter);
     PixelGrid prev_layer_grid(po, flow_width);
     SupportGridFilter supports_presence_grid { po, params.min_distance_between_support_points };
-
-    BOOST_LOG_TRIVIAL(debug)
-    << "SSG: flow width: " << flow_width;
 
     // PREPARE BASE LAYER
     const Layer *layer = po->layers()[0];
