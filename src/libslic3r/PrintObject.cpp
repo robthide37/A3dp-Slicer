@@ -457,14 +457,20 @@ std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> PrintObject::prepare
 
 FillLightning::GeneratorPtr PrintObject::prepare_lightning_infill_data()
 {
-    bool has_lightning_infill = false;
+    bool     has_lightning_infill = false;
+    coordf_t lightning_density    = 0.;
+    size_t   lightning_cnt        = 0;
     for (size_t region_id = 0; region_id < this->num_printing_regions(); ++region_id)
         if (const PrintRegionConfig &config = this->printing_region(region_id).config(); config.fill_density > 0 && config.fill_pattern == ipLightning) {
             has_lightning_infill = true;
-            break;
+            lightning_density   += config.fill_density;
+            ++lightning_cnt;
         }
 
-    return has_lightning_infill ? FillLightning::build_generator(std::as_const(*this), [this]() -> void { this->throw_if_canceled(); }) : FillLightning::GeneratorPtr();
+    if (has_lightning_infill)
+        lightning_density /= coordf_t(lightning_cnt);
+
+    return has_lightning_infill ? FillLightning::build_generator(std::as_const(*this), lightning_density, [this]() -> void { this->throw_if_canceled(); }) : FillLightning::GeneratorPtr();
 }
 
 void PrintObject::clear_layers()

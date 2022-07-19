@@ -58,9 +58,9 @@ PressureEqualizer::PressureEqualizer(const Slic3r::GCodeConfig &config) : m_use_
         extrusion_rate_slope.positive = m_max_volumetric_extrusion_rate_slope_positive;
     }
 
-    // Don't regulate the pressure in infill and gap fill.
+    // Don't regulate the pressure in infill, gap fill and ironing.
     // TODO: Do we want to regulate pressure in erWipeTower, erCustom and erMixed?
-    for (const ExtrusionRole er : {erBridgeInfill, erGapFill}) {
+    for (const ExtrusionRole er : {erBridgeInfill, erGapFill, erIroning}) {
         m_max_volumetric_extrusion_rate_slopes[er].negative = 0;
         m_max_volumetric_extrusion_rate_slopes[er].positive = 0;
     }
@@ -517,7 +517,7 @@ void PressureEqualizer::adjust_volumetric_rate()
                 // Limit by the succeeding volumetric flow rate.
                 rate_end = rate_succ;
 
-            if (line.extrusion_role == erExternalPerimeter || line.extrusion_role == erGapFill || line.extrusion_role == erBridgeInfill) {
+            if (line.extrusion_role == erExternalPerimeter || line.extrusion_role == erGapFill || line.extrusion_role == erBridgeInfill || line.extrusion_role == erIroning) {
                 rate_end = line.volumetric_extrusion_rate_end;
             } else if (line.volumetric_extrusion_rate_end > rate_end) {
                 line.volumetric_extrusion_rate_end = rate_end;
@@ -562,7 +562,7 @@ void PressureEqualizer::adjust_volumetric_rate()
                 continue; // The positive rate is unlimited or the rate for ExtrusionRole iRole is unlimited.
 
             float rate_start = feedrate_per_extrusion_role[iRole];
-            if (line.extrusion_role == erExternalPerimeter || line.extrusion_role == erGapFill || line.extrusion_role == erBridgeInfill) {
+            if (line.extrusion_role == erExternalPerimeter || line.extrusion_role == erGapFill || line.extrusion_role == erBridgeInfill || line.extrusion_role == erIroning) {
                 rate_start = line.volumetric_extrusion_rate_start;
             } else if (iRole == line.extrusion_role && rate_prec < rate_start)
                 rate_start = rate_prec;

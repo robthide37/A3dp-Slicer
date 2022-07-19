@@ -112,11 +112,11 @@ void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const 
         //h = L / b           [divide by b]
         //h^2 = (L / b)^2     [square it]
         //h^2 = L^2 / b^2     [factor the divisor]
-        const int64_t height_2 = int64_t(double(area_removed_so_far) * double(area_removed_so_far) / double(base_length_2));
-        coord_t weighted_average_width;
+        const auto    height_2 = int64_t(double(area_removed_so_far) * double(area_removed_so_far) / double(base_length_2));
+        coord_t       weighted_average_width;
         const int64_t extrusion_area_error = calculateExtrusionAreaDeviationError(previous, current, next, weighted_average_width);
-        if ((height_2 <= 1 //Almost exactly colinear (barring rounding errors).
-             && Line::distance_to_infinite(current.p, previous.p, next.p) <= 1.) // Make sure that height_2 is not small because of cancellation of positive and negative areas
+        if ((height_2 <= scaled<coord_t>(0.001) //Almost exactly colinear (barring rounding errors).
+             && Line::distance_to_infinite(current.p, previous.p, next.p) <= scaled<double>(0.001)) // Make sure that height_2 is not small because of cancellation of positive and negative areas
             // We shouldn't remove middle junctions of colinear segments if the area changed for the C-P segment is exceeding the maximum allowed
              && extrusion_area_error <= maximum_extrusion_area_deviation)
         {
@@ -268,13 +268,13 @@ void extrusion_paths_append(ExtrusionPaths &dst, const ClipperLib_Z::Paths &extr
 {
     for (const ClipperLib_Z::Path &extrusion_path : extrusion_paths) {
         ThickPolyline thick_polyline = Arachne::to_thick_polyline(extrusion_path);
-        Slic3r::append(dst, thick_polyline_to_extrusion_paths(thick_polyline, role, flow, scaled<float>(0.05), 0));
+        Slic3r::append(dst, thick_polyline_to_extrusion_paths(thick_polyline, role, flow, scaled<float>(0.05), SCALED_EPSILON));
     }
 }
 
 void extrusion_paths_append(ExtrusionPaths &dst, const Arachne::ExtrusionLine &extrusion, const ExtrusionRole role, const Flow &flow)
 {
     ThickPolyline thick_polyline = Arachne::to_thick_polyline(extrusion);
-    Slic3r::append(dst, thick_polyline_to_extrusion_paths(thick_polyline, role, flow, scaled<float>(0.05), 0));
+    Slic3r::append(dst, thick_polyline_to_extrusion_paths(thick_polyline, role, flow, scaled<float>(0.05), SCALED_EPSILON));
 }
 } // namespace Slic3r
