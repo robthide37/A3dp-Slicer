@@ -52,9 +52,14 @@ bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
         
     } else if (mouse_event.LeftUp()) {
         if (m_mouse_left_down) {
-            // responsible for mouse left up after selecting plane
-            m_mouse_left_down = false;
-            return true;
+            if (m_hover_id == -1)
+                // no plane hovered
+                return false;
+            else {
+                // responsible for mouse left up after selecting plane
+                m_mouse_left_down = false;
+                return true;
+            }
         }
     } else if (mouse_event.Leaving()) {
         m_mouse_left_down = false;
