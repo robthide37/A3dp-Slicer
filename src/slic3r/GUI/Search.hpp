@@ -65,6 +65,8 @@ struct Option {
     std::wstring    category_local;
     std::wstring    tooltip;
     std::wstring    tooltip_local;
+    std::wstring    tooltip_lowercase;
+    std::wstring    tooltip_local_lowercase;
     std::string     opt_key() const;
 };
 
