@@ -379,7 +379,10 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     shader->set_uniform("view_normal_matrix", (Matrix3d)Matrix3d::Identity());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-    glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 11));
+//    glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
 
     // Render the color bar
@@ -575,7 +578,10 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
     const GLsizei h = (GLsizei)m_layers_texture.height;
     const GLsizei half_w = w / 2;
     const GLsizei half_h = h / 2;
-    glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 11));
+//    glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
     glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0));
     glsafe(::glTexImage2D(GL_TEXTURE_2D, 1, GL_RGBA, half_w, half_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0));
