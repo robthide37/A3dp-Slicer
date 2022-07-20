@@ -566,13 +566,33 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
     return {result, current_layer_grid};
 }
 
-struct ObjectPart {
+struct CoordinateFunctor {
+    const std::vector<Vec3f> *coordinates;
+    CoordinateFunctor(const std::vector<Vec3f> *coords) :
+            coordinates(coords) {
+    }
+    CoordinateFunctor() :
+            coordinates(nullptr) {
+    }
+
+    const float& operator()(size_t idx, size_t dim) const {
+        return coordinates->operator [](idx)[dim];
+    }
+};
+
+//TODO make pivot tree part of this structure, with cached invalidation, then recompute manually when needed
+class ObjectPart {
     float volume { };
     Vec3f volume_centroid_accumulator = Vec3f::Zero();
     float sticking_force { };
     Vec3f sticking_centroid_accumulator = Vec3f::Zero();
     std::vector<Vec3f> pivot_points { };
 
+    CoordinateFunctor pivots_coordinate_functor;
+    bool is_pivot_tree_valid = false;
+    KDTreeIndirect<3, float, CoordinateFunctor> pivot_tree { CoordinateFunctor { } };
+
+public:
     void add(const ObjectPart &other) {
         this->volume_centroid_accumulator += other.volume_centroid_accumulator;
         this->volume += other.volume;
@@ -587,9 +607,12 @@ struct ObjectPart {
         this->sticking_force = island.sticking_force;
         this->sticking_centroid_accumulator = island.sticking_centroid_accumulator;
         this->pivot_points = island.pivot_points;
+        this->pivots_coordinate_functor = CoordinateFunctor(&this->pivot_points);
     }
 
-    ObjectPart() = default;
+    ObjectPart() {
+        this->pivots_coordinate_functor = CoordinateFunctor(&this->pivot_points);
+    };
 };
 
 struct WeakestConnection {
@@ -690,6 +713,10 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
         next_island_to_object_part_mapping.clear();
         prev_island_to_weakest_connection = next_island_to_weakest_connection;
         next_island_to_weakest_connection.clear();
+
+        // All object parts updated, inactive parts removed and weakest point of each island updated as well.
+        // Now compute the stability of each active object part, adding supports where necessary, and also
+        // check each island whether the weakest point is strong enough. If not, add supports as well.
 
     }
     return issues;
