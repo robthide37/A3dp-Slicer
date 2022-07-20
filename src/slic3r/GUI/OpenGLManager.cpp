@@ -430,12 +430,12 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
             for (auto v = OpenGLVersions::core.rbegin(); v != OpenGLVersions::core.rend(); ++v) {
                 wxGLContextAttrs attrs;
 #if ENABLE_OPENGL_DEBUG_OPTION
-                attrs.MajorVersion(v->first).MinorVersion(v->second).CoreProfile().ForwardCompatible();
+                attrs.PlatformDefaults().MajorVersion(v->first).MinorVersion(v->second).CoreProfile().ForwardCompatible();
                 if (m_debug_enabled)
                     attrs.DebugCtx();
                 attrs.EndList();
 #else
-                attrs.MajorVersion(gl_major).MinorVersion(gl_minor).CoreProfile().ForwardCompatible().EndList();
+                attrs.PlatformDefaults().MajorVersion(gl_major).MinorVersion(gl_minor).CoreProfile().ForwardCompatible().EndList();
 #endif // ENABLE_OPENGL_DEBUG_OPTION
                 m_context = new wxGLContext(&canvas, nullptr, &attrs);
                 if (m_context->IsOK()) {
@@ -456,12 +456,12 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
                 wxLogNull logNo;
                 wxGLContextAttrs attrs;
 #if ENABLE_OPENGL_DEBUG_OPTION
-                attrs.MajorVersion(gl_major).MinorVersion(gl_minor).CoreProfile().ForwardCompatible();
+                attrs.PlatformDefaults().MajorVersion(gl_major).MinorVersion(gl_minor).CoreProfile().ForwardCompatible();
                 if (m_debug_enabled)
                     attrs.DebugCtx();
                 attrs.EndList();
 #else
-                attrs.MajorVersion(gl_major).MinorVersion(gl_minor).CoreProfile().ForwardCompatible().EndList();
+                attrs.PlatformDefaults().MajorVersion(gl_major).MinorVersion(gl_minor).CoreProfile().ForwardCompatible().EndList();
 #endif // ENABLE_OPENGL_DEBUG_OPTION
                 m_context = new wxGLContext(&canvas, nullptr, &attrs);
                 if (!m_context->IsOK()) {
@@ -477,6 +477,7 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
 #if ENABLE_OPENGL_DEBUG_OPTION
         if (m_context == nullptr) {
             wxGLContextAttrs attrs;
+            attrs.PlatformDefaults();
             if (m_debug_enabled)
                 attrs.DebugCtx();
             attrs.EndList();
