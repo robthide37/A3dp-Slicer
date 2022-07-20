@@ -13,8 +13,57 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "Polygon.hpp"
+#include "PrintConfig.hpp"
+
 namespace Slic3r
 {
+
+using LayerIndex = size_t;
+using AngleRadians = double;
+
+//FIXME
+class SliceDataStorage;
+class SliceMeshStorage;
+
+struct TreeSupportMeshGroupSettings {
+    AngleRadians                    support_tree_angle;
+    AngleRadians                    support_tree_angle_slow;
+    AngleRadians                    support_tree_branch_diameter_angle;
+    coord_t                         support_tree_bp_diameter;
+    coord_t                         support_tree_max_diameter_increase_by_merges_when_support_to_model;
+    coord_t                         support_tree_min_height_to_model;
+    coord_t                         support_line_width;
+    coord_t                         layer_height;
+    coord_t                         support_tree_branch_diameter;
+    coord_t                         support_tree_tip_diameter;
+    bool                            support_bottom_enable;
+    coord_t                         support_bottom_height;
+    bool                            support_material_buildplate_only;
+    bool                            support_xy_overrides_z;
+    coord_t                         support_xy_distance;
+    coord_t                         support_xy_distance_overhang;
+    coord_t                         support_top_distance;
+    coord_t                         support_bottom_distance;
+    coord_t                         support_interface_skip_height;
+    std::vector<AngleRadians>       support_infill_angles;
+    std::vector<AngleRadians>       support_roof_angles;
+    SupportMaterialInterfacePattern support_roof_pattern;
+    SupportMaterialPattern          support_pattern;
+    coord_t                         support_roof_line_width;
+    coord_t                         support_line_distance;
+    coord_t                         support_bottom_offset;
+    int                             support_wall_count;
+    coord_t                         meshfix_maximum_deviation;
+    coord_t                         meshfix_maximum_resolution;
+    coord_t                         support_roof_line_distance;
+    coord_t                         min_feature_size;
+};
+
+inline coord_t round_up_divide(const coord_t dividend, const coord_t divisor) //!< Return dividend divided by divisor rounded to the nearest integer
+{
+    return (dividend + divisor - 1) / divisor;
+}
 
 class TreeModelVolumes
 {
@@ -208,7 +257,7 @@ class TreeModelVolumes
      */
     void calculateAvoidance(RadiusLayerPair key)
     {
-        calculateAvoidance(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) }).wait();
+        calculateAvoidance(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) });
     }
 
     /*!
@@ -218,7 +267,7 @@ class TreeModelVolumes
      */
     void calculatePlaceables(RadiusLayerPair key)
     {
-        calculatePlaceables(std::deque<RadiusLayerPair>{ key }).wait();
+        calculatePlaceables(std::deque<RadiusLayerPair>{ key });
     }
 
     /*!
@@ -246,7 +295,7 @@ class TreeModelVolumes
      */
     void calculateAvoidanceToModel(RadiusLayerPair key)
     {
-        calculateAvoidanceToModel(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) }).wait();
+        calculateAvoidanceToModel(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) });
     }
     /*!
      * \brief Creates the areas that can not be passed when expanding an area downwards. As such these areas are an somewhat abstract representation of a wall (as in a printed object).
@@ -264,7 +313,7 @@ class TreeModelVolumes
      */
     void calculateWallRestrictions(RadiusLayerPair key)
     {
-        calculateWallRestrictions(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) }).wait();
+        calculateWallRestrictions(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) });
     }
 
     /*!
@@ -274,7 +323,7 @@ class TreeModelVolumes
      */
     template <typename KEY>
     const std::optional<std::reference_wrapper<const Polygons>> getArea(const std::unordered_map<KEY, Polygons>& cache, const KEY key) const;
-    bool checkSettingsEquality(const Settings& me, const Settings& other) const;
+    bool checkSettingsEquality(const TreeSupportMeshGroupSettings& me, const TreeSupportMeshGroupSettings& other) const;
     /*!
      * \brief Get the highest already calculated layer in the cache.
      * \param radius The radius for which the highest already calculated layer has to be found.
@@ -349,7 +398,7 @@ class TreeModelVolumes
     /*!
      * \brief Storage for layer outlines and the corresponding settings of the meshes grouped by meshes with identical setting.
      */
-    std::vector<std::pair<Settings, std::vector<Polygons>>> layer_outlines_;
+    std::vector<std::pair<TreeSupportMeshGroupSettings, std::vector<Polygons>>> layer_outlines_;
     /*!
      * \brief Storage for areas that should be avoided, like support blocker or previous generated trees.
      */

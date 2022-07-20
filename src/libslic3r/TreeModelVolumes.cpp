@@ -52,7 +52,7 @@ TreeModelVolumes::TreeModelVolumes(const SliceDataStorage& storage, const coord_
     current_outline_idx = mesh_to_layeroutline_idx[current_mesh_idx];
     TreeSupport::TreeSupportSettings config(layer_outlines_[current_outline_idx].first);
 
-    if (config.support_overrides == SupportDistPriority::Z_OVERRIDES_XY)
+    if (! config.support_xy_overrides_z)
     {
         current_min_xy_dist = config.xy_min_distance;
 
@@ -76,7 +76,7 @@ TreeModelVolumes::TreeModelVolumes(const SliceDataStorage& storage, const coord_
 
         tbb::parallel_for(tbb::blocked_range<size_t>(0, layer_outlines_[mesh_to_layeroutline_idx[mesh_idx]].second.size()),
             [&](const tbb::blocked_range<size_t> &range) {
-            for (const size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
+            for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
                 if (mesh.layer_nr_max_filled_layer < layer_idx)
                 {
                     return; // cant break as parallel_for wont allow it, this is equivalent to a continue
@@ -89,7 +89,7 @@ TreeModelVolumes::TreeModelVolumes(const SliceDataStorage& storage, const coord_
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, anti_overhang_.size()),
         [&](const tbb::blocked_range<size_t> &range) {
-        for (const size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
+        for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
             if (layer_idx < coord_t(additional_excluded_areas.size()))
             {
                 anti_overhang_[layer_idx].add(additional_excluded_areas[layer_idx]);
@@ -501,7 +501,7 @@ coord_t TreeModelVolumes::getRadiusNextCeil(coord_t radius, bool min_xy_dist) co
     return ceiled_radius;
 }
 
-bool TreeModelVolumes::checkSettingsEquality(const Settings& me, const Settings& other) const
+bool TreeModelVolumes::checkSettingsEquality(const TreeSupportMeshGroupSettings& me, const TreeSupportMeshGroupSettings& other) const
 {
     return TreeSupport::TreeSupportSettings(me) == TreeSupport::TreeSupportSettings(other);
 }

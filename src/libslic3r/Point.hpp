@@ -511,6 +511,13 @@ inline Point   align_to_grid(Point   coord, Point   spacing, Point   base)
 
 } // namespace Slic3r
 
+namespace std {
+    template <> struct hash<Slic3r::Point> {
+        size_t operator()(const Slic3r::Point &p) const
+        { return (89 * 31 + p.x()) * 31 + p.y(); }
+    };
+}
+
 // start Boost
 #include <boost/version.hpp>
 #include <boost/polygon/polygon.hpp>
