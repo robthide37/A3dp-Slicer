@@ -2966,6 +2966,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                         m_dirty = true;
 #endif // !ENABLE_NEW_RECTANGLE_SELECTION
                     }
+                    m_shift_kar_filter.reset_count();
 #if ENABLE_NEW_RECTANGLE_SELECTION
                     m_dirty = true;
 #endif // ENABLE_NEW_RECTANGLE_SELECTION
@@ -2989,6 +2990,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                         m_mouse.set_start_position_3D_as_invalid();
                     }
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS
+                    m_ctrl_kar_filter.reset_count();
                     m_dirty = true;
                 }
                 else if (m_gizmos.is_enabled() && !m_selection.is_empty()) {
@@ -3026,7 +3028,10 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
 //                        set_cursor(Cross);
                     }
 #if ENABLE_NEW_RECTANGLE_SELECTION
-                    m_dirty = true;
+                    if (m_shift_kar_filter.is_first())
+                        m_dirty = true;
+
+                    m_shift_kar_filter.increase_count();
 #endif // ENABLE_NEW_RECTANGLE_SELECTION
                 }
                 else if (keyCode == WXK_ALT) {
@@ -3035,8 +3040,12 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
 //                        set_cursor(Cross);
                     }
                 }
-                else if (keyCode == WXK_CONTROL)
-                    m_dirty = true;
+                else if (keyCode == WXK_CONTROL) {
+                    if (m_ctrl_kar_filter.is_first())
+                        m_dirty = true;
+
+                    m_ctrl_kar_filter.increase_count();
+                }
                 else if (m_gizmos.is_enabled() && !m_selection.is_empty()) {
                     auto do_rotate = [this](double angle_z_rad) {
                         m_selection.setup_cache();
