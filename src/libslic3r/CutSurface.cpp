@@ -760,8 +760,6 @@ indexed_triangle_set Slic3r::its_mask(const indexed_triangle_set &its,
         }
     }
     if (faces_count == 0) return {};
-    assert(vertices_count <= vertices.size());
-    assert(faces_count <= indices.size());
     
     indexed_triangle_set result;
     result.indices.reserve(faces_count);
