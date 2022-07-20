@@ -18,6 +18,7 @@
 #include "SkeletalTrapezoidationJoint.hpp"
 #include "libslic3r/Arachne/BeadingStrategy/BeadingStrategy.hpp"
 #include "SkeletalTrapezoidationGraph.hpp"
+#include "../Geometry/Voronoi.hpp"
 
 namespace Slic3r::Arachne
 {
@@ -590,6 +591,8 @@ protected:
      */
     void generateLocalMaximaSingleBeads();
 };
+
+bool is_voronoi_diagram_planar(const Geometry::VoronoiDiagram &voronoi_diagram);
 
 } // namespace Slic3r::Arachne
 #endif // VORONOI_QUADRILATERALIZATION_H
