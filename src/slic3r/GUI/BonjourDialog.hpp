@@ -8,6 +8,8 @@
 
 #include <wx/dialog.h>
 #include <wx/string.h>
+#include <boost/asio.hpp>
+#include <boost/nowide/convert.hpp>
 
 #include "libslic3r/PrintConfig.hpp"
 

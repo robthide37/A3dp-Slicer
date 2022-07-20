@@ -245,8 +245,7 @@ set(SLIC3R_SOURCES
     SlicingAdaptive.hpp
     Subdivide.cpp
     Subdivide.hpp
-#    SupportSpotsGenerator.cpp
-    SupportSpotsGeneratorRefactoring.cpp
+    SupportSpotsGenerator.cpp
     SupportSpotsGenerator.hpp
     SupportMaterial.cpp
     SupportMaterial.hpp
