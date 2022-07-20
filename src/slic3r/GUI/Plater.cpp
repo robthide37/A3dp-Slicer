@@ -1586,12 +1586,15 @@ std::string& Sidebar::get_search_line()
 class PlaterDropTarget : public wxFileDropTarget
 {
 public:
-    PlaterDropTarget(Plater* plater) : m_plater(plater) { this->SetDefaultAction(wxDragCopy); }
+    PlaterDropTarget(MainFrame& mainframe, Plater& plater) : m_mainframe(mainframe), m_plater(plater) {
+        this->SetDefaultAction(wxDragCopy);
+    }
 
     virtual bool OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &filenames);
 
 private:
-    Plater* m_plater;
+    MainFrame& m_mainframe;
+    Plater& m_plater;
 };
 
 bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &filenames)
@@ -1601,8 +1604,11 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &fi
     this->MSWUpdateDragImageOnLeave();
 #endif // WIN32
 
-    bool res = (m_plater != nullptr) ? m_plater->load_files(filenames) : false;
-    wxGetApp().mainframe->update_title();
+    m_mainframe.Raise();
+    m_mainframe.select_tab(size_t(0));
+    m_plater.select_view_3D("3D");
+    bool res = m_plater.load_files(filenames);
+    m_mainframe.update_title();
     return res;
 }
 
@@ -1656,6 +1662,9 @@ struct Plater::priv
     // objects would be frozen for the user. In case of arrange, an animation
     // could be shown, or with the optimize orientations, partial results
     // could be displayed.
+    //
+    // UIThreadWorker can be used as a replacement for BoostThreadWorker if
+    // no additional worker threads are desired (useful for debugging or profiling)
     PlaterWorker<BoostThreadWorker> m_worker;
     SLAImportDialog *               m_sla_import_dlg;
 
@@ -2082,6 +2091,9 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         view3D_canvas->Bind(EVT_GLCANVAS_WIPETOWER_MOVED, &priv::on_wipetower_moved, this);
         view3D_canvas->Bind(EVT_GLCANVAS_WIPETOWER_ROTATED, &priv::on_wipetower_rotated, this);
         view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_ROTATED, [this](SimpleEvent&) { update(); });
+#if ENABLE_WORLD_COORDINATE
+        view3D_canvas->Bind(EVT_GLCANVAS_RESET_SKEW, [this](SimpleEvent&) { update(); });
+#endif // ENABLE_WORLD_COORDINATE
         view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_SCALED, [this](SimpleEvent&) { update(); });
         view3D_canvas->Bind(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, [this](Event<bool>& evt) { this->sidebar->enable_buttons(evt.data); });
         view3D_canvas->Bind(EVT_GLCANVAS_UPDATE_GEOMETRY, &priv::on_update_geometry, this);
@@ -2138,7 +2150,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     }
 
     // Drop target:
-    q->SetDropTarget(new PlaterDropTarget(q));   // if my understanding is right, wxWindow takes the owenership
+    main_frame->SetDropTarget(new PlaterDropTarget(*main_frame, *q));   // if my understanding is right, wxWindow takes the owenership
     q->Layout();
 
     set_current_panel(wxGetApp().is_editor() ? static_cast<wxPanel*>(view3D) : static_cast<wxPanel*>(preview));
@@ -2927,7 +2939,7 @@ int Plater::priv::get_selected_volume_idx() const
     if ((0 > idx) || (idx > 1000))
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         return-1;
-    const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* v = selection.get_first_volume();
     if (model.objects[idx]->volumes.size() > 1)
         return v->volume_idx();
     return -1;
@@ -3489,7 +3501,11 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
     new_volume->set_type(old_volume->type());
     new_volume->set_material_id(old_volume->material_id());
     new_volume->set_transformation(old_volume->get_transformation());
+#if ENABLE_WORLD_COORDINATE
+    new_volume->translate(new_volume->get_transformation().get_matrix_no_offset() * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+#else
     new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+#endif // ENABLE_WORLD_COORDINATE
     assert(!old_volume->source.is_converted_from_inches || !old_volume->source.is_converted_from_meters);
     if (old_volume->source.is_converted_from_inches)
         new_volume->convert_from_imperial_units();
@@ -3526,7 +3542,7 @@ void Plater::priv::replace_with_stl()
     if (selection.is_wipe_tower() || get_selection().get_volume_idxs().size() != 1)
         return;
 
-    const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* v = selection.get_first_volume();
     int object_idx = v->object_idx();
     int volume_idx = v->volume_idx();
 
@@ -3844,10 +3860,16 @@ void Plater::priv::reload_from_disk()
                 new_volume->config.apply(old_volume->config);
                 new_volume->set_type(old_volume->type());
                 new_volume->set_material_id(old_volume->material_id());
+#if ENABLE_WORLD_COORDINATE
+                new_volume->set_transformation(Geometry::translation_transform(old_volume->source.transform.get_offset()) *
+                    old_volume->get_transformation().get_matrix_no_offset() * old_volume->source.transform.get_matrix_no_offset());
+                new_volume->translate(new_volume->get_transformation().get_matrix_no_offset() * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+#else
                 new_volume->set_transformation(Geometry::assemble_transform(old_volume->source.transform.get_offset()) *
                                                old_volume->get_transformation().get_matrix(true) *
                                                old_volume->source.transform.get_matrix(true));
                 new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+#endif // ENABLE_WORLD_COORDINATE
                 new_volume->source.object_idx = old_volume->source.object_idx;
                 new_volume->source.volume_idx = old_volume->source.volume_idx;
                 assert(!old_volume->source.is_converted_from_inches || !old_volume->source.is_converted_from_meters);
@@ -3862,6 +3884,9 @@ void Plater::priv::reload_from_disk()
                 old_model_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
 
                 sla::reproject_points_and_holes(old_model_object);
+
+                // Fix warning icon in object list
+                wxGetApp().obj_list()->update_item_error_icon(obj_idx, vol_idx);
             }
         }
 #else
@@ -6036,7 +6061,7 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
             if (selection.get_mode() == Selection::Instance)
                 mesh = mesh_to_export(*model_object, (selection.is_single_full_object() && model_object->instances.size() > 1) ? -1 : selection.get_instance_idx());
             else {
-                const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+                const GLVolume* volume = selection.get_first_volume();
                 mesh = model_object->volumes[volume->volume_idx()]->mesh();
                 mesh.transform(volume->get_volume_transformation().get_matrix(), true);
             }

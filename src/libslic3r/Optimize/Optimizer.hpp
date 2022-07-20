@@ -41,13 +41,13 @@ template<size_t N> using Bounds = std::array<Bound, N>;
 class StopCriteria {
 
     // If the absolute value difference between two scores.
-    double m_abs_score_diff = std::nan("");
+    double m_abs_score_diff = NaNd;
 
     // If the relative value difference between two scores.
-    double m_rel_score_diff = std::nan("");
+    double m_rel_score_diff = NaNd;
 
     // Stop if this value or better is found.
-    double m_stop_score = std::nan("");
+    double m_stop_score = NaNd;
 
     // A predicate that if evaluates to true, the optimization should terminate
     // and the best result found prior to termination should be returned.

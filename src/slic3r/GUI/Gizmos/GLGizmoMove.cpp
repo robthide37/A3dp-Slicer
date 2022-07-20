@@ -54,9 +54,7 @@ bool GLGizmoMove3D::on_mouse(const wxMouseEvent &mouse_event) {
 }
 
 void GLGizmoMove3D::data_changed() {
-    const Selection& selection = m_parent.get_selection();
-    bool is_wipe_tower = selection.is_wipe_tower();
-    m_grabbers[2].enabled = !is_wipe_tower;
+    m_grabbers[2].enabled = !m_parent.get_selection().is_wipe_tower();
 }
 
 bool GLGizmoMove3D::on_init()
@@ -99,12 +97,12 @@ void GLGizmoMove3D::on_start_dragging()
     if (coordinates_type == ECoordinatesType::World)
         m_starting_drag_position = m_center + m_grabbers[m_hover_id].center;
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
-        m_starting_drag_position = m_center + Geometry::assemble_transform(Vec3d::Zero(), v.get_instance_rotation()) * Geometry::assemble_transform(Vec3d::Zero(), v.get_volume_rotation()) * m_grabbers[m_hover_id].center;
+        const GLVolume& v = *selection.get_first_volume();
+        m_starting_drag_position = m_center + v.get_instance_transformation().get_rotation_matrix() * v.get_volume_transformation().get_rotation_matrix() * m_grabbers[m_hover_id].center;
     }
     else {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
-        m_starting_drag_position = m_center + Geometry::assemble_transform(Vec3d::Zero(), v.get_instance_rotation()) * m_grabbers[m_hover_id].center;
+        const GLVolume& v = *selection.get_first_volume();
+        m_starting_drag_position = m_center + v.get_instance_transformation().get_rotation_matrix() * m_grabbers[m_hover_id].center;
     }
     m_starting_box_center = m_center;
     m_starting_box_bottom_center = m_center;
@@ -135,7 +133,15 @@ void GLGizmoMove3D::on_dragging(const UpdateData& data)
         
     Selection &selection = m_parent.get_selection();
 #if ENABLE_WORLD_COORDINATE
-    selection.translate(m_displacement, wxGetApp().obj_manipul()->get_coordinates_type());
+    TransformationType trafo_type;
+    trafo_type.set_relative();
+    switch (wxGetApp().obj_manipul()->get_coordinates_type())
+    {
+    case ECoordinatesType::Instance: { trafo_type.set_instance(); break; }
+    case ECoordinatesType::Local: { trafo_type.set_local(); break; }
+    default: { break; }
+    }
+    selection.translate(m_displacement, trafo_type);
 #else
     selection.translate(m_displacement);
 #endif // ENABLE_WORLD_COORDINATE
@@ -249,7 +255,11 @@ void GLGizmoMove3D::on_render()
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
@@ -309,7 +319,11 @@ void GLGizmoMove3D::on_render()
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#if ENABLE_WORLD_COORDINATE
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix()* base_matrix);
+#else
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
@@ -502,10 +516,10 @@ Transform3d GLGizmoMove3D::local_transform(const Selection& selection) const
 {
     Transform3d ret = Geometry::assemble_transform(m_center);
     if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
-        Transform3d orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
+        const GLVolume& v = *selection.get_first_volume();
+        Transform3d orient_matrix = v.get_instance_transformation().get_rotation_matrix();
         if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
-            orient_matrix = orient_matrix * v.get_volume_transformation().get_matrix(true, false, true, true);
+            orient_matrix = orient_matrix * v.get_volume_transformation().get_rotation_matrix();
         ret = ret * orient_matrix;
     }
     return ret;
@@ -516,7 +530,7 @@ void GLGizmoMove3D::transform_to_local(const Selection& selection) const
     glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
 
     if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume& v = *selection.get_first_volume();
         Transform3d orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
         if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
             orient_matrix = orient_matrix * v.get_volume_transformation().get_matrix(true, false, true, true);
@@ -534,8 +548,9 @@ void GLGizmoMove3D::calc_selection_box_and_center()
         m_center = m_bounding_box.center();
     }
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
-        m_bounding_box = v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true));
+        const GLVolume& v = *selection.get_first_volume();
+        m_bounding_box = v.transformed_convex_hull_bounding_box(
+            v.get_instance_transformation().get_scaling_factor_matrix() * v.get_volume_transformation().get_scaling_factor_matrix());
         m_center = v.world_matrix() * m_bounding_box.center();
     }
     else {
@@ -545,8 +560,9 @@ void GLGizmoMove3D::calc_selection_box_and_center()
             const GLVolume& v = *selection.get_volume(id);
             m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
         }
-        m_bounding_box = m_bounding_box.transformed(selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(true, true, false, true));
-        m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(false, false, true, false) * m_bounding_box.center();
+        const Geometry::Transformation inst_trafo = selection.get_first_volume()->get_instance_transformation();
+        m_bounding_box = m_bounding_box.transformed(inst_trafo.get_scaling_factor_matrix());
+        m_center = inst_trafo.get_matrix_no_scaling_factor() * m_bounding_box.center();
     }
 }
 #endif // ENABLE_WORLD_COORDINATE

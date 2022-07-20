@@ -14,6 +14,7 @@
 #include <wx/debug.h>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/replace.hpp>
 #include <boost/log/trivial.hpp>
 
 #include "libslic3r/Print.hpp"
@@ -637,7 +638,9 @@ void MainFrame::update_title()
         }
     }
 
-    std::string build_id = wxGetApp().is_editor() ? SLIC3R_BUILD_ID : GCODEVIEWER_BUILD_ID;
+    std::string build_id = SLIC3R_BUILD_ID;
+    if (! wxGetApp().is_editor())
+        boost::replace_first(build_id, SLIC3R_APP_NAME, GCODEVIEWER_APP_NAME);
     size_t 		idx_plus = build_id.find('+');
     if (idx_plus != build_id.npos) {
     	// Parse what is behind the '+'. If there is a number, then it is a build number after the label, and full build ID is shown.
@@ -706,6 +709,10 @@ void MainFrame::init_tabpanel()
             // before the MainFrame is fully set up.
             tab->OnActivate();
             m_last_selected_tab = m_tabpanel->GetSelection();
+#ifdef _MSW_DARK_MODE
+            if (wxGetApp().tabs_as_menu())
+                tab->SetFocus();
+#endif
         }
         else
             select_tab(size_t(0)); // select Plater
@@ -1100,7 +1107,11 @@ static wxMenu* generate_help_menu()
     else
         append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("&About %s"), GCODEVIEWER_APP_NAME), _L("Show about dialog"),
             [](wxCommandEvent&) { Slic3r::GUI::about(); });
-    append_menu_item(helpMenu, wxID_ANY, _L("Show Tip of the Day"), _L("Opens Tip of the day notification in bottom right corner or shows another tip if already opened."),
+    append_menu_item(helpMenu, wxID_ANY, _L("Show Tip of the Day") 
+#if 0//debug
+        + "\tCtrl+Shift+T"
+#endif
+        ,_L("Opens Tip of the day notification in bottom right corner or shows another tip if already opened."),
         [](wxCommandEvent&) { wxGetApp().plater()->get_notification_manager()->push_hint_notification(false); });
     helpMenu->AppendSeparator();
     append_menu_item(helpMenu, wxID_ANY, _L("Keyboard Shortcuts") + sep + "&?", _L("Show the list of the keyboard shortcuts"),
@@ -2018,8 +2029,13 @@ void MainFrame::select_tab(size_t tab/* = size_t(-1)*/)
             m_plater->SetFocus();
         Layout();
     }
-    else
+    else {
         select(false);
+#ifdef _MSW_DARK_MODE
+        if (wxGetApp().tabs_as_menu() && tab == 0)
+            m_plater->SetFocus();
+#endif
+    }
 
     // When we run application in ESettingsLayout::New or ESettingsLayout::Dlg mode, tabpanel is hidden from the very beginning
     // and as a result Tab::update_changed_tree_ui() function couldn't update m_is_nonsys_values values,

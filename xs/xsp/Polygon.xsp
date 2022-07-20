@@ -23,7 +23,6 @@
         %code{% RETVAL = THIS->split_at_vertex(*point); %};
     Clone<Polyline> split_at_index(int index);
     Clone<Polyline> split_at_first_point();
-    Points equally_spaced_points(double distance);
     double length();
     double area();
     bool is_counter_clockwise();
@@ -35,18 +34,8 @@
     bool contains_point(Point* point)
         %code{% RETVAL = THIS->contains(*point); %};
     Polygons simplify(double tolerance);
-    Polygons triangulate_convex()
-        %code{% THIS->triangulate_convex(&RETVAL); %};
     Clone<Point> centroid();
     Clone<BoundingBox> bounding_box();
-    Clone<Point> point_projection(Point* point)
-        %code{% RETVAL = THIS->point_projection(*point); %};
-    Clone<Point> intersection(Line* line)
-        %code{%
-            Point p;
-            (void)THIS->intersection(*line, &p);
-            RETVAL = p;
-        %};
     Clone<Point> first_intersection(Line* line)
         %code{%
             Point p;

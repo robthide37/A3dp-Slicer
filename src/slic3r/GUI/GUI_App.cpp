@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <regex>
 #include <string_view>
+#include <boost/nowide/fstream.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
@@ -58,6 +59,7 @@
 #include "../Utils/Process.hpp"
 #include "../Utils/MacDarkMode.hpp"
 #include "../Utils/AppUpdater.hpp"
+#include "../Utils/WinRegistry.hpp"
 #include "slic3r/Config/Snapshot.hpp"
 #include "ConfigSnapshotDialog.hpp"
 #include "FirmwareDialog.hpp"
@@ -267,9 +269,9 @@ private:
             credits =   title + " " +
                         _L("is based on Slic3r by Alessandro Ranellucci and the RepRap community.") + "\n" +
                         _L("Developed by Prusa Research.")+ "\n\n" +
-                        title + " " + _L("is licensed under the") + " " + _L("GNU Affero General Public License, version 3") + "\n\n" +
+                        title + " " + _L("is licensed under the") + " " + _L("GNU Affero General Public License, version 3") + ".\n\n" +
                         _L("Contributions by Vojtech Bubnik, Enrico Turri, Oleksandra Iushchenko, Tamas Meszaros, Lukas Matena, Vojtech Kral, David Kocik and numerous others.") + "\n\n" +
-                        _L("Artwork model by M Boyer");
+                        _L("Artwork model by Leslie Ing");
 
             title_font = version_font = credits_font = init_font;
         }
@@ -736,7 +738,7 @@ void GUI_App::post_init()
     if (! this->initialized())
         throw Slic3r::RuntimeError("Calling post_init() while not yet initialized");
 
-    if (this->init_params->start_as_gcodeviewer) {
+    if (this->is_gcode_viewer()) {
         if (! this->init_params->input_files.empty())
             this->plater()->load_gcode(wxString::FromUTF8(this->init_params->input_files[0].c_str()));
     }
@@ -1960,15 +1962,17 @@ static const wxLanguageInfo* linux_get_existing_locale_language(const wxLanguage
                                  }),
                    locales.end());
 
-    // Is there a candidate matching a country code of a system language? Move it to the end,
-    // while maintaining the order of matches, so that the best match ends up at the very end.
-    std::string system_country = "_" + into_u8(system_language->CanonicalName.AfterFirst('_')).substr(0, 2);
-    int cnt = locales.size();
-    for (int i=0; i<cnt; ++i)
-        if (locales[i].find(system_country) != std::string::npos) {
-            locales.emplace_back(std::move(locales[i]));
-            locales[i].clear();
-        }
+    if (system_language) {
+        // Is there a candidate matching a country code of a system language? Move it to the end,
+        // while maintaining the order of matches, so that the best match ends up at the very end.
+        std::string system_country = "_" + into_u8(system_language->CanonicalName.AfterFirst('_')).substr(0, 2);
+        int cnt = locales.size();
+        for (int i=0; i<cnt; ++i)
+            if (locales[i].find(system_country) != std::string::npos) {
+                locales.emplace_back(std::move(locales[i]));
+                locales[i].clear();
+            }
+    }
 
     // Now try them one by one.
     for (auto it = locales.rbegin(); it != locales.rend(); ++ it)
@@ -3134,118 +3138,21 @@ bool GUI_App::open_browser_with_warning_dialog(const wxString& url, wxWindow* pa
 
 
 #ifdef __WXMSW__
-static bool set_into_win_registry(HKEY hkeyHive, const wchar_t* pszVar, const wchar_t* pszValue)
-{
-    // see as reference: https://stackoverflow.com/questions/20245262/c-program-needs-an-file-association
-    wchar_t szValueCurrent[1000];
-    DWORD dwType;
-    DWORD dwSize = sizeof(szValueCurrent);
-
-    int iRC = ::RegGetValueW(hkeyHive, pszVar, nullptr, RRF_RT_ANY, &dwType, szValueCurrent, &dwSize);
-
-    bool bDidntExist = iRC == ERROR_FILE_NOT_FOUND;
-
-    if ((iRC != ERROR_SUCCESS) && !bDidntExist)
-        // an error occurred
-        return false;
-
-    if (!bDidntExist) {
-        if (dwType != REG_SZ)
-            // invalid type
-            return false;
-
-        if (::wcscmp(szValueCurrent, pszValue) == 0)
-            // value already set
-            return false;
-    }
-
-    DWORD dwDisposition;
-    HKEY hkey;
-    iRC = ::RegCreateKeyExW(hkeyHive, pszVar, 0, 0, 0, KEY_ALL_ACCESS, nullptr, &hkey, &dwDisposition);
-    bool ret = false;
-    if (iRC == ERROR_SUCCESS) {
-        iRC = ::RegSetValueExW(hkey, L"", 0, REG_SZ, (BYTE*)pszValue, (::wcslen(pszValue) + 1) * sizeof(wchar_t));
-        if (iRC == ERROR_SUCCESS)
-            ret = true;
-    }
-
-    RegCloseKey(hkey);
-    return ret;
-}
-
 void GUI_App::associate_3mf_files()
 {
-    wchar_t app_path[MAX_PATH];
-    ::GetModuleFileNameW(nullptr, app_path, sizeof(app_path));
-
-    std::wstring prog_path = L"\"" + std::wstring(app_path) + L"\"";
-    std::wstring prog_id = L"Prusa.Slicer.1";
-    std::wstring prog_desc = L"PrusaSlicer";
-    std::wstring prog_command = prog_path + L" \"%1\"";
-    std::wstring reg_base = L"Software\\Classes";
-    std::wstring reg_extension = reg_base + L"\\.3mf";
-    std::wstring reg_prog_id = reg_base + L"\\" + prog_id;
-    std::wstring reg_prog_id_command = reg_prog_id + L"\\Shell\\Open\\Command";
-
-    bool is_new = false;
-    is_new |= set_into_win_registry(HKEY_CURRENT_USER, reg_extension.c_str(), prog_id.c_str());
-    is_new |= set_into_win_registry(HKEY_CURRENT_USER, reg_prog_id.c_str(), prog_desc.c_str());
-    is_new |= set_into_win_registry(HKEY_CURRENT_USER, reg_prog_id_command.c_str(), prog_command.c_str());
-
-    if (is_new)
-        // notify Windows only when any of the values gets changed
-        ::SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+    associate_file_type(L".3mf", L"Prusa.Slicer.1", L"PrusaSlicer", true);
 }
 
 void GUI_App::associate_stl_files()
 {
-    wchar_t app_path[MAX_PATH];
-    ::GetModuleFileNameW(nullptr, app_path, sizeof(app_path));
-
-    std::wstring prog_path = L"\"" + std::wstring(app_path) + L"\"";
-    std::wstring prog_id = L"Prusa.Slicer.1";
-    std::wstring prog_desc = L"PrusaSlicer";
-    std::wstring prog_command = prog_path + L" \"%1\"";
-    std::wstring reg_base = L"Software\\Classes";
-    std::wstring reg_extension = reg_base + L"\\.stl";
-    std::wstring reg_prog_id = reg_base + L"\\" + prog_id;
-    std::wstring reg_prog_id_command = reg_prog_id + L"\\Shell\\Open\\Command";
-
-    bool is_new = false;
-    is_new |= set_into_win_registry(HKEY_CURRENT_USER, reg_extension.c_str(), prog_id.c_str());
-    is_new |= set_into_win_registry(HKEY_CURRENT_USER, reg_prog_id.c_str(), prog_desc.c_str());
-    is_new |= set_into_win_registry(HKEY_CURRENT_USER, reg_prog_id_command.c_str(), prog_command.c_str());
-
-    if (is_new)
-        // notify Windows only when any of the values gets changed
-        ::SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+    associate_file_type(L".stl", L"Prusa.Slicer.1", L"PrusaSlicer", true);
 }
 
 void GUI_App::associate_gcode_files()
 {
-    wchar_t app_path[MAX_PATH];
-    ::GetModuleFileNameW(nullptr, app_path, sizeof(app_path));
-
-    std::wstring prog_path = L"\"" + std::wstring(app_path) + L"\"";
-    std::wstring prog_id = L"PrusaSlicer.GCodeViewer.1";
-    std::wstring prog_desc = L"PrusaSlicerGCodeViewer";
-    std::wstring prog_command = prog_path + L" \"%1\"";
-    std::wstring reg_base = L"Software\\Classes";
-    std::wstring reg_extension = reg_base + L"\\.gcode";
-    std::wstring reg_prog_id = reg_base + L"\\" + prog_id;
-    std::wstring reg_prog_id_command = reg_prog_id + L"\\Shell\\Open\\Command";
-
-    bool is_new = false;
-    is_new |= set_into_win_registry(HKEY_CURRENT_USER, reg_extension.c_str(), prog_id.c_str());
-    is_new |= set_into_win_registry(HKEY_CURRENT_USER, reg_prog_id.c_str(), prog_desc.c_str());
-    is_new |= set_into_win_registry(HKEY_CURRENT_USER, reg_prog_id_command.c_str(), prog_command.c_str());
-
-    if (is_new)
-        // notify Windows only when any of the values gets changed
-        ::SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+    associate_file_type(L".gcode", L"PrusaSlicer.GCodeViewer.1", L"PrusaSlicerGCodeViewer", true);
 }
 #endif // __WXMSW__
-
 
 void GUI_App::on_version_read(wxCommandEvent& evt)
 {

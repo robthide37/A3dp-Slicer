@@ -309,31 +309,24 @@ private:
     // Caching the transformed (m_trafo) raw mesh of the object
     mutable CachedObject<TriangleMesh>      m_transformed_rmesh;
     
-    class SupportData : public sla::SupportableMesh
+    struct SupportData
     {
-    public:
-        sla::SupportTree::UPtr  support_tree_ptr; // the supports
+        sla::SupportableMesh    input; // the input
         std::vector<ExPolygons> support_slices;   // sliced supports
-        TriangleMesh tree_mesh, pad_mesh, full_mesh;
+        TriangleMesh tree_mesh, pad_mesh, full_mesh; // cached artifacts
         
         inline SupportData(const TriangleMesh &t)
-            : sla::SupportableMesh{t.its, {}, {}}
+            : input{t.its, {}, {}}
         {}
         
-        sla::SupportTree::UPtr &create_support_tree(const sla::JobController &ctl)
+        void create_support_tree(const sla::JobController &ctl)
         {
-            support_tree_ptr = sla::SupportTree::create(*this, ctl);
-            tree_mesh = TriangleMesh{support_tree_ptr->retrieve_mesh(sla::MeshType::Support)};
-            return support_tree_ptr;
+            tree_mesh = TriangleMesh{sla::create_support_tree(input, ctl)};
         }
 
-        void create_pad(const ExPolygons &blueprint, const sla::PadConfig &pcfg)
+        void create_pad(const sla::JobController &ctl)
         {
-            if (!support_tree_ptr)
-                return;
-
-            support_tree_ptr->add_pad(blueprint, pcfg);
-            pad_mesh = TriangleMesh{support_tree_ptr->retrieve_mesh(sla::MeshType::Pad)};
+            pad_mesh = TriangleMesh{sla::create_pad(input, tree_mesh.its, ctl)};
         }
     };
     

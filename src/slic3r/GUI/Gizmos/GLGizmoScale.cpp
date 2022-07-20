@@ -41,17 +41,17 @@ GLGizmoScale3D::GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filen
 
 std::string GLGizmoScale3D::get_tooltip() const
 {
+#if ENABLE_WORLD_COORDINATE
+    const Vec3d scale = 100.0 * m_scale;
+#else
     const Selection& selection = m_parent.get_selection();
 
     Vec3d scale = 100.0 * Vec3d::Ones();
     if (selection.is_single_full_instance())
-        scale = 100.0 * selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_scaling_factor();
-#if ENABLE_WORLD_COORDINATE
-    else if (selection.is_single_volume_or_modifier())
-#else
+        scale = 100.0 * selection.get_first_volume()->get_instance_scaling_factor();
     else if (selection.is_single_modifier() || selection.is_single_volume())
+        scale = 100.0 * selection.get_first_volume()->get_volume_scaling_factor();
 #endif // ENABLE_WORLD_COORDINATE
-        scale = 100.0 * selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_scaling_factor();
 
     if (m_hover_id == 0 || m_hover_id == 1 || m_grabbers[0].dragging || m_grabbers[1].dragging)
         return "X: " + format(scale.x(), 4) + "%";
@@ -75,37 +75,29 @@ bool GLGizmoScale3D::on_mouse(const wxMouseEvent &mouse_event)
 {
     if (mouse_event.Dragging()) {
         if (m_dragging) {
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-            int res = 1;
-            if (m_scale.x() != m_scale.y() || m_scale.x() != m_scale.z())
-                res = m_parent.get_selection().bake_transform_if_needed();
-
-            if (res != 1) {
-                do_stop_dragging(true);
-                return true;
-            }
-            else {
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             // Apply new temporary scale factors
 #if ENABLE_WORLD_COORDINATE
-                TransformationType transformation_type;
-                if (!wxGetApp().obj_manipul()->is_world_coordinates())
-                    transformation_type.set_local();
-#else
-                TransformationType transformation_type(TransformationType::Local_Absolute_Joint);
-#endif // ENABLE_WORLD_COORDINATE
-                if (mouse_event.AltDown()) transformation_type.set_independent();
+            TransformationType transformation_type;
+            if (wxGetApp().obj_manipul()->is_local_coordinates())
+                transformation_type.set_local();
+            else if (wxGetApp().obj_manipul()->is_instance_coordinates())
+                transformation_type.set_instance();
 
-                Selection &selection = m_parent.get_selection();
-                selection.scale(m_scale, transformation_type);
-#if ENABLE_WORLD_COORDINATE
-                if (mouse_event.CmdDown()) selection.translate(m_offset, wxGetApp().obj_manipul()->get_coordinates_type());
+            transformation_type.set_relative();
 #else
-                if (mouse_event.CmdDown()) selection.translate(m_offset, true);
+            TransformationType transformation_type(TransformationType::Local_Absolute_Joint);
 #endif // ENABLE_WORLD_COORDINATE
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-            }
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+
+            if (mouse_event.AltDown())
+                transformation_type.set_independent();
+
+#if ENABLE_WORLD_COORDINATE
+            m_parent.get_selection().scale_and_translate(m_scale, m_offset, transformation_type);
+#else
+            Selection& selection = m_parent.get_selection();
+            selection.scale(m_scale, transformation_type);
+            if (mouse_event.CmdDown()) selection.translate(m_offset, true);
+#endif // ENABLE_WORLD_COORDINATE
         }
     }
     return use_grabbers(mouse_event);
@@ -113,40 +105,29 @@ bool GLGizmoScale3D::on_mouse(const wxMouseEvent &mouse_event)
 
 void GLGizmoScale3D::data_changed()
 {
-    const Selection &selection = m_parent.get_selection();
 #if ENABLE_WORLD_COORDINATE
-#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-    bool enable_scale_xyz = !selection.requires_uniform_scale();
-#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+    set_scale(Vec3d::Ones());
 #else
-    bool             enable_scale_xyz = selection.is_single_full_instance() ||
-                            selection.is_single_volume() ||
-                            selection.is_single_modifier();
-#endif // ENABLE_WORLD_COORDINATE
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-    if (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) {
-#else
+    const Selection& selection = m_parent.get_selection();
+    bool enable_scale_xyz = selection.is_single_full_instance() ||
+        selection.is_single_volume() ||
+        selection.is_single_modifier();
+
     for (unsigned int i = 0; i < 6; ++i)
         m_grabbers[i].enabled = enable_scale_xyz;
 
     if (enable_scale_xyz) {
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-
         // all volumes in the selection belongs to the same instance, any of
         // them contains the needed data, so we take the first
-        const GLVolume *volume = selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume* volume = selection.get_first_volume();
         if (selection.is_single_full_instance())
             set_scale(volume->get_instance_scaling_factor());
-#if ENABLE_WORLD_COORDINATE
-        else if (selection.is_single_volume_or_modifier())
-#else
-        else if (selection.is_single_volume() ||
-                   selection.is_single_modifier())
-#endif // ENABLE_WORLD_COORDINATE
+        else if (selection.is_single_volume() || selection.is_single_modifier())
             set_scale(volume->get_volume_scaling_factor());
     }
     else
         set_scale(Vec3d::Ones());
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 bool GLGizmoScale3D::on_init()
@@ -194,7 +175,7 @@ void GLGizmoScale3D::on_start_dragging()
     m_starting.instance_center = m_instance_center;
 #else
     m_starting.drag_position = m_grabbers[m_hover_id].center;
-    m_starting.box = (m_starting.ctrl_down && m_hover_id < 6) ? m_box : m_parent.get_selection().get_bounding_box();
+    m_starting.box = (m_starting.ctrl_down && m_hover_id < 6) ? m_bounding_box : m_parent.get_selection().get_bounding_box();
 
     const Vec3d& center = m_starting.box.center();
     m_starting.pivots[0] = m_transform * Vec3d(m_starting.box.max.x(), center.y(), center.z());
@@ -252,14 +233,15 @@ void GLGizmoScale3D::on_render()
         }
 
 #if ENABLE_WORLD_COORDINATE
-        m_bounding_box = m_bounding_box.transformed(selection.get_volume(*idxs.begin())->get_instance_transformation().get_matrix(true, true, false, true));
+        m_bounding_box = m_bounding_box.transformed(selection.get_first_volume()->get_instance_transformation().get_scaling_factor_matrix());
 #endif // ENABLE_WORLD_COORDINATE
 
         // gets transform from first selected volume
-        const GLVolume& v = *selection.get_volume(*idxs.begin());
+        const GLVolume& v = *selection.get_first_volume();
 #if ENABLE_WORLD_COORDINATE
-        m_grabbers_transform = v.get_instance_transformation().get_matrix(false, false, true) * Geometry::assemble_transform(m_bounding_box.center());
-        m_center = selection.get_volume(*idxs.begin())->get_instance_transformation().get_matrix(false, false, true, false) * m_bounding_box.center();
+        const Transform3d inst_trafo = v.get_instance_transformation().get_matrix_no_scaling_factor();
+        m_grabbers_transform = inst_trafo * Geometry::translation_transform(m_bounding_box.center());
+        m_center = inst_trafo * m_bounding_box.center();
         m_instance_center = v.get_instance_offset();
     }
     else if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_instance_coordinates()) {
@@ -274,19 +256,21 @@ void GLGizmoScale3D::on_render()
     }
     else if (selection.is_single_modifier() || selection.is_single_volume()) {
 #endif // ENABLE_WORLD_COORDINATE
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        const GLVolume& v = *selection.get_first_volume();
 #if ENABLE_WORLD_COORDINATE
-        m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, false, false, true)));
-        Geometry::Transformation trafo(v.get_instance_transformation().get_matrix(true, false, true, true));
+        m_bounding_box.merge(v.transformed_convex_hull_bounding_box(
+            v.get_instance_transformation().get_scaling_factor_matrix() * v.get_volume_transformation().get_matrix_no_offset()));
+        Geometry::Transformation trafo(v.get_instance_transformation().get_rotation_matrix());
         trafo.set_offset(v.world_matrix().translation());
         m_grabbers_transform = trafo.get_matrix();
         m_center = v.world_matrix() * m_bounding_box.center();
         m_instance_center = m_center;
     }
     else if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates()) {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
-        m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true)));
-        Geometry::Transformation trafo(v.get_instance_transformation().get_matrix(true, false, true, true) * v.get_volume_transformation().get_matrix(true, false, true, true));
+        const GLVolume& v = *selection.get_first_volume();
+        m_bounding_box.merge(v.transformed_convex_hull_bounding_box(
+            v.get_instance_transformation().get_scaling_factor_matrix() * v.get_volume_transformation().get_scaling_factor_matrix()));
+        Geometry::Transformation trafo(v.get_instance_transformation().get_rotation_matrix() * v.get_volume_transformation().get_rotation_matrix());
         trafo.set_offset(v.world_matrix().translation());
         m_grabbers_transform = trafo.get_matrix();
         m_center = v.world_matrix() * m_bounding_box.center();
@@ -296,7 +280,7 @@ void GLGizmoScale3D::on_render()
         m_bounding_box = selection.get_bounding_box();
         m_grabbers_transform = Geometry::assemble_transform(m_bounding_box.center());
         m_center = m_bounding_box.center();
-        m_instance_center = selection.is_single_full_instance() ? selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_offset() : m_center;
+        m_instance_center = selection.is_single_full_instance() ? selection.get_first_volume()->get_instance_offset() : m_center;
     }
 #else
         m_bounding_box = v.bounding_box();
@@ -309,7 +293,7 @@ void GLGizmoScale3D::on_render()
     else
         m_bounding_box = selection.get_bounding_box();
 
-    const Vec3d& center = m_box.center();
+    const Vec3d& center = m_bounding_box.center();
     const Vec3d offset_x = offsets_transform * Vec3d((double)Offset, 0.0, 0.0);
     const Vec3d offset_y = offsets_transform * Vec3d(0.0, (double)Offset, 0.0);
     const Vec3d offset_z = offsets_transform * Vec3d(0.0, 0.0, (double)Offset);
@@ -350,8 +334,6 @@ void GLGizmoScale3D::on_render()
     m_grabbers[9].color = (use_constrain && m_hover_id == 7) ? CONSTRAINED_COLOR : m_highlight_color;
 #else
     // x axis
-    const Vec3d center = m_bounding_box.center();
-
     m_grabbers[0].center = m_transform * Vec3d(m_bounding_box.min.x(), center.y(), center.z()) - offset_x;
     m_grabbers[0].color = (ctrl_down && m_hover_id == 1) ? CONSTRAINED_COLOR : AXES_COLOR[0];
     m_grabbers[1].center = m_transform * Vec3d(m_bounding_box.max.x(), center.y(), center.z()) + offset_x;
@@ -411,7 +393,11 @@ void GLGizmoScale3D::on_render()
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             if (m_grabbers[0].enabled && m_grabbers[1].enabled)
@@ -458,7 +444,11 @@ void GLGizmoScale3D::on_render()
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(0, 1, m_grabbers[0].color);
@@ -491,7 +481,11 @@ void GLGizmoScale3D::on_render()
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(2, 3, m_grabbers[2].color);
@@ -524,7 +518,11 @@ void GLGizmoScale3D::on_render()
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(4, 5, m_grabbers[4].color);
@@ -557,7 +555,11 @@ void GLGizmoScale3D::on_render()
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+#else
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(6, 7, m_drag_color);
@@ -672,66 +674,29 @@ void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int 
 }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if ENABLE_WORLD_COORDINATE
 void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
 {
-#if ENABLE_WORLD_COORDINATE
     double ratio = calc_ratio(data);
     if (ratio > 0.0) {
         Vec3d curr_scale = m_scale;
         Vec3d starting_scale = m_starting.scale;
         const Selection& selection = m_parent.get_selection();
         const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
-        if (coordinates_type == ECoordinatesType::World) {
-            if (selection.is_single_full_instance()) {
-                const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation());
-                curr_scale = (m * curr_scale).cwiseAbs();
-                starting_scale = (m * starting_scale).cwiseAbs();
-            }
-            else if (selection.is_single_volume_or_modifier()) {
-                const Transform3d mi = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation());
-                const Transform3d mv = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_rotation());
-                const Transform3d m = mi * mv;
-                curr_scale = (m * curr_scale).cwiseAbs();
-                starting_scale = (m * starting_scale).cwiseAbs();
-            }
-        }
 
         curr_scale(axis) = starting_scale(axis) * ratio;
+        m_scale = curr_scale;
 
-        if (coordinates_type == ECoordinatesType::World) {
-            if (selection.is_single_full_instance())
-                m_scale = (Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse() * curr_scale).cwiseAbs();
-            else if (selection.is_single_volume_or_modifier()) {
-                const Transform3d mi = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse();
-                const Transform3d mv = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_rotation()).inverse();
-                m_scale = (mv * mi * curr_scale).cwiseAbs();
-            }
-            else
-                m_scale = curr_scale;
-        }
-        else
-            m_scale = curr_scale;
-#else
-    const double ratio = calc_ratio(data);
-    if (ratio > 0.0) {
-        m_scale(axis) = m_starting.scale(axis) * ratio;
-#endif // ENABLE_WORLD_COORDINATE
-        if (m_starting.ctrl_down) {
-#if ENABLE_WORLD_COORDINATE
+        if (m_starting.ctrl_down && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
             double local_offset = 0.5 * (ratio - 1.0) * m_starting.box.size()(axis);
-#else
-            double local_offset = 0.5 * (m_scale(axis) - m_starting.scale(axis)) * m_starting.box.size()(axis);
-#endif // ENABLE_WORLD_COORDINATE
 
             if (m_hover_id == 2 * axis)
                 local_offset *= -1.0;
 
-#if ENABLE_WORLD_COORDINATE
-            Vec3d center_offset = m_starting.instance_center - m_starting.center;
-            if (selection.is_single_full_instance() && coordinates_type != ECoordinatesType::World) {
-                const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse();
-                center_offset = m * center_offset;
-            }
+            Vec3d center_offset = m_starting.instance_center - m_starting.center; // world coordinates (== Vec3d::Zero() for single volume selection)
+            if (selection.is_single_full_instance() && coordinates_type == ECoordinatesType::Local)
+                // from world coordinates to instance coordinates
+                center_offset = selection.get_first_volume()->get_instance_transformation().get_rotation_matrix().inverse() * center_offset;
 
             local_offset += (ratio - 1.0) * center_offset(axis);
 
@@ -742,7 +707,37 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
             case Z:  { m_offset = local_offset * Vec3d::UnitZ(); break; }
             default: { m_offset = Vec3d::Zero(); break; }
             }
+
+            if (selection.is_single_full_instance() && coordinates_type == ECoordinatesType::Local)
+                // from instance coordinates to world coordinates
+                m_offset = selection.get_first_volume()->get_instance_transformation().get_rotation_matrix() * m_offset;
+
+            if (selection.is_single_volume_or_modifier()) {
+                if (coordinates_type == ECoordinatesType::Instance)
+                    m_offset = selection.get_first_volume()->get_instance_transformation().get_scaling_factor_matrix().inverse() * m_offset;
+                else if (coordinates_type == ECoordinatesType::Local) {
+                    m_offset = selection.get_first_volume()->get_instance_transformation().get_scaling_factor_matrix().inverse() *
+                        selection.get_first_volume()->get_volume_transformation().get_rotation_matrix() * m_offset;
+                }
+            }
+        }
+        else
+            m_offset = Vec3d::Zero();
+    }
+}
 #else
+void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
+{
+    const double ratio = calc_ratio(data);
+    if (ratio > 0.0) {
+        m_scale(axis) = m_starting.scale(axis) * ratio;
+
+        if (m_starting.ctrl_down) {
+            double local_offset = 0.5 * (m_scale(axis) - m_starting.scale(axis)) * m_starting.box.size()(axis);
+
+            if (m_hover_id == 2 * axis)
+                local_offset *= -1.0;
+
             Vec3d local_offset_vec;
             switch (axis)
             {
@@ -753,20 +748,23 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
             }
 
             m_offset = m_offsets_transform * local_offset_vec;
-#endif // ENABLE_WORLD_COORDINATE
         }
         else
             m_offset = Vec3d::Zero();
     }
 }
+#endif // ENABLE_WORLD_COORDINATE
 
-void GLGizmoScale3D::do_scale_uniform(const UpdateData& data)
+#if ENABLE_WORLD_COORDINATE
+void GLGizmoScale3D::do_scale_uniform(const UpdateData & data)
 {
     const double ratio = calc_ratio(data);
     if (ratio > 0.0) {
         m_scale = m_starting.scale * ratio;
-#if ENABLE_WORLD_COORDINATE
-        if (m_starting.ctrl_down) {
+
+        const Selection& selection = m_parent.get_selection();
+        const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
+        if (m_starting.ctrl_down && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
             m_offset = 0.5 * (ratio - 1.0) * m_starting.box.size();
 
             if (m_hover_id == 6 || m_hover_id == 9)
@@ -774,21 +772,41 @@ void GLGizmoScale3D::do_scale_uniform(const UpdateData& data)
             if (m_hover_id == 6 || m_hover_id == 7)
                 m_offset.y() *= -1.0;
 
-            const Selection& selection = m_parent.get_selection();
-            Vec3d center_offset = m_starting.instance_center - m_starting.center;
+            Vec3d center_offset = m_starting.instance_center - m_starting.center; // world coordinates (== Vec3d::Zero() for single volume selection)
 
-            if (selection.is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
-                const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse();
-                center_offset = m * center_offset;
-            }
+            if (selection.is_single_full_instance() && coordinates_type == ECoordinatesType::Local)
+                // from world coordinates to instance coordinates
+                center_offset = selection.get_first_volume()->get_instance_transformation().get_rotation_matrix().inverse() * center_offset;
 
             m_offset += (ratio - 1.0) * center_offset;
+
+            if (selection.is_single_full_instance() && coordinates_type == ECoordinatesType::Local)
+                // from instance coordinates to world coordinates
+                m_offset = selection.get_first_volume()->get_instance_transformation().get_rotation_matrix() * m_offset;
+
+            if (selection.is_single_volume_or_modifier()) {
+                if (coordinates_type == ECoordinatesType::Instance)
+                    m_offset = selection.get_first_volume()->get_instance_transformation().get_scaling_factor_matrix().inverse() * m_offset;
+                else if (coordinates_type == ECoordinatesType::Local) {
+                    m_offset = selection.get_first_volume()->get_instance_transformation().get_scaling_factor_matrix().inverse() *
+                        selection.get_first_volume()->get_volume_transformation().get_rotation_matrix() * m_offset;
+                }
+            }
         }
         else
-#endif // ENABLE_WORLD_COORDINATE
+            m_offset = Vec3d::Zero();
+    }
+}
+#else
+void GLGizmoScale3D::do_scale_uniform(const UpdateData& data)
+{
+    const double ratio = calc_ratio(data);
+    if (ratio > 0.0) {
+        m_scale = m_starting.scale * ratio;
         m_offset = Vec3d::Zero();
     }
 }
+#endif // ENABLE_WORLD_COORDINATE
 
 double GLGizmoScale3D::calc_ratio(const UpdateData& data) const
 {
@@ -831,10 +849,10 @@ Transform3d GLGizmoScale3D::local_transform(const Selection& selection) const
 {
     Transform3d ret = Geometry::assemble_transform(m_center);
     if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
-        Transform3d orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
+        const GLVolume& v = *selection.get_first_volume();
+        Transform3d orient_matrix = v.get_instance_transformation().get_rotation_matrix();
         if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
-            orient_matrix = orient_matrix * v.get_volume_transformation().get_matrix(true, false, true, true);
+            orient_matrix = orient_matrix * v.get_volume_transformation().get_rotation_matrix();
         ret = ret * orient_matrix;
     }
     return ret;
@@ -845,9 +863,9 @@ void GLGizmoScale3D::transform_to_local(const Selection& selection) const
     glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
 
     if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
-        Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+        Transform3d orient_matrix = selection.get_first_volume()->get_instance_transformation().get_matrix(true, false, true, true);
         if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
-            orient_matrix = orient_matrix * selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_transformation().get_matrix(true, false, true, true);
+            orient_matrix = orient_matrix * selection.get_first_volume()->get_volume_transformation().get_matrix(true, false, true, true);
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
 }

@@ -4,6 +4,8 @@
 
 #include "libslic3r/MutablePriorityQueue.hpp"
 
+using namespace Slic3r;
+
 // based on https://raw.githubusercontent.com/rollbear/prio_queue/master/self_test.cpp
 // original source Copyright Björn Fahller 2015, Boost Software License, Version 1.0, http://www.boost.org/LICENSE_1_0.txt
 
@@ -343,28 +345,39 @@ TEST_CASE("Mutable priority queue - reshedule first", "[MutableSkipHeapPriorityQ
 TEST_CASE("Mutable priority queue - first pop", "[MutableSkipHeapPriorityQueue]")
 {
     struct MyValue{
-        int   id;
+        size_t id;
         float val;
     };
-    size_t              count = 50000;
+    static constexpr const size_t count = 50000;
     std::vector<size_t> idxs(count, {0});
-    std::vector<bool>   dels(count, false);
     auto q = make_miniheap_mutable_priority_queue<MyValue, 16, true>(
-        [&](MyValue &v, size_t idx) {
-            idxs[v.id] = idx; 
-        },
+        [&idxs](MyValue &v, size_t idx) { idxs[v.id] = idx; },
         [](MyValue &l, MyValue &r) { return l.val < r.val; });
-    q.reserve(count);
-    for (size_t id = 0; id < count; id++) {
-        MyValue mv;
-        mv.id  = id;
-        mv.val = rand();
-        q.push(mv);
+    using QueueType = decltype(q);
+    THEN("Skip queue has 0th element unused, 1st element is the top of the queue.") {
+        CHECK(QueueType::address::is_padding(0));
+        CHECK(!QueueType::address::is_padding(1));
     }
-    MyValue it = q.top(); // copy
+    q.reserve(count);
+    for (size_t id = 0; id < count; ++ id)
+        q.push({ id, rand() / 100.f });
+    MyValue v = q.top(); // copy
+    THEN("Element at the top of the queue has a valid ID.") {
+        CHECK(v.id >= 0);
+        CHECK(v.id < count);
+    }
+    THEN("Element at the top of the queue has its position stored in idxs.") {
+        CHECK(idxs[v.id] == 1);
+    }
     q.pop();
-    bool valid = (it.id != 0) && (idxs[0] < 3 * count);
-    CHECK(valid);
+    THEN("Element removed from the queue has its position in idxs reset to invalid.") {
+        CHECK(idxs[v.id] == q.invalid_id());
+    }
+    THEN("Element was removed from the queue, new top of the queue has its index set correctly.") {
+        CHECK(q.top().id >= 0);
+        CHECK(q.top().id < count);
+        CHECK(idxs[q.top().id] == 1);
+    }
 }
 
 TEST_CASE("Mutable priority queue complex", "[MutableSkipHeapPriorityQueue]")
@@ -382,23 +395,23 @@ TEST_CASE("Mutable priority queue complex", "[MutableSkipHeapPriorityQueue]")
     q.reserve(count);
 
     auto rand_val = [&]()->float { return (rand() % 53) / 10.f; };
-    size_t ord = 0;
-    for (size_t id = 0; id < count; id++) {
-        MyValue mv;
-        mv.id = ord++;
-        mv.val = rand_val();
-        q.push(mv);
-    }
+    for (size_t id = 0; id < count; ++ id)
+        q.push({ id, rand_val() });
+
     auto check = [&]()->bool{
         for (size_t i = 0; i < idxs.size(); ++i) {
-            if (dels[i]) continue;
-            size_t   qid = idxs[i];
-            if (qid > 3*count) { 
-                return false;
-            }
-            MyValue &mv  = q[qid]; 
-            if (mv.id != i) { 
-                return false; // ERROR 
+            if (dels[i]) {
+                if (idxs[i] != q.invalid_id())
+                    return false; // ERROR 
+            } else {
+                size_t   qid = idxs[i];
+                if (qid >= q.heap_size()) { 
+                    return false; // ERROR 
+                }
+                MyValue &mv  = q[qid]; 
+                if (mv.id != i) { 
+                    return false; // ERROR 
+                }
             }
         }
         return true;
@@ -406,6 +419,7 @@ TEST_CASE("Mutable priority queue complex", "[MutableSkipHeapPriorityQueue]")
 
     CHECK(check()); // initial check
 
+    // Generate an element ID of an elmenet, which was not yet deleted, thus it is still valid.
     auto get_valid_id = [&]()->int { 
         int id = 0;
         do {
@@ -413,23 +427,28 @@ TEST_CASE("Mutable priority queue complex", "[MutableSkipHeapPriorityQueue]")
         } while (dels[id]);
         return id;
     };
+
+    // Remove first 100 elements from the queue of 5000 elements, cross-validate indices.
+    // Re-enter every 20th element back to the queue.
     for (size_t i = 0; i < 100; i++) {
-        MyValue it = q.top(); // copy
+        MyValue v = q.top(); // copy
         q.pop();
-        dels[it.id] = true;
+        dels[v.id] = true;
         CHECK(check());
         if (i % 20 == 0) {
-            it.val = rand_val();
-            q.push(it);
-            dels[it.id] = false;
+            v.val = rand_val();
+            q.push(v);
+            dels[v.id] = false;
             CHECK(check());
             continue;
         }
-
+        // Remove some valid element from the queue.
         int id = get_valid_id();
+        CHECK(idxs[id] != q.invalid_id());
         q.remove(idxs[id]);
         dels[id] = true;
         CHECK(check());
+        // and change 5 random elements and reorder them in the queue.
         for (size_t j = 0; j < 5; j++) { 
             int id = get_valid_id();
             size_t   qid = idxs[id];

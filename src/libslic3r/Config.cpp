@@ -402,6 +402,42 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
     return out;
 }
 
+std::string ConfigBase::SetDeserializeItem::format(std::initializer_list<int> values)
+{
+    std::string out;
+    int i = 0;
+    for (int v : values) {
+        if (i ++ > 0)
+            out += ", ";
+        out += std::to_string(v);
+    }
+    return out;
+}
+
+std::string ConfigBase::SetDeserializeItem::format(std::initializer_list<float> values)
+{
+    std::string out;
+    int i = 0;
+    for (float v : values) {
+        if (i ++ > 0)
+            out += ", ";
+        out += float_to_string_decimal_point(double(v));
+    }
+    return out;
+}
+
+std::string ConfigBase::SetDeserializeItem::format(std::initializer_list<double> values)
+{
+    std::string out;
+    int i = 0;
+    for (float v : values) {
+        if (i ++ > 0)
+            out += ", ";
+        out += float_to_string_decimal_point(v);
+    }
+    return out;
+}
+
 void ConfigBase::apply_only(const ConfigBase &other, const t_config_option_keys &keys, bool ignore_nonexistent)
 {
     // loop through options and apply them

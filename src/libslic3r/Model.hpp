@@ -691,15 +691,26 @@ public:
 
     const Geometry::Transformation& get_transformation() const { return m_transformation; }
     void set_transformation(const Geometry::Transformation& transformation) { m_transformation = transformation; }
+#if ENABLE_WORLD_COORDINATE
+    void set_transformation(const Transform3d& trafo) { m_transformation.set_matrix(trafo); }
+
+    Vec3d get_offset() const { return m_transformation.get_offset(); }
+#else
     void set_transformation(const Transform3d &trafo) { m_transformation.set_from_transform(trafo); }
 
     const Vec3d& get_offset() const { return m_transformation.get_offset(); }
+#endif // ENABLE_WORLD_COORDINATE
+
     double get_offset(Axis axis) const { return m_transformation.get_offset(axis); }
 
     void set_offset(const Vec3d& offset) { m_transformation.set_offset(offset); }
     void set_offset(Axis axis, double offset) { m_transformation.set_offset(axis, offset); }
 
+#if ENABLE_WORLD_COORDINATE
+    Vec3d get_rotation() const { return m_transformation.get_rotation(); }
+#else
     const Vec3d& get_rotation() const { return m_transformation.get_rotation(); }
+#endif // ENABLE_WORLD_COORDINATE
     double get_rotation(Axis axis) const { return m_transformation.get_rotation(axis); }
 
     void set_rotation(const Vec3d& rotation) { m_transformation.set_rotation(rotation); }
@@ -711,7 +722,11 @@ public:
     void set_scaling_factor(const Vec3d& scaling_factor) { m_transformation.set_scaling_factor(scaling_factor); }
     void set_scaling_factor(Axis axis, double scaling_factor) { m_transformation.set_scaling_factor(axis, scaling_factor); }
 
+#if ENABLE_WORLD_COORDINATE
+    Vec3d get_mirror() const { return m_transformation.get_mirror(); }
+#else
     const Vec3d& get_mirror() const { return m_transformation.get_mirror(); }
+#endif // ENABLE_WORLD_COORDINATE
     double get_mirror(Axis axis) const { return m_transformation.get_mirror(axis); }
     bool is_left_handed() const { return m_transformation.is_left_handed(); }
 
@@ -720,7 +735,12 @@ public:
     void convert_from_imperial_units();
     void convert_from_meters();
 
+#if ENABLE_WORLD_COORDINATE
+    const Transform3d& get_matrix() const { return m_transformation.get_matrix(); }
+    Transform3d get_matrix_no_offset() const { return m_transformation.get_matrix_no_offset(); }
+#else
     const Transform3d& get_matrix(bool dont_translate = false, bool dont_rotate = false, bool dont_scale = false, bool dont_mirror = false) const { return m_transformation.get_matrix(dont_translate, dont_rotate, dont_scale, dont_mirror); }
+#endif // ENABLE_WORLD_COORDINATE
 
 	void set_new_unique_id() { 
         ObjectBase::set_new_unique_id();
@@ -923,25 +943,41 @@ public:
     const Geometry::Transformation& get_transformation() const { return m_transformation; }
     void set_transformation(const Geometry::Transformation& transformation) { m_transformation = transformation; }
 
+#if ENABLE_WORLD_COORDINATE
+    Vec3d get_offset() const { return m_transformation.get_offset(); }
+#else
     const Vec3d& get_offset() const { return m_transformation.get_offset(); }
+#endif // ENABLE_WORLD_COORDINATE
     double get_offset(Axis axis) const { return m_transformation.get_offset(axis); }
     
     void set_offset(const Vec3d& offset) { m_transformation.set_offset(offset); }
     void set_offset(Axis axis, double offset) { m_transformation.set_offset(axis, offset); }
 
+#if ENABLE_WORLD_COORDINATE
+    Vec3d get_rotation() const { return m_transformation.get_rotation(); }
+#else
     const Vec3d& get_rotation() const { return m_transformation.get_rotation(); }
+#endif // ENABLE_WORLD_COORDINATE
     double get_rotation(Axis axis) const { return m_transformation.get_rotation(axis); }
 
     void set_rotation(const Vec3d& rotation) { m_transformation.set_rotation(rotation); }
     void set_rotation(Axis axis, double rotation) { m_transformation.set_rotation(axis, rotation); }
 
+#if ENABLE_WORLD_COORDINATE
+    Vec3d get_scaling_factor() const { return m_transformation.get_scaling_factor(); }
+#else
     const Vec3d& get_scaling_factor() const { return m_transformation.get_scaling_factor(); }
+#endif // ENABLE_WORLD_COORDINATE
     double get_scaling_factor(Axis axis) const { return m_transformation.get_scaling_factor(axis); }
 
     void set_scaling_factor(const Vec3d& scaling_factor) { m_transformation.set_scaling_factor(scaling_factor); }
     void set_scaling_factor(Axis axis, double scaling_factor) { m_transformation.set_scaling_factor(axis, scaling_factor); }
 
+#if ENABLE_WORLD_COORDINATE
+    Vec3d get_mirror() const { return m_transformation.get_mirror(); }
+#else
     const Vec3d& get_mirror() const { return m_transformation.get_mirror(); }
+#endif // ENABLE_WORLD_COORDINATE
     double get_mirror(Axis axis) const { return m_transformation.get_mirror(axis); }
 	bool is_left_handed() const { return m_transformation.is_left_handed(); }
     
@@ -959,7 +995,12 @@ public:
     // To be called on an external polygon. It does not translate the polygon, only rotates and scales.
     void transform_polygon(Polygon* polygon) const;
 
+#if ENABLE_WORLD_COORDINATE
+    const Transform3d& get_matrix() const { return m_transformation.get_matrix(); }
+    Transform3d get_matrix_no_offset() const { return m_transformation.get_matrix_no_offset(); }
+#else
     const Transform3d& get_matrix(bool dont_translate = false, bool dont_rotate = false, bool dont_scale = false, bool dont_mirror = false) const { return m_transformation.get_matrix(dont_translate, dont_rotate, dont_scale, dont_mirror); }
+#endif // ENABLE_WORLD_COORDINATE
 
     bool is_printable() const { return object->printable && printable && (print_volume_state == ModelInstancePVS_Inside); }
 

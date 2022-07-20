@@ -1281,17 +1281,6 @@ PageMode::PageMode(ConfigWizard *parent)
     radio_advanced = new wxRadioButton(this, wxID_ANY, _L("Advanced mode"));
     radio_expert = new wxRadioButton(this, wxID_ANY, _L("Expert mode"));
 
-    append(radio_simple);
-    append(radio_advanced);
-    append(radio_expert);
-
-    append_text("\n" + _L("The size of the object can be specified in inches"));
-    check_inch = new wxCheckBox(this, wxID_ANY, _L("Use inches"));
-    append(check_inch);
-}
-
-void PageMode::on_activate()
-{
     std::string mode { "simple" };
     wxGetApp().app_config->get("", "view_mode", mode);
 
@@ -1299,7 +1288,16 @@ void PageMode::on_activate()
     else if (mode == "expert") { radio_expert->SetValue(true); }
     else { radio_simple->SetValue(true); }
 
+    append(radio_simple);
+    append(radio_advanced);
+    append(radio_expert);
+
+    append_text("\n" + _L("The size of the object can be specified in inches"));
+    check_inch = new wxCheckBox(this, wxID_ANY, _L("Use inches"));
     check_inch->SetValue(wxGetApp().app_config->get("use_inches") == "1");
+    append(check_inch);
+
+    on_activate();
 }
 
 void PageMode::serialize_mode(AppConfig *app_config) const
@@ -1309,11 +1307,6 @@ void PageMode::serialize_mode(AppConfig *app_config) const
     if (radio_simple->GetValue()) { mode = "simple"; }
     if (radio_advanced->GetValue()) { mode = "advanced"; }
     if (radio_expert->GetValue()) { mode = "expert"; }
-
-    // If "Mode" page wasn't selected (no one radiobutton is checked),
-    // we shouldn't to update a view_mode value in app_config
-    if (mode.empty())
-        return; 
 
     app_config->set("view_mode", mode);
     app_config->set("use_inches", check_inch->GetValue() ? "1" : "0");
@@ -1491,7 +1484,7 @@ PageDiameters::PageDiameters(ConfigWizard *parent)
     auto *unit_filam = new wxStaticText(this, wxID_ANY, _L("mm"));
     sizer_filam->AddGrowableCol(0, 1);
     sizer_filam->Add(text_filam, 0, wxALIGN_CENTRE_VERTICAL);
-    sizer_filam->Add(diam_filam);
+    sizer_filam->Add(diam_filam, 0, wxALIGN_CENTRE_VERTICAL);
     sizer_filam->Add(unit_filam, 0, wxALIGN_CENTRE_VERTICAL);
     append(sizer_filam);
 }
@@ -2768,7 +2761,6 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 //        if (page_files_association->associate_gcode())
 //            wxGetApp().associate_gcode_files();
 //    }
-
 #endif // _WIN32
 
     page_mode->serialize_mode(app_config);
@@ -2787,6 +2779,10 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         page_bed->apply_custom_config(*custom_config);
         page_diams->apply_custom_config(*custom_config);
         page_temps->apply_custom_config(*custom_config);
+
+#if ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
+        copy_bed_model_and_texture_if_needed(*custom_config);
+#endif // ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
 
         const std::string profile_name = page_custom->profile_name();
         preset_bundle->load_config_from_wizard(profile_name, *custom_config);

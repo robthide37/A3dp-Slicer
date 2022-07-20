@@ -104,6 +104,17 @@ Polygon convex_hull(const Polygons &polygons)
     return convex_hull(std::move(pp));
 }
 
+Polygon convex_hull(const ExPolygons &expolygons)
+{
+    Points pp;
+    size_t sz = 0;
+    for (const auto &expoly : expolygons)
+        sz += expoly.contour.size();
+    pp.reserve(sz);
+    for (const auto &expoly : expolygons)
+        pp.insert(pp.end(), expoly.contour.points.begin(), expoly.contour.points.end());
+    return convex_hull(pp);
+}
 
 namespace rotcalip {
 

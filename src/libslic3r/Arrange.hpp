@@ -15,7 +15,7 @@ class CircleBed {
     double radius_;
 public:
 
-    inline CircleBed(): center_(0, 0), radius_(std::nan("")) {}
+    inline CircleBed(): center_(0, 0), radius_(NaNd) {}
     explicit inline CircleBed(const Point& c, double r): center_(c), radius_(r) {}
 
     inline double radius() const { return radius_; }
@@ -49,11 +49,11 @@ struct ArrangePolygon {
     coord_t   inflation = 0;        /// Arrange with inflated polygon
     int       bed_idx{UNARRANGED};  /// To which logical bed does poly belong...
     int       priority{0};
-    
+
     // If empty, any rotation is allowed (currently unsupported)
     // If only a zero is there, no rotation is allowed
     std::vector<double> allowed_rotations = {0.};
-    
+
     /// Optional setter function which can store arbitrary data in its closure
     std::function<void(const ArrangePolygon&)> setter = nullptr;
     
@@ -76,29 +76,32 @@ struct ArrangePolygon {
 using ArrangePolygons = std::vector<ArrangePolygon>;
 
 struct ArrangeParams {
-    
+
     /// The minimum distance which is allowed for any 
     /// pair of items on the print bed in any direction.
     coord_t min_obj_distance = 0;
-    
+
+    /// The minimum distance of any object from bed edges
+    coord_t min_bed_distance = 0;
+
     /// The accuracy of optimization.
     /// Goes from 0.0 to 1.0 and scales performance as well
     float accuracy = 1.f;
-    
+
     /// Allow parallel execution.
     bool parallel = true;
 
     bool allow_rotations = false;
-    
+
     /// Progress indicator callback called when an object gets packed. 
     /// The unsigned argument is the number of items remaining to pack.
     std::function<void(unsigned)> progressind;
 
     std::function<void(const ArrangePolygon &)> on_packed;
-    
+
     /// A predicate returning true if abort is needed.
     std::function<bool(void)>     stopcondition;
-    
+
     ArrangeParams() = default;
     explicit ArrangeParams(coord_t md) : min_obj_distance(md) {}
 };

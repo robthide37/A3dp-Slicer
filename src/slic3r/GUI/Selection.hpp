@@ -4,11 +4,7 @@
 #include "libslic3r/Geometry.hpp"
 #if ENABLE_WORLD_COORDINATE
 #include "GUI_Geometry.hpp"
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
 #include "CoordAxes.hpp"
-#else
-#include "GLModel.hpp"
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
 #else
 #include "GLModel.hpp"
 #endif // ENABLE_WORLD_COORDINATE
@@ -121,16 +117,19 @@ private:
     private:
         struct TransformCache
         {
-            Vec3d position;
-            Vec3d rotation;
-            Vec3d scaling_factor;
-            Vec3d mirror;
-            Transform3d rotation_matrix;
-            Transform3d scale_matrix;
-            Transform3d mirror_matrix;
-            Transform3d full_matrix;
+            Vec3d position{ Vec3d::Zero() };
+            Vec3d rotation{ Vec3d::Zero() };
+            Vec3d scaling_factor{ Vec3d::Ones() };
+            Vec3d mirror{ Vec3d::Ones() };
+            Transform3d rotation_matrix{ Transform3d::Identity() };
+            Transform3d scale_matrix{ Transform3d::Identity() };
+            Transform3d mirror_matrix{ Transform3d::Identity() };
+            Transform3d full_matrix{ Transform3d::Identity() };
+#if ENABLE_WORLD_COORDINATE
+            Geometry::Transformation transform;
+#endif // ENABLE_WORLD_COORDINATE
 
-            TransformCache();
+            TransformCache() = default;
             explicit TransformCache(const Geometry::Transformation& transform);
         };
 
@@ -142,13 +141,18 @@ private:
         VolumeCache(const Geometry::Transformation& volume_transform, const Geometry::Transformation& instance_transform);
 
         const Vec3d& get_volume_position() const { return m_volume.position; }
+#if !ENABLE_WORLD_COORDINATE
         const Vec3d& get_volume_rotation() const { return m_volume.rotation; }
         const Vec3d& get_volume_scaling_factor() const { return m_volume.scaling_factor; }
         const Vec3d& get_volume_mirror() const { return m_volume.mirror; }
+#endif // !ENABLE_WORLD_COORDINATE
         const Transform3d& get_volume_rotation_matrix() const { return m_volume.rotation_matrix; }
         const Transform3d& get_volume_scale_matrix() const { return m_volume.scale_matrix; }
         const Transform3d& get_volume_mirror_matrix() const { return m_volume.mirror_matrix; }
         const Transform3d& get_volume_full_matrix() const { return m_volume.full_matrix; }
+#if ENABLE_WORLD_COORDINATE
+        const Geometry::Transformation& get_volume_transform() const { return m_volume.transform; }
+#endif // ENABLE_WORLD_COORDINATE
 
         const Vec3d& get_instance_position() const { return m_instance.position; }
         const Vec3d& get_instance_rotation() const { return m_instance.rotation; }
@@ -158,6 +162,9 @@ private:
         const Transform3d& get_instance_scale_matrix() const { return m_instance.scale_matrix; }
         const Transform3d& get_instance_mirror_matrix() const { return m_instance.mirror_matrix; }
         const Transform3d& get_instance_full_matrix() const { return m_instance.full_matrix; }
+#if ENABLE_WORLD_COORDINATE
+        const Geometry::Transformation& get_instance_transform() const { return m_instance.transform; }
+#endif // ENABLE_WORLD_COORDINATE
     };
 
 public:
@@ -218,18 +225,32 @@ private:
     Cache m_cache;
     Clipboard m_clipboard;
     std::optional<BoundingBoxf3> m_bounding_box;
-    // Bounding box of a selection, with no instance scaling applied. This bounding box
-    // is useful for absolute scaling of tilted objects in world coordinate space.
+    // Bounding box of a single full instance selection, in world coordinates, with no instance scaling applied.
+    // This bounding box is useful for absolute scaling of tilted objects in world coordinate space.
+    // Modifiers are NOT taken in account
     std::optional<BoundingBoxf3> m_unscaled_instance_bounding_box;
+    // Bounding box of a single full instance selection, in world coordinates.
+    // Modifiers are NOT taken in account
     std::optional<BoundingBoxf3> m_scaled_instance_bounding_box;
+#if ENABLE_WORLD_COORDINATE
+    // Bounding box of a single full instance selection, in world coordinates, with no instance scaling applied.
+    // Modifiers are taken in account
+    std::optional<BoundingBoxf3> m_full_unscaled_instance_bounding_box;
+    // Bounding box of a single full instance selection, in world coordinates.
+    // Modifiers are taken in account
+    std::optional<BoundingBoxf3> m_full_scaled_instance_bounding_box;
+    // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
+    // Modifiers are taken in account
+    std::optional<BoundingBoxf3> m_full_unscaled_instance_local_bounding_box;
+#endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_RENDER_SELECTION_CENTER
     GLModel m_vbo_sphere;
 #endif // ENABLE_RENDER_SELECTION_CENTER
 
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
     CoordAxes m_axes;
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE
     GLModel m_arrow;
     GLModel m_curved_arrow;
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -325,7 +346,6 @@ public:
         VolumeNotAxisAligned_Instance,
         MultipleSelection,
     };
-    bool requires_uniform_scale(EUniformScaleRequiredReason* reason = nullptr) const;
 #else
     bool requires_uniform_scale() const;
 #endif // ENABLE_WORLD_COORDINATE
@@ -340,20 +360,36 @@ public:
 
     const IndicesList& get_volume_idxs() const { return m_list; }
     const GLVolume* get_volume(unsigned int volume_idx) const;
+    const GLVolume* get_first_volume() const { return get_volume(*m_list.begin()); }
 
     const ObjectIdxsToInstanceIdxsMap& get_content() const { return m_cache.content; }
 
     unsigned int volumes_count() const { return (unsigned int)m_list.size(); }
     const BoundingBoxf3& get_bounding_box() const;
-    // Bounding box of a selection, with no instance scaling applied. This bounding box
-    // is useful for absolute scaling of tilted objects in world coordinate space.
+    // Bounding box of a single full instance selection, in world coordinates, with no instance scaling applied.
+    // This bounding box is useful for absolute scaling of tilted objects in world coordinate space.
+    // Modifiers are NOT taken in account
     const BoundingBoxf3& get_unscaled_instance_bounding_box() const;
+    // Bounding box of a single full instance selection, in world coordinates.
+    // Modifiers are NOT taken in account
     const BoundingBoxf3& get_scaled_instance_bounding_box() const;
+#if ENABLE_WORLD_COORDINATE
+    // Bounding box of a single full instance selection, in world coordinates, with no instance scaling applied.
+    // Modifiers are taken in account
+    const BoundingBoxf3& get_full_unscaled_instance_bounding_box() const;
+    // Bounding box of a single full instance selection, in world coordinates.
+    // Modifiers are taken in account
+    const BoundingBoxf3& get_full_scaled_instance_bounding_box() const;
+
+    // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
+    // Modifiers are taken in account
+    const BoundingBoxf3& get_full_unscaled_instance_local_bounding_box() const;
+#endif // ENABLE_WORLD_COORDINATE
 
     void setup_cache();
 
 #if ENABLE_WORLD_COORDINATE
-    void translate(const Vec3d& displacement, ECoordinatesType type = ECoordinatesType::World);
+    void translate(const Vec3d& displacement, TransformationType transformation_type);
 #else
     void translate(const Vec3d& displacement, bool local = false);
 #endif // ENABLE_WORLD_COORDINATE
@@ -362,17 +398,21 @@ public:
     void scale(const Vec3d& scale, TransformationType transformation_type);
     void scale_to_fit_print_volume(const BuildVolume& volume);
     void mirror(Axis axis);
-
+#if ENABLE_WORLD_COORDINATE
+    void scale_and_translate(const Vec3d& scale, const Vec3d& translation, TransformationType transformation_type);
+    void reset_skew();
+#else
     void translate(unsigned int object_idx, const Vec3d& displacement);
+#endif // ENABLE_WORLD_COORDINATE
     void translate(unsigned int object_idx, unsigned int instance_idx, const Vec3d& displacement);
 
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
     // returns:
     // -1 if the user refused to proceed with baking when asked
     // 0 if the baking was performed
     // 1 if no baking was needed
     int bake_transform_if_needed() const;
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 
     void erase();
 
@@ -409,14 +449,23 @@ private:
     void do_remove_volume(unsigned int volume_idx);
     void do_remove_instance(unsigned int object_idx, unsigned int instance_idx);
     void do_remove_object(unsigned int object_idx);
+#if ENABLE_WORLD_COORDINATE
+    void set_bounding_boxes_dirty() {
+        m_bounding_box.reset();
+        m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset();
+        m_full_unscaled_instance_bounding_box.reset(); m_full_scaled_instance_bounding_box.reset();
+        m_full_unscaled_instance_local_bounding_box.reset();;
+    }
+#else
     void set_bounding_boxes_dirty() { m_bounding_box.reset(); m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset(); }
+#endif // ENABLE_WORLD_COORDINATE
     void render_synchronized_volumes();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if ENABLE_WORLD_COORDINATE
     void render_bounding_box(const BoundingBoxf3& box, const Transform3d& trafo, const ColorRGB& color);
 #else
     void render_bounding_box(const BoundingBoxf3& box, const ColorRGB& color);
-#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#endif // ENABLE_WORLD_COORDINATE
 #else
     void render_selected_volumes() const;
     void render_bounding_box(const BoundingBoxf3& box, float* color) const;
@@ -454,6 +503,11 @@ private:
 
     void paste_volumes_from_clipboard();
     void paste_objects_from_clipboard();
+
+#if ENABLE_WORLD_COORDINATE
+    void transform_volume_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
+        const Transform3d& transform);
+#endif // ENABLE_WORLD_COORDINATE
 };
 
 } // namespace GUI

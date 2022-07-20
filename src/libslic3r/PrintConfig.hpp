@@ -18,6 +18,7 @@
 
 #include "libslic3r.h"
 #include "Config.hpp"
+#include "SLA/SupportTreeStrategies.hpp"
 
 #include <boost/preprocessor/facilities/empty.hpp>
 #include <boost/preprocessor/punctuation/comma_if.hpp>
@@ -26,8 +27,6 @@
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/tuple/elem.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
-
-// #define HAS_PRESSURE_EQUALIZER
 
 namespace Slic3r {
 
@@ -110,11 +109,8 @@ enum SLADisplayOrientation {
     sladoPortrait
 };
 
-enum SLAPillarConnectionMode {
-    slapcmZigZag,
-    slapcmCross,
-    slapcmDynamic
-};
+using SLASupportTreeType = sla::SupportTreeType;
+using SLAPillarConnectionMode = sla::PillarConnectionMode;
 
 enum BrimType {
     btNoBrim,
@@ -125,6 +121,15 @@ enum BrimType {
 
 enum DraftShield {
     dsDisabled, dsLimited, dsEnabled
+};
+
+enum class PerimeterGeneratorType
+{
+    // Classic perimeter generator using Clipper offsets with constant extrusion width.
+    Classic,
+    // Perimeter generator with variable extrusion width based on the paper
+    // "A framework for adaptive width control of dense contour-parallel toolpaths in fused deposition modeling" ported from Cura.
+    Arachne
 };
 
 enum class GCodeThumbnailsFormat {
@@ -154,6 +159,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -197,7 +203,6 @@ double min_object_distance(const ConfigBase &cfg);
 // The dynamic configuration is also used to store user modifications of the print global parameters,
 // so the modified configuration values may be diffed against the active configuration
 // to invalidate the proper slicing resp. g-code generation processing steps.
-// This object is mapped to Perl as Slic3r::Config.
 class DynamicPrintConfig : public DynamicConfig
 {
 public:
@@ -211,6 +216,26 @@ public:
     DynamicPrintConfig& operator=(DynamicPrintConfig &&rhs) noexcept { DynamicConfig::operator=(std::move(rhs)); return *this; }
 
     static DynamicPrintConfig  full_print_config();
+    static DynamicPrintConfig  full_print_config_with(const t_config_option_key &opt_key, const std::string &str, bool append = false) {
+        auto config = DynamicPrintConfig::full_print_config();
+        config.set_deserialize_strict(opt_key, str, append);
+        return config;
+    }
+    static DynamicPrintConfig  full_print_config_with(std::initializer_list<SetDeserializeItem> items) {
+        auto config = DynamicPrintConfig::full_print_config();
+        config.set_deserialize_strict(items);
+        return config;
+    }
+    static DynamicPrintConfig  new_with(const t_config_option_key &opt_key, const std::string &str, bool append = false) {
+        DynamicPrintConfig config;
+        config.set_deserialize_strict(opt_key, str, append);
+        return config;
+    }
+    static DynamicPrintConfig  new_with(std::initializer_list<SetDeserializeItem> items) {
+        DynamicPrintConfig config;
+        config.set_deserialize_strict(items);
+        return config;
+    }
     static DynamicPrintConfig* new_from_defaults_keys(const std::vector<std::string> &keys);
 
     // Overrides ConfigBase::def(). Static configuration definition. Any value stored into this ConfigBase shall have its definition here.
@@ -454,7 +479,6 @@ protected: \
         BOOST_PP_SEQ_FOR_EACH(PRINT_CONFIG_CLASS_ELEMENT_HASH, _, PARAMETER_DEFINITION_SEQ), \
         BOOST_PP_SEQ_FOR_EACH(PRINT_CONFIG_CLASS_ELEMENT_EQUAL, _, PARAMETER_DEFINITION_SEQ))
 
-// This object is mapped to Perl as Slic3r::Config::PrintObject.
 PRINT_CONFIG_CLASS_DEFINE(
     PrintObjectConfig,
 
@@ -482,6 +506,15 @@ PRINT_CONFIG_CLASS_DEFINE(
 //  ((ConfigOptionFloat,               seam_preferred_direction_jitter))
     ((ConfigOptionFloat,               slice_closing_radius))
     ((ConfigOptionEnum<SlicingMode>,   slicing_mode))
+    ((ConfigOptionEnum<PerimeterGeneratorType>, perimeter_generator))
+    ((ConfigOptionFloat,               wall_transition_length))
+    ((ConfigOptionFloatOrPercent,      wall_transition_filter_deviation))
+    ((ConfigOptionFloat,               wall_transition_angle))
+    ((ConfigOptionInt,                 wall_distribution_count))
+    ((ConfigOptionPercent,             wall_split_middle_threshold))
+    ((ConfigOptionPercent,             wall_add_middle_threshold))
+    ((ConfigOptionFloat,               min_feature_size))
+    ((ConfigOptionFloatOrPercent,      min_bead_width))
     ((ConfigOptionBool,                support_material))
     // Automatic supports (generated based on support_material_threshold).
     ((ConfigOptionBool,                support_material_auto))
@@ -518,7 +551,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                wipe_into_objects))
 )
 
-// This object is mapped to Perl as Slic3r::Config::PrintRegion.
 PRINT_CONFIG_CLASS_DEFINE(
     PrintRegionConfig,
 
@@ -609,7 +641,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,               machine_min_extruding_rate))
 )
 
-// This object is mapped to Perl as Slic3r::Config::GCode.
 PRINT_CONFIG_CLASS_DEFINE(
     GCodeConfig,
 
@@ -651,10 +682,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionString,              layer_gcode))
     ((ConfigOptionFloat,               max_print_speed))
     ((ConfigOptionFloat,               max_volumetric_speed))
-//#ifdef HAS_PRESSURE_EQUALIZER
-//    ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_positive))
-//    ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_negative))
-//#endif
+    ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_positive))
+    ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_negative))
     ((ConfigOptionPercents,            retract_before_wipe))
     ((ConfigOptionFloats,              retract_length))
     ((ConfigOptionFloats,              retract_length_toolchange))
@@ -695,7 +724,6 @@ static inline std::string get_extrusion_axis(const GCodeConfig &cfg)
         (cfg.gcode_flavor.value == gcfNoExtrusion) ? "" : cfg.extrusion_axis.value;
 }
 
-// This object is mapped to Perl as Slic3r::Config::Print.
 PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     PrintConfig, 
     (MachineEnvelopeConfig, GCodeConfig),
@@ -774,7 +802,6 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,              z_offset))
 )
 
-// This object is mapped to Perl as Slic3r::Config::Full.
 PRINT_CONFIG_CLASS_DERIVED_DEFINE0(
     FullPrintConfig,
     (PrintObjectConfig, PrintRegionConfig, PrintConfig)
@@ -931,7 +958,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat, hollowing_closing_distance))
 )
 
-enum SLAMaterialSpeed { slamsSlow, slamsFast };
+enum SLAMaterialSpeed { slamsSlow, slamsFast, slamsHighViscosity };
 
 PRINT_CONFIG_CLASS_DEFINE(
     SLAMaterialConfig,
@@ -973,6 +1000,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                      gamma_correction))
     ((ConfigOptionFloat,                      fast_tilt_time))
     ((ConfigOptionFloat,                      slow_tilt_time))
+    ((ConfigOptionFloat,                      high_viscosity_tilt_time))
     ((ConfigOptionFloat,                      area_fill))
     ((ConfigOptionFloat,                      min_exposure_time))
     ((ConfigOptionFloat,                      max_exposure_time))
@@ -1127,6 +1155,8 @@ public:
     void         set(const std::string &opt_key, T value) { m_data.set(opt_key, value, true); this->touch(); }
     void         set_deserialize(const t_config_option_key &opt_key, const std::string &str, ConfigSubstitutionContext &substitution_context, bool append = false)
         { m_data.set_deserialize(opt_key, str, substitution_context, append); this->touch(); }
+    void         set_deserialize_strict(const t_config_option_key &opt_key, const std::string &str, bool append = false)
+        { m_data.set_deserialize_strict(opt_key, str, append); this->touch(); }
     bool         erase(const t_config_option_key &opt_key) { bool out = m_data.erase(opt_key); if (out) this->touch(); return out; }
 
     // Getters are thread safe.

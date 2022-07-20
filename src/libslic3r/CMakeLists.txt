@@ -17,6 +17,10 @@ endif()
 set(SLIC3R_SOURCES
     pchheader.cpp
     pchheader.hpp
+    AStar.hpp
+    AABBTreeIndirect.hpp
+    AABBMesh.hpp
+    AABBMesh.cpp
     BoundingBox.cpp
     BoundingBox.hpp
     BridgeDetector.cpp
@@ -25,6 +29,7 @@ set(SLIC3R_SOURCES
     Brim.hpp
     BuildVolume.cpp
     BuildVolume.hpp
+    BoostAdapter.hpp
     clipper.cpp
     clipper.hpp
     ClipperUtils.cpp
@@ -40,8 +45,6 @@ set(SLIC3R_SOURCES
     enum_bitmask.hpp
     ExPolygon.cpp
     ExPolygon.hpp
-    ExPolygonCollection.cpp
-    ExPolygonCollection.hpp
     Extruder.cpp
     Extruder.hpp
     ExtrusionEntity.cpp
@@ -116,8 +119,8 @@ set(SLIC3R_SOURCES
     GCode/FindReplace.hpp
     GCode/PostProcessor.cpp
     GCode/PostProcessor.hpp
-#    GCode/PressureEqualizer.cpp
-#    GCode/PressureEqualizer.hpp
+    GCode/PressureEqualizer.cpp
+    GCode/PressureEqualizer.hpp
     GCode/PrintExtents.cpp
     GCode/PrintExtents.hpp
     GCode/SpiralVase.cpp
@@ -173,6 +176,8 @@ set(SLIC3R_SOURCES
     ModelArrange.cpp
     MultiMaterialSegmentation.cpp
     MultiMaterialSegmentation.hpp
+    MeshNormals.hpp
+    MeshNormals.cpp
     CustomGCode.cpp
     CustomGCode.hpp
     Arrange.hpp
@@ -180,6 +185,8 @@ set(SLIC3R_SOURCES
     MultiPoint.cpp
     MultiPoint.hpp
     MutablePriorityQueue.hpp
+    NormalUtils.cpp
+    NormalUtils.hpp
     ObjectID.cpp
     ObjectID.hpp
     PerimeterGenerator.cpp
@@ -214,11 +221,14 @@ set(SLIC3R_SOURCES
     PrintObject.cpp
     PrintObjectSlice.cpp
     PrintRegion.cpp
+    PointGrid.hpp
     PNGReadWrite.hpp
     PNGReadWrite.cpp
     QuadricEdgeCollapse.cpp
     QuadricEdgeCollapse.hpp
     Semver.cpp
+    ShortEdgeCollapse.cpp
+    ShortEdgeCollapse.hpp
     ShortestPath.cpp
     ShortestPath.hpp
     SLAPrint.cpp
@@ -259,6 +269,8 @@ set(SLIC3R_SOURCES
     Thread.hpp
     TriangleSelector.cpp
     TriangleSelector.hpp
+    TriangleSetSampling.cpp
+    TriangleSetSampling.hpp
     MTUtils.hpp
     Zipper.hpp
     Zipper.cpp
@@ -279,16 +291,14 @@ set(SLIC3R_SOURCES
     SLA/SupportTreeBuilder.hpp
     SLA/SupportTreeMesher.hpp
     SLA/SupportTreeMesher.cpp
-    SLA/SupportTreeBuildsteps.hpp
-    SLA/SupportTreeBuildsteps.cpp
+    SLA/SupportTreeUtils.hpp
     SLA/SupportTreeBuilder.cpp
-    SLA/Concurrency.hpp
     SLA/SupportTree.hpp
     SLA/SupportTree.cpp
+    SLA/SupportTreeStrategies.hpp
 #    SLA/SupportTreeIGL.cpp
     SLA/Rotfinder.hpp
     SLA/Rotfinder.cpp
-    SLA/BoostAdapter.hpp
     SLA/SpatIndex.hpp
     SLA/SpatIndex.cpp
     SLA/RasterBase.hpp
@@ -304,11 +314,52 @@ set(SLIC3R_SOURCES
     SLA/SupportPoint.hpp
     SLA/SupportPointGenerator.hpp
     SLA/SupportPointGenerator.cpp
-    SLA/IndexedMesh.hpp
-    SLA/IndexedMesh.cpp
     SLA/Clustering.hpp
     SLA/Clustering.cpp
     SLA/ReprojectPointsOnMesh.hpp
+    SLA/DefaultSupportTree.hpp
+    SLA/DefaultSupportTree.cpp
+
+    Arachne/BeadingStrategy/BeadingStrategy.hpp
+    Arachne/BeadingStrategy/BeadingStrategy.cpp
+    Arachne/BeadingStrategy/BeadingStrategyFactory.hpp
+    Arachne/BeadingStrategy/BeadingStrategyFactory.cpp
+    Arachne/BeadingStrategy/DistributedBeadingStrategy.hpp
+    Arachne/BeadingStrategy/DistributedBeadingStrategy.cpp
+    Arachne/BeadingStrategy/LimitedBeadingStrategy.hpp
+    Arachne/BeadingStrategy/LimitedBeadingStrategy.cpp
+    Arachne/BeadingStrategy/OuterWallInsetBeadingStrategy.hpp
+    Arachne/BeadingStrategy/OuterWallInsetBeadingStrategy.cpp
+    Arachne/BeadingStrategy/RedistributeBeadingStrategy.hpp
+    Arachne/BeadingStrategy/RedistributeBeadingStrategy.cpp
+    Arachne/BeadingStrategy/WideningBeadingStrategy.hpp
+    Arachne/BeadingStrategy/WideningBeadingStrategy.cpp
+    Arachne/utils/ExtrusionJunction.hpp
+    Arachne/utils/ExtrusionJunction.cpp
+    Arachne/utils/ExtrusionLine.hpp
+    Arachne/utils/ExtrusionLine.cpp
+    Arachne/utils/HalfEdge.hpp
+    Arachne/utils/HalfEdgeGraph.hpp
+    Arachne/utils/HalfEdgeNode.hpp
+    Arachne/utils/SparseGrid.hpp
+    Arachne/utils/SparsePointGrid.hpp
+    Arachne/utils/SparseLineGrid.hpp
+    Arachne/utils/SquareGrid.hpp
+    Arachne/utils/SquareGrid.cpp
+    Arachne/utils/PolygonsPointIndex.hpp
+    Arachne/utils/PolygonsSegmentIndex.hpp
+    Arachne/utils/PolylineStitcher.hpp
+    Arachne/utils/PolylineStitcher.cpp
+    Arachne/utils/VoronoiUtils.hpp
+    Arachne/utils/VoronoiUtils.cpp
+    Arachne/SkeletalTrapezoidation.hpp
+    Arachne/SkeletalTrapezoidation.cpp
+    Arachne/SkeletalTrapezoidationEdge.hpp
+    Arachne/SkeletalTrapezoidationGraph.hpp
+    Arachne/SkeletalTrapezoidationGraph.cpp
+    Arachne/SkeletalTrapezoidationJoint.hpp
+    Arachne/WallToolPaths.hpp
+    Arachne/WallToolPaths.cpp
 )
 
 add_library(libslic3r STATIC ${SLIC3R_SOURCES})
@@ -372,7 +423,7 @@ target_link_libraries(libslic3r
     boost_libs
     clipper
     nowide
-    EXPAT::EXPAT
+    libexpat
     glu-libtess
     qhull
     semver
@@ -399,7 +450,7 @@ endif()
 
 if (APPLE)
     # This flag prevents the need for minimum SDK version 10.14
-    # currently, PS targets v10.10
+    # currently, PS targets v10.12
     target_compile_options(libslic3r PUBLIC "-fno-aligned-allocation")
 endif ()
 

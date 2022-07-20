@@ -1530,9 +1530,13 @@ void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& mo
     const BoundingBoxf3 instance_bb = model_object.instance_bounding_box(instance_idx);
 
     // First (any) GLVolume of the selected instance. They all share the same instance matrix.
-    const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* v = selection.get_first_volume();
     const Geometry::Transformation inst_transform = v->get_instance_transformation();
+#if ENABLE_WORLD_COORDINATE
+    const Transform3d inv_inst_transform = inst_transform.get_matrix_no_offset().inverse();
+#else
     const Transform3d inv_inst_transform = inst_transform.get_matrix(true).inverse();
+#endif // ENABLE_WORLD_COORDINATE
     const Vec3d instance_offset = v->get_instance_offset();
 
     for (size_t i = 0; i < input_files.size(); ++i) {
@@ -1580,9 +1584,15 @@ void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& mo
             new_volume->source.mesh_offset = model.objects.front()->volumes.front()->source.mesh_offset;
 
         if (from_galery) {
+#if ENABLE_WORLD_COORDINATE
+            // Transform the new modifier to be aligned with the print bed.
+            new_volume->set_transformation(v->get_instance_transformation().get_matrix_no_offset().inverse());
+            const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
+#else
             // Transform the new modifier to be aligned with the print bed.
             const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
             new_volume->set_transformation(Geometry::Transformation::volume_to_bed_transformation(inst_transform, mesh_bb));
+#endif // ENABLE_WORLD_COORDINATE
             // Set the modifier position.
             // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
             const Vec3d offset = Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - instance_offset;
@@ -1650,17 +1660,27 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
     ModelVolume *new_volume = model_object.add_volume(std::move(mesh), type);
 
     // First (any) GLVolume of the selected instance. They all share the same instance matrix.
-    const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+    const GLVolume* v = selection.get_first_volume();
+#if ENABLE_WORLD_COORDINATE
     // Transform the new modifier to be aligned with the print bed.
-	const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
+    new_volume->set_transformation(v->get_instance_transformation().get_matrix_no_offset().inverse());
+    const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
+#else
+    // Transform the new modifier to be aligned with the print bed.
+    const BoundingBoxf3 mesh_bb = new_volume->mesh().bounding_box();
     new_volume->set_transformation(Geometry::Transformation::volume_to_bed_transformation(v->get_instance_transformation(), mesh_bb));
+#endif // ENABLE_WORLD_COORDINATE
     // Set the modifier position.
     auto offset = (type_name == "Slab") ?
         // Slab: Lift to print bed
 		Vec3d(0., 0., 0.5 * mesh_bb.size().z() + instance_bb.min.z() - v->get_instance_offset().z()) :
         // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
         Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - v->get_instance_offset();
+#if ENABLE_WORLD_COORDINATE
+    new_volume->set_offset(v->get_instance_transformation().get_matrix_no_offset().inverse() * offset);
+#else
     new_volume->set_offset(v->get_instance_transformation().get_matrix(true).inverse() * offset);
+#endif // ENABLE_WORLD_COORDINATE
 
     const wxString name = _L("Generic") + "-" + _(type_name);
     new_volume->name = into_u8(name);
@@ -3264,7 +3284,7 @@ void ObjectList::update_selections()
     {
         const auto item = GetSelection();
         if (selection.is_single_full_object()) {
-            if (m_objects_model->GetItemType(m_objects_model->GetParent(item)) & itObject &&
+            if (m_objects_model->GetItemType(m_objects_model->GetParent(item)) & (itObject | itLayerRoot | itLayer) &&
                 m_objects_model->GetObjectIdByItem(item) == selection.get_object_idx() )
                 return;
             sels.Add(m_objects_model->GetItemById(selection.get_object_idx()));
@@ -3274,7 +3294,7 @@ void ObjectList::update_selections()
 #else
         else if (selection.is_single_volume() || selection.is_any_modifier()) {
 #endif // ENABLE_WORLD_COORDINATE
-            const auto gl_vol = selection.get_volume(*selection.get_volume_idxs().begin());
+            const auto gl_vol = selection.get_first_volume();
             if (m_objects_model->GetVolumeIdByItem(m_objects_model->GetParent(item)) == gl_vol->volume_idx())
                 return;
         }

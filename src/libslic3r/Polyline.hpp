@@ -65,7 +65,7 @@ public:
     const Point& leftmost_point() const;
     Lines lines() const override;
 
-    void clip_end(double distance);
+    virtual void clip_end(double distance);
     void clip_start(double distance);
     void extend_end(double distance);
     void extend_start(double distance);
@@ -79,15 +79,6 @@ public:
 
 inline bool operator==(const Polyline &lhs, const Polyline &rhs) { return lhs.points == rhs.points; }
 inline bool operator!=(const Polyline &lhs, const Polyline &rhs) { return lhs.points != rhs.points; }
-
-// Don't use this class in production code, it is used exclusively by the Perl binding for unit tests!
-#ifdef PERL_UCHAR_MIN
-class PolylineCollection
-{
-public:
-    Polylines polylines;
-};
-#endif /* PERL_UCHAR_MIN */
 
 extern BoundingBox get_extents(const Polyline &polyline);
 extern BoundingBox get_extents(const Polylines &polylines);
@@ -163,6 +154,9 @@ const Point& leftmost_point(const Polylines &polylines);
 
 bool remove_degenerate(Polylines &polylines);
 
+// Returns index of a segment of a polyline and foot point of pt on polyline.
+std::pair<int, Point> foot_pt(const Points &polyline, const Point &pt);
+
 class ThickPolyline : public Polyline {
 public:
     ThickPolyline() : endpoints(std::make_pair(false, false)) {}
@@ -173,9 +167,23 @@ public:
         std::swap(this->endpoints.first, this->endpoints.second);
     }
 
+    void clip_end(double distance) override;
+
     std::vector<coordf_t> width;
     std::pair<bool,bool>  endpoints;
 };
+
+inline ThickPolylines to_thick_polylines(Polylines &&polylines, const coordf_t width)
+{
+    ThickPolylines out;
+    out.reserve(polylines.size());
+    for (Polyline &polyline : polylines) {
+        out.emplace_back();
+        out.back().width.assign((polyline.points.size() - 1) * 2, width);
+        out.back().points = std::move(polyline.points);
+    }
+    return out;
+}
 
 class Polyline3 : public MultiPoint3
 {

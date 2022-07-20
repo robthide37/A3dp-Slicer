@@ -132,6 +132,15 @@ private:
     wxTimer* m_timer;
 };
 
+class KeyAutoRepeatFilter
+{
+    size_t m_count{ 0 };
+
+public:
+    void increase_count() { ++m_count; }
+    void reset_count() { m_count = 0; }
+    bool is_first() const { return m_count == 0; }
+};
 
 wxDECLARE_EVENT(EVT_GLCANVAS_OBJECT_SELECT, SimpleEvent);
 
@@ -156,6 +165,9 @@ wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_MOVED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_FORCE_UPDATE, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_MOVED, Vec3dEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_ROTATED, SimpleEvent);
+#if ENABLE_WORLD_COORDINATE
+wxDECLARE_EVENT(EVT_GLCANVAS_RESET_SKEW, SimpleEvent);
+#endif // ENABLE_WORLD_COORDINATE
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_SCALED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3dEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, Event<bool>);
@@ -473,7 +485,8 @@ public:
 
     struct ArrangeSettings
     {
-        float distance           = 6.;
+        float distance           = 6.f;
+        float distance_from_bed  = 0.f;
 //        float distance_seq_print = 6.;    // Used when sequential print is ON
 //        float distance_sla       = 6.;
         float accuracy           = 0.65f; // Unused currently
@@ -540,6 +553,9 @@ private:
 #if ENABLE_RENDER_PICKING_PASS
     bool m_show_picking_texture;
 #endif // ENABLE_RENDER_PICKING_PASS
+
+    KeyAutoRepeatFilter m_shift_kar_filter;
+    KeyAutoRepeatFilter m_ctrl_kar_filter;
 
     RenderStats m_render_stats;
 
@@ -739,7 +755,11 @@ public:
 
     void update_volumes_colors_by_extruder();
 
+#if ENABLE_WORLD_COORDINATE
+    bool is_dragging() const { return m_gizmos.is_dragging() || (m_moving && !m_mouse.scene_position.isApprox(m_mouse.drag.start_position_3D)); }
+#else
     bool is_dragging() const { return m_gizmos.is_dragging() || m_moving; }
+#endif // ENABLE_WORLD_COORDINATE
 
     void render();
     // printable_only == false -> render also non printable volumes as grayed
@@ -807,6 +827,9 @@ public:
     void do_rotate(const std::string& snapshot_type);
     void do_scale(const std::string& snapshot_type);
     void do_mirror(const std::string& snapshot_type);
+#if ENABLE_WORLD_COORDINATE
+    void do_reset_skew(const std::string& snapshot_type);
+#endif // ENABLE_WORLD_COORDINATE
 
     void update_gizmos_on_off_state();
     void reset_all_gizmos() { m_gizmos.reset_all_states(); }
@@ -822,7 +845,7 @@ public:
     
     class WipeTowerInfo {
     protected:
-        Vec2d m_pos = {std::nan(""), std::nan("")};
+        Vec2d m_pos = {NaNd, NaNd};
         double m_rotation = 0.;
         BoundingBoxf m_bb;
         friend class GLCanvas3D;
@@ -844,7 +867,6 @@ public:
     // Returns the view ray line, in world coordinate, at the given mouse position.
     Linef3 mouse_ray(const Point& mouse_pos);
 
-    void set_mouse_as_dragging() { m_mouse.dragging = true; }
     bool is_mouse_dragging() const { return m_mouse.dragging; }
 
     double get_size_proportional_to_max_bed_size(double factor) const;

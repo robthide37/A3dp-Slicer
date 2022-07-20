@@ -71,7 +71,6 @@
         %code%{ RETVAL = THIS->materials.size(); %};
 
     bool add_default_instances();
-    Clone<BoundingBoxf3> bounding_box();
     void center_instances_around_point(Vec2d* point)
         %code%{ THIS->center_instances_around_point(*point); %};
     void translate(double x, double y, double z);
@@ -80,11 +79,8 @@
     ModelObjectPtrs* objects()
         %code%{ RETVAL = &THIS->objects; %};
     
-    bool arrange_objects(double dist, BoundingBoxf* bb = NULL) %code%{ ArrangeParams ap{scaled(dist)}; if (bb) arrange_objects(*THIS, scaled(*bb), ap); else arrange_objects(*THIS, InfiniteBed{}, ap); %};
-    void duplicate(unsigned int copies_num, double dist, BoundingBoxf* bb = NULL) %code%{ ArrangeParams ap{scaled(dist)}; if (bb) duplicate(*THIS, copies_num, scaled(*bb), ap); else duplicate(*THIS, copies_num, InfiniteBed{}, ap); %};
-    void duplicate_objects(unsigned int copies_num, double dist, BoundingBoxf* bb = NULL) %code%{ ArrangeParams ap{scaled(dist)}; if (bb) duplicate_objects(*THIS, copies_num, scaled(*bb), ap); else duplicate_objects(*THIS, copies_num, InfiniteBed{}, ap); %};
-    void duplicate_objects_grid(unsigned int x, unsigned int y, double dist);
-
+    bool arrange_objects(double dist) %code%{ ArrangeParams ap{scaled(dist)}; arrange_objects(*THIS, InfiniteBed{}, ap); %};
+    void duplicate(unsigned int copies_num, double dist) %code%{ ArrangeParams ap{scaled(dist)};  duplicate(*THIS, copies_num, InfiniteBed{}, ap); %};
     bool looks_like_multipart_object() const;
     void convert_multipart_object(unsigned int max_extruders);
 
@@ -150,9 +146,6 @@ ModelMaterial::attributes()
     void invalidate_bounding_box();
     Clone<TriangleMesh> mesh();
     Clone<TriangleMesh> raw_mesh();
-    Clone<BoundingBoxf3> instance_bounding_box(int idx)
-        %code%{ RETVAL = THIS->instance_bounding_box(idx, true); %};
-    Clone<BoundingBoxf3> bounding_box();
 
     %name{_add_volume} Ref<ModelVolume> add_volume(TriangleMesh* mesh)
         %code%{ RETVAL = THIS->add_volume(*mesh); %};
@@ -290,7 +283,4 @@ ModelMaterial::attributes()
             THIS->set_offset(X, (*offset)(0));
             THIS->set_offset(Y, (*offset)(1));
         %};
-
-    void transform_mesh(TriangleMesh* mesh, bool dont_translate = false) const;
-    void transform_polygon(Polygon* polygon) const;
 };

@@ -30,8 +30,8 @@ template<class EP> using AsTraits = Traits<remove_cvref_t<EP>>;
 
 // Each execution policy should declare two types of mutexes. A a spin lock and
 // a blocking mutex. These types should satisfy the BasicLockable concept.
-template<class EP> using SpinningMutex = typename Traits<EP>::SpinningMutex;
-template<class EP> using BlockingMutex = typename Traits<EP>::BlockingMutex;
+template<class EP> using SpinningMutex = typename AsTraits<EP>::SpinningMutex;
+template<class EP> using BlockingMutex = typename AsTraits<EP>::BlockingMutex;
 
 // Query the available threads for concurrency.
 template<class EP, class = ExecutionPolicyOnly<EP> >

@@ -3243,6 +3243,7 @@ static inline void fill_expolygon_generate_paths(
     Surface surface(stInternal, std::move(expolygon));
     Polylines polylines;
     try {
+        assert(!fill_params.use_arachne);
         polylines = filler->fill_surface(&surface, fill_params);
     } catch (InfillFailedException &) {
     }
@@ -4283,7 +4284,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 std::stable_sort(layer_cache_item.overlapping.begin(), layer_cache_item.overlapping.end(), [](auto *l1, auto *l2) { return *l1 < *l2; });
             }
             if (! polys.empty())
-                expolygons_append(support_layer.support_islands.expolygons, union_ex(polys));
+                expolygons_append(support_layer.support_islands, union_ex(polys));
         } // for each support_layer_id
     });
 

@@ -162,13 +162,33 @@ TEST_CASE("Splitting a Polygon generates a polyline correctly", "[Geometry]"){
 }
 
 
-TEST_CASE("Bounding boxes are scaled appropriately", "[Geometry]"){
-    BoundingBox bb(std::vector<Point>({Point(0, 1), Point(10, 2), Point(20, 2)}));
-    bb.scale(2);
-    REQUIRE(bb.min == Point(0,2));
-    REQUIRE(bb.max == Point(40,4));
+SCENARIO("BoundingBox", "[Geometry]") {
+    WHEN("Bounding boxes are scaled") {
+        BoundingBox bb(std::vector<Point>({Point(0, 1), Point(10, 2), Point(20, 2)}));
+        bb.scale(2);
+        REQUIRE(bb.min == Point(0,2));
+        REQUIRE(bb.max == Point(40,4));
+    }
+    WHEN("BoundingBox constructed from points") {
+        BoundingBox bb(Points{ {100,200}, {100, 200}, {500, -600} });
+        THEN("minimum is correct") {
+            REQUIRE(bb.min == Point{100,-600});
+        }
+        THEN("maximum is correct") {
+            REQUIRE(bb.max == Point{500,200});
+        }
+    }
+    WHEN("BoundingBox constructed from a single point") {
+        BoundingBox bb;
+        bb.merge({10, 10});
+        THEN("minimum equals to the only defined point") {
+            REQUIRE(bb.min == Point{10,10});
+        }
+        THEN("maximum equals to the only defined point") {
+            REQUIRE(bb.max == Point{10,10});
+        }
+    }
 }
-
 
 TEST_CASE("Offseting a line generates a polygon correctly", "[Geometry]"){
 	Slic3r::Polyline tmp = { Point(10,10), Point(20,10) };

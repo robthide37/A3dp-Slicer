@@ -10,7 +10,7 @@
 
 #include <GL/glew.h>
 
-#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_WORLD_COORDINATE
 
 namespace Slic3r {
 namespace GUI {
@@ -47,25 +47,14 @@ void CoordAxes::render(float emission_factor)
         m_arrow.init_from(stilized_arrow(16, m_tip_radius, m_tip_length, m_stem_radius, m_stem_length));
 
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    bool shader_differs = (curr_shader == nullptr || curr_shader->get_name() != "gouraud_light_attr");
-#else
-    bool shader_differs = (curr_shader == nullptr || curr_shader->get_name() != "gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
-    if (shader_differs) {
-        if (curr_shader != nullptr)
-            curr_shader->stop_using();
-        shader->start_using();
-    }
+    if (curr_shader != nullptr)
+        curr_shader->stop_using();
+
+    shader->start_using();
     shader->set_uniform("emission_factor", emission_factor);
 
     // x axis
@@ -104,14 +93,12 @@ void CoordAxes::render(float emission_factor)
     render_axis(Geometry::assemble_transform(m_origin).cast<float>());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-    if (shader_differs) {
-        shader->stop_using();
-        if (curr_shader != nullptr)
-            curr_shader->start_using();
-    }
+    shader->stop_using();
+    if (curr_shader != nullptr)
+        curr_shader->start_using();
 }
 
 } // GUI
 } // Slic3r
 
-#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#endif // ENABLE_WORLD_COORDINATE

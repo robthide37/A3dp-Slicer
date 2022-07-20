@@ -457,14 +457,20 @@ std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> PrintObject::prepare
 
 FillLightning::GeneratorPtr PrintObject::prepare_lightning_infill_data()
 {
-    bool has_lightning_infill = false;
+    bool     has_lightning_infill = false;
+    coordf_t lightning_density    = 0.;
+    size_t   lightning_cnt        = 0;
     for (size_t region_id = 0; region_id < this->num_printing_regions(); ++region_id)
         if (const PrintRegionConfig &config = this->printing_region(region_id).config(); config.fill_density > 0 && config.fill_pattern == ipLightning) {
             has_lightning_infill = true;
-            break;
+            lightning_density   += config.fill_density;
+            ++lightning_cnt;
         }
 
-    return has_lightning_infill ? FillLightning::build_generator(std::as_const(*this)) : FillLightning::GeneratorPtr();
+    if (has_lightning_infill)
+        lightning_density /= coordf_t(lightning_cnt);
+
+    return has_lightning_infill ? FillLightning::build_generator(std::as_const(*this), lightning_density, [this]() -> void { this->throw_if_canceled(); }) : FillLightning::GeneratorPtr();
 }
 
 void PrintObject::clear_layers()
@@ -661,6 +667,17 @@ bool PrintObject::invalidate_state_by_config_options(
             	steps.emplace_back(posInfill);
 	            steps.emplace_back(posSupportMaterial);
 	        }
+        } else if (
+            opt_key == "perimeter_generator"
+            || opt_key == "wall_transition_length"
+            || opt_key == "wall_transition_filter_deviation"
+            || opt_key == "wall_transition_angle"
+            || opt_key == "wall_distribution_count"
+            || opt_key == "wall_split_middle_threshold"
+            || opt_key == "wall_add_middle_threshold"
+            || opt_key == "min_feature_size"
+            || opt_key == "min_bead_width") {
+            steps.emplace_back(posSlice);
         } else if (
                opt_key == "seam_position"
             || opt_key == "seam_preferred_direction"

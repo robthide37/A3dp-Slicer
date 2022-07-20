@@ -1450,6 +1450,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("seam_position", category_path + "seam-position");
         optgroup->append_single_option_line("external_perimeters_first", category_path + "external-perimeters-first");
         optgroup->append_single_option_line("gap_fill_enabled", category_path + "fill-gaps");
+        optgroup->append_single_option_line("perimeter_generator");
 
         optgroup = page->new_optgroup(L("Fuzzy skin (experimental)"));
         category_path = "fuzzy-skin_246186/#";
@@ -1568,10 +1569,10 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Autospeed (advanced)"));
         optgroup->append_single_option_line("max_print_speed", "max-volumetric-speed_127176");
         optgroup->append_single_option_line("max_volumetric_speed", "max-volumetric-speed_127176");
-#ifdef HAS_PRESSURE_EQUALIZER
-        optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope_positive");
-        optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope_negative");
-#endif /* HAS_PRESSURE_EQUALIZER */
+
+        optgroup = page->new_optgroup(L("Pressure equalizer (experimental)"));
+        optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope_positive", "pressure-equlizer_331504");
+        optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope_negative", "pressure-equlizer_331504");
 
     page = add_options_page(L("Multiple Extruders"), "funnel");
         optgroup = page->new_optgroup(L("Extruders"));
@@ -1627,6 +1628,16 @@ void TabPrint::build()
 
         optgroup = page->new_optgroup(L("Other"));
         optgroup->append_single_option_line("clip_multipart_objects");
+
+        optgroup = page->new_optgroup(L("Arachne perimeter generator"));
+        optgroup->append_single_option_line("wall_add_middle_threshold");
+        optgroup->append_single_option_line("wall_split_middle_threshold");
+        optgroup->append_single_option_line("wall_transition_angle");
+        optgroup->append_single_option_line("wall_transition_filter_deviation");
+        optgroup->append_single_option_line("wall_transition_length");
+        optgroup->append_single_option_line("wall_distribution_count");
+        optgroup->append_single_option_line("min_bead_width");
+        optgroup->append_single_option_line("min_feature_size");
 
     page = add_options_page(L("Output options"), "output+page_white");
         optgroup = page->new_optgroup(L("Sequential printing"));
@@ -2492,6 +2503,7 @@ void TabPrinter::build_sla()
     line = { L("Tilt time"), "" };
     line.append_option(optgroup->get_option("fast_tilt_time"));
     line.append_option(optgroup->get_option("slow_tilt_time"));
+    line.append_option(optgroup->get_option("high_viscosity_tilt_time"));
     optgroup->append_line(line);
     optgroup->append_single_option_line("area_fill");
 
@@ -3481,6 +3493,28 @@ void Tab::activate_selected_page(std::function<void()> throw_if_canceled)
     toggle_options();
 }
 
+#ifdef WIN32
+// Override the wxCheckForInterrupt to process inperruptions just from key or mouse
+// and to avoid an unwanted early call of CallAfter()
+static bool CheckForInterrupt(wxWindow* wnd)
+{
+    wxCHECK(wnd, false);
+
+    MSG msg;
+    while (::PeekMessage(&msg, ((HWND)((wnd)->GetHWND())), WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+    {
+        ::TranslateMessage(&msg);
+        ::DispatchMessage(&msg);
+    }
+    while (::PeekMessage(&msg, ((HWND)((wnd)->GetHWND())), WM_MOUSEFIRST, WM_MOUSELAST, PM_REMOVE))
+    {
+        ::TranslateMessage(&msg);
+        ::DispatchMessage(&msg);
+    }
+    return true;
+}
+#endif //WIN32
+
 bool Tab::tree_sel_change_delayed()
 {
     // There is a bug related to Ubuntu overlay scrollbars, see https://github.com/prusa3d/PrusaSlicer/issues/898 and https://github.com/prusa3d/PrusaSlicer/issues/952.
@@ -3517,7 +3551,7 @@ bool Tab::tree_sel_change_delayed()
     
     auto throw_if_canceled = std::function<void()>([this](){
 #ifdef WIN32
-            wxCheckForInterrupt(m_treectrl);
+            CheckForInterrupt(m_treectrl);
             if (m_page_switch_planned)
                 throw UIBuildCanceled();
 #else // WIN32
@@ -3583,8 +3617,15 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
         name = dlg.get_name();
     }
 
+    if (detach && m_type == Preset::TYPE_PRINTER)
+        m_config->opt_string("printer_model", true) = "";
+
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
     m_presets->save_current_preset(name, detach);
+
+    if (detach && m_type == Preset::TYPE_PRINTER)
+        wxGetApp().mainframe->on_config_changed(m_config);
+
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     // If saving the preset changes compatibility with other presets, keep the now incompatible dependent presets selected, however with a "red flag" icon showing that they are no more compatible.
     m_preset_bundle->update_compatible(PresetSelectCompatibleType::Never);
@@ -3637,6 +3678,9 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
 
     // update preset comboboxes in DiffPresetDlg
     wxGetApp().mainframe->diff_dialog.update_presets(m_type);
+
+    if (detach)
+        update_description_lines();
 }
 
 // Called for a currently selected preset.
