@@ -36,11 +36,13 @@ class GLGizmoCut3D : public GLGizmoBase
     Vec3d m_center_offset{ Vec3d::Zero() };
 
     // values from RotationGizmo
-    float m_radius{ 0.0f };
-    float m_snap_coarse_in_radius{ 0.0f };
-    float m_snap_coarse_out_radius{ 0.0f };
-    float m_snap_fine_in_radius{ 0.0f };
-    float m_snap_fine_out_radius{ 0.0f };
+    double m_radius{ 0.0 };
+    double m_grabber_radius{ 0.0 };
+    double m_grabber_connection_len{ 0.0 };
+
+    // dragging angel in hovered axes
+    Transform3d m_start_dragging_m{ Transform3d::Identity() };
+    double m_angle{ 0.0 };
 
     GLModel         m_connector_shape;
     TriangleMesh    m_connector_mesh;
@@ -56,6 +58,13 @@ class GLGizmoCut3D : public GLGizmoBase
     GLModel m_cut_line;
     GLModel m_cone;
     GLModel m_sphere;
+
+    GLModel m_circle;
+    GLModel m_scale;
+    GLModel m_snap_radii;
+    GLModel m_reference_radius;
+    GLModel m_angle_arc;
+
     Vec3d   m_old_center;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
