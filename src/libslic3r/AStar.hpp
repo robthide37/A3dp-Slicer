@@ -1,10 +1,11 @@
 #ifndef ASTAR_HPP
 #define ASTAR_HPP
 
+#include <cmath> // std::isinf() is here
+#include <unordered_map>
+
 #include "libslic3r/Point.hpp"
 #include "libslic3r/MutablePriorityQueue.hpp"
-
-#include <unordered_map>
 
 namespace Slic3r { namespace astar {
 
@@ -34,6 +35,8 @@ template<class T> struct TracerTraits_
     // Get the estimated distance heuristic from node 'n' to the destination.
     // This is referred to as the h value in AStar context.
     // If node 'n' is the goal, this function should return a negative value.
+    // Note that this heuristic should be admissible (never bigger than the real
+    // cost) in order for Astar to work.
     static float goal_heuristic(const T &tracer, const Node &n)
     {
         return tracer.goal_heuristic(n);
@@ -50,131 +53,136 @@ template<class T> struct TracerTraits_
 template<class T>
 using TracerNodeT = typename TracerTraits_<remove_cvref_t<T>>::Node;
 
-namespace detail {
-// Helper functions dispatching calls through the TracerTraits_ interface
+constexpr auto Unassigned = std::numeric_limits<size_t>::max();
 
-template<class T> using TracerTraits = TracerTraits_<remove_cvref_t<T>>;
-
-template<class T, class Fn>
-void foreach_reachable(const T &tracer, const TracerNodeT<T> &from, Fn &&fn)
+template<class Tracer>
+struct QNode // Queue node. Keeps track of scores g, and h
 {
-    TracerTraits<T>::foreach_reachable(tracer, from, fn);
-}
+    TracerNodeT<Tracer> node; // The actual node itself
+    size_t queue_id; // Position in the open queue or Unassigned if closed
+    size_t parent;   // unique id of the parent or Unassigned
 
-template<class T>
-float trace_distance(const T &tracer, const TracerNodeT<T> &a, const TracerNodeT<T> &b)
-{
-    return TracerTraits<T>::distance(tracer, a, b);
-}
+    float g, h;
+    float f() const { return g + h; }
 
-template<class T>
-float goal_heuristic(const T &tracer, const TracerNodeT<T> &n)
-{
-    return TracerTraits<T>::goal_heuristic(tracer, n);
-}
-
-template<class T>
-size_t unique_id(const T &tracer, const TracerNodeT<T> &n)
-{
-    return TracerTraits<T>::unique_id(tracer, n);
-}
-
-} // namespace astar_detail
+    QNode(TracerNodeT<Tracer> n    = {},
+          size_t              p    = Unassigned,
+          float               gval = std::numeric_limits<float>::infinity(),
+          float               hval = 0.f)
+        : node{std::move(n)}
+        , parent{p}
+        , queue_id{InvalidQueueID}
+        , g{gval}
+        , h{hval}
+    {}
+};
 
 // Run the AStar algorithm on a tracer implementation.
 // The 'tracer' argument encapsulates the domain (grid, point cloud, etc...)
 // The 'source' argument is the starting node.
 // The 'out' argument is the output iterator into which the output nodes are
-// written.
-// Note that no destination node is given. The tracer's goal_heuristic() method
-// should return a negative value if a node is a destination node.
-template<class Tracer, class It>
-bool search_route(const Tracer &tracer, const TracerNodeT<Tracer> &source, It out)
+// written. For performance reasons, the order is reverse, from the destination
+// to the source -- (destination included, source is not).
+// The 'cached_nodes' argument is an optional associative container to hold a
+// QNode entry for each visited node. Any compatible container can be used
+// (like std::map or maps with different allocators, even a sufficiently large
+// std::vector).
+//
+// Note that no destination node is given in the signature. The tracer's
+// goal_heuristic() method should return a negative value if a node is a
+// destination node.
+template<class Tracer,
+         class It,
+         class NodeMap = std::unordered_map<size_t, QNode<Tracer>>>
+bool search_route(const Tracer              &tracer,
+                  const TracerNodeT<Tracer> &source,
+                  It                         out,
+                  NodeMap                  &&cached_nodes = {})
 {
-    using namespace detail;
+    using Node         = TracerNodeT<Tracer>;
+    using QNode        = QNode<Tracer>;
+    using TracerTraits = TracerTraits_<remove_cvref_t<Tracer>>;
 
-    using Node = TracerNodeT<Tracer>;
-    enum  class QueueType { Open, Closed, None };
-
-    struct QNode // Queue node. Keeps track of scores g, and h
-    {
-        Node      node;                    // The actual node itself
-        QueueType qtype = QueueType::None; // Which queue holds this node
-
-        float  g = 0.f, h = 0.f;
-        float f() const { return g + h; }
-    };
-
-       // TODO: apply a linear memory allocator
-    using QMap = std::unordered_map<size_t, QNode>;
-
-       // The traversed nodes are stored here encapsulated in QNodes
-    QMap cached_nodes;
-
-    struct LessPred { // Comparison functor needed by MutablePriorityQueue
-        QMap &m;
+    struct LessPred { // Comparison functor needed by the priority queue
+        NodeMap &m;
         bool operator ()(size_t node_a, size_t node_b) {
-            auto ait = m.find(node_a);
-            auto bit = m.find(node_b);
-            assert (ait != m.end() && bit != m.end());
-
-            return ait->second.f() < bit->second.f();
+            return m[node_a].f() < m[node_b].f();
         }
     };
 
-    auto qopen =
-        make_mutable_priority_queue<size_t, false>([](size_t, size_t){},
-                                                   LessPred{cached_nodes});
+    auto qopen = make_mutable_priority_queue<size_t, true>(
+        [&cached_nodes](size_t el, size_t qidx) {
+            cached_nodes[el].queue_id = qidx;
+        },
+        LessPred{cached_nodes});
 
-    auto qclosed =
-        make_mutable_priority_queue<size_t, false>([](size_t, size_t){},
-                                                   LessPred{cached_nodes});
+    QNode initial{source, /*parent = */ Unassigned, /*g = */0.f};
+    size_t source_id = TracerTraits::unique_id(tracer, source);
+    cached_nodes[source_id] = initial;
+    qopen.push(source_id);
 
-    QNode initial{source, QueueType::Open};
-    cached_nodes.insert({unique_id(tracer, source), initial});
-    qopen.push(unique_id(tracer, source));
+    size_t goal_id = TracerTraits::goal_heuristic(tracer, source) < 0.f ?
+                         source_id :
+                         Unassigned;
 
-    bool goal_reached = false;
-
-    while (!goal_reached && !qopen.empty()) {
+    while (goal_id == Unassigned && !qopen.empty()) {
         size_t q_id = qopen.top();
         qopen.pop();
-        QNode q = cached_nodes.at(q_id);
+        QNode &q = cached_nodes[q_id];
 
-        foreach_reachable(tracer, q.node, [&](const Node &nd) {
-            if (goal_reached) return goal_reached;
+        // This should absolutely be initialized in the cache already
+        assert(!std::isinf(q.g));
 
-            float h = goal_heuristic(tracer, nd);
+        TracerTraits::foreach_reachable(tracer, q.node, [&](const Node &succ_nd) {
+            if (goal_id != Unassigned)
+                return true;
+
+            float  h       = TracerTraits::goal_heuristic(tracer, succ_nd);
+            float  dst     = TracerTraits::distance(tracer, q.node, succ_nd);
+            size_t succ_id = TracerTraits::unique_id(tracer, succ_nd);
+            QNode  qsucc_nd{succ_nd, q_id, q.g + dst, h};
+
             if (h < 0.f) {
-                goal_reached = true;
+                goal_id = succ_id;
+                cached_nodes[succ_id] = qsucc_nd;
             } else {
-                float  dst = trace_distance(tracer, q.node, nd);
-                QNode  qnd{nd, QueueType::None, q.g + dst, h};
-                size_t qnd_id = unique_id(tracer, nd);
+                // If succ_id is not in cache, it gets created with g = infinity
+                QNode &prev_nd = cached_nodes[succ_id];
 
-                auto it = cached_nodes.find(qnd_id);
+                if (qsucc_nd.g < prev_nd.g) {
+                    // new route is better, apply it:
 
-                if (it == cached_nodes.end() ||
-                    (it->second.qtype != QueueType::None && qnd.f() < it->second.f())) {
-                    qnd.qtype = QueueType::Open;
-                    cached_nodes.insert_or_assign(qnd_id, qnd);
-                    qopen.push(qnd_id);
+                    // Save the old queue id, it would be lost after the next line
+                    size_t queue_id = prev_nd.queue_id;
+
+                    // The cache needs to be updated either way
+                    prev_nd = qsucc_nd;
+
+                    if (queue_id == InvalidQueueID)
+                        // was in closed or unqueued, rescheduling
+                        qopen.push(succ_id);
+                    else // was in open, updating
+                        qopen.update(queue_id);
                 }
             }
 
-            return goal_reached;
+            return goal_id != Unassigned;
         });
-
-        q.qtype = QueueType::Closed;
-        cached_nodes.insert_or_assign(q_id, q);
-        qclosed.push(q_id);
-
-           // write the output
-        *out = q.node;
-        ++out;
     }
 
-    return goal_reached;
+    // Write the output, do not reverse. Clients can do so if they need to.
+    if (goal_id != Unassigned) {
+        const QNode *q = &cached_nodes[goal_id];
+        while (q->parent != Unassigned) {
+            assert(!std::isinf(q->g)); // Uninitialized nodes are NOT allowed
+
+            *out = q->node;
+            ++out;
+            q = &cached_nodes[q->parent];
+        }
+    }
+
+    return goal_id != Unassigned;
 }
 
 }} // namespace Slic3r::astar

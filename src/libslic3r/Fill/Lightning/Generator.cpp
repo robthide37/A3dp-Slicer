@@ -7,7 +7,6 @@
 #include "../../ClipperUtils.hpp"
 #include "../../Layer.hpp"
 #include "../../Print.hpp"
-#include "../../Surface.hpp"
 
 /* Possible future tasks/optimizations,etc.:
  * - Improve connecting heuristic to favor connecting to shorter trees
@@ -25,7 +24,7 @@
 
 namespace Slic3r::FillLightning {
 
-Generator::Generator(const PrintObject &print_object, const std::function<void()> &throw_on_cancel_callback)
+Generator::Generator(const PrintObject &print_object, const coordf_t fill_density, const std::function<void()> &throw_on_cancel_callback)
 {
     const PrintConfig         &print_config         = print_object.print()->config();
     const PrintObjectConfig   &object_config        = print_object.config();
@@ -37,8 +36,10 @@ Generator::Generator(const PrintObject &print_object, const std::function<void()
     // Note: There's not going to be a layer below the first one, so the 'initial layer height' doesn't have to be taken into account.
     const double               layer_thickness      = scaled<double>(object_config.layer_height.value);
 
-    m_infill_extrusion_width = scaled<float>(region_config.infill_extrusion_width.percent ? default_infill_extrusion_width * 0.01 * region_config.infill_extrusion_width : region_config.infill_extrusion_width);
-    m_supporting_radius      = coord_t(m_infill_extrusion_width) * 100 / coord_t(region_config.fill_density.value);
+    m_infill_extrusion_width = scaled<float>(region_config.infill_extrusion_width.percent ? default_infill_extrusion_width * 0.01 * region_config.infill_extrusion_width :
+                                             region_config.infill_extrusion_width != 0.   ? region_config.infill_extrusion_width :
+                                                                                            default_infill_extrusion_width);
+    m_supporting_radius      = coord_t(m_infill_extrusion_width * 100. / fill_density);
 
     const double lightning_infill_overhang_angle      = M_PI / 4; // 45 degrees
     const double lightning_infill_prune_angle         = M_PI / 4; // 45 degrees
@@ -54,21 +55,22 @@ Generator::Generator(const PrintObject &print_object, const std::function<void()
 void Generator::generateInitialInternalOverhangs(const PrintObject &print_object, const std::function<void()> &throw_on_cancel_callback)
 {
     m_overhang_per_layer.resize(print_object.layers().size());
-    // FIXME: It can be adjusted to improve bonding between infill and perimeters.
-    const float infill_wall_offset = 0;// m_infill_extrusion_width;
 
     Polygons infill_area_above;
-    //Iterate from top to bottom, to subtract the overhang areas above from the overhang areas on the layer below, to get only overhang in the top layer where it is overhanging.
+    // Iterate from top to bottom, to subtract the overhang areas above from the overhang areas on the layer below, to get only overhang in the top layer where it is overhanging.
     for (int layer_nr = int(print_object.layers().size()) - 1; layer_nr >= 0; --layer_nr) {
         throw_on_cancel_callback();
         Polygons infill_area_here;
         for (const LayerRegion* layerm : print_object.get_layer(layer_nr)->regions())
             for (const Surface& surface : layerm->fill_surfaces.surfaces)
                 if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
-                    append(infill_area_here, infill_wall_offset == 0 ? surface.expolygon : offset(surface.expolygon, infill_wall_offset));
+                    append(infill_area_here, to_polygons(surface.expolygon));
 
-        //Remove the part of the infill area that is already supported by the walls.
+        infill_area_here = union_(infill_area_here);
+        // Remove the part of the infill area that is already supported by the walls.
         Polygons overhang = diff(offset(infill_area_here, -float(m_wall_supporting_radius)), infill_area_above);
+        // Filter out unprintable polygons and near degenerated polygons (three almost collinear points and so).
+        overhang = opening(overhang, SCALED_EPSILON, SCALED_EPSILON);
 
         m_overhang_per_layer[layer_nr] = overhang;
         infill_area_above = std::move(infill_area_here);
@@ -84,8 +86,6 @@ const Layer& Generator::getTreesForLayer(const size_t& layer_id) const
 void Generator::generateTrees(const PrintObject &print_object, const std::function<void()> &throw_on_cancel_callback)
 {
     m_lightning_layers.resize(print_object.layers().size());
-    // FIXME: It can be adjusted to improve bonding between infill and perimeters.
-    const coord_t infill_wall_offset = 0;// m_infill_extrusion_width;
 
     std::vector<Polygons> infill_outlines(print_object.layers().size(), Polygons());
 
@@ -95,7 +95,9 @@ void Generator::generateTrees(const PrintObject &print_object, const std::functi
         for (const LayerRegion *layerm : print_object.get_layer(layer_id)->regions())
             for (const Surface &surface : layerm->fill_surfaces.surfaces)
                 if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
-                    append(infill_outlines[layer_id], infill_wall_offset == 0 ? surface.expolygon : offset(surface.expolygon, infill_wall_offset));
+                    append(infill_outlines[layer_id], to_polygons(surface.expolygon));
+
+        infill_outlines[layer_id] = union_(infill_outlines[layer_id]);
     }
 
     // For various operations its beneficial to quickly locate nearby features on the polygon:
@@ -125,7 +127,8 @@ void Generator::generateTrees(const PrintObject &print_object, const std::functi
         if (const BoundingBox &outlines_locator_bbox = outlines_locator.bbox(); outlines_locator_bbox.defined)
             below_outlines_bbox.merge(outlines_locator_bbox);
 
-        below_outlines_bbox.merge(get_extents(current_lightning_layer.tree_roots).inflated(SCALED_EPSILON));
+        if (!current_lightning_layer.tree_roots.empty())
+            below_outlines_bbox.merge(get_extents(current_lightning_layer.tree_roots).inflated(SCALED_EPSILON));
 
         outlines_locator.set_bbox(below_outlines_bbox);
         outlines_locator.create(below_outlines, locator_cell_size);

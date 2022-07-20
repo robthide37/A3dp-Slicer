@@ -8,6 +8,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/asio.hpp>
 
 #include <curl/curl.h>
 
@@ -18,7 +19,8 @@
 #include "slic3r/GUI/GUI.hpp"
 #include "Http.hpp"
 #include "libslic3r/AppConfig.hpp"
-
+#include "Bonjour.hpp"
+#include "slic3r/GUI/BonjourDialog.hpp"
 
 namespace fs = boost::filesystem;
 namespace pt = boost::property_tree;
@@ -91,6 +93,38 @@ std::string substitute_host(const std::string& orig_addr, std::string sub_addr)
     return out;
 #endif
 }
+
+std::string get_host_from_url(const std::string& url_in)
+{
+    std::string url = url_in;
+    // add http:// if there is no scheme
+    size_t double_slash = url.find("//");
+    if (double_slash == std::string::npos)
+        url = "http://" + url;
+    std::string out = url;
+    CURLU* hurl = curl_url();
+    if (hurl) {
+        // Parse the input URL.
+        CURLUcode rc = curl_url_set(hurl, CURLUPART_URL, url.c_str(), 0);
+        if (rc == CURLUE_OK) {
+            // Replace the address.
+            char* host;
+            rc = curl_url_get(hurl, CURLUPART_HOST, &host, 0);
+            if (rc == CURLUE_OK) {
+                out = host;
+                curl_free(host);
+            }
+            else
+                BOOST_LOG_TRIVIAL(error) << "OctoPrint get_host_from_url: failed to get host form URL " << url;
+        }
+        else
+            BOOST_LOG_TRIVIAL(error) << "OctoPrint get_host_from_url: failed to parse URL " << url;
+        curl_url_cleanup(hurl);
+    }
+    else
+        BOOST_LOG_TRIVIAL(error) << "OctoPrint get_host_from_url: failed to allocate curl_url";
+    return out;
+}
 } //namespace
 #endif // WIN32
 
@@ -103,11 +137,62 @@ OctoPrint::OctoPrint(DynamicPrintConfig *config) :
 
 const char* OctoPrint::get_name() const { return "OctoPrint"; }
 
-bool OctoPrint::test(wxString &msg) const
+#ifdef WIN32
+bool OctoPrint::test_with_resolved_ip(wxString &msg) const
+{
+    // Since the request is performed synchronously here,
+   // it is ok to refer to `msg` from within the closure
+    const char* name = get_name();
+    bool res = true;
+    // Msg contains ip string.
+    auto url = substitute_host(make_url("api/version"), GUI::into_u8(msg));
+    msg.Clear();
+
+    BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Get version at: %2%") % name % url;
+
+    auto http = Http::get(url);//std::move(url));
+    set_auth(http);
+    http
+        .on_error([&](std::string body, std::string error, unsigned status) {
+            BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error getting version at %2% : %3%, HTTP %4%, body: `%5%`") % name % url % error % status % body;
+            res = false;
+            msg = format_error(body, error, status);
+        })
+        .on_complete([&, this](std::string body, unsigned) {
+            BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Got version: %2%") % name % body;
+
+            try {
+                std::stringstream ss(body);
+                pt::ptree ptree;
+                pt::read_json(ss, ptree);
+
+                if (!ptree.get_optional<std::string>("api")) {
+                    res = false;
+                    return;
+                }
+
+                const auto text = ptree.get_optional<std::string>("text");
+                res = validate_version_text(text);
+                if (!res) {
+                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                }
+            }
+            catch (const std::exception&) {
+                res = false;
+                msg = "Could not parse server response.";
+            }
+        })
+        .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
+        .perform_sync();
+
+    return res;
+}
+#endif //WIN32
+
+bool OctoPrint::test(wxString& msg) const
 {
     // Since the request is performed synchronously here,
     // it is ok to refer to `msg` from within the closure
-
     const char *name = get_name();
 
     bool res = true;
@@ -147,8 +232,8 @@ bool OctoPrint::test(wxString &msg) const
             }
         })
 #ifdef WIN32
-        .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
-        .on_ip_resolve([&](std::string address) {
+            .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
+            .on_ip_resolve([&](std::string address) {
             // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
             // Remember resolved address to be reused at successive REST API call.
             msg = GUI::from_u8(address);
@@ -158,6 +243,7 @@ bool OctoPrint::test(wxString &msg) const
 
     return res;
 }
+
 
 wxString OctoPrint::get_test_ok_msg () const
 {
@@ -172,9 +258,130 @@ wxString OctoPrint::get_test_failed_msg (wxString &msg) const
         % _utf8(L("Note: OctoPrint version at least 1.1.0 is required."))).str());
 }
 
-bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const
+bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn) const
 {
-    const char *name = get_name();
+#ifndef WIN32
+    return upload_inner_with_host(upload_data, prorgess_fn, error_fn, resolve_fn);
+#else
+    std::string host = get_host_from_url(m_host);
+
+    // decide what to do based on m_host - resolve hostname or upload to ip
+    std::vector<boost::asio::ip::address> resolved_addr;
+    boost::system::error_code ec;
+    boost::asio::ip::address host_ip = boost::asio::ip::make_address(host, ec);
+    if (!ec) {
+        resolved_addr.push_back(host_ip);
+    } else if ( GUI::get_app_config()->get("allow_ip_resolve") == "1"){
+        Bonjour("octoprint")
+            .set_hostname(host)
+            .set_retries(10) // number of rounds of queries send
+            .set_timeout(1) // after each timeout, if there is any answer, the resolving will stop
+            .on_resolve([&ra = resolved_addr](const std::vector<BonjourReply>& replies) {
+                std::vector<boost::asio::ip::address> resolved_addr;
+                for (const auto & rpl : replies) {
+                    boost::asio::ip::address ip(rpl.ip);
+                    ra.emplace_back(ip);
+                    BOOST_LOG_TRIVIAL(info) << "Resolved IP address: " << rpl.ip;
+                }
+            })
+            .resolve_sync();
+    }
+    if (resolved_addr.empty()) {
+        // no resolved addresses - try system resolving
+        BOOST_LOG_TRIVIAL(error) << "PrusaSlicer failed to resolve hostname " << m_host << " into the IP address. Starting upload with system resolving.";
+        return upload_inner_with_host(upload_data, prorgess_fn, error_fn, resolve_fn);
+    } else if (resolved_addr.size() == 1) {
+        // one address resolved - upload there
+        return upload_inner_with_resolved_ip(upload_data, prorgess_fn, error_fn, resolve_fn, resolved_addr.front());
+    }  else if (resolved_addr.size() == 2 && resolved_addr[0].is_v4() != resolved_addr[1].is_v4()) {
+        // there are just 2 addresses and 1 is ip_v4 and other is ip_v6
+        // try sending to both. (Then if both fail, show both error msg after second try)
+        wxString error_message;
+        if (!upload_inner_with_resolved_ip(upload_data, prorgess_fn 
+            , [&msg = error_message, resolved_addr](wxString error) { msg = GUI::format_wxstr("%1%: %2%", resolved_addr.front(), error); }
+            , resolve_fn, resolved_addr.front())
+            &&
+            !upload_inner_with_resolved_ip(upload_data, prorgess_fn
+            , [&msg = error_message, resolved_addr](wxString error) { msg += GUI::format_wxstr("\n%1%: %2%", resolved_addr.back(), error); }
+            , resolve_fn, resolved_addr.back())
+            ) {
+
+            error_fn(error_message);
+            return false;
+        }
+        return true;
+    } else {
+        // There are multiple addresses - user needs to choose which to use.
+        size_t selected_index = resolved_addr.size();
+        IPListDialog dialog(nullptr, boost::nowide::widen(m_host), resolved_addr, selected_index);
+        if (dialog.ShowModal() == wxID_OK && selected_index < resolved_addr.size()) {    
+            return upload_inner_with_resolved_ip(upload_data, prorgess_fn, error_fn, resolve_fn, resolved_addr[selected_index]);
+        }
+    }
+    return false;
+#endif // WIN32
+}
+#ifdef WIN32
+bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn, const boost::asio::ip::address& resolved_addr) const
+{
+    resolve_fn(boost::nowide::widen(resolved_addr.to_string()));
+
+    // If test fails, test_msg_or_host_ip contains the error message.
+    // Otherwise on Windows it contains the resolved IP address of the host.
+    // Test_msg already contains resolved ip and will be cleared on start of test().
+    wxString test_msg_or_host_ip = GUI::from_u8(resolved_addr.to_string());
+    if (!test_with_resolved_ip(test_msg_or_host_ip)) {
+        error_fn(std::move(test_msg_or_host_ip));
+        return false;
+    }
+
+    const char* name = get_name();
+    const auto upload_filename = upload_data.upload_path.filename();
+    const auto upload_parent_path = upload_data.upload_path.parent_path();
+    std::string url = substitute_host(make_url("api/files/local"), resolved_addr.to_string());
+    bool result = true;
+
+    resolve_fn(boost::nowide::widen(url));
+
+    BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Uploading file %2% at %3%, filename: %4%, path: %5%, print: %6%")
+        % name
+        % upload_data.source_path
+        % url
+        % upload_filename.string()
+        % upload_parent_path.string()
+        % (upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false");
+
+    auto http = Http::post(url);//std::move(url));
+    set_auth(http);
+    http.form_add("print", upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false")
+        .form_add("path", upload_parent_path.string())      // XXX: slashes on windows ???
+        .form_add_file("file", upload_data.source_path.string(), upload_filename.string())
+        .on_complete([&](std::string body, unsigned status) {
+            BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: File uploaded: HTTP %2%: %3%") % name % status % body;
+        })
+        .on_error([&](std::string body, std::string error, unsigned status) {
+            BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error uploading file to %2%: %3%, HTTP %4%, body: `%5%`") % name % url % error % status % body;
+            error_fn(format_error(body, error, status));
+            result = false;
+        })
+        .on_progress([&](Http::Progress progress, bool& cancel) {
+            prorgess_fn(std::move(progress), cancel);
+            if (cancel) {
+                // Upload was canceled
+                BOOST_LOG_TRIVIAL(info) << "Octoprint: Upload canceled";
+                result = false;
+            }
+        })
+        .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
+        .perform_sync();
+
+    return result;
+}
+#endif //WIN32
+
+bool OctoPrint::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, ResolveFn resolve_fn) const
+{
+    const char* name = get_name();
 
     const auto upload_filename = upload_data.upload_path.filename();
     const auto upload_parent_path = upload_data.upload_path.parent_path();
@@ -182,7 +389,7 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
     // If test fails, test_msg_or_host_ip contains the error message.
     // Otherwise on Windows it contains the resolved IP address of the host.
     wxString test_msg_or_host_ip;
-    if (! test(test_msg_or_host_ip)) {
+    if (!test(test_msg_or_host_ip)) {
         error_fn(std::move(test_msg_or_host_ip));
         return false;
     }
@@ -207,6 +414,7 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
         // This new address returns in "test_msg_or_host_ip" variable.
         // Solves troubles of uploades failing with name address.
         // in original address (m_host) replace host for resolved ip 
+        resolve_fn(test_msg_or_host_ip);
         url = substitute_host(make_url("api/files/local"), GUI::into_u8(test_msg_or_host_ip));
         BOOST_LOG_TRIVIAL(info) << "Upload address after ip resolve: " << url;
     }
@@ -233,7 +441,7 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
             error_fn(format_error(body, error, status));
             res = false;
         })
-        .on_progress([&](Http::Progress progress, bool &cancel) {
+        .on_progress([&](Http::Progress progress, bool& cancel) {
             prorgess_fn(std::move(progress), cancel);
             if (cancel) {
                 // Upload was canceled

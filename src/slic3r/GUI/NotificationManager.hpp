@@ -205,6 +205,7 @@ public:
 	// print host upload
 	void push_upload_job_notification(int id, float filesize, const std::string& filename, const std::string& host, float percentage = 0);
 	void set_upload_job_notification_percentage(int id, const std::string& filename, const std::string& host, float percentage);
+	void set_upload_job_notification_host(int id, const std::string& host);
 	void upload_job_notification_show_canceled(int id, const std::string& filename, const std::string& host);
 	void upload_job_notification_show_error(int id, const std::string& filename, const std::string& host);
 	// Download App progress
@@ -507,10 +508,12 @@ private:
 			PB_CANCELLED,
 			PB_COMPLETED
 		};
-		PrintHostUploadNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler, float percentage, int job_id, float filesize)
+		PrintHostUploadNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler, float percentage, int job_id, float filesize, const std::string& filename, const std::string& host)
 			:ProgressBarNotification(n, id_provider, evt_handler)
 			, m_job_id(job_id)
 			, m_file_size(filesize)
+			, m_filename(filename)
+			, m_host(host)
 		{
 			m_has_cancel_button = true;
 			set_percentage(percentage);
@@ -521,6 +524,8 @@ private:
 		void				error()  { m_uj_state = UploadJobState::PB_ERROR;     m_has_cancel_button = false; init(); }
 		bool				compare_job_id(const int other_id) const { return m_job_id == other_id; }
 		bool				compare_text(const std::string& text) const override { return false; }
+		void				set_host(const std::string& host) { m_host = host; update({ NotificationType::PrintHostUpload, NotificationLevel::ProgressBarNotificationLevel, 10, get_upload_job_text(m_id, m_filename, m_host)}); }
+		std::string			get_host() const { return m_host; }
 	protected:
 		void        init() override;
 		void		count_spaces() override;
@@ -538,6 +543,8 @@ private:
 		float			    m_file_size;
 		long				m_hover_time{ 0 };
 		UploadJobState		m_uj_state{ UploadJobState::PB_PROGRESS };
+		std::string         m_filename;
+		std::string         m_host;
 	};
 
 	class SlicingProgressNotification : public ProgressBarNotification

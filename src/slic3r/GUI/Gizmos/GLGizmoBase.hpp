@@ -231,9 +231,9 @@ protected:
     /// <returns>same as on_mouse</returns>
     bool use_grabbers(const wxMouseEvent &mouse_event);
 
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#if ENABLE_WORLD_COORDINATE
     void do_stop_dragging(bool perform_mouse_cleanup);
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#endif // ENABLE_WORLD_COORDINATE
 
 private:
     // Flag for dirty visible state of Gizmo

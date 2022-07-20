@@ -52,9 +52,14 @@ bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
         
     } else if (mouse_event.LeftUp()) {
         if (m_mouse_left_down) {
-            // responsible for mouse left up after selecting plane
-            m_mouse_left_down = false;
-            return true;
+            if (m_hover_id == -1)
+                // no plane hovered
+                return false;
+            else {
+                // responsible for mouse left up after selecting plane
+                m_mouse_left_down = false;
+                return true;
+            }
         }
     } else if (mouse_event.Leaving()) {
         m_mouse_left_down = false;
@@ -118,17 +123,17 @@ void GLGizmoFlatten::on_render()
     glsafe(::glEnable(GL_BLEND));
 
     if (selection.is_single_full_instance()) {
-        const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
+        const Transform3d& m = selection.get_first_volume()->get_instance_transformation().get_matrix();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d view_model_matrix = camera.get_view_matrix() *
-            Geometry::assemble_transform(selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z() * Vec3d::UnitZ()) * m;
+            Geometry::assemble_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * m;
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
         glsafe(::glPushMatrix());
-        glsafe(::glTranslatef(0.f, 0.f, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z()));
+        glsafe(::glTranslatef(0.f, 0.f, selection.get_first_volume()->get_sla_shift_z()));
         glsafe(::glMultMatrixd(m.data()));
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (this->is_plane_update_necessary())
@@ -172,17 +177,17 @@ void GLGizmoFlatten::on_render_for_picking()
     glsafe(::glDisable(GL_BLEND));
 
     if (selection.is_single_full_instance() && !wxGetKeyState(WXK_CONTROL)) {
-        const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
+        const Transform3d& m = selection.get_first_volume()->get_instance_transformation().get_matrix();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d view_model_matrix = camera.get_view_matrix() *
-            Geometry::assemble_transform(selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z() * Vec3d::UnitZ()) * m;
+            Geometry::assemble_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * m;
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
         glsafe(::glPushMatrix());
-        glsafe(::glTranslatef(0.f, 0.f, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z()));
+        glsafe(::glTranslatef(0.f, 0.f, selection.get_first_volume()->get_sla_shift_z()));
         glsafe(::glMultMatrixd(m.data()));
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (this->is_plane_update_necessary())
@@ -228,7 +233,11 @@ void GLGizmoFlatten::update_planes()
     }
     ch = ch.convex_hull_3d();
     m_planes.clear();
+#if ENABLE_WORLD_COORDINATE
+    const Transform3d inst_matrix = mo->instances.front()->get_matrix_no_offset();
+#else
     const Transform3d& inst_matrix = mo->instances.front()->get_matrix(true);
+#endif // ENABLE_WORLD_COORDINATE
 
     // Following constants are used for discarding too small polygons.
     const float minimal_area = 5.f; // in square mm (world coordinates)

@@ -117,7 +117,11 @@ void GLGizmoRotate::on_start_dragging()
 
 void GLGizmoRotate::on_dragging(const UpdateData &data)
 {
+#if ENABLE_WORLD_COORDINATE
+    const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray));
+#else
     const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray, m_parent.get_selection()));
+#endif // ENABLE_WORLD_COORDINATE
 
     const Vec2d orig_dir = Vec2d::UnitX();
     const Vec2d new_dir = mouse_pos.normalized();
@@ -287,14 +291,19 @@ void GLGizmoRotate::on_render_for_picking()
 #if ENABLE_WORLD_COORDINATE
 void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 {
-    const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
+    ECoordinatesType coordinates_type;
+    if (selection.is_wipe_tower())
+        coordinates_type = ECoordinatesType::Local;
+    else
+        coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
     if (coordinates_type == ECoordinatesType::World) {
         m_bounding_box = selection.get_bounding_box();
         m_center = m_bounding_box.center();
     }
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
-        m_bounding_box = v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true));
+        const GLVolume& v = *selection.get_first_volume();
+        m_bounding_box = v.transformed_convex_hull_bounding_box(
+            v.get_instance_transformation().get_scaling_factor_matrix() * v.get_volume_transformation().get_scaling_factor_matrix());
         m_center = v.world_matrix() * m_bounding_box.center();
     }
     else {
@@ -304,8 +313,9 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
             const GLVolume& v = *selection.get_volume(id);
             m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
         }
-        m_bounding_box = m_bounding_box.transformed(selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(true, true, false, true));
-        m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(false, false, true, false) * m_bounding_box.center();
+        const Geometry::Transformation inst_trafo = selection.get_first_volume()->get_instance_transformation();
+        m_bounding_box = m_bounding_box.transformed(inst_trafo.get_scaling_factor_matrix());
+        m_center = inst_trafo.get_matrix_no_scaling_factor() * m_bounding_box.center();
     }
 
     m_radius = Offset + m_bounding_box.radius();
@@ -316,13 +326,13 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 
     if (coordinates_type == ECoordinatesType::World)
         m_orient_matrix = Transform3d::Identity();
-    else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
-        m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true) * v.get_volume_transformation().get_matrix(true, false, true, true);
+    else if (coordinates_type == ECoordinatesType::Local && (selection.is_wipe_tower() || selection.is_single_volume_or_modifier())) {
+        const GLVolume& v = *selection.get_first_volume();
+        m_orient_matrix = v.get_instance_transformation().get_rotation_matrix() * v.get_volume_transformation().get_rotation_matrix();
     }
     else {
-        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
-        m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
+        const GLVolume& v = *selection.get_first_volume();
+        m_orient_matrix = v.get_instance_transformation().get_rotation_matrix();
     }
 }
 #endif // ENABLE_WORLD_COORDINATE
@@ -731,12 +741,20 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
     {
     case X:
     {
+#if ENABLE_WORLD_COORDINATE
+        ret = Geometry::rotation_transform(0.5 * PI * Vec3d::UnitY()) * Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitZ());
+#else
         ret = Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitY()) * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitZ());
+#endif // ENABLE_WORLD_COORDINATE
         break;
     }
     case Y:
     {
+#if ENABLE_WORLD_COORDINATE
+        ret = Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitZ()) * Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitY());
+#else
         ret = Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitZ()) * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitY());
+#endif // ENABLE_WORLD_COORDINATE
         break;
     }
     default:
@@ -748,10 +766,10 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
     }
 
 #if ENABLE_WORLD_COORDINATE
-    return Geometry::assemble_transform(m_center) * m_orient_matrix * ret;
+    return Geometry::translation_transform(m_center) * m_orient_matrix * ret;
 #else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
-        ret = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true) * ret;
+        ret = selection.get_first_volume()->get_instance_transformation().get_matrix(true, false, true, true) * ret;
 
     return Geometry::assemble_transform(m_center) * ret;
 #endif // ENABLE_WORLD_COORDINATE
@@ -765,7 +783,7 @@ void GLGizmoRotate::transform_to_local(const Selection& selection) const
     glsafe(::glMultMatrixd(m_orient_matrix.data()));
 #else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes()) {
-        const Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+        const Transform3d orient_matrix = selection.get_first_volume()->get_instance_transformation().get_matrix(true, false, true, true);
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
 #endif // ENABLE_WORLD_COORDINATE
@@ -794,7 +812,11 @@ void GLGizmoRotate::transform_to_local(const Selection& selection) const
 }
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if ENABLE_WORLD_COORDINATE
+Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray) const
+#else
 Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const
+#endif // ENABLE_WORLD_COORDINATE
 {
     double half_pi = 0.5 * double(PI);
 
@@ -826,11 +848,10 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
     m = m * m_orient_matrix.inverse();
 #else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
-        m = m * selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true).inverse();
+        m = m * selection.get_first_volume()->get_instance_transformation().get_matrix(true, false, true, true).inverse();
 #endif // ENABLE_WORLD_COORDINATE
 
     m.translate(-m_center);
-
     return transform(mouse_ray, m).intersect_plane(0.0);
 }
 
@@ -849,7 +870,10 @@ bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
     if (mouse_event.Dragging() && m_dragging) {
         // Apply new temporary rotations
 #if ENABLE_WORLD_COORDINATE
-            TransformationType transformation_type;
+        TransformationType transformation_type;
+        if (m_parent.get_selection().is_wipe_tower())
+            transformation_type = TransformationType::Instance_Relative_Joint;
+        else {
             switch (wxGetApp().obj_manipul()->get_coordinates_type())
             {
             default:
@@ -857,32 +881,39 @@ bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
             case ECoordinatesType::Instance: { transformation_type = TransformationType::Instance_Relative_Joint; break; }
             case ECoordinatesType::Local:    { transformation_type = TransformationType::Local_Relative_Joint; break; }
             }
+        }
 #else
         TransformationType transformation_type(TransformationType::World_Relative_Joint);
 #endif // ENABLE_WORLD_COORDINATE
-        if (mouse_event.AltDown()) transformation_type.set_independent();
+        if (mouse_event.AltDown())
+            transformation_type.set_independent();
         m_parent.get_selection().rotate(get_rotation(), transformation_type);
     }
     return use_grabbers(mouse_event);
 }
 
 void GLGizmoRotate3D::data_changed() {
-    const Selection &selection = m_parent.get_selection();
-    bool is_wipe_tower = selection.is_wipe_tower();
-    if (is_wipe_tower) {
-        DynamicPrintConfig& config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
-        float wipe_tower_rotation_angle =
-            dynamic_cast<const ConfigOptionFloat *>(
-                config.option("wipe_tower_rotation_angle"))
-                ->value;
+    if (m_parent.get_selection().is_wipe_tower()) {
+#if !ENABLE_WORLD_COORDINATE
+        const DynamicPrintConfig& config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        const float wipe_tower_rotation_angle =
+            dynamic_cast<const ConfigOptionFloat*>(
+                config.option("wipe_tower_rotation_angle"))->value;
         set_rotation(Vec3d(0., 0., (M_PI / 180.) * wipe_tower_rotation_angle));
+#endif // !ENABLE_WORLD_COORDINATE
         m_gizmos[0].disable_grabber();
         m_gizmos[1].disable_grabber();
-    } else {
+    }
+    else {
+#if !ENABLE_WORLD_COORDINATE
         set_rotation(Vec3d::Zero());
+#endif // !ENABLE_WORLD_COORDINATE
         m_gizmos[0].enable_grabber();
         m_gizmos[1].enable_grabber();
     }
+#if ENABLE_WORLD_COORDINATE
+    set_rotation(Vec3d::Zero());
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 bool GLGizmoRotate3D::on_init()

@@ -1829,7 +1829,7 @@ void  NotificationManager::push_upload_job_notification(int id, float filesize, 
 	}
 	std::string text = PrintHostUploadNotification::get_upload_job_text(id, filename, host);
 	NotificationData data{ NotificationType::PrintHostUpload, NotificationLevel::ProgressBarNotificationLevel, 10, text };
-	push_notification_data(std::make_unique<NotificationManager::PrintHostUploadNotification>(data, m_id_provider, m_evt_handler, 0, id, filesize), 0);
+	push_notification_data(std::make_unique<NotificationManager::PrintHostUploadNotification>(data, m_id_provider, m_evt_handler, 0, id, filesize, filename, host), 0);
 }
 void NotificationManager::set_upload_job_notification_percentage(int id, const std::string& filename, const std::string& host, float percentage)
 {
@@ -1838,6 +1838,21 @@ void NotificationManager::set_upload_job_notification_percentage(int id, const s
 			PrintHostUploadNotification* phun = dynamic_cast<PrintHostUploadNotification*>(notification.get());
 			if (phun->compare_job_id(id)) {
 				phun->set_percentage(percentage);
+				if (phun->get_host() != host)
+					phun->set_host(host);
+				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+				break;
+			}
+		}
+	}
+}
+void NotificationManager::set_upload_job_notification_host(int id, const std::string& host)
+{
+	for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
+		if (notification->get_type() == NotificationType::PrintHostUpload) {
+			PrintHostUploadNotification* phun = dynamic_cast<PrintHostUploadNotification*>(notification.get());
+			if (phun->compare_job_id(id)) {
+				phun->set_host(host);
 				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
 				break;
 			}
@@ -1851,6 +1866,8 @@ void NotificationManager::upload_job_notification_show_canceled(int id, const st
 			PrintHostUploadNotification* phun = dynamic_cast<PrintHostUploadNotification*>(notification.get());
 			if (phun->compare_job_id(id)) {
 				phun->cancel();
+				if (phun->get_host() != host)
+					phun->set_host(host);
 				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
 				break;
 			}
@@ -1864,6 +1881,8 @@ void NotificationManager::upload_job_notification_show_error(int id, const std::
 			PrintHostUploadNotification* phun = dynamic_cast<PrintHostUploadNotification*>(notification.get());
 			if(phun->compare_job_id(id)) {
 				phun->error();
+				if (phun->get_host() != host)
+					phun->set_host(host);
 				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
 				break;
 			}

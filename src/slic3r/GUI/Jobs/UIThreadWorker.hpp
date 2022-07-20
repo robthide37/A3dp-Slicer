@@ -62,7 +62,15 @@ protected:
 
     std::future<void> call_on_main_thread(std::function<void()> fn) override
     {
-        return std::async(std::launch::deferred, [fn]{ fn(); });
+        std::future<void> ftr = std::async(std::launch::deferred, [fn]{ fn(); });
+
+        // So, it seems that the destructor of std::future will not call the
+        // packaged function. The future needs to be accessed at least ones
+        // or waited upon. Calling wait() instead of get() will keep the
+        // returned future's state valid.
+        ftr.wait();
+
+        return ftr;
     }
 
 public:

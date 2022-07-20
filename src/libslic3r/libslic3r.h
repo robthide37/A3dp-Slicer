@@ -4,7 +4,6 @@
 #include "libslic3r_version.h"
 #define GCODEVIEWER_APP_NAME "PrusaSlicer G-code Viewer"
 #define GCODEVIEWER_APP_KEY  "PrusaSlicerGcodeViewer"
-#define GCODEVIEWER_BUILD_ID std::string("PrusaSlicer G-code Viewer-") + std::string(SLIC3R_VERSION) + std::string("-UNKNOWN")
 
 // this needs to be included early for MSVC (listing it in Build.PL is not enough)
 #include <memory>
@@ -130,6 +129,15 @@ inline void append(std::vector<T>& dest, std::vector<T>&& src)
         src.clear();
         src.shrink_to_fit();
     }
+}
+
+template<class T, class... Args> // Arbitrary allocator can be used
+void clear_and_shrink(std::vector<T, Args...>& vec)
+{
+    // shrink_to_fit does not garantee the release of memory nor does it clear()
+    std::vector<T, Args...> tmp;
+    vec.swap(tmp);
+    assert(vec.capacity() == 0);
 }
 
 // Append the source in reverse.

@@ -11,6 +11,8 @@
 #include "BoundingBox.hpp"
 #include "LocalesUtils.hpp"
 
+#include <boost/algorithm/string/predicate.hpp>
+
 
 namespace Slic3r
 {
@@ -170,12 +172,18 @@ public:
 			m_gcode += set_format_F(f);
         }
 
+        // Append newline if at least one of X,Y,E,F was changed.
+        // Otherwise, remove the "G1".
+        if (! boost::ends_with(m_gcode, "G1"))
+            m_gcode += "\n";
+        else
+            m_gcode.erase(m_gcode.end()-2, m_gcode.end());
+
         m_current_pos.x() = x;
         m_current_pos.y() = y;
 
 		// Update the elapsed time with a rough estimate.
         m_elapsed_time += ((len == 0.f) ? std::abs(e) : len) / m_current_feedrate * 60.f;
-		m_gcode += "\n";
 		return *this;
 	}
 

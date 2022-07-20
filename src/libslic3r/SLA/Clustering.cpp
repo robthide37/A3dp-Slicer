@@ -2,7 +2,7 @@
 #include "boost/geometry/index/rtree.hpp"
 
 #include <libslic3r/SLA/SpatIndex.hpp>
-#include <libslic3r/SLA/BoostAdapter.hpp>
+#include <libslic3r/BoostAdapter.hpp>
 
 namespace Slic3r { namespace sla {
 

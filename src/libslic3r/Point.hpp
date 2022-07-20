@@ -175,6 +175,7 @@ public:
     Point  rotated(double angle) const { Point res(*this); res.rotate(angle); return res; }
     Point  rotated(double cos_a, double sin_a) const { Point res(*this); res.rotate(cos_a, sin_a); return res; }
     Point  rotated(double angle, const Point &center) const { Point res(*this); res.rotate(angle, center); return res; }
+    Point  rotate_90_degree_ccw() const { return Point(-this->y(), this->x()); }
     int    nearest_point_index(const Points &points) const;
     int    nearest_point_index(const PointConstPtrs &points) const;
     int    nearest_point_index(const PointPtrs &points) const;
@@ -257,6 +258,15 @@ inline bool has_duplicate_successive_points(const std::vector<Point> &pts)
 inline bool has_duplicate_successive_points_closed(const std::vector<Point> &pts)
 {
     return has_duplicate_successive_points(pts) || (pts.size() >= 2 && pts.front() == pts.back());
+}
+
+inline bool shorter_then(const Point& p0, const coord_t len)
+{
+    if (p0.x() > len || p0.x() < -len)
+        return false;
+    if (p0.y() > len || p0.y() < -len)
+        return false;
+    return p0.cast<int64_t>().squaredNorm() <= Slic3r::sqr(int64_t(len));
 }
 
 namespace int128 {
@@ -545,6 +555,10 @@ namespace cereal {
 
 	template<class Archive> void load(Archive& archive, Slic3r::Matrix2f &m) { archive.loadBinary((char*)m.data(), sizeof(float) * 4); }
 	template<class Archive> void save(Archive& archive, Slic3r::Matrix2f &m) { archive.saveBinary((char*)m.data(), sizeof(float) * 4); }
+#if ENABLE_WORLD_COORDINATE
+    template<class Archive> void load(Archive& archive, Slic3r::Transform3d& m)       { archive.loadBinary((char*)m.data(), sizeof(double) * 16); }
+    template<class Archive> void save(Archive& archive, const Slic3r::Transform3d& m) { archive.saveBinary((char*)m.data(), sizeof(double) * 16); }
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 // To be able to use Vec<> and Mat<> in range based for loops:

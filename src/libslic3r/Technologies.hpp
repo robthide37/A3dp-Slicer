@@ -50,7 +50,7 @@
 // Enable showing time estimate for travel moves in legend
 #define ENABLE_TRAVEL_TIME (1 && ENABLE_2_5_0_ALPHA1)
 // Enable not killing focus in object manipulator fields when hovering over 3D scene
-#define ENABLE_OBJECT_MANIPULATOR_FOCUS (1 && ENABLE_2_5_0_ALPHA1)
+#define ENABLE_OBJECT_MANIPULATOR_FOCUS (0 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of wipe tower magic object_id equal to 1000
 #define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of legacy OpenGL calls
@@ -71,14 +71,6 @@
 #define ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC (1 && ENABLE_2_5_0_ALPHA1)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
-// Enable showing world coordinates of volumes' offset relative to the instance containing them
-#define ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET (0 && ENABLE_WORLD_COORDINATE)
-// Enable rendering the selection bounding box in the current reference system
-#define ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX (1 && ENABLE_WORLD_COORDINATE)
-// Enable showing the axes of the current reference system when sidebar hints are active
-#define ENABLE_WORLD_COORDINATE_SHOW_AXES (1 && ENABLE_WORLD_COORDINATE)
-// Enable alternate implementation of manipulating scale for instances and volumes
-#define ENABLE_WORLD_COORDINATE_SCALE_REVISITED (1 && ENABLE_WORLD_COORDINATE)
 // Enable modified camera control using mouse
 #define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
 // Enable modified rectangle selection

@@ -8,6 +8,8 @@
 #include "../../Point.hpp"
 #include "../../Polygon.hpp"
 
+//#define LIGHTNING_DISTANCE_FIELD_DEBUG_OUTPUT
+
 namespace Slic3r::FillLightning
 {
 
@@ -176,7 +178,7 @@ protected:
             const Point  offset_loc = loc - m_grid_range.min;
             const size_t flat_idx   = m_grid_size.x() * offset_loc.y() + offset_loc.x();
             assert(offset_loc.x() >= 0 && offset_loc.y() >= 0);
-            assert(flat_idx < m_grid_size.y() * m_grid_size.x());
+            assert(flat_idx < size_t(m_grid_size.y() * m_grid_size.x()));
             return flat_idx;
         }
     };
@@ -196,6 +198,10 @@ protected:
     Point from_grid_point(const Point &point) const {
         return point * m_cell_size + m_unsupported_points_bbox.min;
     }
+
+#ifdef LIGHTNING_DISTANCE_FIELD_DEBUG_OUTPUT
+    friend void export_distance_field_to_svg(const std::string &path, const Polygons &outline, const Polygons &overhang, const std::vector<DistanceField::UnsupportedCell> &unsupported_points, const Points &points);
+#endif
 };
 
 } // namespace Slic3r::FillLightning
