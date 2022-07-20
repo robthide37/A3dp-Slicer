@@ -2132,7 +2132,7 @@ void GLGizmoEmboss::do_translate(const Vec3d &relative_move)
     Selection &selection = m_parent.get_selection();
     assert(!selection.is_empty());
     selection.setup_cache();
-    selection.translate(relative_move, ECoordinatesType::Local);
+    selection.translate(relative_move, TransformationType::Local);
 
     std::string snapshot_name; // empty meand no store undo / redo
     // NOTE: it use L instead of _L macro because prefix _ is appended inside

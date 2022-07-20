@@ -11,35 +11,35 @@
 #include "Point.hpp" // Transform3d
 
 // Serialization through the Cereal library
-namespace cereal {    
-    // Eigen Matrix 4x4 serialization
-    template <class Archive> void serialize(Archive &ar, ::Slic3r::Matrix4d &m){
-        ar(binary_data(m.data(), 4*4*sizeof(double)));
-    }
-
-    // !!! create duplicit implementation
-    // General solution for Eigen matrix serialization 
-    //template <class Archive, class Derived> inline typename std::enable_if<traits::is_output_serializable<BinaryData<typename Derived::Scalar>, Archive>::value, void>::type
-    //save(Archive & ar, Eigen::PlainObjectBase<Derived> const & m){
-    //    typedef Eigen::PlainObjectBase<Derived> ArrT;
-    //    if(ArrT::RowsAtCompileTime==Eigen::Dynamic) ar(m.rows());
-    //    if(ArrT::ColsAtCompileTime==Eigen::Dynamic) ar(m.cols());
-    //    ar(binary_data(m.data(),m.size()*sizeof(typename Derived::Scalar)));
-    //}
-    //template <class Archive, class Derived> inline typename std::enable_if<traits::is_input_serializable<BinaryData<typename Derived::Scalar>, Archive>::value, void>::type
-    //load(Archive & ar, Eigen::PlainObjectBase<Derived> & m){
-    //    typedef Eigen::PlainObjectBase<Derived> ArrT;
-    //    Eigen::Index rows=ArrT::RowsAtCompileTime, cols=ArrT::ColsAtCompileTime;
-    //    if(rows==Eigen::Dynamic) ar(rows);
-    //    if(cols==Eigen::Dynamic) ar(cols);
-    //    m.resize(rows,cols);
-    //    ar(binary_data(m.data(),static_cast<std::size_t>(rows*cols*sizeof(typename Derived::Scalar))));
-    //}
-    
-    // Eigen Transformation serialization
-    template<class Archive, class T, int N> inline void
-    serialize(Archive & ar, Eigen::Transform<T, N, Eigen::Affine, Eigen::DontAlign>& t){ ar(t.matrix()); }
-}
+//namespace cereal {    
+//    // Eigen Matrix 4x4 serialization
+//    template <class Archive> void serialize(Archive &ar, ::Slic3r::Matrix4d &m){
+//        ar(binary_data(m.data(), 4*4*sizeof(double)));
+//    }
+//
+//    // !!! create duplicit implementation
+//    // General solution for Eigen matrix serialization 
+//    //template <class Archive, class Derived> inline typename std::enable_if<traits::is_output_serializable<BinaryData<typename Derived::Scalar>, Archive>::value, void>::type
+//    //save(Archive & ar, Eigen::PlainObjectBase<Derived> const & m){
+//    //    typedef Eigen::PlainObjectBase<Derived> ArrT;
+//    //    if(ArrT::RowsAtCompileTime==Eigen::Dynamic) ar(m.rows());
+//    //    if(ArrT::ColsAtCompileTime==Eigen::Dynamic) ar(m.cols());
+//    //    ar(binary_data(m.data(),m.size()*sizeof(typename Derived::Scalar)));
+//    //}
+//    //template <class Archive, class Derived> inline typename std::enable_if<traits::is_input_serializable<BinaryData<typename Derived::Scalar>, Archive>::value, void>::type
+//    //load(Archive & ar, Eigen::PlainObjectBase<Derived> & m){
+//    //    typedef Eigen::PlainObjectBase<Derived> ArrT;
+//    //    Eigen::Index rows=ArrT::RowsAtCompileTime, cols=ArrT::ColsAtCompileTime;
+//    //    if(rows==Eigen::Dynamic) ar(rows);
+//    //    if(cols==Eigen::Dynamic) ar(cols);
+//    //    m.resize(rows,cols);
+//    //    ar(binary_data(m.data(),static_cast<std::size_t>(rows*cols*sizeof(typename Derived::Scalar))));
+//    //}
+//    
+//    // Eigen Transformation serialization
+//    template<class Archive, class T, int N> inline void
+//    serialize(Archive & ar, Eigen::Transform<T, N, Eigen::Affine, Eigen::DontAlign>& t){ ar(t.matrix()); }
+//}
 
 namespace Slic3r {
 

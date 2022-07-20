@@ -553,11 +553,16 @@ namespace cereal {
 	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2d   &v) { archive(v.x(), v.y()); }
 	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3d   &v) { archive(v.x(), v.y(), v.z()); }
 
+    template<class Archive> void serialize(Archive& archive, Slic3r::Matrix4d &m){ archive(binary_data(m.data(), 4*4*sizeof(double))); }
 	template<class Archive> void load(Archive& archive, Slic3r::Matrix2f &m) { archive.loadBinary((char*)m.data(), sizeof(float) * 4); }
 	template<class Archive> void save(Archive& archive, Slic3r::Matrix2f &m) { archive.saveBinary((char*)m.data(), sizeof(float) * 4); }
+        
+    // Eigen Transformation serialization
+    template<class Archive, class T, int N> inline void serialize(Archive& archive, Eigen::Transform<T, N, Eigen::Affine, Eigen::DontAlign>& t){ archive(t.matrix()); }
+
 #if ENABLE_WORLD_COORDINATE
-    template<class Archive> void load(Archive& archive, Slic3r::Transform3d& m)       { archive.loadBinary((char*)m.data(), sizeof(double) * 16); }
-    template<class Archive> void save(Archive& archive, const Slic3r::Transform3d& m) { archive.saveBinary((char*)m.data(), sizeof(double) * 16); }
+    //template<class Archive> void load(Archive& archive, Slic3r::Transform3d& m)       { archive.loadBinary((char*)m.data(), sizeof(double) * 16); }
+    //template<class Archive> void save(Archive& archive, const Slic3r::Transform3d& m) { archive.saveBinary((char*)m.data(), sizeof(double) * 16); }
 #endif // ENABLE_WORLD_COORDINATE
 }
 

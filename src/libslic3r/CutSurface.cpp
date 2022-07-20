@@ -847,7 +847,7 @@ priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
         }        
     }
     assert(vertices_count <= vertices.size());
-    assert(edges_count <= (indices.size() * 3) / 2);
+    assert(edges_count <= (indices.size() * 3));
     assert(faces_count <= indices.size());
 
     CutMesh result;
