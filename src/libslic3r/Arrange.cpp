@@ -489,7 +489,7 @@ void _arrange(
 {
     // Integer ceiling the min distance from the bed perimeters
     coord_t md = params.min_obj_distance;
-    md = md / 2;
+    md = md / 2 - params.min_bed_distance;
     
     auto corrected_bin = bin;
     sl::offset(corrected_bin, md);

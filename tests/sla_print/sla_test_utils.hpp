@@ -14,7 +14,7 @@
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/SLA/Pad.hpp"
 #include "libslic3r/SLA/SupportTreeBuilder.hpp"
-#include "libslic3r/SLA/SupportTreeBuildsteps.hpp"
+#include "libslic3r/SLA/SupportTreeUtils.hpp"
 #include "libslic3r/SLA/SupportPointGenerator.hpp"
 #include "libslic3r/SLA/AGGRaster.hpp"
 #include "libslic3r/SLA/ConcaveHull.hpp"
@@ -67,7 +67,8 @@ struct SupportByproducts
 const constexpr float CLOSING_RADIUS = 0.005f;
 
 void check_support_tree_integrity(const sla::SupportTreeBuilder &stree,
-                                  const sla::SupportTreeConfig &cfg);
+                                  const sla::SupportTreeConfig &cfg,
+                                  double gnd);
 
 void test_supports(const std::string          &obj_filename,
                    const sla::SupportTreeConfig   &supportcfg,

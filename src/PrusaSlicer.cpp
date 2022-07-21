@@ -173,19 +173,20 @@ int CLI::run(int argc, char **argv)
         m_actions.erase(it);
     }
 
-    it = std::find(m_actions.begin(), m_actions.end(), "opengl-core");
+    it = std::find(m_actions.begin(), m_actions.end(), "opengl-version");
     if (it != m_actions.end()) {
-        std::string opengl_version_str = m_config.opt_string("opengl-core");
-        const std::vector<std::string> valid_versions = { "3.2", "3.3", "4.0", "4.1", "4.2", "4.3", "4.4", "4.5", "4.6" };
-        if (std::find(valid_versions.begin(), valid_versions.end(), opengl_version_str) == valid_versions.end()) {
-            boost::nowide::cerr << "Found invalid OpenGL version: " << opengl_version_str << std::endl;
-            opengl_version_str.clear();
+        std::string opengl_version_str = m_config.opt_string("opengl-version");
+        if (std::find(Slic3r::GUI::OpenGLVersions::core_str.begin(), Slic3r::GUI::OpenGLVersions::core_str.end(), opengl_version_str) == Slic3r::GUI::OpenGLVersions::core_str.end()) {
+            if (std::find(Slic3r::GUI::OpenGLVersions::precore_str.begin(), Slic3r::GUI::OpenGLVersions::precore_str.end(), opengl_version_str) == Slic3r::GUI::OpenGLVersions::precore_str.end()) {
+                boost::nowide::cerr << "Found invalid OpenGL version: " << opengl_version_str << std::endl;
+                opengl_version_str.clear();
+            }
         }
 
         if (!opengl_version_str.empty()) {
             std::vector<std::string> tokens;
             boost::split(tokens, opengl_version_str, boost::is_any_of("."), boost::token_compress_on);
-            opengl_version.first  = std::stoi(tokens[0].c_str());
+            opengl_version.first = std::stoi(tokens[0].c_str());
             opengl_version.second = std::stoi(tokens[1].c_str());
         }
         start_gui = true;

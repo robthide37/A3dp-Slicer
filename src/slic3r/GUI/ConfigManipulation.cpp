@@ -317,6 +317,17 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     bool have_avoid_crossing_perimeters = config->opt_bool("avoid_crossing_perimeters");
     toggle_field("avoid_crossing_perimeters_max_detour", have_avoid_crossing_perimeters);
+
+    bool have_arachne = config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
+    toggle_field("wall_transition_length", have_arachne);
+    toggle_field("wall_transition_filter_deviation", have_arachne);
+    toggle_field("wall_transition_angle", have_arachne);
+    toggle_field("wall_distribution_count", have_arachne);
+    toggle_field("wall_split_middle_threshold", have_arachne);
+    toggle_field("wall_add_middle_threshold", have_arachne);
+    toggle_field("min_feature_size", have_arachne);
+    toggle_field("min_bead_width", have_arachne);
+    toggle_field("thin_walls", !have_arachne);
 }
 
 void ConfigManipulation::update_print_sla_config(DynamicPrintConfig* config, const bool is_global_config/* = false*/)

@@ -25,6 +25,10 @@ namespace FillLightning {
     class Generator;
 };
 
+namespace FillLightning {
+    class Generator;
+};
+
 class LayerRegion
 {
 public:

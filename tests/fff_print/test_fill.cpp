@@ -134,6 +134,7 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
         for (auto density : { 0.4, 1.0 }) {
             fill_params.density = density;
             filler->spacing = flow.spacing();
+            REQUIRE(!fill_params.use_arachne); // Make this test fail when Arachne is used because this test is not ready for it.
             for (auto angle : { 0.0, 45.0}) {
                 surface.expolygon.rotate(angle, Point(0,0));
                 Polylines paths = filler->fill_surface(&surface, fill_params);
@@ -266,7 +267,15 @@ SCENARIO("Infill only where needed", "[Fill]")
     });
 
     auto test = [&config]() -> double {
-        std::string gcode = Slic3r::Test::slice({ Slic3r::Test::TestMesh::pyramid }, config);
+        TriangleMesh pyramid = Test::mesh(Slic3r::Test::TestMesh::pyramid);
+        // Arachne doesn't use "Detect thin walls," and because of this, it filters out tiny infill areas differently.
+        // So, for Arachne, we cut the pyramid model to achieve similar results.
+        if (config.opt_enum<PerimeterGeneratorType>("perimeter_generator") == Slic3r::PerimeterGeneratorType::Arachne) {
+            indexed_triangle_set lower{};
+            cut_mesh(pyramid.its, 35, nullptr, &lower);
+            pyramid = TriangleMesh(lower);
+        }
+        std::string gcode = Slic3r::Test::slice({ pyramid }, config);
         THEN("gcode not empty") {
             REQUIRE(! gcode.empty());
         }
@@ -541,8 +550,10 @@ bool test_if_solid_surface_filled(const ExPolygon& expolygon, double flow_spacin
 	fill_params.density = float(density);
 	fill_params.dont_adjust = false;
 
-	Surface surface(stBottom, expolygon);
-	Slic3r::Polylines paths = filler->fill_surface(&surface, fill_params);
+    Surface surface(stBottom, expolygon);
+    if (fill_params.use_arachne) // Make this test fail when Arachne is used because this test is not ready for it.
+        return false;
+    Slic3r::Polylines paths = filler->fill_surface(&surface, fill_params);
 
     // check whether any part was left uncovered
     Polygons grown_paths;

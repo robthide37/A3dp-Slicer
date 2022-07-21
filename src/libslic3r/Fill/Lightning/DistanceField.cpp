@@ -7,10 +7,33 @@
 
 #include <tbb/parallel_for.h>
 
+#ifdef LIGHTNING_DISTANCE_FIELD_DEBUG_OUTPUT
+#include "../../SVG.hpp"
+#endif
+
 namespace Slic3r::FillLightning
 {
 
 constexpr coord_t radius_per_cell_size = 6;  // The cell-size should be small compared to the radius, but not so small as to be inefficient.
+
+#ifdef LIGHTNING_DISTANCE_FIELD_DEBUG_OUTPUT
+void export_distance_field_to_svg(const std::string &path, const Polygons &outline, const Polygons &overhang, const std::vector<DistanceField::UnsupportedCell> &unsupported_points, const Points &points = {})
+{
+    coordf_t    stroke_width = scaled<coordf_t>(0.01);
+    BoundingBox bbox         = get_extents(outline);
+
+    bbox.offset(SCALED_EPSILON);
+    SVG svg(path, bbox);
+    svg.draw_outline(outline, "green", stroke_width);
+    svg.draw_outline(overhang, "blue", stroke_width);
+
+    for (const DistanceField::UnsupportedCell &cell : unsupported_points)
+        svg.draw(cell.loc, "cyan", coord_t(stroke_width));
+
+    for (const Point &pt : points)
+        svg.draw(pt, "red", coord_t(stroke_width));
+}
+#endif
 
 DistanceField::DistanceField(const coord_t& radius, const Polygons& current_outline, const BoundingBox& current_outlines_bbox, const Polygons& current_overhang) :
     m_cell_size(radius / radius_per_cell_size),
@@ -19,8 +42,9 @@ DistanceField::DistanceField(const coord_t& radius, const Polygons& current_outl
 {
     m_supporting_radius2 = Slic3r::sqr(int64_t(radius));
     // Sample source polygons with a regular grid sampling pattern.
+    const BoundingBox overhang_bbox = get_extents(current_overhang);
     for (const ExPolygon &expoly : union_ex(current_overhang)) {
-        const Points sampled_points               = sample_grid_pattern(expoly, m_cell_size);
+        const Points sampled_points               = sample_grid_pattern(expoly, m_cell_size, overhang_bbox);
         const size_t unsupported_points_prev_size = m_unsupported_points.size();
         m_unsupported_points.resize(unsupported_points_prev_size + sampled_points.size());
 
@@ -59,6 +83,13 @@ DistanceField::DistanceField(const coord_t& radius, const Polygons& current_outl
     // Because the distance between two points is at least one axis equal to m_cell_size, every cell
     // in m_unsupported_points_grid contains exactly one point.
     assert(m_unsupported_points.size() == m_unsupported_points_grid.size());
+
+#ifdef LIGHTNING_DISTANCE_FIELD_DEBUG_OUTPUT
+    {
+        static int iRun = 0;
+        export_distance_field_to_svg(debug_out_path("FillLightning-DistanceField-%d.svg", iRun++), current_outline, current_overhang, m_unsupported_points);
+    }
+#endif
 }
 
 void DistanceField::update(const Point& to_node, const Point& added_leaf)

@@ -31,11 +31,6 @@ static double volume(const BoundingBox3Base<Vec3f> &box)
     return sz.x() * sz.y() * sz.z();
 }
 
-static double volume(const Eigen::AlignedBox<float, 3> &box)
-{
-    return box.volume();
-}
-
 TEST_CASE("Test kdtree query for a Box", "[KDTreeIndirect]")
 {
     auto vol = BoundingBox3Base<Vec3f>{{0.f, 0.f, 0.f}, {10.f, 10.f, 10.f}};

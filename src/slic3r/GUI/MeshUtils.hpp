@@ -4,7 +4,7 @@
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/TriangleMesh.hpp"
-#include "libslic3r/SLA/IndexedMesh.hpp"
+#include "libslic3r/AABBMesh.hpp"
 #include "admesh/stl.h"
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -204,7 +204,7 @@ private:
 #if ENABLE_RAYCAST_PICKING
     std::shared_ptr<const TriangleMesh> m_mesh;
 #endif // ENABLE_RAYCAST_PICKING
-    sla::IndexedMesh m_emesh;
+    AABBMesh m_emesh;
     std::vector<stl_normal> m_normals;
 };
 

@@ -1,6 +1,7 @@
 #include "sla_test_utils.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
 #include "libslic3r/SLA/AGGRaster.hpp"
+#include "libslic3r/SLA/DefaultSupportTree.hpp"
 
 #include <iomanip>
 
@@ -15,14 +16,16 @@ void test_support_model_collision(const std::string          &obj_filename,
     
     // Set head penetration to a small negative value which should ensure that
     // the supports will not touch the model body.
-    supportcfg.head_penetration_mm = -0.15;
+    supportcfg.head_penetration_mm = -0.2;
     
     test_supports(obj_filename, supportcfg, hollowingcfg, drainholes, byproducts);
     
     // Slice the support mesh given the slice grid of the model.
     std::vector<ExPolygons> support_slices =
-            byproducts.supporttree.slice(byproducts.slicegrid, CLOSING_RADIUS);
-    
+        sla::slice(byproducts.supporttree.retrieve_mesh(sla::MeshType::Support),
+              byproducts.supporttree.retrieve_mesh(sla::MeshType::Pad),
+              byproducts.slicegrid, CLOSING_RADIUS, {});
+
     // The slices originate from the same slice grid so the numbers must match
     
     bool support_mesh_is_empty =
@@ -47,13 +50,15 @@ void test_support_model_collision(const std::string          &obj_filename,
         notouch = notouch && area(intersections) < PI * pinhead_r * pinhead_r;
     }
     
-    /*if (!notouch) */export_failed_case(support_slices, byproducts);
+    if (!notouch)
+        export_failed_case(support_slices, byproducts);
     
     REQUIRE(notouch);
 }
 
 void export_failed_case(const std::vector<ExPolygons> &support_slices, const SupportByproducts &byproducts)
 {
+    bool do_export_stl = false;
     for (size_t n = 0; n < support_slices.size(); ++n) {
         const ExPolygons &sup_slice = support_slices[n];
         const ExPolygons &mod_slice = byproducts.model_slices[n];
@@ -68,14 +73,18 @@ void export_failed_case(const std::vector<ExPolygons> &support_slices, const Sup
             svg.draw(intersections, "red");
             svg.Close();
         }
+
+        do_export_stl = do_export_stl || !intersections.empty();
     }
 
-    indexed_triangle_set its;
-    byproducts.supporttree.retrieve_full_mesh(its);
-    TriangleMesh m{its};
-    m.merge(byproducts.input_mesh);
-    m.WriteOBJFile((Catch::getResultCapture().getCurrentTestName() + "_" +
-                    byproducts.obj_fname).c_str());
+    if (do_export_stl) {
+        indexed_triangle_set its;
+        byproducts.supporttree.retrieve_full_mesh(its);
+        TriangleMesh m{its};
+        m.merge(byproducts.input_mesh);
+        m.WriteOBJFile((Catch::getResultCapture().getCurrentTestName() + "_" +
+                        byproducts.obj_fname).c_str());
+    }
 }
 
 void test_supports(const std::string          &obj_filename,
@@ -107,7 +116,7 @@ void test_supports(const std::string          &obj_filename,
     
     // Create the special index-triangle mesh with spatial indexing which
     // is the input of the support point and support mesh generators
-    sla::IndexedMesh emesh{mesh};
+    AABBMesh emesh{mesh};
 
 #ifdef SLIC3R_HOLE_RAYCASTER
     if (hollowingcfg.enabled) 
@@ -144,10 +153,16 @@ void test_supports(const std::string          &obj_filename,
     // Generate the actual support tree
     sla::SupportTreeBuilder treebuilder;
     sla::SupportableMesh    sm{emesh, support_points, supportcfg};
-    sla::SupportTreeBuildsteps::execute(treebuilder, sm);
-    
-    check_support_tree_integrity(treebuilder, supportcfg);
-    
+
+    switch (sm.cfg.tree_type) {
+    case sla::SupportTreeType::Default: {
+        sla::DefaultSupportTree::execute(treebuilder, sm);
+        check_support_tree_integrity(treebuilder, supportcfg, sla::ground_level(sm));
+        break;
+    }
+    default:;
+    }
+
     TriangleMesh output_mesh{treebuilder.retrieve_mesh(sla::MeshType::Support)};
     
     check_validity(output_mesh, validityflags);
@@ -171,9 +186,9 @@ void test_supports(const std::string          &obj_filename,
 }
 
 void check_support_tree_integrity(const sla::SupportTreeBuilder &stree, 
-                                  const sla::SupportTreeConfig &cfg)
+                                  const sla::SupportTreeConfig &cfg,
+                                  double gnd)
 {
-    double gnd  = stree.ground_level;
     double H1   = cfg.max_solo_pillar_height_mm;
     double H2   = cfg.max_dual_pillar_height_mm;
     
@@ -426,7 +441,7 @@ sla::SupportPoints calc_support_pts(
     std::vector<ExPolygons> slices  = slice_mesh_ex(mesh.its, heights, CLOSING_RADIUS);
 
     // Prepare the support point calculator
-    sla::IndexedMesh emesh{mesh};
+    AABBMesh emesh{mesh};
     sla::SupportPointGenerator spgen{emesh, cfg, []{}, [](int){}};
 
     // Calculate the support points
