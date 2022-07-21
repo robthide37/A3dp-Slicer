@@ -249,16 +249,16 @@ public:
 };
 
 struct IslandConnection {
-    float area{};
+    float area { };
     Vec3f centroid_accumulator = Vec3f::Zero();
 };
 
 struct Island {
-    std::unordered_map<size_t, IslandConnection> connected_islands{};
-    std::vector<Vec3f> pivot_points{}; // for support points present on this layer (or bed extrusions)
-    float volume{};
+    std::unordered_map<size_t, IslandConnection> connected_islands { };
+    std::vector<Vec3f> pivot_points { }; // for support points present on this layer (or bed extrusions)
+    float volume { };
     Vec3f volume_centroid_accumulator = Vec3f::Zero();
-    float sticking_force{}; // for support points present on this layer (or bed extrusions)
+    float sticking_force { }; // for support points present on this layer (or bed extrusions)
     Vec3f sticking_centroid_accumulator = Vec3f::Zero();
 
     std::vector<ExtrusionLine> external_lines;
@@ -623,6 +623,10 @@ public:
 
     std::tuple<float, Vec3f> is_stable_while_extruding(const ExtrusionLine &extruded_line, float layer_z,
             const Params &params) {
+        if (pivot_points.empty()) {
+            return {this->volume * params.filament_density*params.gravity_constant,Vec3f {0.0f,0.0f,-1.0f}};
+        }
+
         check_pivot_tree();
 
         Vec2f line_dir = (extruded_line.b - extruded_line.a).normalized();
@@ -648,9 +652,8 @@ public:
         extruder_pressure_direction.z() = -0.1f - extruded_line.malformation * 0.5f;
         extruder_pressure_direction.normalize();
         Vec3d endpoint = (to_3d(extruded_line.b, layer_z)).cast<double>();
-        float conflict_torque_arm = line_alg::distance_to(Linef3(endpoint, endpoint + extruder_pressure_direction.cast<double>()), pivot.cast<double>());
-//        float conflict_torque_arm = (to_3d(Vec2f(pivot.head<2>() - extruded_line.b), layer_z).cross(
-//                extruder_pressure_direction)).norm();
+        float conflict_torque_arm = line_alg::distance_to(
+                Linef3(endpoint, endpoint + extruder_pressure_direction.cast<double>()), pivot.cast<double>());
         float extruder_conflict_force = params.tolerable_extruder_conflict_force +
                 std::min(extruded_line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
         float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
@@ -661,7 +664,8 @@ public:
         BOOST_LOG_TRIVIAL(debug)
         << "pivot: " << pivot.x() << "  " << pivot.y() << "  " << pivot.z();
         BOOST_LOG_TRIVIAL(debug)
-        << "sticking_centroid: " << sticking_centroid.x() << "  " << sticking_centroid.y() << "  " << sticking_centroid.z();
+        << "sticking_centroid: " << sticking_centroid.x() << "  " << sticking_centroid.y() << "  "
+                << sticking_centroid.z();
         BOOST_LOG_TRIVIAL(debug)
         << "SSG: sticking_force: " << sticking_force;
         BOOST_LOG_TRIVIAL(debug)
@@ -711,10 +715,11 @@ struct WeakestConnection {
     }
 };
 
-void debug_print_graph(const std::vector<LayerIslands>& islands_graph) {
+void debug_print_graph(const std::vector<LayerIslands> &islands_graph) {
     std::cout << "BUILT ISLANDS GRAPH:" << std::endl;
     for (size_t layer_idx = 0; layer_idx < islands_graph.size(); ++layer_idx) {
-        std::cout << "ISLANDS AT LAYER: " << layer_idx << "  AT HEIGHT: " << islands_graph[layer_idx].layer_z << std::endl;
+        std::cout << "ISLANDS AT LAYER: " << layer_idx << "  AT HEIGHT: " << islands_graph[layer_idx].layer_z
+                << std::endl;
         for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
             const Island &island = islands_graph[layer_idx].islands[island_idx];
             std::cout << "        ISLAND " << island_idx << std::endl;
@@ -725,7 +730,6 @@ void debug_print_graph(const std::vector<LayerIslands>& islands_graph) {
         }
     }
     std::cout << "END OF GRAPH" << std::endl;
-
 
 }
 
