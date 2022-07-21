@@ -290,6 +290,13 @@ if (APPLE)
     FIND_LIBRARY(DISKARBITRATION_LIBRARY DiskArbitration)
 endif ()
 
+if (MSVC)
+    list(APPEND SLIC3R_GUI_SOURCES
+            StackWalker.cpp
+            StackWalker.h
+        )
+endif ()
+
 add_library(libslic3r_gui STATIC ${SLIC3R_GUI_SOURCES})
 target_compile_definitions(libslic3r_gui PRIVATE $<$<BOOL:${SLIC3R_ALPHA}>:SLIC3R_ALPHA>)
 
