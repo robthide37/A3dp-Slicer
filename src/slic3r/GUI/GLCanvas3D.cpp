@@ -3896,12 +3896,13 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     for (int i = 0; i < static_cast<int>(m_model->objects.size()); ++i) {
         const ModelObject* obj = m_model->objects[i];
         for (int j = 0; j < static_cast<int>(obj->instances.size()); ++j) {
-            if (snapshot_type.empty() && m_selection.get_object_idx() == i) {
+            if (snapshot_type == L("Gizmo-Place on Face") && m_selection.get_object_idx() == i) {
                 // This means we are flattening this object. In that case pretend
                 // that it is not sinking (even if it is), so it is placed on bed
                 // later on (whatever is sinking will be left sinking).
                 min_zs[{ i, j }] = SINKING_Z_THRESHOLD;
-            } else
+            }
+            else
                 min_zs[{ i, j }] = obj->instance_bounding_box(j).min.z();
 
         }

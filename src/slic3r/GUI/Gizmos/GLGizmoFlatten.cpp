@@ -43,25 +43,18 @@ bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
             }
             return true;
         }
-
-        // fix: prevent restart gizmo when reselect object
-        // take responsibility for left up
-        if (m_parent.get_first_hover_volume_idx() >= 0) m_mouse_left_down = true;
-        
-    } else if (mouse_event.LeftUp()) {
-        if (m_mouse_left_down) {
-            if (m_hover_id == -1)
-                // no plane hovered
-                return false;
-            else {
-                // responsible for mouse left up after selecting plane
-                m_mouse_left_down = false;
-                return true;
-            }
-        }
-    } else if (mouse_event.Leaving()) {
-        m_mouse_left_down = false;
     }
+    else if (mouse_event.LeftUp()) {
+        if (m_mouse_left_down) {
+            // responsible for mouse left up after selecting plane
+            m_mouse_left_down = false;
+            return true;
+        }
+
+    }
+    else if (mouse_event.Leaving())
+        m_mouse_left_down = false;
+
     return false;
 }
 
