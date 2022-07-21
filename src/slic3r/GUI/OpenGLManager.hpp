@@ -6,9 +6,9 @@
 class wxWindow;
 class wxGLCanvas;
 class wxGLContext;
-#if ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 class wxGLAttributes;
-#endif // ENABLE_GL_CORE_PROFILE
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
 namespace Slic3r {
 namespace GUI {
@@ -48,6 +48,14 @@ public:
         void set_core_profile(bool value) { m_core_profile = value; }
 
         bool is_mesa() const;
+        bool is_es() const {
+            return
+#if ENABLE_OPENGL_ES
+                true;
+#else
+                false;
+#endif // ENABLE_OPENGL_ES
+        }
 
         int get_max_tex_size() const;
         float get_max_anisotropy() const;
@@ -126,11 +134,11 @@ public:
     static const GLInfo& get_gl_info() { return s_gl_info; }
 
 private:
-#if ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
     static void detect_multisample(const wxGLAttributes& attribList);
 #else
     static void detect_multisample(int* attribList);
-#endif // ENABLE_GL_CORE_PROFILE
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 };
 
 } // namespace GUI

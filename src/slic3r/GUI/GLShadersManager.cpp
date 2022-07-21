@@ -37,7 +37,13 @@ std::pair<bool, std::string> GLShadersManager::init()
     bool valid = true;
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_OPENGL_ES
+    const std::string prefix = "ES/";
+    // used to render wireframed triangles
+    valid &= append_shader("wireframe", { prefix + "wireframe.vs", prefix + "wireframe.fs" });
+#else
     const std::string prefix = GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 1) ? "140/" : "110/";
+#endif // ENABLE_OPENGL_ES
     // imgui shader
     valid &= append_shader("imgui", { prefix + "imgui.vs", prefix + "imgui.fs" });
     // basic shader, used to render all what was previously rendered using the immediate mode
@@ -48,11 +54,14 @@ std::pair<bool, std::string> GLShadersManager::init()
     valid &= append_shader("flat_texture", { prefix + "flat_texture.vs", prefix + "flat_texture.fs" });
     // used to render 3D scene background
     valid &= append_shader("background", { prefix + "background.vs", prefix + "background.fs" });
-#if ENABLE_GL_CORE_PROFILE
+#if ENABLE_OPENGL_ES
+    // used to render dashed lines
+    valid &= append_shader("dashed_lines", { prefix + "dashed_lines.vs", prefix + "dashed_lines.fs" });
+#elif ENABLE_GL_CORE_PROFILE
     if (GUI::OpenGLManager::get_gl_info().is_core_profile())
         // used to render thick and/or dashed lines
         valid &= append_shader("dashed_thick_lines", { prefix + "dashed_thick_lines.vs", prefix + "dashed_thick_lines.fs", prefix + "dashed_thick_lines.gs" });
-#endif // ENABLE_GL_CORE_PROFILE
+#endif // ENABLE_OPENGL_ES
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SHOW_TOOLPATHS_COG
     // used to render toolpaths center of gravity

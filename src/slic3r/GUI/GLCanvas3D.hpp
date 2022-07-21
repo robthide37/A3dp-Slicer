@@ -517,6 +517,9 @@ private:
     bool m_event_handlers_bound{ false };
 
     GLVolumeCollection m_volumes;
+#if ENABLE_OPENGL_ES
+    TriangleMesh m_wipe_tower_mesh;
+#endif // ENABLE_OPENGL_ES
     GCodeViewer m_gcode_viewer;
 
     RenderTimer m_render_timer;
