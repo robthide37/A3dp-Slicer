@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cassert>
 #include <stack>
+#include <unordered_map>
 
 namespace Slic3r {
 
@@ -478,8 +479,40 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator &p
             // Reapply the nearest point search for starting point.
             // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
             // Arachne sometimes creates extrusion with zero-length (just two same endpoints);
-            if (!paths.empty())
-                chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
+            if (!paths.empty()) {
+                Point start_point = paths.front().first_point();
+                if (!extrusion->is_closed) {
+                    // Especially for open extrusion, we need to select a starting point that is at the start
+                    // or the end of the extrusions to make one continuous line. Also, we prefer a non-overhang
+                    // starting point.
+                    struct PointInfo
+                    {
+                        size_t occurrence  = 0;
+                        bool   is_overhang = false;
+                    };
+                    std::unordered_map<Point, PointInfo, PointHash> point_occurrence;
+                    for (const ExtrusionPath &path : paths) {
+                        ++point_occurrence[path.polyline.first_point()].occurrence;
+                        ++point_occurrence[path.polyline.last_point()].occurrence;
+                        if (path.role() == erOverhangPerimeter) {
+                            point_occurrence[path.polyline.first_point()].is_overhang = true;
+                            point_occurrence[path.polyline.last_point()].is_overhang  = true;
+                        }
+                    }
+
+                    // Prefer non-overhang point as a starting point.
+                    for (const std::pair<Point, PointInfo> pt : point_occurrence)
+                        if (pt.second.occurrence == 1) {
+                            start_point = pt.first;
+                            if (!pt.second.is_overhang) {
+                                start_point = pt.first;
+                                break;
+                            }
+                        }
+                }
+
+                chain_and_reorder_extrusion_paths(paths, &start_point);
+            }
         } else {
             extrusion_paths_append(paths, *extrusion, role, is_external ? perimeter_generator.ext_perimeter_flow : perimeter_generator.perimeter_flow);
         }
