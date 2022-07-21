@@ -66,8 +66,12 @@ group:Advanced
 	setting:width$25:no_perimeter_unsupported_algo
 	line:Gap Fill
 		setting:label$_:gap_fill_enabled
-		setting:width$5:gap_fill_min_area
 		setting:width$5:gap_fill_last
+	end_line
+	line:Gap Fill threshold
+		setting:width$5:gap_fill_min_width
+		setting:width$5:gap_fill_max_width
+		setting:width$5:gap_fill_min_area
 	end_line
 	line:Seam
 		setting:tags$Simple$Advanced$Expert$Prusa$SuSi:script:enum$corners$Corners$nearest$Nearest$random$Random$aligned$Aligned$rear$Rear$custom$Custom:depends$seam_position$seam_angle_cost$seam_travel_cost:label$Seam position:label_width$12:sidetext_width$0:tooltip$Position of perimeters' starting points.\nCustom can be defined in Advanced or Expert mode. Cost-based settings let you choose the angle and travel cost. A high angle cost will place the seam where it can be hidden by a corner, the travel cost place the seam near the last position (often at the end of the previous infill).:s_seam_position

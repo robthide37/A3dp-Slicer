@@ -1127,14 +1127,23 @@ void PerimeterGenerator::process()
         ExPolygons gap_srf;
         if (!gaps.empty()) {
             // collapse 
-            double min = 0.2 * perimeter_width * (1 - INSET_OVERLAP_TOLERANCE);
+            coordf_t min = 0.2 * perimeter_width * (1 - INSET_OVERLAP_TOLERANCE);
             //be sure we don't gapfill where the perimeters are already touching each other (negative spacing).
             min = std::max(min, double(Flow::new_from_spacing((float)EPSILON, (float)this->perimeter_flow.nozzle_diameter(), (float)this->layer->height, (float)this->perimeter_flow.spacing_ratio(), false).scaled_width()));
-            double max = 2.2 * perimeter_spacing;
+            coordf_t real_max = 2.5 * perimeter_spacing;
+            const coordf_t minwidth = scale_d(this->config->gap_fill_min_width.get_abs_value(unscaled((double)perimeter_width)));
+            const coordf_t maxwidth = scale_d(this->config->gap_fill_max_width.get_abs_value(unscaled((double)perimeter_width)));
+            if (minwidth > 0) {
+                min = std::max(min, minwidth);
+            }
+            coordf_t max = real_max;
+            if (maxwidth > 0) {
+                max = std::min(max, maxwidth);
+            }
             //remove areas that are too big (shouldn't occur...)
             ExPolygons too_big = offset2_ex(gaps, double(-max / 2), double(+max / 2));
             ExPolygons gaps_ex_to_test = too_big.empty() ? gaps : diff_ex(gaps, too_big, ApplySafetyOffset::Yes);
-            const double minarea = scale_(scale_(this->config->gap_fill_min_area.get_abs_value(unscaled((double)perimeter_width) * unscaled((double)perimeter_width))));
+            const double minarea = scale_d(scale_d(this->config->gap_fill_min_area.get_abs_value(unscaled((double)perimeter_width) * unscaled((double)perimeter_width))));
             // check each gapfill area to see if it's printable.
             for (const ExPolygon& expoly : gaps_ex_to_test) {
                 //remove too small gaps that are too hard to fill.
@@ -1189,7 +1198,9 @@ void PerimeterGenerator::process()
             // create lines from the area
             ThickPolylines polylines;
             for (const ExPolygon& ex : gaps_ex) {
-                Geometry::MedialAxis{ ex, coord_t(max * 1.1), coord_t(min), coord_t(this->layer->height) }.build(polylines);
+                Geometry::MedialAxis{ ex, coord_t(real_max), coord_t(min), coord_t(this->layer->height) }
+                    .set_biggest_width(max)
+                    .build(polylines);
             }
             // create extrusion from lines
             if (!polylines.empty()) {
