@@ -578,6 +578,17 @@ void PerimeterGenerator::process_arachne()
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
         loop_number = int(perimeters.size()) - 1;
 
+        // All closed ExtrusionLine should have the same the first and the last point.
+        // But in rare cases, Arachne produce ExtrusionLine marked as closed but without
+        // equal the first and the last point.
+        assert([&perimeters = std::as_const(perimeters)]() -> bool {
+            for (const Arachne::VariableWidthLines &perimeter : perimeters)
+                for (const Arachne::ExtrusionLine &el : perimeter)
+                    if (el.is_closed && el.junctions.front().p != el.junctions.back().p)
+                        return false;
+            return true;
+        }());
+
         int start_perimeter = int(perimeters.size()) - 1;
         int end_perimeter   = -1;
         int direction       = -1;
