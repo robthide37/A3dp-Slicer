@@ -567,6 +567,16 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
     return {result, current_layer_grid};
 }
 
+struct WeakestConnection {
+    float area = 0.0f;
+    Vec3f centroid_accumulator = Vec3f::Zero();
+
+    void add(const WeakestConnection &other) {
+        this->area += other.area;
+        this->centroid_accumulator += other.centroid_accumulator;
+    }
+};
+
 struct CoordinateFunctor {
     const std::vector<Vec3f> *coordinates;
     CoordinateFunctor(const std::vector<Vec3f> *coords) :
@@ -639,12 +649,12 @@ public:
         float sticking_torque = sticking_arm * this->sticking_force;
 
         float mass = this->volume * params.filament_density;
-        const Vec3f &mass_centorid = this->volume_centroid_accumulator / this->volume;
+        const Vec3f &mass_centroid = this->volume_centroid_accumulator / this->volume;
         float weight = mass * params.gravity_constant;
-        float weight_arm = (pivot.head<2>() - mass_centorid.head<2>()).norm();
+        float weight_arm = (pivot.head<2>() - mass_centroid.head<2>()).norm();
         float weight_torque = weight_arm * weight;
 
-        float bed_movement_arm = mass_centorid.z();
+        float bed_movement_arm = mass_centroid.z();
         float bed_movement_force = params.max_acceleration * mass;
         float bed_movement_torque = bed_movement_force * bed_movement_arm;
 
@@ -673,7 +683,7 @@ public:
         BOOST_LOG_TRIVIAL(debug)
         << "SSG: sticking_torque: " << sticking_torque;
         BOOST_LOG_TRIVIAL(debug)
-        << "SSG: weight_arm: " << sticking_arm;
+        << "SSG: weight_arm: " << weight_arm;
         BOOST_LOG_TRIVIAL(debug)
         << "SSG: weight_torque: " << weight_torque;
         BOOST_LOG_TRIVIAL(debug)
@@ -691,6 +701,73 @@ public:
         return {total_torque / conflict_torque_arm, pivot_site_search_point};
     }
 
+    float is_strong_enough_while_extruding(
+            const WeakestConnection &connection,
+            const ExtrusionLine &extruded_line,
+            float layer_z,
+            const Params &params) const {
+
+        Vec2f line_dir = (extruded_line.b - extruded_line.a).normalized();
+        Vec3f pivot = connection.centroid_accumulator / connection.area;
+
+        float tensile_force = connection.area * params.tensile_strength;
+        float tensile_arm = fsqrt(connection.area / float(PI));
+        float tensile_torque = tensile_force * tensile_arm;
+
+        const Vec3f &mass_centroid = this->volume_centroid_accumulator / this->volume;
+        float mass = this->volume * params.filament_density
+                * ((2.0f * layer_z - pivot.z() - mass_centroid.z()) / (2.0f * layer_z));
+
+        float weight = mass * params.gravity_constant;
+        float weight_arm = (pivot.head<2>() - mass_centroid.head<2>()).norm();
+        float weight_torque = weight_arm * weight;
+
+        float bed_movement_arm = mass_centroid.z();
+        float bed_movement_force = params.max_acceleration * mass;
+        float bed_movement_torque = bed_movement_force * bed_movement_arm;
+
+        Vec3f extruder_pressure_direction = to_3d(line_dir, 0.0f);
+        extruder_pressure_direction.z() = -0.1f - extruded_line.malformation * 0.5f;
+        extruder_pressure_direction.normalize();
+        Vec3d endpoint = (to_3d(extruded_line.b, layer_z)).cast<double>();
+        float conflict_torque_arm = line_alg::distance_to(
+                Linef3(endpoint, endpoint + extruder_pressure_direction.cast<double>()), pivot.cast<double>());
+        float extruder_conflict_force = params.tolerable_extruder_conflict_force +
+                std::min(extruded_line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
+        float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
+
+        float total_torque = bed_movement_torque + extruder_conflict_torque + weight_torque - tensile_torque;
+#if 1
+        BOOST_LOG_TRIVIAL(debug)
+        << "pivot: " << pivot.x() << "  " << pivot.y() << "  " << pivot.z();
+        BOOST_LOG_TRIVIAL(debug)
+        << "mass_centroid: " << mass_centroid.x() << "  " << mass_centroid.y() << "  "
+                << mass_centroid.z();
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: tensile_force: " << tensile_force;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: tensile_arm: " << tensile_arm;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: tensile_torque: " << tensile_torque;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: weight_arm: " << weight_arm;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: weight_torque: " << weight_torque;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: bed_movement_arm: " << bed_movement_arm;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: bed_movement_torque: " << bed_movement_torque;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: conflict_torque_arm: " << conflict_torque_arm;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: extruder_conflict_torque: " << extruder_conflict_torque;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: total_torque: " << total_torque << "   layer_z: " << layer_z;
+#endif
+
+        return total_torque / conflict_torque_arm;
+    }
+
     void add_pivot_point(const Vec3f pivot_point, float sticking_force) {
         this->pivot_points.push_back(pivot_point);
         this->sticking_force += sticking_force;
@@ -703,16 +780,6 @@ public:
         std::cout << "volume: " << volume << std::endl;
     }
 
-};
-
-struct WeakestConnection {
-    float area = 0.0f;
-    Vec3f centroid_accumulator = Vec3f::Zero();
-
-    void add(const WeakestConnection &other) {
-        this->area += other.area;
-        this->centroid_accumulator += other.centroid_accumulator;
-    }
 };
 
 void debug_print_graph(const std::vector<LayerIslands> &islands_graph) {
@@ -793,9 +860,20 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                 }
                 auto estimate_strength = [layer_z](const WeakestConnection &conn) {
                     float radius = fsqrt(conn.area / PI);
-                    float arm_len_estimate = std::max(0.001f, layer_z - (conn.centroid_accumulator.z() / conn.area));
+                    float arm_len_estimate = std::max(1.3f, layer_z - (conn.centroid_accumulator.z() / conn.area));
                     return radius * conn.area / arm_len_estimate;
                 };
+
+                std::cout << "new_weakest_connection info: " << std::endl;
+                std::cout << "area: " << new_weakest_connection.area << std::endl;
+                std::cout << "centroid acc: " << new_weakest_connection.centroid_accumulator.x() << " "
+                        << new_weakest_connection.centroid_accumulator.y() << " "
+                        << new_weakest_connection.centroid_accumulator.z() << std::endl;
+                std::cout << "transfered_weakest_connection info: " << std::endl;
+                std::cout << "area: " << transfered_weakest_connection.area << std::endl;
+                std::cout << "centroid acc: " << transfered_weakest_connection.centroid_accumulator.x() << " "
+                        << transfered_weakest_connection.centroid_accumulator.y() << " "
+                        << transfered_weakest_connection.centroid_accumulator.z() << std::endl;
 
                 if (estimate_strength(transfered_weakest_connection) < estimate_strength(new_weakest_connection)) {
                     new_weakest_connection = transfered_weakest_connection;
@@ -833,6 +911,12 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
         for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
             const Island &island = islands_graph[layer_idx].islands[island_idx];
             ObjectPart &part = active_object_parts.at(prev_island_to_object_part_mapping[island_idx]);
+            WeakestConnection &weakest_conn = prev_island_to_weakest_connection[island_idx];
+            std::cout << "Weakest connection info: " << std::endl;
+            std::cout << "area: " << weakest_conn.area << std::endl;
+            std::cout << "centroid acc: " << weakest_conn.centroid_accumulator.x() << " "
+                    << weakest_conn.centroid_accumulator.y() << " "
+                    << weakest_conn.centroid_accumulator.z() << std::endl;
 
             std::vector<ExtrusionLine> dummy { };
             LinesDistancer island_lines_dist(dummy);
@@ -845,6 +929,10 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                 } else {
                     unchecked_dist = line.len;
                     auto [force, pivot_site_search_point] = part.is_stable_while_extruding(line, layer_z, params);
+                    if (force <= 0) {
+                        force = part.is_strong_enough_while_extruding(weakest_conn, line, layer_z, params);
+                    }
+
                     if (force > 0) {
                         if (island_lines_dist.get_lines().empty()) {
                             island_lines_dist = LinesDistancer(island.external_lines);
@@ -862,6 +950,9 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                             issues.support_points.emplace_back(support_point, force,
                                     to_3d(Vec2f(line.b - line.a).normalized(), 0.0f));
                             supports_presence_grid.take_position(support_point);
+
+                            weakest_conn.area += area;
+                            weakest_conn.centroid_accumulator += support_point * area;
                         }
                     }
                 }
@@ -871,223 +962,6 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
     }
     return issues;
 }
-
-/*
- void a() {
-
- // islands_graph.back() refers to the top most (current) layer
- for (size_t island_idx = 0; island_idx < islands_graph.back().islands.size(); ++island_idx) {
- Island &island = islands_graph.back().islands[island_idx];
-
- std::vector<ExtrusionLine> island_external_lines;
- for (size_t lidx : islands_lines[island_idx]) {
- island_external_lines.push_back(layer_lines[lidx]);
- }
- LinesDistancer island_lines_dist(island_external_lines);
- Accumulator acc = island; // in acc, we accumulate the mass and other properties of the object part as we traverse the islands down to bed
- // There is one object part for each island at the top most layer, and each one is computed individually -
- // Some of the calculations will be done multiple times
- int layer_idx = islands_graph.size() - 1;
- // traverse the islands graph down, and for each connection area, calculate if it holds or breaks
- while (acc.connected_islands.size() > 0) {
- //test for break between layer_idx and layer_idx -1;
- LayerIslands below = islands_graph[layer_idx - 1]; // must exist, see while condition
- layer_idx--;
- // initialize variables that we will accumulate over all islands, which are connected to the current object part
- std::vector<Vec2f> pivot_points;
- Vec2f sticking_centroid;
- float connection_area = 0;
- for (const auto &pair : acc.connected_islands) {
- const Island &below_i = below.islands[pair.first];
- Vec2f centroid = (below_i.volume_centroid_accumulator / below_i.volume).head<2>(); // centroid of the island 'below_i'; TODO it should be centroid of the connection area
- pivot_points.push_back(centroid); // for object parts, we also consider breaking pivots in the centroids of the islands
- sticking_centroid += centroid * pair.second; // pair.second is connection area in mm^2
- connection_area += pair.second;
- }
- sticking_centroid /= connection_area; //normalize to get final sticking centroid
- for (const Vec3f &p_point : acc.pivot_points) {
- pivot_points.push_back(p_point.head<2>());
- }
- // Now we have accumulated pivot points, connection area and sticking centroid of the whole layer to the current object part
-
- // create KD tree over current pivot points
- auto coord_fn = [&pivot_points](size_t idx, size_t dim) {
- return pivot_points[idx][dim];
- };
- KDTreeIndirect<2, float, decltype(coord_fn)> pivot_points_tree(coord_fn, pivot_points.size());
-
- // iterate over extrusions at top layer island, check each for stability
- for (const ExtrusionLine &line : island_external_lines) {
- Vec2f line_dir = (line.b - line.a).normalized();
- Vec2f pivot_site_search_point = line.b + line_dir * 300.0f;
- size_t pivot_idx = find_closest_point(pivot_points_tree, pivot_site_search_point);
- const Vec2f &pivot = pivot_points[pivot_idx];
-
- float sticking_arm = (pivot - sticking_centroid).norm();
- float sticking_torque = sticking_arm * connection_area * params.tensile_strength; // For breakage in between layers, we compute with tensile strength, not bed adhesion
-
- float mass = acc.volume * params.filament_density;
- const Vec3f &mass_centorid = acc.volume_centroid_accumulator / acc.volume;
- float weight = mass * params.gravity_constant;
- float weight_arm = (pivot - mass_centorid.head<2>()).norm();
- float weight_torque = weight_arm * weight;
-
- float bed_movement_arm = mass_centorid.z();
- float bed_movement_force = params.max_acceleration * mass;
- float bed_movement_torque = bed_movement_force * bed_movement_arm;
-
- Vec3f extruder_pressure_direction = to_3d(line_dir, 0.0f);
- extruder_pressure_direction.z() = -0.2 - line.malformation * 0.5;
- extruder_pressure_direction.normalize();
- float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), layer_z).cross(
- extruder_pressure_direction)).norm();
- float extruder_conflict_force = params.tolerable_extruder_conflict_force +
- std::min(line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
- float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
-
- float total_torque = bed_movement_torque + extruder_conflict_torque - weight_torque - sticking_torque;
-
- if (total_torque > 0) {
- Vec2f target_point { };
- size_t _idx { };
- island_lines_dist.signed_distance_from_lines(pivot_site_search_point, _idx, target_point);
- if (!supports_presence_grid.position_taken(to_3d(target_point, layer_z))) {
- float area = params.support_points_interface_radius * params.support_points_interface_radius
- * float(PI);
- float sticking_force = area * params.support_adhesion;
- Vec3f support_point = to_3d(target_point, layer_z);
- island.pivot_points.push_back(support_point);
- island.sticking_force += sticking_force;
- island.sticking_centroid_accumulator += sticking_force * support_point;
- issues.support_points.emplace_back(support_point,
- extruder_conflict_torque - sticking_torque, extruder_pressure_direction);
- supports_presence_grid.take_position(to_3d(target_point, layer_z));
- }
- }
- #if 0
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: sticking_arm: " << sticking_arm;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: sticking_torque: " << sticking_torque;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: weight_arm: " << sticking_arm;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: weight_torque: " << weight_torque;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: bed_movement_arm: " << bed_movement_arm;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: bed_movement_torque: " << bed_movement_torque;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: conflict_torque_arm: " << conflict_torque_arm;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: extruder_conflict_torque: " << extruder_conflict_torque;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: total_torque: " << total_torque << "   layer_z: " << layer_z;
- #endif
- }
-
- std::unordered_map<size_t, float> tmp = acc.connected_islands;
- acc.connected_islands.clear();
- // finally, add gathered islands to accumulator, and continue down to next layer
- for (const auto &pair : tmp) {
- const Island &below_i = below.islands[pair.first];
- for (const auto &below_islands : below_i.connected_islands) {
- acc.connected_islands[below_islands.first] += below_islands.second;
- }
- for (const Vec3f &pivot_p : below_i.pivot_points) {
- acc.pivot_points.push_back(pivot_p);
- }
- acc.sticking_centroid_accumulator += below_i.sticking_centroid_accumulator;
- acc.sticking_force += below_i.sticking_force;
- acc.volume += below_i.volume;
- acc.volume_centroid_accumulator += below_i.volume_centroid_accumulator;
- }
- }
-
- // We have arrived to the bed level, now check for stability of the object part on the bed
- std::vector<Vec2f> pivot_points;
- for (const Vec3f &p_point : acc.pivot_points) {
- pivot_points.push_back(p_point.head<2>());
- }
- auto coord_fn = [&pivot_points](size_t idx, size_t dim) {
- return pivot_points[idx][dim];
- };
- KDTreeIndirect<2, float, decltype(coord_fn)> pivot_points_tree(coord_fn, pivot_points.size());
-
- for (const ExtrusionLine &line : island_external_lines) {
- Vec2f line_dir = (line.b - line.a).normalized();
- Vec2f pivot_site_search_point = line.b + line_dir * 300.0f;
- size_t pivot_idx = find_closest_point(pivot_points_tree, pivot_site_search_point);
- const Vec2f &pivot = pivot_points[pivot_idx];
-
- const Vec2f &sticking_centroid = acc.sticking_centroid_accumulator.head<2>() / acc.sticking_force;
- float sticking_arm = (pivot - sticking_centroid).norm();
- float sticking_torque = sticking_arm * acc.sticking_force;
-
- float mass = acc.volume * params.filament_density;
- const Vec3f &mass_centorid = acc.volume_centroid_accumulator / acc.volume;
- float weight = mass * params.gravity_constant;
- float weight_arm = (pivot - mass_centorid.head<2>()).norm();
- float weight_torque = weight_arm * weight;
-
- float bed_movement_arm = mass_centorid.z();
- float bed_movement_force = params.max_acceleration * mass;
- float bed_movement_torque = bed_movement_force * bed_movement_arm;
-
- Vec3f extruder_pressure_direction = to_3d(line_dir, 0.0f);
- extruder_pressure_direction.z() = -0.2 - line.malformation * 0.5;
- extruder_pressure_direction.normalize();
- float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), layer_z).cross(
- extruder_pressure_direction)).norm();
- float extruder_conflict_force = params.tolerable_extruder_conflict_force +
- std::min(line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
- float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
-
- float total_torque = bed_movement_torque + extruder_conflict_torque - weight_torque - sticking_torque;
-
- if (total_torque > 0) {
- Vec2f target_point;
- size_t _idx;
- island_lines_dist.signed_distance_from_lines(pivot_site_search_point, _idx, target_point);
- if (!supports_presence_grid.position_taken(to_3d(target_point, layer_z))) {
- float area = params.support_points_interface_radius * params.support_points_interface_radius
- * float(PI);
- float sticking_force = area * params.support_adhesion;
- Vec3f support_point = to_3d(target_point, layer_z);
- island.pivot_points.push_back(support_point);
- island.sticking_force += sticking_force;
- island.sticking_centroid_accumulator += sticking_force * support_point;
- issues.support_points.emplace_back(support_point,
- extruder_conflict_torque - sticking_torque, extruder_pressure_direction);
- supports_presence_grid.take_position(to_3d(target_point, layer_z));
- }
- }
- #if 0
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: sticking_arm: " << sticking_arm;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: sticking_torque: " << sticking_torque;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: weight_arm: " << sticking_arm;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: weight_torque: " << weight_torque;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: bed_movement_arm: " << bed_movement_arm;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: bed_movement_torque: " << bed_movement_torque;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: conflict_torque_arm: " << conflict_torque_arm;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: extruder_conflict_torque: " << extruder_conflict_torque;
- BOOST_LOG_TRIVIAL(debug)
- << "SSG: total_torque: " << total_torque << "   layer_z: " << layer_z;
- #endif
- }
- }
-
- return issues;
- }
- */
 
 std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(const PrintObject *po,
         const Params &params) {
