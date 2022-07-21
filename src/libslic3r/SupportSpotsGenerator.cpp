@@ -74,7 +74,7 @@ private:
     AABBTreeIndirect::Tree<2, float> tree;
 
 public:
-    explicit LinesDistancer(std::vector<ExtrusionLine> &lines) :
+    explicit LinesDistancer(const std::vector<ExtrusionLine> &lines) :
             lines(lines) {
         tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(this->lines);
     }
@@ -249,17 +249,17 @@ public:
 };
 
 struct IslandConnection {
-    float area;
-    Vec3f centroid_accumulator;
+    float area{};
+    Vec3f centroid_accumulator = Vec3f::Zero();
 };
 
 struct Island {
-    std::unordered_map<size_t, IslandConnection> connected_islands;
-    std::vector<Vec3f> pivot_points; // for support points present on this layer (or bed extrusions)
-    float volume;
-    Vec3f volume_centroid_accumulator;
-    float sticking_force; // for support points present on this layer (or bed extrusions)
-    Vec3f sticking_centroid_accumulator;
+    std::unordered_map<size_t, IslandConnection> connected_islands{};
+    std::vector<Vec3f> pivot_points{}; // for support points present on this layer (or bed extrusions)
+    float volume{};
+    Vec3f volume_centroid_accumulator = Vec3f::Zero();
+    float sticking_force{}; // for support points present on this layer (or bed extrusions)
+    Vec3f sticking_centroid_accumulator = Vec3f::Zero();
 
     std::vector<ExtrusionLine> external_lines;
 };
@@ -316,7 +316,7 @@ struct ExtrusionPropertiesAccumulator {
 
 void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         std::vector<ExtrusionLine> &checked_lines_out,
-        float print_z,
+        float layer_z,
         const LayerRegion *layer_region,
         const LinesDistancer &prev_layer_lines,
         Issues &issues,
@@ -324,12 +324,12 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
 
     if (entity->is_collection()) {
         for (const auto *e : static_cast<const ExtrusionEntityCollection*>(entity)->entities) {
-            check_extrusion_entity_stability(e, checked_lines_out, print_z, layer_region, prev_layer_lines,
+            check_extrusion_entity_stability(e, checked_lines_out, layer_z, layer_region, prev_layer_lines,
                     issues, params);
         }
     } else { //single extrusion path, with possible varying parameters
-        const auto to_vec3f = [print_z](const Vec2f &point) {
-            return Vec3f(point.x(), point.y(), print_z);
+        const auto to_vec3f = [layer_z](const Vec2f &point) {
+            return Vec3f(point.x(), point.y(), layer_z);
         };
         Points points { };
         entity->collect_points(points);
@@ -509,16 +509,16 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                 const ExtrusionLine &line = layer_lines[lidx];
                 float volume = line.origin_entity->min_mm3_per_mm() * line.len;
                 island.volume += volume;
-                island.volume_centroid_accumulator += to_3d(Vec2f((line.a + line.b) / 2.0f), float(layer->print_z))
+                island.volume_centroid_accumulator += to_3d(Vec2f((line.a + line.b) / 2.0f), float(layer->slice_z))
                         * volume;
 
                 if (first_layer) {
                     float sticking_force = line.len * flow_width * params.base_adhesion;
                     island.sticking_force += sticking_force;
                     island.sticking_centroid_accumulator += sticking_force
-                            * to_3d(Vec2f((line.a + line.b) / 2.0f), float(layer->print_z));
+                            * to_3d(Vec2f((line.a + line.b) / 2.0f), float(layer->slice_z));
                     if (line.is_external_perimeter()) {
-                        island.pivot_points.push_back(to_3d(Vec2f(line.b), float(layer->print_z)));
+                        island.pivot_points.push_back(to_3d(Vec2f(line.b), float(layer->slice_z)));
                     }
                 } else if (layer_lines[lidx].support_point_generated) {
                     float support_interface_area = params.support_points_interface_radius
@@ -527,8 +527,8 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                     float sticking_force = support_interface_area * params.support_adhesion;
                     island.sticking_force += sticking_force;
                     island.sticking_centroid_accumulator += sticking_force
-                            * to_3d(Vec2f(line.b), float(layer->print_z));
-                    island.pivot_points.push_back(to_3d(Vec2f(line.b), float(layer->print_z)));
+                            * to_3d(Vec2f(line.b), float(layer->slice_z));
+                    island.pivot_points.push_back(to_3d(Vec2f(line.b), float(layer->slice_z)));
                 }
             }
         }
@@ -555,10 +555,11 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
             Vec2i coords = Vec2i(x, y);
             if (current_layer_grid.get_pixel(coords) != NULL_ISLAND
                     && prev_layer_grid.get_pixel(coords) != NULL_ISLAND) {
-                IslandConnection& connection = result.islands[current_layer_grid.get_pixel(coords)]
-                                                              .connected_islands[prev_layer_grid.get_pixel(coords)];
+                IslandConnection &connection = result.islands[current_layer_grid.get_pixel(coords)]
+                        .connected_islands[prev_layer_grid.get_pixel(coords)];
                 connection.area += current_layer_grid.pixel_area();
-                connection.centroid_accumulator += to_3d(current_layer_grid.get_pixel_center(coords), result.layer_z) * current_layer_grid.pixel_area();
+                connection.centroid_accumulator += to_3d(current_layer_grid.get_pixel_center(coords), result.layer_z)
+                        * current_layer_grid.pixel_area();
             }
         }
     }
@@ -580,7 +581,6 @@ struct CoordinateFunctor {
     }
 };
 
-//TODO make pivot tree part of this structure, with cached invalidation, then recompute manually when needed
 class ObjectPart {
     float volume { };
     Vec3f volume_centroid_accumulator = Vec3f::Zero();
@@ -592,6 +592,15 @@ class ObjectPart {
     bool is_pivot_tree_valid = false;
     KDTreeIndirect<3, float, CoordinateFunctor> pivot_tree { CoordinateFunctor { } };
 
+    void check_pivot_tree() {
+        if (!is_pivot_tree_valid) {
+            this->pivots_coordinate_functor = CoordinateFunctor(&this->pivot_points);
+            this->pivot_tree = { this->pivots_coordinate_functor };
+            pivot_tree.build(pivot_points.size());
+            is_pivot_tree_valid = true;
+        }
+    }
+
 public:
     void add(const ObjectPart &other) {
         this->volume_centroid_accumulator += other.volume_centroid_accumulator;
@@ -599,6 +608,7 @@ public:
         this->sticking_force += other.sticking_force;
         this->sticking_centroid_accumulator += other.sticking_centroid_accumulator;
         this->pivot_points.insert(this->pivot_points.end(), other.pivot_points.begin(), other.pivot_points.end());
+        this->is_pivot_tree_valid = this->is_pivot_tree_valid && other.pivot_points.empty();
     }
 
     ObjectPart(const Island &island) {
@@ -607,25 +617,121 @@ public:
         this->sticking_force = island.sticking_force;
         this->sticking_centroid_accumulator = island.sticking_centroid_accumulator;
         this->pivot_points = island.pivot_points;
-        this->pivots_coordinate_functor = CoordinateFunctor(&this->pivot_points);
     }
 
-    ObjectPart() {
-        this->pivots_coordinate_functor = CoordinateFunctor(&this->pivot_points);
-    };
+    ObjectPart() = default;
+
+    std::tuple<float, Vec3f> is_stable_while_extruding(const ExtrusionLine &extruded_line, float layer_z,
+            const Params &params) {
+        check_pivot_tree();
+
+        Vec2f line_dir = (extruded_line.b - extruded_line.a).normalized();
+        Vec3f pivot_site_search_point = to_3d(Vec2f(extruded_line.b + line_dir * 300.0f), layer_z);
+        size_t pivot_idx = find_closest_point(this->pivot_tree, pivot_site_search_point);
+        const Vec3f &pivot = pivot_points[pivot_idx];
+
+        const Vec3f &sticking_centroid = this->sticking_centroid_accumulator / this->sticking_force;
+        float sticking_arm = (pivot - sticking_centroid).norm();
+        float sticking_torque = sticking_arm * this->sticking_force;
+
+        float mass = this->volume * params.filament_density;
+        const Vec3f &mass_centorid = this->volume_centroid_accumulator / this->volume;
+        float weight = mass * params.gravity_constant;
+        float weight_arm = (pivot.head<2>() - mass_centorid.head<2>()).norm();
+        float weight_torque = weight_arm * weight;
+
+        float bed_movement_arm = mass_centorid.z();
+        float bed_movement_force = params.max_acceleration * mass;
+        float bed_movement_torque = bed_movement_force * bed_movement_arm;
+
+        Vec3f extruder_pressure_direction = to_3d(line_dir, 0.0f);
+        extruder_pressure_direction.z() = -0.1f - extruded_line.malformation * 0.5f;
+        extruder_pressure_direction.normalize();
+        Vec3d endpoint = (to_3d(extruded_line.b, layer_z)).cast<double>();
+        float conflict_torque_arm = line_alg::distance_to(Linef3(endpoint, endpoint + extruder_pressure_direction.cast<double>()), pivot.cast<double>());
+//        float conflict_torque_arm = (to_3d(Vec2f(pivot.head<2>() - extruded_line.b), layer_z).cross(
+//                extruder_pressure_direction)).norm();
+        float extruder_conflict_force = params.tolerable_extruder_conflict_force +
+                std::min(extruded_line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
+        float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
+
+        float total_torque = bed_movement_torque + extruder_conflict_torque - weight_torque - sticking_torque;
+
+#if 1
+        BOOST_LOG_TRIVIAL(debug)
+        << "pivot: " << pivot.x() << "  " << pivot.y() << "  " << pivot.z();
+        BOOST_LOG_TRIVIAL(debug)
+        << "sticking_centroid: " << sticking_centroid.x() << "  " << sticking_centroid.y() << "  " << sticking_centroid.z();
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: sticking_force: " << sticking_force;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: sticking_arm: " << sticking_arm;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: sticking_torque: " << sticking_torque;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: weight_arm: " << sticking_arm;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: weight_torque: " << weight_torque;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: bed_movement_arm: " << bed_movement_arm;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: bed_movement_torque: " << bed_movement_torque;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: conflict_torque_arm: " << conflict_torque_arm;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: extruder_conflict_torque: " << extruder_conflict_torque;
+        BOOST_LOG_TRIVIAL(debug)
+        << "SSG: total_torque: " << total_torque << "   layer_z: " << layer_z;
+#endif
+
+        return {total_torque / conflict_torque_arm, pivot_site_search_point};
+    }
+
+    void add_pivot_point(const Vec3f pivot_point, float sticking_force) {
+        this->pivot_points.push_back(pivot_point);
+        this->sticking_force += sticking_force;
+        this->sticking_centroid_accumulator += sticking_force * pivot_point;
+        this->is_pivot_tree_valid = false;
+    }
+
+    void print() const {
+        std::cout << "sticking_force: " << sticking_force << std::endl;
+        std::cout << "volume: " << volume << std::endl;
+    }
+
 };
 
 struct WeakestConnection {
     float area = 0.0f;
     Vec3f centroid_accumulator = Vec3f::Zero();
 
-    void add(const WeakestConnection& other) {
+    void add(const WeakestConnection &other) {
         this->area += other.area;
         this->centroid_accumulator += other.centroid_accumulator;
     }
 };
 
-Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, const Params &params) {
+void debug_print_graph(const std::vector<LayerIslands>& islands_graph) {
+    std::cout << "BUILT ISLANDS GRAPH:" << std::endl;
+    for (size_t layer_idx = 0; layer_idx < islands_graph.size(); ++layer_idx) {
+        std::cout << "ISLANDS AT LAYER: " << layer_idx << "  AT HEIGHT: " << islands_graph[layer_idx].layer_z << std::endl;
+        for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
+            const Island &island = islands_graph[layer_idx].islands[island_idx];
+            std::cout << "        ISLAND " << island_idx << std::endl;
+            std::cout << "              volume: " << island.volume << std::endl;
+            std::cout << "              sticking_force: " << island.sticking_force << std::endl;
+            std::cout << "              pivot_points count: " << island.pivot_points.size() << std::endl;
+            std::cout << "              connected_islands count: " << island.connected_islands.size() << std::endl;
+        }
+    }
+    std::cout << "END OF GRAPH" << std::endl;
+
+
+}
+
+Issues check_global_stability(SupportGridFilter supports_presence_grid,
+        const std::vector<LayerIslands> &islands_graph, const Params &params) {
+    debug_print_graph(islands_graph);
     Issues issues { };
     size_t next_part_idx = 0;
     std::unordered_map<size_t, ObjectPart> active_object_parts;
@@ -641,7 +747,8 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
         std::cout << "at layer: " << layer_idx << "  the following island to object mapping is used:" << std::endl;
         for (const auto &m : prev_island_to_object_part_mapping) {
             std::cout << "island " << m.first << " maps to part " << m.second << std::endl;
-            Vec3f connection_center = prev_island_to_weakest_connection[m.first].centroid_accumulator /  prev_island_to_weakest_connection[m.first].area;
+            Vec3f connection_center = prev_island_to_weakest_connection[m.first].centroid_accumulator
+                    / prev_island_to_weakest_connection[m.first].area;
             std::cout << " island has weak point with connection area: " <<
                     prev_island_to_weakest_connection[m.first].area << " and center: " <<
                     connection_center.x() << " " << connection_center.y() << " " << connection_center.z() << std::endl;
@@ -655,12 +762,12 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
                 active_object_parts.emplace(part_idx, ObjectPart(island));
                 next_island_to_object_part_mapping.emplace(island_idx, part_idx);
                 next_island_to_weakest_connection.emplace(island_idx,
-                        WeakestConnection{INFINITY, Vec3f::Zero()});
+                        WeakestConnection { INFINITY, Vec3f::Zero() });
                 layer_active_parts.insert(part_idx);
             } else {
-                size_t final_part_idx{};
-                WeakestConnection transfered_weakest_connection{};
-                WeakestConnection new_weakest_connection{};
+                size_t final_part_idx { };
+                WeakestConnection transfered_weakest_connection { };
+                WeakestConnection new_weakest_connection { };
                 // MERGE parts
                 {
                     std::unordered_set<size_t> part_indices;
@@ -680,7 +787,7 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
                         }
                     }
                 }
-                auto estimate_strength = [layer_z](const WeakestConnection& conn){
+                auto estimate_strength = [layer_z](const WeakestConnection &conn) {
                     float radius = fsqrt(conn.area / PI);
                     float arm_len_estimate = std::max(0.001f, layer_z - (conn.centroid_accumulator.z() / conn.area));
                     return radius * conn.area / arm_len_estimate;
@@ -703,6 +810,7 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
                 parts_to_delete.insert(part.first);
             } else {
                 std::cout << "at layer " << layer_idx << " part is still active: " << part.first << std::endl;
+                part.second.print();
             }
         }
         for (size_t part_id : parts_to_delete) {
@@ -718,11 +826,50 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
         // Now compute the stability of each active object part, adding supports where necessary, and also
         // check each island whether the weakest point is strong enough. If not, add supports as well.
 
+        for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
+            const Island &island = islands_graph[layer_idx].islands[island_idx];
+            ObjectPart &part = active_object_parts.at(prev_island_to_object_part_mapping[island_idx]);
+
+            std::vector<ExtrusionLine> dummy { };
+            LinesDistancer island_lines_dist(dummy);
+            float unchecked_dist = params.min_distance_between_support_points + 1.0f;
+
+            for (const ExtrusionLine &line : island.external_lines) {
+                if (unchecked_dist + line.len < params.min_distance_between_support_points
+                        && line.malformation < 0.3f) {
+                    unchecked_dist += line.len;
+                } else {
+                    unchecked_dist = line.len;
+                    auto [force, pivot_site_search_point] = part.is_stable_while_extruding(line, layer_z, params);
+                    if (force > 0) {
+                        if (island_lines_dist.get_lines().empty()) {
+                            island_lines_dist = LinesDistancer(island.external_lines);
+                        }
+                        Vec2f target_point;
+                        size_t _idx;
+                        island_lines_dist.signed_distance_from_lines(pivot_site_search_point.head<2>(), _idx,
+                                target_point);
+                        Vec3f support_point = to_3d(target_point, layer_z);
+                        if (!supports_presence_grid.position_taken(support_point)) {
+                            float area = params.support_points_interface_radius * params.support_points_interface_radius
+                                    * float(PI);
+                            float sticking_force = area * params.support_adhesion;
+                            part.add_pivot_point(support_point, sticking_force);
+                            issues.support_points.emplace_back(support_point, force,
+                                    to_3d(Vec2f(line.b - line.a).normalized(), 0.0f));
+                            supports_presence_grid.take_position(support_point);
+                        }
+                    }
+                }
+            }
+        }
+        //end of iteration over layer
     }
     return issues;
 }
 
 /*
+ void a() {
 
  // islands_graph.back() refers to the top most (current) layer
  for (size_t island_idx = 0; island_idx < islands_graph.back().islands.size(); ++island_idx) {
@@ -788,7 +935,7 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
  Vec3f extruder_pressure_direction = to_3d(line_dir, 0.0f);
  extruder_pressure_direction.z() = -0.2 - line.malformation * 0.5;
  extruder_pressure_direction.normalize();
- float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), print_z).cross(
+ float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), layer_z).cross(
  extruder_pressure_direction)).norm();
  float extruder_conflict_force = params.tolerable_extruder_conflict_force +
  std::min(line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
@@ -800,17 +947,17 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
  Vec2f target_point { };
  size_t _idx { };
  island_lines_dist.signed_distance_from_lines(pivot_site_search_point, _idx, target_point);
- if (!supports_presence_grid.position_taken(to_3d(target_point, print_z))) {
+ if (!supports_presence_grid.position_taken(to_3d(target_point, layer_z))) {
  float area = params.support_points_interface_radius * params.support_points_interface_radius
  * float(PI);
  float sticking_force = area * params.support_adhesion;
- Vec3f support_point = to_3d(target_point, print_z);
+ Vec3f support_point = to_3d(target_point, layer_z);
  island.pivot_points.push_back(support_point);
  island.sticking_force += sticking_force;
  island.sticking_centroid_accumulator += sticking_force * support_point;
  issues.support_points.emplace_back(support_point,
  extruder_conflict_torque - sticking_torque, extruder_pressure_direction);
- supports_presence_grid.take_position(to_3d(target_point, print_z));
+ supports_presence_grid.take_position(to_3d(target_point, layer_z));
  }
  }
  #if 0
@@ -831,7 +978,7 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
  BOOST_LOG_TRIVIAL(debug)
  << "SSG: extruder_conflict_torque: " << extruder_conflict_torque;
  BOOST_LOG_TRIVIAL(debug)
- << "SSG: total_torque: " << total_torque << "   printz: " << print_z;
+ << "SSG: total_torque: " << total_torque << "   layer_z: " << layer_z;
  #endif
  }
 
@@ -886,7 +1033,7 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
  Vec3f extruder_pressure_direction = to_3d(line_dir, 0.0f);
  extruder_pressure_direction.z() = -0.2 - line.malformation * 0.5;
  extruder_pressure_direction.normalize();
- float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), print_z).cross(
+ float conflict_torque_arm = (to_3d(Vec2f(pivot - line.b), layer_z).cross(
  extruder_pressure_direction)).norm();
  float extruder_conflict_force = params.tolerable_extruder_conflict_force +
  std::min(line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
@@ -898,17 +1045,17 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
  Vec2f target_point;
  size_t _idx;
  island_lines_dist.signed_distance_from_lines(pivot_site_search_point, _idx, target_point);
- if (!supports_presence_grid.position_taken(to_3d(target_point, print_z))) {
+ if (!supports_presence_grid.position_taken(to_3d(target_point, layer_z))) {
  float area = params.support_points_interface_radius * params.support_points_interface_radius
  * float(PI);
  float sticking_force = area * params.support_adhesion;
- Vec3f support_point = to_3d(target_point, print_z);
+ Vec3f support_point = to_3d(target_point, layer_z);
  island.pivot_points.push_back(support_point);
  island.sticking_force += sticking_force;
  island.sticking_centroid_accumulator += sticking_force * support_point;
  issues.support_points.emplace_back(support_point,
  extruder_conflict_torque - sticking_torque, extruder_pressure_direction);
- supports_presence_grid.take_position(to_3d(target_point, print_z));
+ supports_presence_grid.take_position(to_3d(target_point, layer_z));
  }
  }
  #if 0
@@ -929,12 +1076,13 @@ Issues check_global_stability(const std::vector<LayerIslands> &islands_graph, co
  BOOST_LOG_TRIVIAL(debug)
  << "SSG: extruder_conflict_torque: " << extruder_conflict_torque;
  BOOST_LOG_TRIVIAL(debug)
- << "SSG: total_torque: " << total_torque << "   printz: " << print_z;
+ << "SSG: total_torque: " << total_torque << "   layer_z: " << layer_z;
  #endif
  }
  }
 
  return issues;
+ }
  */
 
 std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(const PrintObject *po,
@@ -950,7 +1098,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
     float flow_width = get_flow_width(po->layers()[po->layer_count() - 1]->regions()[0], erExternalPerimeter);
     PixelGrid prev_layer_grid(po, flow_width);
 
-    // PREPARE BASE LAYER
+// PREPARE BASE LAYER
     const Layer *layer = po->layers()[0];
     for (const LayerRegion *layer_region : layer->regions()) {
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
@@ -998,7 +1146,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
                 size_t pseudornd = ((island_idx + 127) * 33331 + 6907) % 23;
                 Vec3f color = value_to_rgbf(0.0f, float(23), float(pseudornd));
                 fprintf(segmentation_f, "v %f %f %f  %f %f %f\n", pos[0],
-                        pos[1], layer->print_z, color[0], color[1], color[2]);
+                        pos[1], layer->slice_z, color[0], color[1], color[2]);
             }
         }
     }
@@ -1006,7 +1154,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
         if (line.malformation > 0.0f) {
             Vec3f color = value_to_rgbf(0, 1.0f, line.malformation);
             fprintf(malform_f, "v %f %f %f  %f %f %f\n", line.b[0],
-                    line.b[1], layer->print_z, color[0], color[1], color[2]);
+                    line.b[1], layer->slice_z, color[0], color[1], color[2]);
         }
     }
 #endif
@@ -1019,7 +1167,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
         for (const LayerRegion *layer_region : layer->regions()) {
             for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-                    check_extrusion_entity_stability(perimeter, layer_lines, layer->print_z, layer_region,
+                    check_extrusion_entity_stability(perimeter, layer_lines, layer->slice_z, layer_region,
                             external_lines, issues, params);
                 } // perimeter
             } // ex_entity
@@ -1027,7 +1175,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
                 for (const ExtrusionEntity *fill : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     if (fill->role() == ExtrusionRole::erGapFill
                             || fill->role() == ExtrusionRole::erBridgeInfill) {
-                        check_extrusion_entity_stability(fill, layer_lines, layer->print_z, layer_region,
+                        check_extrusion_entity_stability(fill, layer_lines, layer->slice_z, layer_region,
                                 external_lines, issues, params);
                     } else {
                         Points points { };
@@ -1043,7 +1191,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
             } // ex_entity
         } // region
 
-        auto [layer_islands, layer_grid] = reckon_islands(layer, true, 0, prev_layer_grid,
+        auto [layer_islands, layer_grid] = reckon_islands(layer, false, 0, prev_layer_grid,
                 layer_lines, params);
         islands_graph.push_back(std::move(layer_islands));
 
@@ -1057,7 +1205,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
                     size_t pseudornd = ((island_idx + 127) * 33331 + 6907) % 23;
                     Vec3f color = value_to_rgbf(0.0f, float(23), float(pseudornd));
                     fprintf(segmentation_f, "v %f %f %f  %f %f %f\n", pos[0],
-                            pos[1], layer->print_z, color[0], color[1], color[2]);
+                            pos[1], layer->slice_z, color[0], color[1], color[2]);
                 }
             }
         }
@@ -1065,7 +1213,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
             if (line.malformation > 0.0f) {
                 Vec3f color = value_to_rgbf(0, 1.0f, line.malformation);
                 fprintf(malform_f, "v %f %f %f  %f %f %f\n", line.b[0],
-                        line.b[1], layer->print_z, color[0], color[1], color[2]);
+                        line.b[1], layer->slice_z, color[0], color[1], color[2]);
             }
         }
 #endif
@@ -1110,7 +1258,7 @@ std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
 
 Issues full_search(const PrintObject *po, const Params &params) {
     auto [local_issues, graph] = check_extrusions_and_build_graph(po, params);
-    Issues global_issues = check_global_stability(graph, params);
+    Issues global_issues = check_global_stability( { po, params.min_distance_between_support_points }, graph, params);
 #ifdef DEBUG_FILES
     debug_export(local_issues, "local_issues");
     debug_export(global_issues, "global_issues");
