@@ -697,7 +697,6 @@ void PreferencesDialog::revert(wxEvent&)
 
 
 	for (auto value : m_values) {
-		bool reverted = false;
 		const std::string& key = value.first;
 
 		if (key == "default_action_on_dirty_project") {
@@ -714,14 +713,17 @@ void PreferencesDialog::revert(wxEvent&)
 		}
 		if (key == "old_settings_layout_mode") {
 			m_rb_old_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			m_settings_layout_changed = false;
 			continue;
 		}
 		if (key == "new_settings_layout_mode") {
 			m_rb_new_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			m_settings_layout_changed = false;
 			continue;
 		}
 		if (key == "dlg_settings_layout_mode") {
 			m_rb_dlg_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			m_settings_layout_changed = false;
 			continue;
 		}
 

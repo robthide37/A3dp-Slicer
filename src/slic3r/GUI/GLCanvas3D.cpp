@@ -11,6 +11,7 @@
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/Technologies.hpp"
 #include "libslic3r/Tesselate.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -1126,13 +1127,13 @@ void GLCanvas3D::load_arrange_settings()
         wxGetApp().app_config->get("arrange", "enable_rotation_sla");
 
     if (!dist_fff_str.empty())
-        m_arrange_settings_fff.distance = std::stof(dist_fff_str);
+        m_arrange_settings_fff.distance = string_to_float_decimal_point(dist_fff_str);
 
     if (!dist_fff_seq_print_str.empty())
-        m_arrange_settings_fff_seq_print.distance = std::stof(dist_fff_seq_print_str);
+        m_arrange_settings_fff_seq_print.distance = string_to_float_decimal_point(dist_fff_seq_print_str);
 
     if (!dist_sla_str.empty())
-        m_arrange_settings_sla.distance = std::stof(dist_sla_str);
+        m_arrange_settings_sla.distance = string_to_float_decimal_point(dist_sla_str);
 
     if (!en_rot_fff_str.empty())
         m_arrange_settings_fff.enable_rotation = (en_rot_fff_str == "1" || en_rot_fff_str == "yes");
@@ -1814,6 +1815,10 @@ void GLCanvas3D::select_all()
 {
     m_selection.add_all();
     m_dirty = true;
+    wxGetApp().obj_manipul()->set_dirty();
+    m_gizmos.reset_all_states();
+    m_gizmos.update_data();
+    post_event(SimpleEvent(EVT_GLCANVAS_OBJECT_SELECT));
 }
 
 void GLCanvas3D::deselect_all()
@@ -2935,6 +2940,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                         m_dirty = true;
 #endif // !ENABLE_NEW_RECTANGLE_SELECTION
                     }
+                    m_shift_kar_filter.reset_count();
 #if ENABLE_NEW_RECTANGLE_SELECTION
                     m_dirty = true;
 #endif // ENABLE_NEW_RECTANGLE_SELECTION
@@ -2958,6 +2964,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                         m_mouse.set_start_position_3D_as_invalid();
                     }
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS
+                    m_ctrl_kar_filter.reset_count();
                     m_dirty = true;
                 }
                 else if (m_gizmos.is_enabled() && !m_selection.is_empty()) {
@@ -2995,7 +3002,10 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
 //                        set_cursor(Cross);
                     }
 #if ENABLE_NEW_RECTANGLE_SELECTION
-                    m_dirty = true;
+                    if (m_shift_kar_filter.is_first())
+                        m_dirty = true;
+
+                    m_shift_kar_filter.increase_count();
 #endif // ENABLE_NEW_RECTANGLE_SELECTION
                 }
                 else if (keyCode == WXK_ALT) {
@@ -3004,8 +3014,12 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
 //                        set_cursor(Cross);
                     }
                 }
-                else if (keyCode == WXK_CONTROL)
-                    m_dirty = true;
+                else if (keyCode == WXK_CONTROL) {
+                    if (m_ctrl_kar_filter.is_first())
+                        m_dirty = true;
+
+                    m_ctrl_kar_filter.increase_count();
+                }
                 else if (m_gizmos.is_enabled() && !m_selection.is_empty()) {
                     auto do_rotate = [this](double angle_z_rad) {
                         m_selection.setup_cache();
@@ -5394,7 +5408,7 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
 
 void GLCanvas3D::_picking_pass()
 {
-    if (m_picking_enabled && !m_mouse.dragging && m_mouse.position != Vec2d(DBL_MAX, DBL_MAX)) {
+    if (m_picking_enabled && !m_mouse.dragging && m_mouse.position != Vec2d(DBL_MAX, DBL_MAX) && !m_gizmos.is_dragging()) {
         m_hover_volume_idxs.clear();
 
         // Render the object for picking.

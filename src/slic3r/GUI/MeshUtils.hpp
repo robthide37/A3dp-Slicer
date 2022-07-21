@@ -4,7 +4,7 @@
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/TriangleMesh.hpp"
-#include "libslic3r/SLA/IndexedMesh.hpp"
+#include "libslic3r/AABBMesh.hpp"
 #include "admesh/stl.h"
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -167,7 +167,7 @@ public:
     Vec3f get_triangle_normal(size_t facet_idx) const;
 
 private:
-    sla::IndexedMesh m_emesh;
+    AABBMesh m_emesh;
     std::vector<stl_normal> m_normals;
 };
 

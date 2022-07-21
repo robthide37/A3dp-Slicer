@@ -27,6 +27,7 @@ class Grid;
 
 namespace SeamPlacerImpl {
 
+
 struct GlobalModelInfo;
 struct SeamComparator;
 
@@ -73,10 +74,6 @@ struct SeamCandidate {
     bool central_enforcer; //marks this candidate as central point of enforced segment on the perimeter - important for alignment
 };
 
-struct FaceVisibilityInfo {
-    float visibility;
-};
-
 struct SeamCandidateCoordinateFunctor {
     SeamCandidateCoordinateFunctor(const std::vector<SeamCandidate> &seam_candidates) :
             seam_candidates(seam_candidates) {
@@ -94,9 +91,9 @@ struct PrintObjectSeamData
 
     struct LayerSeams
     {
-        Slic3r::deque<SeamPlacerImpl::Perimeter>    perimeters;
-        std::vector<SeamPlacerImpl::SeamCandidate>  points;
-        std::unique_ptr<SeamCandidatesTree>         points_tree;
+        Slic3r::deque<SeamPlacerImpl::Perimeter> perimeters;
+        std::vector<SeamPlacerImpl::SeamCandidate> points;
+        std::unique_ptr<SeamCandidatesTree> points_tree;
     };
     // Map of PrintObjects (PO) -> vector of layers of PO -> vector of perimeter
     std::vector<LayerSeams> layers;
@@ -111,39 +108,40 @@ struct PrintObjectSeamData
 
 class SeamPlacer {
 public:
-    static constexpr size_t raycasting_decimation_target_triangle_count = 10000;
-    static constexpr float raycasting_subdivision_target_length = 2.0f;
-    //square of number of rays per triangle
-    static constexpr size_t sqr_rays_per_triangle = 7;
+    // Number of samples generated on the mesh. There are sqr_rays_per_sample_point*sqr_rays_per_sample_point rays casted from each samples
+    static constexpr size_t raycasting_visibility_samples_count = 30000;
+    //square of number of rays per sample point
+    static constexpr size_t sqr_rays_per_sample_point = 5;
 
     // arm length used during angles computation
-    static constexpr float polygon_local_angles_arm_distance = 0.5f;
+    static constexpr float polygon_local_angles_arm_distance = 0.3f;
+    // value for angles with penalty lower than this threshold - such angles will be snapped to their original position instead of spline interpolated position
+    static constexpr float sharp_angle_penalty_snapping_threshold = 0.6f;
 
-    // increases angle importance at the cost of deacreasing visibility info importance. must be > 0
-    static constexpr float additional_angle_importance = 0.6f;
+    // max tolerable distance from the previous layer is overhang_distance_tolerance_factor * flow_width
+    static constexpr float overhang_distance_tolerance_factor = 0.5f;
 
-    // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
-    static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
+    // determines angle importance compared to visibility ( neutral value is 1.0f. )
+    static constexpr float angle_importance_aligned = 0.6f;
+    static constexpr float angle_importance_nearest = 1.0f; // use much higher angle importance for nearest mode, to combat the visibility info noise
+
     // For long polygon sides, if they are close to the custom seam drawings, they are oversampled with this step size
     static constexpr float enforcer_oversampling_distance = 0.2f;
 
     // When searching for seam clusters for alignment:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
-    static constexpr float seam_align_score_tolerance = 0.5f;
-    // seam_align_tolerable_dist - if next layer closes point is too far away, break string
+    static constexpr float seam_align_score_tolerance = 0.3f;
+    // seam_align_tolerable_dist - if next layer closest point is too far away, break aligned string
     static constexpr float seam_align_tolerable_dist = 1.0f;
-    // if the seam of the current layer is too far away, and the closest seam candidate is not very good, layer is skipped.
-    // this param limits the number of allowed skips
-    static constexpr size_t seam_align_tolerable_skips = 4;
     // minimum number of seams needed in cluster to make alignment happen
     static constexpr size_t seam_align_minimum_string_seams = 6;
-    // points covered by spline; determines number of splines for the given string
-    static constexpr size_t seam_align_seams_per_segment = 8;
+    // millimeters covered by spline; determines number of splines for the given string
+    static constexpr size_t seam_align_mm_per_segment = 4.0f;
 
     //The following data structures hold all perimeter points for all PrintObject.
     std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
 
-    void init(const Print &print);
+    void init(const Print &print, std::function<void(void)> throw_if_canceled_func);
 
     void place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first, const Point &last_pos) const;
 
@@ -154,12 +152,15 @@ private:
             const SeamPlacerImpl::GlobalModelInfo &global_model_info);
     void calculate_overhangs_and_layer_embedding(const PrintObject *po);
     void align_seam_points(const PrintObject *po, const SeamPlacerImpl::SeamComparator &comparator);
-    bool find_next_seam_in_layer(
-            const std::vector<PrintObjectSeamData::LayerSeams> &layers,
-            std::pair<size_t, size_t> &last_point_indexes,
-            const size_t layer_idx, const float slice_z,
+    std::vector<std::pair<size_t, size_t>> find_seam_string(const PrintObject *po,
+            std::pair<size_t, size_t> start_seam,
             const SeamPlacerImpl::SeamComparator &comparator,
-            std::vector<std::pair<size_t, size_t>> &seam_string) const;
+            float& string_weight) const;
+    std::optional<std::pair<size_t, size_t>> find_next_seam_in_layer(
+            const std::vector<PrintObjectSeamData::LayerSeams> &layers,
+            const Vec3f& projected_position,
+            const size_t layer_idx, const float max_distance,
+            const SeamPlacerImpl::SeamComparator &comparator) const;
 };
 
 } // namespace Slic3r

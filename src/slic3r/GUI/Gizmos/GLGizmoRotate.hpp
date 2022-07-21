@@ -122,7 +122,11 @@ private:
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // returns the intersection of the mouse ray with the plane perpendicular to the gizmo axis, in local coordinate
+#if ENABLE_WORLD_COORDINATE
+    Vec3d mouse_position_in_local_plane(const Linef3& mouse_ray) const;
+#else
     Vec3d mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const;
+#endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_WORLD_COORDINATE
     void init_data_from_selection(const Selection& selection);
