@@ -24,7 +24,18 @@ ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_poly
         assert(line.a_width >= SCALED_EPSILON && line.b_width >= SCALED_EPSILON);
 
         const coordf_t line_len = line.length();
-        if (line_len < SCALED_EPSILON) continue;
+        if (line_len < SCALED_EPSILON) {
+            // The line is so tiny that we don't care about its width when we connect it to another line.
+            if (!path.empty())
+                path.polyline.points.back() = line.b; // If the variable path is non-empty, connect this tiny line to it.
+            else if (i + 1 < (int)lines.size()) // If there is at least one following line, connect this tiny line to it.
+                lines[i + 1].a = line.a;
+            else if (!paths.empty())
+                paths.back().polyline.points.back() = line.b; // Connect this tiny line to the last finished path.
+
+            // If any of the above isn't satisfied, then remove this tiny line.
+            continue;
+        }
 
         double thickness_delta = fabs(line.a_width - line.b_width);
         if (thickness_delta > tolerance) {
@@ -100,14 +111,19 @@ static void variable_width(const ThickPolylines& polylines, ExtrusionRole role, 
 	// This value determines granularity of adaptive width, as G-code does not allow
 	// variable extrusion within a single move; this value shall only affect the amount
 	// of segments, and any pruning shall be performed before we apply this tolerance.
-	const float tolerance = float(scale_(0.05));
+	const auto tolerance = float(scale_(0.05));
 	for (const ThickPolyline &p : polylines) {
 		ExtrusionPaths paths = thick_polyline_to_extrusion_paths(p, role, flow, tolerance, tolerance);
 		// Append paths to collection.
-		if (! paths.empty()) {
-			if (paths.front().first_point() == paths.back().last_point())
-				out.emplace_back(new ExtrusionLoop(std::move(paths)));
-			else {
+        if (!paths.empty()) {
+            for (auto it = std::next(paths.begin()); it != paths.end(); ++it) {
+                assert(it->polyline.points.size() >= 2);
+                assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+            }
+
+            if (paths.front().first_point() == paths.back().last_point()) {
+                out.emplace_back(new ExtrusionLoop(std::move(paths)));
+            } else {
 				for (ExtrusionPath &path : paths)
 					out.emplace_back(new ExtrusionPath(std::move(path)));
 			}
