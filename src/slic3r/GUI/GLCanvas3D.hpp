@@ -135,6 +135,15 @@ private:
     wxTimer* m_timer;
 };
 
+class KeyAutoRepeatFilter
+{
+    size_t m_count{ 0 };
+
+public:
+    void increase_count() { ++m_count; }
+    void reset_count() { m_count = 0; }
+    bool is_first() const { return m_count == 0; }
+};
 
 wxDECLARE_EVENT(EVT_GLCANVAS_OBJECT_SELECT, SimpleEvent);
 
@@ -472,7 +481,8 @@ public:
 
     struct ArrangeSettings
     {
-        float distance           = 6.;
+        float distance           = 6.f;
+        float distance_from_bed  = 0.f;
 //        float distance_seq_print = 6.;    // Used when sequential print is ON
 //        float distance_sla       = 6.;
         float accuracy           = 0.65f; // Unused currently
@@ -538,6 +548,13 @@ private:
     bool m_render_sla_auxiliaries;
 
     bool m_reload_delayed;
+
+#if ENABLE_RENDER_PICKING_PASS
+    bool m_show_picking_texture;
+#endif // ENABLE_RENDER_PICKING_PASS
+
+    KeyAutoRepeatFilter m_shift_kar_filter;
+    KeyAutoRepeatFilter m_ctrl_kar_filter;
 
     RenderStats m_render_stats;
 
@@ -659,8 +676,9 @@ public:
     void post_event(wxEvent &&event);
 
 #if ENABLE_RAYCAST_PICKING
-    std::shared_ptr<SceneRaycasterItem> add_raycaster_for_picking(SceneRaycaster::EType type, int id, const MeshRaycaster& raycaster, const Transform3d& trafo) {
-        return m_scene_raycaster.add_raycaster(type, id, raycaster, trafo);
+    std::shared_ptr<SceneRaycasterItem> add_raycaster_for_picking(SceneRaycaster::EType type, int id, const MeshRaycaster& raycaster,
+        const Transform3d& trafo, bool use_back_faces = false) {
+        return m_scene_raycaster.add_raycaster(type, id, raycaster, trafo, use_back_faces);
     }
     void remove_raycasters_for_picking(SceneRaycaster::EType type, int id) {
         m_scene_raycaster.remove_raycasters(type, id);
@@ -869,7 +887,6 @@ public:
     // Returns the view ray line, in world coordinate, at the given mouse position.
     Linef3 mouse_ray(const Point& mouse_pos);
 
-    void set_mouse_as_dragging() { m_mouse.dragging = true; }
     bool is_mouse_dragging() const { return m_mouse.dragging; }
 
     double get_size_proportional_to_max_bed_size(double factor) const;

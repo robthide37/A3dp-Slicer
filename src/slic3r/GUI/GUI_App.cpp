@@ -266,12 +266,12 @@ private:
             version = _L("Version") + " " + std::string(SLIC3R_VERSION);
 
             // credits infornation
-            credits =   title + " " +
-                        _L("is based on Slic3r by Alessandro Ranellucci and the RepRap community.") + "\n" +
-                        _L("Developed by Prusa Research.")+ "\n\n" +
-                        title + " " + _L("is licensed under the") + " " + _L("GNU Affero General Public License, version 3") + "\n\n" +
-                        _L("Contributions by Vojtech Bubnik, Enrico Turri, Oleksandra Iushchenko, Tamas Meszaros, Lukas Matena, Vojtech Kral, David Kocik and numerous others.") + "\n\n" +
-                        _L("Artwork model by M Boyer");
+            credits = title + " " +
+                _L("is based on Slic3r by Alessandro Ranellucci and the RepRap community.") + "\n" +
+                _L("Developed by Prusa Research.") + "\n\n" +
+                title + " " + _L("is licensed under the") + " " + _L("GNU Affero General Public License, version 3") + ".\n\n" +
+                _L("Contributions by Vojtech Bubnik, Enrico Turri, Oleksandra Iushchenko, Tamas Meszaros, Lukas Matena, Vojtech Kral, David Kocik and numerous others.") + "\n\n" +
+                _L("Artwork model by Leslie Ing");
 
             title_font = version_font = credits_font = init_font;
         }
@@ -738,7 +738,7 @@ void GUI_App::post_init()
     if (! this->initialized())
         throw Slic3r::RuntimeError("Calling post_init() while not yet initialized");
 
-    if (this->init_params->start_as_gcodeviewer) {
+    if (this->is_gcode_viewer()) {
         if (! this->init_params->input_files.empty())
             this->plater()->load_gcode(wxString::FromUTF8(this->init_params->input_files[0].c_str()));
     }
@@ -1971,15 +1971,17 @@ static const wxLanguageInfo* linux_get_existing_locale_language(const wxLanguage
                                  }),
                    locales.end());
 
-    // Is there a candidate matching a country code of a system language? Move it to the end,
-    // while maintaining the order of matches, so that the best match ends up at the very end.
-    std::string system_country = "_" + into_u8(system_language->CanonicalName.AfterFirst('_')).substr(0, 2);
-    int cnt = locales.size();
-    for (int i=0; i<cnt; ++i)
-        if (locales[i].find(system_country) != std::string::npos) {
-            locales.emplace_back(std::move(locales[i]));
-            locales[i].clear();
-        }
+    if (system_language) {
+        // Is there a candidate matching a country code of a system language? Move it to the end,
+        // while maintaining the order of matches, so that the best match ends up at the very end.
+        std::string system_country = "_" + into_u8(system_language->CanonicalName.AfterFirst('_')).substr(0, 2);
+        int cnt = locales.size();
+        for (int i = 0; i < cnt; ++i)
+            if (locales[i].find(system_country) != std::string::npos) {
+                locales.emplace_back(std::move(locales[i]));
+                locales[i].clear();
+            }
+    }
 
     // Now try them one by one.
     for (auto it = locales.rbegin(); it != locales.rend(); ++ it)

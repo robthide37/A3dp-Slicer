@@ -115,7 +115,11 @@ void GLGizmoRotate::on_start_dragging()
 
 void GLGizmoRotate::on_dragging(const UpdateData &data)
 {
+#if ENABLE_WORLD_COORDINATE
+    const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray));
+#else
     const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray, m_parent.get_selection()));
+#endif // ENABLE_WORLD_COORDINATE
 
     const Vec2d orig_dir = Vec2d::UnitX();
     const Vec2d new_dir = mouse_pos.normalized();
@@ -725,7 +729,11 @@ void GLGizmoRotate::transform_to_local(const Selection& selection) const
 }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if ENABLE_WORLD_COORDINATE
+Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray) const
+#else
 Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const
+#endif // ENABLE_WORLD_COORDINATE
 {
     double half_pi = 0.5 * double(PI);
 
@@ -762,7 +770,20 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
 
     m.translate(-m_center);
 
-    return transform(mouse_ray, m).intersect_plane(0.0);
+    const Linef3 local_mouse_ray = transform(mouse_ray, m);
+    if (std::abs(local_mouse_ray.vector().dot(Vec3d::UnitZ())) < EPSILON) {
+        // if the ray is parallel to the plane containing the circle
+        if (std::abs(local_mouse_ray.vector().dot(Vec3d::UnitY())) > 1.0 - EPSILON)
+            // if the ray is parallel to grabber direction
+            return Vec3d::UnitX();
+        else {
+            const Vec3d world_pos = (local_mouse_ray.a.x() >= 0.0) ? mouse_ray.a - m_center : mouse_ray.b - m_center;
+            m.translate(m_center);
+            return m * world_pos;
+        }
+    }
+    else
+        return local_mouse_ray.intersect_plane(0.0);
 }
 
 GLGizmoRotate3D::GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)

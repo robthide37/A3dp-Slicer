@@ -8,7 +8,7 @@
 // Need the cylinder method for the the drainholes in hollowing step
 #include <libslic3r/SLA/SupportTreeBuilder.hpp>
 
-#include <libslic3r/SLA/Concurrency.hpp>
+#include <libslic3r/Execution/ExecutionTBB.hpp>
 #include <libslic3r/SLA/Pad.hpp>
 #include <libslic3r/SLA/SupportPointGenerator.hpp>
 
@@ -20,6 +20,8 @@
 #include <boost/log/trivial.hpp>
 
 #include "I18N.hpp"
+
+#include <libnest2d/tools/benchmark.h>
 
 //! macro used to mark string used at localization,
 //! return same string
@@ -546,12 +548,13 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
 
         std::vector<ExPolygons> interior_slices = slice_mesh_ex(interiormesh, slice_grid, params, thr);
 
-        sla::ccr::for_each(size_t(0), interior_slices.size(),
-                           [&po, &interior_slices] (size_t i) {
-                              const ExPolygons &slice = interior_slices[i];
-                              po.m_model_slices[i] =
-                                  diff_ex(po.m_model_slices[i], slice);
-                           });
+        execution::for_each(
+            ex_tbb, size_t(0), interior_slices.size(),
+            [&po, &interior_slices](size_t i) {
+                const ExPolygons &slice = interior_slices[i];
+                po.m_model_slices[i] = diff_ex(po.m_model_slices[i], slice);
+            },
+            execution::max_concurrency(ex_tbb));
     }
 
     auto mit = slindex_it;
@@ -621,16 +624,17 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
         // Construction of this object does the calculation.
         throw_if_canceled();
         sla::SupportPointGenerator auto_supports(
-            po.m_supportdata->emesh, po.get_model_slices(), heights, config,
-            [this]() { throw_if_canceled(); }, statuscb);
+            po.m_supportdata->input.emesh, po.get_model_slices(),
+            heights, config, [this]() { throw_if_canceled(); }, statuscb);
 
         // Now let's extract the result.
         const std::vector<sla::SupportPoint>& points = auto_supports.output();
         throw_if_canceled();
-        po.m_supportdata->pts = points;
+        po.m_supportdata->input.pts = points;
 
-        BOOST_LOG_TRIVIAL(debug) << "Automatic support points: "
-                                 << po.m_supportdata->pts.size();
+        BOOST_LOG_TRIVIAL(debug)
+            << "Automatic support points: "
+            << po.m_supportdata->input.pts.size();
 
         // Using RELOAD_SLA_SUPPORT_POINTS to tell the Plater to pass
         // the update status to GLGizmoSlaSupports
@@ -639,7 +643,7 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
     } else {
         // There are either some points on the front-end, or the user
         // removed them on purpose. No calculation will be done.
-        po.m_supportdata->pts = po.transformed_support_points();
+        po.m_supportdata->input.pts = po.transformed_support_points();
     }
 }
 
@@ -647,19 +651,22 @@ void SLAPrint::Steps::support_tree(SLAPrintObject &po)
 {
     if(!po.m_supportdata) return;
 
-    sla::PadConfig pcfg = make_pad_cfg(po.m_config);
+//    sla::PadConfig pcfg = make_pad_cfg(po.m_config);
 
-    if (pcfg.embed_object)
-        po.m_supportdata->emesh.ground_level_offset(pcfg.wall_thickness_mm);
+//    if (pcfg.embed_object)
+//        po.m_supportdata->emesh.ground_level_offset(pcfg.wall_thickness_mm);
 
     // If the zero elevation mode is engaged, we have to filter out all the
     // points that are on the bottom of the object
     if (is_zero_elevation(po.config())) {
-        remove_bottom_points(po.m_supportdata->pts,
-                             float(po.m_supportdata->emesh.ground_level() + EPSILON));
+        remove_bottom_points(po.m_supportdata->input.pts,
+                             float(
+                                 po.m_supportdata->input.emesh.ground_level() +
+                                 EPSILON));
     }
 
-    po.m_supportdata->cfg = make_support_cfg(po.m_config);
+    po.m_supportdata->input.cfg = make_support_cfg(po.m_config);
+    po.m_supportdata->input.pad_cfg = make_pad_cfg(po.m_config);
 //    po.m_supportdata->emesh.load_holes(po.transformed_drainhole_points());
 
     // scaling for the sub operations
@@ -689,7 +696,7 @@ void SLAPrint::Steps::support_tree(SLAPrintObject &po)
     report_status(-1, L("Visualizing supports"));
 
     BOOST_LOG_TRIVIAL(debug) << "Processed support point count "
-                             << po.m_supportdata->pts.size();
+                             << po.m_supportdata->input.pts.size();
 
     // Check the mesh for later troubleshooting.
     if(po.support_mesh().empty())
@@ -705,31 +712,34 @@ void SLAPrint::Steps::generate_pad(SLAPrintObject &po) {
 
     if(po.m_config.pad_enable.getBool()) {
         // Get the distilled pad configuration from the config
+        // (Again, despite it was retrieved in the previous step. Note that
+        // on a param change event, the previous step might not be executed
+        // depending on the specific parameter that has changed).
         sla::PadConfig pcfg = make_pad_cfg(po.m_config);
+        po.m_supportdata->input.pad_cfg = pcfg;
 
-        ExPolygons bp; // This will store the base plate of the pad.
-        double   pad_h             = pcfg.full_height();
-        const TriangleMesh &trmesh = po.transformed_mesh();
+//        if (!po.m_config.supports_enable.getBool() || pcfg.embed_object) {
+//            // No support (thus no elevation) or zero elevation mode
+//            // we sometimes call it "builtin pad" is enabled so we will
+//            // get a sample from the bottom of the mesh and use it for pad
+//            // creation.
+//            sla::pad_blueprint(trmesh.its, bp, float(pad_h),
+//                               float(po.m_config.layer_height.getFloat()),
+//                               [this](){ throw_if_canceled(); });
+//        }
 
-        if (!po.m_config.supports_enable.getBool() || pcfg.embed_object) {
-            // No support (thus no elevation) or zero elevation mode
-            // we sometimes call it "builtin pad" is enabled so we will
-            // get a sample from the bottom of the mesh and use it for pad
-            // creation.
-            sla::pad_blueprint(trmesh.its, bp, float(pad_h),
-                               float(po.m_config.layer_height.getFloat()),
-                               [this](){ throw_if_canceled(); });
-        }
+        sla::JobController ctl;
+        ctl.stopcondition = [this]() { return canceled(); };
+        ctl.cancelfn = [this]() { throw_if_canceled(); };
+        po.m_supportdata->create_pad(ctl);
 
-        po.m_supportdata->create_pad(bp, pcfg);
-
-        if (!validate_pad(po.m_supportdata->support_tree_ptr->retrieve_mesh(sla::MeshType::Pad), pcfg))
+        if (!validate_pad(po.m_supportdata->pad_mesh.its, pcfg))
             throw Slic3r::SlicingError(
                     L("No pad can be generated for this model with the "
                       "current configuration"));
 
-    } else if(po.m_supportdata && po.m_supportdata->support_tree_ptr) {
-        po.m_supportdata->support_tree_ptr->remove_pad();
+    } else if(po.m_supportdata) {
+        po.m_supportdata->pad_mesh = {};
     }
 
     throw_if_canceled();
@@ -748,13 +758,18 @@ void SLAPrint::Steps::slice_supports(SLAPrintObject &po) {
     if (!po.m_config.supports_enable.getBool() && !po.m_config.pad_enable.getBool())
         return;
 
-    if(sd && sd->support_tree_ptr) {
+    if(sd) {
         auto heights = reserve_vector<float>(po.m_slice_index.size());
 
         for(auto& rec : po.m_slice_index) heights.emplace_back(rec.slice_level());
 
-        sd->support_slices = sd->support_tree_ptr->slice(
-            heights, float(po.config().slice_closing_radius.value));
+        sla::JobController ctl;
+        ctl.stopcondition = [this]() { return canceled(); };
+        ctl.cancelfn = [this]() { throw_if_canceled(); };
+
+        sd->support_slices =
+            sla::slice(sd->tree_mesh.its, sd->pad_mesh.its, heights,
+                       float(po.config().slice_closing_radius.value), ctl);
     }
 
     for (size_t i = 0; i < sd->support_slices.size() && i < po.m_slice_index.size(); ++i)
@@ -887,6 +902,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     const double area_fill = printer_config.area_fill.getFloat()*0.01;// 0.5 (50%);
     const double fast_tilt = printer_config.fast_tilt_time.getFloat();// 5.0;
     const double slow_tilt = printer_config.slow_tilt_time.getFloat();// 8.0;
+    const double hv_tilt   = printer_config.high_viscosity_tilt_time.getFloat();// 10.0;
 
     const double init_exp_time = material_config.initial_exposure_time.getFloat();
     const double exp_time      = material_config.exposure_time.getFloat();
@@ -910,13 +926,13 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     const double delta_fade_time = (init_exp_time - exp_time) / (fade_layers_cnt + 1);
     double fade_layer_time = init_exp_time;
 
-    sla::ccr::SpinningMutex mutex;
-    using Lock = std::lock_guard<sla::ccr::SpinningMutex>;
+    execution::SpinningMutex<ExecutionTBB> mutex;
+    using Lock = std::lock_guard<decltype(mutex)>;
 
     // Going to parallel:
     auto printlayerfn = [this,
             // functions and read only vars
-            area_fill, display_area, exp_time, init_exp_time, fast_tilt, slow_tilt, delta_fade_time,
+            area_fill, display_area, exp_time, init_exp_time, fast_tilt, slow_tilt, hv_tilt, material_config, delta_fade_time,
 
             // write vars
             &mutex, &models_volume, &supports_volume, &estim_time, &slow_layers,
@@ -950,7 +966,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
                             layer.slices().end(),
                             size_t(0),
                             [](size_t a, const SliceRecord &sr) {
-            return a + sr.get_slice(soModel).size();
+            return a + sr.get_slice(soSupport).size();
         });
 
         supports_polygons.reserve(c);
@@ -999,7 +1015,9 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
         // Calculation of the slow and fast layers to the future controlling those values on FW
 
         const bool is_fast_layer = (layer_model_area + layer_support_area) <= display_area*area_fill;
-        const double tilt_time = is_fast_layer ? fast_tilt : slow_tilt;
+        const double tilt_time = material_config.material_print_speed == slamsSlow              ? slow_tilt :
+                                 material_config.material_print_speed == slamsHighViscosity     ? hv_tilt   :
+                                 is_fast_layer ? fast_tilt : slow_tilt;
 
         { Lock lck(mutex);
             if (is_fast_layer)
@@ -1020,6 +1038,25 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
                 layer_times += exp_time;
             layer_times += tilt_time;
 
+            //// Per layer times (magical constants cuclulated from FW)
+
+            static double exposure_safe_delay_before{ 3.0 };
+            static double exposure_high_viscosity_delay_before{ 3.5 };
+            static double exposure_slow_move_delay_before{ 1.0 };
+
+            if (material_config.material_print_speed == slamsSlow)
+                layer_times += exposure_safe_delay_before;
+            else if (material_config.material_print_speed == slamsHighViscosity)
+                layer_times += exposure_high_viscosity_delay_before;
+            else if (!is_fast_layer)
+                layer_times += exposure_slow_move_delay_before;
+
+            // Increase layer time for "magic constants" from FW
+            layer_times += (
+                l_height * 5  // tower move
+                + 120 / 1000  // Magical constant to compensate remaining computation delay in exposure thread
+            );
+
             layers_times.push_back(layer_times);
             estim_time += layer_times;
         }
@@ -1027,7 +1064,8 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
 
     // sequential version for debugging:
     // for(size_t i = 0; i < m_printer_input.size(); ++i) printlayerfn(i);
-    sla::ccr::for_each(size_t(0), printer_input.size(), printlayerfn);
+    execution::for_each(ex_tbb, size_t(0), printer_input.size(), printlayerfn,
+                        execution::max_concurrency(ex_tbb));
 
     auto SCALING2 = SCALING_FACTOR * SCALING_FACTOR;
     print_statistics.support_used_material = supports_volume * SCALING2;
@@ -1066,8 +1104,7 @@ void SLAPrint::Steps::rasterize()
     double increment = (slot * sd) / m_print->m_printer_input.size();
     double dstatus = current_status();
 
-    sla::ccr::SpinningMutex slck;
-    using Lock = std::lock_guard<sla::ccr::SpinningMutex>;
+    execution::SpinningMutex<ExecutionTBB> slck;
 
     // procedure to process one height level. This will run in parallel
     auto lvlfn =
@@ -1082,7 +1119,7 @@ void SLAPrint::Steps::rasterize()
 
         // Status indication guarded with the spinlock
         {
-            Lock lck(slck);
+            std::lock_guard lck(slck);
             dstatus += increment;
             double st = std::round(dstatus);
             if(st > pst) {

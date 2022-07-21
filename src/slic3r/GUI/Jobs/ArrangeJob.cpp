@@ -286,6 +286,7 @@ arrangement::ArrangeParams get_arrange_params(Plater *p)
     arrangement::ArrangeParams params;
     params.allow_rotations  = settings.enable_rotation;
     params.min_obj_distance = scaled(settings.distance);
+    params.min_bed_distance = scaled(settings.distance_from_bed);
 
     return params;
 }

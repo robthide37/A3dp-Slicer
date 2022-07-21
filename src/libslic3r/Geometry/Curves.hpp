@@ -15,8 +15,8 @@ template<int Dimension, typename NumberType>
 struct PolynomialCurve {
     Eigen::MatrixXf coefficients;
 
-    Vec3f get_fitted_value(const NumberType value) const {
-        auto result = Vec<Dimension, NumberType>::Zero();
+    Vec<Dimension, NumberType> get_fitted_value(const NumberType& value) const {
+        Vec<Dimension, NumberType> result = Vec<Dimension, NumberType>::Zero();
         size_t order = this->coefficients.rows() - 1;
         auto x = NumberType(1.);
         for (size_t index = 0; index < order + 1; ++index, x *= value)
@@ -142,7 +142,7 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
         //find corresponding segment index; expects kernels to be centered
         int middle_right_segment_index = floor((observation_point - result.start) / result.segment_size);
         //find index of first segment that is affected by the point i; this can be deduced from kernel_span
-        int start_segment_idx = middle_right_segment_index - Kernel::kernel_span / 2 + 1;
+        int start_segment_idx = middle_right_segment_index - int(Kernel::kernel_span / 2) + 1;
         for (int segment_index = start_segment_idx; segment_index < int(start_segment_idx + Kernel::kernel_span);
                 segment_index++) {
             NumberType segment_start = result.start + segment_index * result.segment_size;

@@ -190,6 +190,7 @@ void PrintHostSendDialog::EndModal(int ret)
 wxDEFINE_EVENT(EVT_PRINTHOST_PROGRESS, PrintHostQueueDialog::Event);
 wxDEFINE_EVENT(EVT_PRINTHOST_ERROR,    PrintHostQueueDialog::Event);
 wxDEFINE_EVENT(EVT_PRINTHOST_CANCEL,   PrintHostQueueDialog::Event);
+wxDEFINE_EVENT(EVT_PRINTHOST_RESOLVE,  PrintHostQueueDialog::Event);
 
 PrintHostQueueDialog::Event::Event(wxEventType eventType, int winid, size_t job_id)
     : wxEvent(winid, eventType)
@@ -218,6 +219,7 @@ PrintHostQueueDialog::PrintHostQueueDialog(wxWindow *parent)
     , on_progress_evt(this, EVT_PRINTHOST_PROGRESS, &PrintHostQueueDialog::on_progress, this)
     , on_error_evt(this, EVT_PRINTHOST_ERROR, &PrintHostQueueDialog::on_error, this)
     , on_cancel_evt(this, EVT_PRINTHOST_CANCEL, &PrintHostQueueDialog::on_cancel, this)
+    , on_resolve_evt(this, EVT_PRINTHOST_RESOLVE, &PrintHostQueueDialog::on_resolve, this)
 {
     const auto em = GetTextExtent("m").x;
 
@@ -448,6 +450,17 @@ void PrintHostQueueDialog::on_cancel(Event &evt)
     job_list->GetValue(nm, evt.job_id, COL_FILENAME);
     job_list->GetValue(hst, evt.job_id, COL_HOST);
     wxGetApp().notification_manager()->upload_job_notification_show_canceled(evt.job_id + 1, boost::nowide::narrow(nm.GetString()), boost::nowide::narrow(hst.GetString()));
+}
+
+void PrintHostQueueDialog::on_resolve(Event& evt)
+{
+    wxCHECK_RET(evt.job_id < (size_t)job_list->GetItemCount(), "Out of bounds access to job list");
+    
+    // wxstring in event is called error, but it should contain new host string.
+    wxVariant hst(evt.error);
+    // todo: set variant
+    job_list->SetValue(hst,evt.job_id,COL_HOST);
+    wxGetApp().notification_manager()->set_upload_job_notification_host(evt.job_id + 1, boost::nowide::narrow(evt.error));
 }
 
 void PrintHostQueueDialog::get_active_jobs(std::vector<std::pair<std::string, std::string>>& ret)

@@ -127,6 +127,10 @@ protected:
     bool on_is_selectable() const override;
     void on_load(cereal::BinaryInputArchive& ar) override;
     void on_save(cereal::BinaryOutputArchive& ar) const override;
+
+#if ENABLE_RAYCAST_PICKING
+    void init_cylinder_model();
+#endif // ENABLE_RAYCAST_PICKING
 };
 
 

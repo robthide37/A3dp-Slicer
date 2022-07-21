@@ -93,68 +93,6 @@ indexed_triangle_set sphere(double rho, Portion portion, double fa) {
     return ret;
 }
 
-indexed_triangle_set cylinder(double r, double h, size_t ssteps, const Vec3d &sp)
-{
-    assert(ssteps > 0);
-
-    indexed_triangle_set ret;
-
-    auto steps = int(ssteps);
-    auto& points = ret.vertices;
-    auto& indices = ret.indices;
-    points.reserve(2*ssteps);
-    double a = 2*PI/steps;
-
-    Vec3d jp = sp;
-    Vec3d endp = {sp(X), sp(Y), sp(Z) + h};
-
-    // Upper circle points
-    for(int i = 0; i < steps; ++i) {
-        double phi = i*a;
-        auto ex = float(endp(X) + r*std::cos(phi));
-        auto ey = float(endp(Y) + r*std::sin(phi));
-        points.emplace_back(ex, ey, float(endp(Z)));
-    }
-
-    // Lower circle points
-    for(int i = 0; i < steps; ++i) {
-        double phi = i*a;
-        auto x = float(jp(X) + r*std::cos(phi));
-        auto y = float(jp(Y) + r*std::sin(phi));
-        points.emplace_back(x, y, float(jp(Z)));
-    }
-
-    // Now create long triangles connecting upper and lower circles
-    indices.reserve(2*ssteps);
-    auto offs = steps;
-    for(int i = 0; i < steps - 1; ++i) {
-        indices.emplace_back(i, i + offs, offs + i + 1);
-        indices.emplace_back(i, offs + i + 1, i + 1);
-    }
-
-    // Last triangle connecting the first and last vertices
-    auto last = steps - 1;
-    indices.emplace_back(0, last, offs);
-    indices.emplace_back(last, offs + last, offs);
-
-    // According to the slicing algorithms, we need to aid them with generating
-    // a watertight body. So we create a triangle fan for the upper and lower
-    // ending of the cylinder to close the geometry.
-    points.emplace_back(jp.cast<float>()); int ci = int(points.size() - 1);
-    for(int i = 0; i < steps - 1; ++i)
-        indices.emplace_back(i + offs + 1, i + offs, ci);
-
-    indices.emplace_back(offs, steps + offs - 1, ci);
-
-    points.emplace_back(endp.cast<float>()); ci = int(points.size() - 1);
-    for(int i = 0; i < steps - 1; ++i)
-        indices.emplace_back(ci, i, i + 1);
-
-    indices.emplace_back(steps - 1, 0, ci);
-
-    return ret;
-}
-
 indexed_triangle_set pinhead(double r_pin,
                              double r_back,
                              double length,
@@ -183,13 +121,16 @@ indexed_triangle_set pinhead(double r_pin,
     const double h   = r_back + r_pin + length;
     double       phi = PI / 2. - std::acos((r_back - r_pin) / h);
 
+    if (std::isnan(phi))
+        return mesh;
+
     // To generate a whole circle we would pass a portion of (0, Pi)
     // To generate only a half horizontal circle we can pass (0, Pi/2)
     // The calculated phi is an offset to the half circles needed to smooth
     // the transition from the circle to the robe geometry
 
-    auto &&s1 = sphere(r_back, make_portion(0, PI / 2 + phi), detail);
-    auto &&s2 = sphere(r_pin, make_portion(PI / 2 + phi, PI), detail);
+    auto s1 = sphere(r_back, make_portion(0, PI / 2 + phi), detail);
+    auto s2 = sphere(r_pin, make_portion(PI / 2 + phi, PI), detail);
 
     for (auto &p : s2.vertices) p.z() += h;
 
@@ -265,6 +206,65 @@ indexed_triangle_set halfcone(double       baseheight,
     indices.emplace_back(offs, offs + last, lcenter);
 
     return base;
+}
+
+indexed_triangle_set get_mesh(const Head &h, size_t steps)
+{
+    indexed_triangle_set mesh = pinhead(h.r_pin_mm, h.r_back_mm, h.width_mm, steps);
+
+    for (auto& p : mesh.vertices) p.z() -= (h.fullwidth() - h.r_back_mm);
+
+    using Quaternion = Eigen::Quaternion<float>;
+
+       // We rotate the head to the specified direction. The head's pointing
+       // side is facing upwards so this means that it would hold a support
+       // point with a normal pointing straight down. This is the reason of
+       // the -1 z coordinate
+    auto quatern = Quaternion::FromTwoVectors(Vec3f{0.f, 0.f, -1.f},
+                                              h.dir.cast<float>());
+
+    Vec3f pos = h.pos.cast<float>();
+    for (auto& p : mesh.vertices) p = quatern * p + pos;
+
+    return mesh;
+}
+
+indexed_triangle_set get_mesh(const Bridge &br, size_t steps)
+{
+    using Quaternion = Eigen::Quaternion<float>;
+    Vec3d v = (br.endp - br.startp);
+    Vec3d dir = v.normalized();
+    double d = v.norm();
+
+    indexed_triangle_set mesh = cylinder(br.r, d, steps);
+
+    auto quater = Quaternion::FromTwoVectors(Vec3f{0.f, 0.f, 1.f},
+                                             dir.cast<float>());
+
+    Vec3f startp = br.startp.cast<float>();
+    for(auto& p : mesh.vertices) p = quater * p + startp;
+
+    return mesh;
+}
+
+indexed_triangle_set get_mesh(const DiffBridge &br, size_t steps)
+{
+    double h = br.get_length();
+    indexed_triangle_set mesh = halfcone(h, br.r, br.end_r, Vec3d::Zero(), steps);
+
+    using Quaternion = Eigen::Quaternion<float>;
+
+       // We rotate the head to the specified direction. The head's pointing
+       // side is facing upwards so this means that it would hold a support
+       // point with a normal pointing straight down. This is the reason of
+       // the -1 z coordinate
+    auto quatern = Quaternion::FromTwoVectors(Vec3f{0.f, 0.f, 1.f},
+                                              br.get_dir().cast<float>());
+
+    Vec3f startp = br.startp.cast<float>();
+    for(auto& p : mesh.vertices) p = quatern * p + startp;
+
+    return mesh;
 }
 
 }} // namespace Slic3r::sla

@@ -26,6 +26,12 @@
 namespace Slic3r {
 namespace GUI {
 
+const std::vector<std::string> OpenGLVersions::core_str    = { "3.2", "3.3", "4.0", "4.1", "4.2", "4.3", "4.4", "4.5", "4.6" };
+const std::vector<std::string> OpenGLVersions::precore_str = { "2.0", "2.1", "3.0", "3.1" };
+
+const std::vector<std::pair<int, int>> OpenGLVersions::core    = { {3,2}, {3,3}, {4,0}, {4,1}, {4,2}, {4,3}, {4,4}, {4,5}, {4,6} };
+const std::vector<std::pair<int, int>> OpenGLVersions::precore = { {2,0}, {2,1}, {3,0}, {3,1} };
+
 int GUI_Run(GUI_InitParams &params)
 {
 #if __APPLE__
@@ -53,7 +59,6 @@ int GUI_Run(GUI_InitParams &params)
 //      gui->autosave = m_config.opt_string("autosave");
         GUI::GUI_App::SetInstance(gui);
         gui->init_params = &params;
-
         return wxEntry(params.argc, params.argv);
     } catch (const Slic3r::Exception &ex) {
         boost::nowide::cerr << ex.what() << std::endl;

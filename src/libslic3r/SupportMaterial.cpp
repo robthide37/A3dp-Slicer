@@ -3243,6 +3243,7 @@ static inline void fill_expolygon_generate_paths(
     Surface surface(stInternal, std::move(expolygon));
     Polylines polylines;
     try {
+        assert(!fill_params.use_arachne);
         polylines = filler->fill_surface(&surface, fill_params);
     } catch (InfillFailedException &) {
     }

@@ -11,6 +11,7 @@
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/Technologies.hpp"
 #include "libslic3r/Tesselate.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -124,8 +125,8 @@ void GLCanvas3D::LayersEditing::init()
     glsafe(::glGenTextures(1, (GLuint*)&m_z_texture_id));
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
     if (!OpenGLManager::get_gl_info().is_core_profile() || !OpenGLManager::get_gl_info().is_mesa()) {
-        glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP));
-        glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP));
+        glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+        glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
     }
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST));
@@ -389,7 +390,7 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
         m_profile.background.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2 };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3T2 };
         init_data.reserve_vertices(4);
         init_data.reserve_indices(6);
 
@@ -398,10 +399,10 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
         const float r = 1.0f;
         const float t = 1.0f;
         const float b = -1.0f;
-        init_data.add_vertex(Vec2f(l, b), Vec2f(0.0f, 0.0f));
-        init_data.add_vertex(Vec2f(r, b), Vec2f(1.0f, 0.0f));
-        init_data.add_vertex(Vec2f(r, t), Vec2f(1.0f, 1.0f));
-        init_data.add_vertex(Vec2f(l, t), Vec2f(0.0f, 1.0f));
+        init_data.add_vertex(Vec3f(l, b, 0.0f), Vec3f::UnitZ(), Vec2f(0.0f, 0.0f));
+        init_data.add_vertex(Vec3f(r, b, 0.0f), Vec3f::UnitZ(), Vec2f(1.0f, 0.0f));
+        init_data.add_vertex(Vec3f(r, t, 0.0f), Vec3f::UnitZ(), Vec2f(1.0f, 1.0f));
+        init_data.add_vertex(Vec3f(l, t, 0.0f), Vec3f::UnitZ(), Vec2f(0.0f, 1.0f));
 
         // indices
         init_data.add_triangle(0, 1, 2);
@@ -1126,13 +1127,13 @@ void GLCanvas3D::load_arrange_settings()
         wxGetApp().app_config->get("arrange", "enable_rotation_sla");
 
     if (!dist_fff_str.empty())
-        m_arrange_settings_fff.distance = std::stof(dist_fff_str);
+        m_arrange_settings_fff.distance = string_to_float_decimal_point(dist_fff_str);
 
     if (!dist_fff_seq_print_str.empty())
-        m_arrange_settings_fff_seq_print.distance = std::stof(dist_fff_seq_print_str);
+        m_arrange_settings_fff_seq_print.distance = string_to_float_decimal_point(dist_fff_seq_print_str);
 
     if (!dist_sla_str.empty())
-        m_arrange_settings_sla.distance = std::stof(dist_sla_str);
+        m_arrange_settings_sla.distance = string_to_float_decimal_point(dist_sla_str);
 
     if (!en_rot_fff_str.empty())
         m_arrange_settings_fff.enable_rotation = (en_rot_fff_str == "1" || en_rot_fff_str == "yes");
@@ -1818,6 +1819,10 @@ void GLCanvas3D::select_all()
 {
     m_selection.add_all();
     m_dirty = true;
+    wxGetApp().obj_manipul()->set_dirty();
+    m_gizmos.reset_all_states();
+    m_gizmos.update_data();
+    post_event(SimpleEvent(EVT_GLCANVAS_OBJECT_SELECT));
 }
 
 void GLCanvas3D::deselect_all()
@@ -2954,6 +2959,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                         m_rectangle_selection.stop_dragging();
                         m_mouse.ignore_left_up = true;
                     }
+                    m_shift_kar_filter.reset_count();
                     m_dirty = true;
 //                    set_cursor(Standard);
                 }
@@ -2968,13 +2974,18 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                 }
                 else if (keyCode == WXK_CONTROL) {
 #if ENABLE_NEW_CAMERA_MOVEMENTS
+#if ENABLE_RAYCAST_PICKING
+                    if (m_mouse.dragging && !m_moving) {
+#else
                     if (m_mouse.dragging) {
+#endif // ENABLE_RAYCAST_PICKING
                         // if the user releases CTRL while rotating the 3D scene
                         // prevent from moving the selected volume
                         m_mouse.drag.move_volume_idx = -1;
                         m_mouse.set_start_position_3D_as_invalid();
                     }
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS
+                    m_ctrl_kar_filter.reset_count();
                     m_dirty = true;
                 }
                 else if (m_gizmos.is_enabled() && !m_selection.is_empty()) {
@@ -3011,7 +3022,10 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                         m_mouse.ignore_left_up = false;
 //                        set_cursor(Cross);
                     }
-                    m_dirty = true;
+                    if (m_shift_kar_filter.is_first())
+                        m_dirty = true;
+
+                    m_shift_kar_filter.increase_count();
                 }
                 else if (keyCode == WXK_ALT) {
                     if (m_picking_enabled && (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports)) {
@@ -3019,8 +3033,12 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
 //                        set_cursor(Cross);
                     }
                 }
-                else if (keyCode == WXK_CONTROL)
-                    m_dirty = true;
+                else if (keyCode == WXK_CONTROL) {
+                    if (m_ctrl_kar_filter.is_first())
+                        m_dirty = true;
+
+                    m_ctrl_kar_filter.increase_count();
+                }
                 else if (m_gizmos.is_enabled() && !m_selection.is_empty()) {
                     auto do_rotate = [this](double angle_z_rad) {
                         m_selection.setup_cache();
@@ -3498,7 +3516,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS
                             m_mouse.drag.start_position_3D = m_mouse.scene_position;
                         m_sequential_print_clearance_first_displacement = true;
+#if !ENABLE_RAYCAST_PICKING
                         m_moving = true;
+#endif // !ENABLE_RAYCAST_PICKING
                     }
                 }
             }
@@ -3510,7 +3530,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 #else
     else if (evt.Dragging() && evt.LeftIsDown() && m_layers_editing.state == LayersEditing::Unknown && m_mouse.drag.move_volume_idx != -1) {
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS
-    if (!m_mouse.drag.move_requires_threshold) {
+        if (!m_mouse.drag.move_requires_threshold) {
             m_mouse.dragging = true;
             Vec3d cur_pos = m_mouse.drag.start_position_3D;
             // we do not want to translate objects if the user just clicked on an object while pressing shift to remove it from the selection and then drag
@@ -3546,6 +3566,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
 
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_RAYCAST_PICKING
+            m_moving = true;
+#endif // ENABLE_RAYCAST_PICKING
             TransformationType trafo_type;
             trafo_type.set_relative();
             m_selection.translate(cur_pos - m_mouse.drag.start_position_3D, trafo_type);
@@ -3577,29 +3600,35 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 #if ENABLE_NEW_CAMERA_MOVEMENTS
         else if (evt.LeftIsDown()) {
             // if dragging over blank area with left button, rotate
-            if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
+#if ENABLE_RAYCAST_PICKING
+            if (!m_moving) {
+#endif // ENABLE_RAYCAST_PICKING
+                if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
 #else
             // if dragging over blank area with left button, rotate
         else if (evt.LeftIsDown()) {
             if ((any_gizmo_active || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS
-                const Vec3d rot = (Vec3d(pos.x(), pos.y(), 0.0) - m_mouse.drag.start_position_3D) * (PI * TRACKBALLSIZE / 180.0);
-                if (wxGetApp().app_config->get("use_free_camera") == "1")
-                    // Virtual track ball (similar to the 3DConnexion mouse).
-                    wxGetApp().plater()->get_camera().rotate_local_around_target(Vec3d(rot.y(), rot.x(), 0.0));
-                else {
-                    // Forces camera right vector to be parallel to XY plane in case it has been misaligned using the 3D mouse free rotation.
-                    // It is cheaper to call this function right away instead of testing wxGetApp().plater()->get_mouse3d_controller().connected(),
-                    // which checks an atomics (flushes CPU caches).
-                    // See GH issue #3816.
-                    Camera& camera = wxGetApp().plater()->get_camera();
-                    camera.recover_from_free_camera();
-                    camera.rotate_on_sphere(rot.x(), rot.y(), current_printer_technology() != ptSLA);
-                }
+                    const Vec3d rot = (Vec3d(pos.x(), pos.y(), 0.0) - m_mouse.drag.start_position_3D) * (PI * TRACKBALLSIZE / 180.0);
+                    if (wxGetApp().app_config->get("use_free_camera") == "1")
+                        // Virtual track ball (similar to the 3DConnexion mouse).
+                        wxGetApp().plater()->get_camera().rotate_local_around_target(Vec3d(rot.y(), rot.x(), 0.0));
+                    else {
+                        // Forces camera right vector to be parallel to XY plane in case it has been misaligned using the 3D mouse free rotation.
+                        // It is cheaper to call this function right away instead of testing wxGetApp().plater()->get_mouse3d_controller().connected(),
+                        // which checks an atomics (flushes CPU caches).
+                        // See GH issue #3816.
+                        Camera& camera = wxGetApp().plater()->get_camera();
+                        camera.recover_from_free_camera();
+                        camera.rotate_on_sphere(rot.x(), rot.y(), current_printer_technology() != ptSLA);
+                    }
 
-                m_dirty = true;
+                    m_dirty = true;
+                }
+                m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
+#if ENABLE_RAYCAST_PICKING
             }
-            m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
+#endif // ENABLE_RAYCAST_PICKING
         }
         else if (evt.MiddleIsDown() || evt.RightIsDown()) {
             // If dragging over blank area with right/middle button, pan.
@@ -5389,15 +5418,15 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
 #if ENABLE_RAYCAST_PICKING
 void GLCanvas3D::_picking_pass()
 {
-#if ENABLE_RAYCAST_PICKING_DEBUG
     if (!m_picking_enabled || m_mouse.dragging || m_mouse.position == Vec2d(DBL_MAX, DBL_MAX) || m_gizmos.is_dragging()) {
+#if ENABLE_RAYCAST_PICKING_DEBUG
         ImGuiWrapper& imgui = *wxGetApp().imgui();
         imgui.begin(std::string("Hit result"), ImGuiWindowFlags_AlwaysAutoResize);
         imgui.text("Picking disabled");
         imgui.end();
+#endif // ENABLE_RAYCAST_PICKING_DEBUG
         return;
     }
-#endif // ENABLE_RAYCAST_PICKING_DEBUG
 
     m_hover_volume_idxs.clear();
 
@@ -5500,7 +5529,7 @@ void GLCanvas3D::_picking_pass()
 #else
 void GLCanvas3D::_picking_pass()
 {
-    if (m_picking_enabled && !m_mouse.dragging && m_mouse.position != Vec2d(DBL_MAX, DBL_MAX)) {
+    if (m_picking_enabled && !m_mouse.dragging && m_mouse.position != Vec2d(DBL_MAX, DBL_MAX) && !m_gizmos.is_dragging()) {
         m_hover_volume_idxs.clear();
 
         // Render the object for picking.
@@ -6770,6 +6799,19 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
     if (m_canvas == nullptr)
         return Vec3d(DBL_MAX, DBL_MAX, DBL_MAX);
 
+#if ENABLE_RAYCAST_PICKING
+    if (z == nullptr) {
+        const SceneRaycaster::HitResult hit = m_scene_raycaster.hit(mouse_pos.cast<double>(), wxGetApp().plater()->get_camera(), nullptr);
+        return hit.is_valid() ? hit.position.cast<double>() : _mouse_to_bed_3d(mouse_pos);
+    }
+    else {
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Vec4i viewport(camera.get_viewport().data());
+        Vec3d out;
+        igl::unproject(Vec3d(mouse_pos.x(), viewport[3] - mouse_pos.y(), *z), camera.get_view_matrix().matrix(), camera.get_projection_matrix().matrix(), viewport, out);
+        return out;
+    }
+#else
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Matrix4d modelview  = camera.get_view_matrix().matrix();
     const Matrix4d projection = camera.get_projection_matrix().matrix();
@@ -6785,6 +6827,7 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
     Vec3d out;
     igl::unproject(Vec3d(mouse_pos.x(), y, mouse_z), modelview, projection, viewport, out);
     return out;
+#endif // ENABLE_RAYCAST_PICKING
 }
 
 Vec3d GLCanvas3D::_mouse_to_bed_3d(const Point& mouse_pos)

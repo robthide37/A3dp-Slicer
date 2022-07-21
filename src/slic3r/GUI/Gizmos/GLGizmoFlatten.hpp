@@ -11,7 +11,6 @@
 #include "slic3r/GUI/3DScene.hpp"
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-
 namespace Slic3r {
 
 enum class ModelVolumeType : int;
@@ -51,8 +50,10 @@ private:
     Vec3d m_first_instance_mirror;
 
     std::vector<PlaneData> m_planes;
+#if ENABLE_RAYCAST_PICKING
+    std::vector<std::shared_ptr<SceneRaycasterItem>> m_planes_casters;
+#endif // ENABLE_RAYCAST_PICKING
     bool m_mouse_left_down = false; // for detection left_up of this gizmo
-    bool m_planes_valid = false;
     const ModelObject* m_old_model_object = nullptr;
     std::vector<const Transform3d*> instances_matrices;
 

@@ -3200,7 +3200,8 @@ bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionCo
     bool res = importer.load_model_from_file(path, *model, config, config_substitutions, check_version);
     importer.log_errors();
     handle_legacy_project_loaded(importer.version(), config);
-    return res;
+
+    return !model->objects.empty() || !config.empty();
 }
 
 bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64)
