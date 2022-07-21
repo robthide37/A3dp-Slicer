@@ -201,6 +201,7 @@ public:
     void        Enable(const bool enadle = true);
     void        Disable() { Enable(false); }
     void        DisableScale();
+    void        DisableUnuniformScale();
     void        update_ui_from_settings();
     bool        use_colors() { return m_use_colors; }
 

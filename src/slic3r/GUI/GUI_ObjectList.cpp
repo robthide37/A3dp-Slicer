@@ -2499,6 +2499,7 @@ void ObjectList::part_selection_changed()
 
     bool enable_manipulation     {true};
     bool disable_ss_manipulation {false};
+    bool disable_ununiform_scale {false};
 
     const auto item = GetSelection();
 
@@ -2543,6 +2544,7 @@ void ObjectList::part_selection_changed()
                         disable_ss_manipulation = true;
                         break;
                     }
+                disable_ununiform_scale = !cut_objects.empty();
             }
         }
     }
@@ -2649,8 +2651,11 @@ void ObjectList::part_selection_changed()
 
         if (disable_ss_manipulation)
             wxGetApp().obj_manipul()->DisableScale();
-        else
+        else {
             wxGetApp().obj_manipul()->Enable(enable_manipulation);
+            if (disable_ununiform_scale)
+                wxGetApp().obj_manipul()->DisableUnuniformScale();
+        }
     }
 
     if (update_and_show_settings)

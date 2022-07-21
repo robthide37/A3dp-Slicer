@@ -81,6 +81,9 @@ class GLGizmoCut3D : public GLGizmoBase
     double m_connector_depth_ratio{ 3.0 };
     double m_connector_size{ 2.5 };
 
+    int m_connector_depth_ratio_tolerance{ 10 };
+    int m_connector_size_tolerance{ 0 };
+
     float m_label_width{ 150.0 };
     float m_control_width{ 200.0 };
     bool  m_imperial_units{ false };
@@ -174,7 +177,7 @@ private:
     void set_center(const Vec3d& center);
     bool render_combo(const std::string& label, const std::vector<std::string>& lines, size_t& selection_idx);
     bool render_double_input(const std::string& label, double& value_in);
-    bool render_slicer_double_input(const std::string& label, double& value_in);
+    bool render_slider_double_input(const std::string& label, double& value_in, int& tolerance_in);
     void render_move_center_input(int axis);
     void render_connect_mode_radio_button(CutConnectorMode mode);
     bool render_revert_button(const std::string& label);

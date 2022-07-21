@@ -580,7 +580,11 @@ void ObjectManipulation::Enable(const bool enadle)
 {
     for (auto editor : m_editors)
         editor->Enable(enadle);
-    for (wxWindow* win : std::initializer_list<wxWindow*>{ m_reset_scale_button, m_reset_rotation_button, m_drop_to_bed_button, m_check_inch, m_lock_bnt })
+    for (wxWindow* win : std::initializer_list<wxWindow*>{ m_reset_scale_button, m_reset_rotation_button, m_drop_to_bed_button, m_check_inch, m_lock_bnt
+#if ENABLE_WORLD_COORDINATE
+    ,m_reset_skew_button
+#endif // ENABLE_WORLD_COORDINATE
+    })
         win->Enable(enadle);
 }
 
@@ -588,8 +592,17 @@ void ObjectManipulation::DisableScale()
 {
     for (auto editor : m_editors)
         editor->Enable(editor->has_opt_key("scale") || editor->has_opt_key("size") ? false : true);
-    for (wxWindow* win : std::initializer_list<wxWindow*>{ m_reset_scale_button, m_lock_bnt })
+    for (wxWindow* win : std::initializer_list<wxWindow*>{ m_reset_scale_button, m_lock_bnt
+#if ENABLE_WORLD_COORDINATE
+    ,m_reset_skew_button
+#endif // ENABLE_WORLD_COORDINATE
+    })
         win->Enable(false);
+}
+
+void ObjectManipulation::DisableUnuniformScale()
+{
+    m_lock_bnt->disable();
 }
 
 void ObjectManipulation::update_ui_from_settings()

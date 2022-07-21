@@ -430,12 +430,12 @@ bool GLGizmoCut3D::render_double_input(const std::string& label, double& value_i
     return old_val != value;
 }
 
-bool GLGizmoCut3D::render_slicer_double_input(const std::string& label, double& value_in)
+bool GLGizmoCut3D::render_slider_double_input(const std::string& label, double& value_in, int& tolerance_in)
 {
     ImGui::AlignTextToFramePadding();
     m_imgui->text(label);
     ImGui::SameLine(m_label_width);
-    ImGui::PushItemWidth(m_control_width);
+    ImGui::PushItemWidth(m_control_width * 0.85f);
 
     float value = (float)value_in;
     if (m_imperial_units)
@@ -443,15 +443,25 @@ bool GLGizmoCut3D::render_slicer_double_input(const std::string& label, double& 
     float old_val = value;
 
     const BoundingBoxf3 bbox = bounding_box();
-    const float mean_size = float((bbox.size().x() + bbox.size().y() + bbox.size().z()) / 9.0);
+    float mean_size = float((bbox.size().x() + bbox.size().y() + bbox.size().z()) / 9.0);
+    float min_size = 1.f;
+    if (m_imperial_units) {
+        mean_size *= ObjectManipulation::mm_to_in;
+        min_size  *= ObjectManipulation::mm_to_in;
+    }
+    std::string format = m_imperial_units ? "%.4f  " + _u8L("in") : "%.2f  " + _u8L("mm");
 
-    m_imgui->slider_float(("##" + label).c_str(), &value, 1.0f, mean_size);
-
-    ImGui::SameLine();
-    m_imgui->text(m_imperial_units ? _L("in") : _L("mm"));
-
+    m_imgui->slider_float(("##" + label).c_str(), &value, min_size, mean_size, format.c_str());
     value_in = (double)(value * (m_imperial_units ? ObjectManipulation::in_to_mm : 1.0));
-    return old_val != value;
+
+    ImGui::SameLine(m_label_width + m_control_width + 3);
+    ImGui::PushItemWidth(m_control_width * 0.3f);
+
+    float old_tolerance, tolerance = old_tolerance = (float)tolerance_in;
+    m_imgui->slider_float(("##tolerance_" + label).c_str(), &tolerance, 1.f, 20.f, "%.f %%", 1.f, true, _L("Tolerance"));
+    tolerance_in = (int)tolerance;
+
+    return old_val != value || old_tolerance != tolerance;
 }
 
 void GLGizmoCut3D::render_move_center_input(int axis)
@@ -1253,11 +1263,11 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
         if (m_imgui->button("  " + _L("Reset") + "  ##connectors"))
             reset_connectors();
         m_imgui->disabled_end();
-
+/*
         m_imgui->text(_L("Mode"));
         render_connect_mode_radio_button(CutConnectorMode::Auto);
         render_connect_mode_radio_button(CutConnectorMode::Manual);
-
+*/
         m_imgui->text(_L("Type"));
         render_connect_type_radio_button(CutConnectorType::Plug);
         render_connect_type_radio_button(CutConnectorType::Dowel);
@@ -1267,12 +1277,16 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
         if (render_combo(_u8L("Shape"), m_connector_shapes, m_connector_shape_id))
             update_connector_shape();
 
-        if (render_slicer_double_input(_u8L("Depth ratio"), m_connector_depth_ratio))
-            for (auto& connector : connectors)
+        if (render_slider_double_input(_u8L("Depth ratio"), m_connector_depth_ratio, m_connector_depth_ratio_tolerance)) 
+            for (auto& connector : connectors) {
                 connector.height = float(m_connector_depth_ratio);
-        if (render_slicer_double_input(_u8L("Size"), m_connector_size))
-            for (auto& connector : connectors)
+                connector.height_tolerance = 0.01f * m_connector_depth_ratio;
+            }
+        if (render_slider_double_input(_u8L("Size"), m_connector_size, m_connector_size_tolerance))
+            for (auto& connector : connectors) {
                 connector.radius = float(m_connector_size * 0.5);
+                connector.radius_tolerance = 0.01f * m_connector_size_tolerance;
+            }
 
         m_imgui->disabled_end();
 
@@ -1710,7 +1724,9 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
                 //std::cout << hit.x() << "\t" << hit.y() << "\t" << hit.z() << std::endl;
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
 
-                connectors.emplace_back(hit, Geometry::Transformation(m_rotation_m).get_rotation(), float(m_connector_size * 0.5), float(m_connector_depth_ratio));
+                connectors.emplace_back(hit, Geometry::Transformation(m_rotation_m).get_rotation(), 
+                                        float(m_connector_size * 0.5), float(m_connector_depth_ratio), 
+                                        float(0.01f * m_connector_size_tolerance), float(0.01f * m_connector_depth_ratio_tolerance));
                 update_model_object();
                 m_selected.push_back(false);
                 assert(m_selected.size() == connectors.size());

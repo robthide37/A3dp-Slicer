@@ -225,18 +225,20 @@ struct CutConnector
     Vec3d rotation;
     float radius;
     float height;
+    float radius_tolerance;// [0.f : 1.f]
+    float height_tolerance;// [0.f : 1.f]
     bool  failed = false;
 
     CutConnector()
-        : pos(Vec3d::Zero()), rotation(Vec3d::UnitZ()), radius(5.f), height(10.f)
+        : pos(Vec3d::Zero()), rotation(Vec3d::UnitZ()), radius(5.f), height(10.f), radius_tolerance(0.f), height_tolerance(0.1f)
     {}
 
-    CutConnector(Vec3d p, Vec3d rot, float r, float h, bool fl = false)
-        : pos(p), rotation(rot), radius(r), height(h), failed(fl)
+    CutConnector(Vec3d p, Vec3d rot, float r, float h, float rt, float ht, bool fl = false)
+        : pos(p), rotation(rot), radius(r), height(h), radius_tolerance(rt), height_tolerance(ht), failed(fl)
     {}
 
     CutConnector(const CutConnector& rhs) :
-        CutConnector(rhs.pos, rhs.rotation, rhs.radius, rhs.height, rhs.failed) {}
+        CutConnector(rhs.pos, rhs.rotation, rhs.radius, rhs.height, rhs.radius_tolerance, rhs.height_tolerance, rhs.failed) {}
 
     bool operator==(const CutConnector& sp) const;
 
@@ -251,7 +253,7 @@ struct CutConnector
 */
     template<class Archive> inline void serialize(Archive& ar)
     {
-        ar(pos, rotation, radius, height, failed);
+        ar(pos, rotation, radius, height, radius_tolerance, height_tolerance, failed);
     }
 
     static constexpr size_t steps = 32;
@@ -696,15 +698,24 @@ public:
         bool is_converted_from_meters{ false };
         bool is_from_builtin_objects{ false };
 
-        bool is_connector{ false };
-
         template<class Archive> void serialize(Archive& ar) { 
             //FIXME Vojtech: Serialize / deserialize only if the Source is set.
             // likely testing input_file or object_idx would be sufficient.
-            ar(input_file, object_idx, volume_idx, mesh_offset, transform, is_converted_from_inches, is_converted_from_meters, is_from_builtin_objects, is_connector);
+            ar(input_file, object_idx, volume_idx, mesh_offset, transform, is_converted_from_inches, is_converted_from_meters, is_from_builtin_objects);
         }
     };
     Source              source;
+
+    // struct used by cut command 
+    // It contains information about connetors
+    struct CutInfo
+    {
+        bool is_connector {false};
+        float radius_tolerance;// [0.f : 1.f]
+        float height_tolerance;// [0.f : 1.f]
+
+        void discard() { is_connector = false; }
+    }                    cut_info;
 
     // The triangular model.
     const TriangleMesh& mesh() const { return *m_mesh.get(); }
