@@ -38,8 +38,6 @@ set(SLIC3R_SOURCES
     Color.hpp
     Config.cpp
     Config.hpp
-    CutSurface.cpp
-    CutSurface.hpp
     EdgeGrid.cpp
     EdgeGrid.hpp
     ElephantFootCompensation.cpp
@@ -388,7 +386,9 @@ cmake_policy(SET CMP0011 NEW)
 find_package(CGAL REQUIRED)
 cmake_policy(POP)
 
-add_library(libslic3r_cgal STATIC MeshBoolean.hpp MeshBoolean.cpp
+add_library(libslic3r_cgal STATIC 
+    CutSurface.hpp CutSurface.cpp
+    MeshBoolean.hpp MeshBoolean.cpp
     TryCatchSignal.hpp TryCatchSignal.cpp
     Triangulation.hpp Triangulation.cpp)
 target_include_directories(libslic3r_cgal PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
