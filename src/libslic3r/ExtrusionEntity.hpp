@@ -216,6 +216,7 @@ public:
     static ExtrusionRole string_to_role(const std::string_view role);
 };
 
+//FIXME: don't use that unsafe container. use a vector of sharedpointer or a ExtrusionEntityCollection.
 typedef std::vector<ExtrusionEntity*> ExtrusionEntitiesPtr;
 
 class ExtrusionPath : public ExtrusionEntity
@@ -409,6 +410,9 @@ public:
     ExtrusionMultiPath(const ExtrusionPaths &paths) : ExtrusionMultiEntity(paths) {};
     ExtrusionMultiPath(const ExtrusionPath &path) :ExtrusionMultiEntity(path) {}
 
+    ExtrusionMultiPath& operator=(const ExtrusionMultiPath& rhs) { this->paths = rhs.paths; return *this; }
+    ExtrusionMultiPath& operator=(ExtrusionMultiPath&& rhs) { this->paths = std::move(rhs.paths); return *this; }
+
     virtual ExtrusionMultiPath* clone() const override { return new ExtrusionMultiPath(*this); }
     virtual ExtrusionMultiPath* clone_move() override { return new ExtrusionMultiPath(std::move(*this)); }
 
@@ -424,6 +428,9 @@ public:
     ExtrusionMultiPath3D(ExtrusionMultiPath3D &&rhs) : ExtrusionMultiEntity(rhs) {}
     ExtrusionMultiPath3D(const ExtrusionPaths3D &paths) : ExtrusionMultiEntity(paths) {};
     ExtrusionMultiPath3D(const ExtrusionPath3D &path) :ExtrusionMultiEntity(path) {}
+
+    ExtrusionMultiPath3D& operator=(const ExtrusionMultiPath3D& rhs) { this->paths = rhs.paths; return *this; }
+    ExtrusionMultiPath3D& operator=(ExtrusionMultiPath3D&& rhs) { this->paths = std::move(rhs.paths); return *this; }
 
     virtual ExtrusionMultiPath3D* clone() const override { return new ExtrusionMultiPath3D(*this); }
     virtual ExtrusionMultiPath3D* clone_move() override { return new ExtrusionMultiPath3D(std::move(*this)); }

@@ -3043,8 +3043,11 @@ MedialAxis::build(ThickPolylines& polylines_out)
 
 }
 
+ExtrusionMultiPath variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance) {
+    return ExtrusionMultiPath(unsafe_variable_width(polyline, role, flow, resolution_internal, tolerance));
+}
 ExtrusionPaths
-variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance)
+unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance)
 {
 
     ExtrusionPaths paths;
@@ -3189,7 +3192,7 @@ variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Fl
                 path.polyline.append(line.b);
             } else {
                 // we need to initialize a new line
-                paths.emplace_back(std::move(path));
+                paths.push_back(path);
                 path = ExtrusionPath(role);
                 if (wanted_width != current_flow.width()) {
                     current_flow = current_flow.with_width(wanted_width);
@@ -3207,7 +3210,7 @@ variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Fl
         assert(path.polyline.points.size() > 2 || path.first_point() != path.last_point());
     }
     if (path.polyline.is_valid())
-        paths.emplace_back(std::move(path));
+        paths.push_back(path);
 
     return paths;
 }
@@ -3223,36 +3226,34 @@ ExtrusionEntitiesPtr
     const coord_t tolerance = flow.scaled_width() / 10;//scale_(0.05);
     ExtrusionEntitiesPtr coll;
     for (const ThickPolyline& p : polylines) {
-
-        ExtrusionPaths paths = variable_width(p, role, flow, resolution_internal, tolerance);
+        ExtrusionMultiPath multi_paths = variable_width(p, role, flow, resolution_internal, tolerance);
         // Append paths to collection.
-        if (!paths.empty()) {
-            for (auto it = std::next(paths.begin()); it != paths.end(); ++it) {
+        if (!multi_paths.empty()) {
+#if _DEBUG
+            for (auto it = std::next(multi_paths.paths.begin()); it != multi_paths.paths.end(); ++it) {
                 assert(it->polyline.points.size() >= 2);
                 assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
             }
-            if (paths.front().first_point().coincides_with_epsilon(paths.back().last_point())) {
-                coll.push_back(new ExtrusionLoop(std::move(paths)));
+#endif
+            if (multi_paths.paths.front().first_point().coincides_with_epsilon(multi_paths.paths.back().last_point())) {
+                coll.push_back(new ExtrusionLoop(std::move(multi_paths.paths)));
             } else {
                 if (role == erThinWall) {
                     //thin walls : avoid to cut them, please.
                     //also, keep the start, as the start should be already in a frontier where possible.
-                    ExtrusionEntityCollection* unsortable_coll = new ExtrusionEntityCollection(std::move(paths));
+                    ExtrusionEntityCollection* unsortable_coll = new ExtrusionEntityCollection(std::move(multi_paths.paths));
                     unsortable_coll->set_can_sort_reverse(false, false);
+                    //TODO un-reversable multipath ?
                     coll.push_back(unsortable_coll);
                 } else if (role == erGapFill) {
-                    if (paths.size() == 1) {
-                        coll.push_back(paths.front().clone_move());
+                    if (multi_paths.size() == 1) {
+                        coll.push_back(multi_paths.paths.front().clone_move());
                     } else {
-                        ExtrusionEntityCollection* unsortable_coll = new ExtrusionEntityCollection(std::move(paths));
-                        //gap fill : can reverse, but refrain from cutting them as it creates a mess.
-                        // I say that, but currently (false, true) does bad things.
-                        unsortable_coll->set_can_sort_reverse(false, true);
-                        coll.push_back(unsortable_coll);
+                        //can reverse but not sort/cut: it's a multipath!
+                        coll.push_back(multi_paths.clone_move());
                     }
                 } else {
-                    for (ExtrusionPath& path : paths)
-                        coll.push_back(new ExtrusionPath(std::move(path)));
+                    coll.push_back(multi_paths.clone_move());
                 }
             }
         }

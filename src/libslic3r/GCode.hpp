@@ -302,6 +302,8 @@ private:
     std::string     extrude_path(const ExtrusionPath &path, const std::string &description, double speed = -1.);
     std::string     extrude_path_3D(const ExtrusionPath3D &path, const std::string &description, double speed = -1.);
     void            split_at_seam_pos(ExtrusionLoop &loop, std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid, bool was_clockwise);
+    template <typename THING = ExtrusionEntity> // can be templated safely because private
+    void            add_wipe_points(const std::vector<THING>& paths);
 
     // Extruding multiple objects with soluble / non-soluble / combined supports
     // on a multi-material printer, trying to minimize tool switches.

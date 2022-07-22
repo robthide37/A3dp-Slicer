@@ -217,8 +217,8 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                 for (const ExtrusionEntity* entity : entities) {
                     extruded_volume += entity->total_volume();
                 }
-                //append
-                all_new_paths->append(entities);
+                //append (move so the pointers are reused, and won't need to be deleted)
+                all_new_paths->append(std::move(entities));
             }
             thick_polylines.clear();
 

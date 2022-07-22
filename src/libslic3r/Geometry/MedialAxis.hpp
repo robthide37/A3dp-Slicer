@@ -159,7 +159,9 @@ private:
 /// create a ExtrusionEntitiesPtr from ThickPolylines, discretizing the variable width into little sections (of 4*SCALED_RESOLUTION length) where needed. Please delete all ptr if not used.
 ExtrusionEntitiesPtr thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, const Flow &flow, const coord_t resolution_internal);
 // used by thin_variable_width. Only does the work for a single polyline.
-ExtrusionPaths variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance);
+ExtrusionMultiPath variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance);
+//prefer using multi_variable_width
+ExtrusionPaths unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance);
 
 } } // namespace Slicer::Geometry
 

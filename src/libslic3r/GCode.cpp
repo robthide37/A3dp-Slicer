@@ -3855,7 +3855,13 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     const coordf_t full_loop_length = loop_to_seam.length();
     const bool is_full_loop_ccw = loop_to_seam.polygon().is_counter_clockwise();
     //after that point, loop_to_seam can be modified by 'paths', so don't use it anymore
-    
+#if _DEBUG
+    for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
+        assert(it->polyline.points.size() >= 2);
+        assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+    }
+    assert(loop.paths.front().first_point() == loop.paths.back().last_point());
+#endif
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
     // we discard it in that case
@@ -3978,8 +3984,8 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     // reset acceleration
     m_writer.set_acceleration((uint16_t)floor(get_default_acceleration(m_config) + 0.5));
 
-    if (m_wipe.enable)
-        m_wipe.path = paths.front().polyline;  // TODO: don't limit wipe to last path
+    //basic wipe, may be erased after if we need a more complex one
+    add_wipe_points(paths);
 
     //wipe for External Perimeter (and not vase)
     if (paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 0 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 2
@@ -4159,16 +4165,39 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     return gcode;
 }
 
+template <typename THING>
+void GCode::add_wipe_points(const std::vector<THING>& paths) {
+    if (m_wipe.enable) {
+        m_wipe.path = std::move(paths.back().polyline);
+        m_wipe.path.reverse();
+
+        for (auto it = std::next(paths.rbegin()); it != paths.rend(); ++it) {
+            if (is_bridge(it->role()))
+                break; // Do not perform a wipe on bridges.
+
+            assert(it->polyline.points.size() >= 2);
+            assert(m_wipe.path.points.back() == it->polyline.last_point());
+            if (m_wipe.path.points.back() != it->polyline.last_point())
+                break; // ExtrusionMultiPath is interrupted in some place.
+
+            m_wipe.path.points.insert(m_wipe.path.points.end(), it->polyline.points.rbegin() + 1, it->polyline.points.rend());
+        }
+    }
+}
+
 std::string GCode::extrude_multi_path(const ExtrusionMultiPath &multipath, const std::string &description, double speed) {
+#if _DEBUG
+    for (auto it = std::next(multipath.paths.begin()); it != multipath.paths.end(); ++it) {
+        assert(it->polyline.points.size() >= 2);
+        assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+    }
+#endif
     // extrude along the path
     std::string gcode;
     for (const ExtrusionPath &path : multipath.paths) {
         gcode += extrude_path(path, description, speed);
     }
-    if (m_wipe.enable) {
-        m_wipe.path = std::move(multipath.paths.back().polyline);  // TODO: don't limit wipe to last path
-        m_wipe.path.reverse();
-    }
+    add_wipe_points(multipath.paths);
     // reset acceleration
     m_writer.set_acceleration((uint16_t)floor(get_default_acceleration(m_config) + 0.5));
     return gcode;
@@ -4202,10 +4231,7 @@ std::string GCode::extrude_multi_path3D(const ExtrusionMultiPath3D &multipath3D,
         }
         gcode += this->_after_extrude(path);
     }
-    if (m_wipe.enable) {
-        m_wipe.path = std::move(multipath3D.paths.back().polyline);  // TODO: don't limit wipe to last path
-        m_wipe.path.reverse();
-    }
+    add_wipe_points(multipath3D.paths);
     // reset acceleration
     m_writer.set_acceleration((uint16_t)floor(get_default_acceleration(m_config) + 0.5));
     return gcode;
