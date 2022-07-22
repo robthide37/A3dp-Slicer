@@ -251,6 +251,23 @@ public:
 struct IslandConnection {
     float area { };
     Vec3f centroid_accumulator = Vec3f::Zero();
+    Vec2f second_moment_of_area_accumulator = Vec2f::Zero();
+
+    void add(const IslandConnection &other) {
+        this->area += other.area;
+        this->centroid_accumulator += other.centroid_accumulator;
+        this->second_moment_of_area_accumulator += other.second_moment_of_area_accumulator;
+    }
+
+    void print_info(const std::string &tag) {
+        Vec3f centroid = centroid_accumulator / area;
+        Vec2f variance =
+                (second_moment_of_area_accumulator / area - centroid.head<2>().cwiseProduct(centroid.head<2>()));
+        std::cout << tag << std::endl;
+        std::cout << "area: " << area << std::endl;
+        std::cout << "centroid: " << centroid.x() << " " << centroid.y() << " " << centroid.z() << std::endl;
+        std::cout << "variance: " << variance.x() << " " << variance.y() << std::endl;
+    }
 };
 
 struct Island {
@@ -557,8 +574,11 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                     && prev_layer_grid.get_pixel(coords) != NULL_ISLAND) {
                 IslandConnection &connection = result.islands[current_layer_grid.get_pixel(coords)]
                         .connected_islands[prev_layer_grid.get_pixel(coords)];
+                Vec2f current_coords = current_layer_grid.get_pixel_center(coords);
                 connection.area += current_layer_grid.pixel_area();
-                connection.centroid_accumulator += to_3d(current_layer_grid.get_pixel_center(coords), result.layer_z)
+                connection.centroid_accumulator += to_3d(current_coords, result.layer_z)
+                        * current_layer_grid.pixel_area();
+                connection.second_moment_of_area_accumulator += current_coords.cwiseProduct(current_coords)
                         * current_layer_grid.pixel_area();
             }
         }
@@ -566,16 +586,6 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
 
     return {result, current_layer_grid};
 }
-
-struct WeakestConnection {
-    float area = 0.0f;
-    Vec3f centroid_accumulator = Vec3f::Zero();
-
-    void add(const WeakestConnection &other) {
-        this->area += other.area;
-        this->centroid_accumulator += other.centroid_accumulator;
-    }
-};
 
 struct CoordinateFunctor {
     const std::vector<Vec3f> *coordinates;
@@ -702,24 +712,25 @@ public:
     }
 
     float is_strong_enough_while_extruding(
-            const WeakestConnection &connection,
+            const IslandConnection &connection,
             const ExtrusionLine &extruded_line,
             float layer_z,
             const Params &params) const {
 
         Vec2f line_dir = (extruded_line.b - extruded_line.a).normalized();
-        Vec3f pivot = connection.centroid_accumulator / connection.area;
-
-        float tensile_force = connection.area * params.tensile_strength;
-        float tensile_arm = fsqrt(connection.area / float(PI));
-        float tensile_torque = tensile_force * tensile_arm;
+        Vec3f centroid = connection.centroid_accumulator / connection.area;
+        Vec2f variance = (connection.second_moment_of_area_accumulator / connection.area
+                - centroid.head<2>().cwiseProduct(centroid.head<2>()));
+        float extreme_fiber_dist = variance.cwiseSqrt().norm();
+        float elastic_section_modulus = connection.area * (variance.x() + variance.y()) / extreme_fiber_dist;
+        float yield_torque = elastic_section_modulus * params.yield_strength;
 
         const Vec3f &mass_centroid = this->volume_centroid_accumulator / this->volume;
         float mass = this->volume * params.filament_density
-                * ((2.0f * layer_z - pivot.z() - mass_centroid.z()) / (2.0f * layer_z));
+                * ((2.0f * layer_z - centroid.z() - mass_centroid.z()) / (2.0f * layer_z));
 
         float weight = mass * params.gravity_constant;
-        float weight_arm = (pivot.head<2>() - mass_centroid.head<2>()).norm();
+        float weight_arm = (centroid.head<2>() - mass_centroid.head<2>()).norm();
         float weight_torque = weight_arm * weight;
 
         float bed_movement_arm = mass_centroid.z();
@@ -731,24 +742,24 @@ public:
         extruder_pressure_direction.normalize();
         Vec3d endpoint = (to_3d(extruded_line.b, layer_z)).cast<double>();
         float conflict_torque_arm = line_alg::distance_to(
-                Linef3(endpoint, endpoint + extruder_pressure_direction.cast<double>()), pivot.cast<double>());
+                Linef3(endpoint, endpoint + extruder_pressure_direction.cast<double>()), centroid.cast<double>());
         float extruder_conflict_force = params.tolerable_extruder_conflict_force +
                 std::min(extruded_line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
         float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
 
-        float total_torque = bed_movement_torque + extruder_conflict_torque + weight_torque - tensile_torque;
+        float total_torque = bed_movement_torque + extruder_conflict_torque + weight_torque - yield_torque;
 #if 1
         BOOST_LOG_TRIVIAL(debug)
-        << "pivot: " << pivot.x() << "  " << pivot.y() << "  " << pivot.z();
+        << "centroid: " << centroid.x() << "  " << centroid.y() << "  " << centroid.z();
         BOOST_LOG_TRIVIAL(debug)
         << "mass_centroid: " << mass_centroid.x() << "  " << mass_centroid.y() << "  "
                 << mass_centroid.z();
         BOOST_LOG_TRIVIAL(debug)
-        << "SSG: tensile_force: " << tensile_force;
+        << "variance: " << variance.x() << "  " << variance.y();
         BOOST_LOG_TRIVIAL(debug)
-        << "SSG: tensile_arm: " << tensile_arm;
+        << "SSG: elastic_section_modulus: " << elastic_section_modulus;
         BOOST_LOG_TRIVIAL(debug)
-        << "SSG: tensile_torque: " << tensile_torque;
+        << "SSG: yield_torque: " << yield_torque;
         BOOST_LOG_TRIVIAL(debug)
         << "SSG: weight_arm: " << weight_arm;
         BOOST_LOG_TRIVIAL(debug)
@@ -809,8 +820,8 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
     std::unordered_map<size_t, size_t> prev_island_to_object_part_mapping;
     std::unordered_map<size_t, size_t> next_island_to_object_part_mapping;
 
-    std::unordered_map<size_t, WeakestConnection> prev_island_to_weakest_connection;
-    std::unordered_map<size_t, WeakestConnection> next_island_to_weakest_connection;
+    std::unordered_map<size_t, IslandConnection> prev_island_to_weakest_connection;
+    std::unordered_map<size_t, IslandConnection> next_island_to_weakest_connection;
 
     for (size_t layer_idx = 0; layer_idx < islands_graph.size(); ++layer_idx) {
         float layer_z = islands_graph[layer_idx].layer_z;
@@ -818,11 +829,7 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
         std::cout << "at layer: " << layer_idx << "  the following island to object mapping is used:" << std::endl;
         for (const auto &m : prev_island_to_object_part_mapping) {
             std::cout << "island " << m.first << " maps to part " << m.second << std::endl;
-            Vec3f connection_center = prev_island_to_weakest_connection[m.first].centroid_accumulator
-                    / prev_island_to_weakest_connection[m.first].area;
-            std::cout << " island has weak point with connection area: " <<
-                    prev_island_to_weakest_connection[m.first].area << " and center: " <<
-                    connection_center.x() << " " << connection_center.y() << " " << connection_center.z() << std::endl;
+            prev_island_to_weakest_connection[m.first].print_info("connection info:");
         }
 
         for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
@@ -833,20 +840,19 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                 active_object_parts.emplace(part_idx, ObjectPart(island));
                 next_island_to_object_part_mapping.emplace(island_idx, part_idx);
                 next_island_to_weakest_connection.emplace(island_idx,
-                        WeakestConnection { INFINITY, Vec3f::Zero() });
+                        IslandConnection { 1.0f, Vec3f::Zero(), Vec2f { INFINITY, INFINITY } });
                 layer_active_parts.insert(part_idx);
             } else {
                 size_t final_part_idx { };
-                WeakestConnection transfered_weakest_connection { };
-                WeakestConnection new_weakest_connection { };
+                IslandConnection transfered_weakest_connection { };
+                IslandConnection new_weakest_connection { };
                 // MERGE parts
                 {
                     std::unordered_set<size_t> part_indices;
                     for (const auto &connection : island.connected_islands) {
                         part_indices.insert(prev_island_to_object_part_mapping.at(connection.first));
                         transfered_weakest_connection.add(prev_island_to_weakest_connection.at(connection.first));
-                        new_weakest_connection.area += connection.second.area;
-                        new_weakest_connection.centroid_accumulator += connection.second.centroid_accumulator;
+                        new_weakest_connection.add(connection.second);
                     }
                     final_part_idx = *part_indices.begin();
                     for (size_t part_idx : part_indices) {
@@ -858,22 +864,16 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                         }
                     }
                 }
-                auto estimate_strength = [layer_z](const WeakestConnection &conn) {
-                    float radius = fsqrt(conn.area / PI);
-                    float arm_len_estimate = std::max(1.3f, layer_z - (conn.centroid_accumulator.z() / conn.area));
-                    return radius * conn.area / arm_len_estimate;
+                auto estimate_strength = [layer_z](const IslandConnection &conn) {
+                    Vec3f centroid = conn.centroid_accumulator / conn.area;
+                    float min_variance = (conn.second_moment_of_area_accumulator / conn.area
+                            - centroid.head<2>().cwiseProduct(centroid.head<2>())).minCoeff();
+                    float arm_len_estimate = std::max(1.1f, layer_z - (conn.centroid_accumulator.z() / conn.area));
+                    return min_variance / arm_len_estimate;
                 };
 
-                std::cout << "new_weakest_connection info: " << std::endl;
-                std::cout << "area: " << new_weakest_connection.area << std::endl;
-                std::cout << "centroid acc: " << new_weakest_connection.centroid_accumulator.x() << " "
-                        << new_weakest_connection.centroid_accumulator.y() << " "
-                        << new_weakest_connection.centroid_accumulator.z() << std::endl;
-                std::cout << "transfered_weakest_connection info: " << std::endl;
-                std::cout << "area: " << transfered_weakest_connection.area << std::endl;
-                std::cout << "centroid acc: " << transfered_weakest_connection.centroid_accumulator.x() << " "
-                        << transfered_weakest_connection.centroid_accumulator.y() << " "
-                        << transfered_weakest_connection.centroid_accumulator.z() << std::endl;
+                new_weakest_connection.print_info("new_weakest_connection");
+                transfered_weakest_connection.print_info("transfered_weakest_connection");
 
                 if (estimate_strength(transfered_weakest_connection) < estimate_strength(new_weakest_connection)) {
                     new_weakest_connection = transfered_weakest_connection;
@@ -911,20 +911,16 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
         for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
             const Island &island = islands_graph[layer_idx].islands[island_idx];
             ObjectPart &part = active_object_parts.at(prev_island_to_object_part_mapping[island_idx]);
-            WeakestConnection &weakest_conn = prev_island_to_weakest_connection[island_idx];
-            std::cout << "Weakest connection info: " << std::endl;
-            std::cout << "area: " << weakest_conn.area << std::endl;
-            std::cout << "centroid acc: " << weakest_conn.centroid_accumulator.x() << " "
-                    << weakest_conn.centroid_accumulator.y() << " "
-                    << weakest_conn.centroid_accumulator.z() << std::endl;
+            IslandConnection &weakest_conn = prev_island_to_weakest_connection[island_idx];
+            weakest_conn.print_info("weakest connection info: ");
 
             std::vector<ExtrusionLine> dummy { };
             LinesDistancer island_lines_dist(dummy);
             float unchecked_dist = params.min_distance_between_support_points + 1.0f;
 
             for (const ExtrusionLine &line : island.external_lines) {
-                if (unchecked_dist + line.len < params.min_distance_between_support_points
-                        && line.malformation < 0.3f) {
+                if ((unchecked_dist + line.len < params.min_distance_between_support_points
+                        && line.malformation < 0.3f) || line.len == 0) {
                     unchecked_dist += line.len;
                 } else {
                     unchecked_dist = line.len;
@@ -953,6 +949,8 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
 
                             weakest_conn.area += area;
                             weakest_conn.centroid_accumulator += support_point * area;
+                            weakest_conn.second_moment_of_area_accumulator += area
+                                    * support_point.head<2>().cwiseProduct(support_point.head<2>());
                         }
                     }
                 }
