@@ -2642,6 +2642,12 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
         // thus empty path segments will not be produced by G-code export.
         loop.split_at(last_pos, false, scaled<double>(0.0015));
 
+    for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
+        assert(it->polyline.points.size() >= 2);
+        assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+    }
+    assert(loop.paths.front().first_point() == loop.paths.back().last_point());
+
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
     // we discard it in that case
@@ -2670,8 +2676,21 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
     // reset acceleration
     gcode += m_writer.set_acceleration((unsigned int)(m_config.default_acceleration.value + 0.5));
 
-    if (m_wipe.enable)
-        m_wipe.path = paths.front().polyline;  // TODO: don't limit wipe to last path
+    if (m_wipe.enable) {
+        m_wipe.path = paths.front().polyline;
+
+        for (auto it = std::next(paths.begin()); it != paths.end(); ++it) {
+            if (is_bridge(it->role()))
+                break; // Don't perform a wipe on bridges.
+
+            assert(it->polyline.points.size() >= 2);
+            assert(m_wipe.path.points.back() == it->polyline.first_point());
+            if (m_wipe.path.points.back() != it->polyline.first_point())
+                break; // ExtrusionLoop is interrupted in some place.
+
+            m_wipe.path.points.insert(m_wipe.path.points.end(), it->polyline.points.begin() + 1, it->polyline.points.end());
+        }
+    }
 
     // make a little move inwards before leaving loop
     if (paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 1 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 3) {
@@ -2712,6 +2731,10 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
 
 std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, std::string description, double speed)
 {
+    for (auto it = std::next(multipath.paths.begin()); it != multipath.paths.end(); ++it) {
+        assert(it->polyline.points.size() >= 2);
+        assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+    }
     // extrude along the path
     std::string gcode;
     for (ExtrusionPath path : multipath.paths) {
@@ -2721,8 +2744,20 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, std::string 
         gcode += this->_extrude(path, description, speed);
     }
     if (m_wipe.enable) {
-        m_wipe.path = std::move(multipath.paths.back().polyline);  // TODO: don't limit wipe to last path
+        m_wipe.path = std::move(multipath.paths.back().polyline);
         m_wipe.path.reverse();
+
+        for (auto it = std::next(multipath.paths.rbegin()); it != multipath.paths.rend(); ++it) {
+            if (is_bridge(it->role()))
+                break; // Do not perform a wipe on bridges.
+
+            assert(it->polyline.points.size() >= 2);
+            assert(m_wipe.path.points.back() == it->polyline.last_point());
+            if (m_wipe.path.points.back() != it->polyline.last_point())
+                break; // ExtrusionMultiPath is interrupted in some place.
+
+            m_wipe.path.points.insert(m_wipe.path.points.end(), it->polyline.points.rbegin() + 1, it->polyline.points.rend());
+        }
     }
     // reset acceleration
     gcode += m_writer.set_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
