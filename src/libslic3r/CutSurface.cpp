@@ -411,11 +411,13 @@ VDistances calc_distances(const SurfacePatches &patches,
 /// </summary>
 /// <param name="distances">All distances - Vector distances for each shape point</param>
 /// <param name="shapes">Vector of letters</param>
+/// <param name="center">Center of projection</param>
 /// <param name="shape_point_2_index">Convert index to addresss inside of shape</param>
 /// <returns>Best projection distances</returns>
 ProjectionDistances choose_best_distance(
     const VDistances       &distances,
     const ExPolygons       &shapes,
+    const Point            &center,
     const ShapePoint2index &shape_point_2_index);
 
 /// <summary>
@@ -454,6 +456,7 @@ void store(const CutAOIs &aois, const CutMesh &mesh, const std::string &dir);
 void store(const SurfacePatches &patches, const std::string &dir);
 void store(const Vec3f &vertex, const Vec3f &normal, const std::string &file, float size = 2.f);
 void store(const ProjectionDistances &pds, const VCutAOIs &aois, const CutMeshes &meshes, const std::string &file, float width = 0.2f/* [in mm] */);
+void store(const ExPolygons& shapes, const std::vector<bool>& mask_distances, const std::vector<std::pair<size_t, size_t>>& connections, const std::string& file_svg);
 void store(const SurfaceCut &cut, const std::string &file, const std::string &contour_dir);
 void store(const std::vector<indexed_triangle_set> &models, const std::string &obj_filename);
 void store(const std::vector<CutMesh>&models, const std::string &dir);
@@ -541,7 +544,7 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     priv::VDistances distances = priv::calc_distances(patches, cgal_models, cgal_shape, shapes_points, projection_ratio);
 
     // for each point select best projection
-    priv::ProjectionDistances best_projection = priv::choose_best_distance(distances, shapes, s2i);
+    priv::ProjectionDistances best_projection = priv::choose_best_distance(distances, shapes, shapes_bb.center(), s2i);
     std::vector<bool> use_patch = priv::select_patches(best_projection, patches, model_cuts);
     SurfaceCut result = merge_patches(patches, use_patch);
 #ifdef DEBUG_OUTPUT_DIR
@@ -1685,6 +1688,9 @@ priv::VDistances priv::calc_distances(const SurfacePatches &patches,
     return result;
 }
 
+
+#include "libslic3r/AABBTreeLines.hpp"
+#include "libslic3r/Line.hpp"
 // functions for choose_best_distance
 namespace priv {
 
@@ -1700,20 +1706,22 @@ struct ClosePoint
     float dist_sq = std::numeric_limits<float>::max();
 };
 
-// search in all shapes points to found closest point to given point
-uint32_t get_closest_point_index(const Point &p, const ExPolygons &shapes, const VDistances &distances);
+struct SearchData{
+// IMPROVE: float lines are enough
+std::vector<Linef> lines;
+// convert line index into Shape point index
+std::vector<size_t> cvt;
+// contain lines from prev point to Point index
+AABBTreeIndirect::Tree<2, double> tree;
+};
 
-using PNode = std::pair<Point, uint32_t>;
-using PNodes = std::vector<PNode>;
-PNodes create_nodes(const ExPolygons &shapes, const VDistances &distances, size_t shapes_point_count);
+SearchData create_search_data(const ExPolygons &shapes, const std::vector<bool>& mask);
+uint32_t get_closest_point_index(const SearchData &sd, size_t line_idx, const Vec2d &hit_point, const ExPolygons &shapes, const ShapePoint2index &s2i);
 
-/// <summary>
-/// Search in all shapes points(nodes) to found closest point to given point
-/// </summary>
-/// <param name="p">Point to search closest</param>
-/// <param name="nodes">Points sorted by X</param>
-/// <returns>Index into shapes of point closest to given point</returns>
-uint32_t get_closest_point_index2(const Point &p, const PNodes& nodes);
+// use AABB Tree Lines to find closest point
+uint32_t find_closest_point_index(const Point &p, const ExPolygons &shapes, const ShapePoint2index &s2i, const std::vector<bool> &mask);
+
+std::pair<uint32_t, uint32_t> find_closest_point_pair(const ExPolygons &shapes, const std::vector<bool> &done_shapes, const ShapePoint2index  &s2i, const std::vector<bool> &mask);
 
 // Search for closest projection to wanted distance
 const ProjectionDistance *get_closest_projection(const ProjectionDistances &distance, float wanted_distance);
@@ -1729,136 +1737,179 @@ ClosePoint find_close_point(const Point &p, ProjectionDistances &result, std::ve
 
 }
 
-float priv::calc_size_sq(const Point &p){
+float priv::calc_size_sq(const Point &p){    
+    // NOTE: p.squaredNorm() can't be use due to overflow max int value
     return (float) p.x() * p.x() + (float) p.y() * p.y();
 }
 
-uint32_t priv::get_closest_point_index(const Point      &p,
-                                       const ExPolygons &shapes,
-                                       const VDistances &distances)
+priv::SearchData priv::create_search_data(const ExPolygons        &shapes,
+                                          const std::vector<bool> &mask)
 {
-    ClosePoint cp;
-    uint32_t id{0};
-    auto get_closest = [&distances, &p, &id, &cp]
-    (const Points &pts) {
-        for (const Point &p_ : pts) {
-            if (distances[id].empty()) { 
-                ++id;
-                continue;
-            }
-            float d = calc_size_sq(p - p_);
-            if (cp.dist_sq > d) {
-                cp.dist_sq = d;
-                cp.index  = id;
-            }
-            ++id;
-        }
-    };
-    for (const ExPolygon &shape : shapes) {
-        get_closest(shape.contour.points);
-        for (const Polygon &hole : shape.holes) 
-            get_closest(hole.points);
-    }
-    return cp.index;
-}
-
-priv::PNodes priv::create_nodes(const ExPolygons &shapes, const VDistances &distances, size_t shapes_point_count) {
-    PNodes pts;
-    pts.reserve(shapes_point_count);
-    uint32_t index = 0;
-    auto  add_polygon = [&pts, &index, &distances](const Polygon &poly) {
+    // IMPROVE: Use float precission (it is enough)
+    SearchData sd;
+    sd.lines.reserve(mask.size());
+    sd.cvt.reserve(mask.size());
+    size_t index     = 0;
+    auto   add_lines = [&sd, &index, &mask]
+    (const Polygon &poly) {
+        Vec2d prev = poly.back().cast<double>();
+        bool use_point = mask[index + poly.points.size() - 1];
         for (const Point &p : poly.points) {
-            // skip empty distances
-            if (distances[index].empty()) {
-                ++index;
-                continue;
+            if (!use_point) {
+                use_point = mask[index];
+                if (use_point) prev = p.cast<double>();
+            } else if (!mask[index]) {
+                use_point = false;
+            } else {
+                Vec2d p_d = p.cast<double>();
+                sd.lines.emplace_back(prev, p_d);
+                sd.cvt.push_back(index);
+                prev = p_d;
             }
-            pts.emplace_back(p, index++);
+            ++index;
         }
     };
-    for (const ExPolygon s : shapes) {
-        add_polygon(s.contour);
-        for (const Polygon &h : s.holes) add_polygon(h);
+
+    for (const ExPolygon &shape : shapes) {
+        add_lines(shape.contour);
+        for (const Polygon &hole : shape.holes) add_lines(hole);
     }
-    
-    std::sort(pts.begin(), pts.end(), [](const PNode &n1, const PNode &n2) {
-        return n1.first.x() < n2.first.x();
-    });
-    return pts;
+    sd.tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(sd.lines);
+    return sd;
 }
 
-uint32_t priv::get_closest_point_index2(const Point &p, const PNodes &nodes)
+uint32_t priv::get_closest_point_index(const SearchData &sd,
+                                       size_t            line_idx,
+                                       const Vec2d      &hit_point,
+                                       const ExPolygons       &shapes,
+                                       const ShapePoint2index &s2i)
 {
-    assert(!nodes.empty());
+    const Linef &line = sd.lines[line_idx];
+    Vec2d dir = line.a - line.b;
+    Vec2d dir_abs = dir.cwiseAbs();
+    // use x coordinate
+    int i = (dir_abs.x() > dir_abs.y())? 0 :1;
+
+    bool use_index = abs(line.a[i] - hit_point[i]) >
+                     abs(line.b[i] - hit_point[i]);
+    size_t point_index = sd.cvt[line_idx];
+
+    // Lambda used only for check result
+    auto   is_same     = [&s2i, &shapes](const Vec2d &p, size_t i) -> bool {
+        auto id = s2i.calc_id(i);
+        const ExPolygon &shape = shapes[id.expolygons_index];
+        const Polygon   &poly  = (id.polygon_index == 0) ?
+                                           shape.contour :
+                                           shape.holes[id.polygon_index - 1];
+        Vec2i p_ = p.cast<int>();
+        return p_ == poly[id.point_index];
+    };
+
+    if (use_index) { 
+        assert(is_same(line.b, point_index));
+        return point_index; 
+    }
+    auto id = s2i.calc_id(point_index);
+    if (id.point_index != 0) {
+        assert(is_same(line.a, point_index - 1));
+        return point_index - 1;
+    }
+    const ExPolygon &shape = shapes[id.expolygons_index];
+    size_t count_polygon_points = (id.polygon_index == 0) ?
+        shape.contour.size() :
+        shape.holes[id.polygon_index - 1].size();
+    size_t prev_point_index = point_index  + (count_polygon_points - 1);
+    assert(is_same(line.a, prev_point_index));
+    // return previous point index
+    return prev_point_index;
+}
+
+// use AABB Tree Lines
+uint32_t priv::find_closest_point_index(const Point            &p,
+                                        const ExPolygons       &shapes,
+                                        const ShapePoint2index &s2i,
+                                        const std::vector<bool> &mask)
+{    
+    SearchData sd = create_search_data(shapes, mask);
+    size_t line_idx = std::numeric_limits<size_t>::max();
+    Vec2d  hit_point;
+    Vec2d  p_d = p.cast<double>();
+    double distance_sq = AABBTreeLines::squared_distance_to_indexed_lines(
+        sd.lines, sd.tree, p_d, line_idx, hit_point);
+    assert(distance_sq > 0);
     
-    // function to find upper point node
-    auto f_u = [](coord_t value, const PNode& n) {
-        return value < n.first.x();
-    };
+    // IMPROVE: one could use line ratio to find closest point
+    return get_closest_point_index(sd, line_idx, hit_point, shapes, s2i);
+}
 
-    // function to find lower point node
-    auto f_l = [](const PNode &n, coord_t value) {
-        return value > n.first.x();
-    };
+std::pair<uint32_t, uint32_t> priv::find_closest_point_pair(
+    const ExPolygons        &shapes,
+    const std::vector<bool> &done_shapes,
+    const ShapePoint2index  &s2i,
+    const std::vector<bool> &mask)
+{
+    assert(mask.size() == s2i.get_count());
+    assert(done_shapes.size() == shapes.size());
+    std::vector<bool> unfinished_mask = mask; // copy
 
-    // closest point node in X
-    auto it_x = std::upper_bound(nodes.begin(), nodes.end(), p.x(), f_u);
-    // manhatn distance to closest point
-    auto manhattan_size = [](const Point &p) -> uint32_t {
-        return std::abs(p.x()) + abs(p.y());
-    };
-    uint32_t manhattan_dist = (it_x != nodes.end())?
-        manhattan_size(it_x->first - p) :
-        manhattan_size(nodes.back().first - p);
-    // node for lower bound
-    auto  it_l = std::lower_bound(nodes.begin(), it_x, p.x() - manhattan_dist, f_l);
-    auto it = it_x;
-    while (it > it_l) {
-        uint32_t diff_y = std::abs(it->first.y() - p.y());
-        if (diff_y > manhattan_dist) {
-            --it;
+    size_t index = 0;
+    for (size_t shape_index = 0; shape_index < shapes.size(); shape_index++) {
+        size_t count = count_points(shapes[shape_index]);
+        if (done_shapes[shape_index]) { 
+            for (size_t i = 0; i < count; ++i, ++index)
+                unfinished_mask[index] = false;
+        } else {
+            index += count;
+        }
+    }
+    assert(index == s2i.get_count());
+    SearchData sd = create_search_data(shapes, unfinished_mask);
+
+    struct ClosestPair
+    {
+        size_t finish_idx          = std::numeric_limits<size_t>::max();
+        size_t unfinished_line_idx = std::numeric_limits<size_t>::max();
+        Vec2d  hit_point           = Vec2d();
+        double distance_sq         = std::numeric_limits<double>::max();
+    } cp;
+
+    index = 0;
+    for (size_t shape_index = 0; shape_index < shapes.size(); shape_index++) {
+        const ExPolygon shape = shapes[shape_index];
+        if (!done_shapes[shape_index]) {            
+            index += count_points(shape);
             continue;
-        }
-        uint32_t diff_x   = std::abs(it->first.x() - p.x());
-        uint32_t act_dist = diff_y + diff_x;
-        if (manhattan_dist > act_dist) {
-            manhattan_dist = act_dist;
-            it_l = std::lower_bound(it_l, it_x, p.x() - manhattan_dist, f_l);
-        }
-        --it;
+        }        
+
+        auto search_in_polygon = [&index, &cp, &sd, &mask](const Polygon& polygon) {
+            for (size_t i = 0; i < polygon.size(); ++i, ++index) { 
+                if (mask[index] == false) continue;
+                Vec2d p_d = polygon[i].cast<double>();
+                size_t line_idx = std::numeric_limits<size_t>::max();
+                Vec2d  hit_point;
+                double distance_sq = AABBTreeLines::squared_distance_to_indexed_lines(
+                    sd.lines, sd.tree, p_d, line_idx, hit_point, cp.distance_sq);
+                if (distance_sq < 0) continue;
+                assert(distance_sq <= cp.distance_sq);
+                cp.distance_sq         = distance_sq;
+                cp.unfinished_line_idx = line_idx;
+                cp.hit_point           = hit_point;
+                cp.finish_idx          = index;
+            }
+        };
+        search_in_polygon(shape.contour);
+        for (const Polygon& hole: shape.holes)
+            search_in_polygon(hole);
+    }
+    assert(index == s2i.get_count());
+    // check that exists result
+    if (cp.finish_idx == std::numeric_limits<size_t>::max()) {
+        return std::make_pair(std::numeric_limits<size_t>::max(),
+                              std::numeric_limits<size_t>::max());
     }
 
-    // node for upper bound
-    auto  it_u = std::upper_bound(it_x, nodes.end(), p.x() + manhattan_dist, f_u);
-    it = it_x;
-    while (it < it_u) { 
-        ++it;
-        uint32_t diff_y = std::abs(it->first.y() - p.y());
-        if (diff_y > manhattan_dist) continue;
-        uint32_t diff_x = std::abs(it->first.x() - p.x());
-        uint32_t act_dist = diff_y + diff_x;
-        if (manhattan_dist > act_dist) {
-            // IMPROVE: calc euclid distance when e.g. (diff_Biggery < 2*diff_smaller)
-            manhattan_dist = act_dist;
-            it_u = std::upper_bound(it_x, it_u, p.x() + manhattan_dist, f_u);
-        }
-    }
-
-    // find closest by squer distance
-    it = it_l;
-    ClosePoint cp;
-    for (it = it_l; it < it_u; ++it) {
-        uint32_t diff_y = std::abs(it->first.y() - p.y());
-        if (diff_y > manhattan_dist) continue;
-        float diff_x = it->first.x() - p.x();
-        // calculate square distance
-        float d = (float) diff_y * diff_y + diff_x * diff_x;
-        if (cp.dist_sq > d) {
-            cp.dist_sq = d;
-            cp.index   = it->second;
-        }
-    }
-    return cp.index;
+    size_t unfinished_idx = get_closest_point_index(sd, cp.unfinished_line_idx, cp.hit_point, shapes, s2i);
+    return std::make_pair(cp.finish_idx, unfinished_idx);
 }
 
 const priv::ProjectionDistance *priv::get_closest_projection(
@@ -2065,6 +2116,7 @@ priv::ClosePoint priv::find_close_point(const Point         &p,
 priv::ProjectionDistances priv::choose_best_distance(
     const VDistances       &distances,
     const ExPolygons       &shapes,
+    const Point            &center,
     const ShapePoint2index &s2i)
 {
     // collect one closest projection for each outline point
@@ -2077,14 +2129,19 @@ priv::ProjectionDistances priv::choose_best_distance(
     // Distances are relative to projection distance
     // so first wanted distance is the closest one (ZERO)
     float wanted_distance = 0.f;
+    
+    std::vector<bool> mask_distances(s2i.get_count(), {true});
+    for (const auto &d : distances)
+        if (d.empty()) mask_distances[&d - &distances.front()] = false;
 
-    // NOTE: Shapes are centered to respect allign of text
-    Point center(0, 0);
     // Select point from shapes(text contour) which is closest to center (all in 2d)
-    uint32_t unfinished_index = get_closest_point_index(center, shapes, distances);
-
-    //PNodes pts = create_nodes(shapes, distances, s2i.get_count());
-    //uint32_t unfinished_index2 = get_closest_point_index2(center, pts);
+    uint32_t unfinished_index = find_closest_point_index(center, shapes, s2i, mask_distances);
+    
+#ifdef DEBUG_OUTPUT_DIR
+    std::vector<std::pair<size_t, size_t>> connections;
+    connections.reserve(shapes.size());
+    connections.emplace_back(unfinished_index, unfinished_index);
+#endif // DEBUG_OUTPUT_DIR
 
     do {
         const ProjectionDistance* pd = get_closest_projection(distances[unfinished_index], wanted_distance);
@@ -2094,45 +2151,26 @@ priv::ProjectionDistances priv::choose_best_distance(
         fill_shape_distances(unfinished_index, *pd, result, finished_shapes, s2i, shapes, distances);
 
         // The most close points between finished and unfinished shapes
-        unfinished_index = std::numeric_limits<uint32_t>::max();
-        ClosePoint best_cp; // must be finished
-        
-        // for each unfinished points 
-        for (uint32_t shape_index = 0; shape_index < shapes.size(); ++shape_index) {
-            if (finished_shapes[shape_index]) continue;
-            const ExPolygon &shape  = shapes[shape_index];
-            uint32_t index = s2i.calc_index({shape_index, 0, 0});
-            auto find_close_point_in_points =
-                [&unfinished_index, &best_cp,
-                &index, &result, &finished_shapes, &distances, &s2i, &shapes]
-            (const Points &pts) {
-                for (const Point &p : pts) {
-                    if (distances[index].empty()){ 
-                        ++index;
-                        continue;
-                    }
-                    ClosePoint cp = find_close_point(p, result, finished_shapes, s2i, shapes);
-                    if (cp.index != std::numeric_limits<uint32_t>::max() &&
-                        best_cp.dist_sq > cp.dist_sq) {
-                        best_cp = cp; // copy
-                        unfinished_index = index;
-                    }
-                    ++index;
-                }
-            };
-            find_close_point_in_points(shape.contour.points);
-            // shape could be inside of another shape's hole
-            for (const Polygon &h : shape.holes)
-                find_close_point_in_points(h.points);
-        }
-        // detect finish (best doesn't have value)
-        if (best_cp.index == std::numeric_limits<uint32_t>::max()) break;
+        auto [finished, unfinished] = find_closest_point_pair(
+            shapes, finished_shapes, s2i, mask_distances);
 
-        const ProjectionDistance &closest_pd = result[best_cp.index];
+        // detection of end (best doesn't have value)
+        if (finished == std::numeric_limits<uint32_t>::max()) break;
+
+        assert(unfinished != std::numeric_limits<uint32_t>::max());
+        const ProjectionDistance &closest_pd = result[finished];
         // check that best_cp is finished and has result
         assert(closest_pd.aoi_index != std::numeric_limits<uint32_t>::max());
         wanted_distance = closest_pd.distance;
-    } while (unfinished_index != std::numeric_limits<uint32_t>::max());
+        unfinished_index = unfinished;
+
+#ifdef DEBUG_OUTPUT_DIR
+        connections.emplace_back(finished, unfinished);
+#endif // DEBUG_OUTPUT_DIR
+    } while (true); //(unfinished_index != std::numeric_limits<uint32_t>::max());    
+#ifdef DEBUG_OUTPUT_DIR
+    store(shapes, mask_distances, connections, DEBUG_OUTPUT_DIR + "closest_points.svg");
+#endif // DEBUG_OUTPUT_DIR
     return result;
 }
 
@@ -3409,6 +3447,50 @@ void priv::store(const ProjectionDistances &pds,
         its.indices.emplace_back(i + 2, i + 1, i + 3);
     }
     its_write_obj(its, file.c_str());
+}
+
+#include "SVG.hpp"
+void priv::store(const ExPolygons                   &shapes,
+           const std::vector<bool>            &mask,
+           const std::vector<std::pair<size_t, size_t>> &connections,
+           const std::string                  &file_svg)
+{
+    auto bb = get_extents(shapes);
+    int  width = get_extents(shapes.front()).size().x() / 70;
+
+    SVG svg(file_svg, bb);
+    svg.draw(shapes);
+    
+    ShapePoint2index s2i(shapes);
+    auto get_point = [&shapes, &s2i](size_t i)->Point {
+        auto id = s2i.calc_id(i);
+        const ExPolygon &s  = shapes[id.expolygons_index];
+        const Polygon   &p  = (id.polygon_index == 0) ?
+                                              s.contour :
+                                              s.holes[id.polygon_index - 1];
+        return p[id.point_index];
+    };
+
+    bool is_first = true;
+    for (auto c : connections) { 
+        if (is_first) {
+            is_first = false;
+            Point p = get_point(c.first);
+            svg.draw(p, "purple", 4 * width);
+            continue;
+        }
+        Point p1 = get_point(c.first);
+        Point p2 = get_point(c.second);
+        svg.draw(Line(p1, p2), "red", width);
+    }
+
+    for (size_t i = 0; i < s2i.get_count(); i++) { 
+        Point p = get_point(i);
+        svg.draw(p, "black", 2*width);
+        if (!mask[i])
+            svg.draw(p, "white", width);
+    }
+    svg.Close();
 }
 
 namespace priv {

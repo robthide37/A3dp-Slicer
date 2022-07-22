@@ -87,26 +87,29 @@ inline AABBTreeIndirect::Tree<2, typename LineType::Scalar> build_aabb_tree_over
 }
 
 // Finding a closest line, its closest point and squared distance to the closest point
-// Returns squared distance to the closest point or -1 if the input is empty.
-template<typename LineType, typename TreeType, typename VectorType>
+// Returns squared distance to the closest point or -1 if the input is empty 
+// or no closer point than max_sq_dist
+template<typename LineType, typename TreeType, typename VectorType, 
+    typename Scalar = typename VectorType::Scalar>
 inline typename VectorType::Scalar squared_distance_to_indexed_lines(
-        const std::vector<LineType> &lines,
-        const TreeType &tree,
-        const VectorType &point,
-        size_t &hit_idx_out,
-        Eigen::PlainObjectBase<VectorType> &hit_point_out)
-        {
-    using Scalar = typename VectorType::Scalar;
+    const std::vector<LineType> &lines,
+    const TreeType &tree,
+    const VectorType &point,
+    size_t &hit_idx_out,
+    Eigen::PlainObjectBase<VectorType> &hit_point_out,
+    Scalar max_sqr_dist = std::numeric_limits<Scalar>::infinity())
+{
+    if (tree.empty()) return Scalar(-1);
     auto distancer = detail::IndexedLinesDistancer<LineType, TreeType, VectorType>
             { lines, tree, point };
-    return tree.empty() ?
-                          Scalar(-1) :
-                          AABBTreeIndirect::detail::squared_distance_to_indexed_primitives_recursive(distancer, size_t(0), Scalar(0),
-                                  std::numeric_limits<Scalar>::infinity(), hit_idx_out, hit_point_out);
+    hit_idx_out     = std::numeric_limits<size_t>::max();
+    Scalar distance = AABBTreeIndirect::detail::squared_distance_to_indexed_primitives_recursive(
+        distancer, size_t(0), Scalar(0), max_sqr_dist, hit_idx_out, hit_point_out);
+    if (hit_idx_out == std::numeric_limits<size_t>::max()) return Scalar(-1);
+    return distance;
 }
 
 }
-
 }
 
 #endif /* SRC_LIBSLIC3R_AABBTREELINES_HPP_ */

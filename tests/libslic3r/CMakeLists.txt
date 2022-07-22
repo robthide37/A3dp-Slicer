@@ -7,7 +7,6 @@ add_executable(${_TEST_NAME}_tests
 	test_kdtreeindirect.cpp
 	test_clipper_offset.cpp
 	test_clipper_utils.cpp
-	test_closest_point.cpp
 	test_color.cpp
 	test_config.cpp
 	test_curve_fitting.cpp

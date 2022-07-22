@@ -34,8 +34,6 @@ set(SLIC3R_SOURCES
     clipper.hpp
     ClipperUtils.cpp
     ClipperUtils.hpp
-    ClosestPoint.cpp
-    ClosestPoint.hpp
     Color.cpp
     Color.hpp
     Config.cpp
