@@ -81,6 +81,10 @@ private:
     bool                            m_retracted;
     bool                            m_use_relative_e_distances;
 
+    // Indicate if extrude set speed block was opened using the tag ";_EXTRUDE_SET_SPEED"
+    // or not (not opened, or it was closed using the tag ";_EXTRUDE_END").
+    bool                            opened_extrude_set_speed_block = false;
+
     enum GCodeLineType {
         GCODELINETYPE_INVALID,
         GCODELINETYPE_NOOP,
@@ -158,6 +162,8 @@ private:
         // If set to zero, the slope is unlimited.
         float       max_volumetric_extrusion_rate_slope_positive;
         float       max_volumetric_extrusion_rate_slope_negative;
+
+        bool        adjustable_flow = false;
     };
 
     // Output buffer will only grow. It will not be reallocated over and over.
