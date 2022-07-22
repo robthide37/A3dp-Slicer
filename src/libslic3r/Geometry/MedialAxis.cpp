@@ -1597,6 +1597,23 @@ MedialAxis::extends_line(ThickPolyline& polyline, const ExPolygons& anchors, con
 }
 
 void
+MedialAxis::extends_line_extra(ThickPolylines& pp) {
+    // opening : offset2-+
+    for (size_t i = 0; i < pp.size(); ++i) {
+        ThickPolyline& polyline = pp[i];
+
+        if (polyline.endpoints.first) {
+            polyline.extend_start(this->extension_length);
+        }
+        if (polyline.endpoints.second) {
+            polyline.extend_end(this->extension_length);
+        }
+    }
+}
+
+
+
+void
 MedialAxis::main_fusion(ThickPolylines& pp)
 {
     //int idf = 0;
@@ -2059,7 +2076,7 @@ MedialAxis::concatenate_small_polylines(ThickPolylines& pp)
     /*
      new goal: ensure that if there is a too short segment, it will be connected with a sufficiently long one, to save it
     */
-    coordf_t shortest_size = (coordf_t)this->min_length;
+    const coordf_t shortest_size = (coordf_t)this->min_length;
     std::set<size_t> deleted;
     std::vector<size_t> idx_per_size;
     //TODO: cache the length
@@ -2425,10 +2442,11 @@ MedialAxis::remove_too_short_polylines(ThickPolylines& pp)
             // know how long will the endpoints be extended since it depends on polygon thickness
             // which is variable - extension will be <= max_width/2 on each side) 
             if ((polyline.endpoints.first || polyline.endpoints.second)) {
-                coordf_t local_max_width = this->max_width / 2;
+                coordf_t local_min_length = this->max_width / 2;
                 for (coordf_t w : polyline.width)
-                    local_max_width = std::max(local_max_width, w);
-                if (polyline.length() < local_max_width) {
+                    local_min_length = std::max(local_min_length, w - SCALED_EPSILON);
+                local_min_length = std::max(local_min_length, shortest_size);
+                if (polyline.length() < local_min_length) {
                     if (shortest_size > polyline.length()) {
                         shortest_size = polyline.length();
                         shortest_idx = i;
@@ -2968,6 +2986,8 @@ MedialAxis::build(ThickPolylines& polylines_out)
     //    svg.draw(pp, "red");
     //    svg.Close();
     //}
+
+    extends_line_extra(pp);
 
     remove_too_short_polylines(pp);
     //{

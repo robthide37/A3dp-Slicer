@@ -2585,6 +2585,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
+    def = this->add("gap_fill_extension", coFloatOrPercent);
+    def->label = L("Extension");
+    def->full_label = L("Gapfill: extra extension");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Increase the length of all gapfills by this amount (may overextrude a little bit)\nCan be a % of the perimeter width");
+    def->ratio_over = "perimeter_width";
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->max_literal = { 50, true };
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent{ 0, false });
+
     def = this->add("gap_fill_flow_match_perimeter", coPercent);
     def->label = L("Cap with perimeter flow");
     def->full_label = L("Gapfill: cap speed with perimeter flow");
@@ -2626,6 +2638,17 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent{ 100, true });
+
+    def = this->add("gap_fill_min_length", coFloatOrPercent);
+    def->label = L("Min length");
+    def->full_label = L("Gapfill: Min length");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("This setting represents the minimum mm for a gapfill extrusion to be extruded.\nCan be a % of the perimeter width\n0 to auto");
+    def->ratio_over = "perimeter_width";
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent{ 0, false });
 
     def = this->add("gap_fill_min_width", coFloatOrPercent);
     def->label = L("Min width");

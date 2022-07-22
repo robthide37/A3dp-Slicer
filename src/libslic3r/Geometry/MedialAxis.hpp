@@ -73,6 +73,7 @@ public:
     MedialAxis& set_stop_at_min_width(const bool stop_at_min_width) { this->stop_at_min_width = stop_at_min_width; return *this; }
     MedialAxis& set_min_length(const coord_t min_length) { this->min_length = min_length; return *this; }
     MedialAxis& set_biggest_width(const coord_t biggest_width) { this->biggest_width = biggest_width; return *this; }
+    MedialAxis& set_extension_length(const coord_t extension_length) { this->extension_length = extension_length; return *this; }
 
 private:
 
@@ -99,6 +100,8 @@ private:
     coord_t taper_size;
     //if true, remove_too_* can shorten the bits created by extends_line.
     bool stop_at_min_width;
+    // arbitrary extra extension at ends.
+    coord_t extension_length = 0;
 
     //voronoi stuff
     class VD : public voronoi_diagram<double> {

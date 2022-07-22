@@ -62,16 +62,18 @@ group:label_width$12:Overhangs
 		setting:sidetext_width$2:overhangs_reverse
 		setting:label_width$12:width$5:overhangs_reverse_threshold
 	end_line
-group:Advanced
+group:sidetext_width$5:Advanced
 	setting:width$25:no_perimeter_unsupported_algo
 	line:Gap Fill
 		setting:label$_:gap_fill_enabled
 		setting:width$5:gap_fill_last
+		setting:width$5:gap_fill_extension
 	end_line
 	line:Gap Fill threshold
 		setting:width$5:gap_fill_min_width
 		setting:width$5:gap_fill_max_width
-		setting:width$5:gap_fill_min_area
+		setting:width$5:sidetext_width$6:gap_fill_min_area
+		setting:width$5:gap_fill_min_length
 	end_line
 	line:Seam
 		setting:tags$Simple$Advanced$Expert$Prusa$SuSi:script:enum$corners$Corners$nearest$Nearest$random$Random$aligned$Aligned$rear$Rear$custom$Custom:depends$seam_position$seam_angle_cost$seam_travel_cost:label$Seam position:label_width$12:sidetext_width$0:tooltip$Position of perimeters' starting points.\nCustom can be defined in Advanced or Expert mode. Cost-based settings let you choose the angle and travel cost. A high angle cost will place the seam where it can be hidden by a corner, the travel cost place the seam near the last position (often at the end of the previous infill).:s_seam_position
@@ -87,7 +89,7 @@ group:Advanced
 	line:Fuzzy skin (experimental)
 		setting:sidetext_width$1:label$_:fuzzy_skin
 		setting:width$6:sidetext_width$6:fuzzy_skin_thickness
-		setting:width$6:sidetext_width$5:fuzzy_skin_point_dist
+		setting:width$6:fuzzy_skin_point_dist
 	end_line
 group:External perimeter first
 	setting:label$Activate:external_perimeters_first

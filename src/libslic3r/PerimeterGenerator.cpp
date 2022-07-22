@@ -1133,6 +1133,7 @@ void PerimeterGenerator::process()
             coordf_t real_max = 2.5 * perimeter_spacing;
             const coordf_t minwidth = scale_d(this->config->gap_fill_min_width.get_abs_value(unscaled((double)perimeter_width)));
             const coordf_t maxwidth = scale_d(this->config->gap_fill_max_width.get_abs_value(unscaled((double)perimeter_width)));
+            const coord_t minlength = scale_t(this->config->gap_fill_min_length.get_abs_value(unscaled((double)perimeter_width)));
             if (minwidth > 0) {
                 min = std::max(min, minwidth);
             }
@@ -1140,6 +1141,7 @@ void PerimeterGenerator::process()
             if (maxwidth > 0) {
                 max = std::min(max, maxwidth);
             }
+            const coord_t gapfill_extension = scale_t(this->config->gap_fill_extension.get_abs_value(unscaled((double)perimeter_width)));
             //remove areas that are too big (shouldn't occur...)
             ExPolygons too_big = offset2_ex(gaps, double(-max / 2), double(+max / 2));
             ExPolygons gaps_ex_to_test = too_big.empty() ? gaps : diff_ex(gaps, too_big, ApplySafetyOffset::Yes);
@@ -1198,9 +1200,15 @@ void PerimeterGenerator::process()
             // create lines from the area
             ThickPolylines polylines;
             for (const ExPolygon& ex : gaps_ex) {
-                Geometry::MedialAxis{ ex, coord_t(real_max), coord_t(min), coord_t(this->layer->height) }
-                    .set_biggest_width(max)
-                    .build(polylines);
+                Geometry::MedialAxis md{ ex, coord_t(real_max), coord_t(min), coord_t(this->layer->height) };
+                if (minlength > 0) {
+                    md.set_min_length(minlength);
+                }
+                if (gapfill_extension > 0) {
+                    md.set_extension_length(gapfill_extension);
+                }
+                md.set_biggest_width(max);
+                md.build(polylines);
             }
             // create extrusion from lines
             if (!polylines.empty()) {
