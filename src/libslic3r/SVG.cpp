@@ -194,6 +194,21 @@ void SVG::draw(const ThickLines &thicklines, const std::string &fill, const std:
         this->draw(*it, fill, stroke, stroke_width);
 }
 
+void SVG::draw(const ThickPolylines &polylines, const std::string &stroke)
+{
+    for (const ThickPolyline& poly : polylines) {
+        if (poly.points.size() < 2) continue;
+        Line l{ poly.points.front(), poly.points[1] };
+        this->draw(Line{ poly.points.front(), l.midpoint() }, stroke, poly.width.front() / 10);
+        for (int i = 1; i < poly.points.size()-1; ++i) {
+            Point first_point = l.midpoint();
+            l=Line{ poly.points[i], poly.points[i+1] };
+            this->draw(Line{ first_point, l.midpoint() }, stroke, poly.width[i]/10);
+        }
+        this->draw(Line{ l.midpoint(), poly.points.back() }, stroke, poly.width.back() / 10);
+    }
+}
+
 void SVG::draw(const ThickPolylines &polylines, const std::string &stroke, coordf_t stroke_width)
 {
     for (ThickPolylines::const_iterator it = polylines.begin(); it != polylines.end(); ++it)

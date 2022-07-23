@@ -813,18 +813,18 @@ MedialAxis::polyline_from_voronoi(const ExPolygon& voronoi_polygon, ThickPolylin
     // iterate through the valid edges to build polylines
     while (!edges.empty()) {
         const edge_t* edge = *edges.begin();
-        if (thickness[edge].first > this->max_width * 1.001) {
+        //if (thickness[edge].first > this->max_width * 1.001) {
             //std::cerr << "Error, edge.first has a thickness of " << unscaled(this->thickness[edge].first) << " > " << unscaled(this->max_width) << "\n";
             //(void)this->edges.erase(edge);
             //(void)this->edges.erase(edge->twin());
             //continue;
-        }
-        if (thickness[edge].second > this->max_width * 1.001) {
+        //}
+        //if (thickness[edge].second > this->max_width * 1.001) {
             //std::cerr << "Error, edge.second has a thickness of " << unscaled(this->thickness[edge].second) << " > " << unscaled(this->max_width) << "\n";
             //(void)this->edges.erase(edge);
             //(void)this->edges.erase(edge->twin());
             //continue;
-        }
+        //}
 
         // start a polyline
         ThickPolyline polyline;
@@ -2553,9 +2553,9 @@ MedialAxis::simplify_polygon_frontier()
 {
     //it will remove every point in the surface contour that aren't on the bounds contour
     this->expolygon = this->surface;
-    this->expolygon.contour.remove_collinear(SCALED_EPSILON);
+    this->expolygon.contour.remove_collinear_angle(M_PI/180);
     for (Polygon& hole : this->expolygon.holes)
-        hole.remove_collinear(SCALED_EPSILON);
+        hole.remove_collinear_angle(M_PI / 180);
     if (&this->surface != this->bounds) {
         bool need_intersect = false;
         for (size_t i = 0; i < this->expolygon.contour.points.size(); i++) {
@@ -2584,9 +2584,9 @@ MedialAxis::simplify_polygon_frontier()
             } else {
                 //can't simplify that much, reuse the given one
                 this->expolygon = this->surface;
-                this->expolygon.contour.remove_collinear(SCALED_EPSILON);
+                this->expolygon.contour.remove_collinear_angle(M_PI / 180);
                 for (Polygon& hole : this->expolygon.holes)
-                    hole.remove_collinear(SCALED_EPSILON);
+                    hole.remove_collinear_angle(M_PI / 180);
             }
         }
     }
