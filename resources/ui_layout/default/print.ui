@@ -40,7 +40,7 @@ group:Quality
 	line:Avoid crossing perimeters
 		setting:label$_:avoid_crossing_perimeters
 		setting:label_width$12:label$Not on first layer:avoid_crossing_not_first_layer
-		setting:avoid_crossing_perimeters_max_detour
+		setting:sidetext_width$15:avoid_crossing_perimeters_max_detour
 	end_line
 	line:Overlapping external perimeter
 		setting:label$_:thin_perimeters
@@ -131,7 +131,7 @@ group:Modifying slices
 	end_line
 	line:Convert round vertical holes to polyholes
 		setting:label$_:hole_to_polyhole
-		setting:hole_to_polyhole_threshold
+		setting:sidetext_width$5:hole_to_polyhole_threshold
 		setting:hole_to_polyhole_twisted
 	end_line
 group:Other
@@ -270,7 +270,7 @@ group:Options for support material interface
 page:Speed:time
 group:label_width$8:sidetext_width$7:Speed for print moves
 	line:Default speed
-		setting:width$4:default_speed
+		setting:width$4:sidetext_width$15:default_speed
 	line:Perimeter speed
 		setting:width$4:perimeter_speed
 		setting:width$4:external_perimeter_speed
