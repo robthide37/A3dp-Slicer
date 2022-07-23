@@ -280,12 +280,14 @@ void AppConfig::set_defaults()
 #else
 #ifdef __APPLE__
             //apple
-            if (boost::filesystem::exists("/Applications/FreeCAD.app/Contents/Frameworks/FreeCAD"))
+            if (boost::filesystem::exists("/Applications/FreeCAD.app/Contents/Frameworks/FreeCAD/lib"))
                 set("freecad_path", "/Applications/FreeCAD.app/Contents/Frameworks/FreeCAD");
 
 #else
             // linux
-            if (boost::filesystem::exists("/usr/local/bin/FreeCAD"))
+            if (boost::filesystem::exists("/usr/lib/freecad/lib"))
+                set("freecad_path", "/usr/lib/freecad");
+            else if (boost::filesystem::exists("/usr/local/bin/FreeCAD/lib"))
                 set("freecad_path", "/usr/local/bin/FreeCAD");
 #endif
 #endif

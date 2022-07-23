@@ -45,6 +45,7 @@
 #define pid_t pid_t
 #include <boost/process.hpp>
 
+#include <cstdlib>   // getenv()
 
 #if ENABLE_SCROLLABLE
 static wxSize get_screen_size(wxWindow* window)
@@ -783,27 +784,41 @@ bool FreeCADDialog::init_start_python() {
         delete exec_var;
     exec_var = new ExecVar();
 
+#ifdef __WINDO2WS__
     // Get the freecad path (python path)
     boost::filesystem::path pythonpath(gui_app->app_config->get("freecad_path"));
     if (pythonpath.filename().string().find("python") == std::string::npos) {
         if (pythonpath.filename().string() != "bin") {
             pythonpath = pythonpath / "bin";
         }
-#ifdef __WINDOWS__
         pythonpath = pythonpath / "python.exe";
-#endif
-#ifdef __APPLE__
-        pythonpath = pythonpath / "python";
-#endif
-#ifdef __linux__
-        pythonpath = pythonpath / "python";
-#endif
     }
     if (!exists(pythonpath)) {
         m_errors->AppendText("Error, cannot find the freecad (version 0.19 or higher) python at '" + pythonpath.string() + "', please update your freecad python path in the preferences.");
         return false;
     }
     boost::filesystem::path freecadpath = pythonpath.parent_path().parent_path();
+    if (!exists(freecadpath / "lib")) {
+        m_errors->AppendText("Error, cannot find the freecad (version 0.19 or higher) lib directory at '" + (freecadpath / "lib").string() + "', please update your freecad python path in the preferences.");
+        return false;
+    }
+#else
+    // Get the freecad path
+    boost::filesystem::path freecadpath = gui_app->app_config->get("freecad_path");
+    // using the system python (as freecad don't come with its own)
+    boost::filesystem::path pythonpath("python3");
+    // or the freecad one if it exists
+    if (boost::filesystem::exists(freecadpath / "bin" / "python")) {
+        pythonpath = freecadpath / "bin" / "python";
+    } else if (boost::filesystem::exists(freecadpath / "bin" / "python3")) {
+        pythonpath = freecadpath / "bin" / "python3";
+    }
+    //TODO check if python3 exists in the PATH, and use an exiting python if it doesn't.
+    if (!exists(freecadpath / "lib")) {
+        m_errors->AppendText("Error, cannot find the freecad (version 0.19 or higher) lib directory at '" + (freecadpath / "lib").string() + "', please update your freecad python path in the preferences.");
+        return false;
+    }
+#endif
 
     const boost::filesystem::path scripts_path(boost::filesystem::path(Slic3r::data_dir()) / "scripts");
     boost::filesystem::create_directories(scripts_path / "FreePySCAD");
@@ -812,8 +827,8 @@ bool FreeCADDialog::init_start_python() {
         get_file_from_web("https://raw.githubusercontent.com/supermerill/FreePySCAD/master/__init__.py", scripts_path / "FreePySCAD" / "__init__.py");
         get_file_from_web("https://raw.githubusercontent.com/supermerill/FreePySCAD/master/Init.py", scripts_path / "FreePySCAD" / "Init.py");
         get_file_from_web("https://raw.githubusercontent.com/supermerill/FreePySCAD/master/freepyscad.py", scripts_path / "FreePySCAD" / "freepyscad.py");
-    } else if (!update_done) {
-        update_done = true;
+    } else if (!this->update_done) {
+        this->update_done = true;
         //try to check last version on website
         //it's async so maybe you won't update it in time, but it's not the end of the world. 
         const boost::filesystem::path pyscad_path = scripts_path / "FreePySCAD";
@@ -824,10 +839,8 @@ bool FreeCADDialog::init_start_python() {
     exec_var->process.reset(new boost::process::child(pythonpath.string() + " -u -i", boost::process::std_in < exec_var->pyin,
         boost::process::std_out > exec_var->data_out, boost::process::std_err > exec_var->data_err, exec_var->ios));
     exec_var->pyin << "import sys" << std::endl;
-#ifndef __WINDOWS__
     // add freecad lib path if not already done
     exec_var->pyin << "sys.path.append('" << (freecadpath / "lib").string() << "')" << std::endl;
-#endif
     exec_var->pyin << "import FreeCAD" << std::endl;
     exec_var->pyin << "import Part" << std::endl;
     exec_var->pyin << "import Draft" << std::endl;

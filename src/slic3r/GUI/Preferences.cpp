@@ -419,7 +419,9 @@ void PreferencesDialog::build(size_t selected_tab)
 
 		def.label = L("FreeCAD path");
 		def.type = coString;
-		def.tooltip = L("If it point to a valid freecad instance (the bin directory or the python executable), you can use the built-in python script to quickly generate geometry.");
+		def.tooltip = L("If it point to a valid freecad instance, you can use the built-in python script to quickly generate geometry."
+            "\nPut here the freecad directory from which you can access its 'lib' directory."
+            "\nFreecad will use its own python (from the bin directoyr) on windows and will use the system python3 on linux & macos");
 		def.set_default_value(new ConfigOptionString{ app_config->get("freecad_path") });
 		option = Option(def, "freecad_path");
 		//option.opt.full_width = true;
