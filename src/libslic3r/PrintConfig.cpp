@@ -474,6 +474,7 @@ void PrintConfigDef::init_common_params()
     def->cli = ConfigOptionDef::nocli;
     def->set_default_value(new ConfigOptionString(""));
     
+    // for repetier
     def = this->add("printhost_port", coString);
     def->label = L("Printer");
     def->tooltip = L("Name of the printer");
@@ -482,6 +483,7 @@ void PrintConfigDef::init_common_params()
     def->cli = ConfigOptionDef::nocli;
     def->set_default_value(new ConfigOptionString(""));
     
+    // only if there isn't a native SSL support
     def = this->add("printhost_cafile", coString);
     def->label = L("HTTPS CA File");
     def->category = OptionCategory::general;
@@ -494,20 +496,35 @@ void PrintConfigDef::init_common_params()
     def = this->add("printhost_client_cert", coString);
     def->label = L("Client Certificate File");
     def->category = OptionCategory::general;
-    def->tooltip = L("Custom Client certificate file can be specified for 2-way ssl authentication, in p12/pfx format. "
+    def->tooltip = L("A Client certificate file for use with 2-way ssl authentication, in p12/pfx format. "
                    "If left blank, no client certificate is used.");
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionString(""));
 
-    // Options used by physical printers
-    
+    def = this->add("printhost_client_cert_enabled", coBool);
+    def->label = L("Enable 2-way ssl authentication");
+    def->category = OptionCategory::general;
+    def->tooltip = L("Use this option to enable 2-way ssl authentication with you printer.");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("printhost_client_cert_password", coString);
+    def->label = L("Client Certificate Password");
+    def->category = OptionCategory::general;
+    def->tooltip = L("Password for client certificate for 2-way ssl authentication. "
+                   "Leave blank if no password is needed");
+    def->mode = comAdvanced | comSuSi;
+    def->set_default_value(new ConfigOptionString(""));
+
+    // For PrusaLink
     def = this->add("printhost_user", coString);
     def->label = L("User");
 //    def->tooltip = L("");
     def->mode = comAdvancedE | comPrusa;
     def->cli = ConfigOptionDef::nocli;
     def->set_default_value(new ConfigOptionString(""));
-    
+
+    // For PrusaLink
     def = this->add("printhost_password", coString);
     def->label = L("Password");
 //    def->tooltip = L("");
@@ -530,6 +547,7 @@ void PrintConfigDef::init_common_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionStrings{});
 
+    // For PrusaLink
     def = this->add("printhost_authorization_type", coEnum);
     def->label = L("Authorization Type");
 //    def->tooltip = L("");
@@ -7292,6 +7310,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "print_retract_lift",
 "print_temperature",
 "printhost_client_cert",
+"printhost_client_cert_enabled",
+"printhost_client_cert_password",
 "remaining_times_type",
 "retract_lift_first_layer",
 "retract_lift_top",
