@@ -94,6 +94,8 @@ struct CoolingLine
     float   time_max;
     // If marked with the "slowdown" flag, the line has been slowed down.
     bool    slowdown;
+    // for TYPE_SET_TOOL
+    uint16_t new_tool;
 };
 
 // Calculate the required per extruder time stretches.
@@ -485,15 +487,17 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         } else if (boost::starts_with(sline, ";_EXTRUDE_END")) {
             line.type = CoolingLine::TYPE_EXTRUDE_END;
             active_speed_modifier = size_t(-1);
-        } else if (boost::starts_with(sline, m_toolchange_prefix)) {
-            uint16_t new_extruder = (uint16_t)atoi(sline.c_str() + m_toolchange_prefix.size());
+        } else if (boost::starts_with(sline, m_toolchange_prefix) || boost::starts_with(sline, ";_TOOLCHANGE")) {
+            int prefix = boost::starts_with(sline, ";_TOOLCHANGE") ? 13 : m_toolchange_prefix.size();
+            uint16_t new_extruder = (uint16_t)atoi(sline.c_str() + prefix);
             // Only change extruder in case the number is meaningful. User could provide an out-of-range index through custom gcodes - those shall be ignored.
             if (new_extruder < map_extruder_to_per_extruder_adjustment.size()) {
+                // Switch the tool.
+                line.type = CoolingLine::TYPE_SET_TOOL;
+                line.new_tool = new_extruder;
                 if (new_extruder != current_extruder) {
-                    // Switch the tool.
-                    line.type = CoolingLine::TYPE_SET_TOOL;
                     current_extruder = new_extruder;
-                    adjustment         = &per_extruder_adjustments[map_extruder_to_per_extruder_adjustment[current_extruder]];
+                    adjustment       = &per_extruder_adjustments[map_extruder_to_per_extruder_adjustment[current_extruder]];
                 }
             }
             else {
@@ -893,12 +897,14 @@ std::string CoolingBuffer::apply_layer_cooldown(
         if (line_start > pos)
             new_gcode.append(pos, line_start - pos);
         if (line->type & CoolingLine::TYPE_SET_TOOL) {
-            unsigned int new_extruder = (unsigned int)atoi(line_start + m_toolchange_prefix.size());
-            if (new_extruder != m_current_extruder) {
-                m_current_extruder = new_extruder;
+            if (line->new_tool != m_current_extruder) {
+                m_current_extruder = line->new_tool;
                 change_extruder_set_fan();
             }
-            new_gcode.append(line_start, line_end - line_start);
+            //write line if it's not a cooling marker comment
+            if (!boost::starts_with(line_start, ";_")) {
+                new_gcode.append(line_start, line_end - line_start);
+            }
         } else if (line->type & CoolingLine::TYPE_STORE_FOR_WT) {
             stored_fan_speed = m_fan_speed;
         } else if (line->type & CoolingLine::TYPE_RESTORE_AFTER_WT) {
