@@ -514,9 +514,17 @@ void PerimeterGenerator::process()
                 }
 
                 // allow this perimeter to overlap itself?
-                float thin_perimeter = perimeter_idx == 0 ? this->config->thin_perimeters.get_abs_value(1) : (this->config->thin_perimeters.get_abs_value(1)==0 ? 0 : this->config->thin_perimeters_all.get_abs_value(1));
-                if (thin_perimeter < 0.02) // can create artifacts
+                float thin_perimeter = this->config->thin_perimeters.get_abs_value(1);
+                if (perimeter_idx > 0 && thin_perimeter != 0) {
+                    thin_perimeter = this->config->thin_perimeters_all.get_abs_value(1);
+                }
+                bool allow_perimeter_anti_hysteresis = thin_perimeter >= 0;
+                if (thin_perimeter < 0) {
+                    thin_perimeter = -thin_perimeter;
+                }
+                if (thin_perimeter < 0.02) { // can create artifacts
                     thin_perimeter = 0;
+                }
 
                 // Calculate next onion shell of perimeters.
                 //this variable stored the next onion
@@ -525,13 +533,13 @@ void PerimeterGenerator::process()
                     // compute next onion
                         // the minimum thickness of a single loop is:
                         // ext_width/2 + ext_spacing/2 + spacing/2 + width/2
-                    if (thin_perimeter > 0.98)
+                    if (thin_perimeter > 0.98) {
                         next_onion = offset_ex(
                             last,
                             -(float)(ext_perimeter_width / 2),
                             ClipperLib::JoinType::jtMiter,
                             3);
-                    else if (thin_perimeter > 0.01) {
+                    } else if (thin_perimeter > 0.01) {
                         next_onion = offset2_ex(
                             last,
                             -(float)(ext_perimeter_width / 2 + (1 - thin_perimeter) * ext_perimeter_spacing / 2 - 1),
@@ -560,19 +568,21 @@ void PerimeterGenerator::process()
                     // look for thin walls
                     if (this->config->thin_walls) {
                         // detect edge case where a curve can be split in multiple small chunks.
-                        std::vector<float> divs = { 2.1f, 1.9f, 2.2f, 1.75f, 1.5f }; //don't go too far, it's not possible to print thin wall after that
-                        size_t idx_div = 0;
-                        while (next_onion.size() > last.size() && idx_div < divs.size()) {
-                            float div = divs[idx_div];
-                            //use a sightly bigger spacing to try to drastically improve the split, that can lead to very thick gapfill
-                            ExPolygons next_onion_secondTry = offset2_ex(
-                                last,
-                                -(float)((ext_perimeter_width / 2) + (ext_perimeter_spacing / div) - 1),
-                                +(float)((ext_perimeter_spacing / div) - 1));
-                            if (next_onion.size() > next_onion_secondTry.size() * 1.2 && next_onion.size() > next_onion_secondTry.size() + 2) {
-                                next_onion = next_onion_secondTry;
+                        if (allow_perimeter_anti_hysteresis) {
+                            std::vector<float> divs = { 2.1f, 1.9f, 2.2f, 1.75f, 1.5f }; //don't go too far, it's not possible to print thin wall after that
+                            size_t idx_div = 0;
+                            while (next_onion.size() > last.size() && idx_div < divs.size()) {
+                                float div = divs[idx_div];
+                                //use a sightly bigger spacing to try to drastically improve the split, that can lead to very thick gapfill
+                                ExPolygons next_onion_secondTry = offset2_ex(
+                                    last,
+                                    -(float)((ext_perimeter_width / 2) + (ext_perimeter_spacing / div) - 1),
+                                    +(float)((ext_perimeter_spacing / div) - 1));
+                                if (next_onion.size() > next_onion_secondTry.size() * 1.2 && next_onion.size() > next_onion_secondTry.size() + 2) {
+                                    next_onion = next_onion_secondTry;
+                                }
+                                idx_div++;
                             }
-                            idx_div++;
                         }
 
                         // the following offset2 ensures almost nothing in @thin_walls is narrower than $min_width
@@ -674,46 +684,47 @@ void PerimeterGenerator::process()
                             +(float)((1 - thin_perimeter) * perimeter_spacing / 2 - 1),
                             (round_peri ? ClipperLib::JoinType::jtRound : ClipperLib::JoinType::jtMiter),
                             (round_peri ? min_round_spacing : 3));
-                        // now try with different min spacing if we fear some hysteresis
-                        //TODO, do that for each polygon from last, instead to do for all of them in one go.
-                        ExPolygons no_thin_onion = offset_ex(last, double(-good_spacing));
-                        if (last_area < 0) {
-                            last_area = 0;
-                            for (const ExPolygon& expoly : last) {
-                                last_area += expoly.area();
-                            }
-                        }
-                        double new_area = 0;
-                        for (const ExPolygon& expoly : next_onion) {
-                            new_area += expoly.area();
-                        }
-
-                        std::vector<float> divs{ 1.8f, 1.6f }; //don't over-extrude, so don't use divider >2
-                        size_t idx_div = 0;
-                        while ((next_onion.size() > no_thin_onion.size() || (new_area != 0 && last_area > new_area * 100)) && idx_div < divs.size()) {
-                            float div = divs[idx_div];
-                            //use a sightly bigger spacing to try to drastically improve the split, that can lead to very thick gapfill
-                            ExPolygons next_onion_secondTry = offset2_ex(
-                                last,
-                                -(float)(good_spacing + (1 - thin_perimeter) * (perimeter_spacing / div) - 1),
-                                +(float)((1 - thin_perimeter) * (perimeter_spacing / div) - 1));
-                            if (next_onion.size() > next_onion_secondTry.size() * 1.2 && next_onion.size() > next_onion_secondTry.size() + 2) {
-                                // don't get it if it creates too many
-                                next_onion = next_onion_secondTry;
-                            } else if (next_onion.size() > next_onion_secondTry.size() || last_area > new_area * 100) {
-                                // don't get it if it's too small
-                                double area_new = 0;
-                                for (const ExPolygon& expoly : next_onion_secondTry) {
-                                    area_new += expoly.area();
+                        if (allow_perimeter_anti_hysteresis) {
+                            // now try with different min spacing if we fear some hysteresis
+                            //TODO, do that for each polygon from last, instead to do for all of them in one go.
+                            ExPolygons no_thin_onion = offset_ex(last, double(-good_spacing));
+                            if (last_area < 0) {
+                                last_area = 0;
+                                for (const ExPolygon& expoly : last) {
+                                    last_area += expoly.area();
                                 }
-                                if (last_area > area_new * 100 || new_area == 0) {
+                            }
+                            double new_area = 0;
+                            for (const ExPolygon& expoly : next_onion) {
+                                new_area += expoly.area();
+                            }
+
+                            std::vector<float> divs{ 1.8f, 1.6f }; //don't over-extrude, so don't use divider >2
+                            size_t idx_div = 0;
+                            while ((next_onion.size() > no_thin_onion.size() || (new_area != 0 && last_area > new_area * 100)) && idx_div < divs.size()) {
+                                float div = divs[idx_div];
+                                //use a sightly bigger spacing to try to drastically improve the split, that can lead to very thick gapfill
+                                ExPolygons next_onion_secondTry = offset2_ex(
+                                    last,
+                                    -(float)(good_spacing + (1 - thin_perimeter) * (perimeter_spacing / div) - 1),
+                                    +(float)((1 - thin_perimeter) * (perimeter_spacing / div) - 1));
+                                if (next_onion.size() > next_onion_secondTry.size() * 1.2 && next_onion.size() > next_onion_secondTry.size() + 2) {
+                                    // don't get it if it creates too many
                                     next_onion = next_onion_secondTry;
+                                } else if (next_onion.size() > next_onion_secondTry.size() || last_area > new_area * 100) {
+                                    // don't get it if it's too small
+                                    double area_new = 0;
+                                    for (const ExPolygon& expoly : next_onion_secondTry) {
+                                        area_new += expoly.area();
+                                    }
+                                    if (last_area > area_new * 100 || new_area == 0) {
+                                        next_onion = next_onion_secondTry;
+                                    }
                                 }
+                                idx_div++;
                             }
-                            idx_div++;
+                            last_area = new_area;
                         }
-                        last_area = new_area;
-
                     } else {
                         // If "overlapping_perimeters" is enabled, this paths will be entered, which 
                         // leads to overflows, as in prusa3d/Slic3r GH #32

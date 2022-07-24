@@ -5213,7 +5213,9 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Allow outermost perimeter to overlap itself to avoid the use of thin walls. Note that flow isn't adjusted and so this will result in over-extruding and undefined behavior."
                 "\n100% means that perimeters can overlap completly on top of each other."
-                "\n0% will deactivate this setting");
+                "\n0% will deactivate this setting."
+                "\nValues below 2% don't have any effect."
+                "\n-1% will also deactivate the anti-hysteris checks for external perimeters.");
     def->sidetext = "%";
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionPercent(80));
@@ -5224,7 +5226,9 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Allow all perimeters to overlap, instead of just external ones."
                 "\n100% means that perimeters can overlap completly on top of each other."
-                "\n0% will deactivate this setting");
+                "\n0% will deactivate this setting."
+                "\nValues below 2% don't have any effect."
+                "\n-1% will also deactivate the anti-hysteris checks for internal perimeters.");
     def->sidetext = "%";
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionPercent(20));
