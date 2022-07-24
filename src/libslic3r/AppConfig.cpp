@@ -389,6 +389,9 @@ void AppConfig::set_defaults()
             set("date_in_config_file", "1");
         set_header_generate_with_date(get("date_in_config_file") == "1");
 
+        if (get("check_material_export").empty())
+            set("check_material_export", "0");
+
         if (get("use_custom_toolbar_size").empty())
             set("use_custom_toolbar_size", "0");
 

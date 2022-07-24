@@ -5850,6 +5850,26 @@ void Plater::export_gcode(bool prefer_removable)
     if (p->process_completed_with_error)
         return;
 
+    //check if the material is okay
+    if (p->get_config("check_material_export") == "1") {
+        std::string str_material = "";
+        if (printer_technology() == ptFFF) {
+            const ConfigOptionStrings* filaments = fff_print().full_print_config().opt<ConfigOptionStrings>("filament_settings_id");
+            assert(filaments->values.size() == fff_print().config().filament_type.values.size());
+            for (int i = 0; i < filaments->values.size(); i++) {
+                str_material += "\n" + format(_L("'%1%' of type %2%"), filaments->values[i], fff_print().config().filament_type.values[i]);
+            }
+        } else if (printer_technology() == ptSLA) {
+            str_material = format(_L(" resin '%1%'"), sla_print().full_print_config().opt_string("sla_material_settings_id"));
+        }
+        MessageDialog dlg(this,
+            format_wxstr(_L("You will export the file with the material profile(s): %1%"), str_material),
+            _L("Checking your material"),
+            wxOK | wxOK_DEFAULT | wxCANCEL | wxICON_WARNING);
+        if (dlg.ShowModal() != wxID_OK)
+            return;
+    }
+
     // If possible, remove accents from accented latin characters.
     // This function is useful for generating file names to be processed by legacy firmwares.
     fs::path default_output_file;
