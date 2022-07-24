@@ -764,6 +764,11 @@ CopyFileResult copy_file_inner(const std::string& from, const std::string& to, s
 {
 	const boost::filesystem::path source(from);
 	const boost::filesystem::path target(to);
+	return copy_file_inner(source, target, error_message);
+}
+
+CopyFileResult copy_file_inner(const boost::filesystem::path& source, const boost::filesystem::path& target, std::string& error_message)
+{
 	static const auto perms = boost::filesystem::owner_read | boost::filesystem::owner_write | boost::filesystem::group_read | boost::filesystem::others_read;   // aka 644
 
 	// Make sure the file has correct permission both before and after we copy over it.

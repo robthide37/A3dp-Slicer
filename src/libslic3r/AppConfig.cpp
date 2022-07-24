@@ -655,6 +655,7 @@ void AppConfig::init_ui_layout() {
     //copy all resources that aren't in datadir or newer
     std::string current_name = get("ui_layout");
     bool find_current = false;
+    std::string error_message;
     for (const auto& layout : resources_map) {
         auto it_datadir_layout = datadir_map.find(layout.first);
         if (it_datadir_layout != datadir_map.end()) {
@@ -665,7 +666,8 @@ void AppConfig::init_ui_layout() {
                     boost::filesystem::remove_all(file.path());
                 }
                 for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(layout.second.path)) {
-                    boost::filesystem::copy_file(file.path(), it_datadir_layout->second.path / file.path().filename());
+                    if (copy_file_inner(file.path(), it_datadir_layout->second.path / file.path().filename(), error_message))
+                        throw FileIOError(error_message);
                 }
                 //update for saving
                 it_datadir_layout->second.version = layout.second.version;
@@ -679,7 +681,8 @@ void AppConfig::init_ui_layout() {
                     std::time_t datadir_last_mod = boost::filesystem::last_write_time(datadir_path);
                     if (datadir_last_mod < resources_last_mod) {
                         boost::filesystem::remove_all(datadir_path);
-                        boost::filesystem::copy_file(resources_file.path(), datadir_path);
+                        if (copy_file_inner(resources_file.path(), datadir_path, error_message))
+                            throw FileIOError(error_message);
                     }
                 }
 
@@ -688,7 +691,8 @@ void AppConfig::init_ui_layout() {
             // Doesn't exists, copy
             boost::filesystem::create_directory(data_dir_path / layout.second.path.filename());
             for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(layout.second.path)) {
-                boost::filesystem::copy_file(file.path(), data_dir_path / layout.second.path.filename() / file.path().filename());
+                if (copy_file_inner(file.path(), data_dir_path / layout.second.path.filename() / file.path().filename(), error_message))
+                    throw FileIOError(error_message);
             }
             //update for saving
             datadir_map[layout.first] = layout.second;
