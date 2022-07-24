@@ -73,6 +73,7 @@ public:
     /// remove points that are (almost) on an existing line from previous & next point.
     /// return number of point removed
     size_t remove_collinear(coord_t max_offset);
+    size_t remove_collinear_angle(double angle);
 
     using iterator = Points::iterator;
     using const_iterator = Points::const_iterator;

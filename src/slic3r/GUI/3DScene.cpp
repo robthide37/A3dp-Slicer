@@ -256,6 +256,12 @@ void GLIndexedVertexArray::render(
     const std::pair<size_t, size_t>& tverts_range,
     const std::pair<size_t, size_t>& qverts_range) const
 {
+    // nothing to draw (TODO: this theis thing. I addede as it triggers the assert when everything is empty)
+    if (this->vertices_and_normals_interleaved_size == 0) {
+        assert(this->vertices_and_normals_interleaved_VBO_id == 0);
+        return;
+    }
+
     // this method has been called before calling finalize() ?
     if (this->vertices_and_normals_interleaved_VBO_id == 0 && !this->vertices_and_normals_interleaved.empty())
         return;

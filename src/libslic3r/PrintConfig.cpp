@@ -2585,9 +2585,21 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
+    def = this->add("gap_fill_extension", coFloatOrPercent);
+    def->label = L("Extension");
+    def->full_label = L("Gapfill: extra extension");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Increase the length of all gapfills by this amount (may overextrude a little bit)\nCan be a % of the perimeter width");
+    def->ratio_over = "perimeter_width";
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->max_literal = { 50, true };
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent{ 0, false });
+
     def = this->add("gap_fill_flow_match_perimeter", coPercent);
     def->label = L("Cap with perimeter flow");
-    def->full_label = L("Cap gapfill speed with perimeter flow");
+    def->full_label = L("Gapfill: cap speed with perimeter flow");
     def->category = OptionCategory::output;
     def->tooltip = L("A percentage of the perimeter flow (mm3/s) is used as a limit for the gap fill flow, and so the gapfill may reduce its speed when the gap fill extrusions became too thick."
                 " This allow you to use a high gapfill speed, to print the thin gapfill quickly and reduce the difference in flow rate for the gapfill."
@@ -2599,21 +2611,55 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("gap_fill_last", coBool);
     def->label = L("after last perimeter");
-    def->full_label = L("Gapfill after last perimeter");
+    def->full_label = L("Gapfill: after last perimeter");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("All gaps, between the last perimeter and the infill, which are thinner than a perimeter will be filled by gapfill.");
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("gap_fill_max_width", coFloatOrPercent);
+    def->label = L("Max width");
+    def->full_label = L("Gapfill: Max width");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("This setting represents the maximum width of a gapfill. Points wider than this threshold won't be created.\nCan be a % of the perimeter width\n0 to auto");
+    def->ratio_over = "perimeter_width";
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent{ 0, false });
+
     def = this->add("gap_fill_min_area", coFloatOrPercent);
     def->label = L("Min surface");
-    def->full_label = L("Min surface for gap filling");
+    def->full_label = L("Gapfill: Min surface");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("This setting represents the minimum mm² for a gapfill extrusion to be created.\nCan be a % of (perimeter width)²");
     def->ratio_over = "perimeter_width_square";
+    def->sidetext = L("mm² or %");
     def->min = 0;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloatOrPercent{100, true });
+    def->set_default_value(new ConfigOptionFloatOrPercent{ 100, true });
+
+    def = this->add("gap_fill_min_length", coFloatOrPercent);
+    def->label = L("Min length");
+    def->full_label = L("Gapfill: Min length");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("This setting represents the minimum mm for a gapfill extrusion to be extruded.\nCan be a % of the perimeter width\n0 to auto");
+    def->ratio_over = "perimeter_width";
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent{ 0, false });
+
+    def = this->add("gap_fill_min_width", coFloatOrPercent);
+    def->label = L("Min width");
+    def->full_label = L("Gapfill: Min width");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("This setting represents the minimum width of a gapfill. Points thinner than this threshold won't be created.\nCan be a % of the perimeter width\n0 to auto");
+    def->ratio_over = "perimeter_width";
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent{ 0, false });
 
     def = this->add("gap_fill_overlap", coPercent);
     def->label = L("Gap fill overlap");

@@ -38,6 +38,11 @@
 
 #include "slic3r/GUI/Plater.hpp"
 
+#ifdef WIN32
+#include <windows.h>
+#include "../StackWalker.h"
+#endif
+
 namespace Slic3r {
 
 bool SlicingProcessCompletedEvent::critical_error() const
@@ -77,14 +82,21 @@ std::pair<std::string, bool> SlicingProcessCompletedEvent::format_error_message(
 	try {
 		this->rethrow_exception();
     } catch (const std::bad_alloc& ex) {
-        wxString errmsg = GUI::from_u8((boost::format(_utf8(L("%s has encountered an error. It was likely caused by running out of memory. "
+        std::string errmsg = GUI::format(_u8L("%1% has encountered an error. It was likely caused by running out of memory. "
                               "If you are sure you have enough RAM on your system, this may also be a bug and we would "
-                              "be glad if you reported it."))) % SLIC3R_APP_NAME).str());
-        error = std::string(errmsg.ToUTF8()) + "\n\n" + std::string(ex.what());
+                              "be glad if you reported it."), SLIC3R_APP_NAME);
+        error = errmsg + "\n\n" + std::string(ex.what());
+#ifdef WIN32
+        error += " \nPlease join the 'crash_log.txt' file (if it exists) content to your report.";
+#endif
     } catch (const HardCrash &ex) {
-        error = GUI::format(_L("PrusaSlicer has encountered a fatal error: \"%1%\""), ex.what()) + "\n\n" +
-        		_u8L("Please save your project and restart PrusaSlicer. "
-                     "We would be glad if you reported the issue.");
+        error = GUI::format(_L("%1% has encountered a fatal error: \"%2%\""), SLIC3R_APP_NAME, ex.what())
+                + "\n\n"
+                + GUI::format(_u8L("Please save your project and restart %1%. "
+                     "We would be glad if you reported the issue."), SLIC3R_APP_NAME);
+#ifdef WIN32
+        error += " \nPlease join the 'crash_log.txt' file (if it exists) content to your report.";
+#endif
     } catch (PlaceholderParserError &ex) {
 		error = ex.what();
 		monospace = true;
@@ -289,8 +301,10 @@ static void rethrow_seh_exception(unsigned long win32_seh_catched)
 {
 	if (win32_seh_catched) {
 		// Rethrow SEH exception as Slicer::HardCrash.
-		if (win32_seh_catched == STATUS_ACCESS_VIOLATION || win32_seh_catched == STATUS_DATATYPE_MISALIGNMENT)
-			throw Slic3r::HardCrash(_u8L("Access violation"));
+		if (win32_seh_catched == STATUS_ACCESS_VIOLATION)
+			throw Slic3r::HardCrash(_u8L("Access (status) violation"));
+		if (win32_seh_catched == STATUS_DATATYPE_MISALIGNMENT)
+			throw Slic3r::HardCrash(_u8L("Access violation (misalignement)"));
 		if (win32_seh_catched == STATUS_ILLEGAL_INSTRUCTION || win32_seh_catched == STATUS_PRIVILEGED_INSTRUCTION)
 			throw Slic3r::HardCrash(_u8L("Illegal instruction"));
 		if (win32_seh_catched == STATUS_FLOAT_DIVIDE_BY_ZERO || win32_seh_catched == STATUS_INTEGER_DIVIDE_BY_ZERO)
@@ -331,6 +345,16 @@ void BackgroundSlicingProcess::call_process_seh_throw(std::exception_ptr &ex) th
 		}
 	}
 }
+
+class StackWalker2 : public StackWalker {
+public:
+    StackWalker2(ExceptType extype) : StackWalker(extype) {}
+    std::string output;
+    void OnOutput(LPCSTR szText) override {
+        output += szText; //this will collect stack info in output string
+    }
+};
+
 #endif // _WIN32
 
 void BackgroundSlicingProcess::call_process(std::exception_ptr &ex) throw()
@@ -347,6 +371,19 @@ void BackgroundSlicingProcess::call_process(std::exception_ptr &ex) throw()
 		assert(m_print->canceled());
 		ex = std::current_exception();
 	} catch (...) {
+#ifdef _WIN32
+		StackWalker2 sw(StackWalker::AfterCatch);
+		sw.ShowCallstack();
+		BOOST_LOG_TRIVIAL(error) << "EXCEPTION during the print->process():" << sw.output;
+		// also wrote it on disk
+		try {
+			std::ofstream myfile;
+			myfile.open("crash_log.txt", std::ofstream::out | std::ofstream::app);
+			myfile << "\nEXCEPTION during the print->process():\n";
+			myfile << sw.output << "\n";
+			myfile.close();
+		} catch (...) {}
+#endif // _WIN32
 		ex = std::current_exception();
 	}
 }

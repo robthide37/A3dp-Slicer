@@ -3029,7 +3029,11 @@ PageShp TabPrinter::build_kinematics_page()
     line.append_option(optgroup->get_option_and_register("time_start_gcode"));
     line.append_option(optgroup->get_option_and_register("time_toolchange"));
     optgroup->append_line(line);
-    optgroup->append_single_option_line("time_cost");
+    { // like optgroup->append_single_option_line("time_cost"); but with sidetext_width set
+        Option option = optgroup->get_option_and_register("time_cost");
+        option.opt.sidetext_width = 8;
+        optgroup->append_single_option_line(option);
+    }
 
     optgroup = page->new_optgroup(_L("Machine Limits"));
     optgroup->append_single_option_line("machine_limits_usage");

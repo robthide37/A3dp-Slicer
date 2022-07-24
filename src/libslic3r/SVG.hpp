@@ -65,7 +65,8 @@ public:
     void draw(const Polyline &polyline, std::string stroke = "black", coordf_t stroke_width = 0);
     void draw(const Polylines &polylines, std::string stroke = "black", coordf_t stroke_width = 0);
     void draw(const ThickLines &thicklines, const std::string &fill = "lime", const std::string &stroke = "black", coordf_t stroke_width = 0);
-    void draw(const ThickPolylines &polylines, const std::string &stroke = "black", coordf_t stroke_width = 0);
+    void draw(const ThickPolylines &thickpolylines, const std::string &stroke = "black");
+    void draw(const ThickPolylines &polylines, const std::string &stroke, coordf_t stroke_width);
     void draw(const ThickPolylines &thickpolylines, const std::string &fill, const std::string &stroke, coordf_t stroke_width);
     void draw(const Point &point, std::string fill = "black", coord_t radius = 0);
     void draw(const Points &points, std::string fill = "black", coord_t radius = 0);

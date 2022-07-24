@@ -813,18 +813,18 @@ MedialAxis::polyline_from_voronoi(const ExPolygon& voronoi_polygon, ThickPolylin
     // iterate through the valid edges to build polylines
     while (!edges.empty()) {
         const edge_t* edge = *edges.begin();
-        if (thickness[edge].first > this->max_width * 1.001) {
+        //if (thickness[edge].first > this->max_width * 1.001) {
             //std::cerr << "Error, edge.first has a thickness of " << unscaled(this->thickness[edge].first) << " > " << unscaled(this->max_width) << "\n";
             //(void)this->edges.erase(edge);
             //(void)this->edges.erase(edge->twin());
             //continue;
-        }
-        if (thickness[edge].second > this->max_width * 1.001) {
+        //}
+        //if (thickness[edge].second > this->max_width * 1.001) {
             //std::cerr << "Error, edge.second has a thickness of " << unscaled(this->thickness[edge].second) << " > " << unscaled(this->max_width) << "\n";
             //(void)this->edges.erase(edge);
             //(void)this->edges.erase(edge->twin());
             //continue;
-        }
+        //}
 
         // start a polyline
         ThickPolyline polyline;
@@ -1597,6 +1597,23 @@ MedialAxis::extends_line(ThickPolyline& polyline, const ExPolygons& anchors, con
 }
 
 void
+MedialAxis::extends_line_extra(ThickPolylines& pp) {
+    // opening : offset2-+
+    for (size_t i = 0; i < pp.size(); ++i) {
+        ThickPolyline& polyline = pp[i];
+
+        if (polyline.endpoints.first) {
+            polyline.extend_start(this->extension_length);
+        }
+        if (polyline.endpoints.second) {
+            polyline.extend_end(this->extension_length);
+        }
+    }
+}
+
+
+
+void
 MedialAxis::main_fusion(ThickPolylines& pp)
 {
     //int idf = 0;
@@ -1979,7 +1996,72 @@ MedialAxis::remove_too_thin_extrusion(ThickPolylines& pp)
             changes = true;
         }
         //remove points and bits that comes from a "main line"
-        if (polyline.points.size() < 2 || (polyline_changes && polyline.points.size() == 2 && polyline.length() < std::max(this->min_length, std::max(polyline.width.front(), polyline.width.back()))) ) {
+        if (polyline.points.size() < 2 || (polyline_changes && polyline.points.size() == 2 && polyline.length() < std::max(this->min_length, std::max(polyline.width.front(), polyline.width.back())))) {
+            //remove self if too small
+            pp.erase(pp.begin() + i);
+            --i;
+        }
+    }
+    if (changes) concatThickPolylines(pp);
+}
+
+void
+MedialAxis::remove_too_thick_extrusion(ThickPolylines& pp)
+{
+    // remove too thin extrusion at start & end of polylines
+    bool changes = false;
+    for (size_t i = 0; i < pp.size(); ++i) {
+        ThickPolyline& polyline = pp[i];
+        bool polyline_changes = false;
+        // remove bits with too small extrusion
+        while (polyline.points.size() > 1 && polyline.width.front() > this->biggest_width && polyline.endpoints.first) {
+            //try to split if possible
+            if (polyline.width[1] < this->biggest_width) {
+                double percent_can_keep = (this->biggest_width - polyline.width[0]) / (polyline.width[1] - polyline.width[0]);
+                if (polyline.points.front().distance_to(polyline.points[1]) * (1 - percent_can_keep) > coordf_t(this->resolution)) {
+                    //Can split => move the first point and assign a new weight.
+                    //the update of endpoints wil be performed in concatThickPolylines
+                    polyline.points.front() = polyline.points.front().interpolate(percent_can_keep, polyline.points[1]);
+                    polyline.width.front() = this->biggest_width;
+                } else {
+                    /// almost 0-length, Remove
+                    polyline.points.erase(polyline.points.begin());
+                    polyline.width.erase(polyline.width.begin());
+                }
+                changes = true;
+                polyline_changes = true;
+                break;
+            }
+            polyline.points.erase(polyline.points.begin());
+            polyline.width.erase(polyline.width.begin());
+            changes = true;
+            polyline_changes = true;
+        }
+        while (polyline.points.size() > 1 && polyline.width.back() > this->biggest_width && polyline.endpoints.second) {
+            //try to split if possible
+            if (polyline.width[polyline.points.size() - 2] < this->biggest_width) {
+                double percent_can_keep = (this->biggest_width - polyline.width.back()) / (polyline.width[polyline.points.size() - 2] - polyline.width.back());
+                if (polyline.points.back().distance_to(polyline.points[polyline.points.size() - 2]) * (1 - percent_can_keep) > coordf_t(this->resolution)) {
+                    //Can split => move the first point and assign a new weight.
+                    //the update of endpoints wil be performed in concatThickPolylines
+                    polyline.points.back() = polyline.points.back().interpolate(percent_can_keep, polyline.points[polyline.points.size() - 2]);
+                    polyline.width.back() = this->biggest_width;
+                } else {
+                    /// almost 0-length, Remove
+                    polyline.points.erase(polyline.points.end() - 1);
+                    polyline.width.erase(polyline.width.end() - 1);
+                }
+                polyline_changes = true;
+                changes = true;
+                break;
+            }
+            polyline.points.erase(polyline.points.end() - 1);
+            polyline.width.erase(polyline.width.end() - 1);
+            polyline_changes = true;
+            changes = true;
+        }
+        //remove points and bits that comes from a "main line"
+        if (polyline.points.size() < 2 || (polyline_changes && polyline.points.size() == 2 && polyline.length() < std::max(this->min_length, std::max(polyline.width.front(), polyline.width.back())))) {
             //remove self if too small
             pp.erase(pp.begin() + i);
             --i;
@@ -1994,7 +2076,7 @@ MedialAxis::concatenate_small_polylines(ThickPolylines& pp)
     /*
      new goal: ensure that if there is a too short segment, it will be connected with a sufficiently long one, to save it
     */
-    coordf_t shortest_size = (coordf_t)this->min_length;
+    const coordf_t shortest_size = (coordf_t)this->min_length;
     std::set<size_t> deleted;
     std::vector<size_t> idx_per_size;
     //TODO: cache the length
@@ -2229,6 +2311,62 @@ MedialAxis::remove_too_thin_points(ThickPolylines& pp)
 }
 
 void
+MedialAxis::remove_too_thick_points(ThickPolylines& pp)
+{
+    if (biggest_width <= 0) return;
+    //remove too thin polylines points (inside a polyline : split it)
+    for (size_t i = 0; i < pp.size(); ++i) {
+        ThickPolyline* polyline = &pp[i];
+
+        // remove bits with too small extrusion
+        size_t idx_point = 0;
+        while (idx_point < polyline->points.size()) {
+            if (polyline->width[idx_point] > biggest_width) {
+                if (idx_point == 0) {
+                    //too thin at start
+                    polyline->points.erase(polyline->points.begin());
+                    polyline->width.erase(polyline->width.begin());
+                    idx_point = 0;
+                } else if (idx_point == 1) {
+                    //too thin at start
+                    polyline->points.erase(polyline->points.begin());
+                    polyline->width.erase(polyline->width.begin());
+                    polyline->points.erase(polyline->points.begin());
+                    polyline->width.erase(polyline->width.begin());
+                    idx_point = 0;
+                } else if (idx_point == polyline->points.size() - 2) {
+                    //too thin at (near) end
+                    polyline->points.erase(polyline->points.end() - 1);
+                    polyline->width.erase(polyline->width.end() - 1);
+                    polyline->points.erase(polyline->points.end() - 1);
+                    polyline->width.erase(polyline->width.end() - 1);
+                } else if (idx_point == polyline->points.size() - 1) {
+                    //too thin at end
+                    polyline->points.erase(polyline->points.end() - 1);
+                    polyline->width.erase(polyline->width.end() - 1);
+                } else {
+                    //too thin in middle : split
+                    pp.emplace_back();
+                    polyline = &pp[i]; // have to refresh the pointer, as the emplace_back() may have moved the array
+                    ThickPolyline& newone = pp.back();
+                    newone.points.insert(newone.points.begin(), polyline->points.begin() + idx_point + 1, polyline->points.end());
+                    newone.width.insert(newone.width.begin(), polyline->width.begin() + idx_point + 1, polyline->width.end());
+                    polyline->points.erase(polyline->points.begin() + idx_point, polyline->points.end());
+                    polyline->width.erase(polyline->width.begin() + idx_point, polyline->width.end());
+                }
+            } else idx_point++;
+
+            if (polyline->points.size() < 2) {
+                //remove self if too small
+                pp.erase(pp.begin() + i);
+                --i;
+                break;
+            }
+        }
+    }
+}
+
+void
 MedialAxis::remove_too_short_polylines(ThickPolylines& pp)
 {
     // reduce the flow at the intersection ( + ) points
@@ -2304,10 +2442,11 @@ MedialAxis::remove_too_short_polylines(ThickPolylines& pp)
             // know how long will the endpoints be extended since it depends on polygon thickness
             // which is variable - extension will be <= max_width/2 on each side) 
             if ((polyline.endpoints.first || polyline.endpoints.second)) {
-                coordf_t local_max_width = this->max_width / 2;
+                coordf_t local_min_length = this->max_width / 2;
                 for (coordf_t w : polyline.width)
-                    local_max_width = std::max(local_max_width, w);
-                if (polyline.length() < local_max_width) {
+                    local_min_length = std::max(local_min_length, w - SCALED_EPSILON);
+                local_min_length = std::max(local_min_length, shortest_size);
+                if (polyline.length() < local_min_length) {
                     if (shortest_size > polyline.length()) {
                         shortest_size = polyline.length();
                         shortest_idx = i;
@@ -2414,9 +2553,9 @@ MedialAxis::simplify_polygon_frontier()
 {
     //it will remove every point in the surface contour that aren't on the bounds contour
     this->expolygon = this->surface;
-    this->expolygon.contour.remove_collinear(SCALED_EPSILON);
+    this->expolygon.contour.remove_collinear_angle(M_PI/180);
     for (Polygon& hole : this->expolygon.holes)
-        hole.remove_collinear(SCALED_EPSILON);
+        hole.remove_collinear_angle(M_PI / 180);
     if (&this->surface != this->bounds) {
         bool need_intersect = false;
         for (size_t i = 0; i < this->expolygon.contour.points.size(); i++) {
@@ -2445,9 +2584,9 @@ MedialAxis::simplify_polygon_frontier()
             } else {
                 //can't simplify that much, reuse the given one
                 this->expolygon = this->surface;
-                this->expolygon.contour.remove_collinear(SCALED_EPSILON);
+                this->expolygon.contour.remove_collinear_angle(M_PI / 180);
                 for (Polygon& hole : this->expolygon.holes)
-                    hole.remove_collinear(SCALED_EPSILON);
+                    hole.remove_collinear_angle(M_PI / 180);
             }
         }
     }
@@ -2800,6 +2939,7 @@ MedialAxis::build(ThickPolylines& polylines_out)
     //}
 
     remove_too_thin_points(pp);
+    remove_too_thick_extrusion(pp);
     //{
     //    std::stringstream stri;
     //    stri << "medial_axis_5.0_thuinner_" << id << ".svg";
@@ -2846,6 +2986,8 @@ MedialAxis::build(ThickPolylines& polylines_out)
     //    svg.draw(pp, "red");
     //    svg.Close();
     //}
+
+    extends_line_extra(pp);
 
     remove_too_short_polylines(pp);
     //{

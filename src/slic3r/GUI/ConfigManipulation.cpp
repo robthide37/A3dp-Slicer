@@ -345,7 +345,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     toggle_field("perimeter_loop_seam", config->opt_bool("perimeter_loop"));
 
-    for (auto el : { "gap_fill_last", "gap_fill_min_area" })
+    for (auto el : { "gap_fill_extension", "gap_fill_last", "gap_fill_max_width", "gap_fill_min_area", "gap_fill_min_length", "gap_fill_min_width" })
         toggle_field(el, config->opt_bool("gap_fill_enabled"));
 
     for (auto el : { "fuzzy_skin_thickness", "fuzzy_skin_point_dist" })
