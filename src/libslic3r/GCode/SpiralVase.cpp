@@ -1,5 +1,7 @@
 #include "SpiralVase.hpp"
+#include "LocalesUtils.hpp"
 #include "GCode.hpp"
+#include "GCodeProcessor.hpp"
 #include <sstream>
 
 namespace Slic3r {
@@ -25,12 +27,12 @@ std::string SpiralVase::process_layer(const std::string &gcode)
     float total_layer_length = 0;
     float layer_height = 0;
     float z = 0.f;
-    
+    std::string height_str = "";
     {
         //FIXME Performance warning: This copies the GCodeConfig of the reader.
         GCodeReader r = m_reader;  // clone
         bool set_z = false;
-        r.parse_buffer(gcode, [&total_layer_length, &layer_height, &z, &set_z]
+        r.parse_buffer(gcode, [&total_layer_length, &layer_height, &z, &set_z, &height_str]
             (GCodeReader &reader, const GCodeReader::GCodeLine &line) {
             if (line.cmd_is("G1")) {
                 if (line.extruding(reader)) {
@@ -40,6 +42,14 @@ std::string SpiralVase::process_layer(const std::string &gcode)
                     if (!set_z) {
                         z = line.new_Z(reader);
                         set_z = true;
+                    }
+                }
+            } else {
+                const std::string& comment = line.raw();
+                if (comment.length() > 2 && comment.front() == ';') {
+                    std::string comment_str = comment.substr(1);
+                    if (boost::starts_with(comment_str, GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height))) {
+                        height_str = comment_str.substr(GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height).size());
                     }
                 }
             }
@@ -54,13 +64,22 @@ std::string SpiralVase::process_layer(const std::string &gcode)
     // For absolute extruder distances it will be switched off.
     // Tapering the absolute extruder distances requires to process every extrusion value after the first transition
     // layer.
-    bool  transition = m_transition_layer && m_config.use_relative_e_distances.value;
-    if (transition)
+    if (m_transition_layer) {
         new_gcode += "; Began spiral\n";
+        if (!m_config.use_relative_e_distances.value) {
+            new_gcode += "G92 E0\n";
+        }
+        // remove constant height and replace by constant width
+        if (!height_str.empty()) {
+            new_gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height) + "0\n";
+        }
+    }
     bool  keep_first_travel = m_transition_layer;
     float layer_height_factor = layer_height / total_layer_length;
     float len = 0.f;
-    m_reader.parse_buffer(gcode, [&keep_first_travel , &new_gcode, &z, total_layer_length, layer_height_factor, transition, &len]
+    double E_accumulator = 0;
+    double last_old_E = 0;
+    m_reader.parse_buffer(gcode, [this, &keep_first_travel , &new_gcode, &z, total_layer_length, layer_height_factor, &len, &E_accumulator, &last_old_E, &height_str]
         (GCodeReader &reader, GCodeReader::GCodeLine line) {
         if (line.cmd_is("G1")) {
             if (line.has_z()) {
@@ -77,9 +96,16 @@ std::string SpiralVase::process_layer(const std::string &gcode)
                         keep_first_travel = false;
                         len += dist_XY;
                         line.set(reader, Z, z + len * layer_height_factor);
-                        if (transition && line.has(E))
+                        if (m_transition_layer && line.has(E)) {
                             // Transition layer, modulate the amount of extrusion from zero to the final value.
-                            line.set(reader, E, line.value(E) * len / total_layer_length);
+                            if (m_config.use_relative_e_distances.value) {
+                                line.set(reader, E, line.value(E) * len / total_layer_length);
+                            } else {
+                                last_old_E = line.value(E);
+                                E_accumulator += line.dist_E(reader) * len / total_layer_length;
+                                line.set(reader, E, E_accumulator);
+                            }
+                        }
                         new_gcode += line.raw() + '\n';
                     } else if (keep_first_travel) {
                         //we can travel until the first spiral extrusion
@@ -94,9 +120,26 @@ std::string SpiralVase::process_layer(const std::string &gcode)
                         enforce some minimum length?).  */
                 }
             }
+        } else if (!height_str.empty()) {
+            const std::string& comment = line.raw();
+            if (comment.length() > 2 && comment.front() == ';') {
+                std::string comment_str = comment.substr(1);
+                if (boost::starts_with(comment_str, GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height))) {
+                    //do not write it on the gcode
+                    return;
+                }
+            }
+        }
+        if (m_transition_layer && !m_config.use_relative_e_distances.value) {
+            new_gcode += "; End spiral transition layer\n";
+            new_gcode += "G92 E"+ to_string_nozero(last_old_E, m_config.gcode_precision_e.value) + "\n";
         }
         new_gcode += line.raw() + '\n';
     });
+    if (m_transition_layer && !height_str.empty()) {
+        //restore height/width
+        new_gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height) + height_str +"\n";
+    }
     
     return new_gcode;
 }

@@ -171,6 +171,7 @@ static const ConfigOptionFloatOrPercent& first_positive(const ConfigOptionFloatO
     return (v1 != nullptr && v1->value > 0) ? *v1 : ((v2.value > 0) ? v2 : v3);
 }
 
+//TODO since 2.4: check the flow computation (and try to simplify them)
 std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle &preset_bundle)
 {
     // Find out, to which nozzle index is the current filament profile assigned.
@@ -419,16 +420,15 @@ std::string PresetHints::recommended_thin_wall_thickness(const PresetBundle& pre
     }
 
     float filament_max_overlap = (float)filament_config.get_computed_value("filament_max_overlap", 0);
-    Flow    external_perimeter_flow = Flow::new_from_config_width(
-        frExternalPerimeter,
-        *print_config.opt<ConfigOptionFloatOrPercent>("external_perimeter_extrusion_width"),
+    Flow    external_perimeter_flow =  Flow::new_from_config(frExternalPerimeter,
+        print_config,
         nozzle_diameter,
         layer_height,
         filament_max_overlap,
         false);
-    Flow    perimeter_flow = Flow::new_from_config_width(
+    Flow    perimeter_flow = Flow::new_from_config(
         frPerimeter,
-        *print_config.opt<ConfigOptionFloatOrPercent>("perimeter_extrusion_width"),
+        print_config,
         nozzle_diameter,
         layer_height,
         filament_max_overlap,

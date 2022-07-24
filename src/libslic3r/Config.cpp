@@ -838,8 +838,11 @@ double ConfigBase::get_abs_value(const t_config_option_key &opt_key, double rati
     // Get stored option value.
     const ConfigOption *raw_opt = this->option(opt_key);
     assert(raw_opt != nullptr);
-    if (raw_opt->type() != coFloatOrPercent)
-        throw ConfigurationError("ConfigBase::get_abs_value(): opt_key is not of coFloatOrPercent");
+    if (raw_opt->type() != coFloatOrPercent) {
+        if(raw_opt->type() != coPercent)
+            throw ConfigurationError("ConfigBase::get_abs_value(): opt_key is not of coFloatOrPercent");
+        return static_cast<const ConfigOptionPercent*>(raw_opt)->get_abs_value(ratio_over);
+    }
     // Compute absolute value.
     return static_cast<const ConfigOptionFloatOrPercent*>(raw_opt)->get_abs_value(ratio_over);
 }

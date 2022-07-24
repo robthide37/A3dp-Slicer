@@ -108,10 +108,6 @@ public:
     Flow        with_cross_section(float area) const;
     Flow        with_flow_ratio(double ratio) const { return this->with_cross_section(this->mm3_per_mm() * ratio); }
 
-    static Flow bridging_flow(float dmr, float nozzle_diameter) { return Flow { dmr, dmr, bridge_extrusion_spacing(dmr), nozzle_diameter, 0, true }; }
-
-    static Flow new_from_config_width(FlowRole role, const ConfigOptionFloatOrPercent& width, float nozzle_diameter, float height, float spacing_ratio);
-
     // Spacing of extrusions with rounded extrusion model.
     static float rounded_rectangle_extrusion_spacing(float width, float height);
     // Width of extrusions with rounded extrusion model.
@@ -119,7 +115,7 @@ public:
     // Spacing of round thread extrusions.
     static float bridge_extrusion_spacing(float dmr);
 
-    // Sane extrusion width defautl based on nozzle diameter.
+    // Sane extrusion width default based on nozzle diameter.
     // The defaults were derived from manual Prusa MK3 profiles.
     static float auto_extrusion_width(FlowRole role, float nozzle_diameter);
 
@@ -130,8 +126,13 @@ public:
 	static double extrusion_width(const std::string &opt_key, const ConfigOptionResolver &config, const unsigned int first_printing_extruder = 0);
     static const ConfigOptionFloatOrPercent* extrusion_option(const std::string& opt_key, const ConfigOptionResolver& config);
 
+    // like PrintRegion::flow() but with print settings from a DynamicConfig
+    static Flow new_from_config(FlowRole role, const DynamicConfig& print_config, float nozzle_diameter, float layer_height, float filament_max_overlap, bool first_layer);
 
-/// old constructors
+    //low level constructor
+    static Flow new_from_config_width(FlowRole role, const ConfigOptionFloatOrPercent& width, float nozzle_diameter, float height, float spacing_ratio);
+    static Flow bridging_flow(float dmr, float nozzle_diameter) { return Flow{ dmr, dmr, bridge_extrusion_spacing(dmr), nozzle_diameter, 0, true }; }
+/// old constructors don't use them. They are used by the good constructors from PrintRegion or the default_flow().
     static Flow new_from_config_width(FlowRole role, const ConfigOptionFloatOrPercent& width, float nozzle_diameter, float height, float spacing_ratio, float bridge_flow_ratio);
     // Create a flow from the spacing of extrusion lines.
     // This method is used exclusively to calculate new flow of 100% infill, where the extrusion width was allowed to scale

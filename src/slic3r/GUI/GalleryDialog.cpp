@@ -473,7 +473,9 @@ void GalleryDialog::change_thumbnail()
         png_path.replace_extension("png");
 
         fs::path current = fs::path(into_u8(input_files.Item(0)));
-        fs::copy_file(current, png_path, fs::copy_option::overwrite_if_exists);
+		std::string error_msg;
+        if (copy_file_inner(current, png_path, error_msg))
+            throw FileIOError(error_msg);
     }
     catch (fs::filesystem_error const& e) {
         std::cerr << e.what() << '\n';
@@ -560,9 +562,11 @@ bool GalleryDialog::load_files(const wxArrayString& input_files)
 
         try {
             fs::path current = fs::path(input_file);
-            if (!fs::exists(dest_dir / current.filename()))
-                fs::copy_file(current, dest_dir / current.filename());
-            else {
+            if (!fs::exists(dest_dir / current.filename())) {
+				std::string error_msg;
+        		if (copy_file_inner(current, dest_dir / current.filename(), error_msg))
+            		throw FileIOError(error_msg);
+            } else {
                 std::string filename = current.stem().string();
 
                 int file_idx = 0;
@@ -584,7 +588,9 @@ bool GalleryDialog::load_files(const wxArrayString& input_files)
                     }
                 if (file_idx > 0) {
                     filename += " (" + std::to_string(file_idx) + ")." + (is_gallery_file(input_file, ".stl") ? "stl" : "obj");
-                    fs::copy_file(current, dest_dir / filename);
+                    std::string error_msg;
+        		    if (copy_file_inner(current, dest_dir / filename, error_msg))
+            		    throw FileIOError(error_msg);
                 }
             }
         }

@@ -307,6 +307,13 @@ void PreferencesDialog::build(size_t selected_tab)
         option = Option(def, "date_in_config_file");
         m_optgroups_general.back()->append_single_option_line(option);
 
+        def.label = L("Show a Pop-up with the current material when exporting");
+        def.type = coBool;
+        def.tooltip = L("If you constantly forgot to select the right filament/materail, check this option to have a really obtrusive reminder on each export.");
+        def.set_default_value(new ConfigOptionBool{ app_config->has("check_material_export") ? app_config->get("check_material_export") == "1" : false });
+        option = Option(def, "check_material_export");
+        m_optgroups_general.back()->append_single_option_line(option);
+
         activate_options_tab(m_optgroups_general.back(), 3);
         m_optgroups_general.emplace_back(create_options_group(_L("Dialogs"), tabs, 0));
 
