@@ -392,7 +392,7 @@ public:
     /// <param name="opt_key">name of the changed option</param>
     /// <return> configs that have at least a change</param>
     std::set<const DynamicPrintConfig*> value_changed(const t_config_option_key& opt_key, const std::vector<DynamicPrintConfig*> config_collection);
-    std::set<const DynamicPrintConfig*> update_phony(const std::vector<DynamicPrintConfig*> config_collection);
+    std::set<const DynamicPrintConfig*> update_phony(const std::vector<DynamicPrintConfig*> config_collection, bool exclude_default_extrusion = false);
 };
 
 void handle_legacy_sla(DynamicPrintConfig& config);

@@ -148,20 +148,20 @@ const ConfigOptionFloatOrPercent* Flow::extrusion_option(const std::string& opt_
 	}
 
     // external_perimeter_extrusion_width default is perimeter_extrusion_width
-    if (opt->value == 0. && boost::starts_with(opt_key, "external_perimeter_extrusion_width")) {
-        // The role specific extrusion width value was set to zero, try the role non-specific extrusion width.
-        opt = config.option<ConfigOptionFloatOrPercent>("perimeter_extrusion_width");
-        if (opt == nullptr)
-            throw_on_missing_variable(opt_key, "perimeter_extrusion_width");
-    }
+    //if (opt->value == 0. && boost::starts_with(opt_key, "external_perimeter_extrusion_width")) {
+    //    // The role specific extrusion width value was set to zero, try the role non-specific extrusion width.
+    //    opt = config.option<ConfigOptionFloatOrPercent>("perimeter_extrusion_width");
+    //    if (opt == nullptr)
+    //        throw_on_missing_variable(opt_key, "perimeter_extrusion_width");
+    //}
 
     // top_infill_extrusion_width default is solid_infill_extrusion_width
-    if (opt->value == 0. && boost::starts_with(opt_key, "top_infill_extrusion_width")) {
-        // The role specific extrusion width value was set to zero, try the role non-specific extrusion width.
-        opt = config.option<ConfigOptionFloatOrPercent>("solid_infill_extrusion_width");
-        if (opt == nullptr)
-            throw_on_missing_variable(opt_key, "perimeter_extrusion_width");
-    }
+    //if (opt->value == 0. && boost::starts_with(opt_key, "top_infill_extrusion_width")) {
+    //    // The role specific extrusion width value was set to zero, try the role non-specific extrusion width.
+    //    opt = config.option<ConfigOptionFloatOrPercent>("solid_infill_extrusion_width");
+    //    if (opt == nullptr)
+    //        throw_on_missing_variable(opt_key, "solid_infill_extrusion_width");
+    //}
 
 	if (opt->value == 0.) {
 		// The role specific extrusion width value was set to zero, try the role non-specific extrusion width.
@@ -177,6 +177,42 @@ const ConfigOptionFloatOrPercent* Flow::extrusion_option(const std::string& opt_
 double Flow::extrusion_width(const std::string& opt_key, const ConfigOptionResolver &config, const unsigned int first_printing_extruder)
 {
     return extrusion_width(opt_key, config.option<ConfigOptionFloatOrPercent>(opt_key), config, first_printing_extruder);
+}
+
+Flow Flow::new_from_config(FlowRole role, const DynamicConfig& print_config, float nozzle_diameter, float layer_height, float filament_max_overlap, bool first_layer) {
+
+    ConfigOptionFloatOrPercent  config_width;
+    // Get extrusion width from configuration.
+    float overlap = 1.f;
+    // (might be an absolute value, or a percent value, or zero for auto)
+    if (role == frExternalPerimeter) {
+        config_width = print_config.opt<ConfigOptionFloatOrPercent>("external_perimeter_extrusion_width");
+        overlap = (float)print_config.get_abs_value("external_perimeter_overlap", 1.);
+    } else if (role == frPerimeter) {
+        config_width = print_config.opt<ConfigOptionFloatOrPercent>("perimeter_extrusion_width");
+        overlap = (float)print_config.get_abs_value("perimeter_overlap", 1.);
+    } else if (role == frInfill) {
+        config_width = print_config.opt<ConfigOptionFloatOrPercent>("infill_extrusion_width");
+    } else if (role == frSolidInfill) {
+        config_width = print_config.opt<ConfigOptionFloatOrPercent>("solid_infill_extrusion_width");
+        overlap = (float)print_config.get_abs_value("solid_infill_overlap", 1.);
+    } else if (role == frTopSolidInfill) {
+        config_width = print_config.opt<ConfigOptionFloatOrPercent>("top_infill_extrusion_width");
+        overlap = (float)print_config.get_abs_value("solid_infill_overlap", 1.);
+    } else {
+        throw Slic3r::InvalidArgument("Unknown role");
+    }
+    if (first_layer && print_config.get_abs_value("first_layer_extrusion_width", 1) > 0) {
+        config_width = print_config.opt<ConfigOptionFloatOrPercent>("first_layer_extrusion_width");
+    }
+
+    if (config_width.value == 0)
+        config_width = print_config.opt<ConfigOptionFloatOrPercent>("extrusion_width");
+
+    // Get the configured nozzle_diameter for the extruder associated to the flow role requested.
+    // Here this->extruder(role) - 1 may underflow to MAX_INT, but then the get_at() will follback to zero'th element, so everything is all right.
+    return Flow::new_from_config_width(role, config_width, nozzle_diameter, layer_height, std::min(overlap, filament_max_overlap));
+    //bridge ? (float)m_config.bridge_flow_ratio.get_abs_value(1) : 0.0f);
 }
 
 // This constructor builds a Flow object from an extrusion width config setting

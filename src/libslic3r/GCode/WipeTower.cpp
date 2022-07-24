@@ -615,9 +615,10 @@ WipeTower::ToolChangeResult WipeTower::construct_tcr(WipeTowerWriter& writer,
 
 
 
-WipeTower::WipeTower(const PrintConfig& config, const PrintObjectConfig& object_config, const std::vector<std::vector<float>>& wiping_matrix, size_t initial_tool) :
+WipeTower::WipeTower(const PrintConfig& config, const PrintObjectConfig& default_object_config, const PrintRegionConfig& default_region_config, const std::vector<std::vector<float>>& wiping_matrix, size_t initial_tool) :
     m_config(&config),
-    m_object_config(&object_config),
+    m_object_config(&default_object_config),
+    m_region_config(&default_region_config),
     m_semm(config.single_extruder_multi_material.value),
     m_wipe_tower_pos(config.wipe_tower_x, config.wipe_tower_y),
     m_wipe_tower_width(float(config.wipe_tower_width)),
@@ -1396,7 +1397,17 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
     // brim (first layer only)
     if (first_layer) {
         box_coordinates box = wt_box;
-        const Slic3r::Flow brim_flow = Flow::new_from_config_width(FlowRole::frPerimeter, m_object_config->first_layer_extrusion_width, m_nozzle_diameter, m_layer_height, 1,0); //don't care of spacing and bridge
+        //same as print::brimflow()
+		PrintRegionConfig brim_region_config = *m_region_config;
+        brim_region_config.parent = m_object_config;
+        const Slic3r::Flow brim_flow = 
+             Flow::new_from_config_width(
+            frPerimeter,
+            *Flow::extrusion_option("brim_extrusion_width", brim_region_config),
+            (float)m_nozzle_diameter,
+            (float)m_layer_height,
+            (m_current_tool < m_config->nozzle_diameter.values.size()) ? m_object_config->get_computed_value("filament_max_overlap", m_current_tool) : 1
+        );
         const coordf_t spacing = brim_flow.spacing();
         // How many perimeters shall the brim have?
         size_t loops_num = (m_wipe_tower_brim_width + spacing / 2) / spacing;
