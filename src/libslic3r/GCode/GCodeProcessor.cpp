@@ -2702,10 +2702,28 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         m_mm3_per_mm_compare.update(area_toolpath_cross_section, m_extrusion_role);
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
-        if (m_forced_height > 0.0f)
+        if (m_forced_height > 0.0f) {
             m_height = m_forced_height;
-        else {
-            if (m_end_position[Z] > m_extruded_last_z + EPSILON)
+        } else if (m_forced_width > 0.0f) {
+            m_width = m_forced_width;
+            if (m_extrusion_role == erExternalPerimeter)
+                // cross section: rectangle
+                m_height = static_cast<float>(delta_pos[E] * (M_PI * sqr(1.05f * filament_radius)) / (delta_xyz * m_width));
+            else if (is_bridge(m_extrusion_role) || m_extrusion_role == erNone)
+                // cross section: circle
+                m_height = static_cast<float>(m_result.filament_diameters[m_extruder_id] * std::sqrt(delta_pos[E] / delta_xyz));
+            else
+                // cross section: rectangle + 2 semicircles
+                m_height = static_cast<float>(delta_pos[E] * (M_PI * sqr(filament_radius)) / (delta_xyz * m_width) + (1.0 - 0.25 * M_PI) * m_width);
+
+            // if the value seems wrong, fall back to circular extrusion from flow
+            //note: m_width > m_height * 10 is possible if spiral vase start
+            if (m_width < m_height) {
+                m_width = 2 * std::sqrt(m_mm3_per_mm / float(PI));
+                height_saved = m_height;
+                m_height = m_width;
+            }
+        } else if (m_end_position[Z] > m_extruded_last_z + EPSILON) {
                 m_height = float(m_end_position[Z] - m_extruded_last_z);
         }
 
