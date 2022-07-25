@@ -3863,9 +3863,9 @@ void Plater::priv::reload_from_disk()
 #if ENABLE_WORLD_COORDINATE
                 new_volume->set_transformation(
                     old_volume->get_transformation().get_matrix() *
-                    old_volume->source.transform.get_matrix() *
+                    old_volume->source.transform.get_matrix_no_offset() *
                     Geometry::translation_transform(new_volume->source.mesh_offset - old_volume->source.mesh_offset) *
-                    new_volume->source.transform.get_matrix().inverse()
+                    new_volume->source.transform.get_matrix_no_offset().inverse()
                     );
 #else
                 new_volume->set_transformation(Geometry::assemble_transform(old_volume->source.transform.get_offset()) *
