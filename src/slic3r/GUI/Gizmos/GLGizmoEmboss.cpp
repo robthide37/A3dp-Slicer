@@ -356,6 +356,10 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // temp is in wolrld coors
         m_temp_transformation = object_trmat * trmat;
     } else if (mouse_event.LeftUp()) {
+        // Added because of weird case after double click into scene 
+        // with Mesa driver OR on Linux
+        if (!m_temp_transformation.has_value()) return false;
+
         // TODO: Disable apply common transformation after draggig
         // Call after is used for apply transformation after common dragging to rewrite it
         Transform3d volume_trmat =
