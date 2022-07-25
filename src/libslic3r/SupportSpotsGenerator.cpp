@@ -674,7 +674,7 @@ public:
         Vec3d endpoint = (to_3d(extruded_line.b, layer_z)).cast<double>();
         float conflict_torque_arm = line_alg::distance_to(
                 Linef3(endpoint, endpoint + extruder_pressure_direction.cast<double>()), pivot.cast<double>());
-        float extruder_conflict_force = params.tolerable_extruder_conflict_force +
+        float extruder_conflict_force = params.standard_extruder_conflict_force +
                 std::min(extruded_line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
         float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
 
@@ -721,6 +721,7 @@ public:
         Vec3f centroid = connection.centroid_accumulator / connection.area;
         Vec2f variance = (connection.second_moment_of_area_accumulator / connection.area
                 - centroid.head<2>().cwiseProduct(centroid.head<2>()));
+        variance = variance.cwiseProduct(line_dir.cwiseAbs());
         float extreme_fiber_dist = variance.cwiseSqrt().norm();
         float elastic_section_modulus = connection.area * (variance.x() + variance.y()) / extreme_fiber_dist;
         float yield_torque = elastic_section_modulus * params.yield_strength;
@@ -733,17 +734,17 @@ public:
         float weight_arm = (centroid.head<2>() - mass_centroid.head<2>()).norm();
         float weight_torque = weight_arm * weight;
 
-        float bed_movement_arm = mass_centroid.z();
+        float bed_movement_arm = std::max(0.0f, mass_centroid.z() - centroid.z());
         float bed_movement_force = params.max_acceleration * mass;
         float bed_movement_torque = bed_movement_force * bed_movement_arm;
 
         Vec3f extruder_pressure_direction = to_3d(line_dir, 0.0f);
-        extruder_pressure_direction.z() = -0.1f - extruded_line.malformation * 0.5f;
+        extruder_pressure_direction.z() = -extruded_line.malformation * 0.5f;
         extruder_pressure_direction.normalize();
         Vec3d endpoint = (to_3d(extruded_line.b, layer_z)).cast<double>();
         float conflict_torque_arm = line_alg::distance_to(
                 Linef3(endpoint, endpoint + extruder_pressure_direction.cast<double>()), centroid.cast<double>());
-        float extruder_conflict_force = params.tolerable_extruder_conflict_force +
+        float extruder_conflict_force = params.standard_extruder_conflict_force +
                 std::min(extruded_line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
         float extruder_conflict_torque = extruder_conflict_force * conflict_torque_arm;
 
