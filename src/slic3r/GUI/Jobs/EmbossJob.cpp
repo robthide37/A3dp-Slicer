@@ -349,22 +349,6 @@ UseSurfaceJob::UseSurfaceJob(UseSurfaceData &&input)
     assert(priv::check(m_input, true));
 }
 
-static const UseSurfaceData::ModelSource* get_biggest(
-    const UseSurfaceData::ModelSources &sources)
-{
-    const UseSurfaceData::ModelSource *biggest = nullptr;
-    for (const UseSurfaceData::ModelSource &s : sources) { 
-        if (biggest == nullptr) {
-            biggest = &s;
-            continue;
-        }
-        if (biggest->mesh->its.indices.size() < s.mesh->its.indices.size()) {
-            biggest = &s;
-        }        
-    }
-    return biggest;
-}
-
 void UseSurfaceJob::process(Ctl &ctl) {
     if (!priv::check(m_input)) 
         throw std::runtime_error("Bad input data for UseSurfaceJob.");
@@ -395,7 +379,6 @@ void UseSurfaceJob::process(Ctl &ctl) {
     double shape_scale = Emboss::get_shape_scale(fp, ff);
     
     size_t biggest_count = 0;
-    size_t biggest_index = 0;
     const UseSurfaceData::ModelSource *biggest = nullptr;
     std::vector<size_t> s_to_itss(m_input.sources.size(), std::numeric_limits<size_t>::max());
     std::vector<indexed_triangle_set> itss;

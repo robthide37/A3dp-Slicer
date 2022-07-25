@@ -1795,7 +1795,8 @@ uint32_t priv::get_closest_point_index(const SearchData &sd,
     size_t point_index = sd.cvt[line_idx];
 
     // Lambda used only for check result
-    auto   is_same     = [&s2i, &shapes](const Vec2d &p, size_t i) -> bool {
+    [[maybe_unused]] auto is_same = [&s2i, &shapes]
+    (const Vec2d &p, size_t i) -> bool {
         auto id = s2i.calc_id(i);
         const ExPolygon &shape = shapes[id.expolygons_index];
         const Polygon   &poly  = (id.polygon_index == 0) ?
@@ -1834,7 +1835,8 @@ uint32_t priv::find_closest_point_index(const Point            &p,
     size_t line_idx = std::numeric_limits<size_t>::max();
     Vec2d  hit_point;
     Vec2d  p_d = p.cast<double>();
-    double distance_sq = AABBTreeLines::squared_distance_to_indexed_lines(
+    [[maybe_unused]] double distance_sq =
+        AABBTreeLines::squared_distance_to_indexed_lines(
         sd.lines, sd.tree, p_d, line_idx, hit_point);
     assert(distance_sq > 0);
     
@@ -2791,8 +2793,6 @@ void priv::divide_patch(size_t i, SurfacePatches &patches) {
     SurfacePatch &patch = patches[i];
     assert(patch.just_cliped); 
     patch.just_cliped = false;
-
-    constexpr size_t def_value = std::numeric_limits<size_t>::max();
 
     CutMesh& cm = patch.mesh;
     assert(!cm.faces().empty());

@@ -1333,7 +1333,6 @@ void GLGizmoEmboss::draw_font_list()
     const char * selected = (!actual_face_name.empty()) ?
         actual_face_name.ToUTF8().data() : " --- ";
     wxString del_facename;
-    static bool was_opened = false;
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if (!m_face_names.is_init) init_face_names();
         init_texture();

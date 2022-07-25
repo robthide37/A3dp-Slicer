@@ -119,7 +119,8 @@ TEST_CASE("Find the closest point from ExPolys", "[ClosestPoint]") {
 
     size_t hit_idx_out = std::numeric_limits<size_t>::max();
     Vec2d  hit_point_out; 
-    double distance_sq = AABBTreeLines::squared_distance_to_indexed_lines(
+    [[maybe_unused]] double distance_sq =
+        AABBTreeLines::squared_distance_to_indexed_lines(
         lines, tree, p, hit_idx_out, hit_point_out, 0.24/* < (0.5*0.5) */);
     CHECK(hit_idx_out == std::numeric_limits<size_t>::max());
     distance_sq = AABBTreeLines::squared_distance_to_indexed_lines(
