@@ -811,56 +811,90 @@ void debug_print_graph(const std::vector<LayerIslands> &islands_graph) {
 
 }
 
+class ActiveObjectParts {
+    size_t next_part_idx = 0;
+    std::unordered_map<size_t, ObjectPart> active_object_parts;
+    std::unordered_map<size_t, size_t> active_object_parts_id_mapping;
+
+public:
+    size_t get_flat_id(size_t id) {
+        size_t index = active_object_parts_id_mapping.at(id);
+        while (index != active_object_parts_id_mapping.at(index)) {
+            index = active_object_parts_id_mapping.at(index);
+        }
+        size_t i = id;
+        while (index != active_object_parts_id_mapping.at(i)) {
+            size_t next = active_object_parts_id_mapping[i];
+            active_object_parts_id_mapping[i] = index;
+            i = next;
+        }
+        return index;
+    }
+
+    ObjectPart& access(size_t id) {
+        return this->active_object_parts.at(this->get_flat_id(id));
+    }
+
+    size_t insert(const Island &island) {
+        this->active_object_parts.emplace(next_part_idx, ObjectPart(island));
+        this->active_object_parts_id_mapping.emplace(next_part_idx, next_part_idx);
+        return next_part_idx++;
+    }
+
+    void merge(size_t from, size_t to) {
+        size_t to_flat = this->get_flat_id(to);
+        size_t from_flat = this->get_flat_id(from);
+        active_object_parts.at(to_flat).add(active_object_parts.at(from_flat));
+        active_object_parts.erase(from_flat);
+        active_object_parts_id_mapping[from] = to_flat;
+    }
+};
+
 Issues check_global_stability(SupportGridFilter supports_presence_grid,
         const std::vector<LayerIslands> &islands_graph, const Params &params) {
     debug_print_graph(islands_graph);
     Issues issues { };
-    size_t next_part_idx = 0;
-    std::unordered_map<size_t, ObjectPart> active_object_parts;
+    ActiveObjectParts active_object_parts { };
     std::unordered_map<size_t, size_t> prev_island_to_object_part_mapping;
     std::unordered_map<size_t, size_t> next_island_to_object_part_mapping;
 
-    std::unordered_map<size_t, IslandConnection> prev_island_to_weakest_connection;
-    std::unordered_map<size_t, IslandConnection> next_island_to_weakest_connection;
+    std::unordered_map<size_t, IslandConnection> prev_island_weakest_connection;
+    std::unordered_map<size_t, IslandConnection> next_island_weakest_connection;
 
     for (size_t layer_idx = 0; layer_idx < islands_graph.size(); ++layer_idx) {
         float layer_z = islands_graph[layer_idx].layer_z;
-        std::unordered_set<size_t> layer_active_parts;
         std::cout << "at layer: " << layer_idx << "  the following island to object mapping is used:" << std::endl;
         for (const auto &m : prev_island_to_object_part_mapping) {
             std::cout << "island " << m.first << " maps to part " << m.second << std::endl;
-            prev_island_to_weakest_connection[m.first].print_info("connection info:");
+            prev_island_weakest_connection[m.first].print_info("connection info:");
         }
 
         for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
             const Island &island = islands_graph[layer_idx].islands[island_idx];
             if (island.connected_islands.empty()) { //new object part emerging
-                size_t part_idx = next_part_idx;
-                next_part_idx++;
-                active_object_parts.emplace(part_idx, ObjectPart(island));
-                next_island_to_object_part_mapping.emplace(island_idx, part_idx);
-                next_island_to_weakest_connection.emplace(island_idx,
+                size_t part_id = active_object_parts.insert(island);
+                next_island_to_object_part_mapping.emplace(island_idx, part_id);
+                next_island_weakest_connection.emplace(island_idx,
                         IslandConnection { 1.0f, Vec3f::Zero(), Vec2f { INFINITY, INFINITY } });
-                layer_active_parts.insert(part_idx);
             } else {
-                size_t final_part_idx { };
+                size_t final_part_id { };
                 IslandConnection transfered_weakest_connection { };
                 IslandConnection new_weakest_connection { };
                 // MERGE parts
                 {
-                    std::unordered_set<size_t> part_indices;
+                    std::unordered_set<size_t> parts_ids;
                     for (const auto &connection : island.connected_islands) {
-                        part_indices.insert(prev_island_to_object_part_mapping.at(connection.first));
-                        transfered_weakest_connection.add(prev_island_to_weakest_connection.at(connection.first));
+                        size_t part_id = active_object_parts.get_flat_id(prev_island_to_object_part_mapping.at(connection.first));
+                        parts_ids.insert(part_id);
+                        transfered_weakest_connection.add(prev_island_weakest_connection.at(connection.first));
                         new_weakest_connection.add(connection.second);
                     }
-                    final_part_idx = *part_indices.begin();
-                    for (size_t part_idx : part_indices) {
-                        if (final_part_idx != part_idx) {
-                            std::cout << "at layer: " << layer_idx << "  merging object part: " << part_idx
-                                    << " into final part: " << final_part_idx << std::endl;
-                            active_object_parts.at(final_part_idx).add(active_object_parts.at(part_idx));
-                            active_object_parts.erase(part_idx);
+                    final_part_id = *parts_ids.begin();
+                    for (size_t part_id : parts_ids) {
+                        if (final_part_id != part_id) {
+                            std::cout << "at layer: " << layer_idx << "  merging object part: " << part_id
+                                    << " into final part: " << final_part_id << std::endl;
+                            active_object_parts.merge(part_id, final_part_id);
                         }
                     }
                 }
@@ -878,31 +912,17 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                 if (estimate_strength(transfered_weakest_connection) < estimate_strength(new_weakest_connection)) {
                     new_weakest_connection = transfered_weakest_connection;
                 }
-                next_island_to_weakest_connection.emplace(island_idx, new_weakest_connection);
-                next_island_to_object_part_mapping.emplace(island_idx, final_part_idx);
-                ObjectPart &part = active_object_parts[final_part_idx];
+                next_island_weakest_connection.emplace(island_idx, new_weakest_connection);
+                next_island_to_object_part_mapping.emplace(island_idx, final_part_id);
+                ObjectPart &part = active_object_parts.access(final_part_id);
                 part.add(ObjectPart(island));
-                layer_active_parts.insert(final_part_idx);
             }
         }
 
-        std::unordered_set<size_t> parts_to_delete;
-        for (const auto &part : active_object_parts) {
-            if (layer_active_parts.find(part.first) == layer_active_parts.end()) {
-                parts_to_delete.insert(part.first);
-            } else {
-                std::cout << "at layer " << layer_idx << " part is still active: " << part.first << std::endl;
-                part.second.print();
-            }
-        }
-        for (size_t part_id : parts_to_delete) {
-            active_object_parts.erase(part_id);
-            std::cout << " at layer: " << layer_idx << " removing object part " << part_id << std::endl;
-        }
         prev_island_to_object_part_mapping = next_island_to_object_part_mapping;
         next_island_to_object_part_mapping.clear();
-        prev_island_to_weakest_connection = next_island_to_weakest_connection;
-        next_island_to_weakest_connection.clear();
+        prev_island_weakest_connection = next_island_weakest_connection;
+        next_island_weakest_connection.clear();
 
         // All object parts updated, inactive parts removed and weakest point of each island updated as well.
         // Now compute the stability of each active object part, adding supports where necessary, and also
@@ -910,8 +930,9 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
 
         for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
             const Island &island = islands_graph[layer_idx].islands[island_idx];
-            ObjectPart &part = active_object_parts.at(prev_island_to_object_part_mapping[island_idx]);
-            IslandConnection &weakest_conn = prev_island_to_weakest_connection[island_idx];
+            ObjectPart &part = active_object_parts.access(prev_island_to_object_part_mapping[island_idx]);
+            part.print();
+            IslandConnection &weakest_conn = prev_island_weakest_connection[island_idx];
             weakest_conn.print_info("weakest connection info: ");
 
             std::vector<ExtrusionLine> dummy { };
