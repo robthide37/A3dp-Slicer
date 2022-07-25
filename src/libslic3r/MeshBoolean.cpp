@@ -274,7 +274,7 @@ void CGALMeshDeleter::operator()(CGALMesh *ptr) { delete ptr; }
 
 bool does_bound_a_volume(const CGALMesh &mesh)
 {
-    return CGALProc::does_bound_a_volume(mesh.m);
+    return CGAL::is_closed(mesh.m) && CGALProc::does_bound_a_volume(mesh.m);
 }
 
 bool empty(const CGALMesh &mesh)
