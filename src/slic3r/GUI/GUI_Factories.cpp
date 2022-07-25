@@ -142,13 +142,20 @@ std::map<std::string, std::string> SettingsFactory::CATEGORY_ICON =
     { L("Hollowing")            , "hollowing"   }
 };
 
-wxBitmap SettingsFactory::get_category_bitmap(const std::string& category_name, bool menu_bmp /*= true*/)
+//wxBitmap SettingsFactory::get_category_bitmap(const std::string& category_name, bool menu_bmp /*= true*/)
+wxBitmap SettingsFactory::get_category_bitmap_(const std::string& category_name, bool menu_bmp /*= true*/)
 {
     if (CATEGORY_ICON.find(category_name) == CATEGORY_ICON.end())
         return wxNullBitmap;
-    return menu_bmp ? create_menu_bitmap(CATEGORY_ICON.at(category_name)) : create_scaled_bitmap(CATEGORY_ICON.at(category_name));
+    return /*menu_bmp ? create_menu_bitmap(CATEGORY_ICON.at(category_name)) : */create_scaled_bitmap(CATEGORY_ICON.at(category_name));
 }
 
+wxBitmapBundle SettingsFactory::get_category_bitmap(const std::string& category_name)
+{
+    if (CATEGORY_ICON.find(category_name) == CATEGORY_ICON.end())
+        return wxNullBitmap;
+    return create_menu_bitmap(CATEGORY_ICON.at(category_name));
+}
 
 //-------------------------------------
 //            MenuFactory
@@ -435,7 +442,8 @@ std::vector<wxBitmap> MenuFactory::get_volume_bitmaps()
     std::vector<wxBitmap> volume_bmps;
     volume_bmps.reserve(ADD_VOLUME_MENU_ITEMS.size());
     for (auto item : ADD_VOLUME_MENU_ITEMS)
-        volume_bmps.push_back(create_menu_bitmap(item.second));
+//        volume_bmps.push_back(create_menu_bitmap(item.second));
+        volume_bmps.push_back(create_scaled_bitmap(item.second, nullptr, 16, false, "", true));
     return volume_bmps;
 }
 

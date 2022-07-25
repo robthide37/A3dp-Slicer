@@ -102,8 +102,10 @@ SysInfoDialog::SysInfoDialog()
 	main_sizer->Add(hsizer, 1, wxEXPAND | wxALL, 10);
 
     // logo
-    m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 192);
-    m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bmp.bmp());
+    //m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 192);
+    //m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bmp.bmp());
+    m_logo = new wxStaticBitmap(this, wxID_ANY, wxBitmapBundle::FromSVGFile(Slic3r::var(wxGetApp().logo_name() + ".svg"), wxSize(192, 192)));
+
 	hsizer->Add(m_logo, 0, wxALIGN_CENTER_VERTICAL);
     
     wxBoxSizer* vsizer = new wxBoxSizer(wxVERTICAL);
@@ -194,8 +196,8 @@ SysInfoDialog::SysInfoDialog()
 
 void SysInfoDialog::on_dpi_changed(const wxRect &suggested_rect)
 {
-    m_logo_bmp.msw_rescale();
-    m_logo->SetBitmap(m_logo_bmp.bmp());
+    //m_logo_bmp.msw_rescale();
+    //m_logo->SetBitmap(m_logo_bmp.bmp());
 
     wxFont font = get_default_font(this);
     const int fs = font.GetPointSize() - 1;

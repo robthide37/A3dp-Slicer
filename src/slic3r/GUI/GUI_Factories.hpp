@@ -25,7 +25,9 @@ struct SettingsFactory
     typedef std::map<std::string, std::vector<std::string>> Bundle;
     static std::map<std::string, std::string>               CATEGORY_ICON;
 
-    static wxBitmap                             get_category_bitmap(const std::string& category_name, bool menu_bmp = true);
+//    static wxBitmap                             get_category_bitmap(const std::string& category_name, bool menu_bmp = true);
+    static wxBitmap                             get_category_bitmap_(const std::string& category_name, bool menu_bmp = true);
+    static wxBitmapBundle                       get_category_bitmap(const std::string& category_name);
     static Bundle                               get_bundle(const DynamicPrintConfig* config, bool is_object_settings);
     static std::vector<std::string>             get_options(bool is_part);
 };

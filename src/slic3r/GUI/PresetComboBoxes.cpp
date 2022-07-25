@@ -376,8 +376,8 @@ void PresetComboBox::msw_rescale()
 {
     m_em_unit = em_unit(this);
 
-    m_bitmapIncompatible.msw_rescale();
-    m_bitmapCompatible.msw_rescale();
+    //m_bitmapIncompatible.msw_rescale();
+    //m_bitmapCompatible.msw_rescale();
 
     // parameters for an icon's drawing
     fill_width_height();
@@ -403,7 +403,8 @@ void PresetComboBox::fill_width_height()
     * So set sizes for solid_colored icons used for filament preset
     * and scale them in respect to em_unit value
     */
-    const float scale_f = (float)m_em_unit * 0.1f;
+//    const float scale_f = (float)m_em_unit * 0.1f;
+    const float scale_f = 1.0f;
 
     thin_icon_width = lroundf(8 * scale_f);          // analogue to 8px;
     wide_icon_width = norm_icon_width + thin_icon_width;
