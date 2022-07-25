@@ -1427,16 +1427,24 @@ void GLGizmoEmboss::draw_font_list()
 
 void GLGizmoEmboss::draw_model_type()
 {
+    ImGui::Text("%s", m_gui_cfg->translations.type.c_str());
+    ImGui::SameLine(m_gui_cfg->style_offset);
+
+    if (m_volume == nullptr) {
+        ImGui::Text("[ %s ]", _u8L("No text").c_str());
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("First select text to change type.").c_str());
+        return;
+    }
+
     std::optional<ModelVolumeType> new_type;
     ModelVolumeType modifier = ModelVolumeType::PARAMETER_MODIFIER;
     ModelVolumeType negative = ModelVolumeType::NEGATIVE_VOLUME;
     ModelVolumeType part = ModelVolumeType::MODEL_PART;
-    ModelVolumeType type = (m_volume != nullptr) ? m_volume->type() :
-                                                   ModelVolumeType::INVALID;
+    ModelVolumeType type = m_volume->type();
 
     bool is_last_solid_part = is_text_object(m_volume);
-    ImGui::Text("%s", m_gui_cfg->translations.type.c_str());
-    ImGui::SameLine(m_gui_cfg->style_offset);
+
     if (type == part) { 
         draw_icon(IconType::part, IconState::hovered);
     } else {
