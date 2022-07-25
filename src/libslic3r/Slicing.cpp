@@ -124,7 +124,7 @@ SlicingParameters SlicingParameters::create_from_config(
     //apply z_step to layer_height
     params.layer_height = check_z_step(params.layer_height , params.z_step);
     params.object_print_z_max = check_z_step(params.object_print_z_max, params.z_step);
-    if (params.object_print_z_max < object_height) params.object_print_z_max += params.z_step;
+    if (params.object_print_z_max + EPSILON < object_height) params.object_print_z_max += params.z_step;
 
     // Miniumum/maximum of the minimum layer height over all extruders.
     params.min_layer_height = 0;
@@ -269,7 +269,7 @@ std::vector<coordf_t> layer_height_profile_from_ranges(
         coordf_t lo = it_range->first.first;
         coordf_t hi = it_range->first.second;
         coordf_t height = it_range->second;
-        coordf_t last_z      = layer_height_profile.empty() ? 0. : layer_height_profile[layer_height_profile.size() - 2];
+        coordf_t last_z = layer_height_profile.empty() ? 0. : layer_height_profile[layer_height_profile.size() - 2];
         if (lo > last_z + EPSILON) {
             // Insert a step of normal layer height.
             layer_height_profile.push_back(last_z);
@@ -284,8 +284,8 @@ std::vector<coordf_t> layer_height_profile_from_ranges(
         layer_height_profile.push_back(height);
     }
 
-    coordf_t last_z      = layer_height_profile.empty() ? 0. : layer_height_profile[layer_height_profile.size() - 2];
-    if (last_z < slicing_params.object_print_z_height()) {
+    coordf_t last_z = layer_height_profile.empty() ? 0. : layer_height_profile[layer_height_profile.size() - 2];
+    if (last_z + EPSILON < slicing_params.object_print_z_height()) {
         // Insert a step of normal layer height up to the object top.
         layer_height_profile.push_back(last_z);
         layer_height_profile.push_back(slicing_params.layer_height);

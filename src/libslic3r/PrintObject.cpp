@@ -2541,9 +2541,16 @@ PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &defau
             // Must not be of even length.
             ((layer_height_profile.size() & 1) != 0 ||
                 // Last entry must be at the top of the object.
-            std::abs(layer_height_profile[layer_height_profile.size() - 2] - slicing_parameters.object_print_z_max + slicing_parameters.object_print_z_min) > 1e-3))
+           std::abs(layer_height_profile[layer_height_profile.size() - 2] - slicing_parameters.object_print_z_max + slicing_parameters.object_print_z_min) > 10 * EPSILON)) {
+            if ((layer_height_profile.size() & 1) != 0) {
+                BOOST_LOG_TRIVIAL(error) << "Error: can't apply the layer hight profile: layer_height_profile array is odd, not even.";
+            } else {
+                BOOST_LOG_TRIVIAL(error) << "Error: can't apply the layer hight profile: layer_height_profile last layer is at "
+                    << layer_height_profile[layer_height_profile.size() - 2]
+                    <<", and it's too far away from object_print_z_max = "<<(slicing_parameters.object_print_z_max + slicing_parameters.object_print_z_min);
+            }
             layer_height_profile.clear();
-
+        }
         if (layer_height_profile.empty()) {
             layer_height_profile = layer_height_profile_from_ranges(slicing_parameters, model_object.layer_config_ranges);
             updated = true;
