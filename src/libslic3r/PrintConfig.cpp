@@ -3498,11 +3498,12 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("max_volumetric_speed", coFloat);
     def->label = L("Volumetric speed");
-    def->full_label = L("Volumetric speed for Autospeed");
+    def->full_label = L("Maximum Print Volumetric speed");
     def->category = OptionCategory::extruders;
-    def->tooltip = L("This setting allow you to set the desired flow rate for the autospeed algorithm. It tries to keep a constant feedrate for the entire object."
-        "\nThe autospeed is only enable on speed field that have a value of 0. If a speed field is a % of a 0 field, then it will be a % of the value it should have got from the autospeed."
-        "\nIf this field is set to 0, then there is no autospeed. If a speed value i still set to 0, it will get the max speed");
+    def->tooltip = L("This setting allows you to set the maximum flowrate for your print, and so cap the desired flow rate for the autospeed algorithm."
+        " The autospeed tries to keep a constant feedrate for the entire object, and so can lower the volumetric speed for some features."
+        "\nThe autospeed is only enable on speed fields that have a value of 0. If a speed field is a % of a 0 field, then it will be a % of the value it should have got from the autospeed."
+        "\nIf this field is set to 0, then there is no autospeed nor maximum flowrate. If a speed value i still set to 0, it will get the max speed allwoed by the printer.");
     def->sidetext = L("mm³/s");
     def->min = 0;
     def->mode = comExpert | comPrusa;
