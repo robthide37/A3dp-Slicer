@@ -9,9 +9,14 @@
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 
+#include <memory>
+
+
 namespace Slic3r {
 
 enum class ModelVolumeType : int;
+
+namespace Measure { class Measuring; }
 
 
 namespace GUI {
@@ -22,37 +27,10 @@ class GLGizmoMeasure : public GLGizmoBase
 // This gizmo does not use grabbers. The m_hover_id relates to polygon managed by the class itself.
 
 private:
-
-    int m_currently_shown_plane = 0;
-    bool m_show_all_planes = false;
-    bool m_show_points = true;
-    bool m_show_edges = true;
-    bool m_show_circles = true;
+    std::unique_ptr<Measure::Measuring> m_measuring;
 
     GLModel m_vbo_sphere;
     GLModel m_vbo_cylinder;
-
-    struct SurfaceFeature {
-        enum Type {
-            Circle,
-            Line
-        };
-        Type type;
-        Vec3d pos;
-        Vec3d endpoint; // for type == Line
-        double radius;  // for type == Circle;
-    };
-
-    struct PlaneData {
-        std::vector<int> facets;
-        std::vector<std::vector<Vec3d>> borders; // should be in fact local in update_planes()
-        std::vector<SurfaceFeature> surface_features;        
-        std::vector<GLModel> vbos;
-        Vec3d normal;
-        float area;
-    };
-
-    static void extract_features(PlaneData& plane);
 
     // This holds information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;
@@ -60,15 +38,16 @@ private:
     Vec3d m_first_instance_scale;
     Vec3d m_first_instance_mirror;
 
-    std::vector<PlaneData> m_planes;
-    std::vector<size_t> m_face_to_plane;
     bool m_mouse_left_down = false; // for detection left_up of this gizmo
     bool m_planes_valid = false;
     const ModelObject* m_old_model_object = nullptr;
     std::vector<const Transform3d*> instances_matrices;
 
-    void update_planes();
-    bool is_plane_update_necessary() const;
+    int m_mouse_pos_x;
+    int m_mouse_pos_y;
+    bool m_show_all = true;
+
+    void update_if_needed();
     void set_flattening_data(const ModelObject* model_object);
 
 public:
