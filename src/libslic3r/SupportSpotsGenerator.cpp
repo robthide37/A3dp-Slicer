@@ -638,6 +638,7 @@ public:
 
         auto compute_elastic_section_modulus = [&line_dir](
                 const Vec3f &centroid_accumulator, const Vec2f &second_moment_of_area_accumulator, const float &area) {
+            if (area < EPSILON) return 0.0f;
             Vec3f centroid = centroid_accumulator / area;
             Vec2f variance = (second_moment_of_area_accumulator / area
                     - centroid.head<2>().cwiseProduct(centroid.head<2>()));

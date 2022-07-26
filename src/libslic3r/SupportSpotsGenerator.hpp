@@ -10,7 +10,7 @@ namespace SupportSpotsGenerator {
 struct Params {
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [N]
     const float bridge_distance = 12.0f; //mm
-    const float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
+    const float bridge_distance_decrease_by_curvature_factor = 3.0f; // allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
 
     const float min_distance_between_support_points = 3.0f; //mm
     const float support_points_interface_radius = 0.6f; // mm
