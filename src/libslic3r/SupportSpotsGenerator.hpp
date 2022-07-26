@@ -8,7 +8,7 @@ namespace Slic3r {
 namespace SupportSpotsGenerator {
 
 struct Params {
-    // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [N]
+    // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
     const float bridge_distance = 12.0f; //mm
     const float bridge_distance_decrease_by_curvature_factor = 3.0f; // allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
 

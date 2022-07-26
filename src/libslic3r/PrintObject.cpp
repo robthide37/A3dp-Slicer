@@ -398,7 +398,6 @@ void PrintObject::ironing()
     }
 }
 
-
 void PrintObject::generate_support_spots()
 {
     if (this->set_started(posSupportSpotsSearch)) {
@@ -421,8 +420,6 @@ void PrintObject::generate_support_spots()
             }
         } else {
             SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this);
-            //TODO fix
-//            if (!issues.supports_nedded.empty()) {
             auto obj_transform = this->trafo_centered();
             for (ModelVolume *model_volume : this->model_object()->volumes) {
                 if (model_volume->type() == ModelVolumeType::MODEL_PART) {
@@ -438,7 +435,7 @@ void PrintObject::generate_support_spots()
                     }
 
                     model_volume->supported_facets.set(selector.selector);
-#if 1
+#if 0 //DEBUG export
                     indexed_triangle_set copy = model_volume->mesh().its;
                     its_transform(copy, obj_transform * model_transformation);
                     its_write_obj(copy,
@@ -446,7 +443,6 @@ void PrintObject::generate_support_spots()
 #endif
                 }
             }
-//            }
         }
 
         m_print->throw_if_canceled();
@@ -455,7 +451,6 @@ void PrintObject::generate_support_spots()
         this->set_done(posSupportSpotsSearch);
     }
 }
-
 
 void PrintObject::generate_support_material()
 {
