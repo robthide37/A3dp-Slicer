@@ -4218,7 +4218,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 spacing = m_support_params.support_material_flow.spacing();
                 assert(! raft_layer.bridging);
                 float nzd = m_support_params.support_material_flow.nozzle_diameter();
-                flow = raft_layer.bridging ?
+                flow = !raft_layer.bridging ?
                     Flow(float(m_support_params.support_material_interface_flow.width()), float(raft_layer.height), nzd, m_support_params.support_material_flow.spacing_ratio()) :
                     Flow::bridging_flow(nzd * std::sqrt(m_support_params.raft_bridge_flow_ratio), nzd);
                 density       = float(m_support_params.interface_density);
