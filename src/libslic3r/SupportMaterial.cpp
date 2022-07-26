@@ -352,18 +352,26 @@ PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object
     m_support_params.first_layer_flow                   = support_material_1st_layer_flow(object, float(slicing_params.first_print_layer_height));
     m_support_params.support_material_flow              = support_material_flow(object, float(slicing_params.layer_height));
     m_support_params.support_material_interface_flow    = support_material_interface_flow(object, float(slicing_params.layer_height));
-    m_support_params.support_layer_height_min           = 0.01;
     m_support_params.raft_bridge_flow_ratio             = object->print()->default_region_config().bridge_flow_ratio.get_abs_value(1.);
 
     // Calculate a minimum support layer height as a minimum over all extruders, but not smaller than 10um.
     m_support_params.support_layer_height_min = 1000000.;
     const ConfigOptionFloatsOrPercents& min_layer_height = m_print_config->min_layer_height;
     const ConfigOptionFloats& nozzle_diameter = m_print_config->nozzle_diameter;
-    for (int extr_id = 0; extr_id < min_layer_height.values.size(); ++extr_id)
-        m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, std::max(0.01, min_layer_height.get_abs_value(extr_id, nozzle_diameter.get_at(extr_id))));
-    for (auto layer : m_object->layers())
-        m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, std::max(0.01, layer->height));
-
+    for (int extr_id = 0; extr_id < min_layer_height.values.size(); ++extr_id) {
+        double min_from_extr = min_layer_height.get_abs_value(extr_id, nozzle_diameter.get_at(extr_id));
+        if(min_from_extr > 0)
+            m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, min_from_extr);
+    }
+    for (auto layer : m_object->layers()) {
+        if (layer->height > 0)
+            m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, layer->height);
+    }
+    if (m_support_params.support_layer_height_min >= 1000000.) {
+        for (int extr_id = 0; extr_id < min_layer_height.values.size(); ++extr_id) {
+            m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, nozzle_diameter.get_at(extr_id) / 10);
+        }
+    }
     if (m_object_config->support_material_interface_layers.value == 0) {
         // No interface layers allowed, print everything with the base support pattern.
         m_support_params.support_material_interface_flow = m_support_params.support_material_flow;
@@ -2589,6 +2597,14 @@ PrintObjectSupportMaterial::MyLayersPtr PrintObjectSupportMaterial::raft_and_int
     // Intermediate layers are always printed with a normal etrusion flow (non-bridging).
     size_t idx_layer_object = 0;
     size_t idx_extreme_first = 0;
+    coordf_t support_layer_height = m_object_config->support_material_layer_height.value == 0 ?
+        m_slicing_params.max_suport_layer_height :
+        std::min(m_slicing_params.max_suport_layer_height, std::max(0.,//m_slicing_params.min_suport_layer_height,
+            m_object_config->support_material_layer_height.get_abs_value(m_support_params.support_material_flow.nozzle_diameter())));
+    coordf_t support_interface_layer_height = m_object_config->support_material_interface_layer_height.value == 0 ?
+        m_slicing_params.max_suport_layer_height :
+        std::min(m_slicing_params.max_suport_layer_height, std::max(0.,// m_slicing_params.min_suport_layer_height,
+            m_object_config->support_material_interface_layer_height.get_abs_value(m_support_params.support_material_interface_flow.nozzle_diameter())));
     if (! extremes.empty() && std::abs(extremes.front()->extreme_z() - m_slicing_params.raft_interface_top_z) < EPSILON) {
         // This is a raft contact layer, its height has been decided in this->top_contact_layers().
         // Ignore this layer when calculating the intermediate support layers.
@@ -2667,9 +2683,56 @@ PrintObjectSupportMaterial::MyLayersPtr PrintObjectSupportMaterial::raft_and_int
             }
         } else {
             // Insert intermediate layers.
-            size_t        n_layers_extra = size_t(ceil(dist / m_slicing_params.max_suport_layer_height)); 
-            assert(n_layers_extra > 0);
-            coordf_t      step   = dist / coordf_t(n_layers_extra);
+            //compute the layers height
+            size_t      n_layers_bot = 0;
+            size_t      n_layers_middle = size_t(ceil(dist / support_layer_height));
+            size_t      n_layers_top = 0;
+            size_t      n_layers_total = 0;
+            coordf_t    step_interface = support_interface_layer_height;
+            coordf_t    step = 0;
+            auto compute_step = []() {
+            };
+            {
+                n_layers_top = m_object_config->support_material_interface_layers.value;
+                coordf_t height_top_interface = std::max(0., support_interface_layer_height * n_layers_top);
+                n_layers_bot = m_object_config->support_material_bottom_interface_layers.value >= 0 ? m_object_config->support_material_bottom_interface_layers.value : n_layers_top;
+                n_layers_bot = std::max(size_t(0), n_layers_bot - 1); //the first bot layer is already in the extreme list.
+                coordf_t height_bot_interface = (support_interface_layer_height * n_layers_bot);
+                if (dist <= height_top_interface + height_bot_interface) {
+                    // not enough height for a not-interface layer
+                    n_layers_top = size_t(ceil(dist / support_interface_layer_height));
+                    step_interface = dist / coordf_t(n_layers_top);
+                    n_layers_middle = 0;
+                    if (n_layers_bot > 0) {
+                        n_layers_bot = std::min(n_layers_bot, n_layers_top / 2);
+                        n_layers_top -= n_layers_bot;
+                    }
+                    n_layers_total = n_layers_bot + n_layers_middle + n_layers_top;
+                } else {
+                    //enough place of at least one normal support layer
+                    n_layers_middle = size_t(ceil((dist - height_top_interface - height_bot_interface) / support_layer_height));
+                    n_layers_total = n_layers_bot + n_layers_middle + n_layers_top;
+                    //compute the avg
+                    step = dist / coordf_t(n_layers_total);
+                    //it's not possible to have the average above both height.
+                    assert(step < support_layer_height || step < support_interface_layer_height);
+                    if (step < support_layer_height && step < support_interface_layer_height) {
+                        // the average step is lower than the interface and the normal hiehgt, so use that
+                        step_interface = step;
+                    } else {
+                        // The average is between the two, so use the height of the feature that have the lower height. And use th rest for the other feature
+                        // It will have somethign between its max and the other one.
+                        if (support_interface_layer_height <= support_layer_height) {
+                            step_interface = support_interface_layer_height;
+                            step = (dist - step_interface * (n_layers_top + n_layers_bot)) / coordf_t(n_layers_middle);
+                        } else {
+                            step = support_layer_height;
+                            step_interface = (dist - step * n_layers_middle)/ coordf_t(n_layers_top + n_layers_bot);
+                        }
+                    }
+                }
+            }
+            assert(n_layers_total > 0);
             if (extr1 != nullptr && extr1->layer_type == sltTopContact &&
                 extr1->print_z + m_support_params.support_layer_height_min > extr1->bottom_z + step) {
                 // The bottom extreme is a bottom of a top surface. Ensure that the gap 
@@ -2682,40 +2745,102 @@ PrintObjectSupportMaterial::MyLayersPtr PrintObjectSupportMaterial::raft_and_int
                 layer_new.height        = extr1->height;
                 layer_new.height_block  = layer_new.height;
                 intermediate_layers.push_back(&layer_new);
-                dist = extr2z - extr1z;
-                n_layers_extra = size_t(ceil(dist / m_slicing_params.max_suport_layer_height));
-                if (n_layers_extra == 0)
+                dist = extr2z - layer_new.print_z;
+                if (dist <= 0)
                     continue;
                 // Continue printing the other layers up to extr2z.
-                step = dist / coordf_t(n_layers_extra);
+                n_layers_total--;
+                if (n_layers_bot > 0) {
+                    n_layers_bot--;
+                } else if (n_layers_middle > 0) {
+                    n_layers_middle--;
+                } else {
+                    n_layers_top--;
+                }
+                assert(n_layers_bot >= 0);
+                assert(n_layers_middle >= 0);
+                assert(n_layers_top >= 0);
+                assert(n_layers_total == n_layers_bot + n_layers_middle + n_layers_top);
+                //recompute the steps
+                {
+                    coordf_t height_top_interface = support_interface_layer_height * n_layers_top;
+                    coordf_t height_bot_interface = support_interface_layer_height * n_layers_bot;
+                    if (dist <= height_top_interface + height_bot_interface) {
+                        // not enough height for a not-interface layer
+                        n_layers_top = size_t(ceil(dist / support_interface_layer_height));
+                        step_interface = dist / coordf_t(n_layers_top);
+                        n_layers_middle = 0;
+                        n_layers_total = n_layers_bot + n_layers_middle + n_layers_top;
+                    } else {
+                        //enough place of at least one normal support layer
+                        n_layers_middle = size_t(ceil((dist - height_top_interface - height_bot_interface) / support_layer_height));
+                        n_layers_total = n_layers_bot + n_layers_middle + n_layers_top;
+                        //compute the avg
+                        step = dist / coordf_t(n_layers_total);
+                        //it's not possible to have the average above both height.
+                        assert(step < support_layer_height || step < support_interface_layer_height);
+                        if (step < support_layer_height && step < support_interface_layer_height) {
+                            // the average step is lower than the interface and the normal hiehgt, so use that
+                            step_interface = step;
+                        } else {
+                            // The average is between the two, so use the height of the feature that have the lower height. And use th rest for the other feature
+                            // It will have somethign between its max and the other one.
+                            if (support_interface_layer_height <= support_layer_height) {
+                                step_interface = support_interface_layer_height;
+                                step = (dist - height_top_interface - height_bot_interface) / coordf_t(n_layers_middle);
+                            } else {
+                                step = support_layer_height;
+                                step_interface = (height_top_interface + height_bot_interface) / coordf_t(n_layers_top + n_layers_bot);
+                            }
+                        }
+                    }
+                }
             }
             if (! m_slicing_params.soluble_interface && extr2->layer_type == sltTopContact) {
                 // This is a top interface layer, which does not have a height assigned yet. Do it now.
                 assert(extr2->height == 0.);
                 assert(extr1z > m_slicing_params.first_print_layer_height - EPSILON);
-                extr2->height = step;
-                extr2->bottom_z = extr2z = extr2->print_z - step;
-                if (-- n_layers_extra == 0)
+                if (n_layers_top > 0) {
+                    n_layers_top--;
+                    extr2->height = step_interface;
+                } else if (n_layers_middle > 0) {
+                    n_layers_middle--;
+                    extr2->height = step;
+                } else {
+                    n_layers_bot--;
+                    extr2->height = step_interface;
+                }
+                extr2->bottom_z = extr2z = extr2->print_z - extr2->height;
+                if (--n_layers_total == 0)
                     continue;
             }
+            //not enough place
+            if (dist < m_support_params.support_layer_height_min)
+                continue;
             coordf_t extr2z_large_steps = extr2z;
             // Take the largest allowed step in the Z axis until extr2z_large_steps is reached.
-            for (size_t i = 0; i < n_layers_extra; ++ i) {
+            coordf_t last_z = extr1z;
+            for (size_t i = 0; i < n_layers_total; ++ i) {
                 MyLayer &layer_new = layer_allocate(layer_storage, sltIntermediate);
-                if (i + 1 == n_layers_extra) {
+                if (i + 1 == n_layers_total) {
                     // Last intermediate layer added. Align the last entered layer with extr2z_large_steps exactly.
                     layer_new.bottom_z = (i == 0) ? extr1z : intermediate_layers.back()->print_z;
                     layer_new.print_z = extr2z_large_steps;
                     layer_new.height = layer_new.print_z - layer_new.bottom_z;
                     layer_new.height_block = layer_new.height;
-                }
-                else {
-                    // Intermediate layer, not the last added.
-                    layer_new.height = step;
-                    layer_new.bottom_z = extr1z + i * step;
-                    layer_new.print_z = layer_new.bottom_z + step;
+                } else {
+                    if (i < n_layers_bot || i >= n_layers_total - n_layers_top) {
+                        // Interface
+                        layer_new.height = step_interface;
+                    } else {
+                        // Intermediate layer, not the last added.
+                        layer_new.height = step;
+                    }
+                    layer_new.bottom_z = last_z;
+                    layer_new.print_z = layer_new.bottom_z + layer_new.height;
                     layer_new.height_block = layer_new.height;
                 }
+                last_z = layer_new.print_z;
                 assert(intermediate_layers.empty() || intermediate_layers.back()->print_z <= layer_new.print_z);
                 intermediate_layers.push_back(&layer_new);
             }

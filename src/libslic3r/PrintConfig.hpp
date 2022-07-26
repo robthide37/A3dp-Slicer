@@ -711,7 +711,9 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                raft_expansion))
     ((ConfigOptionPercent,              raft_first_layer_density))
     ((ConfigOptionFloat,                raft_first_layer_expansion))
+    ((ConfigOptionFloatOrPercent,       raft_interface_layer_height))
     ((ConfigOptionInt,                  raft_layers))
+    ((ConfigOptionFloatOrPercent,       raft_layer_height))
     ((ConfigOptionEnum<SeamPosition>,   seam_position))
     ((ConfigOptionPercent,              seam_angle_cost))
     ((ConfigOptionPercent,              seam_travel_cost))
@@ -736,6 +738,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 support_material_interface_contact_loops))
     ((ConfigOptionInt,                  support_material_interface_extruder))
     ((ConfigOptionInt,                  support_material_interface_layers))
+    ((ConfigOptionFloatOrPercent,       support_material_interface_layer_height))
     ((ConfigOptionInt,                  support_material_bottom_interface_layers))
     // Spacing between interface lines (the hatching distance). Set zero to get a solid interface.
     ((ConfigOptionFloat,                support_material_interface_spacing))
@@ -744,6 +747,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<SupportMaterialPattern>,  support_material_pattern))
     // Morphological closing of support areas. Only used for "sung" supports.
     ((ConfigOptionFloat,                support_material_closing_radius))
+    ((ConfigOptionFloatOrPercent,       support_material_layer_height))
     // Spacing between support material lines (the hatching distance).
     ((ConfigOptionFloat,                support_material_spacing))
     ((ConfigOptionFloatOrPercent,       support_material_speed))

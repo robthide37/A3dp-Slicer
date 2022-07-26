@@ -4093,7 +4093,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("raft_contact_distance", coFloat);
     def->label = L("Raft contact Z distance");
     def->category = OptionCategory::support;
-    def->tooltip = L("The vertical distance between object and raft. Ignored for soluble interface.");
+    def->tooltip = L("The vertical distance between object and raft. Ignored for soluble interface. It uses the same type as the support z-offset type.");
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comAdvancedE | comPrusa;
@@ -4138,6 +4138,30 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("raft_layer_height", coFloatOrPercent);
+    def->label = L("Raft layer height");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Maximum layer height for the raft, after the first layer that uses the first layer height, and before the interface layers."
+        "\nCan be a % of the nozzle diameter"
+        "\nIf set to 0, the support layer height will be used.");
+    def->sidetext = L("mm");
+    def->ratio_over = "nozzle_diameter";
+    def->min = 0;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
+
+    def = this->add("raft_interface_layer_height", coFloatOrPercent);
+    def->label = L("Raft interface layer height");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Maximum layer height for the raft interface."
+        "\nCan be a % of the nozzle diameter"
+        "\nIf set to 0, the support layer height will be used.");
+    def->sidetext = L("mm");
+    def->ratio_over = "nozzle_diameter";
+    def->min = 0;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
     def = this->add("resolution", coFloat);
     def->label = L("Slice resolution");
@@ -5049,6 +5073,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(2));
 
+    def = this->add("support_material_interface_layer_height", coFloatOrPercent);
+    def->label = L("Support interface layer height");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Maximum layer height for the support interface."
+        "\nCan be a % of the nozzle diameter"
+        "\nIf set to 0, the extruder maximum height will be used.");
+    def->sidetext = L("mm");
+    def->ratio_over = "nozzle_diameter";
+    def->min = 0;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
+
     def = this->add("support_material_interface_spacing", coFloat);
     def->label = L("Interface pattern spacing");
     def->category = OptionCategory::support;
@@ -5111,6 +5147,18 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Ironing"));
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipRectilinear));
+
+    def = this->add("support_material_layer_height", coFloatOrPercent);
+    def->label = L("Support layer height");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Maximum layer height for the support, after the first layer that uses the first layer height, and before the interface layers."
+        "\nCan be a % of the nozzle diameter"
+        "\nIf set to 0, the extruder maximum height will be used.");
+    def->sidetext = L("mm");
+    def->ratio_over = "nozzle_diameter";
+    def->min = 0;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
     
     def = this->add("support_material_spacing", coFloat);
     def->label = L("Pattern spacing");
@@ -7321,6 +7369,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "printhost_client_cert",
 "printhost_client_cert_enabled",
 "printhost_client_cert_password",
+"raft_layer_height",
+"raft_interface_layer_height",
 "remaining_times_type",
 "retract_lift_first_layer",
 "retract_lift_top",
@@ -7340,7 +7390,9 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "support_material_contact_distance_type",
 "support_material_interface_acceleration",
 "support_material_interface_fan_speed",
+"support_material_interface_layer_height",
 "support_material_interface_pattern",
+"support_material_layer_height",
 "thin_perimeters_all",
 "thin_perimeters",
 "thin_walls_acceleration",

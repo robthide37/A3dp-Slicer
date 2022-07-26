@@ -591,6 +591,8 @@ static std::vector<std::string> s_Preset_print_options {
         "raft_first_layer_density", 
         "raft_first_layer_expansion",
         "raft_layers",
+        "raft_layer_height", "raft_interface_layer_height",
+        "support_material_layer_height", "support_material_interface_layer_height",
         "support_material_pattern", "support_material_with_sheath", "support_material_spacing",
         "support_material_closing_radius", "support_material_style",
         "support_material_synchronize_layers", "support_material_angle",

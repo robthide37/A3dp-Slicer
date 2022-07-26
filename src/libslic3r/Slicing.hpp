@@ -67,6 +67,7 @@ struct SlicingParameters
     coordf_t    min_layer_height { 0 };
     coordf_t    max_layer_height { 0 };
     coordf_t    max_suport_layer_height { 0 };
+    coordf_t    min_suport_layer_height { 0 };
     bool        exact_last_layer_height;
     // min common divisor for all layer height
     coordf_t    z_step;
@@ -119,6 +120,7 @@ inline bool equal_layering(const SlicingParameters &sp1, const SlicingParameters
         std::abs(sp1.min_layer_height            - sp2.min_layer_height) < EPSILON &&
         std::abs(sp1.max_layer_height            - sp2.max_layer_height) < EPSILON &&
         //            sp1.max_suport_layer_height             == sp2.max_suport_layer_height              &&
+        //            sp1.min_suport_layer_height             == sp2.min_suport_layer_height              &&
         std::abs(sp1.first_print_layer_height    - sp2.first_print_layer_height) < EPSILON &&
         std::abs(sp1.first_object_layer_height   - sp2.first_object_layer_height) < EPSILON &&
         sp1.first_object_layer_bridging         == sp2.first_object_layer_bridging &&

@@ -437,26 +437,26 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     bool have_raft = config->opt_int("raft_layers") > 0;
     bool have_support_material = config->opt_bool("support_material") || have_raft;
     bool have_support_material_auto = have_support_material && config->opt_bool("support_material_auto");
-    bool have_support_interface = config->opt_int("support_material_interface_layers") > 0;
+    bool have_support_interface = have_support_material && (config->opt_int("support_material_interface_layers") > 0 || config->opt_int("support_material_bottom_interface_layers") > 0);
     bool have_support_soluble = have_support_material && ((ConfigOptionEnumGeneric*)config->option("support_material_contact_distance_type"))->value == zdNone;
     auto support_material_style = config->opt_enum<SupportMaterialStyle>("support_material_style");
     for (auto el : { "support_material_style", "support_material_pattern", "support_material_with_sheath",
                     "support_material_spacing", "support_material_angle", 
-                    "support_material_interface_pattern", "support_material_interface_layers",
+                    "support_material_bottom_interface_layers", "support_material_interface_layers",
                     "dont_support_bridges", "support_material_extrusion_width",
                     "support_material_contact_distance_type",
-                    "support_material_xy_spacing", "support_material_interface_pattern" })
+                    "support_material_xy_spacing",
+                    "support_material_layer_height"})
         toggle_field(el, have_support_material);
     toggle_field("support_material_threshold", have_support_material_auto);
     toggle_field("support_material_bottom_contact_distance", have_support_material && ! have_support_soluble);
     toggle_field("support_material_closing_radius", have_support_material && support_material_style == smsSnug);
 
-    for (auto el : { "support_material_contact_distance",
-        "support_material_bottom_contact_distance" })
+    for (auto el : { "support_material_contact_distance", "support_material_bottom_contact_distance" })
         toggle_field(el, have_support_material && !have_support_soluble);
 
-    for (auto el : { "support_material_interface_spacing", "support_material_interface_extruder",
-                    "support_material_interface_speed", "support_material_interface_contact_loops" })
+    for (auto el : { "support_material_interface_pattern", "support_material_interface_spacing", "support_material_interface_extruder",
+                    "support_material_interface_speed", "support_material_interface_contact_loops", "support_material_interface_layer_height"})
         toggle_field(el, have_support_material && have_support_interface);
     toggle_field("support_material_synchronize_layers", have_support_soluble);
 
@@ -468,7 +468,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("brim_speed", have_brim || have_skirt);
 
     toggle_field("raft_contact_distance", have_raft && !have_support_soluble);
-    for (auto el : { "raft_expansion", "first_layer_acceleration_over_raft", "first_layer_speed_over_raft" })
+    for (auto el : { "raft_expansion", "first_layer_acceleration_over_raft", "first_layer_speed_over_raft",
+        "raft_layer_height", "raft_interface_layer_height"})
         toggle_field(el, have_raft);
 
     //for default_extrusion_width/spacing, you need to ahve at least an extrusion_width with 0
