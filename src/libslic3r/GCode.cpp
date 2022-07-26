@@ -2694,6 +2694,10 @@ GCode::LayerResult GCode::process_layer(
                 }
         }
         result.spiral_vase_enable = enable;
+        if (enable)
+            m_spiral_vase_layer = std::abs(m_spiral_vase_layer) + 1;
+        else
+            m_spiral_vase_layer = -std::abs(m_spiral_vase_layer);
         // If we're going to apply spiralvase to this layer, disable loop clipping.
         m_enable_loop_clipping = !enable;
     }
@@ -3665,7 +3669,7 @@ void GCode::split_at_seam_pos(ExtrusionLoop& loop, std::unique_ptr<EdgeGrid::Gri
     // or randomize if requested
     Point last_pos = this->last_pos();
     //for first spiral, choose the seam, as the position will be very relevant.
-    if (m_config.spiral_vase && !m_spiral_vase->is_transition_layer()) {
+    if (m_spiral_vase_layer > 1 /* spiral vase is printign and it's after the transition layer (that one can find a good spot)*/) {
             loop.split_at(last_pos, false);
     /*} else {
         const EdgeGrid::Grid* edge_grid_ptr = (lower_layer_edge_grid && *lower_layer_edge_grid)
