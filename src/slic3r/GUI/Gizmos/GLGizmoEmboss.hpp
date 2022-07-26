@@ -132,7 +132,7 @@ private:
     bool rev_slider(const std::string &name, float &value, float *default_value, 
         const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip);
     template<typename T, typename Draw>
-    bool revertible(const std::string &name, T &value, T *default_value, bool exist_change, const std::string &undo_tooltip, float undo_offset, Draw draw);
+    bool revertible(const std::string &name, T &value, T *default_value, const std::string &undo_tooltip, float undo_offset, Draw draw);
 
     void set_minimal_window_size(bool is_advance_edit_style);
     const ImVec2 &get_minimal_window_size() const;

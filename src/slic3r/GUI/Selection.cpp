@@ -773,7 +773,9 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
     if (!m_valid)
         return;
 
-    assert(transformation_type.relative());
+    // Emboss use translate in local coordinate
+    assert(transformation_type.relative() || 
+           transformation_type.local());
 
     for (unsigned int i : m_list) {
         GLVolume& v = *(*m_volumes)[i];

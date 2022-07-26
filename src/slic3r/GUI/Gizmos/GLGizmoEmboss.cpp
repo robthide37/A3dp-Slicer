@@ -1879,21 +1879,38 @@ bool GLGizmoEmboss::bold_button() {
     return false;
 }
 
+template<typename T> bool exist_change(const T &value, const T *default_value){
+    if (default_value == nullptr) return false;
+    return (value != *default_value);
+}
+
+template<> bool exist_change(const std::optional<float> &value, const std::optional<float> *default_value){
+    if (default_value == nullptr) return false;
+    return !is_approx(value, *default_value);
+}
+
+template<> bool exist_change(const float &value, const float *default_value){
+    if (default_value == nullptr) return false;
+    return !is_approx(value, *default_value);
+}
+
 template<typename T, typename Draw>
 bool GLGizmoEmboss::revertible(const std::string &name,
                                T                 &value,
                                T                 *default_value,
-                               bool               exist_change,
                                const std::string &undo_tooltip,
                                float              undo_offset,
                                Draw               draw)
 {
-    if (exist_change)
+    bool changed = exist_change(value, default_value);
+    if (changed)
         ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, name);
     else
         ImGuiWrapper::text(name);
+
+    bool result = draw();
     // render revert changes button
-    if (exist_change) {        
+    if (changed) {        
         ImGui::SameLine(undo_offset);
         if (draw_button(IconType::undo)) {
             value = *default_value;
@@ -1901,7 +1918,7 @@ bool GLGizmoEmboss::revertible(const std::string &name,
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", undo_tooltip.c_str());
     }
-    return draw();
+    return result;
 }
 
 
@@ -1924,8 +1941,7 @@ bool GLGizmoEmboss::rev_input(const std::string  &name,
             &value, step, step_fast, format, flags);
     };
     float undo_offset = ImGui::GetStyle().FramePadding.x;
-    bool exist_change = default_value != nullptr ? (!is_approx(value, *default_value)) : false;
-    return revertible(name, value, default_value, exist_change, undo_tooltip, undo_offset, draw_offseted_input);
+    return revertible(name, value, default_value, undo_tooltip, undo_offset, draw_offseted_input);
 }
 
 bool GLGizmoEmboss::rev_checkbox(const std::string &name,
@@ -1939,10 +1955,7 @@ bool GLGizmoEmboss::rev_checkbox(const std::string &name,
         return ImGui::Checkbox(("##" + name).c_str(), &value);
     };
     float undo_offset  = ImGui::GetStyle().FramePadding.x;
-    bool  exist_change = default_value != nullptr ?
-                             (value != *default_value) :
-                             false;
-    return revertible(name, value, default_value, exist_change, undo_tooltip,
+    return revertible(name, value, default_value, undo_tooltip,
                       undo_offset, draw_offseted_input);
 }
 
@@ -2086,9 +2099,8 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
         return m_imgui->slider_optional_int( ("##" + name).c_str(), value, 
             v_min, v_max, format.c_str(), 1.f, false, tooltip);
     };
-    float undo_offset = ImGui::GetStyle().FramePadding.x;    
-    bool exist_change = default_value != nullptr ? (value != *default_value) : false;
-    return revertible(name, value, default_value, exist_change, 
+    float undo_offset = ImGui::GetStyle().FramePadding.x;
+    return revertible(name, value, default_value,
         undo_tooltip, undo_offset, draw_slider_optional_int);
 }
 
@@ -2109,10 +2121,8 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
         return m_imgui->slider_optional_float(("##" + name).c_str(), value,
             v_min, v_max, format.c_str(), 1.f, false, tooltip);
     };
-    float undo_offset = ImGui::GetStyle().FramePadding.x;    
-    bool exist_change = (default_value != nullptr)? 
-        (!is_approx(value, *default_value)) : false;
-    return revertible(name, value, default_value, exist_change,
+    float undo_offset = ImGui::GetStyle().FramePadding.x;
+    return revertible(name, value, default_value,
         undo_tooltip, undo_offset, draw_slider_optional_float);
 }
 
@@ -2133,10 +2143,8 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
         return m_imgui->slider_float("##" + name, &value, v_min, v_max,
             format.c_str(), 1.f, false, tooltip);
     };
-    float undo_offset = ImGui::GetStyle().FramePadding.x;    
-    bool exist_change = default_value != nullptr ? 
-        (!is_approx(value, *default_value)) : false;
-    return revertible(name, value, default_value, exist_change,
+    float undo_offset = ImGui::GetStyle().FramePadding.x;
+    return revertible(name, value, default_value,
         undo_tooltip, undo_offset, draw_slider_float);
 }
 
