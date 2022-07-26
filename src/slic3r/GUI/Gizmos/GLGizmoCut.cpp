@@ -226,11 +226,14 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
     if (mouse_event.Moving() && !cut_line_processing())
         return false;
 
-    if (use_grabbers(mouse_event)) 
-        return true;
-
     Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
     Vec2d mouse_pos = mouse_coord.cast<double>();
+
+    if (use_grabbers(mouse_event)) {
+        if (m_hover_id >= m_connectors_group_id && mouse_event.LeftUp() && !mouse_event.ShiftDown()) 
+            gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), mouse_event.CmdDown());
+        return true;
+    }
 
     static bool pending_right_up = false;
     if (mouse_event.LeftDown()) {
@@ -407,6 +410,9 @@ bool GLGizmoCut3D::render_combo(const std::string& label, const std::vector<std:
     bool is_changed = selection_idx != selection_out;
     selection_idx = selection_out;
 
+    if (is_changed)
+        update_connector_shape();
+
     return is_changed;
 }
 
@@ -486,14 +492,16 @@ void GLGizmoCut3D::render_move_center_input(int axis)
     }
 }
 
-void GLGizmoCut3D::render_connect_type_radio_button(CutConnectorType type)
+bool GLGizmoCut3D::render_connect_type_radio_button(CutConnectorType type)
 {
     ImGui::SameLine(type == CutConnectorType::Plug ? m_label_width : 2*m_label_width);
     ImGui::PushItemWidth(m_control_width);
     if (m_imgui->radio_button(m_connector_types[size_t(type)], m_connector_type == type)) {
         m_connector_type = type;
         update_connector_shape();
+        return true;
     }
+    return false;
 }
 
 void GLGizmoCut3D::render_connect_mode_radio_button(CutConnectorMode mode)
@@ -1268,31 +1276,63 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
         render_connect_mode_radio_button(CutConnectorMode::Auto);
         render_connect_mode_radio_button(CutConnectorMode::Manual);
 */
+
+        if (m_selected_count == 1)
+            for (size_t idx = 0; idx < m_selected.size(); idx++)
+                if (m_selected[idx]) {
+                    auto& connector = connectors[idx];
+                    m_connector_depth_ratio             = connector.height;
+                    m_connector_depth_ratio_tolerance   = 100 * connector.height_tolerance;
+                    m_connector_size                    = 2. * connector.radius;
+                    m_connector_size_tolerance          = 100 * connector.radius_tolerance;
+                    m_connector_type                    = connector.attribs.type;
+                    m_connector_style                   = size_t(connector.attribs.style);
+                    m_connector_shape_id                = size_t(connector.attribs.shape);
+
+                    break;
+                }
+
         m_imgui->text(_L("Type"));
-        render_connect_type_radio_button(CutConnectorType::Plug);
-        render_connect_type_radio_button(CutConnectorType::Dowel);
+        bool type_changed = render_connect_type_radio_button(CutConnectorType::Plug);
+        type_changed     |= render_connect_type_radio_button(CutConnectorType::Dowel);
+        if (type_changed)
+            for (size_t idx = 0; idx < m_selected.size() ; idx++)
+                if (m_selected[idx])
+                    connectors[idx].attribs.type = CutConnectorType(m_connector_type);
 
         if (render_combo(_u8L("Style"), m_connector_styles, m_connector_style))
-            update_connector_shape();
-        if (render_combo(_u8L("Shape"), m_connector_shapes, m_connector_shape_id))
-            update_connector_shape();
+            for (size_t idx = 0; idx < m_selected.size() ; idx++)
+                if (m_selected[idx])
+                    connectors[idx].attribs.style = CutConnectorStyle(m_connector_style) ;
 
-        if (render_slider_double_input(_u8L("Depth ratio"), m_connector_depth_ratio, m_connector_depth_ratio_tolerance)) 
-            for (auto& connector : connectors) {
-                connector.height = float(m_connector_depth_ratio);
-                connector.height_tolerance = 0.01f * m_connector_depth_ratio;
-            }
+        if (render_combo(_u8L("Shape"), m_connector_shapes, m_connector_shape_id))
+            for (size_t idx = 0; idx < m_selected.size() ; idx++)
+                if (m_selected[idx])
+                    connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id);
+
+        if (render_slider_double_input(_u8L("Depth ratio"), m_connector_depth_ratio, m_connector_depth_ratio_tolerance))
+            for (size_t idx = 0; idx < m_selected.size() ; idx++)
+                if (m_selected[idx]) {
+                    auto& connector = connectors[idx];
+                    connector.height            = float(m_connector_depth_ratio);
+                    connector.height_tolerance  = 0.01f * m_connector_depth_ratio_tolerance;
+                }
+
         if (render_slider_double_input(_u8L("Size"), m_connector_size, m_connector_size_tolerance))
-            for (auto& connector : connectors) {
-                connector.radius = float(m_connector_size * 0.5);
-                connector.radius_tolerance = 0.01f * m_connector_size_tolerance;
-            }
+            for (size_t idx = 0; idx < m_selected.size(); idx++)
+                if (m_selected[idx]) {
+                    auto& connector = connectors[idx];
+                    connector.radius            = float(m_connector_size * 0.5);
+                    connector.radius_tolerance  = 0.01f * m_connector_size_tolerance;
+                }
 
         m_imgui->disabled_end();
 
         if (m_imgui->button(_L("Confirm connectors"))) {
             m_clp_normal = m_c->object_clipper()->get_clipping_plane()->get_normal();
             m_connectors_editing = false;
+            std::fill(m_selected.begin(), m_selected.end(), false);
+            m_selected_count = 0;
         }
         m_parent.request_extra_frame();
     }
@@ -1380,7 +1420,6 @@ void GLGizmoCut3D::render_connectors(bool picking)
         m_selected.resize(connectors.size(), false);
     }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat") : wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)
         return;
@@ -1388,19 +1427,8 @@ void GLGizmoCut3D::render_connectors(bool picking)
     shader->start_using();
 
     ScopeGuard guard([shader]() { shader->stop_using(); });
-#else
-    GLShaderProgram* shader = picking ? nullptr : wxGetApp().get_shader("gouraud_light");
-    if (shader)
-        shader->start_using();
-    ScopeGuard guard([shader]() { if (shader) shader->stop_using(); });
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
-#else
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(0.0, 0.0, m_c->selection_info()->get_sla_shift()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     ColorRGBA render_color;
 
@@ -1417,13 +1445,12 @@ void GLGizmoCut3D::render_connectors(bool picking)
 
     for (size_t i = 0; i < connectors.size(); ++i) {
         const CutConnector& connector = connectors[i];
-//        const bool& point_selected = m_selected[i];
 
         double height = connector.height;
         // recalculate connector position to world position
         Vec3d pos = connector.pos + instance_offset;
-        if (m_connector_type == CutConnectorType::Dowel &&
-            m_connector_style == size_t(CutConnectorStyle::Prizm)) {
+        if (connector.attribs.type  == CutConnectorType::Dowel &&
+            connector.attribs.style == CutConnectorStyle::Prizm) {
             pos -= height * normal;
             height *= 2;
         }
@@ -1435,7 +1462,13 @@ void GLGizmoCut3D::render_connectors(bool picking)
         else {
             if (size_t(m_hover_id- m_connectors_group_id) == i)
                 render_color = ColorRGBA::CYAN();
-            else { // neither hover nor picking
+            else if (m_selected[i])
+                render_color = ColorRGBA::DARK_GRAY();
+            else // neither hover nor picking
+                render_color = m_connectors_editing ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f) : ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f);
+
+            // ! #ysFIXME rework get_volume_transformation
+            if (0) { // else { // neither hover nor picking
                 int mesh_id = -1;
                 for (const ModelVolume* mv : mo->volumes) {
                     ++mesh_id;
@@ -1454,42 +1487,18 @@ void GLGizmoCut3D::render_connectors(bool picking)
             }
         }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        m_connector_shape.set_color(render_color);
+        m_shapes[connector.attribs].set_color(render_color);
 
         const Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(
-            Vec3d(pos.x(), pos.y(), pos.z()),
+            pos,
             Geometry::Transformation(m_rotation_m).get_rotation(),
-            Vec3d(connector.radius, connector.radius, height),
-            Vec3d::Ones()
+            Vec3d(connector.radius, connector.radius, height)
         );
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#else
-        const_cast<GLModel*>(&m_connector_shape)->set_color(-1, render_color);
 
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslatef(pos.x(), pos.y(), pos.z()));
-
-        const Vec3d& angles = m_rotation_gizmo.get_rotation();
-        glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
-        glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
-        glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
-
-        glsafe(::glTranslated(0., 0., -0.5*connector.height));
-        glsafe(::glScaled(connector.radius, connector.radius, height));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-
-        m_connector_shape.render();
-
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPopMatrix());
-#endif //!ENABLE_GL_SHADERS_ATTRIBUTES
+        m_shapes[connector.attribs].render();
     }
-
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-    glsafe(::glPopMatrix());
-#endif //!ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 bool GLGizmoCut3D::can_perform_cut() const
@@ -1535,9 +1544,10 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                 for (CutConnector& connector : mo->cut_connectors) {
                     connector.rotation = rotation;
 
-                    if (m_connector_type == CutConnectorType::Dowel) {
-                        if (m_connector_style == size_t(CutConnectorStyle::Prizm))
+                    if (connector.attribs.type == CutConnectorType::Dowel) {
+                        if (connector.attribs.style == CutConnectorStyle::Prizm)
                             connector.height *= 2;
+                        create_dowels_as_separate_object = true;
                     }
                     else {
                         // culculate shift of the connector center regarding to the position on the cut plane
@@ -1551,9 +1561,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                         connector.pos += norm * (0.5 * connector.height);
                     }
                 }
-                mo->apply_cut_connectors(_u8L("Connector"), CutConnectorAttributes(CutConnectorType(m_connector_type), CutConnectorStyle(m_connector_style), CutConnectorShape(m_connector_shape_id)));
-                if (m_connector_type == CutConnectorType::Dowel)
-                    create_dowels_as_separate_object = true;
+                mo->apply_cut_connectors(_u8L("Connector"));
             }
         }
 
@@ -1623,15 +1631,15 @@ void GLGizmoCut3D::reset_connectors()
 
 void GLGizmoCut3D::update_connector_shape()
 {
-    if (m_connector_shape.is_initialized())
-        m_connector_shape.reset();
+    CutConnectorAttributes attribs = { m_connector_type, CutConnectorStyle(m_connector_style), CutConnectorShape(m_connector_shape_id) };
+    if (m_shapes.find(attribs) == m_shapes.end()) {
+        const indexed_triangle_set its = ModelObject::get_connector_mesh(attribs);
+        m_shapes[attribs].init_from(its);
+    }
 
-    const indexed_triangle_set its = ModelObject::get_connector_mesh({ m_connector_type, CutConnectorStyle(m_connector_style), CutConnectorShape(m_connector_shape_id) });
-    m_connector_shape.init_from(its);
-
+    const indexed_triangle_set its = ModelObject::get_connector_mesh(attribs);
     m_connector_mesh.clear();
     m_connector_mesh = TriangleMesh(its);
-
 }
 
 void GLGizmoCut3D::update_model_object() const
@@ -1709,14 +1717,9 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
 
     CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;
 
-    // left down without selection rectangle - place connector on the cut plane:
-    if (action == SLAGizmoEventType::LeftDown && /*!m_selection_rectangle.is_dragging() && */!shift_down && m_connectors_editing) {
-        // If any point is in hover state, this should initiate its move - return control back to GLCanvas:
-        if (m_hover_id != -1)
-            return false;
-
-        // If there is some selection, don't add new point and deselect everything instead.
-        if (m_selection_empty) {
+    if (action == SLAGizmoEventType::LeftDown && !shift_down && m_connectors_editing) {
+        // If there is no selection and no hovering, add new point
+        if (m_hover_id == -1 && !control_down && !alt_down) {
             std::pair<Vec3d, Vec3d> pos_and_normal;
             if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal)) {
                 const Vec3d& hit = pos_and_normal.first;
@@ -1726,18 +1729,38 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
 
                 connectors.emplace_back(hit, Geometry::Transformation(m_rotation_m).get_rotation(), 
                                         float(m_connector_size * 0.5), float(m_connector_depth_ratio), 
-                                        float(0.01f * m_connector_size_tolerance), float(0.01f * m_connector_depth_ratio_tolerance));
+                                        float(0.01f * m_connector_size_tolerance), float(0.01f * m_connector_depth_ratio_tolerance),
+                                        CutConnectorAttributes( CutConnectorType(m_connector_type), 
+                                                                CutConnectorStyle(m_connector_style), 
+                                                                CutConnectorShape(m_connector_shape_id)));
                 update_model_object();
-                m_selected.push_back(false);
+                std::fill(m_selected.begin(), m_selected.end(), false);
+                m_selected.push_back(true);
                 assert(m_selected.size() == connectors.size());
                 m_parent.set_as_dirty();
-                m_wait_for_up_event = true;
 
                 return true;
             }
             return false;
         }
         return true;
+    }
+    else if (action == SLAGizmoEventType::LeftUp && !shift_down && m_connectors_editing) {
+        if (m_hover_id >= m_connectors_group_id) {
+            if (alt_down) {
+                m_selected[m_hover_id - m_connectors_group_id] = false;
+                --m_selected_count;
+            }
+            else {
+                if (!control_down) {
+                    std::fill(m_selected.begin(), m_selected.end(), false);
+                    m_selected_count = 0;
+                }
+                m_selected[m_hover_id - m_connectors_group_id] = true;
+                ++m_selected_count;
+            }
+            return true;
+        }
     }
     else if (action == SLAGizmoEventType::RightDown && !shift_down && m_connectors_editing) {
         // If any point is in hover state, this should initiate its move - return control back to GLCanvas:

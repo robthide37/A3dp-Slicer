@@ -1378,7 +1378,7 @@ indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes conn
     return connector_mesh;
 }
 
-void ModelObject::apply_cut_connectors(const std::string& name, CutConnectorAttributes connector_attributes)
+void ModelObject::apply_cut_connectors(const std::string& name)
 {
     // discard old connector markers for volumes
     for (ModelVolume* volume : volumes)
@@ -1387,11 +1387,9 @@ void ModelObject::apply_cut_connectors(const std::string& name, CutConnectorAttr
     if (cut_connectors.empty())
         return;
 
-    indexed_triangle_set connector_mesh = get_connector_mesh(connector_attributes);
-
     size_t connector_id = cut_id.connectors_cnt();
     for (const CutConnector& connector : cut_connectors) {
-        TriangleMesh mesh = TriangleMesh(connector_mesh);
+        TriangleMesh mesh = TriangleMesh(get_connector_mesh(connector.attribs));
         // Mesh will be centered when loading.
         ModelVolume* new_volume = add_volume(std::move(mesh), ModelVolumeType::NEGATIVE_VOLUME);
 
@@ -1403,7 +1401,7 @@ void ModelObject::apply_cut_connectors(const std::string& name, CutConnectorAttr
             Vec3d::Ones()
         ));
 
-        new_volume->cut_info = { true, connector.radius_tolerance, connector.height_tolerance };
+        new_volume->cut_info = { true, connector.attribs.type, connector.radius_tolerance, connector.height_tolerance };
         new_volume->name = name + "-" + std::to_string(++connector_id);
     }
     cut_id.increase_connectors_cnt(cut_connectors.size());
@@ -1541,13 +1539,13 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
                     ModelVolume* vol = lower->add_volume(*volume);
                     vol->set_transformation(volume_matrix);
 
-                    if (attributes.has(ModelObjectCutAttribute::CreateDowels))
+                    if (volume->cut_info.connector_type == CutConnectorType::Dowel)
                         apply_tolerance(vol);
                     else
                         // for lower part change type of connector from NEGATIVE_VOLUME to MODEL_PART if this connector is a plug
                         vol->set_type(ModelVolumeType::MODEL_PART);
                 }
-                if (attributes.has(ModelObjectCutAttribute::CreateDowels)) {
+                if (volume->cut_info.connector_type == CutConnectorType::Dowel) {
                     // add one more solid part same as connector if this connector is a dowel
                     ModelVolume* vol = dowels->add_volume(*volume);
                     vol->set_type(ModelVolumeType::MODEL_PART);

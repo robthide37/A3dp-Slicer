@@ -219,48 +219,6 @@ private:
     friend class ModelObject;
 };
 
-struct CutConnector
-{
-    Vec3d pos;
-    Vec3d rotation;
-    float radius;
-    float height;
-    float radius_tolerance;// [0.f : 1.f]
-    float height_tolerance;// [0.f : 1.f]
-    bool  failed = false;
-
-    CutConnector()
-        : pos(Vec3d::Zero()), rotation(Vec3d::UnitZ()), radius(5.f), height(10.f), radius_tolerance(0.f), height_tolerance(0.1f)
-    {}
-
-    CutConnector(Vec3d p, Vec3d rot, float r, float h, float rt, float ht, bool fl = false)
-        : pos(p), rotation(rot), radius(r), height(h), radius_tolerance(rt), height_tolerance(ht), failed(fl)
-    {}
-
-    CutConnector(const CutConnector& rhs) :
-        CutConnector(rhs.pos, rhs.rotation, rhs.radius, rhs.height, rhs.radius_tolerance, rhs.height_tolerance, rhs.failed) {}
-
-    bool operator==(const CutConnector& sp) const;
-
-    bool operator!=(const CutConnector& sp) const { return !(sp == (*this)); }
-/*
-    bool is_inside(const Vec3f& pt) const;
-
-    bool get_intersections(const Vec3f& s, const Vec3f& dir,
-        std::array<std::pair<float, Vec3d>, 2>& out) const;
-
-    indexed_triangle_set to_mesh() const;
-*/
-    template<class Archive> inline void serialize(Archive& ar)
-    {
-        ar(pos, rotation, radius, height, radius_tolerance, height_tolerance, failed);
-    }
-
-    static constexpr size_t steps = 32;
-};
-
-using CutConnectors = std::vector<CutConnector>;
-
 enum class CutConnectorType : int {
     Plug
     , Dowel
@@ -283,8 +241,8 @@ enum class CutConnectorShape : int {
 struct CutConnectorAttributes
 {
     CutConnectorType    type{ CutConnectorType::Plug };
-    CutConnectorStyle   style{ CutConnectorStyle::Prizm};
-    CutConnectorShape   shape{CutConnectorShape::Circle};
+    CutConnectorStyle   style{ CutConnectorStyle::Prizm };
+    CutConnectorShape   shape{ CutConnectorShape::Circle };
 
     CutConnectorAttributes() {}
 
@@ -294,7 +252,54 @@ struct CutConnectorAttributes
 
     CutConnectorAttributes(const CutConnectorAttributes& rhs) :
         CutConnectorAttributes(rhs.type, rhs.style, rhs.shape) {}
+
+    bool operator==(const CutConnectorAttributes& other) const;
+
+    bool operator!=(const CutConnectorAttributes& other) const { return !(other == (*this)); }
+
+    bool operator<(const CutConnectorAttributes& other) const {
+        return   this->type <  other.type ||
+                (this->type == other.type && this->style <  other.style) ||
+                (this->type == other.type && this->style == other.style && this->shape < other.shape);
+    }
+
+    template<class Archive> inline void serialize(Archive& ar) {
+        ar(type, style, shape);
+    }
 };
+
+struct CutConnector
+{
+    Vec3d pos;
+    Vec3d rotation;
+    float radius;
+    float height;
+    float radius_tolerance;// [0.f : 1.f]
+    float height_tolerance;// [0.f : 1.f]
+    CutConnectorAttributes attribs;
+
+    CutConnector()
+        : pos(Vec3d::Zero()), rotation(Vec3d::UnitZ()), radius(5.f), height(10.f), radius_tolerance(0.f), height_tolerance(0.1f)
+    {}
+
+    CutConnector(Vec3d p, Vec3d rot, float r, float h, float rt, float ht, CutConnectorAttributes attributes)
+        : pos(p), rotation(rot), radius(r), height(h), radius_tolerance(rt), height_tolerance(ht), attribs(attributes)
+    {}
+
+    CutConnector(const CutConnector& rhs) :
+        CutConnector(rhs.pos, rhs.rotation, rhs.radius, rhs.height, rhs.radius_tolerance, rhs.height_tolerance, rhs.attribs) {}
+
+    bool operator==(const CutConnector& other) const;
+
+    bool operator!=(const CutConnector& other) const { return !(other == (*this)); }
+
+    template<class Archive> inline void serialize(Archive& ar) {
+        ar(pos, rotation, radius, height, radius_tolerance, height_tolerance, attribs);
+    }
+};
+
+using CutConnectors = std::vector<CutConnector>;
+
 
 // Declared outside of ModelVolume, so it could be forward declared.
 enum class ModelVolumeType : int {
@@ -436,7 +441,7 @@ public:
     size_t parts_count() const;
     ModelObjectPtrs cut(size_t instance, coordf_t z, ModelObjectCutAttributes attributes);
     static indexed_triangle_set get_connector_mesh(CutConnectorAttributes connector_attributes);
-    void apply_cut_connectors(const std::string& name, CutConnectorAttributes connector_attributes);
+    void apply_cut_connectors(const std::string& name);
     // invalidate cut state for this and related objects from the whole model
     void invalidate_cut();
     void synchronize_model_after_cut();
@@ -710,12 +715,14 @@ public:
     // It contains information about connetors
     struct CutInfo
     {
-        bool is_connector {false};
-        float radius_tolerance;// [0.f : 1.f]
-        float height_tolerance;// [0.f : 1.f]
+        bool                is_connector{ false };
+        CutConnectorType    connector_type{ CutConnectorType::Plug };
+        float               radius_tolerance;// [0.f : 1.f]
+        float               height_tolerance;// [0.f : 1.f]
 
         void discard() { is_connector = false; }
-    }                    cut_info;
+    };
+    CutInfo             cut_info;
 
     // The triangular model.
     const TriangleMesh& mesh() const { return *m_mesh.get(); }

@@ -12,6 +12,7 @@ namespace Slic3r {
 
 enum class CutConnectorType : int;
 class ModelVolume;
+struct CutConnectorAttributes;
 
 namespace GUI {
 class Selection;
@@ -44,7 +45,7 @@ class GLGizmoCut3D : public GLGizmoBase
     Transform3d m_start_dragging_m{ Transform3d::Identity() };
     double m_angle{ 0.0 };
 
-    GLModel         m_connector_shape;
+    std::map<CutConnectorAttributes, GLModel> m_shapes;
     TriangleMesh    m_connector_mesh;
     // workaround for using of the clipping plane normal
     Vec3d           m_clp_normal{ Vec3d::Ones() };
@@ -90,8 +91,7 @@ class GLGizmoCut3D : public GLGizmoBase
     bool  force_update_clipper_on_render{false};
 
     mutable std::vector<bool> m_selected; // which pins are currently selected
-    bool m_selection_empty      = true;
-    bool m_wait_for_up_event    = false;
+    int  m_selected_count{ 0 };
 
     bool m_has_invalid_connector{ false };
 
@@ -181,7 +181,7 @@ private:
     void render_move_center_input(int axis);
     void render_connect_mode_radio_button(CutConnectorMode mode);
     bool render_revert_button(const std::string& label);
-    void render_connect_type_radio_button(CutConnectorType type);
+    bool render_connect_type_radio_button(CutConnectorType type);
     Transform3d get_volume_transformation(const ModelVolume* volume) const;
     void render_connectors(bool picking);
 
