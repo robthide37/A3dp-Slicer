@@ -882,9 +882,17 @@ Transform3d Emboss::create_transformation_onto_surface(const Vec3f &position,
     wanted_up_dir.normalize(); 
 
     // perpendicular to emboss vector of text and normal
-    Vec3d  axis_view  = text_emboss_dir.cross(wanted_emboss_dir);
-    double angle_view = std::acos(text_emboss_dir.dot(wanted_emboss_dir)); // in rad
-    axis_view.normalize();
+    Vec3d axis_view;
+    double angle_view;
+    if (wanted_emboss_dir == -Vec3d::UnitZ()) {
+        // text_emboss_dir has opposit direction to wanted_emboss_dir
+        axis_view = Vec3d::UnitY();
+        angle_view = M_PI;
+    } else {
+        axis_view = text_emboss_dir.cross(wanted_emboss_dir);
+        angle_view = std::acos(text_emboss_dir.dot(wanted_emboss_dir)); // in rad
+        axis_view.normalize();
+    }
 
     Eigen::AngleAxis view_rot(angle_view, axis_view);
     Vec3d wanterd_up_rotated = view_rot.matrix().inverse() * wanted_up_dir;
