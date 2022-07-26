@@ -139,13 +139,13 @@ public:
     ColorGenerator() {}
     ~ColorGenerator() {}
 
-    double rand_val()
+    double rand_val(double min, double max)
     {
         std::mt19937 rand_generator(rd());
 
         // this value will be used for Saturation and Value
-        // to avoid extremely light/dark colors, take this value from range [0.65; 1.0]
-        std::uniform_real_distribution<double> distrib(0.65, 1.0);
+        // to avoid extremely light/dark colors, take this value from range [min; max]
+        std::uniform_real_distribution<double> distrib(min, max);
         return distrib(rand_generator);
     }
 
@@ -156,8 +156,20 @@ public:
 
         hsv hsv_clr = rgb2hsv(color);
         hsv_clr.h += 65; // 65 instead 60 to avoid circle values
-        hsv_clr.s = rand_val();
-        hsv_clr.v = rand_val();
+        if (hsv_clr.s < 0.8) {
+            hsv_clr.s = rand_val(0.8, 1.0);
+        } else if (hsv_clr.s > 0.85) {
+            hsv_clr.s = rand_val(0.65, 0.85);
+        } else {
+            hsv_clr.s = rand_val(0.65, 1.0);
+        }
+        if (hsv_clr.v < 0.8) {
+            hsv_clr.v = rand_val(0.8, 1.0);
+        } else if (hsv_clr.v > 0.85) {
+            hsv_clr.v = rand_val(0.65, 0.85);
+        } else {
+            hsv_clr.v = rand_val(0.65, 1.0);
+        }
 
         rgb rgb_opp_color = hsv2rgb(hsv_clr);
 
@@ -180,7 +192,7 @@ public:
         if (delta_h < 180)
             delta_h = 360 - delta_h;
 
-        hsv hsv_opp = hsv{ start_h + 0.5 * delta_h, rand_val(), rand_val() };
+        hsv hsv_opp = hsv{ start_h + 0.5 * delta_h, rand_val(0.65,1.0), rand_val(0.65,1.0) };
         rgb rgb_opp_color = hsv2rgb(hsv_opp);
 
         wxString clr_str = wxString::Format(wxT("#%02X%02X%02X"), (unsigned char)(rgb_opp_color.r * 255), (unsigned char)(rgb_opp_color.g * 255), (unsigned char)(rgb_opp_color.b * 255));
