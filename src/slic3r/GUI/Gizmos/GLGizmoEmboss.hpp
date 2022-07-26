@@ -101,7 +101,7 @@ private:
     void draw_model_type();
     void draw_style_list();
     void draw_delete_style_button();
-    void draw_undo_style_button(bool is_stored, bool is_changed);
+    void discard_changes_in_style();
     void draw_revert_all_styles_button();
     void draw_rename_style_botton();
     void draw_font_list();

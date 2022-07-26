@@ -166,7 +166,9 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
            volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
            volume_type == ModelVolumeType::PARAMETER_MODIFIER);
     if (!m_gui_cfg.has_value()) initialize();
+
     set_default_text();
+    discard_changes_in_style();
 
     Vec2d screen_coor = mouse_pos;
     if (mouse_pos.x() < 0 || mouse_pos.y() < 0) {
@@ -1616,56 +1618,45 @@ void GLGizmoEmboss::draw_delete_style_button() {
     }
 }
 
-void GLGizmoEmboss::draw_undo_style_button(bool is_stored, bool is_changed)
+void GLGizmoEmboss::discard_changes_in_style()
 {
-    bool can_undo = is_stored && is_changed;
-    if (draw_button(IconType::undo, !can_undo)) {
-        FontItem &font_item  = m_font_manager.get_font_item();
-        bool is_path_changed = font_item.path != m_stored_font_item->path;
+    FontItem &font_item  = m_font_manager.get_font_item();
+    bool is_path_changed = font_item.path != m_stored_font_item->path;
             
-        // is rotation changed
-        auto &angle = font_item.prop.angle;
-        const auto &angle_ = m_stored_font_item->prop.angle;
-        // TODO: compare with approx
-        if (angle.has_value() != angle_.has_value() ||
-            (angle.has_value() && !is_approx(*angle, *angle_))) {
-            auto &tc = m_volume->text_configuration;
-            if (m_volume != nullptr && tc.has_value()) {
-                // change actual text configuration
-                tc->font_item.prop.angle = angle_;
-                float act_angle  = angle_.has_value() ? *angle_ : .0f;
-                float prev_angle = angle.has_value() ? *angle : .0f;
-                do_rotate(act_angle - prev_angle);
-            }
+    // is rotation changed
+    auto &angle = font_item.prop.angle;
+    const auto &angle_ = m_stored_font_item->prop.angle;
+    // TODO: compare with approx
+    if (angle.has_value() != angle_.has_value() ||
+        (angle.has_value() && !is_approx(*angle, *angle_))) {
+        auto &tc = m_volume->text_configuration;
+        if (m_volume != nullptr && tc.has_value()) {
+            // change actual text configuration
+            tc->font_item.prop.angle = angle_;
+            float act_angle  = angle_.has_value() ? *angle_ : .0f;
+            float prev_angle = angle.has_value() ? *angle : .0f;
+            do_rotate(act_angle - prev_angle);
         }
+    }
             
-        // is distance changed
-        auto &distance = font_item.prop.distance;
-        const auto &distance_ = m_stored_font_item->prop.distance;
-        if (distance.has_value() != distance_.has_value() ||
-            (distance.has_value() && !is_approx(*distance, *distance_))) {
-            auto &tc = m_volume->text_configuration;
-            if (m_volume != nullptr && tc.has_value()) {
-                tc->font_item.prop.distance = distance_;
-                float act_distance = distance_.has_value() ? *distance_ : .0f;
-                float prev_distance = distance.has_value() ? *distance : .0f;
-                do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
-            }
+    // is distance changed
+    auto &distance = font_item.prop.distance;
+    const auto &distance_ = m_stored_font_item->prop.distance;
+    if (distance.has_value() != distance_.has_value() ||
+        (distance.has_value() && !is_approx(*distance, *distance_))) {
+        auto &tc = m_volume->text_configuration;
+        if (m_volume != nullptr && tc.has_value()) {
+            tc->font_item.prop.distance = distance_;
+            float act_distance = distance_.has_value() ? *distance_ : .0f;
+            float prev_distance = distance.has_value() ? *distance : .0f;
+            do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
         }
+    }
 
-        font_item = *m_stored_font_item;
-        if (is_path_changed) {
-            m_font_manager.get_wx_font() = WxFontUtils::load_wxFont(font_item.path);
-            m_font_manager.wx_font_changed();
-        }
-        process();
-    } else if (ImGui::IsItemHovered()) {
-        if (can_undo)
-            ImGui::SetTooltip("%s", _u8L("Reload stored values of selected style").c_str());
-        else if (!is_stored)
-            ImGui::SetTooltip("%s", _u8L("Nothing to reload from").c_str());
-        else if (!is_changed)
-            ImGui::SetTooltip("%s", _u8L("No change to restore from style").c_str());
+    font_item = *m_stored_font_item;
+    if (is_path_changed) {
+        m_font_manager.get_wx_font() = WxFontUtils::load_wxFont(font_item.path);
+        m_font_manager.wx_font_changed();
     }
 }
 
@@ -1764,6 +1755,7 @@ void GLGizmoEmboss::draw_style_list() {
     bool is_changed = (is_stored) ? !(*m_stored_font_item == font_item) : true;
     // TODO: check order of font items in list to allowe save actual order
 
+    // save button
     ImGui::SameLine();
     if (draw_button(IconType::save, !is_changed)) {
         // save styles to app config
@@ -1776,8 +1768,20 @@ void GLGizmoEmboss::draw_style_list() {
         }
     }
 
+    // undo button
     ImGui::SameLine();
-    draw_undo_style_button(is_stored, is_changed);    
+    bool can_undo = is_stored && is_changed;
+    if (draw_button(IconType::undo, !can_undo)) {
+        discard_changes_in_style();
+        process();
+    } else if (ImGui::IsItemHovered()) {
+        if (can_undo)
+            ImGui::SetTooltip("%s", _u8L("Reload stored values of selected style").c_str());
+        else if (!is_stored)
+            ImGui::SetTooltip("%s", _u8L("Nothing to reload from").c_str());
+        else if (!is_changed)
+            ImGui::SetTooltip("%s", _u8L("No change to restore from style").c_str());
+    }    
     
 #ifdef ALLOW_REVERT_ALL_STYLES
     ImGui::SameLine();
