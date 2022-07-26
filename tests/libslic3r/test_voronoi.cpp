@@ -5,7 +5,7 @@
 #include <libslic3r/Polyline.hpp>
 #include <libslic3r/EdgeGrid.hpp>
 #include <libslic3r/Geometry.hpp>
-#include <libslic3r/Arachne/SkeletalTrapezoidation.hpp>
+#include "libslic3r/Geometry/VoronoiUtilsCgal.hpp"
 
 #include <libslic3r/Geometry/VoronoiOffset.hpp>
 #include <libslic3r/Geometry/VoronoiVisualUtils.hpp>
@@ -2188,5 +2188,5 @@ TEST_CASE("Non-planar voronoi diagram", "[VoronoiNonPlanar]")
     dump_voronoi_to_svg(debug_out_path("voronoi-non-planar-out.svg").c_str(), vd, Points(), lines);
 #endif
 
-//    REQUIRE(Arachne::is_voronoi_diagram_planar(vd));
+//    REQUIRE(Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(vd));
 }
