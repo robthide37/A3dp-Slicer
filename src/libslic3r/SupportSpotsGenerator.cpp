@@ -638,12 +638,14 @@ public:
 
         auto compute_elastic_section_modulus = [&line_dir](
                 const Vec3f &centroid_accumulator, const Vec2f &second_moment_of_area_accumulator, const float &area) {
-            if (area < EPSILON) return 0.0f;
             Vec3f centroid = centroid_accumulator / area;
             Vec2f variance = (second_moment_of_area_accumulator / area
                     - centroid.head<2>().cwiseProduct(centroid.head<2>()));
             variance = variance.cwiseProduct(line_dir.cwiseAbs());
             float extreme_fiber_dist = variance.cwiseSqrt().norm();
+            if (extreme_fiber_dist < EPSILON) {
+                return 0.0f;
+            }
             float elastic_section_modulus = area * (variance.x() + variance.y()) / extreme_fiber_dist;
             return elastic_section_modulus;
         };
@@ -663,6 +665,9 @@ public:
 
         // section for bed calculations
         {
+            if (this->sticking_area < EPSILON)
+                return 1.0f;
+
             Vec3f bed_centroid = this->sticking_centroid_accumulator / this->sticking_area;
             float bed_yield_torque = compute_elastic_section_modulus(this->sticking_centroid_accumulator,
                     this->sticking_second_moment_of_area_accumulator, this->sticking_area)
@@ -708,6 +713,9 @@ public:
 
         //section for weak connection calculations
         {
+            if (connection.area < EPSILON)
+                return 1.0f;
+
             Vec3f conn_centroid = connection.centroid_accumulator / connection.area;
             float conn_yield_torque = compute_elastic_section_modulus(connection.centroid_accumulator,
                     connection.second_moment_of_area_accumulator, connection.area) * params.material_yield_strength;
@@ -763,6 +771,7 @@ void debug_print_graph(const std::vector<LayerIslands> &islands_graph) {
             std::cout << "              volume: " << island.volume << std::endl;
             std::cout << "              sticking_area: " << island.sticking_area << std::endl;
             std::cout << "              connected_islands count: " << island.connected_islands.size() << std::endl;
+            std::cout << "              lines count: " << island.external_lines.size() << std::endl;
         }
     }
     std::cout << "END OF GRAPH" << std::endl;
