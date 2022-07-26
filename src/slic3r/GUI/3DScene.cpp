@@ -814,7 +814,10 @@ int GLVolumeCollection::load_object_volume(
     v.set_color(color_from_model_volume(*model_volume));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
-    v.model.init_from(mesh, true);
+    v.model.init_from(*mesh, true);
+#if ENABLE_RAYCAST_PICKING
+    v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
+#endif // ENABLE_RAYCAST_PICKING
 #else
 #if ENABLE_RAYCAST_PICKING
     v.model.init_from(*mesh);

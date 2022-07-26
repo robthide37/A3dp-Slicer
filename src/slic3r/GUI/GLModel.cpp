@@ -518,7 +518,7 @@ void GLModel::init_from(const TriangleMesh& mesh, bool smooth_normals)
 
         const indexed_triangle_set& its = mesh.its;
         Geometry& data = m_render_data.geometry;
-        data.format = { Geometry::EPrimitiveType::Triangles, Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(3 * its.indices.size()) };
+        data.format = { Geometry::EPrimitiveType::Triangles, Geometry::EVertexLayout::P3N3 };
         data.reserve_vertices(3 * its.indices.size());
         data.reserve_indices(3 * its.indices.size());
 
@@ -530,10 +530,7 @@ void GLModel::init_from(const TriangleMesh& mesh, bool smooth_normals)
         // indices
         for (size_t i = 0; i < its.indices.size(); ++i) {
             const stl_triangle_vertex_indices& idx = its.indices[i];
-            if (data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
-                data.add_ushort_triangle((unsigned short)idx(0), (unsigned short)idx(1), (unsigned short)idx(2));
-            else
-                data.add_uint_triangle((unsigned int)idx(0), (unsigned int)idx(1), (unsigned int)idx(2));
+            data.add_triangle((unsigned int)idx(0), (unsigned int)idx(1), (unsigned int)idx(2));
         }
 
         // update bounding box
