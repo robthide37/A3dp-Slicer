@@ -58,18 +58,24 @@ if (SLIC3R_GUI)
                     "Hint: On Linux you can set -DSLIC3R_WX_STABLE=1 to use wxWidgets 3.0\n")
             endif ()
         endif ()
+
+        include(${wxWidgets_USE_FILE})
     else ()
-        find_package(wxWidgets 3.1 REQUIRED COMPONENTS html adv gl core base)
+        find_package(wxWidgets 3.1 COMPONENTS html adv gl core base)
+        if (wxWidgets_NOTFOUND)
+            find_package(wxWidgets 3.2 CONFIG REQUIRED COMPONENTS html adv gl core base)
+        else ()
+            include(${wxWidgets_USE_FILE})
+        endif ()
     endif ()
 
     if(UNIX)
         message(STATUS "wx-config path: ${wxWidgets_CONFIG_EXECUTABLE}")
     endif()
 
-    include(${wxWidgets_USE_FILE})
-
     find_package(JPEG QUIET)
     find_package(TIFF QUIET)
+    find_package(NanoSVG REQUIRED)
 
     string(REGEX MATCH "wxpng" WX_PNG_BUILTIN ${wxWidgets_LIBRARIES})
     if (PNG_FOUND AND NOT WX_PNG_BUILTIN)
