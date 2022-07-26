@@ -94,6 +94,8 @@ add_library(libslic3r STATIC
     Format/STL.hpp
     Format/SL1.hpp
     Format/SL1.cpp
+    Format/STEP.hpp
+    Format/STEP.cpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp

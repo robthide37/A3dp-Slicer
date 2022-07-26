@@ -189,6 +189,7 @@ endif ()
 include(JPEG/JPEG.cmake)
 include(TIFF/TIFF.cmake)
 include(wxWidgets/wxWidgets.cmake)
+include(OCCT/OCCT.cmake)
 
 set(_dep_list
     dep_Boost
@@ -200,6 +201,7 @@ set(_dep_list
     dep_OpenVDB
     dep_OpenCSG
     dep_CGAL
+    dep_OCCT
     ${PNG_PKG}
     ${ZLIB_PKG}
     ${EXPAT_PKG}

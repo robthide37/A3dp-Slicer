@@ -13,6 +13,7 @@
 #include "Format/OBJ.hpp"
 #include "Format/STL.hpp"
 #include "Format/3mf.hpp"
+#include "Format/STEP.hpp"
 
 #include <float.h>
 
@@ -114,6 +115,8 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
         result = load_stl(input_file.c_str(), &model);
     else if (boost::algorithm::iends_with(input_file, ".obj"))
         result = load_obj(input_file.c_str(), &model);
+    else if (boost::algorithm::iends_with(input_file, ".step") || boost::algorithm::iends_with(input_file, ".stp"))
+        result = load_step(input_file.c_str(), &model);
     else if (boost::algorithm::iends_with(input_file, ".amf") || boost::algorithm::iends_with(input_file, ".amf.xml"))
         result = load_amf(input_file.c_str(), config, config_substitutions, &model, options & LoadAttribute::CheckVersion);
     else if (boost::algorithm::iends_with(input_file, ".3mf"))
