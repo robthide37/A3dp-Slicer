@@ -17,6 +17,7 @@ namespace Slic3r {
 
 extern void set_logging_level(unsigned int level);
 extern unsigned get_logging_level();
+extern void trace(unsigned int level, const std::string& message);
 extern void trace(unsigned int level, const char *message);
 // Format memory allocated, separate thousands by comma.
 extern std::string format_memsize_MB(size_t n);

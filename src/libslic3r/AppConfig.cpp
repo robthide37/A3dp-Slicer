@@ -562,7 +562,7 @@ void AppConfig::set_defaults()
                 std::string color_code = tree_colors.get<std::string>(it.first);
                 if (!color_code.empty()) {
                     std::string tag = it.first.substr(4);
-                    color_code = (tag, color_code[0] == '#' ? color_code : ("#" + color_code));
+                    color_code = (color_code[0] == '#' ? color_code : ("#" + color_code));
 
                     // get/set into ConfigOptionDef
                     auto it = ConfigOptionDef::names_2_tag_mode.find(tag);

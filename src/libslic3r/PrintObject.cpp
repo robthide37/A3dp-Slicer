@@ -135,8 +135,8 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
         for (int i_poly = 0; i_poly < nb_polyhole; i_poly++) {
             Polygon& pts = (((i_poly % 2) == 0) ? list[i_poly / 2] : list[(nb_polyhole + 1) / 2 + i_poly / 2]);
             const float new_radius = radius / float(std::cos(PI / nb_edges));
-            for (int i_edge = 0; i_edge < nb_edges; ++i_edge) {
-                float angle = rotation * i_poly + (float(PI) * 2 * i_edge) / nb_edges;
+            for (size_t i_edge = 0; i_edge < nb_edges; ++i_edge) {
+                float angle = rotation * i_poly + (float(PI) * 2 * (float)i_edge) / nb_edges;
                 pts.points.emplace_back(center.x() + new_radius * cos(angle), center.y() + new_radius * sin(angle));
             }
             pts.make_clockwise();
@@ -206,7 +206,6 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
 
         //search & find hole that span at least X layers
         const size_t min_nb_layers = 2;
-        float max_layer_height = config().layer_height * 2;
         for (size_t layer_idx = 0; layer_idx < this->m_layers.size(); ++layer_idx) {
             for (size_t hole_idx = 0; hole_idx < layerid2center[layer_idx].size(); ++hole_idx) {
                 //get all other same polygons
@@ -1050,7 +1049,6 @@ bool PrintObject::invalidate_state_by_config_options(
 
         ExPolygon polygon_reduced = polygon_to_check;
         size_t pos_check = 0;
-        bool has_del = false;
         while ((polygon_reduced.contour.points.begin() + pos_check) != polygon_reduced.contour.points.end()) {
             Point best_point = polygon_reduced.contour.points[pos_check].projection_onto(allowedPoints.contour);
             for (const Polygon& hole : allowedPoints.holes) {
@@ -1089,7 +1087,6 @@ bool PrintObject::invalidate_state_by_config_options(
             polygon_reduced = try_fit_to_size2(bigger_polygon[0], growing_area);
         }
         //ExPolygons to_check = offset_ex(polygon_to_cover, -offset);
-        int idx = 0;
         ExPolygons not_covered = diff_ex(polygon_to_cover, polygon_reduced, ApplySafetyOffset::Yes);
         while (!not_covered.empty()) {
             //not enough, use a bigger offset
@@ -1097,7 +1094,6 @@ bool PrintObject::invalidate_state_by_config_options(
             float next_coverage = percent_coverage + (percent_coverage - current_coverage) * 4;
             previous_offset = current_offset;
             current_offset *= 2;
-            double area = 0;
             if (next_coverage < 0.1) current_offset *= 2;
             //create the bigger polygon and test it
             ExPolygons bigger_polygon = offset_ex(polygon_to_cover, double(current_offset));
@@ -1265,7 +1261,6 @@ bool PrintObject::invalidate_state_by_config_options(
                                                 } else {
                                                     double sparse_area = surf_with_overlap.area();
                                                     double area_to_cover = 0;
-                                                    double min_area_to_cover = 0;
                                                     if (dfaAutoNotFull == algo) {
                                                         // calculate area to decide if area is small enough for autofill
                                                         for (ExPolygon poly_inter : intersect)
@@ -1320,7 +1315,7 @@ bool PrintObject::invalidate_state_by_config_options(
                                                             dense = dense_test;
                                                         }
                                                         dense_polys.insert(dense_polys.end(), dense.begin(), dense.end());
-                                                        for (int i = 0; i < dense.size(); i++)
+                                                        for (size_t i = 0; i < dense.size(); i++)
                                                             dense_priority.push_back(priority);
                                                     }
                                                     //assign (copy)
@@ -1343,7 +1338,7 @@ bool PrintObject::invalidate_state_by_config_options(
                                         if (area_sparse > area_dense * 0.1) {
                                             //split
                                             //dense_polys = union_ex(dense_polys);
-                                            for (int idx_dense = 0; idx_dense < dense_polys.size(); idx_dense++) {
+                                            for (size_t idx_dense = 0; idx_dense < dense_polys.size(); idx_dense++) {
                                                 ExPolygon dense_poly = dense_polys[idx_dense];
                                                 //remove overlap with perimeter
                                                 ExPolygons offseted_dense_polys = layerm->fill_no_overlap_expolygons.empty()

@@ -368,14 +368,14 @@ class Transformation
         void set(bool dont_translate, bool dont_rotate, bool dont_scale, bool dont_mirror);
     };
 
-    Vec3d m_offset;              // In unscaled coordinates
-    Vec3d m_rotation;            // Rotation around the three axes, in radians around mesh center point
-    Vec3d m_scaling_factor;      // Scaling factors along the three axes
-    Vec3d m_mirror;              // Mirroring along the three axes
+    Vec3d m_offset = { 0,0,0 };              // In unscaled coordinates
+    Vec3d m_rotation = { 0,0,0 };            // Rotation around the three axes, in radians around mesh center point
+    Vec3d m_scaling_factor = { 0,0,0 };      // Scaling factors along the three axes
+    Vec3d m_mirror = { 0,0,0 };              // Mirroring along the three axes
 
     mutable Transform3d m_matrix;
     mutable Flags m_flags;
-    mutable bool m_dirty;
+    mutable bool m_dirty = false;
 
 public:
     Transformation();

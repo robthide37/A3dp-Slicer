@@ -222,7 +222,7 @@ Flow Flow::new_from_config_width(FlowRole role, const ConfigOptionFloatOrPercent
     if (height <= 0)
         throw Slic3r::InvalidArgument("Invalid flow height supplied to new_from_config_width()");
 
-    float w;
+    float w = 0.f;
     if (bridge_flow_ratio > 0) {
         // If bridge flow was requested, calculate the bridge width.
         height = w = (bridge_flow_ratio == 1.) ?
@@ -379,8 +379,8 @@ float Flow::spacing(const Flow &other) const
 float Flow::rounded_rectangle_extrusion_spacing(float width, float height)
 {
     if (width == height && width == 0)
-        return 0;
-    auto out = width - height * float(1. - 0.25 * PI);
+        return 0.f;
+    float out = width - height * float(1. - 0.25 * PI);
     if (out <= 0.f)
         throw FlowErrorNegativeSpacing();
     return out;

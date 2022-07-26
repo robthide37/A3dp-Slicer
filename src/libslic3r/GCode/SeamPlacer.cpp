@@ -551,9 +551,9 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
         // Look for all lambda-seam-modifiers below current z, choose the highest one
         ModelVolume* v_lambda_seam = nullptr;
         Vec3d lambda_pos;
-        double lambda_z;
-        double lambda_dist;
-        double lambda_radius;
+        double lambda_z = 0;
+        double lambda_dist = 0;
+        double lambda_radius = 0;
         //get model_instance (like from po->model_object()->instances, but we don't have the index for that array)
         const ModelInstance* model_instance = po->instances()[print_object_instance_idx].model_instance;
         for (ModelVolume* v : po->model_object()->volumes) {
