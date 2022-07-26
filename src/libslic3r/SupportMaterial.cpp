@@ -2820,6 +2820,7 @@ PrintObjectSupportMaterial::MyLayersPtr PrintObjectSupportMaterial::raft_and_int
             coordf_t extr2z_large_steps = extr2z;
             // Take the largest allowed step in the Z axis until extr2z_large_steps is reached.
             coordf_t last_z = extr1z;
+            coordf_t wanted_z = extr1z;
             for (size_t i = 0; i < n_layers_total; ++ i) {
                 MyLayer &layer_new = layer_allocate(layer_storage, sltIntermediate);
                 if (i + 1 == n_layers_total) {
@@ -2829,14 +2830,20 @@ PrintObjectSupportMaterial::MyLayersPtr PrintObjectSupportMaterial::raft_and_int
                     layer_new.height = layer_new.print_z - layer_new.bottom_z;
                     layer_new.height_block = layer_new.height;
                 } else {
+                    layer_new.bottom_z = last_z;
                     if (i < n_layers_bot || i >= n_layers_total - n_layers_top) {
                         // Interface
-                        layer_new.height = step_interface;
+                        wanted_z += step_interface;
+                        // ensure the height is multuiple of z_step, and don't go higher than support_interface_layer_height
+                        //taht work because support_interface_layer_height is a multiple of z_step, so it's not possible to accumulate a big wanted_z
+                        layer_new.height = std::min(check_z_step(wanted_z - last_z, this->m_slicing_params.z_step), support_interface_layer_height);
                     } else {
                         // Intermediate layer, not the last added.
-                        layer_new.height = step;
+                        wanted_z += step;
+                        // ensure the height is multuiple of z_step, and don't go higher than support_layer_height
+                        //taht work because support_layer_height is a multiple of z_step, so it's not possible to accumulate a big wanted_z
+                        layer_new.height = std::min(check_z_step(wanted_z - last_z, this->m_slicing_params.z_step), support_layer_height);
                     }
-                    layer_new.bottom_z = last_z;
                     layer_new.print_z = layer_new.bottom_z + layer_new.height;
                     layer_new.height_block = layer_new.height;
                 }
