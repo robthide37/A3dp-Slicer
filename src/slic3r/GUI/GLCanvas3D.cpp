@@ -1827,6 +1827,9 @@ void GLCanvas3D::select_all()
 
 void GLCanvas3D::deselect_all()
 {
+    if (m_selection.is_empty())
+        return;
+
     m_selection.remove_all();
     wxGetApp().obj_manipul()->set_dirty();
     m_gizmos.reset_all_states();
