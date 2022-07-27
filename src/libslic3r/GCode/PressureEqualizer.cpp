@@ -1,6 +1,6 @@
 #include <memory.h>
-#include <string.h>
-#include <float.h>
+#include <cstring>
+#include <cfloat>
 
 #include "../libslic3r.h"
 #include "../PrintConfig.hpp"
@@ -31,7 +31,8 @@ PressureEqualizer::PressureEqualizer(const Slic3r::GCodeConfig &config) : m_use_
 {
     // Preallocate some data, so that output_buffer.data() will return an empty string.
     output_buffer.assign(32, 0);
-    output_buffer_length = 0;
+    output_buffer_length      = 0;
+    output_buffer_prev_length = 0;
 
     m_current_extruder = 0;
     // Zero the position of the XYZE axes + the current feed
@@ -117,9 +118,10 @@ LayerResult PressureEqualizer::process_layer(LayerResult &&input)
     LayerResult *prev_layer_result = m_layer_results.front();
     m_layer_results.pop();
 
-    output_buffer_length = 0;
+    output_buffer_length      = 0;
+    output_buffer_prev_length = 0;
     for (size_t line_idx = 0; line_idx < next_layer_first_idx; ++line_idx)
-        output_gcode_line(m_gcode_lines[line_idx]);
+        output_gcode_line(line_idx);
     m_gcode_lines.erase(m_gcode_lines.begin(), m_gcode_lines.begin() + int(next_layer_first_idx));
 
     if (output_buffer_length > 0)
@@ -134,9 +136,9 @@ LayerResult PressureEqualizer::process_layer(LayerResult &&input)
 // Is a white space?
 static inline bool is_ws(const char c) { return c == ' ' || c == '\t'; }
 // Is it an end of line? Consider a comment to be an end of line as well.
-static inline bool is_eol(const char c) { return c == 0 || c == '\r' || c == '\n' || c == ';'; };
+static inline bool is_eol(const char c) { return c == 0 || c == '\r' || c == '\n' || c == ';'; }
 // Is it a white space or end of line?
-static inline bool is_ws_or_eol(const char c) { return is_ws(c) || is_eol(c); };
+static inline bool is_ws_or_eol(const char c) { return is_ws(c) || is_eol(c); }
 
 // Eat whitespaces.
 static void eatws(const char *&line)
@@ -155,7 +157,7 @@ static inline int parse_int(const char *&line)
         throw Slic3r::InvalidArgument("PressureEqualizer: Error parsing an int");
     line = endptr;
     return int(result);
-};
+}
 
 float string_to_float_decimal_point(const char *line, const size_t str_len, size_t* pos)
 {
@@ -176,7 +178,7 @@ static inline float parse_float(const char *&line, const size_t line_length)
         throw Slic3r::RuntimeError("PressureEqualizer: Error parsing a float");
     line = line + endptr;
     return result;
-};
+}
 
 bool PressureEqualizer::process_line(const char *line, const char *line_end, GCodeLine &buf)
 {
@@ -213,8 +215,8 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
 	buf.extrusion_role = m_current_extrusion_role;
 
     std::string str_line(line, line_end);
-    bool found_extrude_set_speed_tag = boost::contains(str_line, ";_EXTRUDE_SET_SPEED");
-    bool found_extrude_end_tag = boost::contains(str_line, ";_EXTRUDE_END");
+    const bool found_extrude_set_speed_tag = boost::contains(str_line, EXTRUDE_SET_SPEED_TAG);
+    const bool found_extrude_end_tag = boost::contains(str_line, EXTRUDE_END_TAG);
     assert(!found_extrude_set_speed_tag || !found_extrude_end_tag);
 
     if (found_extrude_set_speed_tag)
@@ -242,6 +244,8 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
         {
             // G0, G1: A FFF 3D printer does not make a difference between the two.
             buf.adjustable_flow = this->opened_extrude_set_speed_block;
+            buf.extrude_set_speed_tag = found_extrude_set_speed_tag;
+            buf.extrude_end_tag = found_extrude_end_tag;
             float new_pos[5];
             memcpy(new_pos, m_current_pos, sizeof(float)*5);
             bool  changed[5] = { false, false, false, false, false };
@@ -386,8 +390,9 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
     return true;
 }
 
-void PressureEqualizer::output_gcode_line(GCodeLine &line)
+void PressureEqualizer::output_gcode_line(const size_t line_idx)
 {
+    GCodeLine &line = m_gcode_lines[line_idx];
     if (!line.modified) {
         push_to_output(line.raw.data(), line.raw_length, true);
         return;
@@ -403,7 +408,7 @@ void PressureEqualizer::output_gcode_line(GCodeLine &line)
     // Emit the line with lowered extrusion rates.
     float l = line.dist_xyz();
     if (auto nSegments = size_t(ceil(l / max_segment_length)); nSegments == 1) { // Just update this segment.
-        push_line_to_output(line, line.feedrate() * line.volumetric_correction_avg(), comment);
+        push_line_to_output(line_idx, line.feedrate() * line.volumetric_correction_avg(), comment);
     } else {
         bool accelerating = line.volumetric_extrusion_rate_start < line.volumetric_extrusion_rate_end;
         // Update the initial and final feed rate values.
@@ -453,7 +458,7 @@ void PressureEqualizer::output_gcode_line(GCodeLine &line)
                     line.pos_end[i] = pos_start[i] + (pos_end[i] - pos_start[i]) * t;
                     line.pos_provided[i] = true;
                 }
-                push_line_to_output(line, pos_start[4], comment);
+                push_line_to_output(line_idx, pos_start[4], comment);
                 comment = nullptr;
 
                 float new_pos_start_feedrate = pos_start[4];
@@ -473,7 +478,7 @@ void PressureEqualizer::output_gcode_line(GCodeLine &line)
                 line.pos_provided[j] = true;
             } 
             // Interpolate the feed rate at the center of the segment.
-            push_line_to_output(line, pos_start[4] + (pos_end[4] - pos_start[4]) * (float(i) - 0.5f) / float(nSegments), comment);
+            push_line_to_output(line_idx, pos_start[4] + (pos_end[4] - pos_start[4]) * (float(i) - 0.5f) / float(nSegments), comment);
             comment = nullptr;
             memcpy(line.pos_start, line.pos_end, sizeof(float)*5);
         }
@@ -482,13 +487,13 @@ void PressureEqualizer::output_gcode_line(GCodeLine &line)
                 line.pos_end[i] = pos_end2[i];
                 line.pos_provided[i] = true;
             }
-            push_line_to_output(line, pos_end[4], comment);
+            push_line_to_output(line_idx, pos_end[4], comment);
         } else {
             for (int i = 0; i < 4; ++ i) {
                 line.pos_end[i] = pos_end[i];
                 line.pos_provided[i] = true;
             }
-            push_line_to_output(line, pos_end[4], comment);
+            push_line_to_output(line_idx, pos_end[4], comment);
         }
     }
 }
@@ -643,6 +648,7 @@ inline void PressureEqualizer::push_to_output(const char *text, const size_t len
     // Copy the text to the output.
     if (len != 0) {
         memcpy(output_buffer.data() + output_buffer_length, text, len);
+        this->output_buffer_prev_length = this->output_buffer_length;
         output_buffer_length += len;
     }
     if (add_eol)
@@ -650,9 +656,22 @@ inline void PressureEqualizer::push_to_output(const char *text, const size_t len
     output_buffer[output_buffer_length] = 0;
 }
 
-void PressureEqualizer::push_line_to_output(const GCodeLine &line, const float new_feedrate, const char *comment)
+inline bool PressureEqualizer::is_just_feedrate_provided(const GCodeLine &line)
 {
-    push_to_output(EXTRUDE_END_TAG.data(), EXTRUDE_END_TAG.length(), true);
+    return line.pos_provided[4] && !line.pos_provided[0] && !line.pos_provided[1] && !line.pos_provided[2] && !line.pos_provided[3];
+}
+
+void PressureEqualizer::push_line_to_output(const size_t line_idx, const float new_feedrate, const char *comment)
+{
+    const GCodeLine &line = this->m_gcode_lines[line_idx];
+    if (line_idx > 0) {
+        const GCodeLine &prev_line = this->m_gcode_lines[line_idx - 1];
+        if (prev_line.extrude_set_speed_tag && this->is_just_feedrate_provided(prev_line))
+            this->output_buffer_length = this->output_buffer_prev_length; // Remove the last line because it only sets the speed for an empty block of g-code lines, so it is useless.
+        else
+            push_to_output(EXTRUDE_END_TAG.data(), EXTRUDE_END_TAG.length(), true);
+    } else
+        push_to_output(EXTRUDE_END_TAG.data(), EXTRUDE_END_TAG.length(), true);
 
     GCodeG1Formatter feedrate_formatter;
     feedrate_formatter.emit_f(new_feedrate);

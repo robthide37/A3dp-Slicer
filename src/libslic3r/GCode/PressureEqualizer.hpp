@@ -143,7 +143,7 @@ private:
         // X,Y,Z,E,F. Storing the state of the currently active extruder only.
         float       pos_start[5];
         float       pos_end[5];
-        // Was the axis found on the G-code line? X,Y,Z,F
+        // Was the axis found on the G-code line? X,Y,Z,E,F
         bool        pos_provided[5];
 
         // Index of the active extruder.
@@ -163,12 +163,16 @@ private:
         float       max_volumetric_extrusion_rate_slope_positive;
         float       max_volumetric_extrusion_rate_slope_negative;
 
-        bool        adjustable_flow = false;
+        bool        adjustable_flow       = false;
+
+        bool        extrude_set_speed_tag = false;
+        bool        extrude_end_tag       = false;
     };
 
     // Output buffer will only grow. It will not be reallocated over and over.
     std::vector<char>               output_buffer;
     size_t                          output_buffer_length;
+    size_t                          output_buffer_prev_length;
 
 #ifdef PRESSURE_EQUALIZER_DEBUG
     // For debugging purposes. Index of the G-code line processed.
@@ -176,7 +180,7 @@ private:
 #endif
 
     bool process_line(const char *line, const char *line_end, GCodeLine &buf);
-    void output_gcode_line(GCodeLine &buf);
+    void output_gcode_line(size_t line_idx);
 
     // Go back from the current circular_buffer_pos and lower the feedtrate to decrease the slope of the extrusion rate changes.
     // Then go forward and adjust the feedrate to decrease the slope of the extrusion rate changes.
@@ -187,7 +191,9 @@ private:
     inline void push_to_output(const std::string &text, bool add_eol);
     inline void push_to_output(const char *text, size_t len, bool add_eol = true);
     // Push a G-code line to the output.
-    void push_line_to_output(const GCodeLine &line, float new_feedrate, const char *comment);
+    void push_line_to_output(size_t line_idx, float new_feedrate, const char *comment);
+
+    inline bool is_just_feedrate_provided(const GCodeLine &line);
 
 public:
     std::queue<LayerResult*> m_layer_results;
