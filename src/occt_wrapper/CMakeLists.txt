@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 project(OCCTWrapper)
 
-add_library(OCCTWrapper SHARED OCCTWrapper.cpp)
+add_library(OCCTWrapper MODULE OCCTWrapper.cpp)
 
 set_target_properties(OCCTWrapper
     PROPERTIES

@@ -21,6 +21,8 @@ LoadStepFn get_load_step_fn()
 {
     static LoadStepFn load_step_fn = nullptr;
 
+    constexpr const char* fn_name = "load_step_internal";
+
     if (!load_step_fn) {
 #ifdef _WIN32
         HMODULE module = LoadLibraryW(L"OCCTWrapper.dll");
@@ -28,7 +30,6 @@ LoadStepFn get_load_step_fn()
             throw Slic3r::RuntimeError("Cannot load OCCTWrapper.dll");
 
         try {
-            const char* fn_name = "load_step_internal";
             FARPROC farproc = GetProcAddress(module, fn_name);
             if (! farproc) {
                 DWORD ec = GetLastError();
@@ -47,7 +48,12 @@ LoadStepFn get_load_step_fn()
             load_step_fn = reinterpret_cast<LoadStepFn>(dlsym(plugin_ptr, "load_step_internal"));
             if (!load_step_fn) {
                 dlclose(plugin_ptr);
+                throw Slic3r::RuntimeError("Cannot load function from OCCTWrapper.so");
             }
+        } else {
+            throw Slic3r::RuntimeError(
+                std::string("Cannot load function from OCCTWrapper.dll: ") +
+                fn_name + "\n\nError code: " + dlerror());
         }
 #endif
     }
