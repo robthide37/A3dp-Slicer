@@ -149,6 +149,7 @@ static constexpr const char* MESH_STAT_BACKWARDS_EDGES      = "backwards_edges";
 static constexpr const char *TEXT_TAG = "emboss";
 static constexpr const char *TEXT_DATA_ATTR = "text";
 // TextConfiguration::FontItem
+static constexpr const char *STYLE_NAME_ATTR      = "style_name";
 static constexpr const char *FONT_DESCRIPTOR_ATTR = "font_descriptor";
 static constexpr const char *FONT_DESCRIPTOR_TYPE_ATTR = "font_descriptor_type";
 
@@ -3348,6 +3349,7 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
     stream << TEXT_DATA_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(tc.text) << "\" ";
     // font item
     const FontItem &fi = tc.font_item;
+    stream << STYLE_NAME_ATTR <<  "=\"" << xml_escape_double_quotes_attribute_value(fi.name) << "\" ";
     stream << FONT_DESCRIPTOR_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(fi.path) << "\" ";
     stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::get_name(fi.type) << "\" ";
 
@@ -3464,7 +3466,7 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     std::string weight = get_attribute_value_string(attributes, num_attributes, FONT_WEIGHT_ATTR);
     if (!weight.empty()) fp.weight = weight;
 
-    std::string style_name{}; // should store .3mf file name 
+    std::string style_name = get_attribute_value_string(attributes, num_attributes, STYLE_NAME_ATTR);
     std::string font_descriptor = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_ATTR);
     std::string type_str = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_TYPE_ATTR);
     FontItem::Type type = TextConfigurationSerialization::get_type(type_str);
