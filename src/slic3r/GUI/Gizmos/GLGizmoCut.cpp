@@ -783,6 +783,17 @@ bool GLGizmoCut3D::on_init()
     m_grabbers.emplace_back();
     m_shortcut_key = WXK_CONTROL_C;
 
+    // initiate info shortcuts
+    const wxString ctrl = GUI::shortkey_ctrl_prefix();
+    const wxString alt  = GUI::shortkey_alt_prefix();
+
+    m_shortcuts.push_back(std::make_pair(_L("Left click"),        _L("Add connector")));
+    m_shortcuts.push_back(std::make_pair(_L("Right click"),       _L("Remove connector")));
+    m_shortcuts.push_back(std::make_pair(_L("Drag"),              _L("Move connector")));
+    m_shortcuts.push_back(std::make_pair(ctrl + _L("Left click"), _L("Add connector to selection")));
+    m_shortcuts.push_back(std::make_pair(alt + _L("Left click"),  _L("Remove connector from selection")));
+    m_shortcuts.push_back(std::make_pair(ctrl + "A",              _L("Select all connectors")));
+
     return true;
 }
 
@@ -1258,7 +1269,18 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
         if (m_imgui->button(_L("Add/Edit connectors")))
             m_connectors_editing = true;
         m_imgui->disabled_end();
-    } else { // connectors mode
+    } 
+    else { // connectors mode
+        if (m_imgui->button("? " + (m_show_shortcuts ? wxString(ImGui::CollapseBtn) : wxString(ImGui::ExpandBtn))))
+            m_show_shortcuts = !m_show_shortcuts;
+
+        if (m_show_shortcuts)
+            for (const auto& shortcut : m_shortcuts ){
+                m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, shortcut.first);
+                ImGui::SameLine(m_label_width);
+                m_imgui->text(shortcut.second);
+            }
+
         m_imgui->disabled_begin(!m_keep_lower || !m_keep_upper);
         // Connectors section
         ImGui::Separator();
@@ -1776,6 +1798,10 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
         assert(m_selected.size() == connectors.size());
         m_parent.set_as_dirty();
 
+        return true;
+    }
+    else if (action == SLAGizmoEventType::SelectAll) {
+        std::fill(m_selected.begin(), m_selected.end(), true);
         return true;
     }
     return false;

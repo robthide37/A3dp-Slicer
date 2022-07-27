@@ -505,7 +505,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
 #endif /* __APPLE__ */
         {
             // Sla gizmo selects all support points
-            if ((m_current == SlaSupports || m_current == Hollow) && gizmo_event(SLAGizmoEventType::SelectAll))
+            if ((m_current == SlaSupports || m_current == Hollow || m_current == Cut) && gizmo_event(SLAGizmoEventType::SelectAll))
                 processed = true;
 
             break;

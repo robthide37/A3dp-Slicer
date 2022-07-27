@@ -98,6 +98,9 @@ class GLGizmoCut3D : public GLGizmoBase
     Matrix3d m_rotation_matrix;
     Vec3d    m_rotations{ Vec3d::Zero() };
 
+    bool                                        m_show_shortcuts{ false };
+    std::vector<std::pair<wxString, wxString>>  m_shortcuts;
+
     enum class CutMode {
         cutPlanar
         , cutGrig
