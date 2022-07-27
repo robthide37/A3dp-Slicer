@@ -144,6 +144,7 @@ void GLGizmoMeasure::on_render()
         m_imgui->begin(std::string("DEBUG"));
         
         m_imgui->checkbox(wxString("Show all features"), m_show_all);
+        m_imgui->checkbox(wxString("Show all planes"), m_show_planes);
 
         Vec3f pos;
         Vec3f normal;
@@ -157,37 +158,51 @@ void GLGizmoMeasure::on_render()
 
 
 
-        if (m_show_all) {
-            const std::vector<Measure::SurfaceFeature*> features = m_measuring->get_features();
-            for (const Measure::SurfaceFeature* feature : features) {
+        std::vector<const Measure::SurfaceFeature*> features = {m_measuring->get_feature(facet_idx, pos.cast<double>())};
+         if (m_show_all) {
+            features = m_measuring->get_features();
+            features.erase(std::remove_if(features.begin(), features.end(),
+                           [](const Measure::SurfaceFeature* f) {
+                            return f->get_type() == Measure::SurfaceFeatureType::Plane;
+                            }), features.end());
+         }
+            
+            
+        for (const Measure::SurfaceFeature* feature : features) {
+            if (! feature)
+                continue;
 
-                if (feature->get_type() == Measure::SurfaceFeatureType::Circle) {
-                    const auto* circle = static_cast<const Measure::Circle*>(feature);
-                    Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(circle->get_center()));
-                    view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(circle->get_center()));
-                    view_feature_matrix.scale(0.5);
-                    shader->set_uniform("view_model_matrix", view_feature_matrix);
-                    m_vbo_sphere.set_color(ColorRGBA(0.f, 1.f, 0.f, 1.f));
-                    m_vbo_sphere.render();
-                }
-
-
-                else if (feature->get_type() == Measure::SurfaceFeatureType::Edge) {
-                    const auto* edge = static_cast<const Measure::Edge*>(feature);
-                    auto& [start, end] = edge->get_edge();
-                    Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(start));
-                    auto q  = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start);
-                    view_feature_matrix *= q;
-                    view_feature_matrix.scale(Vec3d(0.075, 0.075, (end - start).norm()));
-                    shader->set_uniform("view_model_matrix", view_feature_matrix);
-                    m_vbo_cylinder.set_color(ColorRGBA(0.7f, 0.7f, 0.f, 1.f));
-                    m_vbo_cylinder.render();
-                }
-
-                
+            if (feature->get_type() == Measure::SurfaceFeatureType::Circle) {
+                const auto* circle = static_cast<const Measure::Circle*>(feature);
+                Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(circle->get_center()));
+                view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(circle->get_center()));
+                view_feature_matrix.scale(0.5);
+                shader->set_uniform("view_model_matrix", view_feature_matrix);
+                m_vbo_sphere.set_color(ColorRGBA(0.f, 1.f, 0.f, 1.f));
+                m_vbo_sphere.render();
             }
-            shader->set_uniform("view_model_matrix", view_model_matrix);
+            else if (feature->get_type() == Measure::SurfaceFeatureType::Edge) {
+                const auto* edge = static_cast<const Measure::Edge*>(feature);
+                auto& [start, end] = edge->get_edge();
+                Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(start));
+                auto q  = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start);
+                view_feature_matrix *= q;
+                view_feature_matrix.scale(Vec3d(0.075, 0.075, (end - start).norm()));
+                shader->set_uniform("view_model_matrix", view_feature_matrix);
+                m_vbo_cylinder.set_color(ColorRGBA(0.8f, 0.2f, 0.2f, 1.f));
+                m_vbo_cylinder.render();
+            }
+            else if (feature->get_type() == Measure::SurfaceFeatureType::Plane) {
+                const auto* plane = static_cast<const Measure::Plane*>(feature);
+                assert(plane->get_plane_idx() < m_plane_models.size());
+                m_plane_models[plane->get_plane_idx()]->render();
+            }   
         }
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        if (m_show_planes)
+            for (const auto& glmodel : m_plane_models)
+                glmodel->render();
+        
         m_imgui->end();
     }
 
@@ -244,7 +259,25 @@ void GLGizmoMeasure::update_if_needed()
     return;
 
 UPDATE:
-    m_measuring.reset(new Measure::Measuring(mo->volumes.front()->mesh().its));
+    const indexed_triangle_set& its = mo->volumes.front()->mesh().its;
+    m_measuring.reset(new Measure::Measuring(its));
+    m_plane_models.clear();
+    const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
+    for (const std::vector<int>& triangle_indices : planes_triangles) {
+        m_plane_models.emplace_back(std::unique_ptr<GLModel>(new GLModel()));
+        GUI::GLModel::Geometry init_data;
+        init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3 };
+        init_data.color = ColorRGBA(0.9f, 0.9f, 0.9f, 0.5f);
+        int i = 0;
+        for (int idx : triangle_indices) {  
+            init_data.add_vertex(its.vertices[its.indices[idx][0]]);
+            init_data.add_vertex(its.vertices[its.indices[idx][1]]);
+            init_data.add_vertex(its.vertices[its.indices[idx][2]]);
+            init_data.add_triangle(i, i+1, i+2);
+            i+=3;
+        }
+        m_plane_models.back()->init_from(std::move(init_data));
+    }
 
     // Let's save what we calculated it from:
     m_volumes_matrices.clear();

@@ -45,7 +45,9 @@ private:
 
     int m_mouse_pos_x;
     int m_mouse_pos_y;
-    bool m_show_all = true;
+    bool m_show_all = false;
+    bool m_show_planes = false;
+    std::vector<std::unique_ptr<GLModel>> m_plane_models;
 
     void update_if_needed();
     void set_flattening_data(const ModelObject* model_object);
