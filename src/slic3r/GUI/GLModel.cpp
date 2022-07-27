@@ -2107,7 +2107,6 @@ GLModel::Geometry diamond(unsigned int resolution)
 }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_SHOW_TOOLPATHS_COG
 GLModel::Geometry smooth_sphere(unsigned int resolution, float radius)
 {
     resolution = std::max<unsigned int>(4, resolution);
@@ -2170,7 +2169,6 @@ GLModel::Geometry smooth_sphere(unsigned int resolution, float radius)
 
     return data;
 }
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace GUI

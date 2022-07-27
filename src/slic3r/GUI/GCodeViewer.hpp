@@ -387,7 +387,6 @@ class GCodeViewer
         bool visible{ false };
     };
 
-#if ENABLE_SHOW_TOOLPATHS_COG
     // helper to render center of gravity
     class COG
     {
@@ -431,7 +430,6 @@ class GCodeViewer
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
     };
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 
     // helper to render extrusion paths
     struct Extrusions
@@ -791,9 +789,7 @@ private:
     Extrusions m_extrusions;
     SequentialView m_sequential_view;
     Shells m_shells;
-#if ENABLE_SHOW_TOOLPATHS_COG
     COG m_cog;
-#endif // ENABLE_SHOW_TOOLPATHS_COG
     EViewType m_view_type{ EViewType::FeatureType };
     bool m_legend_enabled{ true };
 #if ENABLE_PREVIEW_LAYOUT
@@ -842,9 +838,7 @@ public:
 
     void reset();
     void render();
-#if ENABLE_SHOW_TOOLPATHS_COG
     void render_cog() { m_cog.render(); }
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 
     bool has_data() const { return !m_roles.empty(); }
     bool can_export_toolpaths() const;

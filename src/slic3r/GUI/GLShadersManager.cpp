@@ -54,14 +54,12 @@ std::pair<bool, std::string> GLShadersManager::init()
         valid &= append_shader("dashed_thick_lines", { prefix + "dashed_thick_lines.vs", prefix + "dashed_thick_lines.fs", prefix + "dashed_thick_lines.gs" });
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_SHOW_TOOLPATHS_COG
     // used to render toolpaths center of gravity
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     valid &= append_shader("toolpaths_cog", { prefix + "toolpaths_cog.vs", prefix + "toolpaths_cog.fs" });
 #else
     valid &= append_shader("toolpaths_cog", { "toolpaths_cog.vs", "toolpaths_cog.fs" });
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview
     valid &= append_shader("gouraud_light", { prefix + "gouraud_light.vs", prefix + "gouraud_light.fs" });

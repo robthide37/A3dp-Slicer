@@ -347,11 +347,9 @@ namespace GUI {
     GLModel::Geometry diamond(unsigned int resolution);
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_SHOW_TOOLPATHS_COG
     // create a sphere with the given resolution and smooth normals
     // the origin of the sphere is in its center
     GLModel::Geometry smooth_sphere(unsigned int resolution, float radius);
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace GUI
