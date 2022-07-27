@@ -207,6 +207,14 @@ void GLGizmoMeasure::on_render()
                 shader->set_uniform("view_model_matrix", view_feature_matrix);
                 m_vbo_cylinder.set_color(ColorRGBA(0.8f, 0.2f, 0.2f, 1.f));
                 m_vbo_cylinder.render();
+                if (edge->get_point_of_interest()) {
+                    Vec3d pin = *edge->get_point_of_interest();
+                    view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(pin));
+                    view_feature_matrix.scale(0.5);
+                    shader->set_uniform("view_model_matrix", view_feature_matrix);
+                    m_vbo_sphere.set_color(ColorRGBA(0.8f, 0.2f, 0.2f, 1.f));
+                    m_vbo_sphere.render();
+                }
             }
             else if (feature->get_type() == Measure::SurfaceFeatureType::Plane) {
                 const auto* plane = static_cast<const Measure::Plane*>(feature);

@@ -192,10 +192,11 @@ void MeasuringImpl::update_planes()
 
 void MeasuringImpl::extract_features()
 {
-    
-
-    const double edge_threshold = 25. * (M_PI/180.);
+    auto N_to_angle = [](double N) -> double { return 2.*M_PI / N; };
+    constexpr double polygon_upper_threshold = N_to_angle(4.5);
+    constexpr double polygon_lower_threshold = N_to_angle(8.5);
     std::vector<double> angles;
+    std::vector<double> lengths;
 
 
     for (int i=0; i<m_planes.size(); ++i) {
@@ -214,23 +215,30 @@ void MeasuringImpl::extract_features()
 
             // First calculate angles at all the vertices.
             angles.clear();
+            lengths.clear();
             for (int i=0; i<int(border.size()); ++i) {
                 const Vec3d& v2 = (i == 0 ? border[0] - border[border.size()-1]
                                         : border[i] - border[i-1]);
                 const Vec3d& v1 = i == border.size()-1 ? border[0] - border.back()
                                                     : border[i+1] - border[i];
-                double angle = -atan2(normal.dot(v1.cross(v2)), v1.dot(v2));
-                if (angle < -M_PI/2.)
-                    angle += M_PI;
+                double angle = atan2(-normal.dot(v1.cross(v2)), -v1.dot(v2)) + M_PI;
+                if (angle > M_PI)
+                    angle = 2*M_PI - angle;
+
                 angles.push_back(angle);
+                lengths.push_back(v2.squaredNorm());
             }
             assert(border.size() == angles.size());
+            assert(border.size() == lengths.size());
 
 
             bool circle = false;
-            std::vector<std::pair<size_t, size_t>> circles;
+            std::vector<std::unique_ptr<SurfaceFeature>> circles;
+            std::vector<std::pair<size_t, size_t>> circles_idxs;
             for (int i=1; i<angles.size(); ++i) {
-                if (angles[i] < edge_threshold && Slic3r::is_approx(angles[i], angles[i-1]) && i != angles.size()-1 ) {
+                if (Slic3r::is_approx(lengths[i], lengths[i-1])
+                    && Slic3r::is_approx(angles[i], angles[i-1])
+                    && i != angles.size()-1 ) {
                     // circle
                     if (! circle) {
                         circle = true;
@@ -238,17 +246,48 @@ void MeasuringImpl::extract_features()
                     }
                 } else {
                     if (circle) {
-                        circles.emplace_back(start_idx, i);
+                        // Add the circle and remember indices into borders.
+                        const auto& [center, radius] = get_center_and_radius(border, start_idx, i, trafo);
+                        circles_idxs.emplace_back(start_idx, i);
+                        circles.emplace_back(std::unique_ptr<SurfaceFeature>(
+                            new Circle(center, radius, plane.normal)));
                         circle = false;
                     }
                 }
             }
 
+            // Some of the "circles" may actually be polygons. We want them detected as
+            // edges, but also to remember the center and save it into those edges.
+            // We will add all such edges manually and delete the detected circles,
+            // leaving it in circles_idxs so they are not picked again:
+            assert(circles.size() == circles_idxs.size());
+            for (int i=circles.size()-1; i>=0; --i) {
+                assert(circles_idxs[i].first + 1 < angles.size() - 1); // Check that this is internal point of the circle, not the first, not the last.
+                double angle = angles[circles_idxs[i].first + 1];
+                if (angle > polygon_lower_threshold) {
+                    if (angle < polygon_upper_threshold) {
+                        const Vec3d center = static_cast<const Circle*>(circles[i].get())->get_center();
+                        for (int j=circles_idxs[i].first + 1; j<=circles_idxs[i].second; ++j)
+                            plane.surface_features.emplace_back(std::unique_ptr<SurfaceFeature>(
+                                new Edge(border[j-1], border[j], center)));
+                    } else {
+                        // This will be handled just like a regular edge.
+                        circles_idxs.erase(circles_idxs.begin() + i);
+                    }
+                    circles.erase(circles.begin() + i);
+                }
+            }
+
+
+
+
+
+
             // We have the circles. Now go around again and pick edges.
             int cidx = 0; // index of next circle in the way
             for (int i=1; i<int(border.size()); ++i) {
-                if (cidx < circles.size() && i > circles[cidx].first)
-                    i = circles[cidx++].second;
+                if (cidx < circles_idxs.size() && i > circles_idxs[cidx].first)
+                    i = circles_idxs[cidx++].second;
                 else plane.surface_features.emplace_back(std::unique_ptr<SurfaceFeature>(
                         new Edge(border[i-1], border[i])));                
             }
@@ -258,13 +297,10 @@ void MeasuringImpl::extract_features()
 
             // FIXME Check and merge first and last circle if needed.
 
-            // Now create the circle-typed surface features.
-            for (const auto& [start_idx, end_idx] : circles) {
-                std::pair<Vec3d, double> center_and_radius = get_center_and_radius(border, start_idx, end_idx, trafo);
-                plane.surface_features.emplace_back(std::unique_ptr<SurfaceFeature>(
-                    new Circle(center_and_radius.first, center_and_radius.second, plane.normal)));
-            }
-
+            // Now move the circles into the feature list.
+            assert(std::all_of(circles.begin(), circles.end(), [](const std::unique_ptr<SurfaceFeature>& f) { return f->get_type() == SurfaceFeatureType::Circle; }));
+            plane.surface_features.insert(plane.surface_features.end(), std::make_move_iterator(circles.begin()),
+            std::make_move_iterator(circles.end()));
         }
 
         // The last surface feature is the plane itself.
