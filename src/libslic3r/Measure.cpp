@@ -262,7 +262,7 @@ void MeasuringImpl::extract_features()
             for (const auto& [start_idx, end_idx] : circles) {
                 std::pair<Vec3d, double> center_and_radius = get_center_and_radius(border, start_idx, end_idx, trafo);
                 plane.surface_features.emplace_back(std::unique_ptr<SurfaceFeature>(
-                    new Circle(center_and_radius.first, center_and_radius.second)));
+                    new Circle(center_and_radius.first, center_and_radius.second, plane.normal)));
             }
 
         }
@@ -381,6 +381,15 @@ double Measuring::get_distance(const SurfaceFeature* feature, const Vec3d* pt)
         const auto& [s,e] = edge->get_edge();
         Eigen::ParametrizedLine<double, 3> line(s, (e-s).normalized());
         return line.distance(*pt);
+    }
+    else if (feature->get_type() == SurfaceFeatureType::Circle) {
+        const Circle* circle = static_cast<const Circle*>(feature);
+        // Find a plane containing normal, center and the point.
+        const Vec3d& c = circle->get_center();
+        const Vec3d& n = circle->get_normal();
+        Eigen::Hyperplane<double, 3> circle_plane(n, c);
+        Vec3d proj = circle_plane.projection(*pt);
+        return std::sqrt( std::pow((proj - c).norm() - circle->get_radius(), 2.) + (*pt - proj).squaredNorm());
     }
 
     return std::numeric_limits<double>::max();

@@ -28,22 +28,28 @@ public:
 class Edge : public SurfaceFeature {
 public:
     Edge(const Vec3d& start, const Vec3d& end) : m_start{start}, m_end{end} {}
+    Edge(const Vec3d& start, const Vec3d& end, const Vec3d& pin) : m_start{start}, m_end{end},
+        m_pin{std::unique_ptr<Vec3d>(new Vec3d(pin))} {}
     SurfaceFeatureType      get_type() const override { return SurfaceFeatureType::Edge; }
     std::pair<Vec3d, Vec3d> get_edge() const { return std::make_pair(m_start, m_end); }
 private:
     Vec3d m_start;
     Vec3d m_end;
+    std::unique_ptr<Vec3d> m_pin;
 };
 
 class Circle : public SurfaceFeature {
 public:
-    Circle(const Vec3d& center, double radius) : m_center{center}, m_radius{radius} {}
+    Circle(const Vec3d& center, double radius, const Vec3d& normal)
+    : m_center{center}, m_radius{radius}, m_normal{normal} {}
     SurfaceFeatureType   get_type()   const override { return SurfaceFeatureType::Circle; }
     Vec3d  get_center() const { return m_center; }
     double get_radius() const { return m_radius; }
+    Vec3d  get_normal() const { return m_normal; }
 private:
     Vec3d m_center;
     double m_radius;
+    Vec3d m_normal;
 };
 
 class Plane : public SurfaceFeature {

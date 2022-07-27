@@ -174,12 +174,28 @@ void GLGizmoMeasure::on_render()
 
             if (feature->get_type() == Measure::SurfaceFeatureType::Circle) {
                 const auto* circle = static_cast<const Measure::Circle*>(feature);
-                Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(circle->get_center()));
-                view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(circle->get_center()));
+                const Vec3d& c = circle->get_center();
+                const Vec3d& n = circle->get_normal();
+                Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(c));
                 view_feature_matrix.scale(0.5);
                 shader->set_uniform("view_model_matrix", view_feature_matrix);
-                m_vbo_sphere.set_color(ColorRGBA(0.f, 1.f, 0.f, 1.f));
+                m_vbo_sphere.set_color(ColorRGBA(0.8f, 0.2f, 0.2f, 1.f));
                 m_vbo_sphere.render();
+
+                // Now draw the circle itself - let's take a funny shortcut:
+                Vec3d rad = n.cross(Vec3d::UnitX());
+                if (rad.squaredNorm() < 0.1)
+                    rad = n.cross(Vec3d::UnitY());
+                rad *= circle->get_radius() * rad.norm();
+                const int N = 20;
+                for (int i=0; i<N; ++i) {
+                    rad = Eigen::AngleAxisd(6.28/N, n) * rad;
+                    view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(c));
+                    view_feature_matrix = view_feature_matrix * Transform3d(Eigen::Translation3d(rad));
+                    view_feature_matrix.scale(N/100.);
+                    shader->set_uniform("view_model_matrix", view_feature_matrix);
+                    m_vbo_sphere.render();
+                }
             }
             else if (feature->get_type() == Measure::SurfaceFeatureType::Edge) {
                 const auto* edge = static_cast<const Measure::Edge*>(feature);
