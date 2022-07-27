@@ -6,6 +6,7 @@
 #include "libslic3r/Utils.hpp"
 
 #include <boost/filesystem.hpp>
+#include <boost/dll/runtime_symbol_info.hpp>
 
 #include <string>
 #include <functional>
@@ -27,7 +28,7 @@ LoadStepFn get_load_step_fn()
     constexpr const char* fn_name = "load_step_internal";
 
     if (!load_step_fn) {
-        auto libpath = boost::filesystem::path(resources_dir()) / "plugins";
+        auto libpath = boost::dll::program_location().parent_path();
 #ifdef _WIN32
         libpath /= "OCCTWrapper.dll";
         HMODULE module = LoadLibraryW(libpath.wstring().c_str());

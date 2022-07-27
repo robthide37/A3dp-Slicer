@@ -5,8 +5,8 @@ add_library(OCCTWrapper MODULE OCCTWrapper.cpp)
 
 set_target_properties(OCCTWrapper
     PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY "${SLIC3R_RESOURCES_DIR}/plugins"
-    RUNTIME_OUTPUT_DIRECTORY "${SLIC3R_RESOURCES_DIR}/plugins"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/src"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/src"
     PREFIX ""
 )
 
@@ -48,4 +48,6 @@ set(OCCT_LIBS
 target_include_directories(OCCTWrapper PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(OCCTWrapper PUBLIC ${OpenCASCADE_INCLUDE_DIR})
 target_link_libraries(OCCTWrapper ${OCCT_LIBS})
+
+install(TARGETS OCCTWrapper DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
