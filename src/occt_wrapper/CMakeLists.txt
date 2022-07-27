@@ -49,5 +49,7 @@ target_include_directories(OCCTWrapper PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(OCCTWrapper PUBLIC ${OpenCASCADE_INCLUDE_DIR})
 target_link_libraries(OCCTWrapper ${OCCT_LIBS})
 
+include(GNUInstallDirs)
+
 install(TARGETS OCCTWrapper DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
