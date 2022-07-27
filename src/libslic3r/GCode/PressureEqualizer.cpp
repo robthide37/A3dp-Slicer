@@ -520,6 +520,11 @@ void PressureEqualizer::adjust_volumetric_rate()
         for (; !m_gcode_lines[idx_prev].extruding() && idx_prev != fist_line_idx; --idx_prev);
         if (!m_gcode_lines[idx_prev].extruding())
             break;
+        // Don't decelerate before ironing.
+        if (m_gcode_lines[line_idx].extrusion_role == erIroning) {
+            line_idx = idx_prev;
+            continue;
+        }
         // Volumetric extrusion rate at the start of the succeding segment.
         float rate_succ = m_gcode_lines[line_idx].volumetric_extrusion_rate_start;
         // What is the gradient of the extrusion rate between idx_prev and idx?
@@ -559,7 +564,9 @@ void PressureEqualizer::adjust_volumetric_rate()
                 }
             }
 //            feedrate_per_extrusion_role[iRole] = (iRole == line.extrusion_role) ? line.volumetric_extrusion_rate_start : rate_start;
-            feedrate_per_extrusion_role[iRole] = line.volumetric_extrusion_rate_start;
+            // Don't store feed rate for ironing.
+            if (line.extrusion_role != erIroning)
+                feedrate_per_extrusion_role[iRole] = line.volumetric_extrusion_rate_start;
         }
     }
 
@@ -572,6 +579,11 @@ void PressureEqualizer::adjust_volumetric_rate()
         for (; !m_gcode_lines[idx_next].extruding() && idx_next != last_line_idx; ++idx_next);
         if (!m_gcode_lines[idx_next].extruding())
             break;
+        // Don't accelerate after ironing.
+        if (m_gcode_lines[line_idx].extrusion_role == erIroning) {
+            line_idx = idx_next;
+            continue;
+        }
         float rate_prec = m_gcode_lines[line_idx].volumetric_extrusion_rate_end;
         // What is the gradient of the extrusion rate between idx_prev and idx?
         line_idx = idx_next;
@@ -608,7 +620,9 @@ void PressureEqualizer::adjust_volumetric_rate()
                 }
             }
 //            feedrate_per_extrusion_role[iRole] = (iRole == line.extrusion_role) ? line.volumetric_extrusion_rate_end : rate_end;
-            feedrate_per_extrusion_role[iRole] = line.volumetric_extrusion_rate_end;
+            // Don't store feed rate for ironing.
+            if (line.extrusion_role != erIroning)
+                feedrate_per_extrusion_role[iRole] = line.volumetric_extrusion_rate_end;
         }
     }
 }
