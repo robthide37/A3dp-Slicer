@@ -3,6 +3,9 @@
 
 #include "libslic3r/Model.hpp"
 #include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/Utils.hpp"
+
+#include <boost/filesystem.hpp>
 
 #include <string>
 #include <functional>
@@ -24,8 +27,10 @@ LoadStepFn get_load_step_fn()
     constexpr const char* fn_name = "load_step_internal";
 
     if (!load_step_fn) {
+        auto libpath = boost::filesystem::path(resources_dir()) / "plugins";
 #ifdef _WIN32
-        HMODULE module = LoadLibraryW(L"OCCTWrapper.dll");
+        libpath /= "OCCTWrapper.dll";
+        HMODULE module = LoadLibraryW(libpath.wstring().c_str());
         if (module == NULL)
             throw Slic3r::RuntimeError("Cannot load OCCTWrapper.dll");
 
@@ -42,18 +47,17 @@ LoadStepFn get_load_step_fn()
             throw;
         }
 #else
-        void *plugin_ptr = dlopen("OCCTWrapper.so", RTLD_NOW | RTLD_GLOBAL);
+        libpath /= "OCCTWrapper.so";
+        void *plugin_ptr = dlopen(libpath.c_str(), RTLD_NOW | RTLD_GLOBAL);
 
         if (plugin_ptr) {
-            load_step_fn = reinterpret_cast<LoadStepFn>(dlsym(plugin_ptr, "load_step_internal"));
+            load_step_fn = reinterpret_cast<LoadStepFn>(dlsym(plugin_ptr, fn_name));
             if (!load_step_fn) {
                 dlclose(plugin_ptr);
-                throw Slic3r::RuntimeError("Cannot load function from OCCTWrapper.so");
+                BOOST_LOG_TRIVIAL(error) << dlerror();
             }
         } else {
-            throw Slic3r::RuntimeError(
-                std::string("Cannot load function from OCCTWrapper.dll: ") +
-                fn_name + "\n\nError code: " + dlerror());
+            BOOST_LOG_TRIVIAL(error) << dlerror();
         }
 #endif
     }

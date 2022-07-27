@@ -17,7 +17,10 @@ add_subdirectory(hints)
 add_subdirectory(qoi)
 add_subdirectory(libnest2d)
 add_subdirectory(libslic3r)
-add_subdirectory(occt_wrapper)
+
+if (SLIC3R_ENABLE_FORMAT_STEP)
+    add_subdirectory(occt_wrapper)
+endif ()
 
 if (SLIC3R_GUI)
     add_subdirectory(imgui)
