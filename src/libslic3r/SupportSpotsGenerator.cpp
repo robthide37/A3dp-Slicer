@@ -313,7 +313,7 @@ float get_flow_width(const LayerRegion *region, ExtrusionRole role) {
     }
 }
 
-// Accumulator of current extruion path properties
+// Accumulator of current extrusion path properties
 // It remembers unsuported distance and maximum accumulated curvature over that distance.
 // Used to determine local stability issues (too long bridges, extrusion curves into air)
 struct ExtrusionPropertiesAccumulator {
@@ -417,7 +417,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
             if (dist_from_prev_layer > flow_width * 0.3) {
                 malformation_acc.add_distance(current_line.len);
-                current_line.malformation += 0.15f
+                current_line.malformation += 0.3f * layer_region->layer()->height
                         * (0.8f + 0.2f * malformation_acc.max_curvature / (1.0f + 0.5f * malformation_acc.distance));
             } else {
                 malformation_acc.reset();
@@ -704,10 +704,6 @@ public:
 
         float movement_force = params.max_acceleration * mass;
 
-        Vec3f extruder_pressure_direction = to_3d(line_dir, 0.0f);
-        extruder_pressure_direction.z() = -extruded_line.malformation * 0.5f;
-        extruder_pressure_direction.normalize();
-        Vec3d endpoint = (to_3d(extruded_line.b, layer_z)).cast<double>();
         float extruder_conflict_force = params.standard_extruder_conflict_force +
                 std::min(extruded_line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
 
@@ -731,9 +727,7 @@ public:
             float bed_movement_arm = std::max(0.0f, mass_centroid.z() - bed_centroid.z());
             float bed_movement_torque = movement_force * bed_movement_arm;
 
-            float bed_conflict_torque_arm = line_alg::distance_to(
-                    Linef3(endpoint, endpoint + extruder_pressure_direction.cast<double>()),
-                    bed_centroid.cast<double>());
+            float bed_conflict_torque_arm = layer_z - bed_centroid.z();
             float bed_extruder_conflict_torque = extruder_conflict_force * bed_conflict_torque_arm;
 
             float bed_total_torque = bed_movement_torque + bed_extruder_conflict_torque + bed_weight_torque
@@ -783,9 +777,7 @@ public:
             float conn_movement_arm = std::max(0.0f, mass_centroid.z() - conn_centroid.z());
             float conn_movement_torque = movement_force * conn_movement_arm;
 
-            float conn_conflict_torque_arm = line_alg::distance_to(
-                    Linef3(endpoint, endpoint + extruder_pressure_direction.cast<double>()),
-                    conn_centroid.cast<double>());
+            float conn_conflict_torque_arm = layer_z - conn_centroid.z();
             float conn_extruder_conflict_torque = extruder_conflict_force * conn_conflict_torque_arm;
 
             float conn_total_torque = conn_movement_torque + conn_extruder_conflict_torque + conn_weight_torque
@@ -817,6 +809,7 @@ public:
     }
 };
 
+#ifdef DETAILED_DEBUG_LOGS
 void debug_print_graph(const std::vector<LayerIslands> &islands_graph) {
     std::cout << "BUILT ISLANDS GRAPH:" << std::endl;
     for (size_t layer_idx = 0; layer_idx < islands_graph.size(); ++layer_idx) {
@@ -832,8 +825,8 @@ void debug_print_graph(const std::vector<LayerIslands> &islands_graph) {
         }
     }
     std::cout << "END OF GRAPH" << std::endl;
-
 }
+#endif
 
 class ActiveObjectParts {
     size_t next_part_idx = 0;
@@ -876,7 +869,10 @@ public:
 
 Issues check_global_stability(SupportGridFilter supports_presence_grid,
         const std::vector<LayerIslands> &islands_graph, const Params &params) {
+#ifdef DETAILED_DEBUG_LOGS
     debug_print_graph(islands_graph);
+#endif
+
     Issues issues { };
     ActiveObjectParts active_object_parts { };
     std::unordered_map<size_t, size_t> prev_island_to_object_part_mapping;
@@ -887,11 +883,13 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
 
     for (size_t layer_idx = 0; layer_idx < islands_graph.size(); ++layer_idx) {
         float layer_z = islands_graph[layer_idx].layer_z;
-        std::cout << "at layer: " << layer_idx << "  the following island to object mapping is used:" << std::endl;
+
+#ifdef DETAILED_DEBUG_LOGS
         for (const auto &m : prev_island_to_object_part_mapping) {
             std::cout << "island " << m.first << " maps to part " << m.second << std::endl;
             prev_island_weakest_connection[m.first].print_info("connection info:");
         }
+#endif
 
         for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
             const Island &island = islands_graph[layer_idx].islands[island_idx];
@@ -917,24 +915,25 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                     final_part_id = *parts_ids.begin();
                     for (size_t part_id : parts_ids) {
                         if (final_part_id != part_id) {
-                            std::cout << "at layer: " << layer_idx << "  merging object part: " << part_id
-                                    << " into final part: " << final_part_id << std::endl;
                             active_object_parts.merge(part_id, final_part_id);
                         }
                     }
                 }
-                auto estimate_strength = [layer_z](const IslandConnection &conn) {
+                auto estimate_conn_strength = [layer_z](const IslandConnection &conn) {
                     Vec3f centroid = conn.centroid_accumulator / conn.area;
-                    float min_variance = (conn.second_moment_of_area_accumulator / conn.area
-                            - centroid.head<2>().cwiseProduct(centroid.head<2>())).minCoeff();
+                    Vec2f variance = (conn.second_moment_of_area_accumulator / conn.area
+                            - centroid.head<2>().cwiseProduct(centroid.head<2>()));
+                    float xy_variance = variance.x() + variance.y();
                     float arm_len_estimate = std::max(1.1f, layer_z - (conn.centroid_accumulator.z() / conn.area));
-                    return min_variance / arm_len_estimate;
+                    return conn.area * sqrt(xy_variance) / arm_len_estimate;
                 };
 
+#ifdef DETAILED_DEBUG_LOGS
                 new_weakest_connection.print_info("new_weakest_connection");
                 transfered_weakest_connection.print_info("transfered_weakest_connection");
+#endif
 
-                if (estimate_strength(transfered_weakest_connection) < estimate_strength(new_weakest_connection)) {
+                if (estimate_conn_strength(transfered_weakest_connection) < estimate_conn_strength(new_weakest_connection)) {
                     new_weakest_connection = transfered_weakest_connection;
                 }
                 next_island_weakest_connection.emplace(island_idx, new_weakest_connection);
@@ -957,8 +956,9 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
             const Island &island = islands_graph[layer_idx].islands[island_idx];
             ObjectPart &part = active_object_parts.access(prev_island_to_object_part_mapping[island_idx]);
             IslandConnection &weakest_conn = prev_island_weakest_connection[island_idx];
+#ifdef DETAILED_DEBUG_LOGS
             weakest_conn.print_info("weakest connection info: ");
-
+#endif
             std::vector<ExtrusionLine> dummy { };
             LinesDistancer island_lines_dist(dummy);
             float unchecked_dist = params.min_distance_between_support_points + 1.0f;

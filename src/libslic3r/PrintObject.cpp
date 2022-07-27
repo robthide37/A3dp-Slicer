@@ -422,7 +422,7 @@ void PrintObject::generate_support_spots()
             SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this);
             auto obj_transform = this->trafo_centered();
             for (ModelVolume *model_volume : this->model_object()->volumes) {
-                if (model_volume->type() == ModelVolumeType::MODEL_PART) {
+                if (model_volume->is_model_part()) {
                     Transform3d model_transformation = model_volume->get_matrix();
                     Transform3f inv_transform = (obj_transform * model_transformation).inverse().cast<float>();
                     TriangleSelectorWrapper selector { model_volume->mesh() };
@@ -439,7 +439,7 @@ void PrintObject::generate_support_spots()
                     indexed_triangle_set copy = model_volume->mesh().its;
                     its_transform(copy, obj_transform * model_transformation);
                     its_write_obj(copy,
-                            debug_out_path("model.obj").c_str());
+                            debug_out_path(("model"+std::to_string(model_volume->id().id)+".obj").c_str()).c_str());
 #endif
                 }
             }
