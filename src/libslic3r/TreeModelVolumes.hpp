@@ -372,8 +372,6 @@ private:
         calculateCollisionHolefree(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) });
     }
 
-    static Polygons safeOffset(const Polygons& me, coord_t distance, ClipperLib::JoinType jt, coord_t max_safe_step_distance, const Polygons& collision);
-
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model.
      *
@@ -583,6 +581,8 @@ private:
 
     std::unique_ptr<std::mutex> m_critical_progress { std::make_unique<std::mutex>() };
 };
+
+static Polygons safeOffset(const Polygons& me, coord_t distance, ClipperLib::JoinType jt, coord_t max_safe_step_distance, const Polygons& collision);
 
 }
 

@@ -7,6 +7,7 @@
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "TreeSupport.hpp"
+#include "BuildVolume.hpp"
 #include "ClipperUtils.hpp"
 #include "Fill/Fill.hpp"
 #include "Layer.hpp"
@@ -33,7 +34,7 @@ namespace Slic3r
 
 static constexpr const auto tiny_area_threshold = sqr(scaled<double>(0.001));
 
-static [[nodiscard]] std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_t>>> group_meshes(const Print &print, std::vector<size_t> &print_object_ids)
+static [[nodiscard]] std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_t>>> group_meshes(const Print &print, const std::vector<size_t> &print_object_ids)
 {
     std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_t>>> grouped_meshes;
 
@@ -162,7 +163,19 @@ LayerIndex precalculate(const Print &print, const TreeSupport::TreeSupportSettin
     return max_layer;
 }
 
-void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_volume, std::vector<size_t> &print_object_ids)
+//FIXME this is an ugly wrapper interface for a single print object and a phony build volume.
+void TreeSupport::generateSupportAreas(PrintObject& print_object)
+{
+    size_t idx = 0;
+    for (PrintObject *po : print_object.print()->objects()) {
+        if (po == &print_object)
+            break;
+        ++ idx;
+    }
+    this->generateSupportAreas(*print_object.print(), BuildVolume(Pointfs{ Vec2d{ -1000., -1000. }, Vec2d{ -1000., +1000. }, Vec2d{ +1000., +1000. }, Vec2d{ +1000., -1000. } }, 0.), { idx });
+}
+
+void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_volume, const std::vector<size_t> &print_object_ids)
 {
     std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_t>>> grouped_meshes = group_meshes(print, print_object_ids);
     if (grouped_meshes.empty())
@@ -198,7 +211,8 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
         m_progress_multiplier = 1.0 / double(m_grouped_meshes.size());
         m_progress_offset = counter == 0 ? 0 : TREE_PROGRESS_TOTAL * (double(counter) * m_progress_multiplier);
 #endif // SLIC3R_TREESUPPORT_PROGRESS
-        m_volumes = TreeModelVolumes(*print.get_object(processing.second.front()), build_volume, m_config.maximum_move_distance, m_config.maximum_move_distance_slow, processing.second.front(), m_progress_multiplier, m_progress_offset, {} /* exclude */);
+        PrintObject &print_object = *print.get_object(processing.second.front());
+        m_volumes = TreeModelVolumes(print_object, build_volume, m_config.maximum_move_distance, m_config.maximum_move_distance_slow, processing.second.front(), m_progress_multiplier, m_progress_offset, /* additional_excluded_areas */{});
 
         // ### Precalculate avoidances, collision etc.
         size_t num_support_layers = precalculate(print, processing.first, processing.second, m_volumes);
@@ -208,8 +222,13 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
         std::vector<std::set<SupportElement*>> move_bounds(num_support_layers);
 
         // ### Place tips of the support tree
+        SupportGeneratorLayersPtr    bottom_contacts(num_support_layers, nullptr);
+        SupportGeneratorLayersPtr    top_contacts(num_support_layers, nullptr);
+        SupportGeneratorLayersPtr    top_interface_layers(num_support_layers, nullptr);
+        SupportGeneratorLayersPtr    intermediate_layers(num_support_layers, nullptr);
+        SupportGeneratorLayerStorage layer_storage;
         for (size_t mesh_idx : processing.second)
-            generateInitialAreas(*print.get_object(mesh_idx), move_bounds);
+            generateInitialAreas(*print.get_object(mesh_idx), move_bounds, top_contacts, top_interface_layers, layer_storage);
         auto t_gen = std::chrono::high_resolution_clock::now();
 
         // ### Propagate the influence areas downwards.
@@ -221,7 +240,8 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
         auto t_place = std::chrono::high_resolution_clock::now();
 
         // ### draw these points as circles
-        drawAreas(*print.get_object(processing.second.front()), move_bounds);
+        drawAreas(*print.get_object(processing.second.front()), move_bounds, 
+            bottom_contacts, top_contacts, intermediate_layers, layer_storage);
 
         auto t_draw = std::chrono::high_resolution_clock::now();
         auto dur_pre_gen = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_precalc - t_start).count();
@@ -246,6 +266,12 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
                 delete elem;
             }
         }
+
+        // Produce the support G-code.
+        // Used by both classic and tree supports.
+        SupportGeneratorLayersPtr raft_layers, interface_layers, base_interface_layers;
+        generate_support_toolpaths(print_object.support_layers(), print_object.config(), SupportParameters(print_object), print_object.slicing_parameters(), 
+            raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
 
         ++ counter;
     }
@@ -759,7 +785,22 @@ static [[nodiscard]] Polygons safeOffsetInc(const Polygons& me, coord_t distance
     return union_(ret);
 }
 
-void TreeSupport::generateInitialAreas(const PrintObject &print_object, std::vector<std::set<SupportElement*>> &move_bounds)
+// Using the std::deque as an allocator.
+inline SupportGeneratorLayer& layer_allocate(
+    std::deque<SupportGeneratorLayer>& layer_storage,
+    SupporLayerType                    layer_type)
+{
+    layer_storage.push_back(SupportGeneratorLayer());
+    layer_storage.back().layer_type = layer_type;
+    return layer_storage.back();
+}
+
+void TreeSupport::generateInitialAreas(
+    const PrintObject                       &print_object,
+    std::vector<std::set<SupportElement*>>  &move_bounds,
+    SupportGeneratorLayersPtr               &top_contacts,
+    SupportGeneratorLayersPtr               &top_interface_layers,
+    SupportGeneratorLayerStorage            &layer_storage)
 {
     Polygon base_circle;
     const int base_radius = 10;
@@ -790,12 +831,12 @@ void TreeSupport::generateInitialAreas(const PrintObject &print_object, std::vec
 
     //FIXME 
     size_t num_support_layers = print_object.layer_count();
-    std::vector<std::unordered_set<Point>> already_inserted(num_support_layers - z_distance_delta);
+    std::vector<std::unordered_set<Point, PointHash>> already_inserted(num_support_layers - z_distance_delta);
 
     std::mutex critical_sections;
     tbb::parallel_for(tbb::blocked_range<size_t>(1, num_support_layers - z_distance_delta),
         [this, &print_object, &mesh_config, &mesh_group_settings, &support_params, z_distance_delta, xy_overrides_z, force_tip_to_roof, roof_enabled, support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length, max_overhang_insert_lag,
-         &base_circle, &critical_sections, &already_inserted,
+         &base_circle, &critical_sections, &top_contacts, &layer_storage, &already_inserted,
          &move_bounds, &base_radius](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
             if (! layer_has_overhangs(*print_object.get_layer(layer_idx + z_distance_delta)))
@@ -883,8 +924,10 @@ void TreeSupport::generateInitialAreas(const PrintObject &print_object, std::vec
                     added_roofs = union_(added_roofs);
                     {
                         std::lock_guard<std::mutex> critical_section_storage(critical_sections);
-//FIXME store top support interface areas or maybe hatch them?
-//                        append(storage.support.supportLayers[insert_layer_idx - dtt_roof_tip].support_roof, added_roofs);
+                        SupportGeneratorLayer *&l = top_contacts[insert_layer_idx - dtt_roof_tip];
+                        if (l == nullptr)
+                            l = &layer_allocate(layer_storage, SupporLayerType::TopContact);
+                        append(l->polygons, std::move(added_roofs));
                     }
                 }
 
@@ -1023,9 +1066,13 @@ void TreeSupport::generateInitialAreas(const PrintObject &print_object, std::vec
 
                 {
                     std::lock_guard<std::mutex> critical_section_storage(critical_sections);
-//FIXME store support areas or hatch the lines?
-//                    for (size_t idx = 0; idx < dtt_roof; idx++)
-//                        append(storage.support.supportLayers[layer_idx - idx].support_roof, added_roofs[idx]); // will be unioned in finalizeInterfaceAndSupportAreas
+                    for (size_t idx = 0; idx < dtt_roof; idx++) {
+                        SupportGeneratorLayer *&l = top_contacts[layer_idx - idx];
+                        if (l == nullptr)
+                            l = &layer_allocate(layer_storage, SupporLayerType::TopContact);
+                        // will be unioned in finalizeInterfaceAndSupportAreas
+                        append(l->polygons, std::move(added_roofs[idx]));
+                    }
                 }
 
                 if (overhang_lines.empty()) {
@@ -1054,8 +1101,10 @@ void TreeSupport::generateInitialAreas(const PrintObject &print_object, std::vec
 
                 if (int(dtt_roof) >= layer_idx && roof_allowed_for_this_part) { // reached buildplate                
                     std::lock_guard<std::mutex> critical_section_storage(critical_sections);
-//FIXME store support roofs
-//                    append(storage.support.supportLayers[0].support_roof, overhang_outset);
+                    SupportGeneratorLayer*& l = top_contacts[0];
+                    if (l == nullptr)
+                        l = &layer_allocate(layer_storage, SupporLayerType::TopContact);
+                    append(l->polygons, std::move(overhang_outset));
                 } else // normal trees have to be generated
                     addLinesAsInfluenceAreas(overhang_lines, force_tip_to_roof ? support_roof_layers - dtt_roof : 0, layer_idx - dtt_roof, dtt_roof > 0, roof_enabled ? support_roof_layers - dtt_roof : 0);
             }
@@ -1107,7 +1156,7 @@ static unsigned int moveInside(const Polygons &polygons, Point &from, int distan
                             ret = x;
                         else {
                             Vec2d  abd   = ab.cast<double>();
-                            Vec2d  p1p2  = p1 - p0;
+                            Vec2d  p1p2  = (p1 - p0).cast<double>();
                             double lab   = abd.norm();
                             double lp1p2 = p1p2.norm();
                             // inward direction irrespective of sign of [distance]
@@ -1661,7 +1710,7 @@ void TreeSupport::increaseAreas(std::unordered_map<SupportElement, Polygons>& to
                 for (AreaIncreaseSettings settings : order)
                 {
                     new_order.emplace_back(settings);
-                    new_order.emplace_back(settings.type, settings.increase_speed, settings.increase_radius, settings.no_error, use_min_radius, settings.move);
+                    new_order.push_back({ settings.type, settings.increase_speed, settings.increase_radius, settings.no_error, use_min_radius, settings.move });
                 }
                 order = new_order;
             }
@@ -2260,7 +2309,15 @@ void TreeSupport::dropNonGraciousAreas(
     });
 }
 
-void TreeSupport::finalizeInterfaceAndSupportAreas(const PrintObject &print_object, std::vector<Polygons>& support_layer_storage, std::vector<Polygons>& support_roof_storage)
+void TreeSupport::finalizeInterfaceAndSupportAreas(
+    const PrintObject               &print_object,
+    std::vector<Polygons>           &support_layer_storage,
+    std::vector<Polygons>           &support_roof_storage,
+
+    SupportGeneratorLayersPtr   	&bottom_contacts,
+    SupportGeneratorLayersPtr   	&top_contacts,
+    SupportGeneratorLayersPtr       &intermediate_layers,
+    SupportGeneratorLayerStorage    &layer_storage)
 {
     InterfacePreference interface_pref = m_config.interface_preference; // InterfacePreference::SUPPORT_LINES_OVERWRITE_INTERFACE;
 
@@ -2278,46 +2335,57 @@ void TreeSupport::finalizeInterfaceAndSupportAreas(const PrintObject &print_obje
             // simplify a bit, to ensure the output does not contain outrageous amounts of vertices. Should not be necessary, just a precaution.
             support_layer_storage[layer_idx] = polygons_simplify(support_layer_storage[layer_idx], std::min(scaled<double>(0.03), double(m_config.resolution)));
             // Subtract support lines of the branches from the roof
-            storage.support.supportLayers[layer_idx].support_roof = union_(storage.support.supportLayers[layer_idx].support_roof, support_roof_storage[layer_idx]);
-            if (!storage.support.supportLayers[layer_idx].support_roof.empty() && 
-                area(intersection(support_layer_storage[layer_idx], storage.support.supportLayers[layer_idx].support_roof)) > tiny_area_threshold) {
-                switch (interface_pref) {
-                    case InterfacePreference::INTERFACE_AREA_OVERWRITES_SUPPORT:
-                        support_layer_storage[layer_idx] = diff(support_layer_storage[layer_idx], storage.support.supportLayers[layer_idx].support_roof);
-                        break;
-                    case InterfacePreference::SUPPORT_AREA_OVERWRITES_INTERFACE:
-                        storage.support.supportLayers[layer_idx].support_roof = diff(storage.support.supportLayers[layer_idx].support_roof, support_layer_storage[layer_idx]);
-                        break;
-//FIXME
-#if 0
-                    case InterfacePreference::INTERFACE_LINES_OVERWRITE_SUPPORT:
-                    {
-                        // Hatch the support roof interfaces, offset them by their line width and subtract them from support base.
-                        Polygons interface_lines = offset(to_polylines(
-                            generateSupportInfillLines(storage.support.supportLayers[layer_idx].support_roof, true, layer_idx, m_config.support_roof_line_distance)),
-                            m_config.support_roof_line_width / 2);
-                        support_layer_storage[layer_idx] = diff(support_layer_storage[layer_idx], interface_lines);
-                        break;
+            SupportGeneratorLayer*& support_roof = top_contacts[layer_idx];
+            if (! support_roof_storage[layer_idx].empty() || support_roof != nullptr) {
+                if (support_roof == nullptr) {
+                    support_roof = &layer_allocate(layer_storage, SupporLayerType::TopContact);
+                    support_roof->polygons = union_(support_roof_storage[layer_idx]);
+                } else
+                    support_roof->polygons = union_(support_roof->polygons, support_roof_storage[layer_idx]);
+
+                if (! support_roof->polygons.empty() &&
+                    area(intersection(support_layer_storage[layer_idx], support_roof->polygons)) > tiny_area_threshold) {
+                    switch (interface_pref) {
+                        case InterfacePreference::INTERFACE_AREA_OVERWRITES_SUPPORT:
+                            support_layer_storage[layer_idx] = diff(support_layer_storage[layer_idx], support_roof->polygons);
+                            break;
+                        case InterfacePreference::SUPPORT_AREA_OVERWRITES_INTERFACE:
+                            support_roof->polygons = diff(support_roof->polygons, support_layer_storage[layer_idx]);
+                            break;
+    //FIXME
+    #if 0
+                        case InterfacePreference::INTERFACE_LINES_OVERWRITE_SUPPORT:
+                        {
+                            // Hatch the support roof interfaces, offset them by their line width and subtract them from support base.
+                            Polygons interface_lines = offset(to_polylines(
+                                generateSupportInfillLines(support_roof->polygons, true, layer_idx, m_config.support_roof_line_distance)),
+                                m_config.support_roof_line_width / 2);
+                            support_layer_storage[layer_idx] = diff(support_layer_storage[layer_idx], interface_lines);
+                            break;
+                        }
+                        case InterfacePreference::SUPPORT_LINES_OVERWRITE_INTERFACE:
+                        {
+                            // Hatch the support roof interfaces, offset them by their line width and subtract them from support base.
+                            Polygons tree_lines = union_(offset(to_polylines(
+                                generateSupportInfillLines(support_layer_storage[layer_idx], false, layer_idx, m_config.support_line_distance, true)),
+                                m_config.support_line_width / 2));
+                            // do not draw roof where the tree is. I prefer it this way as otherwise the roof may cut of a branch from its support below.
+                            support_roof->polygons = diff(support_roof->polygons, tree_lines);
+                            break;
+                        }
+    #endif
+                        case InterfacePreference::NOTHING:
+                            break;
                     }
-                    case InterfacePreference::SUPPORT_LINES_OVERWRITE_INTERFACE:
-                    {
-                        // Hatch the support roof interfaces, offset them by their line width and subtract them from support base.
-                        Polygons tree_lines = union_(offset(to_polylines(
-                            generateSupportInfillLines(support_layer_storage[layer_idx], false, layer_idx, m_config.support_line_distance, true)),
-                            m_config.support_line_width / 2));
-                        // do not draw roof where the tree is. I prefer it this way as otherwise the roof may cut of a branch from its support below.
-                        storage.support.supportLayers[layer_idx].support_roof = diff(storage.support.supportLayers[layer_idx].support_roof, tree_lines);
-                        break;
-                    }
-#endif
-                    case InterfacePreference::NOTHING:
-                        break;
                 }
             }
 
             // Subtract support floors from the support area and add them to the support floor instead.
             if (m_config.support_bottom_layers > 0 && !support_layer_storage[layer_idx].empty()) {
-                Polygons floor_layer = storage.support.supportLayers[layer_idx].support_bottom;
+                SupportGeneratorLayer*& support_bottom = bottom_contacts[layer_idx];
+                if (support_bottom == nullptr)
+                    support_bottom = &layer_allocate(layer_storage, SupporLayerType::BottomContact);
+                Polygons floor_layer = std::move(support_bottom->polygons);
                 Polygons layer_outset = diff(offset(support_layer_storage[layer_idx], m_config.support_bottom_offset), m_volumes.getCollision(0, layer_idx, false));
                 size_t layers_below = 0;
                 while (layers_below <= m_config.support_bottom_layers) {
@@ -2330,13 +2398,16 @@ void TreeSupport::finalizeInterfaceAndSupportAreas(const PrintObject &print_obje
                     else
                         break;
                 }
-                floor_layer = union_(floor_layer);
-                storage.support.supportLayers[layer_idx].support_bottom = union_(storage.support.supportLayers[layer_idx].support_bottom, floor_layer);
-                support_layer_storage[layer_idx] = diff(support_layer_storage[layer_idx], offset(floor_layer, scaled<float>(0.01))); // Subtract the support floor from the normal support.
+                support_bottom->polygons = union_(floor_layer);
+                support_layer_storage[layer_idx] = diff(support_layer_storage[layer_idx], offset(support_bottom->polygons, scaled<float>(0.01))); // Subtract the support floor from the normal support.
             }
 
-            for (const ExPolygon &part : union_ex(support_layer_storage[layer_idx])) // Convert every part into a PolygonsPart for the support.
-                storage.support.supportLayers[layer_idx].support_infill_parts.emplace_back(part, m_config.support_line_width, m_config.support_wall_count);
+            {
+                SupportGeneratorLayer *&l = intermediate_layers[layer_idx];
+                if (l == nullptr)
+                    l = &layer_allocate(layer_storage, SupporLayerType::Base);
+                append(l->polygons, union_(support_layer_storage[layer_idx]));
+            }
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
             {
@@ -2356,7 +2427,14 @@ void TreeSupport::finalizeInterfaceAndSupportAreas(const PrintObject &print_obje
     });
 }
 
-void TreeSupport::drawAreas(PrintObject &print_object, std::vector<std::set<SupportElement*>> &move_bounds)
+void TreeSupport::drawAreas(
+    PrintObject                             &print_object, 
+    std::vector<std::set<SupportElement*>>  &move_bounds,
+
+    SupportGeneratorLayersPtr            	&bottom_contacts,
+    SupportGeneratorLayersPtr   	        &top_contacts,
+    SupportGeneratorLayersPtr               &intermediate_layers,
+    SupportGeneratorLayerStorage            &layer_storage)
 {
     std::vector<Polygons> support_layer_storage(move_bounds.size());
     std::vector<Polygons> support_roof_storage(move_bounds.size());
@@ -2396,7 +2474,8 @@ void TreeSupport::drawAreas(PrintObject &print_object, std::vector<std::set<Supp
         for (std::pair<SupportElement*, Polygons> data_pair : layer_tree_polygons[layer_idx])
             append(data_pair.first->missing_roof_layers > data_pair.first->distance_to_top ? support_roof_storage[layer_idx] : support_layer_storage[layer_idx], std::move(data_pair.second));
 
-    finalizeInterfaceAndSupportAreas(print_object, support_layer_storage, support_roof_storage);
+    finalizeInterfaceAndSupportAreas(print_object, support_layer_storage, support_roof_storage,
+        bottom_contacts, top_contacts, intermediate_layers, layer_storage);
     auto t_end = std::chrono::high_resolution_clock::now();
 
     auto dur_gen_tips = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_generate - t_start).count();

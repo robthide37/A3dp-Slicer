@@ -2130,7 +2130,7 @@ void PrintObject::_generate_support_material()
 {
     if (m_config.support_material_style == smsTree) {
         TreeSupport tree_support;
-        tree_support.generateSupportAreas();
+        tree_support.generateSupportAreas(*this);
     } else {
         PrintObjectSupportMaterial support_material(this, m_slicing_params);
         support_material.generate(*this);

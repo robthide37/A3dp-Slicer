@@ -45,7 +45,7 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
     this->layer_height              = scaled<coord_t>(config.layer_height.value);
     this->resolution                = scaled<coord_t>(print_config.resolution.value);
     this->min_feature_size          = scaled<coord_t>(config.min_feature_size.value);
-    this->support_angle             = M_PI / 2. - config.support_angle * M_PI / 180.;
+    this->support_angle             = M_PI / 2. - config.support_material_angle * M_PI / 180.;
     this->support_line_width        = support_material_flow(&print_object, config.layer_height).scaled_width();
     this->support_roof_line_width   = support_material_interface_flow(&print_object, config.layer_height).scaled_width();
     //FIXME add it to SlicingParameters and reuse in both tree and normal supports?

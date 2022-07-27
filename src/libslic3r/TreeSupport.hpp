@@ -48,8 +48,9 @@ using LayerIndex = size_t;
 //FIXME
 class Print;
 class PrintObject;
-class SliceDataStorage;
-
+class SupportGeneratorLayer;
+using SupportGeneratorLayerStorage	= std::deque<SupportGeneratorLayer>;
+using SupportGeneratorLayersPtr		= std::vector<SupportGeneratorLayer*>;
 /*!
  * \brief Generates a tree structure to support your models.
  */
@@ -70,7 +71,7 @@ public:
     /*!
      * \brief Creates an instance of the tree support generator.
      */
-    TreeSupport();
+    TreeSupport() = default;
 
     /*!
      * \brief Create the areas that need support.
@@ -79,7 +80,8 @@ public:
      * \param storage The data storage where the mesh data is gotten from and
      * where the resulting support areas are stored.
      */
-    void generateSupportAreas(Print &print, const BuildVolume &build_volume, std::vector<size_t>& print_object_ids);
+    void generateSupportAreas(Print &print, const BuildVolume &build_volume, const std::vector<size_t>& print_object_ids);
+    void generateSupportAreas(PrintObject &print_object);
 
 
     //todo Remove! Only relevant for public BETA!
@@ -711,7 +713,11 @@ private:
      * \param move_bounds[out] Storage for the influence areas.
      * \param storage[in] Background storage, required for adding roofs.
      */
-    void generateInitialAreas(const PrintObject &print_object, std::vector<std::set<SupportElement*>> &move_bounds);
+    void generateInitialAreas(const PrintObject &print_object, 
+        std::vector<std::set<SupportElement*>> &move_bounds,
+        SupportGeneratorLayersPtr               &top_contacts,
+        SupportGeneratorLayersPtr               &top_interface_layers,
+        SupportGeneratorLayerStorage            &layer_storage);
 
     /*!
      * \brief Checks if an influence area contains a valid subsection and returns the corresponding metadata and the new Influence area.
@@ -818,7 +824,15 @@ private:
      * \param support_roof_storage[in] Areas where support was replaced with roof.
      * \param storage[in,out] The storage where the support should be stored.
      */
-    void finalizeInterfaceAndSupportAreas(const PrintObject &print_object, std::vector<Polygons>& support_layer_storage, std::vector<Polygons>& support_roof_storage);
+    void finalizeInterfaceAndSupportAreas(
+        const PrintObject               &print_object,
+        std::vector<Polygons>           &support_layer_storage,
+        std::vector<Polygons>           &support_roof_storage,
+
+        SupportGeneratorLayersPtr   	&bottom_contacts,
+        SupportGeneratorLayersPtr   	&top_contacts,
+        SupportGeneratorLayersPtr       &intermediate_layers,
+        SupportGeneratorLayerStorage    &layer_storage);
 
     /*!
      * \brief Draws circles around result_on_layer points of the influence areas and applies some post processing.
@@ -826,7 +840,14 @@ private:
      * \param move_bounds[in] All currently existing influence areas
      * \param storage[in,out] The storage where the support should be stored.
      */
-    void drawAreas(PrintObject &print_object, std::vector<std::set<SupportElement*>>& move_bounds);
+    void drawAreas(
+        PrintObject                             &print_object, 
+        std::vector<std::set<SupportElement*>>  &move_bounds,
+
+        SupportGeneratorLayersPtr            	&bottom_contacts,
+        SupportGeneratorLayersPtr   	        &top_contacts,
+        SupportGeneratorLayersPtr               &intermediate_layers,
+        SupportGeneratorLayerStorage            &layer_storage);
 
     /*!
      * \brief Settings with the indexes of meshes that use these settings.

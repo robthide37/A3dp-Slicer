@@ -3912,16 +3912,16 @@ void modulate_extrusion_by_overlapping_layers(
 }
 
 void generate_support_toolpaths(
-    SupportLayerPtrs    &support_layers,
-    const PrintObjectConfig &config,
-    const SupportParameters &support_params,
-    const SlicingParameters &slicing_params,
-    const SupportGeneratorLayersPtr   &raft_layers,
-    const SupportGeneratorLayersPtr   &bottom_contacts,
-    const SupportGeneratorLayersPtr   &top_contacts,
-    const SupportGeneratorLayersPtr   &intermediate_layers,
-    const SupportGeneratorLayersPtr   &interface_layers,
-    const SupportGeneratorLayersPtr   &base_interface_layers)
+    SupportLayerPtrs                    &support_layers,
+    const PrintObjectConfig             &config,
+    const SupportParameters             &support_params,
+    const SlicingParameters             &slicing_params,
+    const SupportGeneratorLayersPtr     &raft_layers,
+    const SupportGeneratorLayersPtr     &bottom_contacts,
+    const SupportGeneratorLayersPtr     &top_contacts,
+    const SupportGeneratorLayersPtr     &intermediate_layers,
+    const SupportGeneratorLayersPtr     &interface_layers,
+    const SupportGeneratorLayersPtr     &base_interface_layers)
 {
     // loop_interface_processor with a given circle radius.
     LoopInterfaceProcessor loop_interface_processor(1.5 * support_params.support_material_interface_flow.scaled_width());

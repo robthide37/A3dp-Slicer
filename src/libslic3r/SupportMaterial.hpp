@@ -149,7 +149,7 @@ struct SupportParameters {
 
 // Produce the support G-code.
 // Used by both classic and tree supports.
-static void generate_support_toolpaths(
+void generate_support_toolpaths(
 	SupportLayerPtrs    				&support_layers,
 	const PrintObjectConfig 			&config,
 	const SupportParameters 			&support_params,
