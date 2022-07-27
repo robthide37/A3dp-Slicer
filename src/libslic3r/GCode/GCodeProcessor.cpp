@@ -2931,7 +2931,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 #if ENABLE_PROCESS_G2_G3_LINES
 void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise)
 {
-    if (!line.has('X') || !line.has('Y') || !line.has('I') || !line.has('J'))
+    if (!line.has('I') || !line.has('J'))
         return;
 
     // relative center
@@ -2962,7 +2962,7 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         Vec3d relative_start() const { return start - center; }
         Vec3d relative_end() const { return end - center; }
 
-        bool closed() const { return end.isApprox(start); }
+        bool is_full_circle() const { return std::abs(delta_x()) < EPSILON && std::abs(delta_y()) < EPSILON; }
     };
 
     Arc arc;
@@ -3005,7 +3005,7 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     const Vec3d rel_arc_end   = arc.relative_end();
 
     // arc angle
-    if (arc.closed())
+    if (arc.is_full_circle())
         arc.angle = 2.0 * PI;
     else {
         arc.angle = std::atan2(rel_arc_start.x() * rel_arc_end.y() - rel_arc_start.y() * rel_arc_end.x(),
@@ -3057,24 +3057,23 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     // calculate arc segments
     // reference:
     // Prusa-Firmware\Firmware\motion_control.cpp - mc_arc()
+    // https://github.com/prusa3d/Prusa-Firmware/blob/MK3/Firmware/motion_control.cpp
 
     // segments count
-    static const double MM_PER_ARC_SEGMENT = 1.0;
-    const size_t segments = std::max<size_t>(std::floor(travel_length / MM_PER_ARC_SEGMENT), 1);
+    static const double MM_PER_ARC_SEGMENT = 0.5;
+    const size_t segments = std::ceil(travel_length / MM_PER_ARC_SEGMENT);
+    assert(segments >= 1);
 
     const double theta_per_segment = arc.angle / double(segments);
     const double z_per_segment = arc.delta_z() / double(segments);
     const double extruder_per_segment = (extrusion.has_value()) ? *extrusion / double(segments) : 0.0;
 
-    double cos_T = 1.0 - 0.5 * sqr(theta_per_segment); // Small angle approximation
-    double sin_T = theta_per_segment;
+    const double sq_theta_per_segment = sqr(theta_per_segment);
+    const double cos_T = 1.0 - 0.5 * sq_theta_per_segment; // Small angle approximation
+    const double sin_T = theta_per_segment - sq_theta_per_segment * theta_per_segment / 6.0; // Small angle approximation
 
     AxisCoords prev_target = m_start_position;
     AxisCoords arc_target;
-    double sin_Ti;
-    double cos_Ti;
-    double r_axisi;
-    size_t count = 0;
 
     // Initialize the linear axis
     arc_target[Z] = m_start_position[Z];
@@ -3088,22 +3087,23 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
 
     std::string gcode;
 
-    for (size_t i = 1; i < segments; ++i) { // Increment (segments-1)
-        if (count < N_ARC_CORRECTION) {
-            // Apply vector rotation matrix 
-            r_axisi = curr_rel_arc_start.x() * sin_T + curr_rel_arc_start.y() * cos_T;
-            curr_rel_arc_start.x() = curr_rel_arc_start.x() * cos_T - curr_rel_arc_start.y() * sin_T;
-            curr_rel_arc_start.y() = r_axisi;
-            count++;
-        }
-        else {
-            // Arc correction to radius vector. Computed only every N_ARC_CORRECTION increments.
-            // Compute exact location by applying transformation matrix from initial radius vector(=-offset).
-            cos_Ti = ::cos(double(i) * theta_per_segment);
-            sin_Ti = ::sin(double(i) * theta_per_segment);
+    size_t n_arc_correction = N_ARC_CORRECTION;
+
+    for (size_t i = 1; i < segments; ++i) {
+        if (n_arc_correction-- == 0) {
+            // Calculate the actual position for r_axis_x and r_axis_y
+            const double cos_Ti = ::cos((double)i * theta_per_segment);
+            const double sin_Ti = ::sin((double)i * theta_per_segment);
             curr_rel_arc_start.x() = -double(rel_center.x()) * cos_Ti + double(rel_center.y()) * sin_Ti;
             curr_rel_arc_start.y() = -double(rel_center.x()) * sin_Ti - double(rel_center.y()) * cos_Ti;
-            count = 0;
+            // reset n_arc_correction
+            n_arc_correction = N_ARC_CORRECTION;
+        }
+        else {
+            // Calculate X and Y using the small angle approximation
+            const float r_axisi = curr_rel_arc_start.x() * sin_T + curr_rel_arc_start.y() * cos_T;
+            curr_rel_arc_start.x() = curr_rel_arc_start.x() * cos_T - curr_rel_arc_start.y() * sin_T;
+            curr_rel_arc_start.y() = r_axisi;
         }
 
         // Update arc_target location

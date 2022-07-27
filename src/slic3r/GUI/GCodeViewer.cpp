@@ -2322,7 +2322,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
         if (move.type == EMoveType::Extrude) {
 #if ENABLE_PROCESS_G2_G3_LINES
-            if (move.extrusion_role != erNone && !move.internal_only) {
+            if (!move.internal_only) {
 #endif // ENABLE_PROCESS_G2_G3_LINES
                 // layers zs
                 const double* const last_z = m_layers.empty() ? nullptr : &m_layers.get_zs().back();
