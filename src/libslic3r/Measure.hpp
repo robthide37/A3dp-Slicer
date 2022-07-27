@@ -32,6 +32,7 @@ public:
         m_pin{std::unique_ptr<Vec3d>(new Vec3d(pin))} {}
     SurfaceFeatureType      get_type() const override { return SurfaceFeatureType::Edge; }
     std::pair<Vec3d, Vec3d> get_edge() const { return std::make_pair(m_start, m_end); }
+    const Vec3d*            get_point_of_interest() const { return m_pin.get(); }
 private:
     Vec3d m_start;
     Vec3d m_end;
