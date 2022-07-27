@@ -649,6 +649,7 @@ public:
 
     float compute_elastic_section_modulus(
             const Vec2f &line_dir,
+            const Vec3f &extreme_point,
             const Vec3f &centroid_accumulator,
             const Vec2f &second_moment_of_area_accumulator,
             const float &second_moment_of_area_covariance_accumulator,
@@ -673,11 +674,13 @@ public:
         BOOST_LOG_TRIVIAL(debug)
         << "directional_xy_variance: " << directional_xy_variance;
 #endif
-
         if (directional_xy_variance < EPSILON) {
             return 0.0f;
         }
-        float extreme_fiber_dist = sqrt(area/PI);
+
+        float extreme_fiber_dist = line_alg::distance_to(
+                Linef(centroid.head<2>().cast<double>(), (centroid.head<2>() + Vec2f(line_dir.y(), -line_dir.x())).cast<double>()),
+                extreme_point.head<2>().cast<double>());
         float elastic_section_modulus = area * directional_xy_variance / extreme_fiber_dist;
 
 #ifdef DETAILED_DEBUG_LOGS
@@ -693,11 +696,11 @@ public:
     float is_stable_while_extruding(
             const IslandConnection &connection,
             const ExtrusionLine &extruded_line,
+            const Vec3f &extreme_point,
             float layer_z,
             const Params &params) const {
 
         Vec2f line_dir = (extruded_line.b - extruded_line.a).normalized();
-
         const Vec3f &mass_centroid = this->volume_centroid_accumulator / this->volume;
         float mass = this->volume * params.filament_density;
         float weight = mass * params.gravity_constant;
@@ -715,6 +718,7 @@ public:
             Vec3f bed_centroid = this->sticking_centroid_accumulator / this->sticking_area;
             float bed_yield_torque = compute_elastic_section_modulus(
                     line_dir,
+                    extreme_point,
                     this->sticking_centroid_accumulator,
                     this->sticking_second_moment_of_area_accumulator,
                     this->sticking_second_moment_of_area_covariance_accumulator,
@@ -764,8 +768,13 @@ public:
                 return 1.0f;
 
             Vec3f conn_centroid = connection.centroid_accumulator / connection.area;
+
+            if (layer_z - conn_centroid.z() < 3.0f) {
+                return -1.0f;
+            }
             float conn_yield_torque = compute_elastic_section_modulus(
                     line_dir,
+                    extreme_point,
                     connection.centroid_accumulator,
                     connection.second_moment_of_area_accumulator,
                     connection.second_moment_of_area_covariance_accumulator,
@@ -933,7 +942,8 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                 transfered_weakest_connection.print_info("transfered_weakest_connection");
 #endif
 
-                if (estimate_conn_strength(transfered_weakest_connection) > estimate_conn_strength(new_weakest_connection)) {
+                if (estimate_conn_strength(transfered_weakest_connection)
+                        > estimate_conn_strength(new_weakest_connection)) {
                     transfered_weakest_connection = new_weakest_connection;
                 }
                 next_island_weakest_connection.emplace(island_idx, transfered_weakest_connection);
@@ -959,8 +969,7 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
 #ifdef DETAILED_DEBUG_LOGS
             weakest_conn.print_info("weakest connection info: ");
 #endif
-            std::vector<ExtrusionLine> dummy { };
-            LinesDistancer island_lines_dist(dummy);
+            LinesDistancer island_lines_dist(island.external_lines);
             float unchecked_dist = params.min_distance_between_support_points + 1.0f;
 
             for (const ExtrusionLine &line : island.external_lines) {
@@ -969,18 +978,15 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                     unchecked_dist += line.len;
                 } else {
                     unchecked_dist = line.len;
-                    auto force = part.is_stable_while_extruding(weakest_conn, line, layer_z, params);
+                    Vec2f target_point;
+                    size_t _idx;
+                    Vec3f pivot_site_search_point = to_3d(Vec2f(line.b + (line.b - line.a).normalized() * 300.0f),
+                            layer_z);
+                    island_lines_dist.signed_distance_from_lines(pivot_site_search_point.head<2>(), _idx,
+                            target_point);
+                    Vec3f support_point = to_3d(target_point, layer_z);
+                    auto force = part.is_stable_while_extruding(weakest_conn, line, support_point, layer_z, params);
                     if (force > 0) {
-                        if (island_lines_dist.get_lines().empty()) {
-                            island_lines_dist = LinesDistancer(island.external_lines);
-                        }
-                        Vec2f target_point;
-                        size_t _idx;
-                        Vec3f pivot_site_search_point = to_3d(Vec2f(line.b + (line.b - line.a).normalized() * 300.0f),
-                                layer_z);
-                        island_lines_dist.signed_distance_from_lines(pivot_site_search_point.head<2>(), _idx,
-                                target_point);
-                        Vec3f support_point = to_3d(target_point, layer_z);
                         if (!supports_presence_grid.position_taken(support_point)) {
                             float area = params.support_points_interface_radius * params.support_points_interface_radius
                                     * float(PI);
