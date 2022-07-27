@@ -598,6 +598,8 @@ static std::vector<std::string> s_Preset_print_options {
         "support_material_synchronize_layers", "support_material_angle",
         "support_material_interface_layers", "support_material_bottom_interface_layers",
         "support_material_interface_pattern",
+        "support_material_interface_angle",
+        "support_material_interface_angle_increment",
         "support_material_interface_spacing",
         "support_material_interface_contact_loops",
         "support_material_contact_distance_type",

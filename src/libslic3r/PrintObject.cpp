@@ -813,6 +813,8 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "support_material_bottom_contact_distance"
                 || opt_key == "support_material_interface_layers"
                 || opt_key == "support_material_bottom_interface_layers"
+                || opt_key == "support_material_interface_angle"
+                || opt_key == "support_material_interface_angle_increment"
                 || opt_key == "support_material_interface_pattern"
                 || opt_key == "support_material_interface_contact_loops"
                 || opt_key == "support_material_interface_extruder"

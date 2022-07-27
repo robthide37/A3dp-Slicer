@@ -255,9 +255,9 @@ group:Options for support material and raft
 		setting:width$6:support_material_bottom_contact_distance
 	end_line
 	line:Pattern
-		setting:support_material_pattern
-		setting:support_material_spacing
-		setting:support_material_angle
+		setting:label$_:support_material_pattern
+		setting:label$Spacing:support_material_spacing
+		setting:label$Angle:support_material_angle
 	end_line
 	setting:support_material_with_sheath
 	setting:support_material_closing_radius
@@ -270,6 +270,10 @@ group:Options for support material interface
 	line:Pattern
 		setting:support_material_interface_pattern
 		setting:label$Interface spacing:support_material_interface_spacing
+	end_line
+	line:Pattern Angle
+		setting:label$_:support_material_interface_angle
+		setting:label$Increment:support_material_interface_angle_increment
 	end_line
 	line:Layer count
 		setting:support_material_interface_layers

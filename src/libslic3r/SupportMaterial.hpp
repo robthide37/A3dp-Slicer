@@ -140,6 +140,7 @@ public:
 
 	    float    				base_angle;
 	    float    				interface_angle;
+		float    				interface_angle_incr;
 	    coordf_t 				interface_spacing;
 	    coordf_t 				interface_density;
 	    coordf_t 				support_spacing;

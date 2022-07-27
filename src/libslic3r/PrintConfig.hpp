@@ -735,6 +735,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionInt,                  support_material_enforce_layers))
     ((ConfigOptionInt,                  support_material_extruder))
     ((ConfigOptionFloatOrPercent,       support_material_extrusion_width))
+    ((ConfigOptionFloat,                support_material_interface_angle))
+    ((ConfigOptionFloat,                support_material_interface_angle_increment))
     ((ConfigOptionBool,                 support_material_interface_contact_loops))
     ((ConfigOptionInt,                  support_material_interface_extruder))
     ((ConfigOptionInt,                  support_material_interface_layers))

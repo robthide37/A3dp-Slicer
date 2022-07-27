@@ -408,7 +408,8 @@ PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object
 
 
     m_support_params.base_angle         = Geometry::deg2rad(float(m_object_config->support_material_angle.value));
-    m_support_params.interface_angle    = Geometry::deg2rad(float(m_object_config->support_material_angle.value + 90.));
+    m_support_params.interface_angle    = Geometry::deg2rad(float(m_object_config->support_material_interface_angle.value));
+    m_support_params.interface_angle_incr = Geometry::deg2rad(float(m_object_config->support_material_interface_angle_increment.value));
     m_support_params.interface_spacing  = m_object_config->support_material_interface_spacing.value + m_support_params.support_material_interface_flow.spacing();
     m_support_params.interface_density  = std::min(1., m_support_params.support_material_interface_flow.spacing() / m_support_params.interface_spacing);
     m_support_params.support_spacing    = m_object_config->support_material_spacing.value + m_support_params.support_material_flow.spacing();
@@ -4216,7 +4217,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 density       = float(m_object_config->raft_first_layer_density.value * 0.01);
                 spacing = m_support_params.first_layer_flow.spacing();
             } else if (support_layer_id >= m_slicing_params.base_raft_layers) {
-                filler->angle = raft_angle_interface;
+                filler->angle = raft_angle_interface + ((support_layer_id - m_slicing_params.base_raft_layers) * m_support_params.interface_angle_incr);
                 // We don't use $base_flow->spacing because we need a constant spacing
                 // value that guarantees that all layers are correctly aligned.
                 spacing = m_support_params.raft_interface_flow.spacing();
@@ -4273,7 +4274,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
     filler_first_layer_ptr->ratio_fill_inside = 0.2f;
     tbb::parallel_for(tbb::blocked_range<size_t>(n_raft_layers, support_layers.size()),
         [this, &support_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers, &layer_caches, &loop_interface_processor, 
-            &bbox_object, &angles, link_max_length_factor, &filler_first_layer_ptr, &raft_top_interface_idx]
+            &bbox_object, &angles, link_max_length_factor, &filler_first_layer_ptr, &raft_top_interface_idx, &raft_angle_interface]
             (const tbb::blocked_range<size_t>& range) {
         // Indices of the 1st layer in their respective container at the support layer height.
         size_t idx_layer_bottom_contact   = size_t(-1);
@@ -4306,9 +4307,12 @@ void PrintObjectSupportMaterial::generate_toolpaths(
         {
             SupportLayer &support_layer = *support_layers[support_layer_id];
             LayerCache   &layer_cache   = layer_caches[support_layer_id];
-            float         interface_angle_delta = m_object_config->support_material_style.value == smsSnug ? 
-                (support_layer.interface_id() & 1) ? float(- M_PI / 4.) : float(+ M_PI / 4.) :
-                0;
+            float         interface_angle_delta = 0;
+            if (m_support_params.interface_angle_incr == 0 && m_object_config->support_material_style.value == smsSnug) {
+                interface_angle_delta = (support_layer.interface_id() & 1) ? float(-M_PI / 4.) : float(+M_PI / 4.);
+            } else if (m_support_params.interface_angle_incr > 0) {
+                interface_angle_delta = support_layer.interface_id() * m_support_params.interface_angle_incr;
+            }
 
             // Find polygons with the same print_z.
             MyLayerExtruded &bottom_contact_layer = layer_cache.bottom_contact_layer;
@@ -4388,7 +4392,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     Flow::bridging_flow(layer_ex.layer->height, m_support_params.support_material_bottom_interface_flow.nozzle_diameter()) :
                     (interface_as_base ? &m_support_params.support_material_flow : &m_support_params.support_material_interface_flow)->with_height(float(layer_ex.layer->height));
                 Fill *filler = i == 2 ? filler_intermediate_interface.get() : filler_interface.get();
-                filler->layer_id = support_layer_id;
+                //filler->layer_id = support_layer_id; // don't do that, or the filler will rotate thigns from that layerid
                 filler->z = support_layer.print_z;
                 float supp_density = m_support_params.interface_density;
                 coordf_t filler_spacing;
@@ -4400,15 +4404,16 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     filler->angle = 0;
                     filler_spacing = interface_flow.spacing();
                 } else {
-                    filler->angle = interface_as_base ?
-                        // If zero interface layers are configured, use the same angle as for the base layers.
-                        angles[support_layer_id % angles.size()] :
-                        // Use interface angle for the interface layers.
-                        m_support_params.interface_angle + interface_angle_delta;
                     if (raft_top_interface_idx == support_layer_id) {
+                        filler->angle = raft_angle_interface + ((support_layer_id - m_slicing_params.base_raft_layers) * m_support_params.interface_angle_incr);
                         supp_density = interface_as_base ? m_support_params.support_density : m_support_params.interface_density;
                         filler_spacing = interface_as_base ? m_support_params.raft_flow.spacing() : m_support_params.raft_interface_flow.spacing();
                     } else {
+                        filler->angle = interface_as_base ?
+                            // If zero interface layers are configured, use the same angle as for the base layers.
+                            angles[support_layer_id % angles.size()] :
+                            // Use interface angle for the interface layers.
+                            m_support_params.interface_angle + interface_angle_delta;
                         supp_density = interface_as_base ? m_support_params.support_density : m_support_params.interface_density;
                         filler_spacing = interface_as_base ? m_support_params.support_material_flow.spacing() : m_support_params.support_material_interface_flow.spacing();
                     }

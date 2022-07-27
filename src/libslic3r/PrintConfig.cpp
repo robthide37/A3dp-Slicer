@@ -4998,6 +4998,27 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
+    def = this->add("support_material_interface_angle", coFloat);
+    def->label = L("Pattern angle");
+    def->full_label = L("Support interface pattern angle");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Use this setting to rotate the support material pattern on the horizontal plane.\n0 to use the support_material_angle.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 360;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(90));
+
+    def = this->add("support_material_interface_angle_increment", coFloat);
+    def->label = L("Support interface angle increment");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Each layer, add this angle to the interface pattern angle. 0 to keep the same angle, 90 to cross.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 360;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("support_material_interface_fan_speed", coInts);
     def->label = L("Support interface fan speed");
     def->category = OptionCategory::cooling;
@@ -5024,7 +5045,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Support material/raft interface extruder");
     def->category = OptionCategory::extruders;
     def->tooltip = L("The extruder to use when printing support material interface "
-                   "(1+, 0 to use the current extruder to minimize tool changes). This affects raft too.");
+        "(1+, 0 to use the current extruder to minimize tool changes). This affects raft too.");
     def->min = 0;
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionInt(0));
@@ -7389,6 +7410,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "support_material_acceleration",
 "support_material_contact_distance_type",
 "support_material_interface_acceleration",
+"support_material_interface_angle",
+"support_material_interface_angle_increment",
 "support_material_interface_fan_speed",
 "support_material_interface_layer_height",
 "support_material_interface_pattern",

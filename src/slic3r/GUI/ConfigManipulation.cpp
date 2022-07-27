@@ -456,7 +456,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, have_support_material && !have_support_soluble);
 
     for (auto el : { "support_material_interface_pattern", "support_material_interface_spacing", "support_material_interface_extruder",
-                    "support_material_interface_speed", "support_material_interface_contact_loops", "support_material_interface_layer_height"})
+                    "support_material_interface_speed", "support_material_interface_contact_loops", "support_material_interface_layer_height"
+                    "support_material_interface_angle", "support_material_interface_angle_increment"})
         toggle_field(el, have_support_material && have_support_interface);
     toggle_field("support_material_synchronize_layers", have_support_soluble);
 
