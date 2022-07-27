@@ -19,9 +19,9 @@ struct Params {
     const float max_acceleration = 9*1000.0f; // mm/s^2 ; max acceleration of object (bed) in XY (NOTE: The max hit is received by the object in the jerk phase, so the usual machine limits are too low)
     const float filament_density = 1.25e-3f ; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
     const float bed_adhesion_yield_strength = 0.128f * 1e6f; //MPa * 1e^6 = (g*mm/s^2)/mm^2 = g/(mm*s^2); yield strength of the bed surface
-    const float material_yield_strength = 33.0f * 1e6f; // (g*mm/s^2)/mm^2; 33 MPa is yield strength of ABS, which has the lowest yield strength from common materials.
+    const float material_yield_strength = 15.0f * 1e6f; // (g*mm/s^2)/mm^2; 33 MPa is yield strength of ABS, which has the lowest yield strength from common materials.
     const float standard_extruder_conflict_force = 20.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... );
-    const float malformations_additive_conflict_extruder_force = 150.0f * gravity_constant; // for areas with possible high layered curled filaments
+    const float malformations_additive_conflict_extruder_force = 300.0f * gravity_constant; // for areas with possible high layered curled filaments
 };
 
 struct SupportPoint {

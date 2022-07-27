@@ -677,7 +677,7 @@ public:
         if (directional_xy_variance < EPSILON) {
             return 0.0f;
         }
-        float extreme_fiber_dist = sqrt(area * directional_xy_variance);
+        float extreme_fiber_dist = sqrt(area/PI);
         float elastic_section_modulus = area * directional_xy_variance / extreme_fiber_dist;
 
 #ifdef DETAILED_DEBUG_LOGS
@@ -924,7 +924,7 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                     Vec2f variance = (conn.second_moment_of_area_accumulator / conn.area
                             - centroid.head<2>().cwiseProduct(centroid.head<2>()));
                     float xy_variance = variance.x() + variance.y();
-                    float arm_len_estimate = std::max(1.1f, layer_z - (conn.centroid_accumulator.z() / conn.area));
+                    float arm_len_estimate = std::max(1.0f, layer_z - (conn.centroid_accumulator.z() / conn.area));
                     return conn.area * sqrt(xy_variance) / arm_len_estimate;
                 };
 
@@ -933,10 +933,10 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                 transfered_weakest_connection.print_info("transfered_weakest_connection");
 #endif
 
-                if (estimate_conn_strength(transfered_weakest_connection) < estimate_conn_strength(new_weakest_connection)) {
-                    new_weakest_connection = transfered_weakest_connection;
+                if (estimate_conn_strength(transfered_weakest_connection) > estimate_conn_strength(new_weakest_connection)) {
+                    transfered_weakest_connection = new_weakest_connection;
                 }
-                next_island_weakest_connection.emplace(island_idx, new_weakest_connection);
+                next_island_weakest_connection.emplace(island_idx, transfered_weakest_connection);
                 next_island_to_object_part_mapping.emplace(island_idx, final_part_id);
                 ObjectPart &part = active_object_parts.access(final_part_id);
                 part.add(ObjectPart(island));
