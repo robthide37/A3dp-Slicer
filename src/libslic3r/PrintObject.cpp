@@ -8,6 +8,7 @@
 #include "Layer.hpp"
 #include "MutablePolygon.hpp"
 #include "SupportMaterial.hpp"
+#include "TreeSupport.hpp"
 #include "Surface.hpp"
 #include "Slicing.hpp"
 #include "Tesselate.hpp"
@@ -2127,8 +2128,13 @@ void PrintObject::combine_infill()
 
 void PrintObject::_generate_support_material()
 {
-    PrintObjectSupportMaterial support_material(this, m_slicing_params);
-    support_material.generate(*this);
+    if (m_config.support_material_style == smsTree) {
+        TreeSupport tree_support;
+        tree_support.generateSupportAreas();
+    } else {
+        PrintObjectSupportMaterial support_material(this, m_slicing_params);
+        support_material.generate(*this);
+    }
 }
 
 static void project_triangles_to_slabs(ConstLayerPtrsAdaptor layers, const indexed_triangle_set &custom_facets, const Transform3f &tr, bool seam, std::vector<Polygons> &out)

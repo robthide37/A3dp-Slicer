@@ -13,6 +13,9 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include <boost/functional/hash.hpp>
+
+#include "Point.hpp"
 #include "Polygon.hpp"
 #include "PrintConfig.hpp"
 
@@ -22,42 +25,174 @@ namespace Slic3r
 using LayerIndex = size_t;
 using AngleRadians = double;
 
-//FIXME
-class SliceDataStorage;
-class SliceMeshStorage;
+class BuildVolume;
+class PrintObject;
 
 struct TreeSupportMeshGroupSettings {
-    AngleRadians                    support_tree_angle;
-    AngleRadians                    support_tree_angle_slow;
-    AngleRadians                    support_tree_branch_diameter_angle;
-    coord_t                         support_tree_bp_diameter;
-    coord_t                         support_tree_max_diameter_increase_by_merges_when_support_to_model;
-    coord_t                         support_tree_min_height_to_model;
-    coord_t                         support_line_width;
-    coord_t                         layer_height;
-    coord_t                         support_tree_branch_diameter;
-    coord_t                         support_tree_tip_diameter;
-    bool                            support_bottom_enable;
-    coord_t                         support_bottom_height;
-    bool                            support_material_buildplate_only;
-    bool                            support_xy_overrides_z;
-    coord_t                         support_xy_distance;
-    coord_t                         support_xy_distance_overhang;
-    coord_t                         support_top_distance;
-    coord_t                         support_bottom_distance;
-    coord_t                         support_interface_skip_height;
-    std::vector<AngleRadians>       support_infill_angles;
-    std::vector<AngleRadians>       support_roof_angles;
-    SupportMaterialInterfacePattern support_roof_pattern;
-    SupportMaterialPattern          support_pattern;
-    coord_t                         support_roof_line_width;
-    coord_t                         support_line_distance;
-    coord_t                         support_bottom_offset;
-    int                             support_wall_count;
-    coord_t                         meshfix_maximum_deviation;
-    coord_t                         meshfix_maximum_resolution;
-    coord_t                         support_roof_line_distance;
-    coord_t                         min_feature_size;
+    TreeSupportMeshGroupSettings() = default;
+    TreeSupportMeshGroupSettings(const PrintObject &print_object);
+
+/*********************************************************************/
+/* Print parameters, not support specific:                           */
+/*********************************************************************/
+    coord_t                         layer_height                            { scaled<coord_t>(0.15) };
+    // Maximum Deviation (meshfix_maximum_deviation)
+    // The maximum deviation allowed when reducing the resolution for the Maximum Resolution setting. If you increase this, 
+    // the print will be less accurate, but the g-code will be smaller. Maximum Deviation is a limit for Maximum Resolution, 
+    // so if the two conflict the Maximum Deviation will always be held true.
+    coord_t                         resolution                              { scaled<coord_t>(0.025) };
+    // Minimum Feature Size (aka minimum line width)
+    // Minimum thickness of thin features. Model features that are thinner than this value will not be printed, while features thicker 
+    // than the Minimum Feature Size will be widened to the Minimum Wall Line Width.
+    coord_t                         min_feature_size                        { scaled<coord_t>(0.1) };
+
+/*********************************************************************/
+/* General support parameters:                                       */
+/*********************************************************************/
+
+    // Support Overhang Angle
+    // The minimum angle of overhangs for which support is added. At a value of 0° all overhangs are supported, 90° will not provide any support.
+    AngleRadians                    support_angle                           { 50. * M_PI / 180. };
+    // Support Line Width
+    // Width of a single support structure line.
+    coord_t                         support_line_width                      { scaled<coord_t>(0.4) };
+    // Support Roof Line Width: Width of a single support roof line.
+    coord_t                         support_roof_line_width                 { scaled<coord_t>(0.4) };
+    // Enable Support Floor (aka bottom interfaces)
+    // Generate a dense slab of material between the bottom of the support and the model. This will create a skin between the model and support.
+    bool                            support_bottom_enable                   { false };
+    // Support Floor Thickness
+    // The thickness of the support floors. This controls the number of dense layers that are printed on top of places of a model on which support rests.
+    coord_t                         support_bottom_height                   { scaled<coord_t>(1.) };
+    bool                            support_material_buildplate_only        { false };
+    // Support Distance Priority
+    // Whether the Support X/Y Distance overrides the Support Z Distance or vice versa. When X/Y overrides Z the X/Y distance can push away 
+    // the support from the model, influencing the actual Z distance to the overhang. We can disable this by not applying the X/Y distance around overhangs.
+    bool                            support_xy_overrides_z                  { false };
+    // Support X/Y Distance
+    // Distance of the support structure from the print in the X/Y directions.
+    // minimum: 0, maximum warning: 1.5 * machine_nozzle_tip_outer_diameter
+    coord_t                         support_xy_distance                     { scaled<coord_t>(0.7) };
+    // Minimum Support X/Y Distance
+    // Distance of the support structure from the overhang in the X/Y directions.
+    // minimum_value: 0,  minimum warning": support_xy_distance - support_line_width * 2, maximum warning: support_xy_distance
+    // Used if ! support_xy_overrides_z.
+    coord_t                         support_xy_distance_overhang            { scaled<coord_t>(0.2) };
+    // Support Top Distance
+    // Distance from the top of the support to the print.
+    coord_t                         support_top_distance                    { scaled<coord_t>(0.1) };
+    // Support Bottom Distance
+    // Distance from the print to the bottom of the support.
+    coord_t                         support_bottom_distance                 { scaled<coord_t>(0.1) };
+    //FIXME likely not needed, optimization for clipping of interface layers
+    // When checking where there's model above and below the support, take steps of the given height. Lower values will slice slower, while higher values 
+    // may cause normal support to be printed in some places where there should have been support interface.
+    coord_t                         support_interface_skip_height           { scaled<coord_t>(0.3) };
+    // Support Infill Line Directions
+    // A list of integer line directions to use. Elements from the list are used sequentially as the layers progress and when the end 
+    // of the list is reached, it starts at the beginning again. The list items are separated by commas and the whole list is contained 
+    // in square brackets. Default is an empty list which means use the default angle 0 degrees.
+    std::vector<AngleRadians>       support_infill_angles                   {};
+    // Enable Support Roof
+    // Generate a dense slab of material between the top of support and the model. This will create a skin between the model and support.
+    bool                            support_roof_enable                     { false };
+    // Support Roof Thickness
+    // The thickness of the support roofs. This controls the amount of dense layers at the top of the support on which the model rests.
+    coord_t                         support_roof_height                     { scaled<coord_t>(1.) };
+    // Minimum Support Roof Area
+    // Minimum area size for the roofs of the support. Polygons which have an area smaller than this value will be printed as normal support.
+    double                          minimum_roof_area                       { scaled<double>(scaled<double>(1.)) };
+    // A list of integer line directions to use. Elements from the list are used sequentially as the layers progress 
+    // and when the end of the list is reached, it starts at the beginning again. The list items are separated
+    // by commas and the whole list is contained in square brackets. Default is an empty list which means
+    // use the default angles (alternates between 45 and 135 degrees if interfaces are quite thick or 90 degrees).
+    std::vector<AngleRadians>       support_roof_angles                     {};
+    // Support Roof Pattern (aka top interface)
+    // The pattern with which the roofs of the support are printed.
+    SupportMaterialInterfacePattern support_roof_pattern                    { smipAuto };
+    // Support Pattern
+    // The pattern of the support structures of the print. The different options available result in sturdy or easy to remove support.
+    SupportMaterialPattern          support_pattern                         { smpRectilinear };
+    // Support Line Distance
+    // Distance between the printed support structure lines. This setting is calculated by the support density.
+    coord_t                         support_line_spacing                    { scaled<coord_t>(2.66 - 0.4) };
+    // Support Floor Horizontal Expansion
+    // Amount of offset applied to the floors of the support.
+    coord_t                         support_bottom_offset                   { scaled<coord_t>(0.) };
+    // Support Wall Line Count
+    // The number of walls with which to surround support infill. Adding a wall can make support print more reliably 
+    // and can support overhangs better, but increases print time and material used.
+    // tree: 1, zig-zag: 0, concentric: 1
+    int                             support_wall_count                      { 1 };
+    // Support Roof Line Distance
+    // Distance between the printed support roof lines. This setting is calculated by the Support Roof Density, but can be adjusted separately.
+    coord_t                         support_roof_line_distance              { scaled<coord_t>(0.4) };
+    // Minimum Support Area
+    // Minimum area size for support polygons. Polygons which have an area smaller than this value will not be generated.
+    coord_t                         minimum_support_area                    { scaled<coord_t>(0.) };
+    // Minimum Support Floor Area
+    // Minimum area size for the floors of the support. Polygons which have an area smaller than this value will be printed as normal support.
+    coord_t                         minimum_bottom_area                     { scaled<coord_t>(1.0) };
+    // Support Horizontal Expansion
+    // Amount of offset applied to all support polygons in each layer. Positive values can smooth out the support areas and result in more sturdy support.
+    coord_t                         support_offset                          { scaled<coord_t>(0.) };
+
+/*********************************************************************/
+/* Parameters for the Cura tree supports implementation:             */
+/*********************************************************************/
+
+    // Tree Support Maximum Branch Angle
+    // The maximum angle of the branches, when the branches have to avoid the model. Use a lower angle to make them more vertical and more stable. Use a higher angle to be able to have more reach.
+    // minimum: 0, minimum warning: 20, maximum: 89, maximum warning": 85
+    AngleRadians                    support_tree_angle                      { 60. * M_PI / 180. };
+    // Tree Support Branch Diameter Angle
+    // The angle of the branches' diameter as they gradually become thicker towards the bottom. An angle of 0 will cause the branches to have uniform thickness over their length. 
+    // A bit of an angle can increase stability of the tree support.
+    // minimum: 0, maximum: 89.9999, maximum warning: 15
+    AngleRadians                    support_tree_branch_diameter_angle      { 5.  * M_PI / 180. };
+    // Tree Support Branch Distance
+    // How far apart the branches need to be when they touch the model. Making this distance small will cause 
+    // the tree support to touch the model at more points, causing better overhang but making support harder to remove.
+    coord_t                         support_tree_branch_distance            { scaled<coord_t>(50.) };
+    // Tree Support Branch Diameter
+    // The diameter of the thinnest branches of tree support. Thicker branches are more sturdy. Branches towards the base will be thicker than this.
+    // minimum: 0.001, minimum warning: support_line_width * 2
+    coord_t                         support_tree_branch_diameter            { scaled<coord_t>(2.) };
+
+/*********************************************************************/
+/* Parameters new to the Thomas Rahm's tree supports implementation: */
+/*********************************************************************/
+
+    // Tree Support Preferred Branch Angle
+    // The preferred angle of the branches, when they do not have to avoid the model. Use a lower angle to make them more vertical and more stable. Use a higher angle for branches to merge faster.
+    // minimum: 0, minimum warning: 10, maximum: support_tree_angle, maximum warning: support_tree_angle-1
+    AngleRadians                    support_tree_angle_slow                 { 50. * M_PI / 180. };
+    // Tree Support Diameter Increase To Model
+    // The most the diameter of a branch that has to connect to the model may increase by merging with branches that could reach the buildplate.
+    // Increasing this reduces print time, but increases the area of support that rests on model
+    // minimum: 0
+    coord_t                         support_tree_max_diameter_increase_by_merges_when_support_to_model { scaled<coord_t>(1.0) };
+    // Tree Support Minimum Height To Model
+    // How tall a branch has to be if it is placed on the model. Prevents small blobs of support. This setting is ignored when a branch is supporting a support roof.
+    // minimum: 0, maximum warning: 5
+    coord_t                         support_tree_min_height_to_model        { scaled<coord_t>(1.0) };
+    // Tree Support Inital Layer Diameter
+    // Diameter every branch tries to achieve when reaching the buildplate. Improves bed adhesion.
+    // minimum: 0, maximum warning: 20
+    coord_t                         support_tree_bp_diameter                { scaled<coord_t>(7.5) };
+    // Tree Support Branch Density
+    // Adjusts the density of the support structure used to generate the tips of the branches. A higher value results in better overhangs,
+    // but the supports are harder to remove. Use Support Roof for very high values or ensure support density is similarly high at the top.
+    // 5%-35%
+    double                          support_tree_top_rate                   { 15. };
+    // Tree Support Tip Diameter
+    // The diameter of the top of the tip of the branches of tree support."
+    // minimum: min_wall_line_width, minimum warning: min_wall_line_width+0.05, maximum_value: support_tree_branch_diameter, value: support_line_width
+    coord_t                         support_tree_tip_diameter               { scaled<coord_t>(0.4) };
+
+    // Support Interface Priority
+    // How support interface and support will interact when they overlap. Currently only implemented for support roof.
+    //enum                           support_interface_priority { support_lines_overwrite_interface_area };
 };
 
 inline coord_t round_up_divide(const coord_t dividend, const coord_t divisor) //!< Return dividend divided by divisor rounded to the nearest integer
@@ -67,9 +202,10 @@ inline coord_t round_up_divide(const coord_t dividend, const coord_t divisor) //
 
 class TreeModelVolumes
 {
-  public:
+public:
     TreeModelVolumes() = default;
-    TreeModelVolumes(const SliceDataStorage& storage, coord_t max_move, coord_t max_move_slow, size_t current_mesh_idx, double progress_multiplier, double progress_offset, const std::vector<Polygons>& additional_excluded_areas = std::vector<Polygons>());
+    TreeModelVolumes(const PrintObject &print_object, const BuildVolume &build_volume,
+        coord_t max_move, coord_t max_move_slow, size_t current_mesh_idx, double progress_multiplier, double progress_offset, const std::vector<Polygons> &additional_excluded_areas = {});
     TreeModelVolumes(TreeModelVolumes&&) = default;
     TreeModelVolumes& operator=(TreeModelVolumes&&) = default;
 
@@ -103,22 +239,20 @@ class TreeModelVolumes
      * \param min_xy_dist Is the minimum xy distance used.
      * \return Polygons object
      */
-
-    const Polygons& getCollision(coord_t radius, LayerIndex layer_idx, bool min_xy_dist = false);
+    const Polygons& getCollision(coord_t radius, LayerIndex layer_idx, bool min_xy_dist = false) const;
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer. Holes are removed.
      *
      * The result is a 2D area that would cause nodes of given radius to
      * collide with the model or be inside a hole.
-     * A Hole is defined as an area, in which a branch with increase_until_radius radius would collide with the wall.
+     * A Hole is defined as an area, in which a branch with m_increase_until_radius radius would collide with the wall.
      * \param radius The radius of the node of interest
      * \param layer_idx The layer of interest
      * \param min_xy_dist Is the minimum xy distance used.
      * \return Polygons object
      */
-    const Polygons& getCollisionHolefree(coord_t radius, LayerIndex layer_idx, bool min_xy_dist = false);
-
+    const Polygons& getCollisionHolefree(coord_t radius, LayerIndex layer_idx, bool min_xy_dist = false) const;
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches
@@ -137,14 +271,14 @@ class TreeModelVolumes
      * \param min_xy_dist is the minimum xy distance used.
      * \return Polygons object
      */
-    const Polygons& getAvoidance(coord_t radius, LayerIndex layer_idx, AvoidanceType type, bool to_model = false, bool min_xy_dist = false);
+    const Polygons& getAvoidance(coord_t radius, LayerIndex layer_idx, AvoidanceType type, bool to_model = false, bool min_xy_dist = false) const;
     /*!
      * \brief Provides the area represents all areas on the model where the branch does completely fit on the given layer.
      * \param radius The radius of the node of interest
      * \param layer_idx The layer of interest
      * \return Polygons object
      */
-    const Polygons& getPlaceableAreas(coord_t radius, LayerIndex layer_idx);
+    const Polygons& getPlaceableAreas(coord_t radius, LayerIndex layer_idx) const;
     /*!
      * \brief Provides the area that represents the walls, as in the printed area, of the model. This is an abstract representation not equal with the outline. See calculateWallRestrictions for better description.
      * \param radius The radius of the node of interest.
@@ -152,9 +286,9 @@ class TreeModelVolumes
      * \param min_xy_dist is the minimum xy distance used.
      * \return Polygons object
      */
-    const Polygons& getWallRestriction(coord_t radius, LayerIndex layer_idx, bool min_xy_dist);
+    const Polygons& getWallRestriction(coord_t radius, LayerIndex layer_idx, bool min_xy_dist) const;
     /*!
-     * \brief Round \p radius upwards to either a multiple of radius_sample_resolution_ or a exponentially increasing value
+     * \brief Round \p radius upwards to either a multiple of m_radius_sample_resolution or a exponentially increasing value
      *
      *	It also adds the difference between the minimum xy distance and the regular one.
      *
@@ -172,16 +306,17 @@ class TreeModelVolumes
      */
     coord_t getRadiusNextCeil(coord_t radius, bool min_xy_dist) const;
 
-
-  private:
+private:
     /*!
      * \brief Convenience typedef for the keys to the caches
      */
-    using RadiusLayerPair = std::pair<coord_t, LayerIndex>;
+    using RadiusLayerPair         = std::pair<coord_t, LayerIndex>;
+    using RadiusLayerPolygonCache = std::unordered_map<RadiusLayerPair, Polygons, boost::hash<RadiusLayerPair>>;
 
+    friend std::optional<std::reference_wrapper<const Polygons>> getArea(const TreeModelVolumes::RadiusLayerPolygonCache &cache, const TreeModelVolumes::RadiusLayerPair &key);
 
     /*!
-     * \brief Round \p radius upwards to either a multiple of radius_sample_resolution_ or a exponentially increasing value
+     * \brief Round \p radius upwards to either a multiple of m_radius_sample_resolution or a exponentially increasing value
      *
      * \param radius The radius of the node of interest
      */
@@ -193,7 +328,7 @@ class TreeModelVolumes
      * \param layer_idx The layer which should be extracted from the mesh
      * \return Polygons object representing the outline
      */
-    Polygons extractOutlineFromMesh(const SliceMeshStorage& mesh, LayerIndex layer_idx) const;
+//    Polygons extractOutlineFromMesh(const PrintObject &print_object, LayerIndex layer_idx) const;
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer.
@@ -219,7 +354,7 @@ class TreeModelVolumes
      *
      * The result is a 2D area that would cause nodes of given radius to
      * collide with the model or be inside a hole. Result is saved in the cache.
-     * A Hole is defined as an area, in which a branch with increase_until_radius radius would collide with the wall.
+     * A Hole is defined as an area, in which a branch with m_increase_until_radius radius would collide with the wall.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
     void calculateCollisionHolefree(std::deque<RadiusLayerPair> keys);
@@ -229,7 +364,7 @@ class TreeModelVolumes
      *
      * The result is a 2D area that would cause nodes of given radius to
      * collide with the model or be inside a hole. Result is saved in the cache.
-     * A Hole is defined as an area, in which a branch with increase_until_radius radius would collide with the wall.
+     * A Hole is defined as an area, in which a branch with m_increase_until_radius radius would collide with the wall.
      * \param key RadiusLayerPairs the requested areas. The radius will be calculated up to the provided layer.
      */
     void calculateCollisionHolefree(RadiusLayerPair key)
@@ -237,7 +372,7 @@ class TreeModelVolumes
         calculateCollisionHolefree(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) });
     }
 
-    Polygons safeOffset(const Polygons& me, coord_t distance, ClipperLib::JoinType jt, coord_t max_safe_step_distance, const Polygons& collision) const;
+    static Polygons safeOffset(const Polygons& me, coord_t distance, ClipperLib::JoinType jt, coord_t max_safe_step_distance, const Polygons& collision);
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model.
@@ -317,153 +452,136 @@ class TreeModelVolumes
     }
 
     /*!
-     * \brief Checks a cache for a given RadiusLayerPair and returns it if it is found
-     * \param key RadiusLayerPair of the requested areas. The radius will be calculated up to the provided layer.
-     * \return A wrapped optional reference of the requested area (if it was found, an empty optional if nothing was found)
-     */
-    template <typename KEY>
-    const std::optional<std::reference_wrapper<const Polygons>> getArea(const std::unordered_map<KEY, Polygons>& cache, const KEY key) const;
-    bool checkSettingsEquality(const TreeSupportMeshGroupSettings& me, const TreeSupportMeshGroupSettings& other) const;
-    /*!
      * \brief Get the highest already calculated layer in the cache.
      * \param radius The radius for which the highest already calculated layer has to be found.
      * \param map The cache in which the lookup is performed.
      *
      * \return A wrapped optional reference of the requested area (if it was found, an empty optional if nothing was found)
      */
-    LayerIndex getMaxCalculatedLayer(coord_t radius, const std::unordered_map<RadiusLayerPair, Polygons>& map) const;
+    LayerIndex getMaxCalculatedLayer(coord_t radius, const RadiusLayerPolygonCache& map) const;
 
-    Polygons calculateMachineBorderCollision(Polygon machine_border);
     /*!
      * \brief The maximum distance that the center point of a tree branch may move in consecutive layers if it has to avoid the model.
      */
-    coord_t max_move_;
+    coord_t m_max_move;
     /*!
      * \brief The maximum distance that the centre-point of a tree branch may
      * move in consecutive layers if it does not have to avoid the model
      */
-    coord_t max_move_slow_;
+    coord_t m_max_move_slow;
     /*!
      * \brief The smallest maximum resolution for simplify
      */
-    coord_t min_maximum_resolution_;
-    /*!
-     * \brief The smallest maximum deviation for simplify
-     */
-    coord_t min_maximum_deviation_;
-    /*!
-     * \brief Whether the precalculate was called, meaning every required value should be cached.
-     */
-    bool precalculated = false;
+    coord_t m_min_resolution;
+
+    bool m_precalculated = false;
     /*!
      * \brief The index to access the outline corresponding with the currently processing mesh
      */
-    size_t current_outline_idx;
+    size_t m_current_outline_idx;
     /*!
      * \brief The minimum required clearance between the model and the tree branches
      */
-    coord_t current_min_xy_dist;
+    coord_t m_current_min_xy_dist;
     /*!
      * \brief The difference between the minimum required clearance between the model and the tree branches and the regular one.
      */
-    coord_t current_min_xy_dist_delta;
+    coord_t m_current_min_xy_dist_delta;
     /*!
      * \brief Does at least one mesh allow support to rest on a model.
      */
-    bool support_rests_on_model;
+    bool m_support_rests_on_model;
     /*!
      * \brief The progress of the precalculate function for communicating it to the progress bar.
      */
-    coord_t precalculation_progress = 0;
+    coord_t m_precalculation_progress = 0;
     /*!
      * \brief The progress multiplier of all values added progress bar.
      * Required for the progress bar the behave as expected when areas have to be calculated multiple times
      */
-    double progress_multiplier;
+    double m_progress_multiplier;
     /*!
      * \brief The progress offset added to all values communicated to the progress bar.
      * Required for the progress bar the behave as expected when areas have to be calculated multiple times
      */
-    double progress_offset;
+    double m_progress_offset;
     /*!
      * \brief Increase radius in the resulting drawn branches, even if the avoidance does not allow it. Will be cut later to still fit.
      */
-    coord_t increase_until_radius;
+    coord_t m_increase_until_radius;
 
     /*!
      * \brief Polygons representing the limits of the printable area of the
      * machine
      */
-    Polygons machine_border_;
+    Polygons m_machine_border;
     /*!
      * \brief Storage for layer outlines and the corresponding settings of the meshes grouped by meshes with identical setting.
      */
-    std::vector<std::pair<TreeSupportMeshGroupSettings, std::vector<Polygons>>> layer_outlines_;
+    std::vector<std::pair<TreeSupportMeshGroupSettings, std::vector<Polygons>>> m_layer_outlines;
     /*!
      * \brief Storage for areas that should be avoided, like support blocker or previous generated trees.
      */
-    std::vector<Polygons> anti_overhang_;
+    std::vector<Polygons> m_anti_overhang;
     /*!
      * \brief Radii that can be ignored by ceilRadius as they will never be requested.
      */
-    std::unordered_set<coord_t> ignorable_radii_;
+    std::unordered_set<coord_t> m_ignorable_radii;
 
     /*!
      * \brief Smallest radius a branch can have. This is the radius of a SupportElement with DTT=0.
      */
-    coord_t radius_0;
+    coord_t m_radius_0;
 
 
     /*!
      * \brief Caches for the collision, avoidance and areas on the model where support can be placed safely
      * at given radius and layer indices.
-     *
-     * These are mutable to allow modification from const function. This is
-     * generally considered OK as the functions are still logically const
-     * (ie there is no difference in behaviour for the user between
-     * calculating the values each time vs caching the results).
      */
-    mutable std::unordered_map<RadiusLayerPair, Polygons> collision_cache_;
-    std::unique_ptr<std::mutex> critical_collision_cache_ = std::make_unique<std::mutex>();
+    RadiusLayerPolygonCache m_collision_cache;
+    std::unique_ptr<std::mutex> m_critical_collision_cache { std::make_unique<std::mutex>() };
 
-    mutable std::unordered_map<RadiusLayerPair, Polygons> collision_cache_holefree_;
-    std::unique_ptr<std::mutex> critical_collision_cache_holefree_ = std::make_unique<std::mutex>();
+    RadiusLayerPolygonCache m_collision_cache_holefree;
+    std::unique_ptr<std::mutex> m_critical_collision_cache_holefree { std::make_unique<std::mutex>() };
 
-    mutable std::unordered_map<RadiusLayerPair, Polygons> avoidance_cache_;
-    std::unique_ptr<std::mutex> critical_avoidance_cache_ = std::make_unique<std::mutex>();
+    RadiusLayerPolygonCache m_avoidance_cache;
+    std::unique_ptr<std::mutex> m_critical_avoidance_cache { std::make_unique<std::mutex>() };
 
-    mutable std::unordered_map<RadiusLayerPair, Polygons> avoidance_cache_slow_;
-    std::unique_ptr<std::mutex> critical_avoidance_cache_slow_ = std::make_unique<std::mutex>();
+    RadiusLayerPolygonCache m_avoidance_cache_slow;
+    std::unique_ptr<std::mutex> m_critical_avoidance_cache_slow { std::make_unique<std::mutex>() };
 
-    mutable std::unordered_map<RadiusLayerPair, Polygons> avoidance_cache_to_model_;
-    std::unique_ptr<std::mutex> critical_avoidance_cache_to_model_ = std::make_unique<std::mutex>();
+    RadiusLayerPolygonCache m_avoidance_cache_to_model;
+    std::unique_ptr<std::mutex> m_critical_avoidance_cache_to_model { std::make_unique<std::mutex>() };
 
-    mutable std::unordered_map<RadiusLayerPair, Polygons> avoidance_cache_to_model_slow_;
-    std::unique_ptr<std::mutex> critical_avoidance_cache_to_model_slow_ = std::make_unique<std::mutex>();
+    RadiusLayerPolygonCache m_avoidance_cache_to_model_slow;
+    std::unique_ptr<std::mutex> m_critical_avoidance_cache_to_model_slow { std::make_unique<std::mutex>() };
 
-    mutable std::unordered_map<RadiusLayerPair, Polygons> placeable_areas_cache_;
-    std::unique_ptr<std::mutex> critical_placeable_areas_cache_ = std::make_unique<std::mutex>();
-
+    RadiusLayerPolygonCache m_placeable_areas_cache;
+    std::unique_ptr<std::mutex> m_critical_placeable_areas_cache { std::make_unique<std::mutex>() };
 
     /*!
-     * \brief Caches to avoid holes smaller than the radius until which the radius is always increased, as they are free of holes. Also called safe avoidances, as they are safe regarding not running into holes.
+     * \brief Caches to avoid holes smaller than the radius until which the radius is always increased, as they are free of holes. 
+     * Also called safe avoidances, as they are safe regarding not running into holes.
      */
-    mutable std::unordered_map<RadiusLayerPair, Polygons> avoidance_cache_hole_;
-    std::unique_ptr<std::mutex> critical_avoidance_cache_holefree_ = std::make_unique<std::mutex>();
+    RadiusLayerPolygonCache m_avoidance_cache_hole;
+    std::unique_ptr<std::mutex> m_critical_avoidance_cache_holefree { std::make_unique<std::mutex>() };
 
-    mutable std::unordered_map<RadiusLayerPair, Polygons> avoidance_cache_hole_to_model_;
-    std::unique_ptr<std::mutex> critical_avoidance_cache_holefree_to_model_ = std::make_unique<std::mutex>();
+    RadiusLayerPolygonCache m_avoidance_cache_hole_to_model;
+    std::unique_ptr<std::mutex> m_critical_avoidance_cache_holefree_to_model { std::make_unique<std::mutex>() };
 
     /*!
      * \brief Caches to represent walls not allowed to be passed over.
      */
-    mutable std::unordered_map<RadiusLayerPair, Polygons> wall_restrictions_cache_;
-    std::unique_ptr<std::mutex> critical_wall_restrictions_cache_ = std::make_unique<std::mutex>();
+    RadiusLayerPolygonCache m_wall_restrictions_cache;
+    std::unique_ptr<std::mutex> m_critical_wall_restrictions_cache { std::make_unique<std::mutex>() };
 
-    mutable std::unordered_map<RadiusLayerPair, Polygons> wall_restrictions_cache_min_; // A different cache for min_xy_dist as the maximal safe distance an influence area can be increased(guaranteed overlap of two walls in consecutive layer) is much smaller when min_xy_dist is used. This causes the area of the wall restriction to be thinner and as such just using the min_xy_dist wall restriction would be slower.
-    std::unique_ptr<std::mutex> critical_wall_restrictions_cache_min_ = std::make_unique<std::mutex>();
+    // A different cache for min_xy_dist as the maximal safe distance an influence area can be increased(guaranteed overlap of two walls in consecutive layer) 
+    // is much smaller when min_xy_dist is used. This causes the area of the wall restriction to be thinner and as such just using the min_xy_dist wall 
+    // restriction would be slower.    
+    RadiusLayerPolygonCache m_wall_restrictions_cache_min;
+    std::unique_ptr<std::mutex> m_critical_wall_restrictions_cache_min = std::make_unique<std::mutex>();
 
-    std::unique_ptr<std::mutex> critical_progress = std::make_unique<std::mutex>();
+    std::unique_ptr<std::mutex> m_critical_progress { std::make_unique<std::mutex>() };
 };
 
 }

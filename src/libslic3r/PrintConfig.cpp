@@ -2770,8 +2770,10 @@ void PrintConfigDef::init_fff_params()
     def->enum_keys_map = &ConfigOptionEnum<SupportMaterialStyle>::get_enum_values();
     def->enum_values.push_back("grid");
     def->enum_values.push_back("snug");
+    def->enum_values.push_back("tree");
     def->enum_labels.push_back(L("Grid"));
     def->enum_labels.push_back(L("Snug"));
+    def->enum_labels.push_back(L("Tree"));
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<SupportMaterialStyle>(smsGrid));
 
