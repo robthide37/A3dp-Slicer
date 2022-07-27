@@ -15,6 +15,7 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
 
+#define DETAILED_DEBUG_LOGS
 #define DEBUG_FILES
 
 #ifdef DEBUG_FILES
@@ -252,21 +253,25 @@ struct IslandConnection {
     float area { };
     Vec3f centroid_accumulator = Vec3f::Zero();
     Vec2f second_moment_of_area_accumulator = Vec2f::Zero();
+    float second_moment_of_area_covariance_accumulator { };
 
     void add(const IslandConnection &other) {
         this->area += other.area;
         this->centroid_accumulator += other.centroid_accumulator;
         this->second_moment_of_area_accumulator += other.second_moment_of_area_accumulator;
+        this->second_moment_of_area_covariance_accumulator += other.second_moment_of_area_covariance_accumulator;
     }
 
     void print_info(const std::string &tag) {
         Vec3f centroid = centroid_accumulator / area;
         Vec2f variance =
                 (second_moment_of_area_accumulator / area - centroid.head<2>().cwiseProduct(centroid.head<2>()));
+        float covariance = second_moment_of_area_covariance_accumulator / area - centroid.x() * centroid.y();
         std::cout << tag << std::endl;
         std::cout << "area: " << area << std::endl;
         std::cout << "centroid: " << centroid.x() << " " << centroid.y() << " " << centroid.z() << std::endl;
         std::cout << "variance: " << variance.x() << " " << variance.y() << std::endl;
+        std::cout << "covariance: " << covariance << std::endl;
     }
 };
 
@@ -277,6 +282,7 @@ struct Island {
     float sticking_area { }; // for support points present on this layer (or bed extrusions)
     Vec3f sticking_centroid_accumulator = Vec3f::Zero();
     Vec2f sticking_second_moment_of_area_accumulator = Vec2f::Zero();
+    float sticking_second_moment_of_area_covariance_accumulator { };
 
     std::vector<ExtrusionLine> external_lines;
 };
@@ -535,11 +541,15 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                     Vec2f middle = Vec2f((line.a + line.b) / 2.0f);
                     island.sticking_centroid_accumulator += sticking_area * to_3d(middle, float(layer->slice_z));
                     island.sticking_second_moment_of_area_accumulator += sticking_area * middle.cwiseProduct(middle);
+                    island.sticking_second_moment_of_area_covariance_accumulator += sticking_area * middle.x()
+                            * middle.y();
                 } else if (layer_lines[lidx].support_point_generated) {
                     float sticking_area = line.len * flow_width;
                     island.sticking_area += sticking_area;
                     island.sticking_centroid_accumulator += sticking_area * to_3d(line.b, float(layer->slice_z));
                     island.sticking_second_moment_of_area_accumulator += sticking_area * line.b.cwiseProduct(line.b);
+                    island.sticking_second_moment_of_area_covariance_accumulator += sticking_area * line.b.x()
+                            * line.b.y();
                 }
             }
         }
@@ -574,6 +584,8 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                         * current_layer_grid.pixel_area();
                 connection.second_moment_of_area_accumulator += current_coords.cwiseProduct(current_coords)
                         * current_layer_grid.pixel_area();
+                connection.second_moment_of_area_covariance_accumulator += current_coords.x() * current_coords.y()
+                        * current_layer_grid.pixel_area();
             }
         }
     }
@@ -601,6 +613,7 @@ class ObjectPart {
     float sticking_area { };
     Vec3f sticking_centroid_accumulator = Vec3f::Zero();
     Vec2f sticking_second_moment_of_area_accumulator = Vec2f::Zero();
+    float sticking_second_moment_of_area_covariance_accumulator { };
 
 public:
     ObjectPart() = default;
@@ -611,6 +624,8 @@ public:
         this->sticking_area = island.sticking_area;
         this->sticking_centroid_accumulator = island.sticking_centroid_accumulator;
         this->sticking_second_moment_of_area_accumulator = island.sticking_second_moment_of_area_accumulator;
+        this->sticking_second_moment_of_area_covariance_accumulator =
+                island.sticking_second_moment_of_area_covariance_accumulator;
     }
 
     void add(const ObjectPart &other) {
@@ -619,6 +634,8 @@ public:
         this->sticking_area += other.sticking_area;
         this->sticking_centroid_accumulator += other.sticking_centroid_accumulator;
         this->sticking_second_moment_of_area_accumulator += other.sticking_second_moment_of_area_accumulator;
+        this->sticking_second_moment_of_area_covariance_accumulator +=
+                other.sticking_second_moment_of_area_covariance_accumulator;
     }
 
     void add_support_point(const Vec3f &position, float sticking_area) {
@@ -626,6 +643,51 @@ public:
         this->sticking_centroid_accumulator += sticking_area * position;
         this->sticking_second_moment_of_area_accumulator += sticking_area
                 * position.head<2>().cwiseProduct(position.head<2>());
+        this->sticking_second_moment_of_area_covariance_accumulator += sticking_area
+                * position.x() * position.y();
+    }
+
+    float compute_elastic_section_modulus(
+            const Vec2f &line_dir,
+            const Vec3f &centroid_accumulator,
+            const Vec2f &second_moment_of_area_accumulator,
+            const float &second_moment_of_area_covariance_accumulator,
+            const float &area) const {
+        assert(area > 0);
+        Vec3f centroid = centroid_accumulator / area;
+        Vec2f variance = (second_moment_of_area_accumulator / area
+                - centroid.head<2>().cwiseProduct(centroid.head<2>()));
+        float covariance = second_moment_of_area_covariance_accumulator / area - centroid.x() * centroid.y();
+        // Var(aX+bY)=a^2*Var(X)+b^2*Var(Y)+2*a*b*Cov(X,Y)
+        float directional_xy_variance = line_dir.x() * line_dir.x() * variance.x()
+                + line_dir.y() * line_dir.y() * variance.y() +
+                2.0f * line_dir.x() * line_dir.y() * covariance;
+
+#ifdef DETAILED_DEBUG_LOGS
+        BOOST_LOG_TRIVIAL(debug)
+        << "centroid: " << centroid.x() << "  " << centroid.y() << "  " << centroid.z();
+        BOOST_LOG_TRIVIAL(debug)
+        << "variance: " << variance.x() << "  " << variance.y();
+        BOOST_LOG_TRIVIAL(debug)
+        << "covariance: " << covariance;
+        BOOST_LOG_TRIVIAL(debug)
+        << "directional_xy_variance: " << directional_xy_variance;
+#endif
+
+        if (directional_xy_variance < EPSILON) {
+            return 0.0f;
+        }
+        float extreme_fiber_dist = sqrt(area * directional_xy_variance);
+        float elastic_section_modulus = area * directional_xy_variance / extreme_fiber_dist;
+
+#ifdef DETAILED_DEBUG_LOGS
+        BOOST_LOG_TRIVIAL(debug)
+        << "extreme_fiber_dist: " << extreme_fiber_dist;
+        BOOST_LOG_TRIVIAL(debug)
+        << "elastic_section_modulus: " << elastic_section_modulus;
+#endif
+
+        return elastic_section_modulus;
     }
 
     float is_stable_while_extruding(
@@ -635,20 +697,6 @@ public:
             const Params &params) const {
 
         Vec2f line_dir = (extruded_line.b - extruded_line.a).normalized();
-
-        auto compute_elastic_section_modulus = [&line_dir](
-                const Vec3f &centroid_accumulator, const Vec2f &second_moment_of_area_accumulator, const float &area) {
-            Vec3f centroid = centroid_accumulator / area;
-            Vec2f variance = (second_moment_of_area_accumulator / area
-                    - centroid.head<2>().cwiseProduct(centroid.head<2>()));
-            variance = variance.cwiseProduct(line_dir.cwiseAbs());
-            float extreme_fiber_dist = variance.cwiseSqrt().norm();
-            if (extreme_fiber_dist < EPSILON) {
-                return 0.0f;
-            }
-            float elastic_section_modulus = area * (variance.x() + variance.y()) / extreme_fiber_dist;
-            return elastic_section_modulus;
-        };
 
         const Vec3f &mass_centroid = this->volume_centroid_accumulator / this->volume;
         float mass = this->volume * params.filament_density;
@@ -669,8 +717,12 @@ public:
                 return 1.0f;
 
             Vec3f bed_centroid = this->sticking_centroid_accumulator / this->sticking_area;
-            float bed_yield_torque = compute_elastic_section_modulus(this->sticking_centroid_accumulator,
-                    this->sticking_second_moment_of_area_accumulator, this->sticking_area)
+            float bed_yield_torque = compute_elastic_section_modulus(
+                    line_dir,
+                    this->sticking_centroid_accumulator,
+                    this->sticking_second_moment_of_area_accumulator,
+                    this->sticking_second_moment_of_area_covariance_accumulator,
+                    this->sticking_area)
                     * params.bed_adhesion_yield_strength;
 
             float bed_weight_arm = (bed_centroid.head<2>() - mass_centroid.head<2>()).norm();
@@ -686,7 +738,8 @@ public:
 
             float bed_total_torque = bed_movement_torque + bed_extruder_conflict_torque + bed_weight_torque
                     - bed_yield_torque;
-#if 1
+
+#ifdef DETAILED_DEBUG_LOGS
             BOOST_LOG_TRIVIAL(debug)
             << "bed_centroid: " << bed_centroid.x() << "  " << bed_centroid.y() << "  " << bed_centroid.z();
             BOOST_LOG_TRIVIAL(debug)
@@ -717,8 +770,12 @@ public:
                 return 1.0f;
 
             Vec3f conn_centroid = connection.centroid_accumulator / connection.area;
-            float conn_yield_torque = compute_elastic_section_modulus(connection.centroid_accumulator,
-                    connection.second_moment_of_area_accumulator, connection.area) * params.material_yield_strength;
+            float conn_yield_torque = compute_elastic_section_modulus(
+                    line_dir,
+                    connection.centroid_accumulator,
+                    connection.second_moment_of_area_accumulator,
+                    connection.second_moment_of_area_covariance_accumulator,
+                    connection.area) * params.material_yield_strength;
 
             float conn_weight_arm = (conn_centroid.head<2>() - mass_centroid.head<2>()).norm();
             float conn_weight_torque = conn_weight_arm * weight * (conn_centroid.z() / layer_z);
@@ -734,7 +791,7 @@ public:
             float conn_total_torque = conn_movement_torque + conn_extruder_conflict_torque + conn_weight_torque
                     - conn_yield_torque;
 
-#if 1
+#ifdef DETAILED_DEBUG_LOGS
             BOOST_LOG_TRIVIAL(debug)
             << "bed_centroid: " << conn_centroid.x() << "  " << conn_centroid.y() << "  " << conn_centroid.z();
             BOOST_LOG_TRIVIAL(debug)
@@ -936,6 +993,8 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                             weakest_conn.centroid_accumulator += support_point * area;
                             weakest_conn.second_moment_of_area_accumulator += area
                                     * support_point.head<2>().cwiseProduct(support_point.head<2>());
+                            weakest_conn.second_moment_of_area_covariance_accumulator += area * support_point.x()
+                                    * support_point.y();
                         }
                     }
                 }
