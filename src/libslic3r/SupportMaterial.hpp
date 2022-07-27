@@ -126,6 +126,8 @@ public:
 		Flow 		first_layer_flow;
 		Flow 		support_material_flow;
 		Flow 		support_material_interface_flow;
+		Flow 		raft_flow;
+		Flow 		raft_interface_flow;
 		Flow 		support_material_bottom_interface_flow;
 		float 		raft_bridge_flow_ratio;
 		// Is merging of regions allowed? Could the interface & base support regions be printed with the same extruder?

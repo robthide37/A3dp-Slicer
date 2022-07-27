@@ -416,13 +416,30 @@ Flow support_material_flow(const PrintObject* object, float layer_height)
     if (extruder_id < 0) {
         extruder_id = object->layers().front()->get_region(0)->region().config().perimeter_extruder - 1;
     }
+    double nzd = object->print()->config().nozzle_diameter.get_at(extruder_id);
+    const ConfigOptionFloatOrPercent& width = (object->config().support_material_extrusion_width.value > 0) ? object->config().support_material_extrusion_width : object->config().extrusion_width;
+    float max_height = 0.f;
+    if (!width.percent && width.value <= 0.) {
+        // If user left option to 0, calculate a sane default width.
+        max_height = Flow::auto_extrusion_width(frSupportMaterialInterface, nzd);
+    } else {
+        // If user set a manual value, use it.
+        max_height = float(width.get_abs_value(nzd));
+    }
+    if (layer_height <= 0) { // get default layer height for material interface
+        layer_height = object->config().support_material_layer_height.get_abs_value(nzd);
+        if (layer_height == 0) {
+            layer_height = object->print()->config().max_layer_height.get_abs_value(extruder_id, nzd);
+        }
+    }
+    layer_height = std::min(layer_height, max_height);
     return Flow::new_from_config_width(
         frSupportMaterial,
         // The width parameter accepted by new_from_config_width is of type ConfigOptionFloatOrPercent, the Flow class takes care of the percent to value substitution.
-        (object->config().support_material_extrusion_width.value > 0) ? object->config().support_material_extrusion_width : object->config().extrusion_width,
+        width,
         // if object->config().support_material_extruder == 0 (which means to not trigger tool change, but use the current extruder instead), get_at will return the 0th component.
-        float(object->print()->config().nozzle_diameter.get_at(extruder_id)),
-        (layer_height > 0.f) ? layer_height : float(object->config().layer_height.value),
+        float(nzd),
+        layer_height,
         extruder_id < 0 ? 1 : object->config().get_computed_value("filament_max_overlap", extruder_id), //if can get an extruder, then use its param, or use full overlap if we don't know the extruder id.
         // bridge_flow_ratio
         0.f);
@@ -452,19 +469,106 @@ Flow support_material_1st_layer_flow(const PrintObject *object, float layer_heig
         0.f);
 }
 
-Flow support_material_interface_flow(const PrintObject *object, float layer_height)
+Flow support_material_interface_flow(const PrintObject* object, float layer_height)
 {
     int extruder_id = object->config().support_material_interface_extruder.value - 1;
     if (extruder_id < 0) {
         extruder_id = object->layers().front()->get_region(0)->region().config().infill_extruder - 1;
     }
+    double nzd = object->print()->config().nozzle_diameter.get_at(extruder_id);
+    const ConfigOptionFloatOrPercent& width = (object->config().support_material_extrusion_width.value > 0) ? object->config().support_material_extrusion_width : object->config().extrusion_width;
+    float max_height = 0.f;
+    if (!width.percent && width.value <= 0.) {
+        // If user left option to 0, calculate a sane default width.
+        max_height = Flow::auto_extrusion_width(frSupportMaterialInterface, nzd);
+    } else {
+        // If user set a manual value, use it.
+        max_height = float(width.get_abs_value(nzd));
+    }
+    if (layer_height <= 0) { // get default layer height for material interface
+        layer_height = object->config().support_material_interface_layer_height.get_abs_value(nzd);
+        if (layer_height == 0) {
+            layer_height = object->print()->config().max_layer_height.get_abs_value(extruder_id, nzd);
+        }
+    }
+    layer_height = std::min(layer_height, max_height);
     return Flow::new_from_config_width(
         frSupportMaterialInterface,
         // The width parameter accepted by new_from_config_width is of type ConfigOptionFloatOrPercent, the Flow class takes care of the percent to value substitution.
-        (object->config().support_material_extrusion_width > 0) ? object->config().support_material_extrusion_width : object->config().extrusion_width,
+        width,
         // if object->config().support_material_interface_extruder == 0 (which means to not trigger tool change, but use the current extruder instead), get_at will return the 0th component.
-        float(object->print()->config().nozzle_diameter.get_at(extruder_id)),
-        (layer_height > 0.f) ? layer_height : float(object->config().layer_height.value),
+        float(nzd),
+        layer_height,
+        extruder_id < 0 ? 1 : object->config().get_computed_value("filament_max_overlap", extruder_id), //if can get an extruder, then use its param, or use full overlap if we don't know the extruder id.
+        // bridge_flow_ratio
+        0.f);
+}
+
+Flow raft_flow(const PrintObject* object, float layer_height)
+{
+    int extruder_id = object->config().support_material_interface_extruder.value - 1;
+    if (extruder_id < 0) {
+        extruder_id = object->layers().front()->get_region(0)->region().config().perimeter_extruder - 1;
+    }
+    double nzd = object->print()->config().nozzle_diameter.get_at(extruder_id);
+    const ConfigOptionFloatOrPercent& width = (object->config().support_material_extrusion_width.value > 0) ? object->config().support_material_extrusion_width : object->config().extrusion_width;
+    float max_height = 0.f;
+    if (!width.percent && width.value <= 0.) {
+        // If user left option to 0, calculate a sane default width.
+        max_height = Flow::auto_extrusion_width(frSupportMaterial, nzd);
+    } else {
+        // If user set a manual value, use it.
+        max_height = float(width.get_abs_value(nzd));
+    }
+    if (layer_height <= 0) { // get default layer height for material interface
+        layer_height = object->config().raft_interface_layer_height.get_abs_value(nzd);
+        if (layer_height == 0) {
+            layer_height = object->print()->config().max_layer_height.get_abs_value(extruder_id, nzd);
+        }
+    }
+    layer_height = std::min(layer_height, max_height);
+    return Flow::new_from_config_width(
+        frSupportMaterial,
+        // The width parameter accepted by new_from_config_width is of type ConfigOptionFloatOrPercent, the Flow class takes care of the percent to value substitution.
+        width,
+        // if object->config().support_material_interface_extruder == 0 (which means to not trigger tool change, but use the current extruder instead), get_at will return the 0th component.
+        float(nzd),
+        layer_height,
+        extruder_id < 0 ? 1 : object->config().get_computed_value("filament_max_overlap", extruder_id), //if can get an extruder, then use its param, or use full overlap if we don't know the extruder id.
+        // bridge_flow_ratio
+        0.f);
+}
+
+Flow raft_interface_flow(const PrintObject* object, float layer_height)
+{
+    int extruder_id = object->config().support_material_interface_extruder.value - 1;
+    if (extruder_id < 0) {
+        extruder_id = object->layers().front()->get_region(0)->region().config().infill_extruder - 1;
+    }
+    double nzd = object->print()->config().nozzle_diameter.get_at(extruder_id);
+    const ConfigOptionFloatOrPercent& width = (object->config().support_material_extrusion_width.value > 0) ? object->config().support_material_extrusion_width : object->config().extrusion_width;
+    float max_height = 0.f;
+    if (!width.percent && width.value <= 0.) {
+        // If user left option to 0, calculate a sane default width.
+        max_height = Flow::auto_extrusion_width(frSupportMaterialInterface, nzd);
+    } else {
+        // If user set a manual value, use it.
+        max_height = float(width.get_abs_value(nzd));
+    }
+    if (layer_height <= 0) { // get default layer height for material interface
+        layer_height = object->config().raft_interface_layer_height.get_abs_value(nzd);
+        if (layer_height == 0) {
+            layer_height = object->print()->config().max_layer_height.get_abs_value(extruder_id, nzd);
+        }
+    }
+    layer_height = std::min(layer_height, max_height);
+    return Flow::new_from_config_width(
+        frSupportMaterialInterface,
+        // The width parameter accepted by new_from_config_width is of type ConfigOptionFloatOrPercent, the Flow class takes care of the percent to value substitution.
+        width,
+        // if object->config().support_material_interface_extruder == 0 (which means to not trigger tool change, but use the current extruder instead), get_at will return the 0th component.
+        float(nzd),
+        layer_height,
         extruder_id < 0 ? 1 : object->config().get_computed_value("filament_max_overlap", extruder_id), //if can get an extruder, then use its param, or use full overlap if we don't know the extruder id.
         // bridge_flow_ratio
         0.f);
