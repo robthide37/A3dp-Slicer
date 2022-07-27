@@ -138,7 +138,8 @@ public:
 
 		coordf_t	gap_xy;
 
-	    float    				base_angle;
+		float    				base_angle;
+		coordf_t 				base_angle_height;
 	    float    				interface_angle;
 		float    				interface_angle_incr;
 	    coordf_t 				interface_spacing;

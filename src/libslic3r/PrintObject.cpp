@@ -806,6 +806,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "raft_first_layer_expansion"
                 || opt_key == "support_material_auto"
                 || opt_key == "support_material_angle"
+                || opt_key == "support_material_angle_height"
                 || opt_key == "support_material_buildplate_only"
                 || opt_key == "support_material_enforce_layers"
                 || opt_key == "support_material_extruder"

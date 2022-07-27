@@ -726,6 +726,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 support_material_auto))
     // Direction of the support pattern (in XY plane).
     ((ConfigOptionFloat,                support_material_angle))
+    ((ConfigOptionFloat,                support_material_angle_height))
     ((ConfigOptionBool,                 support_material_buildplate_only))
     ((ConfigOptionEnum<SupportZDistanceType>,   support_material_contact_distance_type))
     // support_material_contact_distance (PS) == support_material_contact_distance_top (SuSi 2.3 &-)

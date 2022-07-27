@@ -4895,6 +4895,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("support_material_angle_height", coFloat);
+    def->label = L("Pattern angle swap height");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Use this setting to rotate the support material pattern by 90° at this height (in mm). Set 0 to disable.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("support_material_buildplate_only", coBool);
     def->label = L("Support on build plate only");
     def->category = OptionCategory::support;
@@ -7407,6 +7416,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "solid_infill_acceleration",
 "solid_infill_extrusion_spacing",
 "start_gcode_manual",
+"support_material_angle_height",
 "support_material_acceleration",
 "support_material_contact_distance_type",
 "support_material_interface_acceleration",

@@ -441,7 +441,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     bool have_support_soluble = have_support_material && ((ConfigOptionEnumGeneric*)config->option("support_material_contact_distance_type"))->value == zdNone;
     auto support_material_style = config->opt_enum<SupportMaterialStyle>("support_material_style");
     for (auto el : { "support_material_style", "support_material_pattern", "support_material_with_sheath",
-                    "support_material_spacing", "support_material_angle", 
+                    "support_material_spacing", "support_material_angle", "support_material_angle_height", 
                     "support_material_bottom_interface_layers", "support_material_interface_layers",
                     "dont_support_bridges", "support_material_extrusion_width",
                     "support_material_contact_distance_type",
