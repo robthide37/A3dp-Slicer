@@ -48,8 +48,12 @@ private:
 
 class Plane : public SurfaceFeature {
 public:
+    Plane(int idx) : m_idx(idx) {}
     SurfaceFeatureType get_type() const override { return SurfaceFeatureType::Plane; }
+    int get_plane_idx() const { return m_idx; } // index into vector provided by Measuring::get_plane_triangle_indices
 
+private:
+    int m_idx;
 };
 
 
@@ -64,30 +68,30 @@ public:
     ~Measuring();
     
     // Return a reference to a list of all features identified on the its.
-    const std::vector<SurfaceFeature*>& get_features() const;
+    [[deprecated]]const std::vector<const SurfaceFeature*>& get_features() const;
 
     // Given a face_idx where the mouse cursor points, return a feature that
     // should be highlighted or nullptr.
     const SurfaceFeature* get_feature(size_t face_idx, const Vec3d& point) const;
 
+    // Returns a list of triangle indices for each identified plane. Each
+    // Plane object contains an index into this vector.
+    const std::vector<std::vector<int>> get_planes_triangle_indices() const;
+
+
+
     // Returns distance between two SurfaceFeatures.
     static double get_distance(const SurfaceFeature* a, const SurfaceFeature* b);
 
-    // Returns true if an x/y/z distance between features makes sense.
-    // If so, result contains the distances.
-    static bool   get_distances(const SurfaceFeature* a, const SurfaceFeature* b, std::array<double, 3>& result);
-
-    // Returns true if an x/y/z distance between feature and a point makes sense.
-    // If so, result contains the distances.
-    static bool   get_axis_aligned_distances(const SurfaceFeature* feature, const Vec3d* pt, std::array<double, 3>& result);
+    // Returns distance between a SurfaceFeature and a point.
+    static double get_distance(const SurfaceFeature* a, const Vec3d* pt);
 
     // Returns true if measuring angles between features makes sense.
     // If so, result contains the angle in radians.
     static bool   get_angle(const SurfaceFeature* a, const SurfaceFeature* b, double& result);
 
 
-private:
-    
+private: 
     std::unique_ptr<MeasuringImpl> priv;  
 };
 
