@@ -2682,6 +2682,14 @@ bool model_has_multi_part_objects(const Model &model)
     return false;
 }
 
+bool model_has_connectors(const Model &model)
+{
+    for (const ModelObject *model_object : model.objects)
+        if (!model_object->cut_connectors.empty())
+            return true;
+    return false;
+}
+
 bool model_has_advanced_features(const Model &model)
 {
 	auto config_is_advanced = [](const ModelConfig &config) {

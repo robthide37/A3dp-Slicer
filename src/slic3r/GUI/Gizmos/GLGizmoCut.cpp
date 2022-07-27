@@ -1176,6 +1176,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
     bool cut_clicked = false;
     bool revert_move{ false };
     bool revert_rotation{ false };
+    bool fff_printer = wxGetApp().plater()->printer_technology() == ptFFF;
 
     if (! m_connectors_editing) {
         if (m_mode == size_t(CutMode::cutPlanar)) {
@@ -1263,12 +1264,14 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
             m_imgui->disabled_end();
         }
 
-        ImGui::Separator();
+        if (fff_printer) {
+            ImGui::Separator();
 
-        m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
-        if (m_imgui->button(_L("Add/Edit connectors")))
-            m_connectors_editing = true;
-        m_imgui->disabled_end();
+            m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
+            if (m_imgui->button(_L("Add/Edit connectors")))
+                m_connectors_editing = true;
+            m_imgui->disabled_end();
+        }
     } 
     else { // connectors mode
         if (m_imgui->button("? " + (m_show_shortcuts ? wxString(ImGui::CollapseBtn) : wxString(ImGui::ExpandBtn))))
@@ -1361,7 +1364,8 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
     ImGui::Separator();
 
-    m_imgui->text(m_has_invalid_connector ? wxString(ImGui::WarningMarkerSmall) + _L("Invalid connectors detected.") : wxString());
+    if (fff_printer)
+        m_imgui->text(m_has_invalid_connector ? wxString(ImGui::WarningMarkerSmall) + _L("Invalid connectors detected.") : wxString());
     if (!m_connectors_editing) {
         m_imgui->disabled_begin(!can_perform_cut());
         cut_clicked = m_imgui->button(_L("Perform cut"));
