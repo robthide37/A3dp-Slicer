@@ -1194,8 +1194,10 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                     update_apply_status(false);
                 }
                 // Invalidate just the supports step.
-                for (const PrintObjectStatus &print_object_status : print_objects_range)
+                for (const PrintObjectStatus &print_object_status : print_objects_range) {
+                    update_apply_status(print_object_status.print_object->invalidate_step(posSupportSpotsSearch));
                     update_apply_status(print_object_status.print_object->invalidate_step(posSupportMaterial));
+                }
                 if (supports_differ) {
                     // Copy just the support volumes.
                     model_volume_list_update_supports(model_object, model_object_new);
