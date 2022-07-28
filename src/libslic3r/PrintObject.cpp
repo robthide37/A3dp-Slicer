@@ -398,6 +398,21 @@ void PrintObject::ironing()
     }
 }
 
+
+/*
+std::vector<size_t> problematic_layers = SupportSpotsGenerator::quick_search(this);
+    if (!problematic_layers.empty()) {
+        std::cout << "Object needs supports" << std::endl;
+        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                L("Supportable issues found. Consider enabling supports for this object"));
+        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                L("Supportable issues found. Consider enabling supports for this object"));
+        for (size_t index = 0; index < std::min(problematic_layers.size(), size_t(4)); ++index) {
+            this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                    format(L("Layer with issues: %1%"), problematic_layers[index] + 1));
+        }
+    }
+ */
 void PrintObject::generate_support_spots()
 {
     if (this->set_started(posSupportSpotsSearch)) {
@@ -405,20 +420,10 @@ void PrintObject::generate_support_spots()
         << "Searching support spots - start";
         m_print->set_status(75, L("Searching support spots"));
 
-        if (!this->m_config.support_material) {
-            std::vector<size_t> problematic_layers = SupportSpotsGenerator::quick_search(this);
-            if (!problematic_layers.empty()) {
-                std::cout << "Object needs supports" << std::endl;
-                this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                        L("Supportable issues found. Consider enabling supports for this object"));
-                this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                        L("Supportable issues found. Consider enabling supports for this object"));
-                for (size_t index = 0; index < std::min(problematic_layers.size(), size_t(4)); ++index) {
-                    this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                            format(L("Layer with issues: %1%"), problematic_layers[index] + 1));
-                }
-            }
-        } else {
+        if (this->m_config.support_material && !this->m_config.support_material_auto &&
+        std::all_of(this->model_object()->volumes.begin(), this->model_object()->volumes.end(),
+                [](const ModelVolume* mv){return mv->supported_facets.empty();})
+        ) {
             SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this);
             auto obj_transform = this->trafo_centered();
             for (ModelVolume *model_volume : this->model_object()->volumes) {

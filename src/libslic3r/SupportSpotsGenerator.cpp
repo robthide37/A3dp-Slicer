@@ -434,7 +434,7 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
         const std::vector<ExtrusionLine> &layer_lines,
         const Params &params) {
 
-    //extract extrusions (connected paths from multiple lines) from the layer_lines. belonging to single polyline is determined by origin_entity ptr.
+    //extract extrusions (connected paths from multiple lines) from the layer_lines. Grouping by the same polyline is determined by common origin_entity ptr.
     // result is a vector of [start, end) index pairs into the layer_lines vector
     std::vector<std::pair<size_t, size_t>> extrusions; //start and end idx (one beyond last extrusion) [start,end)
     const ExtrusionEntity *current_ex = nullptr;
