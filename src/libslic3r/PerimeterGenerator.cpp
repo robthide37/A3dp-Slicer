@@ -414,6 +414,12 @@ void PerimeterGenerator::process()
         int        loop_number = this->config->perimeters + surface.extra_perimeters - 1 + extra_odd_perimeter;  // 0-indexed loops
         surface_idx++;
 
+        if (print_config->spiral_vase) {
+            if (layer->id() >= config->bottom_solid_layers){
+                loop_number = 0;
+            }
+        }
+
         if ((layer->id() == 0 && this->config->only_one_perimeter_first_layer) || (this->config->only_one_perimeter_top && loop_number > 0 && this->upper_slices == NULL)) {
             loop_number = 0;
         }

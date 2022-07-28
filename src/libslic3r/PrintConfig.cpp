@@ -2945,7 +2945,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Connection of bridged infill lines");
     def->category = OptionCategory::infill;
     def->tooltip = L("Give to the bridge infill algorithm if the infill needs to be connected, and on which perimeters."
-        " Can be useful to disconnect to reduce a little bit the pressure buildup when going over the bridge's anchors."
+        " Can be useful to disconnect to reduce a little bit the pressure buildup when going over the bridge's anchors.");
     def->enum_keys_map = &ConfigOptionEnum<InfillConnection>::get_enum_values();
     def->enum_values.push_back("connected");
     def->enum_values.push_back("holes");
@@ -4711,9 +4711,10 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Spiral vase");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("This feature will raise Z gradually while printing a single-walled object "
-                   "in order to remove any visible seam. This option requires a single perimeter, "
+                   "in order to remove any visible seam. This option requires "
                    "no infill, no top solid layers and no support material. You can still set "
-                   "any number of bottom solid layers as well as skirt/brim loops. "
+                   "any number of bottom solid layers as well as skirt/brim loops."
+                   " After the bottom solid layers, the number of perimeters is enforce to 1."
                    "It won't work when printing more than one single object.");
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
@@ -7832,7 +7833,6 @@ void DynamicPrintConfig::normalize_fdm()
             opt_n->values.assign(opt_n->values.size(), false);  // Set all values to false.
         }
         {
-            this->opt<ConfigOptionInt>("perimeters", true)->value = 1;
             this->opt<ConfigOptionInt>("top_solid_layers", true)->value = 0;
             this->opt<ConfigOptionPercent>("fill_density", true)->value = 0;
             this->opt<ConfigOptionBool>("support_material", true)->value = false;
