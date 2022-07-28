@@ -1042,6 +1042,11 @@ GLGizmoBase* GLGizmosManager::get_current() const
     return ((m_current == Undefined) || m_gizmos.empty()) ? nullptr : m_gizmos[m_current].get();
 }
 
+GLGizmoBase* GLGizmosManager::get_gizmo(GLGizmosManager::EType type) const
+{
+    return ((type == Undefined) || m_gizmos.empty()) ? nullptr : m_gizmos[type].get();
+}
+
 GLGizmosManager::EType GLGizmosManager::get_gizmo_from_name(const std::string& gizmo_name) const
 {
     std::vector<size_t> selectable_idxs = get_selectable_idxs();

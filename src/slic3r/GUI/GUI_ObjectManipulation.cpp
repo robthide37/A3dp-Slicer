@@ -602,7 +602,7 @@ void ObjectManipulation::DisableScale()
 
 void ObjectManipulation::DisableUnuniformScale()
 {
-    m_lock_bnt->disable();
+    m_lock_bnt->Enable(false);
 }
 
 void ObjectManipulation::update_ui_from_settings()

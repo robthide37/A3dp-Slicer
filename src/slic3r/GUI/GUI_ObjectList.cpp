@@ -12,6 +12,7 @@
 #include "MainFrame.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 #include "Gizmos/GLGizmoCut.hpp"
+#include "Gizmos/GLGizmoScale.hpp"
 
 #include "OptionsGroup.hpp"
 #include "Tab.hpp"
@@ -2503,6 +2504,8 @@ void ObjectList::part_selection_changed()
 
     const auto item = GetSelection();
 
+    GLGizmosManager& gizmos_mgr = wxGetApp().plater()->canvas3D()->get_gizmos_manager();
+
     if ( multiple_selection() || (item && m_objects_model->GetItemType(item) == itInstanceRoot )) {
         og_name = _L("Group manipulation");
 
@@ -2579,7 +2582,6 @@ void ObjectList::part_selection_changed()
                                                             info_type == InfoItemType::CustomSeam       ? GLGizmosManager::EType::Seam :
                                                             info_type == InfoItemType::Cut              ? GLGizmosManager::EType::Cut :
                                                             GLGizmosManager::EType::MmuSegmentation;
-                        GLGizmosManager& gizmos_mgr = wxGetApp().plater()->canvas3D()->get_gizmos_manager();
                         if (gizmos_mgr.get_current_type() != gizmo_type)
                             gizmos_mgr.open_gizmo(gizmo_type);
                         if (info_type == InfoItemType::Cut) {
@@ -2656,6 +2658,9 @@ void ObjectList::part_selection_changed()
             if (disable_ununiform_scale)
                 wxGetApp().obj_manipul()->DisableUnuniformScale();
         }
+
+        if (GLGizmoScale3D* scale = dynamic_cast<GLGizmoScale3D*>(gizmos_mgr.get_gizmo(GLGizmosManager::Scale)))
+            scale->enable_ununiversal_scale(!disable_ununiform_scale);
     }
 
     if (update_and_show_settings)

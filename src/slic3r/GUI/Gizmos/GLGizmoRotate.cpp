@@ -58,12 +58,6 @@ void GLGizmoRotate::set_angle(double angle)
     m_angle = angle;
 }
 
-void GLGizmoRotate::set_center(const Vec3d& center)
-{
-    m_forced_center = center;
-    m_has_forced_center = true;
-}
-
 std::string GLGizmoRotate::get_tooltip() const
 {
     std::string axis;
@@ -301,13 +295,13 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
         coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
     if (coordinates_type == ECoordinatesType::World) {
         m_bounding_box = selection.get_bounding_box();
-        m_center = m_has_forced_center ? m_forced_center : m_bounding_box.center();
+        m_center = m_bounding_box.center();
     }
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
         const GLVolume& v = *selection.get_first_volume();
         m_bounding_box = v.transformed_convex_hull_bounding_box(
             v.get_instance_transformation().get_scaling_factor_matrix() * v.get_volume_transformation().get_scaling_factor_matrix());
-        m_center = v.world_matrix() * (m_has_forced_center ? m_forced_center : m_bounding_box.center());
+        m_center = v.world_matrix() * m_bounding_box.center();
     }
     else {
         m_bounding_box.reset();
@@ -318,7 +312,7 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
         }
         const Geometry::Transformation inst_trafo = selection.get_first_volume()->get_instance_transformation();
         m_bounding_box = m_bounding_box.transformed(inst_trafo.get_scaling_factor_matrix());
-        m_center = inst_trafo.get_matrix_no_scaling_factor() * (m_has_forced_center ? m_forced_center : m_bounding_box.center());
+        m_center = inst_trafo.get_matrix_no_scaling_factor() * m_bounding_box.center();
     }
 
     m_radius = Offset + m_bounding_box.radius();
@@ -867,7 +861,7 @@ GLGizmoRotate3D::GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_fil
 
 bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
 {
-    if (mouse_event.Dragging() && m_dragging && !m_use_only_grabbers) {
+    if (mouse_event.Dragging() && m_dragging) {
         // Apply new temporary rotations
 #if ENABLE_WORLD_COORDINATE
         TransformationType transformation_type;
@@ -954,8 +948,7 @@ void GLGizmoRotate3D::on_start_dragging()
 void GLGizmoRotate3D::on_stop_dragging()
 {
     assert(0 <= m_hover_id && m_hover_id < 3);
-    if (!m_use_only_grabbers)
-        m_parent.do_rotate(L("Gizmo-Rotate"));
+    m_parent.do_rotate(L("Gizmo-Rotate"));
     m_gizmos[m_hover_id].stop_dragging();
 }
 

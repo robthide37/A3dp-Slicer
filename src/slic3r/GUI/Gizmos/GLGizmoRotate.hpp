@@ -34,7 +34,6 @@ private:
     float m_snap_coarse_out_radius{ 0.0f };
     float m_snap_fine_in_radius{ 0.0f };
     float m_snap_fine_out_radius{ 0.0f };
-    bool  m_has_forced_center{false};
     Vec3d m_forced_center{ Vec3d::Zero() };
 #if ENABLE_WORLD_COORDINATE
     BoundingBoxf3 m_bounding_box;
@@ -70,7 +69,6 @@ public:
 
     double get_angle() const { return m_angle; }
     void set_angle(double angle);
-    void set_center(const Vec3d& center);
 
     std::string get_tooltip() const override;
 
@@ -135,15 +133,12 @@ private:
 class GLGizmoRotate3D : public GLGizmoBase
 {
     std::array<GLGizmoRotate, 3> m_gizmos;
-    bool  m_use_only_grabbers{ false };
 
 public:
     GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
     Vec3d get_rotation() const { return Vec3d(m_gizmos[X].get_angle(), m_gizmos[Y].get_angle(), m_gizmos[Z].get_angle()); }
     void set_rotation(const Vec3d& rotation) { m_gizmos[X].set_angle(rotation.x()); m_gizmos[Y].set_angle(rotation.y()); m_gizmos[Z].set_angle(rotation.z()); }
-    void set_center(const Vec3d& center) { m_gizmos[X].set_center(center); m_gizmos[Y].set_center(center); m_gizmos[Z].set_center(center); }
-    void use_only_grabbers()             { m_use_only_grabbers = true; }
 
     std::string get_tooltip() const override {
         std::string tooltip = m_gizmos[X].get_tooltip();

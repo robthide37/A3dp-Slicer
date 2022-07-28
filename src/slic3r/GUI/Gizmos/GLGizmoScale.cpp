@@ -104,6 +104,12 @@ bool GLGizmoScale3D::on_mouse(const wxMouseEvent &mouse_event)
     return use_grabbers(mouse_event);
 }
 
+void GLGizmoScale3D::enable_ununiversal_scale(bool enable)
+{
+    for (unsigned int i = 0; i < 6; ++i)
+        m_grabbers[i].enabled = enable;
+}
+
 void GLGizmoScale3D::data_changed()
 {
 #if ENABLE_WORLD_COORDINATE
