@@ -526,11 +526,11 @@ void PrintObject::slice()
         return;
     m_print->set_status(0, L("Processing triangulated mesh"));
     std::vector<coordf_t> layer_height_profile;
-    this->update_layer_height_profile(*this->model_object(), m_slicing_params, layer_height_profile);
+    this->update_layer_height_profile(*this->model_object(), *m_slicing_params, layer_height_profile);
     m_print->throw_if_canceled();
     m_typed_slices = false;
     this->clear_layers();
-    m_layers = new_layers(this, generate_object_layers(m_slicing_params, layer_height_profile));
+    m_layers = new_layers(this, generate_object_layers(*m_slicing_params, layer_height_profile));
     this->slice_volumes();
     m_print->throw_if_canceled();
     // Fix the model.

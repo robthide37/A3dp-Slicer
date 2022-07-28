@@ -626,7 +626,11 @@ void ScriptContainer::init(const std::string& tab_key, Tab* tab)
                 throw ScriptError("Failed to create script engine.");
             }
             // The script compiler will send any compiler messages to the callback function
+#ifdef AS_MAX_PORTABILITY
+            m_script_engine->SetMessageCallback(WRAP_FN(as_message_callback), 0, AngelScript::asCALL_GENERIC);
+#else
             m_script_engine->SetMessageCallback(AngelScript::asFUNCTION(as_message_callback), 0, AngelScript::asCALL_CDECL);
+#endif
             // Configure the script engine with the callback function
             AngelScript::RegisterScriptArray(m_script_engine.get(), false);
             AngelScript::RegisterStdString(m_script_engine.get());
@@ -756,7 +760,7 @@ std::string get_type_name(ConfigOptionType type)
 }
 void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const boost::any& value)
 {
-    if (value.empty())
+    if (value.empty() || !is_intialized())
         return;
     std::string func_name = ("void " + def.opt_key + "_set(" + get_type_name(def.type) + ")");
     AngelScript::asIScriptFunction* func = m_script_module->GetFunctionByDecl(func_name.c_str());
@@ -896,6 +900,9 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
 
 boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef& def)
 {
+    if (!is_intialized())
+        return boost::any();
+
     std::string func_name;
 
     switch (def.type) {

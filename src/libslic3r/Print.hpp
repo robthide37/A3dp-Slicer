@@ -121,7 +121,7 @@ public:
     T * const *             begin() const { return m_data->data(); }
     T * const *             end()   const { return m_data->data() + m_data->size(); }
     const T*                front() const { return m_data->front(); }
-    const T*                back()  const { return m_data->front(); }
+    const T*                back()  const { return m_data->back(); }
     size_t                  size()  const { return m_data->size(); }
     bool                    empty() const { return m_data->empty(); }
     const T*                operator[](size_t i) const { return (*m_data)[i]; }
@@ -314,8 +314,8 @@ public:
     // by the interactive layer height editor and by the printing process itself.
     // The slicing parameters are dependent on various configuration values
     // (layer height, first layer height, raft settings, print nozzle diameter etc).
-    const SlicingParameters&    slicing_parameters() const { return m_slicing_params; }
-    static SlicingParameters    slicing_parameters(const DynamicPrintConfig &full_config, const ModelObject &model_object, float object_max_z);
+    const SlicingParameters&                    slicing_parameters() const { return *m_slicing_params; }
+    static std::shared_ptr<SlicingParameters>   slicing_parameters(const DynamicPrintConfig &full_config, const ModelObject &model_object, float object_max_z);
 
     size_t                      num_printing_regions() const throw() { return m_shared_regions->all_regions.size(); }
     const PrintRegion&          printing_region(size_t idx) const throw() { return *m_shared_regions->all_regions[idx].get(); }
@@ -412,7 +412,7 @@ private:
     // Shared among PrintObjects created for the same ModelObject.
     PrintObjectRegions                     *m_shared_regions { nullptr };
 
-    SlicingParameters                       m_slicing_params;
+    std::shared_ptr<SlicingParameters>      m_slicing_params;
     LayerPtrs                               m_layers;
     SupportLayerPtrs                        m_support_layers;
 

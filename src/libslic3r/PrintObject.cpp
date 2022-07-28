@@ -1005,10 +1005,10 @@ bool PrintObject::invalidate_state_by_config_options(
         } else if (step == posSlice) {
             invalidated |= this->invalidate_steps({ posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportMaterial });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
-        m_slicing_params.valid = false;
+        m_slicing_params->valid = false;
         } else if (step == posSupportMaterial) {
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
-        m_slicing_params.valid = false;
+        m_slicing_params->valid = false;
         }
 
         // Wipe tower depends on the ordering of extruders, which in turn depends on everything.
@@ -1025,7 +1025,7 @@ bool PrintObject::invalidate_state_by_config_options(
         // First call the "invalidate" functions, which may cancel background processing.
         bool result = Inherited::invalidate_all_steps() | m_print->invalidate_all_steps();
         // Then reset some of the depending values.
-        m_slicing_params.valid = false;
+        m_slicing_params->valid = false;
         return result;
     }
 
@@ -2463,12 +2463,12 @@ PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &defau
 
     void PrintObject::update_slicing_parameters()
     {
-        if (!m_slicing_params.valid)
+        if (!m_slicing_params || !m_slicing_params->valid)
             m_slicing_params = SlicingParameters::create_from_config(
-            this->print()->config(), m_config, this->model_object()->bounding_box().max.z(), this->object_extruders());
+                this->print()->config(), m_config, this->model_object()->bounding_box().max.z(), this->object_extruders());
     }
 
-    SlicingParameters PrintObject::slicing_parameters(const DynamicPrintConfig& full_config, const ModelObject& model_object, float object_max_z)
+    std::shared_ptr<SlicingParameters> PrintObject::slicing_parameters(const DynamicPrintConfig& full_config, const ModelObject& model_object, float object_max_z)
     {
         PrintConfig         print_config;
         PrintObjectConfig   object_config;

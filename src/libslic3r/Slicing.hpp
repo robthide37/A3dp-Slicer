@@ -29,9 +29,9 @@ extern coordf_t check_z_step(const coordf_t val,const coordf_t z_step);
 // (using a normal flow over a soluble support, using a bridging flow over a non-soluble support).
 struct SlicingParameters
 {
-	SlicingParameters() = default;
+    SlicingParameters() = default;
 
-    static SlicingParameters create_from_config(
+    static std::shared_ptr<SlicingParameters> create_from_config(
         const PrintConfig       &print_config, 
         const PrintObjectConfig &object_config,
         coordf_t                 object_height,

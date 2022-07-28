@@ -102,21 +102,21 @@ void SlicingAdaptive::prepare(const ModelObject &object)
 // returns height of the next layer.
 float SlicingAdaptive::next_layer_height(const float print_z, float quality_factor, size_t &current_facet)
 {
-	float  height = (float)m_slicing_params.max_layer_height;
+	float  height = (float)m_slicing_params->max_layer_height;
 
 	float  max_surface_deviation;
 
 	{
 #if 0
 // @platch's formula for quality:
-	    double delta_min = SURFACE_CONST * m_slicing_params.min_layer_height;
-	    double delta_mid = (SURFACE_CONST + 0.5) * m_slicing_params.layer_height;
-	    double delta_max = (SURFACE_CONST + 0.5) * m_slicing_params.max_layer_height;
+	    double delta_min = SURFACE_CONST * m_slicing_params->min_layer_height;
+	    double delta_mid = (SURFACE_CONST + 0.5) * m_slicing_params->layer_height;
+	    double delta_max = (SURFACE_CONST + 0.5) * m_slicing_params->max_layer_height;
 #else
 // Vojtech's formula for triangle area error metric.
-	    double delta_min = m_slicing_params.min_layer_height;
-	    double delta_mid = m_slicing_params.layer_height;
-	    double delta_max = m_slicing_params.max_layer_height;
+	    double delta_min = m_slicing_params->min_layer_height;
+	    double delta_mid = m_slicing_params->layer_height;
+	    double delta_max = m_slicing_params->max_layer_height;
 #endif
 	    max_surface_deviation = (quality_factor < 0.5f) ?
 	    	lerp(delta_min, delta_mid, 2. * quality_factor) :
@@ -149,10 +149,10 @@ float SlicingAdaptive::next_layer_height(const float print_z, float quality_fact
 	}
 
 	// lower height limit due to printer capabilities
-	height = std::max(height, float(m_slicing_params.min_layer_height));
+	height = std::max(height, float(m_slicing_params->min_layer_height));
 
 	// check for sloped facets inside the determined layer and correct height if necessary
-	if (height > float(m_slicing_params.min_layer_height)) {
+	if (height > float(m_slicing_params->min_layer_height)) {
 		for (; ordered_id < m_faces.size(); ++ ordered_id) {
             const std::pair<float, float> &zspan = m_faces[ordered_id].z_span;
             // facet's minimum is higher than slice_z + height -> end loop
@@ -185,7 +185,7 @@ float SlicingAdaptive::next_layer_height(const float print_z, float quality_fact
 			}
 		}
 		// lower height limit due to printer capabilities again
-		height = std::max(height, float(m_slicing_params.min_layer_height));
+		height = std::max(height, float(m_slicing_params->min_layer_height));
 	}
 
 #ifdef ADAPTIVE_LAYER_HEIGHT_DEBUG
@@ -201,7 +201,7 @@ float SlicingAdaptive::horizontal_facet_distance(float z)
 	for (size_t i = 0; i < m_faces.size(); ++ i) {
         std::pair<float, float> zspan = m_faces[i].z_span;
         // facet's minimum is higher than max forward distance -> end loop
-		if (zspan.first > z + m_slicing_params.max_layer_height)
+		if (zspan.first > z + m_slicing_params->max_layer_height)
 			break;
 		// min_z == max_z -> horizontal facet
 		if (zspan.first > z && zspan.first == zspan.second)
@@ -209,8 +209,8 @@ float SlicingAdaptive::horizontal_facet_distance(float z)
 	}
 	
 	// objects maximum?
-	return (z + (float)m_slicing_params.max_layer_height > (float)m_slicing_params.object_print_z_height()) ? 
-		std::max((float)m_slicing_params.object_print_z_height() - z, 0.f) : (float)m_slicing_params.max_layer_height;
+	return (z + (float)m_slicing_params->max_layer_height > (float)m_slicing_params->object_print_z_height()) ? 
+		std::max((float)m_slicing_params->object_print_z_height() - z, 0.f) : (float)m_slicing_params->max_layer_height;
 }
 
 }; // namespace Slic3r

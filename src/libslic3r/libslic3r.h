@@ -327,6 +327,33 @@ public:
     inline bool   empty() const { return size() == 0; }
 };
 
+
+// to check when & how an object is created/copied/deleted
+class Intrumentation {
+public:
+    //SlicingParameters() = default;
+    Intrumentation() {
+        std::cout << "create" << "\n";
+    }
+    Intrumentation(const Intrumentation& sp) {
+        std::cout << "copy" << "\n";
+    }
+    virtual ~Intrumentation() {
+        std::cout << "destroy" << "\n";
+    }
+    Intrumentation& operator=(const Intrumentation& sp) {
+        std::cout << "assign" << "\n";
+        return *this;
+    }
+    Intrumentation(Intrumentation&& sp) {
+        std::cout << "move-copy" << "\n";
+    }
+    Intrumentation& operator=(Intrumentation&& sp) {
+        std::cout << "move-assign" << "\n";
+        return *this;
+    }
+};
+
 } // namespace Slic3r
 
 #endif

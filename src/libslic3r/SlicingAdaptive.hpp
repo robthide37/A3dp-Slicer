@@ -15,7 +15,7 @@ class SlicingAdaptive
 {
 public:
     void  clear();
-    void  set_slicing_parameters(SlicingParameters params) { m_slicing_params = params; }
+    void  set_slicing_parameters(const SlicingParameters* params) { m_slicing_params = params; }
     void  prepare(const ModelObject &object);
     // Return next layer height starting from the last print_z, using a quality measure
     // (quality in range from 0 to 1, 0 - highest quality at low layer heights, 1 - lowest print quality at high layer heights).
@@ -32,7 +32,7 @@ public:
 	};
 
 protected:
-	SlicingParameters 		m_slicing_params;
+	const SlicingParameters* m_slicing_params;
 
 	std::vector<FaceZ>		m_faces;
 };

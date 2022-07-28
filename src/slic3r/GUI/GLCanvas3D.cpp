@@ -151,7 +151,7 @@ GLCanvas3D::LayersEditing::~LayersEditing()
         glsafe(::glDeleteTextures(1, &m_z_texture_id));
         m_z_texture_id = 0;
     }
-    delete m_slicing_parameters;
+    //m_slicing_parameters.reset();
 }
 
 const float GLCanvas3D::LayersEditing::THICKNESS_BAR_WIDTH = 70.0f;
@@ -171,8 +171,7 @@ void GLCanvas3D::LayersEditing::init()
 void GLCanvas3D::LayersEditing::set_config(const DynamicPrintConfig* config)
 { 
     m_config = config;
-    delete m_slicing_parameters;
-    m_slicing_parameters = nullptr;
+    m_slicing_parameters.reset();
     m_layers_texture.valid = false;
 }
 
@@ -187,8 +186,7 @@ void GLCanvas3D::LayersEditing::select_object(const Model &model, int object_id)
         (model_object_new != nullptr && m_model_object->id() != model_object_new->id())) {
         m_layer_height_profile.clear();
         m_layer_height_profile_modified = false;
-        delete m_slicing_parameters;
-        m_slicing_parameters   = nullptr;
+        m_slicing_parameters.reset();
         m_layers_texture.valid = false;
         this->last_object_id   = object_id;
         m_model_object         = model_object_new;
@@ -574,9 +572,8 @@ void GLCanvas3D::LayersEditing::accept_changes(GLCanvas3D& canvas)
 
 void GLCanvas3D::LayersEditing::update_slicing_parameters()
 {
-	if (m_slicing_parameters == nullptr) {
-		m_slicing_parameters = new SlicingParameters();
-        *m_slicing_parameters = PrintObject::slicing_parameters(*m_config, *m_model_object, m_object_max_z);
+	if (!m_slicing_parameters) {
+        m_slicing_parameters = PrintObject::slicing_parameters(*m_config, *m_model_object, m_object_max_z);
     }
 }
 
