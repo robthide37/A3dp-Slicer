@@ -5979,9 +5979,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
 
     m_volumes.set_clipping_plane(m_camera_clipping_plane.get_data());
     m_volumes.set_show_sinking_contours(! m_gizmos.is_hiding_instances());
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     m_volumes.set_show_non_manifold_edges(!m_gizmos.is_hiding_instances() && m_gizmos.get_current_type() != GLGizmosManager::Simplify);
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud");
     if (shader != nullptr) {

@@ -59,8 +59,6 @@
 #define ENABLE_OPENGL_DEBUG_OPTION (1 && ENABLE_GL_CORE_PROFILE)
 // Shows an imgui dialog with GLModel statistics data
 #define ENABLE_GLMODEL_STATISTICS (0 && ENABLE_LEGACY_OPENGL_REMOVAL)
-// Enable show non-manifold edges
-#define ENABLE_SHOW_NON_MANIFOLD_EDGES (1 && ENABLE_2_5_0_ALPHA1)
 // Enable rework of Reload from disk command
 #define ENABLE_RELOAD_FROM_DISK_REWORK (1 && ENABLE_2_5_0_ALPHA1)
 // Enable recalculating toolpaths when switching to/from volumetric rate visualization
