@@ -1377,6 +1377,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipRectilinearWGapFill));
 
+    def = this->add("bridge_fill_pattern", coEnum);
+    def->label = L("Bridging fill pattern");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Fill pattern for bridges and internal bridge infill.");
+    def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
+    def->enum_values.push_back("rectilinear");
+    def->enum_values.push_back("monotonic");
+    def->enum_labels.push_back(L("Rectilinear"));
+    def->enum_labels.push_back(L("Monotonic"));
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipRectilinear));
+
     def = this->add("enforce_full_fill_volume", coBool);
     def->label = L("Enforce 100% fill volume");
     def->category = OptionCategory::infill;
@@ -2917,6 +2929,23 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Give to the infill algorithm if the infill needs to be connected, and on which perimeters"
         " Can be useful for art or with high infill/perimeter overlap."
         " The result may vary between infill types.");
+    def->enum_keys_map = &ConfigOptionEnum<InfillConnection>::get_enum_values();
+    def->enum_values.push_back("connected");
+    def->enum_values.push_back("holes");
+    def->enum_values.push_back("outershell");
+    def->enum_values.push_back("notconnected");
+    def->enum_labels.push_back(L("Connected"));
+    def->enum_labels.push_back(L("Connected to hole perimeters"));
+    def->enum_labels.push_back(L("Connected to outer perimeters"));
+    def->enum_labels.push_back(L("Not connected"));
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionEnum<InfillConnection>(icConnected));
+
+    def = this->add("infill_connection_bridge", coEnum);
+    def->label = L("Connection of bridged infill lines");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Give to the bridge infill algorithm if the infill needs to be connected, and on which perimeters."
+        " Can be useful to disconnect to reduce a little bit the pressure buildup when going over the bridge's anchors."
     def->enum_keys_map = &ConfigOptionEnum<InfillConnection>::get_enum_values();
     def->enum_values.push_back("connected");
     def->enum_values.push_back("holes");
@@ -7114,7 +7143,8 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     };
 
     // In PrusaSlicer 2.3.0-alpha0 the "monotonic" infill was introduced, which was later renamed to "monotonous".
-    if (value == "monotonous" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern" || opt_key == "fill_pattern" || opt_key == "solid_fill_pattern" || opt_key == "support_material_interface_pattern"))
+    if (value == "monotonous" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern" || opt_key == "fill_pattern"
+            || opt_key == "solid_fill_pattern" || opt_key == "bridge_fill_pattern" || opt_key == "support_material_interface_pattern"))
         value = "monotonic";
     // some changes has occurs between rectilineargapfill and monotonicgapfill. Set them at the right value for each type
     if (value == "rectilineargapfill" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern" || opt_key == "fill_pattern" || opt_key == "support_material_interface_pattern"))
@@ -7267,6 +7297,7 @@ void ModelConfig::convert_from_prusa(const DynamicPrintConfig& global_config) {
 std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "allow_empty_layers",
 "avoid_crossing_not_first_layer",
+"bridge_fill_pattern",
 "bridge_internal_acceleration",
 "bridge_internal_fan_speed",
 "bridge_overlap",
@@ -7355,6 +7386,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "hole_to_polyhole_twisted",
 "hole_to_polyhole",
 "infill_connection",
+"infill_connection_bridge",
 "infill_dense_algo",
 "infill_dense",
 "infill_extrusion_spacing",

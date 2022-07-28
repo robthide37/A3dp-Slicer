@@ -771,6 +771,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     PrintRegionConfig,
 
     ((ConfigOptionFloat,                bridge_angle))
+    ((ConfigOptionEnum<InfillPattern>,  bridge_fill_pattern))
     ((ConfigOptionEnum<BridgeType>,     bridge_type))
     ((ConfigOptionInt,                  bottom_solid_layers))
     ((ConfigOptionFloat,                bottom_solid_min_thickness))
@@ -841,6 +842,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<InfillConnection>,  infill_connection_solid))
     ((ConfigOptionEnum<InfillConnection>,  infill_connection_top))
     ((ConfigOptionEnum<InfillConnection>,  infill_connection_bottom))
+    ((ConfigOptionEnum<InfillConnection>,  infill_connection_bridge))
     ((ConfigOptionBool,                 infill_dense))
     ((ConfigOptionEnum<DenseInfillAlgo>,  infill_dense_algo))
     ((ConfigOptionBool,                 infill_first))

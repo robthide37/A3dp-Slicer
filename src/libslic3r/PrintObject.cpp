@@ -861,6 +861,7 @@ bool PrintObject::invalidate_state_by_config_options(
             } else if (
                 opt_key == "top_fill_pattern"
                 || opt_key == "bottom_fill_pattern"
+                || opt_key == "bridge_fill_pattern"
                 || opt_key == "solid_fill_pattern"
                 || opt_key == "enforce_full_fill_volume"
                 || opt_key == "fill_angle"
@@ -872,9 +873,10 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "infill_anchor"
                 || opt_key == "infill_anchor_max"
                 || opt_key == "infill_connection"
+                || opt_key == "infill_connection_bottom"
+                || opt_key == "infill_connection_bridge"
                 || opt_key == "infill_connection_solid"
                 || opt_key == "infill_connection_top"
-                || opt_key == "infill_connection_bottom"
                 || opt_key == "seam_gap"
                 || opt_key == "top_infill_extrusion_spacing"
                 || opt_key == "top_infill_extrusion_width" ) {
@@ -888,10 +890,6 @@ bool PrintObject::invalidate_state_by_config_options(
                 //FIXME Vojtech is not quite sure about the 100% here, maybe it is not needed.
                 if (is_approx(old_density->value, 0.) || is_approx(old_density->value, 100.) ||
                     is_approx(new_density->value, 0.) || is_approx(new_density->value, 100.))
-
-
-
-
 
                 steps.emplace_back(posPerimeters);
                 steps.emplace_back(posPrepareInfill);

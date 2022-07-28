@@ -162,6 +162,10 @@ group:title_width$0:Infill
 		setting:label_left:label_width$20:label$Bottom:bottom_fill_pattern
 		setting:label$_:width$18:infill_connection_bottom
 	end_line
+	line:_
+		setting:label_left:label_width$20:label$Bridge:bridge_fill_pattern
+		setting:label$_:width$18:infill_connection_bridge
+	end_line
 group:Reducing printing time
 	setting:infill_every_layers
 	setting:infill_only_where_needed

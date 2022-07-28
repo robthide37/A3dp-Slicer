@@ -412,7 +412,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "bottom_fill_pattern", "infill_connection_bottom" })
         toggle_field(el, has_bottom_solid_infill);
 
-    for (auto el : { "solid_fill_pattern", "infill_connection_solid" })
+    for (auto el : { "solid_fill_pattern", "infill_connection_solid", "bridge_fill_pattern", "infill_connection_bridge" })
         toggle_field(el, has_solid_infill); // should be top_solid_layers") > 1 || bottom_solid_layers") > 1
 
     for (auto el : { "hole_to_polyhole_threshold", "hole_to_polyhole_twisted" })

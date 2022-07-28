@@ -489,6 +489,7 @@ static std::vector<std::string> s_Preset_print_options {
         "top_fill_pattern",
         "bottom_fill_pattern",
         "solid_fill_pattern",
+        "bridge_fill_pattern",
         "infill_every_layers", "infill_only_where_needed", "solid_infill_every_layers",
         // ironing
         "ironing",
@@ -675,7 +676,7 @@ static std::vector<std::string> s_Preset_print_options {
         "perimeter_loop_seam",
         "seam_angle_cost",
         "seam_travel_cost",
-        "infill_connection", "infill_connection_solid", "infill_connection_top", "infill_connection_bottom",
+        "infill_connection", "infill_connection_solid", "infill_connection_top", "infill_connection_bottom", "infill_connection_bridge",
         "first_layer_infill_speed",
         // thin wall
         "thin_walls",
