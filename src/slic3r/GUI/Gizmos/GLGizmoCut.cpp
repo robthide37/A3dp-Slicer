@@ -223,11 +223,22 @@ std::string GLGizmoCut3D::get_tooltip() const
 
 bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
 {
-    if (mouse_event.Moving() && !cut_line_processing())
-        return false;
-
     Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
     Vec2d mouse_pos = mouse_coord.cast<double>();
+
+    if (mouse_event.ShiftDown() && mouse_event.LeftDown())
+        return gizmo_event(SLAGizmoEventType::LeftDown, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), mouse_event.CmdDown());
+    if (cut_line_processing()) {
+        if (mouse_event.ShiftDown()) {
+            if (mouse_event.Moving()|| mouse_event.Dragging())
+                return gizmo_event(SLAGizmoEventType::Moving, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), mouse_event.CmdDown());
+            if (mouse_event.LeftUp())
+                return gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), mouse_event.CmdDown());
+        }
+        discard_cut_line_processing();
+    }
+    else if (mouse_event.Moving())
+        return false;
 
     if (use_grabbers(mouse_event)) {
         if (m_hover_id >= m_connectors_group_id && mouse_event.LeftUp() && !mouse_event.ShiftDown()) 
@@ -280,11 +291,6 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
             // event was taken care of by the SlaSupports gizmo
             return true;
         }
-    }
-    else if (mouse_event.Moving()) { 
-        // draw cut line 
-        gizmo_event(SLAGizmoEventType::Moving, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), mouse_event.CmdDown());
-        return true;
     }
     else if (pending_right_up && mouse_event.RightUp()) {
         pending_right_up = false;
@@ -543,7 +549,6 @@ void GLGizmoCut3D::render_cut_plane()
     if (cut_line_processing())
         return;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader == nullptr)
         return;
@@ -554,7 +559,7 @@ void GLGizmoCut3D::render_cut_plane()
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
     shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(
         m_plane_center,
@@ -564,14 +569,6 @@ void GLGizmoCut3D::render_cut_plane()
     );
     shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#else
-    const Vec3d& angles = m_rotation_gizmo.get_rotation();
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(m_plane_center.x(), m_plane_center.y(), m_plane_center.z()));
-    glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
-    glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
-    glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     if (!m_plane.is_initialized()) {
         GLModel::Geometry init_data;
@@ -580,17 +577,12 @@ void GLGizmoCut3D::render_cut_plane()
         init_data.reserve_vertices(4);
         init_data.reserve_indices(6);
 
-        const BoundingBoxf3 bb = bounding_box();
-        const float min_x = bb.min.x() - Margin - m_plane_center.x();
-        const float max_x = bb.max.x() + Margin - m_plane_center.x();
-        const float min_y = bb.min.y() - Margin - m_plane_center.y();
-        const float max_y = bb.max.y() + Margin - m_plane_center.y();
-
         // vertices
-        init_data.add_vertex(Vec3f(min_x, min_y, 0.0));
-        init_data.add_vertex(Vec3f(max_x, min_y, 0.0));
-        init_data.add_vertex(Vec3f(max_x, max_y, 0.0));
-        init_data.add_vertex(Vec3f(min_x, max_y, 0.0));
+        float radius = (float)bounding_box().radius();
+        init_data.add_vertex(Vec3f(-radius, -radius, 0.0));
+        init_data.add_vertex(Vec3f( radius, -radius, 0.0));
+        init_data.add_vertex(Vec3f( radius,  radius, 0.0));
+        init_data.add_vertex(Vec3f(-radius,  radius, 0.0));
 
         // indices
         init_data.add_triangle(0, 1, 2);
@@ -600,19 +592,6 @@ void GLGizmoCut3D::render_cut_plane()
     }
 
     m_plane.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-    glsafe(::glPopMatrix());
-#endif //!ENABLE_GL_SHADERS_ATTRIBUTES
-#else
-    // Draw the cutting plane
-    ::glBegin(GL_QUADS);
-    ::glColor4fv(PLANE_COLOR.data());
-    ::glVertex3f(min_x, min_y, plane_center.z());
-    ::glVertex3f(max_x, min_y, plane_center.z());
-    ::glVertex3f(max_x, max_y, plane_center.z());
-    ::glVertex3f(min_x, max_y, plane_center.z());
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_CULL_FACE));
     glsafe(::glDisable(GL_BLEND));
@@ -1685,6 +1664,11 @@ bool GLGizmoCut3D::cut_line_processing() const
     return m_line_beg != Vec3d::Zero();
 }
 
+void GLGizmoCut3D::discard_cut_line_processing()
+{
+    m_line_beg = m_line_end = Vec3d::Zero();
+}
+
 bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse_position)
 {
     const float sla_shift = m_c->selection_info()->get_sla_shift();
@@ -1710,9 +1694,10 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
 
     if (cut_line_processing()) {
         m_line_end = pt;
-        if (action == SLAGizmoEventType::LeftDown) {
-            Vec3d point = m_line_end;
+        if (action == SLAGizmoEventType::LeftDown || action == SLAGizmoEventType::LeftUp) {
             Vec3d line_dir = m_line_end - m_line_beg;
+            if (line_dir.norm() < 3.0)
+                return true;
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by line"), UndoRedo::SnapshotType::GizmoAction);
 
             Vec3d cross_dir = line_dir.cross(dir).normalized();
@@ -1725,7 +1710,7 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
 
             set_center(m_plane_center + cross_dir * (cross_dir.dot(pt - m_plane_center)));
 
-            m_line_end = m_line_beg = Vec3d::Zero();
+            discard_cut_line_processing();
         }
         return true;
     }
@@ -1738,7 +1723,7 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
         return false;
 
     if ( m_hover_id < 0 && shift_down &&  ! m_connectors_editing &&
-        (action == SLAGizmoEventType::LeftDown || action == SLAGizmoEventType::Moving) )
+        (action == SLAGizmoEventType::LeftDown || action == SLAGizmoEventType::LeftUp || action == SLAGizmoEventType::Moving) )
         return process_cut_line(action, mouse_position);
 
     CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;

@@ -190,6 +190,7 @@ private:
 
     bool can_perform_cut() const;
     bool cut_line_processing() const;
+    void discard_cut_line_processing();
 
     void render_cut_plane();
     void render_cut_center_graber(bool picking = false);
