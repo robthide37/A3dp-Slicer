@@ -3066,7 +3066,8 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Layers and Perimeters");
     def->tooltip = L("Classic perimeter generator produces perimeters with constant extrusion width and for "
                       "very thin areas is used gap-fill. "
-                      "Arachne engine produces perimeters with variable extrusion width.");
+                      "Arachne engine produces perimeters with variable extrusion width. "
+                      "This setting also affects the Concentric infill.");
     def->enum_keys_map = &ConfigOptionEnum<PerimeterGeneratorType>::get_enum_values();
     def->enum_values.push_back("classic");
     def->enum_values.push_back("arachne");
