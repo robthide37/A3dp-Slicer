@@ -10,10 +10,11 @@ namespace SupportSpotsGenerator {
 struct Params {
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
     const float bridge_distance = 12.0f; //mm
-    const float bridge_distance_decrease_by_curvature_factor = 3.0f; // allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
+    const float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
+    const float overhang_angle_deg = 55.0f;
 
     const float min_distance_between_support_points = 3.0f; //mm
-    const float support_points_interface_radius = 1.0f; // mm
+    const float support_points_interface_radius = 0.6f; // mm
 
     const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.
     const float max_acceleration = 9*1000.0f; // mm/s^2 ; max acceleration of object (bed) in XY (NOTE: The max hit is received by the object in the jerk phase, so the usual machine limits are too low)

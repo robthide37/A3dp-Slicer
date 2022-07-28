@@ -354,10 +354,12 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         const auto to_vec3f = [layer_z](const Vec2f &point) {
             return Vec3f(point.x(), point.y(), layer_z);
         };
+        float overhang_dist = tan(params.overhang_angle_deg * PI / 180.0f)*layer_region->layer()->height;
+
         Points points { };
         entity->collect_points(points);
         std::vector<ExtrusionLine> lines;
-        lines.reserve(points.size() * 1.5);
+        lines.reserve(points.size() * 1.5f);
         lines.emplace_back(unscaled(points[0]).cast<float>(), unscaled(points[0]).cast<float>(), entity);
         for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
             Vec2f start = unscaled(points[point_idx]).cast<float>();
@@ -396,14 +398,18 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             float dist_from_prev_layer = prev_layer_lines.signed_distance_from_lines(current_line.b, nearest_line_idx,
                     nearest_point);
 
-            if (fabs(dist_from_prev_layer) < flow_width) {
+            if (fabs(dist_from_prev_layer) < overhang_dist) {
                 bridging_acc.reset();
             } else {
                 bridging_acc.add_distance(current_line.len);
-                if (bridging_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
-                > params.bridge_distance
-                        / (1.0f + (bridging_acc.max_curvature
-                                * params.bridge_distance_decrease_by_curvature_factor / PI))) {
+                // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
+                bool in_layer_dist_condition = bridging_acc.distance
+                        > params.bridge_distance / (1.0f + (bridging_acc.max_curvature
+                                * params.bridge_distance_decrease_by_curvature_factor / PI));
+                bool between_layers_condition = fabs(dist_from_prev_layer) > 5.0f*overhang_dist ||
+                        prev_layer_lines.get_line(nearest_line_idx).malformation > 0.3f;
+
+                if (in_layer_dist_condition && between_layers_condition) {
                     issues.support_points.emplace_back(to_vec3f(current_line.b), 0.0f, Vec3f(0.f, 0.0f, -1.0f));
                     current_line.support_point_generated = true;
                     bridging_acc.reset();
@@ -411,13 +417,13 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
 
             //malformation
-            if (fabs(dist_from_prev_layer) < flow_width * 2.0f) {
+            if (fabs(dist_from_prev_layer) < overhang_dist * 5.0f) {
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
                 current_line.malformation += 0.9 * nearest_line.malformation;
             }
-            if (dist_from_prev_layer > flow_width * 0.3) {
+            if (dist_from_prev_layer > overhang_dist) {
                 malformation_acc.add_distance(current_line.len);
-                current_line.malformation += 0.3f * layer_region->layer()->height
+                current_line.malformation += 0.1f
                         * (0.8f + 0.2f * malformation_acc.max_curvature / (1.0f + 0.5f * malformation_acc.distance));
             } else {
                 malformation_acc.reset();
