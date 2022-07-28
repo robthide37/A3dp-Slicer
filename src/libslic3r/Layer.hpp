@@ -69,9 +69,10 @@ public:
     ExtrusionEntityCollection   fills;
     ExtrusionEntityCollection   ironings;
     
-    Flow    flow(FlowRole role) const;
-    Flow    flow(FlowRole role, double layer_height) const;
-    Flow    bridging_flow(FlowRole role) const;
+    Flow     flow(FlowRole role) const;
+    Flow     flow(FlowRole role, double layer_height) const;
+    coordf_t bridging_height_avg() const;
+    Flow     bridging_flow(FlowRole role) const;
 
     void    slices_to_fill_surfaces_clipped(coord_t opening_offset);
     void    prepare_fill_surfaces();

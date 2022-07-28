@@ -1778,7 +1778,7 @@ static inline std::pair<PrintObjectSupportMaterial::MyLayer*, PrintObjectSupport
             if (object_config.support_material_contact_distance_type.value == zdFilament) {
                 bridging_height = 0.;
                 for (const LayerRegion* region : layer.regions())
-                    bridging_height += region->region().bridging_height_avg(print_config);
+                    bridging_height += region->bridging_height_avg();
                 bridging_height /= coordf_t(layer.regions().size());
             }
             coordf_t bridging_print_z = layer.print_z - bridging_height - slicing_params.gap_support_object;
@@ -3073,7 +3073,7 @@ void PrintObjectSupportMaterial::trim_support_layers_by_object(
                         bool some_region_overlaps = false;
                         for (LayerRegion *region : object_layer.regions()) {
                             coordf_t bridging_height = m_object_config->support_material_contact_distance_type.value == zdFilament
-                                ? region->region().bridging_height_avg(*m_print_config)
+                                ? region->bridging_height_avg()
                                 : object_layer.height;
                             if (object_layer.print_z - bridging_height > support_layer.print_z + gap_extra_above - EPSILON)
                                 break;

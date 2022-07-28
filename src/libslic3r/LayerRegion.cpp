@@ -26,6 +26,21 @@ Flow LayerRegion::flow(FlowRole role, double layer_height) const
     return m_region->flow(*m_layer->object(), role, layer_height, m_layer->id() == 0);
 }
 
+// Average diameter of nozzles participating on extruding this region.
+coordf_t LayerRegion::bridging_height_avg() const
+{
+    const PrintRegionConfig& region_config = this->region().config();
+    if (region_config.bridge_type == BridgeType::btFromNozzle) {
+        const PrintConfig& print_config = this->layer()->object()->print()->config();
+        return region().nozzle_dmr_avg(print_config) * sqrt(region_config.bridge_flow_ratio.get_abs_value(1));
+    } else if (region_config.bridge_type == BridgeType::btFromHeight) {
+        return this->layer()->height;
+    } else if (region_config.bridge_type == BridgeType::btFromFlow) {
+        return this->bridging_flow(FlowRole::frInfill).height();
+    }
+    throw Slic3r::InvalidArgument("Unknown BridgeType");
+}
+
 Flow LayerRegion::bridging_flow(FlowRole role) const
 {
     const PrintRegion       &region         = this->region();

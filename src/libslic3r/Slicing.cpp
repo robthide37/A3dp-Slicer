@@ -5,6 +5,7 @@
 #include "SlicingAdaptive.hpp"
 #include "PrintConfig.hpp"
 #include "Model.hpp"
+#include "Flow.hpp"
 
 // #define SLIC3R_DEBUG
 
@@ -78,8 +79,9 @@ coordf_t Slicing::max_layer_height_from_nozzle(const DynamicPrintConfig &print_c
 
 
 std::shared_ptr<SlicingParameters> SlicingParameters::create_from_config(
-	const PrintConfig 		&print_config, 
-	const PrintObjectConfig &object_config,
+	const PrintConfig 		&print_config,
+    const PrintObjectConfig &object_config,
+    const PrintRegionConfig &default_region_config,
 	coordf_t				 object_height,
 	const std::set<uint16_t> &object_extruders)
 {
@@ -181,6 +183,24 @@ std::shared_ptr<SlicingParameters> SlicingParameters::create_from_config(
 
     if (! soluble_interface) {
         params.gap_raft_object = object_config.raft_contact_distance.value;// get_abs_value(support_material_interface_extruder_dmr);
+        if (object_config.support_material_contact_distance_type.value == zdFilament) {
+            if (default_region_config.bridge_type == BridgeType::btFromNozzle) {
+                float nzd_avg = 0;
+                for (unsigned int extruder_id : object_extruders) {
+                    nzd_avg += print_config.nozzle_diameter.get_at(extruder_id - 1);
+                }
+                nzd_avg /= object_extruders.size();
+                params.gap_raft_object += nzd_avg * sqrt(default_region_config.bridge_flow_ratio.get_abs_value(1)) - params.layer_height;
+            } else if (default_region_config.bridge_type == BridgeType::btFromFlow) {
+                float nzd_solid_infill = print_config.nozzle_diameter.get_at(default_region_config.solid_infill_extruder - 1);
+                Flow reference_flow = Flow::new_from_config_width(frInfill, default_region_config.infill_extrusion_width, nzd_solid_infill, (float)params.layer_height, 1);
+                double diameter = sqrt(4 * reference_flow.mm3_per_mm() / PI);
+                params.gap_raft_object += diameter - params.layer_height;
+            } /*else if (default_region_config.bridge_type == BridgeType::btFromHeight) {
+                params.gap_raft_object += 0;
+            }*/
+
+        }
         params.gap_raft_object = check_z_step(params.gap_raft_object, params.z_step);
         params.gap_object_support = object_config.support_material_bottom_contact_distance.get_abs_value(support_material_interface_extruder_dmr);
         params.gap_object_support = check_z_step(params.gap_object_support, params.z_step);
@@ -191,8 +211,9 @@ std::shared_ptr<SlicingParameters> SlicingParameters::create_from_config(
     }
 
     if (params.base_raft_layers > 0) {
-        params.interface_raft_layers = std::max(1, object_config.support_material_interface_layers.value);
+        params.interface_raft_layers = std::min(params.base_raft_layers - 1, (size_t)std::max(1, object_config.support_material_interface_layers.value));
         params.base_raft_layers -= params.interface_raft_layers;
+
         if (object_config.raft_layer_height.value == 0) {
             if (object_config.support_material_layer_height.value == 0) {
                 // Use as large as possible layer height for the intermediate raft layers.

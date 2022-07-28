@@ -17,6 +17,7 @@ namespace Slic3r
 
 class PrintConfig;
 class PrintObjectConfig;
+class PrintRegionConfig;
 class ModelConfig;
 class ModelObject;
 class DynamicPrintConfig;
@@ -34,6 +35,7 @@ struct SlicingParameters
     static std::shared_ptr<SlicingParameters> create_from_config(
         const PrintConfig       &print_config, 
         const PrintObjectConfig &object_config,
+        const PrintRegionConfig &default_region_config,
         coordf_t                 object_height,
         const std::set<uint16_t> &object_extruders);
 

@@ -2463,7 +2463,7 @@ PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &defau
     {
         if (!m_slicing_params || !m_slicing_params->valid)
             m_slicing_params = SlicingParameters::create_from_config(
-                this->print()->config(), m_config, this->model_object()->bounding_box().max.z(), this->object_extruders());
+                this->print()->config(), m_config, this->print()->default_region_config(), this->model_object()->bounding_box().max.z(), this->object_extruders());
     }
 
     std::shared_ptr<SlicingParameters> PrintObject::slicing_parameters(const DynamicPrintConfig& full_config, const ModelObject& model_object, float object_max_z)
@@ -2499,7 +2499,7 @@ PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &defau
 
         if (object_max_z <= 0.f)
             object_max_z = (float)model_object.raw_bounding_box().size().z();
-        return SlicingParameters::create_from_config(print_config, object_config, object_max_z, object_extruders);
+        return SlicingParameters::create_from_config(print_config, object_config, default_region_config, object_max_z, object_extruders);
     }
 
     // returns 0-based indices of extruders used to print the object (without brim, support and other helper extrusions)
