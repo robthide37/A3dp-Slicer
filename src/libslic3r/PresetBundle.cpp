@@ -837,8 +837,9 @@ ConfigSubstitutions PresetBundle::load_config_file(const std::string &path, Forw
     		config.apply(FullPrintConfig::defaults());
             config_substitutions = config.load(tree, compatibility_rule);
     		Preset::normalize(config);
-            if (from_prusa)
+            if (from_prusa) {
                 config.convert_from_prusa();
+            }
     		load_config_file_config(path, true, std::move(config));
             return config_substitutions;
         }

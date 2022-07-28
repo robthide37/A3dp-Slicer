@@ -160,7 +160,9 @@ private:
 
 extern Flow support_material_flow(const PrintObject *object, float layer_height = 0.f);
 extern Flow support_material_1st_layer_flow(const PrintObject *object, float layer_height = 0.f);
-extern Flow support_material_interface_flow(const PrintObject *object, float layer_height = 0.f);
+extern Flow support_material_interface_flow(const PrintObject* object, float layer_height = 0.f);
+extern Flow raft_flow(const PrintObject* object, float layer_height = 0.f);
+extern Flow raft_interface_flow(const PrintObject* object, float layer_height = 0.f);
 
 }
 

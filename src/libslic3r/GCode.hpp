@@ -459,6 +459,8 @@ private:
 
     std::unique_ptr<CoolingBuffer>      m_cooling_buffer;
     std::unique_ptr<SpiralVase>         m_spiral_vase;
+    //to know the current spiral layer. Only for process_layer. began at 1, 0 means no spiral. Negative means disbaled spiral.
+    int32_t                             m_spiral_vase_layer = 0;
     std::unique_ptr<GCodeFindReplace>   m_find_replace;
 #ifdef HAS_PRESSURE_EQUALIZER
     std::unique_ptr<PressureEqualizer>  m_pressure_equalizer;

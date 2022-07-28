@@ -1377,6 +1377,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipRectilinearWGapFill));
 
+    def = this->add("bridge_fill_pattern", coEnum);
+    def->label = L("Bridging fill pattern");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Fill pattern for bridges and internal bridge infill.");
+    def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
+    def->enum_values.push_back("rectilinear");
+    def->enum_values.push_back("monotonic");
+    def->enum_labels.push_back(L("Rectilinear"));
+    def->enum_labels.push_back(L("Monotonic"));
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipRectilinear));
+
     def = this->add("enforce_full_fill_volume", coBool);
     def->label = L("Enforce 100% fill volume");
     def->category = OptionCategory::infill;
@@ -2929,6 +2941,23 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionEnum<InfillConnection>(icConnected));
 
+    def = this->add("infill_connection_bridge", coEnum);
+    def->label = L("Connection of bridged infill lines");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Give to the bridge infill algorithm if the infill needs to be connected, and on which perimeters."
+        " Can be useful to disconnect to reduce a little bit the pressure buildup when going over the bridge's anchors.");
+    def->enum_keys_map = &ConfigOptionEnum<InfillConnection>::get_enum_values();
+    def->enum_values.push_back("connected");
+    def->enum_values.push_back("holes");
+    def->enum_values.push_back("outershell");
+    def->enum_values.push_back("notconnected");
+    def->enum_labels.push_back(L("Connected"));
+    def->enum_labels.push_back(L("Connected to hole perimeters"));
+    def->enum_labels.push_back(L("Connected to outer perimeters"));
+    def->enum_labels.push_back(L("Not connected"));
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionEnum<InfillConnection>(icConnected));
+
     def = this->add("infill_connection_solid", coEnum);
     def->label = L("Connection of solid infill lines");
     def->category = OptionCategory::infill;
@@ -3254,7 +3283,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("fan_speedup_overhangs", coBool);
-    def->label = L("Allow fan delay on overhangs");
+    def->label = L("Fan delay only for overhangs");
     def->category = OptionCategory::firmware;
     def->tooltip = L("Will only take into account the delay for the cooling of overhangs.");
     def->mode = comAdvancedE | comSuSi;
@@ -3498,11 +3527,12 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("max_volumetric_speed", coFloat);
     def->label = L("Volumetric speed");
-    def->full_label = L("Volumetric speed for Autospeed");
+    def->full_label = L("Maximum Print Volumetric speed");
     def->category = OptionCategory::extruders;
-    def->tooltip = L("This setting allow you to set the desired flow rate for the autospeed algorithm. It tries to keep a constant feedrate for the entire object."
-        "\nThe autospeed is only enable on speed field that have a value of 0. If a speed field is a % of a 0 field, then it will be a % of the value it should have got from the autospeed."
-        "\nIf this field is set to 0, then there is no autospeed. If a speed value i still set to 0, it will get the max speed");
+    def->tooltip = L("This setting allows you to set the maximum flowrate for your print, and so cap the desired flow rate for the autospeed algorithm."
+        " The autospeed tries to keep a constant feedrate for the entire object, and so can lower the volumetric speed for some features."
+        "\nThe autospeed is only enable on speed fields that have a value of 0. If a speed field is a % of a 0 field, then it will be a % of the value it should have got from the autospeed."
+        "\nIf this field is set to 0, then there is no autospeed nor maximum flowrate. If a speed value i still set to 0, it will get the max speed allwoed by the printer.");
     def->sidetext = L("mm³/s");
     def->min = 0;
     def->mode = comExpert | comPrusa;
@@ -4092,7 +4122,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("raft_contact_distance", coFloat);
     def->label = L("Raft contact Z distance");
     def->category = OptionCategory::support;
-    def->tooltip = L("The vertical distance between object and raft. Ignored for soluble interface.");
+    def->tooltip = L("The vertical distance between object and raft. Ignored for soluble interface. It uses the same type as the support z-offset type.");
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comAdvancedE | comPrusa;
@@ -4137,6 +4167,30 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("raft_layer_height", coFloatOrPercent);
+    def->label = L("Raft layer height");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Maximum layer height for the raft, after the first layer that uses the first layer height, and before the interface layers."
+        "\nCan be a % of the nozzle diameter"
+        "\nIf set to 0, the support layer height will be used.");
+    def->sidetext = L("mm");
+    def->ratio_over = "nozzle_diameter";
+    def->min = 0;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
+
+    def = this->add("raft_interface_layer_height", coFloatOrPercent);
+    def->label = L("Raft interface layer height");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Maximum layer height for the raft interface."
+        "\nCan be a % of the nozzle diameter"
+        "\nIf set to 0, the support layer height will be used.");
+    def->sidetext = L("mm");
+    def->ratio_over = "nozzle_diameter";
+    def->min = 0;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
     def = this->add("resolution", coFloat);
     def->label = L("Slice resolution");
@@ -4657,9 +4711,10 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Spiral vase");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("This feature will raise Z gradually while printing a single-walled object "
-                   "in order to remove any visible seam. This option requires a single perimeter, "
+                   "in order to remove any visible seam. This option requires "
                    "no infill, no top solid layers and no support material. You can still set "
-                   "any number of bottom solid layers as well as skirt/brim loops. "
+                   "any number of bottom solid layers as well as skirt/brim loops."
+                   " After the bottom solid layers, the number of perimeters is enforce to 1."
                    "It won't work when printing more than one single object.");
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
@@ -4870,6 +4925,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("support_material_angle_height", coFloat);
+    def->label = L("Pattern angle swap height");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Use this setting to rotate the support material pattern by 90° at this height (in mm). Set 0 to disable.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("support_material_buildplate_only", coBool);
     def->label = L("Support on build plate only");
     def->category = OptionCategory::support;
@@ -4973,6 +5037,27 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
+    def = this->add("support_material_interface_angle", coFloat);
+    def->label = L("Pattern angle");
+    def->full_label = L("Support interface pattern angle");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Use this setting to rotate the support material pattern on the horizontal plane.\n0 to use the support_material_angle.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 360;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(90));
+
+    def = this->add("support_material_interface_angle_increment", coFloat);
+    def->label = L("Support interface angle increment");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Each layer, add this angle to the interface pattern angle. 0 to keep the same angle, 90 to cross.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 360;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("support_material_interface_fan_speed", coInts);
     def->label = L("Support interface fan speed");
     def->category = OptionCategory::cooling;
@@ -4999,7 +5084,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Support material/raft interface extruder");
     def->category = OptionCategory::extruders;
     def->tooltip = L("The extruder to use when printing support material interface "
-                   "(1+, 0 to use the current extruder to minimize tool changes). This affects raft too.");
+        "(1+, 0 to use the current extruder to minimize tool changes). This affects raft too.");
     def->min = 0;
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionInt(0));
@@ -5047,6 +5132,18 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(2));
+
+    def = this->add("support_material_interface_layer_height", coFloatOrPercent);
+    def->label = L("Support interface layer height");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Maximum layer height for the support interface."
+        "\nCan be a % of the nozzle diameter"
+        "\nIf set to 0, the extruder maximum height will be used.");
+    def->sidetext = L("mm");
+    def->ratio_over = "nozzle_diameter";
+    def->min = 0;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
     def = this->add("support_material_interface_spacing", coFloat);
     def->label = L("Interface pattern spacing");
@@ -5110,6 +5207,18 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Ironing"));
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipRectilinear));
+
+    def = this->add("support_material_layer_height", coFloatOrPercent);
+    def->label = L("Support layer height");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Maximum layer height for the support, after the first layer that uses the first layer height, and before the interface layers."
+        "\nCan be a % of the nozzle diameter"
+        "\nIf set to 0, the extruder maximum height will be used.");
+    def->sidetext = L("mm");
+    def->ratio_over = "nozzle_diameter";
+    def->min = 0;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
     
     def = this->add("support_material_spacing", coFloat);
     def->label = L("Pattern spacing");
@@ -7035,7 +7144,8 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     };
 
     // In PrusaSlicer 2.3.0-alpha0 the "monotonic" infill was introduced, which was later renamed to "monotonous".
-    if (value == "monotonous" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern" || opt_key == "fill_pattern" || opt_key == "solid_fill_pattern" || opt_key == "support_material_interface_pattern"))
+    if (value == "monotonous" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern" || opt_key == "fill_pattern"
+            || opt_key == "solid_fill_pattern" || opt_key == "bridge_fill_pattern" || opt_key == "support_material_interface_pattern"))
         value = "monotonic";
     // some changes has occurs between rectilineargapfill and monotonicgapfill. Set them at the right value for each type
     if (value == "rectilineargapfill" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern" || opt_key == "fill_pattern" || opt_key == "support_material_interface_pattern"))
@@ -7188,6 +7298,7 @@ void ModelConfig::convert_from_prusa(const DynamicPrintConfig& global_config) {
 std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "allow_empty_layers",
 "avoid_crossing_not_first_layer",
+"bridge_fill_pattern",
 "bridge_internal_acceleration",
 "bridge_internal_fan_speed",
 "bridge_overlap",
@@ -7260,10 +7371,14 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "first_layer_min_speed",
 "first_layer_size_compensation_layers",
 "gap_fill_acceleration",
+"gap_fill_extension",
 "gap_fill_flow_match_perimeter",
 "gap_fill_last",
 "gap_fill_infill",
 "gap_fill_min_area",
+"gap_fill_max_width",
+"gap_fill_min_length",
+"gap_fill_min_width",
 "gap_fill_overlap",
 "gcode_filename_illegal_char",
 "hole_size_compensation",
@@ -7272,6 +7387,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "hole_to_polyhole_twisted",
 "hole_to_polyhole",
 "infill_connection",
+"infill_connection_bridge",
 "infill_dense_algo",
 "infill_dense",
 "infill_extrusion_spacing",
@@ -7316,6 +7432,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "printhost_client_cert",
 "printhost_client_cert_enabled",
 "printhost_client_cert_password",
+"raft_layer_height",
+"raft_interface_layer_height",
 "remaining_times_type",
 "retract_lift_first_layer",
 "retract_lift_top",
@@ -7331,11 +7449,16 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "solid_infill_acceleration",
 "solid_infill_extrusion_spacing",
 "start_gcode_manual",
+"support_material_angle_height",
 "support_material_acceleration",
 "support_material_contact_distance_type",
 "support_material_interface_acceleration",
+"support_material_interface_angle",
+"support_material_interface_angle_increment",
 "support_material_interface_fan_speed",
+"support_material_interface_layer_height",
 "support_material_interface_pattern",
+"support_material_layer_height",
 "thin_perimeters_all",
 "thin_perimeters",
 "thin_walls_acceleration",
@@ -7710,7 +7833,6 @@ void DynamicPrintConfig::normalize_fdm()
             opt_n->values.assign(opt_n->values.size(), false);  // Set all values to false.
         }
         {
-            this->opt<ConfigOptionInt>("perimeters", true)->value = 1;
             this->opt<ConfigOptionInt>("top_solid_layers", true)->value = 0;
             this->opt<ConfigOptionPercent>("fill_density", true)->value = 0;
             this->opt<ConfigOptionBool>("support_material", true)->value = false;

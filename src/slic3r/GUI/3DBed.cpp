@@ -176,10 +176,10 @@ Bed3D::Bed3D()
             }
         }
         catch (const std::ifstream::failure& err) {
-            trace(1, (std::string("The color file cannot be loaded. Reason: ") + err.what(), path_colors.string()).c_str());
+            trace(1, (std::string("The color file cannot be loaded. Reason: ") + err.what(), path_colors.string()));
         }
         catch (const std::runtime_error& err) {
-            trace(1, (std::string("Failed loading the color file. Reason: ") + err.what(), path_colors.string()).c_str());
+            trace(1, (std::string("Failed loading the color file. Reason: ") + err.what(), path_colors.string()));
         }
     }
 

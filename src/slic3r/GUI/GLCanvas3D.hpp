@@ -207,7 +207,7 @@ class GLCanvas3D
         // Maximum z of the currently selected object (Model::objects[last_object_id]).
         float                       m_object_max_z{ 0.0f };
         // Owned by LayersEditing.
-        SlicingParameters           *m_slicing_parameters{ nullptr };
+        std::shared_ptr<SlicingParameters> m_slicing_parameters{ nullptr };
         std::vector<double>         m_layer_height_profile;
         bool                        m_layer_height_profile_modified{ false };
 

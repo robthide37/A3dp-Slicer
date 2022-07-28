@@ -711,7 +711,9 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                raft_expansion))
     ((ConfigOptionPercent,              raft_first_layer_density))
     ((ConfigOptionFloat,                raft_first_layer_expansion))
+    ((ConfigOptionFloatOrPercent,       raft_interface_layer_height))
     ((ConfigOptionInt,                  raft_layers))
+    ((ConfigOptionFloatOrPercent,       raft_layer_height))
     ((ConfigOptionEnum<SeamPosition>,   seam_position))
     ((ConfigOptionPercent,              seam_angle_cost))
     ((ConfigOptionPercent,              seam_travel_cost))
@@ -724,6 +726,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 support_material_auto))
     // Direction of the support pattern (in XY plane).
     ((ConfigOptionFloat,                support_material_angle))
+    ((ConfigOptionFloat,                support_material_angle_height))
     ((ConfigOptionBool,                 support_material_buildplate_only))
     ((ConfigOptionEnum<SupportZDistanceType>,   support_material_contact_distance_type))
     // support_material_contact_distance (PS) == support_material_contact_distance_top (SuSi 2.3 &-)
@@ -733,9 +736,12 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionInt,                  support_material_enforce_layers))
     ((ConfigOptionInt,                  support_material_extruder))
     ((ConfigOptionFloatOrPercent,       support_material_extrusion_width))
+    ((ConfigOptionFloat,                support_material_interface_angle))
+    ((ConfigOptionFloat,                support_material_interface_angle_increment))
     ((ConfigOptionBool,                 support_material_interface_contact_loops))
     ((ConfigOptionInt,                  support_material_interface_extruder))
     ((ConfigOptionInt,                  support_material_interface_layers))
+    ((ConfigOptionFloatOrPercent,       support_material_interface_layer_height))
     ((ConfigOptionInt,                  support_material_bottom_interface_layers))
     // Spacing between interface lines (the hatching distance). Set zero to get a solid interface.
     ((ConfigOptionFloat,                support_material_interface_spacing))
@@ -744,6 +750,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<SupportMaterialPattern>,  support_material_pattern))
     // Morphological closing of support areas. Only used for "sung" supports.
     ((ConfigOptionFloat,                support_material_closing_radius))
+    ((ConfigOptionFloatOrPercent,       support_material_layer_height))
     // Spacing between support material lines (the hatching distance).
     ((ConfigOptionFloat,                support_material_spacing))
     ((ConfigOptionFloatOrPercent,       support_material_speed))
@@ -764,6 +771,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     PrintRegionConfig,
 
     ((ConfigOptionFloat,                bridge_angle))
+    ((ConfigOptionEnum<InfillPattern>,  bridge_fill_pattern))
     ((ConfigOptionEnum<BridgeType>,     bridge_type))
     ((ConfigOptionInt,                  bottom_solid_layers))
     ((ConfigOptionFloat,                bottom_solid_min_thickness))
@@ -834,6 +842,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<InfillConnection>,  infill_connection_solid))
     ((ConfigOptionEnum<InfillConnection>,  infill_connection_top))
     ((ConfigOptionEnum<InfillConnection>,  infill_connection_bottom))
+    ((ConfigOptionEnum<InfillConnection>,  infill_connection_bridge))
     ((ConfigOptionBool,                 infill_dense))
     ((ConfigOptionEnum<DenseInfillAlgo>,  infill_dense_algo))
     ((ConfigOptionBool,                 infill_first))

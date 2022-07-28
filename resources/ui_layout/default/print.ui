@@ -162,6 +162,10 @@ group:title_width$0:Infill
 		setting:label_left:label_width$20:label$Bottom:bottom_fill_pattern
 		setting:label$_:width$18:infill_connection_bottom
 	end_line
+	line:_
+		setting:label_left:label_width$20:label$Bridge:bridge_fill_pattern
+		setting:label$_:width$18:infill_connection_bridge
+	end_line
 group:Reducing printing time
 	setting:infill_every_layers
 	setting:infill_only_where_needed
@@ -233,38 +237,52 @@ group:Support material
 	setting:support_material_threshold
 	setting:support_material_enforce_layers
 group:Raft
-	setting:raft_layers
+	line:Layers
+		setting:label$Count:raft_layers
+		setting:label$Layer height:raft_layer_height
+		setting:label$Interface layer height:raft_interface_layer_height
+	end_line
 	line:First layer
 		setting:raft_first_layer_density
 		setting:raft_first_layer_expansion
 	end_line
-	line:advanced
+	line:Advanced
 		setting:raft_contact_distance
 		setting:raft_expansion
 	end_line
 group:Options for support material and raft
 	setting:support_material_style
+	setting:support_material_layer_height
 	line:Z-offset
 		setting:width$13:support_material_contact_distance_type
 		setting:width$6:support_material_contact_distance
 		setting:width$6:support_material_bottom_contact_distance
 	end_line
-	setting:support_material_pattern
+	line:Pattern
+		setting:label$_:support_material_pattern
+		setting:label$Spacing:support_material_spacing
+		setting:label$Angle:support_material_angle
+	end_line
 	setting:support_material_with_sheath
-	setting:support_material_spacing
-	setting:support_material_angle
 	setting:support_material_closing_radius
 	setting:tags$Advanced$Expert$Prusa:support_material_buildplate_only
 	setting:sidetext_width$7:support_material_xy_spacing
 	setting:dont_support_bridges
 	setting:support_material_synchronize_layers
 group:Options for support material interface
-	setting:support_material_interface_pattern
+	setting:support_material_interface_layer_height
+	line:Pattern
+		setting:support_material_interface_pattern
+		setting:label$Interface spacing:support_material_interface_spacing
+	end_line
+	line:Pattern Angle
+		setting:label$_:support_material_interface_angle
+		setting:label$Increment:support_material_interface_angle_increment
+	end_line
 	line:Layer count
 		setting:support_material_interface_layers
 		setting:support_material_bottom_interface_layers
 	end_line
-	setting:support_material_interface_spacing
 	setting:support_material_interface_contact_loops
 
 page:Speed:time

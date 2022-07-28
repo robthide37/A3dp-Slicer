@@ -488,11 +488,13 @@ bool Print::has_brim() const
 
 bool Print::sequential_print_horizontal_clearance_valid(const Print &print, Polygons* polygons)
 {
-    if (print.config().extruder_clearance_radius == 0)
+    if (print.config().extruder_clearance_radius == 0) {
         return true;
-	Polygons convex_hulls_other;
-    if (polygons != nullptr)
+    }
+    Polygons convex_hulls_other;
+    if (polygons != nullptr) {
         polygons->clear();
+    }
     std::vector<size_t> intersecting_idxs;
 
 	std::map<ObjectID, Polygon> map_model_object_to_convex_hull;
@@ -975,15 +977,14 @@ Flow Print::skirt_flow(size_t extruder_id, bool first_layer/*=false*/) const
         throw Slic3r::InvalidArgument("skirt_first_layer_height() can't be called without PrintObjects");
 
     //get extruder used to compute first layer height
-    double max_nozzle_diam;
+    double max_nozzle_diam = 0.f;
     for (PrintObject* pobject : m_objects) {
         PrintObject& object = *pobject;
         std::set<uint16_t> object_extruders;
         for (const PrintRegion& region : pobject->all_regions()) {
             PrintRegion::collect_object_printing_extruders(config(), object.config(), region.config(), object_extruders);
         }
-        //get object first layer extruder
-        int first_layer_extruder = 0;
+        //get object first layer extruder diam
         for (uint16_t extruder_id : object_extruders) {
             double nozzle_diameter = config().nozzle_diameter.values[extruder_id];
             max_nozzle_diam = std::max(max_nozzle_diam, nozzle_diameter);
@@ -1034,17 +1035,21 @@ void Print::process()
     name_tbb_thread_pool_threads_set_locale();
     bool something_done = !is_step_done_unguarded(psSkirtBrim);
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
-    for (PrintObject *obj : m_objects)
+    for (PrintObject* obj : m_objects) {
         obj->make_perimeters();
+    }
     //note: as object seems to be sliced independantly, it's maybe possible to add a tbb parallel_loop with simple partitioner on infill,
     //  as prepare_infill has some function not // 
-    for (PrintObject *obj : m_objects)
+    for (PrintObject* obj : m_objects) {
         obj->infill();
-    for (PrintObject *obj : m_objects)
+    }
+    for (PrintObject* obj : m_objects) {
         obj->ironing();
+    }
 	this->set_status(50, L("Generating support material"));
-    for (PrintObject *obj : m_objects)
+    for (PrintObject* obj : m_objects) {
         obj->generate_support_material();
+    }
     if (this->set_started(psWipeTower)) {
         m_wipe_tower_data.clear();
         m_tool_ordering.clear();
@@ -1121,9 +1126,9 @@ void Print::process()
                 for (const PrintObject *object : obj_group)
                     if (!object->m_layers.empty())
                         for (const PrintInstance &pt : object->m_instances) {
-                            int first_idx = brim_area.size();
+                            size_t first_idx = brim_area.size();
                             brim_area.insert(brim_area.end(), object->m_layers.front()->lslices.begin(), object->m_layers.front()->lslices.end());
-                            for (int i = first_idx; i < brim_area.size(); i++) {
+                            for (size_t i = first_idx; i < brim_area.size(); i++) {
                                 brim_area[i].translate(pt.shift.x(), pt.shift.y());
                             }
                         }
@@ -1374,7 +1379,7 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
                 assert(extruded_length[extruder_idx] >= m_config.min_skirt_length.value);
                 // Enough extruded with the current extruder. Extrude with the next one,
                 // until the prescribed number of skirt loops is extruded.
-                if (extruder_idx + 1 < extruders.size())
+                if (extruder_idx + 1 < extruders.size()) {
                     if (nb_skirts < current_lines_per_extruder) {
                         nb_skirts++;
                     } else {
@@ -1382,6 +1387,7 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
                         nb_skirts = 1;
                         ++extruder_idx;
                     }
+                }
             }
         } else {
             // The skirt lenght is not limited, extrude the skirt with the 1st extruder only.

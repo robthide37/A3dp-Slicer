@@ -94,7 +94,7 @@ std::string PrintBase::output_filename(const std::string &format, const std::str
             std::smatch matches;
             std::string::const_iterator searchStart(filename_init.cbegin());
             while (std::regex_search(searchStart, filename_init.cend(), matches, placehoder)) {
-                for (int i = 0; i < matches.size(); i++) {
+                for (size_t i = 0; i < matches.size(); i++) {
                     filename.replace(matches.position(i), matches.length(i), matches.length(i), '_');
                 }
                 searchStart = matches.suffix().first;
@@ -108,13 +108,13 @@ std::string PrintBase::output_filename(const std::string &format, const std::str
                 }catch(std::exception){}
             }
             if (!regexp_used) {
-                for(int i=0; i< forbidden_base.size(); i++)
+                for(size_t i = 0; i < forbidden_base.size(); i++)
                     std::replace(filename.begin(), filename.end(), forbidden_base.at(i), '_');
             }
             //re-put {print_time} and things like that
             searchStart = (filename_init.cbegin());
             while (std::regex_search(searchStart, filename_init.cend(), matches, placehoder)) {
-                for (int i = 0; i < matches.size(); i++) {
+                for (size_t i = 0; i < matches.size(); i++) {
                     filename.replace(matches.position(i), matches.length(i), matches.str());
                 }
                 searchStart = matches.suffix().first;

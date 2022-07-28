@@ -131,7 +131,8 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                         params.connection = region_config.infill_connection_bottom.value;
                     //FIXME for non-thick bridges, shall we allow a bottom surface pattern?
                     if (is_bridge) {
-                        params.connection = InfillConnection::icConnected;
+                        params.pattern = region_config.bridge_fill_pattern.value;
+                        params.connection = region_config.infill_connection_bridge.value;
                         params.bridge_type = region_config.bridge_type.value;
                     }
                     if (surface.has_pos_external() && !is_bridge)
@@ -140,7 +141,8 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                         params.pattern = region_config.solid_fill_pattern.value;
                 } else {
                     if (is_bridge)
-                        params.connection = InfillConnection::icConnected;
+                        params.pattern = region_config.bridge_fill_pattern.value;
+                        params.connection = region_config.infill_connection_bridge.value;
                     if (region_config.infill_dense.getBool()
                         && region_config.fill_density < 40
                         && surface.maxNbSolidLayersOnTop == 1) {

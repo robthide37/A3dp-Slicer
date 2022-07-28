@@ -138,6 +138,10 @@ static struct RunOnInit {
     }
 } g_RunOnInit;
 
+void trace(unsigned int level, const std::string& message)
+{
+	trace(level, message.c_str());
+}
 void trace(unsigned int level, const char *message)
 {
     boost::log::trivial::severity_level severity = level_to_boost(level);

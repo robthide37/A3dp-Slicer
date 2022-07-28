@@ -838,10 +838,10 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                     (*extrude_ptr)(child, mycoll);
                 //remove un-needed collection if possible
                 if (mycoll->entities().size() == 1) {
-                    parent->append(*mycoll->entities().front());
-                    delete mycoll;
+                    parent->append(*mycoll->entities().front()); //add clone
+                    delete mycoll; // remove coll & content
                 } else if (mycoll->entities().size() == 0) {
-                    delete mycoll;
+                    delete mycoll;// remove coll & content
                 } else {
                     parent->append(ExtrusionEntitiesPtr{ mycoll });
                 }
@@ -856,10 +856,10 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                 if (line.points.back() == line.points.front()) {
                     ExtrusionPath path(erSkirt, mm3_per_mm, width, height);
                     path.polyline.points = line.points;
-                    to_add.emplace_back(new ExtrusionLoop(std::move(path), elrSkirt));
+                    to_add.push_back(new ExtrusionLoop(std::move(path), elrSkirt));
                 } else {
                     ExtrusionPath* extrusion_path = new ExtrusionPath(erSkirt, mm3_per_mm, width, height);
-                    to_add.emplace_back(extrusion_path);
+                    to_add.push_back(extrusion_path);
                     extrusion_path->polyline = line;
                 }
             }
