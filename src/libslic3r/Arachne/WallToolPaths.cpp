@@ -34,6 +34,7 @@ WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t bead_width_0
     , min_feature_size(scaled<coord_t>(print_object_config.min_feature_size.value))
     , min_bead_width(scaled<coord_t>(print_object_config.min_bead_width.value))
     , small_area_length(static_cast<double>(bead_width_0) / 2.)
+    , wall_transition_filter_deviation(scaled<coord_t>(print_object_config.wall_transition_filter_deviation.value))
     , toolpaths_generated(false)
     , print_object_config(print_object_config)
 {
