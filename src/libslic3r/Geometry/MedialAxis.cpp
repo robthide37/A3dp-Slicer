@@ -3220,6 +3220,10 @@ ExtrusionEntitiesPtr
         ExtrusionPaths paths = variable_width(p, role, flow, resolution_internal, tolerance);
         // Append paths to collection.
         if (!paths.empty()) {
+            for (auto it = std::next(paths.begin()); it != paths.end(); ++it) {
+                assert(it->polyline.points.size() >= 2);
+                assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+            }
             if (paths.front().first_point().coincides_with_epsilon(paths.back().last_point())) {
                 coll.push_back(new ExtrusionLoop(std::move(paths)));
             } else {
@@ -3229,7 +3233,7 @@ ExtrusionEntitiesPtr
                     ExtrusionEntityCollection* unsortable_coll = new ExtrusionEntityCollection(std::move(paths));
                     unsortable_coll->set_can_sort_reverse(false, false);
                     coll.push_back(unsortable_coll);
-                } else {
+                } else if (role == erGapFill) {
                     if (paths.size() == 1) {
                         coll.push_back(paths.front().clone_move());
                     } else {
@@ -3239,6 +3243,9 @@ ExtrusionEntitiesPtr
                         unsortable_coll->set_can_sort_reverse(false, true);
                         coll.push_back(unsortable_coll);
                     }
+                } else {
+                    for (ExtrusionPath& path : paths)
+                        coll.push_back(new ExtrusionPath(std::move(path)));
                 }
             }
         }
