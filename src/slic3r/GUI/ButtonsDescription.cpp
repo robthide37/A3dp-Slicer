@@ -17,9 +17,6 @@ void ButtonsDescription::FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWi
 	wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(3, 5, 5);
 	sizer->Add(grid_sizer, 0, wxEXPAND);
 
-	ScalableBitmap bmp_delete = ScalableBitmap(parent, "cross");
-	ScalableBitmap bmp_delete_focus = ScalableBitmap(parent, "cross_focus");
-
 	auto add_color = [grid_sizer, parent](wxColourPickerCtrl** color_picker, const wxColour& color, const wxColour& def_color, wxString label_text) {
 		// wrap the label_text to the max 80 characters
 		if (label_text.Len() > 80) {

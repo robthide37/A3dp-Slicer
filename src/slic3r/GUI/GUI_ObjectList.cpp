@@ -971,12 +971,11 @@ void ObjectList::extruder_editing()
     if (!item || !(m_objects_model->GetItemType(item) & (itVolume | itObject)))
         return;
 
-    const int column_width = GetColumn(colExtruder)->GetWidth() + wxSystemSettings::GetMetric(wxSYS_VSCROLL_X) + 5;
-
-    wxPoint pos = this->get_mouse_position_in_control();
-    wxSize size = wxSize(column_width, -1);
-    pos.x = GetColumn(colName)->GetWidth() + GetColumn(colPrint)->GetWidth() + 5;
-    pos.y -= GetTextExtent("m").y;
+    wxRect rect = this->GetItemRect(item, GetColumn(colExtruder));
+    wxPoint pos = rect.GetPosition();
+    pos.y -= 4;
+    wxSize size = rect.GetSize();
+    size.SetWidth(size.GetWidth() + 8);
 
     apply_extruder_selector(&m_extruder_editor, this, L("default"), pos, size);
 
@@ -2431,6 +2430,21 @@ bool ObjectList::can_merge_to_single_object() const
 
     // selected object should be multipart
     return (*m_objects)[obj_idx]->volumes.size() > 1;
+}
+
+wxPoint ObjectList::get_mouse_position_in_control() const
+{
+    wxPoint pt = wxGetMousePosition() - this->GetScreenPosition();
+
+#ifdef __APPLE__
+    // Workaround for OSX. From wxWidgets 3.1.6 Hittest doesn't respect to the header of wxDataViewCtrl
+    if (wxDataViewItem top_item = this->GetTopItem(); top_item.IsOk()) {
+        auto rect = this->GetItemRect(top_item, this->GetColumn(0));
+        pt.y -= rect.y;
+    }
+#endif // __APPLE__
+
+    return pt;
 }
 
 // NO_PARAMETERS function call means that changed object index will be determine from Selection() 
@@ -4239,9 +4253,6 @@ void ObjectList::msw_rescale()
     GetColumn(colExtruder)->SetWidth( 8 * em);
     GetColumn(colEditing )->SetWidth( 3 * em);
 
-    // rescale/update existing items with bitmaps
-    m_objects_model->Rescale();
-
     Layout();
 }
 
@@ -4249,7 +4260,10 @@ void ObjectList::sys_color_changed()
 {
     wxGetApp().UpdateDVCDarkUI(this, true);
 
-    msw_rescale();
+    // update existing items with bitmaps
+    m_objects_model->UpdateBitmaps();
+
+    Layout();
 }
 
 void ObjectList::ItemValueChanged(wxDataViewEvent &event)
