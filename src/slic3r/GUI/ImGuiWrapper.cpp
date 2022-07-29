@@ -230,6 +230,9 @@ bool ImGuiWrapper::update_mouse_data(wxMouseEvent& evt)
     io.MouseDown[0] = evt.LeftIsDown();
     io.MouseDown[1] = evt.RightIsDown();
     io.MouseDown[2] = evt.MiddleIsDown();
+    io.MouseDoubleClicked[0] = evt.LeftDClick();
+    io.MouseDoubleClicked[1] = evt.RightDClick();
+    io.MouseDoubleClicked[2] = evt.MiddleDClick();
     float wheel_delta = static_cast<float>(evt.GetWheelDelta());
     if (wheel_delta != 0.0f)
         io.MouseWheel = static_cast<float>(evt.GetWheelRotation()) / wheel_delta;
