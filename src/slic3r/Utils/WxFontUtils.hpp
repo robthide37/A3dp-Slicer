@@ -36,8 +36,7 @@ public:
     static std::optional<wxFont> load_wxFont(const std::string &font_descriptor);
 
     // Try to create similar font, loaded from 3mf from different Computer
-    static std::optional<wxFont> create_wxFont(const FontItem &fi,
-                                               const FontProp &fp);
+    static std::optional<wxFont> create_wxFont(const FontItem &fi);
     // update font property by wxFont
     static void update_property(FontProp &font_prop, const wxFont &font);
 

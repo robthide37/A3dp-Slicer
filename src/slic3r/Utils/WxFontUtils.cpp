@@ -194,9 +194,9 @@ const TypeToWeight WxFontUtils::type_to_weight =
         (wxFONTWEIGHT_HEAVY,      "heavy")
         (wxFONTWEIGHT_EXTRAHEAVY, "extraHeavy");
 
-std::optional<wxFont> WxFontUtils::create_wxFont(const FontItem &fi,
-                                                 const FontProp &fp)
+std::optional<wxFont> WxFontUtils::create_wxFont(const FontItem &fi)
 {
+    const FontProp &fp = fi.prop;
     double     point_size = static_cast<double>(fp.size_in_mm);
     wxFontInfo info(point_size);
     if (fp.family.has_value()) {

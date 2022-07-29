@@ -614,7 +614,7 @@ void GLGizmoEmboss::on_set_state()
         // to reload fonts from system, when install new one
         wxFontEnumerator::InvalidateCache();
 
-        // Try(when exist) set configuration by volume
+        // Try(when exist) set text configuration by volume
         load_configuration(get_selected_volume());
 
         // change position of just opened emboss window
@@ -971,41 +971,14 @@ void GLGizmoEmboss::close()
         mng.open_gizmo(GLGizmosManager::Emboss);
 }
 
-//void GLGizmoEmboss::fill_stored_font_items()
-//{
-//    m_stored_font_items.clear();
-//    for (const auto &item : m_style_manager.get_styles()) {
-//        const FontItem &fi = item.font_item;
-//        // skip file paths + fonts from other OS(loaded from .3mf)
-//        if (fi.type != WxFontUtils::get_actual_type()) continue;
-//
-//        assert(m_stored_font_items.find(fi.name) == m_stored_font_items.end());
-//        m_stored_font_items[fi.name] = fi; // copy
-//    }
-//    select_stored_font_item();
-//}
-//
-//void GLGizmoEmboss::select_stored_font_item()
-//{    
-//    const std::string &name = m_style_manager.get_font_item().name;
-//    const auto &it = m_stored_font_items.find(name);
-//    if (it == m_stored_font_items.end()) { 
-//        m_stored_font_item.reset();
-//        m_stored_wx_font.reset();
-//        return;
-//    }
-//    m_stored_font_item = it->second;
-//    m_stored_wx_font = WxFontUtils::load_wxFont(m_stored_font_item->path);
-//}
-
 void GLGizmoEmboss::draw_window()
 {
 #ifdef ALLOW_DEBUG_MODE
     if (ImGui::Button("re-process")) process();
     if (ImGui::Button("add svg")) choose_svg_file();
     if (ImGui::Button("use system font")) {
-        size_t font_index = m_font_list.size();
-        m_font_list.emplace_back(WxFontUtils::get_os_font());
+        size_t font_index = m_style_items.size();
+        m_style_items.emplace_back(WxFontUtils::get_os_font());
         bool loaded = load_font(font_index);
     }
 #endif //  ALLOW_DEBUG_MODE
@@ -1487,37 +1460,149 @@ void GLGizmoEmboss::draw_model_type()
     }
 }
 
-void GLGizmoEmboss::draw_rename_style_botton()
-{
-    bool start_rename = false;
-    if (draw_button(IconType::rename))
-        start_rename = true;
-    else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Rename actual style.").c_str());
+void GLGizmoEmboss::draw_rename_popup() {
+    std::string& new_name = m_style_manager.get_font_item().name;
+    const std::string &old_name = m_style_manager.get_stored_font_item()->name;
+    std::string text_in_popup = GUI::format(_u8L("Rename style(%1%) for embossing text: "), old_name);
+    ImGui::Text("%s", text_in_popup.c_str());
+    
+    bool is_unique = true;
+    for (const auto &item : m_style_manager.get_styles()) {
+        const FontItem &fi = item.font_item;
+        if (&fi == &m_style_manager.get_font_item())
+            continue; // could be same as original name
+        if (fi.name == new_name) is_unique = false;
+    }
+    bool allow_change = false;
+    if (new_name.empty()) {
+        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
+    }else if (!is_unique) { 
+        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name has to be unique."));
+    } else {
+        ImGui::NewLine();
+        allow_change = true;
+    }
 
+    bool store = false;
+    ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
+    if (ImGui::InputText("##rename style", &new_name, flags) && allow_change) store = true;
+
+    static bool rename_in_volumes = true;
+    ImGui::Checkbox(_u8L("Rename style in scene volumes.").c_str(), &rename_in_volumes);
+
+    if (m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change)) store = true;
+
+    ImGui::SameLine();
+    if (ImGui::Button(_u8L("cancel").c_str())) {
+        new_name = old_name;
+        ImGui::CloseCurrentPopup();
+    }
+
+    if (store) {
+        if (rename_in_volumes) {
+            // rename style in all objects and volumes
+            for (ModelObject *mo :wxGetApp().plater()->model().objects) {
+                for (ModelVolume *mv : mo->volumes) { 
+                    if (!mv->text_configuration.has_value()) continue;
+                    std::string& name = mv->text_configuration->font_item.name;
+                    if (name != old_name) continue;
+                    name = new_name;
+                }
+            }
+        }
+        m_style_manager.rename(new_name);
+        m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
+        ImGui::CloseCurrentPopup();
+    }
+}
+
+void GLGizmoEmboss::draw_style_rename_button()
+{
+    bool can_rename = m_style_manager.exist_stored_style();
     std::string title = _u8L("Rename style");
     const char * popup_id = title.c_str();
-    static FontItem *  rename_item;
-    static std::string new_name;
-    if (start_rename && !ImGui::IsPopupOpen(popup_id)) {
+    if (draw_button(IconType::rename, !can_rename)) {
+        assert(m_style_manager.get_stored_font_item());
         ImGui::OpenPopup(popup_id);
-        rename_item = &m_style_manager.get_font_item();
-        new_name    = rename_item->name; // initialize with original copy
+    }
+    else if (ImGui::IsItemHovered()) {
+        if (can_rename) ImGui::SetTooltip("%s", _u8L("Rename actual style.").c_str());
+        else            ImGui::SetTooltip("%s", _u8L("Can't rename temporary style.").c_str());
+    }
+    if (ImGui::BeginPopupModal(popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+        draw_rename_popup();
+        ImGui::EndPopup();
+    }
+}
+
+void GLGizmoEmboss::draw_style_save_button()
+{
+    bool is_stored_style     = m_style_manager.exist_stored_style();
+    const FontItem *stored_fi = nullptr;
+    if (is_stored_style)
+        stored_fi = m_style_manager.get_stored_font_item();
+
+    const FontItem &fi  = m_style_manager.get_font_item();    
+    bool is_changed = (stored_fi)? !(*stored_fi == fi) : true;
+
+    bool is_style_order_changed = m_style_manager.is_style_order_changed();
+    bool is_activ_style_changed = m_style_manager.is_activ_style_changed();
+    bool can_save = is_changed || is_style_order_changed || is_activ_style_changed;
+    if (draw_button(IconType::save, !can_save)) {
+        // save styles to app config
+        m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
+    }else if (ImGui::IsItemHovered()) { 
+        if (!is_stored_style) {
+            ImGui::SetTooltip("%s", _u8L("Add style to be able save.").c_str());
+        } else if (is_changed) {
+            ImGui::SetTooltip("%s", _u8L("Save changes into style.").c_str());
+        } else if (is_style_order_changed) {
+            ImGui::SetTooltip("%s", _u8L("Save order of styles.").c_str());
+        } else if (is_activ_style_changed) {
+            ImGui::SetTooltip("%s", _u8L("Save style selection.").c_str());
+        } else {
+            ImGui::SetTooltip("%s", _u8L("No changes to save into style").c_str());
+        }
+    }
+}
+
+void GLGizmoEmboss::draw_style_save_as_button()
+{
+    bool start_save_as = false;
+    bool only_add_style = !m_style_manager.exist_stored_style();
+    // save as new style
+    ImGui::SameLine();
+    if (draw_button(IconType::duplicate)) {
+        if (!m_style_manager.exist_stored_style()) {
+            m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
+        } else {
+            start_save_as = true;
+        }
+        //m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
+    } else if (ImGui::IsItemHovered()) {
+        if (only_add_style) {
+            ImGui::SetTooltip("%s", _u8L("Add style to my list.").c_str());
+        } else {
+            ImGui::SetTooltip("%s", _u8L("Add as new named style.").c_str());
+        }
+    }
+
+    std::string title = _u8L("Save as new style");
+    const char * popup_id = title.c_str();
+    static std::string new_name;
+    if (start_save_as && !ImGui::IsPopupOpen(popup_id)) {
+        ImGui::OpenPopup(popup_id);
+        // initialize with original copy
+        new_name = m_style_manager.get_font_item().name;
     }
 
     if (ImGui::BeginPopupModal(popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
-        const std::string &original_style_name = rename_item->name;
-        std::string text_in_popup =
-            GUI::format(_u8L("Rename style(%1%) for embossing text: "), original_style_name);
-        ImGui::Text("%s", text_in_popup.c_str());
+        ImGui::Text("%s", _u8L("New name of style: ").c_str());
 
         bool is_unique = true;
-        for (const auto &item : m_style_manager.get_styles()) {
-            const FontItem &fi = item.font_item;
-            if (&fi == rename_item)
-                continue; // could be same as original name
-            if (fi.name == new_name) is_unique = false;
-        }
+        for (const auto &item : m_style_manager.get_styles())
+            if (item.font_item.name == new_name) is_unique = false;
+        
         bool allow_change = false;
         if (new_name.empty()) {
             m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
@@ -1529,19 +1614,44 @@ void GLGizmoEmboss::draw_rename_style_botton()
         }
 
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
-        if ((ImGui::InputText("##rename style", &new_name, flags) && allow_change) ||
+        if ((ImGui::InputText("##save as style", &new_name, flags) && allow_change) ||
             m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change)) {
-            rename_item->name = new_name;
-            m_style_manager.get_truncated_name().clear();
+            m_style_manager.store_style(new_name);
+            m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
             ImGui::CloseCurrentPopup();
         }
+        ImGui::SameLine();
+        if (ImGui::Button(_u8L("cancel").c_str()))
+            ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
 }
 
+void GLGizmoEmboss::draw_style_undo_button() {
+    const FontItem *stored_fi = nullptr;
+    bool is_stored = m_style_manager.exist_stored_style();
+    if (is_stored)
+        stored_fi = m_style_manager.get_stored_font_item();
+    const FontItem &fi  = m_style_manager.get_font_item();
+    bool is_changed = (stored_fi)? !(*stored_fi == fi) : true;    
+    bool can_undo = is_stored && is_changed;
+    if (draw_button(IconType::undo, !can_undo)) {
+        discard_changes_in_style();
+        process();
+    } else if (ImGui::IsItemHovered()) {
+        if (can_undo)
+            ImGui::SetTooltip("%s", _u8L("Discard style changes.").c_str());
+        else if (!is_stored)
+            ImGui::SetTooltip("%s", _u8L("Not stored yet.").c_str());
+        else if (!is_changed)
+            ImGui::SetTooltip("%s", _u8L("No change to discard.").c_str());
+    }
+}
+
 void GLGizmoEmboss::draw_delete_style_button() {
-    bool can_delete = 
-        m_style_manager.get_style_index() != std::numeric_limits<size_t>::max();
+    bool is_stored  = m_style_manager.exist_stored_style();
+    bool is_last    = m_style_manager.get_styles().size() == 1;
+    bool can_delete = is_stored && !is_last;
 
     std::string title = _u8L("Remove style");
     const char * popup_id = title.c_str();
@@ -1573,9 +1683,10 @@ void GLGizmoEmboss::draw_delete_style_button() {
 
     if (ImGui::IsItemHovered()) {
         const std::string &style_name = m_style_manager.get_font_item().name;
-        std::string tooltip = can_delete ?            
-            GUI::format(_L("Delete \"%1%\" style."), style_name) :
-            GUI::format(_L("Can't delete \"%1%\". It is last style."), style_name) ;
+        std::string tooltip;
+        if (can_delete)        tooltip = GUI::format(_L("Delete \"%1%\" style."), style_name);
+        else if (is_last)      tooltip = GUI::format(_L("Can't delete \"%1%\". It is last style."), style_name);
+        else/*if(!is_stored)*/ tooltip = GUI::format(_L("Can't delete temporary style \"%1%\"."), style_name);        
         ImGui::SetTooltip("%s", tooltip.c_str());
     }
 
@@ -1584,8 +1695,8 @@ void GLGizmoEmboss::draw_delete_style_button() {
         std::string text_in_popup = GUI::format(_u8L("Are you sure,\nthat you want permanently and unrecoverable \nremove style \"%1%\"?"), style_name);
         ImGui::Text("%s", text_in_popup.c_str());
         if (ImGui::Button(_u8L("Yes").c_str())) {
-            m_style_manager.load_font(next_style_index);
             size_t activ_index = m_style_manager.get_style_index();
+            m_style_manager.load_font(next_style_index);
             m_style_manager.erase(activ_index);
             m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
             ImGui::CloseCurrentPopup();
@@ -1664,7 +1775,11 @@ void GLGizmoEmboss::draw_style_list() {
         const std::string &current_name  = actual_font_item.name;
         trunc_name = ImGuiWrapper::trunc(current_name, max_width);
     }
-    ImGui::Text("%s", m_gui_cfg->translations.style.c_str());
+
+    if (m_style_manager.exist_stored_style())
+        ImGui::Text("%s", m_gui_cfg->translations.style.c_str());
+    else ImGui::TextColored(ImGuiWrapper::COL_ORANGE_LIGHT, "%s", m_gui_cfg->translations.style.c_str());
+
     ImGui::SameLine(m_gui_cfg->style_offset);
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
     if (ImGui::BeginCombo("##style_selector", trunc_name.c_str())) {
@@ -1720,7 +1835,7 @@ void GLGizmoEmboss::draw_style_list() {
     }
         
     ImGui::SameLine();
-    draw_rename_style_botton();
+    draw_style_rename_button();
         
     // Is style changed against stored one
     FontItem &font_item = m_style_manager.get_font_item();
@@ -1733,33 +1848,15 @@ void GLGizmoEmboss::draw_style_list() {
     bool is_changed = (is_stored) ? !(*stored_fi == font_item) : true;
     // TODO: check order of font items in list to allowe save actual order
 
-    // save button
     ImGui::SameLine();
-    if (draw_button(IconType::save, !is_changed)) {
-        // save styles to app config
-        m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
-    }else if (ImGui::IsItemHovered()) { 
-        if (is_changed) {
-            ImGui::SetTooltip("%s", _u8L("Save current settings to selected style").c_str());
-        } else {
-            ImGui::SetTooltip("%s", _u8L("No changes to save into style").c_str());
-        }
-    }
+    draw_style_save_button();
+
+    ImGui::SameLine();
+    draw_style_save_as_button();
 
     // undo button
     ImGui::SameLine();
-    bool can_undo = is_stored && is_changed;
-    if (draw_button(IconType::undo, !can_undo)) {
-        discard_changes_in_style();
-        process();
-    } else if (ImGui::IsItemHovered()) {
-        if (can_undo)
-            ImGui::SetTooltip("%s", _u8L("Reload stored values of selected style").c_str());
-        else if (!is_stored)
-            ImGui::SetTooltip("%s", _u8L("Nothing to reload from").c_str());
-        else if (!is_changed)
-            ImGui::SetTooltip("%s", _u8L("No change to restore from style").c_str());
-    }    
+    draw_style_undo_button();    
     
 #ifdef ALLOW_REVERT_ALL_STYLES
     ImGui::SameLine();
@@ -1771,7 +1868,7 @@ void GLGizmoEmboss::draw_style_list() {
     draw_delete_style_button();
 }
 
-bool GLGizmoEmboss::italic_button()
+bool GLGizmoEmboss::draw_italic_button()
 {
     std::optional<wxFont> &wx_font = m_style_manager.get_wx_font(); 
     const auto& ff = m_style_manager.get_font_file_with_cache();
@@ -1814,7 +1911,7 @@ bool GLGizmoEmboss::italic_button()
     return false;
 }
 
-bool GLGizmoEmboss::bold_button() {
+bool GLGizmoEmboss::draw_bold_button() {
     std::optional<wxFont> &wx_font = m_style_manager.get_wx_font();
     const auto& ff = m_style_manager.get_font_file_with_cache();
     if (!wx_font.has_value() || !ff.has_value()) {
@@ -1881,7 +1978,7 @@ bool GLGizmoEmboss::revertible(const std::string &name,
                                Draw               draw)
 {
     bool changed = exist_change(value, default_value);
-    if (changed)
+    if (changed || default_value == nullptr)
         ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, name);
     else
         ImGuiWrapper::text(name);
@@ -1976,7 +2073,7 @@ void GLGizmoEmboss::draw_style_edit() {
         is_font_changed = is_font_face_changed || is_font_style_changed;
     }
 
-    if (is_font_changed)
+    if (is_font_changed || !exist_stored_style)
         ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, tr.font);
     else
         ImGuiWrapper::text(tr.font);
@@ -1985,9 +2082,10 @@ void GLGizmoEmboss::draw_style_edit() {
     draw_font_list();
     ImGui::SameLine();
     bool exist_change = false;
-    exist_change |= italic_button();
+    if (draw_italic_button()) exist_change = true;
+
     ImGui::SameLine();
-    exist_change |= bold_button();
+    if (draw_bold_button()) exist_change = true;
     
     if (is_font_changed) {
         ImGui::SameLine(ImGui::GetStyle().FramePadding.x);
@@ -2537,50 +2635,46 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
     if (volume == nullptr) return false;
     if (!volume->text_configuration.has_value()) return false;
 
-    TextConfiguration &configuration = *volume->text_configuration;
-    FontItem &         c_font_item   = configuration.font_item;
+    TextConfiguration &tc    = *volume->text_configuration;
+    FontItem          &tc_fi = tc.font_item;
 
-    auto has_same_name = [&c_font_item](const FontManager::Item &font_item) -> bool {
+    auto has_same_name = [&tc_fi](const FontManager::Item &font_item) -> bool {
         const FontItem &fi = font_item.font_item;
-        return fi.name == c_font_item.name;
+        return fi.name == tc_fi.name;
     };
+
+    std::optional<wxFont> wx_font_opt;
+    if (tc_fi.type == WxFontUtils::get_actual_type())
+        wx_font_opt = WxFontUtils::load_wxFont(tc_fi.path);
+    if (!wx_font_opt.has_value()) {
+        create_notification_not_valid_font(tc);
+        // Try create similar wx font
+        wx_font_opt = WxFontUtils::create_wxFont(tc_fi);
+    }
 
     const auto& styles = m_style_manager.get_styles();
     auto it = std::find_if(styles.begin(), styles.end(), has_same_name);
-    bool found_font = it != styles.end();
-    size_t font_index;
-    if (!found_font) {
-        // font is not in list
-        // add font to list
-        font_index = styles.size();
-        m_style_manager.load_font(c_font_item);
-        // TODO: Add style only temporary !!
-        // IMPROVE: Use private member for actual style
+    if (it == styles.end()) {
+        // style was not found
+        if (wx_font_opt.has_value())
+            m_style_manager.load_font(tc_fi, *wx_font_opt);
     } else {
-        // font is found in list
-        font_index = it - styles.begin();
-    }
+        size_t style_index = it - styles.begin();
+        if (!m_style_manager.load_font(style_index)) {
+            // can`t load stored style
+            m_style_manager.erase(style_index);
+            if (wx_font_opt.has_value())
+                m_style_manager.load_font(tc_fi, *wx_font_opt);
 
-    m_text      = configuration.text;
-    m_volume    = volume;
-
-    if (!m_style_manager.load_font(font_index)) {
-        // create similar font
-        auto wx_font = WxFontUtils::create_wxFont(c_font_item, configuration.font_item.prop);
-        if (wx_font.has_value()) {
-            // fix not loadable font item
-            FontItem &fi = m_style_manager.get_font_item();
-            FontItem fi_new = WxFontUtils::get_font_item(*wx_font);
-            fi_new.name = fi.name; // use previous name
-            fi = fi_new; // rewrite font item
-            fi.prop = configuration.font_item.prop;
-            if (!m_style_manager.load_font(fi, *wx_font)) return false;
         } else {
-            // can't create similar font use previous
-            m_style_manager.erase(font_index);
+            // stored style is loaded, add volume changes
+            m_style_manager.get_font_item() = tc_fi;
+            m_style_manager.get_wx_font()   = wx_font_opt;
         }
-        create_notification_not_valid_font(configuration);
     }
+
+    m_text      = tc.text;
+    m_volume    = volume;
     return true;
 }
 
@@ -2758,26 +2852,6 @@ bool GLGizmoEmboss::is_text_object(const ModelVolume *text) {
     }
     return true;
 }
-
-//void GLGizmoEmboss::store_font_item_to_app_config() const
-//{
-//    AppConfig *cfg = wxGetApp().app_config;
-//    // index of section start from 1
-//    const auto &act_item = m_style_manager.get_activ_style();
-//    const FontItem &fi = act_item.font_item;
-//
-//    //size_t index = &m_style_manager.get_activ_style() -
-//    //               &m_style_manager.get_fonts().front();
-//    // fix index when, not serialized font is in list
-//    size_t index = 0;
-//    for (const auto &item : m_style_manager.get_fonts()) {
-//        if (fi.type != WxFontUtils::get_actual_type()) continue;
-//        if (&item == &act_item) break;
-//        ++index;
-//    }
-//    
-//    FontListSerializable::store_font_item(*cfg, fi, index);
-//}
 
 std::string GLGizmoEmboss::get_file_name(const std::string &file_path)
 {

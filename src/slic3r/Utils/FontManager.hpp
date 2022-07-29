@@ -42,19 +42,43 @@ public:
     bool store_font_list_to_app_config(AppConfig *cfg);
 
     /// <summary>
-    /// Change order of style item in m_font_list.
+    /// Append actual style to style list and store
+    /// </summary>
+    /// <param name="name">New name for style</param>
+    void store_style(const std::string& name);
+
+    /// <summary>
+    /// Change order of style item in m_style_items.
     /// Fix selected font index when (i1 || i2) == m_font_selected 
     /// </summary>
-    /// <param name="i1">First index to m_font_list</param>
-    /// <param name="i2">Second index to m_font_list</param>
+    /// <param name="i1">First index to m_style_items</param>
+    /// <param name="i2">Second index to m_style_items</param>
     void swap(size_t i1, size_t i2);
 
     /// <summary>
-    /// Remove style from m_font_list.
+    /// Track using of swap between saves
+    /// </summary>
+    /// <returns>True when swap was call after save otherwise false</returns>
+    bool is_style_order_changed() const;
+
+    /// <summary>
+    /// Check that actual selected style is same as activ style stored in "PrusaSlicer.ini"
+    /// </summary>
+    /// <returns>True when actual selection is not stored otherwise False</returns>
+    bool is_activ_style_changed() const;
+
+    /// <summary>
+    /// Remove style from m_style_items.
     /// Fix selected font index when index is under m_font_selected
     /// </summary>
     /// <param name="index">Index of style to be removed</param>
     void erase(size_t index);
+
+    /// <summary>
+    /// Rename actual selected font item
+    /// </summary>
+    /// <param name="name">New name</param>
+    void rename(const std::string &name);
 
     /// <summary>
     /// Actual wx font was changed
@@ -67,7 +91,7 @@ public:
     /// Change active font
     /// When font not loaded roll back activ font
     /// </summary>
-    /// <param name="font_index">New font index(from m_font_list range)</param>
+    /// <param name="font_index">New font index(from m_style_items range)</param>
     /// <returns>True on succes. False on fail load font</returns>
     bool load_font(size_t font_index);
     // load font style not stored in list
@@ -205,7 +229,7 @@ private:
         // cache for stored wx font to not create every frame
         std::optional<wxFont> stored_wx_font;
 
-        // index into m_font_list
+        // index into m_style_items
         size_t font_index = std::numeric_limits<size_t>::max();
 
     } m_style_cache;
@@ -218,7 +242,9 @@ private:
     void make_unique_name(std::string &name);
 
     // Privat member
-    std::vector<Item> m_font_list;
+    std::vector<Item> m_style_items;
+    bool m_change_order = false;
+    size_t m_stored_activ_index;
 
     /// <summary>
     /// Keep data needed to create Font Style Images in Job
