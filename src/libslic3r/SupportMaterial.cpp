@@ -573,71 +573,7 @@ void PrintObjectSupportMaterial::generate(PrintObject &object)
 //    intermediate_layers.clear();
 //    interface_layers.clear();
 
-    // Install support layers into the object.
-    // A support layer installed on a PrintObject has a unique print_z.
-    SupportGeneratorLayersPtr layers_sorted;
-    layers_sorted.reserve(raft_layers.size() + bottom_contacts.size() + top_contacts.size() + intermediate_layers.size() + interface_layers.size() + base_interface_layers.size());
-    layers_append(layers_sorted, raft_layers);
-    layers_append(layers_sorted, bottom_contacts);
-    layers_append(layers_sorted, top_contacts);
-    layers_append(layers_sorted, intermediate_layers);
-    layers_append(layers_sorted, interface_layers);
-    layers_append(layers_sorted, base_interface_layers);
-    // Sort the layers lexicographically by a raising print_z and a decreasing height.
-    std::sort(layers_sorted.begin(), layers_sorted.end(), [](auto *l1, auto *l2) { return *l1 < *l2; });
-    int layer_id = 0;
-    int layer_id_interface = 0;
-    assert(object.support_layers().empty());
-    for (size_t i = 0; i < layers_sorted.size();) {
-        // Find the last layer with roughly the same print_z, find the minimum layer height of all.
-        // Due to the floating point inaccuracies, the print_z may not be the same even if in theory they should.
-        size_t j = i + 1;
-        coordf_t zmax = layers_sorted[i]->print_z + EPSILON;
-        for (; j < layers_sorted.size() && layers_sorted[j]->print_z <= zmax; ++j) ;
-        // Assign an average print_z to the set of layers with nearly equal print_z.
-        coordf_t zavg = 0.5 * (layers_sorted[i]->print_z + layers_sorted[j - 1]->print_z);
-        coordf_t height_min = layers_sorted[i]->height;
-        bool     empty = true;
-        // For snug supports, layers where the direction of the support interface shall change are accounted for.
-        size_t   num_interfaces = 0;
-        size_t   num_top_contacts = 0;
-        double   top_contact_bottom_z = 0;
-        for (size_t u = i; u < j; ++u) {
-            SupportGeneratorLayer &layer = *layers_sorted[u];
-            if (! layer.polygons.empty()) {
-                empty             = false;
-                num_interfaces   += one_of(layer.layer_type, support_types_interface);
-                if (layer.layer_type == SupporLayerType::TopContact) {
-                    ++ num_top_contacts;
-                    assert(num_top_contacts <= 1);
-                    // All top contact layers sharing this print_z shall also share bottom_z.
-                    //assert(num_top_contacts == 1 || (top_contact_bottom_z - layer.bottom_z) < EPSILON);
-                    top_contact_bottom_z = layer.bottom_z;
-                }
-            }
-            layer.print_z = zavg;
-            height_min = std::min(height_min, layer.height);
-        }
-        if (! empty) {
-            // Here the upper_layer and lower_layer pointers are left to null at the support layers, 
-            // as they are never used. These pointers are candidates for removal.
-            bool   this_layer_contacts_only = num_top_contacts > 0 && num_top_contacts == num_interfaces;
-            size_t this_layer_id_interface  = layer_id_interface;
-            if (this_layer_contacts_only) {
-                // Find a supporting layer for its interface ID.
-                for (auto it = object.support_layers().rbegin(); it != object.support_layers().rend(); ++ it)
-                    if (const SupportLayer &other_layer = **it; std::abs(other_layer.print_z - top_contact_bottom_z) < EPSILON) {
-                        // other_layer supports this top contact layer. Assign a different support interface direction to this layer
-                        // from the layer that supports it.
-                        this_layer_id_interface = other_layer.interface_id() + 1;
-                    }
-            }
-            object.add_support_layer(layer_id ++, this_layer_id_interface, height_min, zavg);
-            if (num_interfaces && ! this_layer_contacts_only)
-                ++ layer_id_interface;
-        }
-        i = j;
-    }
+    generate_support_layers(object, raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
 
     BOOST_LOG_TRIVIAL(info) << "Support generator - Generating tool paths";
 
@@ -3909,6 +3845,82 @@ void modulate_extrusion_by_overlapping_layers(
     //FIXME this shall not happen, if the Clipper works as expected and all paths split to fragments could be re-connected.
     for (auto it_fragment = path_fragments.begin(); it_fragment != path_fragments.end(); ++ it_fragment)
         extrusion_entities_append_paths(extrusions_in_out, std::move(it_fragment->polylines), extrusion_role, it_fragment->mm3_per_mm, it_fragment->width, it_fragment->height);
+}
+
+void generate_support_layers(
+    PrintObject                         &object,
+    const SupportGeneratorLayersPtr     &raft_layers,
+    const SupportGeneratorLayersPtr     &bottom_contacts,
+    const SupportGeneratorLayersPtr     &top_contacts,
+    const SupportGeneratorLayersPtr     &intermediate_layers,
+    const SupportGeneratorLayersPtr     &interface_layers,
+    const SupportGeneratorLayersPtr     &base_interface_layers)
+{
+    // Install support layers into the object.
+    // A support layer installed on a PrintObject has a unique print_z.
+    SupportGeneratorLayersPtr layers_sorted;
+    layers_sorted.reserve(raft_layers.size() + bottom_contacts.size() + top_contacts.size() + intermediate_layers.size() + interface_layers.size() + base_interface_layers.size());
+    layers_append(layers_sorted, raft_layers);
+    layers_append(layers_sorted, bottom_contacts);
+    layers_append(layers_sorted, top_contacts);
+    layers_append(layers_sorted, intermediate_layers);
+    layers_append(layers_sorted, interface_layers);
+    layers_append(layers_sorted, base_interface_layers);
+    // Sort the layers lexicographically by a raising print_z and a decreasing height.
+    std::sort(layers_sorted.begin(), layers_sorted.end(), [](auto *l1, auto *l2) { return *l1 < *l2; });
+    int layer_id = 0;
+    int layer_id_interface = 0;
+    assert(object.support_layers().empty());
+    for (size_t i = 0; i < layers_sorted.size();) {
+        // Find the last layer with roughly the same print_z, find the minimum layer height of all.
+        // Due to the floating point inaccuracies, the print_z may not be the same even if in theory they should.
+        size_t j = i + 1;
+        coordf_t zmax = layers_sorted[i]->print_z + EPSILON;
+        for (; j < layers_sorted.size() && layers_sorted[j]->print_z <= zmax; ++j) ;
+        // Assign an average print_z to the set of layers with nearly equal print_z.
+        coordf_t zavg = 0.5 * (layers_sorted[i]->print_z + layers_sorted[j - 1]->print_z);
+        coordf_t height_min = layers_sorted[i]->height;
+        bool     empty = true;
+        // For snug supports, layers where the direction of the support interface shall change are accounted for.
+        size_t   num_interfaces = 0;
+        size_t   num_top_contacts = 0;
+        double   top_contact_bottom_z = 0;
+        for (size_t u = i; u < j; ++u) {
+            SupportGeneratorLayer &layer = *layers_sorted[u];
+            if (! layer.polygons.empty()) {
+                empty             = false;
+                num_interfaces   += one_of(layer.layer_type, support_types_interface);
+                if (layer.layer_type == SupporLayerType::TopContact) {
+                    ++ num_top_contacts;
+                    assert(num_top_contacts <= 1);
+                    // All top contact layers sharing this print_z shall also share bottom_z.
+                    //assert(num_top_contacts == 1 || (top_contact_bottom_z - layer.bottom_z) < EPSILON);
+                    top_contact_bottom_z = layer.bottom_z;
+                }
+            }
+            layer.print_z = zavg;
+            height_min = std::min(height_min, layer.height);
+        }
+        if (! empty) {
+            // Here the upper_layer and lower_layer pointers are left to null at the support layers, 
+            // as they are never used. These pointers are candidates for removal.
+            bool   this_layer_contacts_only = num_top_contacts > 0 && num_top_contacts == num_interfaces;
+            size_t this_layer_id_interface  = layer_id_interface;
+            if (this_layer_contacts_only) {
+                // Find a supporting layer for its interface ID.
+                for (auto it = object.support_layers().rbegin(); it != object.support_layers().rend(); ++ it)
+                    if (const SupportLayer &other_layer = **it; std::abs(other_layer.print_z - top_contact_bottom_z) < EPSILON) {
+                        // other_layer supports this top contact layer. Assign a different support interface direction to this layer
+                        // from the layer that supports it.
+                        this_layer_id_interface = other_layer.interface_id() + 1;
+                    }
+            }
+            object.add_support_layer(layer_id ++, this_layer_id_interface, height_min, zavg);
+            if (num_interfaces && ! this_layer_contacts_only)
+                ++ layer_id_interface;
+        }
+        i = j;
+    }
 }
 
 void generate_support_toolpaths(

@@ -200,9 +200,10 @@ public:
             if (config.diameter_scale_bp_radius > 0)
             {
                 coord_t foot_increase_radius = std::abs(std::max(config.getCollisionRadius(second), config.getCollisionRadius(first)) - config.getCollisionRadius(*this));
-                elephant_foot_increases = foot_increase_radius / (config.branch_radius * (config.diameter_scale_bp_radius - config.diameter_angle_scale_factor)); // elephant_foot_increases has to be recalculated, as when a smaller tree with a larger elephant_foot_increases merge with a larger branch the elephant_foot_increases may have to be lower as otherwise the radius suddenly increases. This results often in a non integer value.
+                // elephant_foot_increases has to be recalculated, as when a smaller tree with a larger elephant_foot_increases merge with a larger branch 
+                // the elephant_foot_increases may have to be lower as otherwise the radius suddenly increases. This results often in a non integer value.
+                elephant_foot_increases = foot_increase_radius / (config.branch_radius * (config.diameter_scale_bp_radius - config.diameter_angle_scale_factor));
             }
-
 
             // set last settings to the best out of both parents. If this is wrong, it will only cause a small performance penalty instead of weird behavior.
             last_area_increase = {
@@ -398,9 +399,7 @@ public:
             // When for all meshes the z bottom and top distance is more than one layer though the worst case is xy_min_distance + min_feature_size
             // This is not the best solution, but the only one to ensure areas can not lag though walls at high maximum_move_distance.
             if (has_to_rely_on_min_xy_dist_only)
-            {
                 xy_min_distance = std::max(coord_t(100), xy_min_distance); // If set to low rounding errors WILL cause errors. Best to keep it above 25.
-            }
 
             xy_distance = std::max(xy_distance, xy_min_distance);
 
@@ -678,7 +677,7 @@ public:
          */
         [[nodiscard]] inline coord_t recommendedMinRadius(LayerIndex layer_idx) const
         {
-            double scale = (layer_start_bp_radius - layer_idx) * diameter_scale_bp_radius;
+            double scale = (layer_start_bp_radius - int(layer_idx)) * diameter_scale_bp_radius;
             return scale > 0 ? branch_radius + branch_radius * scale : 0;
         }
 

@@ -80,12 +80,17 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
 
 static Polygons calculateMachineBorderCollision(Polygon machine_border)
 {
-    Polygons machine_volume_border;
     // Put a border of 1m around the print volume so that we don't collide.
-    append(machine_volume_border, offset(machine_border, scaled<float>(1000.)));
+#if 1
+    //FIXME just returning no border will let tree support legs collide with print bed boundary
+    return {};
+#else
+    //FIXME offsetting by 1000mm easily overflows int32_tr coordinate.
+    Polygons out = offset(machine_border, scaled<float>(1000.), jtMiter, 1.2);
     machine_border.reverse(); // Makes the polygon negative so that we subtract the actual volume from the collision area.
-    machine_volume_border.emplace_back(std::move(machine_border));
-    return machine_volume_border;
+    out.emplace_back(std::move(machine_border));
+    return out;
+#endif
 }
 
 TreeModelVolumes::TreeModelVolumes(
@@ -545,7 +550,6 @@ void TreeModelVolumes::calculateCollision(std::deque<RadiusLayerPair> keys)
                 const coord_t z_distance_bottom = m_layer_outlines[outline_idx].first.support_bottom_distance;
                 const size_t z_distance_bottom_layers = round_up_divide(z_distance_bottom, layer_height);
                 const coord_t z_distance_top_layers = round_up_divide(m_layer_outlines[outline_idx].first.support_top_distance, layer_height);
-                const LayerIndex max_anti_overhang_layer = m_anti_overhang.size() - 1;
                 const LayerIndex max_required_layer = keys[i].second + std::max(coord_t(1), z_distance_top_layers);
                 const coord_t xy_distance = outline_idx == m_current_outline_idx ? m_current_min_xy_dist : m_layer_outlines[outline_idx].first.support_xy_distance;
                 // technically this causes collision for the normal xy_distance to be larger by m_current_min_xy_dist_delta for all not currently processing meshes as this delta will be added at request time.
@@ -566,49 +570,48 @@ void TreeModelVolumes::calculateCollision(std::deque<RadiusLayerPair> keys)
                     if (size_t(layer_idx) < m_layer_outlines[outline_idx].second.size())
                         append(collision_areas, m_layer_outlines[outline_idx].second[layer_idx]);
                     // jtRound is not needed here, as the overshoot can not cause errors in the algorithm, because no assumptions are made about the model.
-                    collision_areas = offset(union_ex(collision_areas), radius + xy_distance, ClipperLib::jtMiter, 1.2);
-                    append(data[key], collision_areas); // if a key does not exist when it is accessed it is added!
+                    // if a key does not exist when it is accessed it is added!
+                    append(data[key], offset(union_ex(collision_areas), radius + xy_distance, ClipperLib::jtMiter, 1.2));
                 }
 
                 // Add layers below, to ensure correct support_bottom_distance. Also save placeable areas of radius 0, if required for this mesh.
-                for (LayerIndex layer_idx = max_required_layer; layer_idx >= min_layer_bottom; -- layer_idx) {
+                for (int layer_idx = int(max_required_layer); layer_idx >= min_layer_bottom; -- layer_idx) {
                     key.second = layer_idx;
                     for (size_t layer_offset = 1; layer_offset <= z_distance_bottom_layers && layer_idx - coord_t(layer_offset) > min_layer_bottom; ++ layer_offset)
                         append(data[key], data[RadiusLayerPair(radius, layer_idx - layer_offset)]);
                     if (support_rests_on_this_model && radius == 0 && layer_idx < coord_t(1 + keys[i].second)) {
-                        data[key] = union_(data[key]);
-                        Polygons above = data[RadiusLayerPair(radius, layer_idx + 1)];
+                        RadiusLayerPair key_next_layer(radius, layer_idx + 1);
+                        //data[key] = union_(data[key]);
+                        Polygons above = data[key_next_layer];
                         // just to be sure the area is correctly unioned as otherwise difference may behave unexpectedly.
-                        above = max_anti_overhang_layer >= layer_idx + 1 ? union_(above, m_anti_overhang[layer_idx]) : union_(above);
-                        Polygons placeable = diff(data[key], above);
-                        data_placeable[RadiusLayerPair(radius, layer_idx + 1)] = union_(data_placeable[RadiusLayerPair(radius, layer_idx + 1)], placeable);
+                        //FIXME Vojtech: Why m_anti_overhang.size() > layer_idx + 1? Why +1?
+                        above = m_anti_overhang.size() > layer_idx + 1 ? union_(above, m_anti_overhang[layer_idx]) : union_(above);
+                        data_placeable[key_next_layer] = union_(data_placeable[key_next_layer], diff(data[key], above));
                     }
                 }
 
                 // Add collision layers above to ensure correct support_top_distance.
-                for (LayerIndex layer_idx = min_layer_bottom; layer_idx <= max_required_layer; layer_idx++) {
+                for (LayerIndex layer_idx = min_layer_bottom; layer_idx <= max_required_layer; ++ layer_idx) {
                     key.second = layer_idx;
-                    for (coord_t layer_offset = 1; layer_offset <= z_distance_top_layers && layer_offset + layer_idx <= max_required_layer; layer_offset++)
-                        append(data[key], data[RadiusLayerPair(radius, layer_idx + layer_offset)]);
-                    data[key] = max_anti_overhang_layer >= layer_idx ? union_(data[key], offset(union_ex(m_anti_overhang[layer_idx]), radius, ClipperLib::jtMiter, 1.2)) : union_(data[key]);
+                    Polygons collisions = std::move(data[key]);
+                    for (coord_t layer_offset = 1; layer_offset <= z_distance_top_layers && layer_offset + layer_idx <= max_required_layer; ++ layer_offset)
+                        append(collisions, data[RadiusLayerPair(radius, layer_idx + layer_offset)]);
+                    data[key] = m_anti_overhang.size() > layer_idx ? union_(collisions, offset(union_ex(m_anti_overhang[layer_idx]), radius, ClipperLib::jtMiter, 1.2)) : union_(collisions);
                 }
 
-                for (LayerIndex layer_idx = max_required_layer; layer_idx > keys[i].second; layer_idx--) {
+                for (int layer_idx = int(max_required_layer); layer_idx > keys[i].second; -- layer_idx) {
                     // all these dont have the correct z_distance_top_layers as they can still have areas above them
                     auto it = data.find(RadiusLayerPair(radius, layer_idx));
                     if (it != data.end())
                         data.erase(it);
                 }
 
-                for (auto pair : data) {
-                    pair.second = simplify(pair.second, m_min_resolution);
-                    data_outer[pair.first] = union_(data_outer[pair.first], pair.second);
+                for (auto pair : data)
+                    data_outer[pair.first] = union_(data_outer[pair.first], simplify(pair.second, m_min_resolution));
+                if (radius == 0) {
+                    for (auto pair : data_placeable)
+                        data_placeable_outer[pair.first] = union_(data_placeable_outer[pair.first], simplify(pair.second, m_min_resolution));
                 }
-                if (radius == 0)
-                    for (auto pair : data_placeable) {
-                        pair.second = simplify(pair.second, m_min_resolution);
-                        data_placeable_outer[pair.first] = union_(data_placeable_outer[pair.first], pair.second);
-                    }
             }
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
@@ -648,7 +651,7 @@ void TreeModelVolumes::calculateCollisionHolefree(std::deque<RadiusLayerPair> ke
                 coord_t radius = key.first;
                 coord_t increase_radius_ceil = ceilRadius(m_increase_until_radius, false) - ceilRadius(radius, true);
                 // this union is important as otherwise holes(in form of lines that will increase to holes in a later step) can get unioned onto the area.
-                Polygons col = offset(union_ex(getCollision(m_increase_until_radius, layer_idx, false)), 5 - increase_radius_ceil, ClipperLib::jtRound);
+                Polygons col = offset(union_ex(getCollision(m_increase_until_radius, layer_idx, false)), 5 - increase_radius_ceil, ClipperLib::jtRound, scaled<float>(0.01));
                 col = simplify(col, m_min_resolution);
                 data[RadiusLayerPair(radius, layer_idx)] = col;
             }
@@ -663,11 +666,11 @@ void TreeModelVolumes::calculateCollisionHolefree(std::deque<RadiusLayerPair> ke
 static Polygons safeOffset(const Polygons& me, coord_t distance, ClipperLib::JoinType jt, coord_t max_safe_step_distance, const Polygons& collision)
 {
     const size_t steps = std::abs(distance / max_safe_step_distance);
-    assert(distance * max_safe_step_distance >= 0);
+    assert(int64_t(distance) * int64_t(max_safe_step_distance) >= 0);
     ExPolygons ret = union_ex(me);
     for (size_t i = 0; i < steps; ++ i)
-        ret = union_ex(union_(offset(ret, max_safe_step_distance, jt, 1.2), collision));
-    return union_(offset(ret, distance % max_safe_step_distance, jt, 1.2), collision);
+        ret = union_ex(union_(offset(ret, max_safe_step_distance, jt, jt == jtRound ? scaled<float>(0.01) : 1.2), collision));
+    return union_(offset(ret, distance % max_safe_step_distance, jt, jt == jtRound ? scaled<float>(0.01) : 1.2), collision);
 }
 
 void TreeModelVolumes::calculateAvoidance(std::deque<RadiusLayerPair> keys)
@@ -768,7 +771,7 @@ void TreeModelVolumes::calculatePlaceables(std::deque<RadiusLayerPair> keys)
                 key.second = layer;
                 Polygons placeable = getPlaceableAreas(0, layer);
                 placeable = simplify(placeable, m_min_resolution); // it is faster to do this here in each thread than once in calculateCollision.
-                placeable = offset(union_ex(placeable), - radius);
+                placeable = offset(union_ex(placeable), - radius, jtMiter, 1.2);
                 data[layer] = std::pair<RadiusLayerPair, Polygons>(key, placeable);
             }
 

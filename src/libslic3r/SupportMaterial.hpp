@@ -147,6 +147,15 @@ struct SupportParameters {
     bool                    with_sheath;
 };
 
+void generate_support_layers(
+	PrintObject							&object,
+    const SupportGeneratorLayersPtr     &raft_layers,
+    const SupportGeneratorLayersPtr     &bottom_contacts,
+    const SupportGeneratorLayersPtr     &top_contacts,
+    const SupportGeneratorLayersPtr     &intermediate_layers,
+    const SupportGeneratorLayersPtr     &interface_layers,
+    const SupportGeneratorLayersPtr     &base_interface_layers);
+
 // Produce the support G-code.
 // Used by both classic and tree supports.
 void generate_support_toolpaths(
