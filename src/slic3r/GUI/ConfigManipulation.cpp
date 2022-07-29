@@ -316,12 +316,11 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
 void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 {
     bool have_perimeters = config->opt_int("perimeters") > 0;
-    for (auto el : { "ensure_vertical_shell_thickness", "external_perimeter_speed", "extra_perimeters", "extra_perimeters_overhangs", "extra_perimeters_odd_layers",
-        "external_perimeters_first", "external_perimeters_vase", "external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing",
-        "no_perimeter_unsupported_algo", "only_one_perimeter_top", "overhangs", "overhangs_reverse",
-        "perimeter_loop", "perimeter_loop_seam","perimeter_speed",
+    for (auto el : { "ensure_vertical_shell_thickness", "external_perimeter_speed", "extra_perimeters", "extra_perimeters_odd_layers",
+        "external_perimeters_first", "external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing",
+        "overhangs","perimeter_speed",
         "seam_position", "small_perimeter_speed", "small_perimeter_min_length", " small_perimeter_max_length", "spiral_vase",
-        "thin_perimeters", "perimeter_generator"})
+        "perimeter_generator"})
         toggle_field(el, have_perimeters);
 
 
@@ -332,23 +331,32 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle", "wall_distribution_count", "wall_split_middle_threshold", "wall_add_middle_threshold", "min_feature_size", "min_bead_width", "aaa" })
        toggle_field(el, have_arachne);
 
-    toggle_field("overhangs_width_speed", !have_arachne);
 
-    toggle_field("overhangs_width", config->option<ConfigOptionFloatOrPercent>("overhangs_width_speed")->value > 0 || have_arachne);
+    for (auto el : {"perimeter_loop", "only_one_perimeter_top", "extra_perimeters_overhangs", "no_perimeter_unsupported_algo",
+        "thin_perimeters", "overhangs_reverse", "perimeter_round_corners"})
+        toggle_field(el, have_perimeters && !have_arachne);
+
+    toggle_field("only_one_perimeter_first_layer", config->opt_int("perimeters") > 1);
+    toggle_field("overhangs_width", config->option<ConfigOptionFloatOrPercent>("overhangs_width_speed")->value > 0);
     toggle_field("overhangs_reverse_threshold", have_perimeters && config->opt_bool("overhangs_reverse"));
-    toggle_field("min_width_top_surface", have_perimeters && config->opt_bool("only_one_perimeter_top"));
-    toggle_field("thin_perimeters_all", have_perimeters && config->option("thin_perimeters")->getFloat() != 0);
-    toggle_field("thin_walls", !have_arachne && have_perimeters);
+    toggle_field("min_width_top_surface", have_perimeters && config->opt_bool("only_one_perimeter_top") && !have_arachne);
+    toggle_field("thin_perimeters_all", have_perimeters && config->option("thin_perimeters")->getFloat() != 0 && !have_arachne);
+    bool have_thin_wall = !have_arachne && have_perimeters;
+    toggle_field("thin_walls", have_thin_wall);
     for (auto el : { "thin_walls_min_width", "thin_walls_overlap", "thin_walls_merge" })
-        toggle_field(el, have_perimeters && config->opt_bool("thin_walls"));
+        toggle_field(el, have_thin_wall && config->opt_bool("thin_walls"));
 
     for (auto el : { "seam_angle_cost", "seam_travel_cost" })
         toggle_field(el, have_perimeters && config->option<ConfigOptionEnum<SeamPosition>>("seam_position")->value == SeamPosition::spCost);
 
     toggle_field("perimeter_loop_seam", config->opt_bool("perimeter_loop"));
 
+    bool have_gap_fill = !have_arachne;
+    toggle_field("gap_fill_enabled", have_gap_fill);
     for (auto el : { "gap_fill_extension", "gap_fill_last", "gap_fill_max_width", "gap_fill_min_area", "gap_fill_min_length", "gap_fill_min_width" })
-        toggle_field(el, config->opt_bool("gap_fill_enabled"));
+        toggle_field(el, config->opt_bool("gap_fill_enabled") && have_gap_fill);
+    // gap fill  can appear in infill
+    //toggle_field("gap_fill_speed", have_perimeters && config->opt_bool("gap_fill_enabled"));
 
     for (auto el : { "fuzzy_skin_thickness", "fuzzy_skin_point_dist" })
         toggle_field(el, config->option<ConfigOptionEnum<FuzzySkinType>>("fuzzy_skin")->value != FuzzySkinType::None);
@@ -394,9 +402,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     toggle_field("top_solid_min_thickness", ! has_spiral_vase && has_top_solid_infill);
     toggle_field("bottom_solid_min_thickness", ! has_spiral_vase && has_bottom_solid_infill);
-
-    // gap fill  can appear in infill
-    //toggle_field("gap_fill_speed", have_perimeters && config->opt_bool("gap_fill_enabled"));
 
     //speed
     for (auto el : { "small_perimeter_min_length", "small_perimeter_max_length" })

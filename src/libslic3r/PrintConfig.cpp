@@ -6001,7 +6001,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Classic"));
     def->enum_labels.push_back(L("Arachne"));
     def->mode = comAdvancedE | comPrusa;
-    def->set_default_value(new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Arachne));
+    def->set_default_value(new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Classic));
 
     def = this->add("wall_transition_length", coFloat);
     def->label = L("Wall Transition Length");
