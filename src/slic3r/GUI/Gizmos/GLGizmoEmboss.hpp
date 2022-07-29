@@ -32,6 +32,7 @@ namespace Slic3r{
 
 namespace Slic3r::GUI {
 class MeshRaycaster;
+struct EmbossDataBase;
 
 class GLGizmoEmboss : public GLGizmoBase
 {
@@ -121,18 +122,18 @@ private:
     /// TODO: make more general, static and move to ImGuiWrapper 
     /// </summary>
     /// <returns>True when value changed otherwise FALSE.</returns>
-    bool rev_input(const std::string &name, float &value, float *default_value, 
+    bool rev_input(const std::string &name, float &value, const float *default_value, 
         const std::string &undo_tooltip, float step, float step_fast, const char *format, 
         ImGuiInputTextFlags flags = 0);
-    bool rev_checkbox(const std::string &name, bool &value, bool* default_value, const std::string  &undo_tooltip);
-    bool rev_slider(const std::string &name, std::optional<int>& value, std::optional<int> *default_value,
+    bool rev_checkbox(const std::string &name, bool &value, const bool* default_value, const std::string  &undo_tooltip);
+    bool rev_slider(const std::string &name, std::optional<int>& value, const std::optional<int> *default_value,
         const std::string &undo_tooltip, int v_min, int v_max, const std::string &format, const wxString &tooltip);
-    bool rev_slider(const std::string &name, std::optional<float>& value, std::optional<float> *default_value,
+    bool rev_slider(const std::string &name, std::optional<float>& value, const std::optional<float> *default_value,
         const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip);
-    bool rev_slider(const std::string &name, float &value, float *default_value, 
+    bool rev_slider(const std::string &name, float &value, const float *default_value, 
         const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip);
     template<typename T, typename Draw>
-    bool revertible(const std::string &name, T &value, T *default_value, const std::string &undo_tooltip, float undo_offset, Draw draw);
+    bool revertible(const std::string &name, T &value, const T *default_value, const std::string &undo_tooltip, float undo_offset, Draw draw);
 
     void set_minimal_window_size(bool is_advance_edit_style);
     const ImVec2 &get_minimal_window_size() const;
@@ -145,16 +146,14 @@ private:
     bool choose_true_type_file();
     bool choose_svg_file();
 
-    // Create object described how to make a Volume
-    TextConfiguration create_configuration();
+    // prepare base data for emboss text
+    EmbossDataBase create_emboss_data_base();
     bool load_configuration(ModelVolume *volume);
 
     // Create notification when unknown font type is used
     bool m_exist_notification;
     void create_notification_not_valid_font(const TextConfiguration& tc);
     void remove_notification_not_valid_font();
-
-    std::string create_volume_name();
 
     // This configs holds GUI layout size given by translated texts.
     // etc. When language changes, GUI is recreated and this class constructed again,
@@ -212,7 +211,7 @@ private:
     std::optional<ImVec2> m_set_window_offset;
     bool m_is_advanced_edit_style = false;
 
-    FontManager m_font_manager;
+    FontManager m_style_manager;
 
     // Keep sorted list of loadable face names
     struct Facenames
@@ -227,15 +226,12 @@ private:
         std::vector<bool> exist_textures = {};
     } m_face_names;
 
-    // Track stored values in AppConfig
-    std::optional<FontItem> m_stored_font_item;
-    std::optional<wxFont> m_stored_wx_font; // cache for stored wx font to not create every frame
-    std::map<std::string, FontItem> m_stored_font_items;
-    void fill_stored_font_items();
-    void select_stored_font_item();
-
     // Text to emboss
     std::string m_text;
+
+    // actual volume
+    ModelVolume *m_volume;
+
     // True when m_text contain character unknown by selected font
     bool m_text_contain_unknown_glyph = false;
 
@@ -244,9 +240,6 @@ private:
 
     // cancel for rendering font name
     bool m_allow_update_rendered_font;
-
-    // actual volume
-    ModelVolume *m_volume; 
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
@@ -289,11 +282,6 @@ private:
     void draw_transparent_icon();
     bool draw_clickable(IconType icon, IconState state, IconType hover_icon, IconState hover_state);
     bool draw_button(IconType icon, bool disable = false);
-
-    // load / store appConfig
-    static FontList load_font_list_from_app_config(const AppConfig *cfg, size_t &activ_font_index);
-    void store_font_list_to_app_config();
-    //void store_font_item_to_app_config() const;
 
     // only temporary solution
     static const std::string M_ICON_FILENAME;

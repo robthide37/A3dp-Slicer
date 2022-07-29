@@ -1,10 +1,13 @@
 #ifndef slic3r_FontManager_hpp_
 #define slic3r_FontManager_hpp_
 
+#include <memory>
 #include <optional>
+#include <string>
 #include <imgui/imgui.h>
 #include <GL/glew.h>
 #include <libslic3r/Emboss.hpp>
+#include <libslic3r/AppConfig.hpp>
 
 class wxFont; 
 
@@ -24,17 +27,27 @@ public:
     ~FontManager();
 
     /// <summary>
+    /// Load font style list from config
+    /// Also select actual activ font
+    /// </summary>
+    /// <param name="cfg">Application configuration loaded from file "PrusaSlicer.ini"</param>
+    /// <param name="default_font_list">Used when list is not loadable from config</param>
+    void init(const AppConfig *cfg, const FontList &default_font_list);
+    
+    /// <summary>
+    /// Write font list into AppConfig
+    /// </summary>
+    /// <param name="cfg">Stor into this configuration</param>
+    /// <param name="item_to_store">Configuration</param>
+    bool store_font_list_to_app_config(AppConfig *cfg);
+
+    /// <summary>
     /// Change order of style item in m_font_list.
     /// Fix selected font index when (i1 || i2) == m_font_selected 
     /// </summary>
     /// <param name="i1">First index to m_font_list</param>
     /// <param name="i2">Second index to m_font_list</param>
     void swap(size_t i1, size_t i2);
-
-    /// <summary>
-    /// Duplicate selected font style
-    /// </summary>
-    void duplicate();
 
     /// <summary>
     /// Remove style from m_font_list.
@@ -57,8 +70,10 @@ public:
     /// <param name="font_index">New font index(from m_font_list range)</param>
     /// <returns>True on succes. False on fail load font</returns>
     bool load_font(size_t font_index);
+    // load font style not stored in list
+    bool load_font(const FontItem &fi);
     // fastering load font on index by wxFont, ignore type and descriptor
-    bool load_font(size_t font_index, const wxFont &font);
+    bool load_font(const FontItem &fi, const wxFont &font);
     
     // clear actual selected glyphs cache
     void clear_glyphs_cache();
@@ -70,13 +85,11 @@ public:
     // used at initialize phaze - fonts could be modified in appConfig file by user
     bool load_first_valid_font();
 
-    // add font into manager
-    void add_font(FontItem font_item);
-    // add multiple font into manager
-    void add_fonts(FontList font_list);
+    // getter on stored fontItem
+    const FontItem *get_stored_font_item() const;
 
-    // getter on active font file for access to glyphs
-    std::shared_ptr<const Emboss::FontFile> &get_font_file();
+    // getter on stored wxFont
+    const std::optional<wxFont> &get_stored_wx_font() const;
 
     // getter on active font item for access to font property
     const FontItem &get_font_item() const;
@@ -90,11 +103,18 @@ public:
     const std::optional<wxFont> &get_wx_font() const;
     std::optional<wxFont> &get_wx_font();
 
-    // setter of font for actual selection
-    bool set_wx_font(const wxFont &wx_font);
+    bool exist_stored_style() const;
+    size_t get_style_index() const;
+
+    // getter on font file with cache
+    Emboss::FontFileWithCache &get_font_file_with_cache();
 
     // Getter for cached trucated name for style list selector
     std::string &get_truncated_name();
+        
+    // setter of font for actual selection
+    bool set_wx_font(const wxFont &wx_font);
+
 
     // Getter on acitve font pointer for imgui
     // Initialize imgui font(generate texture) when doesn't exist yet.
@@ -102,9 +122,6 @@ public:
     ImFont *get_imgui_font();
     // initialize font range by unique symbols in text
     ImFont *create_imgui_font(const std::string& text);
-
-    // free used memory and font file data
-    void free_except_active_font();
     
     // init truncated names of styles
     void init_trunc_names(float max_width);
@@ -120,7 +137,6 @@ public:
     struct Item;
     // access to all managed font styles
     const std::vector<Item> &get_styles() const;
-    const Item &get_activ_style() const; // TODO: rename to style
 
     /// <summary>
     /// Describe image in GPU to show settings of style
@@ -140,25 +156,15 @@ public:
     /// </summary>
     struct Item
     {
+        // define font, style and other property of text
         FontItem font_item;
 
         // cache for view font name with maximal width in imgui
         std::string truncated_name; 
 
-        // share font file data with emboss job thread
-        Emboss::FontFileWithCache font_file_with_cache;
-
-        std::optional<size_t> imgui_font_index;
-
-        // must live same as imgui_font inside of atlas
-        ImVector<ImWchar> font_ranges;
-
-        // wx widget font
-        std::optional<wxFont> wx_font;
-
         // visualization of style
         std::optional<StyleImage> image;
-    };   
+    };
 
     // check if exist selected font style in manager
     bool is_activ_font();
@@ -168,35 +174,51 @@ public:
     static float min_imgui_font_size;
     static float max_imgui_font_size;
     static float get_imgui_font_size(const FontProp& prop, const Emboss::FontFile& file);
+
 private:
-    ImFontAtlas m_imgui_font_atlas;
+    /// <summary>
+    /// Cache data from style to reduce amount of:
+    /// 1) loading font from file
+    /// 2) Create atlas of symbols for imgui
+    /// 3) Keep loaded(and modified by style) glyphs from font
+    /// </summary>
+    struct StyleCache
+    {
+        // share font file data with emboss job thread
+        Emboss::FontFileWithCache font_file = {};
 
-    void duplicate(size_t index);
-    // load actual selected font
-    ImFont *create_imgui_font(size_t index, const std::string &text);
+        // must live same as imgui_font inside of atlas
+        ImVector<ImWchar> ranges = {};
 
-    bool load_active_font();
+        // Keep only actual style in atlas
+        ImFontAtlas atlas = {};
 
-    bool set_wx_font(size_t item_index, const wxFont &wx_font);
-        
-    // getter on index selected font pointer for imgui
-    // text could extend font atlas when not in glyph range
-    ImFont *get_imgui_font(size_t item_index);
+        // wx widget font
+        std::optional<wxFont> wx_font = {};
 
+        // cache for view font name with maximal width in imgui
+        std::string truncated_name; 
+
+        // actual used font item
+        FontItem font_item = {};
+
+        // cache for stored wx font to not create every frame
+        std::optional<wxFont> stored_wx_font;
+
+        // index into m_font_list
+        size_t font_index = std::numeric_limits<size_t>::max();
+
+    } m_style_cache;
+            
     // extend actual imgui font when exist unknown char in text
     // NOTE: imgui_font has to be unused
     // return true when extend range otherwise FALSE
     ImFont *extend_imgui_font_range(size_t font_index, const std::string &text);
 
-    void free_imgui_fonts();
-
-    bool set_up_font_file(size_t item_index);
-
     void make_unique_name(std::string &name);
 
     // Privat member
     std::vector<Item> m_font_list;
-    size_t            m_font_selected; // index to m_font_list
 
     /// <summary>
     /// Keep data needed to create Font Style Images in Job

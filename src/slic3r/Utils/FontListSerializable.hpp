@@ -29,14 +29,22 @@ class FontListSerializable
     static const std::string APP_CONFIG_FONT_COLLECTION;
     static const std::string APP_CONFIG_FONT_CHAR_GAP;
     static const std::string APP_CONFIG_FONT_LINE_GAP;
+
+    static const std::string APP_CONFIG_ACTIVE_FONT;
 public:
     FontListSerializable() = delete;
 
+    static void store_font_index(AppConfig &cfg, unsigned index);
+    static std::optional<size_t> load_font_index(const AppConfig &cfg);
+
+    static FontList load_font_list(const AppConfig &cfg);
+    static void     store_font_list(AppConfig &cfg, const FontList font_list);
+
+private:
     static std::string create_section_name(unsigned index);
     static std::optional<FontItem> load_font_item(const std::map<std::string, std::string> &app_cfg_section);
     static void store_font_item(AppConfig &cfg, const FontItem &fi, unsigned index);
 
-private:
     // TODO: move to app config like read from section
     static bool read(const std::map<std::string, std::string>& section, const std::string& key, bool& value);
     static bool read(const std::map<std::string, std::string>& section, const std::string& key, float& value);

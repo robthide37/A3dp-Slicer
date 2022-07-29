@@ -19,6 +19,8 @@ const std::string FontListSerializable::APP_CONFIG_FONT_COLLECTION  = "collectio
 const std::string FontListSerializable::APP_CONFIG_FONT_CHAR_GAP    = "char_gap";
 const std::string FontListSerializable::APP_CONFIG_FONT_LINE_GAP    = "line_gap";
 
+const std::string FontListSerializable::APP_CONFIG_ACTIVE_FONT      = "activ_font";
+
 std::string FontListSerializable::create_section_name(unsigned index)
 {
     return AppConfig::SECTION_FONT + ':' + std::to_string(index);
@@ -142,4 +144,60 @@ void FontListSerializable::store_font_item(AppConfig &     cfg,
         cfg.set(section_name, APP_CONFIG_FONT_CHAR_GAP, std::to_string(*fp.char_gap));
     if (fp.line_gap.has_value())
         cfg.set(section_name, APP_CONFIG_FONT_LINE_GAP, std::to_string(*fp.line_gap));
+}
+
+void FontListSerializable::store_font_index(AppConfig &cfg, unsigned index) {
+    // store actual font index
+    cfg.clear_section(AppConfig::SECTION_FONT);
+    // activ font first index is +1 to correspond with section name
+    std::string activ_font = std::to_string(index);
+    cfg.set(AppConfig::SECTION_FONT, APP_CONFIG_ACTIVE_FONT, activ_font);
+}
+
+std::optional<size_t> FontListSerializable::load_font_index(const AppConfig &cfg)
+{
+    if (!cfg.has_section(AppConfig::SECTION_FONT)) return {};
+
+    auto section = cfg.get_section(AppConfig::SECTION_FONT);
+    auto it      = section.find(APP_CONFIG_ACTIVE_FONT);
+    if (it == section.end()) return {};
+
+    size_t active_font = static_cast<size_t>(std::atoi(it->second.c_str()));
+    // order in config starts with number 1
+    return active_font - 1;
+}
+
+FontList FontListSerializable::load_font_list(const AppConfig &cfg)
+{
+    FontList result;
+    // human readable index inside of config starts from 1 !!
+    unsigned    index        = 1;
+    std::string section_name = create_section_name(
+        index);
+    while (cfg.has_section(section_name)) {
+        std::optional<FontItem> fi = load_font_item(cfg.get_section(section_name));
+        if (fi.has_value()) result.emplace_back(*fi);
+        section_name = create_section_name(++index);
+    }
+    return result;
+}
+
+void FontListSerializable::store_font_list(AppConfig &cfg, const FontList font_list)
+{
+    // store styles
+    unsigned index = 1;
+    for (const FontItem &fi : font_list) {
+        // skip file paths + fonts from other OS(loaded from .3mf)
+        assert(fi.type == WxFontUtils::get_actual_type());
+        // if (fi.type != WxFontUtils::get_actual_type()) continue;
+        store_font_item(cfg, fi, index++);
+    }
+
+    // remove rest of font sections (after deletation)
+    std::string section_name = create_section_name(index);
+    while (cfg.has_section(section_name)) {
+        cfg.clear_section(section_name);
+        section_name = create_section_name(++index);
+    }
+    cfg.save();
 }
