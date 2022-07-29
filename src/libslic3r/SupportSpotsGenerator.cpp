@@ -15,8 +15,8 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
 
-#define DETAILED_DEBUG_LOGS
-#define DEBUG_FILES
+//#define DETAILED_DEBUG_LOGS
+//#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -406,8 +406,8 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 bool in_layer_dist_condition = bridging_acc.distance
                         > params.bridge_distance / (1.0f + (bridging_acc.max_curvature
                                 * params.bridge_distance_decrease_by_curvature_factor / PI));
-                bool between_layers_condition = fabs(dist_from_prev_layer) > 5.0f*overhang_dist ||
-                        prev_layer_lines.get_line(nearest_line_idx).malformation > 0.3f;
+                bool between_layers_condition = fabs(dist_from_prev_layer) > 3.0f*flow_width ||
+                        prev_layer_lines.get_line(nearest_line_idx).malformation > 0.6f;
 
                 if (in_layer_dist_condition && between_layers_condition) {
                     issues.support_points.emplace_back(to_vec3f(current_line.b), 0.0f, Vec3f(0.f, 0.0f, -1.0f));
@@ -417,13 +417,13 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
 
             //malformation
-            if (fabs(dist_from_prev_layer) < overhang_dist * 5.0f) {
+            if (fabs(dist_from_prev_layer) < 3.0f*flow_width) {
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
                 current_line.malformation += 0.9 * nearest_line.malformation;
             }
             if (dist_from_prev_layer > overhang_dist) {
                 malformation_acc.add_distance(current_line.len);
-                current_line.malformation += 0.1f
+                current_line.malformation += 0.3f
                         * (0.8f + 0.2f * malformation_acc.max_curvature / (1.0f + 0.5f * malformation_acc.distance));
             } else {
                 malformation_acc.reset();

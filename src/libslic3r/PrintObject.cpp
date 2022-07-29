@@ -424,7 +424,9 @@ void PrintObject::generate_support_spots()
         std::all_of(this->model_object()->volumes.begin(), this->model_object()->volumes.end(),
                 [](const ModelVolume* mv){return mv->supported_facets.empty();})
         ) {
-            SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this);
+            SupportSpotsGenerator::Params params{};
+            params.overhang_angle_deg = 90.001f - this->m_config.support_material_threshold;
+            SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this, params);
             auto obj_transform = this->trafo_centered();
             for (ModelVolume *model_volume : this->model_object()->volumes) {
                 if (model_volume->is_model_part()) {

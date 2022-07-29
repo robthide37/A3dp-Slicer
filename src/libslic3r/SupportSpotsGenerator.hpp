@@ -11,7 +11,7 @@ struct Params {
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
     const float bridge_distance = 12.0f; //mm
     const float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
-    const float overhang_angle_deg = 55.0f;
+    float overhang_angle_deg = 50.0f;
 
     const float min_distance_between_support_points = 3.0f; //mm
     const float support_points_interface_radius = 0.6f; // mm
@@ -21,8 +21,8 @@ struct Params {
     const float filament_density = 1.25e-3f ; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
     const float bed_adhesion_yield_strength = 0.128f * 1e6f; //MPa * 1e^6 = (g*mm/s^2)/mm^2 = g/(mm*s^2); yield strength of the bed surface
     const float material_yield_strength = 33.0f * 1e6f; // (g*mm/s^2)/mm^2; 33 MPa is yield strength of ABS, which has the lowest yield strength from common materials.
-    const float standard_extruder_conflict_force = 20.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... );
-    const float malformations_additive_conflict_extruder_force = 150.0f * gravity_constant; // for areas with possible high layered curled filaments
+    const float standard_extruder_conflict_force = 50.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... );
+    const float malformations_additive_conflict_extruder_force = 200.0f * gravity_constant; // for areas with possible high layered curled filaments
 };
 
 struct SupportPoint {
