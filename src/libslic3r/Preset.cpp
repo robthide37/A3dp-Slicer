@@ -706,6 +706,9 @@ static std::vector<std::string> s_Preset_print_options {
         "milling_post_process",
         "milling_extra_size",
         "milling_speed",
+        //Arachne
+        "perimeter_generator", "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle",
+        "wall_distribution_count", "wall_split_middle_threshold", "wall_add_middle_threshold", "min_feature_size", "min_bead_width",
 };
 
 static std::vector<std::string> s_Preset_filament_options {

@@ -38,12 +38,12 @@ void ExtrusionPath::subtract_expolygons(const ExPolygonCollection &collection, E
     this->_inflate_collection(diff_pl(Polylines{ this->polyline }, collection.expolygons), retval);
 }
 
-void ExtrusionPath::clip_end(double distance)
+void ExtrusionPath::clip_end(coordf_t distance)
 {
     this->polyline.clip_end(distance);
 }
 
-void ExtrusionPath::simplify(double tolerance)
+void ExtrusionPath::simplify(coordf_t tolerance)
 {
     this->polyline.simplify(tolerance);
 }
@@ -225,7 +225,7 @@ void ExtrusionLoop::split_at(const Point &point, bool prefer_non_overhang)
     this->split_at_vertex(p);
 }
 
-ExtrusionPaths clip_end(ExtrusionPaths& paths, double distance)
+ExtrusionPaths clip_end(ExtrusionPaths& paths, coordf_t distance)
 {
     ExtrusionPaths removed;
     
@@ -406,7 +406,7 @@ void ExtrusionLength::use(const ExtrusionEntityCollection& collection) {
 
 
 void ExtrusionVisitorRecursiveConst::use(const ExtrusionMultiPath& multipath) {
-    for (const ExtrusionPath& path: multipath.paths) {
+    for (const ExtrusionPath& path : multipath.paths) {
         path.visit(*this);
     }
 }
@@ -422,6 +422,26 @@ void ExtrusionVisitorRecursiveConst::use(const ExtrusionLoop& loop) {
 }
 void ExtrusionVisitorRecursiveConst::use(const ExtrusionEntityCollection& collection) {
     for (const ExtrusionEntity* entity : collection.entities()) {
+        entity->visit(*this);
+    }
+}
+void ExtrusionVisitorRecursive::use(ExtrusionMultiPath& multipath) {
+    for (ExtrusionPath& path : multipath.paths) {
+        path.visit(*this);
+    }
+}
+void ExtrusionVisitorRecursive::use(ExtrusionMultiPath3D& multipath3D) {
+    for (ExtrusionPath3D& path3D : multipath3D.paths) {
+        path3D.visit(*this);
+    }
+}
+void ExtrusionVisitorRecursive::use(ExtrusionLoop& loop) {
+    for (ExtrusionPath& path : loop.paths) {
+        path.visit(*this);
+    }
+}
+void ExtrusionVisitorRecursive::use(ExtrusionEntityCollection& collection) {
+    for (ExtrusionEntity* entity : collection.entities()) {
         entity->visit(*this);
     }
 }

@@ -95,7 +95,8 @@ public:
             m_ext_mm3_per_mm(-1), m_mm3_per_mm(-1), m_mm3_per_mm_overhang(-1)
         {}
 
-    void        process();
+    void        process_classic();
+    void        process_arachne();
 
     double      ext_mm3_per_mm()        const { return m_ext_mm3_per_mm; }
     double      mm3_per_mm()            const { return m_mm3_per_mm; }

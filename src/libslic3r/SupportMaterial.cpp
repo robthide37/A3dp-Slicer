@@ -3418,6 +3418,7 @@ static inline void fill_expolygon_generate_paths(
     const Flow              &flow,
     coordf_t                 spacing)
 {
+    assert(!fill_params.use_arachne);
     FillParams new_params = fill_params;
     new_params.flow = flow;
     new_params.role = role;
@@ -3486,7 +3487,7 @@ static inline void fill_expolygons_generate_paths(
 //    fill_params.config = &region_config;
 //
 //    // Clip the sheath path to avoid the extruder to get exactly on the first point of the loop.
-//    double clip_length = spacing * 0.15;
+//    coordf_t clip_length = spacing * 0.15;
 //
 //    for (ExPolygon &expoly : closing_ex(polygons, float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5*flow.scaled_width()))) {
 //        // Don't reorder the skirt and its infills.

@@ -36,5 +36,5 @@
     Ref<StaticPrintConfig> config()
         %code{% RETVAL = THIS->config; %};
     
-    void process();
+    void process_classic();
 };
