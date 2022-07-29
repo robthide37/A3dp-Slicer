@@ -253,8 +253,8 @@ public:
     // Produce a list of extrusion paths into retval by removing parts of this path by ExPolygonCollection.
     // Currently not used.
     void subtract_expolygons(const ExPolygonCollection &collection, ExtrusionEntityCollection* retval) const;
-    void clip_end(double distance);
-    virtual void simplify(double tolerance);
+    void clip_end(coordf_t distance);
+    virtual void simplify(coordf_t tolerance);
     double length() const override;
     ExtrusionRole role() const override { return m_role; }
     void set_role(ExtrusionRole new_role) { m_role = new_role; }
@@ -282,7 +282,7 @@ protected:
     ExtrusionRole m_role;
 };
 typedef std::vector<ExtrusionPath> ExtrusionPaths;
-ExtrusionPaths clip_end(ExtrusionPaths& paths, double distance);
+ExtrusionPaths clip_end(ExtrusionPaths& paths, coordf_t distance);
 
 class ExtrusionPath3D : public ExtrusionPath {
 public:
@@ -650,6 +650,14 @@ public:
     virtual void use(const ExtrusionMultiPath3D& multipath) override;
     virtual void use(const ExtrusionLoop& loop) override;
     virtual void use(const ExtrusionEntityCollection& collection) override;
+};
+
+class ExtrusionVisitorRecursive : public ExtrusionVisitor {
+public:
+    virtual void use(ExtrusionMultiPath& multipath) override;
+    virtual void use(ExtrusionMultiPath3D& multipath) override;
+    virtual void use(ExtrusionLoop& loop) override;
+    virtual void use(ExtrusionEntityCollection& collection) override;
 };
 
 }

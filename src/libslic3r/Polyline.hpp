@@ -66,12 +66,12 @@ public:
     const Point& leftmost_point() const;
     Lines lines() const override;
 
-    void clip_end(double distance);
-    void clip_start(double distance);
-    void extend_end(double distance);
-    void extend_start(double distance);
-    Points equally_spaced_points(double distance) const;
-    void simplify(double tolerance);
+    virtual void clip_end(coordf_t distance);
+    void clip_start(coordf_t distance);
+    void extend_end(coordf_t distance);
+    void extend_start(coordf_t distance);
+    Points equally_spaced_points(coordf_t distance) const;
+    void simplify(coordf_t tolerance);
 //    template <class T> void simplify_by_visibility(const T &area);
     void split_at(const Point &point, Polyline* p1, Polyline* p2) const;
     bool is_straight() const;
@@ -174,7 +174,7 @@ class ThickPolyline : public Polyline {
 public:
     enum StartPos : int8_t{tpspBegin = -1, tpspBoth = 0, tpspEnd = 1};
     /// width size must be == point size
-    std::vector<coord_t> width;
+    std::vector<coord_t> points_width;
     /// if true => it's an endpoint, if false it join an other ThickPolyline. first is at front(), second is at back()
     std::pair<bool, bool> endpoints;
     //if it's important to begin at a specific bit.
@@ -184,11 +184,25 @@ public:
     ThickLines thicklines() const;
     void reverse() {
         Polyline::reverse();
-        std::reverse(this->width.begin(), this->width.end());
+        std::reverse(this->points_width.begin(), this->points_width.end());
         std::swap(this->endpoints.first, this->endpoints.second);
         start_at = StartPos(-start_at);
     }
+
+    void clip_end(coordf_t distance) override;
 };
+
+inline ThickPolylines to_thick_polylines(Polylines &&polylines, const coordf_t width)
+{
+    ThickPolylines out;
+    out.reserve(polylines.size());
+    for (Polyline &polyline : polylines) {
+        out.emplace_back();
+        out.back().points_width.assign(polyline.points.size(), width);
+        out.back().points = std::move(polyline.points);
+    }
+    return out;
+}
 
 /// concatenate poylines if possible and refresh the endpoints
 void concatThickPolylines(ThickPolylines &polylines);

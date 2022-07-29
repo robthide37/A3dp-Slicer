@@ -20,6 +20,7 @@
 #include "../ExtrusionEntity.hpp"
 #include "../ExtrusionEntityCollection.hpp"
 #include "../Flow.hpp"
+#include "../PrintConfig.hpp"
 
 namespace Slic3r {
 
@@ -90,6 +91,9 @@ struct FillParams
 
     // Zero based extruder ID.
     unsigned int    extruder = 0;
+
+    // For Concentric infill, to switch between Classic and Arachne.
+    bool        use_arachne     { false };
 };
 static_assert(IsTriviallyCopyable<FillParams>::value, "FillParams class is not POD (and it should be - see constructor).");
 
@@ -139,6 +143,7 @@ public:
     
     // Perform the fill.
     virtual Polylines fill_surface(const Surface *surface, const FillParams &params) const;
+    virtual ThickPolylines fill_surface_arachne(const Surface *surface, const FillParams &params) const;
 
 protected:
     Fill() :
@@ -157,12 +162,21 @@ protected:
 
     // The expolygon may be modified by the method to avoid a copy.
     virtual void _fill_surface_single(
-        const FillParams                & /* params */, 
+        const FillParams                & /* params */,
         unsigned int                      /* thickness_layers */,
-        const std::pair<float, Point>   & /* direction */, 
+        const std::pair<float, Point>   & /* direction */,
         ExPolygon                         /* expolygon */,
         Polylines                       & /* polylines_out */) const {
         BOOST_LOG_TRIVIAL(error)<<"Error, the fill isn't implemented";
+    };
+
+    // Used for concentric infill to generate ThickPolylines using Arachne.
+    virtual void _fill_surface_single(const FillParams              &params,
+                                      unsigned int                   thickness_layers,
+                                      const std::pair<float, Point> &direction,
+                                      ExPolygon                      expolygon,
+                                      ThickPolylines                &thick_polylines_out) const {
+        BOOST_LOG_TRIVIAL(error) << "Error, the arachne fill isn't implemented";
     };
 
     virtual float _layer_angle(size_t idx) const { return (idx & 1) ? float(M_PI/2.) : 0; }

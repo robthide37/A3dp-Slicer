@@ -249,6 +249,15 @@ enum DraftShield {
     dsEnabled,
 };
 
+enum class PerimeterGeneratorType
+{
+    // Classic perimeter generator using Clipper offsets with constant extrusion width.
+    Classic,
+    // Perimeter generator with variable extrusion width based on the paper
+    // "A framework for adaptive width control of dense contour-parallel toolpaths in fused deposition modeling" ported from Cura.
+    Arachne
+};
+
 enum class GCodeThumbnailsFormat {
     PNG, JPG, QOI, BIQU
 };
@@ -293,6 +302,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ZLiftTop)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -704,9 +714,12 @@ PRINT_CONFIG_CLASS_DEFINE(
     // Force the generation of solid shells between adjacent materials/volumes.
     ((ConfigOptionBool,                 interface_shells))
     ((ConfigOptionFloat,                layer_height))
+    ((ConfigOptionFloatOrPercent,       min_bead_width))
+    ((ConfigOptionFloat,                min_feature_size))
     ((ConfigOptionFloat,                mmu_segmented_region_max_width))
     ((ConfigOptionFloat,                model_precision))
     ((ConfigOptionPercent,              perimeter_bonding))
+    ((ConfigOptionEnum<PerimeterGeneratorType>, perimeter_generator))
     ((ConfigOptionFloat,                raft_contact_distance))
     ((ConfigOptionFloat,                raft_expansion))
     ((ConfigOptionPercent,              raft_first_layer_density))
@@ -722,6 +735,12 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                slice_closing_radius))
     ((ConfigOptionEnum<SlicingMode>,    slicing_mode))
     ((ConfigOptionBool,                 support_material))
+    ((ConfigOptionFloat,                wall_transition_length))
+    ((ConfigOptionFloatOrPercent,       wall_transition_filter_deviation))
+    ((ConfigOptionFloat,                wall_transition_angle))
+    ((ConfigOptionInt,                  wall_distribution_count))
+    ((ConfigOptionPercent,              wall_split_middle_threshold))
+    ((ConfigOptionPercent,              wall_add_middle_threshold))
     // Automatic supports (generated based on support_material_threshold).
     ((ConfigOptionBool,                 support_material_auto))
     // Direction of the support pattern (in XY plane).

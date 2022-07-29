@@ -321,17 +321,24 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         "no_perimeter_unsupported_algo", "only_one_perimeter_top", "overhangs", "overhangs_reverse",
         "perimeter_loop", "perimeter_loop_seam","perimeter_speed",
         "seam_position", "small_perimeter_speed", "small_perimeter_min_length", " small_perimeter_max_length", "spiral_vase",
-        "thin_walls", "thin_perimeters"})
+        "thin_perimeters", "perimeter_generator"})
         toggle_field(el, have_perimeters);
 
-    toggle_field("overhangs_width", config->option<ConfigOptionFloatOrPercent>("overhangs_width_speed")->value > 0);
-    toggle_field("overhangs_reverse_threshold", have_perimeters && config->opt_bool("overhangs_reverse"));
-    toggle_field("min_width_top_surface", have_perimeters && config->opt_bool("only_one_perimeter_top"));
-    toggle_field("thin_perimeters_all", have_perimeters && config->option("thin_perimeters")->getFloat() != 0);
 
     for (auto el : { "external_perimeters_vase", "external_perimeters_nothole", "external_perimeters_hole", "perimeter_bonding"})
         toggle_field(el, config->opt_bool("external_perimeters_first"));
 
+    bool have_arachne = have_perimeters && config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
+    for (auto el : { "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle", "wall_distribution_count", "wall_split_middle_threshold", "wall_add_middle_threshold", "min_feature_size", "min_bead_width", "aaa" })
+       toggle_field(el, have_arachne);
+
+    toggle_field("overhangs_width_speed", !have_arachne);
+
+    toggle_field("overhangs_width", config->option<ConfigOptionFloatOrPercent>("overhangs_width_speed")->value > 0 || have_arachne);
+    toggle_field("overhangs_reverse_threshold", have_perimeters && config->opt_bool("overhangs_reverse"));
+    toggle_field("min_width_top_surface", have_perimeters && config->opt_bool("only_one_perimeter_top"));
+    toggle_field("thin_perimeters_all", have_perimeters && config->option("thin_perimeters")->getFloat() != 0);
+    toggle_field("thin_walls", !have_arachne && have_perimeters);
     for (auto el : { "thin_walls_min_width", "thin_walls_overlap", "thin_walls_merge" })
         toggle_field(el, have_perimeters && config->opt_bool("thin_walls"));
 
