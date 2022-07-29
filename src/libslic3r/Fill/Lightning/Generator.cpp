@@ -70,7 +70,7 @@ void Generator::generateInitialInternalOverhangs(const PrintObject &print_object
         // Remove the part of the infill area that is already supported by the walls.
         Polygons overhang = diff(offset(infill_area_here, -float(m_wall_supporting_radius)), infill_area_above);
         // Filter out unprintable polygons and near degenerated polygons (three almost collinear points and so).
-        overhang = opening(overhang, SCALED_EPSILON, SCALED_EPSILON);
+        overhang = opening(overhang, float(SCALED_EPSILON), float(SCALED_EPSILON));
 
         m_overhang_per_layer[layer_nr] = overhang;
         infill_area_above = std::move(infill_area_here);
