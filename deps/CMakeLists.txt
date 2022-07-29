@@ -75,6 +75,9 @@ function(prusaslicer_add_cmake_project projectname)
     if (MSVC)
         set(_gen CMAKE_GENERATOR "${DEP_MSVC_GEN}" CMAKE_GENERATOR_PLATFORM "${DEP_PLATFORM}")
         set(_build_j "/m")
+        if (${projectname} STREQUAL "OCCT")
+            set(_build_j "/m:1")
+        endif ()
     endif ()
 
     ExternalProject_Add(
