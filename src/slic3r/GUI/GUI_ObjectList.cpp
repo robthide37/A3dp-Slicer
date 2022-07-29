@@ -221,6 +221,14 @@ ObjectList::ObjectList(wxWindow* parent) :
 
     Bind(wxEVT_DATAVIEW_ITEM_VALUE_CHANGED, &ObjectList::ItemValueChanged,  this);
 
+    Bind(wxEVT_DATAVIEW_ITEM_ACTIVATED, [this](wxDataViewEvent& event) {
+        wxDataViewItem item;
+        wxDataViewColumn* col;
+        this->HitTest(this->get_mouse_position_in_control(), item, col);
+        this->EditItem(item, col);
+        event.StopPropagation();
+        });
+
     Bind(wxCUSTOMEVT_LAST_VOLUME_IS_DELETED, [this](wxCommandEvent& e)   { last_volume_is_deleted(e.GetInt()); });
 
     Bind(wxEVT_SIZE, ([this](wxSizeEvent &e) { 
