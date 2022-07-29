@@ -73,3 +73,32 @@ TEST_CASE("Arachne - Closed ExtrusionLine", "[ArachneClosedExtrusionLine]") {
             }
 }
 
+// This test case was distilled from GitHub issue #8472.
+// Where for wall_distribution_count == 3 sometime middle perimeter was missing.
+TEST_CASE("Arachne - Missing perimeter - #8472", "[ArachneMissingPerimeter8472]") {
+    Polygon poly = {
+        Point(-9000000,  8054793),
+        Point( 7000000,  8054793),
+        Point( 7000000, 10211874),
+        Point(-8700000, 10211874),
+        Point(-9000000,  9824444)
+    };
+
+    Polygons polygons    = {poly};
+    coord_t  spacing     = 437079;
+    coord_t  inset_count = 3;
+
+    PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
+    print_object_config.wall_distribution_count.setInt(3);
+
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, print_object_config, PrintConfig::defaults());
+    wallToolPaths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
+
+#ifdef ARACHNE_DEBUG_OUT
+    draw_extrusion(debug_out_path("arachne-missing-perimeter-8472.svg"), polygons, perimeters, union_ex(wallToolPaths.getInnerContour()));
+#endif
+
+    REQUIRE(perimeters.size() == 3);
+}
+
