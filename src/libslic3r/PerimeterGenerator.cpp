@@ -189,7 +189,7 @@ static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Paths &subjects, c
                     }
 
                     assert(dist_sqr_min <= SCALED_EPSILON);
-                    assert(std::next(it_a) != subject.end());
+                    assert(*it_a != subject.back());
                 }
 
                 const Point  pt_a(it_a->x(), it_a->y());
@@ -2074,9 +2074,9 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& lo
     ClipperLib_Z::Paths small_flow;
     ClipperLib_Z::Paths big_flow;
 #ifdef _DEBUG
-    for (Polyline& poly : ok_polylines)
-        for (int i = 0; i < poly.points.size() - 1; i++)
-            assert(poly.points[i] != poly.points[i + 1]);
+    for (ClipperLib_Z::Path& poly : ok_polylines)
+        for (int i = 0; i < poly.size() - 1; i++)
+            assert(poly[i] != poly[i + 1]);
 #endif
 
     std::vector<ClipperLib_Z::Path>* previous = &ok_polylines;
@@ -2085,16 +2085,16 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& lo
             //small_speed = diff_pl(*previous, this->_lower_slices_bridge_speed_small);
             small_speed = clip_extrusion(*previous, this->_lower_slices_bridge_speed_small_clipperpaths, ClipperLib_Z::ctDifference);
 #ifdef _DEBUG
-            for (Polyline& poly : small_speed) //                       assert small_speed
-                for (int i = 0; i < poly.points.size() - 1; i++) //     assert small_speed
-                    assert(poly.points[i] != poly.points[i + 1]); //    assert small_speed
+            for (ClipperLib_Z::Path& poly : small_speed) //                       assert small_speed
+                for (int i = 0; i < poly.size() - 1; i++) //     assert small_speed
+                    assert(poly[i] != poly[i + 1]); //    assert small_speed
 #endif
             if (!small_speed.empty()) {
                 *previous = clip_extrusion(*previous, this->_lower_slices_bridge_speed_small_clipperpaths, ClipperLib_Z::ctIntersection);
 #ifdef _DEBUG
-                for (Polyline& poly : *previous) //                         assert previous
-                    for (int i = 0; i < poly.points.size() - 1; i++) //     assert previous
-                        assert(poly.points[i] != poly.points[i + 1]); //    assert previous
+                for (ClipperLib_Z::Path& poly : *previous) //                         assert previous
+                    for (int i = 0; i < poly.size() - 1; i++) //     assert previous
+                        assert(poly[i] != poly[i + 1]); //    assert previous
 #endif
                 previous = &small_speed;
             }
@@ -2102,16 +2102,16 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& lo
         if (!this->_lower_slices_bridge_speed_big.empty()) {
             big_speed = clip_extrusion(*previous, this->_lower_slices_bridge_speed_big_clipperpaths, ClipperLib_Z::ctDifference);
 #ifdef _DEBUG
-            for (Polyline& poly : big_speed) //                         assert big_speed
-                for (int i = 0; i < poly.points.size() - 1; i++) //     assert big_speed
-                    assert(poly.points[i] != poly.points[i + 1]); //    assert big_speed
+            for (ClipperLib_Z::Path& poly : big_speed) //                         assert big_speed
+                for (int i = 0; i < poly.size() - 1; i++) //     assert big_speed
+                    assert(poly[i] != poly[i + 1]); //    assert big_speed
 #endif
             if (!big_speed.empty()) {
                 *previous = clip_extrusion(*previous, this->_lower_slices_bridge_speed_big_clipperpaths, ClipperLib_Z::ctIntersection);
 #ifdef _DEBUG
-                for (Polyline& poly : *previous) //                         assert previous
-                    for (int i = 0; i < poly.points.size() - 1; i++) //     assert previous
-                        assert(poly.points[i] != poly.points[i + 1]); //    assert previous
+                for (ClipperLib_Z::Path& poly : *previous) //                         assert previous
+                    for (int i = 0; i < poly.size() - 1; i++) //     assert previous
+                        assert(poly[i] != poly[i + 1]); //    assert previous
 #endif
                 previous = &big_speed;
             }
@@ -2121,16 +2121,16 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& lo
         if (!this->_lower_slices_bridge_flow_small.empty()) {
             small_flow = clip_extrusion(*previous, this->_lower_slices_bridge_flow_small_clipperpaths, ClipperLib_Z::ctDifference);
 #ifdef _DEBUG
-            for (Polyline& poly : small_flow) //                        assert small_flow
-                for (int i = 0; i < poly.points.size() - 1; i++) //     assert small_flow
-                    assert(poly.points[i] != poly.points[i + 1]); //    assert small_flow
+            for (ClipperLib_Z::Path& poly : small_flow) //                        assert small_flow
+                for (int i = 0; i < poly.size() - 1; i++) //     assert small_flow
+                    assert(poly[i] != poly[i + 1]); //    assert small_flow
 #endif
             if (!small_flow.empty()) {
                 *previous = clip_extrusion(*previous, this->_lower_slices_bridge_flow_small_clipperpaths, ClipperLib_Z::ctIntersection);
 #ifdef _DEBUG
-                for (Polyline& poly : *previous) //                         assert previous
-                    for (int i = 0; i < poly.points.size() - 1; i++) //     assert previous
-                        assert(poly.points[i] != poly.points[i + 1]); //    assert previous
+                for (ClipperLib_Z::Path& poly : *previous) //                         assert previous
+                    for (int i = 0; i < poly.size() - 1; i++) //     assert previous
+                        assert(poly[i] != poly[i + 1]); //    assert previous
 #endif
                 previous = &small_flow;
             }
@@ -2138,16 +2138,16 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& lo
         if (!this->_lower_slices_bridge_flow_big.empty()) {
             big_flow = clip_extrusion(*previous, this->_lower_slices_bridge_flow_big_clipperpaths, ClipperLib_Z::ctDifference);
 #ifdef _DEBUG
-            for (Polyline& poly : big_flow) //                          assert big_flow
-                for (int i = 0; i < poly.points.size() - 1; i++) //     assert big_flow
-                    assert(poly.points[i] != poly.points[i + 1]); //    assert big_flow
+            for (ClipperLib_Z::Path& poly : big_flow) //                          assert big_flow
+                for (int i = 0; i < poly.size() - 1; i++) //     assert big_flow
+                    assert(poly[i] != poly[i + 1]); //    assert big_flow
 #endif
             if (!big_flow.empty()) {
                 *previous = clip_extrusion(*previous, this->_lower_slices_bridge_flow_big_clipperpaths, ClipperLib_Z::ctIntersection);
 #ifdef _DEBUG
-                for (Polyline& poly : *previous) //                         assert previous
-                    for (int i = 0; i < poly.points.size() - 1; i++) //     assert previous
-                        assert(poly.points[i] != poly.points[i + 1]); //    assert previous
+                for (ClipperLib_Z::Path& poly : *previous) //                         assert previous
+                    for (int i = 0; i < poly.size() - 1; i++) //     assert previous
+                        assert(poly[i] != poly[i + 1]); //    assert previous
 #endif
                 previous = &big_flow;
             }
