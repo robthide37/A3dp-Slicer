@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - rc
+      - debug_macos
 
 jobs:
   build:
@@ -15,11 +16,16 @@ jobs:
       with:
         ref: 'rc'
     - name: build deps & slicer
-      run: ./BuildMacOS.sh -i
+      run: ./BuildMacOS.sh
+    - name: copy zstd
+      run: cp /usr/local/opt/zstd/lib/libzstd.1.dylib ./build/pack/SuperSlicer/SuperSlicer.app/Contents/MacOS/libzstd.1.dylib
+    - name: relink zstd
+      run: install_name_tool -change /usr/local/opt/zstd/lib/libzstd.1.dylib  @executable_path/libzstd.1.dylib ./build/pack/SuperSlicer/SuperSlicer.app/Contents/MacOS/SuperSlicer
     - name: Codesign executable conf
       env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_P12 }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_PASSWD }}
+          MACOS_APP: ${{secret.MAC_APP_PWD}}
       run: |
         echo $MACOS_CERTIFICATE | base64 --decode > certificate.p12
         security create-keychain -p temp_password build.keychain
@@ -31,9 +37,29 @@ jobs:
     - name: register codesign
       run: |
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k temp_password build.keychain
+    - name: run codesign on exe
+      run: |
+        /usr/bin/codesign --options=runtime --force -s "Developer ID Application: Remi Durand (LDTLFRHP3G)" ./build/pack/SuperSlicer/SuperSlicer.app/Contents/MacOS/SuperSlicer -v
+        codesign -vvv --deep --strict ./build/pack/SuperSlicer/SuperSlicer.app/Contents/MacOS/SuperSlicer
+        codesign -dvv ./build/pack/SuperSlicer/SuperSlicer.app/Contents/MacOS/SuperSlicer
+    - name: create the dmg
+      run: |
+        hdiutil create -ov -fs HFS+ -volname SuperSlicer -srcfolder "build/pack/SuperSlicer" temp.dmg
+        hdiutil convert temp.dmg -format UDZO -o SuperSlicer.dmg
+    - name: run codesign on the dmg
+      run: |
+        /usr/bin/codesign -s "Developer ID Application: Remi Durand (LDTLFRHP3G)" SuperSlicer.dmg -v
+        codesign -vvv --deep --strict SuperSlicer.dmg
+        codesign -dvv SuperSlicer.dmg
+    - name: notarize the dmg
+      run: |
+        xcrun altool --notarize-app -f SuperSlicer.dmg --primary-bundle-id org.slic3r.superslicer -u mail@remidurand.fr -p $MACOS_APP
+        spctl -a -t open --context context:primary-signature -v SuperSlicer.dmg
     - name: run codesign on app
       run: |
         /usr/bin/codesign --force -s "Developer ID Application: Remi Durand (LDTLFRHP3G)" ./build/pack/SuperSlicer/SuperSlicer.app -v
+        codesign -vvv --deep --strict ./build/pack/SuperSlicer/SuperSlicer.app
+        codesign -dvv ./build/pack/SuperSlicer/SuperSlicer.app
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
