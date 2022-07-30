@@ -127,6 +127,7 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(BridgeType)
 static const t_config_enum_values s_keys_map_FuzzySkinType{
     { "none",           int(FuzzySkinType::None) },
     { "external",       int(FuzzySkinType::External) },
+    { "shell",          int(FuzzySkinType::Shell) },
     { "all",            int(FuzzySkinType::All) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FuzzySkinType)
@@ -2561,14 +2562,20 @@ void PrintConfigDef::init_fff_params()
     def = this->add("fuzzy_skin", coEnum);
     def->label = L("Fuzzy Skin");
     def->category = OptionCategory::fuzzy_skin;
-    def->tooltip = L("Fuzzy skin type.");
+    def->tooltip = L("Fuzzy skin type."
+        "\nNone: setting disabled."
+        "\Outside walls: Apply fuzzy skin only on the external perimeters of the outside (not the holes)."
+        "\External walls: Apply fuzzy skin only on all external perimeters."
+        "\All perimeters: Apply fuzzy skin on all perimeters (external, internal and gapfill).");
     def->enum_keys_map = &ConfigOptionEnum<FuzzySkinType>::get_enum_values();
     def->enum_values.push_back("none");
     def->enum_values.push_back("external");
+    def->enum_values.push_back("shell");
     def->enum_values.push_back("all");
     def->enum_labels.push_back(L("None"));
     def->enum_labels.push_back(L("Outside walls"));
-    def->enum_labels.push_back(L("All walls"));
+    def->enum_labels.push_back(L("External walls"));
+    def->enum_labels.push_back(L("All perimeters"));
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<FuzzySkinType>(FuzzySkinType::None));
 
@@ -5992,35 +5999,35 @@ void PrintConfigDef::init_fff_params()
     def = this->add("perimeter_generator", coEnum);
     def->label = L("Perimeter generator");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("Classic perimeter generator produces perimeters with constant extrusion width and for"
-        " very thing areas is used gap-fill."
-        "Arachne produces perimeters with variable extrusion width.");
+    def->tooltip = L("Classic perimeter generator produces perimeters with constant extrusion width and for "
+                      "very thin areas is used gap-fill. "
+                      "Arachne engine produces perimeters with variable extrusion width.");
     def->enum_keys_map = &ConfigOptionEnum<PerimeterGeneratorType>::get_enum_values();
     def->enum_values.push_back("classic");
     def->enum_values.push_back("arachne");
     def->enum_labels.push_back(L("Classic"));
     def->enum_labels.push_back(L("Arachne"));
     def->mode = comAdvancedE | comPrusa;
-    def->set_default_value(new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Arachne));
+    def->set_default_value(new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Classic));
 
     def = this->add("wall_transition_length", coFloat);
-    def->label = L("Wall Transition Length");
+    def->label = L("Perimeter transition length");
     def->category = OptionCategory::advanced;
-    def->tooltip = L("When transitioning between different numbers of walls as the part becomes"
-        "thinner, a certain amount of space is allotted to split or join the wall lines.");
+    def->tooltip  = L("When transitioning between different numbers of perimeters as the part becomes"
+                       "thinner, a certain amount of space is allotted to split or join the perimeter segments.");
     def->sidetext = L("mm");
     def->mode = comExpert | comPrusa;
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(0.4));
 
     def = this->add("wall_transition_filter_deviation", coFloatOrPercent);
-    def->label = L("Wall Transitioning Filter Margin");
+    def->label = L("Perimeter transitioning filter margin");
     def->category = OptionCategory::advanced;
-    def->tooltip  = L("Prevent transitioning back and forth between one extra wall and one less. This "
-                       "margin extends the range of line widths which follow to [Minimum Wall Line "
-                       "Width - Margin, 2 * Minimum Wall Line Width + Margin]. Increasing this margin "
+    def->tooltip  = L("Prevent transitioning back and forth between one extra perimeter and one less. This "
+                       "margin extends the range of extrusion widths which follow to [Minimum perimeter width "
+                       "- margin, 2 * Minimum perimeter width + margin]. Increasing this margin "
                        "reduces the number of transitions, which reduces the number of extrusion "
-                       "starts/stops and travel time. However, large line width variation can lead to "
+                       "starts/stops and travel time. However, large extrusion width variation can lead to "
                        "under- or overextrusion problems."
                        "If expressed as percentage (for example 25%), it will be computed over nozzle diameter.");
     def->sidetext = L("mm");
@@ -6029,12 +6036,12 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(25, true));
 
     def = this->add("wall_transition_angle", coFloat);
-    def->label = L("Wall Transitioning Threshold Angle");
+    def->label = L("Perimeter transitioning threshold angle");
     def->category = OptionCategory::advanced;
-    def->tooltip  = L("When to create transitions between even and odd numbers of walls. A wedge shape with"
-                       " an angle greater than this setting will not have transitions and no walls will be "
+    def->tooltip  = L("When to create transitions between even and odd numbers of perimeters. A wedge shape with"
+                       " an angle greater than this setting will not have transitions and no perimeters will be "
                        "printed in the center to fill the remaining space. Reducing this setting reduces "
-                       "the number and length of these center walls, but may leave gaps or overextrude.");
+                       "the number and length of these center perimeters, but may leave gaps or overextrude.");
     def->sidetext = L("°");
     def->mode = comExpert | comPrusa;
     def->min = 1.;
@@ -6042,23 +6049,23 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(10.));
 
     def = this->add("wall_distribution_count", coInt);
-    def->label = L("Wall Distribution Count");
+    def->label = L("Perimeter distribution count");
     def->category = OptionCategory::advanced;
-    def->tooltip = L("The number of walls, counted from the center, over which the variation needs to be "
-        "spread. Lower values mean that the outer walls don't change in width.");
+    def->tooltip  = L("The number of perimeters, counted from the center, over which the variation needs to be "
+                       "spread. Lower values mean that the outer perimeters don't change in width.");
     def->mode = comExpert | comPrusa;
     def->min = 1;
     def->set_default_value(new ConfigOptionInt(1));
 
     def = this->add("wall_split_middle_threshold", coPercent);
-    def->label = L("Split Middle Line Threshold");
+    def->label = L("Split middle perimeter threshold");
     def->category = OptionCategory::advanced;
-    def->tooltip = L("The smallest line width, as a factor of the normal line width, above which the middle "
-        "line (if there is one) will be split into two. Reduce this setting to use more, thinner "
-        "lines. Increase to use fewer, wider lines. Note that this applies -as if- the entire "
-        "shape should be filled with wall, so the middle here refers to the middle of the object "
-        "between two outer edges of the shape, even if there actually is fill or (other) skin in "
-        "the print instead of wall.");
+    def->tooltip  = L("The smallest extrusion width, as a factor of the normal extrusion width, above which the middle "
+                       "perimeter (if there is one) will be split into two. Reduce this setting to use more, thinner "
+                       "perimeters. Increase to use fewer, wider perimeters. Note that this applies -as if- the entire "
+                       "shape should be filled with perimeter, so the middle here refers to the middle of the object "
+                       "between two outer edges of the shape, even if there actually is infill or other extrusion types in "
+                       "the print instead of the perimeter.");
     def->sidetext = L("%");
     def->mode = comAdvancedE | comPrusa;
     def->min = 1;
@@ -6066,14 +6073,14 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionPercent(50));
 
     def = this->add("wall_add_middle_threshold", coPercent);
-    def->label = L("Add Middle Line Threshold");
+    def->label = L("Add middle perimeter threshold");
     def->category = OptionCategory::advanced;
-    def->tooltip = L("The smallest line width, as a factor of the normal line width, above which a middle "
-        "line (if there wasn't one already) will be added. Reduce this setting to use more, "
-        "thinner lines. Increase to use fewer, wider lines. Note that this applies -as if- the "
-        "entire shape should be filled with wall, so the middle here refers to the middle of the "
-        "object between two outer edges of the shape, even if there actually is fill or (other) "
-        "skin in the print instead of wall.");
+    def->tooltip  = L("The smallest extrusion width, as a factor of the normal extrusion width, above which a middle "
+                       "perimeter (if there wasn't one already) will be added. Reduce this setting to use more, "
+                       "thinner perimeters. Increase to use fewer, wider perimeters. Note that this applies -as if- the "
+                       "entire shape should be filled with perimeter, so the middle here refers to the middle of the "
+                       "object between two outer edges of the shape, even if there actually is infill or other "
+                       "extrusion types in the print instead of the perimeter.");
     def->sidetext = L("%");
     def->mode = comAdvancedE | comPrusa;
     def->min = 1;
@@ -6081,22 +6088,22 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionPercent(75));
 
     def = this->add("min_feature_size", coFloat);
-    def->label = L("Minimum Feature Size");
+    def->label = L("Minimum feature size");
     def->category = OptionCategory::advanced;
-    def->tooltip = L("Minimum thickness of thin features. Model features that are thinner than this value will "
-        "not be printed, while features thicker than the Minimum Feature Size will be widened to "
-        "the Minimum Wall Line Width.");
+    def->tooltip  = L("Minimum thickness of thin features. Model features that are thinner than this value will "
+                       "not be printed, while features thicker than the Minimum feature size will be widened to "
+                       "the Minimum perimeter width.");
     def->sidetext = L("mm");
     def->mode = comExpert | comPrusa;
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(0.1));
 
     def = this->add("min_bead_width", coFloatOrPercent);
-    def->label = L("Minimum Wall Line Width");
+    def->label = L("Minimum perimeter width");
     def->category = OptionCategory::advanced;
-    def->tooltip  = L("Width of the wall that will replace thin features (according to the Minimum Feature Size) "
-                       "of the model. If the Minimum Wall Line Width is thinner than the thickness of the feature,"
-                       " the wall will become as thick as the feature itself. "
+    def->tooltip  = L("Width of the perimeter that will replace thin features (according to the Minimum feature size) "
+                       "of the model. If the Minimum perimeter width is thinner than the thickness of the feature,"
+                       " the perimeter will become as thick as the feature itself. "
                        "If expressed as percentage (for example 85%), it will be computed over nozzle diameter.");
     def->sidetext = L("mm or %");
     def->mode = comExpert | comPrusa;

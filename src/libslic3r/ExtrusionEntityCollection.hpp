@@ -45,9 +45,14 @@ public:
     ExtrusionEntityCollection(ExtrusionEntityCollection &&other) : m_entities(std::move(other.m_entities)), no_sort(other.no_sort), no_reverse(other.no_reverse) {}
     explicit ExtrusionEntityCollection(const ExtrusionPaths &paths);
     ExtrusionEntityCollection& operator=(const ExtrusionEntityCollection &other);
-    ExtrusionEntityCollection& operator=(ExtrusionEntityCollection &&other)
-        { this->m_entities = std::move(other.m_entities); this->no_sort = other.no_sort; this->no_reverse = other.no_reverse; return *this; }
-    ~ExtrusionEntityCollection() { clear(); }
+    ExtrusionEntityCollection& operator=(ExtrusionEntityCollection &&other) {
+        this->clear();
+        this->m_entities = std::move(other.m_entities);
+        this->no_sort  = other.no_sort;
+        this->no_reverse = other.no_reverse;
+        return *this;
+    }
+    ~ExtrusionEntityCollection() override { clear(); }
 
     /// Operator to convert and flatten this collection to a single vector of ExtrusionPaths.
     explicit operator ExtrusionPaths() const;

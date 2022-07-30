@@ -278,16 +278,23 @@ void GLGizmoCut::update_contours()
     const ModelObject* model_object = wxGetApp().model().objects[selection.get_object_idx()];
     const int instance_idx = selection.get_instance_idx();
     std::vector<ObjectID> volumes_idxs = std::vector<ObjectID>(model_object->volumes.size());
+    std::vector<Transform3d> volumes_trafos = std::vector<Transform3d>(model_object->volumes.size());
     for (size_t i = 0; i < model_object->volumes.size(); ++i) {
         volumes_idxs[i] = model_object->volumes[i]->id();
+        volumes_trafos[i] = model_object->volumes[i]->get_matrix();
     }
+
+    bool trafos_match = std::equal(volumes_trafos.begin(), volumes_trafos.end(),
+            m_cut_contours.volumes_trafos.begin(), m_cut_contours.volumes_trafos.end(),
+            [](const Transform3d& a, const Transform3d& b) { return a.isApprox(b); });
 
     if (0.0 < m_cut_z && m_cut_z < m_max_z) {
         if (m_cut_contours.cut_z != m_cut_z || m_cut_contours.object_id != model_object->id() ||
-            m_cut_contours.instance_idx != instance_idx || m_cut_contours.volumes_idxs != volumes_idxs) {
+            m_cut_contours.instance_idx != instance_idx || m_cut_contours.volumes_idxs != volumes_idxs ||
+            !trafos_match) {
             m_cut_contours.cut_z = m_cut_z;
 
-            if (m_cut_contours.object_id != model_object->id() || m_cut_contours.volumes_idxs != volumes_idxs)
+            if (m_cut_contours.object_id != model_object->id() || m_cut_contours.volumes_idxs != volumes_idxs || !trafos_match)
                 m_cut_contours.mesh = model_object->raw_mesh();
 
             m_cut_contours.position = box.center();
@@ -295,6 +302,7 @@ void GLGizmoCut::update_contours()
             m_cut_contours.object_id = model_object->id();
             m_cut_contours.instance_idx = instance_idx;
             m_cut_contours.volumes_idxs = volumes_idxs;
+            m_cut_contours.volumes_trafos = volumes_trafos;
             m_cut_contours.contours.reset();
 
             MeshSlicingParams slicing_params;

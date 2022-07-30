@@ -5,6 +5,7 @@
 #include <libslic3r/Polyline.hpp>
 #include <libslic3r/EdgeGrid.hpp>
 #include <libslic3r/Geometry.hpp>
+#include "libslic3r/Geometry/VoronoiUtilsCgal.hpp"
 
 #include <libslic3r/Geometry/VoronoiOffset.hpp>
 #include <libslic3r/Geometry/VoronoiVisualUtils.hpp>
@@ -2157,4 +2158,35 @@ TEST_CASE("Intersecting Voronoi edges", "[Voronoi]")
     };
 
 //    REQUIRE(!has_intersecting_edges(poly, vd));
+}
+
+// In this case resulting Voronoi diagram is not planar. This case was distilled from GH issue #8474.
+// Also, in GH issue #8514, a non-planar Voronoi diagram is generated for several polygons.
+// Rotating the input polygon will solve this issue.
+TEST_CASE("Non-planar voronoi diagram", "[VoronoiNonPlanar]")
+{
+    Polygon poly {
+        { 5500000, -42000000},
+        { 8000000, -17000000},
+        { 8000000,  40000000},
+        { 7500000,  40000000},
+        { 7500000, -18000000},
+        { 6000001, -18000000},
+        { 6000000,  40000000},
+        { 5500000,  40000000},
+    };
+
+//    poly.rotate(PI / 6);
+
+    REQUIRE(poly.area() > 0.);
+    REQUIRE(intersecting_edges({poly}).empty());
+
+    VD    vd;
+    Lines lines = to_lines(poly);
+    construct_voronoi(lines.begin(), lines.end(), &vd);
+#ifdef VORONOI_DEBUG_OUT
+    dump_voronoi_to_svg(debug_out_path("voronoi-non-planar-out.svg").c_str(), vd, Points(), lines);
+#endif
+
+//    REQUIRE(Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(vd));
 }

@@ -3042,133 +3042,151 @@ MedialAxis::build(ThickPolylines& polylines_out)
 
 }
 
-ExtrusionEntitiesPtr
-thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal)
+ExtrusionPaths
+variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance)
 {
-    assert(resolution_internal > SCALED_EPSILON);
 
-    // this value determines granularity of adaptive width, as G-code does not allow
-    // variable extrusion within a single move; this value shall only affect the amount
-    // of segments, and any pruning shall be performed before we apply this tolerance
-    const coord_t tolerance = flow.scaled_width() / 10;//scale_(0.05);
+    ExtrusionPaths paths;
+    ExtrusionPath path(role);
+    ThickLines lines = polyline.thicklines();
     Flow current_flow = flow;
 
-    ExtrusionEntitiesPtr coll;
-    for (const ThickPolyline& p : polylines) {
-        ExtrusionPaths paths;
-        ExtrusionPath path(role);
-        ThickLines lines = p.thicklines();
+    coordf_t saved_line_len = 0;
+    for (int i = 0; i < (int)lines.size(); ++i) {
+        ThickLine& line = lines[i];
 
-        coordf_t saved_line_len = 0;
-        for (int i = 0; i < (int)lines.size(); ++i) {
-            ThickLine& line = lines[i];
+        const coordf_t line_len = line.length();
+        const coordf_t prev_line_len = saved_line_len;
+        saved_line_len = line_len;
 
-            const coordf_t line_len = line.length();
-            const coordf_t prev_line_len = saved_line_len;
-            saved_line_len = line_len;
+        assert(line.a_width > SCALED_EPSILON && !std::isnan(line.a_width));
+        assert(line.b_width > SCALED_EPSILON && !std::isnan(line.b_width));
+        coord_t thickness_delta = std::abs(line.a_width - line.b_width);
 
-            assert(line.a_width >= 0 && !std::isnan(line.a_width));
-            assert(line.b_width >= 0 && !std::isnan(line.b_width));
-            coord_t thickness_delta = std::abs(line.a_width - line.b_width);
-
-            // split lines ?
-            if (resolution_internal < line_len) {
-                if (thickness_delta > tolerance && ceil(float(thickness_delta) / float(tolerance)) > 2) {
-                    const uint16_t segments = 1 + (uint16_t)std::min((uint32_t)16000, (uint32_t)ceil(float(thickness_delta) / float(tolerance)));
-                    Points pp;
-                    std::vector<coordf_t> width;
-                    {
-                        for (size_t j = 0; j < segments; ++j) {
-                            pp.push_back(line.a.interpolate(((double)j) / segments, line.b));
-                            double percent_width = ((double)j) / (segments - 1);
-                            width.push_back(line.a_width * (1 - percent_width) + line.b_width * percent_width);
-                        }
-                        pp.push_back(line.b);
-
-                        assert(pp.size() == segments + 1);
-                        assert(width.size() == segments);
-                    }
-
-                    // delete this line and insert new ones
-                    lines.erase(lines.begin() + i);
+        // split lines ?
+        if (resolution_internal < line_len) {
+            if (thickness_delta > tolerance && ceil(float(thickness_delta) / float(tolerance)) > 2) {
+                const uint16_t segments = 1 + (uint16_t)std::min((uint32_t)16000, (uint32_t)ceil(float(thickness_delta) / float(tolerance)));
+                Points pp;
+                std::vector<coordf_t> width;
+                {
                     for (size_t j = 0; j < segments; ++j) {
-                        ThickLine new_line(pp[j], pp[j + 1]);
-                        new_line.a_width = width[j];
-                        new_line.b_width = width[j];
-                        lines.insert(lines.begin() + i + j, new_line);
+                        pp.push_back(line.a.interpolate(((double)j) / segments, line.b));
+                        double percent_width = ((double)j) / (segments - 1);
+                        width.push_back(line.a_width * (1 - percent_width) + line.b_width * percent_width);
                     }
+                    pp.push_back(line.b);
 
-                    // go back to the start of this loop iteration
-                    --i;
-                    continue;
-                } else if (thickness_delta > 0) {
-                    //create a middle point
-                    ThickLine new_line(line.a.interpolate(0.5, line.b), line.b);
-                    new_line.a_width = line.b_width;
-                    new_line.b_width = line.b_width;
-                    line.b = new_line.a;
-                    line.b_width = line.a_width;
-                    lines.insert(lines.begin() + i + 1, new_line);
+                    assert(pp.size() == segments + 1);
+                    assert(width.size() == segments);
+                }
 
-                    // go back to the start of this loop iteration
-                    --i;
-                    continue;
-                }
-            } else if (i > 0 && resolution_internal > line_len + prev_line_len) {
-                //merge lines?
-                //if it's a loop, merge only if the distance is high enough
-                if (p.first_point() == p.last_point() && p.length() < (line_len + prev_line_len) * 6)
-                    continue;
-                ThickLine& prev_line = lines[i - 1];
-                coordf_t width = prev_line_len * (prev_line.a_width + prev_line.b_width) / 2;
-                width += line_len * (line.a_width + line.b_width) / 2;
-                prev_line.b = line.b;
-                const coordf_t new_length = prev_line.length();
-                if (new_length < SCALED_EPSILON) {
-                    // too short, remove it and restart
-                    if (i > 1) {
-                        line.a = lines[i - 2].b;
-                    }
-                    lines.erase(lines.begin() + i - 1);
-                    i -= 2;
-                    continue;
-                }
-                width /= new_length;
-                prev_line.a_width = width;
-                prev_line.b_width = width;
-                saved_line_len = new_length;
-                //erase 'line'
+                // delete this line and insert new ones
                 lines.erase(lines.begin() + i);
+                for (size_t j = 0; j < segments; ++j) {
+                    ThickLine new_line(pp[j], pp[j + 1]);
+                    new_line.a_width = width[j];
+                    new_line.b_width = width[j];
+                    lines.insert(lines.begin() + i + j, new_line);
+                }
+
+                // go back to the start of this loop iteration
                 --i;
                 continue;
             } else if (thickness_delta > 0) {
-                //set width as a middle-ground
-                line.a_width = (line.a_width + line.b_width) / 2;
+                //create a middle point
+                ThickLine new_line(line.a.interpolate(0.5, line.b), line.b);
+                new_line.a_width = line.b_width;
+                new_line.b_width = line.b_width;
+                line.b = new_line.a;
                 line.b_width = line.a_width;
+                lines.insert(lines.begin() + i + 1, new_line);
+
+                // go back to the start of this loop iteration
+                --i;
+                continue;
             }
+        } else if (i > 0 && resolution_internal > line_len + prev_line_len) {
+            //merge lines?
+            //if it's a loop, merge only if the distance is high enough
+            if (polyline.first_point() == polyline.last_point() && polyline.length() < (line_len + prev_line_len) * 6)
+                continue;
+            ThickLine& prev_line = lines[i - 1];
+            coordf_t width = prev_line_len * (prev_line.a_width + prev_line.b_width) / 2;
+            width += line_len * (line.a_width + line.b_width) / 2;
+            prev_line.b = line.b;
+            const coordf_t new_length = prev_line.length();
+            if (new_length < SCALED_EPSILON) {
+                // too short, remove it and restart
+                if (i > 1) {
+                    line.a = lines[i - 2].b;
+                }
+                lines.erase(lines.begin() + i - 1);
+                i -= 2;
+                continue;
+            }
+            width /= new_length;
+            prev_line.a_width = width;
+            prev_line.b_width = width;
+            saved_line_len = new_length;
+            //erase 'line'
+            lines.erase(lines.begin() + i);
+            --i;
+            continue;
+        } else if (thickness_delta > 0) {
+            //set width as a middle-ground
+            line.a_width = (line.a_width + line.b_width) / 2;
+            line.b_width = line.a_width;
         }
-        for (int i = 0; i < (int)lines.size(); ++i) {
-            ThickLine& line = lines[i];
+    }
+    for (int i = 0; i < (int)lines.size(); ++i) {
+        ThickLine& line = lines[i];
 
-            //gapfill : we want to be able to fill the voids (touching the perimeters), so the spacing is what we want.
-            //thinwall: we want the extrusion to not go out of the polygon, so the width is what we want.
-            //  but we can't extrude with a negative spacing, so we have to gradually fall back to spacing if the width is too small.
+        //gapfill : we want to be able to fill the voids (touching the perimeters), so the spacing is what we want.
+        //thinwall: we want the extrusion to not go out of the polygon, so the width is what we want.
+        //  but we can't extrude with a negative spacing, so we have to gradually fall back to spacing if the width is too small.
 
-            // default: extrude a thin wall that doesn't go outside of the specified width.
-            coordf_t wanted_width = unscaled(line.a_width);
-            if (role == erGapFill) {
-                // Convert from spacing to extrusion width based on the extrusion model
-                // of a square extrusion ended with semi circles.
-                wanted_width = unscaled(line.a_width) + flow.height() * (1. - 0.25 * PI);
-            } else if (unscale<coordf_t>(line.a_width) < 2 * flow.height() * (1. - 0.25 * PI)) {
-                //width (too) small, be sure to not extrude with negative spacing.
-                //we began to fall back to spacing gradually even before the spacing go into the negative
-                //  to make extrusion1 < extrusion2 if width1 < width2 even if width2 is too small. 
-                wanted_width = unscaled(line.a_width) * 0.35 + 1.3 * flow.height() * (1. - 0.25 * PI);
+        // default: extrude a thin wall that doesn't go outside of the specified width.
+        double wanted_width = unscaled(line.a_width);
+        if (role == erGapFill) {
+            // Convert from spacing to extrusion width based on the extrusion model
+            // of a square extrusion ended with semi circles.
+            wanted_width = unscaled(line.a_width) + flow.height() * (1. - 0.25 * PI);
+        } else if (role == erOverhangPerimeter && flow.bridge()) {
+            // for Arachne overhangs: keep the bridge width.
+            wanted_width = flow.width();
+        } else if (unscale<coordf_t>(line.a_width) < 2 * flow.height() * (1. - 0.25 * PI)) {
+            //width (too) small, be sure to not extrude with negative spacing.
+            //we began to fall back to spacing gradually even before the spacing go into the negative
+            //  to make extrusion1 < extrusion2 if width1 < width2 even if width2 is too small. 
+            wanted_width = unscaled(line.a_width) * 0.35 + 1.3 * flow.height() * (1. - 0.25 * PI);
+        }
+
+        if (path.polyline.points.empty()) {
+            if (wanted_width != current_flow.width()) {
+                current_flow = current_flow.with_width((float)wanted_width);
             }
-
-            if (path.polyline.points.empty()) {
-                current_flow = current_flow.with_width(wanted_width);
+            path.polyline.append(line.a);
+            path.polyline.append(line.b);
+            assert(!std::isnan(current_flow.mm3_per_mm()));
+            assert(!std::isnan(current_flow.width()));
+            assert(!std::isnan(current_flow.height()));
+            path.mm3_per_mm = current_flow.mm3_per_mm();
+            path.width = current_flow.width();
+            path.height = current_flow.height();
+        } else {
+            coord_t thickness_delta = scale_t(fabs(current_flow.width() - wanted_width));
+            if (thickness_delta <= tolerance / 2) {
+                // the width difference between this line and the current flow width is 
+                // within the accepted tolerance
+                path.polyline.append(line.b);
+            } else {
+                // we need to initialize a new line
+                paths.emplace_back(std::move(path));
+                path = ExtrusionPath(role);
+                if (wanted_width != current_flow.width()) {
+                    current_flow = current_flow.with_width(wanted_width);
+                }
                 path.polyline.append(line.a);
                 path.polyline.append(line.b);
                 assert(!std::isnan(current_flow.mm3_per_mm()));
@@ -3177,34 +3195,35 @@ thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, c
                 path.mm3_per_mm = current_flow.mm3_per_mm();
                 path.width = current_flow.width();
                 path.height = current_flow.height();
-            } else {
-                coord_t thickness_delta = scale_t(fabs(current_flow.width() - wanted_width));
-                if (thickness_delta <= tolerance / 2) {
-                    // the width difference between this line and the current flow width is 
-                    // within the accepted tolerance
-                    path.polyline.append(line.b);
-                } else {
-                    // we need to initialize a new line
-                    paths.emplace_back(std::move(path));
-                    path = ExtrusionPath(role);
-                    current_flow = current_flow.with_width(wanted_width);
-                    path.polyline.append(line.a);
-                    path.polyline.append(line.b);
-                    assert(!std::isnan(current_flow.mm3_per_mm()));
-                    assert(!std::isnan(current_flow.width()));
-                    assert(!std::isnan(current_flow.height()));
-                    path.mm3_per_mm = current_flow.mm3_per_mm();
-                    path.width = current_flow.width();
-                    path.height = current_flow.height();
-                }
             }
-            assert(path.polyline.points.size() > 2 || path.first_point() != path.last_point());
         }
-        if (path.polyline.is_valid())
-            paths.emplace_back(std::move(path));
+        assert(path.polyline.points.size() > 2 || path.first_point() != path.last_point());
+    }
+    if (path.polyline.is_valid())
+        paths.emplace_back(std::move(path));
 
+    return paths;
+}
+
+ExtrusionEntitiesPtr
+    thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal)
+{
+    assert(resolution_internal > SCALED_EPSILON);
+
+    // this value determines granularity of adaptive width, as G-code does not allow
+    // variable extrusion within a single move; this value shall only affect the amount
+    // of segments, and any pruning shall be performed before we apply this tolerance
+    const coord_t tolerance = flow.scaled_width() / 10;//scale_(0.05);
+    ExtrusionEntitiesPtr coll;
+    for (const ThickPolyline& p : polylines) {
+
+        ExtrusionPaths paths = variable_width(p, role, flow, resolution_internal, tolerance);
         // Append paths to collection.
         if (!paths.empty()) {
+            for (auto it = std::next(paths.begin()); it != paths.end(); ++it) {
+                assert(it->polyline.points.size() >= 2);
+                assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+            }
             if (paths.front().first_point().coincides_with_epsilon(paths.back().last_point())) {
                 coll.push_back(new ExtrusionLoop(std::move(paths)));
             } else {
@@ -3214,7 +3233,7 @@ thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, c
                     ExtrusionEntityCollection* unsortable_coll = new ExtrusionEntityCollection(std::move(paths));
                     unsortable_coll->set_can_sort_reverse(false, false);
                     coll.push_back(unsortable_coll);
-                } else {
+                } else if (role == erGapFill) {
                     if (paths.size() == 1) {
                         coll.push_back(paths.front().clone_move());
                     } else {
@@ -3224,6 +3243,9 @@ thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, c
                         unsortable_coll->set_can_sort_reverse(false, true);
                         coll.push_back(unsortable_coll);
                     }
+                } else {
+                    for (ExtrusionPath& path : paths)
+                        coll.push_back(new ExtrusionPath(std::move(path)));
                 }
             }
         }

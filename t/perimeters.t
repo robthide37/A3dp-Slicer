@@ -258,8 +258,6 @@ use Slic3r::Test;
         $config->set('bridge_flow_ratio', 33);  # arbitrary value
         $config->set('over_bridge_flow_ratio', 110);  # arbitrary value
         $config->set('overhangs', 1);
-        # FIXME Lukas H.: For now, this unit test is disabled for Arachne because of an issue with detecting overhang when Arachne is enabled.
-        $config->set('perimeter_generator', 'classic');
         my $print = Slic3r::Test::init_print('overhang', config => $config);
         my %layer_speeds = ();  # print Z => [ speeds ]
         my $fan_speed = 0;
@@ -380,13 +378,7 @@ use Slic3r::Test;
             ],
         );
     }
-
-    # Because of Arachne and the method for detecting non-covered areas, four areas are falsely recognized as non-covered.
-    if ($config->perimeter_generator eq 'arachne') {
-        is scalar(grep { $_->area > ($iflow->scaled_width**2) } @$non_covered), 4, 'no gap between perimeters and infill';
-    } else {
-        ok !(defined first { $_->area > ($iflow->scaled_width**2) } @$non_covered), 'no gap between perimeters and infill';
-    }
+    ok !(defined first { $_->area > ($iflow->scaled_width**2) } @$non_covered), 'no gap between perimeters and infill';
 }
 
 {
@@ -399,8 +391,6 @@ use Slic3r::Test;
     $config->set('overhangs', 1);
     $config->set('cooling', [ 0 ]);                 # to prevent speeds from being altered
     $config->set('first_layer_speed', '100%');      # to prevent speeds from being altered
-    # FIXME Lukas H.: For now, this unit test is disabled for Arachne because of an issue with detecting overhang when Arachne is enabled.
-    $config->set('perimeter_generator', 'classic');
     
     my $test = sub {
         my ($print) = @_;

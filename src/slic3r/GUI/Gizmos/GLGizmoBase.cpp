@@ -225,9 +225,12 @@ void GLGizmoBase::render_input_window(float x, float y, float bottom_limit)
 {
     on_render_input_window(x, y, bottom_limit);
     if (m_first_input_window_render) {
-        // for some reason, the imgui dialogs are not shown on screen in the 1st frame where they are rendered, but show up only with the 2nd rendered frame
-        // so, we forces another frame rendering the first time the imgui window is shown
+        // imgui windows that don't have an initial size needs to be processed once to get one
+        // and are not rendered in the first frame
+        // so, we forces to render another frame the first time the imgui window is shown
+        // https://github.com/ocornut/imgui/issues/2949
         m_parent.set_as_dirty();
+        m_parent.request_extra_frame();
         m_first_input_window_render = false;
     }
 }

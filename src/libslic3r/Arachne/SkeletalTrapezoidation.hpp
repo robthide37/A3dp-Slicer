@@ -18,6 +18,7 @@
 #include "SkeletalTrapezoidationJoint.hpp"
 #include "libslic3r/Arachne/BeadingStrategy/BeadingStrategy.hpp"
 #include "SkeletalTrapezoidationGraph.hpp"
+#include "../Geometry/Voronoi.hpp"
 
 namespace Slic3r::Arachne
 {

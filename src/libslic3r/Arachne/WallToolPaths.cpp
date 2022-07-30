@@ -18,6 +18,8 @@
 
 #include <boost/log/trivial.hpp>
 
+//#define ARACHNE_STITCH_PATCH_DEBUG
+
 namespace Slic3r::Arachne
 {
 
@@ -549,7 +551,7 @@ void WallToolPaths::stitchToolPaths(std::vector<VariableWidthLines> &toolpaths, 
         VariableWidthLines stitched_polylines;
         VariableWidthLines closed_polygons;
         PolylineStitcher<VariableWidthLines, ExtrusionLine, ExtrusionJunction>::stitch(wall_lines, stitched_polylines, closed_polygons, stitch_distance);
-#ifdef DEBUG
+#ifdef ARACHNE_STITCH_PATCH_DEBUG
         for (const ExtrusionLine& line : stitched_polylines) {
             if ( ! line.is_odd && line.polylineLength() > 3 * stitch_distance && line.size() > 3) {
                 BOOST_LOG_TRIVIAL(error) << "Some even contour lines could not be closed into polygons!";
@@ -608,7 +610,7 @@ void WallToolPaths::stitchToolPaths(std::vector<VariableWidthLines> &toolpaths, 
                 }
             }
         }
-#endif // DEBUG
+#endif // ARACHNE_STITCH_PATCH_DEBUG
         wall_lines = stitched_polylines; // replace input toolpaths with stitched polylines
 
         for (ExtrusionLine& wall_polygon : closed_polygons)
@@ -761,7 +763,7 @@ bool WallToolPaths::removeEmptyToolPaths(std::vector<VariableWidthLines> &toolpa
      *
      * \param outer_to_inner Whether the wall polygons with a lower inset_idx should go before those with a higher one.
  */
-std::unordered_set<std::pair<const ExtrusionLine *, const ExtrusionLine *>, boost::hash<std::pair<const ExtrusionLine *, const ExtrusionLine *>>> WallToolPaths::getRegionOrder(const std::vector<const ExtrusionLine *> &input, const bool outer_to_inner)
+std::unordered_set<std::pair<const ExtrusionLine *, const ExtrusionLine *>, boost::hash<std::pair<const ExtrusionLine *, const ExtrusionLine *>>> WallToolPaths::getRegionOrder(const std::vector<ExtrusionLine *> &input, const bool outer_to_inner)
 {
     std::unordered_set<std::pair<const ExtrusionLine *, const ExtrusionLine *>, boost::hash<std::pair<const ExtrusionLine *, const ExtrusionLine *>>> order_requirements;
 
