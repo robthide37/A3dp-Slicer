@@ -82,6 +82,7 @@ bool FontManager::store_font_list_to_app_config(AppConfig *cfg)
         make_unique_name(fi.name);        
         m_style_cache.font_index = m_style_items.size();
         m_style_items.push_back({fi});
+        m_style_cache.stored_wx_font = m_style_cache.wx_font;
     }
     
     FontListSerializable::store_font_index(*cfg, m_style_cache.font_index);

@@ -647,13 +647,13 @@ void GLGizmoEmboss::initialize()
     float line_height_with_spacing = ImGui::GetTextLineHeightWithSpacing();
     float space = line_height_with_spacing - line_height;
 
-    cfg.max_font_name_width = ImGui::CalcTextSize("Maximal font name, extended").x;
+    cfg.max_style_name_width = ImGui::CalcTextSize("Maximal font name, extended").x;
 
     cfg.icon_width = std::ceil(line_height);
     // make size pair number
     if (cfg.icon_width % 2 != 0) ++cfg.icon_width;
 
-    cfg.delete_pos_x = cfg.max_font_name_width + space;
+    cfg.delete_pos_x = cfg.max_style_name_width + space;
     int count_line_of_text = 3;
     cfg.text_size = ImVec2(-FLT_MIN, line_height_with_spacing * count_line_of_text);
     ImVec2 letter_m_size = ImGui::CalcTextSize("M");
@@ -718,9 +718,9 @@ void GLGizmoEmboss::initialize()
         ImVec2(cfg.minimal_window_size.x,
                cfg.minimal_window_size.y + advance_height);
 
-    int max_style_image_width = cfg.max_font_name_width -
+    int max_style_image_width = cfg.max_style_name_width /2 -
                                 2 * style.FramePadding.x;
-    int max_style_image_height = 2 * input_height;
+    int max_style_image_height = 1.5 * input_height;
     cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
     cfg.face_name_size.y() = line_height_with_spacing;
 
@@ -1322,7 +1322,7 @@ void GLGizmoEmboss::draw_font_list()
                 auto& worker = wxGetApp().plater()->get_ui_job_worker();
                 queue_job(worker, std::move(job));
             }
-            ImGui::SameLine(m_gui_cfg->face_name_offset);
+            ImGui::SameLine(m_gui_cfg->face_name_max_width);
             ImVec2 size(m_gui_cfg->face_name_size.x(),
                         m_gui_cfg->face_name_size.y()),
                 uv0(0.f, index / (float) m_face_names.names.size()),
@@ -1460,7 +1460,7 @@ void GLGizmoEmboss::draw_model_type()
     }
 }
 
-void GLGizmoEmboss::draw_rename_popup() {
+void GLGizmoEmboss::draw_style_rename_popup() {
     std::string& new_name = m_style_manager.get_font_item().name;
     const std::string &old_name = m_style_manager.get_stored_font_item()->name;
     std::string text_in_popup = GUI::format(_u8L("Rename style(%1%) for embossing text: "), old_name);
@@ -1486,12 +1486,7 @@ void GLGizmoEmboss::draw_rename_popup() {
     bool store = false;
     ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
     if (ImGui::InputText("##rename style", &new_name, flags) && allow_change) store = true;
-
-    static bool rename_in_volumes = true;
-    ImGui::Checkbox(_u8L("Rename style in scene volumes.").c_str(), &rename_in_volumes);
-
     if (m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change)) store = true;
-
     ImGui::SameLine();
     if (ImGui::Button(_u8L("cancel").c_str())) {
         new_name = old_name;
@@ -1499,17 +1494,16 @@ void GLGizmoEmboss::draw_rename_popup() {
     }
 
     if (store) {
-        if (rename_in_volumes) {
-            // rename style in all objects and volumes
-            for (ModelObject *mo :wxGetApp().plater()->model().objects) {
-                for (ModelVolume *mv : mo->volumes) { 
-                    if (!mv->text_configuration.has_value()) continue;
-                    std::string& name = mv->text_configuration->font_item.name;
-                    if (name != old_name) continue;
-                    name = new_name;
-                }
+        // rename style in all objects and volumes
+        for (ModelObject *mo :wxGetApp().plater()->model().objects) {
+            for (ModelVolume *mv : mo->volumes) { 
+                if (!mv->text_configuration.has_value()) continue;
+                std::string& name = mv->text_configuration->font_item.name;
+                if (name != old_name) continue;
+                name = new_name;
             }
         }
+        
         m_style_manager.rename(new_name);
         m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
         ImGui::CloseCurrentPopup();
@@ -1530,14 +1524,14 @@ void GLGizmoEmboss::draw_style_rename_button()
         else            ImGui::SetTooltip("%s", _u8L("Can't rename temporary style.").c_str());
     }
     if (ImGui::BeginPopupModal(popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
-        draw_rename_popup();
+        draw_style_rename_popup();
         ImGui::EndPopup();
     }
 }
 
 void GLGizmoEmboss::draw_style_save_button()
 {
-    bool is_stored_style     = m_style_manager.exist_stored_style();
+    bool is_stored_style = m_style_manager.exist_stored_style();
     const FontItem *stored_fi = nullptr;
     if (is_stored_style)
         stored_fi = m_style_manager.get_stored_font_item();
@@ -1548,12 +1542,14 @@ void GLGizmoEmboss::draw_style_save_button()
     bool is_style_order_changed = m_style_manager.is_style_order_changed();
     bool is_activ_style_changed = m_style_manager.is_activ_style_changed();
     bool can_save = is_changed || is_style_order_changed || is_activ_style_changed;
+    if (!is_stored_style) can_save = false;
+
     if (draw_button(IconType::save, !can_save)) {
         // save styles to app config
         m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
     }else if (ImGui::IsItemHovered()) { 
         if (!is_stored_style) {
-            ImGui::SetTooltip("%s", _u8L("Add style to be able save.").c_str());
+            ImGui::SetTooltip("%s", _u8L("First Add style to be able save.").c_str());
         } else if (is_changed) {
             ImGui::SetTooltip("%s", _u8L("Save changes into style.").c_str());
         } else if (is_style_order_changed) {
@@ -1566,63 +1562,81 @@ void GLGizmoEmboss::draw_style_save_button()
     }
 }
 
-void GLGizmoEmboss::draw_style_save_as_button()
+void GLGizmoEmboss::draw_style_save_as_popup() {
+    ImGui::Text("%s", _u8L("New name of style: ").c_str());
+
+    // use name inside of volume configuration as temporary new name
+    std::string &new_name = m_volume->text_configuration->font_item.name;
+
+    bool is_unique = true;
+    for (const auto &item : m_style_manager.get_styles())
+        if (item.font_item.name == new_name) is_unique = false;
+        
+    bool allow_change = false;
+    if (new_name.empty()) {
+        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
+    }else if (!is_unique) { 
+        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name has to be unique."));
+    } else {
+        ImGui::NewLine();
+        allow_change = true;
+    }
+
+    bool save_style = false;
+    ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
+    if (ImGui::InputText("##save as style", &new_name, flags))
+        save_style = true;
+        
+    if (m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change))
+        save_style = true;
+
+    ImGui::SameLine();
+    if (ImGui::Button(_u8L("cancel").c_str())){
+        // write original name to volume TextConfiguration
+        new_name = m_style_manager.get_font_item().name;
+        ImGui::CloseCurrentPopup();
+    }
+
+    if (save_style && allow_change) {
+        m_style_manager.store_style(new_name);
+        m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
+        ImGui::CloseCurrentPopup();
+    }
+}
+
+void GLGizmoEmboss::draw_style_add_button()
 {
     bool start_save_as = false;
     bool only_add_style = !m_style_manager.exist_stored_style();
+    bool can_add        = true;
+    if (only_add_style &&
+        m_volume && 
+        m_volume->text_configuration.has_value() &&
+        m_volume->text_configuration->font_item.type != WxFontUtils::get_actual_type())
+        can_add = false;
+
+    std::string title    = _u8L("Save as new style");
+    const char *popup_id = title.c_str();
     // save as new style
     ImGui::SameLine();
-    if (draw_button(IconType::duplicate)) {
+    if (draw_button(IconType::add, !can_add)) {
         if (!m_style_manager.exist_stored_style()) {
             m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
         } else {
-            start_save_as = true;
+            ImGui::OpenPopup(popup_id);
         }
-        //m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
     } else if (ImGui::IsItemHovered()) {
-        if (only_add_style) {
+        if (!can_add) {
+            ImGui::SetTooltip("%s", _u8L("Only valid font can be added to style.").c_str());
+        }else if (only_add_style) {
             ImGui::SetTooltip("%s", _u8L("Add style to my list.").c_str());
         } else {
             ImGui::SetTooltip("%s", _u8L("Add as new named style.").c_str());
         }
     }
 
-    std::string title = _u8L("Save as new style");
-    const char * popup_id = title.c_str();
-    static std::string new_name;
-    if (start_save_as && !ImGui::IsPopupOpen(popup_id)) {
-        ImGui::OpenPopup(popup_id);
-        // initialize with original copy
-        new_name = m_style_manager.get_font_item().name;
-    }
-
     if (ImGui::BeginPopupModal(popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("%s", _u8L("New name of style: ").c_str());
-
-        bool is_unique = true;
-        for (const auto &item : m_style_manager.get_styles())
-            if (item.font_item.name == new_name) is_unique = false;
-        
-        bool allow_change = false;
-        if (new_name.empty()) {
-            m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
-        }else if (!is_unique) { 
-            m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name has to be unique."));
-        } else {
-            ImGui::NewLine();
-            allow_change = true;
-        }
-
-        ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
-        if ((ImGui::InputText("##save as style", &new_name, flags) && allow_change) ||
-            m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change)) {
-            m_style_manager.store_style(new_name);
-            m_style_manager.store_font_list_to_app_config(wxGetApp().app_config);
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button(_u8L("cancel").c_str()))
-            ImGui::CloseCurrentPopup();
+        draw_style_save_as_popup();
         ImGui::EndPopup();
     }
 }
@@ -1767,13 +1781,13 @@ void GLGizmoEmboss::draw_revert_all_styles_button() {
 
 void GLGizmoEmboss::draw_style_list() {
     if (!m_style_manager.is_activ_font()) return;
-    const float &max_width = m_gui_cfg->max_font_name_width;
+    const float &max_style_name_width = m_gui_cfg->max_style_name_width;
     const FontItem &actual_font_item = m_style_manager.get_font_item();
     std::string &trunc_name = m_style_manager.get_truncated_name();
     if (trunc_name.empty()) {
         // generate trunc name
         const std::string &current_name  = actual_font_item.name;
-        trunc_name = ImGuiWrapper::trunc(current_name, max_width);
+        trunc_name = ImGuiWrapper::trunc(current_name, max_style_name_width);
     }
 
     if (m_style_manager.exist_stored_style())
@@ -1784,7 +1798,7 @@ void GLGizmoEmboss::draw_style_list() {
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
     if (ImGui::BeginCombo("##style_selector", trunc_name.c_str())) {
         m_style_manager.init_style_images(m_gui_cfg->max_style_image_size, m_text);
-        m_style_manager.init_trunc_names(max_width);
+        m_style_manager.init_trunc_names(max_style_name_width);
         std::optional<std::pair<size_t,size_t>> swap_indexes;
         const std::vector<FontManager::Item> &styles = m_style_manager.get_styles();
         for (const auto &item : styles) {
@@ -1817,7 +1831,7 @@ void GLGizmoEmboss::draw_style_list() {
 
             // draw style name
             if (img.has_value()) {
-                ImGui::SameLine();
+                ImGui::SameLine(max_style_name_width);
                 ImGui::Image(img->texture_id, img->tex_size, img->uv0, img->uv1);
             }
 
@@ -1852,7 +1866,7 @@ void GLGizmoEmboss::draw_style_list() {
     draw_style_save_button();
 
     ImGui::SameLine();
-    draw_style_save_as_button();
+    draw_style_add_button();
 
     // undo button
     ImGui::SameLine();
@@ -2302,6 +2316,10 @@ void GLGizmoEmboss::draw_advanced()
     if (m_style_manager.exist_stored_style())
         stored_fi = m_style_manager.get_stored_font_item();
 
+    bool can_use_surface = (m_volume==nullptr)? false :
+                        (font_prop.use_surface)? true : // already used surface must have option to uncheck
+        (m_volume->get_object()->volumes.size() > 1);
+    m_imgui->disabled_begin(!can_use_surface);
     const bool *def_use_surface = stored_fi ?
         &stored_fi->prop.use_surface : nullptr;
     if (rev_checkbox(tr.use_surface, font_prop.use_surface, def_use_surface,
@@ -2313,6 +2331,7 @@ void GLGizmoEmboss::draw_advanced()
         }
         process();
     }
+    m_imgui->disabled_end(); // !can_use_surface
 
     std::string units = _u8L("font points");
     std::string units_fmt = "%.0f " + units;

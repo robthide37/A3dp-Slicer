@@ -104,10 +104,11 @@ private:
     void draw_delete_style_button();
     void discard_changes_in_style();
     void draw_revert_all_styles_button();
-    void draw_rename_popup();
+    void draw_style_rename_popup();
     void draw_style_rename_button();
     void draw_style_save_button();
-    void draw_style_save_as_button();
+    void draw_style_save_as_popup();
+    void draw_style_add_button();
     void draw_style_undo_button();
     void draw_font_list();
     void draw_style_edit();
@@ -170,7 +171,7 @@ private:
         ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
         float        input_width                      = 0.f;
         float        delete_pos_x                     = 0.f;
-        float        max_font_name_width              = 0.f;
+        float        max_style_name_width             = 0.f;
         unsigned int icon_width                       = 0;
 
         // maximal width and height of style image
@@ -182,10 +183,9 @@ private:
 
         ImVec2 text_size;
 
-        // maximal size of face image
-        Vec2i face_name_size = Vec2i(128, 0);
+        // maximal size of face name image
+        Vec2i face_name_size = Vec2i(100, 0);
         float face_name_max_width = 100.f;
-        float face_name_offset = 100.f;
 
         // Only translations needed for calc GUI size
         struct Translations
@@ -264,7 +264,7 @@ private:
     enum class IconType : unsigned {
         rename = 0,
         erase,
-        duplicate,
+        add,
         save,
         undo,
         italic,
