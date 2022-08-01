@@ -28,6 +28,7 @@ using namespace Slic3r;
 #include <CGAL/Exact_integer.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Cartesian_converter.h>
+#include <tbb/parallel_for.h>
 
 // libslic3r
 #include "TriangleMesh.hpp" // its_merge
@@ -631,14 +632,14 @@ using PointNormals = std::array<PointNormal, 4>;
 /// <returns></returns>
 bool is_out_of(const Vec3d &v, const PointNormal &point_normal);
 
-using IsOnSides = std::array<std::vector<bool>, 4>;
+using IsOnSides = std::vector<std::array<bool, 4>>;
 /// <summary>
 /// Check if triangle t has all vertices out of any plane
 /// </summary>
 /// <param name="t">Triangle</param>
 /// <param name="is_on_sides">Flag is vertex index out of plane</param>
 /// <returns>True when triangle is out of one of plane</returns>
-bool is_all_on_one_side(const Vec3i &t, const IsOnSides is_on_sides);
+bool is_all_on_one_side(const Vec3i &t, const IsOnSides& is_on_sides);
 
 } // namespace priv
 
@@ -650,11 +651,11 @@ bool priv::is_out_of(const Vec3d &v, const PointNormal &point_normal)
     return signed_distance > 1e-5;
 };
 
-bool priv::is_all_on_one_side(const Vec3i &t, const IsOnSides is_on_sides) {
+bool priv::is_all_on_one_side(const Vec3i &t, const IsOnSides& is_on_sides) {
     for (size_t side = 0; side < 4; side++) {
         bool result = true;
         for (auto vi : t) {
-            if (!is_on_sides[side][vi]) {
+            if (!is_on_sides[vi][side]) {
                 result = false;
                 break;
             }
@@ -709,36 +710,40 @@ void priv::set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
         point_normals[i] = {p1.cast<double>(), normal};
     }
     // same meaning as point normal
-    IsOnSides is_on_sides;
-    for (size_t side = 0; side < 4; side++)
-        is_on_sides[side] = std::vector<bool>(its.vertices.size(), {false});
+    IsOnSides is_on_sides(its.vertices.size(), {false,false,false,false});    
     
     // inspect all vertices when it is out of bounding box
-    for (size_t i = 0; i < its.vertices.size(); i++) {
-        Vec3d v = its.vertices[i].cast<double>();
-        // under + above
-        for (int side : {0, 2}) {
-            if (is_out_of(v, point_normals[side])) {
-                is_on_sides[side][i] = true;
-                // when it is under it can't be above
-                break;
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, its.vertices.size()),
+    [&its, &point_normals, &is_on_sides](const tbb::blocked_range<size_t> &range) {
+        for (size_t i = range.begin(); i < range.end(); ++i) {
+            Vec3d v = its.vertices[i].cast<double>();
+            // under + above
+            for (int side : {0, 2}) {
+                if (is_out_of(v, point_normals[side])) {
+                    is_on_sides[i][side] = true;
+                    // when it is under it can't be above
+                    break;
+                }
+            }
+            // left + right
+            for (int side : {1, 3}) {
+                if (is_out_of(v, point_normals[side])) {
+                    is_on_sides[i][side] = true;
+                    // when it is on left side it can't be on right
+                    break;
+                }        
             }
         }
-        // left + right
-        for (int side : {1, 3}) {
-            if (is_out_of(v, point_normals[side])) {
-                is_on_sides[side][i] = true;
-                // when it is on left side it can't be on right
-                break;
-            }        
-        }
-    }
+    }); // END parallel for
 
     // inspect all triangles, when it is out of bounding box
-    for (size_t i = 0; i < its.indices.size(); i++) {
-        if (is_all_on_one_side(its.indices[i], is_on_sides)) 
-            skip_indicies[i] = true;
-    }
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, its.indices.size()),
+    [&its, &is_on_sides, &skip_indicies](const tbb::blocked_range<size_t> &range) {
+        for (size_t i = range.begin(); i < range.end(); ++i) {
+            if (is_all_on_one_side(its.indices[i], is_on_sides)) 
+                skip_indicies[i] = true;
+        }
+    }); // END parallel for
 }
 
 indexed_triangle_set Slic3r::its_mask(const indexed_triangle_set &its,
