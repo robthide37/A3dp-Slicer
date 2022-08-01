@@ -301,6 +301,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         allowed_volumes_id.reserve(volumes.size() - 1);
         for (auto &v : volumes) { 
             if (v->id() == m_volume->id()) continue;
+            if (!v->is_model_part()) continue;
             allowed_volumes_id.emplace_back(v->id().id);
         }
     }
