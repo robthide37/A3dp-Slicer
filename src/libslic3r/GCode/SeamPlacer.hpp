@@ -52,16 +52,16 @@ enum class EnforcedBlockedSeamPoint {
 
 // struct representing single perimeter loop
 struct Perimeter {
-    size_t start_index;
-    size_t end_index; //inclusive!
-    size_t seam_index;
-    float flow_width;
+    size_t start_index{};
+    size_t end_index{}; //inclusive!
+    size_t seam_index{};
+    float flow_width{};
 
     // During alignment, a final position may be stored here. In that case, finalized is set to true.
     // Note that final seam position is not limited to points of the perimeter loop. In theory it can be any position
     // Random position also uses this flexibility to set final seam point position
     bool finalized = false;
-    Vec3f final_seam_position;
+    Vec3f final_seam_position = Vec3f::Zero();
 };
 
 //Struct over which all processing of perimeters is done. For each perimeter point, its respective candidate is created,
@@ -167,8 +167,7 @@ private:
     void align_seam_points(const PrintObject *po, const SeamPlacerImpl::SeamComparator &comparator);
     std::vector<std::pair<size_t, size_t>> find_seam_string(const PrintObject *po,
             std::pair<size_t, size_t> start_seam,
-            const SeamPlacerImpl::SeamComparator &comparator,
-            float& string_weight) const;
+            const SeamPlacerImpl::SeamComparator &comparator) const;
     std::optional<std::pair<size_t, size_t>> find_next_seam_in_layer(
             const std::vector<PrintObjectSeamData::LayerSeams> &layers,
             const Vec3f& projected_position,

@@ -501,7 +501,6 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
 		}
     }
 
-
     result.perimeters.push_back( { });
     Perimeter &perimeter = result.perimeters.back();
 
@@ -1042,8 +1041,8 @@ public:
 
     float distance_from_perimeter(const Point &point) const {
         Vec2d p = unscale(point);
-        size_t hit_idx_out;
-        Vec2d hit_point_out;
+        size_t hit_idx_out{};
+        Vec2d hit_point_out = Vec2d::Zero();
         auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, p, hit_idx_out, hit_point_out);
         if (distance < 0) {
             return std::numeric_limits<float>::max();
@@ -1223,9 +1222,7 @@ std::optional<std::pair<size_t, size_t>> SeamPlacer::find_next_seam_in_layer(
 }
 
 std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintObject *po,
-        std::pair<size_t, size_t> start_seam, const SeamPlacerImpl::SeamComparator &comparator,
-        float& string_weight) const {
-    string_weight = 0.0f;
+        std::pair<size_t, size_t> start_seam, const SeamPlacerImpl::SeamComparator &comparator) const {
     const std::vector<PrintObjectSeamData::LayerSeams> &layers = m_seam_per_object.find(po)->second.layers;
     int layer_idx = start_seam.first;
 
@@ -1259,11 +1256,6 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
 
         if (maybe_next_seam.has_value()) {
             // For old macOS (pre 10.14), std::optional does not have .value() method, so the code is using operator*() instead.
-            std::pair<size_t, size_t> next_seam_coords = maybe_next_seam.operator*();
-            const auto &next_seam = layers[next_seam_coords.first].points[next_seam_coords.second];
-            bool is_moved = next_seam.perimeter.seam_index != next_seam_coords.second;
-            string_weight += comparator.weight(next_seam) -
-                    is_moved ? comparator.weight(layers[next_seam_coords.first].points[next_seam.perimeter.seam_index]) : 0.0f;
             seam_string.push_back(maybe_next_seam.operator*());
             prev_point_index = seam_string.back();
             //String added, prev_point_index updated
@@ -1279,7 +1271,6 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
         }
         next_layer += step;
     }
-
     return seam_string;
 }
 
@@ -1349,18 +1340,13 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             // This perimeter is already aligned, skip seam
             continue;
         } else {
-            float seam_string_weight;
-            seam_string = this->find_seam_string(po, { layer_idx, seam_index }, comparator, seam_string_weight);
+            seam_string = this->find_seam_string(po, { layer_idx, seam_index }, comparator);
             size_t step_size = 1 + seam_string.size() / 20;
             for (size_t alternative_start = 0; alternative_start < seam_string.size(); alternative_start+=step_size) {
-                float alternative_seam_string_weight = 0;
                 size_t start_layer_idx = seam_string[alternative_start].first;
                 size_t seam_idx = layers[start_layer_idx].points[seam_string[alternative_start].second].perimeter.seam_index;
-                alternative_seam_string = this->find_seam_string(po, std::pair<size_t,size_t>(start_layer_idx, seam_idx), comparator,
-                        alternative_seam_string_weight);
-                if (alternative_seam_string.size() >= SeamPlacer::seam_align_minimum_string_seams &&
-                        alternative_seam_string_weight > seam_string_weight) {
-                    seam_string_weight = alternative_seam_string_weight;
+                alternative_seam_string = this->find_seam_string(po, std::pair<size_t,size_t>(start_layer_idx, seam_idx), comparator);
+                if (alternative_seam_string.size() > seam_string.size()) {
                     seam_string = std::move(alternative_seam_string);
                 }
             }
