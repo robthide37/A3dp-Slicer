@@ -1,4 +1,5 @@
 #include "NSVGUtils.hpp"
+#include "ClipperUtils.hpp"
 
 using namespace Slic3r;
 

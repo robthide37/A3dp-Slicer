@@ -1607,7 +1607,6 @@ void GLGizmoEmboss::draw_style_save_as_popup() {
 
 void GLGizmoEmboss::draw_style_add_button()
 {
-    bool start_save_as = false;
     bool only_add_style = !m_style_manager.exist_stored_style();
     bool can_add        = true;
     if (only_add_style &&
@@ -1726,7 +1725,7 @@ void GLGizmoEmboss::draw_delete_style_button() {
 
 void GLGizmoEmboss::discard_changes_in_style()
 {
-    assert(m_style_manager.exist_stored_style());
+    if (!m_style_manager.exist_stored_style()) return;
 
     FontItem &font_item  = m_style_manager.get_font_item();
     const FontItem* stored_fi = m_style_manager.get_stored_font_item();
@@ -1852,17 +1851,6 @@ void GLGizmoEmboss::draw_style_list() {
     ImGui::SameLine();
     draw_style_rename_button();
         
-    // Is style changed against stored one
-    FontItem &font_item = m_style_manager.get_font_item();
-
-    const FontItem *stored_fi = nullptr;
-    if (m_style_manager.exist_stored_style())
-        stored_fi = m_style_manager.get_stored_font_item();
-
-    bool is_stored  = stored_fi != nullptr;
-    bool is_changed = (is_stored) ? !(*stored_fi == font_item) : true;
-    // TODO: check order of font items in list to allowe save actual order
-
     ImGui::SameLine();
     draw_style_save_button();
 

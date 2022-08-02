@@ -108,8 +108,8 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
             // bigger value create darker image
             unsigned char gray_level = 5;
             size_t size {static_cast<size_t>(w*h)};
-            assert((offset.x() + width) <= w);
-            assert((offset.y() + height) <= h);
+            assert((offset.x() + width) <= (size_t)w);
+            assert((offset.y() + height) <= (size_t)h);
             const unsigned char *ptr2 = (const unsigned char *) ptr;
             for (size_t x = 0; x < width; ++x)
                 for (size_t y = 0; y < height; ++y) { 

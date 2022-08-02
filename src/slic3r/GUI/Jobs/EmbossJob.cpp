@@ -480,7 +480,7 @@ bool priv::check(const EmbossDataCreateVolume &input, bool is_main_thread) {
     assert(input.object_idx >= 0);
     res &= input.object_idx >= 0;
     if (is_main_thread)
-        assert(input.object_idx < wxGetApp().model().objects.size());
+        assert((size_t)input.object_idx < wxGetApp().model().objects.size());
     assert(input.screen_coor.x() >= 0.);
     res &= input.screen_coor.x() >= 0.;
     assert(input.screen_coor.y() >= 0.);

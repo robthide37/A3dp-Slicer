@@ -2986,7 +2986,7 @@ std::vector<bool> priv::select_patches(
         if (d.patch_index == std::numeric_limits<uint32_t>::max()) continue;
         if (result[d.patch_index]) continue;
         // Add all connected patches
-        // This is way to add patche without source shape point
+        // This is way to add patche(from other models) without source shape point
         // 1. Patches inside of shape
         // 2. Patches crossing outline between shape points
 
@@ -3008,7 +3008,6 @@ std::vector<bool> priv::select_patches(
                 if (patch.shape_id != patch2.shape_id) continue;
                 BoundingBoxf3 bb2 = extend_bb(patch2.bb);
                 if (!bb.intersects(bb2)) continue;
-
                 if (!in_distances[patch_index2]) {
                     // TODO: check that really exist shared outline between patches
                     
