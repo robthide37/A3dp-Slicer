@@ -1159,11 +1159,14 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                         Point point = Point::new_scale(Vec2f { perimeter_point.position.head<2>() });
                         if (prev_layer_distancer.get() != nullptr) {
                             perimeter_point.overhang = prev_layer_distancer->distance_from_perimeter(point)
-                                    - tan(SeamPlacer::overhang_angle_threshold * PI / 180.0f) * po->layers()[layer_idx]->height;
+                                    + 0.5f * perimeter_point.perimeter.flow_width
+                                    - tan(SeamPlacer::overhang_angle_threshold * PI / 180.0f)
+                                            * po->layers()[layer_idx]->height;
                         }
 
                         if (should_compute_layer_embedding) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
-                            perimeter_point.embedded_distance = current_layer_distancer->distance_from_perimeter(point);
+                            perimeter_point.embedded_distance = current_layer_distancer->distance_from_perimeter(point)
+                                    + 0.5f * perimeter_point.perimeter.flow_width;
                         }
                     }
 

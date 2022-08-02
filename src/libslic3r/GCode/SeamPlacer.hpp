@@ -134,7 +134,7 @@ public:
     // max allowed overhang angle for seam placement, in degrees, measured from vertical direction
     //TODO There is some problem in layer distance computation, so the current angle is much lower to counter that issue
     // However, it should be fixed correctly
-    static constexpr float overhang_angle_threshold = 15.0f;
+    static constexpr float overhang_angle_threshold = 50.0f;
 
     // determines angle importance compared to visibility ( neutral value is 1.0f. )
     static constexpr float angle_importance_aligned = 0.6f;
