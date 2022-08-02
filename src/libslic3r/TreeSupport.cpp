@@ -592,7 +592,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
                 }
                 std::rotate(part.begin(), part.begin() + optimal_start_index, part.end() - 1);
                 part[part.size() - 1] = part[0]; // restore that property that this polyline ends where it started.
-                optimal_end_index = (optimal_end_index - optimal_start_index + part.size() - 1) % (part.size() - 1);
+                optimal_end_index = (part.size() + optimal_end_index - optimal_start_index - 1) % (part.size() - 1);
             }
 
             while (line.size() < min_points && current_distance >= scaled<double>(0.1))
