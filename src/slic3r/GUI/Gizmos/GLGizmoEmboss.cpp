@@ -2686,9 +2686,9 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
                 m_style_manager.load_font(tc_fi, *wx_font_opt);
 
         } else {
-            // stored style is loaded, add volume changes
+            // stored style is loaded, now set modification of style
             m_style_manager.get_font_item() = tc_fi;
-            m_style_manager.get_wx_font()   = wx_font_opt;
+            m_style_manager.set_wx_font(*wx_font_opt);
         }
     }
 
