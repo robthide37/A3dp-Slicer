@@ -467,7 +467,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
 //each SeamCandidate also contains pointer to shared Perimeter structure representing the polygon
 // if Custom Seam modifiers are present, oversamples the polygon if necessary to better fit user intentions
 void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const LayerRegion *region,
-        bool arachne_generated, const GlobalModelInfo &global_model_info, PrintObjectSeamData::LayerSeams &result) {
+        const GlobalModelInfo &global_model_info, PrintObjectSeamData::LayerSeams &result) {
     if (orig_polygon.size() == 0) {
         return;
     }
@@ -481,25 +481,6 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
     std::vector<float> polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
             SeamPlacer::polygon_local_angles_arm_distance);
-
-    // resample smooth surfaces from arachne, so that alignment finds short path down, and does not create unnecesary curves
-    if (arachne_generated && std::all_of(polygon_angles.begin(), polygon_angles.end(), [](float angle) {
-    	return compute_angle_penalty(angle) > SeamPlacer::sharp_angle_penalty_snapping_threshold;
-    })) {
-    	float total_dist = std::accumulate(lengths.begin(), lengths.end(), 0.0f);
-    	float avg_dist = total_dist / float(lengths.size());
-    	if (avg_dist < SeamPlacer::seam_align_tolerable_dist * 2.0f){
-			coord_t sampling_dist = scaled(avg_dist*0.2f);
-
-			polygon.points = polygon.equally_spaced_points(sampling_dist);
-			lengths.clear();
-			for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
-				lengths.push_back((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm());
-			}
-			lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
-			polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths, avg_dist);
-		}
-    }
 
     result.perimeters.push_back( { });
     Perimeter &perimeter = result.perimeters.back();
@@ -531,13 +512,14 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
             orig_point = true;
         }
 
-        if (global_model_info.is_enforced(position, perimeter.flow_width)) {
+        if (global_model_info.is_blocked(position, perimeter.flow_width * 0.5f)) {
+            type = EnforcedBlockedSeamPoint::Blocked;
+        }
+
+        if (global_model_info.is_enforced(position, perimeter.flow_width * 0.5f)) {
             type = EnforcedBlockedSeamPoint::Enforced;
         }
 
-        if (global_model_info.is_blocked(position, perimeter.flow_width)) {
-            type = EnforcedBlockedSeamPoint::Blocked;
-        }
         some_point_enforced = some_point_enforced || type == EnforcedBlockedSeamPoint::Enforced;
 
         if (orig_point) {
@@ -880,9 +862,9 @@ struct SeamComparator {
 
     float weight(const SeamCandidate &a) const {
         if (setup == SeamPosition::spAligned && a.central_enforcer) {
-            return 2.0f;
+            return 10.0f;
         }
-        return a.visibility + angle_importance * compute_angle_penalty(a.local_ccw_angle) / (1.0f + angle_importance);
+        return 1.0f / (0.1f + a.visibility + angle_importance * compute_angle_penalty(a.local_ccw_angle) / (1.0f + angle_importance));
     }
 };
 
@@ -907,8 +889,8 @@ void debug_export_points(const std::vector<PrintObjectSeamData::LayerSeams> &lay
             min_vis = std::min(min_vis, point.visibility);
             max_vis = std::max(max_vis, point.visibility);
 
-            min_weight = std::min(min_weight, -comparator.compute_angle_penalty(point.local_ccw_angle));
-            max_weight = std::max(max_weight, -comparator.compute_angle_penalty(point.local_ccw_angle));
+            min_weight = std::min(min_weight, -compute_angle_penalty(point.local_ccw_angle));
+            max_weight = std::max(max_weight, -compute_angle_penalty(point.local_ccw_angle));
 
         }
 
@@ -929,7 +911,7 @@ void debug_export_points(const std::vector<PrintObjectSeamData::LayerSeams> &lay
             visibility_svg.draw(scaled(Vec2f(point.position.head<2>())), visibility_fill);
 
             Vec3i weight_color = value_to_rgbi(min_weight, max_weight,
-                    -comparator.compute_angle_penalty(point.local_ccw_angle));
+                    -compute_angle_penalty(point.local_ccw_angle));
             std::string weight_fill = "rgb(" + std::to_string(weight_color.x()) + "," + std::to_string(weight_color.y())
                     + ","
                     + std::to_string(weight_color.z()) + ")";
@@ -1090,13 +1072,11 @@ public:
 void SeamPlacer::gather_seam_candidates(const PrintObject *po,
         const SeamPlacerImpl::GlobalModelInfo &global_model_info, const SeamPosition configured_seam_preference) {
     using namespace SeamPlacerImpl;
-    bool arachne_generated = po->config().perimeter_generator == PerimeterGeneratorType::Arachne;
-
     PrintObjectSeamData &seam_data = m_seam_per_object.emplace(po, PrintObjectSeamData { }).first->second;
     seam_data.layers.resize(po->layer_count());
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
-            [po, configured_seam_preference, arachne_generated, &global_model_info, &seam_data]
+            [po, configured_seam_preference, &global_model_info, &seam_data]
             (tbb::blocked_range<size_t> r) {
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
                     PrintObjectSeamData::LayerSeams &layer_seams = seam_data.layers[layer_idx];
@@ -1107,7 +1087,7 @@ void SeamPlacer::gather_seam_candidates(const PrintObject *po,
                     Polygons polygons = extract_perimeter_polygons(layer, configured_seam_preference, regions);
                     for (size_t poly_index = 0; poly_index < polygons.size(); ++poly_index) {
                         process_perimeter_polygon(polygons[poly_index], unscaled_z,
-                                regions[poly_index], arachne_generated, global_model_info, layer_seams);
+                                regions[poly_index], global_model_info, layer_seams);
                     }
                     auto functor = SeamCandidateCoordinateFunctor { layer_seams.points };
                     seam_data.layers[layer_idx].points_tree =
@@ -1393,36 +1373,38 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             //repeat the alignment for the current seam, since it could be skipped due to alternative path being aligned.
             global_index--;
 
-            // gather all positions of seams and their weights (weights are derived as negative penalty, they are made positive in next step)
+            // gather all positions of seams and their weights
             observations.resize(seam_string.size());
             observation_points.resize(seam_string.size());
             weights.resize(seam_string.size());
 
             //gather points positions and weights
-            float total_length = 0.0f;
+            float sharp_length = 0.0f;
             Vec3f last_point_pos = layers[seam_string[0].first].points[seam_string[0].second].position;
             for (size_t index = 0; index < seam_string.size(); ++index) {
-                Vec3f pos = layers[seam_string[index].first].points[seam_string[index].second].position;
-                total_length += (last_point_pos - pos).norm();
-                last_point_pos = pos;
+                const SeamCandidate &point = layers[seam_string[index].first].points[seam_string[index].second];
+                Vec3f pos = point.position;
                 observations[index] = pos.head<2>();
                 observation_points[index] = pos.z();
-                weights[index] = comparator.weight(layers[seam_string[index].first].points[seam_string[index].second]);
+                weights[index] = comparator.weight(point);
+                float angle_penalty = compute_angle_penalty(point.local_ccw_angle);
+                float dist = (last_point_pos - pos).norm();
+                sharp_length += dist * 1.0f / (0.1f + 0.7f*angle_penalty);
+                bool is_enforced = point.type == EnforcedBlockedSeamPoint::Enforced;
+                if (is_enforced) sharp_length+= dist;
+                last_point_pos = pos;
             }
 
             // Curve Fitting
             size_t number_of_segments = std::max(size_t(1),
-                    size_t(total_length / SeamPlacer::seam_align_mm_per_segment));
+                    size_t(sharp_length / SeamPlacer::seam_align_sharp_mm_per_segment));
             auto curve = Geometry::fit_cubic_bspline(observations, observation_points, weights, number_of_segments);
 
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
             // Perimeter structure of the point; also set flag aligned to true
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const auto &pair = seam_string[index];
-                const float t =
-                        compute_angle_penalty(layers[pair.first].points[pair.second].local_ccw_angle)
-                                < SeamPlacer::sharp_angle_penalty_snapping_threshold
-                                ? 0.8f : 0.0f;
+                const float t = std::min(1.0f, weights[index] / 10.0f);
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
                 Vec2f fitted_pos = curve.get_fitted_value(current_pos.z());
 
