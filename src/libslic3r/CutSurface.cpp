@@ -350,7 +350,6 @@ public:
 /// Differenciate other models
 /// </summary>
 /// <param name="cuts">Patches from meshes</param>
-/// <param name="m2i">Convert model_index and cut_index into one index</param>
 /// <param name="cut_models">Source points for Cutted AOIs
 /// NOTE: Create Reduction map as mesh property - clean on end</param>
 /// <param name="models">Original models without cut modifications
@@ -359,7 +358,6 @@ public:
 /// <param name="projection">Define projection direction</param> 
 /// <returns>Cuts differenciate by models - Patch</returns>
 SurfacePatches diff_models(VCutAOIs             &cuts,
-                           const ModelCut2index &m2i,
                            /*const*/ CutMeshes  &cut_models,
                            /*const*/ CutMeshes  &models,
                            const Project3f      &projection);
@@ -526,8 +524,7 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
         model_cuts.push_back(std::move(cutAOIs));
     }
 
-    priv::ModelCut2index m2i(model_cuts);
-    priv::SurfacePatches patches = priv::diff_models(model_cuts, m2i, cgal_models, cgal_neg_models, projection);
+    priv::SurfacePatches patches = priv::diff_models(model_cuts, cgal_models, cgal_neg_models, projection);
 #ifdef DEBUG_OUTPUT_DIR
     priv::store(patches, DEBUG_OUTPUT_DIR + "patches/");
 #endif // DEBUG_OUTPUT_DIR
@@ -2873,17 +2870,20 @@ void priv::collect_open_edges(SurfacePatches &patches) {
     }
 }
 
-priv::SurfacePatches priv::diff_models(VCutAOIs             &cuts,
-                                       const ModelCut2index &m2i,
-                                       /*const*/ CutMeshes  &cut_models,
-                                       /*const*/ CutMeshes  &models,
-                                       const Project3f      &projection)
+priv::SurfacePatches priv::diff_models(VCutAOIs            &cuts,
+                                       /*const*/ CutMeshes &cut_models,
+                                       /*const*/ CutMeshes &models,
+                                       const Project3f     &projection)
 {
+    // IMPROVE: when models contain ONE mesh. It is only about convert cuts to patches
+    // and reduce unneccessary triangles on contour
+
+    //Convert model_index and cut_index into one index
+    priv::ModelCut2index m2i(cuts);
+
     // create bounding boxes for cuts
     std::vector<BoundingBoxf3> bbs = create_bbs(cuts, cut_models);
-
-    // IMPROVE: Do not make Tree twice, when exist out of cut function
-    Trees trees = create_trees(models);
+    Trees trees(models.size());
 
     SurfacePatches patches;
     // queue of patches for one AOI (permanent with respect to for loop)
@@ -2914,8 +2914,19 @@ priv::SurfacePatches priv::diff_models(VCutAOIs             &cuts,
                     if (has_bb_intersection(patch.bb, model_index2, bbs, m2i) &&
                         clip_cut(patch, models[model_index2])){
                         patch.just_cliped = true;
-                    } else if (is_patch_inside_of_model(patch, trees[model_index2], projection))
-                        patch.full_inside = true;
+                    } else { 
+                        // build tree on demand
+                        // NOTE: it is possible not neccessary: e.g. one model
+                        Tree &tree = trees[model_index2];
+                        if (tree.empty()) {
+                            const CutMesh &model   = models[model_index2];
+                            auto           f_range = faces(model);
+                            tree.insert(f_range.first, f_range.second, model);
+                            tree.build();
+                        }
+                        if (is_patch_inside_of_model(patch, tree, projection))
+                            patch.full_inside = true;
+                    }
                 }
                 // erase full inside
                 for (size_t i = aoi_patches.size(); i != 0; --i) {
