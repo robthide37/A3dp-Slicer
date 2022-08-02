@@ -2637,7 +2637,6 @@ EmbossDataBase GLGizmoEmboss::create_emboss_data_base() {
         FontItem &fi = m_style_manager.get_font_item();
         // actualize font path - during changes in gui it could be corrupted
         // volume must store valid path
-        assert(fi.type == WxFontUtils::get_actual_type());
         assert(m_style_manager.get_wx_font().has_value());
         fi.path = WxFontUtils::store_wxFont(*m_style_manager.get_wx_font());
         return TextConfiguration{fi, m_text};
