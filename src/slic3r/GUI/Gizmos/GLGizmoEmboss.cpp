@@ -1442,22 +1442,30 @@ void GLGizmoEmboss::draw_model_type()
         Plater::TakeSnapshot snapshot(plater, _L("Change Text Type"), UndoRedo::SnapshotType::GizmoAction);
         m_volume->set_type(*new_type);
 
+         // Update volume position when switch from part or into part
+        if (m_volume->text_configuration->font_item.prop.use_surface) {
+            // move inside
+            bool is_volume_move_inside  = (type == part);
+            bool is_volume_move_outside = (*new_type == part);
+            if (is_volume_move_inside || is_volume_move_outside) process();
+        }
+
+        ObjectID volume_id = m_volume->id();
+
         // inspiration in ObjectList::change_part_type()
         // how to view correct side panel with objects
         ObjectList *obj_list = app.obj_list();
         wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection(
             obj_list->get_selected_obj_idx(),
             [volume = m_volume](const ModelVolume *vol) { return vol == volume; });
-        if (!sel.IsEmpty()) obj_list->select_item(sel.front());
+        if (!sel.IsEmpty()) obj_list->select_item(sel.front());       
 
-        // Update volume position when switch from part or into part
-        if (m_volume->text_configuration->font_item.prop.use_surface) {
-            // move inside
-            bool is_volume_move_inside = (type == part);
-            bool is_volume_move_outside = (*new_type == part);
-            if (is_volume_move_inside || is_volume_move_outside)
-                process();
-        }
+        // NOTE: on linux, function reorder_volumes_and_get_selection call GLCanvas3D::reload_scene(refresh_immediately = false)
+        // which discard m_volume pointer and set it to nullptr also selection is cleared so gizmo is automaticaly closed
+        auto &mng = m_parent.get_gizmos_manager();
+        if (mng.get_current_type() != GLGizmosManager::Emboss)
+            mng.open_gizmo(GLGizmosManager::Emboss);
+        // TODO: select volume back - Ask @Sasa
     }
 }
 
