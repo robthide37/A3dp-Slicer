@@ -9,6 +9,7 @@
 #include "TreeSupport.hpp"
 #include "BuildVolume.hpp"
 #include "ClipperUtils.hpp"
+#include "EdgeGrid.hpp"
 #include "Fill/Fill.hpp"
 #include "Layer.hpp"
 #include "Print.hpp"
@@ -23,7 +24,9 @@
 #include <optional>
 #include <stdio.h>
 #include <string>
-#include <windows.h> //todo Remove!  ONLY FOR PUBLIC BETA!!
+#ifdef _WIN32
+    #include <windows.h> //todo Remove!  ONLY FOR PUBLIC BETA!!
+#endif // _WIN32
 
 #include <boost/log/trivial.hpp>
 
@@ -34,9 +37,64 @@
 namespace Slic3r
 {
 
+enum class LineStatus
+{
+    INVALID,
+    TO_MODEL,
+    TO_MODEL_GRACIOUS,
+    TO_MODEL_GRACIOUS_SAFE,
+    TO_BP,
+    TO_BP_SAFE
+};
+
+using LineInformation = std::vector<std::pair<Point, LineStatus>>;
+using LineInformations = std::vector<LineInformation>;
+
+static inline void validate_range(const Point &pt)
+{
+    static constexpr const int32_t hi = 65536 * 16384;
+    if (pt.x() > hi || pt.y() > hi || -pt.x() > hi || -pt.y() > hi) 
+      throw ClipperLib::clipperException("Coordinate outside allowed range");    
+}
+
+static inline void validate_range(const Points &points) 
+{
+    for (const Point &p : points)
+        validate_range(p);
+}
+
+static inline void validate_range(const MultiPoint &mp) 
+{
+    validate_range(mp.points);
+}
+
+static inline void validate_range(const Polygons &polygons) 
+{
+    for (const Polygon &p : polygons)
+        validate_range(p);
+}
+
+static inline void validate_range(const Polylines &polylines) 
+{
+    for (const Polyline &p : polylines)
+        validate_range(p);
+}
+
+static inline void validate_range(const LineInformation &lines)
+{
+    for (const auto& p : lines)
+        validate_range(p.first);
+}
+
+static inline void validate_range(const LineInformations &lines)
+{
+    for (const LineInformation &l : lines)
+        validate_range(l);
+}
+
 static constexpr const auto tiny_area_threshold = sqr(scaled<double>(0.001));
 
-static [[nodiscard]] std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_t>>> group_meshes(const Print &print, const std::vector<size_t> &print_object_ids)
+static std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_t>>> group_meshes(const Print &print, const std::vector<size_t> &print_object_ids)
 {
     std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_t>>> grouped_meshes;
 
@@ -96,7 +154,7 @@ static [[nodiscard]] std::vector<std::pair<TreeSupport::TreeSupportSettings, std
 }
 
 // todo remove as only for debugging relevant
-static [[nodiscard]] std::string getPolygonAsString(const Polygons& poly)
+[[nodiscard]] static std::string getPolygonAsString(const Polygons& poly)
 {
     std::string ret;
     for (auto path : poly)
@@ -118,9 +176,11 @@ void TreeSupport::showError(std::string message, bool critical)
     bool show = (critical && !g_showed_critical_error) || (!critical && !g_showed_performance_warning);
     (critical ? g_showed_critical_error : g_showed_performance_warning) = true;
 
+#ifdef _WIN32
     if (show)
         MessageBoxA(nullptr, std::string("TreeSupport_2 MOD detected an error while generating the tree support.\nPlease report this back to me with profile and model.\nRevision 5.0\n" + message + "\n" + bugtype).c_str(), 
             "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
+#endif // WIN32
 }
 
 static bool layer_has_overhangs(const Layer &layer)
@@ -131,7 +191,7 @@ static bool layer_has_overhangs(const Layer &layer)
     return false;
 }
 
-static [[nodiscard]] Polygons layer_overhangs(const Layer &layer)
+[[nodiscard]] static Polygons layer_overhangs(const Layer &layer)
 {
     Polygons out;
     for (const LayerRegion* layerm : layer.regions())
@@ -289,26 +349,13 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
 //   storage.support.generated = true;
 }
 
-static inline [[nodiscard]] bool contains(const Polygons &polygons, const Point &p)
+[[nodiscard]] static inline bool contains(const Polygons &polygons, const Point &p)
 {
     for (const Polygon &polygon : polygons)
         if (polygon.contains(p))
             return true;
     return false;
 }
-
-enum class LineStatus
-{
-    INVALID,
-    TO_MODEL,
-    TO_MODEL_GRACIOUS,
-    TO_MODEL_GRACIOUS_SAFE,
-    TO_BP,
-    TO_BP_SAFE
-};
-
-using LineInformation = std::vector<std::pair<Point, LineStatus>>;
-using LineInformations = std::vector<LineInformation>;
 
 /*!
  * \brief Converts a Polygons object representing a line into the internal format.
@@ -317,7 +364,7 @@ using LineInformations = std::vector<LineInformation>;
  * \param layer_idx[in] The current layer.
  * \return All lines of the \p polylines object, with information for each point regarding in which avoidance it is currently valid in.
  */
-static [[nodiscard]] LineInformations convertLinesToInternal(
+[[nodiscard]] static LineInformations convertLinesToInternal(
     const TreeModelVolumes &volumes, const TreeSupport::TreeSupportSettings &config,
     const Polylines &polylines, LayerIndex layer_idx)
 {
@@ -349,6 +396,7 @@ static [[nodiscard]] LineInformations convertLinesToInternal(
         }
     }
 
+    validate_range(result);
     return result;
 }
 
@@ -358,7 +406,7 @@ static [[nodiscard]] LineInformations convertLinesToInternal(
  * \param lines[in] The lines that will be converted.
  * \return All lines of the \p lines object as a Polygons object.
  */
-static [[nodiscard]] Polylines convertInternalToLines(LineInformations lines)
+[[nodiscard]] static Polylines convertInternalToLines(LineInformations lines)
 {
     Polylines result;
     for (LineInformation line : lines) {
@@ -367,6 +415,7 @@ static [[nodiscard]] Polylines convertInternalToLines(LineInformations lines)
             path.points.emplace_back(point_data.first);
         result.emplace_back(std::move(path));
     }
+    validate_range(result);
     return result;
 }
 
@@ -376,7 +425,7 @@ static [[nodiscard]] Polylines convertInternalToLines(LineInformations lines)
  * \param current_layer[in] The layer on which the point lies, point and its status.
  * \return whether the point is valid.
  */
-static [[nodiscard]] bool evaluatePointForNextLayerFunction(
+[[nodiscard]] static bool evaluatePointForNextLayerFunction(
     const TreeModelVolumes &volumes, const TreeSupport::TreeSupportSettings &config,
     size_t current_layer, std::pair<Point, LineStatus> &p)
 {
@@ -400,7 +449,7 @@ static [[nodiscard]] bool evaluatePointForNextLayerFunction(
  * \return A pair with which points are still valid in the first slot and which are not in the second slot.
  */
 template<typename EvaluatePointFn>
-static [[nodiscard]] std::pair<LineInformations, LineInformations> splitLines(LineInformations lines, EvaluatePointFn evaluatePoint)
+[[nodiscard]] static std::pair<LineInformations, LineInformations> splitLines(LineInformations lines, EvaluatePointFn evaluatePoint)
 {
     // assumes all Points on the current line are valid
 
@@ -442,87 +491,58 @@ static [[nodiscard]] std::pair<LineInformations, LineInformations> splitLines(Li
                 set_free.emplace_back(resulting_line);
         }
     }
+    validate_range(keep);
+    validate_range(set_free);
     return std::pair<std::vector<std::vector<std::pair<Point, LineStatus>>>, std::vector<std::vector<std::pair<Point, LineStatus>>>>(keep, set_free);
 }
 
-/*!
- * A point within a polygon and the index of which segment in the polygon the point lies on.
- */
- //from CURA
-struct GivenDistPoint
+// Ported from CURA's PolygonUtils::getNextPointWithDistance()
+// Sample a next point at distance "dist" from start_pt on polyline segment (start_idx, start_idx + 1).
+// Returns sample point and start index of its segment on polyline if such sample exists.
+static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_distance(const Points &polyline, const Point &start_pt, size_t start_idx, double dist)
 {
-    Point location; //!< Result location
-    int pos; //!< Index to the first point in the polygon of the line segment on which the result was found
-};
+    const double                dist2  = sqr(dist);
+    const auto                  dist2i = int64_t(dist2);
+    static constexpr const auto eps    = scaled<double>(0.01);
 
-//from CURA
-static bool getNextPointWithDistance(Point from, double dist, Points &poly, int start_idx, int poly_start_idx, GivenDistPoint& result)
-{
-    Point prev_poly_point = poly[(start_idx + poly_start_idx) % poly.size()];
-
-    for (unsigned int prev_idx = start_idx; prev_idx < poly.size(); ++ prev_idx)
-    {
-        // last checked segment is between last point in poly and poly[0]...
-        int next_idx = (prev_idx + 1 + poly_start_idx) % poly.size();
-        const Point &next_poly_point = poly[next_idx];
-        if ((next_poly_point - from).cast<double>().norm() >= dist) {
-            /*
-             *                 x    r
-             *      p.---------+---+------------.n
-             *                L|  /
-             *                 | / dist
-             *                 |/
-             *                f.
-             *
-             * f=from
-             * p=prev_poly_point
-             * n=next_poly_point
-             * x= f projected on pn
-             * r=result point at distance [dist] from f
-             */
-
-            Point pn = next_poly_point - prev_poly_point;
-
-            static constexpr const double eps = scaled<double>(0.1);
-            if (pn.cast<double>().squaredNorm() < sqr(eps)) { // when precision is limited
-                Point middle = (next_poly_point + prev_poly_point) / 2;
-                double dist_to_middle = (from - middle).cast<double>().norm();
-                if (dist_to_middle - dist < eps && dist_to_middle - dist > -eps) {
-                    result.location = middle;
-                    result.pos = prev_idx;
-                    return true;
-                } else {
-                    prev_poly_point = next_poly_point;
+    for (size_t i = start_idx + 1; i < polyline.size(); ++ i) {
+        const Point p1 = polyline[i];
+        if ((p1 - start_pt).cast<int64_t>().squaredNorm() >= dist2i) {
+            // The end point is outside the circle with center "start_pt" and radius "dist".
+            const Point p0  = polyline[i - 1];
+            Vec2d       v   = (p1 - p0).cast<double>();
+            double      l2v = v.squaredNorm();
+            if (l2v < sqr(eps)) {
+                // Very short segment.
+                Point c = (p0 + p1) / 2;
+                if (std::abs((start_pt - c).cast<double>().norm() - dist) < eps)
+                    return std::pair<Point, size_t>{ c, i - 1 };
+                else
                     continue;
+            }
+            Vec2d p0f = (start_pt - p0).cast<double>();
+            // Foot point of start_pt into v.
+            Vec2d foot_pt = v * (p0f.dot(v) / l2v);
+            // Vector from foot point of "start_pt" to "start_pt".
+            Vec2d xf = p0f - foot_pt;
+            // Squared distance of "start_pt" from the ray (p0, p1).
+            double l2_from_line = xf.squaredNorm();
+            double det = dist2 - l2_from_line;
+
+            if (det > - SCALED_EPSILON) {
+                // The ray (p0, p1) touches or intersects a circle centered at "start_pt" with radius "dist".
+                // Distance of the circle intersection point from the foot point.
+                double dist_circle_intersection = std::sqrt(std::max(0., det));
+                if ((v - foot_pt).cast<double>().norm() > dist_circle_intersection) {
+                    // Intersection of the circle with the segment (p0, p1) is on the right side (close to p1) from the foot point.
+                    Point p = p0 + (foot_pt + v * (dist_circle_intersection / sqrt(l2v))).cast<coord_t>();
+                    validate_range(p);
+                    return std::pair<Point, size_t>{ p, i - 1 };
                 }
             }
-
-            Point pf = from - prev_poly_point;
-            Point px = (pn.cast<double>() * (pf.cast<double>().dot(pn.cast<double>()) / pn.cast<double>().squaredNorm())).cast<coord_t>();
-            Point xf = pf - px;
-
-            if (xf.cast<double>().norm() >= dist) { // line lies wholly further than pn
-                prev_poly_point = next_poly_point;
-                continue;
-            }
-
-            double xr_dist = std::sqrt(dist * dist - xf.cast<double>().squaredNorm()); // inverse Pythagoras
-
-            if ((pn - px).cast<double>().norm() - xr_dist < scaled<double>(1.)) { // r lies beyond n
-                prev_poly_point = next_poly_point;
-                continue;
-            }
-
-            Point xr = (pn * (xr_dist / pn.cast<double>().norm())).cast<coord_t>();
-            Point pr = px + xr;
-
-            result.location = prev_poly_point + pr;
-            result.pos = prev_idx;
-            return true;
         }
-        prev_poly_point = next_poly_point;
     }
-    return false;
+    return {};
 }
 
 /*!
@@ -533,7 +553,7 @@ static bool getNextPointWithDistance(Point from, double dist, Points &poly, int 
  * \param min_points[in] The amount of points that have to be placed. If not enough can be placed the distance will be reduced to place this many points.
  * \return A Polygons object containing the evenly spaced points. Does not represent an area, more a collection of points on lines.
  */
-static [[nodiscard]] Polylines ensureMaximumDistancePolyline(const Polylines &input, double distance, size_t min_points)
+[[nodiscard]] static Polylines ensureMaximumDistancePolyline(const Polylines &input, double distance, size_t min_points)
 {
     Polylines result;
     for (Polyline part : input) {
@@ -583,28 +603,27 @@ static [[nodiscard]] Polylines ensureMaximumDistancePolyline(const Polylines &in
                 if (min_points > 1 || (part[0] - part[optimal_end_index]).cast<double>().norm() > current_distance)
                     line.points.emplace_back(part[optimal_end_index]);
                 size_t current_index = 0;
-                GivenDistPoint next_point;
-                coord_t next_distance = current_distance;
+                std::optional<std::pair<Point, size_t>> next_point;
+                double next_distance = current_distance;
                 // Get points so that at least min_points are added and they each are current_distance away from each other. If that is impossible, decrease current_distance a bit.
                 // The input are lines, that means that the line from the last to the first vertex does not have to exist, so exclude all points that are on this line!
-                while (getNextPointWithDistance(current_point, next_distance, part.points, current_index, 0, next_point) && next_point.pos < coord_t(part.size()))
-                {
+                while ((next_point = polyline_sample_next_point_at_distance(part.points, current_point, current_index, next_distance))) {
                     // Not every point that is distance away, is valid, as it may be much closer to another point. This is especially the case when the overhang is very thin.
                     // So this ensures that the points are actually a certain distance from each other.
                     // This assurance is only made on a per polygon basis, as different but close polygon may not be able to use support below the other polygon.
                     double min_distance_to_existing_point = std::numeric_limits<double>::max();
                     for (Point p : line)
-                        min_distance_to_existing_point = std::min(min_distance_to_existing_point, (p - next_point.location).cast<double>().norm());
+                        min_distance_to_existing_point = std::min(min_distance_to_existing_point, (p - next_point->first).cast<double>().norm());
                     if (min_distance_to_existing_point >= current_distance) {
                         // viable point was found. Add to possible result.
-                        line.points.emplace_back(next_point.location);
-                        current_point = next_point.location;
-                        current_index = next_point.pos;
+                        line.points.emplace_back(next_point->first);
+                        current_point = next_point->first;
+                        current_index = next_point->second;
                         next_distance = current_distance;
                     } else {
-                        if (current_point == next_point.location) {
+                        if (current_point == next_point->first) {
                             // In case a fixpoint is encountered, better aggressively overcompensate so the code does not become stuck here...
-                            BOOST_LOG_TRIVIAL(warning) << "Tree Support: Encountered a fixpoint in getNextPointWithDistance. This is expected to happen if the distance (currently " << next_distance << 
+                            BOOST_LOG_TRIVIAL(warning) << "Tree Support: Encountered a fixpoint in polyline_sample_next_point_at_distance. This is expected to happen if the distance (currently " << next_distance << 
                                 ") is smaller than 100";
                             TreeSupport::showError("Encountered issue while placing tips. Some tips may be missing.", true);
                             if (next_distance > 2 * current_distance)
@@ -615,8 +634,8 @@ static [[nodiscard]] Polylines ensureMaximumDistancePolyline(const Polylines &in
                         }
                         // if the point was too close, the next possible viable point is at least distance-min_distance_to_existing_point away from the one that was just checked.
                         next_distance = std::max(current_distance - min_distance_to_existing_point, scaled<double>(0.1));
-                        current_point = next_point.location;
-                        current_index = next_point.pos;
+                        current_point = next_point->first;
+                        current_index = next_point->second;
                     }
                 }
                 current_distance *= 0.9;
@@ -624,6 +643,7 @@ static [[nodiscard]] Polylines ensureMaximumDistancePolyline(const Polylines &in
         }
         result.emplace_back(std::move(line));
     }
+    validate_range(result);
     return result;
 }
 
@@ -637,8 +657,8 @@ static [[nodiscard]] Polylines ensureMaximumDistancePolyline(const Polylines &in
  *
  * \return A Polygons object that represents the resulting infill lines.
  */
-static [[nodiscard]] Polylines generateSupportInfillLines(
-    const Polygons &area, const SupportParameters &support_params,
+[[nodiscard]] static Polylines generateSupportInfillLines(
+    const Polygons &polygon, const SupportParameters &support_params,
     bool roof, LayerIndex layer_idx, coord_t support_infill_distance)
 {
 #if 0
@@ -667,34 +687,61 @@ static [[nodiscard]] Polylines generateSupportInfillLines(
     int divisor = static_cast<int>(angles.size());
     int index = ((layer_idx % divisor) + divisor) % divisor;
     const AngleRadians fill_angle = angles[index];
-    Infill roof_computation(pattern, true /* zig_zaggify_infill */, connect_polygons, area, 
+    Infill roof_computation(pattern, true /* zig_zaggify_infill */, connect_polygons, polygon, 
         roof ? config.support_roof_line_width : config.support_line_width, support_infill_distance, support_roof_overlap, infill_multiplier, 
         fill_angle, z, support_shift, config.resolution, wall_line_count, infill_origin, 
         perimeter_gaps, connected_zigzags, use_endpieces, false /* skip_some_zags */, zag_skip_count, pocket_size);
-    Polygons areas;
+    Polygons polygons;
     Polygons lines;
-    roof_computation.generate(toolpaths, areas, lines, config.settings);
-    append(lines, to_polylines(areas));
+    roof_computation.generate(toolpaths, polygons, lines, config.settings);
+    append(lines, to_polylines(polygons));
     return lines;
 #else
+#ifdef _WIN32
+    if (! BoundingBox(Point::new_scale(-170., -170.), Point::new_scale(170., 170.)).contains(get_extents(polygon)))
+        ::MessageBoxA(nullptr, "TreeSupport infill kravsky", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
+#endif // _WIN32
+
     const Flow            &flow   = roof ? support_params.support_material_interface_flow : support_params.support_material_flow;
     std::unique_ptr<Fill>  filler = std::unique_ptr<Fill>(Fill::new_from_type(roof ? support_params.interface_fill_pattern : support_params.base_fill_pattern));
     FillParams             fill_params;
 
     filler->layer_id = layer_idx;
     filler->spacing  = flow.spacing();
+    filler->angle = roof ? 
+        //fixme support_layer.interface_id() instead of layer_idx
+        (support_params.interface_angle + (layer_idx & 1) ? float(- M_PI / 4.) : float(+ M_PI / 4.)) :
+        support_params.base_angle;
+
     fill_params.density     = float(roof ? support_params.interface_density : scaled<float>(filler->spacing) / float(support_infill_distance));
     fill_params.dont_adjust = true;
 
     Polylines out;
-    for (ExPolygon &expoly : union_ex(area)) {
+    for (ExPolygon &expoly : union_ex(polygon)) {
         // The surface type does not matter.
+        assert(area(expoly) > 0.);
+#ifdef _WIN32
+        if (area(expoly) <= 0.)
+            ::MessageBoxA(nullptr, "TreeSupport infill negative area", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
+#endif // _WIN32
+        assert(intersecting_edges(expoly).empty());
+#ifdef _WIN32
+        if (! intersecting_edges(expoly).empty())
+            ::MessageBoxA(nullptr, "TreeSupport infill self intersections", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
+#endif // _WIN32
         Surface surface(stInternal, std::move(expoly));
         try {
-            append(out, filler->fill_surface(&surface, fill_params));
+            Polylines pl = filler->fill_surface(&surface, fill_params);
+            assert(pl.empty() || get_extents(surface.expolygon).inflated(SCALED_EPSILON).contains(get_extents(pl)));
+#ifdef _WIN32
+            if (! pl.empty() && ! get_extents(surface.expolygon).inflated(SCALED_EPSILON).contains(get_extents(pl)))
+                ::MessageBoxA(nullptr, "TreeSupport infill failure", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
+#endif // _WIN32
+            append(out, std::move(pl));
         } catch (InfillFailedException &) {
         }
     }
+    validate_range(out);
     return out;
 #endif
 }
@@ -705,7 +752,7 @@ static [[nodiscard]] Polylines generateSupportInfillLines(
  * \param second[in] The second Polygon.
  * \return The union of both Polygons
  */
-static [[nodiscard]] Polygons safeUnion(const Polygons first, const Polygons second = Polygons())
+[[nodiscard]] static Polygons safeUnion(const Polygons first, const Polygons second = Polygons())
 {
     // unionPolygons can slowly remove Polygons under certain circumstances, because of rounding issues (Polygons that have a thin area).
     // This does not cause a problem when actually using it on large areas, but as influence areas (representing centerpoints) can be very thin, this does occur so this ugly workaround is needed
@@ -748,7 +795,7 @@ static [[nodiscard]] Polygons safeUnion(const Polygons first, const Polygons sec
  * \param min_amount_offset[in] How many steps have to be done at least. As this uses round offset this increases the amount of vertices, which may be required if Polygons get very small. Required as arcTolerance is not exposed in offset, which should result with a similar result.
  * \return The resulting Polygons object.
  */
-static [[nodiscard]] Polygons safeOffsetInc(const Polygons& me, coord_t distance, const Polygons& collision, coord_t safe_step_size, coord_t last_step_offset_without_check, size_t min_amount_offset)
+[[nodiscard]] static Polygons safeOffsetInc(const Polygons& me, coord_t distance, const Polygons& collision, coord_t safe_step_size, coord_t last_step_offset_without_check, size_t min_amount_offset)
 {
     bool do_final_difference = last_step_offset_without_check == 0;
     Polygons ret = safeUnion(me); // ensure sane input
@@ -913,6 +960,7 @@ void TreeSupport::generateInitialAreas(
                         already_inserted[insert_layer].emplace(p.first / ((mesh_config.min_radius + 1) / 10));
                         SupportElement* elem = new SupportElement(dtt, insert_layer, p.first, to_bp, gracious, !xy_overrides_z, dont_move_until, roof, safe_radius, force_tip_to_roof, skip_ovalisation);
                         elem->area = new Polygons();
+                        validate_range(circle);
                         elem->area->emplace_back(std::move(circle));
                         move_bounds[insert_layer].emplace(elem);
                     }
@@ -921,6 +969,7 @@ void TreeSupport::generateInitialAreas(
 
             auto addLinesAsInfluenceAreas = [&](LineInformations lines, size_t roof_tip_layers, LayerIndex insert_layer_idx, bool supports_roof, size_t dont_move_until)
             {
+                validate_range(lines);
                 // Add tip area as roof (happens when minimum roof area > minimum tip area) if possible
                 size_t dtt_roof_tip;
                 for (dtt_roof_tip = 0; dtt_roof_tip < roof_tip_layers && insert_layer_idx - dtt_roof_tip >= 1; dtt_roof_tip++)
@@ -1026,6 +1075,7 @@ void TreeSupport::generateInitialAreas(
                             res_line.emplace_back(p, LineStatus::INVALID);
                         overhang_lines.emplace_back(res_line);
                     }
+                    validate_range(overhang_lines);
                 }
 
                 for (size_t lag_ctr = 1; lag_ctr <= max_overhang_insert_lag && !overhang_lines.empty() && layer_idx - coord_t(lag_ctr) >= 1; lag_ctr++) {
@@ -1037,6 +1087,7 @@ void TreeSupport::generateInitialAreas(
                     std::pair<LineInformations, LineInformations> split = splitLines(overhang_lines, evaluatePoint); // keep all lines that are invalid
                     overhang_lines = split.first;
                     LineInformations fresh_valid_points = convertLinesToInternal(m_volumes, m_config, convertInternalToLines(split.second), layer_idx - lag_ctr); // set all now valid lines to their correct LineStatus. Easiest way is to just discard Avoidance information for each point and evaluate them again.
+                    validate_range(fresh_valid_points);
 
                     addLinesAsInfluenceAreas(fresh_valid_points, (force_tip_to_roof && lag_ctr <= support_roof_layers) ? support_roof_layers : 0, layer_idx - lag_ctr, false, roof_enabled ? support_roof_layers : 0);
                 }
@@ -1841,6 +1892,7 @@ void TreeSupport::increaseAreas(std::unordered_map<SupportElement, Polygons>& to
                 {
                     std::lock_guard<std::mutex> critical_section_newLayer(critical_sections);
                     if (bypass_merge) {
+                        validate_range(max_influence_area);
                         Polygons* new_area = new Polygons(max_influence_area);
                         SupportElement* next = new SupportElement(elem, new_area);
                         bypass_merge_areas.emplace_back(next);
@@ -1928,6 +1980,8 @@ void TreeSupport::createLayerPathing(std::vector<std::set<SupportElement*>>& mov
         // Save calculated elements to output, and allocate Polygons on heap, as they will not be changed again.
         for (std::pair<SupportElement, Polygons> tup : influence_areas) {
             const SupportElement elem = tup.first;
+            validate_range(tup.second);
+            validate_range(safeUnion(tup.second));
             Polygons* new_area = new Polygons(safeUnion(tup.second));
             SupportElement* next = new SupportElement(elem, new_area);
             move_bounds[layer_idx - 1].emplace(next);

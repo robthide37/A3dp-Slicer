@@ -492,7 +492,7 @@ coord_t TreeModelVolumes::getRadiusNextCeil(coord_t radius, bool min_xy_dist) co
     return ceiled_radius;
 }
 
-static inline [[nodiscard]] Polygons simplify(const Polygons &polygons, coord_t resolution)
+[[nodiscard]] static inline Polygons simplify(const Polygons &polygons, coord_t resolution)
 {
     //FIXME
     return polygons;
@@ -521,13 +521,13 @@ Polygons TreeModelVolumes::extractOutlineFromMesh(const PrintObject &print_objec
 
 LayerIndex TreeModelVolumes::getMaxCalculatedLayer(coord_t radius, const RadiusLayerPolygonCache& map) const
 {
-    LayerIndex max_layer = -1;
+    int max_layer = -1;
     // the placeable on model areas do not exist on layer 0, as there can not be model below it. As such it may be possible that layer 1 is available, but layer 0 does not exist.
     const RadiusLayerPair key_layer_1(radius, 1);
     if (getArea(map, key_layer_1))
         max_layer = 1;
     while (map.count(RadiusLayerPair(radius, max_layer + 1)))
-        max_layer++;
+        ++ max_layer;
     return max_layer;
 }
 
@@ -559,7 +559,7 @@ void TreeModelVolumes::calculateCollision(std::deque<RadiusLayerPair> keys)
                 coord_t min_layer_bottom;
                 {
                     std::lock_guard<std::mutex> critical_section(*m_critical_collision_cache);
-                    min_layer_bottom = getMaxCalculatedLayer(radius, m_collision_cache) - z_distance_bottom_layers;
+                    min_layer_bottom = getMaxCalculatedLayer(radius, m_collision_cache) - int(z_distance_bottom_layers);
                 }
 
                 if (min_layer_bottom < 0)

@@ -22,7 +22,7 @@
 namespace Slic3r
 {
 
-using LayerIndex = size_t;
+using LayerIndex = int;
 using AngleRadians = double;
 
 class BuildVolume;

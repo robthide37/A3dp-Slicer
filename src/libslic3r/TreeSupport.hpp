@@ -43,7 +43,7 @@
 namespace Slic3r
 {
 
-using LayerIndex = size_t;
+using LayerIndex = int;
 
 //FIXME
 class Print;
