@@ -15,7 +15,7 @@ namespace Slic3r::GUI {
 /// </summary>
 class CreateFontStyleImagesJob : public Job
 {
-    FontManager::StyleImagesData m_input;
+    EmbossStyleManager::StyleImagesData m_input;
 
     // Output data
     // texture size
@@ -23,10 +23,10 @@ class CreateFontStyleImagesJob : public Job
     // texture data
     std::vector<unsigned char> pixels; 
     // descriptors of sub textures
-    std::vector<FontManager::StyleImage> images;
+    std::vector<EmbossStyleManager::StyleImage> images;
 
 public:
-    CreateFontStyleImagesJob(FontManager::StyleImagesData &&input);
+    CreateFontStyleImagesJob(EmbossStyleManager::StyleImagesData &&input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &) override;
 };

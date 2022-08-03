@@ -215,7 +215,7 @@ private:
     std::optional<ImVec2> m_set_window_offset;
     bool m_is_advanced_edit_style = false;
 
-    FontManager m_style_manager;
+    EmbossStyleManager m_style_manager;
 
     // Keep sorted list of loadable face names
     struct Facenames

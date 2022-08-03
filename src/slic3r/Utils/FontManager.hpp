@@ -1,5 +1,5 @@
-#ifndef slic3r_FontManager_hpp_
-#define slic3r_FontManager_hpp_
+#ifndef slic3r_EmbossStyleManager_hpp_
+#define slic3r_EmbossStyleManager_hpp_
 
 #include <memory>
 #include <optional>
@@ -18,13 +18,13 @@ namespace Slic3r::GUI {
 /// Keep file data of TTF files
 /// Cache wx font objects
 /// </summary>
-class FontManager
+class EmbossStyleManager
 {
     friend class CreateFontStyleImagesJob; // access to StyleImagesData
 
 public:
-    FontManager(const ImWchar *language_glyph_range);
-    ~FontManager();
+    EmbossStyleManager(const ImWchar *language_glyph_range);
+    ~EmbossStyleManager();
 
     /// <summary>
     /// Load font style list from config
@@ -274,7 +274,7 @@ private:
             // vector of inputs
             StyleImagesData::Items styles;
             // job output
-            std::vector<FontManager::StyleImage> images;
+            std::vector<EmbossStyleManager::StyleImage> images;
         };
 
         // place to store result in main thread in Finalize
@@ -290,4 +290,4 @@ private:
 
 } // namespace Slic3r
 
-#endif // slic3r_FontManager_hpp_
+#endif // slic3r_EmbossStyleManager_hpp_

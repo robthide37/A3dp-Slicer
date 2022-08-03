@@ -1131,11 +1131,11 @@ void GLGizmoEmboss::draw_text_input()
             append_warning(_u8L("Line gap"),
                 _u8L("Unsupported visualization of gap between lines inside text input."));
         auto &ff = m_style_manager.get_font_file_with_cache();
-        float imgui_size = FontManager::get_imgui_font_size(prop, *ff.font_file);
-        if (imgui_size > FontManager::max_imgui_font_size)           
+        float imgui_size = EmbossStyleManager::get_imgui_font_size(prop, *ff.font_file);
+        if (imgui_size > EmbossStyleManager::max_imgui_font_size)           
             append_warning(_u8L("To tall"),
                 _u8L("Diminished font height inside text input."));
-        if (imgui_size < FontManager::min_imgui_font_size)       
+        if (imgui_size < EmbossStyleManager::min_imgui_font_size)       
             append_warning(_u8L("To small"),
                 _u8L("Enlarged font height inside text input."));
         if (!who.empty())
@@ -1779,7 +1779,7 @@ void GLGizmoEmboss::discard_changes_in_style()
 
 void GLGizmoEmboss::draw_revert_all_styles_button() {
     if (draw_button(IconType::revert_all)) {
-        m_style_manager = FontManager(m_imgui->get_glyph_ranges());
+        m_style_manager = EmbossStyleManager(m_imgui->get_glyph_ranges());
         m_style_manager.init(nullptr, create_default_font_list());
         assert(m_style_manager.get_font_file_with_cache().has_value());
         process();
@@ -1808,7 +1808,7 @@ void GLGizmoEmboss::draw_style_list() {
         m_style_manager.init_style_images(m_gui_cfg->max_style_image_size, m_text);
         m_style_manager.init_trunc_names(max_style_name_width);
         std::optional<std::pair<size_t,size_t>> swap_indexes;
-        const std::vector<FontManager::Item> &styles = m_style_manager.get_styles();
+        const std::vector<EmbossStyleManager::Item> &styles = m_style_manager.get_styles();
         for (const auto &item : styles) {
             size_t             index             = &item - &styles.front();
             const FontItem &   fi                = item.font_item;
@@ -1817,7 +1817,7 @@ void GLGizmoEmboss::draw_style_list() {
             bool is_selected = (&fi == &actual_font_item);
 
             ImVec2 select_size(0,m_gui_cfg->max_style_image_size.y()); // 0,0 --> calculate in draw
-            const std::optional<FontManager::StyleImage> img = item.image;            
+            const std::optional<EmbossStyleManager::StyleImage> img = item.image;            
             // allow click delete button
             ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; 
             if (ImGui::Selectable(item.truncated_name.c_str(), is_selected, flags, select_size)) {
@@ -2653,7 +2653,7 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
     TextConfiguration &tc    = *volume->text_configuration;
     FontItem          &tc_fi = tc.font_item;
 
-    auto has_same_name = [&tc_fi](const FontManager::Item &font_item) -> bool {
+    auto has_same_name = [&tc_fi](const EmbossStyleManager::Item &font_item) -> bool {
         const FontItem &fi = font_item.font_item;
         return fi.name == tc_fi.name;
     };

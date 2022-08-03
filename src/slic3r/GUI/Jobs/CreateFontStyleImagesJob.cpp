@@ -14,7 +14,7 @@ using namespace Slic3r::GUI;
 
 
 CreateFontStyleImagesJob::CreateFontStyleImagesJob(
-    FontManager::StyleImagesData &&input)
+    EmbossStyleManager::StyleImagesData &&input)
     : m_input(std::move(input))
 {
     assert(m_input.result != nullptr);
@@ -29,7 +29,7 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
     // create shapes and calc size (bounding boxes)
     std::vector<ExPolygons> name_shapes(m_input.styles.size());
     std::vector<double> scales(m_input.styles.size());
-    images = std::vector<FontManager::StyleImage>(m_input.styles.size());
+    images = std::vector<EmbossStyleManager::StyleImage>(m_input.styles.size());
 
     for (auto &item : m_input.styles) {
         size_t index = &item - &m_input.styles.front();
@@ -37,7 +37,7 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
         shapes = Emboss::text2shapes(item.font, m_input.text.c_str(), item.prop);
 
         // create image description
-        FontManager::StyleImage &image = images[index];
+        EmbossStyleManager::StyleImage &image = images[index];
         BoundingBox &bounding_box = image.bounding_box;
         for (ExPolygon &shape : shapes)
             bounding_box.merge(BoundingBox(shape.contour.points));
@@ -72,14 +72,14 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
     // arrange bounding boxes
     int offset_y = 0;
     width        = 0;
-    for (FontManager::StyleImage &image : images) {
+    for (EmbossStyleManager::StyleImage &image : images) {
         image.offset.y() = offset_y;
         offset_y += image.tex_size.y+1;
         if (width < image.tex_size.x) 
             width = image.tex_size.x;
     }
     height = offset_y;
-    for (FontManager::StyleImage &image : images) {
+    for (EmbossStyleManager::StyleImage &image : images) {
         const Point &o = image.offset;
         const ImVec2 &s = image.tex_size;
         image.uv0 = ImVec2(o.x() / (double) width, 
@@ -92,7 +92,7 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
     pixels = std::vector<unsigned char>(width * height, {0});
 
     // upload sub textures
-    for (FontManager::StyleImage &image : images) {
+    for (EmbossStyleManager::StyleImage &image : images) {
         sla::Resolution resolution(image.tex_size.x, image.tex_size.y);
         size_t index = &image - &images.front();
         double pixel_dim = SCALING_FACTOR / scales[index];
@@ -140,7 +140,7 @@ void CreateFontStyleImagesJob::finalize(bool canceled, std::exception_ptr &)
 
     // set up texture id
     void *texture_id = (void *) (intptr_t) tex_id;        
-    for (FontManager::StyleImage &image : images)
+    for (EmbossStyleManager::StyleImage &image : images)
         image.texture_id = texture_id;
         
     // move to result
