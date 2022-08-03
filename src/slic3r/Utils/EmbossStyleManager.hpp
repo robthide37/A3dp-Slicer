@@ -118,10 +118,14 @@ public:
     const FontProp &get_font_prop() const;
     FontProp &get_font_prop();
 
+    const ImFontAtlas& get_atlas() const; 
+
     // getter on activ wx font
     const std::optional<wxFont> &get_wx_font() const;
 
+    // True when activ style has same name as some of stored style
     bool exist_stored_style() const;
+
     size_t get_style_index() const;
 
     // getter on font file with cache

@@ -101,14 +101,12 @@ private:
     void draw_model_type();
     void draw_style_list();
     void draw_delete_style_button();
-    void discard_changes_in_style();
     void draw_revert_all_styles_button();
     void draw_style_rename_popup();
     void draw_style_rename_button();
     void draw_style_save_button();
     void draw_style_save_as_popup();
     void draw_style_add_button();
-    void draw_style_undo_button();
     void draw_font_list();
     void draw_style_edit();
     bool draw_italic_button();

@@ -124,8 +124,14 @@ void EmbossStyleManager::discard_style_changes() {
         if (m_style_cache.style == m_style_items[m_stored_activ_index].style &&
             m_style_cache.wx_font == m_style_cache.stored_wx_font)
             return; // already loaded
-        if (load_style(m_style_cache.style_index)) return;
-    }
+        if (load_style(m_style_cache.style_index)) 
+            return; // correct reload style
+    } 
+
+    if (load_style(m_stored_activ_index))
+        return; // correct reload last activ font
+    
+    // try to save situation by load some font
     load_first_valid_font();
 }
 
@@ -226,6 +232,7 @@ bool EmbossStyleManager::exist_stored_style() const { return m_style_cache.style
 size_t EmbossStyleManager::get_style_index() const { return m_style_cache.style_index; }
 Emboss::FontFileWithCache &EmbossStyleManager::get_font_file_with_cache() { return m_style_cache.font_file; }
 std::string &EmbossStyleManager::get_truncated_name() { return m_style_cache.truncated_name; }
+const ImFontAtlas &EmbossStyleManager::get_atlas() const { return m_style_cache.atlas; } 
 
 void EmbossStyleManager::clear_glyphs_cache()
 {
@@ -249,10 +256,6 @@ ImFont *EmbossStyleManager::get_imgui_font()
     if (f_size != 1) return nullptr;
     ImFont *font = fonts.front();
     if (font == nullptr) return nullptr;
-    if (!font->IsLoaded()) return nullptr;
-    if (font->Scale <= 0.f) return nullptr;
-    // Symbol fonts doesn't have atlas because their glyph range is out of language range
-    if (font->ContainerAtlas == nullptr) return nullptr;
     return font;
 }
 
@@ -377,7 +380,7 @@ void EmbossStyleManager::free_style_images() {
 float EmbossStyleManager::min_imgui_font_size = 18.f;
 float EmbossStyleManager::max_imgui_font_size = 60.f;
 float EmbossStyleManager::get_imgui_font_size(const FontProp         &prop,
-                                       const Emboss::FontFile &file)
+                                              const Emboss::FontFile &file)
 {
     const auto  &cn = prop.collection_number;
     unsigned int font_index = (cn.has_value()) ? *cn : 0;
@@ -464,6 +467,7 @@ ImFont *EmbossStyleManager::create_imgui_font(const std::string &text)
     assert(!m_style_cache.atlas.Fonts.empty());
     if (m_style_cache.atlas.Fonts.empty()) return nullptr;
     assert(font == m_style_cache.atlas.Fonts.back());
+    if (!font->IsLoaded()) return nullptr;
     assert(font->IsLoaded());
     return font;
 }
