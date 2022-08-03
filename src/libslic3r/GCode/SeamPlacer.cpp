@@ -36,7 +36,7 @@ namespace SeamPlacerImpl {
 // ************  FOR BACKPORT COMPATIBILITY ONLY ***************
 // Color mapping of a value into RGB false colors.
 inline Vec3f value_to_rgbf(float minimum, float maximum, float value)
-{
+        {
     float ratio = 2.0f * (value - minimum) / (maximum - minimum);
     float b = std::max(0.0f, (1.0f - ratio));
     float r = std::max(0.0f, (ratio - 1.0f));
@@ -46,7 +46,7 @@ inline Vec3f value_to_rgbf(float minimum, float maximum, float value)
 
 // Color mapping of a value into RGB false colors.
 inline Vec3i value_to_rgbi(float minimum, float maximum, float value)
-{
+        {
     return (value_to_rgbf(minimum, maximum, value) * 255).cast<int>();
 }
 // ***************************
@@ -337,7 +337,7 @@ struct GlobalModelInfo {
             return 1.0f;
         }
 
-        auto compute_dist_to_plane = [](const Vec3f& position, const Vec3f& plane_origin, const Vec3f& plane_normal) {
+        auto compute_dist_to_plane = [](const Vec3f &position, const Vec3f &plane_origin, const Vec3f &plane_normal) {
             Vec3f orig_to_point = position - plane_origin;
             return std::abs(orig_to_point.dot(plane_normal));
         };
@@ -421,9 +421,9 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
             if (ex_entity->is_collection()) { //collection of inner, outer, and overhang perimeters
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     ExtrusionRole role = perimeter->role();
-                    if (perimeter->is_loop()){
-                        for (const ExtrusionPath& path : static_cast<const ExtrusionLoop*>(perimeter)->paths){
-                            if (path.role() == ExtrusionRole::erExternalPerimeter){
+                    if (perimeter->is_loop()) {
+                        for (const ExtrusionPath &path : static_cast<const ExtrusionLoop*>(perimeter)->paths) {
+                            if (path.role() == ExtrusionRole::erExternalPerimeter) {
                                 role = ExtrusionRole::erExternalPerimeter;
                             }
                         }
@@ -512,11 +512,11 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
             orig_point = true;
         }
 
-        if (global_model_info.is_blocked(position, perimeter.flow_width * 0.5f)) {
+        if (global_model_info.is_blocked(position, perimeter.flow_width)) {
             type = EnforcedBlockedSeamPoint::Blocked;
         }
 
-        if (global_model_info.is_enforced(position, perimeter.flow_width * 0.5f)) {
+        if (global_model_info.is_enforced(position, perimeter.flow_width)) {
             type = EnforcedBlockedSeamPoint::Enforced;
         }
 
@@ -592,8 +592,8 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
             for (size_t point_idx = longest_patch.first; point_idx != longest_patch.second;
                     point_idx = next_index(point_idx)) {
                 viable_points_indices.push_back(point_idx);
-                if (compute_angle_penalty(result.points[point_idx].local_ccw_angle)
-                        < SeamPlacer::sharp_angle_penalty_snapping_threshold) {
+                if (std::abs(result.points[point_idx].local_ccw_angle)
+                        > SeamPlacer::sharp_angle_snapping_threshold) {
                     large_angle_points_indices.push_back(point_idx);
                 }
             }
@@ -794,10 +794,10 @@ struct SeamComparator {
         }
 
         // the penalites are kept close to range [0-1.x] however, it should not be relied upon
-        float penalty_a = a.visibility +
+        float penalty_a = a.overhang + a.visibility +
                 angle_importance * compute_angle_penalty(a.local_ccw_angle)
                 + distance_penalty_a;
-        float penalty_b = b.visibility +
+        float penalty_b = b.overhang + b.visibility +
                 angle_importance * compute_angle_penalty(b.local_ccw_angle)
                 + distance_penalty_b;
 
@@ -848,9 +848,9 @@ struct SeamComparator {
             return a.position.y() + SeamPlacer::seam_align_score_tolerance * 5.0f > b.position.y();
         }
 
-        float penalty_a = a.visibility
+        float penalty_a = a.overhang + a.visibility
                 + angle_importance * compute_angle_penalty(a.local_ccw_angle);
-        float penalty_b = b.visibility +
+        float penalty_b = b.overhang + b.visibility +
                 angle_importance * compute_angle_penalty(b.local_ccw_angle);
 
         return penalty_a <= penalty_b || penalty_a - penalty_b < SeamPlacer::seam_align_score_tolerance;
@@ -858,13 +858,6 @@ struct SeamComparator {
 
     bool are_similar(const SeamCandidate &a, const SeamCandidate &b) const {
         return is_first_not_much_worse(a, b) && is_first_not_much_worse(b, a);
-    }
-
-    float weight(const SeamCandidate &a) const {
-        if (setup == SeamPosition::spAligned && a.central_enforcer) {
-            return 10.0f;
-        }
-        return 1.0f / (0.1f + a.visibility + angle_importance * compute_angle_penalty(a.local_ccw_angle) / (1.0f + angle_importance));
     }
 };
 
@@ -1138,10 +1131,11 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                     for (SeamCandidate &perimeter_point : layers[layer_idx].points) {
                         Point point = Point::new_scale(Vec2f { perimeter_point.position.head<2>() });
                         if (prev_layer_distancer.get() != nullptr) {
-                            perimeter_point.overhang = prev_layer_distancer->distance_from_perimeter(point)
+                            perimeter_point.overhang = (prev_layer_distancer->distance_from_perimeter(point)
                                     + 0.5f * perimeter_point.perimeter.flow_width
-                                    - tan(SeamPlacer::overhang_angle_threshold * PI / 180.0f)
-                                            * po->layers()[layer_idx]->height;
+                                    - tan(SeamPlacer::overhang_angle_threshold)
+                                            * po->layers()[layer_idx]->height)
+                                    / (3.0f * perimeter_point.perimeter.flow_width);
                         }
 
                         if (should_compute_layer_embedding) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
@@ -1165,7 +1159,7 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
 // Used by align_seam_points().
 std::optional<std::pair<size_t, size_t>> SeamPlacer::find_next_seam_in_layer(
         const std::vector<PrintObjectSeamData::LayerSeams> &layers,
-        const Vec3f& projected_position,
+        const Vec3f &projected_position,
         const size_t layer_idx, const float max_distance,
         const SeamPlacerImpl::SeamComparator &comparator) const {
     using namespace SeamPlacerImpl;
@@ -1251,7 +1245,8 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
                 break;
             }
         }
-        float max_distance = SeamPlacer::seam_align_tolerable_dist;
+        float max_distance = SeamPlacer::seam_align_tolerable_dist_factor *
+                layers[start_seam.first].points[start_seam.second].perimeter.flow_width;
         Vec3f prev_position = layers[prev_point_index.first].points[prev_point_index.second].position;
         Vec3f projected_position = prev_position;
         projected_position.z() = float(po->get_layer(next_layer)->slice_z);
@@ -1378,26 +1373,27 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             observation_points.resize(seam_string.size());
             weights.resize(seam_string.size());
 
+            auto angle_weight = [](float angle){
+                return 1.0f / (0.1f + compute_angle_penalty(angle));
+            };
+            float sharp_angle_weight = angle_weight(SeamPlacer::sharp_angle_snapping_threshold);
+
             //gather points positions and weights
-            float sharp_length = 0.0f;
-            Vec3f last_point_pos = layers[seam_string[0].first].points[seam_string[0].second].position;
+            size_t segments_count = 0;
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const SeamCandidate &point = layers[seam_string[index].first].points[seam_string[index].second];
                 Vec3f pos = point.position;
                 observations[index] = pos.head<2>();
                 observation_points[index] = pos.z();
-                weights[index] = comparator.weight(point);
-                float angle_penalty = compute_angle_penalty(point.local_ccw_angle);
-                float dist = (last_point_pos - pos).norm();
-                sharp_length += dist * 1.0f / (0.1f + 0.7f*angle_penalty);
+                weights[index] = angle_weight(point.local_ccw_angle);
                 bool is_enforced = point.type == EnforcedBlockedSeamPoint::Enforced;
-                if (is_enforced) sharp_length+= dist;
-                last_point_pos = pos;
+                if (is_enforced || weights[index] > sharp_angle_weight) {
+                    segments_count++;
+                }
             }
 
             // Curve Fitting
-            size_t number_of_segments = std::max(size_t(1),
-                    size_t(sharp_length / SeamPlacer::seam_align_sharp_mm_per_segment));
+            size_t number_of_segments = std::max(size_t(1), size_t(segments_count / SeamPlacer::seam_align_seams_per_segment));
             auto curve = Geometry::fit_cubic_bspline(observations, observation_points, weights, number_of_segments);
 
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
