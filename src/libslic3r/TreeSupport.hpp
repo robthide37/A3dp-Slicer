@@ -403,7 +403,8 @@ public:
 
             xy_distance = std::max(xy_distance, xy_min_distance);
 
-            std::function<void(std::vector<AngleRadians>&, SupportMaterialInterfacePattern)> getInterfaceAngles = [&](std::vector<AngleRadians>& angles, SupportMaterialInterfacePattern pattern) { // (logic) from getInterfaceAngles in FFFGcodeWriter.
+            // (logic) from getInterfaceAngles in FFFGcodeWriter.
+            auto getInterfaceAngles = [&](std::vector<AngleRadians>& angles, SupportMaterialInterfacePattern pattern) {
                 if (angles.empty())
                 {
                     if (pattern == SupportMaterialInterfacePattern::smipConcentric)
