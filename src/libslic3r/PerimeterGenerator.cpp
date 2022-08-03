@@ -2387,9 +2387,10 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
     const coordf_t range_random_point_dist = fuzzy_skin_point_dist / 2.;
     coordf_t dist_left_over = coordf_t(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
 
-    Point last_point = paths.back().last_point();
-    bool is_loop = true; //always a loop currently paths.front().first_point() == last_point;
-    Point p0 = last_point;
+    const Point last_point = paths.back().last_point();
+    //not always a loop, with arachne
+    bool is_loop = paths.front().first_point() == last_point;
+    Point p0 = paths.front().first_point();
     for (ExtrusionPath &path : paths) {
         Points out;
         size_t next_idx = 0;
