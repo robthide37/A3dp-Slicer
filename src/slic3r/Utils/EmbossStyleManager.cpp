@@ -9,7 +9,7 @@
 #include "slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp"
 #include "slic3r/GUI/ImGuiWrapper.hpp" // check of font ranges
 
-#include "slic3r/Utils/FontListSerializable.hpp"
+#include "slic3r/Utils/EmbossStylesSerializable.hpp"
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
@@ -27,19 +27,19 @@ EmbossStyleManager::~EmbossStyleManager() {
     free_style_images();
 }
 
-void EmbossStyleManager::init(const AppConfig *cfg, const FontList &default_font_list)
+void EmbossStyleManager::init(const AppConfig *cfg, const EmbossStyles &default_styles)
 {
-    FontList font_list = (cfg != nullptr) ?
-        FontListSerializable::load_font_list(*cfg) :
-        default_font_list;
-    if (font_list.empty()) font_list = default_font_list;
-    for (FontItem &fi : font_list) {
-        make_unique_name(fi.name);
-        m_style_items.push_back({fi});
+    EmbossStyles styles = (cfg != nullptr) ?
+        EmbossStylesSerializable::load_font_list(*cfg) :
+        default_styles;
+    if (styles.empty()) styles = default_styles;
+    for (EmbossStyle &style : styles) {
+        make_unique_name(style.name);
+        m_style_items.push_back({style});
     }
 
     std::optional<size_t> activ_index_opt = (cfg != nullptr) ? 
-        FontListSerializable::load_font_index(*cfg) : 
+        EmbossStylesSerializable::load_font_index(*cfg) : 
         std::optional<size_t>{};
 
     size_t activ_index = 0;
@@ -58,9 +58,9 @@ void EmbossStyleManager::init(const AppConfig *cfg, const FontList &default_font
         // no one style from config is loadable
         if (m_style_items.empty()) {
             // set up default font list
-            for (FontItem fi : default_font_list) {
-                make_unique_name(fi.name);
-                m_style_items.push_back({std::move(fi)});
+            for (EmbossStyle style : default_styles) {
+                make_unique_name(style.name);
+                m_style_items.push_back({std::move(style)});
             }
             // try to load first default font
             bool loaded = load_font(activ_index);
@@ -69,7 +69,7 @@ void EmbossStyleManager::init(const AppConfig *cfg, const FontList &default_font
     }
 }
 
-bool EmbossStyleManager::store_font_list_to_app_config(AppConfig *cfg)
+bool EmbossStyleManager::store_styles_to_app_config(AppConfig *cfg)
 {
     assert(cfg != nullptr);
     if (cfg == nullptr) return false;
@@ -78,31 +78,31 @@ bool EmbossStyleManager::store_font_list_to_app_config(AppConfig *cfg)
         m_style_items[m_style_cache.font_index].font_item = m_style_cache.font_item;
     } else {
         // add new into stored list
-        FontItem &fi = m_style_cache.font_item;
-        make_unique_name(fi.name);        
+        EmbossStyle &style = m_style_cache.font_item;
+        make_unique_name(style.name);        
         m_style_cache.font_index = m_style_items.size();
-        m_style_items.push_back({fi});
+        m_style_items.push_back({style});
         m_style_cache.stored_wx_font = m_style_cache.wx_font;
     }
     
-    FontListSerializable::store_font_index(*cfg, m_style_cache.font_index);
+    EmbossStylesSerializable::store_font_index(*cfg, m_style_cache.font_index);
     m_stored_activ_index = m_style_cache.font_index;
-    FontList font_list;
+    EmbossStyles font_list;
     font_list.reserve(m_style_items.size());
     for (const Item &item : m_style_items) font_list.push_back(item.font_item);
-    FontListSerializable::store_font_list(*cfg, font_list);
+    EmbossStylesSerializable::store_font_list(*cfg, font_list);
     m_change_order = false;
     return true;
 }
 
 void EmbossStyleManager::store_style(const std::string &name) {
-    FontItem& fi = m_style_cache.font_item;
-    fi.name = name;
-    make_unique_name(fi.name);
+    EmbossStyle& style = m_style_cache.font_item;
+    style.name = name;
+    make_unique_name(style.name);
     m_style_cache.font_index = m_style_items.size();
     m_style_cache.stored_wx_font = m_style_cache.wx_font;
     m_style_cache.truncated_name.clear();
-    m_style_items.push_back({fi});
+    m_style_items.push_back({style});
 }
 
 void EmbossStyleManager::swap(size_t i1, size_t i2) {
@@ -159,9 +159,9 @@ bool EmbossStyleManager::wx_font_changed(std::unique_ptr<Emboss::FontFile> font_
         if (font_file == nullptr) return false;
     }
     m_style_cache.font_file = Emboss::FontFileWithCache(std::move(font_file));        
-    auto &fi = get_font_item();
-    fi.type  = WxFontUtils::get_actual_type();
-    fi.path = WxFontUtils::store_wxFont(*wx_font);
+    EmbossStyle &style = get_font_item();
+    style.type  = WxFontUtils::get_actual_type();
+    style.path = WxFontUtils::store_wxFont(*wx_font);
     clear_imgui_font();
     free_style_images();
     return true;
@@ -176,8 +176,8 @@ bool EmbossStyleManager::load_font(size_t font_index)
     return true;
 }
 
-bool EmbossStyleManager::load_font(const FontItem &fi) {
-    if (fi.type == FontItem::Type::file_path) {
+bool EmbossStyleManager::load_font(const EmbossStyle &fi) {
+    if (fi.type == EmbossStyle::Type::file_path) {
         std::unique_ptr<Emboss::FontFile> font_ptr =
             Emboss::create_font_file(fi.path.c_str());
         if (font_ptr == nullptr) return false;
@@ -195,7 +195,7 @@ bool EmbossStyleManager::load_font(const FontItem &fi) {
     return load_font(fi, *wx_font_opt);
 }
 
-bool EmbossStyleManager::load_font(const FontItem &fi, const wxFont &font)
+bool EmbossStyleManager::load_font(const EmbossStyle &fi, const wxFont &font)
 {
     if (!set_wx_font(font)) return false;
     m_style_cache.font_item      = fi; // copy
@@ -216,7 +216,7 @@ bool EmbossStyleManager::load_first_valid_font() {
     return false;
 }
 
-const FontItem* EmbossStyleManager::get_stored_font_item() const
+const EmbossStyle* EmbossStyleManager::get_stored_font_item() const
 {
     if (m_style_cache.font_index >= m_style_items.size()) return nullptr;
     return &m_style_items[m_style_cache.font_index].font_item;
@@ -224,8 +224,8 @@ const FontItem* EmbossStyleManager::get_stored_font_item() const
 
 const std::optional<wxFont> &EmbossStyleManager::get_stored_wx_font() const { return m_style_cache.stored_wx_font; }
 
-const FontItem &EmbossStyleManager::get_font_item() const { return m_style_cache.font_item; }
-      FontItem &EmbossStyleManager::get_font_item()       { return m_style_cache.font_item; }
+const EmbossStyle &EmbossStyleManager::get_font_item() const { return m_style_cache.font_item; }
+      EmbossStyle &EmbossStyleManager::get_font_item()       { return m_style_cache.font_item; }
 const FontProp &EmbossStyleManager::get_font_prop() const { return get_font_item().prop; }
       FontProp &EmbossStyleManager::get_font_prop()       { return get_font_item().prop; }
 const std::optional<wxFont> &EmbossStyleManager::get_wx_font() const { return m_style_cache.wx_font; }
@@ -350,16 +350,16 @@ void EmbossStyleManager::init_style_images(const Vec2i &max_size,
     StyleImagesData::Items styles;
     styles.reserve(m_style_items.size());
     for (const Item &item : m_style_items) {
-        const FontItem &fi = item.font_item;
-        std::optional<wxFont> wx_font_opt = WxFontUtils::load_wxFont(fi.path);
+        const EmbossStyle &style = item.font_item;
+        std::optional<wxFont> wx_font_opt = WxFontUtils::load_wxFont(style.path);
         if (!wx_font_opt.has_value()) continue;
         std::unique_ptr<Emboss::FontFile> font_file =
             WxFontUtils::create_font_file(*wx_font_opt);
         if (font_file == nullptr) continue;
         styles.push_back({
             Emboss::FontFileWithCache(std::move(font_file)), 
-            fi.name,
-            fi.prop
+            style.name,
+            style.prop
         });
     }
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
@@ -484,8 +484,8 @@ bool EmbossStyleManager::set_wx_font(const wxFont &wx_font) {
     m_style_cache.font_file = 
         Emboss::FontFileWithCache(std::move(font_file));
     m_style_cache.wx_font = wx_font; // copy
-    FontItem &fi = m_style_cache.font_item;
-    fi.type = WxFontUtils::get_actual_type();
+    EmbossStyle &style = m_style_cache.font_item;
+    style.type = WxFontUtils::get_actual_type();
     clear_imgui_font();
     return true;
 }

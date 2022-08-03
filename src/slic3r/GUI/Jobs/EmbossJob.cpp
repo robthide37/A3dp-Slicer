@@ -124,7 +124,7 @@ void EmbossCreateVolumeJob::process(Ctl &ctl) {
     if (was_canceled()) return;
             
     // Create new volume inside of object
-    const FontProp &font_prop = m_input.text_configuration.font_item.prop;
+    const FontProp &font_prop = m_input.text_configuration.style.prop;
     Transform3d surface_trmat = Emboss::create_transformation_onto_surface(
             m_input.hit.position, m_input.hit.normal);
     Emboss::apply_transformation(font_prop, surface_trmat);
@@ -234,7 +234,7 @@ void EmbossCreateObjectJob::process(Ctl &ctl)
         // mouse pose is out of build plate so create object in center of plate
         bed_coor = bed.centroid().cast<double>();
 
-    double z = m_input.text_configuration.font_item.prop.emboss / 2;
+    double z = m_input.text_configuration.style.prop.emboss / 2;
     Vec3d  offset(bed_coor.x(), bed_coor.y(), z);
     offset -= m_result.center();
     Transform3d::TranslationType tt(offset.x(), offset.y(), offset.z());
@@ -361,7 +361,7 @@ void UseSurfaceJob::process(Ctl &ctl) {
 
     const TextConfiguration &tc   = m_input.text_configuration;
     const char              *text = tc.text.c_str();
-    const FontProp          &fp   = tc.font_item.prop;
+    const FontProp          &fp   = tc.style.prop;
     ExPolygons shapes = Emboss::text2shapes(m_input.font_file, text, fp);
     if (shapes.empty() || shapes.front().contour.empty())
         throw priv::EmbossJobException(
@@ -522,7 +522,7 @@ TriangleMesh priv::try_create_mesh(const EmbossDataBase &input, Emboss::FontFile
 {
     const TextConfiguration &tc = input.text_configuration;
     const char *text = tc.text.c_str();
-    const FontProp &prop = tc.font_item.prop;
+    const FontProp &prop = tc.style.prop;
 
     assert(font.has_value());
     if (!font.has_value()) return {};

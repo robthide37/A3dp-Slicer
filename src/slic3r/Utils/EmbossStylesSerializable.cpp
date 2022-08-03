@@ -1,4 +1,4 @@
-#include "FontListSerializable.hpp"
+#include "EmbossStylesSerializable.hpp"
 
 #include <libslic3r/AppConfig.hpp>
 #include "WxFontUtils.hpp"
@@ -6,28 +6,28 @@
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
-const std::string FontListSerializable::APP_CONFIG_FONT_NAME        = "name";
-const std::string FontListSerializable::APP_CONFIG_FONT_DESCRIPTOR  = "descriptor";
-const std::string FontListSerializable::APP_CONFIG_FONT_LINE_HEIGHT = "line_height";
-const std::string FontListSerializable::APP_CONFIG_FONT_DEPTH       = "depth";
-const std::string FontListSerializable::APP_CONFIG_FONT_USE_SURFACE = "use_surface";
-const std::string FontListSerializable::APP_CONFIG_FONT_BOLDNESS    = "boldness";
-const std::string FontListSerializable::APP_CONFIG_FONT_SKEW        = "skew";
-const std::string FontListSerializable::APP_CONFIG_FONT_DISTANCE    = "distance";
-const std::string FontListSerializable::APP_CONFIG_FONT_ANGLE       = "angle";
-const std::string FontListSerializable::APP_CONFIG_FONT_COLLECTION  = "collection";
-const std::string FontListSerializable::APP_CONFIG_FONT_CHAR_GAP    = "char_gap";
-const std::string FontListSerializable::APP_CONFIG_FONT_LINE_GAP    = "line_gap";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_NAME        = "name";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_DESCRIPTOR  = "descriptor";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_LINE_HEIGHT = "line_height";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_DEPTH       = "depth";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_USE_SURFACE = "use_surface";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_BOLDNESS    = "boldness";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_SKEW        = "skew";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_DISTANCE    = "distance";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_ANGLE       = "angle";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_COLLECTION  = "collection";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_CHAR_GAP    = "char_gap";
+const std::string EmbossStylesSerializable::APP_CONFIG_FONT_LINE_GAP    = "line_gap";
 
-const std::string FontListSerializable::APP_CONFIG_ACTIVE_FONT      = "activ_font";
+const std::string EmbossStylesSerializable::APP_CONFIG_ACTIVE_FONT      = "activ_font";
 
-std::string FontListSerializable::create_section_name(unsigned index)
+std::string EmbossStylesSerializable::create_section_name(unsigned index)
 {
     return AppConfig::SECTION_FONT + ':' + std::to_string(index);
 }
 
 // check only existence of flag
-bool FontListSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, bool& value){
+bool EmbossStylesSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, bool& value){
     auto item = section.find(key);
     if (item == section.end()) return false;
 
@@ -36,7 +36,7 @@ bool FontListSerializable::read(const std::map<std::string, std::string>& sectio
 }
 
 #include "fast_float/fast_float.h"
-bool FontListSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, float& value){
+bool EmbossStylesSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, float& value){
     auto item = section.find(key);
     if (item == section.end()) return false;
     const std::string &data = item->second;
@@ -50,7 +50,7 @@ bool FontListSerializable::read(const std::map<std::string, std::string>& sectio
     return true;
 }
 
-bool FontListSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<int>& value){
+bool EmbossStylesSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<int>& value){
     auto item = section.find(key);
     if (item == section.end()) return false;
     const std::string &data = item->second;
@@ -62,7 +62,7 @@ bool FontListSerializable::read(const std::map<std::string, std::string>& sectio
     return true;
 }
 
-bool FontListSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<unsigned int>& value){
+bool EmbossStylesSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<unsigned int>& value){
     auto item = section.find(key);
     if (item == section.end()) return false;
     const std::string &data = item->second;
@@ -74,7 +74,7 @@ bool FontListSerializable::read(const std::map<std::string, std::string>& sectio
     return true;
 }
 
-bool FontListSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<float>& value){
+bool EmbossStylesSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<float>& value){
     auto item = section.find(key);
     if (item == section.end()) return false;
     const std::string &data = item->second;
@@ -88,7 +88,7 @@ bool FontListSerializable::read(const std::map<std::string, std::string>& sectio
     return true;
 }
 
-std::optional<FontItem> FontListSerializable::load_font_item(
+std::optional<EmbossStyle> EmbossStylesSerializable::load_font_item(
     const std::map<std::string, std::string> &app_cfg_section)
 {
     auto path_it = app_cfg_section.find(APP_CONFIG_FONT_DESCRIPTOR);
@@ -113,12 +113,12 @@ std::optional<FontItem> FontListSerializable::load_font_item(
     read(app_cfg_section, APP_CONFIG_FONT_CHAR_GAP, fp.char_gap);
     read(app_cfg_section, APP_CONFIG_FONT_LINE_GAP, fp.line_gap);
 
-    FontItem::Type type = WxFontUtils::get_actual_type();
-    return FontItem{ name, path, type, fp };
+    EmbossStyle::Type type = WxFontUtils::get_actual_type();
+    return EmbossStyle{ name, path, type, fp };
 }
 
-void FontListSerializable::store_font_item(AppConfig &     cfg,
-                                           const FontItem &fi,
+void EmbossStylesSerializable::store_font_item(AppConfig &     cfg,
+                                           const EmbossStyle &fi,
                                            unsigned        index)
 {
     std::string section_name = create_section_name(index);
@@ -146,7 +146,7 @@ void FontListSerializable::store_font_item(AppConfig &     cfg,
         cfg.set(section_name, APP_CONFIG_FONT_LINE_GAP, std::to_string(*fp.line_gap));
 }
 
-void FontListSerializable::store_font_index(AppConfig &cfg, unsigned index) {
+void EmbossStylesSerializable::store_font_index(AppConfig &cfg, unsigned index) {
     // store actual font index
     cfg.clear_section(AppConfig::SECTION_FONT);
     // activ font first index is +1 to correspond with section name
@@ -154,7 +154,7 @@ void FontListSerializable::store_font_index(AppConfig &cfg, unsigned index) {
     cfg.set(AppConfig::SECTION_FONT, APP_CONFIG_ACTIVE_FONT, activ_font);
 }
 
-std::optional<size_t> FontListSerializable::load_font_index(const AppConfig &cfg)
+std::optional<size_t> EmbossStylesSerializable::load_font_index(const AppConfig &cfg)
 {
     if (!cfg.has_section(AppConfig::SECTION_FONT)) return {};
 
@@ -167,29 +167,29 @@ std::optional<size_t> FontListSerializable::load_font_index(const AppConfig &cfg
     return active_font - 1;
 }
 
-FontList FontListSerializable::load_font_list(const AppConfig &cfg)
+EmbossStyles EmbossStylesSerializable::load_font_list(const AppConfig &cfg)
 {
-    FontList result;
+    EmbossStyles result;
     // human readable index inside of config starts from 1 !!
     unsigned    index        = 1;
     std::string section_name = create_section_name(
         index);
     while (cfg.has_section(section_name)) {
-        std::optional<FontItem> fi = load_font_item(cfg.get_section(section_name));
-        if (fi.has_value()) result.emplace_back(*fi);
+        std::optional<EmbossStyle> style_opt = load_font_item(cfg.get_section(section_name));
+        if (style_opt.has_value()) result.emplace_back(*style_opt);
         section_name = create_section_name(++index);
     }
     return result;
 }
 
-void FontListSerializable::store_font_list(AppConfig &cfg, const FontList font_list)
+void EmbossStylesSerializable::store_font_list(AppConfig &cfg, const EmbossStyles font_list)
 {
     // store styles
     unsigned index = 1;
-    for (const FontItem &fi : font_list) {
+    for (const EmbossStyle &fi : font_list) {
         // skip file paths + fonts from other OS(loaded from .3mf)
         assert(fi.type == WxFontUtils::get_actual_type());
-        // if (fi.type != WxFontUtils::get_actual_type()) continue;
+        // if (style_opt.type != WxFontUtils::get_actual_type()) continue;
         store_font_item(cfg, fi, index++);
     }
 

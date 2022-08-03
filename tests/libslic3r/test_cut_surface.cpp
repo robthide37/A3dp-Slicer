@@ -136,7 +136,7 @@ TEST_CASE("CutSurface in 3mf", "[Emboss]")
     CHECK(mv_text->text_configuration.has_value());
     TextConfiguration &tc = *mv_text->text_configuration;
     /* // Need GUI to load font by wx
-    std::optional<wxFont> wx_font = GUI::WxFontUtils::load_wxFont(tc.font_item.path);
+    std::optional<wxFont> wx_font = GUI::WxFontUtils::load_wxFont(tc.style.path);
     CHECK(wx_font.has_value());
     Emboss::FontFileWithCache ff(GUI::WxFontUtils::create_font_file(*wx_font));
     CHECK(ff.font_file != nullptr);
@@ -157,7 +157,7 @@ TEST_CASE("CutSurface in 3mf", "[Emboss]")
 
     std::pair<float, float> z_range{mesh_bb_tr.min.z(), mesh_bb_tr.max.z()};
 
-    FontProp fp = tc.font_item.prop;
+    FontProp fp = tc.style.prop;
     ExPolygons shapes = Emboss::text2shapes(ff, tc.text.c_str(), fp);
     double shape_scale = Emboss::get_shape_scale(fp, *ff.font_file);
 
@@ -165,7 +165,7 @@ TEST_CASE("CutSurface in 3mf", "[Emboss]")
         cut_projection_tr, shape_scale, get_extents(shapes), z_range);
 
     float projection_ratio = -z_range.first / (z_range.second - z_range.first);
-    SurfaceCut cut = cut_surface(shapes, its, projection, projection_ratio);
+    SurfaceCut cut = cut_surface(shapes, its, projection, projection_ratio); 
     its_write_obj(cut, "C:/data/temp/cutSurface/result_cut.obj");
 }
 

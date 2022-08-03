@@ -1,10 +1,10 @@
-#ifndef slic3r_FontListSerializable_hpp_
-#define slic3r_FontListSerializable_hpp_
+#ifndef slic3r_EmbossStylesSerializable_hpp_
+#define slic3r_EmbossStylesSerializable_hpp_
 
 #include <string>
 #include <map>
 #include <optional>
-#include <libslic3r/TextConfiguration.hpp> // FontList+FontItem
+#include <libslic3r/TextConfiguration.hpp> // EmbossStyles+EmbossStyle
 
 namespace Slic3r {
 class AppConfig;
@@ -15,7 +15,7 @@ namespace Slic3r::GUI {
 /// <summary>
 /// For store/load font list to/from AppConfig
 /// </summary>
-class FontListSerializable
+class EmbossStylesSerializable
 {
     static const std::string APP_CONFIG_FONT_NAME;
     static const std::string APP_CONFIG_FONT_DESCRIPTOR;
@@ -32,18 +32,18 @@ class FontListSerializable
 
     static const std::string APP_CONFIG_ACTIVE_FONT;
 public:
-    FontListSerializable() = delete;
+    EmbossStylesSerializable() = delete;
 
     static void store_font_index(AppConfig &cfg, unsigned index);
     static std::optional<size_t> load_font_index(const AppConfig &cfg);
 
-    static FontList load_font_list(const AppConfig &cfg);
-    static void     store_font_list(AppConfig &cfg, const FontList font_list);
+    static EmbossStyles load_font_list(const AppConfig &cfg);
+    static void     store_font_list(AppConfig &cfg, const EmbossStyles font_list);
 
 private:
     static std::string create_section_name(unsigned index);
-    static std::optional<FontItem> load_font_item(const std::map<std::string, std::string> &app_cfg_section);
-    static void store_font_item(AppConfig &cfg, const FontItem &fi, unsigned index);
+    static std::optional<EmbossStyle> load_font_item(const std::map<std::string, std::string> &app_cfg_section);
+    static void store_font_item(AppConfig &cfg, const EmbossStyle &fi, unsigned index);
 
     // TODO: move to app config like read from section
     static bool read(const std::map<std::string, std::string>& section, const std::string& key, bool& value);
@@ -54,5 +54,5 @@ private:
 };
 } // namespace Slic3r
 
-#endif // #define slic3r_FontListSerializable_hpp_
+#endif // #define slic3r_EmbossStylesSerializable_hpp_
 

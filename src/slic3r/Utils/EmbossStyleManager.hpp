@@ -31,15 +31,15 @@ public:
     /// Also select actual activ font
     /// </summary>
     /// <param name="cfg">Application configuration loaded from file "PrusaSlicer.ini"</param>
-    /// <param name="default_font_list">Used when list is not loadable from config</param>
-    void init(const AppConfig *cfg, const FontList &default_font_list);
+    /// <param name="default_styles">Used when list is not loadable from config</param>
+    void init(const AppConfig *cfg, const EmbossStyles &default_styles);
     
     /// <summary>
     /// Write font list into AppConfig
     /// </summary>
     /// <param name="cfg">Stor into this configuration</param>
     /// <param name="item_to_store">Configuration</param>
-    bool store_font_list_to_app_config(AppConfig *cfg);
+    bool store_styles_to_app_config(AppConfig *cfg);
 
     /// <summary>
     /// Append actual style to style list and store
@@ -95,9 +95,9 @@ public:
     /// <returns>True on succes. False on fail load font</returns>
     bool load_font(size_t font_index);
     // load font style not stored in list
-    bool load_font(const FontItem &fi);
+    bool load_font(const EmbossStyle &fi);
     // fastering load font on index by wxFont, ignore type and descriptor
-    bool load_font(const FontItem &fi, const wxFont &font);
+    bool load_font(const EmbossStyle &fi, const wxFont &font);
     
     // clear actual selected glyphs cache
     void clear_glyphs_cache();
@@ -109,15 +109,15 @@ public:
     // used at initialize phaze - fonts could be modified in appConfig file by user
     bool load_first_valid_font();
 
-    // getter on stored fontItem
-    const FontItem *get_stored_font_item() const;
+    // getter on stored EmbossStyle
+    const EmbossStyle *get_stored_font_item() const;
 
     // getter on stored wxFont
     const std::optional<wxFont> &get_stored_wx_font() const;
 
     // getter on active font item for access to font property
-    const FontItem &get_font_item() const;
-    FontItem &get_font_item();
+    const EmbossStyle &get_font_item() const;
+    EmbossStyle &get_font_item();
 
     // getter on active font property
     const FontProp &get_font_prop() const;
@@ -181,7 +181,7 @@ public:
     struct Item
     {
         // define font, style and other property of text
-        FontItem font_item;
+        EmbossStyle font_item;
 
         // cache for view font name with maximal width in imgui
         std::string truncated_name; 
@@ -224,7 +224,7 @@ private:
         std::string truncated_name; 
 
         // actual used font item
-        FontItem font_item = {};
+        EmbossStyle font_item = {};
 
         // cache for stored wx font to not create every frame
         std::optional<wxFont> stored_wx_font;

@@ -98,24 +98,24 @@ std::unique_ptr<Emboss::FontFile> WxFontUtils::create_font_file(const wxFont &fo
 #endif
 }
 
-FontItem::Type WxFontUtils::get_actual_type()
+EmbossStyle::Type WxFontUtils::get_actual_type()
 {
 #ifdef _WIN32
-    return FontItem::Type::wx_win_font_descr;
+    return EmbossStyle::Type::wx_win_font_descr;
 #elif defined(__APPLE__)
-    return FontItem::Type::wx_mac_font_descr;
+    return EmbossStyle::Type::wx_mac_font_descr;
 #elif defined(__linux__)
-    return FontItem::Type::wx_lin_font_descr;
+    return EmbossStyle::Type::wx_lin_font_descr;
 #else
-    return FontItem::Type::undefined;
+    return EmbossStyle::Type::undefined;
 #endif
 }
 
-FontItem WxFontUtils::get_font_item(const wxFont &font, const std::string& name)
+EmbossStyle WxFontUtils::create_emboss_style(const wxFont &font, const std::string& name)
 {
     std::string name_item = name.empty()? get_human_readable_name(font) : name;
     std::string fontDesc = store_wxFont(font);
-    FontItem::Type type     = get_actual_type();
+    EmbossStyle::Type type     = get_actual_type();
 
     // synchronize font property with actual font
     FontProp font_prop;    
@@ -123,13 +123,13 @@ FontItem WxFontUtils::get_font_item(const wxFont &font, const std::string& name)
     return { name_item, fontDesc, type, font_prop };
 }
 
-FontItem WxFontUtils::get_os_font()
+EmbossStyle WxFontUtils::get_os_font()
 {
     wxSystemFont system_font = wxSYS_DEFAULT_GUI_FONT;
     wxFont       font        = wxSystemSettings::GetFont(system_font);
-    FontItem     fi          = get_font_item(font);
-    fi.name += std::string(" (OS default)");
-    return get_font_item(font);
+    EmbossStyle  es          = create_emboss_style(font);
+    es.name += std::string(" (OS default)");
+    return create_emboss_style(font);
 }
 
 std::string WxFontUtils::get_human_readable_name(const wxFont &font)
@@ -194,7 +194,7 @@ const TypeToWeight WxFontUtils::type_to_weight =
         (wxFONTWEIGHT_HEAVY,      "heavy")
         (wxFONTWEIGHT_EXTRAHEAVY, "extraHeavy");
 
-std::optional<wxFont> WxFontUtils::create_wxFont(const FontItem &fi)
+std::optional<wxFont> WxFontUtils::create_wxFont(const EmbossStyle &fi)
 {
     const FontProp &fp = fi.prop;
     double     point_size = static_cast<double>(fp.size_in_mm);
@@ -217,12 +217,12 @@ std::optional<wxFont> WxFontUtils::create_wxFont(const FontItem &fi)
     }
 
     // Improve: load descriptor instead of store to font property to 3mf
-    // switch (fi.type) {
-    // case FontItem::Type::wx_lin_font_descr:
-    // case FontItem::Type::wx_win_font_descr:
-    // case FontItem::Type::wx_mac_font_descr:
-    // case FontItem::Type::file_path:
-    // case FontItem::Type::undefined:
+    // switch (es.type) {
+    // case EmbossStyle::Type::wx_lin_font_descr:
+    // case EmbossStyle::Type::wx_win_font_descr:
+    // case EmbossStyle::Type::wx_mac_font_descr:
+    // case EmbossStyle::Type::file_path:
+    // case EmbossStyle::Type::undefined:
     // default:
     //}
 

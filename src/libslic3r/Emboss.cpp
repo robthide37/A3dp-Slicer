@@ -30,7 +30,7 @@ public:
     static const Emboss::Glyph* get_glyph(int unicode, const Emboss::FontFile &font, const FontProp &font_prop, 
         Emboss::Glyphs &cache, std::optional<stbtt_fontinfo> &font_info_opt);
 
-    static FontItem create_font_item(std::wstring name, std::wstring path);
+    static EmbossStyle create_style(std::wstring name, std::wstring path);
 
     /// <summary>
     /// TODO: move to ExPolygon utils
@@ -202,10 +202,10 @@ const Emboss::Glyph* Private::get_glyph(
     return &it.first->second;
 }
 
-FontItem Private::create_font_item(std::wstring name, std::wstring path) {
+EmbossStyle Private::create_style(std::wstring name, std::wstring path) {
     return { boost::nowide::narrow(name.c_str()),
              boost::nowide::narrow(path.c_str()),
-             FontItem::Type::file_path, FontProp() };
+             EmbossStyle::Type::file_path, FontProp() };
 }
 
 ExPolygons Private::dilate_to_unique_points(ExPolygons &expolygons)
@@ -347,15 +347,15 @@ std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_
     return wsFontFile;
 }
 
-FontList Emboss::get_font_list()
+EmbossStyles Emboss::get_font_list()
 {
-    //FontList list1 = get_font_list_by_enumeration();
-    //FontList list2 = get_font_list_by_register();
-    //FontList list3 = get_font_list_by_folder();
+    //EmbossStyles list1 = get_font_list_by_enumeration();
+    //EmbossStyles list2 = get_font_list_by_register();
+    //EmbossStyles list3 = get_font_list_by_folder();
     return get_font_list_by_register();
 }
 
-FontList Emboss::get_font_list_by_register() {
+EmbossStyles Emboss::get_font_list_by_register() {
     static const LPWSTR fontRegistryPath = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
     HKEY hKey;
     LONG result;
@@ -383,7 +383,7 @@ FontList Emboss::get_font_list_by_register() {
     GetWindowsDirectory(winDir, MAX_PATH);
     std::wstring font_path = std::wstring(winDir) + L"\\Fonts\\";
 
-    FontList font_list;
+    EmbossStyles font_list;
     DWORD    valueIndex = 0;
     // Look for a matching font name
     LPWSTR font_name = new WCHAR[maxValueNameSize];
@@ -406,7 +406,7 @@ FontList Emboss::get_font_list_by_register() {
         if (pos >= font_name_w.size()) continue;
         // remove TrueType text from name
         font_name_w = std::wstring(font_name_w, 0, pos);
-        font_list.emplace_back(Private::create_font_item(font_name_w, path_w));
+        font_list.emplace_back(Private::create_style(font_name_w, path_w));
     } while (result != ERROR_NO_MORE_ITEMS);
     delete[] font_name;
     delete[] fileTTF_name;
@@ -432,22 +432,22 @@ bool CALLBACK EnumFamCallBack(LPLOGFONT       lplf,
     UNREFERENCED_PARAMETER(lpntm);
 }
 
-FontList Emboss::get_font_list_by_enumeration() {   
+EmbossStyles Emboss::get_font_list_by_enumeration() {   
 
     HDC                       hDC = GetDC(NULL);
     std::vector<std::wstring> font_names;
     EnumFontFamilies(hDC, (LPCTSTR) NULL, (FONTENUMPROC) EnumFamCallBack,
                      (LPARAM) &font_names);
 
-    FontList font_list;
+    EmbossStyles font_list;
     for (const std::wstring &font_name : font_names) {
-        font_list.emplace_back(Private::create_font_item(font_name, L""));
+        font_list.emplace_back(Private::create_style(font_name, L""));
     }    
     return font_list;
 }
 
-FontList Emboss::get_font_list_by_folder() {
-    FontList result;
+EmbossStyles Emboss::get_font_list_by_folder() {
+    EmbossStyles result;
     WCHAR winDir[MAX_PATH];
     UINT winDir_size = GetWindowsDirectory(winDir, MAX_PATH);
     std::wstring search_dir = std::wstring(winDir, winDir_size) + L"\\Fonts\\";
@@ -463,7 +463,7 @@ FontList Emboss::get_font_list_by_folder() {
             if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
             std::wstring file_name(fd.cFileName);
             // TODO: find font name instead of filename
-            result.emplace_back(Private::create_font_item(file_name, search_dir + file_name));
+            result.emplace_back(Private::create_style(file_name, search_dir + file_name));
         } while (::FindNextFile(hFind, &fd));
         ::FindClose(hFind);
     }
@@ -471,7 +471,7 @@ FontList Emboss::get_font_list_by_folder() {
 }
 
 #else
-FontList Emboss::get_font_list() { 
+EmbossStyles Emboss::get_font_list() { 
     // not implemented
     return {}; 
 }

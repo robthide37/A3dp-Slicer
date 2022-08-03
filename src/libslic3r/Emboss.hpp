@@ -28,11 +28,11 @@ public:
     /// Collect fonts registred inside OS
     /// </summary>
     /// <returns>OS registred TTF font files(full path) with names</returns>
-    static FontList get_font_list();
+    static EmbossStyles get_font_list();
 #ifdef _WIN32
-    static FontList get_font_list_by_register();
-    static FontList get_font_list_by_enumeration();
-    static FontList get_font_list_by_folder();
+    static EmbossStyles get_font_list_by_register();
+    static EmbossStyles get_font_list_by_enumeration();
+    static EmbossStyles get_font_list_by_folder();
 #endif
 
     /// <summary>

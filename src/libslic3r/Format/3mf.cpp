@@ -148,7 +148,7 @@ static constexpr const char* MESH_STAT_BACKWARDS_EDGES      = "backwards_edges";
 // Store / load of TextConfiguration
 static constexpr const char *TEXT_TAG = "emboss";
 static constexpr const char *TEXT_DATA_ATTR = "text";
-// TextConfiguration::FontItem
+// TextConfiguration::EmbossStyle
 static constexpr const char *STYLE_NAME_ATTR      = "style_name";
 static constexpr const char *FONT_DESCRIPTOR_ATTR = "font_descriptor";
 static constexpr const char *FONT_DESCRIPTOR_TYPE_ATTR = "font_descriptor_type";
@@ -1832,17 +1832,17 @@ namespace Slic3r {
     public:
         TextConfigurationSerialization() = delete;
 
-        static const boost::bimap<FontItem::Type, std::string_view> type_to_name;
+        static const boost::bimap<EmbossStyle::Type, std::string_view> type_to_name;
         
-        static FontItem::Type get_type(std::string_view type) {
+        static EmbossStyle::Type get_type(std::string_view type) {
             const auto& to_type = TextConfigurationSerialization::type_to_name.right;
             auto type_item = to_type.find(type);
             assert(type_item != to_type.end());
-            if (type_item == to_type.end()) return FontItem::Type::undefined;
+            if (type_item == to_type.end()) return EmbossStyle::Type::undefined;
             return type_item->second;        
         }
 
-        static std::string_view get_name(FontItem::Type type) {
+        static std::string_view get_name(EmbossStyle::Type type) {
             const auto& to_name = TextConfigurationSerialization::type_to_name.left;
             auto type_name = to_name.find(type);
             assert(type_name != to_name.end());
@@ -3334,13 +3334,13 @@ bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config,
 /// <summary>
 /// TextConfiguration serialization
 /// </summary>
-using TypeToName = boost::bimap<FontItem::Type, std::string_view>;
+using TypeToName = boost::bimap<EmbossStyle::Type, std::string_view>;
 const TypeToName TextConfigurationSerialization::type_to_name =
             boost::assign::list_of<TypeToName::relation>
-    (FontItem::Type::file_path, "file_name")
-    (FontItem::Type::wx_win_font_descr, "wxFontDescriptor_Windows")
-    (FontItem::Type::wx_lin_font_descr, "wxFontDescriptor_Linux")
-    (FontItem::Type::wx_mac_font_descr, "wxFontDescriptor_MacOsX");
+    (EmbossStyle::Type::file_path, "file_name")
+    (EmbossStyle::Type::wx_win_font_descr, "wxFontDescriptor_Windows")
+    (EmbossStyle::Type::wx_lin_font_descr, "wxFontDescriptor_Linux")
+    (EmbossStyle::Type::wx_mac_font_descr, "wxFontDescriptor_MacOsX");
 
 void TextConfigurationSerialization::to_xml(std::stringstream &stream, const TextConfiguration &tc)
 {
@@ -3348,13 +3348,13 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
 
     stream << TEXT_DATA_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(tc.text) << "\" ";
     // font item
-    const FontItem &fi = tc.font_item;
+    const EmbossStyle &fi = tc.style;
     stream << STYLE_NAME_ATTR <<  "=\"" << xml_escape_double_quotes_attribute_value(fi.name) << "\" ";
     stream << FONT_DESCRIPTOR_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(fi.path) << "\" ";
     stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::get_name(fi.type) << "\" ";
 
     // font property
-    const FontProp &fp = tc.font_item.prop;
+    const FontProp &fp = tc.style.prop;
     if (fp.char_gap.has_value())
         stream << CHAR_GAP_ATTR << "=\"" << *fp.char_gap << "\" ";
     if (fp.line_gap.has_value())
@@ -3469,8 +3469,8 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     std::string style_name = get_attribute_value_string(attributes, num_attributes, STYLE_NAME_ATTR);
     std::string font_descriptor = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_ATTR);
     std::string type_str = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_TYPE_ATTR);
-    FontItem::Type type = TextConfigurationSerialization::get_type(type_str);
-    FontItem fi{ style_name, std::move(font_descriptor), type, std::move(fp) };
+    EmbossStyle::Type type = TextConfigurationSerialization::get_type(type_str);
+    EmbossStyle fi{ style_name, std::move(font_descriptor), type, std::move(fp) };
 
     std::string text = get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
 

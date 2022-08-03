@@ -24,11 +24,11 @@ public:
     // os specific load of wxFont
     static std::unique_ptr<Slic3r::Emboss::FontFile> create_font_file(const wxFont &font);
 
-    static FontItem::Type get_actual_type();
-    static FontItem get_font_item(const wxFont &font, const std::string& name = "");
+    static EmbossStyle::Type get_actual_type();
+    static EmbossStyle create_emboss_style(const wxFont &font, const std::string& name = "");
 
     // load font used by Operating system as default GUI
-    static FontItem    get_os_font();
+    static EmbossStyle    get_os_font();
     static std::string get_human_readable_name(const wxFont &font);
 
     // serialize / deserialize font
@@ -36,7 +36,7 @@ public:
     static std::optional<wxFont> load_wxFont(const std::string &font_descriptor);
 
     // Try to create similar font, loaded from 3mf from different Computer
-    static std::optional<wxFont> create_wxFont(const FontItem &fi);
+    static std::optional<wxFont> create_wxFont(const EmbossStyle &fi);
     // update font property by wxFont
     static void update_property(FontProp &font_prop, const wxFont &font);
 

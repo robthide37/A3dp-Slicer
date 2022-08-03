@@ -240,12 +240,12 @@ set(SLIC3R_GUI_SOURCES
     Utils/Duet.hpp
     Utils/EmbossStyleManager.cpp
     Utils/EmbossStyleManager.hpp
+    Utils/EmbossStylesSerializable.cpp
+    Utils/EmbossStylesSerializable.hpp
     Utils/FlashAir.cpp
     Utils/FlashAir.hpp
     Utils/FontConfigHelp.cpp
     Utils/FontConfigHelp.hpp
-    Utils/FontListSerializable.cpp
-    Utils/FontListSerializable.hpp
     Utils/AstroBox.cpp
     Utils/AstroBox.hpp
     Utils/Repetier.cpp

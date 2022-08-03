@@ -10,42 +10,11 @@
 #include <cereal/archives/binary.hpp>
 #include "Point.hpp" // Transform3d
 
-// Serialization through the Cereal library
-//namespace cereal {    
-//    // Eigen Matrix 4x4 serialization
-//    template <class Archive> void serialize(Archive &ar, ::Slic3r::Matrix4d &m){
-//        ar(binary_data(m.data(), 4*4*sizeof(double)));
-//    }
-//
-//    // !!! create duplicit implementation
-//    // General solution for Eigen matrix serialization 
-//    //template <class Archive, class Derived> inline typename std::enable_if<traits::is_output_serializable<BinaryData<typename Derived::Scalar>, Archive>::value, void>::type
-//    //save(Archive & ar, Eigen::PlainObjectBase<Derived> const & m){
-//    //    typedef Eigen::PlainObjectBase<Derived> ArrT;
-//    //    if(ArrT::RowsAtCompileTime==Eigen::Dynamic) ar(m.rows());
-//    //    if(ArrT::ColsAtCompileTime==Eigen::Dynamic) ar(m.cols());
-//    //    ar(binary_data(m.data(),m.size()*sizeof(typename Derived::Scalar)));
-//    //}
-//    //template <class Archive, class Derived> inline typename std::enable_if<traits::is_input_serializable<BinaryData<typename Derived::Scalar>, Archive>::value, void>::type
-//    //load(Archive & ar, Eigen::PlainObjectBase<Derived> & m){
-//    //    typedef Eigen::PlainObjectBase<Derived> ArrT;
-//    //    Eigen::Index rows=ArrT::RowsAtCompileTime, cols=ArrT::ColsAtCompileTime;
-//    //    if(rows==Eigen::Dynamic) ar(rows);
-//    //    if(cols==Eigen::Dynamic) ar(cols);
-//    //    m.resize(rows,cols);
-//    //    ar(binary_data(m.data(),static_cast<std::size_t>(rows*cols*sizeof(typename Derived::Scalar))));
-//    //}
-//    
-//    // Eigen Transformation serialization
-//    template<class Archive, class T, int N> inline void
-//    serialize(Archive & ar, Eigen::Transform<T, N, Eigen::Affine, Eigen::DontAlign>& t){ ar(t.matrix()); }
-//}
-
 namespace Slic3r {
 
 /// <summary>
 /// User modifiable property of text style
-/// NOTE: OnEdit fix serializations: FontListSerializable, TextConfigurationSerialization
+/// NOTE: OnEdit fix serializations: EmbossStylesSerializable, TextConfigurationSerialization
 /// </summary>
 struct FontProp
 {
@@ -178,9 +147,9 @@ struct FontProp
 /// <summary>
 /// Style of embossed text
 /// (Path + Type) must define how to open font for using on different OS
-/// NOTE: OnEdit fix serializations: FontListSerializable, TextConfigurationSerialization
+/// NOTE: OnEdit fix serializations: EmbossStylesSerializable, TextConfigurationSerialization
 /// </summary>
-struct FontItem
+struct EmbossStyle
 {
     // Human readable name of style it is shown in GUI
     std::string name;
@@ -214,7 +183,8 @@ struct FontItem
         file_path
     };
 
-    bool operator==(const FontItem &other) const {
+    bool operator==(const EmbossStyle &other) const
+    {
         return 
             type == other.type &&
             prop == other.prop &&
@@ -229,10 +199,10 @@ struct FontItem
     }
 };
 
-// Font item name inside list is unique
-// FontList is not map beacuse items order matters (view of list)
-// It is stored into AppConfig by FontListSerializable
-using FontList = std::vector<FontItem>;
+// Emboss style name inside vector is unique
+// It is not map beacuse items has own order (view inside of slect)
+// It is stored into AppConfig by EmbossStylesSerializable
+using EmbossStyles = std::vector<EmbossStyle>;
 
 /// <summary>
 /// Define how to create 'Text volume'
@@ -242,7 +212,7 @@ using FontList = std::vector<FontItem>;
 struct TextConfiguration
 {
     // Style of embossed text
-    FontItem font_item;
+    EmbossStyle style;
 
     // Embossed text value
     std::string text = "None";
@@ -255,11 +225,11 @@ struct TextConfiguration
 
     // undo / redo stack recovery
     template<class Archive> void save(Archive &ar) const{
-        ar(text, font_item); 
+        ar(text, style); 
         cereal::save(ar, fix_3mf_tr);
     }
     template<class Archive> void load(Archive &ar){
-        ar(text, font_item); 
+        ar(text, style); 
         cereal::load(ar, fix_3mf_tr);
     }
 };    
