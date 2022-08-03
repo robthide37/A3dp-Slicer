@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <libslic3r/Emboss.hpp>
-#include "slic3r/Utils/FontManager.hpp"
+#include "slic3r/Utils/EmbossStyleManager.hpp"
 #include "Job.hpp"
 
 namespace Slic3r::GUI {

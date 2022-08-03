@@ -7,7 +7,7 @@
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/GLTexture.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
-#include "slic3r/Utils/FontManager.hpp"
+#include "slic3r/Utils/EmbossStyleManager.hpp"
 
 #include "admesh/stl.h" // indexed_triangle_set
 #include <optional>
