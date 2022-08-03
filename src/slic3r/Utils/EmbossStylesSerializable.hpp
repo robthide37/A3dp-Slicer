@@ -34,16 +34,16 @@ class EmbossStylesSerializable
 public:
     EmbossStylesSerializable() = delete;
 
-    static void store_font_index(AppConfig &cfg, unsigned index);
-    static std::optional<size_t> load_font_index(const AppConfig &cfg);
+    static void store_style_index(AppConfig &cfg, unsigned index);
+    static std::optional<size_t> load_style_index(const AppConfig &cfg);
 
-    static EmbossStyles load_font_list(const AppConfig &cfg);
-    static void     store_font_list(AppConfig &cfg, const EmbossStyles font_list);
+    static EmbossStyles load_styles(const AppConfig &cfg);
+    static void     store_styles(AppConfig &cfg, const EmbossStyles& styles);
 
 private:
     static std::string create_section_name(unsigned index);
-    static std::optional<EmbossStyle> load_font_item(const std::map<std::string, std::string> &app_cfg_section);
-    static void store_font_item(AppConfig &cfg, const EmbossStyle &fi, unsigned index);
+    static std::optional<EmbossStyle> load_style(const std::map<std::string, std::string> &app_cfg_section);
+    static void store_style(AppConfig &cfg, const EmbossStyle &style, unsigned index);
 
     // TODO: move to app config like read from section
     static bool read(const std::map<std::string, std::string>& section, const std::string& key, bool& value);

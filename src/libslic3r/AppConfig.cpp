@@ -39,7 +39,7 @@ static const std::string VERSION_CHECK_URL = "https://files.prusa3d.com/wp-conte
 
 const std::string AppConfig::SECTION_FILAMENTS = "filaments";
 const std::string AppConfig::SECTION_MATERIALS = "sla_materials";
-const std::string AppConfig::SECTION_FONT = "font";
+const std::string AppConfig::SECTION_EMBOSS_STYLE = "font";
 
 void AppConfig::reset()
 {

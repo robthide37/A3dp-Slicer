@@ -30,7 +30,7 @@ EmbossStyleManager::~EmbossStyleManager() {
 void EmbossStyleManager::init(const AppConfig *cfg, const EmbossStyles &default_styles)
 {
     EmbossStyles styles = (cfg != nullptr) ?
-        EmbossStylesSerializable::load_font_list(*cfg) :
+        EmbossStylesSerializable::load_styles(*cfg) :
         default_styles;
     if (styles.empty()) styles = default_styles;
     for (EmbossStyle &style : styles) {
@@ -39,7 +39,7 @@ void EmbossStyleManager::init(const AppConfig *cfg, const EmbossStyles &default_
     }
 
     std::optional<size_t> activ_index_opt = (cfg != nullptr) ? 
-        EmbossStylesSerializable::load_font_index(*cfg) : 
+        EmbossStylesSerializable::load_style_index(*cfg) : 
         std::optional<size_t>{};
 
     size_t activ_index = 0;
@@ -50,10 +50,10 @@ void EmbossStyleManager::init(const AppConfig *cfg, const EmbossStyles &default_
     if (activ_index >= m_style_items.size()) activ_index = 0;
     
     // find valid font item
-    if (!load_font(activ_index)) {
+    if (!load_style(activ_index)) {
         m_style_items.erase(m_style_items.begin() + activ_index);
         activ_index = 0;
-        while (m_style_items.empty() || !load_font(activ_index))
+        while (m_style_items.empty() || !load_style(activ_index))
             m_style_items.erase(m_style_items.begin());
         // no one style from config is loadable
         if (m_style_items.empty()) {
@@ -63,7 +63,7 @@ void EmbossStyleManager::init(const AppConfig *cfg, const EmbossStyles &default_
                 m_style_items.push_back({std::move(style)});
             }
             // try to load first default font
-            bool loaded = load_font(activ_index);
+            bool loaded = load_style(activ_index);
             assert(loaded);
         }
     }
@@ -75,31 +75,31 @@ bool EmbossStyleManager::store_styles_to_app_config(AppConfig *cfg)
     if (cfg == nullptr) return false;
     if (exist_stored_style()) {
         // update stored item
-        m_style_items[m_style_cache.font_index].font_item = m_style_cache.font_item;
+        m_style_items[m_style_cache.style_index].style = m_style_cache.style;
     } else {
         // add new into stored list
-        EmbossStyle &style = m_style_cache.font_item;
+        EmbossStyle &style = m_style_cache.style;
         make_unique_name(style.name);        
-        m_style_cache.font_index = m_style_items.size();
+        m_style_cache.style_index = m_style_items.size();
         m_style_items.push_back({style});
         m_style_cache.stored_wx_font = m_style_cache.wx_font;
     }
     
-    EmbossStylesSerializable::store_font_index(*cfg, m_style_cache.font_index);
-    m_stored_activ_index = m_style_cache.font_index;
+    EmbossStylesSerializable::store_style_index(*cfg, m_style_cache.style_index);
+    m_stored_activ_index = m_style_cache.style_index;
     EmbossStyles font_list;
     font_list.reserve(m_style_items.size());
-    for (const Item &item : m_style_items) font_list.push_back(item.font_item);
-    EmbossStylesSerializable::store_font_list(*cfg, font_list);
+    for (const Item &item : m_style_items) font_list.push_back(item.style);
+    EmbossStylesSerializable::store_styles(*cfg, font_list);
     m_change_order = false;
     return true;
 }
 
 void EmbossStyleManager::store_style(const std::string &name) {
-    EmbossStyle& style = m_style_cache.font_item;
+    EmbossStyle& style = m_style_cache.style;
     style.name = name;
     make_unique_name(style.name);
-    m_style_cache.font_index = m_style_items.size();
+    m_style_cache.style_index = m_style_items.size();
     m_style_cache.stored_wx_font = m_style_cache.wx_font;
     m_style_cache.truncated_name.clear();
     m_style_items.push_back({style});
@@ -112,25 +112,36 @@ void EmbossStyleManager::swap(size_t i1, size_t i2) {
     m_change_order = true;
     // fix selected index
     if (!exist_stored_style()) return;
-    if (m_style_cache.font_index == i1) {
-        m_style_cache.font_index = i2;
-    } else if (m_style_cache.font_index == i2) {
-        m_style_cache.font_index = i1;
+    if (m_style_cache.style_index == i1) {
+        m_style_cache.style_index = i2;
+    } else if (m_style_cache.style_index == i2) {
+        m_style_cache.style_index = i1;
     }
 }
+
+void EmbossStyleManager::discard_style_changes() {
+    if (exist_stored_style()) {
+        if (m_style_cache.style == m_style_items[m_stored_activ_index].style &&
+            m_style_cache.wx_font == m_style_cache.stored_wx_font)
+            return; // already loaded
+        if (load_style(m_style_cache.style_index)) return;
+    }
+    load_first_valid_font();
+}
+
 
 bool EmbossStyleManager::is_style_order_changed() const { return m_change_order; }
 bool EmbossStyleManager::is_activ_style_changed() const {
     if (m_stored_activ_index == std::numeric_limits<size_t>::max())
         return true;
-    return m_style_cache.font_index != m_stored_activ_index;
+    return m_style_cache.style_index != m_stored_activ_index;
 };
 void EmbossStyleManager::erase(size_t index) {
     if (index >= m_style_items.size()) return;
 
     // fix selected index
     if (exist_stored_style()) {
-        size_t &i = m_style_cache.font_index;
+        size_t &i = m_style_cache.style_index;
         if (index < i) --i;
         else if (index == i) i = std::numeric_limits<size_t>::max();
     }
@@ -139,48 +150,48 @@ void EmbossStyleManager::erase(size_t index) {
 }
 
 void EmbossStyleManager::rename(const std::string& name) {
-    m_style_cache.font_item.name = name;
+    m_style_cache.style.name = name;
     m_style_cache.truncated_name.clear();
     if (exist_stored_style()) { 
-        Item &it = m_style_items[m_style_cache.font_index];
-        it.font_item.name = name;
+        Item &it = m_style_items[m_style_cache.style_index];
+        it.style.name = name;
         it.truncated_name.clear();
     }
 }
 
-bool EmbossStyleManager::load_font(size_t font_index)
+bool EmbossStyleManager::load_style(size_t style_index)
 {
-    if (font_index >= m_style_items.size()) return false;
-    if (!load_font(m_style_items[font_index].font_item)) return false;
-    m_style_cache.font_index = font_index;
-    m_style_cache.stored_wx_font = m_style_cache.wx_font;
+    if (style_index >= m_style_items.size()) return false;
+    if (!load_style(m_style_items[style_index].style)) return false;
+    m_style_cache.style_index    = style_index;
+    m_style_cache.stored_wx_font = m_style_cache.wx_font; // copy
     return true;
 }
 
-bool EmbossStyleManager::load_font(const EmbossStyle &fi) {
-    if (fi.type == EmbossStyle::Type::file_path) {
+bool EmbossStyleManager::load_style(const EmbossStyle &style) {
+    if (style.type == EmbossStyle::Type::file_path) {
         std::unique_ptr<Emboss::FontFile> font_ptr =
-            Emboss::create_font_file(fi.path.c_str());
+            Emboss::create_font_file(style.path.c_str());
         if (font_ptr == nullptr) return false;
         m_style_cache.wx_font = {};
         m_style_cache.font_file = 
             Emboss::FontFileWithCache(std::move(font_ptr));
-        m_style_cache.font_item      = fi; // copy
-        m_style_cache.font_index     = std::numeric_limits<size_t>::max();
+        m_style_cache.style          = style; // copy
+        m_style_cache.style_index    = std::numeric_limits<size_t>::max();
         m_style_cache.stored_wx_font = {};
         return true;
     }
-    if (fi.type != WxFontUtils::get_actual_type()) return false;
-    std::optional<wxFont> wx_font_opt = WxFontUtils::load_wxFont(fi.path);
+    if (style.type != WxFontUtils::get_actual_type()) return false;
+    std::optional<wxFont> wx_font_opt = WxFontUtils::load_wxFont(style.path);
     if (!wx_font_opt.has_value()) return false;
-    return load_font(fi, *wx_font_opt);
+    return load_style(style, *wx_font_opt);
 }
 
-bool EmbossStyleManager::load_font(const EmbossStyle &fi, const wxFont &font)
+bool EmbossStyleManager::load_style(const EmbossStyle &style, const wxFont &font)
 {
     if (!set_wx_font(font)) return false;
-    m_style_cache.font_item      = fi; // copy
-    m_style_cache.font_index     = std::numeric_limits<size_t>::max();
+    m_style_cache.style      = style; // copy
+    m_style_cache.style_index     = std::numeric_limits<size_t>::max();
     m_style_cache.stored_wx_font = {};
     m_style_cache.truncated_name.clear();
     return true;
@@ -190,29 +201,29 @@ bool EmbossStyleManager::is_activ_font() { return m_style_cache.font_file.has_va
 
 bool EmbossStyleManager::load_first_valid_font() {
     while (!m_style_items.empty()) {
-        if (load_font(0)) return true;
+        if (load_style(0)) return true;
         // can't load so erase it from list
         m_style_items.erase(m_style_items.begin());
     }
     return false;
 }
 
-const EmbossStyle* EmbossStyleManager::get_stored_font_item() const
+const EmbossStyle* EmbossStyleManager::get_stored_style() const
 {
-    if (m_style_cache.font_index >= m_style_items.size()) return nullptr;
-    return &m_style_items[m_style_cache.font_index].font_item;
+    if (m_style_cache.style_index >= m_style_items.size()) return nullptr;
+    return &m_style_items[m_style_cache.style_index].style;
 }
 
 const std::optional<wxFont> &EmbossStyleManager::get_stored_wx_font() const { return m_style_cache.stored_wx_font; }
 
-const EmbossStyle &EmbossStyleManager::get_font_item() const { return m_style_cache.font_item; }
-      EmbossStyle &EmbossStyleManager::get_font_item()       { return m_style_cache.font_item; }
-const FontProp &EmbossStyleManager::get_font_prop() const { return get_font_item().prop; }
-      FontProp &EmbossStyleManager::get_font_prop()       { return get_font_item().prop; }
+const EmbossStyle &EmbossStyleManager::get_style() const { return m_style_cache.style; }
+      EmbossStyle &EmbossStyleManager::get_style()       { return m_style_cache.style; }
+const FontProp &EmbossStyleManager::get_font_prop() const { return get_style().prop; }
+      FontProp &EmbossStyleManager::get_font_prop()       { return get_style().prop; }
 const std::optional<wxFont> &EmbossStyleManager::get_wx_font() const { return m_style_cache.wx_font; }
 
-bool EmbossStyleManager::exist_stored_style() const { return m_style_cache.font_index != std::numeric_limits<size_t>::max(); }
-size_t EmbossStyleManager::get_style_index() const { return m_style_cache.font_index; }
+bool EmbossStyleManager::exist_stored_style() const { return m_style_cache.style_index != std::numeric_limits<size_t>::max(); }
+size_t EmbossStyleManager::get_style_index() const { return m_style_cache.style_index; }
 Emboss::FontFileWithCache &EmbossStyleManager::get_font_file_with_cache() { return m_style_cache.font_file; }
 std::string &EmbossStyleManager::get_truncated_name() { return m_style_cache.truncated_name; }
 
@@ -258,7 +269,7 @@ void EmbossStyleManager::make_unique_name(std::string &name)
 {
     auto is_unique = [&](const std::string &name) -> bool {
         for (const Item &it : m_style_items)
-            if (it.font_item.name == name) return false;
+            if (it.style.name == name) return false;
         return true;
     };
 
@@ -282,7 +293,7 @@ void EmbossStyleManager::make_unique_name(std::string &name)
 void EmbossStyleManager::init_trunc_names(float max_width) { 
     for (auto &s : m_style_items)
         if (s.truncated_name.empty())
-            s.truncated_name = ImGuiWrapper::trunc(s.font_item.name, max_width);
+            s.truncated_name = ImGuiWrapper::trunc(s.style.name, max_width);
 }
 
 #include "slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp"
@@ -310,8 +321,8 @@ void EmbossStyleManager::init_style_images(const Vec2i &max_size,
 
                 // find style in font list and copy to it
                 for (auto &it : m_style_items) {
-                    if (it.font_item.name != style.text ||
-                        !(it.font_item.prop == style.prop))
+                    if (it.style.name != style.text ||
+                        !(it.style.prop == style.prop))
                         continue;
                     it.image = image;
                     break;
@@ -330,7 +341,7 @@ void EmbossStyleManager::init_style_images(const Vec2i &max_size,
     StyleImagesData::Items styles;
     styles.reserve(m_style_items.size());
     for (const Item &item : m_style_items) {
-        const EmbossStyle &style = item.font_item;
+        const EmbossStyle &style = item.style;
         std::optional<wxFont> wx_font_opt = WxFontUtils::load_wxFont(style.path);
         if (!wx_font_opt.has_value()) continue;
         std::unique_ptr<Emboss::FontFile> font_file =
@@ -399,7 +410,7 @@ ImFont *EmbossStyleManager::create_imgui_font(const std::string &text)
     m_style_cache.atlas.Flags |= ImFontAtlasFlags_NoMouseCursors |
                                 ImFontAtlasFlags_NoPowerOfTwoHeight;
 
-    const FontProp &font_prop = m_style_cache.font_item.prop;
+    const FontProp &font_prop = m_style_cache.style.prop;
     float font_size = get_imgui_font_size(font_prop, font_file);
     if (font_size < min_imgui_font_size)
         font_size = min_imgui_font_size;
@@ -466,10 +477,11 @@ bool EmbossStyleManager::set_wx_font(const wxFont &wx_font) {
 bool EmbossStyleManager::set_wx_font(const wxFont &wx_font, std::unique_ptr<Emboss::FontFile> font_file)
 {
     if (font_file == nullptr) return false;
+    m_style_cache.wx_font   = wx_font; // copy
     m_style_cache.font_file = 
         Emboss::FontFileWithCache(std::move(font_file));
 
-    EmbossStyle &style = m_style_cache.font_item;
+    EmbossStyle &style = m_style_cache.style;
     style.type = WxFontUtils::get_actual_type();
     // update string path
     style.path = WxFontUtils::store_wxFont(wx_font);

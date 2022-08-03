@@ -165,9 +165,8 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
            volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
            volume_type == ModelVolumeType::PARAMETER_MODIFIER);
     if (!m_gui_cfg.has_value()) initialize();
-
     set_default_text();
-    discard_changes_in_style();
+    m_style_manager.discard_style_changes();
 
     Vec2d screen_coor = mouse_pos;
     if (mouse_pos.x() < 0 || mouse_pos.y() < 0) {
@@ -537,7 +536,7 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
-    initialize();
+    if (!m_gui_cfg.has_value()) initialize();
     check_selection(); 
 
     // TODO: fix width - showing scroll in first draw of advanced.
@@ -981,7 +980,7 @@ void GLGizmoEmboss::draw_window()
     if (ImGui::Button("use system font")) {
         size_t font_index = m_style_items.size();
         m_style_items.emplace_back(WxFontUtils::get_os_font());
-        bool loaded = load_font(font_index);
+        bool loaded = load_style(font_index);
     }
 #endif //  ALLOW_DEBUG_MODE
 
@@ -1013,7 +1012,7 @@ void GLGizmoEmboss::draw_window()
        
 #ifdef SHOW_WX_FONT_DESCRIPTOR
     if (is_selected_style)
-        m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_style_manager.get_font_item().path);
+        m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_style_manager.get_style().path);
 #endif // SHOW_WX_FONT_DESCRIPTOR
         
     if (ImGui::Button(_u8L("Close").c_str())) close();
@@ -1471,15 +1470,15 @@ void GLGizmoEmboss::draw_model_type()
 }
 
 void GLGizmoEmboss::draw_style_rename_popup() {
-    std::string& new_name = m_style_manager.get_font_item().name;
-    const std::string &old_name = m_style_manager.get_stored_font_item()->name;
+    std::string& new_name = m_style_manager.get_style().name;
+    const std::string &old_name = m_style_manager.get_stored_style()->name;
     std::string text_in_popup = GUI::format(_u8L("Rename style(%1%) for embossing text: "), old_name);
     ImGui::Text("%s", text_in_popup.c_str());
     
     bool is_unique = true;
     for (const auto &item : m_style_manager.get_styles()) {
-        const EmbossStyle &style = item.font_item;
-        if (&style == &m_style_manager.get_font_item())
+        const EmbossStyle &style = item.style;
+        if (&style == &m_style_manager.get_style())
             continue; // could be same as original name
         if (style.name == new_name) is_unique = false;
     }
@@ -1526,7 +1525,7 @@ void GLGizmoEmboss::draw_style_rename_button()
     std::string title = _u8L("Rename style");
     const char * popup_id = title.c_str();
     if (draw_button(IconType::rename, !can_rename)) {
-        assert(m_style_manager.get_stored_font_item());
+        assert(m_style_manager.get_stored_style());
         ImGui::OpenPopup(popup_id);
     }
     else if (ImGui::IsItemHovered()) {
@@ -1544,9 +1543,9 @@ void GLGizmoEmboss::draw_style_save_button()
     bool is_stored_style = m_style_manager.exist_stored_style();
     const EmbossStyle *stored_syle = nullptr;
     if (is_stored_style)
-        stored_syle = m_style_manager.get_stored_font_item();
+        stored_syle = m_style_manager.get_stored_style();
 
-    const EmbossStyle &style = m_style_manager.get_font_item();    
+    const EmbossStyle &style = m_style_manager.get_style();    
     bool is_changed = (stored_syle)? !(*stored_syle == style) : true;
 
     bool is_style_order_changed = m_style_manager.is_style_order_changed();
@@ -1580,7 +1579,7 @@ void GLGizmoEmboss::draw_style_save_as_popup() {
 
     bool is_unique = true;
     for (const auto &item : m_style_manager.get_styles())
-        if (item.font_item.name == new_name) is_unique = false;
+        if (item.style.name == new_name) is_unique = false;
         
     bool allow_change = false;
     if (new_name.empty()) {
@@ -1603,7 +1602,7 @@ void GLGizmoEmboss::draw_style_save_as_popup() {
     ImGui::SameLine();
     if (ImGui::Button(_u8L("cancel").c_str())){
         // write original name to volume TextConfiguration
-        new_name = m_style_manager.get_font_item().name;
+        new_name = m_style_manager.get_style().name;
         ImGui::CloseCurrentPopup();
     }
 
@@ -1654,8 +1653,8 @@ void GLGizmoEmboss::draw_style_undo_button() {
     const EmbossStyle *stored_style = nullptr;
     bool is_stored = m_style_manager.exist_stored_style();
     if (is_stored)
-        stored_style = m_style_manager.get_stored_font_item();
-    const EmbossStyle &style  = m_style_manager.get_font_item();
+        stored_style = m_style_manager.get_stored_style();
+    const EmbossStyle &style  = m_style_manager.get_style();
     bool is_changed = (stored_style)? !(*stored_style == style) : true;    
     bool can_undo = is_stored && is_changed;
     if (draw_button(IconType::undo, !can_undo)) {
@@ -1692,20 +1691,20 @@ void GLGizmoEmboss::draw_delete_style_button() {
             }
             // IMPROVE: add function can_load?
             // clean unactivable styles
-            if (!m_style_manager.load_font(next_style_index)) {
+            if (!m_style_manager.load_style(next_style_index)) {
                 m_style_manager.erase(next_style_index);
                 continue;
             }
 
             // load back
-            m_style_manager.load_font(activ_index);
+            m_style_manager.load_style(activ_index);
             ImGui::OpenPopup(popup_id);
             break;
         }
     }
 
     if (ImGui::IsItemHovered()) {
-        const std::string &style_name = m_style_manager.get_font_item().name;
+        const std::string &style_name = m_style_manager.get_style().name;
         std::string tooltip;
         if (can_delete)        tooltip = GUI::format(_L("Delete \"%1%\" style."), style_name);
         else if (is_last)      tooltip = GUI::format(_L("Can't delete \"%1%\". It is last style."), style_name);
@@ -1714,12 +1713,12 @@ void GLGizmoEmboss::draw_delete_style_button() {
     }
 
     if (ImGui::BeginPopupModal(popup_id)) {
-        const std::string &style_name  = m_style_manager.get_font_item().name;
+        const std::string &style_name  = m_style_manager.get_style().name;
         std::string text_in_popup = GUI::format(_u8L("Are you sure,\nthat you want permanently and unrecoverable \nremove style \"%1%\"?"), style_name);
         ImGui::Text("%s", text_in_popup.c_str());
         if (ImGui::Button(_u8L("Yes").c_str())) {
             size_t activ_index = m_style_manager.get_style_index();
-            m_style_manager.load_font(next_style_index);
+            m_style_manager.load_style(next_style_index);
             m_style_manager.erase(activ_index);
             m_style_manager.store_styles_to_app_config(wxGetApp().app_config);
             ImGui::CloseCurrentPopup();
@@ -1736,8 +1735,8 @@ void GLGizmoEmboss::discard_changes_in_style()
 {
     if (!m_style_manager.exist_stored_style()) return;
 
-    EmbossStyle &emboss_style  = m_style_manager.get_font_item();
-    const EmbossStyle* stored_style = m_style_manager.get_stored_font_item();
+    EmbossStyle &emboss_style  = m_style_manager.get_style();
+    const EmbossStyle* stored_style = m_style_manager.get_stored_style();
     assert(stored_style != nullptr);
                 
     // is rotation changed
@@ -1772,7 +1771,7 @@ void GLGizmoEmboss::discard_changes_in_style()
 
     if (emboss_style.path != stored_style->path) {
         // NOTE: load font file again
-        m_style_manager.load_font(m_style_manager.get_style_index());
+        m_style_manager.load_style(m_style_manager.get_style_index());
         //m_style_manager.get_wx_font() = WxFontUtils::load_wxFont(emboss_style.path);
         //m_style_manager.wx_font_changed();
     }
@@ -1791,11 +1790,11 @@ void GLGizmoEmboss::draw_revert_all_styles_button() {
 void GLGizmoEmboss::draw_style_list() {
     if (!m_style_manager.is_activ_font()) return;
     const float &max_style_name_width = m_gui_cfg->max_style_name_width;
-    const EmbossStyle &actual_font_item = m_style_manager.get_font_item();
+    const EmbossStyle &actual_style = m_style_manager.get_style();
     std::string &trunc_name = m_style_manager.get_truncated_name();
     if (trunc_name.empty()) {
         // generate trunc name
-        const std::string &current_name  = actual_font_item.name;
+        const std::string &current_name  = actual_style.name;
         trunc_name = ImGuiWrapper::trunc(current_name, max_style_name_width);
     }
 
@@ -1812,17 +1811,17 @@ void GLGizmoEmboss::draw_style_list() {
         const std::vector<EmbossStyleManager::Item> &styles = m_style_manager.get_styles();
         for (const auto &item : styles) {
             size_t             index             = &item - &styles.front();
-            const EmbossStyle &es                = item.font_item;
+            const EmbossStyle &es                = item.style;
             const std::string &actual_style_name = es.name;
             ImGui::PushID(actual_style_name.c_str());
-            bool is_selected = (&es == &actual_font_item);
+            bool is_selected = (&es == &actual_style);
 
             ImVec2 select_size(0,m_gui_cfg->max_style_image_size.y()); // 0,0 --> calculate in draw
             const std::optional<EmbossStyleManager::StyleImage> img = item.image;            
             // allow click delete button
             ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; 
             if (ImGui::Selectable(item.truncated_name.c_str(), is_selected, flags, select_size)) {
-                if (m_style_manager.load_font(index))
+                if (m_style_manager.load_style(index))
                     process();
             } else if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", actual_style_name.c_str());
@@ -2060,10 +2059,16 @@ void GLGizmoEmboss::draw_style_edit() {
     const GuiCfg::Translations &tr = m_gui_cfg->translations;
 
     const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
-    EmbossStyle &style = m_style_manager.get_font_item();
+    EmbossStyle &style = m_style_manager.get_style();
 
     assert(wx_font_opt.has_value());
-    if (!wx_font_opt.has_value()) { 
+    if (!wx_font_opt.has_value()) {
+        // TODO: should not be there
+        // when actual font not loaded try to load
+        if (style.type == WxFontUtils::get_actual_type()) {
+            std::optional<wxFont> new_wx_font = WxFontUtils::load_wxFont(style.path);
+            
+        }
         ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("Font is not loaded properly. "));
         return;
     }
@@ -2073,7 +2078,7 @@ void GLGizmoEmboss::draw_style_edit() {
     bool is_font_changed = false;
     if (exist_stored_style && wx_font_opt.has_value()) {        
         const wxFont &wx_font = *wx_font_opt;
-        const EmbossStyle *stored_style = m_style_manager.get_stored_font_item();
+        const EmbossStyle *stored_style = m_style_manager.get_stored_style();
         assert(stored_style != nullptr);
         const std::optional<wxFont> &stored_wx = m_style_manager.get_stored_wx_font();
         assert(stored_wx.has_value());
@@ -2113,7 +2118,7 @@ void GLGizmoEmboss::draw_style_edit() {
     if (is_font_changed) {
         ImGui::SameLine(ImGui::GetStyle().FramePadding.x);
         if (draw_button(IconType::undo)) {
-            const EmbossStyle *stored_style = m_style_manager.get_stored_font_item();
+            const EmbossStyle *stored_style = m_style_manager.get_stored_style();
             style.path = stored_style->path;
             style.prop.boldness = stored_style->prop.boldness;
             style.prop.skew = stored_style->prop.skew;
@@ -2133,7 +2138,7 @@ void GLGizmoEmboss::draw_style_edit() {
 
     FontProp &font_prop = style.prop;
     const float * def_size = exist_stored_style? 
-        &m_style_manager.get_stored_font_item()->prop.size_in_mm : nullptr;
+        &m_style_manager.get_stored_style()->prop.size_in_mm : nullptr;
     if (rev_input(tr.size, font_prop.size_in_mm, def_size,
                   _u8L("Revert text size."), 0.1f, 1.f, "%.1f mm")) {
         // size can't be zero or negative
@@ -2183,7 +2188,7 @@ void GLGizmoEmboss::draw_style_edit() {
 #endif // SHOW_WX_WEIGHT_INPUT
 
     const float *def_depth = exist_stored_style ?
-        &m_style_manager.get_stored_font_item()->prop.emboss : nullptr;
+        &m_style_manager.get_stored_style()->prop.emboss : nullptr;
     if (rev_input(tr.depth, font_prop.emboss, def_depth,
         _u8L("Revert embossed depth."), 0.1f, 0.25, "%.2f mm")) {
         Limits::apply(font_prop.emboss, limits.emboss);
@@ -2297,7 +2302,7 @@ void GLGizmoEmboss::draw_advanced()
         return;
     }
 
-    FontProp &font_prop = m_style_manager.get_font_item().prop;
+    FontProp &font_prop = m_style_manager.get_style().prop;
     const auto  &cn = m_style_manager.get_font_prop().collection_number;
     unsigned int font_index = (cn.has_value()) ? *cn : 0;
     const auto  &font_info  = ff.font_file->infos[font_index];
@@ -2324,7 +2329,7 @@ void GLGizmoEmboss::draw_advanced()
 
     const EmbossStyle *stored_style = nullptr;
     if (m_style_manager.exist_stored_style())
-        stored_style = m_style_manager.get_stored_font_item();
+        stored_style = m_style_manager.get_stored_style();
 
     bool can_use_surface = (m_volume==nullptr)? false :
                         (font_prop.use_surface)? true : // already used surface must have option to uncheck
@@ -2518,10 +2523,10 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     data.EnableEffects(false);
     data.RestrictSelection(wxFONTRESTRICT_SCALABLE);
     // set previous selected font
-    EmbossStyle &selected_font_item = m_style_manager.get_font_item();
-    if (selected_font_item.type == WxFontUtils::get_actual_type()) {
+    EmbossStyle &selected_style = m_style_manager.get_style();
+    if (selected_style.type == WxFontUtils::get_actual_type()) {
         std::optional<wxFont> selected_font = WxFontUtils::load_wxFont(
-            selected_font_item.path);
+            selected_style.path);
         if (selected_font.has_value()) data.SetInitialFont(*selected_font);
     }
 
@@ -2539,8 +2544,8 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     bool use_deserialized_font = false;
 
     // Try load and use new added font
-    if ((use_deserialized_font && !m_style_manager.load_font(font_index)) ||
-        (!use_deserialized_font && !m_style_manager.load_font(emboss_style, wx_font))) {
+    if ((use_deserialized_font && !m_style_manager.load_style(font_index)) ||
+        (!use_deserialized_font && !m_style_manager.load_style(emboss_style, wx_font))) {
         m_style_manager.erase(font_index);
         wxString message = GUI::format_wxstr(
             _L("Font '%1%' can't be used. Please select another."),
@@ -2557,7 +2562,7 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     const auto&ff = m_style_manager.get_font_file_with_cache();
     if (WxFontUtils::is_italic(wx_font) &&
         !Emboss::is_italic(*ff.font_file, font_collection)) {
-        m_style_manager.get_font_item().prop.skew = 0.2;
+        m_style_manager.get_style().prop.skew = 0.2;
     }
     return true;
 }
@@ -2584,7 +2589,7 @@ bool GLGizmoEmboss::choose_true_type_file()
         EmbossStyle style{ name, path, EmbossStyle::Type::file_path, prop };
         m_style_manager.add_font(style);
         // set first valid added font as active
-        if (m_style_manager.load_font(index)) return true;
+        if (m_style_manager.load_style(index)) return true;
         m_style_manager.erase(index);       
     }
     return false;
@@ -2612,7 +2617,7 @@ bool GLGizmoEmboss::choose_svg_file()
 
     BoundingBox bb;
     for (const auto &p : polys) bb.merge(p.contour.points);
-    const FontProp &fp = m_style_manager.get_font_item().prop;
+    const FontProp &fp = m_style_manager.get_style().prop;
     float scale   = fp.size_in_mm / std::max(bb.max.x(), bb.max.y());
     auto  project = std::make_unique<Emboss::ProjectScale>(
         std::make_unique<Emboss::ProjectZ>(fp.emboss / scale), scale);
@@ -2637,13 +2642,13 @@ EmbossDataBase GLGizmoEmboss::create_emboss_data_base() {
     auto create_configuration = [&]() -> TextConfiguration {
         if (!m_style_manager.is_activ_font()) {
             std::string default_text_for_emboss = _u8L("Embossed text");
-            EmbossStyle es = m_style_manager.get_font_item();
+            EmbossStyle es = m_style_manager.get_style();
             TextConfiguration tc{es, default_text_for_emboss};
             // TODO: investigace how to initialize
             return tc;
         }
 
-        EmbossStyle &es = m_style_manager.get_font_item();
+        EmbossStyle &es = m_style_manager.get_style();
         // actualize font path - during changes in gui it could be corrupted
         // volume must store valid path
         assert(m_style_manager.get_wx_font().has_value());
@@ -2666,8 +2671,8 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
     TextConfiguration &tc    = *volume->text_configuration;
     EmbossStyle       &tc_es = tc.style;
 
-    auto has_same_name = [&tc_es](const EmbossStyleManager::Item &font_item) -> bool {
-        const EmbossStyle &es = font_item.font_item;
+    auto has_same_name = [&tc_es](const EmbossStyleManager::Item &style) -> bool {
+        const EmbossStyle &es = style.style;
         return es.name == tc_es.name;
     };
 
@@ -2685,18 +2690,18 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
     if (it == styles.end()) {
         // style was not found
         if (wx_font_opt.has_value())
-            m_style_manager.load_font(tc_es, *wx_font_opt);
+            m_style_manager.load_style(tc_es, *wx_font_opt);
     } else {
         size_t style_index = it - styles.begin();
-        if (!m_style_manager.load_font(style_index)) {
+        if (!m_style_manager.load_style(style_index)) {
             // can`t load stored style
             m_style_manager.erase(style_index);
             if (wx_font_opt.has_value())
-                m_style_manager.load_font(tc_es, *wx_font_opt);
+                m_style_manager.load_style(tc_es, *wx_font_opt);
 
         } else {
             // stored style is loaded, now set modification of style
-            m_style_manager.get_font_item() = tc_es;
+            m_style_manager.get_style() = tc_es;
             m_style_manager.set_wx_font(*wx_font_opt);
         }
     }
@@ -2717,7 +2722,7 @@ void GLGizmoEmboss::create_notification_not_valid_font(
     auto level =
         NotificationManager::NotificationLevel::WarningNotificationLevel;
 
-    const EmbossStyle &es     = m_style_manager.get_font_item();
+    const EmbossStyle &es     = m_style_manager.get_style();
     const auto &origin_family = tc.style.prop.face_name;
     const auto &actual_family = es.prop.face_name;
 

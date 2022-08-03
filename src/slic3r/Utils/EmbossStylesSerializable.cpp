@@ -23,7 +23,7 @@ const std::string EmbossStylesSerializable::APP_CONFIG_ACTIVE_FONT      = "activ
 
 std::string EmbossStylesSerializable::create_section_name(unsigned index)
 {
-    return AppConfig::SECTION_FONT + ':' + std::to_string(index);
+    return AppConfig::SECTION_EMBOSS_STYLE + ':' + std::to_string(index);
 }
 
 // check only existence of flag
@@ -88,7 +88,7 @@ bool EmbossStylesSerializable::read(const std::map<std::string, std::string>& se
     return true;
 }
 
-std::optional<EmbossStyle> EmbossStylesSerializable::load_font_item(
+std::optional<EmbossStyle> EmbossStylesSerializable::load_style(
     const std::map<std::string, std::string> &app_cfg_section)
 {
     auto path_it = app_cfg_section.find(APP_CONFIG_FONT_DESCRIPTOR);
@@ -96,7 +96,7 @@ std::optional<EmbossStyle> EmbossStylesSerializable::load_font_item(
     const std::string &path = path_it->second;
 
     auto name_it = app_cfg_section.find(APP_CONFIG_FONT_NAME);
-    static const std::string default_name = "font_name";
+    const std::string default_name = "font_name";
     const std::string &name = 
         (name_it == app_cfg_section.end()) ?
         default_name : name_it->second;
@@ -117,7 +117,7 @@ std::optional<EmbossStyle> EmbossStylesSerializable::load_font_item(
     return EmbossStyle{ name, path, type, fp };
 }
 
-void EmbossStylesSerializable::store_font_item(AppConfig &     cfg,
+void EmbossStylesSerializable::store_style(AppConfig &     cfg,
                                            const EmbossStyle &fi,
                                            unsigned        index)
 {
@@ -146,19 +146,19 @@ void EmbossStylesSerializable::store_font_item(AppConfig &     cfg,
         cfg.set(section_name, APP_CONFIG_FONT_LINE_GAP, std::to_string(*fp.line_gap));
 }
 
-void EmbossStylesSerializable::store_font_index(AppConfig &cfg, unsigned index) {
+void EmbossStylesSerializable::store_style_index(AppConfig &cfg, unsigned index) {
     // store actual font index
-    cfg.clear_section(AppConfig::SECTION_FONT);
+    cfg.clear_section(AppConfig::SECTION_EMBOSS_STYLE);
     // activ font first index is +1 to correspond with section name
     std::string activ_font = std::to_string(index);
-    cfg.set(AppConfig::SECTION_FONT, APP_CONFIG_ACTIVE_FONT, activ_font);
+    cfg.set(AppConfig::SECTION_EMBOSS_STYLE, APP_CONFIG_ACTIVE_FONT, activ_font);
 }
 
-std::optional<size_t> EmbossStylesSerializable::load_font_index(const AppConfig &cfg)
+std::optional<size_t> EmbossStylesSerializable::load_style_index(const AppConfig &cfg)
 {
-    if (!cfg.has_section(AppConfig::SECTION_FONT)) return {};
+    if (!cfg.has_section(AppConfig::SECTION_EMBOSS_STYLE)) return {};
 
-    auto section = cfg.get_section(AppConfig::SECTION_FONT);
+    auto section = cfg.get_section(AppConfig::SECTION_EMBOSS_STYLE);
     auto it      = section.find(APP_CONFIG_ACTIVE_FONT);
     if (it == section.end()) return {};
 
@@ -167,30 +167,29 @@ std::optional<size_t> EmbossStylesSerializable::load_font_index(const AppConfig 
     return active_font - 1;
 }
 
-EmbossStyles EmbossStylesSerializable::load_font_list(const AppConfig &cfg)
+EmbossStyles EmbossStylesSerializable::load_styles(const AppConfig &cfg)
 {
     EmbossStyles result;
     // human readable index inside of config starts from 1 !!
     unsigned    index        = 1;
-    std::string section_name = create_section_name(
-        index);
+    std::string section_name = create_section_name(index);
     while (cfg.has_section(section_name)) {
-        std::optional<EmbossStyle> style_opt = load_font_item(cfg.get_section(section_name));
+        std::optional<EmbossStyle> style_opt = load_style(cfg.get_section(section_name));
         if (style_opt.has_value()) result.emplace_back(*style_opt);
         section_name = create_section_name(++index);
     }
     return result;
 }
 
-void EmbossStylesSerializable::store_font_list(AppConfig &cfg, const EmbossStyles font_list)
+void EmbossStylesSerializable::store_styles(AppConfig &cfg, const EmbossStyles& styles)
 {
     // store styles
     unsigned index = 1;
-    for (const EmbossStyle &fi : font_list) {
+    for (const EmbossStyle &style : styles) {
         // skip file paths + fonts from other OS(loaded from .3mf)
-        assert(fi.type == WxFontUtils::get_actual_type());
+        assert(style.type == WxFontUtils::get_actual_type());
         // if (style_opt.type != WxFontUtils::get_actual_type()) continue;
-        store_font_item(cfg, fi, index++);
+        store_style(cfg, style, index++);
     }
 
     // remove rest of font sections (after deletation)

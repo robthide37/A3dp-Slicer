@@ -42,7 +42,7 @@ public:
     bool store_styles_to_app_config(AppConfig *cfg);
 
     /// <summary>
-    /// Append actual style to style list and store
+    /// Append actual style to style list
     /// </summary>
     /// <param name="name">New name for style</param>
     void store_style(const std::string& name);
@@ -54,6 +54,12 @@ public:
     /// <param name="i1">First index to m_style_items</param>
     /// <param name="i2">Second index to m_style_items</param>
     void swap(size_t i1, size_t i2);
+
+    /// <summary>
+    /// Discard changes in activ style
+    /// When no activ style use last used
+    /// </summary>
+    void discard_style_changes();
 
     /// <summary>
     /// Track using of swap between saves
@@ -86,11 +92,11 @@ public:
     /// </summary>
     /// <param name="font_index">New font index(from m_style_items range)</param>
     /// <returns>True on succes. False on fail load font</returns>
-    bool load_font(size_t font_index);
+    bool load_style(size_t font_index);
     // load font style not stored in list
-    bool load_font(const EmbossStyle &fi);
+    bool load_style(const EmbossStyle &style);
     // fastering load font on index by wxFont, ignore type and descriptor
-    bool load_font(const EmbossStyle &fi, const wxFont &font);
+    bool load_style(const EmbossStyle &style, const wxFont &font);
     
     // clear actual selected glyphs cache
     void clear_glyphs_cache();
@@ -98,19 +104,15 @@ public:
     // remove cached imgui font for actual selected font
     void clear_imgui_font();
 
-    // erase font when not possible to load
-    // used at initialize phaze - fonts could be modified in appConfig file by user
-    bool load_first_valid_font();
-
     // getter on stored EmbossStyle
-    const EmbossStyle *get_stored_font_item() const;
+    const EmbossStyle *get_stored_style() const;
 
     // getter on stored wxFont
     const std::optional<wxFont> &get_stored_wx_font() const;
 
     // getter on active font item for access to font property
-    const EmbossStyle &get_font_item() const;
-    EmbossStyle &get_font_item();
+    const EmbossStyle &get_style() const;
+    EmbossStyle &get_style();
 
     // getter on active font property
     const FontProp &get_font_prop() const;
@@ -187,7 +189,7 @@ public:
     struct Item
     {
         // define font, style and other property of text
-        EmbossStyle font_item;
+        EmbossStyle style;
 
         // cache for view font name with maximal width in imgui
         std::string truncated_name; 
@@ -206,6 +208,10 @@ public:
     static float get_imgui_font_size(const FontProp& prop, const Emboss::FontFile& file);
 
 private:
+    // erase font when not possible to load
+    // used at initialize phaze - fonts could be modified in appConfig file by user
+    bool load_first_valid_font();
+
     /// <summary>
     /// Cache data from style to reduce amount of:
     /// 1) loading font from file
@@ -230,13 +236,13 @@ private:
         std::string truncated_name; 
 
         // actual used font item
-        EmbossStyle font_item = {};
+        EmbossStyle style = {};
 
         // cache for stored wx font to not create every frame
         std::optional<wxFont> stored_wx_font;
 
         // index into m_style_items
-        size_t font_index = std::numeric_limits<size_t>::max();
+        size_t style_index = std::numeric_limits<size_t>::max();
 
     } m_style_cache;
             
@@ -249,7 +255,7 @@ private:
 
     // Privat member
     std::vector<Item> m_style_items;
-    bool m_change_order = false;
+    bool m_change_order;
     size_t m_stored_activ_index;
 
     /// <summary>
