@@ -60,7 +60,7 @@ struct SupportByproducts
     std::string             obj_fname;
     std::vector<float>      slicegrid;
     std::vector<ExPolygons> model_slices;
-    sla::SupportTreeBuilder supporttree;
+    sla::SupportTreeBuilder suptree_builder;
     TriangleMesh            input_mesh;
 };
 

@@ -319,6 +319,12 @@ set(SLIC3R_SOURCES
     SLA/ReprojectPointsOnMesh.hpp
     SLA/DefaultSupportTree.hpp
     SLA/DefaultSupportTree.cpp
+    SLA/BranchingTreeSLA.hpp
+    SLA/BranchingTreeSLA.cpp
+    BranchingTree/BranchingTree.cpp
+    BranchingTree/BranchingTree.hpp
+    BranchingTree/PointCloud.cpp
+    BranchingTree/PointCloud.hpp
 
     Arachne/BeadingStrategy/BeadingStrategy.hpp
     Arachne/BeadingStrategy/BeadingStrategy.cpp

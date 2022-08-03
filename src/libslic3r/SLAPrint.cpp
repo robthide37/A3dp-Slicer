@@ -43,6 +43,7 @@ sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfig& c)
     sla::SupportTreeConfig scfg;
     
     scfg.enabled = c.supports_enable.getBool();
+    scfg.tree_type = c.support_tree_type.value;
     scfg.head_front_radius_mm = 0.5*c.support_head_front_diameter.getFloat();
     double pillar_r = 0.5 * c.support_pillar_diameter.getFloat();
     scfg.head_back_radius_mm = pillar_r;
@@ -824,6 +825,7 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             || opt_key == "pad_enable"
             || opt_key == "pad_wall_thickness"
             || opt_key == "supports_enable"
+            || opt_key == "support_tree_type"
             || opt_key == "support_object_elevation"
             || opt_key == "pad_around_object"
             || opt_key == "pad_around_object_everywhere"
