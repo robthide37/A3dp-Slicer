@@ -79,14 +79,7 @@ public:
     /// </summary>
     /// <param name="name">New name</param>
     void rename(const std::string &name);
-
-    /// <summary>
-    /// Actual wx font was changed
-    /// Clear caches
-    /// </summary>
-    /// <param name="font_file">font file created by WxFontUtils::create_font_file(wx_font)</param>
-    bool wx_font_changed(std::unique_ptr<Emboss::FontFile> font_file = nullptr);
-    
+        
     /// <summary>
     /// Change active font
     /// When font not loaded roll back activ font
@@ -125,7 +118,6 @@ public:
 
     // getter on activ wx font
     const std::optional<wxFont> &get_wx_font() const;
-    std::optional<wxFont> &get_wx_font();
 
     bool exist_stored_style() const;
     size_t get_style_index() const;
@@ -136,9 +128,23 @@ public:
     // Getter for cached trucated name for style list selector
     std::string &get_truncated_name();
         
-    // setter of font for actual selection
+    // setter of wx font for actual selection
+
+    /// <summary>
+    /// Setter on wx_font when changed
+    /// </summary>
+    /// <param name="wx_font">new wx font</param>
+    /// <returns>True on success set otherwise FALSE</returns>
     bool set_wx_font(const wxFont &wx_font);
 
+    /// <summary>
+    /// Faster way of set wx_font when font file is known(do not load font file twice)
+    /// When you not sure that wx_font is made by font_file use only set_wx_font(wx_font)
+    /// </summary>
+    /// <param name="wx_font">Must be source of font file</param>
+    /// <param name="font_file">font file created by WxFontUtils::create_font_file(wx_font)</param>
+    /// <returns>True on success otherwise false</returns>
+    bool set_wx_font(const wxFont &wx_font, std::unique_ptr<Emboss::FontFile> font_file );
 
     // Getter on acitve font pointer for imgui
     // Initialize imgui font(generate texture) when doesn't exist yet.

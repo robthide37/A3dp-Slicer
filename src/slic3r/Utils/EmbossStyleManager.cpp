@@ -148,25 +148,6 @@ void EmbossStyleManager::rename(const std::string& name) {
     }
 }
 
-bool EmbossStyleManager::wx_font_changed(std::unique_ptr<Emboss::FontFile> font_file)
-{
-    if (!is_activ_font()) return false;
-    auto &wx_font = get_wx_font();
-    if (!wx_font.has_value()) return false;
-
-    if (font_file == nullptr) {        
-        font_file = WxFontUtils::create_font_file(*wx_font);
-        if (font_file == nullptr) return false;
-    }
-    m_style_cache.font_file = Emboss::FontFileWithCache(std::move(font_file));        
-    EmbossStyle &style = get_font_item();
-    style.type  = WxFontUtils::get_actual_type();
-    style.path = WxFontUtils::store_wxFont(*wx_font);
-    clear_imgui_font();
-    free_style_images();
-    return true;
-}
-
 bool EmbossStyleManager::load_font(size_t font_index)
 {
     if (font_index >= m_style_items.size()) return false;
@@ -229,7 +210,6 @@ const EmbossStyle &EmbossStyleManager::get_font_item() const { return m_style_ca
 const FontProp &EmbossStyleManager::get_font_prop() const { return get_font_item().prop; }
       FontProp &EmbossStyleManager::get_font_prop()       { return get_font_item().prop; }
 const std::optional<wxFont> &EmbossStyleManager::get_wx_font() const { return m_style_cache.wx_font; }
-      std::optional<wxFont> &EmbossStyleManager::get_wx_font()       { return m_style_cache.wx_font; }
 
 bool EmbossStyleManager::exist_stored_style() const { return m_style_cache.font_index != std::numeric_limits<size_t>::max(); }
 size_t EmbossStyleManager::get_style_index() const { return m_style_cache.font_index; }
@@ -480,12 +460,20 @@ ImFont *EmbossStyleManager::create_imgui_font(const std::string &text)
 bool EmbossStyleManager::set_wx_font(const wxFont &wx_font) {
     std::unique_ptr<Emboss::FontFile> font_file = 
         WxFontUtils::create_font_file(wx_font);
+    return set_wx_font(wx_font, std::move(font_file));
+}
+
+bool EmbossStyleManager::set_wx_font(const wxFont &wx_font, std::unique_ptr<Emboss::FontFile> font_file)
+{
     if (font_file == nullptr) return false;
     m_style_cache.font_file = 
         Emboss::FontFileWithCache(std::move(font_file));
-    m_style_cache.wx_font = wx_font; // copy
+
     EmbossStyle &style = m_style_cache.font_item;
     style.type = WxFontUtils::get_actual_type();
+    // update string path
+    style.path = WxFontUtils::store_wxFont(wx_font);
     clear_imgui_font();
+    free_style_images();
     return true;
 }

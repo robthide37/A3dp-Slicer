@@ -1281,7 +1281,7 @@ void GLGizmoEmboss::draw_font_list()
     // Set partial
     wxString actual_face_name;
     if (m_style_manager.is_activ_font()) {
-        std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
+        const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
         if (wx_font_opt.has_value())
             actual_face_name = wx_font_opt->GetFaceName();
     }
@@ -1882,23 +1882,26 @@ void GLGizmoEmboss::draw_style_list() {
 
 bool GLGizmoEmboss::draw_italic_button()
 {
-    std::optional<wxFont> &wx_font = m_style_manager.get_wx_font(); 
+    const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font(); 
     const auto& ff = m_style_manager.get_font_file_with_cache();
-    if (!wx_font.has_value() || !ff.has_value()) { 
+    if (!wx_font_opt.has_value() || !ff.has_value()) { 
         draw_icon(IconType::italic, IconState::disabled);
         return false;
     }
+    const wxFont& wx_font = *wx_font_opt;
 
     std::optional<float> &skew = m_style_manager.get_font_prop().skew;
-    bool is_font_italic = skew.has_value() || WxFontUtils::is_italic(*wx_font);
+    bool is_font_italic = skew.has_value() || WxFontUtils::is_italic(wx_font);
     if (is_font_italic) {
         // unset italic
         if (draw_clickable(IconType::italic, IconState::hovered,
                            IconType::unitalic, IconState::hovered)) {
             skew.reset();
-            if (wx_font->GetStyle() != wxFontStyle::wxFONTSTYLE_NORMAL) {
-                wx_font->SetStyle(wxFontStyle::wxFONTSTYLE_NORMAL);
-                m_style_manager.wx_font_changed();
+            if (wx_font.GetStyle() != wxFontStyle::wxFONTSTYLE_NORMAL) {
+                wxFont new_wx_font = wx_font; // copy
+                new_wx_font.SetStyle(wxFontStyle::wxFONTSTYLE_NORMAL);
+                if(!m_style_manager.set_wx_font(new_wx_font))
+                    return false;
             }
             return true;
         }
@@ -1907,9 +1910,11 @@ bool GLGizmoEmboss::draw_italic_button()
     } else {
         // set italic
         if (draw_button(IconType::italic)) {
-            auto new_ff = WxFontUtils::set_italic(*wx_font, *ff.font_file);
+            wxFont new_wx_font = wx_font; // copy
+            auto new_ff = WxFontUtils::set_italic(new_wx_font, *ff.font_file);
             if (new_ff != nullptr) {
-                m_style_manager.wx_font_changed(std::move(new_ff));
+                if(!m_style_manager.set_wx_font(new_wx_font, std::move(new_ff)))
+                    return false;
             } else {
                 // italic font doesn't exist 
                 // add skew when wxFont can't set it
@@ -1924,23 +1929,26 @@ bool GLGizmoEmboss::draw_italic_button()
 }
 
 bool GLGizmoEmboss::draw_bold_button() {
-    std::optional<wxFont> &wx_font = m_style_manager.get_wx_font();
+    const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
     const auto& ff = m_style_manager.get_font_file_with_cache();
-    if (!wx_font.has_value() || !ff.has_value()) {
+    if (!wx_font_opt.has_value() || !ff.has_value()) {
         draw_icon(IconType::bold, IconState::disabled);
         return false;
     }
+    const wxFont &wx_font = *wx_font_opt;
     
     std::optional<float> &boldness = m_style_manager.get_font_prop().boldness;
-    bool is_font_bold = boldness.has_value() || WxFontUtils::is_bold(*wx_font);
+    bool is_font_bold = boldness.has_value() || WxFontUtils::is_bold(wx_font);
     if (is_font_bold) {
         // unset bold
         if (draw_clickable(IconType::bold, IconState::hovered,
                            IconType::unbold, IconState::hovered)) {
             boldness.reset();
-            if (wx_font->GetWeight() != wxFontWeight::wxFONTWEIGHT_NORMAL) {
-                wx_font->SetWeight(wxFontWeight::wxFONTWEIGHT_NORMAL);
-                m_style_manager.wx_font_changed();
+            if (wx_font.GetWeight() != wxFontWeight::wxFONTWEIGHT_NORMAL) {
+                wxFont new_wx_font = wx_font; // copy
+                new_wx_font.SetWeight(wxFontWeight::wxFONTWEIGHT_NORMAL);
+                if(!m_style_manager.set_wx_font(new_wx_font))
+                    return false;
             }
             return true;
         }
@@ -1949,9 +1957,11 @@ bool GLGizmoEmboss::draw_bold_button() {
     } else {
         // set bold
         if (draw_button(IconType::bold)) {
-            auto new_ff = WxFontUtils::set_bold(*wx_font, *ff.font_file);
+            wxFont new_wx_font = wx_font; // copy
+            auto new_ff = WxFontUtils::set_bold(new_wx_font, *ff.font_file);
             if (new_ff != nullptr) {
-                m_style_manager.wx_font_changed(std::move(new_ff));
+                if(!m_style_manager.set_wx_font(new_wx_font, std::move(new_ff)))
+                    return false;
             } else {
                 // bold font can't be loaded
                 // set up boldness
@@ -2049,33 +2059,34 @@ bool GLGizmoEmboss::rev_checkbox(const std::string &name,
 void GLGizmoEmboss::draw_style_edit() {
     const GuiCfg::Translations &tr = m_gui_cfg->translations;
 
-    std::optional<wxFont> &wx_font = m_style_manager.get_wx_font();
+    const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
     EmbossStyle &style = m_style_manager.get_font_item();
-    assert(wx_font.has_value());
 
-    // TODO: should not be there
-    // when actual font not loaded try to load
-    if (!wx_font.has_value() && style.type == WxFontUtils::get_actual_type())
-        wx_font = WxFontUtils::load_wxFont(style.path);
+    assert(wx_font_opt.has_value());
+    if (!wx_font_opt.has_value()) { 
+        ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("Font is not loaded properly. "));
+        return;
+    }
+
 
     bool exist_stored_style = m_style_manager.exist_stored_style();
     bool is_font_changed = false;
-    if (exist_stored_style &&
-        wx_font.has_value()) {
+    if (exist_stored_style && wx_font_opt.has_value()) {        
+        const wxFont &wx_font = *wx_font_opt;
         const EmbossStyle *stored_style = m_style_manager.get_stored_font_item();
         assert(stored_style != nullptr);
         const std::optional<wxFont> &stored_wx = m_style_manager.get_stored_wx_font();
         assert(stored_wx.has_value());
-        bool is_font_face_changed = stored_wx->GetFaceName() != wx_font->GetFaceName();
+        bool is_font_face_changed = stored_wx->GetFaceName() != wx_font.GetFaceName();
 
         const std::optional<float> &skew = m_style_manager.get_font_prop().skew;
-        bool is_italic = skew.has_value() || WxFontUtils::is_italic(*wx_font);
+        bool is_italic = skew.has_value() || WxFontUtils::is_italic(wx_font);
         const std::optional<float> &skew_stored = stored_style->prop.skew;
         bool is_stored_italic = skew_stored.has_value() || WxFontUtils::is_italic(*stored_wx);
         bool is_italic_changed = is_italic != is_stored_italic;
 
         const std::optional<float> &boldness = m_style_manager.get_font_prop().boldness;
-        bool is_bold = boldness.has_value() || WxFontUtils::is_bold(*wx_font);
+        bool is_bold = boldness.has_value() || WxFontUtils::is_bold(wx_font);
         const std::optional<float> &boldness_stored = stored_style->prop.boldness;
         bool is_stored_bold = boldness_stored.has_value() || WxFontUtils::is_bold(*stored_wx);
         bool is_bold_changed = is_bold != is_stored_bold;
@@ -2107,9 +2118,10 @@ void GLGizmoEmboss::draw_style_edit() {
             style.prop.boldness = stored_style->prop.boldness;
             style.prop.skew = stored_style->prop.skew;
 
-            wx_font = WxFontUtils::load_wxFont(style.path);
-            m_style_manager.wx_font_changed();
-            exist_change = true;
+            std::optional<wxFont> new_wx_font = WxFontUtils::load_wxFont(style.path);
+            if (new_wx_font.has_value() && 
+                m_style_manager.set_wx_font(*new_wx_font))
+                exist_change = true;
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("Revert font changes.").c_str());
     }
@@ -2134,10 +2146,10 @@ void GLGizmoEmboss::draw_style_edit() {
 
             // store font size into path
             if (style.type == WxFontUtils::get_actual_type()) {
-                if (wx_font.has_value()) {
-                    wx_font->SetPointSize(
-                        static_cast<int>(font_prop.size_in_mm));
-                    m_style_manager.wx_font_changed();
+                if (wx_font_opt.has_value()) {
+                    wxFont wx_font = *wx_font_opt;
+                    wx_font.SetPointSize(static_cast<int>(font_prop.size_in_mm));
+                    m_style_manager.set_wx_font(wx_font);
                 }
             }
             process();
