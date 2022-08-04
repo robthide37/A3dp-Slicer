@@ -1379,23 +1379,31 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             float sharp_angle_weight = angle_weight(SeamPlacer::sharp_angle_snapping_threshold);
 
             //gather points positions and weights
-            size_t segments_count = 0;
+            float total_length = 0.0f;
+            float sharp_length = 0.0f;
+            Vec3f prev_pos = layers[seam_string[0].first].points[seam_string[0].second].position;
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const SeamCandidate &point = layers[seam_string[index].first].points[seam_string[index].second];
                 Vec3f pos = point.position;
+                float dist = (pos - prev_pos).norm();
+                total_length += dist;
                 observations[index] = pos.head<2>();
                 observation_points[index] = pos.z();
                 weights[index] = angle_weight(point.local_ccw_angle);
                 bool is_enforced = point.type == EnforcedBlockedSeamPoint::Enforced;
-                if (is_enforced || weights[index] > sharp_angle_weight) {
-                    segments_count++;
+                if (is_enforced) {
+                    weights[index] = std::max(weights[index], 6.0f);
                 }
+                if (is_enforced || weights[index] > sharp_angle_weight) {
+                    sharp_length+= dist;
+                }
+                prev_pos = pos;
             }
 
             // Curve Fitting
             size_t number_of_segments = std::max(
-                    std::max(size_t(1), seam_string.size() / 200),
-                    size_t(segments_count / SeamPlacer::seam_align_seams_per_segment));
+                    std::max(size_t(1), size_t(total_length / 30.0f)),
+                    size_t(sharp_length / SeamPlacer::seam_align_mm_per_segment));
             auto curve = Geometry::fit_cubic_bspline(observations, observation_points, weights, number_of_segments);
 
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into

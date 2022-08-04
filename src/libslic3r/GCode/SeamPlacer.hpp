@@ -147,8 +147,8 @@ public:
     static constexpr float seam_align_tolerable_dist_factor = 4.0f;
     // minimum number of seams needed in cluster to make alignment happen
     static constexpr size_t seam_align_minimum_string_seams = 6;
-    // number of seams per bspline segment
-    static constexpr float seam_align_seams_per_segment = 8.0f;
+    // millimeters covered by spline; determines number of splines for the given string
+    static constexpr size_t seam_align_mm_per_segment = 4.0f;
 
     //The following data structures hold all perimeter points for all PrintObject.
     std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
