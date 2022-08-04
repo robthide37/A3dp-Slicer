@@ -67,12 +67,14 @@ static void fuzzy_polygon(Polygon& poly, coordf_t fuzzy_skin_thickness, coordf_t
         dist_left_over = p0p1_size - dist_last_point;
         p0 = &p1;
     }
-    while (out.size() < 3) {
-        size_t point_idx = poly.size() - 2;
-        out.emplace_back(poly[point_idx]);
-        if (point_idx == 0)
-            break;
-        --point_idx;
+    if (out.size() < 3) {
+        size_t point_idx = std::max(size_t(0), poly.size() - 2);
+        while (out.size() < 3) {
+            out.emplace_back(poly[point_idx]);
+            if (point_idx == 0)
+                break;
+            --point_idx;
+        }
     }
     if (out.size() >= 3)
         poly.points = std::move(out);
@@ -2387,16 +2389,26 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
     const coordf_t range_random_point_dist = fuzzy_skin_point_dist / 2.;
     coordf_t dist_left_over = coordf_t(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
 
-    Point last_point = paths.back().last_point();
-    bool is_loop = true; //always a loop currently paths.front().first_point() == last_point;
-    Point p0 = last_point;
+    const Point last_point = paths.back().last_point();
+    //not always a loop, with arachne
+    bool is_loop = paths.front().first_point() == last_point;
+#ifdef _DEBUG
+    assert(paths.back().last_point() == paths.front().first_point());
+    for (int i = 1; i < paths.size(); i++) {
+        assert(paths[i - 1].last_point() == paths[i].first_point());
+    }
+    if (is_loop)
+        assert(paths.front().polyline.points.front() == paths.back().polyline.points.back());
+#endif
+    Point p0 = is_loop ? last_point : paths.front().first_point();
+    const Point* previous_point = is_loop ? &last_point : &paths.front().first_point();
     for (ExtrusionPath &path : paths) {
         Points out;
-        size_t next_idx = 0;
-        if (p0 == path.polyline.points.front()) {
-            next_idx = 1;
-        }
+        size_t next_idx = 1;
+        // it always follow
+        assert(p0 == path.polyline.points.front());
         out.reserve(path.polyline.points.size());
+        out.push_back(*previous_point);
         for (; next_idx < path.polyline.points.size(); next_idx++)
         {
             Point& p1 = path.polyline.points[next_idx];
@@ -2415,21 +2427,22 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
             dist_left_over = p0p1_size - dist_last_point;
             p0 = p1;
         }
-        while (path.polyline.size() < 3) {
-            size_t point_idx = path.polyline.size() - 2;
-            out.emplace_back(path.polyline.points[point_idx]);
-            if (point_idx == 0)
-                break;
-            --point_idx;
-        }
-        if (out.size() >= 3)
-            path.polyline.points = std::move(out);
+        path.polyline.points = std::move(out);
+        previous_point = &path.polyline.points.back();
     }
     if (is_loop) {
+        assert(paths.front().polyline.points.front() != paths.back().polyline.points.back());
         paths.back().polyline.points.push_back(paths.front().polyline.points.front());
+        assert(paths.front().polyline.points.front() == paths.back().polyline.points.back());
     } else {
         paths.back().polyline.points.push_back(last_point);
     }
+#ifdef _DEBUG
+    assert(paths.back().last_point() == paths.front().first_point());
+    for (int i = 1; i < paths.size(); i++) {
+        assert(paths[i - 1].last_point() == paths[i].first_point());
+    }
+#endif
 }
 
 ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
@@ -2640,7 +2653,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
             double nozle_diameter = is_external ? this->ext_perimeter_flow.nozzle_diameter() : this->perimeter_flow.nozzle_diameter();
             double fuzzy_skin_thickness = config->fuzzy_skin_thickness.get_abs_value(nozle_diameter);
             double fuzzy_skin_point_dist = config->fuzzy_skin_point_dist.get_abs_value(nozle_diameter);
-            fuzzy_paths(paths, scale_d(fuzzy_skin_thickness), scale_d(fuzzy_skin_point_dist));
+           fuzzy_paths(paths, scale_d(fuzzy_skin_thickness), scale_d(fuzzy_skin_point_dist));
         }
 
         // Append paths to collection.

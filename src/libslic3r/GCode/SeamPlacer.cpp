@@ -322,7 +322,7 @@ void SeamPlacer::plan_perimeters(const std::vector<const ExtrusionEntity*> perim
     m_plan.resize(perimeters.size());
 
     for (int i = 0; i < int(perimeters.size()); ++i) {
-        if (perimeters[i]->role() == erExternalPerimeter && perimeters[i]->is_loop()) {
+        if ((perimeters[i]->role() == erExternalPerimeter || seam_position == SeamPosition::spRandom) && perimeters[i]->is_loop()) {
             last_pos = this->calculate_seam(
                 layer, 
                 seam_position,
