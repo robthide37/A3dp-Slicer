@@ -119,6 +119,7 @@ struct ExtrusionLine
      * Sum the total length of this path.
      */
     int64_t getLength() const;
+    bool    isZeroLength() const;
     int64_t polylineLength() const { return getLength(); }
 
     /*!

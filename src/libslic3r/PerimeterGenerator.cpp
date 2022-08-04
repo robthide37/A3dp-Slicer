@@ -2591,7 +2591,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
     }
     for (PerimeterGeneratorArachneExtrusion& pg_extrusion : pg_extrusions) {
         Arachne::ExtrusionLine* extrusion = pg_extrusion.extrusion;
-        if (extrusion->empty())
+        if (extrusion->isZeroLength())
             continue;
 
         const bool    is_external = extrusion->inset_idx == 0;
