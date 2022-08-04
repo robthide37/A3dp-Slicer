@@ -351,7 +351,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // with Mesa driver OR on Linux
         if (!m_temp_transformation.has_value()) return false;
 
-        // TODO: Disable apply common transformation after draggig
+        // TODO: Disable applying of common transformation after draggig
         // Call after is used for apply transformation after common dragging to rewrite it
         Transform3d volume_trmat =
             gl_volume->get_instance_transformation().get_matrix().inverse() *
@@ -724,8 +724,7 @@ void GLGizmoEmboss::initialize()
     init_icons();
     
     // initialize text styles
-    const AppConfig *app_cfg = wxGetApp().app_config;
-    m_style_manager.init(app_cfg, create_default_styles());
+    m_style_manager.init(wxGetApp().app_config, create_default_styles());
     set_default_text();
 }
 
@@ -1512,7 +1511,7 @@ void GLGizmoEmboss::draw_style_rename_popup() {
         }
         
         m_style_manager.rename(new_name);
-        m_style_manager.store_styles_to_app_config(wxGetApp().app_config);
+        m_style_manager.store_styles_to_app_config();
         ImGui::CloseCurrentPopup();
     }
 }
@@ -1540,16 +1539,17 @@ void GLGizmoEmboss::draw_style_save_button(bool is_modified)
 {
     if (draw_button(IconType::save, !is_modified)) {
         // save styles to app config
-        m_style_manager.store_styles_to_app_config(wxGetApp().app_config);
+        m_style_manager.store_styles_to_app_config();
     }else if (ImGui::IsItemHovered()) {
+        std::string tooltip;
         if (!m_style_manager.exist_stored_style()) {
-            ImGui::SetTooltip("%s", _u8L("First Add style to list.").c_str());
+            tooltip = _u8L("First Add style to list.");
         } else if (is_modified) {
-            ImGui::SetTooltip("%s", _u8L("Save changes into style.").c_str());
+            tooltip = GUI::format(_L("Save %1% style"), m_style_manager.get_style().name);
         } else {
-            ImGui::SetTooltip("%s", _u8L("No changes to save into style").c_str());
+            tooltip = _u8L("No changes to save.");
         }
-        ImGui::SetTooltip(
+        ImGui::SetTooltip("%s", tooltip.c_str());
     }
 }
 
@@ -1589,8 +1589,8 @@ void GLGizmoEmboss::draw_style_save_as_popup() {
     }
 
     if (save_style && allow_change) {
-        m_style_manager.store_style(new_name);
-        m_style_manager.store_styles_to_app_config(wxGetApp().app_config);
+        m_style_manager.add_style(new_name);
+        m_style_manager.store_styles_to_app_config();
         ImGui::CloseCurrentPopup();
     }
 }
@@ -1692,52 +1692,6 @@ void GLGizmoEmboss::draw_delete_style_button() {
     }
 }
 
-//void GLGizmoEmboss::discard_changes_in_style()
-//{
-//    if (!m_style_manager.exist_stored_style()) return;
-//
-//    EmbossStyle &emboss_style  = m_style_manager.get_style();
-//    const EmbossStyle* stored_style = m_style_manager.get_stored_style();
-//    assert(stored_style != nullptr);
-//                
-//    // is rotation changed
-//    auto &angle = emboss_style.prop.angle;
-//    const auto &angle_ = stored_style->prop.angle;
-//    // TODO: compare with approx
-//    if (angle.has_value() != angle_.has_value() ||
-//        (angle.has_value() && !is_approx(*angle, *angle_))) {
-//        auto &tc = m_volume->text_configuration;
-//        if (m_volume != nullptr && tc.has_value()) {
-//            // change actual text configuration
-//            tc->style.prop.angle = angle_;
-//            float act_angle  = angle_.has_value() ? *angle_ : .0f;
-//            float prev_angle = angle.has_value() ? *angle : .0f;
-//            do_rotate(act_angle - prev_angle);
-//        }
-//    }
-//            
-//    // is distance changed
-//    auto &distance = emboss_style.prop.distance;
-//    const auto &distance_ = stored_style->prop.distance;
-//    if (distance.has_value() != distance_.has_value() ||
-//        (distance.has_value() && !is_approx(*distance, *distance_))) {
-//        auto &tc = m_volume->text_configuration;
-//        if (m_volume != nullptr && tc.has_value()) {
-//            tc->style.prop.distance = distance_;
-//            float act_distance = distance_.has_value() ? *distance_ : .0f;
-//            float prev_distance = distance.has_value() ? *distance : .0f;
-//            do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
-//        }
-//    }
-//
-//    if (emboss_style.path != stored_style->path) {
-//        // NOTE: load font file again
-//        m_style_manager.load_style(m_style_manager.get_style_index());
-//        //m_style_manager.get_wx_font() = WxFontUtils::load_wxFont(emboss_style.path);
-//        //m_style_manager.wx_font_changed();
-//    }
-//}
-
 void GLGizmoEmboss::draw_revert_all_styles_button() {
     if (draw_button(IconType::revert_all)) {
         m_style_manager = EmbossStyleManager(m_imgui->get_glyph_ranges());
@@ -1746,6 +1700,29 @@ void GLGizmoEmboss::draw_revert_all_styles_button() {
         process();
     } else if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Revert all styles").c_str());
+}
+
+void GLGizmoEmboss::fix_transformation(const FontProp &from,
+                                       const FontProp &to)
+{
+    // fix Z rotation when exists difference in styles
+    const std::optional<float> &f_angle_opt = from.angle;
+    const std::optional<float> &t_angle_opt = to.angle;
+    if (!is_approx(f_angle_opt, t_angle_opt)) {
+        // fix rotation
+        float f_angle = f_angle_opt.has_value() ? *f_angle_opt : .0f;
+        float t_angle = t_angle_opt.has_value() ? *t_angle_opt : .0f;
+        do_rotate(t_angle - f_angle);
+    }
+
+    // fix distance (Z move) when exists difference in styles
+    const std::optional<float> &f_move_opt = from.distance;
+    const std::optional<float> &t_move_opt = to.distance;
+    if (!is_approx(f_move_opt, t_move_opt)) {
+        float f_move = f_move_opt.has_value() ? *f_move_opt : .0f;
+        float t_move = t_move_opt.has_value() ? *t_move_opt : .0f;
+        do_translate(Vec3d::UnitZ() * (t_move - f_move));
+    }
 }
 
 void GLGizmoEmboss::draw_style_list() {
@@ -1783,26 +1760,26 @@ void GLGizmoEmboss::draw_style_list() {
         std::optional<std::pair<size_t,size_t>> swap_indexes;
         const std::vector<EmbossStyleManager::Item> &styles = m_style_manager.get_styles();
         for (const auto &item : styles) {
-            size_t             index             = &item - &styles.front();
-            const EmbossStyle &es                = item.style;
-            const std::string &actual_style_name = es.name;
+            size_t index = &item - &styles.front();
+            const EmbossStyle &style = item.style;
+            const std::string &actual_style_name = style.name;
             ImGui::PushID(actual_style_name.c_str());
-            bool is_selected = (&es == &actual_style);
+            bool is_selected = (index == m_style_manager.get_style_index());
 
             ImVec2 select_size(0,m_gui_cfg->max_style_image_size.y()); // 0,0 --> calculate in draw
             const std::optional<EmbossStyleManager::StyleImage> img = item.image;            
             // allow click delete button
             ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; 
             if (ImGui::Selectable(item.truncated_name.c_str(), is_selected, flags, select_size)) {
+                fix_transformation(actual_style.prop, style.prop);
                 if (m_style_manager.load_style(index)) {
-                    // TODO:
-                    // fix volume transformation after change style -->
-                    // rotation or z-move
-                    // HELP:  discard_changes_in_style()
-                    // void style_changed(const FontProp &prev, const FontProp &act);
                     process();
                 } else {
-                    // TODO: inform user that can't load and erase style
+                    wxString title = _L("Not valid style.");
+                    wxString message = GUI::format_wxstr(_L("Style '%1%' can't be used and will be removed from list."), style.name);
+                    MessageDialog not_loaded_style_message(nullptr, message, title, wxOK);
+                    not_loaded_style_message.ShowModal();
+                    m_style_manager.erase(index);
                 }
             } else if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", actual_style_name.c_str());
@@ -2045,16 +2022,9 @@ void GLGizmoEmboss::draw_style_edit() {
 
     assert(wx_font_opt.has_value());
     if (!wx_font_opt.has_value()) {
-        // TODO: should not be there
-        // when actual font not loaded try to load
-        if (style.type == WxFontUtils::get_actual_type()) {
-            std::optional<wxFont> new_wx_font = WxFontUtils::load_wxFont(style.path);
-            
-        }
-        ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("Font is not loaded properly. "));
+        ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("WxFont is not loaded properly."));
         return;
     }
-
 
     bool exist_stored_style = m_style_manager.exist_stored_style();
     bool is_font_changed = false;
@@ -2635,7 +2605,7 @@ EmbossDataBase GLGizmoEmboss::create_emboss_data_base() {
         // volume must store valid path
         assert(m_style_manager.get_wx_font().has_value());
         assert(es.path.compare(WxFontUtils::store_wxFont(*m_style_manager.get_wx_font())) == 0);
-        //es.path = WxFontUtils::store_wxFont(*m_style_manager.get_wx_font());
+        //style.path = WxFontUtils::store_wxFont(*m_style_manager.get_wx_font());
         return TextConfiguration{es, m_text};
     };
     

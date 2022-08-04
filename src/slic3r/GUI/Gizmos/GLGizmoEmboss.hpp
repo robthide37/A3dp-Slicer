@@ -99,6 +99,7 @@ private:
     void draw_window();
     void draw_text_input();
     void draw_model_type();
+    void fix_transformation(const FontProp &from, const FontProp &to);
     void draw_style_list();
     void draw_delete_style_button();
     void draw_revert_all_styles_button();

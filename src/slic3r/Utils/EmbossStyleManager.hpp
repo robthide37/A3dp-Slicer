@@ -13,10 +13,10 @@ class wxFont;
 
 namespace Slic3r::GUI {
 /// <summary>
-/// GUI list of loaded fonts
-/// Keep pointer to ImGui font pointers
-/// Keep file data of TTF files
-/// Cache wx font objects
+/// Manage Emboss text styles
+/// Cache actual state of style
+///     + imgui font
+///     + wx font
 /// </summary>
 class EmbossStyleManager
 {
@@ -24,28 +24,35 @@ class EmbossStyleManager
 
 public:
     EmbossStyleManager(const ImWchar *language_glyph_range);
+        
+    /// <summary>
+    /// Release imgui font and style images from GPU
+    /// Store order and last activ font index
+    /// </summary>
     ~EmbossStyleManager();
 
     /// <summary>
     /// Load font style list from config
     /// Also select actual activ font
     /// </summary>
-    /// <param name="cfg">Application configuration loaded from file "PrusaSlicer.ini"</param>
+    /// <param name="app_config">Application configuration loaded from file "PrusaSlicer.ini"
+    /// + cfg is stored to privat variable</param>
     /// <param name="default_styles">Used when list is not loadable from config</param>
-    void init(const AppConfig *cfg, const EmbossStyles &default_styles);
+    void init(AppConfig *app_config, const EmbossStyles &default_styles);
     
     /// <summary>
     /// Write font list into AppConfig
     /// </summary>
-    /// <param name="cfg">Stor into this configuration</param>
     /// <param name="item_to_store">Configuration</param>
-    bool store_styles_to_app_config(AppConfig *cfg);
+    /// <param name="use_modification">Flag that store should use actual modification</param>
+    /// <returns>True on succes otherwise False.</returns>
+    bool store_styles_to_app_config(bool use_modification = true);
 
     /// <summary>
     /// Append actual style to style list
     /// </summary>
     /// <param name="name">New name for style</param>
-    void store_style(const std::string& name);
+    void add_style(const std::string& name);
 
     /// <summary>
     /// Change order of style item in m_style_items.
@@ -57,21 +64,9 @@ public:
 
     /// <summary>
     /// Discard changes in activ style
-    /// When no activ style use last used
+    /// When no activ style use last used OR first loadable
     /// </summary>
     void discard_style_changes();
-
-    /// <summary>
-    /// Track using of swap between saves
-    /// </summary>
-    /// <returns>True when swap was call after save otherwise false</returns>
-    bool is_style_order_changed() const;
-
-    /// <summary>
-    /// Check that actual selected style is same as activ style stored in "PrusaSlicer.ini"
-    /// </summary>
-    /// <returns>True when actual selection is not stored otherwise False</returns>
-    bool is_activ_style_changed() const;
 
     /// <summary>
     /// Remove style from m_style_items.
@@ -104,38 +99,23 @@ public:
     // remove cached imgui font for actual selected font
     void clear_imgui_font();
 
-    // getter on stored EmbossStyle
+    // getters for private data
     const EmbossStyle *get_stored_style() const;
 
-    // getter on stored wxFont
-    const std::optional<wxFont> &get_stored_wx_font() const;
-
-    // getter on active font item for access to font property
-    const EmbossStyle &get_style() const;
-    EmbossStyle &get_style();
-
-    // getter on active font property
-    const FontProp &get_font_prop() const;
-    FontProp &get_font_prop();
-
-    const ImFontAtlas& get_atlas() const; 
-
-    // getter on activ wx font
-    const std::optional<wxFont> &get_wx_font() const;
+    const EmbossStyle &get_style() const     { return m_style_cache.style; }
+          EmbossStyle &get_style()           { return m_style_cache.style; }
+          size_t get_style_index() const     { return m_style_cache.style_index; }
+    std::string &get_truncated_name()        { return m_style_cache.truncated_name; }
+    const ImFontAtlas &get_atlas() const     { return m_style_cache.atlas; } 
+    const FontProp    &get_font_prop() const { return get_style().prop; }
+          FontProp    &get_font_prop()       { return get_style().prop; }
+    const std::optional<wxFont> &get_wx_font()        const { return m_style_cache.wx_font; }
+    const std::optional<wxFont> &get_stored_wx_font() const { return m_style_cache.stored_wx_font; }
+    Emboss::FontFileWithCache &get_font_file_with_cache()   { return m_style_cache.font_file; }
 
     // True when activ style has same name as some of stored style
-    bool exist_stored_style() const;
-
-    size_t get_style_index() const;
-
-    // getter on font file with cache
-    Emboss::FontFileWithCache &get_font_file_with_cache();
-
-    // Getter for cached trucated name for style list selector
-    std::string &get_truncated_name();
+    bool exist_stored_style() const { return m_style_cache.style_index != std::numeric_limits<size_t>::max(); }
         
-    // setter of wx font for actual selection
-
     /// <summary>
     /// Setter on wx_font when changed
     /// </summary>
@@ -259,8 +239,8 @@ private:
 
     // Privat member
     std::vector<Item> m_style_items;
-    bool m_change_order;
-    size_t m_stored_activ_index;
+    AppConfig        *m_app_config;
+    size_t            m_last_style_index;
 
     /// <summary>
     /// Keep data needed to create Font Style Images in Job
@@ -290,7 +270,7 @@ private:
             // vector of inputs
             StyleImagesData::Items styles;
             // job output
-            std::vector<EmbossStyleManager::StyleImage> images;
+            std::vector<StyleImage> images;
         };
 
         // place to store result in main thread in Finalize
