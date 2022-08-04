@@ -135,7 +135,6 @@ void EmbossStyleManager::discard_style_changes() {
     load_first_valid_font();
 }
 
-
 bool EmbossStyleManager::is_style_order_changed() const { return m_change_order; }
 bool EmbossStyleManager::is_activ_style_changed() const {
     if (m_stored_activ_index == std::numeric_limits<size_t>::max())

@@ -104,7 +104,7 @@ private:
     void draw_revert_all_styles_button();
     void draw_style_rename_popup();
     void draw_style_rename_button();
-    void draw_style_save_button();
+    void draw_style_save_button(bool is_modified);
     void draw_style_save_as_popup();
     void draw_style_add_button();
     void draw_font_list();

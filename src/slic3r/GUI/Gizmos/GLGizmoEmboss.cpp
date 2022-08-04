@@ -1136,7 +1136,7 @@ void GLGizmoEmboss::draw_text_input()
             append_warning(_u8L("To small"),
                 _u8L("Enlarged font height inside text input."));
         if (!who.empty())
-            warning = GUI::format(_u8L("%1% is NOT shown."), who);
+            warning = GUI::format(_L("%1% is NOT shown."), who);
     }
 
     if (!warning.empty()) {
@@ -1470,7 +1470,7 @@ void GLGizmoEmboss::draw_model_type()
 void GLGizmoEmboss::draw_style_rename_popup() {
     std::string& new_name = m_style_manager.get_style().name;
     const std::string &old_name = m_style_manager.get_stored_style()->name;
-    std::string text_in_popup = GUI::format(_u8L("Rename style(%1%) for embossing text: "), old_name);
+    std::string text_in_popup = GUI::format(_L("Rename style(%1%) for embossing text: "), old_name);
     ImGui::Text("%s", text_in_popup.c_str());
     
     bool is_unique = true;
@@ -1536,36 +1536,20 @@ void GLGizmoEmboss::draw_style_rename_button()
     }
 }
 
-void GLGizmoEmboss::draw_style_save_button()
+void GLGizmoEmboss::draw_style_save_button(bool is_modified)
 {
-    bool is_stored_style = m_style_manager.exist_stored_style();
-    const EmbossStyle *stored_syle = nullptr;
-    if (is_stored_style)
-        stored_syle = m_style_manager.get_stored_style();
-
-    const EmbossStyle &style = m_style_manager.get_style();    
-    bool is_changed = (stored_syle)? !(*stored_syle == style) : true;
-
-    bool is_style_order_changed = m_style_manager.is_style_order_changed();
-    bool is_activ_style_changed = m_style_manager.is_activ_style_changed();
-    bool can_save = is_changed || is_style_order_changed || is_activ_style_changed;
-    if (!is_stored_style) can_save = false;
-
-    if (draw_button(IconType::save, !can_save)) {
+    if (draw_button(IconType::save, !is_modified)) {
         // save styles to app config
         m_style_manager.store_styles_to_app_config(wxGetApp().app_config);
-    }else if (ImGui::IsItemHovered()) { 
-        if (!is_stored_style) {
-            ImGui::SetTooltip("%s", _u8L("First Add style to be able save.").c_str());
-        } else if (is_changed) {
+    }else if (ImGui::IsItemHovered()) {
+        if (!m_style_manager.exist_stored_style()) {
+            ImGui::SetTooltip("%s", _u8L("First Add style to list.").c_str());
+        } else if (is_modified) {
             ImGui::SetTooltip("%s", _u8L("Save changes into style.").c_str());
-        } else if (is_style_order_changed) {
-            ImGui::SetTooltip("%s", _u8L("Save order of styles.").c_str());
-        } else if (is_activ_style_changed) {
-            ImGui::SetTooltip("%s", _u8L("Save style selection.").c_str());
         } else {
             ImGui::SetTooltip("%s", _u8L("No changes to save into style").c_str());
         }
+        ImGui::SetTooltip(
     }
 }
 
@@ -1691,7 +1675,7 @@ void GLGizmoEmboss::draw_delete_style_button() {
 
     if (ImGui::BeginPopupModal(popup_id)) {
         const std::string &style_name  = m_style_manager.get_style().name;
-        std::string text_in_popup = GUI::format(_u8L("Are you sure,\nthat you want permanently and unrecoverable \nremove style \"%1%\"?"), style_name);
+        std::string text_in_popup = GUI::format(_L("Are you sure,\nthat you want permanently and unrecoverable \nremove style \"%1%\"?"), style_name);
         ImGui::Text("%s", text_in_popup.c_str());
         if (ImGui::Button(_u8L("Yes").c_str())) {
             size_t activ_index = m_style_manager.get_style_index();
@@ -1766,8 +1750,16 @@ void GLGizmoEmboss::draw_revert_all_styles_button() {
 
 void GLGizmoEmboss::draw_style_list() {
     if (!m_style_manager.is_activ_font()) return;
-    const float &max_style_name_width = m_gui_cfg->max_style_name_width;
+
+    const EmbossStyle *stored_style = nullptr;
+    bool is_stored = m_style_manager.exist_stored_style();
+    if (is_stored)
+        stored_style = m_style_manager.get_stored_style();
     const EmbossStyle &actual_style = m_style_manager.get_style();
+    bool is_changed = (stored_style)? !(*stored_style == actual_style) : true;    
+    bool is_modified = is_stored && is_changed;
+
+    const float &max_style_name_width = m_gui_cfg->max_style_name_width;
     std::string &trunc_name = m_style_manager.get_truncated_name();
     if (trunc_name.empty()) {
         // generate trunc name
@@ -1781,7 +1773,11 @@ void GLGizmoEmboss::draw_style_list() {
 
     ImGui::SameLine(m_gui_cfg->style_offset);
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
-    if (ImGui::BeginCombo("##style_selector", trunc_name.c_str())) {
+    auto add_text_modify = [&is_modified](const std::string& name) {
+        if (!is_modified) return name;
+        return name + " (" + _u8L("modified") + ")";
+    };
+    if (ImGui::BeginCombo("##style_selector", add_text_modify(trunc_name).c_str())) {
         m_style_manager.init_style_images(m_gui_cfg->max_style_image_size, m_text);
         m_style_manager.init_trunc_names(max_style_name_width);
         std::optional<std::pair<size_t,size_t>> swap_indexes;
@@ -1837,15 +1833,20 @@ void GLGizmoEmboss::draw_style_list() {
     } else {
         // do not keep in memory style images when no combo box open
         m_style_manager.free_style_images();
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("Style selector").c_str());
+        if (ImGui::IsItemHovered()) {            
+            std::string style_name = add_text_modify(actual_style.name);
+            std::string tooltip = is_modified?
+                GUI::format(_L("Modified style \"%1%\""), actual_style.name):
+                GUI::format(_L("Current style is \"%1%\""), actual_style.name);
+            ImGui::SetTooltip(" %s", tooltip.c_str());
+        }
     }
         
     ImGui::SameLine();
     draw_style_rename_button();
         
     ImGui::SameLine();
-    draw_style_save_button();
+    draw_style_save_button(is_modified);
 
     ImGui::SameLine();
     draw_style_add_button();
