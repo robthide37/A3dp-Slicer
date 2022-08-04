@@ -25,7 +25,10 @@ EmbossStyleManager::EmbossStyleManager(const ImWchar *language_glyph_range)
 EmbossStyleManager::~EmbossStyleManager() { 
     clear_imgui_font();
     free_style_images();
-    store_styles_to_app_config(false);
+    store_styles_to_app_config(false, false);
+    if (m_app_config != nullptr &&
+        m_last_style_index != std::numeric_limits<size_t>::max())
+        EmbossStylesSerializable::store_style_index(*m_app_config, m_last_style_index);
 }
 
 void EmbossStyleManager::init(AppConfig *app_config, const EmbossStyles &default_styles)
@@ -68,7 +71,8 @@ void EmbossStyleManager::init(AppConfig *app_config, const EmbossStyles &default
     }
 }
 
-bool EmbossStyleManager::store_styles_to_app_config(bool use_modification)
+bool EmbossStyleManager::store_styles_to_app_config(bool use_modification,
+                                                    bool store_activ_index)
 {
     assert(m_app_config != nullptr);
     if (m_app_config == nullptr) return false;
@@ -80,13 +84,15 @@ bool EmbossStyleManager::store_styles_to_app_config(bool use_modification)
             // add new into stored list
             EmbossStyle &style = m_style_cache.style;
             make_unique_name(style.name);
+            m_style_cache.truncated_name.clear();
             m_style_cache.style_index = m_style_items.size();
             m_style_items.push_back({style});
             m_style_cache.stored_wx_font = m_style_cache.wx_font;
         }
     }
-    
-    EmbossStylesSerializable::store_style_index(*m_app_config, m_style_cache.style_index);
+    if (store_activ_index)
+        EmbossStylesSerializable::store_style_index(*m_app_config, m_style_cache.style_index);
+
     EmbossStyles styles;
     styles.reserve(m_style_items.size());
     for (const Item &item : m_style_items) styles.push_back(item.style);
@@ -118,8 +124,13 @@ void EmbossStyleManager::swap(size_t i1, size_t i2) {
 }
 
 void EmbossStyleManager::discard_style_changes() {
-    if (exist_stored_style() && load_style(m_style_cache.style_index)) 
-        return; // correct reload style
+    if (exist_stored_style()) {
+        if (load_style(m_style_cache.style_index))
+            return; // correct reload style
+    } else {
+        if(load_style(m_last_style_index))
+            return; // correct load last used style
+    }
 
     // try to save situation by load some font
     load_first_valid_font();
