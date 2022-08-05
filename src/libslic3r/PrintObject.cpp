@@ -940,8 +940,6 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "wall_transition_filter_deviation"
                 || opt_key == "wall_transition_angle"
                 || opt_key == "wall_distribution_count"
-                || opt_key == "wall_split_middle_threshold"
-                || opt_key == "wall_add_middle_threshold"
                 || opt_key == "min_feature_size"
                 || opt_key == "min_bead_width") {
                 steps.emplace_back(posSlice);

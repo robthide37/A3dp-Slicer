@@ -718,7 +718,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 interface_shells))
     ((ConfigOptionFloat,                layer_height))
     ((ConfigOptionFloatOrPercent,       min_bead_width))
-    ((ConfigOptionFloat,                min_feature_size))
+    ((ConfigOptionFloatOrPercent,       min_feature_size))
     ((ConfigOptionFloat,                mmu_segmented_region_max_width))
     ((ConfigOptionFloat,                model_precision))
     ((ConfigOptionPercent,              perimeter_bonding))
@@ -738,12 +738,10 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                slice_closing_radius))
     ((ConfigOptionEnum<SlicingMode>,    slicing_mode))
     ((ConfigOptionBool,                 support_material))
-    ((ConfigOptionFloat,                wall_transition_length))
+    ((ConfigOptionFloatOrPercent,       wall_transition_length))
     ((ConfigOptionFloatOrPercent,       wall_transition_filter_deviation))
     ((ConfigOptionFloat,                wall_transition_angle))
     ((ConfigOptionInt,                  wall_distribution_count))
-    ((ConfigOptionPercent,              wall_split_middle_threshold))
-    ((ConfigOptionPercent,              wall_add_middle_threshold))
     // Automatic supports (generated based on support_material_threshold).
     ((ConfigOptionBool,                 support_material_auto))
     // Direction of the support pattern (in XY plane).

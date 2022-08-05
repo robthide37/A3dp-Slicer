@@ -160,7 +160,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
 
     Polygons   last_p = to_polygons(last);
 
-    Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, *this->object_config, *this->print_config);
+    Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, this->layer->height, *this->object_config, *this->print_config);
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
     loop_number = int(perimeters.size()) - 1;
 

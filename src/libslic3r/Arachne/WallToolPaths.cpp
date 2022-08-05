@@ -11,6 +11,7 @@
 #include "utils/linearAlg2D.hpp"
 #include "EdgeGrid.hpp"
 #include "utils/SparseLineGrid.hpp"
+#include "Flow.hpp"
 #include "Geometry.hpp"
 #include "utils/PolylineStitcher.hpp"
 #include "SVG.hpp"
@@ -24,31 +25,37 @@ namespace Slic3r::Arachne
 {
 
 WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t bead_width_0, const coord_t bead_width_x,
-                             const size_t inset_count, const coord_t wall_0_inset, const PrintObjectConfig &print_object_config, const PrintConfig &print_config)
+                             const size_t inset_count, const coord_t wall_0_inset, const coordf_t layer_height,
+                             const PrintObjectConfig &print_object_config, const PrintConfig &print_config)
     : outline(outline)
     , bead_width_0(bead_width_0)
     , bead_width_x(bead_width_x)
     , inset_count(inset_count)
     , wall_0_inset(wall_0_inset)
+    , layer_height(layer_height)
     , print_thin_walls(Slic3r::Arachne::fill_outline_gaps)
     , min_feature_size(scaled<coord_t>(print_object_config.min_feature_size.value))
     , min_bead_width(scaled<coord_t>(print_object_config.min_bead_width.value))
     , small_area_length(static_cast<double>(bead_width_0) / 2.)
     , wall_transition_filter_deviation(scaled<coord_t>(print_object_config.wall_transition_filter_deviation.value))
+    , wall_transition_length(scaled<coord_t>(print_object_config.wall_transition_length.value))
     , toolpaths_generated(false)
     , print_object_config(print_object_config)
 {
-    if (const auto &min_bead_width_opt = print_object_config.min_bead_width; min_bead_width_opt.percent) {
-        assert(!print_config.nozzle_diameter.empty());
-        double min_nozzle_diameter = *std::min_element(print_config.nozzle_diameter.values.begin(), print_config.nozzle_diameter.values.end());
-        this->min_bead_width             = scaled<coord_t>(min_bead_width_opt.value * 0.01 * min_nozzle_diameter);
-    }
+    assert(!print_config.nozzle_diameter.empty());
+    this->min_nozzle_diameter = float(*std::min_element(print_config.nozzle_diameter.values.begin(), print_config.nozzle_diameter.values.end()));
 
-    if (const auto &wall_transition_filter_deviation_opt = print_object_config.wall_transition_filter_deviation; wall_transition_filter_deviation_opt.percent) {
-        assert(!print_config.nozzle_diameter.empty());
-        double min_nozzle_diameter = *std::min_element(print_config.nozzle_diameter.values.begin(), print_config.nozzle_diameter.values.end());
-        this->wall_transition_filter_deviation = scaled<coord_t>(wall_transition_filter_deviation_opt.value * 0.01 * min_nozzle_diameter);
-    }
+    if (const auto &min_feature_size_opt = print_object_config.min_feature_size; min_feature_size_opt.percent)
+        this->min_feature_size = scaled<coord_t>(min_feature_size_opt.value * 0.01 * this->min_nozzle_diameter);
+
+    if (const auto &min_bead_width_opt = print_object_config.min_bead_width; min_bead_width_opt.percent)
+        this->min_bead_width = scaled<coord_t>(min_bead_width_opt.value * 0.01 * this->min_nozzle_diameter);
+
+    if (const auto &wall_transition_filter_deviation_opt = print_object_config.wall_transition_filter_deviation; wall_transition_filter_deviation_opt.percent)
+        this->wall_transition_filter_deviation = scaled<coord_t>(wall_transition_filter_deviation_opt.value * 0.01 * this->min_nozzle_diameter);
+
+    if (const auto &wall_transition_length_opt = print_object_config.wall_transition_length; wall_transition_length_opt.percent)
+        this->wall_transition_length = scaled<coord_t>(wall_transition_length_opt.value * 0.01 * this->min_nozzle_diameter);
 }
 
 void simplify(Polygon &thiss, const int64_t smallest_line_segment_squared, const int64_t allowed_error_distance_squared)
@@ -490,9 +497,12 @@ const std::vector<VariableWidthLines> &WallToolPaths::generate()
         return toolpaths;
     }
 
-    const coord_t wall_transition_length = scaled<coord_t>(this->print_object_config.wall_transition_length.value);
-    const double wall_split_middle_threshold = this->print_object_config.wall_split_middle_threshold.value / 100.;  // For an uneven nr. of lines: When to split the middle wall into two.
-    const double wall_add_middle_threshold = this->print_object_config.wall_add_middle_threshold.value / 100.;      // For an even nr. of lines: When to add a new middle in between the innermost two walls.
+    const float external_perimeter_extrusion_width = Flow::rounded_rectangle_extrusion_width_from_spacing(unscale<float>(bead_width_0), float(this->layer_height));
+    const float perimeter_extrusion_width          = Flow::rounded_rectangle_extrusion_width_from_spacing(unscale<float>(bead_width_x), float(this->layer_height));
+
+    const double wall_split_middle_threshold = std::clamp(2. * unscaled<double>(this->min_bead_width) / external_perimeter_extrusion_width - 1., 0.01, 0.99); // For an uneven nr. of lines: When to split the middle wall into two.
+    const double wall_add_middle_threshold   = std::clamp(unscaled<double>(this->min_bead_width) / perimeter_extrusion_width, 0.01, 0.99); // For an even nr. of lines: When to add a new middle in between the innermost two walls.
+
     const int wall_distribution_count = this->print_object_config.wall_distribution_count.value;
     const size_t max_bead_count = (inset_count < std::numeric_limits<coord_t>::max() / 2) ? 2 * inset_count : std::numeric_limits<coord_t>::max();
     const auto beading_strat = BeadingStrategyFactory::makeStrategy

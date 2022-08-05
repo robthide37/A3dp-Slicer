@@ -523,6 +523,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         //params.anchor_length_max = surface_fill.params.anchor_length_max;
         //params.resolution        = resolution;
         surface_fill.params.use_arachne       = perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric;
+        //params.layer_height      = m_regions[surface_fill.region_id]->layer()->height;
 
         if (using_internal_flow) {
             // if we used the internal flow we're not doing a solid infill
@@ -560,6 +561,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
             surface_fill.params.dont_adjust = dont_adjust;
             surface_fill.params.bridge_offset = 0;
             surface_fill.params.density = density;
+            surface_fill.params.layer_height = m_regions[surface_fill.region_id]->layer()->height;
 
             //init the surface with the current polygon
             if (!expoly.contour.empty()) {

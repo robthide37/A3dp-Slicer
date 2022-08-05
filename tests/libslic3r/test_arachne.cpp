@@ -58,7 +58,7 @@ TEST_CASE("Arachne - Closed ExtrusionLine", "[ArachneClosedExtrusionLine]") {
     coord_t  spacing     = 407079;
     coord_t  inset_count = 8;
 
-    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
     wallToolPaths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
@@ -91,7 +91,7 @@ TEST_CASE("Arachne - Missing perimeter - #8472", "[ArachneMissingPerimeter8472]"
     PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
     print_object_config.wall_distribution_count.setInt(3);
 
-    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, print_object_config, PrintConfig::defaults());
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, print_object_config, PrintConfig::defaults());
     wallToolPaths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 

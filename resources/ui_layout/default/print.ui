@@ -101,10 +101,6 @@ group:External perimeter first
 	setting:perimeter_bonding
 group:Arachne perimeter generator (variable width)
 	setting:perimeter_generator
-	line:Wall treshold
-		setting:wall_split_middle_threshold
-		setting:wall_add_middle_threshold
-	end_line
 	line:Wall Transition
 		setting:label$Angle:wall_transition_angle
 		setting:label$Distance Margin:wall_transition_filter_deviation
