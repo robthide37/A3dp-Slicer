@@ -512,14 +512,13 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
             orig_point = true;
         }
 
-        if (global_model_info.is_blocked(position, perimeter.flow_width)) {
-            type = EnforcedBlockedSeamPoint::Blocked;
-        }
-
         if (global_model_info.is_enforced(position, perimeter.flow_width)) {
             type = EnforcedBlockedSeamPoint::Enforced;
         }
 
+        if (global_model_info.is_blocked(position, perimeter.flow_width)) {
+            type = EnforcedBlockedSeamPoint::Blocked;
+        }
         some_point_enforced = some_point_enforced || type == EnforcedBlockedSeamPoint::Enforced;
 
         if (orig_point) {
@@ -828,7 +827,7 @@ struct SeamComparator {
 
         //avoid overhangs
         if ((a.overhang > 0.0f || b.overhang > 0.0f)
-                && abs(a.overhang - b.overhang) > (0.2f * a.perimeter.flow_width)) {
+                && abs(a.overhang - b.overhang) > (0.1f * a.perimeter.flow_width)) {
             return a.overhang < b.overhang;
         }
 
@@ -1137,7 +1136,7 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                                             * po->layers()[layer_idx]->height)
                                     / (3.0f * perimeter_point.perimeter.flow_width);
                             //NOTE disables the feature to place seams on slowly decreasing areas. Remove the following line to enable.
-                            perimeter_point.overhang = perimeter_point.overhang > 0.0f ? 0.0f : perimeter_point.overhang;
+                            perimeter_point.overhang = perimeter_point.overhang < 0.0f ? 0.0f : perimeter_point.overhang;
                         }
 
                         if (should_compute_layer_embedding) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
@@ -1375,44 +1374,55 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             observation_points.resize(seam_string.size());
             weights.resize(seam_string.size());
 
+            auto angle_3d = [](const Vec3f& a, const Vec3f& b){
+                return std::abs(acosf(a.normalized().dot(b.normalized())));
+            };
+
             auto angle_weight = [](float angle){
                 return 1.0f / (0.1f + compute_angle_penalty(angle));
             };
-            float sharp_angle_weight = angle_weight(SeamPlacer::sharp_angle_snapping_threshold);
 
             //gather points positions and weights
             float total_length = 0.0f;
-            float sharp_length = 0.0f;
-            Vec3f prev_pos = layers[seam_string[0].first].points[seam_string[0].second].position;
+            Vec3f last_point_pos = layers[seam_string[0].first].points[seam_string[0].second].position;
             for (size_t index = 0; index < seam_string.size(); ++index) {
-                const SeamCandidate &point = layers[seam_string[index].first].points[seam_string[index].second];
-                Vec3f pos = point.position;
-                float dist = (pos - prev_pos).norm();
-                total_length += dist;
-                observations[index] = pos.head<2>();
-                observation_points[index] = pos.z();
-                weights[index] = angle_weight(point.local_ccw_angle);
-                bool is_enforced = point.type == EnforcedBlockedSeamPoint::Enforced;
-                if (is_enforced) {
-                    weights[index] = std::max(weights[index], 6.0f);
+                const SeamCandidate &current = layers[seam_string[index].first].points[seam_string[index].second];
+                float layer_angle = 0.0f;
+                if (index > 0 && index < seam_string.size() - 1) {
+                    layer_angle = angle_3d(
+                                    current.position
+                                            - layers[seam_string[index - 1].first].points[seam_string[index - 1].second].position,
+                                    layers[seam_string[index + 1].first].points[seam_string[index + 1].second].position
+                                            - current.position
+                                            );
                 }
-                if (is_enforced || weights[index] > sharp_angle_weight) {
-                    sharp_length+= dist;
+                observations[index] = current.position.head<2>();
+                observation_points[index] = current.position.z();
+                weights[index] = angle_weight(current.local_ccw_angle);
+                float sign = layer_angle > 2.0 * std::abs(current.local_ccw_angle) ? -1.0f : 1.0f;
+                if (current.type == EnforcedBlockedSeamPoint::Enforced) {
+                    sign = 1.0f;
+                    weights[index] += 3.0f;
                 }
-                prev_pos = pos;
+                total_length += sign * (last_point_pos - current.position).norm();
+                last_point_pos = current.position;
             }
 
             // Curve Fitting
-            size_t number_of_segments = std::max(
-                    std::max(size_t(1), size_t(total_length / 30.0f)),
-                    size_t(sharp_length / SeamPlacer::seam_align_mm_per_segment));
+            size_t number_of_segments = std::max(size_t(1),
+                    size_t(std::max(0.0f,total_length) / SeamPlacer::seam_align_mm_per_segment));
             auto curve = Geometry::fit_cubic_bspline(observations, observation_points, weights, number_of_segments);
 
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
             // Perimeter structure of the point; also set flag aligned to true
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const auto &pair = seam_string[index];
-                const float t = std::min(1.0f, weights[index] / 10.0f);
+                float t = std::min(1.0f, std::abs(layers[pair.first].points[pair.second].local_ccw_angle)
+                        / SeamPlacer::sharp_angle_snapping_threshold);
+                if (layers[pair.first].points[pair.second].type == EnforcedBlockedSeamPoint::Enforced){
+                    t = std::max(0.7f, t);
+                }
+
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
                 Vec2f fitted_pos = curve.get_fitted_value(current_pos.z());
 
