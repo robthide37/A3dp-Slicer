@@ -1136,6 +1136,8 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                                     - tan(SeamPlacer::overhang_angle_threshold)
                                             * po->layers()[layer_idx]->height)
                                     / (3.0f * perimeter_point.perimeter.flow_width);
+                            //NOTE disables the feature to place seams on slowly decreasing areas. Remove the following line to enable.
+                            perimeter_point.overhang = perimeter_point.overhang > 0.0f ? 0.0f : perimeter_point.overhang;
                         }
 
                         if (should_compute_layer_embedding) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
