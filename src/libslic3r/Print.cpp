@@ -1477,7 +1477,7 @@ const WipeTowerData& Print::wipe_tower_data(size_t extruders_cnt, double nozzle_
         const_cast<Print*>(this)->m_wipe_tower_data.brim_width = unscaled_brim_width;
     }
 
-    return m_wipe_tower_data;
+    return this->m_wipe_tower_data;
 }
 
 void Print::_make_wipe_tower()

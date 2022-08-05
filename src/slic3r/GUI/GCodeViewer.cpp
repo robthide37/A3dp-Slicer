@@ -2224,8 +2224,9 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
         const size_t extruders_count = config.nozzle_diameter.size();
         if (extruders_count > 1 && config.wipe_tower && !config.complete_objects) {
             //FIXME using first nozzle diameter instead of the "right" one.
-            const float depth = print.wipe_tower_data(extruders_count, config.nozzle_diameter.values.front()).depth;
-            const float brim_width = print.wipe_tower_data(extruders_count, config.nozzle_diameter.values.front()).brim_width;
+            const WipeTowerData& wipe_tower_data = print.wipe_tower_data(extruders_count, config.nozzle_diameter.values.front());
+            const float depth = wipe_tower_data.depth;
+            const float brim_width = wipe_tower_data.brim_width;
 
             m_shells.volumes.load_wipe_tower_preview(1000, config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
                 !print.is_step_done(psWipeTower), brim_width, initialized);

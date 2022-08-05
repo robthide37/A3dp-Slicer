@@ -623,7 +623,6 @@ WipeTower::WipeTower(const PrintConfig& config, const PrintObjectConfig& default
     m_wipe_tower_pos(config.wipe_tower_x, config.wipe_tower_y),
     m_wipe_tower_width(float(config.wipe_tower_width)),
     m_wipe_tower_rotation_angle(float(config.wipe_tower_rotation_angle)),
-    m_wipe_tower_brim_width(float(config.wipe_tower_brim_width)),
     m_y_shift(0.f),
     m_z_pos(0.f),
     m_bridging(float(config.wipe_tower_bridging)),
@@ -1408,9 +1407,9 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
             (float)m_layer_height,
             (m_current_tool < m_config->nozzle_diameter.values.size()) ? m_object_config->get_computed_value("filament_max_overlap", m_current_tool) : 1
         );
-        const coordf_t spacing = brim_flow.spacing();
+        const double spacing = brim_flow.spacing();
         // How many perimeters shall the brim have?
-        size_t loops_num = (m_wipe_tower_brim_width + spacing / 2) / spacing;
+        size_t loops_num = (m_config->wipe_tower_brim_width.get_abs_value(m_nozzle_diameter) + spacing / 2) / spacing;
 
 
         writer.set_extrusion_flow(brim_flow.mm3_per_mm() / filament_area())
