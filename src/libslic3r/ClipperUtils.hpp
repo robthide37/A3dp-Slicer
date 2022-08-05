@@ -3,6 +3,7 @@
 
 #include "libslic3r.h"
 #include "clipper.hpp"
+#include "clipper/clipper_z.hpp"
 #include "ExPolygon.hpp"
 #include "Polygon.hpp"
 #include "Surface.hpp"
@@ -405,6 +406,7 @@ Slic3r::Polylines  diff_pl(const Slic3r::Polyline &subject, const Slic3r::ExPoly
 Slic3r::Polylines  diff_pl(const Slic3r::Polylines &subject, const Slic3r::ExPolygon &clip);
 Slic3r::Polylines  diff_pl(const Slic3r::Polylines &subject, const Slic3r::ExPolygons &clip);
 Slic3r::Polylines  diff_pl(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip);
+ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Paths& subjects, const ClipperLib_Z::Paths& clip, ClipperLib_Z::ClipType clipType);
 
 inline Slic3r::Lines diff_ln(const Slic3r::Lines &subject, const Slic3r::Polygons &clip)
 {
