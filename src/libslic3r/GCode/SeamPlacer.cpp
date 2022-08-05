@@ -792,13 +792,24 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
                 if (saw_custom)
                     last_pos = candidate;
             }
-            if(!saw_custom)
+            if (!saw_custom) {
                 if (external_perimeters_first || (loop.loop_role() & ExtrusionLoopRole::elrFirstLoop) != 0) {
                     // this is if external_perimeters_first
                     // this is if only space for one externalperimeter.
                     //in these case, there isn't a seam from the inner loops, so we had to creat our on
                     last_pos = this->get_random_seam(layer_idx, polygon, po_idx);
+                } else if (po != nullptr) {
+                    //just in case, do random if it's on top of a previous one
+                    Point aligned_last_pos;
+                    std::optional<Point> pos = m_seam_history.get_last_seam(m_po_list[po_idx], layer_po->print_z, loop.polygon().bounding_box());
+                    if (pos.has_value()) {
+                        aligned_last_pos = *pos;
+                    }
+                    if (aligned_last_pos.distance_to(last_pos) < std::max(coord_t(polygon.length() / 100), nozzle_r*5) ){
+                        last_pos = this->get_random_seam(layer_idx, polygon, po_idx);
+                    }
                 }
+            }
         } else if (loop.role() == erThinWall) {
             //thin wall loop is like an external perimeter, but without anything near it.
             last_pos = this->get_random_seam(layer_idx, polygon, po_idx);

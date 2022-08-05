@@ -4039,7 +4039,7 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
             current_pos = pt_inside.cast<double>();
             //go to the inside (use clipper for easy shift)
             Polygon original_polygon = original_loop.polygon();
-            Polygons polys = offset(original_polygon, (original_polygon.is_clockwise()?1:-1) * dist);
+            Polygons polys = offset(original_polygon, -dist);
             //find nearest point
             size_t best_poly_idx = 0;
             size_t best_pt_idx = 0;

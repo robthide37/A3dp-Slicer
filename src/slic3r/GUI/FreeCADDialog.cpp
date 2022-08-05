@@ -784,7 +784,7 @@ bool FreeCADDialog::init_start_python() {
         delete exec_var;
     exec_var = new ExecVar();
 
-#ifdef __WINDO2WS__
+#ifdef __WINDOWS__
     // Get the freecad path (python path)
     boost::filesystem::path pythonpath(gui_app->app_config->get("freecad_path"));
     if (pythonpath.filename().string().find("python") == std::string::npos) {

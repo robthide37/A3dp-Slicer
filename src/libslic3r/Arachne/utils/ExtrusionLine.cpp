@@ -28,6 +28,18 @@ int64_t ExtrusionLine::getLength() const
     return len;
 }
 
+bool ExtrusionLine::isZeroLength() const
+{
+    if (junctions.empty())
+        return true;
+    ExtrusionJunction prev = junctions.front();
+    for (const ExtrusionJunction& next : junctions) {
+        if ((next.p - prev.p).cast<int64_t>().squaredNorm() > SCALED_EPSILON)
+            return false;
+    }
+    return true;
+}
+
 coord_t ExtrusionLine::getMinimalWidth() const
 {
     return std::min_element(junctions.cbegin(), junctions.cend(),

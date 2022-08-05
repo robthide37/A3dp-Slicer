@@ -430,6 +430,9 @@ Flow support_material_flow(const PrintObject* object, float layer_height)
         layer_height = object->config().support_material_layer_height.get_abs_value(nzd);
         if (layer_height == 0) {
             layer_height = object->print()->config().max_layer_height.get_abs_value(extruder_id, nzd);
+            if (layer_height == 0) {
+                layer_height = nzd * 0.75;
+            }
         }
     }
     layer_height = std::min(layer_height, max_height);
@@ -489,6 +492,9 @@ Flow support_material_interface_flow(const PrintObject* object, float layer_heig
         layer_height = object->config().support_material_interface_layer_height.get_abs_value(nzd);
         if (layer_height == 0) {
             layer_height = object->print()->config().max_layer_height.get_abs_value(extruder_id, nzd);
+            if (layer_height == 0) {
+                layer_height = nzd * 0.75;
+            }
         }
     }
     layer_height = std::min(layer_height, max_height);
@@ -524,6 +530,9 @@ Flow raft_flow(const PrintObject* object, float layer_height)
         layer_height = object->config().raft_interface_layer_height.get_abs_value(nzd);
         if (layer_height == 0) {
             layer_height = object->print()->config().max_layer_height.get_abs_value(extruder_id, nzd);
+            if (layer_height == 0) {
+                layer_height = nzd * 0.75;
+            }
         }
     }
     layer_height = std::min(layer_height, max_height);
@@ -559,6 +568,9 @@ Flow raft_interface_flow(const PrintObject* object, float layer_height)
         layer_height = object->config().raft_interface_layer_height.get_abs_value(nzd);
         if (layer_height == 0) {
             layer_height = object->print()->config().max_layer_height.get_abs_value(extruder_id, nzd);
+            if (layer_height == 0) {
+                layer_height = nzd * 0.75;
+            }
         }
     }
     layer_height = std::min(layer_height, max_height);

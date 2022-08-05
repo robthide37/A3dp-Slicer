@@ -25,7 +25,7 @@
 #include <boost/property_tree/ptree.hpp>
 
 static const float GROUND_Z = -0.02f;
-static const std::array<float, 4> DEFAULT_GRID_COLOR = { 0.9f, 0.9, 0.9, 0.6f };
+static const std::array<float, 4> DEFAULT_GRID_COLOR = { 0.9f, 0.9f, 0.9f, 0.6f };
 static const std::array<float, 4> DEFAULT_MODEL_COLOR = { 0.235f, 0.235f, 0.235f, 1.0f };
 static const std::array<float, 4> PICKING_MODEL_COLOR = { 0.0f, 0.0f, 0.0f, 1.0f };
 
