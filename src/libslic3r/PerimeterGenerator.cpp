@@ -574,7 +574,7 @@ void PerimeterGenerator::process_arachne()
         ExPolygons last        = offset_ex(surface.expolygon.simplify_p(m_scaled_resolution), - float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
         Polygons   last_p      = to_polygons(last);
 
-        Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, *this->object_config, *this->print_config);
+        Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, layer_height, *this->object_config, *this->print_config);
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
         loop_number = int(perimeters.size()) - 1;
 

@@ -3076,15 +3076,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Arachne));
 
-    def = this->add("wall_transition_length", coFloat);
+    def = this->add("wall_transition_length", coFloatOrPercent);
     def->label = L("Perimeter transition length");
     def->category = L("Advanced");
     def->tooltip  = L("When transitioning between different numbers of perimeters as the part becomes "
-                       "thinner, a certain amount of space is allotted to split or join the perimeter segments.");
-    def->sidetext = L("mm");
+                       "thinner, a certain amount of space is allotted to split or join the perimeter segments. "
+                       "If expressed as a percentage (for example 100%), it will be computed based on the nozzle diameter.");
+    def->sidetext = L("mm or %");
     def->mode = comExpert;
     def->min = 0;
-    def->set_default_value(new ConfigOptionFloat(0.4));
+    def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
 
     def = this->add("wall_transition_filter_deviation", coFloatOrPercent);
     def->label = L("Perimeter transitioning filter margin");
@@ -3123,46 +3124,17 @@ void PrintConfigDef::init_fff_params()
     def->min = 1;
     def->set_default_value(new ConfigOptionInt(1));
 
-    def = this->add("wall_split_middle_threshold", coPercent);
-    def->label = L("Split middle perimeter threshold");
-    def->category = L("Advanced");
-    def->tooltip  = L("The smallest extrusion width, as a factor of the normal extrusion width, above which the middle "
-                       "perimeter (if there is one) will be split into two. Reduce this setting to use more, thinner "
-                       "perimeters. Increase to use fewer, wider perimeters. Note that this applies -as if- the entire "
-                       "shape should be filled with perimeter, so the middle here refers to the middle of the object "
-                       "between two outer edges of the shape, even if there actually is infill or other extrusion types in "
-                       "the print instead of the perimeter.");
-    def->sidetext = L("%");
-    def->mode = comAdvanced;
-    def->min = 1;
-    def->max = 99;
-    def->set_default_value(new ConfigOptionPercent(50));
-
-    def = this->add("wall_add_middle_threshold", coPercent);
-    def->label = L("Add middle perimeter threshold");
-    def->category = L("Advanced");
-    def->tooltip  = L("The smallest extrusion width, as a factor of the normal extrusion width, above which a middle "
-                       "perimeter (if there wasn't one already) will be added. Reduce this setting to use more, "
-                       "thinner perimeters. Increase to use fewer, wider perimeters. Note that this applies -as if- the "
-                       "entire shape should be filled with perimeter, so the middle here refers to the middle of the "
-                       "object between two outer edges of the shape, even if there actually is infill or other "
-                       "extrusion types in the print instead of the perimeter.");
-    def->sidetext = L("%");
-    def->mode = comAdvanced;
-    def->min = 1;
-    def->max = 99;
-    def->set_default_value(new ConfigOptionPercent(75));
-
-    def = this->add("min_feature_size", coFloat);
+    def = this->add("min_feature_size", coFloatOrPercent);
     def->label = L("Minimum feature size");
     def->category = L("Advanced");
     def->tooltip  = L("Minimum thickness of thin features. Model features that are thinner than this value will "
                        "not be printed, while features thicker than the Minimum feature size will be widened to "
-                       "the Minimum perimeter width.");
-    def->sidetext = L("mm");
+                       "the Minimum perimeter width. "
+                       "If expressed as a percentage (for example 25%), it will be computed based on the nozzle diameter.");
+    def->sidetext = L("mm or %");
     def->mode = comExpert;
     def->min = 0;
-    def->set_default_value(new ConfigOptionFloat(0.1));
+    def->set_default_value(new ConfigOptionFloatOrPercent(25, true));
 
     def = this->add("min_bead_width", coFloatOrPercent);
     def->label = L("Minimum perimeter width");
@@ -4012,6 +3984,8 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         "serial_port", "serial_speed",
         // Introduced in some PrusaSlicer 2.3.1 alpha, later renamed or removed.
         "fuzzy_skin_perimeter_mode", "fuzzy_skin_shape",
+        // Introduced in PrusaSlicer 2.3.0-alpha2, later replaced by automatic calculation based on extrusion width.
+        "wall_add_middle_threshold", "wall_split_middle_threshold",
     };
 
     // In PrusaSlicer 2.3.0-alpha0 the "monotonous" infill was introduced, which was later renamed to "monotonic".

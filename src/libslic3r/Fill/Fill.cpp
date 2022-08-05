@@ -388,6 +388,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         params.anchor_length_max = surface_fill.params.anchor_length_max;
         params.resolution        = resolution;
         params.use_arachne       = perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric;
+        params.layer_height      = m_regions[surface_fill.region_id]->layer()->height;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
 			// Spacing is modified by the filler to indicate adjustments. Reset it for each expolygon.
