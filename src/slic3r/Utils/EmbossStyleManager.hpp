@@ -27,7 +27,6 @@ public:
         
     /// <summary>
     /// Release imgui font and style images from GPU
-    /// Store order and last activ font index
     /// </summary>
     ~EmbossStyleManager();
 

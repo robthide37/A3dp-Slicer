@@ -601,7 +601,9 @@ void GLGizmoEmboss::on_set_state()
             return;
         }
         m_volume = nullptr;
-
+        // Store order and last activ index into app.ini
+        // TODO: what to do when can't store into file?
+        m_style_manager.store_styles_to_app_config(false);
         remove_notification_not_valid_font();
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
         if (!m_gui_cfg.has_value()) initialize();

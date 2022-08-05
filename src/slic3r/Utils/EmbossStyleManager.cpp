@@ -25,10 +25,6 @@ EmbossStyleManager::EmbossStyleManager(const ImWchar *language_glyph_range)
 EmbossStyleManager::~EmbossStyleManager() { 
     clear_imgui_font();
     free_style_images();
-    store_styles_to_app_config(false, false);
-    if (m_app_config != nullptr &&
-        m_last_style_index != std::numeric_limits<size_t>::max())
-        EmbossStylesSerializable::store_style_index(*m_app_config, m_last_style_index);
 }
 
 void EmbossStyleManager::init(AppConfig *app_config, const EmbossStyles &default_styles)
@@ -90,8 +86,14 @@ bool EmbossStyleManager::store_styles_to_app_config(bool use_modification,
             m_style_cache.stored_wx_font = m_style_cache.wx_font;
         }
     }
+
     if (store_activ_index)
-        EmbossStylesSerializable::store_style_index(*m_app_config, m_style_cache.style_index);
+    {
+        size_t style_index = exist_stored_style() ?
+                                 m_style_cache.style_index :
+                                 m_last_style_index;
+        EmbossStylesSerializable::store_style_index(*m_app_config, style_index);
+    }
 
     EmbossStyles styles;
     styles.reserve(m_style_items.size());
