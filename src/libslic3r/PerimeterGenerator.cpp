@@ -1790,6 +1790,15 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
 
     //note: layer height is used to identify the path type
     if (!ok_polylines.empty()) {
+        //fast track
+        if (small_speed.empty() && big_speed.empty() && small_flow.empty() && big_flow.empty()) {
+            ExtrusionPath path(role);
+            path.polyline = loop_polygons;
+            path.mm3_per_mm = is_external ? this->ext_mm3_per_mm() : this->mm3_per_mm();
+            path.width = is_external ? this->ext_perimeter_flow.width() : this->perimeter_flow.width();
+            path.height = (float)this->layer->height;
+            return { path };
+        }
         extrusion_paths_append(
             paths,
             ok_polylines,
@@ -2073,13 +2082,14 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
 
     //note: layer height is used to identify the path type
     if (!ok_polylines.empty()) {
-        //extrusion_paths_append(
-        //    paths,
-        //    ok_polylines,
-        //    role,
-        //    is_external ? this->ext_mm3_per_mm() : this->mm3_per_mm(),
-        //    is_external ? this->ext_perimeter_flow.width() : this->perimeter_flow.width(),
-        //    0);
+        //fast track
+        if (small_speed.empty() && big_speed.empty() && small_flow.empty() && big_flow.empty()) {
+            return Geometry::variable_width(Arachne::to_thick_polyline(arachne_path),
+                role,
+                is_external ? this->ext_perimeter_flow : this->perimeter_flow,
+                std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
+                (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10);
+        }
         for (const ClipperLib_Z::Path& extrusion_path : ok_polylines) {
             for (auto&& path : Geometry::variable_width(Arachne::to_thick_polyline(extrusion_path),
                 role,
@@ -2092,13 +2102,6 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
         }
     }
     if (!small_speed.empty()) {
-        //extrusion_paths_append(
-        //    paths,
-        //    small_speed,
-        //    erOverhangPerimeter,
-        //    is_external ? this->ext_mm3_per_mm() : this->mm3_per_mm(),
-        //    is_external ? this->ext_perimeter_flow.width() : this->perimeter_flow.width(),
-        //    no_small_flow ? 2 : 1);
         for (const ClipperLib_Z::Path& extrusion_path : small_speed) {
             for (auto&& path : Geometry::variable_width(Arachne::to_thick_polyline(extrusion_path),
                 erOverhangPerimeter,
@@ -2111,13 +2114,6 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
         }
     }
     if (!big_speed.empty()) {
-        //extrusion_paths_append(
-        //    paths,
-        //    big_speed,
-        //    erOverhangPerimeter,
-        //    is_external ? this->ext_mm3_per_mm() : this->mm3_per_mm(),
-        //    is_external ? this->ext_perimeter_flow.width() : this->perimeter_flow.width(),
-        //    no_small_flow ? 3 : 2);
         for (const ClipperLib_Z::Path& extrusion_path : big_speed) {
             for (auto&& path : Geometry::variable_width(Arachne::to_thick_polyline(extrusion_path),
                 erOverhangPerimeter,
@@ -2130,13 +2126,6 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
         }
     }
     if (!small_flow.empty()) {
-        //extrusion_paths_append(
-        //    paths,
-        //    small_flow,
-        //    erOverhangPerimeter,
-        //    this->mm3_per_mm_overhang(),
-        //    this->overhang_flow.width(),
-        //    3);
         for (const ClipperLib_Z::Path& extrusion_path : small_flow) {
             for (auto&& path : Geometry::variable_width(Arachne::to_thick_polyline(extrusion_path),
                 erOverhangPerimeter,
@@ -2149,13 +2138,6 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
         }
     }
     if (!big_flow.empty()) {
-        //extrusion_paths_append(
-        //    paths,
-        //    big_flow,
-        //    erOverhangPerimeter,
-        //    this->mm3_per_mm_overhang(),
-        //    this->overhang_flow.width(),
-        //    4);
         for (const ClipperLib_Z::Path& extrusion_path : big_flow) {
             for (auto&& path : Geometry::variable_width(Arachne::to_thick_polyline(extrusion_path),
                 erOverhangPerimeter,
@@ -2533,7 +2515,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
                     extrusion_path.emplace_back(ej.p.x(), ej.p.y(), ej.w);
             }
             paths = this->create_overhangs(extrusion_path, role, is_external);
-
+            
             // Reapply the nearest point search for starting point.
             // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
             // Arachne sometimes creates extrusion with zero-length (just two same endpoints);
