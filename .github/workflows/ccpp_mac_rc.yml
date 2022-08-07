@@ -9,7 +9,7 @@ on:
 jobs:
   build:
 
-    runs-on: macos-latest
+    runs-on: macos-12
 
     steps:
     - uses: actions/checkout@v2
@@ -25,7 +25,7 @@ jobs:
       env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_P12 }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_PASSWD }}
-          MACOS_APP: ${{secret.MAC_APP_PWD}}
+          MACOS_APP: ${{ secrets.MAC_APP_PWD }}
       run: |
         echo $MACOS_CERTIFICATE | base64 --decode > certificate.p12
         security create-keychain -p temp_password build.keychain
@@ -65,9 +65,6 @@ jobs:
       with:
         name: rc_macos.app
         path: build/pack/SuperSlicer/SuperSlicer.app
-    - name: run codesign on dmg
-      run: |
-        /usr/bin/codesign --force -s "Developer ID Application: Remi Durand (LDTLFRHP3G)" ./build/SuperSlicer.dmg -v
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
