@@ -214,8 +214,8 @@ std::string GLGizmoCut3D::get_tooltip() const
     }
     if (tooltip.empty() && (m_hover_id == X || m_hover_id == Y)) {
         std::string axis = m_hover_id == X ? "X" : "Y";
-//        return axis + ": " + format(float(Geometry::rad2deg(Geometry::Transformation(m_rotation_m).get_rotation()[m_hover_id])), 1) + _u8L("°");
-        return axis + ": " + format(float(Geometry::rad2deg(m_angle)), 1) + _u8L("°");
+//        return axis + ": " + format(float(Geometry::rad2deg(Geometry::Transformation(m_rotation_m).get_rotation()[m_hover_id])), 1) + _u8L("Â°");
+        return axis + ": " + format(float(Geometry::rad2deg(m_angle)), 1) + _u8L("Â°");
     }
 
     return tooltip;
@@ -608,12 +608,10 @@ void GLGizmoCut3D::render_cut_center_graber(bool picking /* = false*/)
         return;
 
 #if ENABLE_GL_CORE_PROFILE
-        if (!OpenGLManager::get_gl_info().is_core_profile())
+    if (!OpenGLManager::get_gl_info().is_core_profile())
 #endif // ENABLE_GL_CORE_PROFILE
-            glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-        if (!m_grabber_connection.is_initialized() || is_changed) {
-            m_grabber_connection.reset();
+        glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
+
     ColorRGBA color = picking ? picking_decode(BASE_ID - Z) :
                       m_hover_id == Z ? complementary(GRABBER_COLOR) : GRABBER_COLOR;
 
@@ -753,7 +751,7 @@ void GLGizmoCut3D::render_cut_line()
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
         m_cut_line.reset();
         m_cut_line.init_from(its_make_line((Vec3f)m_line_beg.cast<float>(), (Vec3f)m_line_end.cast<float>()));
 
@@ -822,26 +820,32 @@ void GLGizmoCut3D::on_set_state()
     }
     else
         m_c->object_clipper()->release();
-#endif // !ENABLE_GL_CORE_PROFILE
+
 	force_update_clipper_on_render = m_state == On;
 }
 
 #if ENABLE_RAYCAST_PICKING
-void GLGizmoCut::on_register_raycasters_for_picking()
+void GLGizmoCut3D::on_register_raycasters_for_picking()
 {
     // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
     m_parent.set_raycaster_gizmos_on_top(true);
 }
 
-void GLGizmoCut::on_unregister_raycasters_for_picking()
+void GLGizmoCut3D::on_unregister_raycasters_for_picking()
 {
     m_parent.set_raycaster_gizmos_on_top(false);
 }
 #else
+void GLGizmoCut3D::on_render_for_picking()
+{
+    render_cut_center_graber(true);
+    render_connectors(true);
+}
+#endif // ENABLE_RAYCAST_PICKING
+
 void GLGizmoCut3D::on_set_hover_id() 
 {
 }
-#endif // ENABLE_RAYCAST_PICKING
 
 bool GLGizmoCut3D::on_is_activable() const
 {
@@ -1137,12 +1141,6 @@ void GLGizmoCut3D::on_render()
     }
 
     render_cut_line();
-}
-
-void GLGizmoCut3D::on_render_for_picking()
-{
-    render_cut_center_graber(true);
-    render_connectors(true);
 }
 
 void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)

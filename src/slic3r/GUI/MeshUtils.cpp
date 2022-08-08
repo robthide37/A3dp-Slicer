@@ -127,11 +127,9 @@ void MeshClipper::render_contour()
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_model_expanded.set_color(color);
         m_model_expanded.render();
         shader->stop_using();
@@ -418,7 +416,7 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
     Vec3d direction;
     line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
 
-    std::vector<sla::IndexedMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction);
+    std::vector<AABBMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction);
 
     if (hits.empty())
         return false; // no intersection found
@@ -434,8 +432,8 @@ bool MeshRaycaster::is_valid_intersection(Vec3d point, Vec3d direction, const Tr
 {
     point = trafo.inverse() * point;
 
-    std::vector<sla::IndexedMesh::hit_result> hits      = m_emesh.query_ray_hits(point, direction);
-    std::vector<sla::IndexedMesh::hit_result> neg_hits  = m_emesh.query_ray_hits(point, -direction);
+    std::vector<AABBMesh::hit_result> hits      = m_emesh.query_ray_hits(point, direction);
+    std::vector<AABBMesh::hit_result> neg_hits  = m_emesh.query_ray_hits(point, -direction);
 
     return !hits.empty() && !neg_hits.empty();
 }

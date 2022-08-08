@@ -106,7 +106,6 @@ class GLGizmoCut3D : public GLGizmoBase
         , cutGrig
         //,cutRadial
         //,cutModular
-        std::vector<Transform3d> volumes_trafos;
     };
 
     enum class CutConnectorMode {
