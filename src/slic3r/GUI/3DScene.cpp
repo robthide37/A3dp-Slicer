@@ -13,9 +13,9 @@
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "BitmapCache.hpp"
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "Camera.hpp"
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/ExtrusionEntity.hpp"
@@ -301,7 +301,7 @@ void GLVolume::SinkingContours::render()
 {
     update();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
@@ -312,11 +312,11 @@ void GLVolume::SinkingContours::render()
 #else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(m_shift.x(), m_shift.y(), m_shift.z()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLVolume::SinkingContours::update()
@@ -384,13 +384,15 @@ void GLVolume::SinkingContours::update()
         m_model.reset();
 }
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
 void GLVolume::NonManifoldEdges::render()
 {
     update();
 
-    glsafe(::glLineWidth(2.0f));
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_GL_CORE_PROFILE
+    if (!GUI::OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth(2.0f));
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
@@ -398,19 +400,22 @@ void GLVolume::NonManifoldEdges::render()
     const GUI::Camera& camera = GUI::wxGetApp().plater()->get_camera();
     shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_parent.world_matrix());
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#if ENABLE_GL_CORE_PROFILE
+    const std::array<int, 4>& viewport = camera.get_viewport();
+    shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+    shader->set_uniform("width", 0.5f);
+    shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
+    m_model.set_color(complementary(m_parent.render_color));
 #else
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(m_parent.world_matrix().data()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    m_model.set_color(complementary(m_parent.render_color));
-#else
     m_model.set_color(-1, complementary(m_parent.render_color));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLVolume::NonManifoldEdges::update()
@@ -469,7 +474,6 @@ void GLVolume::NonManifoldEdges::update()
 
     m_update_needed = false;
 }
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 const ColorRGBA GLVolume::SELECTED_COLOR         = ColorRGBA::GREEN();
 const ColorRGBA GLVolume::HOVER_SELECT_COLOR     = { 0.4f, 0.9f, 0.1f, 1.0f };
@@ -490,9 +494,7 @@ const std::array<ColorRGBA, 4> GLVolume::MODEL_COLOR = { {
 GLVolume::GLVolume(float r, float g, float b, float a)
     : m_sla_shift_z(0.0)
     , m_sinking_contours(*this)
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     , m_non_manifold_edges(*this)
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
     // geometry_id == 0 -> invalid
     , geometry_id(std::pair<size_t, size_t>(0, 0))
     , extruder_id(0)
@@ -702,19 +704,15 @@ void GLVolume::render()
     if (!is_active)
         return;
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (this->is_left_handed())
-        glFrontFace(GL_CW);
+        glsafe(::glFrontFace(GL_CW));
     glsafe(::glCullFace(GL_BACK));
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPushMatrix());
-        glsafe(::glMultMatrixd(world_matrix().data()));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     if (tverts_range == std::make_pair<size_t, size_t>(0, -1))
@@ -722,15 +720,14 @@ void GLVolume::render()
     else
         model.render(this->tverts_range);
 #else
+    glsafe(::glPushMatrix());
+    glsafe(::glMultMatrixd(world_matrix().data()));
     this->indexed_vertex_array.render(this->tverts_range, this->qverts_range);
+    glsafe(::glPopMatrix());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
-
     if (this->is_left_handed())
-        glFrontFace(GL_CCW);
+        glsafe(::glFrontFace(GL_CCW));
 }
 
 bool GLVolume::is_sla_support() const { return this->composite_id.volume_id == -int(slaposSupportTree); }
@@ -754,12 +751,10 @@ void GLVolume::render_sinking_contours()
     m_sinking_contours.render();
 }
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
 void GLVolume::render_non_manifold_edges()
 {
     m_non_manifold_edges.render();
 }
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 std::vector<int> GLVolumeCollection::load_object(
@@ -803,15 +798,27 @@ int GLVolumeCollection::load_object_volume(
     const ModelVolume   *model_volume = model_object->volumes[volume_idx];
     const int            extruder_id  = model_volume->extruder_id();
     const ModelInstance *instance 	  = model_object->instances[instance_idx];
+#if ENABLE_RAYCAST_PICKING
+    std::shared_ptr<const TriangleMesh> mesh = model_volume->mesh_ptr();
+#else
     const TriangleMesh  &mesh 		  = model_volume->mesh();
+#endif // ENABLE_RAYCAST_PICKING
     this->volumes.emplace_back(new GLVolume());
     GLVolume& v = *this->volumes.back();
     v.set_color(color_from_model_volume(*model_volume));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
-    v.model.init_from(mesh, true);
+    v.model.init_from(*mesh, true);
+#if ENABLE_RAYCAST_PICKING
+    v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
+#endif // ENABLE_RAYCAST_PICKING
+#else
+#if ENABLE_RAYCAST_PICKING
+    v.model.init_from(*mesh);
+    v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
 #else
     v.model.init_from(mesh);
+#endif // ENABLE_RAYCAST_PICKING
 #endif // ENABLE_SMOOTH_NORMALS
 #else
 #if ENABLE_SMOOTH_NORMALS
@@ -876,8 +883,11 @@ void GLVolumeCollection::load_object_auxiliary(
         v.model.init_from(mesh, true);
 #else
         v.model.init_from(mesh);
-#endif // ENABLE_SMOOTH_NORMALS
         v.model.set_color((milestone == slaposPad) ? GLVolume::SLA_PAD_COLOR : GLVolume::SLA_SUPPORT_COLOR);
+#if ENABLE_RAYCAST_PICKING
+        v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(mesh));
+#endif // ENABLE_RAYCAST_PICKING
+#endif // ENABLE_SMOOTH_NORMALS
 #else
 #if ENABLE_SMOOTH_NORMALS
         v.indexed_vertex_array.load_mesh(mesh, true);
@@ -940,8 +950,115 @@ int GLVolumeCollection::load_wipe_tower_preview(
         // Too narrow tower would interfere with the teeth. The estimate is not precise anyway.
         depth = std::max(depth, 10.f);
         float min_width = 30.f;
+
+#if ENABLE_RAYCAST_PICKING
+        const float scaled_brim_height = 0.2f / height;
+#endif // ENABLE_RAYCAST_PICKING
+
         // We'll now create the box with jagged edge. y-coordinates of the pre-generated model
         // are shifted so that the front edge has y=0 and centerline of the back edge has y=depth:
+#if ENABLE_RAYCAST_PICKING
+        // We split the box in three main pieces,
+        // the two laterals are identical and the central is the one containing the jagged geometry
+
+        // lateral parts generator
+        auto generate_lateral = [&](float min_x, float max_x) {
+            const std::vector<Vec3f> vertices = {
+                { min_x, -(depth + brim_width), 0.0f },
+                { max_x, -(depth + brim_width), 0.0f },
+                { min_x, -(depth + brim_width), scaled_brim_height },
+                { max_x, -(depth + brim_width), scaled_brim_height },
+                { min_x, -depth, scaled_brim_height },
+                { max_x, -depth, scaled_brim_height },
+                { min_x, -depth, 1.0f },
+                { max_x, -depth, 1.0f },
+                { min_x, 0.0f, 1.0f },
+                { max_x, 0.0f, 1.0f },
+                { min_x, 0.0f, scaled_brim_height },
+                { max_x, 0.0f, scaled_brim_height },
+                { min_x, brim_width, scaled_brim_height },
+                { max_x, brim_width, scaled_brim_height },
+                { min_x, brim_width, 0.0f },
+                { max_x, brim_width, 0.0f }
+            };
+            const std::vector<Vec3i> triangles = {
+                { 0, 1, 3 }, { 0, 3, 2 }, { 2, 3, 5 }, { 2, 5, 4 }, { 4, 5, 7 }, { 4, 7, 6 }, { 6, 7, 9 }, { 6, 9, 8 },
+                { 8, 9, 11 }, { 8, 11, 10 }, { 10, 11, 13 }, { 10, 13, 12 }, { 12, 13, 15 }, { 12, 15, 14 }, { 14, 15, 1 }, { 14, 1, 0 }
+            };
+
+            indexed_triangle_set its;
+            its.vertices.reserve(vertices.size());
+            for (const Vec3f& v : vertices) {
+                its.vertices.emplace_back(v.x(), v.y() + depth, v.z());
+            }
+            its.indices.reserve(triangles.size());
+            for (const Vec3i& t : triangles) {
+                its.indices.emplace_back(t);
+            }
+            return its;
+        };
+
+        // central parts generator
+        auto generate_central = [&]() {
+            const std::vector<Vec3f> vertices = {
+                { 38.453f, -(depth + brim_width), 0.0f },
+                { 61.547f, -(depth + brim_width), 0.0f },
+                { 38.453f, -(depth + brim_width), scaled_brim_height },
+                { 61.547f, -(depth + brim_width), scaled_brim_height },
+                { 38.453f, -depth, scaled_brim_height },
+                { 61.547f, -depth, scaled_brim_height },
+                { 38.453f, -depth, 1.0f },
+                { 61.547f, -depth, 1.0f },
+                { 38.453f, 0.0f, 1.0f },
+                { 38.453f + 0.57735f * brim_width, brim_width, 1.0f },
+                { 44.2265f, 10.0f, 1.0f },
+                { 50.0f - 0.57735f * brim_width, brim_width, 1.0f },
+                { 50.0f, 0.0f, 1.0f },
+                { 55.7735f, -10.0f, 1.0f },
+                { 61.547f, 0.0f, 1.0f },
+                { 38.453f, 0.0f, scaled_brim_height },
+                { 38.453f, brim_width, scaled_brim_height },
+                { 38.453f + 0.57735f * brim_width, brim_width, scaled_brim_height },
+                { 50.0f - 0.57735f * brim_width, brim_width, scaled_brim_height },
+                { 50.0f, 0.0f, scaled_brim_height },
+                { 55.7735f, -10.0f, scaled_brim_height },
+                { 61.547f, 0.0f, scaled_brim_height },
+                { 61.547f, brim_width, scaled_brim_height },
+                { 38.453f, brim_width, 0.0f },
+                { 38.453f + 0.57735f * brim_width, brim_width, 0.0f },
+                { 44.2265f, 10.0f, 0.0f },
+                { 50.0f - 0.57735f * brim_width, brim_width, 0.0f },
+                { 61.547f, brim_width, 0.0f }
+            };
+
+            const std::vector<Vec3i> triangles = {
+                { 0, 1, 3 }, { 0, 3, 2 }, { 2, 3, 5 }, { 2, 5, 4 }, { 4, 5, 7 }, { 4, 7, 6 }, { 7, 14, 13 }, { 7, 13, 6 },
+                { 6, 13, 12 }, { 6, 12, 8 }, { 8, 12, 11 }, { 8, 11, 9 }, { 9, 11, 10 }, { 18, 19, 22 }, { 22, 19, 21 }, { 19, 20, 21 },
+                { 15, 17, 16 }, { 17, 15, 8 }, { 17, 8, 9 }, { 21, 13, 14 }, { 21, 20, 13 }, { 20, 19, 12 }, { 20, 12, 13 }, { 19, 18, 11 },
+                { 19, 11, 12 }, { 27, 26, 18 }, { 27, 18, 22 }, { 26, 25, 18 }, { 18, 25, 11 }, { 11, 25, 10 }, { 25, 24, 17 }, { 25, 17, 9 },
+                { 25, 9, 10 }, { 24, 23, 16 }, { 24, 16, 17 }, { 1, 26, 27 }, { 1, 23, 26 }, { 1, 0, 23 }, { 0, 23, 24 }, { 24, 25, 26 }
+            };
+
+            indexed_triangle_set its;
+            its.vertices.reserve(vertices.size());
+            for (const Vec3f& v : vertices) {
+                its.vertices.emplace_back(v.x(), v.y() + depth, v.z());
+            }
+            its.indices.reserve(triangles.size());
+            for (const Vec3i& t : triangles) {
+                its.indices.emplace_back(t);
+            }
+            return its;
+        };
+
+        TriangleMesh tooth_mesh;
+        indexed_triangle_set data = generate_lateral(0.0f, 38.453f);
+        tooth_mesh.merge(TriangleMesh(std::move(data)));
+        data = generate_central();
+        tooth_mesh.merge(TriangleMesh(std::move(data)));
+        data = generate_lateral(61.547f, 100.0f);
+        tooth_mesh.merge(TriangleMesh(std::move(data)));
+#else
         float out_points_idx[][3] = { { 0, -depth, 0 }, { 0, 0, 0 }, { 38.453f, 0, 0 }, { 61.547f, 0, 0 }, { 100.0f, 0, 0 }, { 100.0f, -depth, 0 }, { 55.7735f, -10.0f, 0 }, { 44.2265f, 10.0f, 0 },
         { 38.453f, 0, 1 }, { 0, 0, 1 }, { 0, -depth, 1 }, { 100.0f, -depth, 1 }, { 100.0f, 0, 1 }, { 61.547f, 0, 1 }, { 55.7735f, -10.0f, 1 }, { 44.2265f, 10.0f, 1 } };
         static constexpr const int out_facets_idx[][3] = { 
@@ -956,6 +1073,7 @@ int GLVolumeCollection::load_wipe_tower_preview(
         for (const int *face : out_facets_idx)
             its.indices.emplace_back(face);
         TriangleMesh tooth_mesh(std::move(its));
+#endif // ENABLE_RAYCAST_PICKING
 
         // We have the mesh ready. It has one tooth and width of min_width. We will now
         // append several of these together until we are close to the required width
@@ -963,24 +1081,110 @@ int GLVolumeCollection::load_wipe_tower_preview(
         size_t n = std::max(1, int(width / min_width)); // How many shall be merged?
         for (size_t i = 0; i < n; ++i) {
             mesh.merge(tooth_mesh);
+#if ENABLE_RAYCAST_PICKING
+            tooth_mesh.translate(100.0f, 0.0f, 0.0f);
+#else
             tooth_mesh.translate(min_width, 0.f, 0.f);
+#endif // ENABLE_RAYCAST_PICKING
         }
 
+#if ENABLE_RAYCAST_PICKING
+        // Now we add the caps along the X axis
+        const float scaled_brim_width_x = brim_width * n * width / min_width;
+        auto generate_negx_cap = [&]() {
+            const std::vector<Vec3f> vertices = {
+                { -scaled_brim_width_x, -(depth + brim_width), 0.0f },
+                { 0.0f, -(depth + brim_width), 0.0f },
+                { -scaled_brim_width_x, -(depth + brim_width), scaled_brim_height },
+                { 0.0f, -(depth + brim_width), scaled_brim_height },
+                { 0.0f, -depth, scaled_brim_height },
+                { 0.0f, -depth, 1.0f },
+                { 0.0f, 0.0f, 1.0f },
+                { 0.0f, 0.0f, scaled_brim_height },
+                { 0.0f, brim_width, scaled_brim_height },
+                { -scaled_brim_width_x, brim_width, scaled_brim_height },
+                { 0.0f, brim_width, 0.0f },
+                { -scaled_brim_width_x, brim_width, 0.0f }
+            };
+
+            const std::vector<Vec3i> triangles = {
+                { 0, 1, 3 }, { 0, 3, 2 }, { 2, 3, 4 }, { 2, 4, 9 }, { 9, 4, 7 }, { 9, 7, 8 }, { 9, 8, 10 }, { 9, 10, 11 },
+                { 11, 10, 1 }, { 11, 1, 0 }, { 11, 0, 2 }, { 11, 2, 9 }, { 7, 4, 5 }, { 7, 5, 6 }
+            };
+
+            indexed_triangle_set its;
+            its.vertices.reserve(vertices.size());
+            for (const Vec3f& v : vertices) {
+                its.vertices.emplace_back(v.x(), v.y() + depth, v.z());
+            }
+            its.indices.reserve(triangles.size());
+            for (const Vec3i& t : triangles) {
+                its.indices.emplace_back(t);
+            }
+            return its;
+        };
+
+        auto generate_posx_cap = [&]() {
+            const float posx_cap_x = n * 100.0f;
+            const std::vector<Vec3f> vertices = {
+                { posx_cap_x, -(depth + brim_width), 0.0f },
+                { posx_cap_x + scaled_brim_width_x, -(depth + brim_width), 0.0f },
+                { posx_cap_x, -(depth + brim_width), scaled_brim_height },
+                { posx_cap_x + scaled_brim_width_x, -(depth + brim_width), scaled_brim_height },
+                { posx_cap_x, -depth, scaled_brim_height },
+                { posx_cap_x, -depth, 1.0f },
+                { posx_cap_x, 0.0f, 1.0f },
+                { posx_cap_x, 0.0f, scaled_brim_height },
+                { posx_cap_x, brim_width, scaled_brim_height },
+                { posx_cap_x + scaled_brim_width_x, brim_width, scaled_brim_height },
+                { posx_cap_x, brim_width, 0.0f },
+                { posx_cap_x + scaled_brim_width_x, brim_width, 0.0f }
+            };
+
+            const std::vector<Vec3i> triangles = {
+                { 0, 1, 3 }, { 0, 3, 2 }, { 2, 3, 4 }, { 4, 3, 9 }, { 4, 9, 7 }, { 7, 9, 8 }, { 8, 9, 11 }, { 8, 11, 10 },
+                { 10, 11, 1 }, { 10, 1, 0 }, { 1, 11, 9 }, { 1, 9, 3 }, { 4, 7, 6 }, { 4, 6, 5 }
+            };
+
+            indexed_triangle_set its;
+            its.vertices.reserve(vertices.size());
+            for (const Vec3f& v : vertices) {
+                its.vertices.emplace_back(v.x(), v.y() + depth, v.z());
+            }
+            its.indices.reserve(triangles.size());
+            for (const Vec3i& t : triangles) {
+                its.indices.emplace_back(t);
+            }
+            return its;
+        };
+
+        data = generate_negx_cap();
+        mesh.merge(TriangleMesh(std::move(data)));
+        data = generate_posx_cap();
+        mesh.merge(TriangleMesh(std::move(data)));
+        mesh.scale(Vec3f(width / (n * 100.0f), 1.0f, height)); // Scaling to proper width
+#else
         mesh.scale(Vec3f(width / (n * min_width), 1.f, height)); // Scaling to proper width
+#endif // ENABLE_RAYCAST_PICKING
     }
     else
         mesh = make_cube(width, depth, height);
 
+#if !ENABLE_RAYCAST_PICKING
     // We'll make another mesh to show the brim (fixed layer height):
     TriangleMesh brim_mesh = make_cube(width + 2.f * brim_width, depth + 2.f * brim_width, 0.2f);
     brim_mesh.translate(-brim_width, -brim_width, 0.f);
     mesh.merge(brim_mesh);
+#endif // !ENABLE_RAYCAST_PICKING
 
     volumes.emplace_back(new GLVolume(color));
     GLVolume& v = *volumes.back();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     v.model.init_from(mesh);
     v.model.set_color(color);
+#if ENABLE_RAYCAST_PICKING
+    v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(mesh));
+#endif // ENABLE_RAYCAST_PICKING
 #else
     v.indexed_vertex_array.load_mesh(mesh);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -1069,12 +1273,12 @@ GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCo
     return list;
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disable_cullface, const Transform3d& view_matrix, const Transform3d& projection_matrix,
     std::function<bool(const GLVolume&)> filter_func) const
 #else
 void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disable_cullface, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func) const
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     GLVolumeWithIdAndZList to_render = volumes_to_render(volumes, type, view_matrix, filter_func);
     if (to_render.empty())
@@ -1086,7 +1290,11 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* sink_shader  = GUI::wxGetApp().get_shader("flat");
+#if ENABLE_GL_CORE_PROFILE
+    GLShaderProgram* edges_shader = GUI::OpenGLManager::get_gl_info().is_core_profile() ? GUI::wxGetApp().get_shader("dashed_thick_lines") : GUI::wxGetApp().get_shader("flat");
+#else
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (type == ERenderType::Transparent) {
@@ -1123,12 +1331,10 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
             sink_shader->stop_using();
         }
         shader->start_using();
+#else
+        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-            glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-            glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
         shader->set_uniform("z_range", m_z_range);
         shader->set_uniform("clipping_plane", m_clipping_plane);
@@ -1151,15 +1357,14 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         volume.first->model.set_color(volume.first->render_color);
+        const Transform3d model_matrix = volume.first->world_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
+        shader->set_uniform("projection_matrix", projection_matrix);
+        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+        shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
         shader->set_uniform("uniform_color", volume.first->render_color);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        const Transform3d matrix = view_matrix * volume.first->world_matrix();
-        shader->set_uniform("view_model_matrix", matrix);
-        shader->set_uniform("projection_matrix", projection_matrix);
-        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         volume.first->render();
 
 #if ENABLE_ENVIRONMENT_MAP
@@ -1170,10 +1375,10 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
         glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     if (m_show_sinking_contours) {
@@ -1204,7 +1409,6 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
     if (edges_shader != nullptr) {
@@ -1220,7 +1424,6 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
     }
     shader->start_using();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     if (disable_cullface)
         glsafe(::glEnable(GL_CULL_FACE));

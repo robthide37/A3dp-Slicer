@@ -1301,7 +1301,6 @@ size_t its_num_open_edges(const std::vector<Vec3i> &face_neighbors)
     return num_open_edges;
 }
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
 std::vector<std::pair<int, int>> its_get_open_edges(const indexed_triangle_set& its)
 {
     std::vector<std::pair<int, int>> ret;
@@ -1316,7 +1315,6 @@ std::vector<std::pair<int, int>> its_get_open_edges(const indexed_triangle_set& 
     }
     return ret;
 }
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 size_t its_num_open_edges(const indexed_triangle_set &its)
 {

@@ -63,7 +63,7 @@ bool View3D::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig
     m_canvas->set_context(wxGetApp().init_glcontext(*m_canvas_widget));
 
     m_canvas->allow_multisample(OpenGLManager::can_multisample());
-    // XXX: If have OpenGL
+
     m_canvas->enable_picking(true);
     m_canvas->enable_moving(true);
     // XXX: more config from 3D.pm
@@ -1011,8 +1011,10 @@ void Preview::load_print_as_fff(bool keep_z_range)
             std::vector<Item> gcodes = wxGetApp().is_editor() ?
                 wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes :
                 m_canvas->get_custom_gcode_per_print_z();
+            const bool contains_color_gcodes = std::any_of(std::begin(gcodes), std::end(gcodes),
+                [] (auto const& item) { return item.type == CustomGCode::Type::ColorChange; });
 #if ENABLE_PREVIEW_LAYOUT
-            const GCodeViewer::EViewType choice = !gcodes.empty() ?
+            const GCodeViewer::EViewType choice = contains_color_gcodes ?
                 GCodeViewer::EViewType::ColorPrint :
                 (number_extruders > 1) ? GCodeViewer::EViewType::Tool : GCodeViewer::EViewType::FeatureType;
             if (choice != gcode_view_type) {
@@ -1022,7 +1024,7 @@ void Preview::load_print_as_fff(bool keep_z_range)
                 refresh_print();
             }
 #else
-            const wxString choice = !gcodes.empty() ?
+            const wxString choice = contains_color_gcodes ?
                 _L("Color Print") :
                 (number_extruders > 1) ? _L("Tool") : _L("Feature type");
             int type = m_choice_view_type->FindString(choice);

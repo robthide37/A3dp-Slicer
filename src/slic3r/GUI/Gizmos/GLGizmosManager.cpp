@@ -124,7 +124,7 @@ bool GLGizmosManager::init()
     return true;
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 bool GLGizmosManager::init_arrow(const std::string& filename)
 {
     if (m_arrow_texture.get_id() != 0)
@@ -149,7 +149,7 @@ bool GLGizmosManager::init_arrow(const BackgroundTexture::Metadata & arrow_textu
 
     return res;
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 void GLGizmosManager::set_overlay_icon_size(float size)
 {
@@ -333,6 +333,7 @@ void GLGizmosManager::render_painter_gizmo()
     gizmo->render_painter_gizmo();
 }
 
+#if !ENABLE_RAYCAST_PICKING
 void GLGizmosManager::render_current_gizmo_for_picking_pass() const
 {
     if (! m_enabled || m_current == Undefined)
@@ -341,6 +342,7 @@ void GLGizmosManager::render_current_gizmo_for_picking_pass() const
 
     m_gizmos[m_current]->render_for_picking();
 }
+#endif // !ENABLE_RAYCAST_PICKING
 
 void GLGizmosManager::render_overlay()
 {
@@ -684,7 +686,7 @@ void GLGizmosManager::update_after_undo_redo(const UndoRedo::Snapshot& snapshot)
         dynamic_cast<GLGizmoSlaSupports*>(m_gizmos[SlaSupports].get())->reslice_SLA_supports(true);
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmosManager::render_background(float left, float top, float right, float bottom, float border_w, float border_h) const
 {
     const unsigned int tex_id = m_background_texture.texture.get_id();
@@ -790,9 +792,9 @@ void GLGizmosManager::render_background(float left, float top, float right, floa
         GLTexture::render_sub_texture(tex_id, internal_right, right, bottom, internal_bottom, { { internal_right_uv, bottom_uv }, { right_uv, bottom_uv }, { right_uv, internal_bottom_uv }, { internal_right_uv, internal_bottom_uv } });
     }
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_type) const
 {
     const std::vector<size_t> selectable_idxs = get_selectable_idxs();
@@ -878,9 +880,9 @@ void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_t
         zoomed_top_y -= zoomed_stride_y;
     }
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmosManager::do_render_overlay() const
 {
     const std::vector<size_t> selectable_idxs = get_selectable_idxs();
@@ -1025,7 +1027,7 @@ void GLGizmosManager::do_render_overlay() const
         m_gizmos[m_current]->render_input_window(width, current_y, toolbar_top);
     }
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 float GLGizmosManager::get_scaled_total_height() const
 {
@@ -1124,6 +1126,10 @@ bool GLGizmosManager::activate_gizmo(EType type)
         if (old_gizmo.get_state() != GLGizmoBase::Off)
             return false; // gizmo refused to be turned off, do nothing.
 
+#if ENABLE_RAYCAST_PICKING
+        old_gizmo.unregister_raycasters_for_picking();
+#endif // ENABLE_RAYCAST_PICKING
+
         if (!m_serializing && old_gizmo.wants_enter_leave_snapshots())
             Plater::TakeSnapshot
                 snapshot(wxGetApp().plater(),
@@ -1152,6 +1158,10 @@ bool GLGizmosManager::activate_gizmo(EType type)
         m_current = Undefined;
         return false; // gizmo refused to be turned on.
     }
+
+#if ENABLE_RAYCAST_PICKING
+    new_gizmo.register_raycasters_for_picking();
+#endif // ENABLE_RAYCAST_PICKING
 
     // sucessful activation of gizmo
     return true;

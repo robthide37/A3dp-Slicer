@@ -3860,9 +3860,12 @@ void Plater::priv::reload_from_disk()
                 new_volume->set_type(old_volume->type());
                 new_volume->set_material_id(old_volume->material_id());
 #if ENABLE_WORLD_COORDINATE
-                new_volume->set_transformation(Geometry::translation_transform(old_volume->source.transform.get_offset()) *
-                    old_volume->get_transformation().get_matrix_no_offset() * old_volume->source.transform.get_matrix_no_offset());
-                new_volume->translate(new_volume->get_transformation().get_matrix_no_offset() * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+                new_volume->set_transformation(
+                    old_volume->get_transformation().get_matrix() *
+                    old_volume->source.transform.get_matrix_no_offset() *
+                    Geometry::translation_transform(new_volume->source.mesh_offset - old_volume->source.mesh_offset) *
+                    new_volume->source.transform.get_matrix_no_offset().inverse()
+                    );
 #else
                 new_volume->set_transformation(Geometry::assemble_transform(old_volume->source.transform.get_offset()) *
                                                old_volume->get_transformation().get_matrix(true) *

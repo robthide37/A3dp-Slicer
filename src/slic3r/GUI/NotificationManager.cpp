@@ -789,6 +789,7 @@ void NotificationManager::ExportFinishedNotification::render_eject_button(ImGuiW
 		ImVec2(win_pos.x - m_line_height * 2.5f, win_pos.y + win_size.y),
 		true))
 	{
+		
 		button_text = ImGui::EjectHoverButton;
 		// tooltip
 		long time_now = wxGetLocalTime();
@@ -798,12 +799,21 @@ void NotificationManager::ExportFinishedNotification::render_eject_button(ImGuiW
 			imgui.text(_u8L("Eject drive") + " " + GUI::shortkey_ctrl_prefix() + "T");
 			ImGui::EndTooltip();
 			ImGui::PopStyleColor();
+			// somehow the tooltip wont show if the render doesnt run twice
+			if (m_hover_once) {
+				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+				m_hover_once = false;
+			}
 		} 
-		if (m_hover_time == 0)
+		if (m_hover_time == 0) {
 			m_hover_time = time_now;
-	} else 
+			m_hover_once = true;
+			wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(1500);
+		}
+	} else {
 		m_hover_time = 0;
-
+		m_hover_once = false;
+	}
 	ImVec2 button_pic_size = ImGui::CalcTextSize(button_text.c_str());
 	ImVec2 button_size(button_pic_size.x * 1.25f, button_pic_size.y * 1.25f);
 	ImGui::SetCursorPosX(win_size.x - m_line_height * 5.0f);
@@ -828,6 +838,15 @@ void NotificationManager::ExportFinishedNotification::render_eject_button(ImGuiW
 	}
 	ImGui::PopStyleColor(5);
 }
+
+bool NotificationManager::ExportFinishedNotification::update_state(bool paused, const int64_t delta)
+{
+	bool ret = PopNotification::update_state(paused, delta);
+	if (!ret && m_hover_time != 0 && m_hover_time < wxGetLocalTime())
+		return true;
+	return false;
+}
+
 bool NotificationManager::ExportFinishedNotification::on_text_click()
 {
 	open_folder(m_export_dir_path);
@@ -1823,7 +1842,7 @@ void  NotificationManager::push_upload_job_notification(int id, float filesize, 
 	}
 	std::string text = PrintHostUploadNotification::get_upload_job_text(id, filename, host);
 	NotificationData data{ NotificationType::PrintHostUpload, NotificationLevel::ProgressBarNotificationLevel, 10, text };
-	push_notification_data(std::make_unique<NotificationManager::PrintHostUploadNotification>(data, m_id_provider, m_evt_handler, 0, id, filesize), 0);
+	push_notification_data(std::make_unique<NotificationManager::PrintHostUploadNotification>(data, m_id_provider, m_evt_handler, 0, id, filesize, filename, host), 0);
 }
 void NotificationManager::set_upload_job_notification_percentage(int id, const std::string& filename, const std::string& host, float percentage)
 {
@@ -1832,6 +1851,21 @@ void NotificationManager::set_upload_job_notification_percentage(int id, const s
 			PrintHostUploadNotification* phun = dynamic_cast<PrintHostUploadNotification*>(notification.get());
 			if (phun->compare_job_id(id)) {
 				phun->set_percentage(percentage);
+				if (phun->get_host() != host)
+					phun->set_host(host);
+				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+				break;
+			}
+		}
+	}
+}
+void NotificationManager::set_upload_job_notification_host(int id, const std::string& host)
+{
+	for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
+		if (notification->get_type() == NotificationType::PrintHostUpload) {
+			PrintHostUploadNotification* phun = dynamic_cast<PrintHostUploadNotification*>(notification.get());
+			if (phun->compare_job_id(id)) {
+				phun->set_host(host);
 				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
 				break;
 			}
@@ -1845,6 +1879,8 @@ void NotificationManager::upload_job_notification_show_canceled(int id, const st
 			PrintHostUploadNotification* phun = dynamic_cast<PrintHostUploadNotification*>(notification.get());
 			if (phun->compare_job_id(id)) {
 				phun->cancel();
+				if (phun->get_host() != host)
+					phun->set_host(host);
 				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
 				break;
 			}
@@ -1858,6 +1894,8 @@ void NotificationManager::upload_job_notification_show_error(int id, const std::
 			PrintHostUploadNotification* phun = dynamic_cast<PrintHostUploadNotification*>(notification.get());
 			if(phun->compare_job_id(id)) {
 				phun->error();
+				if (phun->get_host() != host)
+					phun->set_host(host);
 				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
 				break;
 			}

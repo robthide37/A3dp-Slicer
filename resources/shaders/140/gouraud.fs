@@ -42,6 +42,8 @@ in vec4 world_pos;
 in float world_normal_z;
 in vec3 eye_normal;
 
+out vec4 out_color;
+
 void main()
 {
     if (any(lessThan(clipping_planes_dots, ZERO)))
@@ -72,8 +74,8 @@ void main()
 	
 #ifdef ENABLE_ENVIRONMENT_MAP
     if (use_environment_tex)
-        gl_FragColor = vec4(0.45 * texture(environment_tex, normalize(eye_normal).xy * 0.5 + 0.5).xyz + 0.8 * color * intensity.x, alpha);
+        out_color = vec4(0.45 * texture(environment_tex, normalize(eye_normal).xy * 0.5 + 0.5).xyz + 0.8 * color * intensity.x, alpha);
     else
 #endif
-        gl_FragColor = vec4(vec3(intensity.y) + color * intensity.x, alpha);
+        out_color = vec4(vec3(intensity.y) + color * intensity.x, alpha);
 }

@@ -277,7 +277,7 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
     glsafe(::glGenTextures(1, &m_id));
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_id));
-    if (compress && GLEW_EXT_texture_compression_s3tc)
+    if (compress && OpenGLManager::are_compressed_textures_supported())
         glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void*)data.data()));
     else
         glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void*)data.data()));
@@ -335,8 +335,10 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
+#if !ENABLE_GL_CORE_PROFILE
     glsafe(::glEnable(GL_TEXTURE_2D));
     glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE));
+#endif // !ENABLE_GL_CORE_PROFILE
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)tex_id));
 
@@ -352,7 +354,7 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     init_data.add_vertex(Vec2f(right, top),    Vec2f(uvs.right_top.u, uvs.right_top.v));
     init_data.add_vertex(Vec2f(left, top),     Vec2f(uvs.left_top.u, uvs.left_top.v));
 
-    // indices
+        // indices
     init_data.add_triangle(0, 1, 2);
     init_data.add_triangle(2, 3, 0);
 
@@ -362,10 +364,10 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     GLShaderProgram* shader = wxGetApp().get_shader("flat_texture");
     if (shader != nullptr) {
         shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->set_uniform("view_model_matrix", Transform3d::Identity());
         shader->set_uniform("projection_matrix", Transform3d::Identity());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         model.render();
         shader->stop_using();
     }
@@ -380,13 +382,15 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 
+#if !ENABLE_GL_CORE_PROFILE
     glsafe(::glDisable(GL_TEXTURE_2D));
+#endif // !ENABLE_GL_CORE_PROFILE
     glsafe(::glDisable(GL_BLEND));
 }
 
 bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECompressionType compression_type, bool apply_anisotropy)
 {
-    bool compression_enabled = (compression_type != None) && GLEW_EXT_texture_compression_s3tc;
+    bool compression_enabled = (compression_type != None) && OpenGLManager::are_compressed_textures_supported();
 
     // Load a PNG with an alpha channel.
     wxImage image;
@@ -535,7 +539,7 @@ bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECo
 
 bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, bool compress, bool apply_anisotropy, unsigned int max_size_px)
 {
-    bool compression_enabled = compress && GLEW_EXT_texture_compression_s3tc;
+    bool compression_enabled = compress && OpenGLManager::are_compressed_textures_supported();
 
     NSVGimage* image = BitmapCache::nsvgParseFromFileWithReplace(filename.c_str(), "px", 96.0f, {});
     if (image == nullptr) {

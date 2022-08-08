@@ -8,6 +8,9 @@
 #else
 #include "GLModel.hpp"
 #endif // ENABLE_WORLD_COORDINATE
+#if ENABLE_RAYCAST_PICKING
+#include "MeshUtils.hpp"
+#endif // ENABLE_RAYCAST_PICKING
 
 #include "libslic3r/BuildVolume.hpp"
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -108,7 +111,11 @@ private:
     GLTexture m_texture;
     // temporary texture shown until the main texture has still no levels compressed
     GLTexture m_temp_texture;
+#if ENABLE_RAYCAST_PICKING
+    PickingModel m_model;
+#else
     GLModel m_model;
+#endif // ENABLE_RAYCAST_PICKING
     Vec3d m_model_offset{ Vec3d::Zero() };
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     unsigned int m_vbo_id{ 0 };
@@ -151,13 +158,13 @@ public:
     bool contains(const Point& point) const;
     Point point_projection(const Point& point) const;
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes, bool show_texture);
     void render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor);
 #else
     void render(GLCanvas3D& canvas, bool bottom, float scale_factor, bool show_axes, bool show_texture);
     void render_for_picking(GLCanvas3D& canvas, bool bottom, float scale_factor);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 private:
     // Calculate an extended bounding box from axes and current model for visualization purposes.
@@ -172,15 +179,15 @@ private:
     void calc_contourlines(const ExPolygon& poly);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     static std::tuple<Type, std::string, std::string> detect_type(const Pointfs& shape);
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
         bool show_axes, bool show_texture, bool picking);
 #else
     void render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
         bool show_axes, bool show_texture, bool picking);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void render_axes();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture);
     void render_texture(bool bottom, GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix);
     void render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix);
@@ -194,11 +201,13 @@ private:
     void render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking);
     void render_default(bool bottom, bool picking, bool show_texture);
     void render_contour();
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
     void release_VBOs();
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+
+#if ENABLE_RAYCAST_PICKING
+    void register_raycasters_for_picking(const GLModel::Geometry& geometry, const Transform3d& trafo);
+#endif // ENABLE_RAYCAST_PICKING
 };
 
 } // GUI

@@ -94,7 +94,12 @@ protected:
     virtual void on_stop_dragging() override;
     virtual void on_dragging(const UpdateData& data) override;
     virtual void on_render() override;
+#if ENABLE_RAYCAST_PICKING
+    virtual void on_register_raycasters_for_picking() override;
+    virtual void on_unregister_raycasters_for_picking() override;
+#else
     virtual void on_render_for_picking() override;
+#endif // ENABLE_RAYCAST_PICKING
 
 private:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -108,11 +113,11 @@ private:
 
     double calc_ratio(const UpdateData& data) const;
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     Transform3d local_transform(const Selection& selection) const;
 #else
     void transform_to_local(const Selection& selection) const;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_WORLD_COORDINATE
 };
 

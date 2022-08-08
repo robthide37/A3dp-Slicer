@@ -73,7 +73,7 @@ enum class CommonGizmosDataID {
 // by GLGizmoManager, the gizmos keep a pointer to it.
 class CommonGizmosDataPool {
 public:
-    CommonGizmosDataPool(GLCanvas3D* canvas);
+    explicit CommonGizmosDataPool(GLCanvas3D* canvas);
 
     // Update all resources and release what is not used.
     // Accepts a bitmask of currently required resources.

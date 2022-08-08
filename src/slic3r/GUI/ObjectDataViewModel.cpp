@@ -1738,8 +1738,10 @@ void ObjectDataViewModel::UpdateBitmaps()
             break;
         case itLayerRoot:
             node->m_bmp = *get_bmp_bundle(LayerRootIcon);
+            break;
         case itLayer:
             node->m_bmp = *get_bmp_bundle(LayerIcon);
+            break;
         case itInfo:
             node->m_bmp = *m_info_bmps.at(node->m_info_item_type);
             break;

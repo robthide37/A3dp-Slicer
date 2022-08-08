@@ -172,10 +172,6 @@ void KBShortcutsDialog::fill_shortcuts()
             { ctrl + "M", L("Show/Hide 3Dconnexion devices settings dialog") },
 #endif // __APPLE__
 #endif // _WIN32
-#if ENABLE_RENDER_PICKING_PASS
-            // Don't localize debugging texts.
-            { "P", "Toggle picking pass texture rendering on/off" },
-#endif // ENABLE_RENDER_PICKING_PASS
         };
 
         m_full_shortcuts.push_back({ { _L("Plater"), "" }, plater_shortcuts });

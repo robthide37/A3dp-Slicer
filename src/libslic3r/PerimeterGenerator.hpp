@@ -55,7 +55,8 @@ public:
             m_ext_mm3_per_mm(-1), m_mm3_per_mm(-1), m_mm3_per_mm_overhang(-1)
         {}
 
-    void        process();
+    void        process_classic();
+    void        process_arachne();
 
     double      ext_mm3_per_mm()        const { return m_ext_mm3_per_mm; }
     double      mm3_per_mm()            const { return m_mm3_per_mm; }
@@ -70,6 +71,8 @@ private:
     double      m_mm3_per_mm_overhang;
     Polygons    m_lower_slices_polygons;
 };
+
+ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, float tolerance, float merge_tolerance);
 
 }
 

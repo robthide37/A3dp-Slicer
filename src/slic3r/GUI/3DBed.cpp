@@ -11,10 +11,10 @@
 
 #include "GUI_App.hpp"
 #include "GLCanvas3D.hpp"
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "Plater.hpp"
 #include "Camera.hpp"
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <GL/glew.h>
 
@@ -110,22 +110,23 @@ const float Bed3D::Axes::DefaultTipLength = 5.0f;
 
 void Bed3D::Axes::render()
 {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     auto render_axis = [this](GLShaderProgram* shader, const Transform3d& transform) {
         const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d matrix = camera.get_view_matrix() * transform;
-        shader->set_uniform("view_model_matrix", matrix);
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix * transform);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("normal_matrix",     (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * transform.matrix().block(0, 0, 3, 3).inverse().transpose();
+        shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
     auto render_axis = [this](const Transform3f& transform) {
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixf(transform.data()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         m_arrow.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     };
 
     if (!m_arrow.is_initialized())
@@ -143,38 +144,29 @@ void Bed3D::Axes::render()
     // x axis
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::X());
-#else
-    m_arrow.set_color(-1, ColorRGBA::X());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     render_axis(shader, Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }));
 #else
+    m_arrow.set_color(-1, ColorRGBA::X());
     render_axis(Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }).cast<float>());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // y axis
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::Y());
-#else
-    m_arrow.set_color(-1, ColorRGBA::Y());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     render_axis(shader, Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }));
 #else
+    m_arrow.set_color(-1, ColorRGBA::Y());
     render_axis(Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }).cast<float>());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // z axis
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::Z());
-#else
-    m_arrow.set_color(-1, ColorRGBA::Z());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     render_axis(shader, Geometry::assemble_transform(m_origin));
 #else
+    m_arrow.set_color(-1, ColorRGBA::Z());
     render_axis(Geometry::assemble_transform(m_origin).cast<float>());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     shader->stop_using();
 
@@ -257,6 +249,11 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
     m_axes.set_origin({ 0.0, 0.0, static_cast<double>(GROUND_Z) });
     m_axes.set_stem_length(0.1f * static_cast<float>(m_build_volume.bounding_volume().max_size()));
 
+#if ENABLE_RAYCAST_PICKING
+    // unregister from picking
+    wxGetApp().plater()->canvas3D()->remove_raycasters_for_picking(SceneRaycaster::EType::Bed);
+#endif // ENABLE_RAYCAST_PICKING
+
     // Let the calee to update the UI.
     return true;
 }
@@ -271,7 +268,7 @@ Point Bed3D::point_projection(const Point& point) const
     return m_polygon.point_projection(point);
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes, bool show_texture)
 {
     render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture, false);
@@ -291,15 +288,15 @@ void Bed3D::render_for_picking(GLCanvas3D& canvas, bool bottom, float scale_fact
 {
     render_internal(canvas, bottom, scale_factor, false, false, true);
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
     bool show_axes, bool show_texture, bool picking)
 #else
 void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
     bool show_axes, bool show_texture, bool picking)
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     m_scale_factor = scale_factor;
 
@@ -309,14 +306,18 @@ void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
     glsafe(::glEnable(GL_DEPTH_TEST));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+    m_model.model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
+#else
     m_model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
+#endif // ENABLE_RAYCAST_PICKING
 #else
     m_model.set_color(-1, picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     switch (m_type)
     {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     case Type::System: { render_system(canvas, view_matrix, projection_matrix, bottom, show_texture); break; }
     default:
     case Type::Custom: { render_custom(canvas, view_matrix, projection_matrix, bottom, show_texture, picking); break; }
@@ -324,7 +325,7 @@ void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
     case Type::System: { render_system(canvas, bottom, show_texture); break; }
     default:
     case Type::Custom: { render_custom(canvas, bottom, show_texture, picking); break; }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     glsafe(::glDisable(GL_DEPTH_TEST));
@@ -341,6 +342,8 @@ BoundingBoxf3 Bed3D::calc_extended_bounding_box() const
     // Reset the build volume Z, we don't want to zoom to the top of the build volume if it is empty.
     out.min.z() = 0.0;
     out.max.z() = 0.0;
+    // extend to origin in case origin is off bed
+    out.merge(m_axes.get_origin());
     // extend to contain axes
     out.merge(m_axes.get_origin() + m_axes.get_total_length() * Vec3d::Ones());
 #if ENABLE_WORLD_COORDINATE
@@ -349,7 +352,11 @@ BoundingBoxf3 Bed3D::calc_extended_bounding_box() const
     out.merge(out.min + Vec3d(-Axes::DefaultTipRadius, -Axes::DefaultTipRadius, out.max.z()));
 #endif // ENABLE_WORLD_COORDINATE
     // extend to contain model, if any
+#if ENABLE_RAYCAST_PICKING
+    BoundingBoxf3 model_bb = m_model.model.get_bounding_box();
+#else
     BoundingBoxf3 model_bb = m_model.get_bounding_box();
+#endif // ENABLE_RAYCAST_PICKING
     if (model_bb.defined) {
         model_bb.translate(m_model_offset);
         out.merge(model_bb);
@@ -399,7 +406,16 @@ void Bed3D::init_triangles()
             init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
     }
 
+#if ENABLE_RAYCAST_PICKING
+    if (m_model.model.get_filename().empty() && m_model.mesh_raycaster == nullptr)
+        // register for picking
+        register_raycasters_for_picking(init_data, Transform3d::Identity());
+#endif // ENABLE_RAYCAST_PICKING
+
     m_triangles.init_from(std::move(init_data));
+#if ENABLE_RAYCAST_PICKING
+    m_triangles.set_color(DEFAULT_MODEL_COLOR);
+#endif // ENABLE_RAYCAST_PICKING
 }
 
 void Bed3D::init_gridlines()
@@ -546,17 +562,17 @@ void Bed3D::render_axes()
 {
     if (m_build_volume.valid())
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_axes.render(Transform3d::Identity(), 0.25f);
 #else
         m_axes.render(0.25f);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #else
         m_axes.render();
 #endif // ENABLE_WORLD_COORDINATE
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture)
 {
     if (!bottom)
@@ -578,21 +594,21 @@ void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture)
     else if (bottom)
         render_contour();
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix)
 #else
 void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (m_texture_filename.empty()) {
         m_texture.reset();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         render_default(bottom, false, true, view_matrix, projection_matrix);
 #else
         render_default(bottom, false, true);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         return;
     }
 
@@ -605,11 +621,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             if (m_temp_texture.get_id() == 0 || m_temp_texture.get_source() != m_texture_filename) {
                 // generate a temporary lower resolution texture to show while no main texture levels have been compressed
                 if (!m_temp_texture.load_from_svg_file(m_texture_filename, false, false, false, max_tex_size / 8)) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                     render_default(bottom, false, true, view_matrix, projection_matrix);
 #else
                     render_default(bottom, false, true);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     return;
                 }
                 canvas.request_extra_frame();
@@ -617,11 +633,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 
             // starts generating the main texture, compression will run asynchronously
             if (!m_texture.load_from_svg_file(m_texture_filename, true, true, true, max_tex_size)) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 render_default(bottom, false, true, view_matrix, projection_matrix);
 #else
                 render_default(bottom, false, true);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 return;
             }
         } 
@@ -629,11 +645,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             // generate a temporary lower resolution texture to show while no main texture levels have been compressed
             if (m_temp_texture.get_id() == 0 || m_temp_texture.get_source() != m_texture_filename) {
                 if (!m_temp_texture.load_from_file(m_texture_filename, false, GLTexture::None, false)) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                     render_default(bottom, false, true, view_matrix, projection_matrix);
 #else
                     render_default(bottom, false, true);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     return;
                 }
                 canvas.request_extra_frame();
@@ -641,20 +657,20 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 
             // starts generating the main texture, compression will run asynchronously
             if (!m_texture.load_from_file(m_texture_filename, true, GLTexture::MultiThreaded, true)) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 render_default(bottom, false, true, view_matrix, projection_matrix);
 #else
                 render_default(bottom, false, true);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 return;
             }
         }
         else {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             render_default(bottom, false, true, view_matrix, projection_matrix);
 #else
             render_default(bottom, false, true);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             return;
         }
     }
@@ -675,10 +691,8 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
     GLShaderProgram* shader = wxGetApp().get_shader("printbed");
     if (shader != nullptr) {
         shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader->set_uniform("view_model_matrix", view_matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         shader->set_uniform("transparent_background", bottom);
         shader->set_uniform("svg_source", boost::algorithm::iends_with(m_texture.get_source(), ".svg"));
 
@@ -772,18 +786,26 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix)
 #else
 void Bed3D::render_model()
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (m_model_filename.empty())
         return;
 
+#if ENABLE_RAYCAST_PICKING
+    if (m_model.model.get_filename() != m_model_filename && m_model.model.init_from_file(m_model_filename)) {
+#else
     if (m_model.get_filename() != m_model_filename && m_model.init_from_file(m_model_filename)) {
+#endif // ENABLE_RAYCAST_PICKING
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+        m_model.model.set_color(DEFAULT_MODEL_COLOR);
+#else
         m_model.set_color(DEFAULT_MODEL_COLOR);
+#endif // ENABLE_RAYCAST_PICKING
 #else
         m_model.set_color(-1, DEFAULT_MODEL_COLOR);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -791,72 +813,86 @@ void Bed3D::render_model()
         // move the model so that its origin (0.0, 0.0, 0.0) goes into the bed shape center and a bit down to avoid z-fighting with the texture quad
         m_model_offset = to_3d(m_build_volume.bounding_volume2d().center(), -0.03);
 
+#if ENABLE_RAYCAST_PICKING
+        // register for picking
+        register_raycasters_for_picking(m_model.model.get_geometry(), Geometry::assemble_transform(m_model_offset));
+#endif // ENABLE_RAYCAST_PICKING
+
         // update extended bounding box
         m_extended_bounding_box = this->calc_extended_bounding_box();
     }
 
+#if ENABLE_RAYCAST_PICKING
+    if (!m_model.model.get_filename().empty()) {
+#else
     if (!m_model.get_filename().empty()) {
+#endif // ENABLE_RAYCAST_PICKING
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.0f);
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-            const Transform3d matrix = view_matrix * Geometry::assemble_transform(m_model_offset);
-            shader->set_uniform("view_model_matrix", matrix);
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+            const Transform3d model_matrix = Geometry::assemble_transform(m_model_offset);
+            shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
             shader->set_uniform("projection_matrix", projection_matrix);
-            shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+            shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
             glsafe(::glPushMatrix());
             glsafe(::glTranslated(m_model_offset.x(), m_model_offset.y(), m_model_offset.z()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+            m_model.model.render();
+#else
             m_model.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_RAYCAST_PICKING
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
             glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
             shader->stop_using();
         }
     }
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking)
 #else
 void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking)
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (m_texture_filename.empty() && m_model_filename.empty()) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         render_default(bottom, picking, show_texture, view_matrix, projection_matrix);
 #else
         render_default(bottom, picking, show_texture);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         return;
     }
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!bottom)
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         render_model(view_matrix, projection_matrix);
-#else
-        render_model();
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     if (show_texture)
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         render_texture(bottom, canvas, view_matrix, projection_matrix);
     else if (bottom)
         render_contour(view_matrix, projection_matrix);
 #else
+    if (!bottom)
+        render_model();
+
+    if (show_texture)
         render_texture(bottom, canvas);
     else if (bottom)
         render_contour();
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::render_default(bool bottom, bool picking, bool show_texture, const Transform3d& view_matrix, const Transform3d& projection_matrix)
 #else
 void Bed3D::render_default(bool bottom, bool picking, bool show_texture)
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     m_texture.reset();
 
@@ -868,33 +904,54 @@ void Bed3D::render_default(bool bottom, bool picking, bool show_texture)
     if (shader != nullptr) {
         shader->start_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader->set_uniform("view_model_matrix", view_matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         glsafe(::glEnable(GL_DEPTH_TEST));
         glsafe(::glEnable(GL_BLEND));
         glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
+#if ENABLE_RAYCAST_PICKING
+        const bool has_model = !m_model.model.get_filename().empty();
+#else
         const bool has_model = !m_model.get_filename().empty();
+#endif // ENABLE_RAYCAST_PICKING
 
         if (!has_model && !bottom) {
             // draw background
             glsafe(::glDepthMask(GL_FALSE));
+#if !ENABLE_RAYCAST_PICKING
             m_triangles.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
+#endif // !ENABLE_RAYCAST_PICKING
             m_triangles.render();
             glsafe(::glDepthMask(GL_TRUE));
         }
 
+#if ENABLE_RAYCAST_PICKING
+        if (show_texture) {
+            // draw grid
+#if ENABLE_GL_CORE_PROFILE
+            if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+                glsafe(::glLineWidth(1.5f * m_scale_factor));
+            m_gridlines.set_color(has_model && !bottom ? DEFAULT_SOLID_GRID_COLOR : DEFAULT_TRANSPARENT_GRID_COLOR);
+            m_gridlines.render();
+        }
+        else
+            render_contour(view_matrix, projection_matrix);
+#else
         if (!picking && show_texture) {
             // draw grid
-            glsafe(::glLineWidth(1.5f * m_scale_factor));
+#if ENABLE_GL_CORE_PROFILE
+            if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+                glsafe(::glLineWidth(1.5f * m_scale_factor));
             m_gridlines.set_color(has_model && !bottom ? DEFAULT_SOLID_GRID_COLOR : DEFAULT_TRANSPARENT_GRID_COLOR);
             m_gridlines.render();
         }
         else if (!show_texture)
             render_contour(view_matrix, projection_matrix);
+#endif // ENABLE_RAYCAST_PICKING
 
         glsafe(::glDisable(GL_BLEND));
 
@@ -946,18 +1003,18 @@ void Bed3D::render_contour(const Transform3d& view_matrix, const Transform3d& pr
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
-
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader->set_uniform("view_model_matrix", view_matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         glsafe(::glEnable(GL_DEPTH_TEST));
         glsafe(::glEnable(GL_BLEND));
         glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
         // draw contour
-        glsafe(::glLineWidth(1.5f * m_scale_factor));
+#if ENABLE_GL_CORE_PROFILE
+        if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+            glsafe(::glLineWidth(1.5f * m_scale_factor));
         m_contourlines.render();
 
         glsafe(::glDisable(GL_BLEND));
@@ -986,6 +1043,27 @@ void Bed3D::release_VBOs()
     }
 }
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
+
+#if ENABLE_RAYCAST_PICKING
+void Bed3D::register_raycasters_for_picking(const GLModel::Geometry& geometry, const Transform3d& trafo)
+{
+    assert(m_model.mesh_raycaster == nullptr);
+
+    indexed_triangle_set its;
+    its.vertices.reserve(geometry.vertices_count());
+    for (size_t i = 0; i < geometry.vertices_count(); ++i) {
+        its.vertices.emplace_back(geometry.extract_position_3(i));
+    }
+    its.indices.reserve(geometry.indices_count() / 3);
+    for (size_t i = 0; i < geometry.indices_count() / 3; ++i) {
+        const size_t tri_id = i * 3;
+        its.indices.emplace_back(geometry.extract_index(tri_id), geometry.extract_index(tri_id + 1), geometry.extract_index(tri_id + 2));
+    }
+
+    m_model.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
+    wxGetApp().plater()->canvas3D()->add_raycaster_for_picking(SceneRaycaster::EType::Bed, 0, *m_model.mesh_raycaster, trafo);
+}
+#endif // ENABLE_RAYCAST_PICKING
 
 } // GUI
 } // Slic3r

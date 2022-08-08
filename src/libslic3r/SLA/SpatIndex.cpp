@@ -1,7 +1,7 @@
 #include "SpatIndex.hpp"
 
 // for concave hull merging decisions
-#include <libslic3r/SLA/BoostAdapter.hpp>
+#include <libslic3r/BoostAdapter.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(push)

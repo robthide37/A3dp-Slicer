@@ -63,6 +63,8 @@ namespace GUI {
                 P3,   // position 3 floats
                 P3T2, // position 3 floats + texture coords 2 floats
                 P3N3, // position 3 floats + normal 3 floats
+                P3N3T2, // position 3 floats + normal 3 floats + texture coords 2 floats
+                P4,   // position 4 floats
             };
 
             enum class EIndexType : unsigned char
@@ -87,11 +89,13 @@ namespace GUI {
             void reserve_vertices(size_t vertices_count) { vertices.reserve(vertices_count * vertex_stride_floats(format)); }
             void reserve_indices(size_t indices_count) { indices.reserve(indices_count); }
 
-            void add_vertex(const Vec2f& position);                          // EVertexLayout::P2
-            void add_vertex(const Vec2f& position, const Vec2f& tex_coord);  // EVertexLayout::P2T2
-            void add_vertex(const Vec3f& position);                          // EVertexLayout::P3
-            void add_vertex(const Vec3f& position, const Vec2f& tex_coord);  // EVertexLayout::P3T2
-            void add_vertex(const Vec3f& position, const Vec3f& normal);     // EVertexLayout::P3N3
+            void add_vertex(const Vec2f& position);                                              // EVertexLayout::P2
+            void add_vertex(const Vec2f& position, const Vec2f& tex_coord);                      // EVertexLayout::P2T2
+            void add_vertex(const Vec3f& position);                                              // EVertexLayout::P3
+            void add_vertex(const Vec3f& position, const Vec2f& tex_coord);                      // EVertexLayout::P3T2
+            void add_vertex(const Vec3f& position, const Vec3f& normal);                         // EVertexLayout::P3N3
+            void add_vertex(const Vec3f& position, const Vec3f& normal, const Vec2f& tex_coord); // EVertexLayout::P3N3T2
+            void add_vertex(const Vec4f& position);                                              // EVertexLayout::P4
 
             void set_vertex(size_t id, const Vec3f& position, const Vec3f& normal); // EVertexLayout::P3N3
 
@@ -167,6 +171,9 @@ namespace GUI {
         struct RenderData
         {
             Geometry geometry;
+#if ENABLE_GL_CORE_PROFILE
+            unsigned int vao_id{ 0 };
+#endif // ENABLE_GL_CORE_PROFILE
             unsigned int vbo_id{ 0 };
             unsigned int ibo_id{ 0 };
             size_t vertices_count{ 0 };
@@ -340,11 +347,9 @@ namespace GUI {
     GLModel::Geometry diamond(unsigned int resolution);
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_SHOW_TOOLPATHS_COG
     // create a sphere with the given resolution and smooth normals
     // the origin of the sphere is in its center
     GLModel::Geometry smooth_sphere(unsigned int resolution, float radius);
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace GUI

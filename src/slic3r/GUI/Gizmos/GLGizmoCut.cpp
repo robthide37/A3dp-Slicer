@@ -214,8 +214,8 @@ std::string GLGizmoCut3D::get_tooltip() const
     }
     if (tooltip.empty() && (m_hover_id == X || m_hover_id == Y)) {
         std::string axis = m_hover_id == X ? "X" : "Y";
-//        return axis + ": " + format(float(Geometry::rad2deg(Geometry::Transformation(m_rotation_m).get_rotation()[m_hover_id])), 1) + _u8L("Â°");
-        return axis + ": " + format(float(Geometry::rad2deg(m_angle)), 1) + _u8L("Â°");
+//        return axis + ": " + format(float(Geometry::rad2deg(Geometry::Transformation(m_rotation_m).get_rotation()[m_hover_id])), 1) + _u8L("°");
+        return axis + ": " + format(float(Geometry::rad2deg(m_angle)), 1) + _u8L("°");
     }
 
     return tooltip;
@@ -607,6 +607,13 @@ void GLGizmoCut3D::render_cut_center_graber(bool picking /* = false*/)
     if (!shader)
         return;
 
+#if ENABLE_GL_CORE_PROFILE
+        if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+            glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+        if (!m_grabber_connection.is_initialized() || is_changed) {
+            m_grabber_connection.reset();
     ColorRGBA color = picking ? picking_decode(BASE_ID - Z) :
                       m_hover_id == Z ? complementary(GRABBER_COLOR) : GRABBER_COLOR;
 
@@ -742,7 +749,7 @@ void GLGizmoCut3D::render_cut_line()
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -815,13 +822,26 @@ void GLGizmoCut3D::on_set_state()
     }
     else
         m_c->object_clipper()->release();
-
-    force_update_clipper_on_render = m_state == On;
+#endif // !ENABLE_GL_CORE_PROFILE
+	force_update_clipper_on_render = m_state == On;
 }
 
+#if ENABLE_RAYCAST_PICKING
+void GLGizmoCut::on_register_raycasters_for_picking()
+{
+    // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(true);
+}
+
+void GLGizmoCut::on_unregister_raycasters_for_picking()
+{
+    m_parent.set_raycaster_gizmos_on_top(false);
+}
+#else
 void GLGizmoCut3D::on_set_hover_id() 
 {
 }
+#endif // ENABLE_RAYCAST_PICKING
 
 bool GLGizmoCut3D::on_is_activable() const
 {
@@ -1690,6 +1710,7 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
         m_line_beg = pt;
         m_line_end = pt;
         return true;
+//        volumes_trafos[i] = model_object->volumes[i]->get_matrix();
     }
 
     if (cut_line_processing()) {

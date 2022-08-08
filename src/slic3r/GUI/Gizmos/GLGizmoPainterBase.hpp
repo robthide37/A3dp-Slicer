@@ -77,7 +77,7 @@ public:
         : TriangleSelector(mesh) {}
     virtual ~TriangleSelectorGUI() = default;
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     virtual void render(ImGuiWrapper* imgui, const Transform3d& matrix);
     void         render(const Transform3d& matrix) { this->render(nullptr, matrix); }
 #else
@@ -85,7 +85,7 @@ public:
     // to be already set.
     virtual void render(ImGuiWrapper *imgui);
     void         render() { this->render(nullptr); }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     void request_update_render_data() { m_update_render_data = true; }
 
@@ -119,14 +119,10 @@ private:
 
 protected:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    GLModel                      m_paint_contour;
+    GLModel m_paint_contour;
 
     void update_paint_contour();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render_paint_contour(const Transform3d& matrix);
-#else
-    void render_paint_contour();
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     GLPaintContour                      m_paint_contour;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -142,7 +138,10 @@ private:
     ObjectID m_old_mo_id;
     size_t m_old_volumes_size = 0;
     void on_render() override {}
+#if !ENABLE_RAYCAST_PICKING
     void on_render_for_picking() override {}
+#endif // !ENABLE_RAYCAST_PICKING
+
 public:
     GLGizmoPainterBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
     ~GLGizmoPainterBase() override;
@@ -214,7 +213,9 @@ protected:
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
+#if !ENABLE_GL_CORE_PROFILE
     Vec2d m_old_center{ Vec2d::Zero() };
+#endif // !ENABLE_GL_CORE_PROFILE
     float m_old_cursor_radius{ 0.0f };
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 

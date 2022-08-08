@@ -95,9 +95,7 @@ void GLGizmoRotate::disable_grabber() { m_grabbers[0].enabled = false; }
 bool GLGizmoRotate::on_init()
 {
     m_grabbers.push_back(Grabber());
-#if ENABLE_GIZMO_GRABBER_REFACTOR
     m_grabbers.back().extensions = (GLGizmoBase::EGrabberExtension)(int(GLGizmoBase::EGrabberExtension::PosY) | int(GLGizmoBase::EGrabberExtension::NegY));
-#endif // ENABLE_GIZMO_GRABBER_REFACTOR
     return true;
 }
 
@@ -107,7 +105,7 @@ void GLGizmoRotate::on_start_dragging()
     init_data_from_selection(m_parent.get_selection());
 #else
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
-    m_center = m_has_forced_center ? m_forced_center : box.center();
+    m_center = box.center();
     m_radius = Offset + box.radius();
     m_snap_coarse_in_radius = m_radius / 3.0f;
     m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
@@ -118,7 +116,11 @@ void GLGizmoRotate::on_start_dragging()
 
 void GLGizmoRotate::on_dragging(const UpdateData &data)
 {
+#if ENABLE_WORLD_COORDINATE
+    const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray));
+#else
     const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray, m_parent.get_selection()));
+#endif // ENABLE_WORLD_COORDINATE
 
     const Vec2d orig_dir = Vec2d::UnitX();
     const Vec2d new_dir = mouse_pos.normalized();
@@ -153,11 +155,6 @@ void GLGizmoRotate::on_render()
     if (!m_grabbers.front().enabled)
         return;
 
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    if (!m_cone.is_initialized())
-        m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 12.0));
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
-
     const Selection& selection = m_parent.get_selection();
 #if !ENABLE_WORLD_COORDINATE
     const BoundingBoxf3& box = selection.get_bounding_box();
@@ -167,7 +164,7 @@ void GLGizmoRotate::on_render()
 #if ENABLE_WORLD_COORDINATE
         init_data_from_selection(selection);
 #else
-        m_center = m_has_forced_center ? m_forced_center : box.center();
+        m_center = box.center();
         m_radius = Offset + box.radius();
         m_snap_coarse_in_radius = m_radius / 3.0f;
         m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
@@ -182,30 +179,41 @@ void GLGizmoRotate::on_render()
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_grabbers.front().matrix = local_transform(selection);
 #else
     glsafe(::glPushMatrix());
     transform_to_local(selection);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-    glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
+#if ENABLE_GL_CORE_PROFILE
+    if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_CORE_PROFILE
+    GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
     if (shader != nullptr) {
         shader->start_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d view_model_matrix = camera.get_view_matrix() * m_grabbers.front().matrix;
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_GL_CORE_PROFILE
+        const std::array<int, 4>& viewport = camera.get_viewport();
+        shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+        shader->set_uniform("width", 0.25f);
+        shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
 
         const bool radius_changed = std::abs(m_old_radius - m_radius) > EPSILON;
         m_old_radius = m_radius;
 
-        ColorRGBA color((m_hover_id != -1) ? m_drag_color : m_highlight_color);
+        const ColorRGBA color = (m_hover_id != -1) ? m_drag_color : m_highlight_color;
         render_circle(color, radius_changed);
         if (m_hover_id != -1) {
             const bool hover_radius_changed = std::abs(m_old_hover_radius - m_radius) > EPSILON;
@@ -239,51 +247,41 @@ void GLGizmoRotate::on_render()
 
 #if ENABLE_WORLD_COORDINATE
     render_grabber(m_bounding_box);
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    render_grabber_extension(m_bounding_box, false);
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #else
     render_grabber(box);
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    render_grabber_extension(box, false);
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #endif // ENABLE_WORLD_COORDINATE
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
+#if !ENABLE_RAYCAST_PICKING
 void GLGizmoRotate::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_grabbers.front().matrix = local_transform(selection);
 #else
     glsafe(::glPushMatrix());
     transform_to_local(selection);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_WORLD_COORDINATE
     render_grabbers_for_picking(m_bounding_box);
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    render_grabber_extension(m_bounding_box, true);
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #else
     const BoundingBoxf3& box = selection.get_bounding_box();
     render_grabbers_for_picking(box);
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    render_grabber_extension(box, true);
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #endif // ENABLE_WORLD_COORDINATE
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
+#endif // !ENABLE_RAYCAST_PICKING
 
 #if ENABLE_WORLD_COORDINATE
 void GLGizmoRotate::init_data_from_selection(const Selection& selection)
@@ -652,84 +650,7 @@ void GLGizmoRotate::render_grabber(const BoundingBoxf3& box)
     render_grabbers(box);
 }
 
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool picking)
-{
-    const float mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 3.0);
-    const double size = m_dragging ? double(m_grabbers.front().get_dragging_half_size(mean_size)) : double(m_grabbers.front().get_half_size(mean_size));
-
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
-    if (shader == nullptr)
-        return;
-
-    m_cone.set_color((!picking && m_hover_id != -1) ? complementary(m_grabbers.front().color) : m_grabbers.front().color);
-
-    shader->start_using();
-    shader->set_uniform("emission_factor", 0.1f);
-#else
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-    if (shader == nullptr)
-        return;
-
-    m_cone.set_color(-1, (!picking && m_hover_id != -1) ? complementary(m_grabbers.front().color) : m_grabbers.front().color);
-    if (!picking) {
-        shader->start_using();
-        shader->set_uniform("emission_factor", 0.1f);
-    }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-    const Vec3d& center = m_grabbers.front().center;
-
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    const Camera& camera = wxGetApp().plater()->get_camera();
-    const Transform3d& view_matrix = camera.get_view_matrix();
-    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-
-    Transform3d view_model_matrix = view_matrix * m_grabbers.front().matrix *
-        Geometry::assemble_transform(center, Vec3d(0.5 * PI, 0.0, m_angle)) *
-        Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
-
-    shader->set_uniform("view_model_matrix", view_model_matrix);
-    shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#else
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(center.x(), center.y(), center.z()));
-    glsafe(::glRotated(Geometry::rad2deg(m_angle), 0.0, 0.0, 1.0));
-    glsafe(::glRotated(90.0, 1.0, 0.0, 0.0));
-    glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
-    glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-    m_cone.render();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    view_model_matrix = view_matrix * m_grabbers.front().matrix *
-        Geometry::assemble_transform(center, Vec3d(-0.5 * PI, 0.0, m_angle)) *
-        Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
-
-    shader->set_uniform("view_model_matrix", view_model_matrix);
-    shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#else
-    glsafe(::glPopMatrix());
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(center.x(), center.y(), center.z()));
-    glsafe(::glRotated(Geometry::rad2deg(m_angle), 0.0, 0.0, 1.0));
-    glsafe(::glRotated(-90.0, 1.0, 0.0, 0.0));
-    glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
-    glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-    m_cone.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-    glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    if (! picking)
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-        shader->stop_using();
-}
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
-
-#if ENABLE_GL_SHADERS_ATTRIBUTES
 Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
 {
     Transform3d ret;
@@ -807,9 +728,13 @@ void GLGizmoRotate::transform_to_local(const Selection& selection) const
     }
     }
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if ENABLE_WORLD_COORDINATE
+Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray) const
+#else
 Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const
+#endif // ENABLE_WORLD_COORDINATE
 {
     double half_pi = 0.5 * double(PI);
 
@@ -846,7 +771,20 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
 
     m.translate(-m_center);
 
-    return transform(mouse_ray, m).intersect_plane(0.0);
+    const Linef3 local_mouse_ray = transform(mouse_ray, m);
+    if (std::abs(local_mouse_ray.vector().dot(Vec3d::UnitZ())) < EPSILON) {
+        // if the ray is parallel to the plane containing the circle
+        if (std::abs(local_mouse_ray.vector().dot(Vec3d::UnitY())) > 1.0 - EPSILON)
+            // if the ray is parallel to grabber direction
+            return Vec3d::UnitX();
+        else {
+            const Vec3d world_pos = (local_mouse_ray.a.x() >= 0.0) ? mouse_ray.a - m_center : mouse_ray.b - m_center;
+            m.translate(m_center);
+            return m * world_pos;
+        }
+    }
+    else
+        return local_mouse_ray.intersect_plane(0.0);
 }
 
 GLGizmoRotate3D::GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
@@ -971,6 +909,25 @@ void GLGizmoRotate3D::on_render()
     if (m_hover_id == -1 || m_hover_id == 2)
         m_gizmos[Z].render();
 }
+
+#if ENABLE_RAYCAST_PICKING
+void GLGizmoRotate3D::on_register_raycasters_for_picking()
+{
+    // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(true);
+    for (GLGizmoRotate& g : m_gizmos) {
+        g.register_raycasters_for_picking();
+    }
+}
+
+void GLGizmoRotate3D::on_unregister_raycasters_for_picking()
+{
+    for (GLGizmoRotate& g : m_gizmos) {
+        g.unregister_raycasters_for_picking();
+    }
+    m_parent.set_raycaster_gizmos_on_top(false);
+}
+#endif // ENABLE_RAYCAST_PICKING
 
 GLGizmoRotate3D::RotoptimzeWindow::RotoptimzeWindow(ImGuiWrapper *   imgui,
                                                     State &          state,

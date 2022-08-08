@@ -106,6 +106,7 @@ class GLGizmoCut3D : public GLGizmoBase
         , cutGrig
         //,cutRadial
         //,cutModular
+        std::vector<Transform3d> volumes_trafos;
     };
 
     enum class CutConnectorMode {
@@ -168,7 +169,12 @@ protected:
     void on_start_dragging() override;
     void on_stop_dragging() override;
     void on_render() override;
-    void on_render_for_picking() override;
+#if ENABLE_RAYCAST_PICKING
+    virtual void on_register_raycasters_for_picking() override;
+    virtual void on_unregister_raycasters_for_picking() override;
+#else
+    virtual void on_render_for_picking() override;
+#endif // ENABLE_RAYCAST_PICKING
     void on_render_input_window(float x, float y, float bottom_limit) override;
 
     bool wants_enter_leave_snapshots() const override       { return true; }

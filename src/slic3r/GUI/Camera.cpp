@@ -91,6 +91,80 @@ void Camera::select_view(const std::string& direction)
         look_at(m_target + m_distance * Vec3d::UnitY(), m_target, Vec3d::UnitZ());
 }
 
+#if ENABLE_RAYCAST_PICKING
+double Camera::get_near_left() const
+{
+    switch (m_type)
+    {
+    case EType::Perspective:
+        return m_frustrum_zs.first * (m_projection_matrix.matrix()(0, 2) - 1.0) / m_projection_matrix.matrix()(0, 0);
+    default:
+    case EType::Ortho:
+        return -1.0 / m_projection_matrix.matrix()(0, 0) - 0.5 * m_projection_matrix.matrix()(0, 0) * m_projection_matrix.matrix()(0, 3);
+    }
+}
+
+double Camera::get_near_right() const
+{
+    switch (m_type)
+    {
+    case EType::Perspective:
+        return m_frustrum_zs.first * (m_projection_matrix.matrix()(0, 2) + 1.0) / m_projection_matrix.matrix()(0, 0);
+    default:
+    case EType::Ortho:
+        return 1.0 / m_projection_matrix.matrix()(0, 0) - 0.5 * m_projection_matrix.matrix()(0, 0) * m_projection_matrix.matrix()(0, 3);
+    }
+}
+
+double Camera::get_near_top() const
+{
+    switch (m_type)
+    {
+    case EType::Perspective:
+        return m_frustrum_zs.first * (m_projection_matrix.matrix()(1, 2) + 1.0) / m_projection_matrix.matrix()(1, 1);
+    default:
+    case EType::Ortho:
+        return 1.0 / m_projection_matrix.matrix()(1, 1) - 0.5 * m_projection_matrix.matrix()(1, 1) * m_projection_matrix.matrix()(1, 3);
+    }
+}
+
+double Camera::get_near_bottom() const
+{
+    switch (m_type)
+    {
+    case EType::Perspective:
+        return m_frustrum_zs.first * (m_projection_matrix.matrix()(1, 2) - 1.0) / m_projection_matrix.matrix()(1, 1);
+    default:
+    case EType::Ortho:
+        return -1.0 / m_projection_matrix.matrix()(1, 1) - 0.5 * m_projection_matrix.matrix()(1, 1) * m_projection_matrix.matrix()(1, 3);
+    }
+}
+
+double Camera::get_near_width() const
+{
+    switch (m_type)
+    {
+    case EType::Perspective:
+        return 2.0 * m_frustrum_zs.first / m_projection_matrix.matrix()(0, 0);
+    default:
+    case EType::Ortho:
+        return 2.0 / m_projection_matrix.matrix()(0, 0);
+    }
+}
+
+double Camera::get_near_height() const
+{
+    switch (m_type)
+    {
+    case EType::Perspective:
+        return 2.0 * m_frustrum_zs.first / m_projection_matrix.matrix()(1, 1);
+    default:
+    case EType::Ortho:
+        return 2.0 / m_projection_matrix.matrix()(1, 1);
+    }
+}
+#endif // ENABLE_RAYCAST_PICKING
+
 double Camera::get_fov() const
 {
     switch (m_type)
@@ -103,6 +177,21 @@ double Camera::get_fov() const
     };
 }
 
+#if ENABLE_RAYCAST_PICKING
+void Camera::set_viewport(int x, int y, unsigned int w, unsigned int h)
+{
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    m_viewport = { 0, 0, int(w), int(h) };
+#else
+    glsafe(::glGetIntegerv(GL_VIEWPORT, m_viewport.data()));
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+}
+
+void Camera::apply_viewport() const
+{
+    glsafe(::glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]));
+}
+#else
 void Camera::apply_viewport(int x, int y, unsigned int w, unsigned int h)
 {
     glsafe(::glViewport(0, 0, w, h));
@@ -112,6 +201,7 @@ void Camera::apply_viewport(int x, int y, unsigned int w, unsigned int h)
     glsafe(::glGetIntegerv(GL_VIEWPORT, m_viewport.data()));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
+#endif // ENABLE_RAYCAST_PICKING
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
 void Camera::apply_view_matrix()
@@ -170,6 +260,9 @@ void Camera::apply_projection(const BoundingBoxf3& box, double near_z, double fa
     }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_RAYCAST_PICKING
+    apply_projection(-w, w, -h, h, m_frustrum_zs.first, m_frustrum_zs.second);
+#else
     switch (m_type)
     {
     default:
@@ -197,6 +290,7 @@ void Camera::apply_projection(const BoundingBoxf3& box, double near_z, double fa
         break;
     }
     }
+#endif // ENABLE_RAYCAST_PICKING
 #else
     glsafe(::glMatrixMode(GL_PROJECTION));
     glsafe(::glLoadIdentity());
@@ -220,6 +314,37 @@ void Camera::apply_projection(const BoundingBoxf3& box, double near_z, double fa
     glsafe(::glMatrixMode(GL_MODELVIEW));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
+
+#if ENABLE_RAYCAST_PICKING
+void Camera::apply_projection(double left, double right, double bottom, double top, double near_z, double far_z)
+{
+    assert(left != right && bottom != top && near_z != far_z);
+    const double inv_dx = 1.0 / (right - left);
+    const double inv_dy = 1.0 / (top - bottom);
+    const double inv_dz = 1.0 / (far_z - near_z);
+
+    switch (m_type)
+    {
+    default:
+    case EType::Ortho:
+    {
+        m_projection_matrix.matrix() << 2.0 * inv_dx,          0.0,           0.0,   -(left + right) * inv_dx,
+                                                 0.0, 2.0 * inv_dy,           0.0,   -(bottom + top) * inv_dy,
+                                                 0.0,          0.0, -2.0 * inv_dz, -(near_z + far_z) * inv_dz,
+                                                 0.0,          0.0,           0.0,                        1.0;
+        break;
+    }
+    case EType::Perspective:
+    {
+        m_projection_matrix.matrix() << 2.0 * near_z * inv_dx,                   0.0,    (left + right) * inv_dx,                            0.0,
+                                                          0.0, 2.0 * near_z * inv_dy,    (bottom + top) * inv_dy,                            0.0,
+                                                          0.0,                   0.0, -(near_z + far_z) * inv_dz, -2.0 * near_z * far_z * inv_dz,
+                                                          0.0,                   0.0,                       -1.0,                            0.0;
+        break;
+    }
+    }
+}
+#endif // ENABLE_RAYCAST_PICKING
 
 void Camera::zoom_to_box(const BoundingBoxf3& box, double margin_factor)
 {

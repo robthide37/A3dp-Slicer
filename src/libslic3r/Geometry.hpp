@@ -366,9 +366,11 @@ void rotation_transform(Transform3d& transform, const Vec3d& rotation);
 Transform3d rotation_transform(const Vec3d& rotation);
 
 // Sets the given transform by assembling the given scale factors
+void scale_transform(Transform3d& transform, double scale);
 void scale_transform(Transform3d& transform, const Vec3d& scale);
 
 // Returns the transform obtained by assembling the given scale factors
+Transform3d scale_transform(double scale);
 Transform3d scale_transform(const Vec3d& scale);
 
 // Returns the euler angles extracted from the given rotation matrix
@@ -556,6 +558,30 @@ inline bool is_rotation_ninety_degrees(double a)
 inline bool is_rotation_ninety_degrees(const Vec3d &rotation)
 {
     return is_rotation_ninety_degrees(rotation.x()) && is_rotation_ninety_degrees(rotation.y()) && is_rotation_ninety_degrees(rotation.z());
+}
+
+template <class Tout = double, class Tin>
+std::pair<Tout, Tout> dir_to_spheric(const Vec<3, Tin> &n, Tout norm = 1.)
+{
+    Tout z       = n.z();
+    Tout r       = norm;
+    Tout polar   = std::acos(z / r);
+    Tout azimuth = std::atan2(n(1), n(0));
+    return {polar, azimuth};
+}
+
+template <class T = double>
+Vec<3, T> spheric_to_dir(double polar, double azimuth)
+{
+    return {T(std::cos(azimuth) * std::sin(polar)),
+            T(std::sin(azimuth) * std::sin(polar)), T(std::cos(polar))};
+}
+
+template <class T = double, class Pair>
+Vec<3, T> spheric_to_dir(const Pair &v)
+{
+    double plr = std::get<0>(v), azm = std::get<1>(v);
+    return spheric_to_dir<T>(plr, azm);
 }
 
 } } // namespace Slicer::Geometry

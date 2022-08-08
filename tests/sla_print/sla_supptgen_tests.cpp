@@ -3,6 +3,7 @@
 
 #include <libslic3r/ExPolygon.hpp>
 #include <libslic3r/BoundingBox.hpp>
+#include <libslic3r/SLA/SpatIndex.hpp>
 
 #include "sla_test_utils.hpp"
 
