@@ -1855,20 +1855,24 @@ bool PrintObject::invalidate_state_by_config_options(
                         float        max_perimeter_infill_spacing = float(layerm.flow(frSolidInfill).scaled_spacing()) * 1.75f;
                         // Top surfaces.
                         auto& cache = cache_top_botom_regions[idx_layer];
-                        cache.top_surfaces = offset_ex(to_expolygons(layerm.slices().filter_by_type(stPosTop | stDensSolid)), min_perimeter_infill_spacing);
-                        append(cache.top_surfaces, offset_ex(to_expolygons(layerm.fill_surfaces.filter_by_type(stPosTop | stDensSolid)), min_perimeter_infill_spacing));
-                        if (nb_perimeter_layers_for_solid_fill != 0 && (idx_layer > min_layer_no_solid || layer.print_z < min_z_no_solid)) {
+                        ExPolygons raw_slice_temp = to_expolygons(layerm.slices().filter_by_type(stPosTop | stDensSolid));
+                        ExPolygons raw_fill_temp = to_expolygons(layerm.fill_surfaces.filter_by_type(stPosTop | stDensSolid));
+                        cache.top_surfaces = offset_ex(raw_slice_temp, min_perimeter_infill_spacing);
+                        append(cache.top_surfaces, offset_ex(raw_fill_temp, min_perimeter_infill_spacing));
+                        if (nb_perimeter_layers_for_solid_fill != 0) {
                             //it needs to be activated and we don't check the firs layers, where everything have to be solid.
-                            cache.top_fill_surfaces = offset_ex(to_expolygons(layerm.fill_surfaces.filter_by_type(stPosTop | stDensSolid)), max_perimeter_infill_spacing);
-                            cache.top_perimeter_surfaces = to_expolygons(layerm.slices().filter_by_type(stPosTop | stDensSolid));
+                            cache.top_fill_surfaces = offset_ex(raw_fill_temp, max_perimeter_infill_spacing);
+                            cache.top_perimeter_surfaces = raw_slice_temp;
                         }
                         // Bottom surfaces.
                         const SurfaceType surfaces_bottom[2] = { stPosBottom | stDensSolid, stPosBottom | stDensSolid | stModBridge };
-                        cache.bottom_surfaces = offset_ex(to_expolygons(layerm.slices().filter_by_types(surfaces_bottom, 2)), min_perimeter_infill_spacing);
-                        append(cache.bottom_surfaces, offset_ex(to_expolygons(layerm.fill_surfaces.filter_by_types(surfaces_bottom, 2)), min_perimeter_infill_spacing));
-                        if (nb_perimeter_layers_for_solid_fill != 0 && (idx_layer > min_layer_no_solid || layer.print_z < min_z_no_solid)) {
-                            cache.bottom_fill_surfaces = offset_ex(to_expolygons(layerm.fill_surfaces.filter_by_types(surfaces_bottom, 2)), max_perimeter_infill_spacing);
-                            cache.bottom_perimeter_surfaces = to_expolygons(layerm.slices().filter_by_types(surfaces_bottom, 2));
+                        raw_slice_temp = to_expolygons(layerm.slices().filter_by_types(surfaces_bottom, 2));
+                        raw_fill_temp = to_expolygons(layerm.fill_surfaces.filter_by_types(surfaces_bottom, 2));
+                        cache.bottom_surfaces = offset_ex(raw_slice_temp, min_perimeter_infill_spacing);
+                        append(cache.bottom_surfaces, offset_ex(raw_fill_temp, min_perimeter_infill_spacing));
+                        if (nb_perimeter_layers_for_solid_fill != 0) {
+                            cache.bottom_perimeter_surfaces = raw_slice_temp;
+                            cache.bottom_fill_surfaces = offset_ex(raw_fill_temp, max_perimeter_infill_spacing);
                         }
                         // Holes over all regions. Only collect them once, they are valid for all idx_region iterations.
                         if (cache.holes.empty()) {
@@ -1908,7 +1912,7 @@ bool PrintObject::invalidate_state_by_config_options(
                     coord_t      infill_line_spacing = solid_infill_flow.scaled_spacing();
                     // Find a union of perimeters below / above this surface to guarantee a minimum shell thickness.
                     ExPolygons shell;
-                    ExPolygons fill_shell;
+                    ExPolygons fill_shell; // for nb_perimeter_layers_for_solid_fill
                     ExPolygons max_perimeter_shell; // for nb_perimeter_layers_for_solid_fill
                     ExPolygons holes;
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
@@ -2063,9 +2067,9 @@ bool PrintObject::invalidate_state_by_config_options(
                         shell = intersection_ex(shell, polygonsInternal, ApplySafetyOffset::Yes);
                         expolygons_append(shell, diff_ex(polygonsInternal, holes));
                         shell = union_ex(shell);
-                        ExPolygons toadd;
                         //check if a polygon is only over perimeter, in this case evict it (depends from nb_perimeter_layers_for_solid_fill value)
                         if (nb_perimeter_layers_for_solid_fill != 0 && (idx_layer > min_layer_no_solid || layer->print_z < min_z_no_solid)) {
+                            ExPolygons toadd;
                             for (int i = 0; i < shell.size(); i++) {
                                 if (nb_perimeter_layers_for_solid_fill < 2 || intersection_ex(ExPolygons{ shell[i] }, max_perimeter_shell, ApplySafetyOffset::No).empty()) {
                                     ExPolygons expoly = intersection_ex(ExPolygons{ shell[i] }, fill_shell);
