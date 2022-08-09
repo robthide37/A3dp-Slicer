@@ -848,7 +848,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Brim inside holes");
     def->full_label = L("Brim inside holes");
     def->category = OptionCategory::skirtBrim;
-    def->tooltip = L("Allow to create a brim over an island when it's inside a hole (or surrounded by an object).");
+    def->tooltip = L("Allow to create a brim over an island when it's inside a hole (or surrounded by an object)."
+        "\nIncompatible with brim_width_interior, as it enables it with brim_width width.");
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -935,7 +936,6 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Offset of brim from the printed object. Should be kept at 0 unless you encounter great difficulties to separate them."
         "\nIt's subtracted to brim_width and brim_width_interior, so it has to be lower than them. The offset is applied after the first layer XY compensation (elephant foot).");
     def->sidetext = L("mm");
-    def->min = 0;
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0));
     def->aliases = { "brim_offset" }; // from superslicer 2.3
