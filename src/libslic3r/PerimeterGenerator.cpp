@@ -2770,7 +2770,7 @@ PerimeterGenerator::_get_nearest_point(const PerimeterGeneratorLoops &children, 
             if (myPolylines.paths[idx_poly].length() < dist_cut + perimeter_flow.scaled_width()/20) continue;
 
             if ((myPolylines.paths[idx_poly].role() == erExternalPerimeter || child.is_external() )
-                && this->object_config->seam_position.value != SeamPosition::spRandom) {
+                && (this->object_config->seam_position.value != SeamPosition::spRandom && this->object_config->seam_position.value != SeamPosition::spAllRandom)) {
                 //first, try to find 2 point near enough
                 for (size_t idx_point = 0; idx_point < myPolylines.paths[idx_poly].polyline.points.size(); idx_point++) {
                     const Point &p = myPolylines.paths[idx_poly].polyline.points[idx_point];

@@ -203,9 +203,11 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialInterfacePattern)
 
 static const t_config_enum_values s_keys_map_SeamPosition{
         {"random", spRandom},
+        {"allrandom", spAllRandom},
         {"nearest", spNearest}, // unused, replaced by cost
         {"cost", spCost},
         {"aligned", spAligned},
+        {"contiguous", spExtremlyAligned},
         {"rear", spRear},
         {"custom", spCustom}, // for seam object
 };
@@ -4416,11 +4418,15 @@ void PrintConfigDef::init_fff_params()
     def->enum_keys_map = &ConfigOptionEnum<SeamPosition>::get_enum_values();
     def->enum_values.push_back("cost");
     def->enum_values.push_back("random");
+    def->enum_values.push_back("allrandom");
     def->enum_values.push_back("aligned");
+    def->enum_values.push_back("contiguous");
     def->enum_values.push_back("rear");
     def->enum_labels.push_back(L("Cost-based"));
+    def->enum_labels.push_back(L("Scattered"));
     def->enum_labels.push_back(L("Random"));
     def->enum_labels.push_back(L("Aligned"));
+    def->enum_labels.push_back(L("Contiguous"));
     def->enum_labels.push_back(L("Rear"));
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<SeamPosition>(spCost));

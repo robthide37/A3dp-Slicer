@@ -3685,12 +3685,13 @@ void GCode::split_at_seam_pos(ExtrusionLoop& loop, std::unique_ptr<EdgeGrid::Gri
         if (!loop.split_at_vertex(seam))
             // The point is not in the original loop. Insert it.
             loop.split_at(seam, true);*/
-    } else
-        m_seam_placer.place_seam(loop,
+    } else {
+        m_seam_placer.place_seam(loop, *this->layer(),
             this->last_pos(), m_config.external_perimeters_first,
             EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4),
             m_print_object_instance_id,
             lower_layer_edge_grid ? lower_layer_edge_grid->get() : nullptr);
+    }
 }
 
 namespace check_wipe {

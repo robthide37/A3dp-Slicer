@@ -21,9 +21,9 @@ namespace EdgeGrid { class Grid; }
 
 class SeamHistory {
 public:
-    SeamHistory() { clear(); }
-    std::optional<Point> get_last_seam(const PrintObject* po, coord_t layer_z, const BoundingBox& island_bb);
-    void add_seam(const PrintObject* po, const Point& pos, const BoundingBox& island_bb);
+    SeamHistory() {}
+    std::optional<Point> get_last_seam(const PrintObject* po, double layer_z, const BoundingBox& island_bb);
+    void add_seam(const PrintObject* po, const Point& pos, double layer_z, const BoundingBox& island_bb);
     void clear();
 
 private:
@@ -32,8 +32,7 @@ private:
         BoundingBox m_island_bb;
     };
 
-    std::map<const PrintObject*, std::vector<SeamPoint>> m_data_last_layer;
-    std::map<const PrintObject*, std::vector<SeamPoint>> m_data_this_layer;
+    std::vector<std::pair<double, std::map<const PrintObject*, std::vector<SeamPoint>>>> m_data;
     coord_t m_layer_z;
 };
 
@@ -54,7 +53,7 @@ public:
         const uint16_t print_object_instance_idx,
         const EdgeGrid::Grid* lower_layer_edge_grid);
 
-    void place_seam(ExtrusionLoop& loop, const Point& last_pos, bool external_first, double nozzle_diameter,
+    void place_seam(ExtrusionLoop& loop, const Layer& layer, const Point& last_pos, bool external_first, double nozzle_diameter,
                     const uint16_t print_object_instance_idx, const EdgeGrid::Grid* lower_layer_edge_grid);
     
 
