@@ -2024,7 +2024,7 @@ void GLGizmoEmboss::draw_style_edit() {
 
     assert(wx_font_opt.has_value());
     if (!wx_font_opt.has_value()) {
-        ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("WxFont is not loaded properly."));
+        ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("WxFont is not loaded properly.").c_str());
         return;
     }
 
