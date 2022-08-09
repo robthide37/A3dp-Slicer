@@ -758,6 +758,7 @@ std::string get_type_name(ConfigOptionType type)
     default: return "";
     }
 }
+
 void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const boost::any& value)
 {
     if (value.empty() || !is_intialized())
@@ -828,7 +829,7 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
             m_to_update[tab->type()] = {};
     m_can_set = true;
     // exec
-    int res = ctx->Execute();
+    /*int res = */ctx->Execute();
     m_can_set = false;
     std::map<Preset::Type, DynamicPrintConfig> to_update = m_to_update;
     m_to_update.clear();
@@ -867,6 +868,63 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
         }
     }
 }
+
+bool ScriptContainer::call_script_function_reset(const ConfigOptionDef& def)
+{
+    std::string func_name = ("void " + def.opt_key + "_reset()");
+    AngelScript::asIScriptFunction* func = m_script_module->GetFunctionByDecl(func_name.c_str());
+    if (func == nullptr) {
+        return false;
+    }
+    AngelScript::asIScriptContext* ctx = m_script_engine->CreateContext();
+    if (ctx == nullptr) {
+        BOOST_LOG_TRIVIAL(error) << "Error, can't create script context for function '" << func_name << "'";
+        return false;
+    }
+    ctx->Prepare(func);
+    m_can_set = true;
+    // exec
+    /*int res = */ctx->Execute();
+    m_can_set = false;
+    std::map<Preset::Type, DynamicPrintConfig> to_update = m_to_update;
+    m_to_update.clear();
+    auto to_reset = m_to_reset_initial;
+    m_to_reset_initial.clear();
+
+    //update the tabs from the results
+    for (auto& data : to_update) {
+        Tab* tab = wxGetApp().get_tab(data.first);
+        //also reset
+        if (!to_reset.empty()) {
+            const DynamicPrintConfig& initial_conf = tab->m_presets->get_selected_preset().config;
+            for (size_t key_idx = 0; key_idx != to_reset.size(); ++key_idx) {
+                const std::string& key = to_reset[key_idx];
+                if (initial_conf.has(key)) {
+                    data.second.set_key_value(key, initial_conf.option(key)->clone());
+                    to_reset.erase(to_reset.begin() + key_idx);
+                    key_idx--;
+                }
+            }
+        }
+        tab->load_config(data.second);
+    }
+    //also call for value_changed, as it's not really a load but a change
+    for (const auto& data : to_update) {
+        Tab* tab = wxGetApp().get_tab(data.first);
+        for (auto opt_key : data.second.keys()) {
+            tab->on_value_change(opt_key, data.second.option(opt_key)->getAny());
+        }
+    }
+    // refresh the field if needed
+    if (m_need_refresh && m_tab) {
+        Field* f = m_tab->get_field(def.opt_key);
+        if (f != nullptr) {
+            f->set_value(call_script_function_get_value(def), false);
+        }
+    }
+    return true;
+}
+ 
 //void ScriptContainer::call_script_function_refresh(const std::string& def_id)
 //{
 //    std::string func_name = ("int " + def_id + "_refresh()");
