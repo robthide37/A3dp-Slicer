@@ -2140,6 +2140,9 @@ void GCode::process_layers(
 
 std::string GCode::placeholder_parser_process(const std::string &name, const std::string &templ, uint16_t current_extruder_id, const DynamicConfig *config_override)
 {
+    if (current_extruder_id == uint16_t(-1)) {
+        current_extruder_id = this->m_writer.tool()->id();
+    }
     DynamicConfig default_config;
     if (config_override != nullptr)
         default_config = *config_override;
