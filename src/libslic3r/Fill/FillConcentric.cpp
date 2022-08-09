@@ -141,9 +141,24 @@ FillConcentricWGapFill::fill_surface_extrusion(
 
         //add gapfills
         if (!gaps.empty() && params.density >= 1) {
-            // collapse 
+            // get parameters 
             coordf_t min = 0.2 * distance * (1 - INSET_OVERLAP_TOLERANCE);
-            coordf_t max = 2. * distance;
+            //be sure we don't gapfill where the perimeters are already touching each other (negative spacing).
+            min = std::max(min, double(Flow::new_from_spacing((float)EPSILON, (float)params.flow.nozzle_diameter(), (float)params.flow.height(), (float)params.flow.spacing_ratio(), false).scaled_width()));
+            coordf_t real_max = 2.5 * distance;
+            const coordf_t minwidth = scale_d(params.config->get_abs_value("gap_fill_min_width", params.flow.width()));
+            const coordf_t maxwidth = scale_d(params.config->get_abs_value("gap_fill_max_width", params.flow.width()));
+            const coord_t minlength = scale_t(params.config->get_abs_value("gap_fill_min_length", params.flow.width()));
+            if (minwidth > 0) {
+                min = std::max(min, minwidth);
+            }
+            coordf_t max = real_max;
+            if (maxwidth > 0) {
+                max = std::min(max, maxwidth);
+            }
+            const coord_t gapfill_extension = scale_t(params.config->get_abs_value("gap_fill_extension", params.flow.width()));
+
+            // collapse 
             ExPolygons gaps_ex = diff_ex(
                 offset2_ex(gaps, -min / 2, +min / 2),
                 offset2_ex(gaps, -max / 2, +max / 2),
@@ -153,7 +168,15 @@ FillConcentricWGapFill::fill_surface_extrusion(
                 //remove too small gaps that are too hard to fill.
                 //ie one that are smaller than an extrusion with width of min and a length of max.
                 if (ex.area() > min_gapfill_area) {
-                    Geometry::MedialAxis{ ex, coord_t(max), coord_t(min), scale_t(params.flow.height()) }.build(polylines);
+                    Geometry::MedialAxis md{ ex, coord_t(real_max), coord_t(min), scale_t(params.flow.height()) };
+                    if (minlength > 0) {
+                        md.set_min_length(minlength);
+                    }
+                    if (gapfill_extension > 0) {
+                        md.set_extension_length(gapfill_extension);
+                    }
+                    md.set_biggest_width(max); 
+                    md.build(polylines);
                 }
             }
             if (!polylines.empty() && !is_bridge(good_role)) {
