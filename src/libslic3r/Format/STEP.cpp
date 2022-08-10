@@ -21,6 +21,10 @@
 
 namespace Slic3r {
 
+#if __APPLE__
+extern "C" bool load_step_internal(const char *path, OCCTResult* res);
+#endif
+
 LoadStepFn get_load_step_fn()
 {
     static LoadStepFn load_step_fn = nullptr;
@@ -47,6 +51,8 @@ LoadStepFn get_load_step_fn()
             FreeLibrary(module);
             throw;
         }
+#elif __APPLE__
+        load_step_fn = &load_step_internal;
 #else
         libpath /= "OCCTWrapper.so";
         void *plugin_ptr = dlopen(libpath.c_str(), RTLD_NOW | RTLD_GLOBAL);

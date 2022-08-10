@@ -1,7 +1,12 @@
 cmake_minimum_required(VERSION 3.13)
 project(OCCTWrapper)
 
-add_library(OCCTWrapper MODULE OCCTWrapper.cpp)
+if (APPLE)
+    # TODO: we need to fix notarization with the separate shared library
+    add_library(OCCTWrapper STATIC OCCTWrapper.cpp)
+else ()
+    add_library(OCCTWrapper MODULE OCCTWrapper.cpp)
+endif ()
 
 set_target_properties(OCCTWrapper
     PROPERTIES

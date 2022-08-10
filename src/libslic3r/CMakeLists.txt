@@ -414,6 +414,11 @@ target_link_libraries(libslic3r
     qoi
     )
 
+if (APPLE)
+    # TODO: we need to fix notarization with the separate shared library
+    target_link_libraries(libslic3r OCCTWrapper)
+endif ()
+
 if (TARGET OpenVDB::openvdb)
     target_link_libraries(libslic3r OpenVDB::openvdb)
 endif()
