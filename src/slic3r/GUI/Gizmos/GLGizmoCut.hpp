@@ -41,11 +41,15 @@ class GLGizmoCut3D : public GLGizmoBase
     double m_grabber_radius{ 0.0 };
     double m_grabber_connection_len{ 0.0 };
 
+    double m_snap_coarse_in_radius{ 0.0 };
+    double m_snap_coarse_out_radius{ 0.0 };
+    double m_snap_fine_in_radius{ 0.0 };
+    double m_snap_fine_out_radius{ 0.0 };
+
     // dragging angel in hovered axes
     Transform3d m_start_dragging_m{ Transform3d::Identity() };
     double m_angle{ 0.0 };
 
-    std::map<CutConnectorAttributes, GLModel> m_shapes;
     TriangleMesh    m_connector_mesh;
     // workaround for using of the clipping plane normal
     Vec3d           m_clp_normal{ Vec3d::Ones() };
@@ -53,12 +57,14 @@ class GLGizmoCut3D : public GLGizmoBase
     Vec3d           m_line_beg{ Vec3d::Zero() };
     Vec3d           m_line_end{ Vec3d::Zero() };
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_plane;
     GLModel m_grabber_connection;
     GLModel m_cut_line;
-    GLModel m_cone;
-    GLModel m_sphere;
+
+    PickingModel m_sphere;
+    PickingModel m_cone;
+    std::map<CutConnectorAttributes, PickingModel> m_shapes;
+    std::vector<std::shared_ptr<SceneRaycasterItem>> m_raycasters;
 
     GLModel m_circle;
     GLModel m_scale;
@@ -67,7 +73,6 @@ class GLGizmoCut3D : public GLGizmoBase
     GLModel m_angle_arc;
 
     Vec3d   m_old_center;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };
@@ -168,12 +173,12 @@ protected:
     void on_start_dragging() override;
     void on_stop_dragging() override;
     void on_render() override;
-#if ENABLE_RAYCAST_PICKING
+
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
-#else
-    virtual void on_render_for_picking() override;
-#endif // ENABLE_RAYCAST_PICKING
+    void set_volumes_picking_state(bool state);
+    void update_raycasters_for_picking_transform();
+
     void on_render_input_window(float x, float y, float bottom_limit) override;
 
     bool wants_enter_leave_snapshots() const override       { return true; }
@@ -191,21 +196,22 @@ private:
     bool render_revert_button(const std::string& label);
     bool render_connect_type_radio_button(CutConnectorType type);
     Transform3d get_volume_transformation(const ModelVolume* volume) const;
-    void render_connectors(bool picking);
+    void render_connectors();
 
     bool can_perform_cut() const;
     bool cut_line_processing() const;
     void discard_cut_line_processing();
 
     void render_cut_plane();
-    void render_cut_center_graber(bool picking = false);
+    void render_cut_center_graber();
     void render_cut_line();
     void perform_cut(const Selection& selection);
     void set_center_pos(const Vec3d& center_pos, bool force = false);
     bool update_bb();
+    void init_picking_models();
     void reset_connectors();
     void update_connector_shape();
-    void update_model_object() const;
+    void update_model_object();
     bool process_cut_line(SLAGizmoEventType action, const Vec2d& mouse_position);
 };
 
