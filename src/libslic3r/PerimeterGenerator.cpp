@@ -29,6 +29,13 @@
 #include <list>
 #include <boost/log/trivial.hpp>
 
+//#define ARACHNE_DEBUG
+
+#ifdef ARACHNE_DEBUG
+#include "SVG.hpp"
+#include "Utils.hpp"
+#endif
+
 namespace Slic3r {
 
 PerimeterGeneratorLoops get_all_Childs(PerimeterGeneratorLoop loop) {
@@ -137,6 +144,27 @@ void convert_to_clipperpath(const Polygons& source, ClipperLib_Z::Paths& dest) {
     }
 }
 
+#ifdef ARACHNE_DEBUG
+static void export_perimeters_to_svg(const std::string &path, const Polygons &contours, const std::vector<Arachne::VariableWidthLines> &perimeters, const ExPolygons &infill_area)
+{
+    coordf_t    stroke_width = scale_(0.03);
+    BoundingBox bbox         = get_extents(contours);
+    bbox.offset(scale_(1.));
+    ::Slic3r::SVG svg(path.c_str(), bbox);
+
+    svg.draw(infill_area, "cyan");
+
+    for (const Arachne::VariableWidthLines &perimeter : perimeters)
+        for (const Arachne::ExtrusionLine &extrusion_line : perimeter) {
+            ThickPolyline thick_polyline = to_thick_polyline(extrusion_line);
+            svg.draw({thick_polyline}, "green", "blue", stroke_width);
+        }
+
+    for (const Line &line : to_lines(contours))
+        svg.draw(line, "red", stroke_width);
+}
+#endif
+
 // Thanks, Cura developers, for implementing an algorithm for generating perimeters with variable width (Arachne) that is based on the paper
 // "A framework for adaptive width control of dense contour-parallel toolpaths in fused deposition modeling"
 ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const Surface& surface) {
@@ -166,6 +194,13 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
     Arachne::WallToolPaths wallToolPaths(last_p, this->get_ext_perimeter_spacing(), this->get_ext_perimeter_width(), this->get_perimeter_spacing(), this->get_perimeter_width(), coord_t(loop_number + 1), 0, this->layer->height, *this->object_config, *this->print_config);
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
     loop_number = int(perimeters.size()) - 1;
+
+#ifdef ARACHNE_DEBUG
+        {
+            static int iRun = 0;
+            export_perimeters_to_svg(debug_out_path("arachne-perimeters-%d-%d.svg", layer_id, iRun++), to_polygons(last), perimeters, union_ex(wallToolPaths.getInnerContour()));
+        }
+#endif
 
     // All closed ExtrusionLine should have the same the first and the last point.
     // But in rare cases, Arachne produce ExtrusionLine marked as closed but without

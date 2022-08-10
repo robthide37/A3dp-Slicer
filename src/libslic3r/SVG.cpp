@@ -321,9 +321,10 @@ void SVG::draw_text(const Point &pt, const char *text, const char *color, const 
 void SVG::draw_legend(const Point &pt, const char *text, const char *color, const coordf_t font_size)
 {
     fprintf(this->f,
-        R"(<circle cx="%f" cy="%f" r="10" fill="%s"/>)",
+        R"(<circle cx="%f" cy="%f" r="%f" fill="%s"/>)",
         to_svg_x(float(pt.x() - origin.x())),
         to_svg_y(float(pt.y() - origin.y())),
+        font_size,
         color);
     fprintf(this->f,
         R"(<text x="%f" y="%f" font-family="sans-serif" font-size="%fpx" fill="%s">%s</text>)",
