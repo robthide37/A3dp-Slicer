@@ -52,6 +52,7 @@ inline SurfaceType operator&=(SurfaceType& a, SurfaceType b) {
 //inline bool operator!=(SurfaceType a, SurfaceType b) {
 //    return static_cast<uint16_t>(a) ^ static_cast<uint16_t>(b) != 0;
 //}
+std::string surfaceType_to_string(SurfaceType st);
 
 
 class Surface

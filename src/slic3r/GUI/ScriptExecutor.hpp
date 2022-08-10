@@ -53,6 +53,8 @@ public:
     void init(const std::string& tab_key, Tab* tab);
     void call_script_function_set(const ConfigOptionDef& def, const boost::any& value);
     void refresh(const ConfigOptionDef& def, boost::any value);
+    //return false if the function doesn't exists.
+    bool call_script_function_reset(const ConfigOptionDef& def);
     //void call_script_function_refresh(const std::string& def_id);
     boost::any call_script_function_get_value(const ConfigOptionDef& def);
 };

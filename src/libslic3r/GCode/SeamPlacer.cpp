@@ -322,7 +322,7 @@ void SeamPlacer::plan_perimeters(const std::vector<const ExtrusionEntity*> perim
     m_plan.resize(perimeters.size());
 
     for (int i = 0; i < int(perimeters.size()); ++i) {
-        if ((perimeters[i]->role() == erExternalPerimeter || seam_position == SeamPosition::spRandom) && perimeters[i]->is_loop()) {
+        if ((perimeters[i]->role() == erExternalPerimeter || seam_position == SeamPosition::spRandom || seam_position == SeamPosition::spAllRandom) && perimeters[i]->is_loop()) {
             last_pos = this->calculate_seam(
                 layer, 
                 seam_position,
@@ -353,7 +353,7 @@ void SeamPlacer::plan_perimeters(const std::vector<const ExtrusionEntity*> perim
 }
 
 
-void SeamPlacer::place_seam(ExtrusionLoop& loop, const Point& last_pos, bool external_first, double nozzle_diameter,
+void SeamPlacer::place_seam(ExtrusionLoop& loop, const Layer& layer, const Point& last_pos, bool external_first, double nozzle_diameter,
                             const uint16_t print_object_instance_idx, const EdgeGrid::Grid* lower_layer_edge_grid)
 {
     // const double seam_offset = nozzle_diameter;
@@ -371,7 +371,8 @@ void SeamPlacer::place_seam(ExtrusionLoop& loop, const Point& last_pos, bool ext
                                             m_plan[m_plan_idx].po, print_object_instance_idx, lower_layer_edge_grid, last_pos, false);
 
             if (loop.role() == erExternalPerimeter /*m_plan[m_plan_idx].seam_position == spAligned*/)
-                m_seam_history.add_seam(m_plan[m_plan_idx].po, m_plan[m_plan_idx].pt, loop.polygon().bounding_box());        }
+                m_seam_history.add_seam(m_plan[m_plan_idx].po, m_plan[m_plan_idx].pt, layer.print_z, loop.polygon().bounding_box());
+        }
         else {
             if (!external_first) {
                 // Internal perimeter printed before the external.
@@ -510,6 +511,10 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
     const coord_t  nozzle_r   = coord_t(scale_(0.5 * nozzle_dmr) + 0.5);
     float last_pos_weight = 1.f;
     float angle_weight = 1.f;
+    if (seam_position == spCustom)
+        seam_position = spCost;
+    if(seam_position == spNearest)
+        seam_position = spCost;
 
     size_t po_idx = std::find(m_po_list.begin(), m_po_list.end(), po) - m_po_list.begin();
 
@@ -596,11 +601,11 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
         }
     }
 
-    if (seam_position != spRandom) {
+    if (seam_position != spRandom && seam_position != spAllRandom) {
         // Retrieve the last start position for this object.
 
         double travel_cost = 1;
-        if (seam_position == spAligned) {
+        if (seam_position == spAligned || seam_position == spExtremlyAligned) {
             // Seam is aligned to the seam at the preceding layer.
             if (po != nullptr) {
                 std::optional<Point> pos = m_seam_history.get_last_seam(m_po_list[po_idx], layer_po->print_z, loop.polygon().bounding_box());
@@ -610,17 +615,17 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
                 // TODO: check why i put it out of the if
                 last_pos_weight = is_custom_enforcer_on_layer(layer_idx, po_idx) ? 0.f : 1.f;
             }
-        }else if (seam_position == spRear) {
+        } else if (seam_position == spRear) {
             // Object is centered around (0,0) in its current coordinate system.
             last_pos.x() = 0;
             last_pos.y() = coord_t(3. * po->bounding_box().radius());
             last_pos_weight = 5.f;
             travel_cost = 0;
-        }else if (seam_position == spNearest) {
+        } else if (seam_position == spNearest) {
             last_pos_weight = 25.f;
             travel_cost = 0;
             angle_weight = 0;
-        }else if (seam_position == spCost) {
+        } else if (seam_position == spCost) {
             // last_pos already contains current nozzle position
             // set base last_pos_weight to the same value as penaltyFlatSurface
             last_pos_weight = 5.f;
@@ -636,122 +641,124 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
         // Insert a projection of last_pos into the polygon.
         size_t last_pos_proj_idx;
         {
-            Points::const_iterator it = project_point_to_polygon_and_insert(polygon, last_pos, 0.1 * nozzle_r );
+            Points::const_iterator it = project_point_to_polygon_and_insert(polygon, last_pos, 0.1 * nozzle_r);
             last_pos_proj_idx = it - polygon.points.begin();
         }
         Point last_pos_proj = polygon.points[last_pos_proj_idx];
 
-        // Parametrize the polygon by its length.
-        std::vector<float> lengths = polygon.parameter_by_length();
+        if (seam_position != spExtremlyAligned) {
 
-        //find the max dist the seam can be
-        float dist_max = 0.1f * lengths.back();// 5.f * nozzle_dmr
-        if (po != nullptr && travel_cost >= 1) {
-            last_pos_weight *= 2;
-            dist_max = 0;
-            for (size_t i = 0; i < polygon.points.size(); ++i) {
-                dist_max = std::max(dist_max, (float)polygon.points[i].distance_to(last_pos_proj));
-            }
-        }
+            // Parametrize the polygon by its length.
+            std::vector<float> lengths = polygon.parameter_by_length();
 
-        // For each polygon point, store a penalty.
-        // First calculate the angles, store them as penalties. The angles are caluculated over a minimum arm length of nozzle_r.
-        std::vector<float> penalties = polygon_angles_at_vertices(polygon, lengths,
-            this->is_custom_seam_on_layer(layer_idx, po_idx) ? std::min(MINIMAL_POLYGON_SIDE / 2.f, float(nozzle_r)) : float(nozzle_r));
-        // No penalty for reflex points, slight penalty for convex points, high penalty for flat surfaces.
-        const float penaltyConvexVertex = 1.f;
-        const float penaltyFlatSurface = 3.f;
-        const float penaltyOverhangHalf = 10.f;
-        // Penalty for visible seams.
-       for (size_t i = 0; i < polygon.points.size(); ++ i) {
-            float ccwAngle = penalties[i];
-            if (was_clockwise)
-                ccwAngle = - ccwAngle;
-            float penalty = 0;
-            //if (ccwAngle < -float(0.6 * PI))
-            //    penalty = 0.f;
-            //else if (ccwAngle > float(0.6 * PI))
-            //    
-            //    penalty = penaltyConvexVertex;
-            //else 
-            if (ccwAngle < 0.f) {
-                // We love Sharp reflex vertex (high negative ccwAngle). It hides the seam perfectly.
-                // Interpolate penalty between maximum and zero.
-                penalty = penaltyFlatSurface * bspline_kernel(ccwAngle);
-            } else  if (ccwAngle > float(0.67 * PI)) {
-                //penalize too sharp convex angle, it's best to be nearer to ~100°
-                penalty = penaltyConvexVertex + (penaltyFlatSurface - penaltyConvexVertex) * bspline_kernel( (PI - ccwAngle) * 1.5);
-            } else {
-                // Interpolate penalty between maximum and the penalty for a convex vertex.
-                penalty = penaltyConvexVertex + (penaltyFlatSurface - penaltyConvexVertex) * bspline_kernel(ccwAngle);
-            }
-            penalty *= angle_weight;
+            //find the max dist the seam can be
+            float dist_max = 0.1f * lengths.back();// 5.f * nozzle_dmr
             if (po != nullptr && travel_cost >= 1) {
-                //TODO maybe delete this code path, it's not used in prusa and may not be optimal. At least, document why it's here.
-                penalty += last_pos_weight * polygon.points[i].distance_to(last_pos_proj) / dist_max;
-                penalties[i] = std::max(0.f, penalty);
-            } else {
-                // Give a negative penalty for points close to the last point or the prefered seam location.
-                float dist_to_last_pos_proj = (i < last_pos_proj_idx) ?
-                    std::min(lengths[last_pos_proj_idx] - lengths[i], lengths.back() - lengths[last_pos_proj_idx] + lengths[i]) :
-                    std::min(lengths[i] - lengths[last_pos_proj_idx], lengths.back() - lengths[i] + lengths[last_pos_proj_idx]);
-                penalty -= last_pos_weight * bspline_kernel(dist_to_last_pos_proj / dist_max);
-                penalties[i] = std::max(0.f, penalty);
-                if (prefer_nearest) {
-                    // This hack limits the search around the nearest position projection.
-                    penalties[i] += dist_to_last_pos_proj > 6.f * nozzle_r ? 100.f : 0.f;
+                last_pos_weight *= 2;
+                dist_max = 0;
+                for (size_t i = 0; i < polygon.points.size(); ++i) {
+                    dist_max = std::max(dist_max, (float)polygon.points[i].distance_to(last_pos_proj));
                 }
             }
-        }
-       
-        // Penalty for overhangs.
-        if (lower_layer_edge_grid) {
-            // Use the edge grid distance field structure over the lower layer to calculate overhangs.
-            coord_t nozzle_r = coord_t(std::floor(scale_(0.5 * nozzle_dmr) + 0.5));
-            coord_t search_r = coord_t(std::floor(scale_(0.8 * nozzle_dmr) + 0.5));
-            for (size_t i = 0; i < polygon.points.size(); ++ i) {
-                const Point &p = polygon.points[i];
-                coordf_t dist;
-                // Signed distance is positive outside the object, negative inside the object.
-                // The point is considered at an overhang, if it is more than nozzle radius
-                // outside of the lower layer contour.
-                [[maybe_unused]] bool found = lower_layer_edge_grid->signed_distance(p, search_r, dist);
-                // If the approximate Signed Distance Field was initialized over lower_layer_edge_grid,
-                // then the signed distnace shall always be known.
-                assert(found);
-                penalties[i] += extrudate_overlap_penalty(float(nozzle_r), penaltyOverhangHalf, float(dist));
+
+            // For each polygon point, store a penalty.
+            // First calculate the angles, store them as penalties. The angles are caluculated over a minimum arm length of nozzle_r.
+            std::vector<float> penalties = polygon_angles_at_vertices(polygon, lengths,
+                this->is_custom_seam_on_layer(layer_idx, po_idx) ? std::min(MINIMAL_POLYGON_SIDE / 2.f, float(nozzle_r)) : float(nozzle_r));
+            // No penalty for reflex points, slight penalty for convex points, high penalty for flat surfaces.
+            const float penaltyConvexVertex = 1.f;
+            const float penaltyFlatSurface = 3.f;
+            const float penaltyOverhangHalf = 10.f;
+            // Penalty for visible seams.
+            for (size_t i = 0; i < polygon.points.size(); ++i) {
+                float ccwAngle = penalties[i];
+                if (was_clockwise)
+                    ccwAngle = -ccwAngle;
+                float penalty = 0;
+                //if (ccwAngle < -float(0.6 * PI))
+                //    penalty = 0.f;
+                //else if (ccwAngle > float(0.6 * PI))
+                //    
+                //    penalty = penaltyConvexVertex;
+                //else 
+                if (ccwAngle < 0.f) {
+                    // We love Sharp reflex vertex (high negative ccwAngle). It hides the seam perfectly.
+                    // Interpolate penalty between maximum and zero.
+                    penalty = penaltyFlatSurface * bspline_kernel(ccwAngle);
+                } else  if (ccwAngle > float(0.67 * PI)) {
+                    //penalize too sharp convex angle, it's best to be nearer to ~100°
+                    penalty = penaltyConvexVertex + (penaltyFlatSurface - penaltyConvexVertex) * bspline_kernel((PI - ccwAngle) * 1.5);
+                } else {
+                    // Interpolate penalty between maximum and the penalty for a convex vertex.
+                    penalty = penaltyConvexVertex + (penaltyFlatSurface - penaltyConvexVertex) * bspline_kernel(ccwAngle);
+                }
+                penalty *= angle_weight;
+                if (po != nullptr && travel_cost >= 1) {
+                    //TODO maybe delete this code path, it's not used in prusa and may not be optimal. At least, document why it's here.
+                    penalty += last_pos_weight * polygon.points[i].distance_to(last_pos_proj) / dist_max;
+                    penalties[i] = std::max(0.f, penalty);
+                } else {
+                    // Give a negative penalty for points close to the last point or the prefered seam location.
+                    float dist_to_last_pos_proj = (i < last_pos_proj_idx) ?
+                        std::min(lengths[last_pos_proj_idx] - lengths[i], lengths.back() - lengths[last_pos_proj_idx] + lengths[i]) :
+                        std::min(lengths[i] - lengths[last_pos_proj_idx], lengths.back() - lengths[i] + lengths[last_pos_proj_idx]);
+                    penalty -= last_pos_weight * bspline_kernel(dist_to_last_pos_proj / dist_max);
+                    penalties[i] = std::max(0.f, penalty);
+                    if (prefer_nearest) {
+                        // This hack limits the search around the nearest position projection.
+                        penalties[i] += dist_to_last_pos_proj > 6.f * nozzle_r ? 100.f : 0.f;
+                    }
+                }
             }
-        }
-        
-        // Custom seam. Huge (negative) constant penalty is applied inside
-        // blockers (enforcers) to rule out points that should not win.
-        std::vector<float> penalties_with_custom_seam = penalties;
-        this->apply_custom_seam(polygon, po_idx, penalties_with_custom_seam, lengths, layer_idx, seam_position);
 
-        // Find a point with a minimum penalty.
-        size_t idx_min = std::min_element(penalties_with_custom_seam.begin(), penalties_with_custom_seam.end()) - penalties_with_custom_seam.begin();
-
-        if (seam_position != spAligned || ! is_custom_enforcer_on_layer(layer_idx, po_idx)) {
-            // Very likely the weight of idx_min is very close to the weight of last_pos_proj_idx.
-            // In that case use last_pos_proj_idx instead.
-            float penalty_aligned  = penalties[last_pos_proj_idx];
-            float penalty_min      = penalties[idx_min];
-            float penalty_diff_abs = std::abs(penalties_with_custom_seam[idx_min] - penalties_with_custom_seam[last_pos_proj_idx]);
-            float penalty_max      = std::max(std::abs(penalties[idx_min]), std::abs(penalties[last_pos_proj_idx]));
-            float penalty_diff_rel = (penalty_max == 0.f) ? 0.f : penalty_diff_abs / penalty_max;
-            // printf("Align seams, penalty aligned: %f, min: %f, diff abs: %f, diff rel: %f\n", penalty_aligned, penalty_min, penalty_diff_abs, penalty_diff_rel);
-            if (std::abs(penalty_diff_rel) < 0.05 && penalty_diff_abs < 3) {
-                // Penalty of the aligned point is very close to the minimum penalty.
-                // Align the seams as accurately as possible.
-                idx_min = last_pos_proj_idx;
+            // Penalty for overhangs.
+            if (lower_layer_edge_grid) {
+                // Use the edge grid distance field structure over the lower layer to calculate overhangs.
+                coord_t nozzle_r = coord_t(std::floor(scale_(0.5 * nozzle_dmr) + 0.5));
+                coord_t search_r = coord_t(std::floor(scale_(0.8 * nozzle_dmr) + 0.5));
+                for (size_t i = 0; i < polygon.points.size(); ++i) {
+                    const Point& p = polygon.points[i];
+                    coordf_t dist;
+                    // Signed distance is positive outside the object, negative inside the object.
+                    // The point is considered at an overhang, if it is more than nozzle radius
+                    // outside of the lower layer contour.
+                    [[maybe_unused]] bool found = lower_layer_edge_grid->signed_distance(p, search_r, dist);
+                    // If the approximate Signed Distance Field was initialized over lower_layer_edge_grid,
+                    // then the signed distnace shall always be known.
+                    assert(found);
+                    penalties[i] += extrudate_overlap_penalty(float(nozzle_r), penaltyOverhangHalf, float(dist));
+                }
             }
-        }
 
-        // moved up //TODO verify it's all good
-        //if (loop.role() == erExternalPerimeter)
-        //    m_seam_history.add_seam(po, polygon.points[idx_min], polygon_bb);
+            // Custom seam. Huge (negative) constant penalty is applied inside
+            // blockers (enforcers) to rule out points that should not win.
+            std::vector<float> penalties_with_custom_seam = penalties;
+            this->apply_custom_seam(polygon, po_idx, penalties_with_custom_seam, lengths, layer_idx, seam_position);
 
-        // Export the contour into a SVG file.
+            // Find a point with a minimum penalty.
+            size_t idx_min = std::min_element(penalties_with_custom_seam.begin(), penalties_with_custom_seam.end()) - penalties_with_custom_seam.begin();
+
+            if ((seam_position != spAligned && seam_position != spExtremlyAligned) || !is_custom_enforcer_on_layer(layer_idx, po_idx)) {
+                // Very likely the weight of idx_min is very close to the weight of last_pos_proj_idx.
+                // In that case use last_pos_proj_idx instead.
+                float penalty_aligned = penalties[last_pos_proj_idx];
+                float penalty_min = penalties[idx_min];
+                float penalty_diff_abs = std::abs(penalties_with_custom_seam[idx_min] - penalties_with_custom_seam[last_pos_proj_idx]);
+                float penalty_max = std::max(std::abs(penalties[idx_min]), std::abs(penalties[last_pos_proj_idx]));
+                float penalty_diff_rel = (penalty_max == 0.f) ? 0.f : penalty_diff_abs / penalty_max;
+                // printf("Align seams, penalty aligned: %f, min: %f, diff abs: %f, diff rel: %f\n", penalty_aligned, penalty_min, penalty_diff_abs, penalty_diff_rel);
+                if (std::abs(penalty_diff_rel) < 0.05 && penalty_diff_abs < 3) {
+                    // Penalty of the aligned point is very close to the minimum penalty.
+                    // Align the seams as accurately as possible.
+                    idx_min = last_pos_proj_idx;
+                }
+            }
+
+            // moved up //TODO verify it's all good
+            //if (loop.role() == erExternalPerimeter)
+            //    m_seam_history.add_seam(po, polygon.points[idx_min], polygon_bb);
+
+            // Export the contour into a SVG file.
         #if 0
         {
             static int iRun = 0;
@@ -773,9 +780,14 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
             svg.Close();
         }
         #endif
-        return polygon.points[idx_min];
-
+            return polygon.points[idx_min];
+        } else { // spExtremlyAligned
+            return last_pos_proj;
+        }
     } else { // spRandom
+        if (seam_position == spAllRandom) {
+            return this->get_random_seam(layer_idx, polygon, po_idx);
+        }
         if ( (loop.loop_role() & ExtrusionLoopRole::elrInternal) != 0 && loop.role() != erExternalPerimeter) {
             // This loop does not contain any other loop. Set a random position.
             // The other loops will get a seam close to the random point chosen
@@ -1061,7 +1073,7 @@ void SeamPlacer::apply_custom_seam(const Polygon& polygon, size_t po_idx,
         assert(i < penalties.size());
         penalties[i] += float(ENFORCER_BLOCKER_PENALTY);
     }
-    if (seam_position == spAligned) {
+    if (seam_position == spAligned || seam_position == spExtremlyAligned) {
         std::vector<size_t> enf_centers = find_enforcer_centers(polygon, lengths, enforcers_idxs);
         for (size_t idx : enf_centers) {
             assert(idx < penalties.size());
@@ -1104,20 +1116,35 @@ void SeamPlacer::apply_custom_seam(const Polygon& polygon, size_t po_idx,
 
 
 
-std::optional<Point> SeamHistory::get_last_seam(const PrintObject* po, coord_t layer_z, const BoundingBox& island_bb)
+std::optional<Point> SeamHistory::get_last_seam(const PrintObject* po, double layer_z, const BoundingBox& island_bb)
 {
-    assert(layer_z >= m_layer_z);
-    if (layer_z > m_layer_z) {
-        // Get seam was called for different layer than last time.
-        m_data_last_layer = m_data_this_layer;
-        m_data_this_layer.clear();
-        m_layer_z = layer_z;
-    }
 
     std::optional<Point> out;
 
-    auto seams_it = m_data_last_layer.find(po);
-    if (seams_it == m_data_last_layer.end())
+    if (m_data.empty())
+        return out;
+
+    // Get seam was called for different layer than last time.
+    std::map<const PrintObject*, std::vector<SeamPoint>>* data_last_layer = nullptr;
+    for (auto it = m_data.begin() + 1; it != m_data.end(); ++it) {
+        if (it->first == layer_z) {
+            data_last_layer = &std::prev(it)->second;
+            break;
+        }
+    }
+    if (data_last_layer == nullptr && m_data.back().first < layer_z) {
+        data_last_layer = &m_data.back().second;
+    }
+    if (data_last_layer == nullptr)
+        return out;
+
+    assert(layer_z >= m_layer_z);
+    if (layer_z > m_layer_z) {
+        m_layer_z = layer_z;
+    }
+
+    auto seams_it = data_last_layer->find(po);
+    if (seams_it == data_last_layer->end())
         return out;
 
     const std::vector<SeamPoint>& seam_data_po = seams_it->second;
@@ -1148,9 +1175,28 @@ std::optional<Point> SeamHistory::get_last_seam(const PrintObject* po, coord_t l
 
 
 
-void SeamHistory::add_seam(const PrintObject* po, const Point& pos, const BoundingBox& island_bb)
+void SeamHistory::add_seam(const PrintObject* po, const Point& pos, double layer_z, const BoundingBox& island_bb)
 {
-    m_data_this_layer[po].push_back({pos, island_bb});;
+    std::map<const PrintObject*, std::vector<SeamPoint>>* data_this_layer = nullptr;
+    for (auto it = m_data.begin(); it != m_data.end(); ++it) {
+        if (it->first == layer_z) {
+            data_this_layer = &it->second;
+            break;
+        }
+        if (it->first >= layer_z) {
+            //add it before
+            m_data.emplace(it);
+            it->first = layer_z;
+            data_this_layer = &it->second;
+        }
+    }
+    if (data_this_layer == nullptr) {
+        //push to end
+        m_data.emplace_back();
+        m_data.back().first = layer_z;
+        data_this_layer = &m_data.back().second;
+    }
+    (*data_this_layer)[po].push_back({pos, island_bb});
 }
 
 
@@ -1158,8 +1204,7 @@ void SeamHistory::add_seam(const PrintObject* po, const Point& pos, const Boundi
 void SeamHistory::clear()
 {
     m_layer_z = 0;
-    m_data_last_layer.clear();
-    m_data_this_layer.clear();
+    m_data.clear();
 }
 
 

@@ -2008,6 +2008,7 @@ MedialAxis::remove_too_thin_extrusion(ThickPolylines& pp)
 void
 MedialAxis::remove_too_thick_extrusion(ThickPolylines& pp)
 {
+    if (this->m_biggest_width <= 0) return;
     // remove too thin extrusion at start & end of polylines
     bool changes = false;
     for (size_t i = 0; i < pp.size(); ++i) {

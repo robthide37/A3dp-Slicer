@@ -87,8 +87,8 @@ each parameter is separated by ':'
 		* `floats_or_percents: mandatory`: Array. Tell the sotfware it's a numeric that can acept a % value (boolean return value)
 		* `strings`: Array. Tell mandatory for a filament or an extruder value. The sotfware it's a numeric an entry field where you can enter a text(string return value)
 		* `enum$STR$STR[$STR$STR]*`: tell the sotfware it's a combobox (string return value). It has to be followed by $name$label for each option you want to show.
-Also, script may depends on normal fields. When a setting it depends is modified, the scripted widget will appear modified. And resetting a widget will reset all depending fields.
-	  * `depends$STR[$STR]*`: add the setting fields this scripted widget depends on. Each one has to be suffixed by a '$'
+	* Also, script may depends on normal fields. When a setting it depends is modified, the scripted widget will appear modified. And resetting a widget will reset all depending fields.
+		* `depends$STR[$STR]*`: add the setting fields this scripted widget depends on. Each one has to be suffixed by a '$'
 
 There is also special commands:
 * `height:INT`: change the default height of settings. Don't works with every type of setting (mostly multilne text). Set to 0 or -1 to disable.
@@ -139,9 +139,87 @@ The second one is called when the user change the value in the gui.
 At the start of the print.ui file, there is a little dictionnary with he methods available for the script to call.
 It also contains the list of methods needed for all types (not only int).
 
+You can also write a `void my_widget_reset()` if the default one (reset the settings from the depends property) isn't what's needed.
+
 ## frequent settings
 
 The files freq_fff.ui and freq_sla.ui contains teh frequent settings.
 Their layout is similar as other ui files. They still have to define a page and a group.
 The group has to be `group:freq_settings_event:no_title:no_search:` to not interfer witht he rest of the gui.
 If it use scripted widget, they have to be in the print.as file. The syntax is similar to c++/java.
+
+## Script API: called by the slicer
+Here are all the functions you need to define for your custom widget to work (for your type):
+### type bool:
+ * int **OPTNAME_get**() 
+      Will return 1 if checked, 0 if unchecked and -1 if half-checked (not all os, will be unchecked if not available)
+ * void **OPTNAME_set**(bool set)
+###  type int:
+ * int **OPTNAME_get**()
+ * void **OPTNAME_set**(int set)
+###  type float & percent:
+ * float **OPTNAME_get**()
+ * void **OPTNAME_set**(float set)
+ ### type float_or_percent:
+ * float **OPTNAME_get**(bool &out is_percent)
+ * void **OPTNAME_set**(float set, bool is_percent)
+###  type string:
+ * void **OPTNAME_get**(string &out get)
+ * void **OPTNAME_set**(string &in set)
+###  type enum:
+ * int **OPTNAME_get**(string &out enum_value)
+      Only the return value is used unless it's out of bounds, then it tries to use the enum_value
+ * void **OPTNAME_set**(string &in set_enum_value, int set_idx)
+###  all type:
+ * void **OPTNAME_reset**()
+      Optional, called when clicked on the "reset" button.
+      If not present, the software will call a reset on all fields from the 'depends' property.
+## Script API: called by the script
+ Here are listed all the functions to the slicer you can call from the script:
+### to get the value of a real settings
+These functions can be called everywhere.
+ * bool  **get_bool**(string &in key)
+ * int   **get_int**(string &in key)
+    Can be used by type int and enum (return the index)
+ * float **get_float**(string &in key)
+    Can be used by type float, percent and flaot_or_percent
+ * float **get_computed_float**(string &in key)
+    Get the float computed value of the field. Useful if it's a floatOrPercent that is computable.
+ * bool  **is_percent**(string &in key)
+ * void  **get_string**(string &in key, string &out get_val)
+    Can be used by type string and enum (return the enum_value, not the label)
+    
+### to set the value of real settings
+These functions can only be called in a `set` or `reset` function. If you need to set a variable in a `get`, call ask_for_refresh() and write it in the set method.
+ * void **set_bool**(string &in key, bool new_val)
+ * void **set_int**(string &in key, int new_val)
+    if an enum, it's the index in the c++ enum
+ * void **set_float**(string &in key, float new_val)
+    if a float_or_percent, unset the percent flag at the same time
+ * void **set_percent**(string &in key, float new_val)
+    if a float_or_percent, set the percent flag at the same time
+ * void **set_string**(string &in key, string &in new_val))
+    if an enum, it's one of the enum_value, as saved in a config file
+ *  void **back_initial_value**(string &in key)
+    revert the setting to the last saved value (same as a click on the reset arrow)
+### others
+  * void **ask_for_refresh**()
+    ask for a OPTNAME_set() after the current OPTNAME_get(), to be able to set settings.
+
+### to get/set the value of a custom variable
+The first argument is the index of the tab setting: 0 for print settings, 1 for filament settings and 2 for printer settings.
+Getters return true if the variable exists, false if it doesn't. If the variable doesn't exists, the 'out' variable isn't set.
+ * bool **get_custom_bool**(int, string &in, bool &out)
+ * void **set_custom_bool**(int, string &in, bool new_val)
+ * bool **get_custom_int**(int, string &in, int &out)
+ * void **set_custom_int**(int, string &in, int new_val)
+ * bool **get_custom_float**(int, string &in, float &out)
+ * void **set_custom_float**(int, string &in, float new_val)
+ * bool **get_custom_string**(int, string &in, string &out)
+ * void **set_custom_string**(int, string &in, string &in new_val)
+ * void **back_custom_initial_value**(int, string &in)
+To remove a custom variable, use `set_custom_string` with an empty string as `new_val`
+
+### to print on the console, for debugging
+ * void **print**(string &out)
+ * void **print_float**(float)

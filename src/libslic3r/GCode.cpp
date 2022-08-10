@@ -2140,6 +2140,9 @@ void GCode::process_layers(
 
 std::string GCode::placeholder_parser_process(const std::string &name, const std::string &templ, uint16_t current_extruder_id, const DynamicConfig *config_override)
 {
+    if (current_extruder_id == uint16_t(-1)) {
+        current_extruder_id = this->m_writer.tool()->id();
+    }
     DynamicConfig default_config;
     if (config_override != nullptr)
         default_config = *config_override;
@@ -3291,7 +3294,6 @@ void GCode::append_full_config(const Print &print, std::string &str)
         "printhost_apikey",
         "printhost_cafile",
         "printhost_client_cert",
-        "printhost_client_cert_enabled",
         "printhost_client_cert_password",
         "printhost_port"
     };
@@ -3685,12 +3687,13 @@ void GCode::split_at_seam_pos(ExtrusionLoop& loop, std::unique_ptr<EdgeGrid::Gri
         if (!loop.split_at_vertex(seam))
             // The point is not in the original loop. Insert it.
             loop.split_at(seam, true);*/
-    } else
-        m_seam_placer.place_seam(loop,
+    } else {
+        m_seam_placer.place_seam(loop, *this->layer(),
             this->last_pos(), m_config.external_perimeters_first,
             EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4),
             m_print_object_instance_id,
             lower_layer_edge_grid ? lower_layer_edge_grid->get() : nullptr);
+    }
 }
 
 namespace check_wipe {

@@ -20,7 +20,7 @@ namespace Slic3r
 class WipeTowerWriter
 {
 public:
-	WipeTowerWriter(float layer_height, float line_width, GCodeFlavor flavor, const std::vector<WipeTower::FilamentParameters>& filament_parameters) :
+	WipeTowerWriter(float layer_height, float line_width, GCodeFlavor flavor, std::vector<std::string> tool_name, const std::vector<WipeTower::FilamentParameters>& filament_parameters) :
 		m_current_pos(std::numeric_limits<float>::max(), std::numeric_limits<float>::max()),
 		m_current_z(0.f),
 		m_current_feedrate(0.f),
@@ -32,6 +32,7 @@ public:
         m_default_analyzer_line_width(line_width),
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
         m_gcode_flavor(flavor),
+        m_tool_name(tool_name),
         m_filpar(filament_parameters)
         {
             // adds tag for analyzer:
@@ -86,12 +87,23 @@ public:
     }
 
     WipeTowerWriter&            disable_linear_advance() {
-        if (m_gcode_flavor == gcfRepRap || m_gcode_flavor == gcfSprinter)
+        if (m_gcode_flavor == gcfRepRap || m_gcode_flavor == gcfSprinter) {
             m_gcode += (std::string("M572 D") + std::to_string(this->m_current_tool) + " S0\n");
-         else if(m_gcode_flavor == gcfKlipper)
-             m_gcode += std::string("SET_PRESSURE_ADVANCE ADVANCE=0 EXTRUDER=extruder") + std::to_string(this->m_current_tool) + "\n";
-         else
+        } else if (m_gcode_flavor == gcfKlipper) {
+            if (this->m_current_tool > 0 && this->m_current_tool < m_tool_name.size() && !m_tool_name[this->m_current_tool].empty()
+                // NOTE: this will probably break if there's more than 10 tools, as it's relying on the
+                // ASCII character table.
+                && m_tool_name[this->m_current_tool][0] != static_cast<char>(('0' + this->m_current_tool))) {
+                m_gcode += "SET_PRESSURE_ADVANCE ADVANCE=0 EXTRUDER=" + m_tool_name[this->m_current_tool] + "\n";
+            } else {
+                m_gcode += "SET_PRESSURE_ADVANCE ADVANCE=0 EXTRUDER=extruder";
+                if (this->m_current_tool > 0)
+                    m_gcode += std::to_string(this->m_current_tool);
+                m_gcode += "\n";
+            }
+        } else {
             m_gcode += std::string("M900 K0\n");
+        }
         return *this;
     }
 
@@ -549,6 +561,7 @@ private:
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
     float         m_used_filament_length = 0.f;
     GCodeFlavor   m_gcode_flavor;
+    std::vector<std::string> m_tool_name;
     const std::vector<WipeTower::FilamentParameters>& m_filpar;
 
 	std::string   set_format_X(float x)
@@ -623,7 +636,6 @@ WipeTower::WipeTower(const PrintConfig& config, const PrintObjectConfig& default
     m_wipe_tower_pos(config.wipe_tower_x, config.wipe_tower_y),
     m_wipe_tower_width(float(config.wipe_tower_width)),
     m_wipe_tower_rotation_angle(float(config.wipe_tower_rotation_angle)),
-    m_wipe_tower_brim_width(float(config.wipe_tower_brim_width)),
     m_y_shift(0.f),
     m_z_pos(0.f),
     m_bridging(float(config.wipe_tower_bridging)),
@@ -771,7 +783,7 @@ std::vector<WipeTower::ToolChangeResult> WipeTower::prime(
     for (size_t idx_tool = 0; idx_tool < tools.size(); ++ idx_tool) {
         size_t old_tool = m_current_tool;
 
-        WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar);
+        WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_config->tool_name.values, m_filpar);
         writer.set_extrusion_flow(m_extrusion_flow)
               .set_z(m_z_pos)
               .set_initial_tool(m_current_tool);
@@ -867,7 +879,7 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool)
         (tool != (unsigned int)(-1) ? wipe_area+m_depth_traversed-0.5f*m_perimeter_width
                                     : m_wipe_tower_depth-m_perimeter_width));
 
-	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar);
+	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_config->tool_name.values, m_filpar);
 	writer.set_extrusion_flow(m_extrusion_flow)
 		.set_z(m_z_pos)
 		.set_initial_tool(m_current_tool)
@@ -1302,7 +1314,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
 
     size_t old_tool = m_current_tool;
 
-	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar);
+	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_config->tool_name.values, m_filpar);
 	writer.set_extrusion_flow(m_extrusion_flow)
 		.set_z(m_z_pos)
 		.set_initial_tool(m_current_tool)
@@ -1408,9 +1420,9 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
             (float)m_layer_height,
             (m_current_tool < m_config->nozzle_diameter.values.size()) ? m_object_config->get_computed_value("filament_max_overlap", m_current_tool) : 1
         );
-        const coordf_t spacing = brim_flow.spacing();
+        const double spacing = brim_flow.spacing();
         // How many perimeters shall the brim have?
-        size_t loops_num = (m_wipe_tower_brim_width + spacing / 2) / spacing;
+        size_t loops_num = (m_config->wipe_tower_brim_width.get_abs_value(m_nozzle_diameter) + spacing / 2) / spacing;
 
 
         writer.set_extrusion_flow(brim_flow.mm3_per_mm() / filament_area())

@@ -393,11 +393,11 @@ msgstr ""
 #: src/slic3r/GUI/Preferences.cpp:921
 #Similar to me: Changing some options will trigger application restart.\nYou will lose the content of the platter.
 # 1    changes: Changing some options will trigger application restart.\nYou will lose the content of the plater.
-#  translation: Změnou nastavení se aplikace restartuje.\nZtratíte objekty na tiskové podložce.
+#  translation: Změnou nastavení se aplikace restartuje.\nPřijdete o obsah tiskové podložky.
 # 21   changes: Switching the language will trigger application restart.\nYou will lose content of the platter.
-#  translation: Přepnutí jazyka spustí restart aplikace.\nPřijdete o obsah talíře.
+#  translation: Přepnutím jazyka se aplikace restartuje.\nPřijdete o obsah tiskové podložky.
 # 22   changes: Switching the language will trigger application restart.\nYou will lose content of the plater.
-#  translation: Přepnutím jazyka se aplikace restartuje.\nZtratíte obsah scény.
+#  translation: Přepnutím jazyka se aplikace restartuje.\nPřijdete o obsah tiskové podložky.
 msgid ""
 "Changing some options will trigger application restart.\n"
 "You will lose the content of the platter."
@@ -2321,7 +2321,7 @@ msgstr ""
 #: src/slic3r/GUI/FreeCADDialog.cpp:255
 #Similar to me: What to do with the result? insert it into the existing platter or replacing the current platter by a new one?
 # 2    changes: What to do with the result? insert it into the existing plater or replacing the current plater by a new one?
-#  translation: Co dělat s výsledkem? vložit jej do stávajícího talíře nebo vyměnit stávající talíř za nový?
+#  translation: Co dělat s výsledkem? přidat jej ke stávajícimu obsahu podložky nebo nahradit obsah podložky za nový?
 msgid ""
 "What to do with the result? insert it into the existing platter or replacing "
 "the current platter by a new one?"

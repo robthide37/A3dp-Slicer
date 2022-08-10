@@ -173,6 +173,27 @@ May also be useful to run
 
 I'm sure there is some steps missing, please open an issue to let us know or open a pull request by editing this document.
 
+To get this running / updated on an RPi running Raspberry Pi OS - Bullseye (64bit) you can run the ./BuildLinux.sh script, however it will not make the AppImage, but it will generate the application in the package folder that you can them move to somewhere convenient.
+
+e.g. navigate to clone repository
+    sudo ./BuildLinux.sh -s
+    sudo ./BuildLinux.sh -dsi
+
+It will fail, but (for me) ONLY when it tries making the AppImage.  If you then copy the contents of the 'package' folder you should have a nice fully working instance. 
+**Note:** I think you can use `./BuildLinux.sh -ds` instead of `sudo ./BuildLinux.sh -dsi` and it should do the same thign without failing. I didn't tried.
+
+Move the package folder to a location of your choice e.g.
+    cp -R build/package /home/pi/SuperSlicer/
+Ensure the executable is runnable as default user pi.
+    cd /home/pi
+    sudo chown -R pi:pi SuperSlicer
+    Finally make the sure the program is executable
+sudo chomod +x ~/SuperSlicer/superslicer
+
+Then run by calling 
+./home/pi/SuperSlicer/superslicer
+
+
 
 
 

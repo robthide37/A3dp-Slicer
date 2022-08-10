@@ -143,4 +143,53 @@ bool export_to_svg(const char *path, const Surfaces &surfaces, const float trans
     return true;
 }
 
+
+std::string surfaceType_to_string(SurfaceType st)
+{
+    std::string str;
+    if ((st & stPosTop) != 0)
+        str += "posTop";
+    if ((st & stPosBottom) != 0) {
+        if (!str.empty())
+            str += "||";
+        str += "posBottom";
+    }
+    if ((st & stPosInternal) != 0) {
+        if (!str.empty())
+            str += "||";
+        str += "posInternal";
+    }
+    if ((st & stPosPerimeter) != 0) {
+        if (!str.empty())
+            str += "||";
+        str += "posPerimeter";
+    }
+    if ((st & stDensSolid) != 0) {
+        if (!str.empty())
+            str += "||";
+        str += "densSolid";
+    }
+    if ((st & stDensSparse) != 0) {
+        if (!str.empty())
+            str += "||";
+        str += "densSparse";
+    }
+    if ((st & stDensVoid) != 0) {
+        if (!str.empty())
+            str += "||";
+        str += "densVoid";
+    }
+    if ((st & stModBridge) != 0) {
+        if (!str.empty())
+            str += "||";
+        str += "modBridge";
+    }
+    if ((st & stModOverBridge) != 0) {
+        if (!str.empty())
+            str += "||";
+        str += "modOverBridge";
+    }
+    return str.empty() ? "none" : str;
+}
+
 }
