@@ -615,6 +615,14 @@ void WallToolPaths::stitchToolPaths(std::vector<VariableWidthLines> &toolpaths, 
             {
                 continue;
             }
+
+            // PolylineStitcher, in some cases, produced closed extrusion (polygons),
+            // but the endpoints differ by a small distance. So we reconnect them.
+            // FIXME Lukas H.: Investigate more deeply why it is happening.
+            if (wall_polygon.junctions.front().p != wall_polygon.junctions.back().p &&
+                (wall_polygon.junctions.back().p - wall_polygon.junctions.front().p).cast<double>().norm() < stitch_distance) {
+                wall_polygon.junctions.emplace_back(wall_polygon.junctions.front());
+            }
             wall_polygon.is_closed = true;
             wall_lines.emplace_back(std::move(wall_polygon)); // add stitched polygons to result
         }
