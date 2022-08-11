@@ -594,7 +594,12 @@ void OptionsGroup::update_script_presets() {
         if (key_opt.second.opt.is_script) {
             Field* field = get_field(key_opt.first);
             if (field) {
-                this->set_value(key_opt.first, key_opt.second.script->call_script_function_get_value(key_opt.second.opt));
+                boost::any val = key_opt.second.script->call_script_function_get_value(key_opt.second.opt);
+                if (val.empty()) {
+                    MessageDialog(nullptr, "Error, can't find the script to get the value for the widget '" + key_opt.first + "'", _L("Error"), wxOK | wxICON_ERROR).ShowModal();
+                } else {
+                    this->set_value(key_opt.first, val);
+                }
             } //if not, it will set at ConfigOptionsGroup::reload_config()
         }
     }

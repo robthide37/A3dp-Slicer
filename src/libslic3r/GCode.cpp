@@ -3764,12 +3764,15 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     std::cout << "\n";
 #endif
 
+    //useful var
+    const double nozzle_diam = (EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0));
+
     //no-seam code path redirect
     if (original_loop.role() == ExtrusionRole::erExternalPerimeter && (original_loop.loop_role() & elrVase) != 0 && !this->m_config.spiral_vase
         //but not for the first layer
         && this->m_layer->id() > 0
         //exclude if min_layer_height * 2 > layer_height (increase from 2 to 3 because it's working but uses in-between)
-        && this->m_layer->height >= m_config.min_layer_height.get_abs_value(m_writer.tool()->id(), m_config.nozzle_diameter.get_at(m_writer.tool()->id())) * 2 - EPSILON
+        && this->m_layer->height >= m_config.min_layer_height.get_abs_value(m_writer.tool()->id(), nozzle_diam) * 2 - EPSILON
         ) {
         return extrude_loop_vase(original_loop, description, speed, lower_layer_edge_grid);
     }
@@ -3820,23 +3823,34 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     // we discard it in that case
     ExtrusionPaths& building_paths = loop_to_seam.paths;
     if (m_enable_loop_clipping && m_writer.tool_is_extruder()) {
-        coordf_t clip_length = scale_(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
-        coordf_t min_clip_length = scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)) * 0.15;
+        coordf_t clip_length = scale_(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), nozzle_diam));
+        coordf_t min_clip_length = scale_(nozzle_diam) * 0.15;
 
-        // get paths
-        ExtrusionPaths clipped;
-        if (clip_length > min_clip_length) {
-                // remove clip_length, like normally, but keep the removed part
-            clipped = clip_end(building_paths, clip_length);
-                // remove min_clip_length from the removed paths
-            clip_end(clipped, min_clip_length);
-                // ensure that the removed paths are travels
-            for (ExtrusionPath& ep : clipped)
-                ep.mm3_per_mm = 0;
-                // re-add removed paths as travels.
-            append(building_paths, clipped);
-        } else {
-            clip_end(building_paths, clip_length);
+        if (clip_length > full_loop_length / 4) {
+            //fall back to min_clip_length
+            if (clip_length > full_loop_length / 2) {
+                clip_length = min_clip_length;
+            } else {
+                float percent = (float(clip_length) / (float(full_loop_length) / 4)) - 1;
+                clip_length = clip_length * (1- percent) + min_clip_length * percent;
+            }
+        }
+        if (clip_length < full_loop_length / 4) {
+            // get paths
+            ExtrusionPaths clipped;
+            if (clip_length > min_clip_length) {
+                    // remove clip_length, like normally, but keep the removed part
+                clipped = clip_end(building_paths, clip_length);
+                    // remove min_clip_length from the removed paths
+                clip_end(clipped, min_clip_length);
+                    // ensure that the removed paths are travels
+                for (ExtrusionPath& ep : clipped)
+                    ep.mm3_per_mm = 0;
+                    // re-add removed paths as travels.
+                append(building_paths, clipped);
+            } else {
+                clip_end(building_paths, clip_length);
+            }
         }
     }
     if (building_paths.empty()) return "";
@@ -3844,8 +3858,8 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
 
     // apply the small perimeter speed
     if (speed == -1 && is_perimeter(paths.front().role()) && paths.front().role() != erThinWall) {
-        double min_length = scale_d(this->m_config.small_perimeter_min_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
-        double max_length = scale_d(this->m_config.small_perimeter_max_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
+        double min_length = scale_d(this->m_config.small_perimeter_min_length.get_abs_value(nozzle_diam));
+        double max_length = scale_d(this->m_config.small_perimeter_max_length.get_abs_value(nozzle_diam));
         if (full_loop_length < max_length) {
             if (full_loop_length <= min_length) {
                 speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET;
@@ -3889,7 +3903,6 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         Vec2d  next_pos = next_point.cast<double>();
         Vec2d  vec_dist = next_pos - current_pos;
         double vec_norm = vec_dist.norm();
-        const double nozzle_diam = (EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0));
         const double setting_max_depth = (m_config.wipe_inside_depth.get_abs_value(m_writer.tool()->id(), nozzle_diam));
         coordf_t dist = scale_d(nozzle_diam) / 2;
         Point  pt = (current_pos + vec_dist * (2 * dist / vec_norm)).cast<coord_t>();
@@ -3933,6 +3946,16 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     //wipe for External Perimeter (and not vase)
     if (paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 0 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 2
         && (m_enable_loop_clipping && m_writer.tool_is_extruder()) ) {
+        double dist_wipe_extra_perimeter = EXTRUDER_CONFIG_WITH_DEFAULT(wipe_extra_perimeter, 0);
+
+        //safeguard : if not possible to wipe, abord.
+        if (paths.size() == 1 && paths.front().size() <= 2) {
+            return gcode;
+        }
+        //TODO: abord if the wipe is too big for a mini loop (in a better way)
+        if (paths.size() == 1 && unscaled(paths.front().length()) < EXTRUDER_CONFIG_WITH_DEFAULT(wipe_extra_perimeter, 0) + nozzle_diam) {
+            return gcode;
+        }
         //get points for wipe
         Point prev_point = *(paths.back().polyline.points.end() - 2);       // second to last point
         // *(paths.back().polyline.points.end() - 2) this is the same as (or should be) as paths.front().first_point();
@@ -3946,8 +3969,8 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
 
         gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
         //extra wipe before the little move.
-        if (EXTRUDER_CONFIG_WITH_DEFAULT(wipe_extra_perimeter, 0) > 0) {
-            coordf_t wipe_dist = scale_(EXTRUDER_CONFIG_WITH_DEFAULT(wipe_extra_perimeter,0));
+        if (dist_wipe_extra_perimeter > 0) {
+            coordf_t wipe_dist = scale_(dist_wipe_extra_perimeter);
             ExtrusionPaths paths_wipe;
             m_wipe.reset_path();
             for (int i = 0; i < paths.size(); i++) {
@@ -4016,7 +4039,6 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         Vec2d  next_pos = next_point.cast<double>();
         Vec2d  vec_dist = next_pos - current_pos;
         double vec_norm = vec_dist.norm();
-        const double nozzle_diam = (EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0));
         const double setting_max_depth = (m_config.wipe_inside_depth.get_abs_value(m_writer.tool()->id(), nozzle_diam));
         coordf_t dist = scale_d(nozzle_diam) / 2;
         if (nozzle_diam != 0 && setting_max_depth > nozzle_diam * 0.55)
