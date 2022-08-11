@@ -2379,9 +2379,20 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     const auto loading = _L("Loading") + dots;
 
-    // Create wxProgressDialog on heap, see the linux ifdef below.
-    auto progress_dlg = new wxProgressDialog(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
+    // The situation with wxProgressDialog is quite interesting here.
+    // On Linux (only), there are issues when FDM/SLA is switched during project file loading (disabling of controls,
+    // see a comment below). This can be bypassed by creating the wxProgressDialog on heap and destroying it
+    // when loading a project file. However, creating the dialog on heap causes issues on macOS, where it does not
+    // appear at all. Therefore, we create the dialog on stack on Win and macOS, and on heap on Linux, which
+    // is the only system that needed the workarounds in the first place.
+#ifdef __linux__
+    auto progress_dlg = new wxProgressDialog(loading, "", 100, find_toplevel_parent(q), wxPD_APP_MODAL | wxPD_AUTO_HIDE);
     Slic3r::ScopeGuard([&progress_dlg](){ if (progress_dlg) progress_dlg->Destroy(); progress_dlg = nullptr; });
+#else
+    wxProgressDialog progress_dlg_stack(loading, "", 100, find_toplevel_parent(q), wxPD_APP_MODAL | wxPD_AUTO_HIDE);
+    wxProgressDialog* progress_dlg = &progress_dlg_stack;    
+#endif
+    
 
     wxBusyCursor busy;
 
