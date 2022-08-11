@@ -15,11 +15,12 @@ add_subdirectory(semver)
 add_subdirectory(libigl)
 add_subdirectory(hints)
 add_subdirectory(qoi)
-
-# Adding libnest2d project for bin packing...
 add_subdirectory(libnest2d)
-
 add_subdirectory(libslic3r)
+
+if (SLIC3R_ENABLE_FORMAT_STEP)
+    add_subdirectory(occt_wrapper)
+endif ()
 
 if (SLIC3R_GUI)
     add_subdirectory(imgui)
@@ -127,6 +128,7 @@ if (NOT WIN32 AND NOT APPLE)
 endif ()
 
 target_link_libraries(PrusaSlicer libslic3r cereal)
+
 if (APPLE)
 #    add_compile_options(-stdlib=libc++)
 #    add_definitions(-DBOOST_THREAD_DONT_USE_CHRONO -DBOOST_NO_CXX11_RVALUE_REFERENCES -DBOOST_THREAD_USES_MOVE)

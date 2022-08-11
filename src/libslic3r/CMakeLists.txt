@@ -94,6 +94,8 @@ add_library(libslic3r STATIC
     Format/STL.hpp
     Format/SL1.hpp
     Format/SL1.cpp
+    Format/STEP.hpp
+    Format/STEP.cpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp
@@ -411,6 +413,11 @@ target_link_libraries(libslic3r
 	JPEG::JPEG
     qoi
     )
+
+if (APPLE)
+    # TODO: we need to fix notarization with the separate shared library
+    target_link_libraries(libslic3r OCCTWrapper)
+endif ()
 
 if (TARGET OpenVDB::openvdb)
     target_link_libraries(libslic3r OpenVDB::openvdb)
