@@ -7,6 +7,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/dll/runtime_symbol_info.hpp>
+#include <boost/log/trivial.hpp>
 
 #include <string>
 #include <functional>
@@ -61,10 +62,11 @@ LoadStepFn get_load_step_fn()
             load_step_fn = reinterpret_cast<LoadStepFn>(dlsym(plugin_ptr, fn_name));
             if (!load_step_fn) {
                 dlclose(plugin_ptr);
-                BOOST_LOG_TRIVIAL(error) << dlerror();
+                throw Slic3r::RuntimeError(std::string("Cannot load function from OCCTWrapper.dll: ") + fn_name
+                                           + "\n\n" + dlerror());
             }
         } else {
-            BOOST_LOG_TRIVIAL(error) << dlerror();
+            throw Slic3r::RuntimeError(std::string("Cannot load OCCTWrapper.dll:\n\n") + dlerror());
         }
 #endif
     }
