@@ -389,3 +389,38 @@ TEST_CASE("Arachne - #8633 - Shorter open perimeter", "[ArachneShorterOpenPerime
 #endif
     }
 }
+
+// This test case was distilled from GitHub issue #8597.
+// There was just an issue with decrementing std::vector::begin() in a specific case.
+TEST_CASE("Arachne - #8597 - removeSmallAreas", "[ArachneRemoveSmallAreas8597]") {
+    const Polygon poly_0 = {
+        Point(-38768167, -3636556),
+        Point(-38763631, -3617883),
+        Point(-38763925, -3617820),
+        Point(-38990169, -3919539),
+        Point(-38928506, -3919539),
+    };
+
+    const Polygon poly_1 = {
+        Point(-39521732, -4480560),
+        Point(-39383333, -4398498),
+        Point(-39119825, -3925307),
+        Point(-39165608, -3926212),
+        Point(-39302205, -3959445),
+        Point(-39578719, -4537002),
+    };
+
+    Polygons polygons    = {poly_0, poly_1};
+    coord_t  spacing     = 407079;
+    coord_t  inset_count = 2;
+
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    wallToolPaths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
+
+#ifdef ARACHNE_DEBUG_OUT
+    export_perimeters_to_svg(debug_out_path("arachne-remove-small-areas-8597.svg"), polygons, perimeters, union_ex(wallToolPaths.getInnerContour()));
+#endif
+
+    REQUIRE(perimeters.size() == 1);
+}

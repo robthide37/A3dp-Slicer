@@ -329,60 +329,46 @@ void removeSmallAreas(Polygons &thiss, const double min_area_size, const bool re
     };
 
     auto new_end = thiss.end();
-    if(remove_holes)
-    {
-        for(auto it = thiss.begin(); it < new_end; it++)
-        {
-            // All polygons smaller than target are removed by replacing them with a polygon from the back of the vector
-            if(fabs(ClipperLib::Area(to_path(*it))) < min_area_size)
-            {
-                new_end--;
+    if (remove_holes) {
+        for (auto it = thiss.begin(); it < new_end;) {
+            // All polygons smaller than target are removed by replacing them with a polygon from the back of the vector.
+            if (fabs(ClipperLib::Area(to_path(*it))) < min_area_size) {
+                --new_end;
                 *it = std::move(*new_end);
-                it--; // wind back the iterator such that the polygon just swaped in is checked next
+                continue; // Don't increment the iterator such that the polygon just swapped in is checked next.
             }
+            ++it;
         }
-    }
-    else
-    {
+    } else {
         // For each polygon, computes the signed area, move small outlines at the end of the vector and keep pointer on small holes
         std::vector<Polygon> small_holes;
-        for(auto it = thiss.begin(); it < new_end; it++) {
-            double area = ClipperLib::Area(to_path(*it));
-            if (fabs(area) < min_area_size)
-            {
-                if(area >= 0)
-                {
-                    new_end--;
-                    if(it < new_end) {
+        for (auto it = thiss.begin(); it < new_end;) {
+            if (double area = ClipperLib::Area(to_path(*it)); fabs(area) < min_area_size) {
+                if (area >= 0) {
+                    --new_end;
+                    if (it < new_end) {
                         std::swap(*new_end, *it);
-                        it--;
-                    }
-                    else
-                    { // Don't self-swap the last Path
+                        continue;
+                    } else { // Don't self-swap the last Path
                         break;
                     }
-                }
-                else
-                {
+                } else {
                     small_holes.push_back(*it);
                 }
             }
+            ++it;
         }
 
         // Removes small holes that have their first point inside one of the removed outlines
         // Iterating in reverse ensures that unprocessed small holes won't be moved
         const auto removed_outlines_start = new_end;
-        for(auto hole_it = small_holes.rbegin(); hole_it < small_holes.rend(); hole_it++)
-        {
-            for(auto outline_it = removed_outlines_start; outline_it < thiss.end() ; outline_it++)
-            {
-                if(Polygon(*outline_it).contains(*hole_it->begin())) {
+        for (auto hole_it = small_holes.rbegin(); hole_it < small_holes.rend(); hole_it++)
+            for (auto outline_it = removed_outlines_start; outline_it < thiss.end(); outline_it++)
+                if (Polygon(*outline_it).contains(*hole_it->begin())) {
                     new_end--;
                     *hole_it = std::move(*new_end);
                     break;
                 }
-            }
-        }
     }
     thiss.resize(new_end-thiss.begin());
 }
