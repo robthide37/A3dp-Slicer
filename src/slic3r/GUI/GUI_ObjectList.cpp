@@ -2035,6 +2035,8 @@ void ObjectList::split()
         Expand(parent);
 
     changed_object(obj_idx);
+    // update printable state for new volumes on canvas3D
+    wxGetApp().plater()->canvas3D()->update_instance_printable_state_for_object(obj_idx);
 }
 
 void ObjectList::merge(bool to_multipart_object)
