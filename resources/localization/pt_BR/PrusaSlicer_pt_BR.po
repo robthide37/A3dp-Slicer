@@ -5151,7 +5151,7 @@ msgstr "Config importação de ini/amf/3mf/gcode"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:85
 msgid "Load Config from ini/amf/3mf/gcode and merge"
-msgstr "Carregar config. de um. ini/AMF/3mf/Gcode e mesclar"
+msgstr "Carregar config. de um. ini/AMF/3mf/gcode e mesclar"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:87 src/slic3r/GUI/Plater.cpp:913
 #: src/slic3r/GUI/Plater.cpp:6530 src/libslic3r/PrintConfig.cpp:4416
@@ -11459,11 +11459,11 @@ msgid ""
 "PrusaSlicer settings. If you have multiple extruders, the gcode is processed "
 "in extruder order."
 msgstr ""
-"Este procedimento final é inserido no final do arquivo de saída, antes da "
-"extremidade da impressora Gcode (e antes de qualquer troca de ferramenta "
-"deste filamento em caso de impressoras multimaterial). Observe que você pode "
-"usar variáveis de espaço reservado para todas as config. de PrusaSlicer. Se "
-"você tiver várias extrusoras, o Gcode é processado em ordem de extrusora."
+"Este procedimento final é inserido no final do arquivo de saída, antes do "
+"G-code final da impressora (e antes de qualquer troca de ferramenta deste filamento em caso de "
+"impressoras multimateriais). Observe que você pode usar variáveis de espaço reservado para todas as "
+"Configurações do PrusaSlicer. Se você tiver várias extrusoras, o G-code será processado "
+"em ordem de extrusão."
 
 #: src/libslic3r/PrintConfig.cpp:706
 msgid "Ensure vertical shell thickness"
@@ -12252,7 +12252,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:1330
 msgid "Verbose G-code"
-msgstr "Gcode detalhado"
+msgstr "G-code detalhado"
 
 #: src/libslic3r/PrintConfig.cpp:1331
 msgid ""
@@ -13665,7 +13665,7 @@ msgid ""
 "extruders, the gcode is processed in extruder order."
 msgstr ""
 "Este procedimento de início é inserido no começo, depois de qualquer "
-"impressora iniciar Gcode (e depois de qualquer troca de ferramenta para este "
+"G-code de início da impressora (e depois de qualquer troca de ferramenta para este "
 "filamento em caso de impressoras de vários materiais). Isso é usado para "
 "substituir as config. de um filamento específico. Se PrusaSlicer detecta "
 "M104, M109, M140 ou M190 em seus códigos personalizados, esses comandos não "
@@ -13673,8 +13673,8 @@ msgstr ""
 "personalizar a ordem dos comandos de aquecimento e outras ações "
 "personalizadas. Observe que você pode usar variáveis de espaço reservado "
 "para todas as config. de PrusaSlicer, para que você possa colocar um comando "
-"\"M109 S [temperatura_primeira_camada]\" onde quiser. Se você tiver várias "
-"extrusoras, o Gcode é processado em ordem de extrusora."
+"\"M109 S[first_layer_temperature]\" onde quiser. Se você tiver várias "
+"extrusoras, o G-code é processado em ordem de extrusora."
 
 #: src/libslic3r/PrintConfig.cpp:2450
 msgid "Color change G-code"
@@ -16032,6 +16032,10 @@ msgid ""
 "surfaces, save a lot of the filament, and decrease the print time? Read more "
 "in the documentation."
 msgstr ""
+"Preenchimento de raio\n"
+"Você sabia que pode usar o preenchimento de Raio para suportar apenas superfícies "
+"de topo, para economizar muito filamento e diminuir o tempo de impressão? Leia mais "
+"na documentação."
 
 #: resources/data/hints.ini: [hint:Fullscreen mode]
 msgid ""
