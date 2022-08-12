@@ -1545,7 +1545,7 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
                         // for lower part change type of connector from NEGATIVE_VOLUME to MODEL_PART if this connector is a plug
                         vol->set_type(ModelVolumeType::MODEL_PART);
                 }
-                if (volume->cut_info.connector_type == CutConnectorType::Dowel) {
+                if (dowels && volume->cut_info.connector_type == CutConnectorType::Dowel) {
                     // add one more solid part same as connector if this connector is a dowel
                     ModelVolume* vol = dowels->add_volume(*volume);
                     vol->set_type(ModelVolumeType::MODEL_PART);

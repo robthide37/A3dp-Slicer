@@ -5949,18 +5949,17 @@ void Slic3r::GUI::Plater::cut(size_t obj_idx, size_t instance_idx, const Vec3d& 
     // suppress to call selection update for Object List to avoid call of early Gizmos on/off update
     p->load_model_objects(new_objects, false, false);
 
-    Selection& selection = p->get_selection();
-    size_t last_id = p->model.objects.size() - 1;
-    for (size_t i = 0; i < new_objects.size(); ++i)
-        selection.add_object((unsigned int)(last_id - i), i == 0);
-    this->allow_snapshots();
-
     // now process all updates of the 3d scene
     update();
     // Update InfoItems in ObjectList after update() to use of a correct value of the GLCanvas3D::is_sinking(),
     // which is updated after a view3D->reload_scene(false, flags & (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH) call
     for (size_t idx = 0; idx < p->model.objects.size(); idx++)
         wxGetApp().obj_list()->update_info_items(idx);
+
+    Selection& selection = p->get_selection();
+    size_t last_id = p->model.objects.size() - 1;
+    for (size_t i = 0; i < new_objects.size(); ++i)
+        selection.add_object((unsigned int)(last_id - i), i == 0);
 }
 
 void Plater::export_gcode(bool prefer_removable)
