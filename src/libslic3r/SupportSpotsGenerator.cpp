@@ -15,8 +15,8 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
 
-//#define DETAILED_DEBUG_LOGS
-//#define DEBUG_FILES
+#define DETAILED_DEBUG_LOGS
+#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -337,6 +337,15 @@ struct ExtrusionPropertiesAccumulator {
     }
 };
 
+// base function: ((e^(((1)/(x^(2)+1)))-1)/(e-1))
+// checkout e.g. here: https://www.geogebra.org/calculator
+float gauss(float value, float mean_x_coord, float mean_value, float falloff_speed) {
+    float shifted = value - mean_x_coord;
+    float denominator = falloff_speed * shifted * shifted + 1.0f;
+    float exponent = 1.0f / denominator;
+    return mean_value * (std::exp(exponent) - 1.0f) / (std::exp(1.0f) - 1.0f);
+}
+
 void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         std::vector<ExtrusionLine> &checked_lines_out,
         float layer_z,
@@ -407,7 +416,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                         > params.bridge_distance / (1.0f + (bridging_acc.max_curvature
                                 * params.bridge_distance_decrease_by_curvature_factor / PI));
                 bool between_layers_condition = fabs(dist_from_prev_layer) > 3.0f*flow_width ||
-                        prev_layer_lines.get_line(nearest_line_idx).malformation > 0.6f;
+                        prev_layer_lines.get_line(nearest_line_idx).malformation > 3.0f * layer_region->layer()->height;
 
                 if (in_layer_dist_condition && between_layers_condition) {
                     issues.support_points.emplace_back(to_vec3f(current_line.b), 0.0f, Vec3f(0.f, 0.0f, -1.0f));
@@ -423,8 +432,8 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
             if (dist_from_prev_layer > overhang_dist) {
                 malformation_acc.add_distance(current_line.len);
-                current_line.malformation += 0.3f
-                        * (0.8f + 0.2f * malformation_acc.max_curvature / (1.0f + 0.5f * malformation_acc.distance));
+                current_line.malformation += layer_region->layer()->height * (0.5f +
+                       1.5f * (malformation_acc.max_curvature / PI) * gauss(malformation_acc.distance, 5.0f, 1.0f, 0.2f));
             } else {
                 malformation_acc.reset();
             }
@@ -729,7 +738,7 @@ public:
                     this->sticking_second_moment_of_area_accumulator,
                     this->sticking_second_moment_of_area_covariance_accumulator,
                     this->sticking_area)
-                    * params.bed_adhesion_yield_strength;
+                    * params.get_bed_adhesion_yield_strength();
 
             float bed_weight_arm = (bed_centroid.head<2>() - mass_centroid.head<2>()).norm();
             float bed_weight_torque = bed_weight_arm * weight;
@@ -758,6 +767,10 @@ public:
             << "SSG: bed_movement_torque: " << bed_movement_torque;
             BOOST_LOG_TRIVIAL(debug)
             << "SSG: bed_conflict_torque_arm: " << bed_conflict_torque_arm;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: extruded_line.malformation: " << extruded_line.malformation;
+            BOOST_LOG_TRIVIAL(debug)
+            << "SSG: extruder_conflict_force: " << extruder_conflict_force;
             BOOST_LOG_TRIVIAL(debug)
             << "SSG: bed_extruder_conflict_torque: " << bed_extruder_conflict_torque;
             BOOST_LOG_TRIVIAL(debug)
@@ -971,6 +984,8 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
         for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
             const Island &island = islands_graph[layer_idx].islands[island_idx];
             ObjectPart &part = active_object_parts.access(prev_island_to_object_part_mapping[island_idx]);
+
+
             IslandConnection &weakest_conn = prev_island_weakest_connection[island_idx];
 #ifdef DETAILED_DEBUG_LOGS
             weakest_conn.print_info("weakest connection info: ");

@@ -419,13 +419,11 @@ void PrintObject::generate_support_spots()
         BOOST_LOG_TRIVIAL(debug)
         << "Searching support spots - start";
         m_print->set_status(75, L("Searching support spots"));
-
         if (this->m_config.support_material && !this->m_config.support_material_auto &&
         std::all_of(this->model_object()->volumes.begin(), this->model_object()->volumes.end(),
                 [](const ModelVolume* mv){return mv->supported_facets.empty();})
         ) {
-            SupportSpotsGenerator::Params params{};
-            params.overhang_angle_deg = 90.001f - this->m_config.support_material_threshold;
+            SupportSpotsGenerator::Params params{90.001f - this->m_config.support_material_threshold, this->print()->m_config.filament_type.values};
             SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this, params);
             auto obj_transform = this->trafo_centered();
             for (ModelVolume *model_volume : this->model_object()->volumes) {
@@ -438,7 +436,7 @@ void PrintObject::generate_support_spots()
                         Vec3f point = Vec3f(inv_transform * support_point.position);
                         Vec3f origin = Vec3f(
                                 inv_transform * Vec3f(support_point.position.x(), support_point.position.y(), 0.0f));
-                        selector.enforce_spot(point, origin, 0.6f);
+                        selector.enforce_spot(point, origin, 1.5f);
                     }
 
                     model_volume->supported_facets.set(selector.selector);
