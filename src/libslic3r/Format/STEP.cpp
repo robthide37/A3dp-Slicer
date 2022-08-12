@@ -30,7 +30,9 @@ LoadStepFn get_load_step_fn()
 {
     static LoadStepFn load_step_fn = nullptr;
 
+#ifndef __APPLE__
     constexpr const char* fn_name = "load_step_internal";
+#endif
 
     if (!load_step_fn) {
         auto libpath = boost::dll::program_location().parent_path();

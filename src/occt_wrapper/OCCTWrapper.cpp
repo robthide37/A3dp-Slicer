@@ -80,7 +80,7 @@ static void getNamedSolids(const TopLoc_Location& location, const Handle(XCAFDoc
 extern "C" OCCTWRAPPER_EXPORT bool load_step_internal(const char *path, OCCTResult* res /*BBS:, ImportStepProgressFn proFn*/)
 {
 try {
-    bool cb_cancel = false;
+    //bool cb_cancel = false;
     //if (proFn) {
     //    proFn(LOAD_STEP_STAGE_READ_FILE, 0, 1, cb_cancel);
     //    if (cb_cancel)
