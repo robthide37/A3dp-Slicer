@@ -147,7 +147,20 @@ struct SupportParameters {
     bool                    with_sheath;
 };
 
-void generate_support_layers(
+// Generate raft layers, also expand the 1st support layer
+// in case there is no raft layer to improve support adhesion.
+SupportGeneratorLayersPtr generate_raft_base(
+	const PrintObject				&object,
+	const SupportParameters			&support_params,
+	const SlicingParameters			&slicing_params,
+	const SupportGeneratorLayersPtr &top_contacts,
+	const SupportGeneratorLayersPtr &interface_layers,
+	const SupportGeneratorLayersPtr &base_interface_layers,
+	const SupportGeneratorLayersPtr &base_layers,
+	SupportGeneratorLayerStorage    &layer_storage);
+
+// returns sorted layers
+SupportGeneratorLayersPtr generate_support_layers(
 	PrintObject							&object,
     const SupportGeneratorLayersPtr     &raft_layers,
     const SupportGeneratorLayersPtr     &bottom_contacts,
@@ -169,6 +182,9 @@ void generate_support_toolpaths(
     const SupportGeneratorLayersPtr   	&intermediate_layers,
 	const SupportGeneratorLayersPtr   	&interface_layers,
     const SupportGeneratorLayersPtr   	&base_interface_layers);
+
+void export_print_z_polygons_to_svg(const char *path, SupportGeneratorLayer ** const layers, size_t n_layers);
+void export_print_z_polygons_and_extrusions_to_svg(const char *path, SupportGeneratorLayer ** const layers, size_t n_layers, SupportLayer& support_layer);
 
 // This class manages raft and supports for a single PrintObject.
 // Instantiated by Slic3r::Print::Object->_support_material()
@@ -225,16 +241,6 @@ private:
 	    const SupportGeneratorLayersPtr   &top_contacts,
 	    SupportGeneratorLayersPtr         &intermediate_layers,
 	    const std::vector<Polygons> &layer_support_areas) const;
-
-	// Generate raft layers, also expand the 1st support layer
-	// in case there is no raft layer to improve support adhesion.
-    SupportGeneratorLayersPtr generate_raft_base(
-    	const PrintObject   &object,
-	    const SupportGeneratorLayersPtr   &top_contacts,
-	    const SupportGeneratorLayersPtr   &interface_layers,
-	    const SupportGeneratorLayersPtr   &base_interface_layers,
-	    const SupportGeneratorLayersPtr   &base_layers,
-	    SupportGeneratorLayerStorage      &layer_storage) const;
 
 	// Turn some of the base layers into base interface layers.
 	// For soluble interfaces with non-soluble bases, print maximum two first interface layers with the base

@@ -61,7 +61,7 @@ namespace Slic3r {
 //#define SUPPORT_SURFACES_OFFSET_PARAMETERS ClipperLib::jtMiter, 1.5
 #define SUPPORT_SURFACES_OFFSET_PARAMETERS ClipperLib::jtSquare, 0.
 
-#ifdef SLIC3R_DEBUG
+#if 1 //#ifdef SLIC3R_DEBUG
 const char* support_surface_type_to_color_name(const SupporLayerType surface_type)
 {
     switch (surface_type) {
@@ -543,7 +543,7 @@ void PrintObjectSupportMaterial::generate(PrintObject &object)
     // If raft is to be generated, the 1st top_contact layer will contain the 1st object layer silhouette with holes filled.
     // There is also a 1st intermediate layer containing bases of support columns.
     // Inflate the bases of the support columns and create the raft base under the object.
-    SupportGeneratorLayersPtr raft_layers = this->generate_raft_base(object, top_contacts, interface_layers, base_interface_layers, intermediate_layers, layer_storage);
+    SupportGeneratorLayersPtr raft_layers = generate_raft_base(object, m_support_params, m_slicing_params, top_contacts, interface_layers, base_interface_layers, intermediate_layers, layer_storage);
 
 #ifdef SLIC3R_DEBUG
     for (const SupportGeneratorLayer *l : interface_layers)
@@ -573,6 +573,9 @@ void PrintObjectSupportMaterial::generate(PrintObject &object)
 //    intermediate_layers.clear();
 //    interface_layers.clear();
 
+#ifdef SLIC3R_DEBUG
+    SupportGeneratorLayersPtr layers_sorted =
+#endif // SLIC3R_DEBUG
     generate_support_layers(object, raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
 
     BOOST_LOG_TRIVIAL(info) << "Support generator - Generating tool paths";
@@ -585,7 +588,7 @@ void PrintObjectSupportMaterial::generate(PrintObject &object)
             // Due to the floating point inaccuracies, the print_z may not be the same even if in theory they should.
             int j = i + 1;
             coordf_t zmax = layers_sorted[i]->print_z + EPSILON;
-            bool empty = true;
+            bool empty = layers_sorted[i]->polygons.empty();
             for (; j < layers_sorted.size() && layers_sorted[j]->print_z <= zmax; ++j)
                 if (!layers_sorted[j]->polygons.empty())
                     empty = false;
@@ -615,7 +618,7 @@ void PrintObjectSupportMaterial::generate(PrintObject &object)
             // Due to the floating point inaccuracies, the print_z may not be the same even if in theory they should.
             int j = i + 1;
             coordf_t zmax = layers_sorted[i]->print_z + EPSILON;
-            bool empty = true;
+            bool empty = layers_sorted[i]->polygons.empty();
             for (; j < layers_sorted.size() && layers_sorted[j]->print_z <= zmax; ++j)
                 if (! layers_sorted[j]->polygons.empty())
                     empty = false;
@@ -2866,13 +2869,15 @@ void PrintObjectSupportMaterial::trim_support_layers_by_object(
     BOOST_LOG_TRIVIAL(debug) << "PrintObjectSupportMaterial::trim_support_layers_by_object() in parallel - end";
 }
 
-SupportGeneratorLayersPtr PrintObjectSupportMaterial::generate_raft_base(
-    const PrintObject   &object,
+SupportGeneratorLayersPtr generate_raft_base(
+    const PrintObject                 &object,
+    const SupportParameters           &support_params,
+	const SlicingParameters			  &slicing_params,
     const SupportGeneratorLayersPtr   &top_contacts,
     const SupportGeneratorLayersPtr   &interface_layers,
     const SupportGeneratorLayersPtr   &base_interface_layers,
     const SupportGeneratorLayersPtr   &base_layers,
-    SupportGeneratorLayerStorage      &layer_storage) const
+    SupportGeneratorLayerStorage      &layer_storage)
 {
     // If there is brim to be generated, calculate the trimming regions.
     Polygons brim;
@@ -2904,22 +2909,22 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::generate_raft_base(
     }
 
     // How much to inflate the support columns to be stable. This also applies to the 1st layer, if no raft layers are to be printed.
-    const float inflate_factor_fine      = float(scale_((m_slicing_params.raft_layers() > 1) ? 0.5 : EPSILON));
+    const float inflate_factor_fine      = float(scale_((slicing_params.raft_layers() > 1) ? 0.5 : EPSILON));
     const float inflate_factor_1st_layer = std::max(0.f, float(scale_(object.config().raft_first_layer_expansion)) - inflate_factor_fine);
     SupportGeneratorLayer       *contacts         = top_contacts         .empty() ? nullptr : top_contacts         .front();
     SupportGeneratorLayer       *interfaces       = interface_layers     .empty() ? nullptr : interface_layers     .front();
     SupportGeneratorLayer       *base_interfaces  = base_interface_layers.empty() ? nullptr : base_interface_layers.front();
     SupportGeneratorLayer       *columns_base     = base_layers          .empty() ? nullptr : base_layers          .front();
-    if (contacts != nullptr && contacts->print_z > std::max(m_slicing_params.first_print_layer_height, m_slicing_params.raft_contact_top_z) + EPSILON)
+    if (contacts != nullptr && contacts->print_z > std::max(slicing_params.first_print_layer_height, slicing_params.raft_contact_top_z) + EPSILON)
         // This is not the raft contact layer.
         contacts = nullptr;
-    if (interfaces != nullptr && interfaces->bottom_print_z() > m_slicing_params.raft_interface_top_z + EPSILON)
+    if (interfaces != nullptr && interfaces->bottom_print_z() > slicing_params.raft_interface_top_z + EPSILON)
         // This is not the raft column base layer.
         interfaces = nullptr;
-    if (base_interfaces != nullptr && base_interfaces->bottom_print_z() > m_slicing_params.raft_interface_top_z + EPSILON)
+    if (base_interfaces != nullptr && base_interfaces->bottom_print_z() > slicing_params.raft_interface_top_z + EPSILON)
         // This is not the raft column base layer.
         base_interfaces = nullptr;
-    if (columns_base != nullptr && columns_base->bottom_print_z() > m_slicing_params.raft_interface_top_z + EPSILON)
+    if (columns_base != nullptr && columns_base->bottom_print_z() > slicing_params.raft_interface_top_z + EPSILON)
         // This is not the raft interface layer.
         columns_base = nullptr;
 
@@ -2934,7 +2939,7 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::generate_raft_base(
     // Output vector.
     SupportGeneratorLayersPtr raft_layers;
 
-    if (m_slicing_params.raft_layers() > 1) {
+    if (slicing_params.raft_layers() > 1) {
         Polygons base;
         Polygons columns;
         if (columns_base != nullptr) {
@@ -2951,30 +2956,30 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::generate_raft_base(
         // Do not add the raft contact layer, only add the raft layers below the contact layer.
         // Insert the 1st layer.
         {
-            SupportGeneratorLayer &new_layer = layer_allocate(layer_storage, (m_slicing_params.base_raft_layers > 0) ? SupporLayerType::RaftBase : SupporLayerType::RaftInterface);
+            SupportGeneratorLayer &new_layer = layer_allocate(layer_storage, (slicing_params.base_raft_layers > 0) ? SupporLayerType::RaftBase : SupporLayerType::RaftInterface);
             raft_layers.push_back(&new_layer);
-            new_layer.print_z = m_slicing_params.first_print_layer_height;
-            new_layer.height  = m_slicing_params.first_print_layer_height;
+            new_layer.print_z = slicing_params.first_print_layer_height;
+            new_layer.height  = slicing_params.first_print_layer_height;
             new_layer.bottom_z = 0.;
             new_layer.polygons = inflate_factor_1st_layer > 0 ? expand(base, inflate_factor_1st_layer) : base;
         }
         // Insert the base layers.
-        for (size_t i = 1; i < m_slicing_params.base_raft_layers; ++ i) {
+        for (size_t i = 1; i < slicing_params.base_raft_layers; ++ i) {
             coordf_t print_z = raft_layers.back()->print_z;
             SupportGeneratorLayer &new_layer  = layer_allocate(layer_storage, SupporLayerType::RaftBase);
             raft_layers.push_back(&new_layer);
-            new_layer.print_z  = print_z + m_slicing_params.base_raft_layer_height;
-            new_layer.height   = m_slicing_params.base_raft_layer_height;
+            new_layer.print_z  = print_z + slicing_params.base_raft_layer_height;
+            new_layer.height   = slicing_params.base_raft_layer_height;
             new_layer.bottom_z = print_z;
             new_layer.polygons = base;
         }
         // Insert the interface layers.
-        for (size_t i = 1; i < m_slicing_params.interface_raft_layers; ++ i) {
+        for (size_t i = 1; i < slicing_params.interface_raft_layers; ++ i) {
             coordf_t print_z = raft_layers.back()->print_z;
             SupportGeneratorLayer &new_layer = layer_allocate(layer_storage, SupporLayerType::RaftInterface);
             raft_layers.push_back(&new_layer);
-            new_layer.print_z = print_z + m_slicing_params.interface_raft_layer_height;
-            new_layer.height  = m_slicing_params.interface_raft_layer_height;
+            new_layer.print_z = print_z + slicing_params.interface_raft_layer_height;
+            new_layer.height  = slicing_params.interface_raft_layer_height;
             new_layer.bottom_z = print_z;
             new_layer.polygons = interface_polygons;
             //FIXME misusing contact_polygons for support columns.
@@ -2982,12 +2987,12 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::generate_raft_base(
         }
     } else {
         if (columns_base != nullptr) {
-        // Expand the bases of the support columns in the 1st layer.
+            // Expand the bases of the support columns in the 1st layer.
             Polygons &raft     = columns_base->polygons;
-            Polygons  trimming = offset(m_object->layers().front()->lslices, (float)scale_(m_support_params.gap_xy), SUPPORT_SURFACES_OFFSET_PARAMETERS);
+            Polygons  trimming = offset(object.layers().front()->lslices, (float)scale_(support_params.gap_xy), SUPPORT_SURFACES_OFFSET_PARAMETERS);
             if (inflate_factor_1st_layer > SCALED_EPSILON) {
                 // Inflate in multiple steps to avoid leaking of the support 1st layer through object walls.
-                auto  nsteps = std::max(5, int(ceil(inflate_factor_1st_layer / m_support_params.first_layer_flow.scaled_width())));
+                auto  nsteps = std::max(5, int(ceil(inflate_factor_1st_layer / support_params.first_layer_flow.scaled_width())));
                 float step   = inflate_factor_1st_layer / nsteps;
                 for (int i = 0; i < nsteps; ++ i)
                     raft = diff(expand(raft, step), trimming);
@@ -3847,7 +3852,7 @@ void modulate_extrusion_by_overlapping_layers(
         extrusion_entities_append_paths(extrusions_in_out, std::move(it_fragment->polylines), extrusion_role, it_fragment->mm3_per_mm, it_fragment->width, it_fragment->height);
 }
 
-void generate_support_layers(
+SupportGeneratorLayersPtr generate_support_layers(
     PrintObject                         &object,
     const SupportGeneratorLayersPtr     &raft_layers,
     const SupportGeneratorLayersPtr     &bottom_contacts,
@@ -3921,6 +3926,7 @@ void generate_support_layers(
         }
         i = j;
     }
+    return layers_sorted;
 }
 
 void generate_support_toolpaths(

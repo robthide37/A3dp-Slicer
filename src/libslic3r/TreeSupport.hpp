@@ -16,6 +16,8 @@
 
 #include "BoundingBox.hpp"
 
+// #define TREE_SUPPORT_SHOW_ERRORS
+
 #define SUPPORT_TREE_CIRCLE_RESOLUTION 25 // The number of vertices in each circle.
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
@@ -108,7 +110,7 @@ public:
 
     struct SupportElement
     {
-        SupportElement(
+        explicit SupportElement(
             coord_t distance_to_top, size_t target_height, Point target_position, bool to_buildplate, bool to_model_gracious, bool use_min_xy_dist, size_t dont_move_until, 
             bool supports_roof, bool can_use_safe_radius, bool force_tips_to_roof, bool skip_ovalisation) : 
             target_height(target_height), target_position(target_position), next_position(target_position), next_height(target_height), effective_radius_height(distance_to_top), 
@@ -119,7 +121,7 @@ public:
         }
 
 
-        SupportElement(const SupportElement& elem, Polygons* newArea = nullptr)
+        explicit SupportElement(const SupportElement& elem, Polygons* newArea = nullptr)
             : // copy constructor with possibility to set a new area
               target_height(elem.target_height),
               target_position(elem.target_position),
@@ -149,7 +151,7 @@ public:
          * \brief Create a new Element for one layer below the element of the pointer supplied.
          */
 
-        SupportElement(SupportElement* element_above)
+        explicit SupportElement(SupportElement* element_above)
             : target_height(element_above->target_height),
               target_position(element_above->target_position),
               next_position(element_above->next_position),
@@ -174,7 +176,7 @@ public:
         }
 
         // ONLY to be called in merge as it assumes a few assurances made by it.
-        SupportElement(const SupportElement& first, const SupportElement& second, size_t next_height, Point next_position, coord_t increased_to_model_radius, const TreeSupportSettings& config) : next_position(next_position), next_height(next_height), area(nullptr), increased_to_model_radius(increased_to_model_radius), use_min_xy_dist(first.use_min_xy_dist || second.use_min_xy_dist), supports_roof(first.supports_roof || second.supports_roof), dont_move_until(std::max(first.dont_move_until, second.dont_move_until)), can_use_safe_radius(first.can_use_safe_radius || second.can_use_safe_radius), missing_roof_layers(std::min(first.missing_roof_layers, second.missing_roof_layers)), skip_ovalisation(false)
+        explicit SupportElement(const SupportElement& first, const SupportElement& second, size_t next_height, Point next_position, coord_t increased_to_model_radius, const TreeSupportSettings& config) : next_position(next_position), next_height(next_height), area(nullptr), increased_to_model_radius(increased_to_model_radius), use_min_xy_dist(first.use_min_xy_dist || second.use_min_xy_dist), supports_roof(first.supports_roof || second.supports_roof), dont_move_until(std::max(first.dont_move_until, second.dont_move_until)), can_use_safe_radius(first.can_use_safe_radius || second.can_use_safe_radius), missing_roof_layers(std::min(first.missing_roof_layers, second.missing_roof_layers)), skip_ovalisation(false)
 
         {
             if (first.target_height > second.target_height)
@@ -353,7 +355,7 @@ public:
     {
         TreeSupportSettings() = default; // required for the definition of the config variable in the TreeSupport class.
 
-        TreeSupportSettings(const TreeSupportMeshGroupSettings& mesh_group_settings)
+        explicit TreeSupportSettings(const TreeSupportMeshGroupSettings& mesh_group_settings)
             : angle(mesh_group_settings.support_tree_angle),
               angle_slow(mesh_group_settings.support_tree_angle_slow),
               support_line_width(mesh_group_settings.support_line_width),

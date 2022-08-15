@@ -30,7 +30,7 @@ class PrintObject;
 
 struct TreeSupportMeshGroupSettings {
     TreeSupportMeshGroupSettings() = default;
-    TreeSupportMeshGroupSettings(const PrintObject &print_object);
+    explicit TreeSupportMeshGroupSettings(const PrintObject &print_object);
 
 /*********************************************************************/
 /* Print parameters, not support specific:                           */
@@ -153,7 +153,7 @@ struct TreeSupportMeshGroupSettings {
     // Tree Support Branch Distance
     // How far apart the branches need to be when they touch the model. Making this distance small will cause 
     // the tree support to touch the model at more points, causing better overhang but making support harder to remove.
-    coord_t                         support_tree_branch_distance            { scaled<coord_t>(50.) };
+    coord_t                         support_tree_branch_distance            { scaled<coord_t>(1.) };
     // Tree Support Branch Diameter
     // The diameter of the thinnest branches of tree support. Thicker branches are more sturdy. Branches towards the base will be thicker than this.
     // minimum: 0.001, minimum warning: support_line_width * 2
@@ -204,7 +204,7 @@ class TreeModelVolumes
 {
 public:
     TreeModelVolumes() = default;
-    TreeModelVolumes(const PrintObject &print_object, const BuildVolume &build_volume,
+    explicit TreeModelVolumes(const PrintObject &print_object, const BuildVolume &build_volume,
         coord_t max_move, coord_t max_move_slow, size_t current_mesh_idx, double progress_multiplier, double progress_offset, const std::vector<Polygons> &additional_excluded_areas = {});
     TreeModelVolumes(TreeModelVolumes&&) = default;
     TreeModelVolumes& operator=(TreeModelVolumes&&) = default;
@@ -582,7 +582,7 @@ private:
     std::unique_ptr<std::mutex> m_critical_progress { std::make_unique<std::mutex>() };
 };
 
-static Polygons safeOffset(const Polygons& me, coord_t distance, ClipperLib::JoinType jt, coord_t max_safe_step_distance, const Polygons& collision);
+Polygons safeOffset(const Polygons& me, coord_t distance, ClipperLib::JoinType jt, coord_t max_safe_step_distance, const Polygons& collision);
 
 }
 
