@@ -2,6 +2,7 @@
 #define SRC_LIBSLIC3R_TRIANGLESELECTORWRAPPER_HPP_
 
 #include "TriangleSelector.hpp"
+#include "Model.hpp"
 #include "AABBTreeIndirect.hpp"
 
 namespace Slic3r {
@@ -15,10 +16,11 @@ namespace Slic3r {
 class TriangleSelectorWrapper {
 public:
     const TriangleMesh &mesh;
+    const Transform3d& mesh_transform;
     TriangleSelector selector;
     AABBTreeIndirect::Tree<3, float> triangles_tree;
 
-    TriangleSelectorWrapper(const TriangleMesh &mesh);
+    TriangleSelectorWrapper(const TriangleMesh &mesh, const Transform3d& mesh_transform);
 
     void enforce_spot(const Vec3f &point, const Vec3f& origin, float radius);
 

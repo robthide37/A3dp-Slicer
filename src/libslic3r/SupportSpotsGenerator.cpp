@@ -984,8 +984,6 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
         for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
             const Island &island = islands_graph[layer_idx].islands[island_idx];
             ObjectPart &part = active_object_parts.access(prev_island_to_object_part_mapping[island_idx]);
-
-
             IslandConnection &weakest_conn = prev_island_weakest_connection[island_idx];
 #ifdef DETAILED_DEBUG_LOGS
             weakest_conn.print_info("weakest connection info: ");

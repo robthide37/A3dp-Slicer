@@ -1,11 +1,10 @@
-#include "Model.hpp"
 #include "TriangleSelectorWrapper.hpp"
 #include <memory>
 
 namespace Slic3r {
 
-TriangleSelectorWrapper::TriangleSelectorWrapper(const TriangleMesh &mesh) :
-        mesh(mesh), selector(mesh), triangles_tree(
+TriangleSelectorWrapper::TriangleSelectorWrapper(const TriangleMesh &mesh, const Transform3d& mesh_transform) :
+        mesh(mesh), mesh_transform(mesh_transform), selector(mesh), triangles_tree(
                 AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(mesh.its.vertices, mesh.its.indices)) {
 
 }
@@ -23,7 +22,7 @@ void TriangleSelectorWrapper::enforce_spot(const Vec3f &point, const Vec3f &orig
             Vec3f face_normal = its_face_normal(mesh.its, hit.id);
             if ((point - pos).norm() < radius && face_normal.dot(dir) < 0) {
                 std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::Sphere>(
-                        pos, origin, radius, Transform3d::Identity(), TriangleSelector::ClippingPlane { });
+                        pos, origin, radius, this->mesh_transform, TriangleSelector::ClippingPlane { });
                 selector.select_patch(hit.id, std::move(cursor), EnforcerBlockerType::ENFORCER, Transform3d::Identity(),
                         true, 0.0f);
                 break;
@@ -36,7 +35,7 @@ void TriangleSelectorWrapper::enforce_spot(const Vec3f &point, const Vec3f &orig
                 triangles_tree, point, hit_idx_out, hit_point_out);
         if (dist < radius) {
             std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::Sphere>(
-                    point, origin, radius, Transform3d::Identity(), TriangleSelector::ClippingPlane { });
+                    point, origin, radius, this->mesh_transform, TriangleSelector::ClippingPlane { });
             selector.select_patch(hit_idx_out, std::move(cursor), EnforcerBlockerType::ENFORCER,
                     Transform3d::Identity(),
                     true, 0.0f);

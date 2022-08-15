@@ -428,14 +428,14 @@ void PrintObject::generate_support_spots()
             auto obj_transform = this->trafo_centered();
             for (ModelVolume *model_volume : this->model_object()->volumes) {
                 if (model_volume->is_model_part()) {
-                    Transform3d model_transformation = model_volume->get_matrix();
-                    Transform3f inv_transform = (obj_transform * model_transformation).inverse().cast<float>();
-                    TriangleSelectorWrapper selector { model_volume->mesh() };
+                    Transform3d mesh_transformation = obj_transform * model_volume->get_matrix();
+                    Transform3d inv_transform = mesh_transformation.inverse();
+                    TriangleSelectorWrapper selector { model_volume->mesh(), mesh_transformation};
 
                     for (const SupportSpotsGenerator::SupportPoint &support_point : issues.support_points) {
-                        Vec3f point = Vec3f(inv_transform * support_point.position);
+                        Vec3f point = Vec3f(inv_transform.cast<float>() * support_point.position);
                         Vec3f origin = Vec3f(
-                                inv_transform * Vec3f(support_point.position.x(), support_point.position.y(), 0.0f));
+                                inv_transform.cast<float>() * Vec3f(support_point.position.x(), support_point.position.y(), 0.0f));
                         selector.enforce_spot(point, origin, 1.5f);
                     }
 
