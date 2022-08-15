@@ -555,9 +555,18 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                     island.sticking_area += sticking_area;
                     Vec2f middle = Vec2f((line.a + line.b) / 2.0f);
                     island.sticking_centroid_accumulator += sticking_area * to_3d(middle, float(layer->slice_z));
-                    island.sticking_second_moment_of_area_accumulator += sticking_area * middle.cwiseProduct(middle);
-                    island.sticking_second_moment_of_area_covariance_accumulator += sticking_area * middle.x()
-                            * middle.y();
+                    // Bottom infill lines can be quite long, and algined, so the middle approximaton used above does not work
+                    Vec2f dir = (line.b - line.a).normalized();
+                    float segment_length = flow_width; // segments of size flow_width
+                    for (float segment_middle_dist = std::min(line.len, segment_length * 0.5f); segment_middle_dist < line.len;
+                            segment_middle_dist += segment_length) {
+                        Vec2f segment_middle = line.a + segment_middle_dist * dir;
+                        island.sticking_second_moment_of_area_accumulator += segment_length * flow_width
+                                * segment_middle.cwiseProduct(segment_middle);
+                        island.sticking_second_moment_of_area_covariance_accumulator += segment_length * flow_width
+                                * segment_middle.x()
+                                * segment_middle.y();
+                    }
                 } else if (layer_lines[lidx].support_point_generated) {
                     float sticking_area = line.len * flow_width;
                     island.sticking_area += sticking_area;
@@ -662,9 +671,8 @@ public:
                 * position.x() * position.y();
     }
 
-    float compute_elastic_section_modulus(
+    float compute_directional_xy_variance(
             const Vec2f &line_dir,
-            const Vec3f &extreme_point,
             const Vec3f &centroid_accumulator,
             const Vec2f &second_moment_of_area_accumulator,
             const float &second_moment_of_area_covariance_accumulator,
@@ -678,7 +686,6 @@ public:
         float directional_xy_variance = line_dir.x() * line_dir.x() * variance.x()
                 + line_dir.y() * line_dir.y() * variance.y() +
                 2.0f * line_dir.x() * line_dir.y() * covariance;
-
 #ifdef DETAILED_DEBUG_LOGS
         BOOST_LOG_TRIVIAL(debug)
         << "centroid: " << centroid.x() << "  " << centroid.y() << "  " << centroid.z();
@@ -689,10 +696,27 @@ public:
         BOOST_LOG_TRIVIAL(debug)
         << "directional_xy_variance: " << directional_xy_variance;
 #endif
+        return directional_xy_variance;
+    }
+
+    float compute_elastic_section_modulus(
+            const Vec2f &line_dir,
+            const Vec3f &extreme_point,
+            const Vec3f &centroid_accumulator,
+            const Vec2f &second_moment_of_area_accumulator,
+            const float &second_moment_of_area_covariance_accumulator,
+            const float &area) const {
+
+        float directional_xy_variance = compute_directional_xy_variance(
+                line_dir,
+                centroid_accumulator,
+                second_moment_of_area_accumulator,
+                second_moment_of_area_covariance_accumulator,
+                area);
         if (directional_xy_variance < EPSILON) {
             return 0.0f;
         }
-
+        Vec3f centroid = centroid_accumulator / area;
         float extreme_fiber_dist = line_alg::distance_to(
                 Linef(centroid.head<2>().cast<double>(), (centroid.head<2>() + Vec2f(line_dir.y(), -line_dir.x())).cast<double>()),
                 extreme_point.head<2>().cast<double>());
@@ -731,7 +755,7 @@ public:
                 return 1.0f;
 
             Vec3f bed_centroid = this->sticking_centroid_accumulator / this->sticking_area;
-            float bed_yield_torque = compute_elastic_section_modulus(
+            float bed_yield_torque = - compute_elastic_section_modulus(
                     line_dir,
                     extreme_point,
                     this->sticking_centroid_accumulator,
@@ -740,8 +764,14 @@ public:
                     this->sticking_area)
                     * params.get_bed_adhesion_yield_strength();
 
-            float bed_weight_arm = (bed_centroid.head<2>() - mass_centroid.head<2>()).norm();
-            float bed_weight_torque = bed_weight_arm * weight;
+            Vec2f bed_weight_arm = (mass_centroid.head<2>() - bed_centroid.head<2>());
+            float bed_weight_arm_len = bed_weight_arm.norm();
+            float bed_weight_dir_xy_variance = compute_directional_xy_variance(bed_weight_arm, this->sticking_centroid_accumulator,
+                    this->sticking_second_moment_of_area_accumulator,
+                    this->sticking_second_moment_of_area_covariance_accumulator,
+                    this->sticking_area);
+            float bed_weight_sign = bed_weight_arm_len < 2.0f * sqrt(bed_weight_dir_xy_variance) ? -1.0f : 1.0f;
+            float bed_weight_torque = bed_weight_sign * bed_weight_arm_len * weight;
 
             float bed_movement_arm = std::max(0.0f, mass_centroid.z() - bed_centroid.z());
             float bed_movement_torque = movement_force * bed_movement_arm;
@@ -750,7 +780,7 @@ public:
             float bed_extruder_conflict_torque = extruder_conflict_force * bed_conflict_torque_arm;
 
             float bed_total_torque = bed_movement_torque + bed_extruder_conflict_torque + bed_weight_torque
-                    - bed_yield_torque;
+                    + bed_yield_torque;
 
 #ifdef DETAILED_DEBUG_LOGS
             BOOST_LOG_TRIVIAL(debug)
