@@ -1446,37 +1446,26 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
             cut_id.increase_check_sum(size_t(cut_obj_cnt));
     }
 
+    auto clone_obj = [this](ModelObject** obj) {
+        (*obj) = ModelObject::new_clone(*this);
+        (*obj)->set_model(nullptr);
+        (*obj)->sla_support_points.clear();
+        (*obj)->sla_drain_holes.clear();
+        (*obj)->sla_points_status = sla::PointsStatus::NoPoints;
+        (*obj)->clear_volumes();
+        (*obj)->input_file.clear();
+    };
+
     // Clone the object to duplicate instances, materials etc.
-    ModelObject* upper = attributes.has(ModelObjectCutAttribute::KeepUpper) ? ModelObject::new_clone(*this) : nullptr;
-    ModelObject* lower = attributes.has(ModelObjectCutAttribute::KeepLower) ? ModelObject::new_clone(*this) : nullptr;
-    ModelObject* dowels = attributes.has(ModelObjectCutAttribute::CreateDowels) ? ModelObject::new_clone(*this) : nullptr;
+    ModelObject* upper{ nullptr };
+    if (attributes.has(ModelObjectCutAttribute::KeepUpper))
+        clone_obj(&upper);
 
-    if (attributes.has(ModelObjectCutAttribute::KeepUpper)) {
-        upper->set_model(nullptr);
-        upper->sla_support_points.clear();
-        upper->sla_drain_holes.clear();
-        upper->sla_points_status = sla::PointsStatus::NoPoints;
-        upper->clear_volumes();
-        upper->input_file.clear();
-    }
+    ModelObject* lower{ nullptr };
+    if (attributes.has(ModelObjectCutAttribute::KeepLower))
+        clone_obj(&lower);
 
-    if (attributes.has(ModelObjectCutAttribute::KeepLower)) {
-        lower->set_model(nullptr);
-        lower->sla_support_points.clear();
-        lower->sla_drain_holes.clear();
-        lower->sla_points_status = sla::PointsStatus::NoPoints;
-        lower->clear_volumes();
-        lower->input_file.clear();
-    }
-
-    if (attributes.has(ModelObjectCutAttribute::CreateDowels)) {
-        dowels->set_model(nullptr);
-        dowels->sla_support_points.clear();
-        dowels->sla_drain_holes.clear();
-        dowels->sla_points_status = sla::PointsStatus::NoPoints;
-        dowels->clear_volumes();
-        dowels->input_file.clear();
-    }
+    std::vector<ModelObject*> dowels;
 
     using namespace Geometry;
 
@@ -1545,9 +1534,14 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
                         // for lower part change type of connector from NEGATIVE_VOLUME to MODEL_PART if this connector is a plug
                         vol->set_type(ModelVolumeType::MODEL_PART);
                 }
-                if (dowels && volume->cut_info.connector_type == CutConnectorType::Dowel) {
+                if (volume->cut_info.connector_type == CutConnectorType::Dowel &&
+                    attributes.has(ModelObjectCutAttribute::CreateDowels)) {
+                    ModelObject* dowel{ nullptr };
+                    // Clone the object to duplicate instances, materials etc.
+                    clone_obj(&dowel);
+
                     // add one more solid part same as connector if this connector is a dowel
-                    ModelVolume* vol = dowels->add_volume(*volume);
+                    ModelVolume* vol = dowel->add_volume(*volume);
                     vol->set_type(ModelVolumeType::MODEL_PART);
 
                     // But discard rotation and Z-offset for this volume
@@ -1556,6 +1550,8 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
 
                     // Compute the displacement (in instance coordinates) to be applied to place the dowels
                     local_dowels_displace = lower->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(1.0, 1.0, 0.0));
+
+                    dowels.push_back(dowel);
                 }
             }
             else {
@@ -1704,35 +1700,37 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
         res.push_back(lower);
     }
 
-    if (attributes.has(ModelObjectCutAttribute::CreateDowels) && dowels->volumes.size() > 0) {
-        if (!dowels->origin_translation.isApprox(Vec3d::Zero()) && instances[instance]->get_offset().isApprox(Vec3d::Zero())) {
-            dowels->center_around_origin();
-            dowels->translate_instances(-dowels->origin_translation);
-            dowels->origin_translation = Vec3d::Zero();
+    if (attributes.has(ModelObjectCutAttribute::CreateDowels) && dowels.size() > 0) {
+        for (auto dowel : dowels) {
+            if (!dowel->origin_translation.isApprox(Vec3d::Zero()) && instances[instance]->get_offset().isApprox(Vec3d::Zero())) {
+                dowel->center_around_origin();
+                dowel->translate_instances(-dowel->origin_translation);
+                dowel->origin_translation = Vec3d::Zero();
+            }
+            else {
+                dowel->invalidate_bounding_box();
+                dowel->center_around_origin();
+            }
+            dowel->name += "-Dowel-" + dowel->volumes[0]->name;
+
+            // Reset instance transformation except offset and Z-rotation
+            for (size_t i = 0; i < instances.size(); ++i) {
+                auto& obj_instance = dowel->instances[i];
+                const Vec3d offset = obj_instance->get_offset();
+                Vec3d rotation = Vec3d::Zero();
+                if (i != instance)
+                    rotation[Z] = obj_instance->get_rotation().z();
+
+                const Vec3d displace = Geometry::assemble_transform(Vec3d::Zero(), rotation) * local_dowels_displace;
+
+                obj_instance->set_transformation(Geometry::Transformation());
+                obj_instance->set_offset(offset + displace);
+                obj_instance->set_rotation(rotation);
+            }
+
+            local_dowels_displace += dowel->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(-1.5, -1.5, 0.0)); 
+            res.push_back(dowel);
         }
-        else {
-            dowels->invalidate_bounding_box();
-            dowels->center_around_origin();
-        }
-
-        dowels->name += "-Dowels";
-
-        // Reset instance transformation except offset and Z-rotation
-        for (size_t i = 0; i < instances.size(); ++i) {
-            auto& obj_instance = dowels->instances[i];
-            const Vec3d offset = obj_instance->get_offset();
-            Vec3d rotation = Vec3d::Zero();
-            if (i != instance)
-                rotation[Z] = obj_instance->get_rotation().z();
-
-            const Vec3d displace = Geometry::assemble_transform(Vec3d::Zero(), rotation) * local_dowels_displace;
-
-            obj_instance->set_transformation(Geometry::Transformation());
-            obj_instance->set_offset(offset + displace);
-            obj_instance->set_rotation(rotation);
-        }
-
-        res.push_back(dowels);
     }
 
     BOOST_LOG_TRIVIAL(trace) << "ModelObject::cut - end";
