@@ -167,7 +167,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     : GLGizmoBase(parent, icon_filename, sprite_id)
     , m_connector_type (CutConnectorType::Plug)
     , m_connector_style (size_t(CutConnectorStyle::Prizm))
-    , m_connector_shape_id (size_t(CutConnectorShape::Hexagon))
+    , m_connector_shape_id (size_t(CutConnectorShape::Circle))
     , m_rotation_matrix(Slic3r::Matrix3d::Identity())
     , m_connectors_group_id (3)
 {
@@ -1777,7 +1777,8 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair
         Vec3f normal;
         bool clipping_plane_was_hit = false;
 
-        const Transform3d volume_trafo = get_volume_transformation(mv);
+//        const Transform3d volume_trafo = get_volume_transformation(mv);
+        const Transform3d volume_trafo = mv->get_transformation().get_matrix();
 
         m_c->raycaster()->raycasters()[mesh_id]->unproject_on_mesh(mouse_position, instance_trafo * volume_trafo,
             camera, hit, normal, m_c->object_clipper()->get_clipping_plane(true),
