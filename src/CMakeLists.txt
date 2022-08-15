@@ -15,7 +15,6 @@ add_subdirectory(libigl)
 add_subdirectory(hints)
 add_subdirectory(qoi)
 add_subdirectory(libnest2d)
-<<<<<<< HEAD
 
 find_package(Qhull 7.2 REQUIRED)
 add_library(qhull INTERFACE)
@@ -27,8 +26,6 @@ else()
     target_link_libraries(qhull INTERFACE Qhull::qhullcpp Qhull::qhull_r)
 endif()
 
-=======
->>>>>>> master_250
 add_subdirectory(libslic3r)
 
 if (SLIC3R_ENABLE_FORMAT_STEP)
@@ -150,12 +147,8 @@ if (NOT WIN32 AND NOT APPLE)
     set_target_properties(PrusaSlicer PROPERTIES OUTPUT_NAME "prusa-slicer")
 endif ()
 
-<<<<<<< HEAD
 target_link_libraries(PrusaSlicer libslic3r libcereal)
-=======
-target_link_libraries(PrusaSlicer libslic3r cereal)
 
->>>>>>> master_250
 if (APPLE)
 #    add_compile_options(-stdlib=libc++)
 #    add_definitions(-DBOOST_THREAD_DONT_USE_CHRONO -DBOOST_NO_CXX11_RVALUE_REFERENCES -DBOOST_THREAD_USES_MOVE)

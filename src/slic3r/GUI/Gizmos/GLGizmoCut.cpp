@@ -420,19 +420,6 @@ void GLGizmoCut::update_contours()
     for (size_t i = 0; i < model_object->volumes.size(); ++i) {
         volumes_idxs[i] = model_object->volumes[i]->id();
         volumes_trafos[i] = model_object->volumes[i]->get_matrix();
-<<<<<<< HEAD
-    }
-
-    bool trafos_match = volumes_trafos.size() == m_cut_contours.volumes_trafos.size();
-    if (trafos_match) {
-        for (size_t i = 0; i < model_object->volumes.size(); ++i) {
-            if (!volumes_trafos[i].isApprox(m_cut_contours.volumes_trafos[i])) {
-                trafos_match = false;
-                break;
-            }
-        }
-=======
->>>>>>> master_250
     }
 
     bool trafos_match = std::equal(volumes_trafos.begin(), volumes_trafos.end(),

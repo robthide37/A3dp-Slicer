@@ -246,14 +246,11 @@ public:
         GetBtnsListCtrl()->Rescale();
     }
 
-<<<<<<< HEAD
     void OnColorsChanged()
     {
         GetBtnsListCtrl()->OnColorsChanged();
     }
 
-=======
->>>>>>> master_250
     void OnNavigationKey(wxNavigationKeyEvent& event)
     {
         if (event.IsWindowChange()) {

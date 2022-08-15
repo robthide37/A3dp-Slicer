@@ -205,11 +205,8 @@ set(_dep_list
     dep_OpenVDB
     dep_OpenCSG
     dep_CGAL
-<<<<<<< HEAD
     dep_Qhull
-=======
     dep_OCCT
->>>>>>> master_250
     ${PNG_PKG}
     ${ZLIB_PKG}
     ${EXPAT_PKG}

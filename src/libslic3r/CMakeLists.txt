@@ -105,15 +105,12 @@ set(SLIC3R_SOURCES
     Format/ZipperArchiveImport.cpp
     Format/SL1.hpp
     Format/SL1.cpp
-<<<<<<< HEAD
     Format/SL1_SVG.hpp
     Format/SL1_SVG.cpp
     Format/pwmx.hpp
     Format/pwmx.cpp
-=======
     Format/STEP.hpp
     Format/STEP.cpp
->>>>>>> master_250
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp

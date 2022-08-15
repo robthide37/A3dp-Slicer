@@ -33,27 +33,6 @@ namespace Slic3r {
 
 namespace SeamPlacerImpl {
 
-<<<<<<< HEAD
-=======
-// ************  FOR BACKPORT COMPATIBILITY ONLY ***************
-// Color mapping of a value into RGB false colors.
-inline Vec3f value_to_rgbf(float minimum, float maximum, float value)
-        {
-    float ratio = 2.0f * (value - minimum) / (maximum - minimum);
-    float b = std::max(0.0f, (1.0f - ratio));
-    float r = std::max(0.0f, (ratio - 1.0f));
-    float g = 1.0f - b - r;
-    return Vec3f { r, g, b };
-}
-
-// Color mapping of a value into RGB false colors.
-inline Vec3i value_to_rgbi(float minimum, float maximum, float value)
-        {
-    return (value_to_rgbf(minimum, maximum, value) * 255).cast<int>();
-}
-// ***************************
-
->>>>>>> master_250
 template<typename T> int sgn(T val) {
     return int(T(0) < val) - int(val < T(0));
 }

@@ -54,11 +54,8 @@ enum FileType
 {
     FT_STL,
     FT_OBJ,
-<<<<<<< HEAD
     FT_OBJECT,
-=======
     FT_STEP,
->>>>>>> master_250
     FT_AMF,
     FT_3MF,
     FT_GCODE,

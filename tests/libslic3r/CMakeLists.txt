@@ -4,11 +4,8 @@ add_executable(${_TEST_NAME}_tests
 	${_TEST_NAME}_tests.cpp
 	test_3mf.cpp
 	test_aabbindirect.cpp
-<<<<<<< HEAD
 	test_kdtreeindirect.cpp
-=======
 	test_arachne.cpp
->>>>>>> master_250
 	test_clipper_offset.cpp
 	test_clipper_utils.cpp
 	test_color.cpp
