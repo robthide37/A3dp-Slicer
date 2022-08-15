@@ -1212,7 +1212,7 @@ void MainFrame::init_menubar_as_editor()
         fileMenu->AppendSeparator();
 
         wxMenu* import_menu = new wxMenu();
-        append_menu_item(import_menu, wxID_ANY, _L("Import STL/OBJ/AM&F/3MF") + dots + "\tCtrl+I", _L("Load a model"),
+        append_menu_item(import_menu, wxID_ANY, _L("Import STL/OBJ/AM&F/3MF/STEP") + dots + "\tCtrl+I", _L("Load a model"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->add_model(); }, "import_plater", nullptr,
             [this](){return m_plater != nullptr; }, this);
         

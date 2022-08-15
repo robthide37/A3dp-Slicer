@@ -2070,6 +2070,8 @@ void ObjectList::split()
         Expand(parent);
 
     changed_object(obj_idx);
+    // update printable state for new volumes on canvas3D
+    wxGetApp().plater()->canvas3D()->update_instance_printable_state_for_object(obj_idx);
 }
 
 void ObjectList::merge(bool to_multipart_object)
@@ -2183,8 +2185,12 @@ void ObjectList::merge(bool to_multipart_object)
             const Vec3d mirror    = transformation.get_mirror();
             const Vec3d rotation  = transformation.get_rotation();
 
-            if (object->id() == (*m_objects)[obj_idxs.front()]->id())
+            if (object->id() == (*m_objects)[obj_idxs.front()]->id()) {
                 new_object->add_instance();
+                new_object->instances[0]->printable = false;
+            }
+            new_object->instances[0]->printable |= object->instances[0]->printable;
+
             const Transform3d& volume_offset_correction = transformation.get_matrix();
 
             // merge volumes
@@ -2249,6 +2255,9 @@ void ObjectList::merge(bool to_multipart_object)
         add_object_to_list(m_objects->size() - 1);
         select_item(m_objects_model->GetItemById(m_objects->size() - 1));
         update_selections_on_canvas();
+
+        // update printable state for new volumes on canvas3D
+        wxGetApp().plater()->canvas3D()->update_instance_printable_state_for_object(int(model->objects.size()) - 1);
     }
     // merge all parts to the one single object
     // all part's settings will be lost

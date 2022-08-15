@@ -293,6 +293,7 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
                 raycasters[i]->set_transform(elements_matrices[i]);
         }
     }
+<<<<<<< HEAD
 #endif // ENABLE_RAYCAST_PICKING
 }
 
@@ -532,3 +533,61 @@ std::string GLGizmoBase::get_name(bool include_shortcut) const
 
 } // namespace GUI
 } // namespace Slic3r
+=======
+}
+
+std::string GLGizmoBase::format(float value, unsigned int decimals) const
+{
+    return Slic3r::string_printf("%.*f", decimals, value);
+}
+
+void GLGizmoBase::set_dirty() {
+    m_dirty = true;
+}
+
+void GLGizmoBase::render_input_window(float x, float y, float bottom_limit)
+{
+    on_render_input_window(x, y, bottom_limit);
+    if (m_first_input_window_render) {
+        // imgui windows that don't have an initial size needs to be processed once to get one
+        // and are not rendered in the first frame
+        // so, we forces to render another frame the first time the imgui window is shown
+        // https://github.com/ocornut/imgui/issues/2949
+        m_parent.set_as_dirty();
+        m_parent.request_extra_frame();
+        m_first_input_window_render = false;
+    }
+}
+
+
+
+std::string GLGizmoBase::get_name(bool include_shortcut) const
+{
+    int key = get_shortcut_key();
+    std::string out = on_get_name();
+    if (include_shortcut && key >= WXK_CONTROL_A && key <= WXK_CONTROL_Z)
+        out += std::string(" [") + char(int('A') + key - int(WXK_CONTROL_A)) + "]";
+    return out;
+}
+
+
+
+// Produce an alpha channel checksum for the red green blue components. The alpha channel may then be used to verify, whether the rgb components
+// were not interpolated by alpha blending or multi sampling.
+unsigned char picking_checksum_alpha_channel(unsigned char red, unsigned char green, unsigned char blue)
+{
+	// 8 bit hash for the color
+	unsigned char b = ((((37 * red) + green) & 0x0ff) * 37 + blue) & 0x0ff;
+	// Increase enthropy by a bit reversal
+	b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+	b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+	b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+	// Flip every second bit to increase the enthropy even more.
+	b ^= 0x55;
+	return b;
+}
+
+
+} // namespace GUI
+} // namespace Slic3r
+>>>>>>> master_250

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-07-12 14:41+0200\n"
+"POT-Creation-Date: 2022-08-12 10:25+0200\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -18,16 +18,16 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 3.0\n"
 
-#: src/slic3r/GUI/AboutDialog.cpp:45 src/slic3r/GUI/AboutDialog.cpp:303
+#: src/slic3r/GUI/AboutDialog.cpp:45 src/slic3r/GUI/AboutDialog.cpp:305
 msgid "Portions copyright"
 msgstr "Az összetevők szerzői joga"
 
-#: src/slic3r/GUI/AboutDialog.cpp:139 src/slic3r/GUI/AboutDialog.cpp:267
+#: src/slic3r/GUI/AboutDialog.cpp:141 src/slic3r/GUI/AboutDialog.cpp:269
 msgid "Copyright"
 msgstr "Szerzői jog"
 
 #. TRN "Slic3r _is licensed under the_ License"
-#: src/slic3r/GUI/AboutDialog.cpp:141
+#: src/slic3r/GUI/AboutDialog.cpp:143
 msgid ""
 "License agreements of all following programs (libraries) are part of "
 "application license agreement"
@@ -35,33 +35,33 @@ msgstr ""
 "A következő programok (könyvtárak) licencszerződései az alkalmazás "
 "licencszerződésének részét képezik"
 
-#: src/slic3r/GUI/AboutDialog.cpp:210
+#: src/slic3r/GUI/AboutDialog.cpp:212
 #, c-format, boost-format
 msgid "About %s"
 msgstr "Szerző: %s"
 
-#: src/slic3r/GUI/AboutDialog.cpp:242 src/slic3r/GUI/AboutDialog.cpp:367
+#: src/slic3r/GUI/AboutDialog.cpp:244 src/slic3r/GUI/AboutDialog.cpp:369
 #: src/slic3r/GUI/GUI_App.cpp:262
 msgid "Version"
 msgstr "Verzió"
 
 #. TRN "Slic3r _is licensed under the_ License"
-#: src/slic3r/GUI/AboutDialog.cpp:269 src/slic3r/GUI/GUI_App.cpp:268
+#: src/slic3r/GUI/AboutDialog.cpp:271 src/slic3r/GUI/GUI_App.cpp:268
 msgid "is licensed under the"
 msgstr "engedélyezve van a következő szerint"
 
-#: src/slic3r/GUI/AboutDialog.cpp:270 src/slic3r/GUI/GUI_App.cpp:268
+#: src/slic3r/GUI/AboutDialog.cpp:272 src/slic3r/GUI/GUI_App.cpp:268
 msgid "GNU Affero General Public License, version 3"
 msgstr "GNU Affero General Public License, 3-as verzió"
 
-#: src/slic3r/GUI/AboutDialog.cpp:271
+#: src/slic3r/GUI/AboutDialog.cpp:273
 msgid ""
 "PrusaSlicer is based on Slic3r by Alessandro Ranellucci and the RepRap "
 "community."
 msgstr ""
 "A PrusaSlicer alapja Alessandro Ranellucci és a RepRap közösség Slic3r-je."
 
-#: src/slic3r/GUI/AboutDialog.cpp:272
+#: src/slic3r/GUI/AboutDialog.cpp:274
 msgid ""
 "Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, "
 "Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik and "
@@ -71,7 +71,7 @@ msgstr ""
 "Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik és még sokan mások "
 "közreműködésével."
 
-#: src/slic3r/GUI/AboutDialog.cpp:308
+#: src/slic3r/GUI/AboutDialog.cpp:310
 msgid "Copy Version Info"
 msgstr "Verzióinformáció Másolása"
 
@@ -214,7 +214,7 @@ msgstr ""
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:31
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:218 src/slic3r/GUI/Plater.cpp:204
-#: src/slic3r/GUI/Tab.cpp:2764
+#: src/slic3r/GUI/Tab.cpp:2762
 msgid "Size"
 msgstr "Méret"
 
@@ -272,19 +272,18 @@ msgstr "A 0,0 G-kód koordináta távolsága a téglalap bal elülső sarkától
 #: src/libslic3r/PrintConfig.cpp:2995 src/libslic3r/PrintConfig.cpp:3002
 #: src/libslic3r/PrintConfig.cpp:3016 src/libslic3r/PrintConfig.cpp:3040
 #: src/libslic3r/PrintConfig.cpp:3050 src/libslic3r/PrintConfig.cpp:3060
-#: src/libslic3r/PrintConfig.cpp:3083 src/libslic3r/PrintConfig.cpp:3161
-#: src/libslic3r/PrintConfig.cpp:3367 src/libslic3r/PrintConfig.cpp:3408
-#: src/libslic3r/PrintConfig.cpp:3568 src/libslic3r/PrintConfig.cpp:3577
-#: src/libslic3r/PrintConfig.cpp:3586 src/libslic3r/PrintConfig.cpp:3596
-#: src/libslic3r/PrintConfig.cpp:3661 src/libslic3r/PrintConfig.cpp:3671
-#: src/libslic3r/PrintConfig.cpp:3683 src/libslic3r/PrintConfig.cpp:3703
-#: src/libslic3r/PrintConfig.cpp:3713 src/libslic3r/PrintConfig.cpp:3723
-#: src/libslic3r/PrintConfig.cpp:3741 src/libslic3r/PrintConfig.cpp:3756
-#: src/libslic3r/PrintConfig.cpp:3770 src/libslic3r/PrintConfig.cpp:3781
-#: src/libslic3r/PrintConfig.cpp:3794 src/libslic3r/PrintConfig.cpp:3839
-#: src/libslic3r/PrintConfig.cpp:3849 src/libslic3r/PrintConfig.cpp:3858
-#: src/libslic3r/PrintConfig.cpp:3868 src/libslic3r/PrintConfig.cpp:3884
-#: src/libslic3r/PrintConfig.cpp:3908
+#: src/libslic3r/PrintConfig.cpp:3340 src/libslic3r/PrintConfig.cpp:3381
+#: src/libslic3r/PrintConfig.cpp:3541 src/libslic3r/PrintConfig.cpp:3550
+#: src/libslic3r/PrintConfig.cpp:3559 src/libslic3r/PrintConfig.cpp:3569
+#: src/libslic3r/PrintConfig.cpp:3634 src/libslic3r/PrintConfig.cpp:3644
+#: src/libslic3r/PrintConfig.cpp:3656 src/libslic3r/PrintConfig.cpp:3676
+#: src/libslic3r/PrintConfig.cpp:3686 src/libslic3r/PrintConfig.cpp:3696
+#: src/libslic3r/PrintConfig.cpp:3714 src/libslic3r/PrintConfig.cpp:3729
+#: src/libslic3r/PrintConfig.cpp:3743 src/libslic3r/PrintConfig.cpp:3754
+#: src/libslic3r/PrintConfig.cpp:3767 src/libslic3r/PrintConfig.cpp:3812
+#: src/libslic3r/PrintConfig.cpp:3822 src/libslic3r/PrintConfig.cpp:3831
+#: src/libslic3r/PrintConfig.cpp:3841 src/libslic3r/PrintConfig.cpp:3857
+#: src/libslic3r/PrintConfig.cpp:3881
 msgid "mm"
 msgstr "mm"
 
@@ -319,7 +318,7 @@ msgid "Load shape from STL..."
 msgstr "Alakzat betöltése STL-ből..."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:249 src/slic3r/GUI/GCodeViewer.cpp:3709
-#: src/slic3r/GUI/MainFrame.cpp:2143
+#: src/slic3r/GUI/MainFrame.cpp:2147
 msgid "Settings"
 msgstr "Beállítások"
 
@@ -332,7 +331,7 @@ msgid "Load..."
 msgstr "Betöltés..."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:292 src/slic3r/GUI/BedShapeDialog.cpp:362
-#: src/slic3r/GUI/Tab.cpp:3750
+#: src/slic3r/GUI/Tab.cpp:3748
 msgid "Remove"
 msgstr "Eltávolítás"
 
@@ -558,19 +557,19 @@ msgstr "Váltsak egyenes vonalú kitöltési mintára?"
 msgid "Infill"
 msgstr "Kitöltés"
 
-#: src/slic3r/GUI/ConfigManipulation.cpp:338
+#: src/slic3r/GUI/ConfigManipulation.cpp:336
 msgid "Head penetration should not be greater than the head width."
 msgstr "A fej benyúlása nem lehet nagyobb, mint a fej szélessége."
 
-#: src/slic3r/GUI/ConfigManipulation.cpp:340
+#: src/slic3r/GUI/ConfigManipulation.cpp:338
 msgid "Invalid Head penetration"
 msgstr "Érvénytelen Fej benyúlás"
 
-#: src/slic3r/GUI/ConfigManipulation.cpp:351
+#: src/slic3r/GUI/ConfigManipulation.cpp:349
 msgid "Pinhead diameter should be smaller than the pillar diameter."
 msgstr "A tűfej átmérőjének kisebbnek kell lennie, az oszlop átmérőjénél."
 
-#: src/slic3r/GUI/ConfigManipulation.cpp:353
+#: src/slic3r/GUI/ConfigManipulation.cpp:351
 msgid "Invalid pinhead diameter"
 msgstr "Érvénytelen tűfej átmérő"
 
@@ -679,7 +678,7 @@ msgid "Standard"
 msgstr "Standard"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:331 src/slic3r/GUI/ConfigWizard.cpp:651
-#: src/slic3r/GUI/Preferences.cpp:434 src/slic3r/GUI/Tab.cpp:3832
+#: src/slic3r/GUI/Preferences.cpp:434 src/slic3r/GUI/Tab.cpp:3830
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1154
 msgid "All"
 msgstr "Összes"
@@ -952,7 +951,7 @@ msgstr "A %s által támogatott egyéb gyártó kiválasztása"
 msgid "Firmware Type"
 msgstr "Firmware Típus"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1357 src/slic3r/GUI/Tab.cpp:2365
+#: src/slic3r/GUI/ConfigWizard.cpp:1357 src/slic3r/GUI/Tab.cpp:2363
 msgid "Firmware"
 msgstr "Firmware"
 
@@ -1270,7 +1269,7 @@ msgstr "Végrahajtás"
 
 #: src/slic3r/GUI/DesktopIntegrationDialog.cpp:486
 #: src/slic3r/GUI/GLCanvas3D.cpp:4699 src/slic3r/GUI/KBShortcutsDialog.cpp:97
-#: src/slic3r/GUI/MainFrame.cpp:1338
+#: src/slic3r/GUI/MainFrame.cpp:1342
 msgid "Undo"
 msgstr "Visszavonás"
 
@@ -1936,7 +1935,7 @@ msgstr "Megerősítés"
 msgid "Cancelling..."
 msgstr "Visszavonás..."
 
-#: src/slic3r/GUI/GalleryDialog.cpp:69 src/slic3r/GUI/MainFrame.cpp:1400
+#: src/slic3r/GUI/GalleryDialog.cpp:69 src/slic3r/GUI/MainFrame.cpp:1404
 msgid "Shape Gallery"
 msgstr "Alakzat Galéria"
 
@@ -1952,7 +1951,7 @@ msgstr "Hozzáadás a tárgyasztalhoz"
 msgid "Add selected shape(s) to the bed"
 msgstr "Kijelölt alakzat(ok) hozzáadása a tárgyasztalhoz"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:117 src/slic3r/GUI/Tab.cpp:4151
+#: src/slic3r/GUI/GalleryDialog.cpp:117 src/slic3r/GUI/Tab.cpp:4149
 msgid "Add"
 msgstr "Hozzáadás"
 
@@ -1962,7 +1961,7 @@ msgstr "Egy vagy több egyedi alakzat hozzáadása"
 
 #: src/slic3r/GUI/GalleryDialog.cpp:118 src/slic3r/GUI/GalleryDialog.cpp:508
 #: src/slic3r/GUI/GLCanvas3D.cpp:4490 src/slic3r/GUI/GUI_Factories.cpp:444
-#: src/slic3r/GUI/Tab.cpp:3750
+#: src/slic3r/GUI/Tab.cpp:3748
 msgid "Delete"
 msgstr "Törlés"
 
@@ -2146,8 +2145,8 @@ msgstr "Mozgás"
 msgid "Extrusion"
 msgstr "Extrudálás"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3614 src/slic3r/GUI/Tab.cpp:1869
-#: src/slic3r/GUI/Tab.cpp:2811
+#: src/slic3r/GUI/GCodeViewer.cpp:3614 src/slic3r/GUI/Tab.cpp:1867
+#: src/slic3r/GUI/Tab.cpp:2809
 msgid "Retraction"
 msgstr "Visszahúzás"
 
@@ -2202,7 +2201,7 @@ msgstr "Nyomtatási beállítások"
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3700 src/slic3r/GUI/GCodeViewer.cpp:3726
 #: src/slic3r/GUI/GUI.cpp:339 src/slic3r/GUI/Plater.cpp:819
-#: src/slic3r/GUI/Tab.cpp:1969 src/slic3r/GUI/Tab.cpp:1970
+#: src/slic3r/GUI/Tab.cpp:1967 src/slic3r/GUI/Tab.cpp:1968
 msgid "Filament"
 msgstr "Filament"
 
@@ -2426,7 +2425,7 @@ msgid "Add..."
 msgstr "Hozzáadás..."
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:4499 src/slic3r/GUI/KBShortcutsDialog.cpp:96
-#: src/slic3r/GUI/Plater.cpp:5496 src/slic3r/GUI/Tab.cpp:4157
+#: src/slic3r/GUI/Plater.cpp:5496 src/slic3r/GUI/Tab.cpp:4155
 msgid "Delete all"
 msgstr "Összes törlése"
 
@@ -2474,7 +2473,7 @@ msgid "Next Undo action: %1%"
 msgstr "Következő visszavonás művelet: %1%"
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:4738 src/slic3r/GUI/KBShortcutsDialog.cpp:98
-#: src/slic3r/GUI/MainFrame.cpp:1341
+#: src/slic3r/GUI/MainFrame.cpp:1345
 msgid "Redo"
 msgstr "Mégis"
 
@@ -2516,7 +2515,7 @@ msgid "Selection-Remove from rectangle"
 msgstr "Kijelölés – Eltávolítás a téglalapból"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:50
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:160 src/libslic3r/PrintConfig.cpp:4471
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:160 src/libslic3r/PrintConfig.cpp:4446
 msgid "Cut"
 msgstr "Vágás"
 
@@ -2777,7 +2776,7 @@ msgid "Quality"
 msgstr "Minőség"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp:34
-#: src/libslic3r/PrintConfig.cpp:3900
+#: src/libslic3r/PrintConfig.cpp:3873
 msgid "Closing distance"
 msgstr "Zárótávolság"
 
@@ -2882,7 +2881,7 @@ msgstr "Mozgatás"
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:543
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:562
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:578
-#: src/libslic3r/PrintConfig.cpp:4525
+#: src/libslic3r/PrintConfig.cpp:4500
 msgid "Rotate"
 msgstr "Forgatás"
 
@@ -2899,7 +2898,7 @@ msgstr "Alkalmaz"
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:216
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:563
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:579
-#: src/libslic3r/PrintConfig.cpp:4540
+#: src/libslic3r/PrintConfig.cpp:4515
 msgid "Scale"
 msgstr "Skálázás"
 
@@ -2954,7 +2953,7 @@ msgstr ""
 "engedélyezett"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:157
-#: src/slic3r/GUI/MainFrame.cpp:1165 src/slic3r/GUI/MainFrame.cpp:1622
+#: src/slic3r/GUI/MainFrame.cpp:1169 src/slic3r/GUI/MainFrame.cpp:1626
 #: src/slic3r/GUI/PrintHostDialogs.cpp:373
 msgid "Error"
 msgstr "Hiba"
@@ -3040,7 +3039,7 @@ msgid "Minimal points distance"
 msgstr "Pontok minimális távolsága"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:46
-#: src/libslic3r/PrintConfig.cpp:3730
+#: src/libslic3r/PrintConfig.cpp:3703
 msgid "Support points density"
 msgstr "Támadztó pontok sűrűsége"
 
@@ -3894,7 +3893,7 @@ msgid "Speed"
 msgstr "Sebesség"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:133 src/slic3r/GUI/Tab.cpp:1620
-#: src/slic3r/GUI/Tab.cpp:2303 src/libslic3r/PrintConfig.cpp:792
+#: src/slic3r/GUI/Tab.cpp:2301 src/libslic3r/PrintConfig.cpp:792
 #: src/libslic3r/PrintConfig.cpp:1465 src/libslic3r/PrintConfig.cpp:1965
 #: src/libslic3r/PrintConfig.cpp:2341 src/libslic3r/PrintConfig.cpp:2615
 #: src/libslic3r/PrintConfig.cpp:2643
@@ -3917,52 +3916,51 @@ msgstr "Szoknya és karima"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:138 src/slic3r/GUI/Tab.cpp:1491
 #: src/slic3r/GUI/Tab.cpp:1525 src/slic3r/GUI/Tab.cpp:1642
-#: src/slic3r/GUI/Tab.cpp:1646 src/slic3r/GUI/Tab.cpp:2030
-#: src/slic3r/GUI/Tab.cpp:2401 src/slic3r/GUI/Tab.cpp:4728
+#: src/slic3r/GUI/Tab.cpp:1646 src/slic3r/GUI/Tab.cpp:2028
+#: src/slic3r/GUI/Tab.cpp:2399 src/slic3r/GUI/Tab.cpp:4726
 #: src/libslic3r/PrintConfig.cpp:259 src/libslic3r/PrintConfig.cpp:494
 #: src/libslic3r/PrintConfig.cpp:1414 src/libslic3r/PrintConfig.cpp:1501
 #: src/libslic3r/PrintConfig.cpp:1548 src/libslic3r/PrintConfig.cpp:2498
 #: src/libslic3r/PrintConfig.cpp:2508 src/libslic3r/PrintConfig.cpp:3046
-#: src/libslic3r/PrintConfig.cpp:3080 src/libslic3r/PrintConfig.cpp:3090
-#: src/libslic3r/PrintConfig.cpp:3105 src/libslic3r/PrintConfig.cpp:3118
-#: src/libslic3r/PrintConfig.cpp:3127 src/libslic3r/PrintConfig.cpp:3142
-#: src/libslic3r/PrintConfig.cpp:3157 src/libslic3r/PrintConfig.cpp:3168
-#: src/libslic3r/PrintConfig.cpp:3365
+#: src/libslic3r/PrintConfig.cpp:3081 src/libslic3r/PrintConfig.cpp:3092
+#: src/libslic3r/PrintConfig.cpp:3107 src/libslic3r/PrintConfig.cpp:3120
+#: src/libslic3r/PrintConfig.cpp:3129 src/libslic3r/PrintConfig.cpp:3141
+#: src/libslic3r/PrintConfig.cpp:3338
 msgid "Advanced"
 msgstr "Haladó"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:140 src/slic3r/GUI/Plater.cpp:428
-#: src/slic3r/GUI/Tab.cpp:4662 src/slic3r/GUI/Tab.cpp:4663
-#: src/libslic3r/PrintConfig.cpp:3559 src/libslic3r/PrintConfig.cpp:3566
-#: src/libslic3r/PrintConfig.cpp:3575 src/libslic3r/PrintConfig.cpp:3584
-#: src/libslic3r/PrintConfig.cpp:3594 src/libslic3r/PrintConfig.cpp:3604
-#: src/libslic3r/PrintConfig.cpp:3641 src/libslic3r/PrintConfig.cpp:3648
-#: src/libslic3r/PrintConfig.cpp:3659 src/libslic3r/PrintConfig.cpp:3669
-#: src/libslic3r/PrintConfig.cpp:3678 src/libslic3r/PrintConfig.cpp:3691
-#: src/libslic3r/PrintConfig.cpp:3701 src/libslic3r/PrintConfig.cpp:3710
-#: src/libslic3r/PrintConfig.cpp:3720 src/libslic3r/PrintConfig.cpp:3731
-#: src/libslic3r/PrintConfig.cpp:3739
+#: src/slic3r/GUI/Tab.cpp:4660 src/slic3r/GUI/Tab.cpp:4661
+#: src/libslic3r/PrintConfig.cpp:3532 src/libslic3r/PrintConfig.cpp:3539
+#: src/libslic3r/PrintConfig.cpp:3548 src/libslic3r/PrintConfig.cpp:3557
+#: src/libslic3r/PrintConfig.cpp:3567 src/libslic3r/PrintConfig.cpp:3577
+#: src/libslic3r/PrintConfig.cpp:3614 src/libslic3r/PrintConfig.cpp:3621
+#: src/libslic3r/PrintConfig.cpp:3632 src/libslic3r/PrintConfig.cpp:3642
+#: src/libslic3r/PrintConfig.cpp:3651 src/libslic3r/PrintConfig.cpp:3664
+#: src/libslic3r/PrintConfig.cpp:3674 src/libslic3r/PrintConfig.cpp:3683
+#: src/libslic3r/PrintConfig.cpp:3693 src/libslic3r/PrintConfig.cpp:3704
+#: src/libslic3r/PrintConfig.cpp:3712
 msgid "Supports"
 msgstr "Támasztékok"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:141 src/slic3r/GUI/Plater.cpp:575
-#: src/slic3r/GUI/Tab.cpp:4703 src/slic3r/GUI/Tab.cpp:4704
-#: src/slic3r/GUI/Tab.cpp:4776 src/libslic3r/PrintConfig.cpp:3747
-#: src/libslic3r/PrintConfig.cpp:3754 src/libslic3r/PrintConfig.cpp:3768
-#: src/libslic3r/PrintConfig.cpp:3779 src/libslic3r/PrintConfig.cpp:3789
-#: src/libslic3r/PrintConfig.cpp:3811 src/libslic3r/PrintConfig.cpp:3822
-#: src/libslic3r/PrintConfig.cpp:3829 src/libslic3r/PrintConfig.cpp:3836
-#: src/libslic3r/PrintConfig.cpp:3847 src/libslic3r/PrintConfig.cpp:3856
-#: src/libslic3r/PrintConfig.cpp:3865
+#: src/slic3r/GUI/Tab.cpp:4701 src/slic3r/GUI/Tab.cpp:4702
+#: src/slic3r/GUI/Tab.cpp:4774 src/libslic3r/PrintConfig.cpp:3720
+#: src/libslic3r/PrintConfig.cpp:3727 src/libslic3r/PrintConfig.cpp:3741
+#: src/libslic3r/PrintConfig.cpp:3752 src/libslic3r/PrintConfig.cpp:3762
+#: src/libslic3r/PrintConfig.cpp:3784 src/libslic3r/PrintConfig.cpp:3795
+#: src/libslic3r/PrintConfig.cpp:3802 src/libslic3r/PrintConfig.cpp:3809
+#: src/libslic3r/PrintConfig.cpp:3820 src/libslic3r/PrintConfig.cpp:3829
+#: src/libslic3r/PrintConfig.cpp:3838
 msgid "Pad"
 msgstr "Párna"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:142 src/slic3r/GUI/Tab.cpp:4721
-#: src/slic3r/GUI/Tab.cpp:4722 src/libslic3r/SLA/Hollowing.cpp:73
+#: src/slic3r/GUI/GUI_Factories.cpp:142 src/slic3r/GUI/Tab.cpp:4719
+#: src/slic3r/GUI/Tab.cpp:4720 src/libslic3r/SLA/Hollowing.cpp:73
 #: src/libslic3r/SLA/Hollowing.cpp:85 src/libslic3r/SLA/Hollowing.cpp:105
-#: src/libslic3r/SLA/Hollowing.cpp:114 src/libslic3r/PrintConfig.cpp:3875
-#: src/libslic3r/PrintConfig.cpp:3882 src/libslic3r/PrintConfig.cpp:3892
-#: src/libslic3r/PrintConfig.cpp:3901
+#: src/libslic3r/SLA/Hollowing.cpp:114 src/libslic3r/PrintConfig.cpp:3848
+#: src/libslic3r/PrintConfig.cpp:3855 src/libslic3r/PrintConfig.cpp:3865
+#: src/libslic3r/PrintConfig.cpp:3874
 msgid "Hollowing"
 msgstr "Üregesítés"
 
@@ -4105,7 +4103,7 @@ msgid "Revert conversion from meters"
 msgstr "Konvertálás visszavonása (metrikus mértékegységről)"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:859 src/slic3r/GUI/GUI_ObjectList.cpp:2133
-#: src/libslic3r/PrintConfig.cpp:4516
+#: src/libslic3r/PrintConfig.cpp:4491
 msgid "Merge"
 msgstr "Összevonás"
 
@@ -4166,7 +4164,7 @@ msgid "Split the selected object into individual parts"
 msgstr "A kijelölt objektum különálló alkatrészekre bontása"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:944 src/slic3r/GUI/GUI_Factories.cpp:954
-#: src/slic3r/GUI/GUI_Factories.cpp:975 src/libslic3r/PrintConfig.cpp:4545
+#: src/slic3r/GUI/GUI_Factories.cpp:975 src/libslic3r/PrintConfig.cpp:4520
 msgid "Split"
 msgstr "Felbontás"
 
@@ -4827,11 +4825,11 @@ msgstr "Magasság"
 msgid "Width"
 msgstr "Szélesség"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:221 src/slic3r/GUI/Tab.cpp:2015
+#: src/slic3r/GUI/GUI_Preview.cpp:221 src/slic3r/GUI/Tab.cpp:2013
 msgid "Fan speed"
 msgstr "Ventilátor sebesség"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:222 src/slic3r/GUI/Tab.cpp:1990
+#: src/slic3r/GUI/GUI_Preview.cpp:222 src/slic3r/GUI/Tab.cpp:1988
 msgid "Temperature"
 msgstr "Hőmérséklet"
 
@@ -5132,7 +5130,7 @@ msgstr ""
 msgid "Attention!"
 msgstr "Figyelem!"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:18 src/slic3r/GUI/MainFrame.cpp:1103
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:18 src/slic3r/GUI/MainFrame.cpp:1107
 msgid "Keyboard Shortcuts"
 msgstr "Gyorsbillentyűk"
 
@@ -5171,7 +5169,7 @@ msgstr ""
 "Konfiguráció betöltése ini/amf/3mf/gcode fájlból, és hozzáadás a meglévőhöz"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:87 src/slic3r/GUI/Plater.cpp:913
-#: src/slic3r/GUI/Plater.cpp:6530 src/libslic3r/PrintConfig.cpp:4416
+#: src/slic3r/GUI/Plater.cpp:6530 src/libslic3r/PrintConfig.cpp:4391
 msgid "Export G-code"
 msgstr "G-kód exportálása"
 
@@ -5527,13 +5525,13 @@ msgstr "Extruder számának beállítása a kiválasztott elemekhez"
 msgid "Objects List"
 msgstr "Objektumok Listája"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:205 src/slic3r/GUI/MainFrame.cpp:1521
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:205 src/slic3r/GUI/MainFrame.cpp:1525
 msgid "Open a G-code file"
 msgstr "G-kód fájl megnyitása"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:207 src/slic3r/GUI/MainFrame.cpp:1355
-#: src/slic3r/GUI/MainFrame.cpp:1359 src/slic3r/GUI/MainFrame.cpp:1526
-#: src/slic3r/GUI/MainFrame.cpp:1530
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:207 src/slic3r/GUI/MainFrame.cpp:1359
+#: src/slic3r/GUI/MainFrame.cpp:1363 src/slic3r/GUI/MainFrame.cpp:1530
+#: src/slic3r/GUI/MainFrame.cpp:1534
 msgid "Reload the plater from disk"
 msgstr "Tárgyasztal újratöltése lemezről"
 
@@ -5570,7 +5568,7 @@ msgid "Show/Hide G-code window"
 msgstr "G-kód ablak megjelenítése/elrejtése"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:230 src/slic3r/GUI/Plater.cpp:4467
-#: src/slic3r/GUI/Tab.cpp:2831
+#: src/slic3r/GUI/Tab.cpp:2829
 msgid "Preview"
 msgstr "Előnézet"
 
@@ -5654,7 +5652,7 @@ msgid "Keyboard shortcuts"
 msgstr "Gyorsbillentyűk"
 
 #: src/slic3r/GUI/MainFrame.cpp:75 src/slic3r/GUI/MainFrame.cpp:89
-#: src/slic3r/GUI/MainFrame.cpp:1416
+#: src/slic3r/GUI/MainFrame.cpp:1420
 msgid "Open a new PrusaSlicer instance"
 msgstr "Új PrusaSlicer példány megnyitása"
 
@@ -5662,11 +5660,11 @@ msgstr "Új PrusaSlicer példány megnyitása"
 msgid "G-code preview"
 msgstr "G-kód előnézet"
 
-#: src/slic3r/GUI/MainFrame.cpp:78 src/slic3r/GUI/MainFrame.cpp:1304
+#: src/slic3r/GUI/MainFrame.cpp:78 src/slic3r/GUI/MainFrame.cpp:1308
 msgid "Open G-code viewer"
 msgstr "G-kód nézegető megnyitása"
 
-#: src/slic3r/GUI/MainFrame.cpp:89 src/slic3r/GUI/MainFrame.cpp:1537
+#: src/slic3r/GUI/MainFrame.cpp:89 src/slic3r/GUI/MainFrame.cpp:1541
 msgid "Open PrusaSlicer"
 msgstr "PrusaSlicer megnyitása"
 
@@ -5692,13 +5690,13 @@ msgid "Print Settings"
 msgstr "Nyomtatási Beállítások"
 
 #: src/slic3r/GUI/MainFrame.cpp:286 src/slic3r/GUI/MainFrame.cpp:339
-#: src/slic3r/GUI/MainFrame.cpp:2099 src/slic3r/GUI/MainFrame.cpp:2100
+#: src/slic3r/GUI/MainFrame.cpp:2103 src/slic3r/GUI/MainFrame.cpp:2104
 #: src/slic3r/GUI/Tab.hpp:535
 msgid "Material Settings"
 msgstr "Alapanyag Beállítások"
 
 #: src/slic3r/GUI/MainFrame.cpp:286 src/slic3r/GUI/MainFrame.cpp:337
-#: src/slic3r/GUI/MainFrame.cpp:2099 src/slic3r/GUI/MainFrame.cpp:2100
+#: src/slic3r/GUI/MainFrame.cpp:2103 src/slic3r/GUI/MainFrame.cpp:2104
 #: src/slic3r/GUI/Tab.hpp:461
 msgid "Filament Settings"
 msgstr "Filament Beállítások"
@@ -5781,7 +5779,7 @@ msgstr "A Szerzőről szóló párbeszédpanel megnyitása"
 msgid "Show Tip of the Day"
 msgstr "Nap Tippje Mutatása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1100
+#: src/slic3r/GUI/MainFrame.cpp:1104
 msgid ""
 "Opens Tip of the day notification in bottom right corner or shows another "
 "tip if already opened."
@@ -5789,94 +5787,94 @@ msgstr ""
 "Megnyitja a nap tippje értesítést a jobb alsó sarokban, vagy egy másik "
 "tippet jelenít meg, ha már nyitva van."
 
-#: src/slic3r/GUI/MainFrame.cpp:1103
+#: src/slic3r/GUI/MainFrame.cpp:1107
 msgid "Show the list of the keyboard shortcuts"
 msgstr "A billentyűparancsok listájának megjelenítése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1117
+#: src/slic3r/GUI/MainFrame.cpp:1121
 msgid "Iso"
 msgstr "Izometrikus"
 
-#: src/slic3r/GUI/MainFrame.cpp:1117
+#: src/slic3r/GUI/MainFrame.cpp:1121
 msgid "Iso View"
 msgstr "Izometrikus nézet"
 
 #. TRN To be shown in the main menu View->Top
 #. TRN To be shown in Print Settings "Top solid layers"
-#: src/slic3r/GUI/MainFrame.cpp:1121 src/libslic3r/PrintConfig.cpp:2885
+#: src/slic3r/GUI/MainFrame.cpp:1125 src/libslic3r/PrintConfig.cpp:2885
 #: src/libslic3r/PrintConfig.cpp:2894
 msgid "Top"
 msgstr "Felül"
 
-#: src/slic3r/GUI/MainFrame.cpp:1121
+#: src/slic3r/GUI/MainFrame.cpp:1125
 msgid "Top View"
 msgstr "Felülnézet"
 
 #. TRN To be shown in the main menu View->Bottom
 #. TRN To be shown in Print Settings "Bottom solid layers"
 #. TRN To be shown in Print Settings "Top solid layers"
-#: src/slic3r/GUI/MainFrame.cpp:1124 src/libslic3r/PrintConfig.cpp:445
+#: src/slic3r/GUI/MainFrame.cpp:1128 src/libslic3r/PrintConfig.cpp:445
 #: src/libslic3r/PrintConfig.cpp:454
 msgid "Bottom"
 msgstr "Alul"
 
-#: src/slic3r/GUI/MainFrame.cpp:1124
+#: src/slic3r/GUI/MainFrame.cpp:1128
 msgid "Bottom View"
 msgstr "Alulnézet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1126
+#: src/slic3r/GUI/MainFrame.cpp:1130
 msgid "Front"
 msgstr "Elöl"
 
-#: src/slic3r/GUI/MainFrame.cpp:1126
+#: src/slic3r/GUI/MainFrame.cpp:1130
 msgid "Front View"
 msgstr "Elölnézet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1128 src/libslic3r/PrintConfig.cpp:2242
+#: src/slic3r/GUI/MainFrame.cpp:1132 src/libslic3r/PrintConfig.cpp:2242
 msgid "Rear"
 msgstr "Hátul"
 
-#: src/slic3r/GUI/MainFrame.cpp:1128
+#: src/slic3r/GUI/MainFrame.cpp:1132
 msgid "Rear View"
 msgstr "Hátulnézet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1130
+#: src/slic3r/GUI/MainFrame.cpp:1134
 msgid "Left"
 msgstr "Bal"
 
-#: src/slic3r/GUI/MainFrame.cpp:1130
+#: src/slic3r/GUI/MainFrame.cpp:1134
 msgid "Left View"
 msgstr "Balnézet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1132
+#: src/slic3r/GUI/MainFrame.cpp:1136
 msgid "Right"
 msgstr "Jobb"
 
-#: src/slic3r/GUI/MainFrame.cpp:1132
+#: src/slic3r/GUI/MainFrame.cpp:1136
 msgid "Right View"
 msgstr "Jobbnézet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1145
+#: src/slic3r/GUI/MainFrame.cpp:1149
 msgid "&New Project"
 msgstr "Új Projekt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1145
+#: src/slic3r/GUI/MainFrame.cpp:1149
 msgid "Start a new project"
 msgstr "Új projekt elkezdése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1148
+#: src/slic3r/GUI/MainFrame.cpp:1152
 msgid "&Open Project"
 msgstr "Projekt megnyitása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1148
+#: src/slic3r/GUI/MainFrame.cpp:1152
 msgid "Open a project file"
 msgstr "Projekt fájl megnyitása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1153
+#: src/slic3r/GUI/MainFrame.cpp:1157
 msgid "Recent projects"
 msgstr "Legutóbbi projektek"
 
-#: src/slic3r/GUI/MainFrame.cpp:1165
+#: src/slic3r/GUI/MainFrame.cpp:1169
 msgid ""
 "The selected project is no longer available.\n"
 "Do you want to remove it from the recent projects list?"
@@ -5884,510 +5882,510 @@ msgstr ""
 "A kiválasztott projekt már nem elérhető.\n"
 "El szeretné távolítani a legutóbbi projektek listájáról?"
 
-#: src/slic3r/GUI/MainFrame.cpp:1190
+#: src/slic3r/GUI/MainFrame.cpp:1194
 msgid "&Save Project"
 msgstr "Projekt mentése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1190
+#: src/slic3r/GUI/MainFrame.cpp:1194
 msgid "Save current project file"
 msgstr "Aktuális projekt fájl mentése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1194 src/slic3r/GUI/MainFrame.cpp:1196
+#: src/slic3r/GUI/MainFrame.cpp:1198 src/slic3r/GUI/MainFrame.cpp:1200
 msgid "Save Project &as"
 msgstr "Projekt mentése másként"
 
-#: src/slic3r/GUI/MainFrame.cpp:1194 src/slic3r/GUI/MainFrame.cpp:1196
+#: src/slic3r/GUI/MainFrame.cpp:1198 src/slic3r/GUI/MainFrame.cpp:1200
 msgid "Save current project file as"
 msgstr "Aktuális projekt fájl mentése másként"
 
-#: src/slic3r/GUI/MainFrame.cpp:1204
+#: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Import STL/OBJ/AM&F/3MF"
 msgstr "STL/OBJ/AM&F/3MF Importálása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1204
+#: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Load a model"
 msgstr "Modell betöltése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1208
+#: src/slic3r/GUI/MainFrame.cpp:1212
 msgid "Import STL (Imperial Units)"
 msgstr "STL (Angolszász mértékegységek) Importálása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1208
+#: src/slic3r/GUI/MainFrame.cpp:1212
 msgid "Load an model saved with imperial units"
 msgstr "Angolszász mértékegységekkel mentett modell importálása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1212
+#: src/slic3r/GUI/MainFrame.cpp:1216
 msgid "Import SL1 / SL1S Archive"
 msgstr "SL1 / SL1S Archív Importálása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1212
+#: src/slic3r/GUI/MainFrame.cpp:1216
 msgid "Load an SL1 / Sl1S archive"
 msgstr "SL1 / Sl1S archív betöltése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1217
+#: src/slic3r/GUI/MainFrame.cpp:1221
 msgid "Import &Config"
 msgstr "Konfiguráció Importálása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1217
+#: src/slic3r/GUI/MainFrame.cpp:1221
 msgid "Load exported configuration file"
 msgstr "Korábban exportált konfigurációs fájl betöltése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1220
+#: src/slic3r/GUI/MainFrame.cpp:1224
 msgid "Import Config from &Project"
 msgstr "Konfiguráció Importálása Projektből"
 
-#: src/slic3r/GUI/MainFrame.cpp:1220
+#: src/slic3r/GUI/MainFrame.cpp:1224
 msgid "Load configuration from project file"
 msgstr "Konfiguráció betöltése projekt fájlból"
 
-#: src/slic3r/GUI/MainFrame.cpp:1224
+#: src/slic3r/GUI/MainFrame.cpp:1228
 msgid "Import Config &Bundle"
 msgstr "Konfigurációs Csomag Importálása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1224
+#: src/slic3r/GUI/MainFrame.cpp:1228
 msgid "Load presets from a bundle"
 msgstr "Előbeállítások betöltése konfigurációs csomagból"
 
-#: src/slic3r/GUI/MainFrame.cpp:1227
+#: src/slic3r/GUI/MainFrame.cpp:1231
 msgid "&Import"
 msgstr "Importálás"
 
-#: src/slic3r/GUI/MainFrame.cpp:1230 src/slic3r/GUI/MainFrame.cpp:1582
+#: src/slic3r/GUI/MainFrame.cpp:1234 src/slic3r/GUI/MainFrame.cpp:1586
 msgid "Export &G-code"
 msgstr "G-kód Exportálása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1230
+#: src/slic3r/GUI/MainFrame.cpp:1234
 msgid "Export current plate as G-code"
 msgstr "Az aktuális tárgyasztal exportálása G-kódként"
 
-#: src/slic3r/GUI/MainFrame.cpp:1234 src/slic3r/GUI/MainFrame.cpp:1583
+#: src/slic3r/GUI/MainFrame.cpp:1238 src/slic3r/GUI/MainFrame.cpp:1587
 msgid "S&end G-code"
 msgstr "G-kód Küldése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1234
+#: src/slic3r/GUI/MainFrame.cpp:1238
 msgid "Send to print current plate as G-code"
 msgstr "Az aktuális tárgyasztal küldése nyomtatóra G-kódként"
 
-#: src/slic3r/GUI/MainFrame.cpp:1238
+#: src/slic3r/GUI/MainFrame.cpp:1242
 msgid "Export G-code to SD Card / Flash Drive"
 msgstr "G-kód Exportálása SD Kártyára / Flash memóriára"
 
-#: src/slic3r/GUI/MainFrame.cpp:1238
+#: src/slic3r/GUI/MainFrame.cpp:1242
 msgid "Export current plate as G-code to SD card / Flash drive"
 msgstr "Tárgyasztal Exportálása G-kódként SD Kártyára / Flash memóriára"
 
-#: src/slic3r/GUI/MainFrame.cpp:1242
+#: src/slic3r/GUI/MainFrame.cpp:1246
 msgid "Export Plate as &STL"
 msgstr "Tárgyasztal Exportálása STL-ként"
 
-#: src/slic3r/GUI/MainFrame.cpp:1242
+#: src/slic3r/GUI/MainFrame.cpp:1246
 msgid "Export current plate as STL"
 msgstr "Tárgyasztal Exportálása STL-ként"
 
-#: src/slic3r/GUI/MainFrame.cpp:1245
+#: src/slic3r/GUI/MainFrame.cpp:1249
 msgid "Export Plate as STL &Including Supports"
 msgstr "Tárgyasztal Exportálása STL-ként támasztékokkal együtt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1245
+#: src/slic3r/GUI/MainFrame.cpp:1249
 msgid "Export current plate as STL including supports"
 msgstr "Tárgyasztal Exportálása STL-ként támasztékokkal együtt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1253 src/slic3r/GUI/MainFrame.cpp:1534
+#: src/slic3r/GUI/MainFrame.cpp:1257 src/slic3r/GUI/MainFrame.cpp:1538
 msgid "Export &Toolpaths as OBJ"
 msgstr "Szerszámpálya Exportálása OBJ-ként"
 
-#: src/slic3r/GUI/MainFrame.cpp:1253 src/slic3r/GUI/MainFrame.cpp:1534
+#: src/slic3r/GUI/MainFrame.cpp:1257 src/slic3r/GUI/MainFrame.cpp:1538
 msgid "Export toolpaths as OBJ"
 msgstr "Szerszámpálya Exportálása OBJ-ként"
 
-#: src/slic3r/GUI/MainFrame.cpp:1257
+#: src/slic3r/GUI/MainFrame.cpp:1261
 msgid "Export &Config"
 msgstr "Beállítások Exportálása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1257
+#: src/slic3r/GUI/MainFrame.cpp:1261
 msgid "Export current configuration to file"
 msgstr "Aktuális beállítások exportálása fájlba"
 
-#: src/slic3r/GUI/MainFrame.cpp:1260
+#: src/slic3r/GUI/MainFrame.cpp:1264
 msgid "Export Config &Bundle"
 msgstr "Konfigurációs Csomag Exportálása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1260
+#: src/slic3r/GUI/MainFrame.cpp:1264
 msgid "Export all presets to file"
 msgstr "Az összes előbeállítás exportálása fájlba"
 
-#: src/slic3r/GUI/MainFrame.cpp:1263
+#: src/slic3r/GUI/MainFrame.cpp:1267
 msgid "Export Config Bundle With Physical Printers"
 msgstr "Konfigurációs Csomag Exportálása Fizikai Nyomtatókkal együtt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1263
+#: src/slic3r/GUI/MainFrame.cpp:1267
 msgid "Export all presets including physical printers to file"
 msgstr "Konfigurációs csomag exportálása a fizikai nyomtatókkal együtt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1266
+#: src/slic3r/GUI/MainFrame.cpp:1270
 msgid "&Export"
 msgstr "Exportlálás"
 
-#: src/slic3r/GUI/MainFrame.cpp:1268
+#: src/slic3r/GUI/MainFrame.cpp:1272
 msgid "Ejec&t SD Card / Flash Drive"
 msgstr "SD Kártya / Flash meghajtó eltávolítása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1268
+#: src/slic3r/GUI/MainFrame.cpp:1272
 msgid "Eject SD card / Flash drive after the G-code was exported to it."
 msgstr "SD-kártyát / Flash meghajtót eltávolítása a G-kódot exportálása után."
 
-#: src/slic3r/GUI/MainFrame.cpp:1276
+#: src/slic3r/GUI/MainFrame.cpp:1280
 msgid "Quick Slice"
 msgstr "Gyors Szeletelés"
 
-#: src/slic3r/GUI/MainFrame.cpp:1276
+#: src/slic3r/GUI/MainFrame.cpp:1280
 msgid "Slice a file into a G-code"
 msgstr "Fájl szeletelése G-kódba"
 
-#: src/slic3r/GUI/MainFrame.cpp:1282
+#: src/slic3r/GUI/MainFrame.cpp:1286
 msgid "Quick Slice and Save As"
 msgstr "Gyors Szeletelés és Mentés Másként"
 
-#: src/slic3r/GUI/MainFrame.cpp:1282
+#: src/slic3r/GUI/MainFrame.cpp:1286
 msgid "Slice a file into a G-code, save as"
 msgstr "Fájl szeletelése G-kódba, mentés másként"
 
-#: src/slic3r/GUI/MainFrame.cpp:1288
+#: src/slic3r/GUI/MainFrame.cpp:1292
 msgid "Repeat Last Quick Slice"
 msgstr "Az Előző Gyors Szeletetelés Megismétlése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1288
+#: src/slic3r/GUI/MainFrame.cpp:1292
 msgid "Repeat last quick slice"
 msgstr "Az előző gyors szeletetelés megismétlése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1296
+#: src/slic3r/GUI/MainFrame.cpp:1300
 msgid "(Re)Slice No&w"
 msgstr "(Újra)Szeletelés Most"
 
-#: src/slic3r/GUI/MainFrame.cpp:1296
+#: src/slic3r/GUI/MainFrame.cpp:1300
 msgid "Start new slicing process"
 msgstr "Új szeletelés indítása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1300
+#: src/slic3r/GUI/MainFrame.cpp:1304
 msgid "&Repair STL file"
 msgstr "STL fájl javítása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1300
+#: src/slic3r/GUI/MainFrame.cpp:1304
 msgid "Automatically repair an STL file"
 msgstr "STL fájl automatikus javítása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1304
+#: src/slic3r/GUI/MainFrame.cpp:1308
 msgid "&G-code Preview"
 msgstr "G-Kód Előnézet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1307 src/slic3r/GUI/MainFrame.cpp:1541
+#: src/slic3r/GUI/MainFrame.cpp:1311 src/slic3r/GUI/MainFrame.cpp:1545
 msgid "&Quit"
 msgstr "Bezárás"
 
-#: src/slic3r/GUI/MainFrame.cpp:1307 src/slic3r/GUI/MainFrame.cpp:1541
+#: src/slic3r/GUI/MainFrame.cpp:1311 src/slic3r/GUI/MainFrame.cpp:1545
 #, c-format, boost-format
 msgid "Quit %s"
 msgstr "Kilépés %s"
 
-#: src/slic3r/GUI/MainFrame.cpp:1322
+#: src/slic3r/GUI/MainFrame.cpp:1326
 msgid "&Select All"
 msgstr "Összes kijelőlése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1323
+#: src/slic3r/GUI/MainFrame.cpp:1327
 msgid "Selects all objects"
 msgstr "Az összes objektum kijelölése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1325
+#: src/slic3r/GUI/MainFrame.cpp:1329
 msgid "D&eselect All"
 msgstr "Összes Kijelölés Megszüntetése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1326
+#: src/slic3r/GUI/MainFrame.cpp:1330
 msgid "Deselects all objects"
 msgstr "Az összes objektum kijelölésének megszüntetése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1329
+#: src/slic3r/GUI/MainFrame.cpp:1333
 msgid "&Delete Selected"
 msgstr "Kijelöltek törlése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1330
+#: src/slic3r/GUI/MainFrame.cpp:1334
 msgid "Deletes the current selection"
 msgstr "Az összes kijelölt objektum törlése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1332
+#: src/slic3r/GUI/MainFrame.cpp:1336
 msgid "Delete &All"
 msgstr "Összes törlése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1333
+#: src/slic3r/GUI/MainFrame.cpp:1337
 msgid "Deletes all objects"
 msgstr "Az összes objektum törlése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1337
+#: src/slic3r/GUI/MainFrame.cpp:1341
 msgid "&Undo"
 msgstr "Visszavonás"
 
-#: src/slic3r/GUI/MainFrame.cpp:1340
+#: src/slic3r/GUI/MainFrame.cpp:1344
 msgid "&Redo"
 msgstr "Mégis"
 
-#: src/slic3r/GUI/MainFrame.cpp:1345
+#: src/slic3r/GUI/MainFrame.cpp:1349
 msgid "&Copy"
 msgstr "Másolás"
 
-#: src/slic3r/GUI/MainFrame.cpp:1346
+#: src/slic3r/GUI/MainFrame.cpp:1350
 msgid "Copy selection to clipboard"
 msgstr "Kijelöltek másolása a vágólapra"
 
-#: src/slic3r/GUI/MainFrame.cpp:1348
+#: src/slic3r/GUI/MainFrame.cpp:1352
 msgid "&Paste"
 msgstr "&Beillesztés"
 
-#: src/slic3r/GUI/MainFrame.cpp:1349
+#: src/slic3r/GUI/MainFrame.cpp:1353
 msgid "Paste clipboard"
 msgstr "Beillesztés a vágólapról"
 
-#: src/slic3r/GUI/MainFrame.cpp:1354 src/slic3r/GUI/MainFrame.cpp:1358
-#: src/slic3r/GUI/MainFrame.cpp:1525 src/slic3r/GUI/MainFrame.cpp:1529
+#: src/slic3r/GUI/MainFrame.cpp:1358 src/slic3r/GUI/MainFrame.cpp:1362
+#: src/slic3r/GUI/MainFrame.cpp:1529 src/slic3r/GUI/MainFrame.cpp:1533
 msgid "Re&load from Disk"
 msgstr "Újratöltés lemezről"
 
-#: src/slic3r/GUI/MainFrame.cpp:1364
+#: src/slic3r/GUI/MainFrame.cpp:1368
 msgid "Searc&h"
 msgstr "Keresés"
 
-#: src/slic3r/GUI/MainFrame.cpp:1365
+#: src/slic3r/GUI/MainFrame.cpp:1369
 msgid "Search in settings"
 msgstr "Keresés a beállításokban"
 
-#: src/slic3r/GUI/MainFrame.cpp:1373
+#: src/slic3r/GUI/MainFrame.cpp:1377
 msgid "&Plater Tab"
 msgstr "Tárgyasztal Fül"
 
-#: src/slic3r/GUI/MainFrame.cpp:1373
+#: src/slic3r/GUI/MainFrame.cpp:1377
 msgid "Show the plater"
 msgstr "Tárgyasztal mutatása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1378
+#: src/slic3r/GUI/MainFrame.cpp:1382
 msgid "P&rint Settings Tab"
 msgstr "Nyomtatási Beállítások Fül"
 
-#: src/slic3r/GUI/MainFrame.cpp:1378
+#: src/slic3r/GUI/MainFrame.cpp:1382
 msgid "Show the print settings"
 msgstr "Nyomtatási beállítások mutatása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1381 src/slic3r/GUI/MainFrame.cpp:1585
+#: src/slic3r/GUI/MainFrame.cpp:1385 src/slic3r/GUI/MainFrame.cpp:1589
 msgid "&Filament Settings Tab"
 msgstr "Filament Beállítások Fül"
 
-#: src/slic3r/GUI/MainFrame.cpp:1381
+#: src/slic3r/GUI/MainFrame.cpp:1385
 msgid "Show the filament settings"
 msgstr "Filament beállítások mutatása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1385
+#: src/slic3r/GUI/MainFrame.cpp:1389
 msgid "Print&er Settings Tab"
 msgstr "Nyomtató Beállítások Fül"
 
-#: src/slic3r/GUI/MainFrame.cpp:1385
+#: src/slic3r/GUI/MainFrame.cpp:1389
 msgid "Show the printer settings"
 msgstr "Nyomtató beállítások mutatása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1391
+#: src/slic3r/GUI/MainFrame.cpp:1395
 msgid "3&D"
 msgstr "3D"
 
-#: src/slic3r/GUI/MainFrame.cpp:1391
+#: src/slic3r/GUI/MainFrame.cpp:1395
 msgid "Show the 3D editing view"
 msgstr "3D szerkesztő nézet mutatása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1394
+#: src/slic3r/GUI/MainFrame.cpp:1398
 msgid "Pre&view"
 msgstr "Előnézet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1394
+#: src/slic3r/GUI/MainFrame.cpp:1398
 msgid "Show the 3D slices preview"
 msgstr "3D szeletek nézet mutatása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1400
+#: src/slic3r/GUI/MainFrame.cpp:1404
 msgid "Open the dialog to modify shape gallery"
 msgstr "Dialógusablak megnyitása az Alakzat Galéria szerkesztéséhez"
 
-#: src/slic3r/GUI/MainFrame.cpp:1412
+#: src/slic3r/GUI/MainFrame.cpp:1416
 msgid "Print &Host Upload Queue"
 msgstr "Nyomtató-feltöltési várakozási sor"
 
-#: src/slic3r/GUI/MainFrame.cpp:1412
+#: src/slic3r/GUI/MainFrame.cpp:1416
 msgid "Display the Print Host Upload Queue window"
 msgstr "A Nyomtató-feltöltési várakozási sor ablak megjelenítése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1416
+#: src/slic3r/GUI/MainFrame.cpp:1420
 msgid "Open New Instance"
 msgstr "Új Példány Megnyitása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1420
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1563
+#: src/slic3r/GUI/MainFrame.cpp:1424
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1566
 msgid "Compare Presets"
 msgstr "Előbeállítások Összehasonlítása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1420
+#: src/slic3r/GUI/MainFrame.cpp:1424
 msgid "Compare presets"
 msgstr "Előbeállítások összehasonlítása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1430
+#: src/slic3r/GUI/MainFrame.cpp:1434
 msgid "Show &Labels"
 msgstr "Címkék Mutatása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1430
+#: src/slic3r/GUI/MainFrame.cpp:1434
 msgid "Show object/instance labels in 3D scene"
 msgstr "Objektum/példánycímkék megjelenítése 3D-s jelenetben"
 
-#: src/slic3r/GUI/MainFrame.cpp:1433
+#: src/slic3r/GUI/MainFrame.cpp:1437
 msgid "&Collapse Sidebar"
 msgstr "Oldalsáv Összecsukása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1433 src/slic3r/GUI/Plater.cpp:2320
+#: src/slic3r/GUI/MainFrame.cpp:1437 src/slic3r/GUI/Plater.cpp:2320
 msgid "Collapse sidebar"
 msgstr "&Az oldalsáv összecsukása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1438
+#: src/slic3r/GUI/MainFrame.cpp:1442
 msgid "&Fullscreen"
 msgstr "Teljes Képernyő"
 
-#: src/slic3r/GUI/MainFrame.cpp:1438
+#: src/slic3r/GUI/MainFrame.cpp:1442
 msgid "Fullscreen"
 msgstr "Teljes képernyő"
 
-#: src/slic3r/GUI/MainFrame.cpp:1453 src/slic3r/GUI/MainFrame.cpp:1556
+#: src/slic3r/GUI/MainFrame.cpp:1457 src/slic3r/GUI/MainFrame.cpp:1560
 msgid "&File"
 msgstr "&Fájl"
 
-#: src/slic3r/GUI/MainFrame.cpp:1454
+#: src/slic3r/GUI/MainFrame.cpp:1458
 msgid "&Edit"
 msgstr "&Szerkesztés"
 
-#: src/slic3r/GUI/MainFrame.cpp:1455
+#: src/slic3r/GUI/MainFrame.cpp:1459
 msgid "&Window"
 msgstr "&Ablak"
 
-#: src/slic3r/GUI/MainFrame.cpp:1456 src/slic3r/GUI/MainFrame.cpp:1557
+#: src/slic3r/GUI/MainFrame.cpp:1460 src/slic3r/GUI/MainFrame.cpp:1561
 msgid "&View"
 msgstr "&Nézet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1459 src/slic3r/GUI/MainFrame.cpp:1560
+#: src/slic3r/GUI/MainFrame.cpp:1463 src/slic3r/GUI/MainFrame.cpp:1564
 msgid "&Help"
 msgstr "&Segítség"
 
-#: src/slic3r/GUI/MainFrame.cpp:1521
+#: src/slic3r/GUI/MainFrame.cpp:1525
 msgid "&Open G-code"
 msgstr "&G-kód megnyitása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1537
+#: src/slic3r/GUI/MainFrame.cpp:1541
 msgid "Open &PrusaSlicer"
 msgstr "PrusaSlicer Megnyitása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1582
+#: src/slic3r/GUI/MainFrame.cpp:1586
 msgid "E&xport"
 msgstr "Exportálás"
 
-#: src/slic3r/GUI/MainFrame.cpp:1583
+#: src/slic3r/GUI/MainFrame.cpp:1587
 msgid "S&end to print"
 msgstr "Nyomtatásra küldés"
 
-#: src/slic3r/GUI/MainFrame.cpp:1585
+#: src/slic3r/GUI/MainFrame.cpp:1589
 msgid "Mate&rial Settings Tab"
 msgstr "Anyagbeállítások Lap"
 
-#: src/slic3r/GUI/MainFrame.cpp:1609
+#: src/slic3r/GUI/MainFrame.cpp:1613
 msgid "Choose a file to slice (STL/OBJ/AMF/3MF/PRUSA):"
 msgstr "Válasszon egy fájlt a szeleteléshez (STL/OBJ/AMF/3MF/PRUSA):"
 
-#: src/slic3r/GUI/MainFrame.cpp:1621
+#: src/slic3r/GUI/MainFrame.cpp:1625
 msgid "No previously sliced file."
 msgstr "Nincs korábban szeletelt fájl."
 
-#: src/slic3r/GUI/MainFrame.cpp:1628
+#: src/slic3r/GUI/MainFrame.cpp:1632
 msgid "Previously sliced file ("
 msgstr "A korábban szeletelt fájl ("
 
-#: src/slic3r/GUI/MainFrame.cpp:1628
+#: src/slic3r/GUI/MainFrame.cpp:1632
 msgid ") not found."
 msgstr ") nem található."
 
-#: src/slic3r/GUI/MainFrame.cpp:1629
+#: src/slic3r/GUI/MainFrame.cpp:1633
 msgid "File Not Found"
 msgstr "Fájl Nem Található"
 
-#: src/slic3r/GUI/MainFrame.cpp:1664
+#: src/slic3r/GUI/MainFrame.cpp:1668
 #, c-format, boost-format
 msgid "Save %s file as:"
 msgstr "%s fájl mentése másként:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1664
+#: src/slic3r/GUI/MainFrame.cpp:1668
 msgid "SVG"
 msgstr "SVG"
 
-#: src/slic3r/GUI/MainFrame.cpp:1664
+#: src/slic3r/GUI/MainFrame.cpp:1668
 msgid "G-code"
 msgstr "G-kód"
 
-#: src/slic3r/GUI/MainFrame.cpp:1676
+#: src/slic3r/GUI/MainFrame.cpp:1680
 msgid "Save zip file as:"
 msgstr "Zip fájl mentése másként:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1685 src/slic3r/GUI/Plater.cpp:3316
+#: src/slic3r/GUI/MainFrame.cpp:1689 src/slic3r/GUI/Plater.cpp:3316
 #: src/slic3r/GUI/Plater.cpp:6051 src/slic3r/GUI/Tab.cpp:1663
-#: src/slic3r/GUI/Tab.cpp:4729
+#: src/slic3r/GUI/Tab.cpp:4727
 msgid "Slicing"
 msgstr "Szeletelés"
 
 #. TRN "Processing input_file_basename"
-#: src/slic3r/GUI/MainFrame.cpp:1687
+#: src/slic3r/GUI/MainFrame.cpp:1691
 #, c-format, boost-format
 msgid "Processing %s"
 msgstr "Feldolgozás %s"
 
-#: src/slic3r/GUI/MainFrame.cpp:1710
+#: src/slic3r/GUI/MainFrame.cpp:1714
 #, boost-format
 msgid "%1% was successfully sliced."
 msgstr "%1% szeletelése sikeresen megtörtént."
 
-#: src/slic3r/GUI/MainFrame.cpp:1713
+#: src/slic3r/GUI/MainFrame.cpp:1717
 msgid "Slicing Done!"
 msgstr "Szeletelés Kész!"
 
-#: src/slic3r/GUI/MainFrame.cpp:1729
+#: src/slic3r/GUI/MainFrame.cpp:1733
 msgid "Select the STL file to repair:"
 msgstr "Válassza ki a javítandó STL fájlt:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1739
+#: src/slic3r/GUI/MainFrame.cpp:1743
 msgid "Save OBJ file (less prone to coordinate errors than STL) as:"
 msgstr ""
 "OBJ fájl mentése (kevésbé hajlamos a koordinációs hibákra, mint az STL) a "
 "másként:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1750
+#: src/slic3r/GUI/MainFrame.cpp:1754
 msgid "Your file was repaired."
 msgstr "A fájlja javításra került."
 
-#: src/slic3r/GUI/MainFrame.cpp:1750 src/libslic3r/PrintConfig.cpp:4521
+#: src/slic3r/GUI/MainFrame.cpp:1754 src/libslic3r/PrintConfig.cpp:4496
 msgid "Repair"
 msgstr "Javítás"
 
-#: src/slic3r/GUI/MainFrame.cpp:1764
+#: src/slic3r/GUI/MainFrame.cpp:1768
 msgid "Save configuration as:"
 msgstr "Konfiguráció mentése a következőként:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1781
+#: src/slic3r/GUI/MainFrame.cpp:1785
 msgid "Loading of a configuration file"
 msgstr "Konfigurációs fájl betöltése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1783 src/slic3r/GUI/MainFrame.cpp:1848
+#: src/slic3r/GUI/MainFrame.cpp:1787 src/slic3r/GUI/MainFrame.cpp:1852
 msgid "Select configuration to load:"
 msgstr "A Betöltendő konfiguráció kiválasztása:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1812
+#: src/slic3r/GUI/MainFrame.cpp:1816
 msgid "Exporting configuration bundle"
 msgstr "Konfigurációs csomag exportálása"
 
-#: src/slic3r/GUI/MainFrame.cpp:1813
+#: src/slic3r/GUI/MainFrame.cpp:1817
 msgid ""
 "Some presets are modified and the unsaved changes will not be exported into "
 "configuration bundle."
@@ -6395,15 +6393,15 @@ msgstr ""
 "Egyes előre beállított értékek módosultak, és a nem mentett módosítások nem "
 "kerülnek exportálásra a konfigurációs csomagba."
 
-#: src/slic3r/GUI/MainFrame.cpp:1822
+#: src/slic3r/GUI/MainFrame.cpp:1826
 msgid "Save presets bundle as:"
 msgstr "Előbeállítási csomag mentése a következőként:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1845
+#: src/slic3r/GUI/MainFrame.cpp:1849
 msgid "Loading of a configuration bundle"
 msgstr "Konfigurációs csomag betöltése"
 
-#: src/slic3r/GUI/MainFrame.cpp:1875
+#: src/slic3r/GUI/MainFrame.cpp:1879
 #, c-format, boost-format
 msgid "%d presets successfully imported."
 msgstr "%d előbeállítás sikeresen importálva."
@@ -6630,8 +6628,8 @@ msgstr "Példányok"
 msgid "Instance %d"
 msgstr "Példány %d"
 
-#: src/slic3r/GUI/ObjectDataViewModel.cpp:105 src/slic3r/GUI/Tab.cpp:4567
-#: src/slic3r/GUI/Tab.cpp:4658
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:105 src/slic3r/GUI/Tab.cpp:4565
+#: src/slic3r/GUI/Tab.cpp:4656
 msgid "Layers"
 msgstr "Rétegek"
 
@@ -6710,7 +6708,7 @@ msgstr "A nyomtató leíró elnevezése"
 msgid "Add preset for this printer device"
 msgstr "Előbeállítás hozzáadása ehhez a nyomtatóeszközhöz"
 
-#: src/slic3r/GUI/PhysicalPrinterDialog.cpp:210 src/slic3r/GUI/Tab.cpp:2254
+#: src/slic3r/GUI/PhysicalPrinterDialog.cpp:210 src/slic3r/GUI/Tab.cpp:2252
 msgid "Print Host upload"
 msgstr "Nyomtató feltöltés"
 
@@ -6872,7 +6870,7 @@ msgid "Select what kind of support do you need"
 msgstr "Válassza ki, milyen támaszra van szüksége"
 
 #: src/slic3r/GUI/Plater.cpp:433 src/libslic3r/PrintConfig.cpp:2558
-#: src/libslic3r/PrintConfig.cpp:3640
+#: src/libslic3r/PrintConfig.cpp:3613
 msgid "Support on build plate only"
 msgstr "Támaszték csak tárgyasztalról"
 
@@ -6972,7 +6970,7 @@ msgid "(including spool)"
 msgstr "(beleértve a spulnit)"
 
 #: src/slic3r/GUI/Plater.cpp:1411 src/libslic3r/PrintConfig.cpp:1067
-#: src/libslic3r/PrintConfig.cpp:3434 src/libslic3r/PrintConfig.cpp:3435
+#: src/libslic3r/PrintConfig.cpp:3407 src/libslic3r/PrintConfig.cpp:3408
 msgid "Cost"
 msgstr "Költség"
 
@@ -7495,10 +7493,10 @@ msgstr ""
 msgid "Paste From Clipboard"
 msgstr "Beillesztés Vágólapról"
 
-#: src/slic3r/GUI/Preferences.cpp:106 src/slic3r/GUI/Tab.cpp:2289
-#: src/slic3r/GUI/Tab.cpp:2516 src/slic3r/GUI/Tab.cpp:2623
+#: src/slic3r/GUI/Preferences.cpp:106 src/slic3r/GUI/Tab.cpp:2287
+#: src/slic3r/GUI/Tab.cpp:2514 src/slic3r/GUI/Tab.cpp:2621
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1287
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1674
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1677
 msgid "General"
 msgstr "Általános"
 
@@ -8022,7 +8020,7 @@ msgid "Add/Remove presets"
 msgstr "Előbeállítás Hozzáadása/Eltávolítása"
 
 #: src/slic3r/GUI/PresetComboBoxes.cpp:702
-#: src/slic3r/GUI/PresetComboBoxes.cpp:742 src/slic3r/GUI/Tab.cpp:3247
+#: src/slic3r/GUI/PresetComboBoxes.cpp:742 src/slic3r/GUI/Tab.cpp:3245
 msgid "Add physical printer"
 msgstr "Fizikai nyomtató hozzáadása"
 
@@ -8034,7 +8032,7 @@ msgstr "Előbeállítás szerkesztése"
 msgid "Change extruder color"
 msgstr "Az Extruder színének változtatása"
 
-#: src/slic3r/GUI/PresetComboBoxes.cpp:730 src/slic3r/GUI/Tab.cpp:3247
+#: src/slic3r/GUI/PresetComboBoxes.cpp:730 src/slic3r/GUI/Tab.cpp:3245
 msgid "Edit physical printer"
 msgstr "Fizikai nyomtató szerkesztése"
 
@@ -8348,11 +8346,11 @@ msgstr "EGYÁLTALÁN NINCS TÖMÖRÍTÉS"
 
 #: src/slic3r/GUI/RammingChart.cpp:90 src/slic3r/GUI/WipeTowerDialog.cpp:114
 #: src/libslic3r/PrintConfig.cpp:951 src/libslic3r/PrintConfig.cpp:995
-#: src/libslic3r/PrintConfig.cpp:1010 src/libslic3r/PrintConfig.cpp:3292
-#: src/libslic3r/PrintConfig.cpp:3301 src/libslic3r/PrintConfig.cpp:3310
-#: src/libslic3r/PrintConfig.cpp:3451 src/libslic3r/PrintConfig.cpp:3459
-#: src/libslic3r/PrintConfig.cpp:3467 src/libslic3r/PrintConfig.cpp:3474
-#: src/libslic3r/PrintConfig.cpp:3482 src/libslic3r/PrintConfig.cpp:3490
+#: src/libslic3r/PrintConfig.cpp:1010 src/libslic3r/PrintConfig.cpp:3265
+#: src/libslic3r/PrintConfig.cpp:3274 src/libslic3r/PrintConfig.cpp:3283
+#: src/libslic3r/PrintConfig.cpp:3424 src/libslic3r/PrintConfig.cpp:3432
+#: src/libslic3r/PrintConfig.cpp:3440 src/libslic3r/PrintConfig.cpp:3447
+#: src/libslic3r/PrintConfig.cpp:3455 src/libslic3r/PrintConfig.cpp:3463
 msgid "s"
 msgstr "s"
 
@@ -8466,12 +8464,12 @@ msgid "Just switch to \"%1%\" preset"
 msgstr "Csak váltson a(z) \"%1%\" előbeállításra"
 
 #: src/slic3r/GUI/Search.cpp:90 src/slic3r/GUI/Search.cpp:336
-#: src/slic3r/GUI/Tab.cpp:2651
+#: src/slic3r/GUI/Tab.cpp:2649
 msgid "Stealth"
 msgstr "Lopakodó"
 
 #: src/slic3r/GUI/Search.cpp:90 src/slic3r/GUI/Search.cpp:336
-#: src/slic3r/GUI/Tab.cpp:2645
+#: src/slic3r/GUI/Tab.cpp:2643
 msgid "Normal"
 msgstr "Normál"
 
@@ -8739,7 +8737,7 @@ msgstr "teljes profil név"
 msgid "symbolic profile name"
 msgstr "szimbolikus profil név"
 
-#: src/slic3r/GUI/Tab.cpp:1447 src/slic3r/GUI/Tab.cpp:4656
+#: src/slic3r/GUI/Tab.cpp:1447 src/slic3r/GUI/Tab.cpp:4654
 msgid "Layers and perimeters"
 msgstr "Rétegek és kerületek"
 
@@ -8827,7 +8825,7 @@ msgstr "Átfedés"
 msgid "Flow"
 msgstr "Áramlás"
 
-#: src/slic3r/GUI/Tab.cpp:1671 src/slic3r/GUI/Tab.cpp:1699
+#: src/slic3r/GUI/Tab.cpp:1671 src/slic3r/GUI/Tab.cpp:1697
 msgid "Other"
 msgstr "Egyéb"
 
@@ -8835,52 +8833,52 @@ msgstr "Egyéb"
 msgid "Arachne perimeter generator"
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:1684 src/slic3r/GUI/Tab.cpp:4733
+#: src/slic3r/GUI/Tab.cpp:1682 src/slic3r/GUI/Tab.cpp:4731
 msgid "Output options"
 msgstr "Kimeneti lehetőségek"
 
-#: src/slic3r/GUI/Tab.cpp:1685
+#: src/slic3r/GUI/Tab.cpp:1683
 msgid "Sequential printing"
 msgstr "Szekvenciális nyomtatás"
 
-#: src/slic3r/GUI/Tab.cpp:1687
+#: src/slic3r/GUI/Tab.cpp:1685
 msgid "Extruder clearance"
 msgstr "Extruder körüli szabad tér"
 
-#: src/slic3r/GUI/Tab.cpp:1692 src/slic3r/GUI/Tab.cpp:4734
+#: src/slic3r/GUI/Tab.cpp:1690 src/slic3r/GUI/Tab.cpp:4732
 msgid "Output file"
 msgstr "Kimeneti fájl"
 
-#: src/slic3r/GUI/Tab.cpp:1711 src/libslic3r/PrintConfig.cpp:2010
+#: src/slic3r/GUI/Tab.cpp:1709 src/libslic3r/PrintConfig.cpp:2010
 msgid "Post-processing scripts"
 msgstr "Utófeldolgozó szkriptek"
 
-#: src/slic3r/GUI/Tab.cpp:1723 src/slic3r/GUI/Tab.cpp:1724
-#: src/slic3r/GUI/Tab.cpp:2109 src/slic3r/GUI/Tab.cpp:2110
-#: src/slic3r/GUI/Tab.cpp:2497 src/slic3r/GUI/Tab.cpp:2498
-#: src/slic3r/GUI/Tab.cpp:2570 src/slic3r/GUI/Tab.cpp:2571
-#: src/slic3r/GUI/Tab.cpp:3956 src/slic3r/GUI/Tab.cpp:4584
-#: src/slic3r/GUI/Tab.cpp:4585
+#: src/slic3r/GUI/Tab.cpp:1721 src/slic3r/GUI/Tab.cpp:1722
+#: src/slic3r/GUI/Tab.cpp:2107 src/slic3r/GUI/Tab.cpp:2108
+#: src/slic3r/GUI/Tab.cpp:2495 src/slic3r/GUI/Tab.cpp:2496
+#: src/slic3r/GUI/Tab.cpp:2568 src/slic3r/GUI/Tab.cpp:2569
+#: src/slic3r/GUI/Tab.cpp:3954 src/slic3r/GUI/Tab.cpp:4582
+#: src/slic3r/GUI/Tab.cpp:4583
 msgid "Notes"
 msgstr "Megjegyzések"
 
-#: src/slic3r/GUI/Tab.cpp:1730 src/slic3r/GUI/Tab.cpp:2117
-#: src/slic3r/GUI/Tab.cpp:2504 src/slic3r/GUI/Tab.cpp:2577
-#: src/slic3r/GUI/Tab.cpp:4592 src/slic3r/GUI/Tab.cpp:4739
+#: src/slic3r/GUI/Tab.cpp:1728 src/slic3r/GUI/Tab.cpp:2115
+#: src/slic3r/GUI/Tab.cpp:2502 src/slic3r/GUI/Tab.cpp:2575
+#: src/slic3r/GUI/Tab.cpp:4590 src/slic3r/GUI/Tab.cpp:4737
 msgid "Dependencies"
 msgstr "Függőségek"
 
-#: src/slic3r/GUI/Tab.cpp:1731 src/slic3r/GUI/Tab.cpp:2118
-#: src/slic3r/GUI/Tab.cpp:2505 src/slic3r/GUI/Tab.cpp:2578
-#: src/slic3r/GUI/Tab.cpp:4593 src/slic3r/GUI/Tab.cpp:4740
+#: src/slic3r/GUI/Tab.cpp:1729 src/slic3r/GUI/Tab.cpp:2116
+#: src/slic3r/GUI/Tab.cpp:2503 src/slic3r/GUI/Tab.cpp:2576
+#: src/slic3r/GUI/Tab.cpp:4591 src/slic3r/GUI/Tab.cpp:4738
 msgid "Profile dependencies"
 msgstr "Profilfüggőségek"
 
-#: src/slic3r/GUI/Tab.cpp:1770
+#: src/slic3r/GUI/Tab.cpp:1768
 msgid "Post processing scripts shall modify G-code file in place."
 msgstr "Az utófeldolgozási szkriptek a G-kód fájlt helyben módosítják."
 
-#: src/slic3r/GUI/Tab.cpp:1849
+#: src/slic3r/GUI/Tab.cpp:1847
 #, c-format, boost-format
 msgid ""
 "The following line %s contains reserved keywords.\n"
@@ -8899,83 +8897,83 @@ msgstr[1] ""
 "Kérjük, távolítsa el ezeket, mivel problémákat okozhat a G-kód "
 "megjelenítésében és a nyomtatási idő becslésében."
 
-#: src/slic3r/GUI/Tab.cpp:1854
+#: src/slic3r/GUI/Tab.cpp:1852
 msgid "Found reserved keywords in"
 msgstr "Fenntartott kulcsszavakat találtam az"
 
-#: src/slic3r/GUI/Tab.cpp:1868
+#: src/slic3r/GUI/Tab.cpp:1866
 msgid "Filament Overrides"
 msgstr "Filament Felülbírálások"
 
-#: src/slic3r/GUI/Tab.cpp:1991
+#: src/slic3r/GUI/Tab.cpp:1989
 msgid "Nozzle"
 msgstr "Fúvóka"
 
-#: src/slic3r/GUI/Tab.cpp:1996
+#: src/slic3r/GUI/Tab.cpp:1994
 msgid "Bed"
 msgstr "Tárgyasztal"
 
-#: src/slic3r/GUI/Tab.cpp:2001
+#: src/slic3r/GUI/Tab.cpp:1999
 msgid "Cooling"
 msgstr "Hűtés"
 
-#: src/slic3r/GUI/Tab.cpp:2003 src/libslic3r/PrintConfig.cpp:1912
+#: src/slic3r/GUI/Tab.cpp:2001 src/libslic3r/PrintConfig.cpp:1912
 #: src/libslic3r/PrintConfig.cpp:2962
 msgid "Enable"
 msgstr "Engedélyezés"
 
-#: src/slic3r/GUI/Tab.cpp:2014
+#: src/slic3r/GUI/Tab.cpp:2012
 msgid "Fan settings"
 msgstr "Ventilátor Beállítások"
 
-#: src/slic3r/GUI/Tab.cpp:2025
+#: src/slic3r/GUI/Tab.cpp:2023
 msgid "Cooling thresholds"
 msgstr "Hűtési küszöbök"
 
-#: src/slic3r/GUI/Tab.cpp:2031
+#: src/slic3r/GUI/Tab.cpp:2029
 msgid "Filament properties"
 msgstr "Filament tulajdonságok"
 
-#: src/slic3r/GUI/Tab.cpp:2038
+#: src/slic3r/GUI/Tab.cpp:2036
 msgid "Print speed override"
 msgstr "Nyomtatási sebesség felülbírálás"
 
-#: src/slic3r/GUI/Tab.cpp:2048
+#: src/slic3r/GUI/Tab.cpp:2046
 msgid "Wipe tower parameters"
 msgstr "Törlőtorony paraméterek"
 
-#: src/slic3r/GUI/Tab.cpp:2051
+#: src/slic3r/GUI/Tab.cpp:2049
 msgid "Toolchange parameters with single extruder MM printers"
 msgstr ""
 "Szerszámváltási paraméterek egy extruderes Több Anyagos (MM) nyomtatónál"
 
-#: src/slic3r/GUI/Tab.cpp:2064
+#: src/slic3r/GUI/Tab.cpp:2062
 msgid "Ramming settings"
 msgstr "Tömörítési beállítások"
 
-#: src/slic3r/GUI/Tab.cpp:2088 src/slic3r/GUI/Tab.cpp:2409
-#: src/slic3r/GUI/Tab.cpp:4263 src/libslic3r/GCode.cpp:733
+#: src/slic3r/GUI/Tab.cpp:2086 src/slic3r/GUI/Tab.cpp:2407
+#: src/slic3r/GUI/Tab.cpp:4261 src/libslic3r/GCode.cpp:733
 #: src/libslic3r/PrintConfig.cpp:2468
 msgid "Custom G-code"
 msgstr "Egyéni G-kód"
 
-#: src/slic3r/GUI/Tab.cpp:2089 src/slic3r/GUI/Tab.cpp:2410
+#: src/slic3r/GUI/Tab.cpp:2087 src/slic3r/GUI/Tab.cpp:2408
 #: src/libslic3r/GCode.cpp:707 src/libslic3r/PrintConfig.cpp:2418
 #: src/libslic3r/PrintConfig.cpp:2433
 msgid "Start G-code"
 msgstr "G-kód kezdete"
 
-#: src/slic3r/GUI/Tab.cpp:2099 src/slic3r/GUI/Tab.cpp:2420
+#: src/slic3r/GUI/Tab.cpp:2097 src/slic3r/GUI/Tab.cpp:2418
 #: src/libslic3r/GCode.cpp:708 src/libslic3r/PrintConfig.cpp:684
 #: src/libslic3r/PrintConfig.cpp:694
 msgid "End G-code"
 msgstr "G-kód vége"
 
-#: src/slic3r/GUI/Tab.cpp:2152
+#: src/slic3r/GUI/Tab.cpp:2150
 msgid "Volumetric flow hints not available"
 msgstr "Térfogatáramlási tippek nem állnak rendelkezésre"
 
-#: src/slic3r/GUI/Tab.cpp:2256
+#: src/slic3r/GUI/Tab.cpp:2254
 msgid ""
 "Note: All parameters from this group are moved to the Physical Printer "
 "settings (see changelog).\n"
@@ -8997,20 +8995,20 @@ msgstr ""
 "beállításai lapon a \"fogaskerék\" ikonra kattint. A fizikai nyomtató "
 "profilok a PrusaSlicer/physical_printer könyvtárban kerülnek tárolásra."
 
-#: src/slic3r/GUI/Tab.cpp:2290 src/slic3r/GUI/Tab.cpp:2517
+#: src/slic3r/GUI/Tab.cpp:2288 src/slic3r/GUI/Tab.cpp:2515
 msgid "Size and coordinates"
 msgstr "Méret és koordináták"
 
-#: src/slic3r/GUI/Tab.cpp:2299 src/slic3r/GUI/UnsavedChangesDialog.cpp:1287
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1674
+#: src/slic3r/GUI/Tab.cpp:2297 src/slic3r/GUI/UnsavedChangesDialog.cpp:1287
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1677
 msgid "Capabilities"
 msgstr "Képességek"
 
-#: src/slic3r/GUI/Tab.cpp:2304
+#: src/slic3r/GUI/Tab.cpp:2302
 msgid "Number of extruders of the printer."
 msgstr "A nyomtató Extrudereinek száma."
 
-#: src/slic3r/GUI/Tab.cpp:2333
+#: src/slic3r/GUI/Tab.cpp:2331
 msgid ""
 "Single Extruder Multi Material is selected, \n"
 "and all extruders must have the same diameter.\n"
@@ -9021,64 +9019,64 @@ msgstr ""
 "ezért minden extruder átmérőjének azonosnak kell lennie.\n"
 "Szeretné az összes extruder fúvókaátmérőjét az első extruderéhez igazítani?"
 
-#: src/slic3r/GUI/Tab.cpp:2337 src/slic3r/GUI/Tab.cpp:2781
+#: src/slic3r/GUI/Tab.cpp:2335 src/slic3r/GUI/Tab.cpp:2779
 #: src/libslic3r/PrintConfig.cpp:1876
 msgid "Nozzle diameter"
 msgstr "Fúvóka Átmérő"
 
-#: src/slic3r/GUI/Tab.cpp:2430 src/libslic3r/GCode.cpp:709
+#: src/slic3r/GUI/Tab.cpp:2428 src/libslic3r/GCode.cpp:709
 #: src/libslic3r/PrintConfig.cpp:424
 msgid "Before layer change G-code"
 msgstr "G-kód Rétegváltás Előtt"
 
-#: src/slic3r/GUI/Tab.cpp:2440 src/libslic3r/GCode.cpp:710
+#: src/slic3r/GUI/Tab.cpp:2438 src/libslic3r/GCode.cpp:710
 #: src/libslic3r/PrintConfig.cpp:1602
 msgid "After layer change G-code"
 msgstr "G-kód Rétegváltás Után"
 
-#: src/slic3r/GUI/Tab.cpp:2450 src/libslic3r/GCode.cpp:711
+#: src/slic3r/GUI/Tab.cpp:2448 src/libslic3r/GCode.cpp:711
 #: src/libslic3r/PrintConfig.cpp:2845
 msgid "Tool change G-code"
 msgstr "G-kód Szerszám Váltás"
 
-#: src/slic3r/GUI/Tab.cpp:2460 src/libslic3r/GCode.cpp:712
+#: src/slic3r/GUI/Tab.cpp:2458 src/libslic3r/GCode.cpp:712
 msgid "Between objects G-code (for sequential printing)"
 msgstr "G-kód Objektumok Között (egymás utáni nyomtatáshoz)"
 
-#: src/slic3r/GUI/Tab.cpp:2470 src/libslic3r/GCode.cpp:713
+#: src/slic3r/GUI/Tab.cpp:2468 src/libslic3r/GCode.cpp:713
 msgid "Color Change G-code"
 msgstr "G-kód Színváltás"
 
-#: src/slic3r/GUI/Tab.cpp:2479 src/libslic3r/GCode.cpp:714
+#: src/slic3r/GUI/Tab.cpp:2477 src/libslic3r/GCode.cpp:714
 #: src/libslic3r/PrintConfig.cpp:2459
 msgid "Pause Print G-code"
 msgstr "G-kód Nyomtatás Szüneteltetése"
 
-#: src/slic3r/GUI/Tab.cpp:2488 src/libslic3r/GCode.cpp:715
+#: src/slic3r/GUI/Tab.cpp:2486 src/libslic3r/GCode.cpp:715
 msgid "Template Custom G-code"
 msgstr "G-kód Egyedi Minta"
 
-#: src/slic3r/GUI/Tab.cpp:2524
+#: src/slic3r/GUI/Tab.cpp:2522
 msgid "Display"
 msgstr "Kijelző"
 
-#: src/slic3r/GUI/Tab.cpp:2539
+#: src/slic3r/GUI/Tab.cpp:2537
 msgid "Tilt"
 msgstr "Billentés"
 
-#: src/slic3r/GUI/Tab.cpp:2540
+#: src/slic3r/GUI/Tab.cpp:2538
 msgid "Tilt time"
 msgstr "Billentési idő"
 
-#: src/slic3r/GUI/Tab.cpp:2547 src/slic3r/GUI/Tab.cpp:4574
+#: src/slic3r/GUI/Tab.cpp:2545 src/slic3r/GUI/Tab.cpp:4572
 msgid "Corrections"
 msgstr "Korrekciók"
 
-#: src/slic3r/GUI/Tab.cpp:2560 src/slic3r/GUI/Tab.cpp:4570
+#: src/slic3r/GUI/Tab.cpp:2558 src/slic3r/GUI/Tab.cpp:4568
 msgid "Exposure"
 msgstr "Expozíció"
 
-#: src/slic3r/GUI/Tab.cpp:2621 src/slic3r/GUI/Tab.cpp:2708
+#: src/slic3r/GUI/Tab.cpp:2619 src/slic3r/GUI/Tab.cpp:2706
 #: src/libslic3r/PrintConfig.cpp:1631 src/libslic3r/PrintConfig.cpp:1666
 #: src/libslic3r/PrintConfig.cpp:1683 src/libslic3r/PrintConfig.cpp:1700
 #: src/libslic3r/PrintConfig.cpp:1716 src/libslic3r/PrintConfig.cpp:1726
@@ -9087,39 +9085,39 @@ msgstr "Expozíció"
 msgid "Machine limits"
 msgstr "Gépi limitek"
 
-#: src/slic3r/GUI/Tab.cpp:2644
+#: src/slic3r/GUI/Tab.cpp:2642
 msgid "Values in this column are for Normal mode"
 msgstr "Ez az oszlop a Normál módra vonatkozik"
 
-#: src/slic3r/GUI/Tab.cpp:2650
+#: src/slic3r/GUI/Tab.cpp:2648
 msgid "Values in this column are for Stealth mode"
 msgstr "Ez az oszlop a Lopakodó módra vonatkozik"
 
-#: src/slic3r/GUI/Tab.cpp:2659
+#: src/slic3r/GUI/Tab.cpp:2657
 msgid "Maximum feedrates"
 msgstr "Maximum előtolások"
 
-#: src/slic3r/GUI/Tab.cpp:2664
+#: src/slic3r/GUI/Tab.cpp:2662
 msgid "Maximum accelerations"
 msgstr "Maximum gyorsulások"
 
-#: src/slic3r/GUI/Tab.cpp:2673
+#: src/slic3r/GUI/Tab.cpp:2671
 msgid "Jerk limits"
 msgstr "Rántás korlátok"
 
-#: src/slic3r/GUI/Tab.cpp:2679
+#: src/slic3r/GUI/Tab.cpp:2677
 msgid "Minimum feedrates"
 msgstr "Minimum előtolások"
 
-#: src/slic3r/GUI/Tab.cpp:2733 src/slic3r/GUI/Tab.cpp:2742
+#: src/slic3r/GUI/Tab.cpp:2731 src/slic3r/GUI/Tab.cpp:2740
 msgid "Single extruder MM setup"
 msgstr "Egy extruders MM beállítása"
 
-#: src/slic3r/GUI/Tab.cpp:2743
+#: src/slic3r/GUI/Tab.cpp:2741
 msgid "Single extruder multimaterial parameters"
 msgstr "Egyetlen extruder többanyagú paraméterei"
 
-#: src/slic3r/GUI/Tab.cpp:2778
+#: src/slic3r/GUI/Tab.cpp:2776
 msgid ""
 "This is a single extruder multimaterial printer, diameters of all extruders "
 "will be set to the new value. Do you want to proceed?"
@@ -9127,19 +9125,19 @@ msgstr ""
 "Ez egy egy-extruderes, többféle anyagot használó nyomtató, az összes "
 "extruder átmérője az új értékre lesz beállítva. Szeretné folytatni?"
 
-#: src/slic3r/GUI/Tab.cpp:2803
+#: src/slic3r/GUI/Tab.cpp:2801
 msgid "Layer height limits"
 msgstr "Rétegmagasság korlátok"
 
-#: src/slic3r/GUI/Tab.cpp:2808
+#: src/slic3r/GUI/Tab.cpp:2806
 msgid "Position (for multi-extruder printers)"
 msgstr "Pozíció (több extruderes nyomtatók esetében)"
 
-#: src/slic3r/GUI/Tab.cpp:2814
+#: src/slic3r/GUI/Tab.cpp:2812
 msgid "Only lift Z"
 msgstr "Csak a Z tengely emelése"
 
-#: src/slic3r/GUI/Tab.cpp:2827
+#: src/slic3r/GUI/Tab.cpp:2825
 msgid ""
 "Retraction when tool is disabled (advanced settings for multi-extruder "
 "setups)"
@@ -9147,11 +9145,11 @@ msgstr ""
 "Visszahúzás, ha a szerszám ki van kapcsolva (több extruderes beállítások "
 "speciális beállításai)"
 
-#: src/slic3r/GUI/Tab.cpp:2834
+#: src/slic3r/GUI/Tab.cpp:2832
 msgid "Reset to Filament Color"
 msgstr "Filament színének visszaállítása"
 
-#: src/slic3r/GUI/Tab.cpp:3011
+#: src/slic3r/GUI/Tab.cpp:3009
 msgid ""
 "The Wipe option is not available when using the Firmware Retraction mode.\n"
 "\n"
@@ -9161,31 +9159,31 @@ msgstr ""
 "\n"
 "Kikapcsolja a Törlést, hogy engedélyezze a Firmware visszahúzást?"
 
-#: src/slic3r/GUI/Tab.cpp:3013
+#: src/slic3r/GUI/Tab.cpp:3011
 msgid "Firmware Retraction"
 msgstr "Firmware visszahúzás"
 
-#: src/slic3r/GUI/Tab.cpp:3318
+#: src/slic3r/GUI/Tab.cpp:3316
 msgid "New printer preset selected"
 msgstr "Új nyomtató előbeállítás kiválasztva"
 
-#: src/slic3r/GUI/Tab.cpp:3624
+#: src/slic3r/GUI/Tab.cpp:3622
 msgid "Detached"
 msgstr "Független_"
 
-#: src/slic3r/GUI/Tab.cpp:3701
+#: src/slic3r/GUI/Tab.cpp:3699
 msgid "remove"
 msgstr "eltávolít"
 
-#: src/slic3r/GUI/Tab.cpp:3701
+#: src/slic3r/GUI/Tab.cpp:3699
 msgid "delete"
 msgstr "törlés"
 
-#: src/slic3r/GUI/Tab.cpp:3710
+#: src/slic3r/GUI/Tab.cpp:3708
 msgid "It's a last preset for this physical printer."
 msgstr "Ez az utolsó előbeállítás ehhez a fizikai nyomtatóhoz."
 
-#: src/slic3r/GUI/Tab.cpp:3715
+#: src/slic3r/GUI/Tab.cpp:3713
 #, boost-format
 msgid ""
 "Are you sure you want to delete \"%1%\" preset from the physical printer "
@@ -9194,7 +9192,7 @@ msgstr ""
 "Biztos, hogy törölni szeretné a \"%1%\" előbeállítást a \"%2%\" fizikai "
 "nyomtatóról?"
 
-#: src/slic3r/GUI/Tab.cpp:3727
+#: src/slic3r/GUI/Tab.cpp:3725
 msgid ""
 "The physical printer below is based on the preset, you are going to delete."
 msgid_plural ""
@@ -9206,7 +9204,7 @@ msgstr[1] ""
 "Az alábbi fizikai nyomtatók azon az előbeállításon alapulnak, amelyet "
 "törölni készül."
 
-#: src/slic3r/GUI/Tab.cpp:3732
+#: src/slic3r/GUI/Tab.cpp:3730
 msgid "Note, that the selected preset will be deleted from this printer too."
 msgid_plural ""
 "Note, that the selected preset will be deleted from these printers too."
@@ -9217,7 +9215,7 @@ msgstr[1] ""
 "Vegye figyelembe, hogy a kiválasztott előbeállítás törlődik ezekről a "
 "nyomtatókról is."
 
-#: src/slic3r/GUI/Tab.cpp:3737
+#: src/slic3r/GUI/Tab.cpp:3735
 msgid ""
 "The physical printer below is based only on the preset, you are going to "
 "delete."
@@ -9231,7 +9229,7 @@ msgstr[1] ""
 "Az alábbi fizikai nyomtatók csak azon az előbeállításon alapulnak, amelyet "
 "törölni készül."
 
-#: src/slic3r/GUI/Tab.cpp:3742
+#: src/slic3r/GUI/Tab.cpp:3740
 msgid ""
 "Note, that this printer will be deleted after deleting the selected preset."
 msgid_plural ""
@@ -9243,57 +9241,57 @@ msgstr[1] ""
 "Vegye figyelembe, hogy ezek a nyomtatók is törlődnek a kiválasztott "
 "előbeállítás törlése után."
 
-#: src/slic3r/GUI/Tab.cpp:3747
+#: src/slic3r/GUI/Tab.cpp:3745
 #, boost-format
 msgid "Are you sure you want to %1% the selected preset?"
 msgstr "Biztos, hogy a kiválasztott előbeállítást %1% szeretné?"
 
 #. TRN  Remove/Delete
-#: src/slic3r/GUI/Tab.cpp:3752
+#: src/slic3r/GUI/Tab.cpp:3750
 #, boost-format
 msgid "%1% Preset"
 msgstr "%1% Előbeállítás"
 
-#: src/slic3r/GUI/Tab.cpp:3835 src/slic3r/GUI/Tab.cpp:4197
+#: src/slic3r/GUI/Tab.cpp:3833 src/slic3r/GUI/Tab.cpp:4195
 msgid "Set"
 msgstr "Beállítás"
 
-#: src/slic3r/GUI/Tab.cpp:3954
+#: src/slic3r/GUI/Tab.cpp:3952
 msgid "Find"
 msgstr "Keresés"
 
-#: src/slic3r/GUI/Tab.cpp:3955
+#: src/slic3r/GUI/Tab.cpp:3953
 msgid "Replace with"
 msgstr "Csere erre"
 
-#: src/slic3r/GUI/Tab.cpp:4044
+#: src/slic3r/GUI/Tab.cpp:4042
 msgid "Regular expression"
 msgstr "Reguláris kifejezés"
 
-#: src/slic3r/GUI/Tab.cpp:4048
+#: src/slic3r/GUI/Tab.cpp:4046
 msgid "Case insensitive"
 msgstr "Nagy- és kisbetű érzékeny"
 
-#: src/slic3r/GUI/Tab.cpp:4052
+#: src/slic3r/GUI/Tab.cpp:4050
 msgid "Whole word"
 msgstr "Teljes szó"
 
-#: src/slic3r/GUI/Tab.cpp:4056
+#: src/slic3r/GUI/Tab.cpp:4054
 msgid "Match single line"
 msgstr "Egysoros egyeztetés"
 
-#: src/slic3r/GUI/Tab.cpp:4159
+#: src/slic3r/GUI/Tab.cpp:4157
 msgid "Are you sure you want to delete all substitutions?"
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:4291
+#: src/slic3r/GUI/Tab.cpp:4289
 msgid ""
 "Machine limits will be emitted to G-code and used to estimate print time."
 msgstr ""
 "A gépi korlátok a G-kódba kerülnek, és a nyomtatási idő becslésére "
 "szolgálnak."
 
-#: src/slic3r/GUI/Tab.cpp:4294
+#: src/slic3r/GUI/Tab.cpp:4292
 msgid ""
 "Machine limits will NOT be emitted to G-code, however they will be used to "
 "estimate print time, which may therefore not be accurate as the printer may "
@@ -9303,7 +9301,7 @@ msgstr ""
 "felhasználásra kerülnek. A nyomtató más gépi korlátokat alkalmazhat, ezért a "
 "nyomtatási idő becslése pontatlan lehet."
 
-#: src/slic3r/GUI/Tab.cpp:4298
+#: src/slic3r/GUI/Tab.cpp:4296
 msgid ""
 "Machine limits are not set, therefore the print time estimate may not be "
 "accurate."
@@ -9311,12 +9309,12 @@ msgstr ""
 "A gépi korlátok nincsenek beállítva, ezért a nyomtatási idő becslése "
 "pontatlan lehet."
 
-#: src/slic3r/GUI/Tab.cpp:4320
+#: src/slic3r/GUI/Tab.cpp:4318
 msgid "LOCKED LOCK"
 msgstr "ZÁRT LAKAT"
 
 #. TRN Description for "LOCKED LOCK"
-#: src/slic3r/GUI/Tab.cpp:4322
+#: src/slic3r/GUI/Tab.cpp:4320
 msgid ""
 "indicates that the settings are the same as the system (or default) values "
 "for the current option group"
@@ -9324,12 +9322,12 @@ msgstr ""
 "azt jelzi, hogy a beállítások megegyeznek az aktuális opciócsoport rendszer- "
 "(vagy alapértelmezett) értékeivel"
 
-#: src/slic3r/GUI/Tab.cpp:4324
+#: src/slic3r/GUI/Tab.cpp:4322
 msgid "UNLOCKED LOCK"
 msgstr "NYITOTT LAKAT"
 
 #. TRN Description for "UNLOCKED LOCK"
-#: src/slic3r/GUI/Tab.cpp:4326
+#: src/slic3r/GUI/Tab.cpp:4324
 msgid ""
 "indicates that some settings were changed and are not equal to the system "
 "(or default) values for the current option group.\n"
@@ -9341,12 +9339,12 @@ msgstr ""
 "Kattintson a NYITOTT LAKAT ikonra az aktuális opciócsoport összes "
 "beállításának visszaállításához a rendszer (vagy az alapértelmezett) értékre."
 
-#: src/slic3r/GUI/Tab.cpp:4331
+#: src/slic3r/GUI/Tab.cpp:4329
 msgid "WHITE BULLET"
 msgstr "SZÜRKE PÖTTY"
 
 #. TRN Description for "WHITE BULLET"
-#: src/slic3r/GUI/Tab.cpp:4333
+#: src/slic3r/GUI/Tab.cpp:4331
 msgid ""
 "for the left button: indicates a non-system (or non-default) preset,\n"
 "for the right button: indicates that the settings hasn't been modified."
@@ -9355,12 +9353,12 @@ msgstr ""
 "értéket jelez,\n"
 "jobb gomb esetén: azt jelzi, hogy a beállításokat nem módosították."
 
-#: src/slic3r/GUI/Tab.cpp:4336
+#: src/slic3r/GUI/Tab.cpp:4334
 msgid "BACK ARROW"
 msgstr "VISSZA NYÍL"
 
 #. TRN Description for "BACK ARROW"
-#: src/slic3r/GUI/Tab.cpp:4338
+#: src/slic3r/GUI/Tab.cpp:4336
 msgid ""
 "indicates that the settings were changed and are not equal to the last saved "
 "preset for the current option group.\n"
@@ -9372,7 +9370,7 @@ msgstr ""
 "Kattintson a VISSZA NYÍL ikonra az aktuális opciócsoport összes "
 "beállításának visszaállításához az utoljára mentett állapotra."
 
-#: src/slic3r/GUI/Tab.cpp:4348
+#: src/slic3r/GUI/Tab.cpp:4346
 msgid ""
 "LOCKED LOCK icon indicates that the settings are the same as the system (or "
 "default) values for the current option group"
@@ -9380,7 +9378,7 @@ msgstr ""
 "ZÁRT LAKAT ikon azt jelzi, hogy a beállítások megegyeznek az aktuális "
 "opciócsoport rendszer- (vagy alapértelmezett) értékeivel"
 
-#: src/slic3r/GUI/Tab.cpp:4350
+#: src/slic3r/GUI/Tab.cpp:4348
 msgid ""
 "UNLOCKED LOCK icon indicates that some settings were changed and are not "
 "equal to the system (or default) values for the current option group.\n"
@@ -9393,13 +9391,13 @@ msgstr ""
 "Kattintson az aktuális opciócsoport összes beállításának visszaállításához a "
 "rendszer (vagy az alapértelmezett) értékre."
 
-#: src/slic3r/GUI/Tab.cpp:4353
+#: src/slic3r/GUI/Tab.cpp:4351
 msgid "WHITE BULLET icon indicates a non system (or non default) preset."
 msgstr ""
 "A SZÜRKE PÖTTY ikon a rendszeren kívüli (vagy nem alapértelmezett) "
 "előbeállítást jelzi."
 
-#: src/slic3r/GUI/Tab.cpp:4356
+#: src/slic3r/GUI/Tab.cpp:4354
 msgid ""
 "WHITE BULLET icon indicates that the settings are the same as in the last "
 "saved preset for the current option group."
@@ -9407,7 +9405,7 @@ msgstr ""
 "A SZÜRKE PÖTTY ikon azt jelzi, hogy a beállítások megegyeznek az aktuális "
 "opciócsoport utoljára mentett előbeállításával."
 
-#: src/slic3r/GUI/Tab.cpp:4358
+#: src/slic3r/GUI/Tab.cpp:4356
 msgid ""
 "BACK ARROW icon indicates that the settings were changed and are not equal "
 "to the last saved preset for the current option group.\n"
@@ -9419,7 +9417,7 @@ msgstr ""
 "Kattintson az aktuális opciócsoport összes beállításának visszaállításához "
 "az utoljára mentett állapotra."
 
-#: src/slic3r/GUI/Tab.cpp:4364
+#: src/slic3r/GUI/Tab.cpp:4362
 msgid ""
 "LOCKED LOCK icon indicates that the value is the same as the system (or "
 "default) value."
@@ -9427,7 +9425,7 @@ msgstr ""
 "ZÁRT LAKAT ikon azt jelzi, hogy az érték megegyezik a rendszer (vagy "
 "alapértelmezett) értékével."
 
-#: src/slic3r/GUI/Tab.cpp:4365
+#: src/slic3r/GUI/Tab.cpp:4363
 msgid ""
 "UNLOCKED LOCK icon indicates that the value was changed and is not equal to "
 "the system (or default) value.\n"
@@ -9438,7 +9436,7 @@ msgstr ""
 "Kattintson az aktuális érték visszaállításához a rendszer (vagy "
 "alapértelmezett) értékre."
 
-#: src/slic3r/GUI/Tab.cpp:4371
+#: src/slic3r/GUI/Tab.cpp:4369
 msgid ""
 "WHITE BULLET icon indicates that the value is the same as in the last saved "
 "preset."
@@ -9446,7 +9444,7 @@ msgstr ""
 "A SZÜRKE PÖTTY azt jelzi, hogy az érték megegyezik az utoljára mentett "
 "előbeállítással."
 
-#: src/slic3r/GUI/Tab.cpp:4372
+#: src/slic3r/GUI/Tab.cpp:4370
 msgid ""
 "BACK ARROW icon indicates that the value was changed and is not equal to the "
 "last saved preset.\n"
@@ -9457,31 +9455,31 @@ msgstr ""
 "Kattintson az aktuális érték visszaállításához az utoljára mentett "
 "beállításra."
 
-#: src/slic3r/GUI/Tab.cpp:4526 src/slic3r/GUI/Tab.cpp:4528
+#: src/slic3r/GUI/Tab.cpp:4524 src/slic3r/GUI/Tab.cpp:4526
 msgid "Material"
 msgstr "Anyag"
 
-#: src/slic3r/GUI/Tab.cpp:4613 src/slic3r/GUI/Tab.cpp:4614
+#: src/slic3r/GUI/Tab.cpp:4611 src/slic3r/GUI/Tab.cpp:4612
 msgid "Material printing profile"
 msgstr "Anyag nyomtatási profil"
 
-#: src/slic3r/GUI/Tab.cpp:4666
+#: src/slic3r/GUI/Tab.cpp:4664
 msgid "Support head"
 msgstr "Támasztó fej"
 
-#: src/slic3r/GUI/Tab.cpp:4671
+#: src/slic3r/GUI/Tab.cpp:4669
 msgid "Support pillar"
 msgstr "Támasztó pillér"
 
-#: src/slic3r/GUI/Tab.cpp:4694
+#: src/slic3r/GUI/Tab.cpp:4692
 msgid "Connection of the support sticks and junctions"
 msgstr "A tartópálcák és a csomópontok csatlakoztatása"
 
-#: src/slic3r/GUI/Tab.cpp:4699
+#: src/slic3r/GUI/Tab.cpp:4697
 msgid "Automatic generation"
 msgstr "Automatikus generálás"
 
-#: src/slic3r/GUI/Tab.cpp:4774
+#: src/slic3r/GUI/Tab.cpp:4772
 #, boost-format
 msgid ""
 "\"%1%\" is disabled because \"%2%\" is on in \"%3%\" category.\n"
@@ -9491,11 +9489,11 @@ msgstr ""
 "kategóriában. \n"
 "\"%1%\" engedélyezéséhez kapcsolja ki a \"%2%\"-ot."
 
-#: src/slic3r/GUI/Tab.cpp:4776 src/libslic3r/PrintConfig.cpp:3719
+#: src/slic3r/GUI/Tab.cpp:4774 src/libslic3r/PrintConfig.cpp:3692
 msgid "Object elevation"
 msgstr "Objektum magassága"
 
-#: src/slic3r/GUI/Tab.cpp:4776 src/libslic3r/PrintConfig.cpp:3821
+#: src/slic3r/GUI/Tab.cpp:4774 src/libslic3r/PrintConfig.cpp:3794
 msgid "Pad around object"
 msgstr "Párna az objektum körül"
 
@@ -9589,7 +9587,7 @@ msgstr ""
 "hogy újra rákérdezzen a nem mentett módosításokra."
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:936
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1696
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1699
 msgid ""
 "Some fields are too long to fit. Right mouse click reveals the full text."
 msgstr ""
@@ -9660,41 +9658,41 @@ msgstr ""
 "következő el nem mentett változtatásokat tartalmazza:"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1283
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1670
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1673
 msgid "Extruders count"
 msgstr "Extruderek száma"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1453
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1456
 msgid "Select presets to compare"
 msgstr "Előbeállítások kiválasztása az összehasonlításhoz"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1502
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1505
 msgid "Show all presets (including incompatible)"
 msgstr "Minden előbeállítás megjelenítése (beleértve az inkompatibiliseket is)"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1517
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1520
 msgid "Left Preset Value"
 msgstr "Bal Előbeállítás Értéke"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1518
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1521
 msgid "Right Preset Value"
 msgstr "Jobb Előbeállítás Értéke"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1627
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1630
 msgid "One of the presets doesn't found"
 msgstr "Az egyik előbeállítás nem található"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1638
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1641
 msgid "Compared presets has different printer technology"
 msgstr ""
 "Az összehasonlított előbeállítások különböző nyomtatási technológiával "
 "rendelkeznek"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1652
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1655
 msgid "Presets are the same"
 msgstr "Az előbeállítások megyegyeznek"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1660
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1663
 msgid ""
 "Presets are different.\n"
 "Click this button to select the same preset for the right and left preset."
@@ -9703,11 +9701,11 @@ msgstr ""
 "Erre a gombra kattintva ugyanazt az előbeállítást választhatja ki a jobb és "
 "a bal előbeállításhoz."
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1684
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1687
 msgid "Undef category"
 msgstr "Nem definiált kategória"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1684
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1687
 msgid "Undef group"
 msgstr "Nem definiált csoport"
 
@@ -10394,7 +10392,7 @@ msgstr ""
 "Nem lehet kiszámítani a %1% extrudálási szélességet: %2%\" változó nem "
 "elérhető."
 
-#: src/libslic3r/Format/3mf.cpp:1734
+#: src/libslic3r/Format/3mf.cpp:1735
 #, boost-format
 msgid ""
 "The selected 3mf file has been saved with a newer version of %1% and is not "
@@ -10403,7 +10401,7 @@ msgstr ""
 "A kiválasztott 3mf fájl a %1% egy újabb verziójával lett mentve, és nem "
 "kompatibilis."
 
-#: src/libslic3r/Format/3mf.cpp:1745
+#: src/libslic3r/Format/3mf.cpp:1746
 msgid ""
 "The selected 3MF contains FDM supports painted object using a newer version "
 "of PrusaSlicer and is not compatible."
@@ -10411,7 +10409,7 @@ msgstr ""
 "A kiválasztott 3MF a PrusaSlicer újabb verziójával készült FDM támaszték "
 "festett objektumot tartalmaz, és nem kompatibilis."
 
-#: src/libslic3r/Format/3mf.cpp:1749
+#: src/libslic3r/Format/3mf.cpp:1750
 msgid ""
 "The selected 3MF contains seam painted object using a newer version of "
 "PrusaSlicer and is not compatible."
@@ -10419,7 +10417,7 @@ msgstr ""
 "A kiválasztott 3MF a PrusaSlicer egy újabb verziójával készült varrat "
 "festett objektumot tartalmaz, és nem kompatibilis."
 
-#: src/libslic3r/Format/3mf.cpp:1753
+#: src/libslic3r/Format/3mf.cpp:1754
 msgid ""
 "The selected 3MF contains multi-material painted object using a newer "
 "version of PrusaSlicer and is not compatible."
@@ -11230,8 +11228,8 @@ msgstr ""
 #: src/libslic3r/PrintConfig.cpp:478 src/libslic3r/PrintConfig.cpp:1097
 #: src/libslic3r/PrintConfig.cpp:2250 src/libslic3r/PrintConfig.cpp:2260
 #: src/libslic3r/PrintConfig.cpp:2551 src/libslic3r/PrintConfig.cpp:2792
-#: src/libslic3r/PrintConfig.cpp:3009 src/libslic3r/PrintConfig.cpp:3110
-#: src/libslic3r/PrintConfig.cpp:3693 src/libslic3r/PrintConfig.cpp:3814
+#: src/libslic3r/PrintConfig.cpp:3009 src/libslic3r/PrintConfig.cpp:3112
+#: src/libslic3r/PrintConfig.cpp:3666 src/libslic3r/PrintConfig.cpp:3787
 msgid "°"
 msgstr "°"
 
@@ -11246,9 +11244,8 @@ msgstr "Ez a ventilátorsebesség minden híd és túlnyúlás során érvényes
 #: src/libslic3r/PrintConfig.cpp:486 src/libslic3r/PrintConfig.cpp:1109
 #: src/libslic3r/PrintConfig.cpp:1577 src/libslic3r/PrintConfig.cpp:1769
 #: src/libslic3r/PrintConfig.cpp:1832 src/libslic3r/PrintConfig.cpp:2083
-#: src/libslic3r/PrintConfig.cpp:2142 src/libslic3r/PrintConfig.cpp:3134
-#: src/libslic3r/PrintConfig.cpp:3149 src/libslic3r/PrintConfig.cpp:3318
-#: src/libslic3r/PrintConfig.cpp:3607 src/libslic3r/PrintConfig.cpp:3733
+#: src/libslic3r/PrintConfig.cpp:2142 src/libslic3r/PrintConfig.cpp:3291
+#: src/libslic3r/PrintConfig.cpp:3580 src/libslic3r/PrintConfig.cpp:3706
 msgid "%"
 msgstr "%"
 
@@ -11469,8 +11466,8 @@ msgstr ""
 msgid "Default print profile"
 msgstr "Alapértelmezett nyomtatási profil"
 
-#: src/libslic3r/PrintConfig.cpp:652 src/libslic3r/PrintConfig.cpp:3537
-#: src/libslic3r/PrintConfig.cpp:3548
+#: src/libslic3r/PrintConfig.cpp:652 src/libslic3r/PrintConfig.cpp:3510
+#: src/libslic3r/PrintConfig.cpp:3521
 msgid ""
 "Default print profile associated with the current printer profile. On "
 "selection of the current printer profile, this print profile will be "
@@ -11623,8 +11620,9 @@ msgstr ""
 #: src/libslic3r/PrintConfig.cpp:1478 src/libslic3r/PrintConfig.cpp:1505
 #: src/libslic3r/PrintConfig.cpp:1979 src/libslic3r/PrintConfig.cpp:2365
 #: src/libslic3r/PrintConfig.cpp:2539 src/libslic3r/PrintConfig.cpp:2628
-#: src/libslic3r/PrintConfig.cpp:2863 src/libslic3r/PrintConfig.cpp:3098
-#: src/libslic3r/PrintConfig.cpp:3173
+#: src/libslic3r/PrintConfig.cpp:2863 src/libslic3r/PrintConfig.cpp:3085
+#: src/libslic3r/PrintConfig.cpp:3100 src/libslic3r/PrintConfig.cpp:3134
+#: src/libslic3r/PrintConfig.cpp:3146
 msgid "mm or %"
 msgstr "mm vagy %"
 
@@ -11710,7 +11708,7 @@ msgid "Extruder Color"
 msgstr "Extruder színe"
 
 #: src/libslic3r/PrintConfig.cpp:827 src/libslic3r/PrintConfig.cpp:890
-#: src/libslic3r/PrintConfig.cpp:3389
+#: src/libslic3r/PrintConfig.cpp:3362
 msgid "This is only used in the Slic3r interface as a visual help."
 msgstr "Ezt csak a Slic3r felületén használjuk vizuális segítségként."
 
@@ -11809,7 +11807,7 @@ msgstr ""
 msgid "approximate seconds"
 msgstr "becsült másodperc"
 
-#: src/libslic3r/PrintConfig.cpp:889 src/libslic3r/PrintConfig.cpp:3388
+#: src/libslic3r/PrintConfig.cpp:889 src/libslic3r/PrintConfig.cpp:3361
 msgid "Color"
 msgstr "Szín"
 
@@ -11988,8 +11986,8 @@ msgstr ""
 "tolómérőt, és végezzen többszöri mérést az izzószál mentén, majd számítsa ki "
 "az átlagot."
 
-#: src/libslic3r/PrintConfig.cpp:1024 src/libslic3r/PrintConfig.cpp:3427
-#: src/libslic3r/PrintConfig.cpp:3428
+#: src/libslic3r/PrintConfig.cpp:1024 src/libslic3r/PrintConfig.cpp:3400
+#: src/libslic3r/PrintConfig.cpp:3401
 msgid "Density"
 msgstr "Sűrűség"
 
@@ -12056,7 +12054,7 @@ msgstr ""
 msgid "g"
 msgstr "g"
 
-#: src/libslic3r/PrintConfig.cpp:1088 src/libslic3r/PrintConfig.cpp:3532
+#: src/libslic3r/PrintConfig.cpp:1088 src/libslic3r/PrintConfig.cpp:3505
 msgid "(Unknown)"
 msgstr "(Ismeretlen)"
 
@@ -13860,7 +13858,7 @@ msgstr ""
 "Ezzel a beállítással elforgathatja a támaszanyag mintázatát a vízszintes "
 "síkon."
 
-#: src/libslic3r/PrintConfig.cpp:2560 src/libslic3r/PrintConfig.cpp:3642
+#: src/libslic3r/PrintConfig.cpp:2560 src/libslic3r/PrintConfig.cpp:3615
 msgid ""
 "Only create support if it lies on a build plate. Don't create support on a "
 "print."
@@ -14511,33 +14509,35 @@ msgstr ""
 msgid ""
 "Classic perimeter generator produces perimeters with constant extrusion "
 "width and for very thin areas is used gap-fill. Arachne engine produces "
-"perimeters with variable extrusion width."
-msgstr ""
-
-#: src/libslic3r/PrintConfig.cpp:3073
-msgid "Classic"
+"perimeters with variable extrusion width. This setting also affects the "
+"Concentric infill."
 msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:3074
+msgid "Classic"
+msgstr ""
+
+#: src/libslic3r/PrintConfig.cpp:3075
 msgid "Arachne"
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3079
+#: src/libslic3r/PrintConfig.cpp:3080
 msgid "Perimeter transition length"
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3081
+#: src/libslic3r/PrintConfig.cpp:3082
 msgid ""
 "When transitioning between different numbers of perimeters as the part "
 "becomes thinner, a certain amount of space is allotted to split or join the "
-"perimeter segments."
-msgstr ""
-
-#: src/libslic3r/PrintConfig.cpp:3089
-msgid "Perimeter transitioning filter margin"
+"perimeter segments. If expressed as a percentage (for example 100%), it will "
+"be computed based on the nozzle diameter."
 msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:3091
+msgid "Perimeter transitioning filter margin"
+msgstr ""
+
+#: src/libslic3r/PrintConfig.cpp:3093
 msgid ""
 "Prevent transitioning back and forth between one extra perimeter and one "
 "less. This margin extends the range of extrusion widths which follow to "
@@ -14549,11 +14549,11 @@ msgid ""
 "diameter."
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3104
+#: src/libslic3r/PrintConfig.cpp:3106
 msgid "Perimeter transitioning threshold angle"
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3106
+#: src/libslic3r/PrintConfig.cpp:3108
 msgid ""
 "When to create transitions between even and odd numbers of perimeters. A "
 "wedge shape with an angle greater than this setting will not have "
@@ -14562,63 +14562,35 @@ msgid ""
 "these center perimeters, but may leave gaps or overextrude."
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3117
+#: src/libslic3r/PrintConfig.cpp:3119
 msgid "Perimeter distribution count"
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3119
+#: src/libslic3r/PrintConfig.cpp:3121
 msgid ""
 "The number of perimeters, counted from the center, over which the variation "
 "needs to be spread. Lower values mean that the outer perimeters don't change "
 "in width."
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3126
-msgid "Split middle perimeter threshold"
-msgstr ""
-
 #: src/libslic3r/PrintConfig.cpp:3128
-msgid ""
-"The smallest extrusion width, as a factor of the normal extrusion width, "
-"above which the middle perimeter (if there is one) will be split into two. "
-"Reduce this setting to use more, thinner perimeters. Increase to use fewer, "
-"wider perimeters. Note that this applies -as if- the entire shape should be "
-"filled with perimeter, so the middle here refers to the middle of the object "
-"between two outer edges of the shape, even if there actually is infill or "
-"other extrusion types in the print instead of the perimeter."
-msgstr ""
-
-#: src/libslic3r/PrintConfig.cpp:3141
-msgid "Add middle perimeter threshold"
-msgstr ""
-
-#: src/libslic3r/PrintConfig.cpp:3143
-msgid ""
-"The smallest extrusion width, as a factor of the normal extrusion width, "
-"above which a middle perimeter (if there wasn't one already) will be added. "
-"Reduce this setting to use more, thinner perimeters. Increase to use fewer, "
-"wider perimeters. Note that this applies -as if- the entire shape should be "
-"filled with perimeter, so the middle here refers to the middle of the object "
-"between two outer edges of the shape, even if there actually is infill or "
-"other extrusion types in the print instead of the perimeter."
-msgstr ""
-
-#: src/libslic3r/PrintConfig.cpp:3156
 msgid "Minimum feature size"
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3158
+#: src/libslic3r/PrintConfig.cpp:3130
 msgid ""
 "Minimum thickness of thin features. Model features that are thinner than "
 "this value will not be printed, while features thicker than the Minimum "
-"feature size will be widened to the Minimum perimeter width."
+"feature size will be widened to the Minimum perimeter width. If expressed as "
+"a percentage (for example 25%), it will be computed based on the nozzle "
+"diameter."
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3167
+#: src/libslic3r/PrintConfig.cpp:3140
 msgid "Minimum perimeter width"
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3169
+#: src/libslic3r/PrintConfig.cpp:3142
 msgid ""
 "Width of the perimeter that will replace thin features (according to the "
 "Minimum feature size) of the model. If the Minimum perimeter width is "
@@ -14627,63 +14599,63 @@ msgid ""
 "it will be computed based on the nozzle diameter."
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3237
+#: src/libslic3r/PrintConfig.cpp:3210
 msgid "Display width"
 msgstr "Kijelző szélesség"
 
-#: src/libslic3r/PrintConfig.cpp:3238
+#: src/libslic3r/PrintConfig.cpp:3211
 msgid "Width of the display"
 msgstr "Kijelző szélessége"
 
-#: src/libslic3r/PrintConfig.cpp:3243
+#: src/libslic3r/PrintConfig.cpp:3216
 msgid "Display height"
 msgstr "Kijelző magasság"
 
-#: src/libslic3r/PrintConfig.cpp:3244
+#: src/libslic3r/PrintConfig.cpp:3217
 msgid "Height of the display"
 msgstr "Kijelző magassága"
 
-#: src/libslic3r/PrintConfig.cpp:3249
+#: src/libslic3r/PrintConfig.cpp:3222
 msgid "Number of pixels in"
 msgstr "Pixelek száma"
 
-#: src/libslic3r/PrintConfig.cpp:3251
+#: src/libslic3r/PrintConfig.cpp:3224
 msgid "Number of pixels in X"
 msgstr "Pixelek száma X irányban"
 
-#: src/libslic3r/PrintConfig.cpp:3257
+#: src/libslic3r/PrintConfig.cpp:3230
 msgid "Number of pixels in Y"
 msgstr "Pixelek száma Y irányban"
 
-#: src/libslic3r/PrintConfig.cpp:3262
+#: src/libslic3r/PrintConfig.cpp:3235
 msgid "Display horizontal mirroring"
 msgstr "Kijelző vízszintes tükrözése"
 
-#: src/libslic3r/PrintConfig.cpp:3263
+#: src/libslic3r/PrintConfig.cpp:3236
 msgid "Mirror horizontally"
 msgstr "Tükrözés vízszintesen"
 
-#: src/libslic3r/PrintConfig.cpp:3264
+#: src/libslic3r/PrintConfig.cpp:3237
 msgid "Enable horizontal mirroring of output images"
 msgstr "A kimeneti képek vízszintes tükrözése"
 
-#: src/libslic3r/PrintConfig.cpp:3269
+#: src/libslic3r/PrintConfig.cpp:3242
 msgid "Display vertical mirroring"
 msgstr "Kijelző függőleges tükrözése"
 
-#: src/libslic3r/PrintConfig.cpp:3270
+#: src/libslic3r/PrintConfig.cpp:3243
 msgid "Mirror vertically"
 msgstr "Tükrözés függőlegesen"
 
-#: src/libslic3r/PrintConfig.cpp:3271
+#: src/libslic3r/PrintConfig.cpp:3244
 msgid "Enable vertical mirroring of output images"
 msgstr "A kimeneti képe függőleges tükrözése"
 
-#: src/libslic3r/PrintConfig.cpp:3276
+#: src/libslic3r/PrintConfig.cpp:3249
 msgid "Display orientation"
 msgstr "Kijelző tájolás"
 
-#: src/libslic3r/PrintConfig.cpp:3277
+#: src/libslic3r/PrintConfig.cpp:3250
 msgid ""
 "Set the actual LCD display orientation inside the SLA printer. Portrait mode "
 "will flip the meaning of display width and height parameters and the output "
@@ -14693,55 +14665,55 @@ msgstr ""
 "mód megfordítja a kijelző szélességi és magassági paramétereinek jelentését, "
 "és a kimeneti képek 90 fokkal el lesznek forgatva."
 
-#: src/libslic3r/PrintConfig.cpp:3283
+#: src/libslic3r/PrintConfig.cpp:3256
 msgid "Landscape"
 msgstr "Tájkép"
 
-#: src/libslic3r/PrintConfig.cpp:3284
+#: src/libslic3r/PrintConfig.cpp:3257
 msgid "Portrait"
 msgstr "Portré"
 
-#: src/libslic3r/PrintConfig.cpp:3289 src/libslic3r/PrintConfig.cpp:3924
+#: src/libslic3r/PrintConfig.cpp:3262 src/libslic3r/PrintConfig.cpp:3897
 msgid "Fast"
 msgstr "Gyors"
 
-#: src/libslic3r/PrintConfig.cpp:3290
+#: src/libslic3r/PrintConfig.cpp:3263
 msgid "Fast tilt"
 msgstr "Gyors billentés"
 
-#: src/libslic3r/PrintConfig.cpp:3291
+#: src/libslic3r/PrintConfig.cpp:3264
 msgid "Time of the fast tilt"
 msgstr "A gyors billenés időtartama"
 
-#: src/libslic3r/PrintConfig.cpp:3298 src/libslic3r/PrintConfig.cpp:3923
+#: src/libslic3r/PrintConfig.cpp:3271 src/libslic3r/PrintConfig.cpp:3896
 msgid "Slow"
 msgstr "Lassú"
 
-#: src/libslic3r/PrintConfig.cpp:3299
+#: src/libslic3r/PrintConfig.cpp:3272
 msgid "Slow tilt"
 msgstr "Lassú billentés"
 
-#: src/libslic3r/PrintConfig.cpp:3300
+#: src/libslic3r/PrintConfig.cpp:3273
 msgid "Time of the slow tilt"
 msgstr "A lassú billentés időtartama"
 
-#: src/libslic3r/PrintConfig.cpp:3307 src/libslic3r/PrintConfig.cpp:3925
+#: src/libslic3r/PrintConfig.cpp:3280 src/libslic3r/PrintConfig.cpp:3898
 msgid "High viscosity"
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3308
+#: src/libslic3r/PrintConfig.cpp:3281
 msgid "Tilt for high viscosity resin"
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3309
+#: src/libslic3r/PrintConfig.cpp:3282
 msgid "Time of the super slow tilt"
 msgstr ""
 
-#: src/libslic3r/PrintConfig.cpp:3316
+#: src/libslic3r/PrintConfig.cpp:3289
 msgid "Area fill"
 msgstr "Felület kitöltés"
 
-#: src/libslic3r/PrintConfig.cpp:3317
+#: src/libslic3r/PrintConfig.cpp:3290
 msgid ""
 "The percentage of the bed area. \n"
 "If the print area exceeds the specified value, \n"
@@ -14752,40 +14724,40 @@ msgstr ""
 "meghaladja a megadott értéket, \n"
 "akkor lassú billenés, ellenkező esetben gyors billenés fog történni"
 
-#: src/libslic3r/PrintConfig.cpp:3324 src/libslic3r/PrintConfig.cpp:3325
-#: src/libslic3r/PrintConfig.cpp:3326
+#: src/libslic3r/PrintConfig.cpp:3297 src/libslic3r/PrintConfig.cpp:3298
+#: src/libslic3r/PrintConfig.cpp:3299
 msgid "Printer scaling correction"
 msgstr "Nyomtató méretkorrekciója"
 
-#: src/libslic3r/PrintConfig.cpp:3332 src/libslic3r/PrintConfig.cpp:3334
+#: src/libslic3r/PrintConfig.cpp:3305 src/libslic3r/PrintConfig.cpp:3307
 msgid "Printer scaling correction in X axis"
 msgstr "Nyomtató méretkorrekciója az X tengelyen"
 
-#: src/libslic3r/PrintConfig.cpp:3333
+#: src/libslic3r/PrintConfig.cpp:3306
 msgid "Printer scaling X axis correction"
 msgstr "Nyomtató méretkorrekciója az X tengelyen"
 
-#: src/libslic3r/PrintConfig.cpp:3340 src/libslic3r/PrintConfig.cpp:3342
+#: src/libslic3r/PrintConfig.cpp:3313 src/libslic3r/PrintConfig.cpp:3315
 msgid "Printer scaling correction in Y axis"
 msgstr "Nyomtató méretkorrekciója az Y tengelyen"
 
-#: src/libslic3r/PrintConfig.cpp:3341
+#: src/libslic3r/PrintConfig.cpp:3314
 msgid "Printer scaling Y axis correction"
 msgstr "Printer scaling correction in Y axis"
 
-#: src/libslic3r/PrintConfig.cpp:3348 src/libslic3r/PrintConfig.cpp:3350
+#: src/libslic3r/PrintConfig.cpp:3321 src/libslic3r/PrintConfig.cpp:3323
 msgid "Printer scaling correction in Z axis"
 msgstr "Nyomtató méretkorrekciója a Z tengelyen"
 
-#: src/libslic3r/PrintConfig.cpp:3349
+#: src/libslic3r/PrintConfig.cpp:3322
 msgid "Printer scaling Z axis correction"
 msgstr "Nyomtató méretkorrekciója a Z tengelyen"
 
-#: src/libslic3r/PrintConfig.cpp:3356 src/libslic3r/PrintConfig.cpp:3357
+#: src/libslic3r/PrintConfig.cpp:3329 src/libslic3r/PrintConfig.cpp:3330
 msgid "Printer absolute correction"
 msgstr "Nyomtató abszolút korrekció"
 
-#: src/libslic3r/PrintConfig.cpp:3358
+#: src/libslic3r/PrintConfig.cpp:3331
 msgid ""
 "Will inflate or deflate the sliced 2D polygons according to the sign of the "
 "correction."
@@ -14793,21 +14765,21 @@ msgstr ""
 "A szeletelt 2D poligonokat megnöveli vagy összezsugorítja a korrekció "
 "előjelének megfelelően."
 
-#: src/libslic3r/PrintConfig.cpp:3364
+#: src/libslic3r/PrintConfig.cpp:3337
 msgid "Elephant foot minimum width"
 msgstr "Elefántláb minimális szélesség"
 
-#: src/libslic3r/PrintConfig.cpp:3366
+#: src/libslic3r/PrintConfig.cpp:3339
 msgid ""
 "Minimum width of features to maintain when doing elephant foot compensation."
 msgstr ""
 "Az elefántláb-kompenzáció során megőrzendő jellemzők minimális szélessége."
 
-#: src/libslic3r/PrintConfig.cpp:3373 src/libslic3r/PrintConfig.cpp:3374
+#: src/libslic3r/PrintConfig.cpp:3346 src/libslic3r/PrintConfig.cpp:3347
 msgid "Printer gamma correction"
 msgstr "Nyomtató Gamma korrekció"
 
-#: src/libslic3r/PrintConfig.cpp:3375
+#: src/libslic3r/PrintConfig.cpp:3348
 msgid ""
 "This will apply a gamma correction to the rasterized 2D polygons. A gamma "
 "value of zero means thresholding with the threshold in the middle. This "
@@ -14818,43 +14790,43 @@ msgstr ""
 "viselkedés megszünteti az élsimítást anélkül, hogy a sokszögek lyukai "
 "elvesznének."
 
-#: src/libslic3r/PrintConfig.cpp:3394 src/libslic3r/PrintConfig.cpp:3395
+#: src/libslic3r/PrintConfig.cpp:3367 src/libslic3r/PrintConfig.cpp:3368
 msgid "SLA material type"
 msgstr "SLA anyag típus"
 
-#: src/libslic3r/PrintConfig.cpp:3406 src/libslic3r/PrintConfig.cpp:3407
+#: src/libslic3r/PrintConfig.cpp:3379 src/libslic3r/PrintConfig.cpp:3380
 msgid "Initial layer height"
 msgstr "Első réteg magasság"
 
-#: src/libslic3r/PrintConfig.cpp:3413 src/libslic3r/PrintConfig.cpp:3414
+#: src/libslic3r/PrintConfig.cpp:3386 src/libslic3r/PrintConfig.cpp:3387
 msgid "Bottle volume"
 msgstr "Flakon térfogata"
 
-#: src/libslic3r/PrintConfig.cpp:3415
+#: src/libslic3r/PrintConfig.cpp:3388
 msgid "ml"
 msgstr "ml"
 
-#: src/libslic3r/PrintConfig.cpp:3420 src/libslic3r/PrintConfig.cpp:3421
+#: src/libslic3r/PrintConfig.cpp:3393 src/libslic3r/PrintConfig.cpp:3394
 msgid "Bottle weight"
 msgstr "A flakon súlya"
 
-#: src/libslic3r/PrintConfig.cpp:3422
+#: src/libslic3r/PrintConfig.cpp:3395
 msgid "kg"
 msgstr "kg"
 
-#: src/libslic3r/PrintConfig.cpp:3429
+#: src/libslic3r/PrintConfig.cpp:3402
 msgid "g/ml"
 msgstr "g/ml"
 
-#: src/libslic3r/PrintConfig.cpp:3436
+#: src/libslic3r/PrintConfig.cpp:3409
 msgid "money/bottle"
 msgstr "pénz/flakon"
 
-#: src/libslic3r/PrintConfig.cpp:3441
+#: src/libslic3r/PrintConfig.cpp:3414
 msgid "Faded layers"
 msgstr "Áttűnő rétegek"
 
-#: src/libslic3r/PrintConfig.cpp:3442
+#: src/libslic3r/PrintConfig.cpp:3415
 msgid ""
 "Number of the layers needed for the exposure time fade from initial exposure "
 "time to the exposure time"
@@ -14862,103 +14834,103 @@ msgstr ""
 "A szükséges rétegek száma a kezdeti expozíciós időről az expozíciós időre "
 "való átmenethez"
 
-#: src/libslic3r/PrintConfig.cpp:3449 src/libslic3r/PrintConfig.cpp:3450
+#: src/libslic3r/PrintConfig.cpp:3422 src/libslic3r/PrintConfig.cpp:3423
 msgid "Minimum exposure time"
 msgstr "Minimális expozíciós idő"
 
-#: src/libslic3r/PrintConfig.cpp:3457 src/libslic3r/PrintConfig.cpp:3458
+#: src/libslic3r/PrintConfig.cpp:3430 src/libslic3r/PrintConfig.cpp:3431
 msgid "Maximum exposure time"
 msgstr "Maximum expozíciós idő"
 
-#: src/libslic3r/PrintConfig.cpp:3465 src/libslic3r/PrintConfig.cpp:3466
+#: src/libslic3r/PrintConfig.cpp:3438 src/libslic3r/PrintConfig.cpp:3439
 msgid "Exposure time"
 msgstr "Expozíciós idő"
 
-#: src/libslic3r/PrintConfig.cpp:3472 src/libslic3r/PrintConfig.cpp:3473
+#: src/libslic3r/PrintConfig.cpp:3445 src/libslic3r/PrintConfig.cpp:3446
 msgid "Minimum initial exposure time"
 msgstr "Minimális kezdeti expozíciós idő"
 
-#: src/libslic3r/PrintConfig.cpp:3480 src/libslic3r/PrintConfig.cpp:3481
+#: src/libslic3r/PrintConfig.cpp:3453 src/libslic3r/PrintConfig.cpp:3454
 msgid "Maximum initial exposure time"
 msgstr "Maximum kezdeti expozíciós idő"
 
-#: src/libslic3r/PrintConfig.cpp:3488 src/libslic3r/PrintConfig.cpp:3489
+#: src/libslic3r/PrintConfig.cpp:3461 src/libslic3r/PrintConfig.cpp:3462
 msgid "Initial exposure time"
 msgstr "Kezdeti expozíciós idő"
 
-#: src/libslic3r/PrintConfig.cpp:3495 src/libslic3r/PrintConfig.cpp:3496
+#: src/libslic3r/PrintConfig.cpp:3468 src/libslic3r/PrintConfig.cpp:3469
 msgid "Correction for expansion"
 msgstr "Terjeszkedés miatti korrekció"
 
-#: src/libslic3r/PrintConfig.cpp:3502 src/libslic3r/PrintConfig.cpp:3503
+#: src/libslic3r/PrintConfig.cpp:3475 src/libslic3r/PrintConfig.cpp:3476
 msgid "Correction for expansion in X axis"
 msgstr "Terjeszkedés miatti korrekció az X tengelyen"
 
-#: src/libslic3r/PrintConfig.cpp:3509 src/libslic3r/PrintConfig.cpp:3510
+#: src/libslic3r/PrintConfig.cpp:3482 src/libslic3r/PrintConfig.cpp:3483
 msgid "Correction for expansion in Y axis"
 msgstr "Terjeszkedés miatti korrekció az Y tengelyen"
 
-#: src/libslic3r/PrintConfig.cpp:3516 src/libslic3r/PrintConfig.cpp:3517
+#: src/libslic3r/PrintConfig.cpp:3489 src/libslic3r/PrintConfig.cpp:3490
 msgid "Correction for expansion in Z axis"
 msgstr "Terjeszkedés miatti korrekció az Z tengelyen"
 
-#: src/libslic3r/PrintConfig.cpp:3523
+#: src/libslic3r/PrintConfig.cpp:3496
 msgid "SLA print material notes"
 msgstr "SLA anyag megjegyzések"
 
-#: src/libslic3r/PrintConfig.cpp:3524
+#: src/libslic3r/PrintConfig.cpp:3497
 msgid "You can put your notes regarding the SLA print material here."
 msgstr "Az SLA anyaggal kapcsolatos jegyzeteit ide írhatja."
 
-#: src/libslic3r/PrintConfig.cpp:3536 src/libslic3r/PrintConfig.cpp:3547
+#: src/libslic3r/PrintConfig.cpp:3509 src/libslic3r/PrintConfig.cpp:3520
 msgid "Default SLA material profile"
 msgstr "Alapértelmezett SLA anyagprofil"
 
-#: src/libslic3r/PrintConfig.cpp:3558
+#: src/libslic3r/PrintConfig.cpp:3531
 msgid "Generate supports"
 msgstr "Támasztók generálása"
 
-#: src/libslic3r/PrintConfig.cpp:3560
+#: src/libslic3r/PrintConfig.cpp:3533
 msgid "Generate supports for the models"
 msgstr "Támasztók generálása a modellekhez"
 
-#: src/libslic3r/PrintConfig.cpp:3565
+#: src/libslic3r/PrintConfig.cpp:3538
 msgid "Pinhead front diameter"
 msgstr "Tűfej elülső átmérője"
 
-#: src/libslic3r/PrintConfig.cpp:3567
+#: src/libslic3r/PrintConfig.cpp:3540
 msgid "Diameter of the pointing side of the head"
 msgstr "A fej mutató oldalának átmérője"
 
-#: src/libslic3r/PrintConfig.cpp:3574
+#: src/libslic3r/PrintConfig.cpp:3547
 msgid "Head penetration"
 msgstr "Fej benyúlás"
 
-#: src/libslic3r/PrintConfig.cpp:3576
+#: src/libslic3r/PrintConfig.cpp:3549
 msgid "How much the pinhead has to penetrate the model surface"
 msgstr "Mennyire kell a tűhegynek benyúlnia a modell felületébe"
 
-#: src/libslic3r/PrintConfig.cpp:3583
+#: src/libslic3r/PrintConfig.cpp:3556
 msgid "Pinhead width"
 msgstr "Tűfej szélessége"
 
-#: src/libslic3r/PrintConfig.cpp:3585
+#: src/libslic3r/PrintConfig.cpp:3558
 msgid "Width from the back sphere center to the front sphere center"
 msgstr "Szélesség a hátsó gömb középpontjától az első gömb középpontjáig"
 
-#: src/libslic3r/PrintConfig.cpp:3593
+#: src/libslic3r/PrintConfig.cpp:3566
 msgid "Pillar diameter"
 msgstr "Pillér átmérője"
 
-#: src/libslic3r/PrintConfig.cpp:3595
+#: src/libslic3r/PrintConfig.cpp:3568
 msgid "Diameter in mm of the support pillars"
 msgstr "A támasztó pillérek átmérője mm-ben"
 
-#: src/libslic3r/PrintConfig.cpp:3603
+#: src/libslic3r/PrintConfig.cpp:3576
 msgid "Small pillar diameter percent"
 msgstr "Kis pillér átmérője százalék"
 
-#: src/libslic3r/PrintConfig.cpp:3605
+#: src/libslic3r/PrintConfig.cpp:3578
 msgid ""
 "The percentage of smaller pillars compared to the normal pillar diameter "
 "which are used in problematic areas where a normal pilla cannot fit."
@@ -14966,11 +14938,11 @@ msgstr ""
 "A kisebb pillérek normál pillérek átmérőjéhez viszonyított aránya, amelyeket "
 "olyan problémás helyeken használnak, ahol egy normál pillér nem fér el."
 
-#: src/libslic3r/PrintConfig.cpp:3614
+#: src/libslic3r/PrintConfig.cpp:3587
 msgid "Max bridges on a pillar"
 msgstr "Max hidak egy pilléren"
 
-#: src/libslic3r/PrintConfig.cpp:3616
+#: src/libslic3r/PrintConfig.cpp:3589
 msgid ""
 "Maximum number of bridges that can be placed on a pillar. Bridges hold "
 "support point pinheads and connect to pillars as small branches."
@@ -14978,11 +14950,11 @@ msgstr ""
 "Az egy pilléren elhelyezhető hidak maximális száma. A hidak tartják a "
 "támasztópont tűfejeit, és kis ágakként csatlakoznak a pillérekhez."
 
-#: src/libslic3r/PrintConfig.cpp:3624
+#: src/libslic3r/PrintConfig.cpp:3597
 msgid "Pillar connection mode"
 msgstr "Pillér összekötési mód"
 
-#: src/libslic3r/PrintConfig.cpp:3625
+#: src/libslic3r/PrintConfig.cpp:3598
 msgid ""
 "Controls the bridge type between two neighboring pillars. Can be zig-zag, "
 "cross (double zig-zag) or dynamic which will automatically switch between "
@@ -14992,23 +14964,23 @@ msgstr ""
 "kereszt (dupla cikk-cakk) vagy dinamikus, amely automatikusan vált az első "
 "kettő között a két pillér távolságától függően."
 
-#: src/libslic3r/PrintConfig.cpp:3633
+#: src/libslic3r/PrintConfig.cpp:3606
 msgid "Zig-Zag"
 msgstr "Cikk-Cakk"
 
-#: src/libslic3r/PrintConfig.cpp:3634
+#: src/libslic3r/PrintConfig.cpp:3607
 msgid "Cross"
 msgstr "Kereszt"
 
-#: src/libslic3r/PrintConfig.cpp:3635
+#: src/libslic3r/PrintConfig.cpp:3608
 msgid "Dynamic"
 msgstr "Dinamikus"
 
-#: src/libslic3r/PrintConfig.cpp:3647
+#: src/libslic3r/PrintConfig.cpp:3620
 msgid "Pillar widening factor"
 msgstr "Pillérszélesítési tényező"
 
-#: src/libslic3r/PrintConfig.cpp:3649
+#: src/libslic3r/PrintConfig.cpp:3622
 msgid ""
 "Merging bridges or pillars into another pillars can increase the radius. "
 "Zero means no increase, one means full increase."
@@ -15017,27 +14989,27 @@ msgstr ""
 "sugarat. A nulla azt jelenti, hogy nincs növelés, az egy pedig teljes "
 "növelést jelent."
 
-#: src/libslic3r/PrintConfig.cpp:3658
+#: src/libslic3r/PrintConfig.cpp:3631
 msgid "Support base diameter"
 msgstr "A támasztó alapjának átmérője"
 
-#: src/libslic3r/PrintConfig.cpp:3660
+#: src/libslic3r/PrintConfig.cpp:3633
 msgid "Diameter in mm of the pillar base"
 msgstr "A pillér alapjának átmérője mm-ben"
 
-#: src/libslic3r/PrintConfig.cpp:3668
+#: src/libslic3r/PrintConfig.cpp:3641
 msgid "Support base height"
 msgstr "A támasztó alapjának magassága"
 
-#: src/libslic3r/PrintConfig.cpp:3670
+#: src/libslic3r/PrintConfig.cpp:3643
 msgid "The height of the pillar base cone"
 msgstr "A pillér alapkúpjának magassága"
 
-#: src/libslic3r/PrintConfig.cpp:3677
+#: src/libslic3r/PrintConfig.cpp:3650
 msgid "Support base safety distance"
 msgstr "A támasztó alapjának biztonsági távolsága"
 
-#: src/libslic3r/PrintConfig.cpp:3680
+#: src/libslic3r/PrintConfig.cpp:3653
 msgid ""
 "The minimum distance of the pillar base from the model in mm. Makes sense in "
 "zero elevation mode where a gap according to this parameter is inserted "
@@ -15047,28 +15019,28 @@ msgstr ""
 "nulla magasságú módban van értelme, ahol a modell és a pillér közé egy ennek "
 "a paraméternek megfelelő rés kerül beillesztésre."
 
-#: src/libslic3r/PrintConfig.cpp:3690
+#: src/libslic3r/PrintConfig.cpp:3663
 msgid "Critical angle"
 msgstr "Kritikus szög"
 
-#: src/libslic3r/PrintConfig.cpp:3692
+#: src/libslic3r/PrintConfig.cpp:3665
 msgid "The default angle for connecting support sticks and junctions."
 msgstr ""
 "Az alapértelmezett szög a támasztópálcák és csomópontok összekötéséhez."
 
-#: src/libslic3r/PrintConfig.cpp:3700
+#: src/libslic3r/PrintConfig.cpp:3673
 msgid "Max bridge length"
 msgstr "Híd max. hossza"
 
-#: src/libslic3r/PrintConfig.cpp:3702
+#: src/libslic3r/PrintConfig.cpp:3675
 msgid "The max length of a bridge"
 msgstr "A híd maximális hossza"
 
-#: src/libslic3r/PrintConfig.cpp:3709
+#: src/libslic3r/PrintConfig.cpp:3682
 msgid "Max pillar linking distance"
 msgstr "Maximális oszlop áthidalási távolság"
 
-#: src/libslic3r/PrintConfig.cpp:3711
+#: src/libslic3r/PrintConfig.cpp:3684
 msgid ""
 "The max distance of two pillars to get linked with each other. A zero value "
 "will prohibit pillar cascading."
@@ -15076,7 +15048,7 @@ msgstr ""
 "Két oszlop maximális távolsága, amelyeket még össze lehet kötni egymással. A "
 "nulla érték tiltja az oszlopok kaszkádosítását."
 
-#: src/libslic3r/PrintConfig.cpp:3721
+#: src/libslic3r/PrintConfig.cpp:3694
 msgid ""
 "How much the supports should lift up the supported object. If \"Pad around "
 "object\" is enabled, this value is ignored."
@@ -15084,40 +15056,40 @@ msgstr ""
 "Mennyire emeljék fel a támasztók a megtámasztott objektumot. Ha a \"Párna az "
 "objektum körül\" opció engedélyezve van, ez az érték nem számít."
 
-#: src/libslic3r/PrintConfig.cpp:3732
+#: src/libslic3r/PrintConfig.cpp:3705
 msgid "This is a relative measure of support points density."
 msgstr "Ez a támasztási pontok sűrűségének relatív mérőszáma."
 
-#: src/libslic3r/PrintConfig.cpp:3738
+#: src/libslic3r/PrintConfig.cpp:3711
 msgid "Minimal distance of the support points"
 msgstr "A támasztási pontok minimális távolsága"
 
-#: src/libslic3r/PrintConfig.cpp:3740
+#: src/libslic3r/PrintConfig.cpp:3713
 msgid "No support points will be placed closer than this threshold."
 msgstr ""
 "Nem kerülnek támasztási pontok ennél a küszöbértéknél közelebb egymáshoz."
 
-#: src/libslic3r/PrintConfig.cpp:3746
+#: src/libslic3r/PrintConfig.cpp:3719
 msgid "Use pad"
 msgstr "Párna használata"
 
-#: src/libslic3r/PrintConfig.cpp:3748
+#: src/libslic3r/PrintConfig.cpp:3721
 msgid "Add a pad underneath the supported model"
 msgstr "Párna hozzáadása a támasztott modell alá"
 
-#: src/libslic3r/PrintConfig.cpp:3753
+#: src/libslic3r/PrintConfig.cpp:3726
 msgid "Pad wall thickness"
 msgstr "Párna falvastagság"
 
-#: src/libslic3r/PrintConfig.cpp:3755
+#: src/libslic3r/PrintConfig.cpp:3728
 msgid "The thickness of the pad and its optional cavity walls."
 msgstr "A párna és az opcionális üreg falainak vastagsága."
 
-#: src/libslic3r/PrintConfig.cpp:3763
+#: src/libslic3r/PrintConfig.cpp:3736
 msgid "Pad wall height"
 msgstr "Párna fal magassága"
 
-#: src/libslic3r/PrintConfig.cpp:3764
+#: src/libslic3r/PrintConfig.cpp:3737
 msgid ""
 "Defines the pad cavity depth. Set to zero to disable the cavity. Be careful "
 "when enabling this feature, as some resins may produce an extreme suction "
@@ -15129,19 +15101,19 @@ msgstr ""
 "szívóhatást fejthetnek ki az üregben, ami megnehezíti a nyomtatás lehúzását "
 "a kádfóliáról."
 
-#: src/libslic3r/PrintConfig.cpp:3777
+#: src/libslic3r/PrintConfig.cpp:3750
 msgid "Pad brim size"
 msgstr "Párna karima mérete"
 
-#: src/libslic3r/PrintConfig.cpp:3778
+#: src/libslic3r/PrintConfig.cpp:3751
 msgid "How far should the pad extend around the contained geometry"
 msgstr "Milyen messzire terjedjen ki a párna az körbevett geometria körül"
 
-#: src/libslic3r/PrintConfig.cpp:3788
+#: src/libslic3r/PrintConfig.cpp:3761
 msgid "Max merge distance"
 msgstr "Maximális összeolvadási távolság"
 
-#: src/libslic3r/PrintConfig.cpp:3790
+#: src/libslic3r/PrintConfig.cpp:3763
 msgid ""
 "Some objects can get along with a few smaller pads instead of a single big "
 "one. This parameter defines how far the center of two smaller pads should "
@@ -15152,11 +15124,11 @@ msgstr ""
 "milyen messze legyen egymástól. Ha ennél közelebb vannak egymáshoz, akkor "
 "egy párnává olvadnak össze."
 
-#: src/libslic3r/PrintConfig.cpp:3810
+#: src/libslic3r/PrintConfig.cpp:3783
 msgid "Pad wall slope"
 msgstr "Párnafal meredekség"
 
-#: src/libslic3r/PrintConfig.cpp:3812
+#: src/libslic3r/PrintConfig.cpp:3785
 msgid ""
 "The slope of the pad wall relative to the bed plane. 90 degrees means "
 "straight walls."
@@ -15164,80 +15136,80 @@ msgstr ""
 "A párnafal meredeksége a tárgyasztal síkjához képest. A 90 fok egyenes falat "
 "jelent."
 
-#: src/libslic3r/PrintConfig.cpp:3823
+#: src/libslic3r/PrintConfig.cpp:3796
 msgid "Create pad around object and ignore the support elevation"
 msgstr ""
 "Hozzon létre párnát az objektum körül és hagyja figyelmen kívül a támasztók "
 "magasságát"
 
-#: src/libslic3r/PrintConfig.cpp:3828
+#: src/libslic3r/PrintConfig.cpp:3801
 msgid "Pad around object everywhere"
 msgstr "Párna az objektum körül mindenhol"
 
-#: src/libslic3r/PrintConfig.cpp:3830
+#: src/libslic3r/PrintConfig.cpp:3803
 msgid "Force pad around object everywhere"
 msgstr "Párna kényszerítése az objektum körül mindenhol"
 
-#: src/libslic3r/PrintConfig.cpp:3835
+#: src/libslic3r/PrintConfig.cpp:3808
 msgid "Pad object gap"
 msgstr "Párna objektum hézag"
 
-#: src/libslic3r/PrintConfig.cpp:3837
+#: src/libslic3r/PrintConfig.cpp:3810
 msgid ""
 "The gap between the object bottom and the generated pad in zero elevation "
 "mode."
 msgstr ""
 "Az objektum alja és a generált párna közötti hézag nulla magasságú módban."
 
-#: src/libslic3r/PrintConfig.cpp:3846
+#: src/libslic3r/PrintConfig.cpp:3819
 msgid "Pad object connector stride"
 msgstr "Párna objektum összekötő lépésköz"
 
-#: src/libslic3r/PrintConfig.cpp:3848
+#: src/libslic3r/PrintConfig.cpp:3821
 msgid ""
 "Distance between two connector sticks which connect the object and the "
 "generated pad."
 msgstr "Az objektumot és a generált párnát összekötő pálcák közötti távolság."
 
-#: src/libslic3r/PrintConfig.cpp:3855
+#: src/libslic3r/PrintConfig.cpp:3828
 msgid "Pad object connector width"
 msgstr "Párna objektum összekötő szélessége"
 
-#: src/libslic3r/PrintConfig.cpp:3857
+#: src/libslic3r/PrintConfig.cpp:3830
 msgid ""
 "Width of the connector sticks which connect the object and the generated pad."
 msgstr ""
 "Az objektumot és a generált párnát összekötő csatlakozó pálcák szélessége."
 
-#: src/libslic3r/PrintConfig.cpp:3864
+#: src/libslic3r/PrintConfig.cpp:3837
 msgid "Pad object connector penetration"
 msgstr "Párna objektum összekötő benyúlása"
 
-#: src/libslic3r/PrintConfig.cpp:3867
+#: src/libslic3r/PrintConfig.cpp:3840
 msgid "How much should the tiny connectors penetrate into the model body."
 msgstr "Az apró összekötőknek mennyire kell benyúlniuk a modell testébe."
 
-#: src/libslic3r/PrintConfig.cpp:3874
+#: src/libslic3r/PrintConfig.cpp:3847
 msgid "Enable hollowing"
 msgstr "Üregesítés engedélyezése"
 
-#: src/libslic3r/PrintConfig.cpp:3876
+#: src/libslic3r/PrintConfig.cpp:3849
 msgid "Hollow out a model to have an empty interior"
 msgstr "Üregesítse a modellt, hogy üres legyen a belseje"
 
-#: src/libslic3r/PrintConfig.cpp:3881
+#: src/libslic3r/PrintConfig.cpp:3854
 msgid "Wall thickness"
 msgstr "Falvastagság"
 
-#: src/libslic3r/PrintConfig.cpp:3883
+#: src/libslic3r/PrintConfig.cpp:3856
 msgid "Minimum wall thickness of a hollowed model."
 msgstr "Az üreges modell minimális falvastagsága."
 
-#: src/libslic3r/PrintConfig.cpp:3891
+#: src/libslic3r/PrintConfig.cpp:3864
 msgid "Accuracy"
 msgstr "Pontosság"
 
-#: src/libslic3r/PrintConfig.cpp:3893
+#: src/libslic3r/PrintConfig.cpp:3866
 msgid ""
 "Performance vs accuracy of calculation. Lower values may produce unwanted "
 "artifacts."
@@ -15245,7 +15217,7 @@ msgstr ""
 "Teljesítmény kontra számítási pontosság. Az alacsonyabb értékek nemkívánatos "
 "műtermékeket okozhatnak."
 
-#: src/libslic3r/PrintConfig.cpp:3903
+#: src/libslic3r/PrintConfig.cpp:3876
 msgid ""
 "Hollowing is done in two steps: first, an imaginary interior is calculated "
 "deeper (offset plus the closing distance) in the object and then it's "
@@ -15259,11 +15231,11 @@ msgstr ""
 "lekerekíti a belső teret. Nulla értéknél a belső tér leginkább a külsőhöz "
 "fog hasonlítani."
 
-#: src/libslic3r/PrintConfig.cpp:3915
+#: src/libslic3r/PrintConfig.cpp:3888
 msgid "Print speed"
 msgstr "Nyomtatási sebesség"
 
-#: src/libslic3r/PrintConfig.cpp:3917
+#: src/libslic3r/PrintConfig.cpp:3890
 msgid ""
 "A slower printing profile might be necessary when using materials with "
 "higher viscosity or with some hollowed parts. It slows down the tilt "
@@ -15273,65 +15245,65 @@ msgstr ""
 "nyomtatási profilra lehet szükség. Lelassítja a billenőmozgást, és "
 "késleltetést ad hozzá az expozíció előtt."
 
-#: src/libslic3r/PrintConfig.cpp:4383
+#: src/libslic3r/PrintConfig.cpp:4358
 msgid "Export OBJ"
 msgstr "OBJ exportálása"
 
-#: src/libslic3r/PrintConfig.cpp:4384
+#: src/libslic3r/PrintConfig.cpp:4359
 msgid "Export the model(s) as OBJ."
 msgstr "Modell(ek) exportálása OBJ formátumban."
 
-#: src/libslic3r/PrintConfig.cpp:4395
+#: src/libslic3r/PrintConfig.cpp:4370
 msgid "Export SLA"
 msgstr "SLA exportálása"
 
-#: src/libslic3r/PrintConfig.cpp:4396
+#: src/libslic3r/PrintConfig.cpp:4371
 msgid "Slice the model and export SLA printing layers as PNG."
 msgstr ""
 "Szeletelje fel a modellt és exportálja az SLA nyomtatási rétegeket PNG "
 "formátumban."
 
-#: src/libslic3r/PrintConfig.cpp:4401
+#: src/libslic3r/PrintConfig.cpp:4376
 msgid "Export 3MF"
 msgstr "3MF exportálása"
 
-#: src/libslic3r/PrintConfig.cpp:4402
+#: src/libslic3r/PrintConfig.cpp:4377
 msgid "Export the model(s) as 3MF."
 msgstr "Modell(ek) exportálása 3MF formátumban."
 
-#: src/libslic3r/PrintConfig.cpp:4406
+#: src/libslic3r/PrintConfig.cpp:4381
 msgid "Export AMF"
 msgstr "AMF exportálása"
 
-#: src/libslic3r/PrintConfig.cpp:4407
+#: src/libslic3r/PrintConfig.cpp:4382
 msgid "Export the model(s) as AMF."
 msgstr "Modell(ek) exportálása AMF formátumban."
 
-#: src/libslic3r/PrintConfig.cpp:4411
+#: src/libslic3r/PrintConfig.cpp:4386
 msgid "Export STL"
 msgstr "STL exportálása"
 
-#: src/libslic3r/PrintConfig.cpp:4412
+#: src/libslic3r/PrintConfig.cpp:4387
 msgid "Export the model(s) as STL."
 msgstr "Modell(ek) exportálása STL formátumban."
 
-#: src/libslic3r/PrintConfig.cpp:4417
+#: src/libslic3r/PrintConfig.cpp:4392
 msgid "Slice the model and export toolpaths as G-code."
 msgstr "Szeletelje a modellt és exportálja a szerszámpályákat G-kódként."
 
-#: src/libslic3r/PrintConfig.cpp:4422
+#: src/libslic3r/PrintConfig.cpp:4397
 msgid "G-code viewer"
 msgstr "G-kód nézegető"
 
-#: src/libslic3r/PrintConfig.cpp:4423
+#: src/libslic3r/PrintConfig.cpp:4398
 msgid "Visualize an already sliced and saved G-code"
 msgstr "Egy már felszeletelt és elmentett G-kód megjelenítése"
 
-#: src/libslic3r/PrintConfig.cpp:4428
+#: src/libslic3r/PrintConfig.cpp:4403
 msgid "Slice"
 msgstr "Szeletelés_"
 
-#: src/libslic3r/PrintConfig.cpp:4429
+#: src/libslic3r/PrintConfig.cpp:4404
 msgid ""
 "Slice the model as FFF or SLA based on the printer_technology configuration "
 "value."
@@ -15339,73 +15311,73 @@ msgstr ""
 "A modell szeletelése FFF-, vagy SLA-ként a printer_technology konfigurációs "
 "érték alapján."
 
-#: src/libslic3r/PrintConfig.cpp:4434
+#: src/libslic3r/PrintConfig.cpp:4409
 msgid "Help"
 msgstr "Súgó"
 
-#: src/libslic3r/PrintConfig.cpp:4435
+#: src/libslic3r/PrintConfig.cpp:4410
 msgid "Show this help."
 msgstr "Ennek a súgónak a megjelenítése."
 
-#: src/libslic3r/PrintConfig.cpp:4440
+#: src/libslic3r/PrintConfig.cpp:4415
 msgid "Help (FFF options)"
 msgstr "Súgó (FFF lehetőségek)"
 
-#: src/libslic3r/PrintConfig.cpp:4441
+#: src/libslic3r/PrintConfig.cpp:4416
 msgid "Show the full list of print/G-code configuration options."
 msgstr ""
 "A nyomtatási/G-kód konfigurációs lehetőségek teljes listájának megjelenítése."
 
-#: src/libslic3r/PrintConfig.cpp:4445
+#: src/libslic3r/PrintConfig.cpp:4420
 msgid "Help (SLA options)"
 msgstr "Súgó (SLA lehetőségek)"
 
-#: src/libslic3r/PrintConfig.cpp:4446
+#: src/libslic3r/PrintConfig.cpp:4421
 msgid "Show the full list of SLA print configuration options."
 msgstr ""
 "Az SLA nyomtatási konfigurációs beállítások teljes listájának megjelenítése."
 
-#: src/libslic3r/PrintConfig.cpp:4450
+#: src/libslic3r/PrintConfig.cpp:4425
 msgid "Output Model Info"
 msgstr "Modell Információ Kimenet"
 
-#: src/libslic3r/PrintConfig.cpp:4451
+#: src/libslic3r/PrintConfig.cpp:4426
 msgid "Write information about the model to the console."
 msgstr "A modellre vonatkozó információk írása a konzolra."
 
-#: src/libslic3r/PrintConfig.cpp:4455
+#: src/libslic3r/PrintConfig.cpp:4430
 msgid "Save config file"
 msgstr "Konfigurációs fájl mentése"
 
-#: src/libslic3r/PrintConfig.cpp:4456
+#: src/libslic3r/PrintConfig.cpp:4431
 msgid "Save configuration to the specified file."
 msgstr "A konfiguráció mentése a megadott fájlba."
 
-#: src/libslic3r/PrintConfig.cpp:4466
+#: src/libslic3r/PrintConfig.cpp:4441
 msgid "Align XY"
 msgstr "XY igazítása"
 
-#: src/libslic3r/PrintConfig.cpp:4467
+#: src/libslic3r/PrintConfig.cpp:4442
 msgid "Align the model to the given point."
 msgstr "A modell igazítása egy megadott ponthoz."
 
-#: src/libslic3r/PrintConfig.cpp:4472
+#: src/libslic3r/PrintConfig.cpp:4447
 msgid "Cut model at the given Z."
 msgstr "A modellt elvágása egy megadott Z-nél."
 
-#: src/libslic3r/PrintConfig.cpp:4493
+#: src/libslic3r/PrintConfig.cpp:4468
 msgid "Center"
 msgstr "Középre igazítás_"
 
-#: src/libslic3r/PrintConfig.cpp:4494
+#: src/libslic3r/PrintConfig.cpp:4469
 msgid "Center the print around the given center."
 msgstr "A nyomtatás középre igazítása a megadott középpont körül."
 
-#: src/libslic3r/PrintConfig.cpp:4498
+#: src/libslic3r/PrintConfig.cpp:4473
 msgid "Don't arrange"
 msgstr "Ne rendezzen"
 
-#: src/libslic3r/PrintConfig.cpp:4499
+#: src/libslic3r/PrintConfig.cpp:4474
 msgid ""
 "Do not rearrange the given models before merging and keep their original XY "
 "coordinates."
@@ -15413,11 +15385,11 @@ msgstr ""
 "Az egyesítés előtt ne rendezze át az adott modelleket, és tartsa meg az "
 "eredeti XY-koordinátákat."
 
-#: src/libslic3r/PrintConfig.cpp:4502
+#: src/libslic3r/PrintConfig.cpp:4477
 msgid "Ensure on bed"
 msgstr "Ágyra igazítás"
 
-#: src/libslic3r/PrintConfig.cpp:4503
+#: src/libslic3r/PrintConfig.cpp:4478
 msgid ""
 "Lift the object above the bed when it is partially below. Enabled by "
 "default, use --no-ensure-on-bed to disable."
@@ -15426,23 +15398,23 @@ msgstr ""
 "Alapértelmezés szerint engedélyezve van, kikapcsolásához használja a --no-"
 "ensure-on-bed opciót."
 
-#: src/libslic3r/PrintConfig.cpp:4507
+#: src/libslic3r/PrintConfig.cpp:4482
 msgid "Duplicate"
 msgstr "Megkettőzés"
 
-#: src/libslic3r/PrintConfig.cpp:4508
+#: src/libslic3r/PrintConfig.cpp:4483
 msgid "Multiply copies by this factor."
 msgstr "Másolatok sokszorozása ezzel a tényezővel."
 
-#: src/libslic3r/PrintConfig.cpp:4512
+#: src/libslic3r/PrintConfig.cpp:4487
 msgid "Duplicate by grid"
 msgstr "Megkettőzés rács szerint"
 
-#: src/libslic3r/PrintConfig.cpp:4513
+#: src/libslic3r/PrintConfig.cpp:4488
 msgid "Multiply copies by creating a grid."
 msgstr "Másolatok sokszorozása rács létrehozásával."
 
-#: src/libslic3r/PrintConfig.cpp:4517
+#: src/libslic3r/PrintConfig.cpp:4492
 msgid ""
 "Arrange the supplied models in a plate and merge them in a single model in "
 "order to perform actions once."
@@ -15450,7 +15422,7 @@ msgstr ""
 "A megadott modellek elredezése és egyetlen modellé való összevonása a "
 "tárgyasztalon, hogy egyszerre lehessen végrehajtani a műveleteket."
 
-#: src/libslic3r/PrintConfig.cpp:4522
+#: src/libslic3r/PrintConfig.cpp:4497
 msgid ""
 "Try to repair any non-manifold meshes (this option is implicitly added "
 "whenever we need to slice the model to perform the requested action)."
@@ -15459,31 +15431,31 @@ msgstr ""
 "hozzáadódik, ha a modellt fel kell szeletelnünk a kért művelet "
 "végrehajtásához)."
 
-#: src/libslic3r/PrintConfig.cpp:4526
+#: src/libslic3r/PrintConfig.cpp:4501
 msgid "Rotation angle around the Z axis in degrees."
 msgstr "Az Z tengely körüli forgatási szög fokban."
 
-#: src/libslic3r/PrintConfig.cpp:4530
+#: src/libslic3r/PrintConfig.cpp:4505
 msgid "Rotate around X"
 msgstr "Forgatás X körül"
 
-#: src/libslic3r/PrintConfig.cpp:4531
+#: src/libslic3r/PrintConfig.cpp:4506
 msgid "Rotation angle around the X axis in degrees."
 msgstr "Az X tengely körüli forgatási szög fokban."
 
-#: src/libslic3r/PrintConfig.cpp:4535
+#: src/libslic3r/PrintConfig.cpp:4510
 msgid "Rotate around Y"
 msgstr "Forgatás Y körül"
 
-#: src/libslic3r/PrintConfig.cpp:4536
+#: src/libslic3r/PrintConfig.cpp:4511
 msgid "Rotation angle around the Y axis in degrees."
 msgstr "Az Y tengely körüli forgatási szög fokban."
 
-#: src/libslic3r/PrintConfig.cpp:4541
+#: src/libslic3r/PrintConfig.cpp:4516
 msgid "Scaling factor or percentage."
 msgstr "Skálázási tényező vagy százalék."
 
-#: src/libslic3r/PrintConfig.cpp:4546
+#: src/libslic3r/PrintConfig.cpp:4521
 msgid ""
 "Detect unconnected parts in the given model(s) and split them into separate "
 "objects."
@@ -15491,23 +15463,23 @@ msgstr ""
 "Az összekapcsolatlan részek felismerése és különálló objektumokra való "
 "bontása az adott modell(ek)ben."
 
-#: src/libslic3r/PrintConfig.cpp:4549
+#: src/libslic3r/PrintConfig.cpp:4524
 msgid "Scale to Fit"
 msgstr "Skálázás Mérethez Igazítva"
 
-#: src/libslic3r/PrintConfig.cpp:4550
+#: src/libslic3r/PrintConfig.cpp:4525
 msgid "Scale to fit the given volume."
 msgstr "A megadott térfogatra való skálázás."
 
-#: src/libslic3r/PrintConfig.cpp:4559
+#: src/libslic3r/PrintConfig.cpp:4534
 msgid "Ignore non-existent config files"
 msgstr "Nem létező konfigurációs fájlok figyelmen kívül hagyása"
 
-#: src/libslic3r/PrintConfig.cpp:4560
+#: src/libslic3r/PrintConfig.cpp:4535
 msgid "Do not fail if a file supplied to --load does not exist."
 msgstr "Ne hibázzon, ha a --betöltéshez megadott fájl nem létezik."
 
-#: src/libslic3r/PrintConfig.cpp:4563
+#: src/libslic3r/PrintConfig.cpp:4538
 msgid ""
 "Forward-compatibility rule when loading configurations from config files and "
 "project files (3MF, AMF)."
@@ -15515,7 +15487,7 @@ msgstr ""
 "Előre kompatibilitási szabály konfigurációs és projektfájlokból (3MF, AMF) "
 "történő konfiguráció betöltéskor."
 
-#: src/libslic3r/PrintConfig.cpp:4564
+#: src/libslic3r/PrintConfig.cpp:4539
 msgid ""
 "This version of PrusaSlicer may not understand configurations produced by "
 "the newest PrusaSlicer versions. For example, newer PrusaSlicer may extend "
@@ -15528,11 +15500,11 @@ msgstr ""
 "hogy kilép, vagy az ismeretlen értéket egy alapértelmezett értékkel "
 "helyettesíti csendben vagy megjegyzéssel."
 
-#: src/libslic3r/PrintConfig.cpp:4571
+#: src/libslic3r/PrintConfig.cpp:4546
 msgid "Bail out on unknown configuration values"
 msgstr "Kilépés ismeretlen konfigurációs értékek esetén"
 
-#: src/libslic3r/PrintConfig.cpp:4572
+#: src/libslic3r/PrintConfig.cpp:4547
 msgid ""
 "Enable reading unknown configuration values by verbosely substituting them "
 "with defaults."
@@ -15540,7 +15512,7 @@ msgstr ""
 "Ismeretlen konfigurációs értékek olvasásának engedélyezése. Az "
 "alapértelmezett értékek helyettesítése megjegyzéssel."
 
-#: src/libslic3r/PrintConfig.cpp:4573
+#: src/libslic3r/PrintConfig.cpp:4548
 msgid ""
 "Enable reading unknown configuration values by silently substituting them "
 "with defaults."
@@ -15548,11 +15520,11 @@ msgstr ""
 "Ismeretlen konfigurációs értékek olvasásának engedélyezése. Az "
 "alapértelmezett értékek helyettesítése csendben."
 
-#: src/libslic3r/PrintConfig.cpp:4577
+#: src/libslic3r/PrintConfig.cpp:4552
 msgid "Load config file"
 msgstr "Konfigurációs fájl betöltése"
 
-#: src/libslic3r/PrintConfig.cpp:4578
+#: src/libslic3r/PrintConfig.cpp:4553
 msgid ""
 "Load configuration from the specified file. It can be used more than once to "
 "load options from multiple files."
@@ -15560,11 +15532,11 @@ msgstr ""
 "Konfiguráció betöltése a megadott fájlból. Többször is használható "
 "beállítások több fájlból történő betöltéséhez."
 
-#: src/libslic3r/PrintConfig.cpp:4581
+#: src/libslic3r/PrintConfig.cpp:4556
 msgid "Output File"
 msgstr "Kimeneti Fájl"
 
-#: src/libslic3r/PrintConfig.cpp:4582
+#: src/libslic3r/PrintConfig.cpp:4557
 msgid ""
 "The file where the output will be written (if not specified, it will be "
 "based on the input file)."
@@ -15572,11 +15544,11 @@ msgstr ""
 "Az a fájl, ahová a kimenet kiírásra kerül (ha nincs megadva, akkor a "
 "bemeneti fájlon alapul)."
 
-#: src/libslic3r/PrintConfig.cpp:4586
+#: src/libslic3r/PrintConfig.cpp:4561
 msgid "Single instance mode"
 msgstr "Egypéldányos mód"
 
-#: src/libslic3r/PrintConfig.cpp:4587
+#: src/libslic3r/PrintConfig.cpp:4562
 msgid ""
 "If enabled, the command line arguments are sent to an existing instance of "
 "GUI PrusaSlicer, or an existing PrusaSlicer window is activated. Overrides "
@@ -15587,11 +15559,11 @@ msgstr ""
 "alkalmazás beállításai közül felülírja a \"single_instance\" konfigurációs "
 "értéket."
 
-#: src/libslic3r/PrintConfig.cpp:4598
+#: src/libslic3r/PrintConfig.cpp:4573
 msgid "Data directory"
 msgstr "Adatkönyvtár"
 
-#: src/libslic3r/PrintConfig.cpp:4599
+#: src/libslic3r/PrintConfig.cpp:4574
 msgid ""
 "Load and store settings at the given directory. This is useful for "
 "maintaining different profiles or including configurations from a network "
@@ -15601,11 +15573,11 @@ msgstr ""
 "különböző profilok karbantartásához vagy a hálózaton tárolt konfigurációk "
 "beviteléhez."
 
-#: src/libslic3r/PrintConfig.cpp:4602
+#: src/libslic3r/PrintConfig.cpp:4577
 msgid "Logging level"
 msgstr "Naplózási szint"
 
-#: src/libslic3r/PrintConfig.cpp:4603
+#: src/libslic3r/PrintConfig.cpp:4578
 msgid ""
 "Sets logging sensitivity. 0:fatal, 1:error, 2:warning, 3:info, 4:debug, 5:"
 "trace\n"
@@ -15616,11 +15588,11 @@ msgstr ""
 "Például: loglevel=2 a végzetes, hiba és figyelmeztetés szintű üzeneteket "
 "naplózza."
 
-#: src/libslic3r/PrintConfig.cpp:4609
+#: src/libslic3r/PrintConfig.cpp:4584
 msgid "Render with a software renderer"
 msgstr "Renderelés szoftveres renderelővel"
 
-#: src/libslic3r/PrintConfig.cpp:4610
+#: src/libslic3r/PrintConfig.cpp:4585
 msgid ""
 "Render with a software renderer. The bundled MESA software renderer is "
 "loaded instead of the default OpenGL driver."
