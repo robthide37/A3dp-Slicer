@@ -2621,23 +2621,25 @@ EmbossDataBase GLGizmoEmboss::create_emboss_data_base() {
 bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
 {
     if (volume == nullptr) return false;
-    if (!volume->text_configuration.has_value()) return false;
+    const std::optional<TextConfiguration> tc_opt = volume->text_configuration;
+    if (!tc_opt.has_value()) return false;
+    const TextConfiguration &tc    = *tc_opt;
+    const EmbossStyle       &style = tc.style;
 
-    TextConfiguration &tc    = *volume->text_configuration;
-    EmbossStyle       &tc_es = tc.style;
-
-    auto has_same_name = [&tc_es](const EmbossStyleManager::Item &style) -> bool {
-        const EmbossStyle &es = style.style;
-        return es.name == tc_es.name;
+    auto has_same_name = [&style](const EmbossStyleManager::Item &style_item) -> bool {
+        const EmbossStyle &es = style_item.style;
+        return es.name == style.name;
     };
 
     std::optional<wxFont> wx_font_opt;
-    if (tc_es.type == WxFontUtils::get_actual_type())
-        wx_font_opt = WxFontUtils::load_wxFont(tc_es.path);
+    if (style.type == WxFontUtils::get_actual_type())
+        wx_font_opt = WxFontUtils::load_wxFont(style.path);
+    bool is_path_changed = false;
     if (!wx_font_opt.has_value()) {
         create_notification_not_valid_font(tc);
         // Try create similar wx font
-        wx_font_opt = WxFontUtils::create_wxFont(tc_es);
+        wx_font_opt = WxFontUtils::create_wxFont(style);
+        is_path_changed = wx_font_opt.has_value();
     }
 
     const auto& styles = m_style_manager.get_styles();
@@ -2645,21 +2647,24 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
     if (it == styles.end()) {
         // style was not found
         if (wx_font_opt.has_value())
-            m_style_manager.load_style(tc_es, *wx_font_opt);
+            m_style_manager.load_style(style, *wx_font_opt);
     } else {
         size_t style_index = it - styles.begin();
         if (!m_style_manager.load_style(style_index)) {
             // can`t load stored style
             m_style_manager.erase(style_index);
             if (wx_font_opt.has_value())
-                m_style_manager.load_style(tc_es, *wx_font_opt);
+                m_style_manager.load_style(style, *wx_font_opt);
 
         } else {
             // stored style is loaded, now set modification of style
-            m_style_manager.get_style() = tc_es;
+            m_style_manager.get_style() = style;
             m_style_manager.set_wx_font(*wx_font_opt);
         }
     }
+
+    if (is_path_changed)
+        m_style_manager.get_style().path = WxFontUtils::store_wxFont(*wx_font_opt);
 
     m_text      = tc.text;
     m_volume    = volume;
