@@ -272,13 +272,47 @@ static bool layer_has_overhangs(const Layer &layer)
     return out;
 }
 
+[[nodiscard]] static const std::vector<Polygons> generate_overhangs(const PrintObject &print_object)
+{
+    std::vector<Polygons> out(print_object.layer_count(), Polygons{});
+
+    const bool              support_auto = print_object.config().support_material_auto.value;
+    std::vector<Polygons>   enforcers_layers{ print_object.slice_support_enforcers() };
+    std::vector<Polygons>   blockers_layers{ print_object.slice_support_blockers() };
+    print_object.project_and_append_custom_facets(false, EnforcerBlockerType::ENFORCER, enforcers_layers);
+    print_object.project_and_append_custom_facets(false, EnforcerBlockerType::BLOCKER, blockers_layers);
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(1, out.size()),
+        [&print_object, &enforcers_layers, &blockers_layers, support_auto, &out](const tbb::blocked_range<size_t> &range) {
+        for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
+            if (layer_has_overhangs(*print_object.get_layer(layer_idx))) {
+                Polygons overhangs;
+                const bool has_enforcers = ! enforcers_layers.empty() && ! enforcers_layers[layer_idx].empty();
+                if (support_auto) {
+                    overhangs = layer_overhangs(*print_object.get_layer(layer_idx));
+                    if (! blockers_layers.empty() && ! blockers_layers[layer_idx].empty())
+                        // Has some support blockers at this layer, apply them to the overhangs.
+                        // Enforcers have priority over blockers: Clip blockers by enforcers.
+                        overhangs = diff(overhangs, has_enforcers ? diff(blockers_layers[layer_idx], enforcers_layers[layer_idx]) : blockers_layers[layer_idx]);
+                } else if (has_enforcers) {
+                    // Has some support enforcers at this layer, apply them to the overhangs.
+                    overhangs = intersection(layer_overhangs(*print_object.get_layer(layer_idx)), enforcers_layers[layer_idx]);
+                } else
+                    continue;
+                out[layer_idx] = std::move(overhangs);
+            }
+    });
+
+    return out;
+}
+
 /*!
  * \brief Precalculates all avoidances, that could be required.
  *
  * \param storage[in] Background storage to access meshes.
  * \param currently_processing_meshes[in] Indexes of all meshes that are processed in this iteration
  */
-LayerIndex precalculate(const Print &print, const TreeSupport::TreeSupportSettings &config, const std::vector<size_t> &object_ids, TreeModelVolumes &volumes)
+static [[nodiscard]] LayerIndex precalculate(const Print &print, const std::vector<Polygons> &overhangs, const TreeSupport::TreeSupportSettings &config, const std::vector<size_t> &object_ids, TreeModelVolumes &volumes)
 {
     // calculate top most layer that is relevant for support
     LayerIndex max_layer = 0;
@@ -286,7 +320,7 @@ LayerIndex precalculate(const Print &print, const TreeSupport::TreeSupportSettin
         const PrintObject &print_object         = *print.get_object(object_id);
         int                max_support_layer_id = 0;
         for (int layer_id = 1; layer_id < print_object.layer_count(); ++ layer_id)
-            if (layer_has_overhangs(*print_object.get_layer(layer_id)))
+            if (! overhangs[layer_id].empty())
                 max_support_layer_id = layer_id;
         max_layer = std::max(max_support_layer_id - int(config.z_distance_top_layers), 0);
     }
@@ -310,6 +344,9 @@ void TreeSupport::generateSupportAreas(PrintObject& print_object)
 
 void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_volume, const std::vector<size_t> &print_object_ids)
 {
+    g_showed_critical_error = false;
+    g_showed_performance_warning = false;
+
     std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_t>>> grouped_meshes = group_meshes(print, print_object_ids);
     if (grouped_meshes.empty())
         return;
@@ -347,8 +384,15 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
         PrintObject &print_object = *print.get_object(processing.second.front());
         m_volumes = TreeModelVolumes(print_object, build_volume, m_config.maximum_move_distance, m_config.maximum_move_distance_slow, processing.second.front(), m_progress_multiplier, m_progress_offset, /* additional_excluded_areas */{});
 
+        //FIXME generating overhangs just for the furst mesh of the group.
+        assert(processing.second.size() == 1);
+        std::vector<Polygons>        overhangs = generate_overhangs(*print.get_object(processing.second.front()));
+
         // ### Precalculate avoidances, collision etc.
-        size_t num_support_layers = precalculate(print, processing.first, processing.second, m_volumes);
+        size_t num_support_layers = precalculate(print, overhangs, processing.first, processing.second, m_volumes);
+        if (num_support_layers == 0)
+            continue;
+
         auto t_precalc = std::chrono::high_resolution_clock::now();
 
         // value is the area where support may be placed. As this is calculated in CreateLayerPathing it is saved and reused in drawAreas
@@ -360,8 +404,9 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
         SupportGeneratorLayersPtr    top_interface_layers(num_support_layers, nullptr);
         SupportGeneratorLayersPtr    intermediate_layers(num_support_layers, nullptr);
         SupportGeneratorLayerStorage layer_storage;
+
         for (size_t mesh_idx : processing.second)
-            generateInitialAreas(*print.get_object(mesh_idx), move_bounds, top_contacts, top_interface_layers, layer_storage);
+            generateInitialAreas(*print.get_object(mesh_idx), overhangs, move_bounds, top_contacts, top_interface_layers, layer_storage);
         auto t_gen = std::chrono::high_resolution_clock::now();
 
         // ### Propagate the influence areas downwards.
@@ -373,7 +418,7 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
         auto t_place = std::chrono::high_resolution_clock::now();
 
         // ### draw these points as circles
-        drawAreas(*print.get_object(processing.second.front()), move_bounds, 
+        drawAreas(*print.get_object(processing.second.front()), overhangs, move_bounds, 
             bottom_contacts, top_contacts, intermediate_layers, layer_storage);
 
         auto t_draw = std::chrono::high_resolution_clock::now();
@@ -1011,6 +1056,7 @@ inline SupportGeneratorLayer& layer_allocate(
 
 void TreeSupport::generateInitialAreas(
     const PrintObject                       &print_object,
+    const std::vector<Polygons>             &overhangs,
     std::vector<std::set<SupportElement*>>  &move_bounds,
     SupportGeneratorLayersPtr               &top_contacts,
     SupportGeneratorLayersPtr               &top_interface_layers,
@@ -1049,11 +1095,12 @@ void TreeSupport::generateInitialAreas(
 
     std::mutex critical_sections;
     tbb::parallel_for(tbb::blocked_range<size_t>(1, num_support_layers - z_distance_delta),
-        [this, &print_object, &mesh_config, &mesh_group_settings, &support_params, z_distance_delta, xy_overrides_z, force_tip_to_roof, roof_enabled, support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length, max_overhang_insert_lag,
+        [this, &print_object, &overhangs, &mesh_config, &mesh_group_settings, &support_params, 
+         z_distance_delta, xy_overrides_z, force_tip_to_roof, roof_enabled, support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length, max_overhang_insert_lag,
          &base_circle, &critical_sections, &top_contacts, &layer_storage, &already_inserted,
          &move_bounds, &base_radius](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
-            if (! layer_has_overhangs(*print_object.get_layer(layer_idx + z_distance_delta)))
+            if (overhangs[layer_idx + z_distance_delta].empty())
                 continue;
             // take the least restrictive avoidance possible
             Polygons relevant_forbidden;
@@ -1165,7 +1212,7 @@ void TreeSupport::generateInitialAreas(
             // even if it is larger than the minimum_roof_area when it is only larger because of the support horizontal expansion and 
             // it would not have a roof if the overhang is offset by support roof horizontal expansion instead. (At least this is the current behavior of the regular support)
             std::vector<std::pair<ExPolygon, bool>> overhang_processing; 
-            Polygons overhang_raw = layer_overhangs(*print_object.get_layer(layer_idx + z_distance_delta));
+            const Polygons &overhang_raw = overhangs[layer_idx + z_distance_delta];
             Polygons overhang_regular = safeOffsetInc(overhang_raw, mesh_group_settings.support_offset, relevant_forbidden, mesh_config.min_radius * 1.75 + mesh_config.xy_min_distance, 0, 1);
             // offset ensures that areas that could be supported by a part of a support line, are not considered unsupported overhang
             Polygons remaining_overhang = intersection(diff(offset(union_ex(overhang_raw), mesh_group_settings.support_offset, jtMiter, 1.2), offset(union_ex(overhang_regular), mesh_config.support_line_width * 0.5, jtMiter, 1.2)), relevant_forbidden);
@@ -1226,7 +1273,7 @@ void TreeSupport::generateInitialAreas(
             Polygons overhang_roofs;
             if (roof_enabled) {
                 static constexpr const coord_t support_roof_offset = 0;
-                overhang_roofs = safeOffsetInc(layer_overhangs(*print_object.get_layer(layer_idx + z_distance_delta)), support_roof_offset, relevant_forbidden, mesh_config.min_radius * 2 + mesh_config.xy_min_distance, 0, 1);
+                overhang_roofs = safeOffsetInc(overhangs[layer_idx + z_distance_delta], support_roof_offset, relevant_forbidden, mesh_config.min_radius * 2 + mesh_config.xy_min_distance, 0, 1);
                 remove_small(overhang_roofs, mesh_group_settings.minimum_roof_area);
                 overhang_regular = diff(overhang_regular, overhang_roofs);
                 for (ExPolygon &roof_part : union_ex(overhang_roofs))
@@ -2558,6 +2605,7 @@ void TreeSupport::dropNonGraciousAreas(
 
 void TreeSupport::finalizeInterfaceAndSupportAreas(
     const PrintObject               &print_object,
+    const std::vector<Polygons>     &overhangs,
     std::vector<Polygons>           &support_layer_storage,
     std::vector<Polygons>           &support_roof_storage,
 
@@ -2641,7 +2689,7 @@ void TreeSupport::finalizeInterfaceAndSupportAreas(
                     // one sample at 0 layers below, another at m_config.support_bottom_layers. In-between samples at m_config.performance_interface_skip_layers distance from each other.
                     const size_t sample_layer = static_cast<size_t>(std::max(0, (static_cast<int>(layer_idx) - static_cast<int>(layers_below)) - static_cast<int>(m_config.z_distance_bottom_layers)));
                     //FIXME subtract the wipe tower 
-                    append(floor_layer, intersection(layer_outset, layer_overhangs(*print_object.get_layer(sample_layer))));
+                    append(floor_layer, intersection(layer_outset, overhangs[sample_layer]));
                     if (layers_below < m_config.support_bottom_layers)
                         layers_below = std::min(layers_below + m_config.performance_interface_skip_layers, m_config.support_bottom_layers);
                     else
@@ -2681,7 +2729,8 @@ void TreeSupport::finalizeInterfaceAndSupportAreas(
 }
 
 void TreeSupport::drawAreas(
-    PrintObject                             &print_object, 
+    PrintObject                             &print_object,
+    const std::vector<Polygons>             &overhangs,
     std::vector<std::set<SupportElement*>>  &move_bounds,
 
     SupportGeneratorLayersPtr            	&bottom_contacts,
@@ -2739,7 +2788,7 @@ void TreeSupport::drawAreas(
         }
     }
 
-    finalizeInterfaceAndSupportAreas(print_object, support_layer_storage, support_roof_storage,
+    finalizeInterfaceAndSupportAreas(print_object, overhangs, support_layer_storage, support_roof_storage,
         bottom_contacts, top_contacts, intermediate_layers, layer_storage);
     auto t_end = std::chrono::high_resolution_clock::now();
 

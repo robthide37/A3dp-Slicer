@@ -16,7 +16,7 @@
 
 #include "BoundingBox.hpp"
 
-// #define TREE_SUPPORT_SHOW_ERRORS
+ #define TREE_SUPPORT_SHOW_ERRORS
 
 #define SUPPORT_TREE_CIRCLE_RESOLUTION 25 // The number of vertices in each circle.
 
@@ -716,7 +716,8 @@ private:
      * \param storage[in] Background storage, required for adding roofs.
      */
     void generateInitialAreas(const PrintObject &print_object, 
-        std::vector<std::set<SupportElement*>> &move_bounds,
+        const std::vector<Polygons>             &overhangs, 
+        std::vector<std::set<SupportElement*>>  &move_bounds,
         SupportGeneratorLayersPtr               &top_contacts,
         SupportGeneratorLayersPtr               &top_interface_layers,
         SupportGeneratorLayerStorage            &layer_storage);
@@ -828,6 +829,7 @@ private:
      */
     void finalizeInterfaceAndSupportAreas(
         const PrintObject               &print_object,
+        const std::vector<Polygons>     &overhangs,
         std::vector<Polygons>           &support_layer_storage,
         std::vector<Polygons>           &support_roof_storage,
 
@@ -844,6 +846,7 @@ private:
      */
     void drawAreas(
         PrintObject                             &print_object, 
+        const std::vector<Polygons>             &overhangs,
         std::vector<std::set<SupportElement*>>  &move_bounds,
 
         SupportGeneratorLayersPtr            	&bottom_contacts,
