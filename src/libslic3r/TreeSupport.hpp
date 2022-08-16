@@ -15,6 +15,7 @@
 #include <boost/functional/hash.hpp> // For combining hashes
 
 #include "BoundingBox.hpp"
+#include "Utils.hpp"
 
  #define TREE_SUPPORT_SHOW_ERRORS
 
@@ -95,7 +96,7 @@ public:
 
     struct AreaIncreaseSettings
     {
-        AvoidanceType   type                { AvoidanceType::FAST };
+        AvoidanceType   type                { AvoidanceType::Fast };
         coord_t         increase_speed      { 0 };
         bool            increase_radius     { false };
         bool            no_error            { false };
@@ -116,7 +117,7 @@ public:
             target_height(target_height), target_position(target_position), next_position(target_position), next_height(target_height), effective_radius_height(distance_to_top), 
             to_buildplate(to_buildplate), distance_to_top(distance_to_top), area(nullptr), result_on_layer(target_position), increased_to_model_radius(0), to_model_gracious(to_model_gracious), 
             elephant_foot_increases(0), use_min_xy_dist(use_min_xy_dist), supports_roof(supports_roof), dont_move_until(dont_move_until), can_use_safe_radius(can_use_safe_radius), 
-            last_area_increase(AreaIncreaseSettings{ AvoidanceType::FAST, 0, false, false, false, false }), missing_roof_layers(force_tips_to_roof ? dont_move_until : 0), skip_ovalisation(skip_ovalisation)
+            last_area_increase(AreaIncreaseSettings{ AvoidanceType::Fast, 0, false, false, false, false }), missing_roof_layers(force_tips_to_roof ? dont_move_until : 0), skip_ovalisation(skip_ovalisation)
         {
         }
 
@@ -176,16 +177,19 @@ public:
         }
 
         // ONLY to be called in merge as it assumes a few assurances made by it.
-        explicit SupportElement(const SupportElement& first, const SupportElement& second, size_t next_height, Point next_position, coord_t increased_to_model_radius, const TreeSupportSettings& config) : next_position(next_position), next_height(next_height), area(nullptr), increased_to_model_radius(increased_to_model_radius), use_min_xy_dist(first.use_min_xy_dist || second.use_min_xy_dist), supports_roof(first.supports_roof || second.supports_roof), dont_move_until(std::max(first.dont_move_until, second.dont_move_until)), can_use_safe_radius(first.can_use_safe_radius || second.can_use_safe_radius), missing_roof_layers(std::min(first.missing_roof_layers, second.missing_roof_layers)), skip_ovalisation(false)
+        explicit SupportElement(
+            const SupportElement& first, const SupportElement& second, size_t next_height, Point next_position, 
+            coord_t increased_to_model_radius, const TreeSupportSettings& config) : 
+            next_position(next_position), next_height(next_height), area(nullptr), increased_to_model_radius(increased_to_model_radius), 
+            use_min_xy_dist(first.use_min_xy_dist || second.use_min_xy_dist), supports_roof(first.supports_roof || second.supports_roof), 
+            dont_move_until(std::max(first.dont_move_until, second.dont_move_until)), can_use_safe_radius(first.can_use_safe_radius || second.can_use_safe_radius), 
+            missing_roof_layers(std::min(first.missing_roof_layers, second.missing_roof_layers)), skip_ovalisation(false)
 
         {
-            if (first.target_height > second.target_height)
-            {
+            if (first.target_height > second.target_height) {
                 target_height = first.target_height;
                 target_position = first.target_position;
-            }
-            else
-            {
+            } else {
                 target_height = second.target_height;
                 target_position = second.target_position;
             }
@@ -199,8 +203,7 @@ public:
             AddParents(second.parents);
 
             elephant_foot_increases = 0;
-            if (config.diameter_scale_bp_radius > 0)
-            {
+            if (config.diameter_scale_bp_radius > 0) {
                 coord_t foot_increase_radius = std::abs(std::max(config.getCollisionRadius(second), config.getCollisionRadius(first)) - config.getCollisionRadius(*this));
                 // elephant_foot_increases has to be recalculated, as when a smaller tree with a larger elephant_foot_increases merge with a larger branch 
                 // the elephant_foot_increases may have to be lower as otherwise the radius suddenly increases. This results often in a non integer value.
@@ -406,7 +409,7 @@ public:
             xy_distance = std::max(xy_distance, xy_min_distance);
 
             // (logic) from getInterfaceAngles in FFFGcodeWriter.
-            auto getInterfaceAngles = [&](std::vector<AngleRadians>& angles, SupportMaterialInterfacePattern pattern) {
+            auto getInterfaceAngles = [&](std::vector<double>& angles, SupportMaterialInterfacePattern pattern) {
                 if (angles.empty())
                 {
                     if (pattern == SupportMaterialInterfacePattern::smipConcentric)
@@ -543,11 +546,11 @@ public:
         /*!
          * \brief User specified angles for the support infill.
          */
-        std::vector<AngleRadians> support_infill_angles;
+        std::vector<double> support_infill_angles;
         /*!
          * \brief User specified angles for the support roof infill.
          */
-        std::vector<AngleRadians> support_roof_angles;
+        std::vector<double> support_roof_angles;
         /*!
          * \brief Pattern used in the support roof. May contain non relevant data if support roof is disabled.
          */
@@ -613,7 +616,7 @@ public:
                        || 
                             (settings.get<bool>("fill_outline_gaps") == other.settings.get<bool>("fill_outline_gaps") && 
                              settings.get<coord_t>("min_bead_width") == other.settings.get<coord_t>("min_bead_width") && 
-                             settings.get<AngleRadians>("wall_transition_angle") == other.settings.get<AngleRadians>("wall_transition_angle") && 
+                             settings.get<double>("wall_transition_angle") == other.settings.get<double>("wall_transition_angle") && 
                              settings.get<coord_t>("wall_transition_length") == other.settings.get<coord_t>("wall_transition_length") && 
                              settings.get<Ratio>("wall_split_middle_threshold") == other.settings.get<Ratio>("wall_split_middle_threshold") && 
                              settings.get<Ratio>("wall_add_middle_threshold") == other.settings.get<Ratio>("wall_add_middle_threshold") && 

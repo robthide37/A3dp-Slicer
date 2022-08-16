@@ -23,7 +23,6 @@ namespace Slic3r
 {
 
 using LayerIndex = int;
-using AngleRadians = double;
 
 class BuildVolume;
 class PrintObject;
@@ -52,7 +51,7 @@ struct TreeSupportMeshGroupSettings {
 
     // Support Overhang Angle
     // The minimum angle of overhangs for which support is added. At a value of 0° all overhangs are supported, 90° will not provide any support.
-    AngleRadians                    support_angle                           { 50. * M_PI / 180. };
+    double                          support_angle                           { 50. * M_PI / 180. };
     // Support Line Width
     // Width of a single support structure line.
     coord_t                         support_line_width                      { scaled<coord_t>(0.4) };
@@ -92,7 +91,7 @@ struct TreeSupportMeshGroupSettings {
     // A list of integer line directions to use. Elements from the list are used sequentially as the layers progress and when the end 
     // of the list is reached, it starts at the beginning again. The list items are separated by commas and the whole list is contained 
     // in square brackets. Default is an empty list which means use the default angle 0 degrees.
-    std::vector<AngleRadians>       support_infill_angles                   {};
+    std::vector<double>             support_infill_angles                   {};
     // Enable Support Roof
     // Generate a dense slab of material between the top of support and the model. This will create a skin between the model and support.
     bool                            support_roof_enable                     { false };
@@ -106,7 +105,7 @@ struct TreeSupportMeshGroupSettings {
     // and when the end of the list is reached, it starts at the beginning again. The list items are separated
     // by commas and the whole list is contained in square brackets. Default is an empty list which means
     // use the default angles (alternates between 45 and 135 degrees if interfaces are quite thick or 90 degrees).
-    std::vector<AngleRadians>       support_roof_angles                     {};
+    std::vector<double>             support_roof_angles                     {};
     // Support Roof Pattern (aka top interface)
     // The pattern with which the roofs of the support are printed.
     SupportMaterialInterfacePattern support_roof_pattern                    { smipAuto };
@@ -144,12 +143,12 @@ struct TreeSupportMeshGroupSettings {
     // Tree Support Maximum Branch Angle
     // The maximum angle of the branches, when the branches have to avoid the model. Use a lower angle to make them more vertical and more stable. Use a higher angle to be able to have more reach.
     // minimum: 0, minimum warning: 20, maximum: 89, maximum warning": 85
-    AngleRadians                    support_tree_angle                      { 60. * M_PI / 180. };
+    double                          support_tree_angle                      { 60. * M_PI / 180. };
     // Tree Support Branch Diameter Angle
     // The angle of the branches' diameter as they gradually become thicker towards the bottom. An angle of 0 will cause the branches to have uniform thickness over their length. 
     // A bit of an angle can increase stability of the tree support.
     // minimum: 0, maximum: 89.9999, maximum warning: 15
-    AngleRadians                    support_tree_branch_diameter_angle      { 5.  * M_PI / 180. };
+    double                          support_tree_branch_diameter_angle      { 5.  * M_PI / 180. };
     // Tree Support Branch Distance
     // How far apart the branches need to be when they touch the model. Making this distance small will cause 
     // the tree support to touch the model at more points, causing better overhang but making support harder to remove.
@@ -166,7 +165,7 @@ struct TreeSupportMeshGroupSettings {
     // Tree Support Preferred Branch Angle
     // The preferred angle of the branches, when they do not have to avoid the model. Use a lower angle to make them more vertical and more stable. Use a higher angle for branches to merge faster.
     // minimum: 0, minimum warning: 10, maximum: support_tree_angle, maximum warning: support_tree_angle-1
-    AngleRadians                    support_tree_angle_slow                 { 50. * M_PI / 180. };
+    double                          support_tree_angle_slow                 { 50. * M_PI / 180. };
     // Tree Support Diameter Increase To Model
     // The most the diameter of a branch that has to connect to the model may increase by merging with branches that could reach the buildplate.
     // Increasing this reduces print time, but increases the area of support that rests on model
@@ -195,17 +194,13 @@ struct TreeSupportMeshGroupSettings {
     //enum                           support_interface_priority { support_lines_overwrite_interface_area };
 };
 
-inline coord_t round_up_divide(const coord_t dividend, const coord_t divisor) //!< Return dividend divided by divisor rounded to the nearest integer
-{
-    return (dividend + divisor - 1) / divisor;
-}
-
 class TreeModelVolumes
 {
 public:
     TreeModelVolumes() = default;
     explicit TreeModelVolumes(const PrintObject &print_object, const BuildVolume &build_volume,
-        coord_t max_move, coord_t max_move_slow, size_t current_mesh_idx, double progress_multiplier, double progress_offset, const std::vector<Polygons> &additional_excluded_areas = {});
+        coord_t max_move, coord_t max_move_slow, size_t current_mesh_idx, double progress_multiplier, 
+        double progress_offset, const std::vector<Polygons> &additional_excluded_areas = {});
     TreeModelVolumes(TreeModelVolumes&&) = default;
     TreeModelVolumes& operator=(TreeModelVolumes&&) = default;
 
@@ -214,17 +209,16 @@ public:
 
     enum class AvoidanceType
     {
-        SLOW,
-        FAST_SAFE,
-        FAST
+        Slow,
+        FastSafe,
+        Fast
     };
 
     /*!
-     * \brief Precalculate avoidances and collisions up to this layer.
+     * \brief Precalculate avoidances and collisions up to max_layer.
      *
-     * This uses knowledge about branch angle to only calculate avoidances and collisions that could actually be needed.
-     * Not calling this will cause the class to lazily calculate avoidances and collisions as needed, which will be a lot slower on systems with more then one or two cores!
-     *
+     * Knowledge about branch angle is used to only calculate avoidances and collisions that may actually be needed.
+     * Not calling precalculate() will cause the class to lazily calculate avoidances and collisions as needed, which will be a lot slower on systems with more then one or two cores!
      */
     void precalculate(coord_t max_layer);
 
@@ -239,20 +233,7 @@ public:
      * \param min_xy_dist Is the minimum xy distance used.
      * \return Polygons object
      */
-    const Polygons& getCollision(coord_t radius, LayerIndex layer_idx, bool min_xy_dist = false) const;
-
-    /*!
-     * \brief Provides the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer. Holes are removed.
-     *
-     * The result is a 2D area that would cause nodes of given radius to
-     * collide with the model or be inside a hole.
-     * A Hole is defined as an area, in which a branch with m_increase_until_radius radius would collide with the wall.
-     * \param radius The radius of the node of interest
-     * \param layer_idx The layer of interest
-     * \param min_xy_dist Is the minimum xy distance used.
-     * \return Polygons object
-     */
-    const Polygons& getCollisionHolefree(coord_t radius, LayerIndex layer_idx, bool min_xy_dist = false) const;
+    const Polygons& getCollision(coord_t radius, LayerIndex layer_idx, bool min_xy_dist) const;
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches
@@ -266,12 +247,12 @@ public:
      *
      * \param radius The radius of the node of interest
      * \param layer_idx The layer of interest
-     * \param slow Is the propagation with the maximum move distance slow required.
+     * \param type Is the propagation with the maximum move distance slow required.
      * \param to_model Does the avoidance allow good connections with the model.
      * \param min_xy_dist is the minimum xy distance used.
      * \return Polygons object
      */
-    const Polygons& getAvoidance(coord_t radius, LayerIndex layer_idx, AvoidanceType type, bool to_model = false, bool min_xy_dist = false) const;
+    const Polygons& getAvoidance(coord_t radius, LayerIndex layer_idx, AvoidanceType type, bool to_model, bool min_xy_dist) const;
     /*!
      * \brief Provides the area represents all areas on the model where the branch does completely fit on the given layer.
      * \param radius The radius of the node of interest
@@ -296,7 +277,9 @@ public:
      * \param min_xy_dist is the minimum xy distance used.
      * \return The rounded radius
      */
-    coord_t ceilRadius(coord_t radius, bool min_xy_dist) const;
+    coord_t ceilRadius(coord_t radius, bool min_xy_dist) const {
+        return this->ceilRadius(min_xy_dist ? radius : radius + m_current_min_xy_dist_delta);
+    }
     /*!
      * \brief Round \p radius upwards to the maximum that would still round up to the same value as the provided one.
      *
@@ -304,16 +287,84 @@ public:
      * \param min_xy_dist is the minimum xy distance used.
      * \return The maximum radius, resulting in the same rounding.
      */
-    coord_t getRadiusNextCeil(coord_t radius, bool min_xy_dist) const;
+    coord_t getRadiusNextCeil(coord_t radius, bool min_xy_dist) const {
+        return min_xy_dist ?
+            this->ceilRadius(radius) :
+            this->ceilRadius(radius + m_current_min_xy_dist_delta) - m_current_min_xy_dist_delta;
+    }
 
 private:
     /*!
      * \brief Convenience typedef for the keys to the caches
      */
-    using RadiusLayerPair         = std::pair<coord_t, LayerIndex>;
-    using RadiusLayerPolygonCache = std::unordered_map<RadiusLayerPair, Polygons, boost::hash<RadiusLayerPair>>;
+    using RadiusLayerPair             = std::pair<coord_t, LayerIndex>;
+    using RadiusLayerPolygonCacheData = std::unordered_map<RadiusLayerPair, Polygons, boost::hash<RadiusLayerPair>>;
+    class RadiusLayerPolygonCache {
+    public:
+        RadiusLayerPolygonCache() = default;
+        RadiusLayerPolygonCache(RadiusLayerPolygonCache &&rhs) : data(std::move(rhs.data)) {}
+        RadiusLayerPolygonCache& operator=(RadiusLayerPolygonCache &&rhs) { data = std::move(rhs.data); return *this; }
 
-    friend std::optional<std::reference_wrapper<const Polygons>> getArea(const TreeModelVolumes::RadiusLayerPolygonCache &cache, const TreeModelVolumes::RadiusLayerPair &key);
+        RadiusLayerPolygonCache(const RadiusLayerPolygonCache&) = delete;
+        RadiusLayerPolygonCache& operator=(const RadiusLayerPolygonCache&) = delete;
+
+        void insert(RadiusLayerPolygonCacheData &&in) {
+            std::lock_guard<std::mutex> guard(this->mutex);
+            for (auto& d : in)
+                this->data.emplace(d.first, std::move(d.second));
+        }
+        void insert(std::vector<std::pair<RadiusLayerPair, Polygons>> && in) {
+            std::lock_guard<std::mutex> guard(this->mutex);
+            for (auto& d : in)
+                this->data.emplace(d.first, std::move(d.second));
+        }
+        /*!
+         * \brief Checks a cache for a given RadiusLayerPair and returns it if it is found
+         * \param key RadiusLayerPair of the requested areas. The radius will be calculated up to the provided layer.
+         * \return A wrapped optional reference of the requested area (if it was found, an empty optional if nothing was found)
+         */
+        std::optional<std::reference_wrapper<const Polygons>> getArea(const TreeModelVolumes::RadiusLayerPair &key) const {
+            std::lock_guard<std::mutex> guard(this->mutex);
+            const auto it = this->data.find(key);
+            return it == this->data.end() ?
+                std::optional<std::reference_wrapper<const Polygons>>{} : std::optional<std::reference_wrapper<const Polygons>>{ it->second };
+        }
+        /*!
+         * \brief Get the highest already calculated layer in the cache.
+         * \param radius The radius for which the highest already calculated layer has to be found.
+         * \param map The cache in which the lookup is performed.
+         *
+         * \return A wrapped optional reference of the requested area (if it was found, an empty optional if nothing was found)
+         */
+        LayerIndex getMaxCalculatedLayer(coord_t radius) const {
+            std::lock_guard<std::mutex> guard(this->mutex);
+            int max_layer = -1;
+            // the placeable on model areas do not exist on layer 0, as there can not be model below it. As such it may be possible that layer 1 is available, but layer 0 does not exist.
+            if (this->data.find({ radius, 1 }) != this->data.end())
+                max_layer = 1;
+            while (this->data.count(TreeModelVolumes::RadiusLayerPair(radius, max_layer + 1)) > 0)
+                ++ max_layer;
+            return max_layer;
+        }
+
+    private:
+        RadiusLayerPolygonCacheData data;
+        mutable std::mutex          mutex;
+    };
+
+
+    /*!
+     * \brief Provides the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer. Holes are removed.
+     *
+     * The result is a 2D area that would cause nodes of given radius to
+     * collide with the model or be inside a hole.
+     * A Hole is defined as an area, in which a branch with m_increase_until_radius radius would collide with the wall.
+     * \param radius The radius of the node of interest
+     * \param layer_idx The layer of interest
+     * \param min_xy_dist Is the minimum xy distance used.
+     * \return Polygons object
+     */
+    const Polygons& getCollisionHolefree(coord_t radius, LayerIndex layer_idx, bool min_xy_dist) const;
 
     /*!
      * \brief Round \p radius upwards to either a multiple of m_radius_sample_resolution or a exponentially increasing value
@@ -321,14 +372,6 @@ private:
      * \param radius The radius of the node of interest
      */
     coord_t ceilRadius(coord_t radius) const;
-
-    /*!
-     * \brief Extracts the relevant outline from a mesh
-     * \param[in] mesh The mesh which outline will be extracted
-     * \param layer_idx The layer which should be extracted from the mesh
-     * \return Polygons object representing the outline
-     */
-//    Polygons extractOutlineFromMesh(const PrintObject &print_object, LayerIndex layer_idx) const;
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer.
@@ -450,15 +493,6 @@ private:
     }
 
     /*!
-     * \brief Get the highest already calculated layer in the cache.
-     * \param radius The radius for which the highest already calculated layer has to be found.
-     * \param map The cache in which the lookup is performed.
-     *
-     * \return A wrapped optional reference of the requested area (if it was found, an empty optional if nothing was found)
-     */
-    LayerIndex getMaxCalculatedLayer(coord_t radius, const RadiusLayerPolygonCache& map) const;
-
-    /*!
      * \brief The maximum distance that the center point of a tree branch may move in consecutive layers if it has to avoid the model.
      */
     coord_t m_max_move;
@@ -531,58 +565,39 @@ private:
      */
     coord_t m_radius_0;
 
-
     /*!
      * \brief Caches for the collision, avoidance and areas on the model where support can be placed safely
      * at given radius and layer indices.
      */
-    RadiusLayerPolygonCache m_collision_cache;
-    std::unique_ptr<std::mutex> m_critical_collision_cache { std::make_unique<std::mutex>() };
-
-    RadiusLayerPolygonCache m_collision_cache_holefree;
-    std::unique_ptr<std::mutex> m_critical_collision_cache_holefree { std::make_unique<std::mutex>() };
-
-    RadiusLayerPolygonCache m_avoidance_cache;
-    std::unique_ptr<std::mutex> m_critical_avoidance_cache { std::make_unique<std::mutex>() };
-
-    RadiusLayerPolygonCache m_avoidance_cache_slow;
-    std::unique_ptr<std::mutex> m_critical_avoidance_cache_slow { std::make_unique<std::mutex>() };
-
-    RadiusLayerPolygonCache m_avoidance_cache_to_model;
-    std::unique_ptr<std::mutex> m_critical_avoidance_cache_to_model { std::make_unique<std::mutex>() };
-
-    RadiusLayerPolygonCache m_avoidance_cache_to_model_slow;
-    std::unique_ptr<std::mutex> m_critical_avoidance_cache_to_model_slow { std::make_unique<std::mutex>() };
-
-    RadiusLayerPolygonCache m_placeable_areas_cache;
-    std::unique_ptr<std::mutex> m_critical_placeable_areas_cache { std::make_unique<std::mutex>() };
+    RadiusLayerPolygonCache     m_collision_cache;
+    RadiusLayerPolygonCache     m_collision_cache_holefree;
+    RadiusLayerPolygonCache     m_avoidance_cache;
+    RadiusLayerPolygonCache     m_avoidance_cache_slow;
+    RadiusLayerPolygonCache     m_avoidance_cache_to_model;
+    RadiusLayerPolygonCache     m_avoidance_cache_to_model_slow;
+    RadiusLayerPolygonCache     m_placeable_areas_cache;
 
     /*!
      * \brief Caches to avoid holes smaller than the radius until which the radius is always increased, as they are free of holes. 
      * Also called safe avoidances, as they are safe regarding not running into holes.
      */
-    RadiusLayerPolygonCache m_avoidance_cache_hole;
-    std::unique_ptr<std::mutex> m_critical_avoidance_cache_holefree { std::make_unique<std::mutex>() };
-
-    RadiusLayerPolygonCache m_avoidance_cache_hole_to_model;
-    std::unique_ptr<std::mutex> m_critical_avoidance_cache_holefree_to_model { std::make_unique<std::mutex>() };
+    RadiusLayerPolygonCache m_avoidance_cache_holefree;
+    RadiusLayerPolygonCache m_avoidance_cache_holefree_to_model;
 
     /*!
      * \brief Caches to represent walls not allowed to be passed over.
      */
     RadiusLayerPolygonCache m_wall_restrictions_cache;
-    std::unique_ptr<std::mutex> m_critical_wall_restrictions_cache { std::make_unique<std::mutex>() };
 
     // A different cache for min_xy_dist as the maximal safe distance an influence area can be increased(guaranteed overlap of two walls in consecutive layer) 
     // is much smaller when min_xy_dist is used. This causes the area of the wall restriction to be thinner and as such just using the min_xy_dist wall 
     // restriction would be slower.    
     RadiusLayerPolygonCache m_wall_restrictions_cache_min;
-    std::unique_ptr<std::mutex> m_critical_wall_restrictions_cache_min = std::make_unique<std::mutex>();
 
+#ifdef SLIC3R_TREESUPPORTS_PROGRESS
     std::unique_ptr<std::mutex> m_critical_progress { std::make_unique<std::mutex>() };
+#endif // SLIC3R_TREESUPPORTS_PROGRESS
 };
-
-Polygons safeOffset(const Polygons& me, coord_t distance, ClipperLib::JoinType jt, coord_t max_safe_step_distance, const Polygons& collision);
 
 }
 

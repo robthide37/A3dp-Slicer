@@ -16,6 +16,7 @@
 #include "Point.hpp"
 #include "Print.hpp"
 #include "PrintConfig.hpp"
+#include "Utils.hpp"
 
 #include <boost/log/trivial.hpp>
 
@@ -282,21 +283,9 @@ void TreeModelVolumes::precalculate(coord_t max_layer)
     BOOST_LOG_TRIVIAL(info) << "Precalculating collision took" << dur_col << " ms. Precalculating avoidance took " << dur_avo << " ms.";
 }
 
-/*!
- * \brief Checks a cache for a given RadiusLayerPair and returns it if it is found
- * \param key RadiusLayerPair of the requested areas. The radius will be calculated up to the provided layer.
- * \return A wrapped optional reference of the requested area (if it was found, an empty optional if nothing was found)
- */
-std::optional<std::reference_wrapper<const Polygons>> getArea(const TreeModelVolumes::RadiusLayerPolygonCache& cache, const TreeModelVolumes::RadiusLayerPair& key)
-{
-    const auto it = cache.find(key);
-    return it == cache.end() ? std::optional<std::reference_wrapper<const Polygons>>{} : std::optional<std::reference_wrapper<const Polygons>>{ it->second };
-}
-
 const Polygons& TreeModelVolumes::getCollision(coord_t radius, LayerIndex layer_idx, bool min_xy_dist) const
 {
     coord_t orig_radius = radius;
-    std::optional<std::reference_wrapper<const Polygons>> result;
     if (!min_xy_dist)
         radius += m_current_min_xy_dist_delta;
 
@@ -304,11 +293,7 @@ const Polygons& TreeModelVolumes::getCollision(coord_t radius, LayerIndex layer_
     if (orig_radius != 0)
         radius = ceilRadius(radius);
     RadiusLayerPair key{ radius, layer_idx };
-
-    {
-        std::lock_guard<std::mutex> critical_section_support_max_layer_nr(*m_critical_avoidance_cache);
-        result = getArea(m_collision_cache, key);
-    }
+    std::optional<std::reference_wrapper<const Polygons>> result = m_collision_cache.getArea(key);
     if (result)
         return result.value().get();
     if (m_precalculated) {
@@ -322,18 +307,15 @@ const Polygons& TreeModelVolumes::getCollision(coord_t radius, LayerIndex layer_
 const Polygons& TreeModelVolumes::getCollisionHolefree(coord_t radius, LayerIndex layer_idx, bool min_xy_dist) const
 {
     coord_t orig_radius = radius;
-    std::optional<std::reference_wrapper<const Polygons>> result;
     if (!min_xy_dist)
         radius += m_current_min_xy_dist_delta;
     if (radius >= m_increase_until_radius + m_current_min_xy_dist_delta)
         return getCollision(orig_radius, layer_idx, min_xy_dist);
 
+    // not needed as the radius should already be adjusted.
+    // radius = ceilRadius(radius);
     RadiusLayerPair key{ radius, layer_idx };
-
-    {
-        std::lock_guard<std::mutex> critical_section_support_max_layer_nr(*m_critical_collision_cache_holefree);
-        result = getArea(m_collision_cache_holefree, key);
-    }
+    std::optional<std::reference_wrapper<const Polygons>> result = m_collision_cache_holefree.getArea(key);
     if (result)
         return result.value().get();
     if (m_precalculated) {
@@ -351,61 +333,44 @@ const Polygons& TreeModelVolumes::getAvoidance(coord_t radius, LayerIndex layer_
 
     coord_t orig_radius = radius;
 
-    std::optional<std::reference_wrapper<const Polygons>> result;
-
     if (!min_xy_dist)
         radius += m_current_min_xy_dist_delta;
     radius = ceilRadius(radius);
 
-    if (radius >= m_increase_until_radius + m_current_min_xy_dist_delta && type == AvoidanceType::FAST_SAFE) // no holes anymore by definition at this request
-        type = AvoidanceType::FAST;
+    if (radius >= m_increase_until_radius + m_current_min_xy_dist_delta && type == AvoidanceType::FastSafe) // no holes anymore by definition at this request
+        type = AvoidanceType::Fast;
 
     const RadiusLayerPair key{ radius, layer_idx };
 
-    const RadiusLayerPolygonCache* cache_ptr = nullptr;
-    std::mutex* mutex_ptr;
-    if (!to_model && type == AvoidanceType::FAST) {
+    const RadiusLayerPolygonCache *cache_ptr = nullptr;
+    if (!to_model && type == AvoidanceType::Fast) {
         cache_ptr = &m_avoidance_cache;
-        mutex_ptr = m_critical_avoidance_cache.get();
-    } else if (!to_model && type == AvoidanceType::SLOW) {
+    } else if (!to_model && type == AvoidanceType::Slow) {
         cache_ptr = &m_avoidance_cache_slow;
-        mutex_ptr = m_critical_avoidance_cache_slow.get();
-    } else if (!to_model && type == AvoidanceType::FAST_SAFE) {
-        cache_ptr = &m_avoidance_cache_hole;
-        mutex_ptr = m_critical_avoidance_cache_holefree.get();
-    } else if (to_model && type == AvoidanceType::FAST) {
+    } else if (!to_model && type == AvoidanceType::FastSafe) {
+        cache_ptr = &m_avoidance_cache_holefree;
+    } else if (to_model && type == AvoidanceType::Fast) {
         cache_ptr = &m_avoidance_cache_to_model;
-        mutex_ptr = m_critical_avoidance_cache_to_model.get();
-    } else if (to_model && type == AvoidanceType::SLOW) {
+    } else if (to_model && type == AvoidanceType::Slow) {
         cache_ptr = &m_avoidance_cache_to_model_slow;
-        mutex_ptr = m_critical_avoidance_cache_to_model_slow.get();
-    } else if (to_model && type == AvoidanceType::FAST_SAFE) {
-        cache_ptr = &m_avoidance_cache_hole_to_model;
-        mutex_ptr = m_critical_avoidance_cache_holefree_to_model.get();
+    } else if (to_model && type == AvoidanceType::FastSafe) {
+        cache_ptr = &m_avoidance_cache_holefree_to_model;
     } else {
         BOOST_LOG_TRIVIAL(error) << "Invalid Avoidance Request";
         TreeSupport::showError("Invalid Avoidance Request.\n", true);
     }
 
+    std::optional<std::reference_wrapper<const Polygons>> result = cache_ptr->getArea(key);
+    if (result)
+        return result.value().get();
+
     if (to_model) {
-        {
-            std::lock_guard<std::mutex> critical_section(*mutex_ptr);
-            result = getArea(*cache_ptr, key);
-        }
-        if (result)
-            return result.value().get();
         if (m_precalculated) {
             BOOST_LOG_TRIVIAL(warning) << "Had to calculate Avoidance to model at radius " << key.first << " and layer " << key.second << ", but precalculate was called. Performance may suffer!";
             TreeSupport::showError("Not precalculated Avoidance(to model) requested.", false);
         }
         const_cast<TreeModelVolumes*>(this)->calculateAvoidanceToModel(key);
     } else {
-        {
-            std::lock_guard<std::mutex> critical_section(*mutex_ptr);
-            result = getArea(*cache_ptr, key);
-        }
-        if (result)
-            return result.value().get();
         if (m_precalculated) {
             BOOST_LOG_TRIVIAL(warning) << "Had to calculate Avoidance at radius " << key.first << " and layer " << key.second << ", but precalculate was called. Performance may suffer!";
             TreeSupport::showError("Not precalculated Avoidance(to buildplate) requested.", false);
@@ -415,118 +380,45 @@ const Polygons& TreeModelVolumes::getAvoidance(coord_t radius, LayerIndex layer_
     return getAvoidance(orig_radius, layer_idx, type, to_model, min_xy_dist); // retrive failed and correct result was calculated. Now it has to be retrived.
 }
 
-const Polygons& TreeModelVolumes::getPlaceableAreas(coord_t radius, LayerIndex layer_idx) const
+const Polygons& TreeModelVolumes::getPlaceableAreas(coord_t orig_radius, LayerIndex layer_idx) const
 {
-    std::optional<std::reference_wrapper<const Polygons>> result;
-    const coord_t orig_radius = radius;
-    radius = ceilRadius(radius);
-    RadiusLayerPair key{ radius, layer_idx };
-
-    {
-        std::lock_guard<std::mutex> critical_section(*m_critical_placeable_areas_cache);
-        result = getArea(m_placeable_areas_cache, key);
-    }
+    const coord_t radius = ceilRadius(orig_radius);
+    std::optional<std::reference_wrapper<const Polygons>> result = m_placeable_areas_cache.getArea({ radius, layer_idx });
     if (result)
         return result.value().get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(warning) << "Had to calculate Placeable Areas at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
         TreeSupport::showError("Not precalculated Placeable areas requested.", false);
     }
-    if (radius != 0)
-        const_cast<TreeModelVolumes*>(this)->calculatePlaceables(key);
+    if (orig_radius > 0)
+        const_cast<TreeModelVolumes*>(this)->calculatePlaceables({ radius, layer_idx });
     else
         getCollision(0, layer_idx, true);
     return getPlaceableAreas(orig_radius, layer_idx);
 }
 
-const Polygons& TreeModelVolumes::getWallRestriction(coord_t radius, LayerIndex layer_idx, bool min_xy_dist) const
+const Polygons& TreeModelVolumes::getWallRestriction(coord_t orig_radius, LayerIndex layer_idx, bool min_xy_dist) const
 {
     if (layer_idx == 0) // Should never be requested as there will be no going below layer 0 ..., but just to be sure some semi-sane catch. Alternative would be empty Polygon.
-        return getCollision(radius, layer_idx, min_xy_dist);
+        return getCollision(orig_radius, layer_idx, min_xy_dist);
 
-    coord_t orig_radius = radius;
     min_xy_dist = min_xy_dist && m_current_min_xy_dist_delta > 0;
 
-    std::optional<std::reference_wrapper<const Polygons>> result;
-
-    radius = ceilRadius(radius);
-    const RadiusLayerPair key{ radius, layer_idx };
-
-    const RadiusLayerPolygonCache* cache_ptr = min_xy_dist ? &m_wall_restrictions_cache_min : &m_wall_restrictions_cache;
-
-    if (min_xy_dist) {
-        {
-            std::lock_guard<std::mutex> critical_section(*m_critical_wall_restrictions_cache_min);
-            result = getArea(*cache_ptr, key);
-        }
-        if (result)
-            return result.value().get();
-        if (m_precalculated) {
-            BOOST_LOG_TRIVIAL(warning) << "Had to calculate Wall restricions at radius " << key.first << " and layer " << key.second << ", but precalculate was called. Performance may suffer!";
-            TreeSupport::showError("Not precalculated Wall restriction of minimum xy distance requested ).", false);
-        }
-    } else {
-        {
-            std::lock_guard<std::mutex> critical_section(*m_critical_wall_restrictions_cache);
-            result = getArea(*cache_ptr, key);
-        }
-        if (result)
-            return result.value().get();
-        if (m_precalculated) {
-            BOOST_LOG_TRIVIAL(warning) << "Had to calculate Wall restricions at radius " << key.first << " and layer " << key.second << ", but precalculate was called. Performance may suffer!";
-            TreeSupport::showError("Not precalculated Wall restriction requested ).", false);
-        }
+    coord_t radius = ceilRadius(orig_radius);
+    std::optional<std::reference_wrapper<const Polygons>> result = 
+        (min_xy_dist ? m_wall_restrictions_cache_min : m_wall_restrictions_cache).getArea({ radius, layer_idx });
+    if (result)
+        return result.value().get();
+    if (m_precalculated) {
+        BOOST_LOG_TRIVIAL(warning) << "Had to calculate Wall restricions at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
+        TreeSupport::showError(
+            min_xy_dist ? 
+                "Not precalculated Wall restriction of minimum xy distance requested )." :
+                "Not precalculated Wall restriction requested )."
+            , false);
     }
-    const_cast<TreeModelVolumes*>(this)->calculateWallRestrictions(key);
+    const_cast<TreeModelVolumes*>(this)->calculateWallRestrictions({ radius, layer_idx });
     return getWallRestriction(orig_radius, layer_idx, min_xy_dist); // Retrieve failed and correct result was calculated. Now it has to be retrieved.
-}
-
-coord_t TreeModelVolumes::ceilRadius(coord_t radius, bool min_xy_dist) const
-{
-    if (! min_xy_dist)
-        radius += m_current_min_xy_dist_delta;
-    return ceilRadius(radius);
-}
-
-coord_t TreeModelVolumes::getRadiusNextCeil(coord_t radius, bool min_xy_dist) const
-{
-    coord_t ceiled_radius = ceilRadius(radius, min_xy_dist);
-    if (! min_xy_dist)
-        ceiled_radius -= m_current_min_xy_dist_delta;
-    return ceiled_radius;
-}
-
-#if 0
-Polygons TreeModelVolumes::extractOutlineFromMesh(const PrintObject &print_object, LayerIndex layer_idx) const
-{
-    constexpr bool external_polys_only = false;
-    Polygons total;
-
-    // similar to SliceDataStorage.getLayerOutlines but only for one mesh instead of for everyone
-
-    if (mesh.settings.get<bool>("infill_mesh") || mesh.settings.get<bool>("anti_overhang_mesh"))
-        return Polygons();
-
-    const SliceLayer& layer = mesh.layers[layer_idx];
-
-    layer.getOutlines(total, external_polys_only);
-    if (mesh.settings.get<ESurfaceMode>("magic_mesh_surface_mode") != ESurfaceMode::NORMAL)
-        total = union_(total, layer.openPolyLines.offsetPolyLine(100));
-    coord_t resolution = mesh.settings.get<coord_t>("resolution");
-    return simplify(total, resolution);
-}
-#endif
-
-LayerIndex TreeModelVolumes::getMaxCalculatedLayer(coord_t radius, const RadiusLayerPolygonCache& map) const
-{
-    int max_layer = -1;
-    // the placeable on model areas do not exist on layer 0, as there can not be model below it. As such it may be possible that layer 1 is available, but layer 0 does not exist.
-    const RadiusLayerPair key_layer_1(radius, 1);
-    if (getArea(map, key_layer_1))
-        max_layer = 1;
-    while (map.count(RadiusLayerPair(radius, max_layer + 1)))
-        ++ max_layer;
-    return max_layer;
 }
 
 void TreeModelVolumes::calculateCollision(std::deque<RadiusLayerPair> keys)
@@ -537,11 +429,11 @@ void TreeModelVolumes::calculateCollision(std::deque<RadiusLayerPair> keys)
             const coord_t radius    = keys[i].first;
             const size_t  layer_idx = keys[i].second;
             RadiusLayerPair key(radius, 0);
-            RadiusLayerPolygonCache data_outer;
-            RadiusLayerPolygonCache data_placeable_outer;
+            RadiusLayerPolygonCacheData data_outer;
+            RadiusLayerPolygonCacheData data_placeable_outer;
             for (size_t outline_idx = 0; outline_idx < m_layer_outlines.size(); ++outline_idx) {
-                RadiusLayerPolygonCache data;
-                RadiusLayerPolygonCache data_placeable;
+                RadiusLayerPolygonCacheData data;
+                RadiusLayerPolygonCacheData data_placeable;
 
                 const coord_t layer_height = m_layer_outlines[outline_idx].first.layer_height;
                 const bool support_rests_on_this_model = ! m_layer_outlines[outline_idx].first.support_material_buildplate_only;
@@ -554,12 +446,7 @@ void TreeModelVolumes::calculateCollision(std::deque<RadiusLayerPair> keys)
                 // avoiding this would require saving each collision for each outline_idx separately.
                 // and later for each avoidance... But avoidance calculation has to be for the whole scene and can NOT be done for each outline_idx separately and combined later.
                 // so avoiding this inaccuracy seems infeasible as it would require 2x the avoidance calculations => 0.5x the performance.
-                coord_t min_layer_bottom;
-                {
-                    std::lock_guard<std::mutex> critical_section(*m_critical_collision_cache);
-                    min_layer_bottom = getMaxCalculatedLayer(radius, m_collision_cache) - int(z_distance_bottom_layers);
-                }
-
+                coord_t min_layer_bottom = m_collision_cache.getMaxCalculatedLayer(radius) - int(z_distance_bottom_layers);
                 if (min_layer_bottom < 0)
                     min_layer_bottom = 0;
                 //FIXME parallel_for
@@ -623,14 +510,9 @@ void TreeModelVolumes::calculateCollision(std::deque<RadiusLayerPair> keys)
             }
 #endif
 
-            {
-                std::lock_guard<std::mutex> critical_section(*m_critical_collision_cache);
-                m_collision_cache.insert(data_outer.begin(), data_outer.end());
-            }
-            if (radius == 0) {
-                std::lock_guard<std::mutex> critical_section(*m_critical_placeable_areas_cache);
-                m_placeable_areas_cache.insert(data_placeable_outer.begin(), data_placeable_outer.end());
-            }
+            m_collision_cache.insert(std::move(data_outer));
+            if (radius == 0)
+                m_placeable_areas_cache.insert(std::move(data_placeable_outer));
         }
     });
 }
@@ -644,7 +526,7 @@ void TreeModelVolumes::calculateCollisionHolefree(std::deque<RadiusLayerPair> ke
     tbb::parallel_for(tbb::blocked_range<size_t>(0, max_layer + 1),
         [&](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
-            RadiusLayerPolygonCache data;
+            RadiusLayerPolygonCacheData data;
             for (RadiusLayerPair key : keys) {
                 // Logically increase the collision by m_increase_until_radius
                 coord_t radius = key.first;
@@ -654,8 +536,7 @@ void TreeModelVolumes::calculateCollisionHolefree(std::deque<RadiusLayerPair> ke
                 data[RadiusLayerPair(radius, layer_idx)] = col;
             }
 
-            std::lock_guard<std::mutex> critical_section(*m_critical_collision_cache_holefree);
-            m_collision_cache_holefree.insert(data.begin(), data.end());
+            m_collision_cache_holefree.insert(std::move(data));
         }
     });
 }
@@ -663,7 +544,7 @@ void TreeModelVolumes::calculateCollisionHolefree(std::deque<RadiusLayerPair> ke
 void TreeModelVolumes::calculateAvoidance(std::deque<RadiusLayerPair> keys)
 {
     // For every RadiusLayer pair there are 3 avoidances that have to be calculate, calculated in the same paralell_for loop for better paralellisation.
-    const std::vector<AvoidanceType> all_types = { AvoidanceType::SLOW, AvoidanceType::FAST_SAFE, AvoidanceType::FAST };
+    const std::vector<AvoidanceType> all_types = { AvoidanceType::Slow, AvoidanceType::FastSafe, AvoidanceType::Fast };
     tbb::parallel_for(tbb::blocked_range<size_t>(0, keys.size() * 3),
         [&, keys, all_types](const tbb::blocked_range<size_t> &range) {
         for (size_t iter_idx = range.begin(); iter_idx < range.end(); ++ iter_idx) {
@@ -671,8 +552,8 @@ void TreeModelVolumes::calculateAvoidance(std::deque<RadiusLayerPair> keys)
             {
                 size_t type_idx = iter_idx % all_types.size();
                 AvoidanceType type = all_types[type_idx];
-                const bool slow = type == AvoidanceType::SLOW;
-                const bool holefree = type == AvoidanceType::FAST_SAFE;
+                const bool slow = type == AvoidanceType::Slow;
+                const bool holefree = type == AvoidanceType::FastSafe;
 
                 coord_t radius = keys[key_idx].first;
                 LayerIndex max_required_layer = keys[key_idx].second;
@@ -683,11 +564,7 @@ void TreeModelVolumes::calculateAvoidance(std::deque<RadiusLayerPair> keys)
 
                 const coord_t offset_speed = slow ? m_max_move_slow : m_max_move;
                 RadiusLayerPair key(radius, 0);
-                LayerIndex start_layer;
-                {
-                    std::lock_guard<std::mutex> critical_section(*(slow ? m_critical_avoidance_cache_slow : holefree ? m_critical_avoidance_cache_holefree : m_critical_avoidance_cache));
-                    start_layer = 1 + getMaxCalculatedLayer(radius, slow ? m_avoidance_cache_slow : holefree ? m_avoidance_cache_hole : m_avoidance_cache);
-                }
+                LayerIndex start_layer = 1 + (slow ? m_avoidance_cache_slow : holefree ? m_avoidance_cache_holefree : m_avoidance_cache).getMaxCalculatedLayer(radius);
                 if (start_layer > max_required_layer) {
                     BOOST_LOG_TRIVIAL(debug) << "Requested calculation for value already calculated ?";
                     continue;
@@ -718,10 +595,7 @@ void TreeModelVolumes::calculateAvoidance(std::deque<RadiusLayerPair> keys)
                 }
 #endif
 
-                {
-                    std::lock_guard<std::mutex> critical_section(*(slow ? m_critical_avoidance_cache_slow : holefree ? m_critical_avoidance_cache_holefree : m_critical_avoidance_cache));
-                    (slow ? m_avoidance_cache_slow : holefree ? m_avoidance_cache_hole : m_avoidance_cache).insert(data.begin(), data.end());
-                }
+                (slow ? m_avoidance_cache_slow : holefree ? m_avoidance_cache_holefree : m_avoidance_cache).insert(std::move(data));
             }
         }
     });
@@ -737,11 +611,7 @@ void TreeModelVolumes::calculatePlaceables(std::deque<RadiusLayerPair> keys)
             std::vector<std::pair<RadiusLayerPair, Polygons>> data(max_required_layer + 1, std::pair<RadiusLayerPair, Polygons>(RadiusLayerPair(radius, -1), Polygons()));
             RadiusLayerPair key(radius, 0);
 
-            LayerIndex start_layer;
-            {
-                std::lock_guard<std::mutex> critical_section(*m_critical_placeable_areas_cache);
-                start_layer = 1 + getMaxCalculatedLayer(radius, m_placeable_areas_cache);
-            }
+            LayerIndex start_layer = 1 + m_placeable_areas_cache.getMaxCalculatedLayer(radius);
             if (start_layer > max_required_layer) {
                 BOOST_LOG_TRIVIAL(debug) << "Requested calculation for value already calculated ?";
                 continue;
@@ -770,10 +640,7 @@ void TreeModelVolumes::calculatePlaceables(std::deque<RadiusLayerPair> keys)
             }
 #endif
 
-            {
-                std::lock_guard<std::mutex> critical_section(*m_critical_placeable_areas_cache);
-                m_placeable_areas_cache.insert(data.begin(), data.end());
-            }
+            m_placeable_areas_cache.insert(std::move(data));
         }
     });
 }
@@ -781,15 +648,15 @@ void TreeModelVolumes::calculatePlaceables(std::deque<RadiusLayerPair> keys)
 void TreeModelVolumes::calculateAvoidanceToModel(std::deque<RadiusLayerPair> keys)
 {
     // For every RadiusLayer pair there are 3 avoidances that have to be calculated, calculated in the same parallel_for loop for better parallelization.
-    const std::vector<AvoidanceType> all_types = { AvoidanceType::SLOW, AvoidanceType::FAST_SAFE, AvoidanceType::FAST };
+    const std::vector<AvoidanceType> all_types = { AvoidanceType::Slow, AvoidanceType::FastSafe, AvoidanceType::Fast };
     tbb::parallel_for(tbb::blocked_range<size_t>(0, keys.size() * 3),
         [&, keys, all_types](const tbb::blocked_range<size_t> &range) {
         for (size_t iter_idx = range.begin(); iter_idx < range.end(); ++ iter_idx) {
             size_t key_idx = iter_idx / 3;
             size_t type_idx = iter_idx % all_types.size();
             AvoidanceType type = all_types[type_idx];
-            bool slow = type == AvoidanceType::SLOW;
-            bool holefree = type == AvoidanceType::FAST_SAFE;
+            bool slow = type == AvoidanceType::Slow;
+            bool holefree = type == AvoidanceType::FastSafe;
             coord_t radius = keys[key_idx].first;
             LayerIndex max_required_layer = keys[key_idx].second;
 
@@ -802,12 +669,7 @@ void TreeModelVolumes::calculateAvoidanceToModel(std::deque<RadiusLayerPair> key
             std::vector<std::pair<RadiusLayerPair, Polygons>> data(max_required_layer + 1, std::pair<RadiusLayerPair, Polygons>(RadiusLayerPair(radius, -1), Polygons()));
             RadiusLayerPair key(radius, 0);
 
-            LayerIndex start_layer;
-
-            {
-                std::lock_guard<std::mutex> critical_section(*(slow ? m_critical_avoidance_cache_to_model_slow : holefree ? m_critical_avoidance_cache_holefree_to_model : m_critical_avoidance_cache_to_model));
-                start_layer = 1 + getMaxCalculatedLayer(radius, slow ? m_avoidance_cache_to_model_slow : holefree ? m_avoidance_cache_hole_to_model : m_avoidance_cache_to_model);
-            }
+            LayerIndex start_layer = 1 + (slow ? m_avoidance_cache_to_model_slow : holefree ? m_avoidance_cache_holefree_to_model : m_avoidance_cache_to_model).getMaxCalculatedLayer(radius);
             if (start_layer > max_required_layer) {
                 BOOST_LOG_TRIVIAL(debug) << "Requested calculation for value already calculated ?";
                 continue;
@@ -836,14 +698,10 @@ void TreeModelVolumes::calculateAvoidanceToModel(std::deque<RadiusLayerPair> key
             }
 #endif
 
-            {
-                std::lock_guard<std::mutex> critical_section(*(slow ? m_critical_avoidance_cache_to_model_slow : holefree ? m_critical_avoidance_cache_holefree_to_model : m_critical_avoidance_cache_to_model));
-                (slow ? m_avoidance_cache_to_model_slow : holefree ? m_avoidance_cache_hole_to_model : m_avoidance_cache_to_model).insert(data.begin(), data.end());
-            }
+            (slow ? m_avoidance_cache_to_model_slow : holefree ? m_avoidance_cache_holefree_to_model : m_avoidance_cache_to_model).insert(std::move(data));
         }
     });
 }
-
 
 void TreeModelVolumes::calculateWallRestrictions(std::deque<RadiusLayerPair> keys)
 {
@@ -886,15 +744,9 @@ void TreeModelVolumes::calculateWallRestrictions(std::deque<RadiusLayerPair> key
         for (size_t key_idx = range.begin(); key_idx < range.end(); ++ key_idx) {
             coord_t radius = keys[key_idx].first;
             RadiusLayerPair key(radius, 0);
-            coord_t min_layer_bottom;
-            RadiusLayerPolygonCache data;
-            RadiusLayerPolygonCache data_min;
-
-            {
-                std::lock_guard<std::mutex> critical_section(*m_critical_wall_restrictions_cache);
-                min_layer_bottom = getMaxCalculatedLayer(radius, m_wall_restrictions_cache);
-            }
-
+            RadiusLayerPolygonCacheData data;
+            RadiusLayerPolygonCacheData data_min;
+            coord_t min_layer_bottom = m_wall_restrictions_cache.getMaxCalculatedLayer(radius);
             if (min_layer_bottom < 1)
                 min_layer_bottom = 1;
 
@@ -904,21 +756,14 @@ void TreeModelVolumes::calculateWallRestrictions(std::deque<RadiusLayerPair> key
                 Polygons wall_restriction = intersection(getCollision(0, layer_idx, false), getCollision(radius, layer_idx_below, true)); // radius contains m_current_min_xy_dist_delta already if required
                 wall_restriction = polygons_simplify(wall_restriction, m_min_resolution);
                 data.emplace(key, wall_restriction);
-                if (m_current_min_xy_dist_delta > 0)
-                {
+                if (m_current_min_xy_dist_delta > 0) {
                     Polygons wall_restriction_min = intersection(getCollision(0, layer_idx, true), getCollision(radius, layer_idx_below, true));
                     wall_restriction = polygons_simplify(wall_restriction_min, m_min_resolution);
                     data_min.emplace(key, wall_restriction_min);
                 }
             }
-            {
-                std::lock_guard<std::mutex> critical_section(*m_critical_wall_restrictions_cache);
-                m_wall_restrictions_cache.insert(data.begin(), data.end());
-            }
-            {
-                std::lock_guard<std::mutex> critical_section(*m_critical_wall_restrictions_cache_min);
-                m_wall_restrictions_cache_min.insert(data_min.begin(), data_min.end());
-            }
+            m_wall_restrictions_cache.insert(std::move(data));
+            m_wall_restrictions_cache_min.insert(std::move(data_min));
         }
     });
 }
