@@ -461,6 +461,7 @@ if (APPLE)
     # This flag prevents the need for minimum SDK version 10.14
     # currently, PS targets v10.12
     target_compile_options(libslic3r PUBLIC "-fno-aligned-allocation")
+    target_compile_options(libslic3r_cgal PUBLIC "-fno-aligned-allocation")
 endif ()
 
 if (SLIC3R_PCH AND NOT SLIC3R_SYNTAXONLY)
