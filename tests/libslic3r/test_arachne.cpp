@@ -109,9 +109,10 @@ TEST_CASE("Arachne - #8593 - Missing a part of the extrusion", "[ArachneMissingP
     coord_t  inset_count = 3;
 
     PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
-    print_object_config.min_bead_width.set(new ConfigOptionFloatOrPercent(0.315, false));
-    print_object_config.wall_transition_angle.set(new ConfigOptionFloat(40.));
-    print_object_config.wall_transition_length.set(new ConfigOptionFloatOrPercent(1., false));
+    print_object_config.min_bead_width         = ConfigOptionFloatOrPercent(0.315, false);
+    print_object_config.wall_transition_angle  = ConfigOptionFloat(40.);
+    print_object_config.wall_transition_length = ConfigOptionFloatOrPercent(1., false);
+
 
     // This behavior seems to be related to the rotation of the input polygon.
     // There are specific angles in which this behavior is always triggered.
@@ -155,7 +156,7 @@ TEST_CASE("Arachne - #8573 - A gap in the perimeter - 1", "[ArachneGapInPerimete
     coord_t  inset_count = 2;
 
     PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
-//    print_object_config.wall_transition_angle.set(new ConfigOptionFloat(20.));
+//    print_object_config.wall_transition_angle = ConfigOptionFloat(20.);
 
     Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, print_object_config, PrintConfig::defaults());
     wallToolPaths.generate();
@@ -198,7 +199,7 @@ TEST_CASE("Arachne - #8444 - A gap in the perimeter - 2", "[ArachneGapInPerimete
     coord_t  inset_count = 2;
 
     PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
-    //    print_object_config.wall_transition_angle.set(new ConfigOptionFloat(20.));
+    //    print_object_config.wall_transition_angle = ConfigOptionFloat(20.);
 
     Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.4, print_object_config, PrintConfig::defaults());
     wallToolPaths.generate();
@@ -237,10 +238,10 @@ TEST_CASE("Arachne - #8528 - A hole when number of perimeters is changing", "[Ar
     coord_t  inset_count = 5;
 
     PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
-    print_object_config.min_bead_width.set(new ConfigOptionFloatOrPercent(0.68, false));
+    print_object_config.min_bead_width = ConfigOptionFloatOrPercent(0.68, false);
 
     // Changing min_bead_width to 0.66 seems that resolve this issue, at least in this case.
-    print_object_config.min_bead_width.set(new ConfigOptionFloatOrPercent(0.66, false));
+    print_object_config.min_bead_width = ConfigOptionFloatOrPercent(0.66, false);
 
     Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.4, print_object_config, PrintConfig::defaults());
     wallToolPaths.generate();
@@ -363,9 +364,9 @@ TEST_CASE("Arachne - #8633 - Shorter open perimeter", "[ArachneShorterOpenPerime
     coord_t  inset_count = 1;
 
     PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
-    print_object_config.min_bead_width.set(new ConfigOptionFloatOrPercent(0.51, false));
-    print_object_config.min_feature_size.set(new ConfigOptionFloatOrPercent(0.15, false));
-    print_object_config.wall_transition_length.set(new ConfigOptionFloatOrPercent(0.6, false));
+    print_object_config.min_bead_width         = ConfigOptionFloatOrPercent(0.51, false);
+    print_object_config.min_feature_size       = ConfigOptionFloatOrPercent(0.15, false);
+    print_object_config.wall_transition_length = ConfigOptionFloatOrPercent(0.6, false);
 
     for (size_t poly_idx = 0; poly_idx < polygons.size(); ++poly_idx) {
         Polygons input_polygons{polygons[poly_idx]};
