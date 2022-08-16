@@ -61,7 +61,7 @@ void EmbossStyleManager::init(AppConfig *app_config, const EmbossStyles &default
                 m_style_items.push_back({std::move(style)});
             }
             // try to load first default font
-            bool loaded = load_style(activ_index);
+            [[maybe_unused]] bool loaded = load_style(activ_index);
             assert(loaded);
         }
     }

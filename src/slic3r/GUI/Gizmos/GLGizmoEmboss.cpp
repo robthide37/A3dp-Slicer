@@ -1449,8 +1449,6 @@ void GLGizmoEmboss::draw_model_type()
             if (is_volume_move_inside || is_volume_move_outside) process();
         }
 
-        ObjectID volume_id = m_volume->id();
-
         // inspiration in ObjectList::change_part_type()
         // how to view correct side panel with objects
         ObjectList *obj_list = app.obj_list();
