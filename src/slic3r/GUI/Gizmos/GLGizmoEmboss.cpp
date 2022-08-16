@@ -2587,9 +2587,11 @@ bool GLGizmoEmboss::choose_svg_file()
 EmbossDataBase GLGizmoEmboss::create_emboss_data_base() {
     auto create_volume_name = [&]() {
         const size_t &max_len = m_gui_cfg->max_count_char_in_volume_name;
+        // m_text is UTF8 and can't be cutted in the middle of letter
+        std::wstring w_text = boost::nowide::widen(m_text);
         return _u8L("Text") + " - " +
-               ((m_text.size() > max_len) ?
-                    (m_text.substr(0, max_len - 3) + " ..") :
+               ((w_text.size() > max_len) ?
+                    (boost::nowide::narrow(w_text.substr(0, max_len - 3)) + " ..") :
                     m_text);
     };
     
