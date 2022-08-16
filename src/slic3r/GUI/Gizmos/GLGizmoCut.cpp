@@ -1117,7 +1117,8 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
     else if (m_hover_id >= m_connectors_group_id && m_connector_mode == CutConnectorMode::Manual)
     {
         std::pair<Vec3d, Vec3d> pos_and_normal;
-        if (!unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos_and_normal))
+        Vec3d pos_world;
+        if (!unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos_and_normal, pos_world))
             return;
         connectors[m_hover_id - m_connectors_group_id].pos    = pos_and_normal.first;
         update_raycasters_for_picking_transform();
@@ -1773,7 +1774,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
 // Unprojects the mouse position on the mesh and saves hit point and normal of the facet into pos_and_normal
 // Return false if no intersection was found, true otherwise.
-bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair<Vec3d, Vec3d>& pos_and_normal)
+bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair<Vec3d, Vec3d>& pos_and_normal, Vec3d& pos_world)
 {
     const float sla_shift = m_c->selection_info()->get_sla_shift();
 
@@ -1788,8 +1789,8 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair
         ++mesh_id;
         if (!mv->is_model_part())
             continue;
-        Vec3f hit;
         Vec3f normal;
+        Vec3f hit;
         bool clipping_plane_was_hit = false;
 
 //        const Transform3d volume_trafo = get_volume_transformation(mv);
@@ -1806,6 +1807,7 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair
 
             // Return both the point and the facet normal.
             pos_and_normal = std::make_pair(hit_d, normal.cast<double>());
+            pos_world = hit.cast<double>();
             return true;
         }
     }
@@ -1916,27 +1918,32 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
 
     CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;
 
-    if (action == SLAGizmoEventType::LeftDown && !shift_down && m_connectors_editing) {
+    if (action == SLAGizmoEventType::LeftDown && !shift_down) {
         // If there is no selection and no hovering, add new point
         if (m_hover_id == -1 && !control_down && !alt_down) {
             std::pair<Vec3d, Vec3d> pos_and_normal;
-            if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal)) {
+            Vec3d pos_world;
+            if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal, pos_world)) {
                 const Vec3d& hit = pos_and_normal.first;
-                // The clipping plane was clicked, hit containts coordinates of the hit in world coords.
-                //std::cout << hit.x() << "\t" << hit.y() << "\t" << hit.z() << std::endl;
-                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
 
-                connectors.emplace_back(hit, Geometry::Transformation(m_rotation_m).get_rotation(), 
-                                        float(m_connector_size * 0.5), float(m_connector_depth_ratio), 
-                                        float(0.01f * m_connector_size_tolerance), float(0.01f * m_connector_depth_ratio_tolerance),
-                                        CutConnectorAttributes( CutConnectorType(m_connector_type), 
-                                                                CutConnectorStyle(m_connector_style), 
-                                                                CutConnectorShape(m_connector_shape_id)));
-                std::fill(m_selected.begin(), m_selected.end(), false);
-                m_selected.push_back(true);
-                assert(m_selected.size() == connectors.size());
-                update_model_object();
-                m_parent.set_as_dirty();
+                if (m_connectors_editing) {
+
+                    Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
+
+                    connectors.emplace_back(hit, Geometry::Transformation(m_rotation_m).get_rotation(), 
+                                            float(m_connector_size * 0.5), float(m_connector_depth_ratio), 
+                                            float(0.01f * m_connector_size_tolerance), float(0.01f * m_connector_depth_ratio_tolerance),
+                                            CutConnectorAttributes( CutConnectorType(m_connector_type), 
+                                                                    CutConnectorStyle(m_connector_style), 
+                                                                    CutConnectorShape(m_connector_shape_id)));
+                    std::fill(m_selected.begin(), m_selected.end(), false);
+                    m_selected.push_back(true);
+                    assert(m_selected.size() == connectors.size());
+                    update_model_object();
+                    m_parent.set_as_dirty();
+                } else {
+                    m_c->object_clipper()->pass_mouse_click(pos_world);
+                }
 
                 return true;
             }

@@ -23,7 +23,7 @@ namespace GUI {
 void MeshClipper::set_behaviour(bool fill_cut, double contour_width)
 {
     if (fill_cut != m_fill_cut || contour_width != m_contour_width)
-        m_triangles_valid = false;
+        m_result.reset();
     m_fill_cut = fill_cut;
     m_contour_width = contour_width;
 }
@@ -34,7 +34,7 @@ void MeshClipper::set_plane(const ClippingPlane& plane)
 {
     if (m_plane != plane) {
         m_plane = plane;
-        m_triangles_valid = false;
+        m_result.reset();
     }
 }
 
@@ -43,7 +43,7 @@ void MeshClipper::set_limiting_plane(const ClippingPlane& plane)
 {
     if (m_limiting_plane != plane) {
         m_limiting_plane = plane;
-        m_triangles_valid = false;
+        m_result.reset();
     }
 }
 
@@ -53,7 +53,7 @@ void MeshClipper::set_mesh(const TriangleMesh& mesh)
 {
     if (m_mesh != &mesh) {
         m_mesh = &mesh;
-        m_triangles_valid = false;
+        m_result.reset();
     }
 }
 
@@ -61,7 +61,7 @@ void MeshClipper::set_negative_mesh(const TriangleMesh& mesh)
 {
     if (m_negative_mesh != &mesh) {
         m_negative_mesh = &mesh;
-        m_triangles_valid = false;
+        m_result.reset();
     }
 }
 
@@ -71,7 +71,7 @@ void MeshClipper::set_transformation(const Geometry::Transformation& trafo)
 {
     if (! m_trafo.get_matrix().isApprox(trafo.get_matrix())) {
         m_trafo = trafo;
-        m_triangles_valid = false;
+        m_result.reset();
     }
 }
 
@@ -81,12 +81,9 @@ void MeshClipper::render_cut(const ColorRGBA& color)
 void MeshClipper::render_cut()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
-    if (! m_triangles_valid)
+    if (! m_result)
         recalculate_triangles();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    if (m_model.vertices_count() == 0 || m_model.indices_count() == 0)
-        return;
-
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
@@ -97,8 +94,10 @@ void MeshClipper::render_cut()
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        m_model.set_color(color);
-        m_model.render();
+        for (CutIsland& isl : m_result->cut_islands) {
+            isl.model.set_color(isl.disabled ? ColorRGBA(1.f, 0.f, 0.f, 1.f) : color);
+            isl.model.render();
+        }
         shader->stop_using();
     }
 
@@ -117,7 +116,7 @@ void MeshClipper::render_contour(const ColorRGBA& color)
 void MeshClipper::render_contour()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
-    if (! m_triangles_valid)
+    if (! m_result)
         recalculate_triangles();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
@@ -130,8 +129,10 @@ void MeshClipper::render_contour()
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        m_model_expanded.set_color(color);
-        m_model_expanded.render();
+        for (CutIsland& isl : m_result->cut_islands) {
+            isl.model_expanded.set_color(color);
+            isl.model_expanded.render();
+        }
         shader->stop_using();
     }
 
@@ -145,8 +146,24 @@ void MeshClipper::render_contour()
 
 
 
+void MeshClipper::pass_mouse_click(const Vec3d& point_in)
+{
+    if (! m_result || m_result->cut_islands.empty())
+        return;
+    Vec3d point = m_result->trafo.inverse() * point_in;
+    Point pt_2d = Point::new_scale(Vec2d(point.x(), point.y()));
+
+    for (CutIsland& isl : m_result->cut_islands) {
+        if (isl.expoly_bb.contains(pt_2d) && isl.expoly.contains(pt_2d))
+            isl.disabled = ! isl.disabled;
+    }
+}
+
 void MeshClipper::recalculate_triangles()
 {
+    m_result = ClipResult();
+
+
 #if ENABLE_WORLD_COORDINATE
     const Transform3f instance_matrix_no_translation_no_scaling = m_trafo.get_rotation_matrix().cast<float>();
 #else
@@ -175,6 +192,8 @@ void MeshClipper::recalculate_triangles()
     Transform3d tr = Transform3d::Identity();
     tr.rotate(q);
     tr = m_trafo.get_matrix() * tr;
+
+    m_result->trafo = tr;
 
     if (m_limiting_plane != ClippingPlane::ClipsNothing())
     {
@@ -231,88 +250,72 @@ void MeshClipper::recalculate_triangles()
 
     tr.pretranslate(0.001 * m_plane.get_normal().normalized()); // to avoid z-fighting
 
-    std::vector<Vec2f> triangles2d = m_fill_cut
-        ? triangulate_expolygons_2f(expolys, m_trafo.get_matrix().matrix().determinant() < 0.)
-        : std::vector<Vec2f>();
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    m_model.reset();
+    std::vector<Vec2f> triangles2d;
 
-    GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
-    init_data.reserve_vertices(triangles2d.size());
-    init_data.reserve_indices(triangles2d.size());
+    for (const ExPolygon& exp : expolys) {
+        triangles2d.clear();
 
-    // vertices + indices
-    for (auto it = triangles2d.cbegin(); it != triangles2d.cend(); it = it + 3) {
-        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-        const size_t idx = it - triangles2d.cbegin();
-        init_data.add_triangle((unsigned int)idx, (unsigned int)idx + 1, (unsigned int)idx + 2);
+        m_result->cut_islands.push_back(CutIsland());
+        CutIsland& isl = m_result->cut_islands.back();
+
+        if (m_fill_cut) {
+            triangles2d = triangulate_expolygon_2f(exp, m_trafo.get_matrix().matrix().determinant() < 0.);
+            GLModel::Geometry init_data;
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+            init_data.reserve_vertices(triangles2d.size());
+            init_data.reserve_indices(triangles2d.size());
+
+            // vertices + indices
+            for (auto it = triangles2d.cbegin(); it != triangles2d.cend(); it = it + 3) {
+                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                const size_t idx = it - triangles2d.cbegin();
+                init_data.add_triangle((unsigned int)idx, (unsigned int)idx + 1, (unsigned int)idx + 2);
+            }
+
+            if (!init_data.is_empty())
+                isl.model.init_from(std::move(init_data));
+        }
+
+        if (m_contour_width != 0.) {
+            triangles2d.clear();
+            ExPolygons expolys_exp = offset_ex(exp, scale_(m_contour_width));
+            expolys_exp = diff_ex(expolys_exp, ExPolygons({exp}));
+            triangles2d = triangulate_expolygons_2f(expolys_exp, m_trafo.get_matrix().matrix().determinant() < 0.);
+            GLModel::Geometry init_data = GLModel::Geometry();
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+            init_data.reserve_vertices(triangles2d.size());
+            init_data.reserve_indices(triangles2d.size());
+
+            // vertices + indices
+            for (auto it = triangles2d.cbegin(); it != triangles2d.cend(); it = it + 3) {
+                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                const size_t idx = it - triangles2d.cbegin();
+                init_data.add_triangle((unsigned short)idx, (unsigned short)idx + 1, (unsigned short)idx + 2);
+            }
+
+            if (!init_data.is_empty())
+                isl.model_expanded.init_from(std::move(init_data));
+        }
+
+        isl.expoly = std::move(exp);
+        isl.expoly_bb = get_extents(exp);
     }
-
-    if (!init_data.is_empty())
-        m_model.init_from(std::move(init_data));
 #else
-    m_vertex_array.release_geometry();
-    for (auto it=triangles2d.cbegin(); it != triangles2d.cend(); it=it+3) {
-        m_vertex_array.push_geometry(tr * Vec3d((*(it+0))(0), (*(it+0))(1), height_mesh), up);
-        m_vertex_array.push_geometry(tr * Vec3d((*(it+1))(0), (*(it+1))(1), height_mesh), up);
-        m_vertex_array.push_geometry(tr * Vec3d((*(it+2))(0), (*(it+2))(1), height_mesh), up);
-        const size_t idx = it - triangles2d.cbegin();
-        m_vertex_array.push_triangle(idx, idx+1, idx+2);
-    }
-    m_vertex_array.finalize_geometry(true);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-
-    triangles2d = {};
-    if (m_contour_width != 0.) {
-        ExPolygons expolys_exp = offset_ex(expolys, scale_(m_contour_width));
-        expolys_exp = diff_ex(expolys_exp, expolys);
-        triangles2d = triangulate_expolygons_2f(expolys_exp, m_trafo.get_matrix().matrix().determinant() < 0.);
-    }
-
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    m_model_expanded.reset();
-
-    init_data = GLModel::Geometry();
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
-    init_data.reserve_vertices(triangles2d.size());
-    init_data.reserve_indices(triangles2d.size());
-
-    // vertices + indices
-    for (auto it = triangles2d.cbegin(); it != triangles2d.cend(); it = it + 3) {
-        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-        const size_t idx = it - triangles2d.cbegin();
-        init_data.add_triangle((unsigned short)idx, (unsigned short)idx + 1, (unsigned short)idx + 2);
-        //if (init_data./*format.*/index_type == GLModel::Geometry::EIndexType::USHORT)
-        //    init_data.add_ushort_triangle((unsigned short)idx, (unsigned short)idx + 1, (unsigned short)idx + 2);
-        //else
-        //    init_data.add_uint_triangle((unsigned int)idx, (unsigned int)idx + 1, (unsigned int)idx + 2);
-    }
-
-    if (!init_data.is_empty())
-        m_model_expanded.init_from(std::move(init_data));
-#else
-    m_vertex_array_expanded.release_geometry();
-    for (auto it=triangles2d.cbegin(); it != triangles2d.cend(); it=it+3) {
-        m_vertex_array_expanded.push_geometry(tr * Vec3d((*(it+0))(0), (*(it+0))(1), height_mesh), up);
-        m_vertex_array_expanded.push_geometry(tr * Vec3d((*(it+1))(0), (*(it+1))(1), height_mesh), up);
-        m_vertex_array_expanded.push_geometry(tr * Vec3d((*(it+2))(0), (*(it+2))(1), height_mesh), up);
-        const size_t idx = it - triangles2d.cbegin();
-        m_vertex_array_expanded.push_triangle(idx, idx+1, idx+2);
-    }
-    m_vertex_array_expanded.finalize_geometry(true);
+    #error NOT IMPLEMENTED
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 
 
-    m_triangles_valid = true;
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#else
+    #error NOT IMPLEMENTED
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 

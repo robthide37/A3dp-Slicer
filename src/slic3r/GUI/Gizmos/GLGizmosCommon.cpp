@@ -494,6 +494,16 @@ void ObjectClipper::set_behavior(bool hide_clipped, bool fill_cut, double contou
         clipper->set_behaviour(fill_cut, contour_width);
 }
 
+void ObjectClipper::pass_mouse_click(const Vec3d& pt)
+{
+    for (auto& clipper : m_clippers)
+        clipper->pass_mouse_click(pt);
+}
+
+std::vector<Vec3d> ObjectClipper::get_disabled_contours() const
+{
+    return std::vector<Vec3d>();
+}
 
 void SupportsClipper::on_update()
 {

@@ -14,6 +14,7 @@
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <cfloat>
+#include <optional>
 #if ENABLE_RAYCAST_PICKING
 #include <memory>
 #endif // ENABLE_RAYCAST_PICKING
@@ -112,6 +113,9 @@ public:
     void render_cut();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+    void pass_mouse_click(const Vec3d& pt);
+
+
 private:
     void recalculate_triangles();
 
@@ -121,12 +125,24 @@ private:
     ClippingPlane m_plane;
     ClippingPlane m_limiting_plane = ClippingPlane::ClipsNothing();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    GLModel m_model;
-    GLModel m_model_expanded;
+
+    struct CutIsland {
+        GLModel model;
+        GLModel model_expanded;
+        ExPolygon expoly;
+        BoundingBox expoly_bb;
+        bool disabled = false;
+    };
+    struct ClipResult {
+        std::vector<CutIsland> cut_islands;
+        Transform3d trafo; // this rotates the cut into world coords
+    };
+    std::optional<ClipResult> m_result;
+    
 #else
+    #error NOT IMLEMENTED
     GLIndexedVertexArray m_vertex_array;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-    bool m_triangles_valid = false;
     bool m_fill_cut = true;
     double m_contour_width = 0.;
 };
