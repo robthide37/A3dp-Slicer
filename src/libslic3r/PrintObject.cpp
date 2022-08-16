@@ -423,7 +423,7 @@ void PrintObject::generate_support_spots()
         std::all_of(this->model_object()->volumes.begin(), this->model_object()->volumes.end(),
                 [](const ModelVolume* mv){return mv->supported_facets.empty();})
         ) {
-            SupportSpotsGenerator::Params params{90.001f - this->m_config.support_material_threshold, this->print()->m_config.filament_type.values};
+            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values};
             SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this, params);
             auto obj_transform = this->trafo_centered();
             for (ModelVolume *model_volume : this->model_object()->volumes) {

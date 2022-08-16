@@ -364,6 +364,8 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             return Vec3f(point.x(), point.y(), layer_z);
         };
         float overhang_dist = tan(params.overhang_angle_deg * PI / 180.0f)*layer_region->layer()->height;
+        float min_malformation_dist = tan(params.malformation_angle_span_deg.first * PI / 180.0f)*layer_region->layer()->height;
+        float max_malformation_dist = tan(params.malformation_angle_span_deg.second * PI / 180.0f)*layer_region->layer()->height;
 
         Points points { };
         entity->collect_points(points);
@@ -387,8 +389,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
 
         ExtrusionPropertiesAccumulator bridging_acc { };
         ExtrusionPropertiesAccumulator malformation_acc { };
-        bridging_acc.add_distance(params.bridge_distance + 1.0f); // Initialise unsupported distance with larger than tolerable distance ->
-        // -> it prevents extruding perimeter starts and short loops into air.
+        bridging_acc.add_distance(params.bridge_distance);
         const float flow_width = get_flow_width(layer_region, entity->role());
 
         for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
@@ -430,7 +431,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
                 current_line.malformation += 0.9 * nearest_line.malformation;
             }
-            if (dist_from_prev_layer > overhang_dist) {
+            if (dist_from_prev_layer > min_malformation_dist && dist_from_prev_layer < max_malformation_dist) {
                 malformation_acc.add_distance(current_line.len);
                 current_line.malformation += layer_region->layer()->height * (0.5f +
                        1.5f * (malformation_acc.max_curvature / PI) * gauss(malformation_acc.distance, 5.0f, 1.0f, 0.2f));
@@ -650,6 +651,10 @@ public:
         this->sticking_second_moment_of_area_accumulator = island.sticking_second_moment_of_area_accumulator;
         this->sticking_second_moment_of_area_covariance_accumulator =
                 island.sticking_second_moment_of_area_covariance_accumulator;
+    }
+
+    float get_volume() const {
+        return volume;
     }
 
     void add(const ObjectPart &other) {
