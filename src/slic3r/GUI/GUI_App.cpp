@@ -123,13 +123,13 @@ public:
     {
         wxASSERT(bitmap.IsOk());
 
-        int init_dpi = get_dpi_for_window(this);
+//        int init_dpi = get_dpi_for_window(this);
         this->SetPosition(pos);
         // The size of the SplashScreen can be hanged after its moving to another display
         // So, update it from a bitmap size
         this->SetClientSize(bitmap.GetWidth(), bitmap.GetHeight());
         this->CenterOnScreen();
-        int new_dpi = get_dpi_for_window(this);
+//        int new_dpi = get_dpi_for_window(this);
 
 //        m_scale         = (float)(new_dpi) / (float)(init_dpi);
         m_main_bitmap   = bitmap;

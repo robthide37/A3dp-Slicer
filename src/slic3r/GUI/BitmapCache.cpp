@@ -493,51 +493,51 @@ wxBitmap* BitmapCache::load_svg(const std::string &bitmap_name, unsigned target_
 
     return this->insert_raw_rgba(bitmap_key, width, height, data.data(), grayscale);
 }
-/*
+
 //we make scaled solid bitmaps only for the cases, when its will be used with scaled SVG icon in one output bitmap
-wxBitmap BitmapCache::mksolid(size_t width, size_t height, unsigned char r, unsigned char g, unsigned char b, unsigned char transparency, bool suppress_scaling/* = false* /, size_t border_width /*= 0* /, bool dark_mode/* = false* /)
-{
-    double scale = suppress_scaling ? 1.0f : m_scale;
-    width  *= scale;
-    height *= scale;
+//wxBitmap BitmapCache::mksolid(size_t width, size_t height, unsigned char r, unsigned char g, unsigned char b, unsigned char transparency, bool suppress_scaling/* = false* /, size_t border_width /*= 0* /, bool dark_mode/* = false* /)
+//{
+//    double scale = suppress_scaling ? 1.0f : m_scale;
+//    width  *= scale;
+//    height *= scale;
+//
+//    wxImage image(width, height);
+//    image.InitAlpha();
+//    unsigned char* imgdata = image.GetData();
+//    unsigned char* imgalpha = image.GetAlpha();
+//    for (size_t i = 0; i < width * height; ++ i) {
+//        *imgdata ++ = r;
+//        *imgdata ++ = g;
+//        *imgdata ++ = b;
+//        *imgalpha ++ = transparency;
+//    }
+//
+//    // Add border, make white/light spools easier to see
+//    if (border_width > 0) {
+//
+//        // Restrict to width of image
+//        if (border_width > height) border_width = height - 1;
+//        if (border_width > width) border_width = width - 1;
+//
+//        auto px_data = (uint8_t*)image.GetData();
+//        auto a_data = (uint8_t*)image.GetAlpha();
+//
+//        for (size_t x = 0; x < width; ++x) {
+//            for (size_t y = 0; y < height; ++y) {
+//                if (x < border_width || y < border_width ||
+//                    x >= (width - border_width) || y >= (height - border_width)) {
+//                    const size_t idx = (x + y * width);
+//                    const size_t idx_rgb = (x + y * width) * 3;
+//                    px_data[idx_rgb] = px_data[idx_rgb + 1] = px_data[idx_rgb + 2] = dark_mode ? 245u : 110u;
+//                    a_data[idx] = 255u;
+//                }
+//            }
+//        }
+//    }
+//
+//    return wxImage_to_wxBitmap_with_alpha(std::move(image), scale);
+//}
 
-    wxImage image(width, height);
-    image.InitAlpha();
-    unsigned char* imgdata = image.GetData();
-    unsigned char* imgalpha = image.GetAlpha();
-    for (size_t i = 0; i < width * height; ++ i) {
-        *imgdata ++ = r;
-        *imgdata ++ = g;
-        *imgdata ++ = b;
-        *imgalpha ++ = transparency;
-    }
-
-    // Add border, make white/light spools easier to see
-    if (border_width > 0) {
-
-        // Restrict to width of image
-        if (border_width > height) border_width = height - 1;
-        if (border_width > width) border_width = width - 1;
-
-        auto px_data = (uint8_t*)image.GetData();
-        auto a_data = (uint8_t*)image.GetAlpha();
-
-        for (size_t x = 0; x < width; ++x) {
-            for (size_t y = 0; y < height; ++y) {
-                if (x < border_width || y < border_width ||
-                    x >= (width - border_width) || y >= (height - border_width)) {
-                    const size_t idx = (x + y * width);
-                    const size_t idx_rgb = (x + y * width) * 3;
-                    px_data[idx_rgb] = px_data[idx_rgb + 1] = px_data[idx_rgb + 2] = dark_mode ? 245u : 110u;
-                    a_data[idx] = 255u;
-                }
-            }
-        }
-    }
-
-    return wxImage_to_wxBitmap_with_alpha(std::move(image), scale);
-}
-*/
 //we make scaled solid bitmaps only for the cases, when its will be used with scaled SVG icon in one output bitmap
 wxBitmapBundle BitmapCache::mksolid(size_t width_in, size_t height_in, unsigned char r, unsigned char g, unsigned char b, unsigned char transparency, size_t border_width /*= 0*/, bool dark_mode/* = false*/)
 {
