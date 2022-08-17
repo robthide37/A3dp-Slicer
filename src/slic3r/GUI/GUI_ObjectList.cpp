@@ -2918,6 +2918,7 @@ bool ObjectList::delete_from_model_and_list(const ItemType type, const int obj_i
                     update_lock_icons_for_model();
                 return true;
             }
+            return false;
         }
         else if (del_subobject_from_object(obj_idx, sub_obj_idx, type)) {
             type == itVolume ? delete_volume_from_list(obj_idx, sub_obj_idx) :
@@ -2942,7 +2943,7 @@ bool ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& it
         if (item->type&itObject) {
             bool was_cut = object(item->obj_idx)->is_cut();
             if (!del_object(item->obj_idx))
-                continue;
+                return false;// continue;
             m_objects_model->Delete(m_objects_model->GetItemById(item->obj_idx));
             if (was_cut)
                 update_lock_icons_for_model();

@@ -1380,10 +1380,6 @@ indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes conn
 
 void ModelObject::apply_cut_connectors(const std::string& name)
 {
-    // discard old connector markers for volumes
-    for (ModelVolume* volume : volumes)
-        volume->cut_info.discard();
-
     if (cut_connectors.empty())
         return;
 
@@ -1517,6 +1513,8 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
 
         if (!volume->is_model_part()) {
             if (volume->cut_info.is_connector) {
+                volume->cut_info.discard();
+
                 // ! Don't apply instance transformation for the conntectors.
                 // This transformation is already there
                 if (attributes.has(ModelObjectCutAttribute::KeepUpper)) {
@@ -1559,10 +1557,12 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
                 // to the modifier volume transformation to preserve their shape properly.
                 volume->set_transformation(Geometry::Transformation(instance_matrix * volume_matrix));
 
-                // #ysFIXME - add logic for the negative volumes/connectors
-                if (attributes.has(ModelObjectCutAttribute::KeepUpper))
+                // Some logic for the negative volumes/connectors. Add only needed modifiers
+                auto bb = volume->mesh().transformed_bounding_box(cut_matrix * volume->get_matrix());
+                bool is_crossed_by_cut = bb.min[Z] <= 0 && bb.max[Z] >= 0;
+                if (attributes.has(ModelObjectCutAttribute::KeepUpper) && (bb.min[Z] >= 0 || is_crossed_by_cut))
                     upper->add_volume(*volume);
-                if (attributes.has(ModelObjectCutAttribute::KeepLower))
+                if (attributes.has(ModelObjectCutAttribute::KeepLower) && (bb.max[Z] <= 0 || is_crossed_by_cut))
                     lower->add_volume(*volume);
             }
         }
