@@ -212,8 +212,8 @@ std::string GLGizmoCut3D::get_tooltip() const
     }
     if (tooltip.empty() && (m_hover_id == X || m_hover_id == Y)) {
         std::string axis = m_hover_id == X ? "X" : "Y";
-//        return axis + ": " + format(float(Geometry::rad2deg(Geometry::Transformation(m_rotation_m).get_rotation()[m_hover_id])), 1) + _u8L("°");
-        return axis + ": " + format(float(Geometry::rad2deg(m_angle)), 1) + _u8L("°");
+//        return axis + ": " + format(float(Geometry::rad2deg(Geometry::Transformation(m_rotation_m).get_rotation()[m_hover_id])), 1) + _u8L("Â°");
+        return axis + ": " + format(float(Geometry::rad2deg(m_angle)), 1) + _u8L("Â°");
     }
 
     return tooltip;
@@ -582,7 +582,7 @@ void GLGizmoCut3D::render_cut_plane()
     if (!m_plane.is_initialized()) {
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
-        init_data.color = { 0.8f, 0.8f, 0.8f, 0.5f };
+//        init_data.color = { 0.8f, 0.8f, 0.8f, 0.5f };
         init_data.reserve_vertices(4);
         init_data.reserve_indices(6);
 
@@ -600,6 +600,10 @@ void GLGizmoCut3D::render_cut_plane()
         m_plane.init_from(std::move(init_data));
     }
 
+    if (can_perform_cut())
+        m_plane.set_color({ 0.8f, 0.8f, 0.8f, 0.5f });
+    else
+        m_plane.set_color({ 1.0f, 0.8f, 0.8f, 0.5f });
     m_plane.render();
 
     glsafe(::glEnable(GL_CULL_FACE));
@@ -892,6 +896,12 @@ void GLGizmoCut3D::on_unregister_raycasters_for_picking()
     m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo);
     m_raycasters.clear();
     set_volumes_picking_state(true);
+}
+
+void GLGizmoCut3D::update_raycasters_for_picking()
+{
+    on_unregister_raycasters_for_picking();
+    on_register_raycasters_for_picking();
 }
 
 void GLGizmoCut3D::set_volumes_picking_state(bool state)
@@ -1422,7 +1432,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
             m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
             if (m_imgui->button(_L("Add/Edit connectors"))) {
                 m_connectors_editing = true;
-                on_unregister_raycasters_for_picking();
+                update_raycasters_for_picking();
             }
             m_imgui->disabled_end();
         }
@@ -1510,7 +1520,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
         if (m_imgui->button(_L("Confirm connectors"))) {
             m_clp_normal = m_c->object_clipper()->get_clipping_plane()->get_normal();
             m_connectors_editing = false;
-            on_unregister_raycasters_for_picking();
+            update_raycasters_for_picking();
             std::fill(m_selected.begin(), m_selected.end(), false);
             m_selected_count = 0;
         }
@@ -1826,8 +1836,7 @@ void GLGizmoCut3D::update_model_object()
 
     m_parent.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
 
-    on_unregister_raycasters_for_picking();
-    on_register_raycasters_for_picking();
+    update_raycasters_for_picking();
 }
 
 bool GLGizmoCut3D::cut_line_processing() const
@@ -1860,6 +1869,7 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
     if (action == SLAGizmoEventType::LeftDown && !cut_line_processing()) {
         m_line_beg = pt;
         m_line_end = pt;
+        on_unregister_raycasters_for_picking();
         return true;
     }
 
@@ -1883,6 +1893,8 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
 
             discard_cut_line_processing();
         }
+        else if (action == SLAGizmoEventType::Moving)
+            this->set_dirty();
         return true;
     }
     return false;

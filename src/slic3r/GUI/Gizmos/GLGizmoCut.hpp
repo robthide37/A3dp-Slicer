@@ -176,6 +176,7 @@ protected:
 
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
+    void update_raycasters_for_picking();
     void set_volumes_picking_state(bool state);
     void update_raycasters_for_picking_transform();
 
