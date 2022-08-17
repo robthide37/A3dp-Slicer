@@ -1440,4 +1440,5 @@ bool its_write_stl_binary(const char *file, const char *label, const std::vector
     return true;
 }
 
+
 } // namespace Slic3r

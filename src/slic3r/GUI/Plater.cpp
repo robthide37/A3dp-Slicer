@@ -2401,9 +2401,20 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     const auto loading = _L("Loading") + dots;
 
-    // Create wxProgressDialog on heap, see the linux ifdef below.
-    auto progress_dlg = new wxProgressDialog(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
+    // The situation with wxProgressDialog is quite interesting here.
+    // On Linux (only), there are issues when FDM/SLA is switched during project file loading (disabling of controls,
+    // see a comment below). This can be bypassed by creating the wxProgressDialog on heap and destroying it
+    // when loading a project file. However, creating the dialog on heap causes issues on macOS, where it does not
+    // appear at all. Therefore, we create the dialog on stack on Win and macOS, and on heap on Linux, which
+    // is the only system that needed the workarounds in the first place.
+#ifdef __linux__
+    auto progress_dlg = new wxProgressDialog(loading, "", 100, find_toplevel_parent(q), wxPD_APP_MODAL | wxPD_AUTO_HIDE);
     Slic3r::ScopeGuard([&progress_dlg](){ if (progress_dlg) progress_dlg->Destroy(); progress_dlg = nullptr; });
+#else
+    wxProgressDialog progress_dlg_stack(loading, "", 100, find_toplevel_parent(q), wxPD_APP_MODAL | wxPD_AUTO_HIDE);
+    wxProgressDialog* progress_dlg = &progress_dlg_stack;    
+#endif
+    
 
     wxBusyCursor busy;
 
@@ -3136,6 +3147,8 @@ void Plater::priv::split_object()
         for (size_t idx : idxs)
         {
             get_selection().add_object((unsigned int)idx, false);
+            // update printable state for new volumes on canvas3D
+            q->canvas3D()->update_instance_printable_state_for_object(idx);
         }
     }
 }
@@ -5571,7 +5584,7 @@ void ProjectDropDialog::on_dpi_changed(const wxRect& suggested_rect)
 
 bool Plater::load_files(const wxArrayString& filenames)
 {
-    const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa)", std::regex::icase);
+    const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa|step|stp)", std::regex::icase);
     const std::regex pattern_gcode_drop(".*[.](gcode|g)", std::regex::icase);
 
     std::vector<fs::path> paths;

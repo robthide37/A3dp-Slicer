@@ -323,8 +323,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("wall_transition_filter_deviation", have_arachne);
     toggle_field("wall_transition_angle", have_arachne);
     toggle_field("wall_distribution_count", have_arachne);
-    toggle_field("wall_split_middle_threshold", have_arachne);
-    toggle_field("wall_add_middle_threshold", have_arachne);
     toggle_field("min_feature_size", have_arachne);
     toggle_field("min_bead_width", have_arachne);
     toggle_field("thin_walls", !have_arachne);

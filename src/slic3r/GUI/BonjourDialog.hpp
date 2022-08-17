@@ -1,7 +1,10 @@
 #ifndef slic3r_BonjourDialog_hpp_
 #define slic3r_BonjourDialog_hpp_
 
+#include <cstddef>
 #include <memory>
+
+#include <boost/asio/ip/address.hpp>
 
 #include <wx/dialog.h>
 #include <wx/string.h>

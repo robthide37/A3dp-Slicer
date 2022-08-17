@@ -10,6 +10,14 @@
 #include <cmath>
 #include <cassert>
 #include <stack>
+#include <unordered_map>
+
+//#define ARACHNE_DEBUG
+
+#ifdef ARACHNE_DEBUG
+#include "SVG.hpp"
+#include "Utils.hpp"
+#endif
 
 namespace Slic3r {
 
@@ -24,7 +32,18 @@ ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_poly
         assert(line.a_width >= SCALED_EPSILON && line.b_width >= SCALED_EPSILON);
 
         const coordf_t line_len = line.length();
-        if (line_len < SCALED_EPSILON) continue;
+        if (line_len < SCALED_EPSILON) {
+            // The line is so tiny that we don't care about its width when we connect it to another line.
+            if (!path.empty())
+                path.polyline.points.back() = line.b; // If the variable path is non-empty, connect this tiny line to it.
+            else if (i + 1 < (int)lines.size()) // If there is at least one following line, connect this tiny line to it.
+                lines[i + 1].a = line.a;
+            else if (!paths.empty())
+                paths.back().polyline.points.back() = line.b; // Connect this tiny line to the last finished path.
+
+            // If any of the above isn't satisfied, then remove this tiny line.
+            continue;
+        }
 
         double thickness_delta = fabs(line.a_width - line.b_width);
         if (thickness_delta > tolerance) {
@@ -100,14 +119,19 @@ static void variable_width(const ThickPolylines& polylines, ExtrusionRole role, 
 	// This value determines granularity of adaptive width, as G-code does not allow
 	// variable extrusion within a single move; this value shall only affect the amount
 	// of segments, and any pruning shall be performed before we apply this tolerance.
-	const float tolerance = float(scale_(0.05));
+	const auto tolerance = float(scale_(0.05));
 	for (const ThickPolyline &p : polylines) {
 		ExtrusionPaths paths = thick_polyline_to_extrusion_paths(p, role, flow, tolerance, tolerance);
 		// Append paths to collection.
-		if (! paths.empty()) {
-			if (paths.front().first_point() == paths.back().last_point())
-				out.emplace_back(new ExtrusionLoop(std::move(paths)));
-			else {
+        if (!paths.empty()) {
+            for (auto it = std::next(paths.begin()); it != paths.end(); ++it) {
+                assert(it->polyline.points.size() >= 2);
+                assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+            }
+
+            if (paths.front().first_point() == paths.back().last_point()) {
+                out.emplace_back(new ExtrusionLoop(std::move(paths)));
+            } else {
 				for (ExtrusionPath &path : paths)
 					out.emplace_back(new ExtrusionPath(std::move(path)));
 			}
@@ -462,8 +486,40 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator &p
             // Reapply the nearest point search for starting point.
             // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
             // Arachne sometimes creates extrusion with zero-length (just two same endpoints);
-            if (!paths.empty())
-                chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
+            if (!paths.empty()) {
+                Point start_point = paths.front().first_point();
+                if (!extrusion->is_closed) {
+                    // Especially for open extrusion, we need to select a starting point that is at the start
+                    // or the end of the extrusions to make one continuous line. Also, we prefer a non-overhang
+                    // starting point.
+                    struct PointInfo
+                    {
+                        size_t occurrence  = 0;
+                        bool   is_overhang = false;
+                    };
+                    std::unordered_map<Point, PointInfo, PointHash> point_occurrence;
+                    for (const ExtrusionPath &path : paths) {
+                        ++point_occurrence[path.polyline.first_point()].occurrence;
+                        ++point_occurrence[path.polyline.last_point()].occurrence;
+                        if (path.role() == erOverhangPerimeter) {
+                            point_occurrence[path.polyline.first_point()].is_overhang = true;
+                            point_occurrence[path.polyline.last_point()].is_overhang  = true;
+                        }
+                    }
+
+                    // Prefer non-overhang point as a starting point.
+                    for (const std::pair<Point, PointInfo> pt : point_occurrence)
+                        if (pt.second.occurrence == 1) {
+                            start_point = pt.first;
+                            if (!pt.second.is_overhang) {
+                                start_point = pt.first;
+                                break;
+                            }
+                        }
+                }
+
+                chain_and_reorder_extrusion_paths(paths, &start_point);
+            }
         } else {
             extrusion_paths_append(paths, *extrusion, role, is_external ? perimeter_generator.ext_perimeter_flow : perimeter_generator.perimeter_flow);
         }
@@ -487,6 +543,27 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator &p
 
     return extrusion_coll;
 }
+
+#ifdef ARACHNE_DEBUG
+static void export_perimeters_to_svg(const std::string &path, const Polygons &contours, const std::vector<Arachne::VariableWidthLines> &perimeters, const ExPolygons &infill_area)
+{
+    coordf_t    stroke_width = scale_(0.03);
+    BoundingBox bbox         = get_extents(contours);
+    bbox.offset(scale_(1.));
+    ::Slic3r::SVG svg(path.c_str(), bbox);
+
+    svg.draw(infill_area, "cyan");
+
+    for (const Arachne::VariableWidthLines &perimeter : perimeters)
+        for (const Arachne::ExtrusionLine &extrusion_line : perimeter) {
+            ThickPolyline thick_polyline = to_thick_polyline(extrusion_line);
+            svg.draw({thick_polyline}, "green", "blue", stroke_width);
+        }
+
+    for (const Line &line : to_lines(contours))
+        svg.draw(line, "red", stroke_width);
+}
+#endif
 
 // Thanks, Cura developers, for implementing an algorithm for generating perimeters with variable width (Arachne) that is based on the paper
 // "A framework for adaptive width control of dense contour-parallel toolpaths in fused deposition modeling"
@@ -525,9 +602,27 @@ void PerimeterGenerator::process_arachne()
         ExPolygons last        = offset_ex(surface.expolygon.simplify_p(m_scaled_resolution), - float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
         Polygons   last_p      = to_polygons(last);
 
-        Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, *this->object_config, *this->print_config);
+        Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, layer_height, *this->object_config, *this->print_config);
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
         loop_number = int(perimeters.size()) - 1;
+
+#ifdef ARACHNE_DEBUG
+        {
+            static int iRun = 0;
+            export_perimeters_to_svg(debug_out_path("arachne-perimeters-%d-%d.svg", layer_id, iRun++), to_polygons(last), perimeters, union_ex(wallToolPaths.getInnerContour()));
+        }
+#endif
+
+        // All closed ExtrusionLine should have the same the first and the last point.
+        // But in rare cases, Arachne produce ExtrusionLine marked as closed but without
+        // equal the first and the last point.
+        assert([&perimeters = std::as_const(perimeters)]() -> bool {
+            for (const Arachne::VariableWidthLines &perimeter : perimeters)
+                for (const Arachne::ExtrusionLine &el : perimeter)
+                    if (el.is_closed && el.junctions.front().p != el.junctions.back().p)
+                        return false;
+            return true;
+        }());
 
         int start_perimeter = int(perimeters.size()) - 1;
         int end_perimeter   = -1;

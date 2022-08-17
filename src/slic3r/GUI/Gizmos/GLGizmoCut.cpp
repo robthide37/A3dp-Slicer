@@ -212,8 +212,8 @@ std::string GLGizmoCut3D::get_tooltip() const
     }
     if (tooltip.empty() && (m_hover_id == X || m_hover_id == Y)) {
         std::string axis = m_hover_id == X ? "X" : "Y";
-//        return axis + ": " + format(float(Geometry::rad2deg(Geometry::Transformation(m_rotation_m).get_rotation()[m_hover_id])), 1) + _u8L("Â°");
-        return axis + ": " + format(float(Geometry::rad2deg(m_angle)), 1) + _u8L("Â°");
+//        return axis + ": " + format(float(Geometry::rad2deg(Geometry::Transformation(m_rotation_m).get_rotation()[m_hover_id])), 1) + _u8L("°");
+        return axis + ": " + format(float(Geometry::rad2deg(m_angle)), 1) + _u8L("°");
     }
 
     return tooltip;

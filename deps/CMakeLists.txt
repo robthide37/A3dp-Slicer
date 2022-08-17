@@ -75,6 +75,9 @@ function(prusaslicer_add_cmake_project projectname)
     if (MSVC)
         set(_gen CMAKE_GENERATOR "${DEP_MSVC_GEN}" CMAKE_GENERATOR_PLATFORM "${DEP_PLATFORM}")
         set(_build_j "/m")
+        if (${projectname} STREQUAL "OCCT")
+            set(_build_j "/m:1")
+        endif ()
     endif ()
 
     ExternalProject_Add(
@@ -190,6 +193,7 @@ include(JPEG/JPEG.cmake)
 include(TIFF/TIFF.cmake)
 include(NanoSVG/NanoSVG.cmake)
 include(wxWidgets/wxWidgets.cmake)
+include(OCCT/OCCT.cmake)
 
 set(_dep_list
     dep_Boost
@@ -202,6 +206,7 @@ set(_dep_list
     dep_OpenCSG
     dep_CGAL
     dep_Qhull
+    dep_OCCT
     ${PNG_PKG}
     ${ZLIB_PKG}
     ${EXPAT_PKG}

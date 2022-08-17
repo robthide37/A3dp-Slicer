@@ -50,7 +50,7 @@ std::string get_main_info(bool format_as_html)
 
     out << line_end;
     out << b_start << "Operating System:    "   << b_end << wxPlatformInfo::Get().GetOperatingSystemFamilyName() << line_end;
-    out << b_start << "System Architecture: "   << b_end << wxPlatformInfo::Get().GetArchName() << line_end;
+    out << b_start << "System Architecture: "   << b_end << wxPlatformInfo::Get().GetBitnessName() << line_end;
     out << b_start << 
 #if defined _WIN32
         "Windows Version:     "

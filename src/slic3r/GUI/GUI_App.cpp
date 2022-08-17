@@ -123,13 +123,13 @@ public:
     {
         wxASSERT(bitmap.IsOk());
 
-        int init_dpi = get_dpi_for_window(this);
+//        int init_dpi = get_dpi_for_window(this);
         this->SetPosition(pos);
         // The size of the SplashScreen can be hanged after its moving to another display
         // So, update it from a bitmap size
         this->SetClientSize(bitmap.GetWidth(), bitmap.GetHeight());
         this->CenterOnScreen();
-        int new_dpi = get_dpi_for_window(this);
+//        int new_dpi = get_dpi_for_window(this);
 
 //        m_scale         = (float)(new_dpi) / (float)(init_dpi);
         m_main_bitmap   = bitmap;
@@ -457,14 +457,17 @@ struct FileWildcards {
     std::vector<std::string_view> file_extensions;
 };
 
+
+ 
 static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_STL */     { "STL files"sv,       { ".stl"sv } },
     /* FT_OBJ */     { "OBJ files"sv,       { ".obj"sv } },
     /* FT_OBJECT */  { "Object files"sv,    { ".stl"sv, ".obj"sv } },
+    /* FT_STEP */    { "STEP files"sv,      { ".stp"sv, ".step"sv } },    
     /* FT_AMF */     { "AMF files"sv,       { ".amf"sv, ".zip.amf"sv, ".xml"sv } },
     /* FT_3MF */     { "3MF files"sv,       { ".3mf"sv } },
     /* FT_GCODE */   { "G-code files"sv,    { ".gcode"sv, ".gco"sv, ".g"sv, ".ngc"sv } },
-    /* FT_MODEL */   { "Known files"sv,     { ".stl"sv, ".obj"sv, ".3mf"sv, ".amf"sv, ".zip.amf"sv, ".xml"sv } },
+    /* FT_MODEL */   { "Known files"sv,     { ".stl"sv, ".obj"sv, ".3mf"sv, ".amf"sv, ".zip.amf"sv, ".xml"sv, ".step"sv, ".stp"sv } },
     /* FT_PROJECT */ { "Project files"sv,   { ".3mf"sv, ".amf"sv, ".zip.amf"sv } },
     /* FT_GALLERY */ { "Known files"sv,     { ".stl"sv, ".obj"sv } },
 
@@ -893,9 +896,9 @@ static boost::optional<Semver> parse_semver_from_ini(std::string path)
 void GUI_App::init_app_config()
 {
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
-//    SetAppName(SLIC3R_APP_KEY);
+//  SetAppName(SLIC3R_APP_KEY);
 	SetAppName(SLIC3R_APP_KEY "-alpha");
-//    SetAppName(SLIC3R_APP_KEY "-beta");
+//  SetAppName(SLIC3R_APP_KEY "-beta");
 
 
 //	SetAppDisplayName(SLIC3R_APP_NAME);
@@ -1893,7 +1896,7 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
 {
     input_files.Clear();
     wxFileDialog dialog(parent ? parent : GetTopWindow(),
-        _L("Choose one or more files (STL/OBJ/AMF/3MF/PRUSA):"),
+        _L("Choose one or more files (STL/OBJ/AMF/3MF/PRUSA/STEP):"),
         from_u8(app_config->get_last_dir()), "",
         file_wildcards(FT_MODEL), wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
 

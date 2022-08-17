@@ -274,26 +274,29 @@ std::string SVG::get_path_d(const ClipperLib::Path &path, double scale, bool clo
     return d.str();
 }
 
-void SVG::draw_text(const Point &pt, const char *text, const char *color)
+void SVG::draw_text(const Point &pt, const char *text, const char *color, const coordf_t font_size)
 {
     fprintf(this->f,
-        "<text x=\"%f\" y=\"%f\" font-family=\"sans-serif\" font-size=\"20px\" fill=\"%s\">%s</text>",
-        to_svg_x(pt(0)-origin(0)),
-        to_svg_y(pt(1)-origin(1)),
+        R"(<text x="%f" y="%f" font-family="sans-serif" font-size="%fpx" fill="%s">%s</text>)",
+        to_svg_x(float(pt.x() - origin.x())),
+        to_svg_y(float(pt.y() - origin.y())),
+        font_size,
         color, text);
 }
 
-void SVG::draw_legend(const Point &pt, const char *text, const char *color)
+void SVG::draw_legend(const Point &pt, const char *text, const char *color, const coordf_t font_size)
 {
     fprintf(this->f,
-        "<circle cx=\"%f\" cy=\"%f\" r=\"10\" fill=\"%s\"/>",
-        to_svg_x(pt(0)-origin(0)),
-        to_svg_y(pt(1)-origin(1)),
+        R"(<circle cx="%f" cy="%f" r="%f" fill="%s"/>)",
+        to_svg_x(float(pt.x() - origin.x())),
+        to_svg_y(float(pt.y() - origin.y())),
+        font_size,
         color);
     fprintf(this->f,
-        "<text x=\"%f\" y=\"%f\" font-family=\"sans-serif\" font-size=\"10px\" fill=\"%s\">%s</text>",
-        to_svg_x(pt(0)-origin(0)) + 20.f,
-        to_svg_y(pt(1)-origin(1)),
+        R"(<text x="%f" y="%f" font-family="sans-serif" font-size="%fpx" fill="%s">%s</text>)",
+        to_svg_x(float(pt.x() - origin.x())) + 20.f,
+        to_svg_y(float(pt.y() - origin.y())),
+        font_size,
         "black", text);
 }
 

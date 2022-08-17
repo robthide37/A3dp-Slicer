@@ -9,7 +9,7 @@ msgstr ""
 "%10 <=9)) || (n%100 >= 12 && n%100 <= 14)) ? 2 : 3);\n"
 "X-Generator: Prusalator\n"
 
-#: src/slic3r/GUI/Tab.cpp:4774
+#: src/slic3r/GUI/Tab.cpp:4772
 #, boost-format
 msgid ""
 "\"%1%\" is disabled because \"%2%\" is on in \"%3%\" category.\n"
@@ -37,9 +37,8 @@ msgstr ""
 #: src/libslic3r/PrintConfig.cpp:486 src/libslic3r/PrintConfig.cpp:1109
 #: src/libslic3r/PrintConfig.cpp:1577 src/libslic3r/PrintConfig.cpp:1769
 #: src/libslic3r/PrintConfig.cpp:1832 src/libslic3r/PrintConfig.cpp:2083
-#: src/libslic3r/PrintConfig.cpp:2142 src/libslic3r/PrintConfig.cpp:3134
-#: src/libslic3r/PrintConfig.cpp:3149 src/libslic3r/PrintConfig.cpp:3318
-#: src/libslic3r/PrintConfig.cpp:3607 src/libslic3r/PrintConfig.cpp:3733
+#: src/libslic3r/PrintConfig.cpp:2142 src/libslic3r/PrintConfig.cpp:3291
+#: src/libslic3r/PrintConfig.cpp:3580 src/libslic3r/PrintConfig.cpp:3706
 msgid "%"
 msgstr "%"
 
@@ -152,7 +151,7 @@ msgstr[2] "%1% (%2$d stěny)"
 msgstr[3] "%1% (%2$d stěn)"
 
 #. TRN  Remove/Delete
-#: src/slic3r/GUI/Tab.cpp:3752
+#: src/slic3r/GUI/Tab.cpp:3750
 #, boost-format
 msgid "%1% Preset"
 msgstr "%1% Přednastavení"
@@ -171,7 +170,7 @@ msgstr ""
 msgid "%1% was substituted with %2%"
 msgstr "%2% bylo nahrazeno hodnotou %1%"
 
-#: src/slic3r/GUI/MainFrame.cpp:1710
+#: src/slic3r/GUI/MainFrame.cpp:1714
 #, boost-format
 msgid "%1% was successfully sliced."
 msgstr "%1% byl úspěšně naslicován."
@@ -193,7 +192,7 @@ msgstr "%3.2f mm³/s při rychlosti filamentu %3.2f mm/s."
 msgid "%d lines: %.2f mm"
 msgstr "%d perimetry: %.2f mm"
 
-#: src/slic3r/GUI/MainFrame.cpp:1875
+#: src/slic3r/GUI/MainFrame.cpp:1879
 #, c-format, boost-format
 msgid "%d presets successfully imported."
 msgstr "%d přednastavení úspěšně importováno."
@@ -365,7 +364,7 @@ msgstr ""
 msgid "&About %s"
 msgstr "&O %su"
 
-#: src/slic3r/GUI/MainFrame.cpp:1433
+#: src/slic3r/GUI/MainFrame.cpp:1437
 msgid "&Collapse Sidebar"
 msgstr "&Sbalit Postranní panel"
 
@@ -377,27 +376,27 @@ msgstr "&Konfigurace"
 msgid "&Configuration Snapshots"
 msgstr "Zálohy konfigura&ce"
 
-#: src/slic3r/GUI/MainFrame.cpp:1345
+#: src/slic3r/GUI/MainFrame.cpp:1349
 msgid "&Copy"
 msgstr "&Kopírovat"
 
-#: src/slic3r/GUI/MainFrame.cpp:1329
+#: src/slic3r/GUI/MainFrame.cpp:1333
 msgid "&Delete Selected"
 msgstr "Sma&zat vybrané"
 
-#: src/slic3r/GUI/MainFrame.cpp:1454
+#: src/slic3r/GUI/MainFrame.cpp:1458
 msgid "&Edit"
 msgstr "&Editovat"
 
-#: src/slic3r/GUI/MainFrame.cpp:1266
+#: src/slic3r/GUI/MainFrame.cpp:1270
 msgid "&Export"
 msgstr "&Exportovat"
 
-#: src/slic3r/GUI/MainFrame.cpp:1381 src/slic3r/GUI/MainFrame.cpp:1585
+#: src/slic3r/GUI/MainFrame.cpp:1385 src/slic3r/GUI/MainFrame.cpp:1589
 msgid "&Filament Settings Tab"
 msgstr "Panel Nastavení &filamentu"
 
-#: src/slic3r/GUI/MainFrame.cpp:1453 src/slic3r/GUI/MainFrame.cpp:1556
+#: src/slic3r/GUI/MainFrame.cpp:1457 src/slic3r/GUI/MainFrame.cpp:1560
 msgid "&File"
 msgstr "&Soubor"
 
@@ -405,19 +404,19 @@ msgstr "&Soubor"
 msgid "&Finish"
 msgstr "&Dokončit"
 
-#: src/slic3r/GUI/MainFrame.cpp:1438
+#: src/slic3r/GUI/MainFrame.cpp:1442
 msgid "&Fullscreen"
 msgstr "&Fullscreen"
 
-#: src/slic3r/GUI/MainFrame.cpp:1304
+#: src/slic3r/GUI/MainFrame.cpp:1308
 msgid "&G-code Preview"
 msgstr "&G-code Prohlížeč"
 
-#: src/slic3r/GUI/MainFrame.cpp:1459 src/slic3r/GUI/MainFrame.cpp:1560
+#: src/slic3r/GUI/MainFrame.cpp:1463 src/slic3r/GUI/MainFrame.cpp:1564
 msgid "&Help"
 msgstr "&Pomoc"
 
-#: src/slic3r/GUI/MainFrame.cpp:1227
+#: src/slic3r/GUI/MainFrame.cpp:1231
 msgid "&Import"
 msgstr "&Importovat"
 
@@ -425,7 +424,7 @@ msgstr "&Importovat"
 msgid "&Language"
 msgstr "&Jazyk"
 
-#: src/slic3r/GUI/MainFrame.cpp:1145
+#: src/slic3r/GUI/MainFrame.cpp:1149
 msgid "&New Project"
 msgstr "&Nový projekt"
 
@@ -433,19 +432,19 @@ msgstr "&Nový projekt"
 msgid "&Next >"
 msgstr "&Další>"
 
-#: src/slic3r/GUI/MainFrame.cpp:1521
+#: src/slic3r/GUI/MainFrame.cpp:1525
 msgid "&Open G-code"
 msgstr "&Otevřít G-code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1148
+#: src/slic3r/GUI/MainFrame.cpp:1152
 msgid "&Open Project"
 msgstr "&Otevřít projekt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1348
+#: src/slic3r/GUI/MainFrame.cpp:1352
 msgid "&Paste"
 msgstr "Vloži&t"
 
-#: src/slic3r/GUI/MainFrame.cpp:1373
+#: src/slic3r/GUI/MainFrame.cpp:1377
 msgid "&Plater Tab"
 msgstr "&Panel Podložka"
 
@@ -453,35 +452,35 @@ msgstr "&Panel Podložka"
 msgid "&Preferences"
 msgstr "Nas&tavení"
 
-#: src/slic3r/GUI/MainFrame.cpp:1307 src/slic3r/GUI/MainFrame.cpp:1541
+#: src/slic3r/GUI/MainFrame.cpp:1311 src/slic3r/GUI/MainFrame.cpp:1545
 msgid "&Quit"
 msgstr "Ukonči&t"
 
-#: src/slic3r/GUI/MainFrame.cpp:1340
+#: src/slic3r/GUI/MainFrame.cpp:1344
 msgid "&Redo"
 msgstr "&Vpřed"
 
-#: src/slic3r/GUI/MainFrame.cpp:1300
+#: src/slic3r/GUI/MainFrame.cpp:1304
 msgid "&Repair STL file"
 msgstr "Op&ravit soubor STL"
 
-#: src/slic3r/GUI/MainFrame.cpp:1190
+#: src/slic3r/GUI/MainFrame.cpp:1194
 msgid "&Save Project"
 msgstr "&Uložit projekt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1322
+#: src/slic3r/GUI/MainFrame.cpp:1326
 msgid "&Select All"
 msgstr "Vybrat &Vše"
 
-#: src/slic3r/GUI/MainFrame.cpp:1337
+#: src/slic3r/GUI/MainFrame.cpp:1341
 msgid "&Undo"
 msgstr "&Zpět"
 
-#: src/slic3r/GUI/MainFrame.cpp:1456 src/slic3r/GUI/MainFrame.cpp:1557
+#: src/slic3r/GUI/MainFrame.cpp:1460 src/slic3r/GUI/MainFrame.cpp:1561
 msgid "&View"
 msgstr "&Zobrazení"
 
-#: src/slic3r/GUI/MainFrame.cpp:1455
+#: src/slic3r/GUI/MainFrame.cpp:1459
 msgid "&Window"
 msgstr "&Okno"
 
@@ -490,7 +489,7 @@ msgstr "&Okno"
 msgid "(All)"
 msgstr "(Všechny)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1296
+#: src/slic3r/GUI/MainFrame.cpp:1300
 msgid "(Re)Slice No&w"
 msgstr "&(Znovu) Slicovat"
 
@@ -502,7 +501,7 @@ msgstr "(Znovu)Slicovat"
 msgid "(Some lines not shown)"
 msgstr "(Některé řádky nejsou zobrazeny)"
 
-#: src/libslic3r/PrintConfig.cpp:1088 src/libslic3r/PrintConfig.cpp:3532
+#: src/libslic3r/PrintConfig.cpp:1088 src/libslic3r/PrintConfig.cpp:3505
 msgid "(Unknown)"
 msgstr "(Neznámý)"
 
@@ -514,7 +513,7 @@ msgstr "(včetně cívky)"
 msgid "(minimum)"
 msgstr "(minimálně)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1628
+#: src/slic3r/GUI/MainFrame.cpp:1632
 msgid ") not found."
 msgstr ") nebyl nalezen."
 
@@ -570,7 +569,7 @@ msgstr "2 mm"
 msgid "3 (heavy)"
 msgstr "3 (silné)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1391
+#: src/slic3r/GUI/MainFrame.cpp:1395
 msgid "3&D"
 msgstr "3&D"
 
@@ -660,7 +659,7 @@ msgstr ""
 "Obecným pravidlem je 60 °C pro PLA a 110 °C pro ABS. Zadejte nula, pokud "
 "nemáte vyhřívanou podložku."
 
-#: src/libslic3r/PrintConfig.cpp:3917
+#: src/libslic3r/PrintConfig.cpp:3890
 msgid ""
 "A slower printing profile might be necessary when using materials with "
 "higher viscosity or with some hollowed parts. It slows down the tilt "
@@ -686,7 +685,7 @@ msgstr "API klíč"
 msgid "Abort"
 msgstr "Přerušit"
 
-#: src/slic3r/GUI/AboutDialog.cpp:210
+#: src/slic3r/GUI/AboutDialog.cpp:212
 #, c-format, boost-format
 msgid "About %s"
 msgstr "O %s"
@@ -703,7 +702,7 @@ msgstr "Kontrola akcelerací (pokročilé)"
 msgid "Access violation"
 msgstr "Porušení přístupu"
 
-#: src/libslic3r/PrintConfig.cpp:3891
+#: src/libslic3r/PrintConfig.cpp:3864
 msgid "Accuracy"
 msgstr "Přesnost"
 
@@ -743,7 +742,7 @@ msgstr ""
 "abyste zkrátili dobu tisku a snížili spotřebu filamentu? Přečtěte si více v "
 "dokumentaci."
 
-#: src/slic3r/GUI/GalleryDialog.cpp:117 src/slic3r/GUI/Tab.cpp:4151
+#: src/slic3r/GUI/GalleryDialog.cpp:117 src/slic3r/GUI/Tab.cpp:4149
 msgid "Add"
 msgstr "Přidat"
 
@@ -806,7 +805,7 @@ msgstr "Přidání tvaru z galerie"
 msgid "Add Shapes from Gallery"
 msgstr "Přidat tvary z galerie"
 
-#: src/libslic3r/PrintConfig.cpp:3748
+#: src/libslic3r/PrintConfig.cpp:3721
 msgid "Add a pad underneath the supported model"
 msgstr "Pod podepíraný model přidá podložku"
 
@@ -923,7 +922,7 @@ msgid "Add pause print"
 msgstr "Přidat pozastavení tisku"
 
 #: src/slic3r/GUI/PresetComboBoxes.cpp:702
-#: src/slic3r/GUI/PresetComboBoxes.cpp:742 src/slic3r/GUI/Tab.cpp:3247
+#: src/slic3r/GUI/PresetComboBoxes.cpp:742 src/slic3r/GUI/Tab.cpp:3245
 msgid "Add physical printer"
 msgstr "Přidat fyzickou tiskárnu"
 
@@ -1022,17 +1021,16 @@ msgstr "Adresa"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:138 src/slic3r/GUI/Tab.cpp:1491
 #: src/slic3r/GUI/Tab.cpp:1525 src/slic3r/GUI/Tab.cpp:1642
-#: src/slic3r/GUI/Tab.cpp:1646 src/slic3r/GUI/Tab.cpp:2030
-#: src/slic3r/GUI/Tab.cpp:2401 src/slic3r/GUI/Tab.cpp:4728
+#: src/slic3r/GUI/Tab.cpp:1646 src/slic3r/GUI/Tab.cpp:2028
+#: src/slic3r/GUI/Tab.cpp:2399 src/slic3r/GUI/Tab.cpp:4726
 #: src/libslic3r/PrintConfig.cpp:259 src/libslic3r/PrintConfig.cpp:494
 #: src/libslic3r/PrintConfig.cpp:1414 src/libslic3r/PrintConfig.cpp:1501
 #: src/libslic3r/PrintConfig.cpp:1548 src/libslic3r/PrintConfig.cpp:2498
 #: src/libslic3r/PrintConfig.cpp:2508 src/libslic3r/PrintConfig.cpp:3046
-#: src/libslic3r/PrintConfig.cpp:3080 src/libslic3r/PrintConfig.cpp:3090
-#: src/libslic3r/PrintConfig.cpp:3105 src/libslic3r/PrintConfig.cpp:3118
-#: src/libslic3r/PrintConfig.cpp:3127 src/libslic3r/PrintConfig.cpp:3142
-#: src/libslic3r/PrintConfig.cpp:3157 src/libslic3r/PrintConfig.cpp:3168
-#: src/libslic3r/PrintConfig.cpp:3365
+#: src/libslic3r/PrintConfig.cpp:3081 src/libslic3r/PrintConfig.cpp:3092
+#: src/libslic3r/PrintConfig.cpp:3107 src/libslic3r/PrintConfig.cpp:3120
+#: src/libslic3r/PrintConfig.cpp:3129 src/libslic3r/PrintConfig.cpp:3141
+#: src/libslic3r/PrintConfig.cpp:3338
 msgid "Advanced"
 msgstr "Pokročilý"
 
@@ -1067,16 +1065,16 @@ msgstr ""
 "materiálu vždy vytlačovat do čistící věže, aby se spolehlivě vytvořily "
 "následné výplně nebo objekty."
 
-#: src/slic3r/GUI/Tab.cpp:2440 src/libslic3r/GCode.cpp:710
+#: src/slic3r/GUI/Tab.cpp:2438 src/libslic3r/GCode.cpp:710
 #: src/libslic3r/PrintConfig.cpp:1602
 msgid "After layer change G-code"
 msgstr "G-code po změně vrstvy"
 
-#: src/libslic3r/PrintConfig.cpp:4466
+#: src/libslic3r/PrintConfig.cpp:4441
 msgid "Align XY"
 msgstr "Zarovnat XY"
 
-#: src/libslic3r/PrintConfig.cpp:4467
+#: src/libslic3r/PrintConfig.cpp:4442
 msgid "Align the model to the given point."
 msgstr "Zarovnejte model s daným bodem."
 
@@ -1089,7 +1087,7 @@ msgid "Aligned Rectilinear"
 msgstr "Zarovnaný přímočarý"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:331 src/slic3r/GUI/ConfigWizard.cpp:651
-#: src/slic3r/GUI/Preferences.cpp:434 src/slic3r/GUI/Tab.cpp:3832
+#: src/slic3r/GUI/Preferences.cpp:434 src/slic3r/GUI/Tab.cpp:3830
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1154
 msgid "All"
 msgstr "Všechny"
@@ -1289,7 +1287,7 @@ msgstr "Automaticky aplikovat změnu barvy"
 msgid "Apply to all the remaining small objects being loaded."
 msgstr "Použít na všechny zbývající malé načítané objekty."
 
-#: src/libslic3r/PrintConfig.cpp:3074
+#: src/libslic3r/PrintConfig.cpp:3075
 msgid "Arachne"
 msgstr "Arachne"
 
@@ -1301,7 +1299,7 @@ msgstr "Arachne generátor perimetrů"
 msgid "Archimedean Chords"
 msgstr "Archimedean Chords"
 
-#: src/slic3r/GUI/Tab.cpp:3747
+#: src/slic3r/GUI/Tab.cpp:3745
 #, boost-format
 msgid "Are you sure you want to %1% the selected preset?"
 msgstr "Opravdu chcete %1% vybrané přednastavení?"
@@ -1318,7 +1316,7 @@ msgstr ""
 msgid "Are you sure you want to continue?"
 msgstr "Opravdu chcete pokračovat?"
 
-#: src/slic3r/GUI/Tab.cpp:3715
+#: src/slic3r/GUI/Tab.cpp:3713
 #, boost-format
 msgid ""
 "Are you sure you want to delete \"%1%\" preset from the physical printer "
@@ -1331,7 +1329,7 @@ msgstr ""
 msgid "Are you sure you want to delete \"%1%\" printer?"
 msgstr "Opravdu chcete odstranit tiskárnu \"%1%\"?"
 
-#: src/slic3r/GUI/Tab.cpp:4159
+#: src/slic3r/GUI/Tab.cpp:4157
 msgid "Are you sure you want to delete all substitutions?"
 msgstr "Jste si jisti, že chcete odstranit všechna nahrazení?"
 
@@ -1339,7 +1337,7 @@ msgstr "Jste si jisti, že chcete odstranit všechna nahrazení?"
 msgid "Are you sure you want to do it?"
 msgstr "Opravdu to chcete udělat?"
 
-#: src/libslic3r/PrintConfig.cpp:3316
+#: src/libslic3r/PrintConfig.cpp:3289
 msgid "Area fill"
 msgstr "Zaplněná plocha"
 
@@ -1371,7 +1369,7 @@ msgstr ""
 "<a>Uspořádat</a> upravit velikost mezery mezi objekty a umožnit automatické "
 "otáčení modelů?"
 
-#: src/libslic3r/PrintConfig.cpp:4517
+#: src/libslic3r/PrintConfig.cpp:4492
 msgid ""
 "Arrange the supplied models in a plate and merge them in a single model in "
 "order to perform actions once."
@@ -1524,7 +1522,7 @@ msgstr "Automatické generování podpěrných bodů"
 msgid "Autogeneration will erase all manually edited points."
 msgstr "Automatické generování vymaže všechny ručně vytvořené body."
 
-#: src/slic3r/GUI/Tab.cpp:4699
+#: src/slic3r/GUI/Tab.cpp:4697
 msgid "Automatic generation"
 msgstr "Automatické generování"
 
@@ -1532,7 +1530,7 @@ msgstr "Automatické generování"
 msgid "Automatic updates"
 msgstr "Automatické aktualizace"
 
-#: src/slic3r/GUI/MainFrame.cpp:1300
+#: src/slic3r/GUI/MainFrame.cpp:1304
 msgid "Automatically repair an STL file"
 msgstr "Automaticky opravit STL soubor"
 
@@ -1548,11 +1546,11 @@ msgstr "Vyhnout se přejíždění perimetrů"
 msgid "Avoid crossing perimeters - Max detour length"
 msgstr "Vyhnout se přejíždění perimetrů - maximální délka objízdné cesty"
 
-#: src/slic3r/GUI/Tab.cpp:4336
+#: src/slic3r/GUI/Tab.cpp:4334
 msgid "BACK ARROW"
 msgstr "ŠIPKA ZPĚT"
 
-#: src/slic3r/GUI/Tab.cpp:4358
+#: src/slic3r/GUI/Tab.cpp:4356
 msgid ""
 "BACK ARROW icon indicates that the settings were changed and are not equal "
 "to the last saved preset for the current option group.\n"
@@ -1564,7 +1562,7 @@ msgstr ""
 "Klikněte pro reset všech nastavení pro aktuální skupinu nastavení na "
 "naposledy uložené přednastavení."
 
-#: src/slic3r/GUI/Tab.cpp:4372
+#: src/slic3r/GUI/Tab.cpp:4370
 msgid ""
 "BACK ARROW icon indicates that the value was changed and is not equal to the "
 "last saved preset.\n"
@@ -1578,7 +1576,7 @@ msgstr ""
 msgid "Background processing"
 msgstr "Zpracování na pozadí"
 
-#: src/libslic3r/PrintConfig.cpp:4571
+#: src/libslic3r/PrintConfig.cpp:4546
 msgid "Bail out on unknown configuration values"
 msgstr "Záchrana při neznámých hodnotách konfigurace"
 
@@ -1586,7 +1584,7 @@ msgstr "Záchrana při neznámých hodnotách konfigurace"
 msgid "Balanced"
 msgstr "Vyvážené"
 
-#: src/slic3r/GUI/Tab.cpp:1996
+#: src/slic3r/GUI/Tab.cpp:1994
 msgid "Bed"
 msgstr "Tisková podložka"
 
@@ -1634,7 +1632,7 @@ msgstr ""
 "Teplota tiskové podložky pro další vrstvy po první vrstvě. Nastavením na "
 "hodnotu nula vypnete ovládací příkazy teploty tiskové podložky ve výstupu."
 
-#: src/slic3r/GUI/Tab.cpp:2430 src/libslic3r/GCode.cpp:709
+#: src/slic3r/GUI/Tab.cpp:2428 src/libslic3r/GCode.cpp:709
 #: src/libslic3r/PrintConfig.cpp:424
 msgid "Before layer change G-code"
 msgstr "G-code před změnou vrstvy"
@@ -1659,7 +1657,7 @@ msgstr "Nejlepší kvalita povrchu"
 msgid "Between objects G-code"
 msgstr "G-code mezi objekty"
 
-#: src/slic3r/GUI/Tab.cpp:2460 src/libslic3r/GCode.cpp:712
+#: src/slic3r/GUI/Tab.cpp:2458 src/libslic3r/GCode.cpp:712
 msgid "Between objects G-code (for sequential printing)"
 msgstr "G-code mezi objekty (pro sekvenční tisk)"
 
@@ -1681,11 +1679,11 @@ msgstr "Blokování podpěr"
 msgid "Block supports by angle"
 msgstr "Blokování podpěr dle úhlu"
 
-#: src/libslic3r/PrintConfig.cpp:3413 src/libslic3r/PrintConfig.cpp:3414
+#: src/libslic3r/PrintConfig.cpp:3386 src/libslic3r/PrintConfig.cpp:3387
 msgid "Bottle volume"
 msgstr "Objem láhve"
 
-#: src/libslic3r/PrintConfig.cpp:3420 src/libslic3r/PrintConfig.cpp:3421
+#: src/libslic3r/PrintConfig.cpp:3393 src/libslic3r/PrintConfig.cpp:3394
 msgid "Bottle weight"
 msgstr "Hmotnost láhve"
 
@@ -1702,7 +1700,7 @@ msgstr "Spodních"
 msgid "Bottom"
 msgstr "Zespod"
 
-#: src/slic3r/GUI/MainFrame.cpp:1124
+#: src/slic3r/GUI/MainFrame.cpp:1128
 msgid "Bottom View"
 msgstr "Pohled zespod"
 
@@ -1977,8 +1975,8 @@ msgstr ""
 "Nelze pokračovat bez podpěrných bodů! Přidejte podpěrné body nebo zakažte "
 "generování podpěr."
 
-#: src/slic3r/GUI/Tab.cpp:2299 src/slic3r/GUI/UnsavedChangesDialog.cpp:1287
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1674
+#: src/slic3r/GUI/Tab.cpp:2297 src/slic3r/GUI/UnsavedChangesDialog.cpp:1287
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1677
 msgid "Capabilities"
 msgstr "Možnosti"
 
@@ -1986,7 +1984,7 @@ msgstr "Možnosti"
 msgid "Capture a configuration snapshot"
 msgstr "Vytvořit aktuální zálohu konfigurace"
 
-#: src/slic3r/GUI/Tab.cpp:4048
+#: src/slic3r/GUI/Tab.cpp:4046
 msgid "Case insensitive"
 msgstr "Nerozlišovat malá a velká písmena"
 
@@ -1994,11 +1992,11 @@ msgstr "Nerozlišovat malá a velká písmena"
 msgid "Category"
 msgstr "Kategorie"
 
-#: src/libslic3r/PrintConfig.cpp:4493
+#: src/libslic3r/PrintConfig.cpp:4468
 msgid "Center"
 msgstr "Střed"
 
-#: src/libslic3r/PrintConfig.cpp:4494
+#: src/libslic3r/PrintConfig.cpp:4469
 msgid "Center the print around the given center."
 msgstr "Vycentrujte tisk kolem daného středu."
 
@@ -2106,7 +2104,7 @@ msgstr ""
 "Vyberte soubor, ze kterého chcete importovat texturu pro tiskovou podložku "
 "(PNG/SVG):"
 
-#: src/slic3r/GUI/MainFrame.cpp:1609
+#: src/slic3r/GUI/MainFrame.cpp:1613
 msgid "Choose a file to slice (STL/OBJ/AMF/3MF/PRUSA):"
 msgstr "Zvolit soubor ke slicování (STL/OBJ/AMF/3MF/PRUSA):"
 
@@ -2154,7 +2152,7 @@ msgstr "Kruh"
 msgid "Circular"
 msgstr "Kruhový"
 
-#: src/libslic3r/PrintConfig.cpp:3073
+#: src/libslic3r/PrintConfig.cpp:3074
 msgid "Classic"
 msgstr "Klasický"
 
@@ -2162,12 +2160,13 @@ msgstr "Klasický"
 msgid ""
 "Classic perimeter generator produces perimeters with constant extrusion "
 "width and for very thin areas is used gap-fill. Arachne engine produces "
-"perimeters with variable extrusion width."
+"perimeters with variable extrusion width. This setting also affects the "
+"Concentric infill."
 msgstr ""
 "Klasický generátor obvodových stěn vytváří perimetry s konstantní šířkou "
 "vytlačovaného materiálu a pro velmi malé plochy se používá technika "
 "vyplňování mezer. Algoritmus Arachne vytváří perimetry s proměnnou šířkou "
-"vytlačovaného materiálu."
+"vytlačovaného materiálu. Toto nastavení ovlivňuje také koncentrickou výplň."
 
 #: src/slic3r/GUI/Preferences.cpp:295
 msgid "Clear Undo / Redo stack on new project"
@@ -2246,7 +2245,7 @@ msgid "Closing PrusaSlicer. Current project is modified."
 msgstr "Zavírání PrusaSliceru. Aktuální projekt je upravený."
 
 #: src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp:34
-#: src/libslic3r/PrintConfig.cpp:3900
+#: src/libslic3r/PrintConfig.cpp:3873
 msgid "Closing distance"
 msgstr "Vzdálenost uzavření"
 
@@ -2254,7 +2253,7 @@ msgstr "Vzdálenost uzavření"
 msgid "Closing radius"
 msgstr "Poloměr uzavření"
 
-#: src/slic3r/GUI/MainFrame.cpp:1433 src/slic3r/GUI/Plater.cpp:2320
+#: src/slic3r/GUI/MainFrame.cpp:1437 src/slic3r/GUI/Plater.cpp:2320
 msgid "Collapse sidebar"
 msgstr "Sbalit postranní panel"
 
@@ -2262,11 +2261,11 @@ msgstr "Sbalit postranní panel"
 msgid "Collapse/Expand the sidebar"
 msgstr "Sbalit/Rozbalit postranní panel"
 
-#: src/libslic3r/PrintConfig.cpp:889 src/libslic3r/PrintConfig.cpp:3388
+#: src/libslic3r/PrintConfig.cpp:889 src/libslic3r/PrintConfig.cpp:3361
 msgid "Color"
 msgstr "Barva"
 
-#: src/slic3r/GUI/Tab.cpp:2470 src/libslic3r/GCode.cpp:713
+#: src/slic3r/GUI/Tab.cpp:2468 src/libslic3r/GCode.cpp:713
 msgid "Color Change G-code"
 msgstr "G-code pro změnu barvy"
 
@@ -2329,12 +2328,12 @@ msgstr "Příkazy"
 msgid "Comment:"
 msgstr "Komentář:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1420
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1563
+#: src/slic3r/GUI/MainFrame.cpp:1424
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1566
 msgid "Compare Presets"
 msgstr "Porovnání přednastavení"
 
-#: src/slic3r/GUI/MainFrame.cpp:1420
+#: src/slic3r/GUI/MainFrame.cpp:1424
 msgid "Compare presets"
 msgstr "Porovnání přednastavení"
 
@@ -2342,7 +2341,7 @@ msgstr "Porovnání přednastavení"
 msgid "Compare this preset with some another"
 msgstr "Porovnat toto přednastavení s jiným"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1638
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1641
 msgid "Compared presets has different printer technology"
 msgstr "Srovnávaná přednastavení mají odlišnou technologii tisku"
 
@@ -2506,7 +2505,7 @@ msgstr ""
 "omezena na infill_anchor, ale ne delší než tento parametr. Nastavením tohoto "
 "parametru na nulu ukotvení zakážete."
 
-#: src/slic3r/GUI/Tab.cpp:4694
+#: src/slic3r/GUI/Tab.cpp:4692
 msgid "Connection of the support sticks and junctions"
 msgstr "Spojení podpůrných tyčí a spojek"
 
@@ -2562,7 +2561,7 @@ msgstr "Pokračovat a instalovat aktualizace konfigurace?"
 msgid "Continue to activate a configuration snapshot %1%?"
 msgstr "Pokračovat v aktivaci zálohy konfigurace %1%?"
 
-#: src/slic3r/GUI/AboutDialog.cpp:272
+#: src/slic3r/GUI/AboutDialog.cpp:274
 msgid ""
 "Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, "
 "Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik and "
@@ -2580,7 +2579,7 @@ msgstr ""
 "Příspěvky od Vojtěcha Bubníka, Enrica Turriho, Oleksandry Iushchenko, Tamáse "
 "Mészárose, Lukáše Matěny, Vojtěcha Krále, Davida Kocíka a řady dalších."
 
-#: src/libslic3r/PrintConfig.cpp:3625
+#: src/libslic3r/PrintConfig.cpp:3598
 msgid ""
 "Controls the bridge type between two neighboring pillars. Can be zig-zag, "
 "cross (double zig-zag) or dynamic which will automatically switch between "
@@ -2598,7 +2597,7 @@ msgstr "Převod z imperiálních jednotek"
 msgid "Convert from meters"
 msgstr "Převod z metrů"
 
-#: src/slic3r/GUI/Tab.cpp:2001
+#: src/slic3r/GUI/Tab.cpp:1999
 msgid "Cooling"
 msgstr "Chlazení"
 
@@ -2610,7 +2609,7 @@ msgstr "Chladicí pohyby se postupně zrychlují a začínají touto rychlostí.
 msgid "Cooling moves are gradually accelerating towards this speed."
 msgstr "Chladící pohyby se postupně zrychlují až k této rychlosti."
 
-#: src/slic3r/GUI/Tab.cpp:2025
+#: src/slic3r/GUI/Tab.cpp:2023
 msgid "Cooling thresholds"
 msgstr "Podmínky chlazení"
 
@@ -2631,11 +2630,11 @@ msgctxt "PresetName"
 msgid "Copy"
 msgstr "Kopie"
 
-#: src/slic3r/GUI/AboutDialog.cpp:308
+#: src/slic3r/GUI/AboutDialog.cpp:310
 msgid "Copy Version Info"
 msgstr "Zkopírovat číslo verze"
 
-#: src/slic3r/GUI/MainFrame.cpp:1346
+#: src/slic3r/GUI/MainFrame.cpp:1350
 msgid "Copy selection to clipboard"
 msgstr "Kopírovat výběr do schránky"
 
@@ -2696,32 +2695,32 @@ msgstr ""
 "problém s cílovým zařízením. Zkuste exportovat znovu nebo použijte jiné "
 "zařízení. Poškozený výstupní G-code je v %1%.tmp."
 
-#: src/slic3r/GUI/AboutDialog.cpp:139 src/slic3r/GUI/AboutDialog.cpp:267
+#: src/slic3r/GUI/AboutDialog.cpp:141 src/slic3r/GUI/AboutDialog.cpp:269
 msgid "Copyright"
 msgstr "Autorská práva"
 
-#: src/libslic3r/PrintConfig.cpp:3495 src/libslic3r/PrintConfig.cpp:3496
+#: src/libslic3r/PrintConfig.cpp:3468 src/libslic3r/PrintConfig.cpp:3469
 msgid "Correction for expansion"
 msgstr "Korekce expanze"
 
-#: src/libslic3r/PrintConfig.cpp:3502 src/libslic3r/PrintConfig.cpp:3503
+#: src/libslic3r/PrintConfig.cpp:3475 src/libslic3r/PrintConfig.cpp:3476
 msgid "Correction for expansion in X axis"
 msgstr "Korekce roztažnosti v ose X"
 
-#: src/libslic3r/PrintConfig.cpp:3509 src/libslic3r/PrintConfig.cpp:3510
+#: src/libslic3r/PrintConfig.cpp:3482 src/libslic3r/PrintConfig.cpp:3483
 msgid "Correction for expansion in Y axis"
 msgstr "Korekce roztažnosti v ose Y"
 
-#: src/libslic3r/PrintConfig.cpp:3516 src/libslic3r/PrintConfig.cpp:3517
+#: src/libslic3r/PrintConfig.cpp:3489 src/libslic3r/PrintConfig.cpp:3490
 msgid "Correction for expansion in Z axis"
 msgstr "Korekce roztažnosti v ose Z"
 
-#: src/slic3r/GUI/Tab.cpp:2547 src/slic3r/GUI/Tab.cpp:4574
+#: src/slic3r/GUI/Tab.cpp:2545 src/slic3r/GUI/Tab.cpp:4572
 msgid "Corrections"
 msgstr "Korekce"
 
 #: src/slic3r/GUI/Plater.cpp:1411 src/libslic3r/PrintConfig.cpp:1067
-#: src/libslic3r/PrintConfig.cpp:3434 src/libslic3r/PrintConfig.cpp:3435
+#: src/libslic3r/PrintConfig.cpp:3407 src/libslic3r/PrintConfig.cpp:3408
 msgid "Cost"
 msgstr "Náklady"
 
@@ -2794,7 +2793,7 @@ msgstr ""
 "trojúhelníkových sítí. Operace uzavírání mezery může snížit konečné "
 "rozlišení tisku, proto je vhodné udržovat rozumně nízkou hodnotu."
 
-#: src/libslic3r/PrintConfig.cpp:3823
+#: src/libslic3r/PrintConfig.cpp:3796
 msgid "Create pad around object and ignore the support elevation"
 msgstr ""
 "Vytvoří podložku kolem objektu a ignorujte nadzvednutí objektu podpěrami"
@@ -2811,7 +2810,7 @@ msgstr "Vytváření nového projektu. Některá přednastavení jsou upravená.
 msgid "Creating a new project while the current project is modified."
 msgstr "Vytvoření nového projektu. Současný projekt byl změněn."
 
-#: src/libslic3r/PrintConfig.cpp:3690
+#: src/libslic3r/PrintConfig.cpp:3663
 msgid "Critical angle"
 msgstr "Kritický úhel"
 
@@ -2819,7 +2818,7 @@ msgstr "Kritický úhel"
 msgid "Critical error"
 msgstr "Kritická chyba"
 
-#: src/libslic3r/PrintConfig.cpp:3634
+#: src/libslic3r/PrintConfig.cpp:3607
 msgid "Cross"
 msgstr "Cross"
 
@@ -2865,8 +2864,8 @@ msgstr ""
 "crt/pem. Pokud zůstane pole prázdné, použije se výchozí úložiště certifikátů "
 "OS CA."
 
-#: src/slic3r/GUI/Tab.cpp:2088 src/slic3r/GUI/Tab.cpp:2409
-#: src/slic3r/GUI/Tab.cpp:4263 src/libslic3r/GCode.cpp:733
+#: src/slic3r/GUI/Tab.cpp:2086 src/slic3r/GUI/Tab.cpp:2407
+#: src/slic3r/GUI/Tab.cpp:4261 src/libslic3r/GCode.cpp:733
 #: src/libslic3r/PrintConfig.cpp:2468
 msgid "Custom G-code"
 msgstr "Vlastní G-code"
@@ -2910,7 +2909,7 @@ msgid "Custom template (\"%1%\")"
 msgstr "Vlastní šablona (\"%1%\")"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:50
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:160 src/libslic3r/PrintConfig.cpp:4471
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:160 src/libslic3r/PrintConfig.cpp:4446
 msgid "Cut"
 msgstr "Řezat"
 
@@ -2918,7 +2917,7 @@ msgstr "Řezat"
 msgid "Cut by Plane"
 msgstr "Řez Rovinou"
 
-#: src/libslic3r/PrintConfig.cpp:4472
+#: src/libslic3r/PrintConfig.cpp:4447
 msgid "Cut model at the given Z."
 msgstr "Rozříznout model v dané výšce Z."
 
@@ -2926,7 +2925,7 @@ msgstr "Rozříznout model v dané výšce Z."
 msgid "Cylinder"
 msgstr "Válec"
 
-#: src/slic3r/GUI/MainFrame.cpp:1325
+#: src/slic3r/GUI/MainFrame.cpp:1329
 msgid "D&eselect All"
 msgstr "Odznačit Vš&e"
 
@@ -2934,7 +2933,7 @@ msgstr "Odznačit Vš&e"
 msgid "Dark mode (experimental)"
 msgstr "Tmavý režim (experimentální)"
 
-#: src/libslic3r/PrintConfig.cpp:4598
+#: src/libslic3r/PrintConfig.cpp:4573
 msgid "Data directory"
 msgstr "Složka Data"
 
@@ -2960,7 +2959,7 @@ msgstr "Odebrání Instancí"
 msgid "Default"
 msgstr "Výchozí"
 
-#: src/libslic3r/PrintConfig.cpp:3536 src/libslic3r/PrintConfig.cpp:3547
+#: src/libslic3r/PrintConfig.cpp:3509 src/libslic3r/PrintConfig.cpp:3520
 msgid "Default SLA material profile"
 msgstr "Výchozí profil pro SLA materiál"
 
@@ -2999,8 +2998,8 @@ msgstr ""
 msgid "Default print profile"
 msgstr "Výchozí tiskový profil"
 
-#: src/libslic3r/PrintConfig.cpp:652 src/libslic3r/PrintConfig.cpp:3537
-#: src/libslic3r/PrintConfig.cpp:3548
+#: src/libslic3r/PrintConfig.cpp:652 src/libslic3r/PrintConfig.cpp:3510
+#: src/libslic3r/PrintConfig.cpp:3521
 msgid ""
 "Default print profile associated with the current printer profile. On "
 "selection of the current printer profile, this print profile will be "
@@ -3013,7 +3012,7 @@ msgstr ""
 msgid "Define a custom printer profile"
 msgstr "Vytvořit vlastní tiskový profil"
 
-#: src/libslic3r/PrintConfig.cpp:3764
+#: src/libslic3r/PrintConfig.cpp:3737
 msgid ""
 "Defines the pad cavity depth. Set to zero to disable the cavity. Be careful "
 "when enabling this feature, as some resins may produce an extreme suction "
@@ -3031,11 +3030,11 @@ msgstr "Zpoždění po vyjmutí"
 
 #: src/slic3r/GUI/GalleryDialog.cpp:118 src/slic3r/GUI/GalleryDialog.cpp:508
 #: src/slic3r/GUI/GLCanvas3D.cpp:4490 src/slic3r/GUI/GUI_Factories.cpp:444
-#: src/slic3r/GUI/Tab.cpp:3750
+#: src/slic3r/GUI/Tab.cpp:3748
 msgid "Delete"
 msgstr "Smazat"
 
-#: src/slic3r/GUI/MainFrame.cpp:1332
+#: src/slic3r/GUI/MainFrame.cpp:1336
 msgid "Delete &All"
 msgstr "Sm&azat Vše"
 
@@ -3089,7 +3088,7 @@ msgid "Delete Subobject"
 msgstr "Smazání dílčího objektu"
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:4499 src/slic3r/GUI/KBShortcutsDialog.cpp:96
-#: src/slic3r/GUI/Plater.cpp:5496 src/slic3r/GUI/Tab.cpp:4157
+#: src/slic3r/GUI/Plater.cpp:5496 src/slic3r/GUI/Tab.cpp:4155
 msgid "Delete all"
 msgstr "Smazat vše"
 
@@ -3146,16 +3145,16 @@ msgstr "Smazat značku - Levé tlačítko myši nebo klávesa \"-\""
 msgid "Delete tool change"
 msgstr "Smazat změnu nástroje"
 
-#: src/slic3r/GUI/MainFrame.cpp:1333
+#: src/slic3r/GUI/MainFrame.cpp:1337
 msgid "Deletes all objects"
 msgstr "Smazat všechny objekty"
 
-#: src/slic3r/GUI/MainFrame.cpp:1330
+#: src/slic3r/GUI/MainFrame.cpp:1334
 msgid "Deletes the current selection"
 msgstr "Smaže aktuální výběr"
 
-#: src/libslic3r/PrintConfig.cpp:1024 src/libslic3r/PrintConfig.cpp:3427
-#: src/libslic3r/PrintConfig.cpp:3428
+#: src/libslic3r/PrintConfig.cpp:1024 src/libslic3r/PrintConfig.cpp:3400
+#: src/libslic3r/PrintConfig.cpp:3401
 msgid "Density"
 msgstr "Hustota"
 
@@ -3167,9 +3166,9 @@ msgstr "Hustota vnitřní výplně vyjádřená v rozmezí 0 až 100 %."
 msgid "Density of the first raft or support layer."
 msgstr "Hustota prvního vrstvy raftu nebo podpěrné vrstvy."
 
-#: src/slic3r/GUI/Tab.cpp:1730 src/slic3r/GUI/Tab.cpp:2117
-#: src/slic3r/GUI/Tab.cpp:2504 src/slic3r/GUI/Tab.cpp:2577
-#: src/slic3r/GUI/Tab.cpp:4592 src/slic3r/GUI/Tab.cpp:4739
+#: src/slic3r/GUI/Tab.cpp:1728 src/slic3r/GUI/Tab.cpp:2115
+#: src/slic3r/GUI/Tab.cpp:2502 src/slic3r/GUI/Tab.cpp:2575
+#: src/slic3r/GUI/Tab.cpp:4590 src/slic3r/GUI/Tab.cpp:4737
 msgid "Dependencies"
 msgstr "Závislosti"
 
@@ -3193,7 +3192,7 @@ msgstr "Odznačit vše"
 msgid "Deselect by rectangle"
 msgstr "Odznačit obdélníkovým výběrem myši"
 
-#: src/slic3r/GUI/MainFrame.cpp:1326
+#: src/slic3r/GUI/MainFrame.cpp:1330
 msgid "Deselects all objects"
 msgstr "Odznačit všechny objekty"
 
@@ -3229,7 +3228,7 @@ msgstr "Oddělit od systémového přednastavení"
 msgid "Detach preset"
 msgstr "Oddělení přednastavení"
 
-#: src/slic3r/GUI/Tab.cpp:3624
+#: src/slic3r/GUI/Tab.cpp:3622
 msgid "Detached"
 msgstr "Odpojeno"
 
@@ -3253,7 +3252,7 @@ msgstr ""
 msgid "Detect thin walls"
 msgstr "Detekovat tenké stěny"
 
-#: src/libslic3r/PrintConfig.cpp:4546
+#: src/libslic3r/PrintConfig.cpp:4521
 msgid ""
 "Detect unconnected parts in the given model(s) and split them into separate "
 "objects."
@@ -3277,15 +3276,15 @@ msgstr "Zařízení:"
 msgid "Diameter"
 msgstr "Průměr"
 
-#: src/libslic3r/PrintConfig.cpp:3660
+#: src/libslic3r/PrintConfig.cpp:3633
 msgid "Diameter in mm of the pillar base"
 msgstr "Průměr základny podpěr v mm"
 
-#: src/libslic3r/PrintConfig.cpp:3595
+#: src/libslic3r/PrintConfig.cpp:3568
 msgid "Diameter in mm of the support pillars"
 msgstr "Průměr podpěrných sloupů v mm"
 
-#: src/libslic3r/PrintConfig.cpp:3567
+#: src/libslic3r/PrintConfig.cpp:3540
 msgid "Diameter of the pointing side of the head"
 msgstr "Průměr konce podpůrného hrotu"
 
@@ -3348,31 +3347,31 @@ msgstr "Odstranit všechny vámi provedené změny"
 msgid "Discard changes"
 msgstr "Zahodit změny"
 
-#: src/slic3r/GUI/Tab.cpp:2524
+#: src/slic3r/GUI/Tab.cpp:2522
 msgid "Display"
 msgstr "Displej"
 
-#: src/libslic3r/PrintConfig.cpp:3243
+#: src/libslic3r/PrintConfig.cpp:3216
 msgid "Display height"
 msgstr "Výška displeje"
 
-#: src/libslic3r/PrintConfig.cpp:3262
+#: src/libslic3r/PrintConfig.cpp:3235
 msgid "Display horizontal mirroring"
 msgstr "Horizontální zrcadlení displeje"
 
-#: src/libslic3r/PrintConfig.cpp:3276
+#: src/libslic3r/PrintConfig.cpp:3249
 msgid "Display orientation"
 msgstr "Orientace displeje"
 
-#: src/slic3r/GUI/MainFrame.cpp:1412
+#: src/slic3r/GUI/MainFrame.cpp:1416
 msgid "Display the Print Host Upload Queue window"
 msgstr "Zobrazit okno s frontou nahrávání do tiskového serveru"
 
-#: src/libslic3r/PrintConfig.cpp:3269
+#: src/libslic3r/PrintConfig.cpp:3242
 msgid "Display vertical mirroring"
 msgstr "Vertikální zrcadlení displeje"
 
-#: src/libslic3r/PrintConfig.cpp:3237
+#: src/libslic3r/PrintConfig.cpp:3210
 msgid "Display width"
 msgstr "Šířka displeje"
 
@@ -3391,7 +3390,7 @@ msgstr ""
 "Vzdálenost mezi obrysem a límcem (pokud není použit ochranný štít) nebo "
 "objekty."
 
-#: src/libslic3r/PrintConfig.cpp:3848
+#: src/libslic3r/PrintConfig.cpp:3821
 msgid ""
 "Distance between two connector sticks which connect the object and the "
 "generated pad."
@@ -3428,11 +3427,11 @@ msgstr "Vzdálenost, použitá pro funkci automatického rozmístění po podlo�
 msgid "Divide by zero"
 msgstr "Dělení nulou"
 
-#: src/libslic3r/PrintConfig.cpp:4560
+#: src/libslic3r/PrintConfig.cpp:4535
 msgid "Do not fail if a file supplied to --load does not exist."
 msgstr "Nepodaří se, pokud neexistuje soubor dodaný k přepínači --load."
 
-#: src/libslic3r/PrintConfig.cpp:4499
+#: src/libslic3r/PrintConfig.cpp:4474
 msgid ""
 "Do not rearrange the given models before merging and keep their original XY "
 "coordinates."
@@ -3488,7 +3487,7 @@ msgstr "Chcete pro tyto modely tiskáren vybrat výchozí SLA materiály?"
 msgid "Do you want to select default filaments for these FFF printer models?"
 msgstr "Chcete pro tyto modely FFF tiskáren vybrat výchozí filamenty?"
 
-#: src/libslic3r/PrintConfig.cpp:4498
+#: src/libslic3r/PrintConfig.cpp:4473
 msgid "Don't arrange"
 msgstr "Neuspořádávat"
 
@@ -3552,11 +3551,11 @@ msgstr ""
 msgid "Drop to bed"
 msgstr "Spadnout na podložku"
 
-#: src/libslic3r/PrintConfig.cpp:4507
+#: src/libslic3r/PrintConfig.cpp:4482
 msgid "Duplicate"
 msgstr "Duplikovat"
 
-#: src/libslic3r/PrintConfig.cpp:4512
+#: src/libslic3r/PrintConfig.cpp:4487
 msgid "Duplicate by grid"
 msgstr "Duplikovat mřížkou"
 
@@ -3573,11 +3572,11 @@ msgstr "Během ostatních vrstev bude ventilátor vždy běžet na %1%%%"
 msgid "During the other layers, fan will be turned off."
 msgstr "Během ostatních vrstev bude ventilátor vypnutý."
 
-#: src/libslic3r/PrintConfig.cpp:3635
+#: src/libslic3r/PrintConfig.cpp:3608
 msgid "Dynamic"
 msgstr "Dynamic"
 
-#: src/slic3r/GUI/MainFrame.cpp:1582
+#: src/slic3r/GUI/MainFrame.cpp:1586
 msgid "E&xport"
 msgstr "E&xportovat"
 
@@ -3628,7 +3627,7 @@ msgstr "Upravit vlastní G-code"
 msgid "Edit pause print message"
 msgstr "Upravit zprávu při pozastavení tisku"
 
-#: src/slic3r/GUI/PresetComboBoxes.cpp:730 src/slic3r/GUI/Tab.cpp:3247
+#: src/slic3r/GUI/PresetComboBoxes.cpp:730 src/slic3r/GUI/Tab.cpp:3245
 msgid "Edit physical printer"
 msgstr "Upravit fyzickou tiskárnu"
 
@@ -3652,7 +3651,7 @@ msgstr "Editace"
 msgid "Eigen vectorization supported:"
 msgstr "Podporovaná vlastní vektorizace:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1268
+#: src/slic3r/GUI/MainFrame.cpp:1272
 msgid "Ejec&t SD Card / Flash Drive"
 msgstr "Vysunou&t SD kartu / Flash disk"
 
@@ -3660,7 +3659,7 @@ msgstr "Vysunou&t SD kartu / Flash disk"
 msgid "Eject SD card / Flash drive"
 msgstr "Vysunout SD kartu / Flash disk"
 
-#: src/slic3r/GUI/MainFrame.cpp:1268
+#: src/slic3r/GUI/MainFrame.cpp:1272
 msgid "Eject SD card / Flash drive after the G-code was exported to it."
 msgstr "Vysunout SD kartu / Flash disk po vyexportování G-codu."
 
@@ -3677,7 +3676,7 @@ msgstr "Vysunutí zařízení  %s(%s) se nezdařilo."
 msgid "Elephant foot compensation"
 msgstr "Kompenzace rozplácnutí první vrstvy"
 
-#: src/libslic3r/PrintConfig.cpp:3364
+#: src/libslic3r/PrintConfig.cpp:3337
 msgid "Elephant foot minimum width"
 msgstr "Minimální šířka po kompenzaci rozplácnutí první vrstvy"
 
@@ -3710,7 +3709,7 @@ msgstr "Emitovat do G-codu"
 msgid "Empty layer between %1% and %2%."
 msgstr "Prázdná vrstva mezi %1% a %2%."
 
-#: src/slic3r/GUI/Tab.cpp:2003 src/libslic3r/PrintConfig.cpp:1912
+#: src/slic3r/GUI/Tab.cpp:2001 src/libslic3r/PrintConfig.cpp:1912
 #: src/libslic3r/PrintConfig.cpp:2962
 msgid "Enable"
 msgstr "Zapnout"
@@ -3727,11 +3726,11 @@ msgstr "Aktivace tmavého režimu"
 msgid "Enable fan if layer print time is below"
 msgstr "Zapnout ventilátor, pokud je doba tisku vrstvy kratší než"
 
-#: src/libslic3r/PrintConfig.cpp:3874
+#: src/libslic3r/PrintConfig.cpp:3847
 msgid "Enable hollowing"
 msgstr "Povolit tvorbu dutin"
 
-#: src/libslic3r/PrintConfig.cpp:3264
+#: src/libslic3r/PrintConfig.cpp:3237
 msgid "Enable horizontal mirroring of output images"
 msgstr "Zapne horizontální zrcadlení výstupních obrázků"
 
@@ -3744,7 +3743,7 @@ msgid ""
 "Enable ironing of the top layers with the hot print head for smooth surface"
 msgstr "Pro hladké vrchní vrstvy povolte ironing pomocí ohřáté tiskové hlavy"
 
-#: src/libslic3r/PrintConfig.cpp:4573
+#: src/libslic3r/PrintConfig.cpp:4548
 msgid ""
 "Enable reading unknown configuration values by silently substituting them "
 "with defaults."
@@ -3752,7 +3751,7 @@ msgstr ""
 "Umožňuje načítání neznámých konfiguračních hodnot jejich tichým nahrazením "
 "výchozími hodnotami."
 
-#: src/libslic3r/PrintConfig.cpp:4572
+#: src/libslic3r/PrintConfig.cpp:4547
 msgid ""
 "Enable reading unknown configuration values by verbosely substituting them "
 "with defaults."
@@ -3802,7 +3801,7 @@ msgstr ""
 msgid "Enable variable layer height feature"
 msgstr "Zapnout variabilní výšku vrstev"
 
-#: src/libslic3r/PrintConfig.cpp:3271
+#: src/libslic3r/PrintConfig.cpp:3244
 msgid "Enable vertical mirroring of output images"
 msgstr "Zapne vertikální zrcadlení výstupních obrázků"
 
@@ -3818,7 +3817,7 @@ msgstr ""
 "Umožňuje vyplnit mezery mezi perimetry a mezi nejvnitřnějšími perimetry a "
 "výplní."
 
-#: src/slic3r/GUI/Tab.cpp:2099 src/slic3r/GUI/Tab.cpp:2420
+#: src/slic3r/GUI/Tab.cpp:2097 src/slic3r/GUI/Tab.cpp:2418
 #: src/libslic3r/GCode.cpp:708 src/libslic3r/PrintConfig.cpp:684
 #: src/libslic3r/PrintConfig.cpp:694
 msgid "End G-code"
@@ -3850,7 +3849,7 @@ msgstr "Vynucení podpěr"
 msgid "Enqueued"
 msgstr "Zařazeno do fronty"
 
-#: src/libslic3r/PrintConfig.cpp:4502
+#: src/libslic3r/PrintConfig.cpp:4477
 msgid "Ensure on bed"
 msgstr "Zajistit položení na podložku"
 
@@ -3959,7 +3958,7 @@ msgstr ""
 "Chyba: \"%2%\""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:157
-#: src/slic3r/GUI/MainFrame.cpp:1165 src/slic3r/GUI/MainFrame.cpp:1622
+#: src/slic3r/GUI/MainFrame.cpp:1169 src/slic3r/GUI/MainFrame.cpp:1626
 #: src/slic3r/GUI/PrintHostDialogs.cpp:373
 msgid "Error"
 msgstr "Chyba"
@@ -4107,23 +4106,23 @@ msgstr "Expertní režim"
 msgid "Export"
 msgstr "Exportovat"
 
-#: src/slic3r/GUI/MainFrame.cpp:1257
+#: src/slic3r/GUI/MainFrame.cpp:1261
 msgid "Export &Config"
 msgstr "Exportovat Konfigura&ci"
 
-#: src/slic3r/GUI/MainFrame.cpp:1230 src/slic3r/GUI/MainFrame.cpp:1582
+#: src/slic3r/GUI/MainFrame.cpp:1234 src/slic3r/GUI/MainFrame.cpp:1586
 msgid "Export &G-code"
 msgstr "Exportovat &G-code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1253 src/slic3r/GUI/MainFrame.cpp:1534
+#: src/slic3r/GUI/MainFrame.cpp:1257 src/slic3r/GUI/MainFrame.cpp:1538
 msgid "Export &Toolpaths as OBJ"
 msgstr "Exportovat &Trasy extruderu jako OBJ"
 
-#: src/libslic3r/PrintConfig.cpp:4401
+#: src/libslic3r/PrintConfig.cpp:4376
 msgid "Export 3MF"
 msgstr "Exportovat 3MF"
 
-#: src/libslic3r/PrintConfig.cpp:4406
+#: src/libslic3r/PrintConfig.cpp:4381
 msgid "Export AMF"
 msgstr "Exportovat AMF"
 
@@ -4131,11 +4130,11 @@ msgstr "Exportovat AMF"
 msgid "Export AMF file:"
 msgstr "Exportovat AMF soubor:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1260
+#: src/slic3r/GUI/MainFrame.cpp:1264
 msgid "Export Config &Bundle"
 msgstr "Exportovat Konfigurační &Balík"
 
-#: src/slic3r/GUI/MainFrame.cpp:1263
+#: src/slic3r/GUI/MainFrame.cpp:1267
 msgid "Export Config Bundle With Physical Printers"
 msgstr "Exportovat Konfigurační balík  včetně fyzických tiskáren"
 
@@ -4144,15 +4143,15 @@ msgid "Export G-Code."
 msgstr "Export G-codu."
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:87 src/slic3r/GUI/Plater.cpp:913
-#: src/slic3r/GUI/Plater.cpp:6530 src/libslic3r/PrintConfig.cpp:4416
+#: src/slic3r/GUI/Plater.cpp:6530 src/libslic3r/PrintConfig.cpp:4391
 msgid "Export G-code"
 msgstr "Exportovat G-code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1238
+#: src/slic3r/GUI/MainFrame.cpp:1242
 msgid "Export G-code to SD Card / Flash Drive"
 msgstr "Exportovat G-code na SD kartu / Flash disk"
 
-#: src/libslic3r/PrintConfig.cpp:4383
+#: src/libslic3r/PrintConfig.cpp:4358
 msgid "Export OBJ"
 msgstr "Exportovat OBJ"
 
@@ -4160,19 +4159,19 @@ msgstr "Exportovat OBJ"
 msgid "Export OBJ file:"
 msgstr "Exportovat OBJ soubor:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1242
+#: src/slic3r/GUI/MainFrame.cpp:1246
 msgid "Export Plate as &STL"
 msgstr "Exportovat Plochu jako &STL"
 
-#: src/slic3r/GUI/MainFrame.cpp:1245
+#: src/slic3r/GUI/MainFrame.cpp:1249
 msgid "Export Plate as STL &Including Supports"
 msgstr "Exportovat T&iskovou plochu včetně podpěr jako STL"
 
-#: src/libslic3r/PrintConfig.cpp:4395
+#: src/libslic3r/PrintConfig.cpp:4370
 msgid "Export SLA"
 msgstr "Exportovat SLA"
 
-#: src/libslic3r/PrintConfig.cpp:4411
+#: src/libslic3r/PrintConfig.cpp:4386
 msgid "Export STL"
 msgstr "Exportovat STL"
 
@@ -4180,11 +4179,11 @@ msgstr "Exportovat STL"
 msgid "Export STL file:"
 msgstr "Exportovat STL soubor:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1263
+#: src/slic3r/GUI/MainFrame.cpp:1267
 msgid "Export all presets including physical printers to file"
 msgstr "Exportovat do souboru všechna přednastavení včetně fyzických tiskáren"
 
-#: src/slic3r/GUI/MainFrame.cpp:1260
+#: src/slic3r/GUI/MainFrame.cpp:1264
 msgid "Export all presets to file"
 msgstr "Exportovat všechna přednastavení do souboru"
 
@@ -4196,23 +4195,23 @@ msgstr "Exportovat jako STL"
 msgid "Export config"
 msgstr "Exportovat konfiguraci"
 
-#: src/slic3r/GUI/MainFrame.cpp:1257
+#: src/slic3r/GUI/MainFrame.cpp:1261
 msgid "Export current configuration to file"
 msgstr "Exportovat současnou konfiguraci do souboru"
 
-#: src/slic3r/GUI/MainFrame.cpp:1230
+#: src/slic3r/GUI/MainFrame.cpp:1234
 msgid "Export current plate as G-code"
 msgstr "Exportovat stávající plochu do G-code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1238
+#: src/slic3r/GUI/MainFrame.cpp:1242
 msgid "Export current plate as G-code to SD card / Flash drive"
 msgstr "Exportovat aktuální podložku jako G-code na SD kartu / Flash disk"
 
-#: src/slic3r/GUI/MainFrame.cpp:1242
+#: src/slic3r/GUI/MainFrame.cpp:1246
 msgid "Export current plate as STL"
 msgstr "Exportovat stávající plochu jako STL"
 
-#: src/slic3r/GUI/MainFrame.cpp:1245
+#: src/slic3r/GUI/MainFrame.cpp:1249
 msgid "Export current plate as STL including supports"
 msgstr "Exportovat stávající plochu včetně podpěr jako STL"
 
@@ -4229,19 +4228,19 @@ msgstr "Export dočasného 3MF souboru selhalo"
 msgid "Export sources full pathnames to 3mf and amf"
 msgstr "Exportovat absolutní cesty k 3mf a amf souborům"
 
-#: src/libslic3r/PrintConfig.cpp:4402
+#: src/libslic3r/PrintConfig.cpp:4377
 msgid "Export the model(s) as 3MF."
 msgstr "Exportovat model(y) jako 3MF."
 
-#: src/libslic3r/PrintConfig.cpp:4407
+#: src/libslic3r/PrintConfig.cpp:4382
 msgid "Export the model(s) as AMF."
 msgstr "Exportovat model(y) jako AMF."
 
-#: src/libslic3r/PrintConfig.cpp:4384
+#: src/libslic3r/PrintConfig.cpp:4359
 msgid "Export the model(s) as OBJ."
 msgstr "Exportovat model(y) jako OBJ."
 
-#: src/libslic3r/PrintConfig.cpp:4412
+#: src/libslic3r/PrintConfig.cpp:4387
 msgid "Export the model(s) as STL."
 msgstr "Exportovat model(y) jako STL."
 
@@ -4249,7 +4248,7 @@ msgstr "Exportovat model(y) jako STL."
 msgid "Export to SD card / Flash drive"
 msgstr "Export na SD kartu / Flash disk"
 
-#: src/slic3r/GUI/MainFrame.cpp:1253 src/slic3r/GUI/MainFrame.cpp:1534
+#: src/slic3r/GUI/MainFrame.cpp:1257 src/slic3r/GUI/MainFrame.cpp:1538
 msgid "Export toolpaths as OBJ"
 msgstr "Exportovat trasy extruderu jako OBJ"
 
@@ -4261,7 +4260,7 @@ msgstr "Export."
 msgid "Exporting G-code"
 msgstr "Exportování souboru G-code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1812
+#: src/slic3r/GUI/MainFrame.cpp:1816
 msgid "Exporting configuration bundle"
 msgstr "Exportování konfiguračního balíku"
 
@@ -4282,11 +4281,11 @@ msgstr "Exportování."
 msgid "Exposition time is out of printer profile bounds."
 msgstr "Doba osvitu  je mimo rozsah profilu tiskárny."
 
-#: src/slic3r/GUI/Tab.cpp:2560 src/slic3r/GUI/Tab.cpp:4570
+#: src/slic3r/GUI/Tab.cpp:2558 src/slic3r/GUI/Tab.cpp:4568
 msgid "Exposure"
 msgstr "Osvit"
 
-#: src/libslic3r/PrintConfig.cpp:3465 src/libslic3r/PrintConfig.cpp:3466
+#: src/libslic3r/PrintConfig.cpp:3438 src/libslic3r/PrintConfig.cpp:3439
 msgid "Exposure time"
 msgstr "Doba osvitu"
 
@@ -4348,7 +4347,7 @@ msgstr "Barva extruderu"
 msgid "Extruder changed to"
 msgstr "Extruder změněn na"
 
-#: src/slic3r/GUI/Tab.cpp:1687
+#: src/slic3r/GUI/Tab.cpp:1685
 msgid "Extruder clearance"
 msgstr "Kolizní oblast extruderu"
 
@@ -4357,7 +4356,7 @@ msgid "Extruder offset"
 msgstr "Odsazení extruderu"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:133 src/slic3r/GUI/Tab.cpp:1620
-#: src/slic3r/GUI/Tab.cpp:2303 src/libslic3r/PrintConfig.cpp:792
+#: src/slic3r/GUI/Tab.cpp:2301 src/libslic3r/PrintConfig.cpp:792
 #: src/libslic3r/PrintConfig.cpp:1465 src/libslic3r/PrintConfig.cpp:1965
 #: src/libslic3r/PrintConfig.cpp:2341 src/libslic3r/PrintConfig.cpp:2615
 #: src/libslic3r/PrintConfig.cpp:2643
@@ -4365,7 +4364,7 @@ msgid "Extruders"
 msgstr "Extrudery"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1283
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1670
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1673
 msgid "Extruders count"
 msgstr "Počet extruderů"
 
@@ -4405,7 +4404,7 @@ msgstr "Tiskárny technologie FFF"
 msgid "Facets"
 msgstr "Facety"
 
-#: src/libslic3r/PrintConfig.cpp:3441
+#: src/libslic3r/PrintConfig.cpp:3414
 msgid "Faded layers"
 msgstr "Vrstvy počátečního osvitu"
 
@@ -4434,11 +4433,11 @@ msgstr "Některé otvory se do modelu nepodařilo se vyvrtat"
 msgid "Fan Speed (%)"
 msgstr "Rychlost ventilátoru (%)"
 
-#: src/slic3r/GUI/Tab.cpp:2014
+#: src/slic3r/GUI/Tab.cpp:2012
 msgid "Fan settings"
 msgstr "Nastavení ventilátoru"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:221 src/slic3r/GUI/Tab.cpp:2015
+#: src/slic3r/GUI/GUI_Preview.cpp:221 src/slic3r/GUI/Tab.cpp:2013
 msgid "Fan speed"
 msgstr "Rychlost ventilátoru"
 
@@ -4471,11 +4470,11 @@ msgstr "Ventilátor vždy poběží na %1%%%"
 msgid "Fan will be turned off."
 msgstr "Ventilátor bude vypnutý."
 
-#: src/libslic3r/PrintConfig.cpp:3289 src/libslic3r/PrintConfig.cpp:3924
+#: src/libslic3r/PrintConfig.cpp:3262 src/libslic3r/PrintConfig.cpp:3897
 msgid "Fast"
 msgstr "Rychlý"
 
-#: src/libslic3r/PrintConfig.cpp:3290
+#: src/libslic3r/PrintConfig.cpp:3263
 msgid "Fast tilt"
 msgstr "Rychlý náklon"
 
@@ -4499,7 +4498,7 @@ msgstr "Typy extrudování"
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3700 src/slic3r/GUI/GCodeViewer.cpp:3726
 #: src/slic3r/GUI/GUI.cpp:339 src/slic3r/GUI/Plater.cpp:819
-#: src/slic3r/GUI/Tab.cpp:1969 src/slic3r/GUI/Tab.cpp:1970
+#: src/slic3r/GUI/Tab.cpp:1967 src/slic3r/GUI/Tab.cpp:1968
 msgid "Filament"
 msgstr "Filament"
 
@@ -4511,7 +4510,7 @@ msgstr "Průměr filamentu:"
 msgid "Filament End G-code"
 msgstr "Filament Konec G-code"
 
-#: src/slic3r/GUI/Tab.cpp:1868
+#: src/slic3r/GUI/Tab.cpp:1866
 msgid "Filament Overrides"
 msgstr "Přepsání globálních hodnot"
 
@@ -4520,7 +4519,7 @@ msgid "Filament Profiles Selection"
 msgstr "Výběr Filamentových Profilů"
 
 #: src/slic3r/GUI/MainFrame.cpp:286 src/slic3r/GUI/MainFrame.cpp:337
-#: src/slic3r/GUI/MainFrame.cpp:2099 src/slic3r/GUI/MainFrame.cpp:2100
+#: src/slic3r/GUI/MainFrame.cpp:2103 src/slic3r/GUI/MainFrame.cpp:2104
 #: src/slic3r/GUI/Tab.hpp:461
 msgid "Filament Settings"
 msgstr "Nastavení filamentu"
@@ -4562,7 +4561,7 @@ msgstr "Poznámky k filamentu"
 msgid "Filament parking position"
 msgstr "Parkovací pozice filamentu"
 
-#: src/slic3r/GUI/Tab.cpp:2031
+#: src/slic3r/GUI/Tab.cpp:2029
 msgid "Filament properties"
 msgstr "Vlastnosti filamentu"
 
@@ -4579,7 +4578,7 @@ msgstr "Doba vysouvání filamentu"
 msgid "Filaments"
 msgstr "Filamenty"
 
-#: src/slic3r/GUI/MainFrame.cpp:1629
+#: src/slic3r/GUI/MainFrame.cpp:1633
 msgid "File Not Found"
 msgstr "Soubor nenalezen"
 
@@ -4647,7 +4646,7 @@ msgstr "Vyplní zbývající tiskovou plochu instancemi vybraného objektu"
 msgid "Filling bed"
 msgstr "Vyplňování podložky"
 
-#: src/slic3r/GUI/Tab.cpp:3954
+#: src/slic3r/GUI/Tab.cpp:3952
 msgid "Find"
 msgstr "Najít"
 
@@ -4659,11 +4658,11 @@ msgstr "Vyhledávání / nahrazování vzorů v řádcích G-code a jejich nahra
 msgid "Finished"
 msgstr "Dokončeno"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1357 src/slic3r/GUI/Tab.cpp:2365
+#: src/slic3r/GUI/ConfigWizard.cpp:1357 src/slic3r/GUI/Tab.cpp:2363
 msgid "Firmware"
 msgstr "Firmware"
 
-#: src/slic3r/GUI/Tab.cpp:3013
+#: src/slic3r/GUI/Tab.cpp:3011
 msgid "Firmware Retraction"
 msgstr "Firmware Retrakce"
 
@@ -4878,7 +4877,7 @@ msgstr ""
 "U čistící věže pokud pracujte s rozpustnými materiály, je třeba\n"
 "synchronizovat vrstvy podpěr s vrstvami objektů."
 
-#: src/libslic3r/PrintConfig.cpp:3830
+#: src/libslic3r/PrintConfig.cpp:3803
 msgid "Force pad around object everywhere"
 msgstr "Vynutit podložku všude okolo objektů"
 
@@ -4912,7 +4911,7 @@ msgstr ""
 "Formát náhledových obrázků G-codu: Pro nejlepší kvalitu PNG, pro nejmenší "
 "velikost JPG, pro firmware s malou pamětí QOI"
 
-#: src/libslic3r/PrintConfig.cpp:4563
+#: src/libslic3r/PrintConfig.cpp:4538
 msgid ""
 "Forward-compatibility rule when loading configurations from config files and "
 "project files (3MF, AMF)."
@@ -4920,7 +4919,7 @@ msgstr ""
 "Pravidlo dopředné kompatibility při načítání konfigurací z konfiguračních "
 "souborů a souborů projektů (3MF, AMF)."
 
-#: src/slic3r/GUI/Tab.cpp:1854
+#: src/slic3r/GUI/Tab.cpp:1852
 msgid "Found reserved keywords in"
 msgstr "Nalezená vyhrazená klíčová slova v"
 
@@ -4932,11 +4931,11 @@ msgstr "Předchozí extruder"
 msgid "From Object List You can't delete the last solid part from object."
 msgstr "Ze seznamu objektů nemůžete smazat poslední část objektu."
 
-#: src/slic3r/GUI/MainFrame.cpp:1126
+#: src/slic3r/GUI/MainFrame.cpp:1130
 msgid "Front"
 msgstr "Zepředu"
 
-#: src/slic3r/GUI/MainFrame.cpp:1126
+#: src/slic3r/GUI/MainFrame.cpp:1130
 msgid "Front View"
 msgstr "Pohled zepředu"
 
@@ -4944,7 +4943,7 @@ msgstr "Pohled zepředu"
 msgid "Full fan speed at layer"
 msgstr "Maximální otáčky ventilátoru ve vrstvě"
 
-#: src/slic3r/GUI/MainFrame.cpp:1438
+#: src/slic3r/GUI/MainFrame.cpp:1442
 msgid "Fullscreen"
 msgstr "Fullscreen"
 
@@ -4992,7 +4991,7 @@ msgstr "Tloušťka členitého povrchu"
 msgid "Fuzzy skin type."
 msgstr "Typ členitého povrchu."
 
-#: src/slic3r/GUI/MainFrame.cpp:1664
+#: src/slic3r/GUI/MainFrame.cpp:1668
 msgid "G-code"
 msgstr "G-code"
 
@@ -5029,11 +5028,11 @@ msgstr "Nahrazení G-codu"
 msgid "G-code thumbnails"
 msgstr "Náhledy G-codu"
 
-#: src/libslic3r/PrintConfig.cpp:4422
+#: src/libslic3r/PrintConfig.cpp:4397
 msgid "G-code viewer"
 msgstr "Prohlížeč G-codu"
 
-#: src/slic3r/GUI/AboutDialog.cpp:270 src/slic3r/GUI/GUI_App.cpp:268
+#: src/slic3r/GUI/AboutDialog.cpp:272 src/slic3r/GUI/GUI_App.cpp:268
 msgid "GNU Affero General Public License, version 3"
 msgstr "GNU Affero General Public License, verze 3"
 
@@ -5050,10 +5049,10 @@ msgstr "Galerie"
 msgid "Gap fill"
 msgstr "Výplň tenkých stěn"
 
-#: src/slic3r/GUI/Preferences.cpp:106 src/slic3r/GUI/Tab.cpp:2289
-#: src/slic3r/GUI/Tab.cpp:2516 src/slic3r/GUI/Tab.cpp:2623
+#: src/slic3r/GUI/Preferences.cpp:106 src/slic3r/GUI/Tab.cpp:2287
+#: src/slic3r/GUI/Tab.cpp:2514 src/slic3r/GUI/Tab.cpp:2621
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1287
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1674
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1677
 msgid "General"
 msgstr "Obecné"
 
@@ -5083,11 +5082,11 @@ msgstr ""
 "ohledu na jakýkoli prah úhlu. To je užitečné pro získání větší přilnavosti "
 "předmětů s velmi tenkou nebo špatnou stopou na tiskové podložce."
 
-#: src/libslic3r/PrintConfig.cpp:3558
+#: src/libslic3r/PrintConfig.cpp:3531
 msgid "Generate supports"
 msgstr "Generovat podpěry"
 
-#: src/libslic3r/PrintConfig.cpp:3560
+#: src/libslic3r/PrintConfig.cpp:3533
 msgid "Generate supports for the models"
 msgstr "Generovat podpěry modelů"
 
@@ -5279,11 +5278,11 @@ msgstr ""
 msgid "Head diameter"
 msgstr "Průměr hrotu"
 
-#: src/libslic3r/PrintConfig.cpp:3574
+#: src/libslic3r/PrintConfig.cpp:3547
 msgid "Head penetration"
 msgstr "Průnik podpěry do modelu"
 
-#: src/slic3r/GUI/ConfigManipulation.cpp:338
+#: src/slic3r/GUI/ConfigManipulation.cpp:336
 msgid "Head penetration should not be greater than the head width."
 msgstr "Průnik hrotu podpěry by neměl být větší než je tloušťka hrotu podpěry."
 
@@ -5307,7 +5306,7 @@ msgstr "Výška (mm)"
 msgid "Height of skirt expressed in layers."
 msgstr "Výška obrysu vyjádřená ve vrstvách."
 
-#: src/libslic3r/PrintConfig.cpp:3244
+#: src/libslic3r/PrintConfig.cpp:3217
 msgid "Height of the display"
 msgstr "Výška displeje"
 
@@ -5332,15 +5331,15 @@ msgstr ""
 "Ahoj, vítejte v %su! Tento %s vám pomůže se základní konfigurací; jen "
 "několik nastavení a budete připraveni tisknout."
 
-#: src/libslic3r/PrintConfig.cpp:4434
+#: src/libslic3r/PrintConfig.cpp:4409
 msgid "Help"
 msgstr "Nápověda"
 
-#: src/libslic3r/PrintConfig.cpp:4440
+#: src/libslic3r/PrintConfig.cpp:4415
 msgid "Help (FFF options)"
 msgstr "Nápověda (pro FFF)"
 
-#: src/libslic3r/PrintConfig.cpp:4445
+#: src/libslic3r/PrintConfig.cpp:4420
 msgid "Help (SLA options)"
 msgstr "Nápověda (pro SLA)"
 
@@ -5375,7 +5374,7 @@ msgstr "Vysoká"
 msgid "High extruder current on filament swap"
 msgstr "Zvýšený proud do extruderového motoru při výměně filamentu"
 
-#: src/libslic3r/PrintConfig.cpp:3307 src/libslic3r/PrintConfig.cpp:3925
+#: src/libslic3r/PrintConfig.cpp:3280 src/libslic3r/PrintConfig.cpp:3898
 msgid "High viscosity"
 msgstr "Vysoká viskozita"
 
@@ -5407,7 +5406,7 @@ msgstr "Průměr otvoru"
 msgid "Hollow and drill"
 msgstr "Vydutit a vyvrtat"
 
-#: src/libslic3r/PrintConfig.cpp:3876
+#: src/libslic3r/PrintConfig.cpp:3849
 msgid "Hollow out a model to have an empty interior"
 msgstr "Vyduťte model, abyste měli vnitřek prázdný"
 
@@ -5415,16 +5414,16 @@ msgstr "Vyduťte model, abyste měli vnitřek prázdný"
 msgid "Hollow this object"
 msgstr "Vydutit tento objekt"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:142 src/slic3r/GUI/Tab.cpp:4721
-#: src/slic3r/GUI/Tab.cpp:4722 src/libslic3r/SLA/Hollowing.cpp:73
+#: src/slic3r/GUI/GUI_Factories.cpp:142 src/slic3r/GUI/Tab.cpp:4719
+#: src/slic3r/GUI/Tab.cpp:4720 src/libslic3r/SLA/Hollowing.cpp:73
 #: src/libslic3r/SLA/Hollowing.cpp:85 src/libslic3r/SLA/Hollowing.cpp:105
-#: src/libslic3r/SLA/Hollowing.cpp:114 src/libslic3r/PrintConfig.cpp:3875
-#: src/libslic3r/PrintConfig.cpp:3882 src/libslic3r/PrintConfig.cpp:3892
-#: src/libslic3r/PrintConfig.cpp:3901
+#: src/libslic3r/SLA/Hollowing.cpp:114 src/libslic3r/PrintConfig.cpp:3848
+#: src/libslic3r/PrintConfig.cpp:3855 src/libslic3r/PrintConfig.cpp:3865
+#: src/libslic3r/PrintConfig.cpp:3874
 msgid "Hollowing"
 msgstr "Vytvoření dutiny"
 
-#: src/libslic3r/PrintConfig.cpp:3903
+#: src/libslic3r/PrintConfig.cpp:3876
 msgid ""
 "Hollowing is done in two steps: first, an imaginary interior is calculated "
 "deeper (offset plus the closing distance) in the object and then it's "
@@ -5492,19 +5491,19 @@ msgstr ""
 "Pro více informací přejeďte kurzorem nad tlačítky\n"
 "nebo na tlačítko klikněte."
 
-#: src/libslic3r/PrintConfig.cpp:3778
+#: src/libslic3r/PrintConfig.cpp:3751
 msgid "How far should the pad extend around the contained geometry"
 msgstr "Jak široká má být podložka kolem geometrie"
 
-#: src/libslic3r/PrintConfig.cpp:3867
+#: src/libslic3r/PrintConfig.cpp:3840
 msgid "How much should the tiny connectors penetrate into the model body."
 msgstr "Jak hluboko mají spojky proniknou do modelu."
 
-#: src/libslic3r/PrintConfig.cpp:3576
+#: src/libslic3r/PrintConfig.cpp:3549
 msgid "How much the pinhead has to penetrate the model surface"
 msgstr "Jak moc hrot podpěry pronikne do povrchu modelu"
 
-#: src/libslic3r/PrintConfig.cpp:3721
+#: src/libslic3r/PrintConfig.cpp:3694
 msgid ""
 "How much the supports should lift up the supported object. If \"Pad around "
 "object\" is enabled, this value is ignored."
@@ -5721,7 +5720,7 @@ msgstr ""
 "Pokud je povoleno, bude v pravém horním rohu 3D scény zobrazeno tlačítko pro "
 "ovládání bočního panelu"
 
-#: src/libslic3r/PrintConfig.cpp:4587
+#: src/libslic3r/PrintConfig.cpp:4562
 msgid ""
 "If enabled, the command line arguments are sent to an existing instance of "
 "GUI PrusaSlicer, or an existing PrusaSlicer window is activated. Overrides "
@@ -5990,7 +5989,7 @@ msgstr ""
 "offline distribučních bodů. Tuto možnost lze povolit pro certifikáty "
 "podepsané vlastním podpisem v případě, že se připojení nezdaří."
 
-#: src/libslic3r/PrintConfig.cpp:4559
+#: src/libslic3r/PrintConfig.cpp:4534
 msgid "Ignore non-existent config files"
 msgstr "Ignorovat neexistující konfigurační soubory"
 
@@ -6008,15 +6007,15 @@ msgstr "Nepovolený příkaz"
 msgid "Import"
 msgstr "Importovat"
 
-#: src/slic3r/GUI/MainFrame.cpp:1217
+#: src/slic3r/GUI/MainFrame.cpp:1221
 msgid "Import &Config"
 msgstr "Importovat Konfigura&ci"
 
-#: src/slic3r/GUI/MainFrame.cpp:1224
+#: src/slic3r/GUI/MainFrame.cpp:1228
 msgid "Import Config &Bundle"
 msgstr "Importovat Konfigurační &Balík"
 
-#: src/slic3r/GUI/MainFrame.cpp:1220
+#: src/slic3r/GUI/MainFrame.cpp:1224
 msgid "Import Config from &Project"
 msgstr "Načíst konfiguraci z &Projektu"
 
@@ -6032,7 +6031,7 @@ msgstr "Importovat Objekt"
 msgid "Import Objects"
 msgstr "Importovat Objekty"
 
-#: src/slic3r/GUI/MainFrame.cpp:1212
+#: src/slic3r/GUI/MainFrame.cpp:1216
 msgid "Import SL1 / SL1S Archive"
 msgstr "Importovat SL1  / SL1S Archiv"
 
@@ -6040,11 +6039,11 @@ msgstr "Importovat SL1  / SL1S Archiv"
 msgid "Import SLA archive"
 msgstr "Importovat SLA archiv"
 
-#: src/slic3r/GUI/MainFrame.cpp:1208
+#: src/slic3r/GUI/MainFrame.cpp:1212
 msgid "Import STL (Imperial Units)"
 msgstr "Importovat STL (imperiální jednotky)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1204
+#: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Import STL/OBJ/AM&F/3MF"
 msgstr "Importovat STL/OBJ/AM&F/3MF"
 
@@ -6172,11 +6171,11 @@ msgstr "Zdědí profil"
 msgid "Initial exposition time is out of printer profile bounds."
 msgstr "Doba počátečního osvitu je mimo rozsah profilu tiskárny."
 
-#: src/libslic3r/PrintConfig.cpp:3488 src/libslic3r/PrintConfig.cpp:3489
+#: src/libslic3r/PrintConfig.cpp:3461 src/libslic3r/PrintConfig.cpp:3462
 msgid "Initial exposure time"
 msgstr "Doba počátečního osvitu"
 
-#: src/libslic3r/PrintConfig.cpp:3406 src/libslic3r/PrintConfig.cpp:3407
+#: src/libslic3r/PrintConfig.cpp:3379 src/libslic3r/PrintConfig.cpp:3380
 msgid "Initial layer height"
 msgstr "Výška první vrstvy"
 
@@ -6280,7 +6279,7 @@ msgstr "Vnitřní chyba: %1%"
 msgid "Internal infill"
 msgstr "Vnitřní výplň"
 
-#: src/slic3r/GUI/ConfigManipulation.cpp:340
+#: src/slic3r/GUI/ConfigManipulation.cpp:338
 msgid "Invalid Head penetration"
 msgstr "Neplatný průnik podpěry do modelu"
 
@@ -6308,7 +6307,7 @@ msgstr ""
 msgid "Invalid numeric input."
 msgstr "Neplatný číselný vstup."
 
-#: src/slic3r/GUI/ConfigManipulation.cpp:353
+#: src/slic3r/GUI/ConfigManipulation.cpp:351
 msgid "Invalid pinhead diameter"
 msgstr "Průměr hrotu podpěry je neplatný"
 
@@ -6343,11 +6342,11 @@ msgstr "Způsob vyhlazování"
 msgid "Is it safe?"
 msgstr "Je to bezpečné?"
 
-#: src/slic3r/GUI/MainFrame.cpp:1117
+#: src/slic3r/GUI/MainFrame.cpp:1121
 msgid "Iso"
 msgstr "Izometrické"
 
-#: src/slic3r/GUI/MainFrame.cpp:1117
+#: src/slic3r/GUI/MainFrame.cpp:1121
 msgid "Iso View"
 msgstr "Izometrické zobrazení"
 
@@ -6374,7 +6373,7 @@ msgstr ""
 "filamentu, aby se umožnily vysoké rychlosti zavádění filamentu a aby se "
 "překonal odpor při zavádění filamentu s ošklivě tvarovanou špičkou."
 
-#: src/slic3r/GUI/Tab.cpp:3710
+#: src/slic3r/GUI/Tab.cpp:3708
 msgid "It's a last preset for this physical printer."
 msgstr "Toto je poslední přednastavení pro tuto fyzickou tiskárnu."
 
@@ -6386,7 +6385,7 @@ msgstr "SLA technologií nelze tisknout vícedílné objekty."
 msgid "It's not possible to delete the last related preset for the printer."
 msgstr "Není možné odstranit poslední související přednastavení tiskárny."
 
-#: src/slic3r/GUI/Tab.cpp:2673
+#: src/slic3r/GUI/Tab.cpp:2671
 msgid "Jerk limits"
 msgstr "Ryv limity"
 
@@ -6452,7 +6451,7 @@ msgstr "Zachovejte vybraná nastavení."
 msgid "Keep upper part"
 msgstr "Zachovat horní část"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:18 src/slic3r/GUI/MainFrame.cpp:1103
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:18 src/slic3r/GUI/MainFrame.cpp:1107
 msgid "Keyboard Shortcuts"
 msgstr "Klávesové zkratky"
 
@@ -6460,11 +6459,11 @@ msgstr "Klávesové zkratky"
 msgid "Keyboard shortcuts"
 msgstr "Klávesové zkratky"
 
-#: src/slic3r/GUI/Tab.cpp:4320
+#: src/slic3r/GUI/Tab.cpp:4318
 msgid "LOCKED LOCK"
 msgstr "ZAMČENÝ ZÁMEK"
 
-#: src/slic3r/GUI/Tab.cpp:4348
+#: src/slic3r/GUI/Tab.cpp:4346
 msgid ""
 "LOCKED LOCK icon indicates that the settings are the same as the system (or "
 "default) values for the current option group"
@@ -6472,7 +6471,7 @@ msgstr ""
 "Ikona ZAMKNUTÉHO ZÁMKU indikuje, že nastavení jsou stejná jako systémové "
 "(nebo výchozí) hodnoty pro aktuální skupinu nastavení"
 
-#: src/slic3r/GUI/Tab.cpp:4364
+#: src/slic3r/GUI/Tab.cpp:4362
 msgid ""
 "LOCKED LOCK icon indicates that the value is the same as the system (or "
 "default) value."
@@ -6484,7 +6483,7 @@ msgstr ""
 msgid "Label objects"
 msgstr "Označování objektů"
 
-#: src/libslic3r/PrintConfig.cpp:3283
+#: src/libslic3r/PrintConfig.cpp:3256
 msgid "Landscape"
 msgstr "Orientace na šířku"
 
@@ -6524,7 +6523,7 @@ msgstr ""
 "\n"
 "Výška vrstvy bude resetována na 0,01."
 
-#: src/slic3r/GUI/Tab.cpp:2803
+#: src/slic3r/GUI/Tab.cpp:2801
 msgid "Layer height limits"
 msgstr "Výškové limity vrstvy"
 
@@ -6532,8 +6531,8 @@ msgstr "Výškové limity vrstvy"
 msgid "Layer range Settings to modify"
 msgstr "Nastavení pro vrstvy v rozsahu"
 
-#: src/slic3r/GUI/ObjectDataViewModel.cpp:105 src/slic3r/GUI/Tab.cpp:4567
-#: src/slic3r/GUI/Tab.cpp:4658
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:105 src/slic3r/GUI/Tab.cpp:4565
+#: src/slic3r/GUI/Tab.cpp:4656
 msgid "Layers"
 msgstr "Vrstvy"
 
@@ -6550,7 +6549,7 @@ msgstr "Vrstvy"
 msgid "Layers and Perimeters"
 msgstr "Vrstvy a perimetry"
 
-#: src/slic3r/GUI/Tab.cpp:1447 src/slic3r/GUI/Tab.cpp:4656
+#: src/slic3r/GUI/Tab.cpp:1447 src/slic3r/GUI/Tab.cpp:4654
 msgid "Layers and perimeters"
 msgstr "Vrstvy a perimetry"
 
@@ -6563,15 +6562,15 @@ msgstr "Možnosti rozložení"
 msgid "Leave \"%1%\" enabled"
 msgstr "Ponechat možnost \"%1%\" povolenou"
 
-#: src/slic3r/GUI/MainFrame.cpp:1130
+#: src/slic3r/GUI/MainFrame.cpp:1134
 msgid "Left"
 msgstr "Zleva"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1517
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1520
 msgid "Left Preset Value"
 msgstr "Hodnota levého přednastavení"
 
-#: src/slic3r/GUI/MainFrame.cpp:1130
+#: src/slic3r/GUI/MainFrame.cpp:1134
 msgid "Left View"
 msgstr "Pohled zleva"
 
@@ -6610,7 +6609,7 @@ msgid "Length of the infill anchor"
 msgstr "Délka výplňové kotvy"
 
 #. TRN "Slic3r _is licensed under the_ License"
-#: src/slic3r/GUI/AboutDialog.cpp:141
+#: src/slic3r/GUI/AboutDialog.cpp:143
 msgid ""
 "License agreements of all following programs (libraries) are part of "
 "application license agreement"
@@ -6622,7 +6621,7 @@ msgstr ""
 msgid "Lift Z"
 msgstr "Zvednout Z"
 
-#: src/libslic3r/PrintConfig.cpp:4503
+#: src/libslic3r/PrintConfig.cpp:4478
 msgid ""
 "Lift the object above the bed when it is partially below. Enabled by "
 "default, use --no-ensure-on-bed to disable."
@@ -6648,7 +6647,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:2293
 msgid "Limited"
-msgstr "Omezené"
+msgstr "Omezeno"
 
 #: src/libslic3r/PrintConfig.cpp:1170
 msgid "Line"
@@ -6682,19 +6681,19 @@ msgstr "Přidání části"
 msgid "Load Project"
 msgstr "Načíst Projekt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1204
+#: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Load a model"
 msgstr "Načíst model"
 
-#: src/slic3r/GUI/MainFrame.cpp:1212
+#: src/slic3r/GUI/MainFrame.cpp:1216
 msgid "Load an SL1 / Sl1S archive"
 msgstr "Načíst SL1 / SL1S archiv"
 
-#: src/slic3r/GUI/MainFrame.cpp:1208
+#: src/slic3r/GUI/MainFrame.cpp:1212
 msgid "Load an model saved with imperial units"
 msgstr "Načíst jako model v imperiálních jednotkách"
 
-#: src/libslic3r/PrintConfig.cpp:4599
+#: src/libslic3r/PrintConfig.cpp:4574
 msgid ""
 "Load and store settings at the given directory. This is useful for "
 "maintaining different profiles or including configurations from a network "
@@ -6703,7 +6702,7 @@ msgstr ""
 "Načtěte a uložte nastavení z/do daného adresáře. To je užitečné pro "
 "udržování různých profilů nebo  konfigurací ze síťového úložiště."
 
-#: src/libslic3r/PrintConfig.cpp:4577
+#: src/libslic3r/PrintConfig.cpp:4552
 msgid "Load config file"
 msgstr "Načíst konfigurační soubor"
 
@@ -6722,11 +6721,11 @@ msgstr ""
 "SL1 / SL1S archiv, která rovněž umožňuje rekonstruovat 3D modely z "
 "voxelových dat."
 
-#: src/slic3r/GUI/MainFrame.cpp:1220
+#: src/slic3r/GUI/MainFrame.cpp:1224
 msgid "Load configuration from project file"
 msgstr "Načíst konfiguraci z projektu"
 
-#: src/libslic3r/PrintConfig.cpp:4578
+#: src/libslic3r/PrintConfig.cpp:4553
 msgid ""
 "Load configuration from the specified file. It can be used more than once to "
 "load options from multiple files."
@@ -6734,11 +6733,11 @@ msgstr ""
 "Načíst konfiguraci ze zadaného souboru. Může být použito vícekrát než jednou "
 "pro načtení  z více souborů."
 
-#: src/slic3r/GUI/MainFrame.cpp:1217
+#: src/slic3r/GUI/MainFrame.cpp:1221
 msgid "Load exported configuration file"
 msgstr "Načíst exportovaný konfigurační soubor"
 
-#: src/slic3r/GUI/MainFrame.cpp:1224
+#: src/slic3r/GUI/MainFrame.cpp:1228
 msgid "Load presets from a bundle"
 msgstr "Načíst přednastavení z balíku"
 
@@ -6770,11 +6769,11 @@ msgstr "Načítání konfigurace"
 msgid "Loading file"
 msgstr "Načítání souboru"
 
-#: src/slic3r/GUI/MainFrame.cpp:1845
+#: src/slic3r/GUI/MainFrame.cpp:1849
 msgid "Loading of a configuration bundle"
 msgstr "Načítání konfiguračního balíku"
 
-#: src/slic3r/GUI/MainFrame.cpp:1781
+#: src/slic3r/GUI/MainFrame.cpp:1785
 msgid "Loading of a configuration file"
 msgstr "Načítání konfiguračního souboru"
 
@@ -6813,7 +6812,7 @@ msgstr "Lokální souřadnice"
 msgid "Lock supports under new islands"
 msgstr "Ukotvi podpěry pod novými ostrůvky"
 
-#: src/libslic3r/PrintConfig.cpp:4602
+#: src/libslic3r/PrintConfig.cpp:4577
 msgid "Logging level"
 msgstr "Úroveň logování"
 
@@ -6829,7 +6828,7 @@ msgstr "Nízká"
 msgid "Lowest Z height"
 msgstr "Nejnižší výška v ose Z"
 
-#: src/slic3r/GUI/Tab.cpp:2621 src/slic3r/GUI/Tab.cpp:2708
+#: src/slic3r/GUI/Tab.cpp:2619 src/slic3r/GUI/Tab.cpp:2706
 #: src/libslic3r/PrintConfig.cpp:1631 src/libslic3r/PrintConfig.cpp:1666
 #: src/libslic3r/PrintConfig.cpp:1683 src/libslic3r/PrintConfig.cpp:1700
 #: src/libslic3r/PrintConfig.cpp:1716 src/libslic3r/PrintConfig.cpp:1726
@@ -6838,14 +6837,14 @@ msgstr "Nejnižší výška v ose Z"
 msgid "Machine limits"
 msgstr "Limity stroje"
 
-#: src/slic3r/GUI/Tab.cpp:4298
+#: src/slic3r/GUI/Tab.cpp:4296
 msgid ""
 "Machine limits are not set, therefore the print time estimate may not be "
 "accurate."
 msgstr ""
 "Nejsou nastaveny limity zařízení, proto nemusí být odhad doby tisku přesný."
 
-#: src/slic3r/GUI/Tab.cpp:4294
+#: src/slic3r/GUI/Tab.cpp:4292
 msgid ""
 "Machine limits will NOT be emitted to G-code, however they will be used to "
 "estimate print time, which may therefore not be accurate as the printer may "
@@ -6855,7 +6854,7 @@ msgstr ""
 "tisku, což však nemusí být přesné, protože tiskárna může použít jinou sadu "
 "limitů."
 
-#: src/slic3r/GUI/Tab.cpp:4291
+#: src/slic3r/GUI/Tab.cpp:4289
 msgid ""
 "Machine limits will be emitted to G-code and used to estimate print time."
 msgstr ""
@@ -6880,20 +6879,20 @@ msgstr "Manuální úprava"
 msgid "Masked SLA file exported to %1%"
 msgstr "Soubor pro SLA byl exportován do %1%"
 
-#: src/slic3r/GUI/Tab.cpp:4056
+#: src/slic3r/GUI/Tab.cpp:4054
 msgid "Match single line"
 msgstr "Shoda na jednom řádku"
 
-#: src/slic3r/GUI/MainFrame.cpp:1585
+#: src/slic3r/GUI/MainFrame.cpp:1589
 msgid "Mate&rial Settings Tab"
 msgstr "Panel Nastavení mate&riálu"
 
-#: src/slic3r/GUI/Tab.cpp:4526 src/slic3r/GUI/Tab.cpp:4528
+#: src/slic3r/GUI/Tab.cpp:4524 src/slic3r/GUI/Tab.cpp:4526
 msgid "Material"
 msgstr "Materiál"
 
 #: src/slic3r/GUI/MainFrame.cpp:286 src/slic3r/GUI/MainFrame.cpp:339
-#: src/slic3r/GUI/MainFrame.cpp:2099 src/slic3r/GUI/MainFrame.cpp:2100
+#: src/slic3r/GUI/MainFrame.cpp:2103 src/slic3r/GUI/MainFrame.cpp:2104
 #: src/slic3r/GUI/Tab.hpp:535
 msgid "Material Settings"
 msgstr "Nastavení materiálu"
@@ -6902,7 +6901,7 @@ msgstr "Nastavení materiálu"
 msgid "Material Settings Tab"
 msgstr "Panel Nastavení materiálu"
 
-#: src/slic3r/GUI/Tab.cpp:4613 src/slic3r/GUI/Tab.cpp:4614
+#: src/slic3r/GUI/Tab.cpp:4611 src/slic3r/GUI/Tab.cpp:4612
 msgid "Material printing profile"
 msgstr "Profil tiskového materiálu"
 
@@ -6910,19 +6909,19 @@ msgstr "Profil tiskového materiálu"
 msgid "Max"
 msgstr "Maximum"
 
-#: src/libslic3r/PrintConfig.cpp:3700
+#: src/libslic3r/PrintConfig.cpp:3673
 msgid "Max bridge length"
 msgstr "Maximální délka mostu"
 
-#: src/libslic3r/PrintConfig.cpp:3614
+#: src/libslic3r/PrintConfig.cpp:3587
 msgid "Max bridges on a pillar"
 msgstr "Max počet mostů na sloupu"
 
-#: src/libslic3r/PrintConfig.cpp:3788
+#: src/libslic3r/PrintConfig.cpp:3761
 msgid "Max merge distance"
 msgstr "Maximální vzdálenost pro sloučení"
 
-#: src/libslic3r/PrintConfig.cpp:3709
+#: src/libslic3r/PrintConfig.cpp:3682
 msgid "Max pillar linking distance"
 msgstr "Max. vzdálenost propojení podpěr"
 
@@ -7018,7 +7017,7 @@ msgstr "Maximální zrychlení při retrakci"
 msgid "Maximum acceleration when retracting (M204 R)"
 msgstr "Maximální zrychlení při retrakci (M204 R)"
 
-#: src/slic3r/GUI/Tab.cpp:2664
+#: src/slic3r/GUI/Tab.cpp:2662
 msgid "Maximum accelerations"
 msgstr "Maximální zrychlení"
 
@@ -7039,7 +7038,7 @@ msgstr ""
 "vytvoří low poly efekt a protože redukce G-codu se provádí v každé vrstvě "
 "nezávisle, mohou vznikat viditelné artefakty."
 
-#: src/libslic3r/PrintConfig.cpp:3457 src/libslic3r/PrintConfig.cpp:3458
+#: src/libslic3r/PrintConfig.cpp:3430 src/libslic3r/PrintConfig.cpp:3431
 msgid "Maximum exposure time"
 msgstr "Maximální doba osvitu"
 
@@ -7075,11 +7074,11 @@ msgstr "Maximální rychlost posuvu osy Y"
 msgid "Maximum feedrate of the Z axis"
 msgstr "Maximální rychlost posuvu osy Z"
 
-#: src/slic3r/GUI/Tab.cpp:2659
+#: src/slic3r/GUI/Tab.cpp:2657
 msgid "Maximum feedrates"
 msgstr "Maximální rychlosti posuvu"
 
-#: src/libslic3r/PrintConfig.cpp:3480 src/libslic3r/PrintConfig.cpp:3481
+#: src/libslic3r/PrintConfig.cpp:3453 src/libslic3r/PrintConfig.cpp:3454
 msgid "Maximum initial exposure time"
 msgstr "Maximální doba počátečního osvitu"
 
@@ -7119,7 +7118,7 @@ msgstr "Maximální ryv (jerk) osy Z"
 msgid "Maximum length of the infill anchor"
 msgstr "Maximální délka výplňové kotvy"
 
-#: src/libslic3r/PrintConfig.cpp:3616
+#: src/libslic3r/PrintConfig.cpp:3589
 msgid ""
 "Maximum number of bridges that can be placed on a pillar. Bridges hold "
 "support point pinheads and connect to pillars as small branches."
@@ -7150,7 +7149,7 @@ msgid "Medium"
 msgstr "Střední"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:859 src/slic3r/GUI/GUI_ObjectList.cpp:2133
-#: src/libslic3r/PrintConfig.cpp:4516
+#: src/libslic3r/PrintConfig.cpp:4491
 msgid "Merge"
 msgstr "Sloučit"
 
@@ -7166,7 +7165,7 @@ msgstr "Sloučit objekty do jednoho vícedílného objektu"
 msgid "Merged"
 msgstr "Sloučení"
 
-#: src/libslic3r/PrintConfig.cpp:3649
+#: src/libslic3r/PrintConfig.cpp:3622
 msgid ""
 "Merging bridges or pillars into another pillars can increase the radius. "
 "Zero means no increase, one means full increase."
@@ -7205,7 +7204,7 @@ msgstr "Minimum"
 msgid "Min print speed"
 msgstr "Minimální rychlost tisku"
 
-#: src/libslic3r/PrintConfig.cpp:3738
+#: src/libslic3r/PrintConfig.cpp:3711
 msgid "Minimal distance of the support points"
 msgstr "Minimální vzdálenost podpěrných bodů"
 
@@ -7247,11 +7246,11 @@ msgstr ""
 "vykreslit. Nastavte na nulu, chcete-li zakázat jakékoli zjednodušení a "
 "použít vstup v plném rozlišení."
 
-#: src/libslic3r/PrintConfig.cpp:3449 src/libslic3r/PrintConfig.cpp:3450
+#: src/libslic3r/PrintConfig.cpp:3422 src/libslic3r/PrintConfig.cpp:3423
 msgid "Minimum exposure time"
 msgstr "Minimální doba osvitu"
 
-#: src/libslic3r/PrintConfig.cpp:3156
+#: src/libslic3r/PrintConfig.cpp:3128
 msgid "Minimum feature size"
 msgstr "Minimální velikost prvku"
 
@@ -7263,15 +7262,15 @@ msgstr "Minimální rychlosti posuvu během extruze"
 msgid "Minimum feedrate when extruding (M205 S)"
 msgstr "Minimální rychlosti posuvu během extruze (M205 S)"
 
-#: src/slic3r/GUI/Tab.cpp:2679
+#: src/slic3r/GUI/Tab.cpp:2677
 msgid "Minimum feedrates"
 msgstr "Minimální rychlosti posuvu"
 
-#: src/libslic3r/PrintConfig.cpp:3472 src/libslic3r/PrintConfig.cpp:3473
+#: src/libslic3r/PrintConfig.cpp:3445 src/libslic3r/PrintConfig.cpp:3446
 msgid "Minimum initial exposure time"
 msgstr "Minimální doba počátečního osvitu"
 
-#: src/libslic3r/PrintConfig.cpp:3167
+#: src/libslic3r/PrintConfig.cpp:3140
 msgid "Minimum perimeter width"
 msgstr "Minimální šířka perimetru"
 
@@ -7295,15 +7294,18 @@ msgstr ""
 msgid "Minimum thickness of a top / bottom shell"
 msgstr "Minimální tloušťka vrchní / spodní skořepiny"
 
-#: src/libslic3r/PrintConfig.cpp:3158
+#: src/libslic3r/PrintConfig.cpp:3130
 msgid ""
 "Minimum thickness of thin features. Model features that are thinner than "
 "this value will not be printed, while features thicker than the Minimum "
-"feature size will be widened to the Minimum perimeter width."
+"feature size will be widened to the Minimum perimeter width. If expressed as "
+"a percentage (for example 25%), it will be computed based on the nozzle "
+"diameter."
 msgstr ""
 "Minimální tloušťka tenkých prvků. Prvky modelu, které jsou tenčí než tato "
 "hodnota, nebudou vytištěny, zatímco prvky silnější než minimální velikost "
-"prvku budou rozšířeny na minimální šířku perimetru."
+"prvku budou rozšířeny na minimální šířku perimetru. Pokud je vyjádřeno v "
+"procentech (například 25%), bude vypočítáno na základě průměru trysky."
 
 #: src/libslic3r/PrintConfig.cpp:2899
 msgid "Minimum top shell thickness"
@@ -7326,11 +7328,11 @@ msgstr "Minimální rychlost při přesunu"
 msgid "Minimum travel feedrate (M205 T)"
 msgstr "Minimální rychlost při přesunu (M205 T)"
 
-#: src/libslic3r/PrintConfig.cpp:3883
+#: src/libslic3r/PrintConfig.cpp:3856
 msgid "Minimum wall thickness of a hollowed model."
 msgstr "Minimální tloušťka stěny dutého modelu."
 
-#: src/libslic3r/PrintConfig.cpp:3366
+#: src/libslic3r/PrintConfig.cpp:3339
 msgid ""
 "Minimum width of features to maintain when doing elephant foot compensation."
 msgstr ""
@@ -7356,7 +7358,7 @@ msgstr ""
 msgid "Mirror Object"
 msgstr "Zrcadlit Objekt"
 
-#: src/libslic3r/PrintConfig.cpp:3263
+#: src/libslic3r/PrintConfig.cpp:3236
 msgid "Mirror horizontally"
 msgstr "Zrcadlit horizontálně"
 
@@ -7376,7 +7378,7 @@ msgstr "Zrcadlit rozměr vybraného objektu podél osy Y"
 msgid "Mirror the selected object along the Z axis"
 msgstr "Zrcadlit rozměr vybraného objektu podél osy Z"
 
-#: src/libslic3r/PrintConfig.cpp:3270
+#: src/libslic3r/PrintConfig.cpp:3243
 msgid "Mirror vertically"
 msgstr "Zrcadlit vertikálně"
 
@@ -7552,11 +7554,11 @@ msgstr ""
 "Mají být vloženy jako jeden objekt obsahující více částí, \n"
 "namísto vložení několika objektů?"
 
-#: src/libslic3r/PrintConfig.cpp:4513
+#: src/libslic3r/PrintConfig.cpp:4488
 msgid "Multiply copies by creating a grid."
 msgstr "Vynásobí kopie vytvořením mřížky."
 
-#: src/libslic3r/PrintConfig.cpp:4508
+#: src/libslic3r/PrintConfig.cpp:4483
 msgid "Multiply copies by this factor."
 msgstr "Vynásobí kopie tímto číslem."
 
@@ -7646,7 +7648,7 @@ msgstr "Nové rozvržení, přístup přes tlačítko nastavení v horním menu"
 msgid "New prerelease version %1% is available."
 msgstr "K dispozici je nová předběžná verze %1%."
 
-#: src/slic3r/GUI/Tab.cpp:3318
+#: src/slic3r/GUI/Tab.cpp:3316
 msgid "New printer preset selected"
 msgstr "Zvoleno nové přednastavení tiskárny"
 
@@ -7705,7 +7707,7 @@ msgstr ""
 msgid "No pad can be generated for this model with the current configuration"
 msgstr "Pro aktuální model nelze vygenerovat žádnou podložku"
 
-#: src/slic3r/GUI/MainFrame.cpp:1621
+#: src/slic3r/GUI/MainFrame.cpp:1625
 msgid "No previously sliced file."
 msgstr "Žádné dříve slicované soubory."
 
@@ -7713,7 +7715,7 @@ msgstr "Žádné dříve slicované soubory."
 msgid "No sparse layers (EXPERIMENTAL)"
 msgstr "Bez řídkých vrstev (EXPERIMENTÁLNÍ)"
 
-#: src/libslic3r/PrintConfig.cpp:3740
+#: src/libslic3r/PrintConfig.cpp:3713
 msgid "No support points will be placed closer than this threshold."
 msgstr "Žádné podpůrné body nebudou umístěny blíže než je tento práh."
 
@@ -7729,7 +7731,7 @@ msgid "None"
 msgstr "Žádné"
 
 #: src/slic3r/GUI/Search.cpp:90 src/slic3r/GUI/Search.cpp:336
-#: src/slic3r/GUI/Tab.cpp:2645
+#: src/slic3r/GUI/Tab.cpp:2643
 msgid "Normal"
 msgstr "Normální"
 
@@ -7745,7 +7747,7 @@ msgstr "Nenalezeno:"
 msgid "Note"
 msgstr "Poznámka"
 
-#: src/slic3r/GUI/Tab.cpp:3732
+#: src/slic3r/GUI/Tab.cpp:3730
 msgid "Note, that the selected preset will be deleted from this printer too."
 msgid_plural ""
 "Note, that the selected preset will be deleted from these printers too."
@@ -7754,7 +7756,7 @@ msgstr[1] "Pozor, vybrané přednastavení bude odstraněno i z těchto tiskáre
 msgstr[2] "Pozor, vybrané přednastavení bude odstraněno i z těchto tiskáren."
 msgstr[3] "Pozor, vybrané přednastavení bude odstraněno i z těchto tiskáren."
 
-#: src/slic3r/GUI/Tab.cpp:3742
+#: src/slic3r/GUI/Tab.cpp:3740
 msgid ""
 "Note, that this printer will be deleted after deleting the selected preset."
 msgid_plural ""
@@ -7772,7 +7774,7 @@ msgstr[3] ""
 "Upozorňujeme, že tyto tiskárny budou po smazání vybraného přednastavení "
 "odstraněny."
 
-#: src/slic3r/GUI/Tab.cpp:2256
+#: src/slic3r/GUI/Tab.cpp:2254
 msgid ""
 "Note: All parameters from this group are moved to the Physical Printer "
 "settings (see changelog).\n"
@@ -7821,12 +7823,12 @@ msgstr "Upozornění: Taoto přednastavení bude po uložení nahrazeno"
 msgid "Note: some shortcuts work in (non)editing mode only."
 msgstr "Poznámka: některé zkratky nefungují v režimu editace."
 
-#: src/slic3r/GUI/Tab.cpp:1723 src/slic3r/GUI/Tab.cpp:1724
-#: src/slic3r/GUI/Tab.cpp:2109 src/slic3r/GUI/Tab.cpp:2110
-#: src/slic3r/GUI/Tab.cpp:2497 src/slic3r/GUI/Tab.cpp:2498
-#: src/slic3r/GUI/Tab.cpp:2570 src/slic3r/GUI/Tab.cpp:2571
-#: src/slic3r/GUI/Tab.cpp:3956 src/slic3r/GUI/Tab.cpp:4584
-#: src/slic3r/GUI/Tab.cpp:4585
+#: src/slic3r/GUI/Tab.cpp:1721 src/slic3r/GUI/Tab.cpp:1722
+#: src/slic3r/GUI/Tab.cpp:2107 src/slic3r/GUI/Tab.cpp:2108
+#: src/slic3r/GUI/Tab.cpp:2495 src/slic3r/GUI/Tab.cpp:2496
+#: src/slic3r/GUI/Tab.cpp:2568 src/slic3r/GUI/Tab.cpp:2569
+#: src/slic3r/GUI/Tab.cpp:3954 src/slic3r/GUI/Tab.cpp:4582
+#: src/slic3r/GUI/Tab.cpp:4583
 msgid "Notes"
 msgstr "Poznámky"
 
@@ -7840,7 +7842,7 @@ msgstr "Oznámení"
 msgid "Notify about new releases"
 msgstr "Upozornění na nové verze"
 
-#: src/slic3r/GUI/Tab.cpp:1991
+#: src/slic3r/GUI/Tab.cpp:1989
 msgid "Nozzle"
 msgstr "Tryska"
 
@@ -7852,7 +7854,7 @@ msgstr "Průměr trysky:"
 msgid "Nozzle and Bed Temperatures"
 msgstr "Teplota trysky a tiskové podložky"
 
-#: src/slic3r/GUI/Tab.cpp:2337 src/slic3r/GUI/Tab.cpp:2781
+#: src/slic3r/GUI/Tab.cpp:2335 src/slic3r/GUI/Tab.cpp:2779
 #: src/libslic3r/PrintConfig.cpp:1876
 msgid "Nozzle diameter"
 msgstr "Průměr trysky"
@@ -7883,7 +7885,7 @@ msgstr ""
 msgid "Number of cooling moves"
 msgstr "Počet chladících pohybů"
 
-#: src/slic3r/GUI/Tab.cpp:2304
+#: src/slic3r/GUI/Tab.cpp:2302
 msgid "Number of extruders of the printer."
 msgstr "Počet extrudérů tiskárny."
 
@@ -7911,15 +7913,15 @@ msgstr ""
 "počet obrysových smyček může být větší než počet zde nakonfigurovaných. "
 "Nastavte tuto hodnotu na nulu, pro úplné deaktivování."
 
-#: src/libslic3r/PrintConfig.cpp:3249
+#: src/libslic3r/PrintConfig.cpp:3222
 msgid "Number of pixels in"
 msgstr "Počet pixelů v ose"
 
-#: src/libslic3r/PrintConfig.cpp:3251
+#: src/libslic3r/PrintConfig.cpp:3224
 msgid "Number of pixels in X"
 msgstr "Počet pixelů v ose X"
 
-#: src/libslic3r/PrintConfig.cpp:3257
+#: src/libslic3r/PrintConfig.cpp:3230
 msgid "Number of pixels in Y"
 msgstr "Počet pixelů v ose Y"
 
@@ -7935,7 +7937,7 @@ msgstr "Počet plných vrstev generovaných na vrchních a spodních površích.
 msgid "Number of solid layers to generate on top surfaces."
 msgstr "Počet vrchních generovaných plných vrstev."
 
-#: src/libslic3r/PrintConfig.cpp:3442
+#: src/libslic3r/PrintConfig.cpp:3415
 msgid ""
 "Number of the layers needed for the exposure time fade from initial exposure "
 "time to the exposure time"
@@ -7950,7 +7952,7 @@ msgstr "Počet změn nástroje"
 msgid "Object Settings to modify"
 msgstr "Změna nastavení objektu"
 
-#: src/slic3r/GUI/Tab.cpp:4776 src/libslic3r/PrintConfig.cpp:3719
+#: src/slic3r/GUI/Tab.cpp:4774 src/libslic3r/PrintConfig.cpp:3692
 msgid "Object elevation"
 msgstr "Nadzvednutí objektu"
 
@@ -8073,7 +8075,7 @@ msgstr "Zapnou/vypnout režim jedné vrstvy vertikálního posuvníku"
 msgid "One layer mode"
 msgstr "Zobrazení po jedné vrstvě"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1627
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1630
 msgid "One of the presets doesn't found"
 msgstr "Jedno z přednastavení nebylo nalezeno"
 
@@ -8096,7 +8098,7 @@ msgstr ""
 "odeberte všechny objekty kromě posledního, nebo povolte sekvenční režim "
 "pomocí \"complete_objects\"."
 
-#: src/libslic3r/PrintConfig.cpp:2560 src/libslic3r/PrintConfig.cpp:3642
+#: src/libslic3r/PrintConfig.cpp:2560 src/libslic3r/PrintConfig.cpp:3615
 msgid ""
 "Only create support if it lies on a build plate. Don't create support on a "
 "print."
@@ -8108,7 +8110,7 @@ msgstr ""
 msgid "Only infill where needed"
 msgstr "Výplň pouze kde je potřeba"
 
-#: src/slic3r/GUI/Tab.cpp:2814
+#: src/slic3r/GUI/Tab.cpp:2812
 msgid "Only lift Z"
 msgstr "Pouze zvednout Z"
 
@@ -8150,7 +8152,7 @@ msgstr ""
 "V současné době není funkce \"Prevence odkapávání\" filamentu podporována "
 "společně s povolenou čistící věží."
 
-#: src/slic3r/GUI/MainFrame.cpp:1537
+#: src/slic3r/GUI/MainFrame.cpp:1541
 msgid "Open &PrusaSlicer"
 msgstr "Otevřít &PrusaSlicer"
 
@@ -8170,11 +8172,11 @@ msgstr "Otevřít složku."
 msgid "Open G-code file:"
 msgstr "Otevřít soubor G-code:"
 
-#: src/slic3r/GUI/MainFrame.cpp:78 src/slic3r/GUI/MainFrame.cpp:1304
+#: src/slic3r/GUI/MainFrame.cpp:78 src/slic3r/GUI/MainFrame.cpp:1308
 msgid "Open G-code viewer"
 msgstr "Otevřít prohlížeč G-codu"
 
-#: src/slic3r/GUI/MainFrame.cpp:1416
+#: src/slic3r/GUI/MainFrame.cpp:1420
 msgid "Open New Instance"
 msgstr "Otevřít Novou Instanci"
 
@@ -8182,20 +8184,20 @@ msgstr "Otevřít Novou Instanci"
 msgid "Open Preferences."
 msgstr "Otevřít Nastavení."
 
-#: src/slic3r/GUI/MainFrame.cpp:89 src/slic3r/GUI/MainFrame.cpp:1537
+#: src/slic3r/GUI/MainFrame.cpp:89 src/slic3r/GUI/MainFrame.cpp:1541
 msgid "Open PrusaSlicer"
 msgstr "Otevřít PrusaSlicer"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:205 src/slic3r/GUI/MainFrame.cpp:1521
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:205 src/slic3r/GUI/MainFrame.cpp:1525
 msgid "Open a G-code file"
 msgstr "Otevřít G-code"
 
 #: src/slic3r/GUI/MainFrame.cpp:75 src/slic3r/GUI/MainFrame.cpp:89
-#: src/slic3r/GUI/MainFrame.cpp:1416
+#: src/slic3r/GUI/MainFrame.cpp:1420
 msgid "Open a new PrusaSlicer instance"
 msgstr "Otevře novou instanci PrusaSliceru"
 
-#: src/slic3r/GUI/MainFrame.cpp:1148
+#: src/slic3r/GUI/MainFrame.cpp:1152
 msgid "Open a project file"
 msgstr "Otevřít soubor s projektem"
 
@@ -8238,7 +8240,7 @@ msgstr "Otevřít webovou stránku %s v prohlížeči"
 msgid "Open the Prusa3D drivers download page in your browser"
 msgstr "Otevřít stránku pro stahování Prusa 3D ovladačů ve vašem prohlížeči"
 
-#: src/slic3r/GUI/MainFrame.cpp:1400
+#: src/slic3r/GUI/MainFrame.cpp:1404
 msgid "Open the dialog to modify shape gallery"
 msgstr "Otevřete dialogové okno pro úpravu galerie tvarů"
 
@@ -8254,7 +8256,7 @@ msgstr "Otevírání průvodce nastavením"
 msgid "Opening new project while some presets are unsaved."
 msgstr "Otevírání nového projektu. Některá přednastavení nejsou uložena."
 
-#: src/slic3r/GUI/MainFrame.cpp:1100
+#: src/slic3r/GUI/MainFrame.cpp:1104
 msgid ""
 "Opens Tip of the day notification in bottom right corner or shows another "
 "tip if already opened."
@@ -8331,7 +8333,7 @@ msgstr "Hledání optimální orientace zrušeno."
 msgid "Origin"
 msgstr "Počátek"
 
-#: src/slic3r/GUI/Tab.cpp:1671 src/slic3r/GUI/Tab.cpp:1699
+#: src/slic3r/GUI/Tab.cpp:1671 src/slic3r/GUI/Tab.cpp:1697
 msgid "Other"
 msgstr "Ostatní"
 
@@ -8351,15 +8353,15 @@ msgstr "Vnější a vnitřní límec"
 msgid "Outer brim only"
 msgstr "Pouze vnější okraj"
 
-#: src/libslic3r/PrintConfig.cpp:4581
+#: src/libslic3r/PrintConfig.cpp:4556
 msgid "Output File"
 msgstr "Výstupní soubor"
 
-#: src/libslic3r/PrintConfig.cpp:4450
+#: src/libslic3r/PrintConfig.cpp:4425
 msgid "Output Model Info"
 msgstr "Info o výstupním modelu"
 
-#: src/slic3r/GUI/Tab.cpp:1692 src/slic3r/GUI/Tab.cpp:4734
+#: src/slic3r/GUI/Tab.cpp:1690 src/slic3r/GUI/Tab.cpp:4732
 msgid "Output file"
 msgstr "Výstupní soubor"
 
@@ -8367,7 +8369,7 @@ msgstr "Výstupní soubor"
 msgid "Output filename format"
 msgstr "Formát názvu výstupního souboru"
 
-#: src/slic3r/GUI/Tab.cpp:1684 src/slic3r/GUI/Tab.cpp:4733
+#: src/slic3r/GUI/Tab.cpp:1682 src/slic3r/GUI/Tab.cpp:4731
 msgid "Output options"
 msgstr "Možnosti výstupu"
 
@@ -8392,19 +8394,19 @@ msgstr "Mezní úhel převisu"
 msgid "Overlap"
 msgstr "Překrytí"
 
-#: src/slic3r/GUI/MainFrame.cpp:1378
+#: src/slic3r/GUI/MainFrame.cpp:1382
 msgid "P&rint Settings Tab"
 msgstr "Panel Nastavení &tisku"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:141 src/slic3r/GUI/Plater.cpp:575
-#: src/slic3r/GUI/Tab.cpp:4703 src/slic3r/GUI/Tab.cpp:4704
-#: src/slic3r/GUI/Tab.cpp:4776 src/libslic3r/PrintConfig.cpp:3747
-#: src/libslic3r/PrintConfig.cpp:3754 src/libslic3r/PrintConfig.cpp:3768
-#: src/libslic3r/PrintConfig.cpp:3779 src/libslic3r/PrintConfig.cpp:3789
-#: src/libslic3r/PrintConfig.cpp:3811 src/libslic3r/PrintConfig.cpp:3822
-#: src/libslic3r/PrintConfig.cpp:3829 src/libslic3r/PrintConfig.cpp:3836
-#: src/libslic3r/PrintConfig.cpp:3847 src/libslic3r/PrintConfig.cpp:3856
-#: src/libslic3r/PrintConfig.cpp:3865
+#: src/slic3r/GUI/Tab.cpp:4701 src/slic3r/GUI/Tab.cpp:4702
+#: src/slic3r/GUI/Tab.cpp:4774 src/libslic3r/PrintConfig.cpp:3720
+#: src/libslic3r/PrintConfig.cpp:3727 src/libslic3r/PrintConfig.cpp:3741
+#: src/libslic3r/PrintConfig.cpp:3752 src/libslic3r/PrintConfig.cpp:3762
+#: src/libslic3r/PrintConfig.cpp:3784 src/libslic3r/PrintConfig.cpp:3795
+#: src/libslic3r/PrintConfig.cpp:3802 src/libslic3r/PrintConfig.cpp:3809
+#: src/libslic3r/PrintConfig.cpp:3820 src/libslic3r/PrintConfig.cpp:3829
+#: src/libslic3r/PrintConfig.cpp:3838
 msgid "Pad"
 msgstr "Podložka"
 
@@ -8412,15 +8414,15 @@ msgstr "Podložka"
 msgid "Pad and Support"
 msgstr "Podložka a Podpěry"
 
-#: src/slic3r/GUI/Tab.cpp:4776 src/libslic3r/PrintConfig.cpp:3821
+#: src/slic3r/GUI/Tab.cpp:4774 src/libslic3r/PrintConfig.cpp:3794
 msgid "Pad around object"
 msgstr "Podložka okolo objektu"
 
-#: src/libslic3r/PrintConfig.cpp:3828
+#: src/libslic3r/PrintConfig.cpp:3801
 msgid "Pad around object everywhere"
 msgstr "Podložka všude okolo objektu"
 
-#: src/libslic3r/PrintConfig.cpp:3777
+#: src/libslic3r/PrintConfig.cpp:3750
 msgid "Pad brim size"
 msgstr "Velikost límce podložky"
 
@@ -8428,31 +8430,31 @@ msgstr "Velikost límce podložky"
 msgid "Pad brim size is too small for the current configuration."
 msgstr "Velikost okraje podložky je pro aktuální konfiguraci příliš malá."
 
-#: src/libslic3r/PrintConfig.cpp:3864
+#: src/libslic3r/PrintConfig.cpp:3837
 msgid "Pad object connector penetration"
 msgstr "Průnik spojky Podložka-Objekt"
 
-#: src/libslic3r/PrintConfig.cpp:3846
+#: src/libslic3r/PrintConfig.cpp:3819
 msgid "Pad object connector stride"
 msgstr "Rozteč spojek Podložka-Objekt"
 
-#: src/libslic3r/PrintConfig.cpp:3855
+#: src/libslic3r/PrintConfig.cpp:3828
 msgid "Pad object connector width"
 msgstr "Šířka spojky Podložka-Objekt"
 
-#: src/libslic3r/PrintConfig.cpp:3835
+#: src/libslic3r/PrintConfig.cpp:3808
 msgid "Pad object gap"
 msgstr "Mezera Podložka-Objekt"
 
-#: src/libslic3r/PrintConfig.cpp:3763
+#: src/libslic3r/PrintConfig.cpp:3736
 msgid "Pad wall height"
 msgstr "Výška bočnice podložky"
 
-#: src/libslic3r/PrintConfig.cpp:3810
+#: src/libslic3r/PrintConfig.cpp:3783
 msgid "Pad wall slope"
 msgstr "Sklon bočnice podložky"
 
-#: src/libslic3r/PrintConfig.cpp:3753
+#: src/libslic3r/PrintConfig.cpp:3726
 msgid "Pad wall thickness"
 msgstr "Tloušťka stěny podložky"
 
@@ -8583,7 +8585,7 @@ msgstr "Vložit"
 msgid "Paste From Clipboard"
 msgstr "Vložení ze schránky"
 
-#: src/slic3r/GUI/MainFrame.cpp:1349
+#: src/slic3r/GUI/MainFrame.cpp:1353
 msgid "Paste clipboard"
 msgstr "Vložit ze schránky"
 
@@ -8621,7 +8623,7 @@ msgstr "Vzor použitý pro generování podpěr."
 msgid "Pause"
 msgstr "Pozastavení"
 
-#: src/slic3r/GUI/Tab.cpp:2479 src/libslic3r/GCode.cpp:714
+#: src/slic3r/GUI/Tab.cpp:2477 src/libslic3r/GCode.cpp:714
 #: src/libslic3r/PrintConfig.cpp:2459
 msgid "Pause Print G-code"
 msgstr "G-code pro pozastavení tisku"
@@ -8656,7 +8658,7 @@ msgstr ""
 "Provést integraci do systému (Nastaví tuto binárku tak, aby ji systém mohl "
 "prohledávat)."
 
-#: src/libslic3r/PrintConfig.cpp:3893
+#: src/libslic3r/PrintConfig.cpp:3866
 msgid ""
 "Performance vs accuracy of calculation. Lower values may produce unwanted "
 "artifacts."
@@ -8699,7 +8701,7 @@ msgstr ""
 msgid "Perimeter"
 msgstr "Perimetr"
 
-#: src/libslic3r/PrintConfig.cpp:3117
+#: src/libslic3r/PrintConfig.cpp:3119
 msgid "Perimeter distribution count"
 msgstr "Počet ovlivněných perimetrů"
 
@@ -8711,15 +8713,15 @@ msgstr "Extruder pro perimetry"
 msgid "Perimeter generator"
 msgstr "Generátor obvodových stěn"
 
-#: src/libslic3r/PrintConfig.cpp:3079
+#: src/libslic3r/PrintConfig.cpp:3080
 msgid "Perimeter transition length"
 msgstr "Délka přechodu perimetru"
 
-#: src/libslic3r/PrintConfig.cpp:3089
+#: src/libslic3r/PrintConfig.cpp:3091
 msgid "Perimeter transitioning filter margin"
 msgstr "Filtr přechodového rozpětí perimetrů"
 
-#: src/libslic3r/PrintConfig.cpp:3104
+#: src/libslic3r/PrintConfig.cpp:3106
 msgid "Perimeter transitioning threshold angle"
 msgstr "Prahový úhel přechodu perimetru"
 
@@ -8770,27 +8772,27 @@ msgstr ""
 "Velikosti obrázků budou uloženy do souborů .gcode / .sl1 / .sl1s, v "
 "následujícím formátu: \"XxY, XxY, ...\""
 
-#: src/libslic3r/PrintConfig.cpp:3624
+#: src/libslic3r/PrintConfig.cpp:3597
 msgid "Pillar connection mode"
 msgstr "Způsob propojení podpěr"
 
-#: src/libslic3r/PrintConfig.cpp:3593
+#: src/libslic3r/PrintConfig.cpp:3566
 msgid "Pillar diameter"
 msgstr "Průměr podpěry"
 
-#: src/libslic3r/PrintConfig.cpp:3647
+#: src/libslic3r/PrintConfig.cpp:3620
 msgid "Pillar widening factor"
 msgstr "Koeficient rozšiřování podpěry"
 
-#: src/slic3r/GUI/ConfigManipulation.cpp:351
+#: src/slic3r/GUI/ConfigManipulation.cpp:349
 msgid "Pinhead diameter should be smaller than the pillar diameter."
 msgstr "Průměr hrotu podpěry by měl být menší než průměr podpěrných sloupů."
 
-#: src/libslic3r/PrintConfig.cpp:3565
+#: src/libslic3r/PrintConfig.cpp:3538
 msgid "Pinhead front diameter"
 msgstr "Průměr podpěrného hrotu"
 
-#: src/libslic3r/PrintConfig.cpp:3583
+#: src/libslic3r/PrintConfig.cpp:3556
 msgid "Pinhead width"
 msgstr "Šířka podpěrného hrotu"
 
@@ -8838,11 +8840,11 @@ msgstr ""
 msgid "Please select the file to reload"
 msgstr "Vyberte soubor, který chcete znovu načíst"
 
-#: src/slic3r/GUI/AboutDialog.cpp:45 src/slic3r/GUI/AboutDialog.cpp:303
+#: src/slic3r/GUI/AboutDialog.cpp:45 src/slic3r/GUI/AboutDialog.cpp:305
 msgid "Portions copyright"
 msgstr "Autorská práva"
 
-#: src/libslic3r/PrintConfig.cpp:3284
+#: src/libslic3r/PrintConfig.cpp:3257
 msgid "Portrait"
 msgstr "Orientace na výšku"
 
@@ -8851,7 +8853,7 @@ msgstr "Orientace na výšku"
 msgid "Position"
 msgstr "Pozice"
 
-#: src/slic3r/GUI/Tab.cpp:2808
+#: src/slic3r/GUI/Tab.cpp:2806
 msgid "Position (for multi-extruder printers)"
 msgstr "Pozice (pro tiskárny s více extrudery)"
 
@@ -8867,7 +8869,7 @@ msgstr "Pozice Y"
 msgid "Position of perimeters starting points."
 msgstr "Pozice začátku perimetrů."
 
-#: src/slic3r/GUI/Tab.cpp:1770
+#: src/slic3r/GUI/Tab.cpp:1768
 msgid "Post processing scripts shall modify G-code file in place."
 msgstr "Post-processing skripty musí G-code upravit in place."
 
@@ -8890,11 +8892,11 @@ msgstr ""
 "Upravte prosím skript tak, aby změnil G-code in place. V manuálu případně "
 "dohledáte jak G-code po zpracování přejmenovat.\n"
 
-#: src/slic3r/GUI/Tab.cpp:1711 src/libslic3r/PrintConfig.cpp:2010
+#: src/slic3r/GUI/Tab.cpp:1709 src/libslic3r/PrintConfig.cpp:2010
 msgid "Post-processing scripts"
 msgstr "Post-processing skripty"
 
-#: src/slic3r/GUI/MainFrame.cpp:1394
+#: src/slic3r/GUI/MainFrame.cpp:1398
 msgid "Pre&view"
 msgstr "&Náhled"
 
@@ -8965,7 +8967,7 @@ msgstr ""
 msgid "Preset with name \"%1%\" already exists."
 msgstr "Přednastavení s názvem \"%1%\" již existuje."
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1660
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1663
 msgid ""
 "Presets are different.\n"
 "Click this button to select the same preset for the right and left preset."
@@ -8974,7 +8976,7 @@ msgstr ""
 "Kliknutím na toto tlačítko vyberete stejná nastavení pro pravé i levé "
 "přednastavení."
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1652
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1655
 msgid "Presets are the same"
 msgstr "Přednastavení jsou shodná"
 
@@ -9014,7 +9016,7 @@ msgstr ""
 msgid "Pressure equalizer (experimental)"
 msgstr "Vyrovnávač tlaku (experimentální)"
 
-#: src/libslic3r/PrintConfig.cpp:3091
+#: src/libslic3r/PrintConfig.cpp:3093
 msgid ""
 "Prevent transitioning back and forth between one extra perimeter and one "
 "less. This margin extends the range of extrusion widths which follow to "
@@ -9035,7 +9037,7 @@ msgstr ""
 "průměru trysky."
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:230 src/slic3r/GUI/Plater.cpp:4467
-#: src/slic3r/GUI/Tab.cpp:2831
+#: src/slic3r/GUI/Tab.cpp:2829
 msgid "Preview"
 msgstr "Náhled"
 
@@ -9043,7 +9045,7 @@ msgstr "Náhled"
 msgid "Preview hollowed and drilled model"
 msgstr "Náhled dutého modelu"
 
-#: src/slic3r/GUI/MainFrame.cpp:1628
+#: src/slic3r/GUI/MainFrame.cpp:1632
 msgid "Previously sliced file ("
 msgstr "Dříve slicovaný soubor ("
 
@@ -9055,7 +9057,7 @@ msgstr "Příprava všech tiskových extruderů"
 msgid "Print"
 msgstr "Tisk"
 
-#: src/slic3r/GUI/MainFrame.cpp:1412
+#: src/slic3r/GUI/MainFrame.cpp:1416
 msgid "Print &Host Upload Queue"
 msgstr "Fronta na&hrávání do tiskového serveru"
 
@@ -9063,7 +9065,7 @@ msgstr "Fronta na&hrávání do tiskového serveru"
 msgid "Print Diameters"
 msgstr "Parametry extruderu"
 
-#: src/slic3r/GUI/PhysicalPrinterDialog.cpp:210 src/slic3r/GUI/Tab.cpp:2254
+#: src/slic3r/GUI/PhysicalPrinterDialog.cpp:210 src/slic3r/GUI/Tab.cpp:2252
 msgid "Print Host upload"
 msgstr "Nahrávání do tiskového serveru"
 
@@ -9102,15 +9104,15 @@ msgstr "Pauzy tisku"
 msgid "Print settings"
 msgstr "Nastavení tisku"
 
-#: src/libslic3r/PrintConfig.cpp:3915
+#: src/libslic3r/PrintConfig.cpp:3888
 msgid "Print speed"
 msgstr "Rychlost tisku"
 
-#: src/slic3r/GUI/Tab.cpp:2038
+#: src/slic3r/GUI/Tab.cpp:2036
 msgid "Print speed override"
 msgstr "Přepsání rychlosti tisku"
 
-#: src/slic3r/GUI/MainFrame.cpp:1385
+#: src/slic3r/GUI/MainFrame.cpp:1389
 msgid "Print&er Settings Tab"
 msgstr "Panel Nastav&ení tiskárny"
 
@@ -9145,11 +9147,11 @@ msgstr "Nastavení tiskárny"
 msgid "Printer Settings Tab"
 msgstr "Panel Nastavení tiskárny"
 
-#: src/libslic3r/PrintConfig.cpp:3356 src/libslic3r/PrintConfig.cpp:3357
+#: src/libslic3r/PrintConfig.cpp:3329 src/libslic3r/PrintConfig.cpp:3330
 msgid "Printer absolute correction"
 msgstr "Absolutní korekce tiskárny"
 
-#: src/libslic3r/PrintConfig.cpp:3373 src/libslic3r/PrintConfig.cpp:3374
+#: src/libslic3r/PrintConfig.cpp:3346 src/libslic3r/PrintConfig.cpp:3347
 msgid "Printer gamma correction"
 msgstr "Gamma korekce tiskárny"
 
@@ -9161,32 +9163,32 @@ msgstr "Poznámky o tiskárně"
 msgid "Printer preset names"
 msgstr "Názvy přednastavení tiskáren"
 
-#: src/libslic3r/PrintConfig.cpp:3333
+#: src/libslic3r/PrintConfig.cpp:3306
 msgid "Printer scaling X axis correction"
 msgstr "Korekce měřítka v ose X"
 
-#: src/libslic3r/PrintConfig.cpp:3341
+#: src/libslic3r/PrintConfig.cpp:3314
 msgid "Printer scaling Y axis correction"
 msgstr "Korekce měřítka v ose Y"
 
-#: src/libslic3r/PrintConfig.cpp:3349
+#: src/libslic3r/PrintConfig.cpp:3322
 msgid "Printer scaling Z axis correction"
 msgstr "Korekce měřítka v ose Z"
 
-#: src/libslic3r/PrintConfig.cpp:3324 src/libslic3r/PrintConfig.cpp:3325
-#: src/libslic3r/PrintConfig.cpp:3326
+#: src/libslic3r/PrintConfig.cpp:3297 src/libslic3r/PrintConfig.cpp:3298
+#: src/libslic3r/PrintConfig.cpp:3299
 msgid "Printer scaling correction"
 msgstr "Korekce měřítka tisku"
 
-#: src/libslic3r/PrintConfig.cpp:3332 src/libslic3r/PrintConfig.cpp:3334
+#: src/libslic3r/PrintConfig.cpp:3305 src/libslic3r/PrintConfig.cpp:3307
 msgid "Printer scaling correction in X axis"
 msgstr "Korekce měřítka v ose X"
 
-#: src/libslic3r/PrintConfig.cpp:3340 src/libslic3r/PrintConfig.cpp:3342
+#: src/libslic3r/PrintConfig.cpp:3313 src/libslic3r/PrintConfig.cpp:3315
 msgid "Printer scaling correction in Y axis"
 msgstr "Korekce měřítka v ose Y"
 
-#: src/libslic3r/PrintConfig.cpp:3348 src/libslic3r/PrintConfig.cpp:3350
+#: src/libslic3r/PrintConfig.cpp:3321 src/libslic3r/PrintConfig.cpp:3323
 msgid "Printer scaling correction in Z axis"
 msgstr "Korekce měřítka v ose Z"
 
@@ -9233,7 +9235,7 @@ msgid "Process %1% / 100"
 msgstr "Zpracováno %1% / 100"
 
 #. TRN "Processing input_file_basename"
-#: src/slic3r/GUI/MainFrame.cpp:1687
+#: src/slic3r/GUI/MainFrame.cpp:1691
 #, c-format, boost-format
 msgid "Processing %s"
 msgstr "Zpracovávám %s"
@@ -9247,9 +9249,9 @@ msgstr ""
 "Zpracování modelu '%1%' s více než milionem trojúhelníků může být pomalé. "
 "Doporučujeme snížit množství trojúhelníků."
 
-#: src/slic3r/GUI/Tab.cpp:1731 src/slic3r/GUI/Tab.cpp:2118
-#: src/slic3r/GUI/Tab.cpp:2505 src/slic3r/GUI/Tab.cpp:2578
-#: src/slic3r/GUI/Tab.cpp:4593 src/slic3r/GUI/Tab.cpp:4740
+#: src/slic3r/GUI/Tab.cpp:1729 src/slic3r/GUI/Tab.cpp:2116
+#: src/slic3r/GUI/Tab.cpp:2503 src/slic3r/GUI/Tab.cpp:2576
+#: src/slic3r/GUI/Tab.cpp:4591 src/slic3r/GUI/Tab.cpp:4738
 msgid "Profile dependencies"
 msgstr "Profilové závislosti"
 
@@ -9341,7 +9343,7 @@ msgid ""
 "PrusaSlicer has encountered an error while taking a configuration snapshot."
 msgstr "PrusaSlicer narazil na chybu při pořizování zálohy konfigurace."
 
-#: src/slic3r/GUI/AboutDialog.cpp:271
+#: src/slic3r/GUI/AboutDialog.cpp:273
 msgid ""
 "PrusaSlicer is based on Slic3r by Alessandro Ranellucci and the RepRap "
 "community."
@@ -9460,15 +9462,15 @@ msgstr "Rychlé"
 msgid "Quick Add Settings (%s)"
 msgstr "Rychlé přidání nastavení (%s)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1276
+#: src/slic3r/GUI/MainFrame.cpp:1280
 msgid "Quick Slice"
 msgstr "Rychlé Slicování"
 
-#: src/slic3r/GUI/MainFrame.cpp:1282
+#: src/slic3r/GUI/MainFrame.cpp:1286
 msgid "Quick Slice and Save As"
 msgstr "Rychlé Slicování a Uložit jako"
 
-#: src/slic3r/GUI/MainFrame.cpp:1307 src/slic3r/GUI/MainFrame.cpp:1541
+#: src/slic3r/GUI/MainFrame.cpp:1311 src/slic3r/GUI/MainFrame.cpp:1545
 #, c-format, boost-format
 msgid "Quit %s"
 msgstr "Ukončit %s"
@@ -9537,7 +9539,7 @@ msgstr "Šířka linky při rapidní extruzi"
 msgid "Ramming parameters"
 msgstr "Parametry rapidní extruze"
 
-#: src/slic3r/GUI/Tab.cpp:2064
+#: src/slic3r/GUI/Tab.cpp:2062
 msgid "Ramming settings"
 msgstr "Nastavení rapidní extruze"
 
@@ -9557,8 +9559,8 @@ msgstr "Rozsah"
 msgid "Rasterizing layers"
 msgstr "Rasterizace vrstev"
 
-#: src/slic3r/GUI/MainFrame.cpp:1354 src/slic3r/GUI/MainFrame.cpp:1358
-#: src/slic3r/GUI/MainFrame.cpp:1525 src/slic3r/GUI/MainFrame.cpp:1529
+#: src/slic3r/GUI/MainFrame.cpp:1358 src/slic3r/GUI/MainFrame.cpp:1362
+#: src/slic3r/GUI/MainFrame.cpp:1529 src/slic3r/GUI/MainFrame.cpp:1533
 msgid "Re&load from Disk"
 msgstr "Znovu &načíst z disku"
 
@@ -9570,15 +9572,15 @@ msgstr "Přenastavit"
 msgid "Ready"
 msgstr "Připraveno"
 
-#: src/slic3r/GUI/MainFrame.cpp:1128 src/libslic3r/PrintConfig.cpp:2242
+#: src/slic3r/GUI/MainFrame.cpp:1132 src/libslic3r/PrintConfig.cpp:2242
 msgid "Rear"
 msgstr "Zezadu"
 
-#: src/slic3r/GUI/MainFrame.cpp:1128
+#: src/slic3r/GUI/MainFrame.cpp:1132
 msgid "Rear View"
 msgstr "Pohled zezadu"
 
-#: src/slic3r/GUI/MainFrame.cpp:1153
+#: src/slic3r/GUI/MainFrame.cpp:1157
 msgid "Recent projects"
 msgstr "N&edávné projekty"
 
@@ -9621,7 +9623,7 @@ msgid "Rectilinear grid"
 msgstr "Přímočará mřížka"
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:4738 src/slic3r/GUI/KBShortcutsDialog.cpp:98
-#: src/slic3r/GUI/MainFrame.cpp:1341
+#: src/slic3r/GUI/MainFrame.cpp:1345
 msgid "Redo"
 msgstr "Vpřed"
 
@@ -9654,7 +9656,7 @@ msgstr "Obnovit tiskárny"
 msgid "Regular"
 msgstr "Obvyklý"
 
-#: src/slic3r/GUI/Tab.cpp:4044
+#: src/slic3r/GUI/Tab.cpp:4042
 msgid "Regular expression"
 msgstr "Regulární výraz"
 
@@ -9704,9 +9706,9 @@ msgstr "Znovu načíst z:"
 msgid "Reload plater from disk"
 msgstr "Znovu načíst podložku z disku"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:207 src/slic3r/GUI/MainFrame.cpp:1355
-#: src/slic3r/GUI/MainFrame.cpp:1359 src/slic3r/GUI/MainFrame.cpp:1526
-#: src/slic3r/GUI/MainFrame.cpp:1530
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:207 src/slic3r/GUI/MainFrame.cpp:1359
+#: src/slic3r/GUI/MainFrame.cpp:1363 src/slic3r/GUI/MainFrame.cpp:1530
+#: src/slic3r/GUI/MainFrame.cpp:1534
 msgid "Reload the plater from disk"
 msgstr "Znovu načíst podložku z disku"
 
@@ -9732,7 +9734,7 @@ msgid "Remember output directory"
 msgstr "Pamatovat si výstupní složku"
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:292 src/slic3r/GUI/BedShapeDialog.cpp:362
-#: src/slic3r/GUI/Tab.cpp:3750
+#: src/slic3r/GUI/Tab.cpp:3748
 msgid "Remove"
 msgstr "Odebrat"
 
@@ -9859,11 +9861,11 @@ msgstr ""
 msgid "Render"
 msgstr "Render"
 
-#: src/libslic3r/PrintConfig.cpp:4609
+#: src/libslic3r/PrintConfig.cpp:4584
 msgid "Render with a software renderer"
 msgstr "Vykreslování pomocí softwaru"
 
-#: src/libslic3r/PrintConfig.cpp:4610
+#: src/libslic3r/PrintConfig.cpp:4585
 msgid ""
 "Render with a software renderer. The bundled MESA software renderer is "
 "loaded instead of the default OpenGL driver."
@@ -9871,7 +9873,7 @@ msgstr ""
 "Vykreslení pomocí softwaru. Namísto výchozího ovladače OpenGL je načten "
 "dodaný softwarový renderer MESA."
 
-#: src/slic3r/GUI/MainFrame.cpp:1750 src/libslic3r/PrintConfig.cpp:4521
+#: src/slic3r/GUI/MainFrame.cpp:1754 src/libslic3r/PrintConfig.cpp:4496
 msgid "Repair"
 msgstr "Oprava"
 
@@ -9903,11 +9905,11 @@ msgstr "Opravování modelu službou Netfabb"
 msgid "Repairing was canceled"
 msgstr "Oprava byla zrušena"
 
-#: src/slic3r/GUI/MainFrame.cpp:1288
+#: src/slic3r/GUI/MainFrame.cpp:1292
 msgid "Repeat Last Quick Slice"
 msgstr "Opakovat poslední rychlé slicování"
 
-#: src/slic3r/GUI/MainFrame.cpp:1288
+#: src/slic3r/GUI/MainFrame.cpp:1292
 msgid "Repeat last quick slice"
 msgstr "Opakovat poslední rychlé slicování"
 
@@ -9919,7 +9921,7 @@ msgstr "Nahradit z:"
 msgid "Replace the selected volume with new STL"
 msgstr "Nahradit vybraný objekt novým STL souborem"
 
-#: src/slic3r/GUI/Tab.cpp:3955
+#: src/slic3r/GUI/Tab.cpp:3953
 msgid "Replace with"
 msgstr "Nahradit"
 
@@ -9987,7 +9989,7 @@ msgstr "Výchozí měřítko"
 msgid "Reset selection"
 msgstr "Resetovat výběr"
 
-#: src/slic3r/GUI/Tab.cpp:2834
+#: src/slic3r/GUI/Tab.cpp:2832
 msgid "Reset to Filament Color"
 msgstr "Obnovit na barvu filamentu"
 
@@ -10011,8 +10013,8 @@ msgstr "Délka retrakce před očištěním"
 msgid "Retract on layer change"
 msgstr "Retrakce při změně vrstvy"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3614 src/slic3r/GUI/Tab.cpp:1869
-#: src/slic3r/GUI/Tab.cpp:2811
+#: src/slic3r/GUI/GCodeViewer.cpp:3614 src/slic3r/GUI/Tab.cpp:1867
+#: src/slic3r/GUI/Tab.cpp:2809
 msgid "Retraction"
 msgstr "Retrakce"
 
@@ -10035,7 +10037,7 @@ msgstr ""
 "Retrakce není spuštěna, pokud jsou rychloposuny pojezdu kratší než tato "
 "délka."
 
-#: src/slic3r/GUI/Tab.cpp:2827
+#: src/slic3r/GUI/Tab.cpp:2825
 msgid ""
 "Retraction when tool is disabled (advanced settings for multi-extruder "
 "setups)"
@@ -10067,15 +10069,15 @@ msgstr "Vrátit převod z metrů"
 msgid "Review the substitutions and adjust them if needed."
 msgstr "Zkontrolujte náhrady a případně je upravte."
 
-#: src/slic3r/GUI/MainFrame.cpp:1132
+#: src/slic3r/GUI/MainFrame.cpp:1136
 msgid "Right"
 msgstr "Zprava"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1518
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1521
 msgid "Right Preset Value"
 msgstr "Hodnota pravého přednastavení"
 
-#: src/slic3r/GUI/MainFrame.cpp:1132
+#: src/slic3r/GUI/MainFrame.cpp:1136
 msgid "Right View"
 msgstr "Pohled zprava"
 
@@ -10112,15 +10114,15 @@ msgstr "Pravé tlačítko myši:"
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:543
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:562
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:578
-#: src/libslic3r/PrintConfig.cpp:4525
+#: src/libslic3r/PrintConfig.cpp:4500
 msgid "Rotate"
 msgstr "Otočit"
 
-#: src/libslic3r/PrintConfig.cpp:4530
+#: src/libslic3r/PrintConfig.cpp:4505
 msgid "Rotate around X"
 msgstr "Otočit okolo osy X"
 
-#: src/libslic3r/PrintConfig.cpp:4535
+#: src/libslic3r/PrintConfig.cpp:4510
 msgid "Rotate around Y"
 msgstr "Otočit okolo osy Y"
 
@@ -10148,15 +10150,15 @@ msgstr ""
 msgid "Rotation"
 msgstr "Otáčení"
 
-#: src/libslic3r/PrintConfig.cpp:4531
+#: src/libslic3r/PrintConfig.cpp:4506
 msgid "Rotation angle around the X axis in degrees."
 msgstr "Úhel otočení kolem osy X ve stupních."
 
-#: src/libslic3r/PrintConfig.cpp:4536
+#: src/libslic3r/PrintConfig.cpp:4511
 msgid "Rotation angle around the Y axis in degrees."
 msgstr "Úhel otočení kolem osy Y ve stupních."
 
-#: src/libslic3r/PrintConfig.cpp:4526
+#: src/libslic3r/PrintConfig.cpp:4501
 msgid "Rotation angle around the Z axis in degrees."
 msgstr "Úhel otočení kolem osy Z ve stupních."
 
@@ -10174,11 +10176,11 @@ msgstr "Spustit %s"
 msgid "Running post-processing scripts"
 msgstr "Vykonávají se postprodukční skripty"
 
-#: src/slic3r/GUI/MainFrame.cpp:1234 src/slic3r/GUI/MainFrame.cpp:1583
+#: src/slic3r/GUI/MainFrame.cpp:1238 src/slic3r/GUI/MainFrame.cpp:1587
 msgid "S&end G-code"
 msgstr "Od&eslat G-code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1583
+#: src/slic3r/GUI/MainFrame.cpp:1587
 msgid "S&end to print"
 msgstr "Od&eslat do tiskárny"
 
@@ -10208,7 +10210,7 @@ msgstr "Klávesové zkratky pro SLA gizma"
 msgid "SLA material"
 msgstr "SLA materiál"
 
-#: src/libslic3r/PrintConfig.cpp:3394 src/libslic3r/PrintConfig.cpp:3395
+#: src/libslic3r/PrintConfig.cpp:3367 src/libslic3r/PrintConfig.cpp:3368
 msgid "SLA material type"
 msgstr "Typ SLA materiálu"
 
@@ -10220,7 +10222,7 @@ msgstr "SLA materiály"
 msgid "SLA print"
 msgstr "SLA tisk"
 
-#: src/libslic3r/PrintConfig.cpp:3523
+#: src/libslic3r/PrintConfig.cpp:3496
 msgid "SLA print material notes"
 msgstr "Poznámky pro SLA materiál"
 
@@ -10232,7 +10234,7 @@ msgstr "Nastavení SLA tisku"
 msgid "SLA supports outside the print area were detected."
 msgstr "Byly zjištěny SLA podpěry mimo tiskovou oblast."
 
-#: src/slic3r/GUI/MainFrame.cpp:1664
+#: src/slic3r/GUI/MainFrame.cpp:1668
 msgid "SVG"
 msgstr "SVG"
 
@@ -10251,7 +10253,7 @@ msgstr "Uložit"
 msgid "Save %s as:"
 msgstr "Uložit %s jako:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1664
+#: src/slic3r/GUI/MainFrame.cpp:1668
 #, c-format, boost-format
 msgid "Save %s file as:"
 msgstr "Uložit %s soubor jako:"
@@ -10260,11 +10262,11 @@ msgstr "Uložit %s soubor jako:"
 msgid "Save G-code file as:"
 msgstr "Uložit G-code jako:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1739
+#: src/slic3r/GUI/MainFrame.cpp:1743
 msgid "Save OBJ file (less prone to coordinate errors than STL) as:"
 msgstr "Uložit soubor OBJ (méně náchylný na chyby souřadnic než STL) jako:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1194 src/slic3r/GUI/MainFrame.cpp:1196
+#: src/slic3r/GUI/MainFrame.cpp:1198 src/slic3r/GUI/MainFrame.cpp:1200
 msgid "Save Project &as"
 msgstr "Uložit Projekt j&ako"
 
@@ -10272,15 +10274,15 @@ msgstr "Uložit Projekt j&ako"
 msgid "Save SL1 / SL1S file as:"
 msgstr "Uložit SL1 / SL1S soubor jako:"
 
-#: src/libslic3r/PrintConfig.cpp:4455
+#: src/libslic3r/PrintConfig.cpp:4430
 msgid "Save config file"
 msgstr "Uložit konfigurační soubor"
 
-#: src/slic3r/GUI/MainFrame.cpp:1764
+#: src/slic3r/GUI/MainFrame.cpp:1768
 msgid "Save configuration as:"
 msgstr "Uložit konfiguraci jako:"
 
-#: src/libslic3r/PrintConfig.cpp:4456
+#: src/libslic3r/PrintConfig.cpp:4431
 msgid "Save configuration to the specified file."
 msgstr "Uložit konfiguraci do zadaného souboru."
 
@@ -10290,11 +10292,11 @@ msgstr "Uložit konfiguraci do zadaného souboru."
 msgid "Save current %s"
 msgstr "Uložit stávající %s"
 
-#: src/slic3r/GUI/MainFrame.cpp:1190
+#: src/slic3r/GUI/MainFrame.cpp:1194
 msgid "Save current project file"
 msgstr "Uložit stávající projekt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1194 src/slic3r/GUI/MainFrame.cpp:1196
+#: src/slic3r/GUI/MainFrame.cpp:1198 src/slic3r/GUI/MainFrame.cpp:1200
 msgid "Save current project file as"
 msgstr "Uložit stávající projekt jako"
 
@@ -10307,7 +10309,7 @@ msgstr "Uložit soubor jako:"
 msgid "Save preset"
 msgstr "Uložit přednastavení"
 
-#: src/slic3r/GUI/MainFrame.cpp:1822
+#: src/slic3r/GUI/MainFrame.cpp:1826
 msgid "Save presets bundle as:"
 msgstr "Uložit balík přednastavení jako:"
 
@@ -10336,7 +10338,7 @@ msgstr "Uloží vybraná nastaneví do přednastavení \"%1%\"."
 msgid "Save the selected options."
 msgstr "Uložte vybrané možnosti."
 
-#: src/slic3r/GUI/MainFrame.cpp:1676
+#: src/slic3r/GUI/MainFrame.cpp:1680
 msgid "Save zip file as:"
 msgstr "Uložit ZIP soubor jako:"
 
@@ -10350,7 +10352,7 @@ msgstr "Ukládání meshe do 3MF kontejneru selhalo."
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:216
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:563
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:579
-#: src/libslic3r/PrintConfig.cpp:4540
+#: src/libslic3r/PrintConfig.cpp:4515
 msgid "Scale"
 msgstr "Měřítko"
 
@@ -10368,11 +10370,11 @@ msgstr ""
 "Přizpůsobit měřítko vybraného objektu, aby se objekt vešel do tiksového "
 "objemu"
 
-#: src/libslic3r/PrintConfig.cpp:4549
+#: src/libslic3r/PrintConfig.cpp:4524
 msgid "Scale to Fit"
 msgstr "Vyplnit tiskový objem"
 
-#: src/libslic3r/PrintConfig.cpp:4550
+#: src/libslic3r/PrintConfig.cpp:4525
 msgid "Scale to fit the given volume."
 msgstr "Změnit velikost, aby se objekt vešel do zadaného tiskového prostoru."
 
@@ -10380,7 +10382,7 @@ msgstr "Změnit velikost, aby se objekt vešel do zadaného tiskového prostoru.
 msgid "Scale to print volume"
 msgstr "Změnit velikost podle tiskového objemu"
 
-#: src/libslic3r/PrintConfig.cpp:4541
+#: src/libslic3r/PrintConfig.cpp:4516
 msgid "Scaling factor or percentage."
 msgstr "Procentuální měřítko."
 
@@ -10411,7 +10413,7 @@ msgstr "Seam preferred direction jitter"
 msgid "Seams"
 msgstr "Švy"
 
-#: src/slic3r/GUI/MainFrame.cpp:1364
+#: src/slic3r/GUI/MainFrame.cpp:1368
 msgid "Searc&h"
 msgstr "Vy&hledávání"
 
@@ -10435,7 +10437,7 @@ msgstr ""
 msgid "Search in English"
 msgstr "Hledat v angličtině"
 
-#: src/slic3r/GUI/MainFrame.cpp:1365
+#: src/slic3r/GUI/MainFrame.cpp:1369
 msgid "Search in settings"
 msgstr "Vyhledávání v nastavení"
 
@@ -10522,7 +10524,7 @@ msgstr "Vyberte jak chcete na soubor otevřít"
 msgid "Select by rectangle"
 msgstr "Označit obdélníkovým výběrem myši"
 
-#: src/slic3r/GUI/MainFrame.cpp:1783 src/slic3r/GUI/MainFrame.cpp:1848
+#: src/slic3r/GUI/MainFrame.cpp:1787 src/slic3r/GUI/MainFrame.cpp:1852
 msgid "Select configuration to load:"
 msgstr "Zvolte konfiguraci k načtení:"
 
@@ -10530,7 +10532,7 @@ msgstr "Zvolte konfiguraci k načtení:"
 msgid "Select coordinate space, in which the transformation will be performed."
 msgstr "Vyberte souřadnicový prostor, ve kterém bude provedena transformace."
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1453
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1456
 msgid "Select presets to compare"
 msgstr "Zvolte přednastavení k porovnání"
 
@@ -10542,7 +10544,7 @@ msgstr "Vyberte tvar z galerie"
 msgid "Select showing settings"
 msgstr "Zvolte nastavení zobrazení"
 
-#: src/slic3r/GUI/MainFrame.cpp:1729
+#: src/slic3r/GUI/MainFrame.cpp:1733
 msgid "Select the STL file to repair:"
 msgstr "Vyberte STL soubor k opravě:"
 
@@ -10626,7 +10628,7 @@ msgstr "Výběr - Odebrání v seznamu"
 msgid "Selection-Remove from rectangle"
 msgstr "Výběr - Odebrání obdélníkovým výběrem"
 
-#: src/slic3r/GUI/MainFrame.cpp:1323
+#: src/slic3r/GUI/MainFrame.cpp:1327
 msgid "Selects all objects"
 msgstr "Vybrat všechny objekty"
 
@@ -10643,7 +10645,7 @@ msgstr "Odeslat G-code"
 msgid "Send system info"
 msgstr "Odeslat systémové informace"
 
-#: src/slic3r/GUI/MainFrame.cpp:1234
+#: src/slic3r/GUI/MainFrame.cpp:1238
 msgid "Send to print current plate as G-code"
 msgstr "Odeslat k tisku stávající plochu jako G-code"
 
@@ -10667,7 +10669,7 @@ msgstr "Odesílání systémových informací..."
 msgid "Seq."
 msgstr "Sekv."
 
-#: src/slic3r/GUI/Tab.cpp:1685
+#: src/slic3r/GUI/Tab.cpp:1683
 msgid "Sequential printing"
 msgstr "Sekvenční tisk"
 
@@ -10683,7 +10685,7 @@ msgstr "Sériový port:"
 msgid "Service name"
 msgstr "Název služby"
 
-#: src/slic3r/GUI/Tab.cpp:3835 src/slic3r/GUI/Tab.cpp:4197
+#: src/slic3r/GUI/Tab.cpp:3833 src/slic3r/GUI/Tab.cpp:4195
 msgid "Set"
 msgstr "Nastavit"
 
@@ -10810,7 +10812,7 @@ msgstr "Nastavení vybraných položek jako tisknuté/netisknuté"
 msgid "Set settings tabs as menu items (experimental)"
 msgstr "Karty s nastavením zobrazovat jako položky v menu (experimentální)"
 
-#: src/libslic3r/PrintConfig.cpp:3277
+#: src/libslic3r/PrintConfig.cpp:3250
 msgid ""
 "Set the actual LCD display orientation inside the SLA printer. Portrait mode "
 "will flip the meaning of display width and height parameters and the output "
@@ -10965,7 +10967,7 @@ msgstr ""
 msgid "Set upper thumb as active"
 msgstr "Nastavit horní ukazatel jako aktivní"
 
-#: src/libslic3r/PrintConfig.cpp:4603
+#: src/libslic3r/PrintConfig.cpp:4578
 msgid ""
 "Sets logging sensitivity. 0:fatal, 1:error, 2:warning, 3:info, 4:debug, 5:"
 "trace\n"
@@ -10976,7 +10978,7 @@ msgstr ""
 "Například. loglevel=2 zaznamenává fatální chyby, chyby a varovné zprávy."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:249 src/slic3r/GUI/GCodeViewer.cpp:3709
-#: src/slic3r/GUI/MainFrame.cpp:2143
+#: src/slic3r/GUI/MainFrame.cpp:2147
 msgid "Settings"
 msgstr "Nastavení"
 
@@ -11025,7 +11027,7 @@ msgstr "Mám synchronizovat vrstvy podpěr, aby bylo možné zapnout Čistící 
 msgid "Shape"
 msgstr "Tvar"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:69 src/slic3r/GUI/MainFrame.cpp:1400
+#: src/slic3r/GUI/GalleryDialog.cpp:69 src/slic3r/GUI/MainFrame.cpp:1404
 msgid "Shape Gallery"
 msgstr "Galerie Tvarů"
 
@@ -11076,7 +11078,7 @@ msgstr "Zobrazovat \"Tip dne\" po spuštění"
 msgid "Show &Configuration Folder"
 msgstr "Otevřít adresář s &konfiguracemi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1430
+#: src/slic3r/GUI/MainFrame.cpp:1434
 msgid "Show &Labels"
 msgstr "Zobrazit &Popisky"
 
@@ -11092,7 +11094,7 @@ msgstr "Zobrazit okno o Slic3ru"
 msgid "Show advanced settings"
 msgstr "Zobrazit rozšířená nastavení"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1502
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1505
 msgid "Show all presets (including incompatible)"
 msgstr "Zobrazit všechna přednastavení (včetně nekompatibilních)"
 
@@ -11132,7 +11134,7 @@ msgstr "Zobrazit výšku objektu"
 msgid "Show object height on the ruler"
 msgstr "Zobrazit výšku objektu na pravítku"
 
-#: src/slic3r/GUI/MainFrame.cpp:1430
+#: src/slic3r/GUI/MainFrame.cpp:1434
 msgid "Show object/instance labels in 3D scene"
 msgstr "Zobrazit popisky objektů / instancí ve 3D scéně"
 
@@ -11160,43 +11162,43 @@ msgstr "Zobrazit podpěry"
 msgid "Show system information"
 msgstr "Zobrazit systémové informace"
 
-#: src/slic3r/GUI/MainFrame.cpp:1391
+#: src/slic3r/GUI/MainFrame.cpp:1395
 msgid "Show the 3D editing view"
 msgstr "Zobrazit 3D editaci"
 
-#: src/slic3r/GUI/MainFrame.cpp:1394
+#: src/slic3r/GUI/MainFrame.cpp:1398
 msgid "Show the 3D slices preview"
 msgstr "Zobrazit 3D náhled vrstev"
 
-#: src/slic3r/GUI/MainFrame.cpp:1381
+#: src/slic3r/GUI/MainFrame.cpp:1385
 msgid "Show the filament settings"
 msgstr "Zobrazit nastavení filamentu"
 
-#: src/libslic3r/PrintConfig.cpp:4446
+#: src/libslic3r/PrintConfig.cpp:4421
 msgid "Show the full list of SLA print configuration options."
 msgstr "Zobrazit kompletní seznam možností konfigurace SLA tisku."
 
-#: src/libslic3r/PrintConfig.cpp:4441
+#: src/libslic3r/PrintConfig.cpp:4416
 msgid "Show the full list of print/G-code configuration options."
 msgstr "Zobrazit kompletní seznam možností konfigurace tisku / G-codu."
 
-#: src/slic3r/GUI/MainFrame.cpp:1103
+#: src/slic3r/GUI/MainFrame.cpp:1107
 msgid "Show the list of the keyboard shortcuts"
 msgstr "Zobrazit seznam klávesových zkratek"
 
-#: src/slic3r/GUI/MainFrame.cpp:1373
+#: src/slic3r/GUI/MainFrame.cpp:1377
 msgid "Show the plater"
 msgstr "Zobrazit podložku"
 
-#: src/slic3r/GUI/MainFrame.cpp:1378
+#: src/slic3r/GUI/MainFrame.cpp:1382
 msgid "Show the print settings"
 msgstr "Zobrazit nastavení tisku"
 
-#: src/slic3r/GUI/MainFrame.cpp:1385
+#: src/slic3r/GUI/MainFrame.cpp:1389
 msgid "Show the printer settings"
 msgstr "Zobrazit nastavení tiskárny"
 
-#: src/libslic3r/PrintConfig.cpp:4435
+#: src/libslic3r/PrintConfig.cpp:4410
 msgid "Show this help."
 msgstr "Zobrazí tuto nápovědu."
 
@@ -11281,7 +11283,7 @@ msgstr "Zjednodušit model"
 msgid "Single Extruder Multi Material"
 msgstr "MultiMaterial tisk s jedním extrudérem"
 
-#: src/slic3r/GUI/Tab.cpp:2333
+#: src/slic3r/GUI/Tab.cpp:2331
 msgid ""
 "Single Extruder Multi Material is selected, \n"
 "and all extruders must have the same diameter.\n"
@@ -11293,15 +11295,15 @@ msgstr ""
 "Chcete nastavit průměry všech extruderových trysek podle průměru prvního "
 "extruderu?"
 
-#: src/slic3r/GUI/Tab.cpp:2733 src/slic3r/GUI/Tab.cpp:2742
+#: src/slic3r/GUI/Tab.cpp:2731 src/slic3r/GUI/Tab.cpp:2740
 msgid "Single extruder MM setup"
 msgstr "Nastavení jednoho extruderu MM"
 
-#: src/slic3r/GUI/Tab.cpp:2743
+#: src/slic3r/GUI/Tab.cpp:2741
 msgid "Single extruder multimaterial parameters"
 msgstr "Parametry jednoho multi materiálového extruderu"
 
-#: src/libslic3r/PrintConfig.cpp:4586
+#: src/libslic3r/PrintConfig.cpp:4561
 msgid "Single instance mode"
 msgstr "Režim jedné instance"
 
@@ -11320,7 +11322,7 @@ msgstr "Velikost"
 msgid "Size"
 msgstr "Rozměr"
 
-#: src/slic3r/GUI/Tab.cpp:2290 src/slic3r/GUI/Tab.cpp:2517
+#: src/slic3r/GUI/Tab.cpp:2288 src/slic3r/GUI/Tab.cpp:2515
 msgid "Size and coordinates"
 msgstr "Rozměry a počátek"
 
@@ -11389,15 +11391,15 @@ msgstr ""
 msgid "Slic3r will not scale speed down below this speed."
 msgstr "Slic3r nebude měnit rychlost pod tuto rychlost."
 
-#: src/libslic3r/PrintConfig.cpp:4428
+#: src/libslic3r/PrintConfig.cpp:4403
 msgid "Slice"
 msgstr "Slicovat"
 
-#: src/slic3r/GUI/MainFrame.cpp:1276
+#: src/slic3r/GUI/MainFrame.cpp:1280
 msgid "Slice a file into a G-code"
 msgstr "Slicovat soubor do G-code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1282
+#: src/slic3r/GUI/MainFrame.cpp:1286
 msgid "Slice a file into a G-code, save as"
 msgstr "Slicovat soubor do G-code, uložit jako"
 
@@ -11414,15 +11416,15 @@ msgstr "Slicovat"
 msgid "Slice resolution"
 msgstr "Rozlišení slicování"
 
-#: src/libslic3r/PrintConfig.cpp:4396
+#: src/libslic3r/PrintConfig.cpp:4371
 msgid "Slice the model and export SLA printing layers as PNG."
 msgstr "Naslicuje model a exportuje SLA tiskové vrstvy jako PNG soubory."
 
-#: src/libslic3r/PrintConfig.cpp:4417
+#: src/libslic3r/PrintConfig.cpp:4392
 msgid "Slice the model and export toolpaths as G-code."
 msgstr "Naslicujte model a exportujte trasy jako G-code."
 
-#: src/libslic3r/PrintConfig.cpp:4429
+#: src/libslic3r/PrintConfig.cpp:4404
 msgid ""
 "Slice the model as FFF or SLA based on the printer_technology configuration "
 "value."
@@ -11439,13 +11441,13 @@ msgstr "Informace o slicování"
 msgid "Sliced object \"%1%\" looks like a logo or a sign"
 msgstr "Slicovaný objekt \"%1%\" vypadá jako logo nebo nápis"
 
-#: src/slic3r/GUI/MainFrame.cpp:1685 src/slic3r/GUI/Plater.cpp:3316
+#: src/slic3r/GUI/MainFrame.cpp:1689 src/slic3r/GUI/Plater.cpp:3316
 #: src/slic3r/GUI/Plater.cpp:6051 src/slic3r/GUI/Tab.cpp:1663
-#: src/slic3r/GUI/Tab.cpp:4729
+#: src/slic3r/GUI/Tab.cpp:4727
 msgid "Slicing"
 msgstr "Slicování"
 
-#: src/slic3r/GUI/MainFrame.cpp:1713
+#: src/slic3r/GUI/MainFrame.cpp:1717
 msgid "Slicing Done!"
 msgstr "Slicování dokončeno!"
 
@@ -11481,7 +11483,7 @@ msgstr "Slicuji model"
 msgid "Slicing supports"
 msgstr "Slicování podpěr"
 
-#: src/libslic3r/PrintConfig.cpp:3298 src/libslic3r/PrintConfig.cpp:3923
+#: src/libslic3r/PrintConfig.cpp:3271 src/libslic3r/PrintConfig.cpp:3896
 msgid "Slow"
 msgstr "Pomalý"
 
@@ -11489,7 +11491,7 @@ msgstr "Pomalý"
 msgid "Slow down if layer print time is below"
 msgstr "Zpomalit tisk pokud je doba tisku kratší než"
 
-#: src/libslic3r/PrintConfig.cpp:3299
+#: src/libslic3r/PrintConfig.cpp:3272
 msgid "Slow tilt"
 msgstr "Pomalý náklon"
 
@@ -11497,7 +11499,7 @@ msgstr "Pomalý náklon"
 msgid "Small perimeters"
 msgstr "Malé perimetry"
 
-#: src/libslic3r/PrintConfig.cpp:3603
+#: src/libslic3r/PrintConfig.cpp:3576
 msgid "Small pillar diameter percent"
 msgstr "Procentní průměr malých pilířů"
 
@@ -11594,7 +11596,7 @@ msgid "Some SLA materials were uninstalled."
 msgstr "Některé SLA materiály byly odinstalovány."
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:936
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1696
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1699
 msgid ""
 "Some fields are too long to fit. Right mouse click reveals the full text."
 msgstr ""
@@ -11619,7 +11621,7 @@ msgid ""
 msgstr ""
 "Některé objekty jsou příliš vysoké a nelze je tisknout bez kolizí extruderu."
 
-#: src/libslic3r/PrintConfig.cpp:3790
+#: src/libslic3r/PrintConfig.cpp:3763
 msgid ""
 "Some objects can get along with a few smaller pads instead of a single big "
 "one. This parameter defines how far the center of two smaller pads should "
@@ -11637,7 +11639,7 @@ msgstr ""
 "Některá přednastavení jsou upravená a neuložené změny nebudou zachyceny v "
 "záloze konfigurace."
 
-#: src/slic3r/GUI/MainFrame.cpp:1813
+#: src/slic3r/GUI/MainFrame.cpp:1817
 msgid ""
 "Some presets are modified and the unsaved changes will not be exported into "
 "configuration bundle."
@@ -11823,7 +11825,7 @@ msgid "Spiral vase"
 msgstr "Spirálová váza"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:944 src/slic3r/GUI/GUI_Factories.cpp:954
-#: src/slic3r/GUI/GUI_Factories.cpp:975 src/libslic3r/PrintConfig.cpp:4545
+#: src/slic3r/GUI/GUI_Factories.cpp:975 src/libslic3r/PrintConfig.cpp:4520
 msgid "Split"
 msgstr "Rozdělit"
 
@@ -11888,13 +11890,13 @@ msgstr "Běžné"
 msgid "Stars"
 msgstr "Hvězdy"
 
-#: src/slic3r/GUI/Tab.cpp:2089 src/slic3r/GUI/Tab.cpp:2410
+#: src/slic3r/GUI/Tab.cpp:2087 src/slic3r/GUI/Tab.cpp:2408
 #: src/libslic3r/GCode.cpp:707 src/libslic3r/PrintConfig.cpp:2418
 #: src/libslic3r/PrintConfig.cpp:2433
 msgid "Start G-code"
 msgstr "Začátek G-code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1145
+#: src/slic3r/GUI/MainFrame.cpp:1149
 msgid "Start a new project"
 msgstr "Vytvořit nový projekt"
 
@@ -11902,7 +11904,7 @@ msgstr "Vytvořit nový projekt"
 msgid "Start at height"
 msgstr "Začít ve výšce"
 
-#: src/slic3r/GUI/MainFrame.cpp:1296
+#: src/slic3r/GUI/MainFrame.cpp:1300
 msgid "Start new slicing process"
 msgstr "Zahájit nový slicovací proces"
 
@@ -11952,7 +11954,7 @@ msgid "Status:"
 msgstr "Stav:"
 
 #: src/slic3r/GUI/Search.cpp:90 src/slic3r/GUI/Search.cpp:336
-#: src/slic3r/GUI/Tab.cpp:2651
+#: src/slic3r/GUI/Tab.cpp:2649
 msgid "Stealth"
 msgstr "Tichý"
 
@@ -12011,19 +12013,19 @@ msgstr "Vynucení podpěr"
 msgid "Support Generator"
 msgstr "Generátor Podpěr"
 
-#: src/libslic3r/PrintConfig.cpp:3658
+#: src/libslic3r/PrintConfig.cpp:3631
 msgid "Support base diameter"
 msgstr "Průměr podpěrné základny"
 
-#: src/libslic3r/PrintConfig.cpp:3668
+#: src/libslic3r/PrintConfig.cpp:3641
 msgid "Support base height"
 msgstr "Výška podpěrné základny"
 
-#: src/libslic3r/PrintConfig.cpp:3677
+#: src/libslic3r/PrintConfig.cpp:3650
 msgid "Support base safety distance"
 msgstr "Bezpečná vzdálenost podpěrné základny"
 
-#: src/slic3r/GUI/Tab.cpp:4666
+#: src/slic3r/GUI/Tab.cpp:4664
 msgid "Support head"
 msgstr "Hrot podpěry"
 
@@ -12077,7 +12079,7 @@ msgid "Support material/raft/skirt extruder"
 msgstr "Extruder pro podpěry/raft/obrys"
 
 #: src/slic3r/GUI/Plater.cpp:433 src/libslic3r/PrintConfig.cpp:2558
-#: src/libslic3r/PrintConfig.cpp:3640
+#: src/libslic3r/PrintConfig.cpp:3613
 msgid "Support on build plate only"
 msgstr "Pouze na tiskové podložce"
 
@@ -12085,12 +12087,12 @@ msgstr "Pouze na tiskové podložce"
 msgid "Support parameter change"
 msgstr "Změna nastavení podpěr"
 
-#: src/slic3r/GUI/Tab.cpp:4671
+#: src/slic3r/GUI/Tab.cpp:4669
 msgid "Support pillar"
 msgstr "Podpěrný pilíř"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:46
-#: src/libslic3r/PrintConfig.cpp:3730
+#: src/libslic3r/PrintConfig.cpp:3703
 msgid "Support points density"
 msgstr "Hustota podpěrných bodů"
 
@@ -12099,16 +12101,16 @@ msgid "Support points edit"
 msgstr "Úprava podpěrných bodů"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:140 src/slic3r/GUI/Plater.cpp:428
-#: src/slic3r/GUI/Tab.cpp:4662 src/slic3r/GUI/Tab.cpp:4663
-#: src/libslic3r/PrintConfig.cpp:3559 src/libslic3r/PrintConfig.cpp:3566
-#: src/libslic3r/PrintConfig.cpp:3575 src/libslic3r/PrintConfig.cpp:3584
-#: src/libslic3r/PrintConfig.cpp:3594 src/libslic3r/PrintConfig.cpp:3604
-#: src/libslic3r/PrintConfig.cpp:3641 src/libslic3r/PrintConfig.cpp:3648
-#: src/libslic3r/PrintConfig.cpp:3659 src/libslic3r/PrintConfig.cpp:3669
-#: src/libslic3r/PrintConfig.cpp:3678 src/libslic3r/PrintConfig.cpp:3691
-#: src/libslic3r/PrintConfig.cpp:3701 src/libslic3r/PrintConfig.cpp:3710
-#: src/libslic3r/PrintConfig.cpp:3720 src/libslic3r/PrintConfig.cpp:3731
-#: src/libslic3r/PrintConfig.cpp:3739
+#: src/slic3r/GUI/Tab.cpp:4660 src/slic3r/GUI/Tab.cpp:4661
+#: src/libslic3r/PrintConfig.cpp:3532 src/libslic3r/PrintConfig.cpp:3539
+#: src/libslic3r/PrintConfig.cpp:3548 src/libslic3r/PrintConfig.cpp:3557
+#: src/libslic3r/PrintConfig.cpp:3567 src/libslic3r/PrintConfig.cpp:3577
+#: src/libslic3r/PrintConfig.cpp:3614 src/libslic3r/PrintConfig.cpp:3621
+#: src/libslic3r/PrintConfig.cpp:3632 src/libslic3r/PrintConfig.cpp:3642
+#: src/libslic3r/PrintConfig.cpp:3651 src/libslic3r/PrintConfig.cpp:3664
+#: src/libslic3r/PrintConfig.cpp:3674 src/libslic3r/PrintConfig.cpp:3683
+#: src/libslic3r/PrintConfig.cpp:3693 src/libslic3r/PrintConfig.cpp:3704
+#: src/libslic3r/PrintConfig.cpp:3712
 msgid "Supports"
 msgstr "Podpěry"
 
@@ -12262,7 +12264,7 @@ msgstr "Pořizování konfiguračního snapshotu"
 msgid "Taking a configuration snapshot failed."
 msgstr "Pořizování konfiguračního snapshotu selhalo."
 
-#: src/slic3r/GUI/GUI_Preview.cpp:222 src/slic3r/GUI/Tab.cpp:1990
+#: src/slic3r/GUI/GUI_Preview.cpp:222 src/slic3r/GUI/Tab.cpp:1988
 msgid "Temperature"
 msgstr "Teplota"
 
@@ -12288,7 +12290,7 @@ msgstr "Kolísání teploty"
 msgid "Temperatures"
 msgstr "Teploty"
 
-#: src/slic3r/GUI/Tab.cpp:2488 src/libslic3r/GCode.cpp:715
+#: src/slic3r/GUI/Tab.cpp:2486 src/libslic3r/GCode.cpp:715
 msgid "Template Custom G-code"
 msgstr "Šablona s vlastním G-code"
 
@@ -12443,7 +12445,7 @@ msgstr ""
 "Čistící věž je při více objektech možná pouze v případě, že objekty mají "
 "všechny vrstvy stejné výšky"
 
-#: src/slic3r/GUI/Tab.cpp:3011
+#: src/slic3r/GUI/Tab.cpp:3009
 msgid ""
 "The Wipe option is not available when using the Firmware Retraction mode.\n"
 "\n"
@@ -12500,7 +12502,7 @@ msgstr ""
 "pouze tehdy, když je informace o rotacích zapsána do koordinátů daného "
 "objektu."
 
-#: src/libslic3r/PrintConfig.cpp:3692
+#: src/libslic3r/PrintConfig.cpp:3665
 msgid "The default angle for connecting support sticks and junctions."
 msgstr "Výchozí úhel pro připojení nosných tyčí a spojek."
 
@@ -12617,7 +12619,7 @@ msgstr "Typ filamentu pro použití ve vlastních G-code."
 msgid "The file does not exist."
 msgstr "Soubor neexistuje."
 
-#: src/libslic3r/PrintConfig.cpp:4582
+#: src/libslic3r/PrintConfig.cpp:4557
 msgid ""
 "The file where the output will be written (if not specified, it will be "
 "based on the input file)."
@@ -12649,7 +12651,7 @@ msgstr "Následující modely SLA tiskáren nemají vybrané žádné materiály
 msgid "The following characters are not allowed by a FAT file system:"
 msgstr "Následující znaky nejsou v souborovém systému FAT povoleny:"
 
-#: src/slic3r/GUI/Tab.cpp:1849
+#: src/slic3r/GUI/Tab.cpp:1847
 #, c-format, boost-format
 msgid ""
 "The following line %s contains reserved keywords.\n"
@@ -12718,7 +12720,7 @@ msgstr ""
 msgid "The following values were substituted:"
 msgstr "Byly nahrazeny následující hodnoty:"
 
-#: src/libslic3r/PrintConfig.cpp:3837
+#: src/libslic3r/PrintConfig.cpp:3810
 msgid ""
 "The gap between the object bottom and the generated pad in zero elevation "
 "mode."
@@ -12726,7 +12728,7 @@ msgstr ""
 "Mezera mezi spodkem objektu a generovanou podložkou v režimu nulového "
 "nadzvednutí."
 
-#: src/libslic3r/PrintConfig.cpp:3670
+#: src/libslic3r/PrintConfig.cpp:3643
 msgid "The height of the pillar base cone"
 msgstr "Výška ukotvení podpěrného kužele"
 
@@ -12764,7 +12766,7 @@ msgstr "Poslední změny barev byly uloženy pro tisk s více extrudery."
 msgid "The last color change data was saved for a single extruder printing."
 msgstr "Poslední změny barev byly uloženy pro tisk s jedním extruderem."
 
-#: src/libslic3r/PrintConfig.cpp:3711
+#: src/libslic3r/PrintConfig.cpp:3684
 msgid ""
 "The max distance of two pillars to get linked with each other. A zero value "
 "will prohibit pillar cascading."
@@ -12772,7 +12774,7 @@ msgstr ""
 "Maximální vzdálenost dvou podpůrných pilířů pro vzájemné provázání. Nulová "
 "hodnota zakáže provazování."
 
-#: src/libslic3r/PrintConfig.cpp:3702
+#: src/libslic3r/PrintConfig.cpp:3675
 msgid "The max length of a bridge"
 msgstr "Maximální délka přemostění"
 
@@ -12796,7 +12798,7 @@ msgstr ""
 "Maximální vzdálenost, o kterou může být každý bod pláště posunut (oběma "
 "směry), měřeno kolmo k obvodové stěně."
 
-#: src/libslic3r/PrintConfig.cpp:3680
+#: src/libslic3r/PrintConfig.cpp:3653
 msgid ""
 "The minimum distance of the pillar base from the model in mm. Makes sense in "
 "zero elevation mode where a gap according to this parameter is inserted "
@@ -12831,7 +12833,7 @@ msgstr ""
 "bottom_solid_layers, je-li to nutné k dosažení minimální tloušťky spodní "
 "skořepiny."
 
-#: src/libslic3r/PrintConfig.cpp:3119
+#: src/libslic3r/PrintConfig.cpp:3121
 msgid ""
 "The number of perimeters, counted from the center, over which the variation "
 "needs to be spread. Lower values mean that the outer perimeters don't change "
@@ -12872,7 +12874,7 @@ msgstr ""
 "Objekt se zvýší tímto počtem vrstev a pod ním bude vytvořen podpůrný "
 "materiál."
 
-#: src/libslic3r/PrintConfig.cpp:3605
+#: src/libslic3r/PrintConfig.cpp:3578
 msgid ""
 "The percentage of smaller pillars compared to the normal pillar diameter "
 "which are used in problematic areas where a normal pilla cannot fit."
@@ -12881,7 +12883,7 @@ msgstr ""
 "pilířů. Menší pilíře jsou použity v problematických místech, kam se normální "
 "nevejdou."
 
-#: src/libslic3r/PrintConfig.cpp:3317
+#: src/libslic3r/PrintConfig.cpp:3290
 msgid ""
 "The percentage of the bed area. \n"
 "If the print area exceeds the specified value, \n"
@@ -12891,7 +12893,7 @@ msgstr ""
 "Pokud tisk zabere více než je zadaná hodnota,\n"
 "bude použit pomalý náklon. V ostatních případech bude použit rychlý náklon"
 
-#: src/slic3r/GUI/Tab.cpp:3727
+#: src/slic3r/GUI/Tab.cpp:3725
 msgid ""
 "The physical printer below is based on the preset, you are going to delete."
 msgid_plural ""
@@ -12909,7 +12911,7 @@ msgstr[3] ""
 "Níže uvedené fyzické tiskárny jsou založeny na přednastavení, které se "
 "chystáte odstranit."
 
-#: src/slic3r/GUI/Tab.cpp:3737
+#: src/slic3r/GUI/Tab.cpp:3735
 msgid ""
 "The physical printer below is based only on the preset, you are going to "
 "delete."
@@ -12983,7 +12985,7 @@ msgstr "Zadaný název je neplatný."
 msgid "The provided name is not valid;"
 msgstr "Zadaný název není platný;"
 
-#: src/libslic3r/Format/3mf.cpp:1745
+#: src/libslic3r/Format/3mf.cpp:1746
 msgid ""
 "The selected 3MF contains FDM supports painted object using a newer version "
 "of PrusaSlicer and is not compatible."
@@ -12991,7 +12993,7 @@ msgstr ""
 "Vybraný 3MF soubor obsahuje objekt s namalovanými podpěrami novější verze "
 "PrusaSliceru a proto není kompatibilní."
 
-#: src/libslic3r/Format/3mf.cpp:1753
+#: src/libslic3r/Format/3mf.cpp:1754
 msgid ""
 "The selected 3MF contains multi-material painted object using a newer "
 "version of PrusaSlicer and is not compatible."
@@ -12999,7 +13001,7 @@ msgstr ""
 "Vybraný 3MF soubor obsahuje objekt multimateriálovým malováním pomocí "
 "novější verze PrusaSliceru a proto není kompatibilní."
 
-#: src/libslic3r/Format/3mf.cpp:1749
+#: src/libslic3r/Format/3mf.cpp:1750
 msgid ""
 "The selected 3MF contains seam painted object using a newer version of "
 "PrusaSlicer and is not compatible."
@@ -13007,7 +13009,7 @@ msgstr ""
 "Vybraný 3MF soubor obsahuje objekt s namalovaný švem pomocí novější verze "
 "PrusaSliceru a proto není kompatibilní."
 
-#: src/libslic3r/Format/3mf.cpp:1734
+#: src/libslic3r/Format/3mf.cpp:1735
 #, boost-format
 msgid ""
 "The selected 3mf file has been saved with a newer version of %1% and is not "
@@ -13048,7 +13050,7 @@ msgid ""
 msgstr ""
 "Vybraný objekt nebylo možné rozdělit, protože obsahuje pouze jednu část."
 
-#: src/slic3r/GUI/MainFrame.cpp:1165
+#: src/slic3r/GUI/MainFrame.cpp:1169
 msgid ""
 "The selected project is no longer available.\n"
 "Do you want to remove it from the recent projects list?"
@@ -13083,7 +13085,7 @@ msgstr "Velikost objektu lze určit v palcích"
 msgid "The size of the object is zero"
 msgstr "Velikost objektu je nulová"
 
-#: src/libslic3r/PrintConfig.cpp:3812
+#: src/libslic3r/PrintConfig.cpp:3785
 msgid ""
 "The slope of the pad wall relative to the bed plane. 90 degrees means "
 "straight walls."
@@ -13155,7 +13157,7 @@ msgstr "Zadaný název není platný;"
 msgid "The supplied settings will cause an empty print."
 msgstr "Zadané nastavení způsobí prázdný tisk."
 
-#: src/libslic3r/PrintConfig.cpp:3755
+#: src/libslic3r/PrintConfig.cpp:3728
 msgid "The thickness of the pad and its optional cavity walls."
 msgstr "Tloušťka podložky a její volitelné duté stěny."
 
@@ -13543,11 +13545,11 @@ msgstr ""
 msgid "This is a default preset."
 msgstr "Toto je výchozí přednastavení."
 
-#: src/libslic3r/PrintConfig.cpp:3732
+#: src/libslic3r/PrintConfig.cpp:3705
 msgid "This is a relative measure of support points density."
 msgstr "Relativní míra hustoty podpěrných bodů."
 
-#: src/slic3r/GUI/Tab.cpp:2778
+#: src/slic3r/GUI/Tab.cpp:2776
 msgid ""
 "This is a single extruder multimaterial printer, diameters of all extruders "
 "will be set to the new value. Do you want to proceed?"
@@ -13560,7 +13562,7 @@ msgid "This is a system preset."
 msgstr "Toto je systémové přednastavení."
 
 #: src/libslic3r/PrintConfig.cpp:827 src/libslic3r/PrintConfig.cpp:890
-#: src/libslic3r/PrintConfig.cpp:3389
+#: src/libslic3r/PrintConfig.cpp:3362
 msgid "This is only used in the Slic3r interface as a visual help."
 msgstr "Toto je v Slic3ru jako názorná pomoc."
 
@@ -13865,7 +13867,7 @@ msgstr ""
 "spustit výchozí konfiguraci. Před instalací kompatibilního nastavení s touto "
 "verzí %s dojde k vytvoření zálohy současné konfigurace."
 
-#: src/libslic3r/PrintConfig.cpp:4564
+#: src/libslic3r/PrintConfig.cpp:4539
 msgid ""
 "This version of PrusaSlicer may not understand configurations produced by "
 "the newest PrusaSlicer versions. For example, newer PrusaSlicer may extend "
@@ -13877,7 +13879,7 @@ msgstr ""
 "například rozšířit seznam podporovaných druhů firmwaru. Lze se rozhodnout, "
 "že to budeme ignorovat, nebo že neznámou hodnotu nahradíme výchozí hodnotou."
 
-#: src/libslic3r/PrintConfig.cpp:3375
+#: src/libslic3r/PrintConfig.cpp:3348
 msgid ""
 "This will apply a gamma correction to the rasterized 2D polygons. A gamma "
 "value of zero means thresholding with the threshold in the middle. This "
@@ -13899,15 +13901,15 @@ msgstr ""
 "Vlákna jsou používána pro paralelizaci časově náročnějších úloh. Optimální "
 "počet vláken je mírně nad počtem dostupných jader/procesorů."
 
-#: src/slic3r/GUI/Tab.cpp:2539
+#: src/slic3r/GUI/Tab.cpp:2537
 msgid "Tilt"
 msgstr "Náklon"
 
-#: src/libslic3r/PrintConfig.cpp:3308
+#: src/libslic3r/PrintConfig.cpp:3281
 msgid "Tilt for high viscosity resin"
 msgstr "Tilt pro resin s vysokou viskozitou"
 
-#: src/slic3r/GUI/Tab.cpp:2540
+#: src/slic3r/GUI/Tab.cpp:2538
 msgid "Tilt time"
 msgstr "Doba náklonu"
 
@@ -13936,15 +13938,15 @@ msgstr ""
 "filament během jeho výměny (při provádění kódu T). Tento čas je přidán k "
 "celkové době tisku pomocí G-code odhadovače tiskového času."
 
-#: src/libslic3r/PrintConfig.cpp:3291
+#: src/libslic3r/PrintConfig.cpp:3264
 msgid "Time of the fast tilt"
 msgstr "Doba trvání rychlého náklonu"
 
-#: src/libslic3r/PrintConfig.cpp:3300
+#: src/libslic3r/PrintConfig.cpp:3273
 msgid "Time of the slow tilt"
 msgstr "Doba trvání pomalého náklonu"
 
-#: src/libslic3r/PrintConfig.cpp:3309
+#: src/libslic3r/PrintConfig.cpp:3282
 msgid "Time of the super slow tilt"
 msgstr "Čas super pomalého náklonu"
 
@@ -14006,7 +14008,7 @@ msgstr "Nástroj"
 msgid "Tool #"
 msgstr "Nástroj #"
 
-#: src/slic3r/GUI/Tab.cpp:2450 src/libslic3r/GCode.cpp:711
+#: src/slic3r/GUI/Tab.cpp:2448 src/libslic3r/GCode.cpp:711
 #: src/libslic3r/PrintConfig.cpp:2845
 msgid "Tool change G-code"
 msgstr "G-code pro výměnu nástroje"
@@ -14028,7 +14030,7 @@ msgstr "Poloha nástroje"
 msgid "Tool type"
 msgstr "Typ nástroje"
 
-#: src/slic3r/GUI/Tab.cpp:2051
+#: src/slic3r/GUI/Tab.cpp:2049
 msgid "Toolchange parameters with single extruder MM printers"
 msgstr "Parametry při výměně (Multi Material s jedním extruderem)"
 
@@ -14051,7 +14053,7 @@ msgstr ""
 "Nápověda pro tloušťku vrchní / spodní skořepiny: Není k dipozici z důvodu "
 "neplatné výšky vrstvy."
 
-#: src/slic3r/GUI/MainFrame.cpp:1121
+#: src/slic3r/GUI/MainFrame.cpp:1125
 msgid "Top View"
 msgstr "Pohled svrchu"
 
@@ -14144,7 +14146,7 @@ msgstr "Rychloposun"
 msgid "Triangles"
 msgstr "Trojúhelníky"
 
-#: src/libslic3r/PrintConfig.cpp:4522
+#: src/libslic3r/PrintConfig.cpp:4497
 msgid ""
 "Try to repair any non-manifold meshes (this option is implicitly added "
 "whenever we need to slice the model to perform the requested action)."
@@ -14165,11 +14167,11 @@ msgstr "Typ tiskárny."
 msgid "Type:"
 msgstr "Typ:"
 
-#: src/slic3r/GUI/Tab.cpp:4324
+#: src/slic3r/GUI/Tab.cpp:4322
 msgid "UNLOCKED LOCK"
 msgstr "ODEMČENÝ ZÁMEK"
 
-#: src/slic3r/GUI/Tab.cpp:4350
+#: src/slic3r/GUI/Tab.cpp:4348
 msgid ""
 "UNLOCKED LOCK icon indicates that some settings were changed and are not "
 "equal to the system (or default) values for the current option group.\n"
@@ -14181,7 +14183,7 @@ msgstr ""
 "Klikněte pro reset všech nastavení aktuální skupiny nastavení na systémové "
 "hodnoty."
 
-#: src/slic3r/GUI/Tab.cpp:4365
+#: src/slic3r/GUI/Tab.cpp:4363
 msgid ""
 "UNLOCKED LOCK icon indicates that the value was changed and is not equal to "
 "the system (or default) value.\n"
@@ -14222,11 +14224,11 @@ msgstr "Nelze nahradit více než jednou částí"
 msgid "Undef"
 msgstr "Nedefinováno"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1684
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1687
 msgid "Undef category"
 msgstr "Nedefinovaná kategorie"
 
-#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1684
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1687
 msgid "Undef group"
 msgstr "Nedefinovaná skupina"
 
@@ -14240,7 +14242,7 @@ msgstr "Podtečení"
 
 #: src/slic3r/GUI/DesktopIntegrationDialog.cpp:486
 #: src/slic3r/GUI/GLCanvas3D.cpp:4699 src/slic3r/GUI/KBShortcutsDialog.cpp:97
-#: src/slic3r/GUI/MainFrame.cpp:1338
+#: src/slic3r/GUI/MainFrame.cpp:1342
 msgid "Undo"
 msgstr "Zpět"
 
@@ -14437,7 +14439,7 @@ msgstr "Scéna v režimu „free camera“"
 msgid "Use inches"
 msgstr "Používat palce"
 
-#: src/libslic3r/PrintConfig.cpp:3746
+#: src/libslic3r/PrintConfig.cpp:3719
 msgid "Use pad"
 msgstr "Použít podložku"
 
@@ -14526,11 +14528,11 @@ msgstr ""
 "Hodnota byla změněna a není shodná se systémovou hodnotou nebo naposled "
 "uloženým přednastavením"
 
-#: src/slic3r/GUI/Tab.cpp:2644
+#: src/slic3r/GUI/Tab.cpp:2642
 msgid "Values in this column are for Normal mode"
 msgstr "Hodnoty v tomto sloupci jsou pro Normální režim"
 
-#: src/slic3r/GUI/Tab.cpp:2650
+#: src/slic3r/GUI/Tab.cpp:2648
 msgid "Values in this column are for Stealth mode"
 msgstr "Hodnoty v tomto sloupci jsou pro Tichý režim"
 
@@ -14575,7 +14577,7 @@ msgstr "Výrobce:"
 msgid "Verbose G-code"
 msgstr "Komentáře do G-code"
 
-#: src/slic3r/GUI/AboutDialog.cpp:242 src/slic3r/GUI/AboutDialog.cpp:367
+#: src/slic3r/GUI/AboutDialog.cpp:244 src/slic3r/GUI/AboutDialog.cpp:369
 #: src/slic3r/GUI/GUI_App.cpp:262
 msgid "Version"
 msgstr "Verze"
@@ -14620,7 +14622,7 @@ msgid ""
 "to changes your choice."
 msgstr "Pro změnu předvolby jděte do Nastavení a zaškrtněte \"%1%\"."
 
-#: src/libslic3r/PrintConfig.cpp:4423
+#: src/libslic3r/PrintConfig.cpp:4398
 msgid "Visualize an already sliced and saved G-code"
 msgstr "Vizualizuje již naslicovaný a uložený G-code"
 
@@ -14645,7 +14647,7 @@ msgstr "Změna pořadí Těles v Objektu"
 msgid "Volumetric"
 msgstr "Volumetrický"
 
-#: src/slic3r/GUI/Tab.cpp:2152
+#: src/slic3r/GUI/Tab.cpp:2150
 msgid "Volumetric flow hints not available"
 msgstr "Doporučení pro objemový průtok nejsou k dispozici"
 
@@ -14668,16 +14670,16 @@ msgstr "Objemová rychlost"
 msgid "WARNING:"
 msgstr "VAROVÁNÍ:"
 
-#: src/slic3r/GUI/Tab.cpp:4331
+#: src/slic3r/GUI/Tab.cpp:4329
 msgid "WHITE BULLET"
 msgstr "BÍLÁ TEČKA"
 
-#: src/slic3r/GUI/Tab.cpp:4353
+#: src/slic3r/GUI/Tab.cpp:4351
 msgid "WHITE BULLET icon indicates a non system (or non default) preset."
 msgstr ""
 "Ikona BÍLÉ TEČKY indikuje nesystémové (nebo jiné než výchozí) přednastavení."
 
-#: src/slic3r/GUI/Tab.cpp:4356
+#: src/slic3r/GUI/Tab.cpp:4354
 msgid ""
 "WHITE BULLET icon indicates that the settings are the same as in the last "
 "saved preset for the current option group."
@@ -14685,7 +14687,7 @@ msgstr ""
 "Ikona BÍLÉ TEČKY indikuje, že nastavení jsou shodná s naposledy uloženým "
 "přednastavením pro danou skupinu nastavení."
 
-#: src/slic3r/GUI/Tab.cpp:4371
+#: src/slic3r/GUI/Tab.cpp:4369
 msgid ""
 "WHITE BULLET icon indicates that the value is the same as in the last saved "
 "preset."
@@ -14693,7 +14695,7 @@ msgstr ""
 "Ikona BÍLÉ TEČKY indikuje, že je hodnota shodná s naposledy uloženým "
 "přednastavením."
 
-#: src/libslic3r/PrintConfig.cpp:3881
+#: src/libslic3r/PrintConfig.cpp:3854
 msgid "Wall thickness"
 msgstr "Tloušťka stěny"
 
@@ -14847,7 +14849,7 @@ msgstr ""
 "Když je retrakce kompenzována po rychloposunu, extruder vytlačuje toto další "
 "množství filamentu. Toto nastavení je zřídkakdy potřeba."
 
-#: src/libslic3r/PrintConfig.cpp:3106
+#: src/libslic3r/PrintConfig.cpp:3108
 msgid ""
 "When to create transitions between even and odd numbers of perimeters. A "
 "wedge shape with an angle greater than this setting will not have "
@@ -14862,16 +14864,19 @@ msgstr ""
 "perimetrů, ale mohou vzniknout mezery nebo vytlačení nadbytečného množství "
 "materiálu."
 
-#: src/libslic3r/PrintConfig.cpp:3081
+#: src/libslic3r/PrintConfig.cpp:3082
 msgid ""
 "When transitioning between different numbers of perimeters as the part "
 "becomes thinner, a certain amount of space is allotted to split or join the "
-"perimeter segments."
+"perimeter segments. If expressed as a percentage (for example 100%), it will "
+"be computed based on the nozzle diameter."
 msgstr ""
 "Při přechodu mezi různými počty perimetrů se ztenčujícím se dílem, je "
-"vyhrazen určitý prostor pro rozdělení nebo spojení perimetrů."
+"vyhrazen určitý prostor pro rozdělení nebo spojení perimetrů. Pokud je "
+"vyjádřeno v procentech (například 100%), bude vypočítáno na základě průměru "
+"trysky."
 
-#: src/slic3r/GUI/Tab.cpp:4052
+#: src/slic3r/GUI/Tab.cpp:4050
 msgid "Whole word"
 msgstr "Celé slovo"
 
@@ -14883,7 +14888,7 @@ msgstr "Šířka"
 msgid "Width (mm)"
 msgstr "Šířka (mm)"
 
-#: src/libslic3r/PrintConfig.cpp:3585
+#: src/libslic3r/PrintConfig.cpp:3558
 msgid "Width from the back sphere center to the front sphere center"
 msgstr "Šířka od středu zadní koule ke středu přední koule"
 
@@ -14891,16 +14896,16 @@ msgstr "Šířka od středu zadní koule ke středu přední koule"
 msgid "Width of a wipe tower"
 msgstr "Šířka čistící věže"
 
-#: src/libslic3r/PrintConfig.cpp:3857
+#: src/libslic3r/PrintConfig.cpp:3830
 msgid ""
 "Width of the connector sticks which connect the object and the generated pad."
 msgstr "Šířka spojek, které spojují objekt s vygenerovanou podložkou."
 
-#: src/libslic3r/PrintConfig.cpp:3238
+#: src/libslic3r/PrintConfig.cpp:3211
 msgid "Width of the display"
 msgstr "Šířka displeje"
 
-#: src/libslic3r/PrintConfig.cpp:3169
+#: src/libslic3r/PrintConfig.cpp:3142
 msgid ""
 "Width of the perimeter that will replace thin features (according to the "
 "Minimum feature size) of the model. If the Minimum perimeter width is "
@@ -14913,7 +14918,7 @@ msgstr ""
 "perimetr stejně tlustý jako samotný prvek. Je-li vyjádřené procentuálně "
 "(například 85%), bude vypočteno v závislosti na průměru trysky."
 
-#: src/libslic3r/PrintConfig.cpp:3358
+#: src/libslic3r/PrintConfig.cpp:3331
 msgid ""
 "Will inflate or deflate the sliced 2D polygons according to the sign of the "
 "correction."
@@ -14958,7 +14963,7 @@ msgstr "Čistící věž - Úprava objemu čištění"
 msgid "Wipe tower brim width"
 msgstr "Šířka límce čistící věže"
 
-#: src/slic3r/GUI/Tab.cpp:2048
+#: src/slic3r/GUI/Tab.cpp:2046
 msgid "Wipe tower parameters"
 msgstr "Parametry čistící věže"
 
@@ -15023,7 +15028,7 @@ msgstr ""
 "\n"
 "Aktualizované balíčky nastavení:"
 
-#: src/libslic3r/PrintConfig.cpp:4451
+#: src/libslic3r/PrintConfig.cpp:4426
 msgid "Write information about the model to the console."
 msgstr "Vypsat informace o modelu do konsole."
 
@@ -15109,7 +15114,7 @@ msgstr ""
 "Zde můžete zadat své osobní poznámky. Tento text bude přidán do komentáře "
 "záhlaví G code."
 
-#: src/libslic3r/PrintConfig.cpp:3524
+#: src/libslic3r/PrintConfig.cpp:3497
 msgid "You can put your notes regarding the SLA print material here."
 msgstr "Zde můžete vkládat své poznámky týkající se tiskového materiálu SLA."
 
@@ -15268,7 +15273,7 @@ msgstr ""
 "Vaše aktuálně provedené změny odstraní všechny uložené změny extruderu "
 "(nástroje)."
 
-#: src/slic3r/GUI/MainFrame.cpp:1750
+#: src/slic3r/GUI/MainFrame.cpp:1754
 msgid "Your file was repaired."
 msgstr "Váš soubor byl opraven."
 
@@ -15306,7 +15311,7 @@ msgstr "Odsazení Z"
 msgid "Z travel"
 msgstr "Posun v ose Z"
 
-#: src/libslic3r/PrintConfig.cpp:3633
+#: src/libslic3r/PrintConfig.cpp:3606
 msgid "Zig-Zag"
 msgstr "Zig-Zag"
 
@@ -15426,7 +15431,7 @@ msgstr "výchozí tiskový profil"
 msgid "default value"
 msgstr "výchozí hodnota"
 
-#: src/slic3r/GUI/Tab.cpp:3701
+#: src/slic3r/GUI/Tab.cpp:3699
 msgid "delete"
 msgstr "smazat"
 
@@ -15504,7 +15509,7 @@ msgid "flow rate is maximized"
 msgstr "průtok je maximalizován"
 
 #. TRN Description for "WHITE BULLET"
-#: src/slic3r/GUI/Tab.cpp:4333
+#: src/slic3r/GUI/Tab.cpp:4331
 msgid ""
 "for the left button: indicates a non-system (or non-default) preset,\n"
 "for the right button: indicates that the settings hasn't been modified."
@@ -15528,7 +15533,7 @@ msgstr "g"
 msgid "g/cm³"
 msgstr "g/cm³"
 
-#: src/libslic3r/PrintConfig.cpp:3429
+#: src/libslic3r/PrintConfig.cpp:3402
 msgid "g/ml"
 msgstr "g/ml"
 
@@ -15545,7 +15550,7 @@ msgid "in"
 msgstr "in"
 
 #. TRN Description for "UNLOCKED LOCK"
-#: src/slic3r/GUI/Tab.cpp:4326
+#: src/slic3r/GUI/Tab.cpp:4324
 msgid ""
 "indicates that some settings were changed and are not equal to the system "
 "(or default) values for the current option group.\n"
@@ -15558,7 +15563,7 @@ msgstr ""
 "skupiny nastavení na systémové (nebo výchozí) hodnoty."
 
 #. TRN Description for "LOCKED LOCK"
-#: src/slic3r/GUI/Tab.cpp:4322
+#: src/slic3r/GUI/Tab.cpp:4320
 msgid ""
 "indicates that the settings are the same as the system (or default) values "
 "for the current option group"
@@ -15567,7 +15572,7 @@ msgstr ""
 "aktuální skupinu nastavení"
 
 #. TRN Description for "BACK ARROW"
-#: src/slic3r/GUI/Tab.cpp:4338
+#: src/slic3r/GUI/Tab.cpp:4336
 msgid ""
 "indicates that the settings were changed and are not equal to the last saved "
 "preset for the current option group.\n"
@@ -15604,11 +15609,11 @@ msgid "is based on Slic3r by Alessandro Ranellucci and the RepRap community."
 msgstr "je založen na Slic3r od Alessandra Ranellucciho a RepRap komunity."
 
 #. TRN "Slic3r _is licensed under the_ License"
-#: src/slic3r/GUI/AboutDialog.cpp:269 src/slic3r/GUI/GUI_App.cpp:268
+#: src/slic3r/GUI/AboutDialog.cpp:271 src/slic3r/GUI/GUI_App.cpp:268
 msgid "is licensed under the"
 msgstr "je licencován pod"
 
-#: src/libslic3r/PrintConfig.cpp:3422
+#: src/libslic3r/PrintConfig.cpp:3395
 msgid "kg"
 msgstr "kg"
 
@@ -15632,7 +15637,7 @@ msgstr "max PrusaSlicer verze"
 msgid "min PrusaSlicer version"
 msgstr "min PrusaSlicer verze"
 
-#: src/libslic3r/PrintConfig.cpp:3415
+#: src/libslic3r/PrintConfig.cpp:3388
 msgid "ml"
 msgstr "ml"
 
@@ -15672,19 +15677,18 @@ msgstr "ml"
 #: src/libslic3r/PrintConfig.cpp:2995 src/libslic3r/PrintConfig.cpp:3002
 #: src/libslic3r/PrintConfig.cpp:3016 src/libslic3r/PrintConfig.cpp:3040
 #: src/libslic3r/PrintConfig.cpp:3050 src/libslic3r/PrintConfig.cpp:3060
-#: src/libslic3r/PrintConfig.cpp:3083 src/libslic3r/PrintConfig.cpp:3161
-#: src/libslic3r/PrintConfig.cpp:3367 src/libslic3r/PrintConfig.cpp:3408
-#: src/libslic3r/PrintConfig.cpp:3568 src/libslic3r/PrintConfig.cpp:3577
-#: src/libslic3r/PrintConfig.cpp:3586 src/libslic3r/PrintConfig.cpp:3596
-#: src/libslic3r/PrintConfig.cpp:3661 src/libslic3r/PrintConfig.cpp:3671
-#: src/libslic3r/PrintConfig.cpp:3683 src/libslic3r/PrintConfig.cpp:3703
-#: src/libslic3r/PrintConfig.cpp:3713 src/libslic3r/PrintConfig.cpp:3723
-#: src/libslic3r/PrintConfig.cpp:3741 src/libslic3r/PrintConfig.cpp:3756
-#: src/libslic3r/PrintConfig.cpp:3770 src/libslic3r/PrintConfig.cpp:3781
-#: src/libslic3r/PrintConfig.cpp:3794 src/libslic3r/PrintConfig.cpp:3839
-#: src/libslic3r/PrintConfig.cpp:3849 src/libslic3r/PrintConfig.cpp:3858
-#: src/libslic3r/PrintConfig.cpp:3868 src/libslic3r/PrintConfig.cpp:3884
-#: src/libslic3r/PrintConfig.cpp:3908
+#: src/libslic3r/PrintConfig.cpp:3340 src/libslic3r/PrintConfig.cpp:3381
+#: src/libslic3r/PrintConfig.cpp:3541 src/libslic3r/PrintConfig.cpp:3550
+#: src/libslic3r/PrintConfig.cpp:3559 src/libslic3r/PrintConfig.cpp:3569
+#: src/libslic3r/PrintConfig.cpp:3634 src/libslic3r/PrintConfig.cpp:3644
+#: src/libslic3r/PrintConfig.cpp:3656 src/libslic3r/PrintConfig.cpp:3676
+#: src/libslic3r/PrintConfig.cpp:3686 src/libslic3r/PrintConfig.cpp:3696
+#: src/libslic3r/PrintConfig.cpp:3714 src/libslic3r/PrintConfig.cpp:3729
+#: src/libslic3r/PrintConfig.cpp:3743 src/libslic3r/PrintConfig.cpp:3754
+#: src/libslic3r/PrintConfig.cpp:3767 src/libslic3r/PrintConfig.cpp:3812
+#: src/libslic3r/PrintConfig.cpp:3822 src/libslic3r/PrintConfig.cpp:3831
+#: src/libslic3r/PrintConfig.cpp:3841 src/libslic3r/PrintConfig.cpp:3857
+#: src/libslic3r/PrintConfig.cpp:3881
 msgid "mm"
 msgstr "mm"
 
@@ -15698,8 +15702,9 @@ msgstr "mm (nula pro vypnutí)"
 #: src/libslic3r/PrintConfig.cpp:1478 src/libslic3r/PrintConfig.cpp:1505
 #: src/libslic3r/PrintConfig.cpp:1979 src/libslic3r/PrintConfig.cpp:2365
 #: src/libslic3r/PrintConfig.cpp:2539 src/libslic3r/PrintConfig.cpp:2628
-#: src/libslic3r/PrintConfig.cpp:2863 src/libslic3r/PrintConfig.cpp:3098
-#: src/libslic3r/PrintConfig.cpp:3173
+#: src/libslic3r/PrintConfig.cpp:2863 src/libslic3r/PrintConfig.cpp:3085
+#: src/libslic3r/PrintConfig.cpp:3100 src/libslic3r/PrintConfig.cpp:3134
+#: src/libslic3r/PrintConfig.cpp:3146
 msgid "mm or %"
 msgstr "mm nebo %"
 
@@ -15761,7 +15766,7 @@ msgstr "model"
 msgid "modified"
 msgstr "upraveno"
 
-#: src/libslic3r/PrintConfig.cpp:3436
+#: src/libslic3r/PrintConfig.cpp:3409
 msgid "money/bottle"
 msgstr "cena/láhev"
 
@@ -15821,7 +15826,7 @@ msgstr "tiskárna"
 msgid "printer model"
 msgstr "model tiskárny"
 
-#: src/slic3r/GUI/Tab.cpp:3701
+#: src/slic3r/GUI/Tab.cpp:3699
 msgid "remove"
 msgstr "odebrat"
 
@@ -15842,11 +15847,11 @@ msgstr "vyžaduje min. %s a max. %s"
 
 #: src/slic3r/GUI/RammingChart.cpp:90 src/slic3r/GUI/WipeTowerDialog.cpp:114
 #: src/libslic3r/PrintConfig.cpp:951 src/libslic3r/PrintConfig.cpp:995
-#: src/libslic3r/PrintConfig.cpp:1010 src/libslic3r/PrintConfig.cpp:3292
-#: src/libslic3r/PrintConfig.cpp:3301 src/libslic3r/PrintConfig.cpp:3310
-#: src/libslic3r/PrintConfig.cpp:3451 src/libslic3r/PrintConfig.cpp:3459
-#: src/libslic3r/PrintConfig.cpp:3467 src/libslic3r/PrintConfig.cpp:3474
-#: src/libslic3r/PrintConfig.cpp:3482 src/libslic3r/PrintConfig.cpp:3490
+#: src/libslic3r/PrintConfig.cpp:1010 src/libslic3r/PrintConfig.cpp:3265
+#: src/libslic3r/PrintConfig.cpp:3274 src/libslic3r/PrintConfig.cpp:3283
+#: src/libslic3r/PrintConfig.cpp:3424 src/libslic3r/PrintConfig.cpp:3432
+#: src/libslic3r/PrintConfig.cpp:3440 src/libslic3r/PrintConfig.cpp:3447
+#: src/libslic3r/PrintConfig.cpp:3455 src/libslic3r/PrintConfig.cpp:3463
 msgid "s"
 msgstr "s"
 
@@ -15969,8 +15974,8 @@ msgstr "zpětné volání se nezdařilo"
 #: src/libslic3r/PrintConfig.cpp:478 src/libslic3r/PrintConfig.cpp:1097
 #: src/libslic3r/PrintConfig.cpp:2250 src/libslic3r/PrintConfig.cpp:2260
 #: src/libslic3r/PrintConfig.cpp:2551 src/libslic3r/PrintConfig.cpp:2792
-#: src/libslic3r/PrintConfig.cpp:3009 src/libslic3r/PrintConfig.cpp:3110
-#: src/libslic3r/PrintConfig.cpp:3693 src/libslic3r/PrintConfig.cpp:3814
+#: src/libslic3r/PrintConfig.cpp:3009 src/libslic3r/PrintConfig.cpp:3112
+#: src/libslic3r/PrintConfig.cpp:3666 src/libslic3r/PrintConfig.cpp:3787
 msgid "°"
 msgstr "°"
 
