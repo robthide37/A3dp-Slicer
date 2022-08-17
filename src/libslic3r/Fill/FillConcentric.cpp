@@ -267,6 +267,7 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
                 assert(thick_polyline.points.size() == thick_polyline.points_width.size());
             }
             thick_polylines_out.emplace_back(std::move(thick_polyline));
+            last_pos = thick_polylines_out.back().last_point();
         }
 
         // clip the paths to prevent the extruder from getting exactly on the first point of the loop
