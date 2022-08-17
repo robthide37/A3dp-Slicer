@@ -127,7 +127,9 @@ void CopyrightsDialog::fill_entries()
         { "fast_float"
                             , "Daniel Lemire, João Paulo Magalhaes and contributors", "https://github.com/fastfloat/fast_float" },
         { "CuraEngine (Arachne, etc.)"
-                            , "Ultimaker", "https://github.com/Ultimaker/CuraEngine" }
+                            , "Ultimaker", "https://github.com/Ultimaker/CuraEngine" },
+        { "Open CASCADE Technology"
+                            , "Open Cascade SAS", "https://github.com/Open-Cascade-SAS/OCCT" }
     };
 }
 
