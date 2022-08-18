@@ -175,6 +175,19 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
     return result;
 }
 
+
+template<int Dimension, typename NumberType>
+PiecewiseFittedCurve<Dimension, NumberType, LinearKernel<NumberType>>
+fit_linear_spline(
+        const std::vector<Vec<Dimension, NumberType>> &observations,
+        std::vector<NumberType> observation_points,
+        std::vector<NumberType> weights,
+        size_t segments_count,
+        size_t endpoints_level_of_freedom = 0) {
+    return fit_curve<LinearKernel<NumberType>>(observations, observation_points, weights, segments_count,
+            endpoints_level_of_freedom);
+}
+
 template<int Dimension, typename NumberType>
 PiecewiseFittedCurve<Dimension, NumberType, CubicBSplineKernel<NumberType>>
 fit_cubic_bspline(

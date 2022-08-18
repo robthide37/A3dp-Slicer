@@ -5,6 +5,8 @@
 #include <set>
 #include <mutex>
 
+#include <boost/nowide/convert.hpp>
+
 #include <wx/sizer.h>
 #include <wx/button.h>
 #include <wx/listctrl.h>

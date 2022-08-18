@@ -668,6 +668,8 @@ private:
 		bool        m_to_removable;
 		std::string m_export_path;
 		std::string m_export_dir_path;
+
+		bool update_state(bool paused, const int64_t delta) override;
 	protected:
 		// Reserves space on right for more buttons
 		void count_spaces() override;
@@ -687,6 +689,7 @@ private:
 		void on_eject_click();
 		// local time of last hover for showing tooltip
 		long      m_hover_time { 0 };
+		bool      m_hover_once { false };
 		bool	  m_eject_pending { false };
 	};
 

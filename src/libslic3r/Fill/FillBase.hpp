@@ -61,6 +61,8 @@ struct FillParams
 
     // For Concentric infill, to switch between Classic and Arachne.
     bool        use_arachne     { false };
+    // Layer height for Concentric infill with Arachne.
+    coordf_t    layer_height    { 0.f };
 };
 static_assert(IsTriviallyCopyable<FillParams>::value, "FillParams class is not POD (and it should be - see constructor).");
 

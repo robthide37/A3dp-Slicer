@@ -57,8 +57,8 @@ KBShortcutsDialog::KBShortcutsDialog()
 
 void KBShortcutsDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
-    m_logo_bmp.msw_rescale();
-    m_header_bitmap->SetBitmap(m_logo_bmp.bmp());
+    //m_logo_bmp.msw_rescale();
+    //m_header_bitmap->SetBitmap(m_logo_bmp.bmp());
     msw_buttons_rescale(this, em_unit(), { wxID_OK });
 
     Layout();
@@ -80,7 +80,7 @@ void KBShortcutsDialog::fill_shortcuts()
             { ctrl + alt + "S", L("Save project as (3mf)") },
             { ctrl + "R", L("(Re)slice") },
             // File>Import
-            { ctrl + "I", L("Import STL/OBJ/AMF/3MF without config, keep plater") },
+            { ctrl + "I", L("Import STL/OBJ/AMF/3MF/STEP without config, keep plater") },
             { ctrl + "L", L("Import Config from ini/amf/3mf/gcode") },
             { ctrl + alt + "L", L("Load Config from ini/amf/3mf/gcode and merge") },
             // File>Export
@@ -266,8 +266,8 @@ wxPanel* KBShortcutsDialog::create_header(wxWindow* parent, const wxFont& bold_f
     sizer->AddStretchSpacer();
 
     // logo
-    m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 32);
-    m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, m_logo_bmp.bmp());
+    m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, *get_bmp_bundle(wxGetApp().logo_name(), 32));
+
     sizer->Add(m_header_bitmap, 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
 
     // text

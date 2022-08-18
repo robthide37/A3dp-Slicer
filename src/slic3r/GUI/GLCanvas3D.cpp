@@ -1700,10 +1700,8 @@ void GLCanvas3D::render()
 #if ENABLE_RENDER_SELECTION_CENTER
     _render_selection_center();
 #endif // ENABLE_RENDER_SELECTION_CENTER
-#if ENABLE_SHOW_TOOLPATHS_COG
     if (!m_main_toolbar.is_enabled())
         _render_gcode_cog();
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 
     // we need to set the mouse's scene position here because the depth buffer
     // could be invalidated by the following gizmo render methods
@@ -1831,6 +1829,9 @@ void GLCanvas3D::select_all()
 
 void GLCanvas3D::deselect_all()
 {
+    if (m_selection.is_empty())
+        return;
+
     m_selection.remove_all();
     wxGetApp().obj_manipul()->set_dirty();
     m_gizmos.reset_all_states();
@@ -3915,12 +3916,13 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     for (int i = 0; i < static_cast<int>(m_model->objects.size()); ++i) {
         const ModelObject* obj = m_model->objects[i];
         for (int j = 0; j < static_cast<int>(obj->instances.size()); ++j) {
-            if (snapshot_type.empty() && m_selection.get_object_idx() == i) {
+            if (snapshot_type == L("Gizmo-Place on Face") && m_selection.get_object_idx() == i) {
                 // This means we are flattening this object. In that case pretend
                 // that it is not sinking (even if it is), so it is placed on bed
                 // later on (whatever is sinking will be left sinking).
                 min_zs[{ i, j }] = SINKING_Z_THRESHOLD;
-            } else
+            }
+            else
                 min_zs[{ i, j }] = obj->instance_bounding_box(j).min.z();
 
         }
@@ -5398,9 +5400,10 @@ BoundingBoxf3 GLCanvas3D::_max_bounding_box(bool include_gizmos, bool include_be
         static const double max_scale_factor = 2.0;
         const Vec3d bb_size = bb.size();
         const Vec3d bed_bb_size = m_bed.build_volume().bounding_volume().size();
-        if (bb_size.x() > max_scale_factor * bed_bb_size.x() ||
-            bb_size.y() > max_scale_factor * bed_bb_size.y() ||
-            bb_size.z() > max_scale_factor * bed_bb_size.z()) {
+
+        if ((bed_bb_size.x() > 0.0 && bb_size.x() > max_scale_factor * bed_bb_size.x()) ||
+            (bed_bb_size.y() > 0.0 && bb_size.y() > max_scale_factor * bed_bb_size.y()) ||
+            (bed_bb_size.z() > 0.0 && bb_size.z() > max_scale_factor * bed_bb_size.z())) {
             const Vec3d bed_bb_center = bed_bb.center();
             const Vec3d extend_by = max_scale_factor * bed_bb_size;
             bb = BoundingBoxf3(bed_bb_center - extend_by, bed_bb_center + extend_by);
@@ -5999,9 +6002,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
 
     m_volumes.set_clipping_plane(m_camera_clipping_plane.get_data());
     m_volumes.set_show_sinking_contours(! m_gizmos.is_hiding_instances());
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     m_volumes.set_show_non_manifold_edges(!m_gizmos.is_hiding_instances() && m_gizmos.get_current_type() != GLGizmosManager::Simplify);
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud");
     if (shader != nullptr) {
@@ -6079,12 +6080,10 @@ void GLCanvas3D::_render_gcode()
     m_gcode_viewer.render();
 }
 
-#if ENABLE_SHOW_TOOLPATHS_COG
 void GLCanvas3D::_render_gcode_cog()
 {
     m_gcode_viewer.render_cog();
 }
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 
 void GLCanvas3D::_render_selection()
 {

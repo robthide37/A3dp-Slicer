@@ -453,10 +453,8 @@ void PresetBundle::save_changes_for_preset(const std::string& new_name, Preset::
         presets.get_edited_preset().config.apply_only(presets.get_selected_preset().config, unselected_options);
     }
 
-#if ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
     if (type == Preset::TYPE_PRINTER)
         copy_bed_model_and_texture_if_needed(presets.get_edited_preset().config);
-#endif // ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
 
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
     presets.save_current_preset(new_name);
@@ -1865,7 +1863,6 @@ void PresetBundle::set_default_suppressed(bool default_suppressed)
     printers.set_default_suppressed(default_suppressed);
 }
 
-#if ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
 void copy_bed_model_and_texture_if_needed(DynamicPrintConfig& config)
 {
     const boost::filesystem::path user_dir = boost::filesystem::absolute(boost::filesystem::path(data_dir()) / "printer").make_preferred();
@@ -1891,6 +1888,5 @@ void copy_bed_model_and_texture_if_needed(DynamicPrintConfig& config)
     do_copy(config.option<ConfigOptionString>("bed_custom_texture"), "texture");
     do_copy(config.option<ConfigOptionString>("bed_custom_model"), "model");
 }
-#endif // ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
 
 } // namespace Slic3r

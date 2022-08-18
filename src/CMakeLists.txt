@@ -14,8 +14,6 @@ add_subdirectory(semver)
 add_subdirectory(libigl)
 add_subdirectory(hints)
 add_subdirectory(qoi)
-
-# Adding libnest2d project for bin packing...
 add_subdirectory(libnest2d)
 
 find_package(Qhull 7.2 REQUIRED)
@@ -29,6 +27,10 @@ else()
 endif()
 
 add_subdirectory(libslic3r)
+
+if (SLIC3R_ENABLE_FORMAT_STEP)
+    add_subdirectory(occt_wrapper)
+endif ()
 
 if (SLIC3R_GUI)
     add_subdirectory(imgui)
@@ -58,18 +60,25 @@ if (SLIC3R_GUI)
                     "Hint: On Linux you can set -DSLIC3R_WX_STABLE=1 to use wxWidgets 3.0\n")
             endif ()
         endif ()
+
+        include(${wxWidgets_USE_FILE})
     else ()
-        find_package(wxWidgets 3.1 REQUIRED COMPONENTS html adv gl core base)
+        find_package(wxWidgets 3.1 COMPONENTS html adv gl core base)
+        if (NOT wxWidgets_FOUND)
+            message(STATUS "Trying to find wxWidgets in CONFIG mode...")
+            find_package(wxWidgets 3.2 CONFIG REQUIRED COMPONENTS html adv gl core base)
+        else ()
+            include(${wxWidgets_USE_FILE})
+        endif ()
     endif ()
 
     if(UNIX)
         message(STATUS "wx-config path: ${wxWidgets_CONFIG_EXECUTABLE}")
     endif()
 
-    include(${wxWidgets_USE_FILE})
-
     find_package(JPEG QUIET)
     find_package(TIFF QUIET)
+    find_package(NanoSVG REQUIRED)
 
     string(REGEX MATCH "wxpng" WX_PNG_BUILTIN ${wxWidgets_LIBRARIES})
     if (PNG_FOUND AND NOT WX_PNG_BUILTIN)
@@ -105,7 +114,10 @@ if (SLIC3R_GUI)
     # wrong libs for opengl in the link line and it does not link to it by himself.
     # libslic3r_gui will link to opengl anyway, so lets override wx
     list(FILTER wxWidgets_LIBRARIES EXCLUDE REGEX OpenGL)
-
+    
+    if (UNIX AND NOT APPLE)
+        list(APPEND wxWidgets_LIBRARIES X11 wayland-client wayland-egl EGL)
+    endif ()
 #    list(REMOVE_ITEM wxWidgets_LIBRARIES oleacc)
     message(STATUS "wx libs: ${wxWidgets_LIBRARIES}")
 
@@ -136,6 +148,7 @@ if (NOT WIN32 AND NOT APPLE)
 endif ()
 
 target_link_libraries(PrusaSlicer libslic3r libcereal)
+
 if (APPLE)
 #    add_compile_options(-stdlib=libc++)
 #    add_definitions(-DBOOST_THREAD_DONT_USE_CHRONO -DBOOST_NO_CXX11_RVALUE_REFERENCES -DBOOST_THREAD_USES_MOVE)

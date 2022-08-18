@@ -384,7 +384,6 @@ void GLVolume::SinkingContours::update()
         m_model.reset();
 }
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
 void GLVolume::NonManifoldEdges::render()
 {
     update();
@@ -475,7 +474,6 @@ void GLVolume::NonManifoldEdges::update()
 
     m_update_needed = false;
 }
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 const ColorRGBA GLVolume::SELECTED_COLOR         = ColorRGBA::GREEN();
 const ColorRGBA GLVolume::HOVER_SELECT_COLOR     = { 0.4f, 0.9f, 0.1f, 1.0f };
@@ -496,9 +494,7 @@ const std::array<ColorRGBA, 4> GLVolume::MODEL_COLOR = { {
 GLVolume::GLVolume(float r, float g, float b, float a)
     : m_sla_shift_z(0.0)
     , m_sinking_contours(*this)
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     , m_non_manifold_edges(*this)
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
     // geometry_id == 0 -> invalid
     , geometry_id(std::pair<size_t, size_t>(0, 0))
     , extruder_id(0)
@@ -755,12 +751,10 @@ void GLVolume::render_sinking_contours()
     m_sinking_contours.render();
 }
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
 void GLVolume::render_non_manifold_edges()
 {
     m_non_manifold_edges.render();
 }
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 std::vector<int> GLVolumeCollection::load_object(
@@ -814,7 +808,10 @@ int GLVolumeCollection::load_object_volume(
     v.set_color(color_from_model_volume(*model_volume));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
-    v.model.init_from(mesh, true);
+    v.model.init_from(*mesh, true);
+#if ENABLE_RAYCAST_PICKING
+    v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
+#endif // ENABLE_RAYCAST_PICKING
 #else
 #if ENABLE_RAYCAST_PICKING
     v.model.init_from(*mesh);
@@ -1428,7 +1425,6 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
     if (edges_shader != nullptr) {
@@ -1444,7 +1440,6 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
     }
     shader->start_using();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     if (disable_cullface)
         glsafe(::glEnable(GL_CULL_FACE));

@@ -560,13 +560,13 @@ inline bool is_rotation_ninety_degrees(const Vec3d &rotation)
     return is_rotation_ninety_degrees(rotation.x()) && is_rotation_ninety_degrees(rotation.y()) && is_rotation_ninety_degrees(rotation.z());
 }
 
-template <class T>
-std::pair<T, T> dir_to_spheric(const Vec<3, T> &n, T norm = 1.)
+template <class Tout = double, class Tin>
+std::pair<Tout, Tout> dir_to_spheric(const Vec<3, Tin> &n, Tout norm = 1.)
 {
-    T z       = n.z();
-    T r       = norm;
-    T polar   = std::acos(z / r);
-    T azimuth = std::atan2(n(1), n(0));
+    Tout z       = n.z();
+    Tout r       = norm;
+    Tout polar   = std::acos(z / r);
+    Tout azimuth = std::atan2(n(1), n(0));
     return {polar, azimuth};
 }
 

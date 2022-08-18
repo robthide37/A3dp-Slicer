@@ -309,7 +309,6 @@ private:
 
     SinkingContours m_sinking_contours;
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     class NonManifoldEdges
     {
         GLVolume& m_parent;
@@ -326,7 +325,6 @@ private:
     };
 
     NonManifoldEdges m_non_manifold_edges;
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 public:
     // Color of the triangles / quads held by this volume.
@@ -574,9 +572,7 @@ public:
     bool                is_sinking() const;
     bool                is_below_printbed() const;
     void                render_sinking_contours();
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     void                render_non_manifold_edges();
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     // Return an estimate of the memory consumed by this class.
     size_t 				cpu_memory_used() const {
@@ -642,9 +638,7 @@ private:
 
     Slope m_slope;
     bool m_show_sinking_contours{ false };
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     bool m_show_non_manifold_edges{ true };
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 public:
     GLVolumePtrs volumes;
@@ -766,9 +760,7 @@ public:
     void set_slope_normal_z(float normal_z) { m_slope.normal_z = normal_z; }
     void set_default_slope_normal_z() { m_slope.normal_z = -::cos(Geometry::deg2rad(90.0f - 45.0f)); }
     void set_show_sinking_contours(bool show) { m_show_sinking_contours = show; }
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     void set_show_non_manifold_edges(bool show) { m_show_non_manifold_edges = show; }
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     // returns true if all the volumes are completely contained in the print volume
     // returns the containment state in the given out_state, if non-null

@@ -375,7 +375,7 @@ protected:
                 sl::addVertex(rsh, item.vertex(static_cast<unsigned long>(i)));
         };
 
-        auto addOthers = [&addOthers_, &reverseAddOthers_]() {
+        auto addOthers = [&]() {
             if constexpr (!is_clockwise<RawShape>())
                 addOthers_();
             else
@@ -415,7 +415,6 @@ protected:
 
 };
 
-}
-}
+}} // namespace libnest2d::placers
 
 #endif //BOTTOMLEFT_HPP

@@ -35,9 +35,8 @@
 #include "GUI_App.hpp"
 
 #include "../Utils/MacDarkMode.hpp"
-
-#include "nanosvg/nanosvg.h"
-#include "nanosvg/nanosvgrast.h"
+#include <nanosvg/nanosvg.h>
+#include <nanosvg/nanosvgrast.h>
 
 namespace Slic3r {
 namespace GUI {
@@ -67,9 +66,7 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::LegendColorChanges    , "legend_colorchanges"           },
     {ImGui::LegendPausePrints     , "legend_pauseprints"            },
     {ImGui::LegendCustomGCodes    , "legend_customgcodes"           },
-#if ENABLE_SHOW_TOOLPATHS_COG
     {ImGui::LegendCOG             , "legend_cog"                    },
-#endif // ENABLE_SHOW_TOOLPATHS_COG
     {ImGui::LegendShells          , "legend_shells"                 },
     {ImGui::LegendToolMarker      , "legend_toolmarker"             },
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
@@ -233,6 +230,9 @@ bool ImGuiWrapper::update_mouse_data(wxMouseEvent& evt)
     io.MouseDown[0] = evt.LeftIsDown();
     io.MouseDown[1] = evt.RightIsDown();
     io.MouseDown[2] = evt.MiddleIsDown();
+    io.MouseDoubleClicked[0] = evt.LeftDClick();
+    io.MouseDoubleClicked[1] = evt.RightDClick();
+    io.MouseDoubleClicked[2] = evt.MiddleDClick();
     float wheel_delta = static_cast<float>(evt.GetWheelDelta());
     if (wheel_delta != 0.0f)
         io.MouseWheel = static_cast<float>(evt.GetWheelRotation()) / wheel_delta;
@@ -542,7 +542,7 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
 
     // let the label string start with "##" to hide the automatic label from ImGui::SliderFloat()
-    bool label_visible = !boost::algorithm::istarts_with(label, "##");
+    bool label_visible = !boost::algorithm::starts_with(label, "##");
     std::string str_label = label_visible ? std::string("##") + std::string(label) : std::string(label);
 
     // removes 2nd evenience of "##", if present

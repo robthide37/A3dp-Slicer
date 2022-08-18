@@ -155,6 +155,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialInterfacePattern)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SeamPosition)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLADisplayOrientation)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLAPillarConnectionMode)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLASupportTreeType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
@@ -507,13 +508,11 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,               slice_closing_radius))
     ((ConfigOptionEnum<SlicingMode>,   slicing_mode))
     ((ConfigOptionEnum<PerimeterGeneratorType>, perimeter_generator))
-    ((ConfigOptionFloat,               wall_transition_length))
+    ((ConfigOptionFloatOrPercent,      wall_transition_length))
     ((ConfigOptionFloatOrPercent,      wall_transition_filter_deviation))
     ((ConfigOptionFloat,               wall_transition_angle))
     ((ConfigOptionInt,                 wall_distribution_count))
-    ((ConfigOptionPercent,             wall_split_middle_threshold))
-    ((ConfigOptionPercent,             wall_add_middle_threshold))
-    ((ConfigOptionFloat,               min_feature_size))
+    ((ConfigOptionFloatOrPercent,      min_feature_size))
     ((ConfigOptionFloatOrPercent,      min_bead_width))
     ((ConfigOptionBool,                support_material))
     // Automatic supports (generated based on support_material_threshold).
@@ -828,6 +827,8 @@ PRINT_CONFIG_CLASS_DEFINE(
 
     // Enabling or disabling support creation
     ((ConfigOptionBool,  supports_enable))
+
+    ((ConfigOptionEnum<sla::SupportTreeType>, support_tree_type))
 
     // Diameter in mm of the pointing side of the head.
     ((ConfigOptionFloat, support_head_front_diameter))/*= 0.2*/

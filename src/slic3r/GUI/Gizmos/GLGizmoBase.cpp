@@ -504,6 +504,8 @@ void GLGizmoBase::set_dirty() {
     m_dirty = true;
 }
 
+
+
 void GLGizmoBase::render_input_window(float x, float y, float bottom_limit)
 {
     on_render_input_window(x, y, bottom_limit);
@@ -532,3 +534,4 @@ std::string GLGizmoBase::get_name(bool include_shortcut) const
 
 } // namespace GUI
 } // namespace Slic3r
+

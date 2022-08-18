@@ -142,10 +142,10 @@ void PresetForPrinter::AllowDelete()
     m_presets_list->update();
 }
 
-void PresetForPrinter::msw_rescale()
+void PresetForPrinter::on_sys_color_changed()
 {
-    m_presets_list->msw_rescale();
-    m_delete_preset_btn->msw_rescale();
+    m_presets_list->sys_color_changed();
+    m_delete_preset_btn->sys_color_changed();
 }
 
 
@@ -603,24 +603,27 @@ void PhysicalPrinterDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     const int& em = em_unit();
 
-    m_add_preset_btn->msw_rescale();
-    m_printhost_browse_btn->msw_rescale();
-    m_printhost_test_btn->msw_rescale();
-    if (m_printhost_cafile_browse_btn)
-        m_printhost_cafile_browse_btn->msw_rescale();
-
     m_optgroup->msw_rescale();
 
     msw_buttons_rescale(this, em, { wxID_OK, wxID_CANCEL });
-
-    for (PresetForPrinter* preset : m_presets)
-        preset->msw_rescale();
 
     const wxSize& size = wxSize(45 * em, 35 * em);
     SetMinSize(size);
 
     Fit();
     Refresh();
+}
+
+void PhysicalPrinterDialog::on_sys_color_changed()
+{
+    m_add_preset_btn->sys_color_changed();
+    m_printhost_browse_btn->sys_color_changed();
+    m_printhost_test_btn->sys_color_changed();
+    if (m_printhost_cafile_browse_btn)
+        m_printhost_cafile_browse_btn->sys_color_changed();
+
+    for (PresetForPrinter* preset : m_presets)
+        preset->on_sys_color_changed();
 }
 
 void PhysicalPrinterDialog::OnOK(wxEvent& event)

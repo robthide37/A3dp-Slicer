@@ -184,7 +184,6 @@ void GCodeViewer::TBuffer::add_path(const GCodeProcessorResult::MoveVertex& move
         move.volumetric_rate(), move.extruder_id, move.cp_color_id, { { endpoint, endpoint } } });
 }
 
-#if ENABLE_SHOW_TOOLPATHS_COG
 void GCodeViewer::COG::render()
 {
     if (!m_visible)
@@ -256,7 +255,6 @@ void GCodeViewer::COG::render()
     //imgui.end();
     //ImGui::PopStyleVar();
 }
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 
 #if ENABLE_PREVIEW_LAYER_TIME
 float GCodeViewer::Extrusions::Range::step_size(EType type) const
@@ -1098,9 +1096,7 @@ unsigned int GCodeViewer::get_options_visibility_flags() const
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::ColorChanges), is_toolpath_move_type_visible(EMoveType::Color_change));
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::PausePrints), is_toolpath_move_type_visible(EMoveType::Pause_Print));
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::CustomGCodes), is_toolpath_move_type_visible(EMoveType::Custom_GCode));
-#if ENABLE_SHOW_TOOLPATHS_COG
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::CenterOfGravity), m_cog.is_visible());
-#endif // ENABLE_SHOW_TOOLPATHS_COG
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::Shells), m_shells.visible);
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::ToolMarker), m_sequential_view.marker.is_visible());
 #if !ENABLE_PREVIEW_LAYOUT
@@ -1124,9 +1120,7 @@ void GCodeViewer::set_options_visibility_from_flags(unsigned int flags)
     set_toolpath_move_type_visible(EMoveType::Color_change, is_flag_set(static_cast<unsigned int>(Preview::OptionType::ColorChanges)));
     set_toolpath_move_type_visible(EMoveType::Pause_Print, is_flag_set(static_cast<unsigned int>(Preview::OptionType::PausePrints)));
     set_toolpath_move_type_visible(EMoveType::Custom_GCode, is_flag_set(static_cast<unsigned int>(Preview::OptionType::CustomGCodes)));
-#if ENABLE_SHOW_TOOLPATHS_COG
     m_cog.set_visible(is_flag_set(static_cast<unsigned int>(Preview::OptionType::CenterOfGravity)));
-#endif // ENABLE_SHOW_TOOLPATHS_COG
     m_shells.visible = is_flag_set(static_cast<unsigned int>(Preview::OptionType::Shells));
     m_sequential_view.marker.set_visible(is_flag_set(static_cast<unsigned int>(Preview::OptionType::ToolMarker)));
 #if !ENABLE_PREVIEW_LAYOUT
@@ -1729,9 +1723,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     if (wxGetApp().is_editor())
         m_contained_in_bed = wxGetApp().plater()->build_volume().all_paths_inside(gcode_result, m_paths_bounding_box);
 
-#if ENABLE_SHOW_TOOLPATHS_COG
     m_cog.reset();
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 
     m_sequential_view.gcode_ids.clear();
     for (size_t i = 0; i < gcode_result.moves.size(); ++i) {
@@ -1767,7 +1759,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
         const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1];
 
-#if ENABLE_SHOW_TOOLPATHS_COG
         if (curr.type == EMoveType::Extrude &&
             curr.extrusion_role != erSkirt &&
             curr.extrusion_role != erSupportMaterial &&
@@ -1779,7 +1770,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             const Vec3d prev_pos = prev.position.cast<double>();
             m_cog.add_segment(curr_pos, prev_pos, curr.mm3_per_mm * (curr_pos - prev_pos).norm());
         }
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 
         // update progress dialog
         ++progress_count;
@@ -2337,7 +2327,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
         if (move.type == EMoveType::Extrude) {
 #if ENABLE_PROCESS_G2_G3_LINES
-            if (move.extrusion_role != erNone && !move.internal_only) {
+            if (!move.internal_only) {
 #endif // ENABLE_PROCESS_G2_G3_LINES
                 // layers zs
                 const double* const last_z = m_layers.empty() ? nullptr : &m_layers.get_zs().back();
@@ -4624,7 +4614,6 @@ void GCodeViewer::render_legend(float& legend_height)
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
-#if ENABLE_SHOW_TOOLPATHS_COG
 #if ENABLE_LEGEND_TOOLBAR_ICONS
     toggle_button(Preview::OptionType::CenterOfGravity, _u8L("Center of gravity"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
         image_icon(window, pos, size, ImGui::LegendCOG);
@@ -4652,7 +4641,6 @@ void GCodeViewer::render_legend(float& legend_height)
         });
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
     ImGui::SameLine();
-#endif // ENABLE_SHOW_TOOLPATHS_COG
     if (!wxGetApp().is_gcode_viewer()) {
 #if ENABLE_LEGEND_TOOLBAR_ICONS
         toggle_button(Preview::OptionType::Shells, _u8L("Shells"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {

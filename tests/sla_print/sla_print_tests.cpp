@@ -8,6 +8,7 @@
 
 #include <libslic3r/TriangleMeshSlicer.hpp>
 #include <libslic3r/SLA/SupportTreeMesher.hpp>
+#include <libslic3r/BranchingTree/PointCloud.hpp>
 
 namespace {
 
@@ -156,37 +157,138 @@ TEST_CASE("DefaultSupports::FloorSupportsDoNotPierceModel", "[SLASupportGenerati
         test_support_model_collision(fname, supportcfg);
 }
 
-//TEST_CASE("CleverSupports::ElevatedSupportGeometryIsValid", "[SLASupportGeneration][Clever]") {
+//TEST_CASE("BranchingSupports::ElevatedSupportGeometryIsValid", "[SLASupportGeneration][Branching]") {
 //    sla::SupportTreeConfig supportcfg;
 //    supportcfg.object_elevation_mm = 10.;
-//    supportcfg.tree_type = sla::SupportTreeType::Clever;
+//    supportcfg.tree_type = sla::SupportTreeType::Branching;
 
 //    for (auto fname : SUPPORT_TEST_MODELS) test_supports(fname, supportcfg);
 //}
 
-//TEST_CASE("CleverSupports::FloorSupportGeometryIsValid", "[SLASupportGeneration][Clever]") {
+//TEST_CASE("BranchingSupports::FloorSupportGeometryIsValid", "[SLASupportGeneration][Branching]") {
 //    sla::SupportTreeConfig supportcfg;
 //    supportcfg.object_elevation_mm = 0;
-//    supportcfg.tree_type = sla::SupportTreeType::Clever;
+//    supportcfg.tree_type = sla::SupportTreeType::Branching;
 
 //    for (auto &fname: SUPPORT_TEST_MODELS) test_supports(fname, supportcfg);
 //}
 
-TEST_CASE("CleverSupports::ElevatedSupportsDoNotPierceModel", "[SLASupportGeneration][Clever]") {
+bool is_outside_support_cone(const Vec3f &supp, const Vec3f &pt, float angle)
+{
+    Vec3d D = (pt - supp).cast<double>();
+    double dot_sq = -D.z() * std::abs(-D.z());
+
+    return dot_sq <
+           D.squaredNorm() * std::cos(angle) * std::abs(std::cos(angle));
+}
+
+TEST_CASE("BranchingSupports::MergePointFinder", "[SLASupportGeneration][Branching]") {
+    SECTION("Identical points have the same merge point") {
+        Vec3f a{0.f, 0.f, 0.f}, b = a;
+        auto slope = float(PI / 4.);
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        REQUIRE((*mergept - b).norm() < EPSILON);
+        REQUIRE((*mergept - a).norm() < EPSILON);
+    }
+
+    // ^ Z
+    // | a *
+    // |
+    // | b * <= mergept
+    SECTION("Points at different heights have the lower point as mergepoint") {
+        Vec3f a{0.f, 0.f, 0.f}, b = {0.f, 0.f, -1.f};
+        auto slope = float(PI / 4.);
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        REQUIRE((*mergept - b).squaredNorm() < 2 * EPSILON);
+    }
+
+    // -|---------> X
+    //  a       b
+    //  *       *
+    //      * <= mergept
+    SECTION("Points at different X have mergept in the middle at lower Z") {
+        Vec3f a{0.f, 0.f, 0.f}, b = {1.f, 0.f, 0.f};
+        auto slope = float(PI / 4.);
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+
+           // Distance of mergept should be equal from both input points
+        float D = std::abs((*mergept - b).squaredNorm() - (*mergept - a).squaredNorm());
+
+        REQUIRE(D < EPSILON);
+        REQUIRE(!is_outside_support_cone(a, *mergept, slope));
+        REQUIRE(!is_outside_support_cone(b, *mergept, slope));
+    }
+
+    // -|---------> Y
+    //  a       b
+    //  *       *
+    //      * <= mergept
+    SECTION("Points at different Y have mergept in the middle at lower Z") {
+        Vec3f a{0.f, 0.f, 0.f}, b = {0.f, 1.f, 0.f};
+        auto slope = float(PI / 4.);
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+
+        // Distance of mergept should be equal from both input points
+        float D = std::abs((*mergept - b).squaredNorm() - (*mergept - a).squaredNorm());
+
+        REQUIRE(D < EPSILON);
+        REQUIRE(!is_outside_support_cone(a, *mergept, slope));
+        REQUIRE(!is_outside_support_cone(b, *mergept, slope));
+    }
+
+    SECTION("Points separated by less than critical angle have the lower point as mergept") {
+        Vec3f a{-1.f, -1.f, -1.f}, b = {-1.5f, -1.5f, -2.f};
+        auto slope = float(PI / 4.);
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        REQUIRE((*mergept - b).norm() < 2 * EPSILON);
+    }
+
+    // -|----------------------------> Y
+    //  a                          b
+    //  *            * <= mergept  *
+    //
+    SECTION("Points at same height have mergepoint in the middle if critical angle is zero ") {
+        Vec3f a{-1.f, -1.f, -1.f}, b = {-1.5f, -1.5f, -1.f};
+        auto slope = EPSILON;
+
+        auto mergept = branchingtree::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        Vec3f middle = (b + a) / 2.;
+        REQUIRE((*mergept - middle).norm() < 4 * EPSILON);
+    }
+}
+
+TEST_CASE("BranchingSupports::ElevatedSupportsDoNotPierceModel", "[SLASupportGeneration][Branching]") {
 
     sla::SupportTreeConfig supportcfg;
     supportcfg.object_elevation_mm = 10.;
-    supportcfg.tree_type = sla::SupportTreeType::Clever;
+    supportcfg.tree_type = sla::SupportTreeType::Branching;
 
     for (auto fname : SUPPORT_TEST_MODELS)
         test_support_model_collision(fname, supportcfg);
 }
 
-TEST_CASE("CleverSupports::FloorSupportsDoNotPierceModel", "[SLASupportGeneration][Clever]") {
+TEST_CASE("BranchingSupports::FloorSupportsDoNotPierceModel", "[SLASupportGeneration][Branching]") {
 
     sla::SupportTreeConfig supportcfg;
     supportcfg.object_elevation_mm = 0;
-    supportcfg.tree_type = sla::SupportTreeType::Clever;
+    supportcfg.tree_type = sla::SupportTreeType::Branching;
 
     for (auto fname : SUPPORT_TEST_MODELS)
         test_support_model_collision(fname, supportcfg);

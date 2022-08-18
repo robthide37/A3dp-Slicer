@@ -123,15 +123,18 @@ public:
     {
         wxASSERT(bitmap.IsOk());
 
-        int init_dpi = get_dpi_for_window(this);
+//        int init_dpi = get_dpi_for_window(this);
         this->SetPosition(pos);
+        // The size of the SplashScreen can be hanged after its moving to another display
+        // So, update it from a bitmap size
+        this->SetClientSize(bitmap.GetWidth(), bitmap.GetHeight());
         this->CenterOnScreen();
-        int new_dpi = get_dpi_for_window(this);
+//        int new_dpi = get_dpi_for_window(this);
 
-        m_scale         = (float)(new_dpi) / (float)(init_dpi);
+//        m_scale         = (float)(new_dpi) / (float)(init_dpi);
         m_main_bitmap   = bitmap;
 
-        scale_bitmap(m_main_bitmap, m_scale);
+//        scale_bitmap(m_main_bitmap, m_scale);
 
         // init constant texts and scale fonts
         init_constant_text();
@@ -331,7 +334,7 @@ private:
         // See https://github.com/wxWidgets/wxWidgets/blob/master/src/msw/font.cpp
         // void wxNativeFontInfo::SetFractionalPointSize(float pointSizeNew)
         wxNativeFontInfo nfi= *font.GetNativeFontInfo();
-        float pointSizeNew  = scale * font.GetPointSize();
+        float pointSizeNew  = wxDisplay(this).GetScaleFactor() * scale * font.GetPointSize();
         nfi.lf.lfHeight     = nfi.GetLogFontHeightAtPPI(pointSizeNew, get_dpi_for_window(this));
         nfi.pointSize       = pointSizeNew;
         font = wxFont(nfi);
@@ -454,14 +457,17 @@ struct FileWildcards {
     std::vector<std::string_view> file_extensions;
 };
 
+
+ 
 static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_STL */     { "STL files"sv,       { ".stl"sv } },
     /* FT_OBJ */     { "OBJ files"sv,       { ".obj"sv } },
     /* FT_OBJECT */  { "Object files"sv,    { ".stl"sv, ".obj"sv } },
+    /* FT_STEP */    { "STEP files"sv,      { ".stp"sv, ".step"sv } },    
     /* FT_AMF */     { "AMF files"sv,       { ".amf"sv, ".zip.amf"sv, ".xml"sv } },
     /* FT_3MF */     { "3MF files"sv,       { ".3mf"sv } },
     /* FT_GCODE */   { "G-code files"sv,    { ".gcode"sv, ".gco"sv, ".g"sv, ".ngc"sv } },
-    /* FT_MODEL */   { "Known files"sv,     { ".stl"sv, ".obj"sv, ".3mf"sv, ".amf"sv, ".zip.amf"sv, ".xml"sv } },
+    /* FT_MODEL */   { "Known files"sv,     { ".stl"sv, ".obj"sv, ".3mf"sv, ".amf"sv, ".zip.amf"sv, ".xml"sv, ".step"sv, ".stp"sv } },
     /* FT_PROJECT */ { "Project files"sv,   { ".3mf"sv, ".amf"sv, ".zip.amf"sv } },
     /* FT_GALLERY */ { "Known files"sv,     { ".stl"sv, ".obj"sv } },
 
@@ -890,9 +896,9 @@ static boost::optional<Semver> parse_semver_from_ini(std::string path)
 void GUI_App::init_app_config()
 {
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
-//    SetAppName(SLIC3R_APP_KEY);
+//  SetAppName(SLIC3R_APP_KEY);
 	SetAppName(SLIC3R_APP_KEY "-alpha");
-//    SetAppName(SLIC3R_APP_KEY "-beta");
+//  SetAppName(SLIC3R_APP_KEY "-beta");
 
 
 //	SetAppDisplayName(SLIC3R_APP_NAME);
@@ -1188,7 +1194,7 @@ bool GUI_App::on_init_inner()
         }
 
         // create splash screen with updated bmp
-        scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap("PrusaSlicer", nullptr, 400), 
+        scrn = new SplashScreen(bmp.IsOk() ? bmp : get_bmp_bundle("PrusaSlicer", 400)->GetPreferredBitmapSizeAtScale(1.0), 
                                 wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos);
 
         if (!default_splashscreen_pos)
@@ -1407,9 +1413,9 @@ bool GUI_App::dark_mode()
     // proper dark mode was first introduced.
     return wxPlatformInfo::Get().CheckOSVersion(10, 14) && mac_dark_mode();
 #else
-    return wxGetApp().app_config->get("dark_color_mode") == "1" ? true : check_dark_mode();
-    //const unsigned luma = get_colour_approx_luma(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-    //return luma < 128;
+    if (wxGetApp().app_config->has("dark_color_mode"))
+        return wxGetApp().app_config->get("dark_color_mode") == "1";
+    return check_dark_mode();
 #endif
 }
 
@@ -1890,7 +1896,7 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
 {
     input_files.Clear();
     wxFileDialog dialog(parent ? parent : GetTopWindow(),
-        _L("Choose one or more files (STL/OBJ/AMF/3MF/PRUSA):"),
+        _L("Choose one or more files (STL/OBJ/AMF/3MF/PRUSA/STEP):"),
         from_u8(app_config->get_last_dir()), "",
         file_wildcards(FT_MODEL), wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
 
@@ -2099,6 +2105,15 @@ bool GUI_App::load_language(wxString language, bool initial)
         {
 	    	// Allocating a temporary locale will switch the default wxTranslations to its internal wxTranslations instance.
 	    	wxLocale temp_locale;
+#ifdef __WXOSX__
+            // ysFIXME - temporary workaround till it isn't fixed in wxWidgets:
+            // Use English as an initial language, because of under OSX it try to load "inappropriate" language for wxLANGUAGE_DEFAULT.
+            // For example in our case it's trying to load "en_CZ" and as a result PrusaSlicer catch warning message.
+            // But wxWidgets guys work on it.
+            temp_locale.Init(wxLANGUAGE_ENGLISH);
+#else
+            temp_locale.Init();
+#endif // __WXOSX__
 	    	// Set the current translation's language to default, otherwise GetBestTranslation() may not work (see the wxWidgets source code).
 	    	wxTranslations::Get()->SetLanguage(wxLANGUAGE_DEFAULT);
 	    	// Let the wxFileTranslationsLoader enumerate all translation dictionaries for PrusaSlicer
@@ -2239,7 +2254,7 @@ void GUI_App::update_mode()
 {
     sidebar().update_mode();
 
-#ifdef _MSW_DARK_MODE
+#ifdef _WIN32 //_MSW_DARK_MODE
     if (!wxGetApp().tabs_as_menu())
         dynamic_cast<Notebook*>(mainframe->m_tabpanel)->UpdateMode();
 #endif

@@ -8,6 +8,7 @@
 #include <libslic3r/SLA/SpatIndex.hpp>
 #include <libslic3r/SLA/SupportTreeBuilder.hpp>
 #include <libslic3r/SLA/DefaultSupportTree.hpp>
+#include <libslic3r/SLA/BranchingTreeSLA.hpp>
 
 #include <libslic3r/MTUtils.hpp>
 #include <libslic3r/ClipperUtils.hpp>
@@ -32,6 +33,10 @@ indexed_triangle_set create_support_tree(const SupportableMesh &sm,
         switch (sm.cfg.tree_type) {
         case SupportTreeType::Default: {
             create_default_tree(*builder, sm);
+            break;
+        }
+        case SupportTreeType::Branching: {
+            create_branching_tree(*builder, sm);
             break;
         }
         default:;

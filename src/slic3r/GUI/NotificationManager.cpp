@@ -789,6 +789,7 @@ void NotificationManager::ExportFinishedNotification::render_eject_button(ImGuiW
 		ImVec2(win_pos.x - m_line_height * 2.5f, win_pos.y + win_size.y),
 		true))
 	{
+		
 		button_text = ImGui::EjectHoverButton;
 		// tooltip
 		long time_now = wxGetLocalTime();
@@ -798,12 +799,21 @@ void NotificationManager::ExportFinishedNotification::render_eject_button(ImGuiW
 			imgui.text(_u8L("Eject drive") + " " + GUI::shortkey_ctrl_prefix() + "T");
 			ImGui::EndTooltip();
 			ImGui::PopStyleColor();
+			// somehow the tooltip wont show if the render doesnt run twice
+			if (m_hover_once) {
+				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+				m_hover_once = false;
+			}
 		} 
-		if (m_hover_time == 0)
+		if (m_hover_time == 0) {
 			m_hover_time = time_now;
-	} else 
+			m_hover_once = true;
+			wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(1500);
+		}
+	} else {
 		m_hover_time = 0;
-
+		m_hover_once = false;
+	}
 	ImVec2 button_pic_size = ImGui::CalcTextSize(button_text.c_str());
 	ImVec2 button_size(button_pic_size.x * 1.25f, button_pic_size.y * 1.25f);
 	ImGui::SetCursorPosX(win_size.x - m_line_height * 5.0f);
@@ -828,6 +838,15 @@ void NotificationManager::ExportFinishedNotification::render_eject_button(ImGuiW
 	}
 	ImGui::PopStyleColor(5);
 }
+
+bool NotificationManager::ExportFinishedNotification::update_state(bool paused, const int64_t delta)
+{
+	bool ret = PopNotification::update_state(paused, delta);
+	if (!ret && m_hover_time != 0 && m_hover_time < wxGetLocalTime())
+		return true;
+	return false;
+}
+
 bool NotificationManager::ExportFinishedNotification::on_text_click()
 {
 	open_folder(m_export_dir_path);
