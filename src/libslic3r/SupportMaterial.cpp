@@ -4312,8 +4312,13 @@ void generate_support_toolpaths(
                 // Order the layers by lexicographically by an increasing print_z and a decreasing layer height.
                 std::stable_sort(layer_cache_item.overlapping.begin(), layer_cache_item.overlapping.end(), [](auto *l1, auto *l2) { return *l1 < *l2; });
             }
-            if (! polys.empty())
-                expolygons_append(support_layer.support_islands, union_ex(polys));
+            assert(support_layer.support_islands.empty());
+            if (! polys.empty()) {
+                support_layer.support_islands = union_ex(polys);
+                support_layer.support_islands_bboxes.reserve(support_layer.support_islands.size());
+                for (const ExPolygon &expoly : support_layer.support_islands)
+                    support_layer.support_islands_bboxes.emplace_back(get_extents(expoly).inflated(SCALED_EPSILON));
+            }
         } // for each support_layer_id
     });
 
