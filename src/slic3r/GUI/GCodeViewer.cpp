@@ -51,7 +51,7 @@ static EMoveType buffer_type(unsigned char id) {
 // Equivalent to conversion to string with sprintf(buf, "%.2g", value) and conversion back to float, but faster.
 static float round_to_bin(const float value)
 {
-//    assert(value > 0);
+//    assert(value >= 0);
     constexpr float const scale    [5] = { 100.f,  1000.f,  10000.f,  100000.f,  1000000.f };
     constexpr float const invscale [5] = { 0.01f,  0.001f,  0.0001f,  0.00001f,  0.000001f };
     constexpr float const threshold[5] = { 0.095f, 0.0095f, 0.00095f, 0.000095f, 0.0000095f };
@@ -59,7 +59,12 @@ static float round_to_bin(const float value)
     int                   i            = 0;
     // While the scaling factor is not yet large enough to get two integer digits after scaling and rounding:
     for (; value < threshold[i] && i < 4; ++ i) ;
-    return std::round(value * scale[i]) * invscale[i];
+    // At least on MSVC std::round() calls a complex function, which is pretty expensive.
+    // our fast_round_up is much cheaper and it could be inlined.
+//    return std::round(value * scale[i]) * invscale[i];
+    double a = value * scale[i];
+    assert(std::abs(a) < double(std::numeric_limits<int64_t>::max()));
+    return fast_round_up<int64_t>(a) * invscale[i];
 }
 
 void GCodeViewer::VBuffer::reset()

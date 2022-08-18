@@ -345,6 +345,25 @@ constexpr T NaN = std::numeric_limits<T>::quiet_NaN();
 constexpr float NaNf = NaN<float>;
 constexpr double NaNd = NaN<double>;
 
+// Rounding up.
+// 1.5 is rounded to 2
+// 1.49 is rounded to 1
+// 0.5 is rounded to 1,
+// 0.49 is rounded to 0
+// -0.5 is rounded to 0,
+// -0.51 is rounded to -1,
+// -1.5 is rounded to -1.
+// -1.51 is rounded to -2.
+// If input is not a valid float (it is infinity NaN or if it does not fit)
+// the float to int conversion produces a max int on Intel and +-max int on ARM.
+template<typename I>
+inline IntegerOnly<I, I> fast_round_up(double a)
+{
+    // Why does Java Math.round(0.49999999999999994) return 1?
+    // https://stackoverflow.com/questions/9902968/why-does-math-round0-49999999999999994-return-1
+    return a == 0.49999999999999994 ? I(0) : I(floor(a + 0.5));
+}
+
 } // namespace Slic3r
 
 #endif
