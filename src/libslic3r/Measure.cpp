@@ -9,6 +9,10 @@ namespace Slic3r {
 namespace Measure {
 
 
+constexpr double feature_hover_limit = 0.5; // how close to a feature the mouse must be to highlight it
+constexpr double edge_endpoint_limit = 0.5; // how close to an edge endpoint the mouse ...
+
+
 
 static std::pair<Vec3d, double> get_center_and_radius(const std::vector<Vec3d>& border, int start_idx, int end_idx, const Transform3d& trafo)
 {
@@ -302,7 +306,7 @@ void MeasuringImpl::extract_features()
 
         // The last surface feature is the plane itself.
         plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Plane,
-            Vec3d::Zero(), Vec3d::Zero(), std::optional<Vec3d>(), i + 0.0001));
+            plane.normal, plane.borders.front().front(), std::optional<Vec3d>(), i + 0.0001));
 
         plane.borders.clear();
         plane.borders.shrink_to_fit();
@@ -333,25 +337,39 @@ std::optional<SurfaceFeature> MeasuringImpl::get_feature(size_t face_idx, const 
 
     const PlaneData& plane = m_planes[m_face_to_plane[face_idx]];
     
-    const SurfaceFeature* closest_feature = nullptr;
+    size_t closest_feature_idx = size_t(-1);
     double min_dist = std::numeric_limits<double>::max();
 
     MeasurementResult res;
     SurfaceFeature point_sf(point);
 
-    for (const SurfaceFeature& feature : plane.surface_features) {
-        res = get_measurement(feature, point_sf);
+    for (size_t i=0; i<plane.surface_features.size() - 1; ++i) {
+        // The -1 is there to prevent measuring distance to the plane itself,
+        // which is needless and relatively expensive.
+        res = get_measurement(plane.surface_features[i], point_sf);
         if (res.distance_strict) { // TODO: this should become an assert after all combinations are implemented.
             double dist = *res.distance_strict;
-            if (dist < 0.5 && dist < min_dist) {
+            if (dist < feature_hover_limit && dist < min_dist) {
                 min_dist = std::min(dist, min_dist);
-                closest_feature = &feature;
+                closest_feature_idx = i;
             }
         }
     }
 
-    if (closest_feature)
-        return std::make_optional(*closest_feature);
+    if (closest_feature_idx != size_t(-1)) {
+        const SurfaceFeature& f = plane.surface_features[closest_feature_idx];
+        if (f.get_type() == SurfaceFeatureType::Edge) {
+            // If this is an edge, check if we are not close to the endpoint. If so,
+            // we will include the endpoint as well.
+            constexpr double limit_sq = edge_endpoint_limit * edge_endpoint_limit;
+            const auto& [sp, ep] = f.get_edge();
+            if ((point-sp).squaredNorm() < limit_sq)
+                return std::make_optional(SurfaceFeature(sp));
+            if ((point-ep).squaredNorm() < limit_sq)
+                return std::make_optional(SurfaceFeature(ep));
+        }
+        return std::make_optional(f);
+    }
 
     // Nothing detected, return the plane as a whole.
     assert(plane.surface_features.back().get_type() == SurfaceFeatureType::Plane);
@@ -429,36 +447,85 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
     const SurfaceFeature& f2 = swap ? a : b;
 
     MeasurementResult result;
+
+    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
     if (f1.get_type() == SurfaceFeatureType::Point) {
         if (f2.get_type() == SurfaceFeatureType::Point) {
             Vec3d diff = (f2.get_point() - f1.get_point());
             result.distance_strict = diff.norm();
             result.distance_xyz = diff;
+    ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Edge) {
             const auto& [s,e] = f2.get_edge();
             Eigen::ParametrizedLine<double, 3> line(s, (e-s).normalized());
-            result.distance_strict = std::make_optional(line.distance(f1.get_point())); // TODO: this is really infinite dist
+            double dist_inf = line.distance(f1.get_point());
+            Vec3d proj = line.projection(f1.get_point());
+            double len_sq = (e-s).squaredNorm();
+            double dist_start_sq = (proj-s).squaredNorm();
+            double dist_end_sq = (proj-e).squaredNorm();
+            if (dist_start_sq < len_sq && dist_end_sq < len_sq) {
+                // projection falls on the line - the strict distance is the same as infinite
+                result.distance_strict = std::make_optional(dist_inf);
+            } else { // the result is the closer of the endpoints
+                result.distance_strict = std::make_optional(std::sqrt(std::min(dist_start_sq, dist_end_sq) + dist_inf));
+            }
+            result.distance_infinite = std::make_optional(dist_inf);
+    ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Circle) {
             // Find a plane containing normal, center and the point.
             const auto& [c, radius, n] = f2.get_circle();
             Eigen::Hyperplane<double, 3> circle_plane(n, c);
             Vec3d proj = circle_plane.projection(f1.get_point());
-            result.distance_strict = std::make_optional(std::sqrt(
-                std::pow((proj - c).norm() - radius, 2.) + (f1.get_point() - proj).squaredNorm()));
+            double dist = std::sqrt(std::pow((proj - c).norm() - radius, 2.) +
+                (f1.get_point() - proj).squaredNorm());
+
+            result.distance_strict = std::make_optional(dist);
+    ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Plane) {
+            const auto& [idx, normal, pt] = f2.get_plane();
+            Eigen::Hyperplane<double, 3> plane(normal, pt);
+            result.distance_infinite = plane.absDistance(f1.get_point());
+            // TODO: result.distance_strict =
         }
+    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
     } else if (f1.get_type() == SurfaceFeatureType::Edge) {
         if (f2.get_type() == SurfaceFeatureType::Edge) {
+    ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Circle) {
+    ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Plane) {
         }
+    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
     } else if (f1.get_type() == SurfaceFeatureType::Circle) {
         if (f2.get_type() == SurfaceFeatureType::Circle) {
+    ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Plane) {
         }
+    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
     } else if (f1.get_type() == SurfaceFeatureType::Plane) {
         assert(f2.get_type() == SurfaceFeatureType::Plane);
-        
+
+        const auto& [idx1, normal1, pt1] = f1.get_plane();
+        const auto& [idx2, normal2, pt2] = f2.get_plane();
+        double angle = 0.;
+
+        if (! normal1.isApprox(normal2)) {
+            // The planes are parallel, calculate distance.
+            Eigen::Hyperplane<double, 3> plane(normal1, pt1);
+            result.distance_infinite = plane.absDistance(pt2);
+        } else {
+            // Planes are not parallel, calculate angle.
+            angle = std::acos(std::abs(normal1.dot(normal2)));
+        }
+        result.angle = angle;
     }
 
 

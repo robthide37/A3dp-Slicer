@@ -31,7 +31,6 @@ public:
     explicit SurfaceFeature(const Vec3d& pt)
     : m_type{SurfaceFeatureType::Point}, m_pt1{pt} {}
 
-
     // Get type of this feature.
     SurfaceFeatureType get_type() const { return m_type; }
 
@@ -44,8 +43,8 @@ public:
     // For circles, return center, radius and normal.
     std::tuple<Vec3d, double, Vec3d> get_circle() const { assert(m_type == SurfaceFeatureType::Circle); return std::make_tuple(m_pt1, m_value, m_pt2); }
 
-    // For planes, return index into vector provided by Measuring::get_plane_triangle_indices.
-    int get_plane_idx() const { return int(m_value); }
+    // For planes, return index into vector provided by Measuring::get_plane_triangle_indices, normal and point.
+    std::tuple<int, Vec3d, Vec3d> get_plane() const { return std::make_tuple(int(m_value), m_pt1, m_pt2); }
 
     // For anything, return an extra point that should also be considered a part of this.
     std::optional<Vec3d> get_extra_point() const { assert(m_type != SurfaceFeatureType::Undef); return m_pt3; }
@@ -84,7 +83,7 @@ public:
     std::vector<std::vector<int>> get_planes_triangle_indices() const;
     
 private: 
-    std::unique_ptr<MeasuringImpl> priv;  
+    std::unique_ptr<MeasuringImpl> priv;
 };
 
 
@@ -98,7 +97,7 @@ struct MeasurementResult {
 };
 
 // Returns distance/angle between two SurfaceFeatures.
-static MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature& b);
+MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature& b);
 
 
 } // namespace Measure
