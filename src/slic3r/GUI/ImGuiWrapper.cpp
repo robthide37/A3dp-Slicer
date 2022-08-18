@@ -544,7 +544,7 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
 
     // let the label string start with "##" to hide the automatic label from ImGui::SliderFloat()
-    bool label_visible = !boost::algorithm::istarts_with(label, "##");
+    bool label_visible = !boost::algorithm::starts_with(label, "##");
     std::string str_label = label_visible ? std::string("##") + std::string(label) : std::string(label);
 
     // removes 2nd evenience of "##", if present

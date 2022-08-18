@@ -3721,8 +3721,13 @@ void GCodeProcessor::post_process()
     }
 
     auto process_used_filament = [&](std::string& gcode_line) {
-        auto process_tag = [](std::string& gcode_line, const std::string& tag, const std::vector<double>& values) {
-            if (boost::algorithm::istarts_with(gcode_line, tag)) {
+        // Prefilter for parsing speed.
+        if (gcode_line.size() < 8 || gcode_line[0] != ';' || gcode_line[1] != ' ')
+            return false;
+        if (const char c = gcode_line[2]; c != 'f' && c != 't')
+            return false;
+        auto process_tag = [](std::string& gcode_line, const std::string_view tag, const std::vector<double>& values) {
+            if (boost::algorithm::starts_with(gcode_line, tag)) {
                 gcode_line = tag;
                 char buf[1024];
                 for (size_t i = 0; i < values.size(); ++i) {
