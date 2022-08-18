@@ -34,24 +34,21 @@ public:
     struct PlaneData {
         std::vector<int> facets;
         std::vector<std::vector<Vec3d>> borders; // FIXME: should be in fact local in update_planes()
-        std::vector<std::unique_ptr<SurfaceFeature>> surface_features;
+        std::vector<SurfaceFeature> surface_features;
         Vec3d normal;
         float area;
     };
 
-    const std::vector<const SurfaceFeature*>& get_features() const;
-    const SurfaceFeature* get_feature(size_t face_idx, const Vec3d& point) const;
-    const std::vector<std::vector<int>> get_planes_triangle_indices() const;
+    std::vector<SurfaceFeature> get_all_features() const;
+    std::optional<SurfaceFeature> get_feature(size_t face_idx, const Vec3d& point) const;
+    std::vector<std::vector<int>> get_planes_triangle_indices() const;
 
 private:
     void update_planes();
     void extract_features();
-    void save_features();
-
-
+    
     std::vector<PlaneData> m_planes;
     std::vector<size_t>    m_face_to_plane;
-    std::vector<const SurfaceFeature*> m_features;
     const indexed_triangle_set& m_its;
 };
 
@@ -65,7 +62,6 @@ MeasuringImpl::MeasuringImpl(const indexed_triangle_set& its)
 {
     update_planes();
     extract_features();
-    save_features();
 }
 
 
@@ -233,7 +229,7 @@ void MeasuringImpl::extract_features()
 
 
             bool circle = false;
-            std::vector<std::unique_ptr<SurfaceFeature>> circles;
+            std::vector<SurfaceFeature> circles;
             std::vector<std::pair<size_t, size_t>> circles_idxs;
             for (int i=1; i<angles.size(); ++i) {
                 if (Slic3r::is_approx(lengths[i], lengths[i-1])
@@ -249,8 +245,7 @@ void MeasuringImpl::extract_features()
                         // Add the circle and remember indices into borders.
                         const auto& [center, radius] = get_center_and_radius(border, start_idx, i, trafo);
                         circles_idxs.emplace_back(start_idx, i);
-                        circles.emplace_back(std::unique_ptr<SurfaceFeature>(
-                            new Circle(center, radius, plane.normal)));
+                        circles.emplace_back(SurfaceFeature(SurfaceFeatureType::Circle, center, plane.normal, std::optional<Vec3d>(), radius));
                         circle = false;
                     }
                 }
@@ -266,10 +261,10 @@ void MeasuringImpl::extract_features()
                 double angle = angles[circles_idxs[i].first + 1];
                 if (angle > polygon_lower_threshold) {
                     if (angle < polygon_upper_threshold) {
-                        const Vec3d center = static_cast<const Circle*>(circles[i].get())->get_center();
+                        const Vec3d center = std::get<0>(circles[i].get_circle());
                         for (int j=circles_idxs[i].first + 1; j<=circles_idxs[i].second; ++j)
-                            plane.surface_features.emplace_back(std::unique_ptr<SurfaceFeature>(
-                                new Edge(border[j-1], border[j], center)));
+                            plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
+                                border[j-1], border[j], std::make_optional(center), 0.));
                     } else {
                         // This will be handled just like a regular edge.
                         circles_idxs.erase(circles_idxs.begin() + i);
@@ -288,8 +283,8 @@ void MeasuringImpl::extract_features()
             for (int i=1; i<int(border.size()); ++i) {
                 if (cidx < circles_idxs.size() && i > circles_idxs[cidx].first)
                     i = circles_idxs[cidx++].second;
-                else plane.surface_features.emplace_back(std::unique_ptr<SurfaceFeature>(
-                        new Edge(border[i-1], border[i])));                
+                else plane.surface_features.emplace_back(SurfaceFeature(
+                        SurfaceFeatureType::Edge, border[i-1], border[i], std::optional<Vec3d>(), 0.));
             }
 
             // FIXME Throw away / do not create edges which are parts of circles or
@@ -298,14 +293,16 @@ void MeasuringImpl::extract_features()
             // FIXME Check and merge first and last circle if needed.
 
             // Now move the circles into the feature list.
-            assert(std::all_of(circles.begin(), circles.end(), [](const std::unique_ptr<SurfaceFeature>& f) { return f->get_type() == SurfaceFeatureType::Circle; }));
+            assert(std::all_of(circles.begin(), circles.end(), [](const SurfaceFeature& f) {
+                return f.get_type() == SurfaceFeatureType::Circle;
+            }));
             plane.surface_features.insert(plane.surface_features.end(), std::make_move_iterator(circles.begin()),
             std::make_move_iterator(circles.end()));
         }
 
         // The last surface feature is the plane itself.
-        plane.surface_features.emplace_back(std::unique_ptr<SurfaceFeature>(
-                    new Plane(i)));
+        plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Plane,
+            Vec3d::Zero(), Vec3d::Zero(), std::optional<Vec3d>(), i + 0.0001));
 
         plane.borders.clear();
         plane.borders.shrink_to_fit();
@@ -314,56 +311,58 @@ void MeasuringImpl::extract_features()
 
 
 
-void MeasuringImpl::save_features()
+std::vector<SurfaceFeature> MeasuringImpl::get_all_features() const
 {
-    m_features.clear();
-    for (PlaneData& plane : m_planes)
+    std::vector<SurfaceFeature> features;
     //PlaneData& plane = m_planes[0];
-    {     
-        for (const std::unique_ptr<SurfaceFeature>& feature : plane.surface_features) {
-            m_features.emplace_back(feature.get());
-        }
-    }
+    for (const PlaneData& plane : m_planes)    
+        for (const SurfaceFeature& feature : plane.surface_features)
+            features.emplace_back(feature);
+    return features;        
 }
 
 
 
-const SurfaceFeature* MeasuringImpl::get_feature(size_t face_idx, const Vec3d& point) const
+
+
+
+std::optional<SurfaceFeature> MeasuringImpl::get_feature(size_t face_idx, const Vec3d& point) const
 {
     if (face_idx >= m_face_to_plane.size())
-        return nullptr;
+        return std::optional<SurfaceFeature>();
 
     const PlaneData& plane = m_planes[m_face_to_plane[face_idx]];
     
     const SurfaceFeature* closest_feature = nullptr;
     double min_dist = std::numeric_limits<double>::max();
 
-    for (const std::unique_ptr<SurfaceFeature>& feature : plane.surface_features) {
-        double dist = Measuring::get_distance(feature.get(), &point);
-        if (dist < 0.5 && dist < min_dist) {
-            min_dist = std::min(dist, min_dist);
-            closest_feature = feature.get();
+    MeasurementResult res;
+    SurfaceFeature point_sf(point);
+
+    for (const SurfaceFeature& feature : plane.surface_features) {
+        res = get_measurement(feature, point_sf);
+        if (res.distance_strict) { // TODO: this should become an assert after all combinations are implemented.
+            double dist = *res.distance_strict;
+            if (dist < 0.5 && dist < min_dist) {
+                min_dist = std::min(dist, min_dist);
+                closest_feature = &feature;
+            }
         }
     }
 
     if (closest_feature)
-        return closest_feature;
+        return std::make_optional(*closest_feature);
 
     // Nothing detected, return the plane as a whole.
-    assert(plane.surface_features.back().get()->get_type() == SurfaceFeatureType::Plane);
-    return plane.surface_features.back().get();
+    assert(plane.surface_features.back().get_type() == SurfaceFeatureType::Plane);
+    return std::make_optional(plane.surface_features.back());
 }
 
 
 
-const std::vector<const SurfaceFeature*>& MeasuringImpl::get_features() const
-{
-    return m_features;
-}
 
 
-
-const std::vector<std::vector<int>> MeasuringImpl::get_planes_triangle_indices() const
+std::vector<std::vector<int>> MeasuringImpl::get_planes_triangle_indices() const
 {
     std::vector<std::vector<int>> out;
     for (const PlaneData& plane : m_planes)
@@ -390,46 +389,85 @@ Measuring::Measuring(const indexed_triangle_set& its)
 Measuring::~Measuring() {}
 
 
-const std::vector<const SurfaceFeature*>& Measuring::get_features() const
+std::vector<SurfaceFeature> Measuring::get_all_features() const
 {
-    return priv->get_features();
+    return priv->get_all_features();
 }
 
 
-const SurfaceFeature* Measuring::get_feature(size_t face_idx, const Vec3d& point) const
+std::optional<SurfaceFeature> Measuring::get_feature(size_t face_idx, const Vec3d& point) const
 {
     return priv->get_feature(face_idx, point);
 }
 
 
 
-const std::vector<std::vector<int>> Measuring::get_planes_triangle_indices() const
+std::vector<std::vector<int>> Measuring::get_planes_triangle_indices() const
 {
     return priv->get_planes_triangle_indices();
 }
 
 
 
-double Measuring::get_distance(const SurfaceFeature* feature, const Vec3d* pt)
+
+
+
+
+
+
+
+
+
+
+
+MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature& b)
 {
-    if (feature->get_type() == SurfaceFeatureType::Edge) {
-        const Edge* edge = static_cast<const Edge*>(feature);
-        const auto& [s,e] = edge->get_edge();
-        Eigen::ParametrizedLine<double, 3> line(s, (e-s).normalized());
-        return line.distance(*pt);
-    }
-    else if (feature->get_type() == SurfaceFeatureType::Circle) {
-        const Circle* circle = static_cast<const Circle*>(feature);
-        // Find a plane containing normal, center and the point.
-        const Vec3d& c = circle->get_center();
-        const Vec3d& n = circle->get_normal();
-        Eigen::Hyperplane<double, 3> circle_plane(n, c);
-        Vec3d proj = circle_plane.projection(*pt);
-        return std::sqrt( std::pow((proj - c).norm() - circle->get_radius(), 2.) + (*pt - proj).squaredNorm());
+    assert(a.get_type() != SurfaceFeatureType::Undef && b.get_type() != SurfaceFeatureType::Undef);
+
+    const bool swap = int(a.get_type()) > int(b.get_type());
+    const SurfaceFeature& f1 = swap ? b : a;
+    const SurfaceFeature& f2 = swap ? a : b;
+
+    MeasurementResult result;
+    if (f1.get_type() == SurfaceFeatureType::Point) {
+        if (f2.get_type() == SurfaceFeatureType::Point) {
+            Vec3d diff = (f2.get_point() - f1.get_point());
+            result.distance_strict = diff.norm();
+            result.distance_xyz = diff;
+        } else if (f2.get_type() == SurfaceFeatureType::Edge) {
+            const auto& [s,e] = f2.get_edge();
+            Eigen::ParametrizedLine<double, 3> line(s, (e-s).normalized());
+            result.distance_strict = std::make_optional(line.distance(f1.get_point())); // TODO: this is really infinite dist
+        } else if (f2.get_type() == SurfaceFeatureType::Circle) {
+            // Find a plane containing normal, center and the point.
+            const auto& [c, radius, n] = f2.get_circle();
+            Eigen::Hyperplane<double, 3> circle_plane(n, c);
+            Vec3d proj = circle_plane.projection(f1.get_point());
+            result.distance_strict = std::make_optional(std::sqrt(
+                std::pow((proj - c).norm() - radius, 2.) + (f1.get_point() - proj).squaredNorm()));
+        } else if (f2.get_type() == SurfaceFeatureType::Plane) {
+        }
+    } else if (f1.get_type() == SurfaceFeatureType::Edge) {
+        if (f2.get_type() == SurfaceFeatureType::Edge) {
+        } else if (f2.get_type() == SurfaceFeatureType::Circle) {
+        } else if (f2.get_type() == SurfaceFeatureType::Plane) {
+        }
+    } else if (f1.get_type() == SurfaceFeatureType::Circle) {
+        if (f2.get_type() == SurfaceFeatureType::Circle) {
+        } else if (f2.get_type() == SurfaceFeatureType::Plane) {
+        }
+    } else if (f1.get_type() == SurfaceFeatureType::Plane) {
+        assert(f2.get_type() == SurfaceFeatureType::Plane);
+        
     }
 
-    return std::numeric_limits<double>::max();
+
+    
+    return result;
 }
+
+
+
 
 
 

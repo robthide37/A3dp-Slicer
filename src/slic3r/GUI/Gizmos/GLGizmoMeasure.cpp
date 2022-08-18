@@ -158,24 +158,25 @@ void GLGizmoMeasure::on_render()
 
 
 
-        std::vector<const Measure::SurfaceFeature*> features = {m_measuring->get_feature(facet_idx, pos.cast<double>())};
+        std::vector<Measure::SurfaceFeature> features;
          if (m_show_all) {
-            features = m_measuring->get_features();
+            features = m_measuring->get_all_features(); // EXPENSIVE - debugging only.
             features.erase(std::remove_if(features.begin(), features.end(),
-                           [](const Measure::SurfaceFeature* f) {
-                            return f->get_type() == Measure::SurfaceFeatureType::Plane;
+                           [](const Measure::SurfaceFeature& f) {
+                            return f.get_type() == Measure::SurfaceFeatureType::Plane;
                             }), features.end());
+         } else {
+            std::optional<Measure::SurfaceFeature> feat = m_measuring->get_feature(facet_idx, pos.cast<double>());
+            if (feat)
+                features.emplace_back(*feat);
          }
-            
-            
-        for (const Measure::SurfaceFeature* feature : features) {
-            if (! feature)
-                continue;
 
-            if (feature->get_type() == Measure::SurfaceFeatureType::Circle) {
-                const auto* circle = static_cast<const Measure::Circle*>(feature);
-                const Vec3d& c = circle->get_center();
-                const Vec3d& n = circle->get_normal();
+            
+            
+        for (const Measure::SurfaceFeature& feature : features) {
+
+            if (feature.get_type() == Measure::SurfaceFeatureType::Circle) {
+                const auto& [c, radius, n] = feature.get_circle();
                 Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(c));
                 view_feature_matrix.scale(0.5);
                 shader->set_uniform("view_model_matrix", view_feature_matrix);
@@ -186,7 +187,7 @@ void GLGizmoMeasure::on_render()
                 Vec3d rad = n.cross(Vec3d::UnitX());
                 if (rad.squaredNorm() < 0.1)
                     rad = n.cross(Vec3d::UnitY());
-                rad *= circle->get_radius() * rad.norm();
+                rad *= radius * rad.norm();
                 const int N = 20;
                 for (int i=0; i<N; ++i) {
                     rad = Eigen::AngleAxisd(6.28/N, n) * rad;
@@ -197,9 +198,8 @@ void GLGizmoMeasure::on_render()
                     m_vbo_sphere.render();
                 }
             }
-            else if (feature->get_type() == Measure::SurfaceFeatureType::Edge) {
-                const auto* edge = static_cast<const Measure::Edge*>(feature);
-                auto& [start, end] = edge->get_edge();
+            else if (feature.get_type() == Measure::SurfaceFeatureType::Edge) {
+                const auto& [start, end] = feature.get_edge();
                 Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(start));
                 auto q  = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start);
                 view_feature_matrix *= q;
@@ -207,8 +207,8 @@ void GLGizmoMeasure::on_render()
                 shader->set_uniform("view_model_matrix", view_feature_matrix);
                 m_vbo_cylinder.set_color(ColorRGBA(0.8f, 0.2f, 0.2f, 1.f));
                 m_vbo_cylinder.render();
-                if (edge->get_point_of_interest()) {
-                    Vec3d pin = *edge->get_point_of_interest();
+                if (feature.get_extra_point()) {
+                    Vec3d pin = *feature.get_extra_point();
                     view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(pin));
                     view_feature_matrix.scale(0.5);
                     shader->set_uniform("view_model_matrix", view_feature_matrix);
@@ -216,10 +216,9 @@ void GLGizmoMeasure::on_render()
                     m_vbo_sphere.render();
                 }
             }
-            else if (feature->get_type() == Measure::SurfaceFeatureType::Plane) {
-                const auto* plane = static_cast<const Measure::Plane*>(feature);
-                assert(plane->get_plane_idx() < m_plane_models.size());
-                m_plane_models[plane->get_plane_idx()]->render();
+            else if (feature.get_type() == Measure::SurfaceFeatureType::Plane) {
+                assert(feature.get_plane_idx() < m_plane_models.size());
+                m_plane_models[feature.get_plane_idx()]->render();
             }   
         }
         shader->set_uniform("view_model_matrix", view_model_matrix);
