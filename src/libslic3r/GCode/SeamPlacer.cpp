@@ -473,6 +473,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     }
     Polygon polygon = orig_polygon;
     bool was_clockwise = polygon.make_counter_clockwise();
+    float angle_arm_len = region != nullptr ? region->flow(FlowRole::frExternalPerimeter).nozzle_diameter() : 0.5f;
 
     std::vector<float> lengths { };
     for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
@@ -480,7 +481,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     }
     lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
     std::vector<float> polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
-            SeamPlacer::polygon_local_angles_arm_distance);
+            angle_arm_len);
 
     result.perimeters.push_back( { });
     Perimeter &perimeter = result.perimeters.back();
@@ -1015,11 +1016,7 @@ class PerimeterDistancer {
 
 public:
     PerimeterDistancer(const Layer *layer) {
-        static const float eps = float(scale_(layer->object()->config().slice_closing_radius.value));
-        // merge with offset
-        ExPolygons merged = layer->merged(eps);
-        // ofsset back
-        ExPolygons layer_outline = offset_ex(merged, -eps);
+        ExPolygons layer_outline = layer->lslices;
         for (const ExPolygon &island : layer_outline) {
             assert(island.contour.is_counter_clockwise());
             for (const auto &line : island.contour.lines()) {
@@ -1035,8 +1032,8 @@ public:
         tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
     }
 
-    float distance_from_perimeter(const Point &point) const {
-        Vec2d p = unscale(point);
+    float distance_from_perimeter(const Vec2f &point) const {
+        Vec2d p = point.cast<double>();
         size_t hit_idx_out { };
         Vec2d hit_point_out = Vec2d::Zero();
         auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, p, hit_idx_out, hit_point_out);
@@ -1128,20 +1125,19 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                     std::unique_ptr<PerimeterDistancer> current_layer_distancer = std::make_unique<PerimeterDistancer>(po->layers()[layer_idx]);
 
                     for (SeamCandidate &perimeter_point : layers[layer_idx].points) {
-                        Point point = Point::new_scale(Vec2f { perimeter_point.position.head<2>() });
+                        Vec2f point = Vec2f { perimeter_point.position.head<2>() };
                         if (prev_layer_distancer.get() != nullptr) {
-                            perimeter_point.overhang = (prev_layer_distancer->distance_from_perimeter(point)
-                                    + 0.5f * perimeter_point.perimeter.flow_width
+                            perimeter_point.overhang = prev_layer_distancer->distance_from_perimeter(point)
+                                    + 0.6f * perimeter_point.perimeter.flow_width
                                     - tan(SeamPlacer::overhang_angle_threshold)
-                                            * po->layers()[layer_idx]->height)
-                                    / (3.0f * perimeter_point.perimeter.flow_width);
-                            //NOTE disables the feature to place seams on slowly decreasing areas. Remove the following line to enable.
-                            perimeter_point.overhang = perimeter_point.overhang < 0.0f ? 0.0f : perimeter_point.overhang;
+                                            * po->layers()[layer_idx]->height;
+                            perimeter_point.overhang =
+                                    perimeter_point.overhang < 0.0f ? 0.0f : perimeter_point.overhang;
                         }
 
                         if (should_compute_layer_embedding) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
                             perimeter_point.embedded_distance = current_layer_distancer->distance_from_perimeter(point)
-                                    + 0.5f * perimeter_point.perimeter.flow_width;
+                                    + 0.6f * perimeter_point.perimeter.flow_width;
                         }
                     }
 
@@ -1399,7 +1395,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 observations[index] = current.position.head<2>();
                 observation_points[index] = current.position.z();
                 weights[index] = angle_weight(current.local_ccw_angle);
-                float sign = layer_angle > 2.0 * std::abs(current.local_ccw_angle) ? -1.0f : 1.0f;
+                float sign = layer_angle > 2.0 * std::abs(current.local_ccw_angle) ? -0.8f : 1.0f;
                 if (current.type == EnforcedBlockedSeamPoint::Enforced) {
                     sign = 1.0f;
                     weights[index] += 3.0f;
@@ -1417,10 +1413,10 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             // Perimeter structure of the point; also set flag aligned to true
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const auto &pair = seam_string[index];
-                float t = std::min(1.0f, std::abs(layers[pair.first].points[pair.second].local_ccw_angle)
-                        / SeamPlacer::sharp_angle_snapping_threshold);
+                float t = std::min(1.0f, std::pow(std::abs(layers[pair.first].points[pair.second].local_ccw_angle)
+                        / SeamPlacer::sharp_angle_snapping_threshold, 3.0f));
                 if (layers[pair.first].points[pair.second].type == EnforcedBlockedSeamPoint::Enforced){
-                    t = std::max(0.7f, t);
+                    t = std::max(0.4f, t);
                 }
 
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
