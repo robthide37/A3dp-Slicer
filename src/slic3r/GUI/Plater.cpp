@@ -5962,6 +5962,8 @@ void Slic3r::GUI::Plater::cut(size_t obj_idx, size_t instance_idx, const Vec3d& 
     // suppress to call selection update for Object List to avoid call of early Gizmos on/off update
     p->load_model_objects(new_objects, false, false);
 
+    this->allow_snapshots();
+
     // now process all updates of the 3d scene
     update();
     // Update InfoItems in ObjectList after update() to use of a correct value of the GLCanvas3D::is_sinking(),

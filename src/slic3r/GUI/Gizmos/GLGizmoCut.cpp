@@ -627,7 +627,7 @@ void GLGizmoCut3D::render_cut_center_graber()
 
     const BoundingBoxf3 box = bounding_box();
 
-    const double mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 6.0);
+    const double mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 3.0);
     double size = m_dragging && m_hover_id == Z ? double(graber.get_dragging_half_size(mean_size)) : double(graber.get_half_size(mean_size));
 
     Vec3d cone_scale = Vec3d(0.75 * size, 0.75 * size, 1.8 * size);
@@ -821,8 +821,8 @@ bool GLGizmoCut3D::on_init()
 
 void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
 {
-    ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, //m_selected,
-        m_connector_depth_ratio, m_connector_size, m_connector_mode, m_connector_type, m_connector_style, m_connector_shape_id,
+    ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, m_connectors_editing,//m_selected,
+ //       m_connector_depth_ratio, m_connector_size, m_connector_mode, m_connector_type, m_connector_style, m_connector_shape_id,
         m_ar_plane_center, m_ar_rotations);
 
     set_center_pos(m_ar_plane_center, true);
@@ -835,8 +835,8 @@ void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
 
 void GLGizmoCut3D::on_save(cereal::BinaryOutputArchive& ar) const
 { 
-    ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, //m_selected,
-        m_connector_depth_ratio, m_connector_size, m_connector_mode, m_connector_type, m_connector_style, m_connector_shape_id,
+    ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, m_connectors_editing,//m_selected,
+ //       m_connector_depth_ratio, m_connector_size, m_connector_mode, m_connector_type, m_connector_style, m_connector_shape_id,
         m_ar_plane_center, m_ar_rotations);
 }
 
@@ -1224,7 +1224,10 @@ bool GLGizmoCut3D::update_bb()
         m_max_pos = box.max;
         m_min_pos = box.min;
         m_bb_center = box.center();
-        set_center_pos(m_bb_center + m_center_offset, true);
+        if (box.contains(m_center_offset))
+            set_center_pos(m_bb_center + m_center_offset, true);
+        else
+            set_center_pos(m_bb_center, true);
 
         m_radius = box.radius();
         m_grabber_connection_len = 0.75 * m_radius;// std::min<double>(0.75 * m_radius, 35.0);
@@ -1242,6 +1245,9 @@ bool GLGizmoCut3D::update_bb()
         m_circle.reset();
         m_scale.reset();
         m_snap_radii.reset();
+        m_reference_radius.reset();
+
+        on_unregister_raycasters_for_picking();
 
         if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info()) {
             m_selected.clear();
@@ -1271,8 +1277,7 @@ void GLGizmoCut3D::on_render()
 {
     if (update_bb() || force_update_clipper_on_render) {
         update_clipper_on_render();
-        if (force_update_clipper_on_render)
-            m_c->object_clipper()->set_behavior(m_connectors_editing, m_connectors_editing, 0.4f);
+        m_c->object_clipper()->set_behavior(m_connectors_editing, m_connectors_editing, 0.4f);
     }
 
     init_picking_models();
@@ -1725,11 +1730,11 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
         const bool has_connectors = !mo->cut_connectors.empty();
         {
+            Plater::TakeSnapshot snapshot(plater, _L("Cut by Plane"));
             // update connectors pos as offset of its center before cut performing
             if (has_connectors && m_connector_mode == CutConnectorMode::Manual) {
                 m_selected.clear();
 
-                Plater::TakeSnapshot snapshot(plater, _L("Cut by Plane"));
                 for (CutConnector& connector : mo->cut_connectors) {
                     connector.rotation = rotation;
 

@@ -89,7 +89,9 @@ private:
 	friend class cereal::access;
 	friend class Slic3r::UndoRedo::StackImpl;
 	template<class Archive> void serialize(Archive &ar) { ar(m_id); }
+protected: // #vbCHECKME && #ysFIXME
     ObjectBase(const ObjectID id) : m_id(id) {}
+private:
   	template<class Archive> static void load_and_construct(Archive & ar, cereal::construct<ObjectBase> &construct) { ObjectID id; ar(id); construct(id); }
 };
 
@@ -141,6 +143,8 @@ public:
     // Constructor with ignored int parameter to assign an invalid ID, to be replaced
     // by an existing ID copied from elsewhere.
     CutObjectBase(int) : ObjectBase(-1) {}
+    // Constructor to initialize full information from 3mf
+    CutObjectBase(ObjectID id, size_t check_sum, size_t connectors_cnt) : ObjectBase(id), m_check_sum(check_sum), m_connectors_cnt(connectors_cnt) {}
 	// The class tree will have virtual tables and type information.
 	virtual ~CutObjectBase() = default;
 
