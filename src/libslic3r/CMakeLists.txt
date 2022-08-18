@@ -180,6 +180,8 @@ set(SLIC3R_SOURCES
     MultiMaterialSegmentation.hpp
     MeshNormals.hpp
     MeshNormals.cpp
+    Measure.hpp
+    Measure.cpp
     CustomGCode.cpp
     CustomGCode.hpp
     Arrange.hpp
@@ -251,6 +253,7 @@ set(SLIC3R_SOURCES
     Surface.hpp
     SurfaceCollection.cpp
     SurfaceCollection.hpp
+    SurfaceMesh.hpp
     SVG.cpp
     SVG.hpp
     Technologies.hpp
