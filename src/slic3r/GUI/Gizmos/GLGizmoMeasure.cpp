@@ -175,7 +175,14 @@ void GLGizmoMeasure::on_render()
             
         for (const Measure::SurfaceFeature& feature : features) {
 
-            if (feature.get_type() == Measure::SurfaceFeatureType::Circle) {
+            if (feature.get_type() == Measure::SurfaceFeatureType::Point) {
+                Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(feature.get_point()));
+                view_feature_matrix.scale(0.5);
+                shader->set_uniform("view_model_matrix", view_feature_matrix);
+                m_vbo_sphere.set_color(ColorRGBA(0.8f, 0.2f, 0.2f, 1.f));
+                m_vbo_sphere.render();
+            }
+            else if (feature.get_type() == Measure::SurfaceFeatureType::Circle) {
                 const auto& [c, radius, n] = feature.get_circle();
                 Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(c));
                 view_feature_matrix.scale(0.5);
@@ -217,8 +224,9 @@ void GLGizmoMeasure::on_render()
                 }
             }
             else if (feature.get_type() == Measure::SurfaceFeatureType::Plane) {
-                assert(feature.get_plane_idx() < m_plane_models.size());
-                m_plane_models[feature.get_plane_idx()]->render();
+                const auto& [idx, normal, pt] = feature.get_plane();
+                assert(idx < m_plane_models.size());
+                m_plane_models[idx]->render();
             }   
         }
         shader->set_uniform("view_model_matrix", view_model_matrix);
