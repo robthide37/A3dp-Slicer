@@ -1480,7 +1480,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     draw_data->ScaleClipRects(io.DisplayFramebufferScale);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
     // Backup GL state
     GLenum last_active_texture;       glsafe(::glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture));
     GLuint last_program;              glsafe(::glGetIntegerv(GL_CURRENT_PROGRAM, (GLint*)&last_program));
@@ -1537,7 +1537,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     glsafe(::glEnable(GL_TEXTURE_2D));
     glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
     glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE));
-#endif // ENABLE_GL_CORE_PROFILE
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     // Setup viewport, orthographic projection matrix
@@ -1679,7 +1679,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
     // Restore modified GL state
     glsafe(::glBindTexture(GL_TEXTURE_2D, last_texture));
     glsafe(::glActiveTexture(last_active_texture));
@@ -1713,7 +1713,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     glsafe(::glPolygonMode(GL_BACK, (GLenum)last_polygon_mode[1])));
     glsafe(::glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]));
     glsafe(::glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]));
-#endif // ENABLE_GL_CORE_PROFILE
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();

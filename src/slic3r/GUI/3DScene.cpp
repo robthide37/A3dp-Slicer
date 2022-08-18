@@ -913,13 +913,25 @@ void GLVolumeCollection::load_object_auxiliary(
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+#if ENABLE_OPENGL_ES
+int GLVolumeCollection::load_wipe_tower_preview(
+    float pos_x, float pos_y, float width, float depth, float height,
+    float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh)
+#else
 int GLVolumeCollection::load_wipe_tower_preview(
     float pos_x, float pos_y, float width, float depth, float height,
     float rotation_angle, bool size_unknown, float brim_width)
+#endif // ENABLE_OPENGL_ES
+#else
+#if ENABLE_OPENGL_ES
+int GLVolumeCollection::load_wipe_tower_preview(
+    int obj_idx, float pos_x, float pos_y, float width, float depth, float height,
+    float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh)
 #else
 int GLVolumeCollection::load_wipe_tower_preview(
     int obj_idx, float pos_x, float pos_y, float width, float depth, float height,
     float rotation_angle, bool size_unknown, float brim_width)
+#endif // ENABLE_OPENGL_ES
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 #else
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
@@ -1180,6 +1192,10 @@ int GLVolumeCollection::load_wipe_tower_preview(
     volumes.emplace_back(new GLVolume(color));
     GLVolume& v = *volumes.back();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_OPENGL_ES
+    if (out_mesh != nullptr)
+        *out_mesh = mesh;
+#endif // ENABLE_OPENGL_ES
     v.model.init_from(mesh);
     v.model.set_color(color);
 #if ENABLE_RAYCAST_PICKING

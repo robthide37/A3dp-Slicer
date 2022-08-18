@@ -1215,7 +1215,11 @@ bool GLCanvas3D::init()
         return false;
 
     glsafe(::glClearColor(1.0f, 1.0f, 1.0f, 1.0f));
+#if ENABLE_OPENGL_ES
+    glsafe(::glClearDepthf(1.0f));
+#else
     glsafe(::glClearDepth(1.0f));
+#endif // ENABLE_OPENGL_ES
 
     glsafe(::glDepthFunc(GL_LESS));
 
@@ -2076,6 +2080,9 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             if (volume->is_wipe_tower) {
                 // There is only one wipe tower.
                 assert(volume_idx_wipe_tower_old == -1);
+#if ENABLE_OPENGL_ES
+                m_wipe_tower_mesh.clear();
+#endif // ENABLE_OPENGL_ES
                 volume_idx_wipe_tower_old = (int)volume_id;
             }
             if (!m_reload_delayed) {
@@ -2324,13 +2331,25 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+#if ENABLE_OPENGL_ES
+            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
+                x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
+                brim_width, &m_wipe_tower_mesh);
+#else
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
                 brim_width);
+#endif // ENABLE_OPENGL_ES
+#else
+#if ENABLE_OPENGL_ES
+            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
+                1000, x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
+                brim_width, &m_wipe_tower_mesh);
 #else
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 1000, x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
                 brim_width);
+#endif // ENABLE_OPENGL_ES
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 #else
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
@@ -5642,7 +5661,11 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
                 glsafe(::glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render_tex, 0));
                 glsafe(::glGenRenderbuffers(1, &render_depth));
                 glsafe(::glBindRenderbuffer(GL_RENDERBUFFER, render_depth));
+#if ENABLE_OPENGL_ES
+                glsafe(::glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height));
+#else
                 glsafe(::glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height));
+#endif // ENABLE_OPENGL_ES
                 glsafe(::glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, render_depth));
             }
             else {

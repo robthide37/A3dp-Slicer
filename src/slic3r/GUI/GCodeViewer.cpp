@@ -1214,9 +1214,16 @@ void GCodeViewer::export_toolpaths_to_obj(const char* filename) const
     // get vertices/normals data from vertex buffers on gpu
     for (size_t i = 0; i < t_buffer.vertices.vbos.size(); ++i) {
         const size_t floats_count = t_buffer.vertices.sizes[i] / sizeof(float);
-        VertexBuffer vertices(floats_count);
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, t_buffer.vertices.vbos[i]));
+#if ENABLE_OPENGL_ES
+        const VertexBuffer vertices = *static_cast<VertexBuffer*>(::glMapBufferRange(GL_ARRAY_BUFFER, 0,
+            static_cast<GLsizeiptr>(t_buffer.vertices.sizes[i]), GL_MAP_READ_BIT));
+        glcheck();
+        glsafe(::glUnmapBuffer(GL_ARRAY_BUFFER));
+#else
+        VertexBuffer vertices(floats_count);
         glsafe(::glGetBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(t_buffer.vertices.sizes[i]), static_cast<void*>(vertices.data())));
+#endif // ENABLE_OPENGL_ES
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
         const size_t vertices_count = floats_count / floats_per_vertex;
         for (size_t j = 0; j < vertices_count; ++j) {
@@ -1264,9 +1271,17 @@ void GCodeViewer::export_toolpaths_to_obj(const char* filename) const
             // get indices data from index buffer on gpu
             glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibuffer.ibo));
             for (size_t j = 0; j < render_path.sizes.size(); ++j) {
+#if ENABLE_OPENGL_ES
+                const IndexBuffer indices = *static_cast<IndexBuffer*>(::glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,
+                    static_cast<GLintptr>(render_path.offsets[j]), static_cast<GLsizeiptr>(render_path.sizes[j] * sizeof(IBufferType)),
+                    GL_MAP_READ_BIT));
+                glcheck();
+                glsafe(::glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER));
+#else
                 IndexBuffer indices(render_path.sizes[j]);
                 glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>(render_path.offsets[j]),
                     static_cast<GLsizeiptr>(render_path.sizes[j] * sizeof(IBufferType)), static_cast<void*>(indices.data())));
+#endif // ENABLE_OPENGL_ES
 
                 const size_t triangles_count = render_path.sizes[j] / 3;
                 for (size_t k = 0; k < triangles_count; ++k) {
@@ -2678,14 +2693,30 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
 
                         // gets the vertex index from the index buffer on gpu
                         const IBuffer& i_buffer = buffer.indices[sub_path.first.b_id];
-                        IBufferType index = 0;
                         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer.ibo));
+#if ENABLE_OPENGL_ES
+                        IBufferType index = *static_cast<IBufferType*>(::glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,
+                            static_cast<GLintptr>(offset * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)),
+                            GL_MAP_READ_BIT));
+                        glcheck();
+                        glsafe(::glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER));
+#else
+                        IBufferType index = 0;
                         glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>(offset * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)), static_cast<void*>(&index)));
+#endif // ENABLE_OPENGL_ES
                         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
                         // gets the position from the vertices buffer on gpu
                         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
+#if ENABLE_OPENGL_ES
+                        sequential_view->current_position = *static_cast<Vec3f*>(::glMapBufferRange(GL_ARRAY_BUFFER,
+                            static_cast<GLintptr>(index * buffer.vertices.vertex_size_bytes()),
+                            static_cast<GLsizeiptr>(buffer.vertices.position_size_bytes()), GL_MAP_READ_BIT));
+                        glcheck();
+                        glsafe(::glUnmapBuffer(GL_ARRAY_BUFFER));
+#else
                         glsafe(::glGetBufferSubData(GL_ARRAY_BUFFER, static_cast<GLintptr>(index * buffer.vertices.vertex_size_bytes()), static_cast<GLsizeiptr>(3 * sizeof(float)), static_cast<void*>(sequential_view->current_position.data())));
+#endif // ENABLE_OPENGL_ES
                         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 
                         sequential_view->current_offset = Vec3f::Zero();
@@ -2893,10 +2924,22 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
                 // extract indices from index buffer
                 std::array<IBufferType, 6> indices{ 0, 0, 0, 0, 0, 0 };
                 glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer.ibo));
+#if ENABLE_OPENGL_ES
+                IBufferType* index_ptr = static_cast<IBufferType*>(::glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,
+                    static_cast<GLintptr>(offset * sizeof(IBufferType)), static_cast<GLsizeiptr>(14 * sizeof(IBufferType)),
+                    GL_MAP_READ_BIT));
+                glcheck();
+                indices[0] = *(index_ptr + 0);
+                indices[1] = *(index_ptr + 7);
+                indices[2] = *(index_ptr + 1);
+                indices[4] = *(index_ptr + 13);
+                glsafe(::glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER));
+#else
                 glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>((offset + 0) * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)), static_cast<void*>(&indices[0])));
                 glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>((offset + 7) * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)), static_cast<void*>(&indices[1])));
                 glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>((offset + 1) * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)), static_cast<void*>(&indices[2])));
                 glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>((offset + 13) * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)), static_cast<void*>(&indices[4])));
+#endif // ENABLE_OPENGL_ES
                 glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
                 indices[3] = indices[0];
                 indices[5] = indices[1];
@@ -2942,10 +2985,22 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
                 // extract indices from index buffer
                 std::array<IBufferType, 6> indices{ 0, 0, 0, 0, 0, 0 };
                 glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer.ibo));
+#if ENABLE_OPENGL_ES
+                IBufferType* index_ptr = static_cast<IBufferType*>(::glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,
+                    static_cast<GLintptr>(offset * sizeof(IBufferType)), static_cast<GLsizeiptr>(17 * sizeof(IBufferType)),
+                    GL_MAP_READ_BIT));
+                glcheck();
+                indices[0] = *(index_ptr + 2);
+                indices[1] = *(index_ptr + 4);
+                indices[2] = *(index_ptr + 10);
+                indices[5] = *(index_ptr + 16);
+                glsafe(::glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER));
+#else
                 glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>((offset + 2) * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)), static_cast<void*>(&indices[0])));
                 glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>((offset + 4) * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)), static_cast<void*>(&indices[1])));
                 glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>((offset + 10) * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)), static_cast<void*>(&indices[2])));
                 glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>((offset + 16) * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)), static_cast<void*>(&indices[5])));
+#endif // ENABLE_OPENGL_ES
                 glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
                 indices[3] = indices[0];
                 indices[4] = indices[2];
@@ -3027,7 +3082,13 @@ void GCodeViewer::render_toolpaths()
             shader.set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
 
+#if ENABLE_OPENGL_ES
+            for (size_t i = 0; i < path.sizes.size(); ++i) {
+                glsafe(::glDrawElements(GL_LINES, (GLsizei)path.sizes[i], GL_UNSIGNED_SHORT, (const void*)path.offsets[i]));
+            }
+#else
             glsafe(::glMultiDrawElements(GL_LINES, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
+#endif // ENABLE_OPENGL_ES
 #if ENABLE_GCODE_VIEWER_STATISTICS
             ++m_statistics.gl_multi_lines_calls_count;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
@@ -3045,7 +3106,13 @@ void GCodeViewer::render_toolpaths()
             assert(! path.sizes.empty());
             assert(! path.offsets.empty());
             shader.set_uniform(uniform_color, path.color);
+#if ENABLE_OPENGL_ES
+            for (size_t i = 0; i < path.sizes.size(); ++i) {
+                glsafe(::glDrawElements(GL_TRIANGLES, (GLsizei)path.sizes[i], GL_UNSIGNED_SHORT, (const void*)path.offsets[i]));
+            }
+#else
             glsafe(::glMultiDrawElements(GL_TRIANGLES, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
+#endif // ENABLE_OPENGL_ES
 #if ENABLE_GCODE_VIEWER_STATISTICS
             ++m_statistics.gl_multi_triangles_calls_count;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
