@@ -1733,7 +1733,14 @@ bool PrintObject::update_layer_height_profile(const ModelObject &model_object, c
 // fill_surfaces but we only turn them into VOID surfaces, thus preserving the boundaries.
 void PrintObject::clip_fill_surfaces()
 {
-    if (! m_config.infill_only_where_needed.value)
+    bool has_lightning_infill = false;
+    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++region_id)
+        if (const PrintRegionConfig &config = this->printing_region(region_id).config(); config.fill_density > 0 && config.fill_pattern == ipLightning)
+            has_lightning_infill = true;
+
+    // For Lightning infill, infill_only_where_needed is ignored because both
+    // do a similar thing, and their combination doesn't make much sense.
+    if (! m_config.infill_only_where_needed.value || has_lightning_infill)
         return;
     bool has_infill = false;
     for (size_t i = 0; i < this->num_printing_regions(); ++ i)
