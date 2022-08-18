@@ -1,6 +1,7 @@
 #ifndef Slic3r_Measure_hpp_
 #define Slic3r_Measure_hpp_
 
+#include <optional>
 #include <memory>
 
 #include "Point.hpp"
@@ -15,53 +16,48 @@ namespace Measure {
 
 
 enum class SurfaceFeatureType {
-        Edge      = 1 << 0,
-        Circle    = 1 << 1,
-        Plane     = 1 << 2
-    };
+    Undef,
+    Point,
+    Edge,
+    Circle,
+    Plane
+};
 
 class SurfaceFeature {
-public:        
-    virtual SurfaceFeatureType get_type() const = 0;
-};
-
-class Edge : public SurfaceFeature {
 public:
-    Edge(const Vec3d& start, const Vec3d& end) : m_start{start}, m_end{end} {}
-    Edge(const Vec3d& start, const Vec3d& end, const Vec3d& pin) : m_start{start}, m_end{end},
-        m_pin{std::unique_ptr<Vec3d>(new Vec3d(pin))} {}
-    SurfaceFeatureType      get_type() const override { return SurfaceFeatureType::Edge; }
-    std::pair<Vec3d, Vec3d> get_edge() const { return std::make_pair(m_start, m_end); }
-    const Vec3d*            get_point_of_interest() const { return m_pin.get(); }
-private:
-    Vec3d m_start;
-    Vec3d m_end;
-    std::unique_ptr<Vec3d> m_pin;
-};
+    SurfaceFeature(SurfaceFeatureType type, const Vec3d& pt1, const Vec3d& pt2, std::optional<Vec3d> pt3, double value)
+    : m_type{type}, m_pt1{pt1}, m_pt2{pt2}, m_pt3{pt3}, m_value{value} {}
 
-class Circle : public SurfaceFeature {
-public:
-    Circle(const Vec3d& center, double radius, const Vec3d& normal)
-    : m_center{center}, m_radius{radius}, m_normal{normal} {}
-    SurfaceFeatureType   get_type()   const override { return SurfaceFeatureType::Circle; }
-    Vec3d  get_center() const { return m_center; }
-    double get_radius() const { return m_radius; }
-    Vec3d  get_normal() const { return m_normal; }
-private:
-    Vec3d m_center;
-    double m_radius;
-    Vec3d m_normal;
-};
+    explicit SurfaceFeature(const Vec3d& pt)
+    : m_type{SurfaceFeatureType::Point}, m_pt1{pt} {}
 
-class Plane : public SurfaceFeature {
-public:
-    Plane(int idx) : m_idx(idx) {}
-    SurfaceFeatureType get_type() const override { return SurfaceFeatureType::Plane; }
-    int get_plane_idx() const { return m_idx; } // index into vector provided by Measuring::get_plane_triangle_indices
+
+    // Get type of this feature.
+    SurfaceFeatureType get_type() const { return m_type; }
+
+    // For points, return the point.
+    Vec3d get_point() const { assert(m_type == SurfaceFeatureType::Point); return m_pt1; }
+
+    // For edges, return start and end.
+    std::pair<Vec3d, Vec3d> get_edge() const { assert(m_type == SurfaceFeatureType::Edge); return std::make_pair(m_pt1, m_pt2); }    
+
+    // For circles, return center, radius and normal.
+    std::tuple<Vec3d, double, Vec3d> get_circle() const { assert(m_type == SurfaceFeatureType::Circle); return std::make_tuple(m_pt1, m_value, m_pt2); }
+
+    // For planes, return index into vector provided by Measuring::get_plane_triangle_indices.
+    int get_plane_idx() const { return int(m_value); }
+
+    // For anything, return an extra point that should also be considered a part of this.
+    std::optional<Vec3d> get_extra_point() const { assert(m_type != SurfaceFeatureType::Undef); return m_pt3; }
 
 private:
-    int m_idx;
+    SurfaceFeatureType m_type = SurfaceFeatureType::Undef;
+    Vec3d m_pt1;
+    Vec3d m_pt2;
+    std::optional<Vec3d> m_pt3;
+    double m_value;
 };
+
 
 
 class MeasuringImpl;
@@ -75,32 +71,34 @@ public:
     ~Measuring();
     
     // Return a reference to a list of all features identified on the its.
-    [[deprecated]]const std::vector<const SurfaceFeature*>& get_features() const;
+    // Use only for debugging. Expensive, do not call often.
+    [[deprecated]] std::vector<SurfaceFeature> get_all_features() const;
 
     // Given a face_idx where the mouse cursor points, return a feature that
-    // should be highlighted or nullptr.
-    const SurfaceFeature* get_feature(size_t face_idx, const Vec3d& point) const;
+    // should be highlighted (if any).
+    std::optional<SurfaceFeature> get_feature(size_t face_idx, const Vec3d& point) const;
 
     // Returns a list of triangle indices for each identified plane. Each
-    // Plane object contains an index into this vector.
-    const std::vector<std::vector<int>> get_planes_triangle_indices() const;
-
-
-
-    // Returns distance between two SurfaceFeatures.
-    static double get_distance(const SurfaceFeature* a, const SurfaceFeature* b);
-
-    // Returns distance between a SurfaceFeature and a point.
-    static double get_distance(const SurfaceFeature* a, const Vec3d* pt);
-
-    // Returns true if measuring angles between features makes sense.
-    // If so, result contains the angle in radians.
-    static bool   get_angle(const SurfaceFeature* a, const SurfaceFeature* b, double& result);
-
-
+    // Plane object contains an index into this vector. Expensive, do not
+    // call too often.
+    std::vector<std::vector<int>> get_planes_triangle_indices() const;
+    
 private: 
     std::unique_ptr<MeasuringImpl> priv;  
 };
+
+
+
+
+struct MeasurementResult {
+    std::optional<double> angle;
+    std::optional<double> distance_infinite;
+    std::optional<double> distance_strict;
+    std::optional<Vec3d> distance_xyz;
+};
+
+// Returns distance/angle between two SurfaceFeatures.
+static MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature& b);
 
 
 } // namespace Measure
