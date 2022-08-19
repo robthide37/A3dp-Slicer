@@ -100,16 +100,11 @@ std::string GLGizmoMeasure::on_get_name() const
     return _u8L("Measure");
 }
 
-
-
 bool GLGizmoMeasure::on_is_activable() const
 {
-    // This is assumed in GLCanvas3D::do_rotate, do not change this
-    // without updating that function too.
-    return m_parent.get_selection().is_single_full_instance();
+    const Selection& selection = m_parent.get_selection();
+    return selection.is_single_volume() || selection.is_single_volume_instance();
 }
-
-
 
 void GLGizmoMeasure::on_render()
 {
@@ -139,9 +134,7 @@ void GLGizmoMeasure::on_render()
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         
-        
         update_if_needed();
-            
 
         m_imgui->begin(std::string("DEBUG"));
         
