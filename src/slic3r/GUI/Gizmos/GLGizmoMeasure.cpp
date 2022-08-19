@@ -69,7 +69,8 @@ void GLGizmoMeasure::data_changed()
         selection.is_from_single_object() ) {        
         model_object = selection.get_model()->objects[selection.get_object_idx()];
     }    
-    set_flattening_data(model_object);
+    if (model_object != m_old_model_object)
+        update_if_needed();
 }
 
 
@@ -255,12 +256,6 @@ void GLGizmoMeasure::on_render_for_picking()
 }
 
 
-
-void GLGizmoMeasure::set_flattening_data(const ModelObject* model_object)
-{
-    if (model_object != m_old_model_object)
-        update_if_needed();
-}
 
 
 void GLGizmoMeasure::update_if_needed()
