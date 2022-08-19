@@ -16,8 +16,7 @@
 namespace Slic3r {
 namespace GUI {
 
-static const Slic3r::ColorRGBA DEFAULT_PLANE_COLOR       = { 0.9f, 0.9f, 0.9f, 0.9f };
-static const Slic3r::ColorRGBA DEFAULT_HOVER_PLANE_COLOR = { 0.9f, 0.2f, 0.2f, 1.f };
+static const Slic3r::ColorRGBA HOVER_COLOR = { 0.8f, 0.2f, 0.2f, 1.0f };
 
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
@@ -126,7 +125,10 @@ void GLGizmoMeasure::on_render()
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glEnable(GL_BLEND));
-    glsafe(::glLineWidth(2.f));
+#if ENABLE_GL_CORE_PROFILE
+    if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth(2.f));
 
     if (selection.is_single_full_instance()) {
         const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
@@ -179,7 +181,7 @@ void GLGizmoMeasure::on_render()
                 Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(feature.get_point()));
                 view_feature_matrix.scale(0.5);
                 shader->set_uniform("view_model_matrix", view_feature_matrix);
-                m_vbo_sphere.set_color(ColorRGBA(0.8f, 0.2f, 0.2f, 1.f));
+                m_vbo_sphere.set_color(HOVER_COLOR);
                 m_vbo_sphere.render();
             }
             else if (feature.get_type() == Measure::SurfaceFeatureType::Circle) {
@@ -187,7 +189,7 @@ void GLGizmoMeasure::on_render()
                 Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(c));
                 view_feature_matrix.scale(0.5);
                 shader->set_uniform("view_model_matrix", view_feature_matrix);
-                m_vbo_sphere.set_color(ColorRGBA(0.8f, 0.2f, 0.2f, 1.f));
+                m_vbo_sphere.set_color(HOVER_COLOR);
                 m_vbo_sphere.render();
 
                 // Now draw the circle itself - let's take a funny shortcut:
@@ -212,20 +214,21 @@ void GLGizmoMeasure::on_render()
                 view_feature_matrix *= q;
                 view_feature_matrix.scale(Vec3d(0.075, 0.075, (end - start).norm()));
                 shader->set_uniform("view_model_matrix", view_feature_matrix);
-                m_vbo_cylinder.set_color(ColorRGBA(0.8f, 0.2f, 0.2f, 1.f));
+                m_vbo_cylinder.set_color(HOVER_COLOR);
                 m_vbo_cylinder.render();
                 if (feature.get_extra_point()) {
                     Vec3d pin = *feature.get_extra_point();
                     view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(pin));
                     view_feature_matrix.scale(0.5);
                     shader->set_uniform("view_model_matrix", view_feature_matrix);
-                    m_vbo_sphere.set_color(ColorRGBA(0.8f, 0.2f, 0.2f, 1.f));
+                    m_vbo_sphere.set_color(HOVER_COLOR);
                     m_vbo_sphere.render();
                 }
             }
             else if (feature.get_type() == Measure::SurfaceFeatureType::Plane) {
                 const auto& [idx, normal, pt] = feature.get_plane();
                 assert(idx < m_plane_models.size());
+                m_plane_models[idx]->set_color(HOVER_COLOR);
                 m_plane_models[idx]->render();
             }   
         }
