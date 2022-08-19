@@ -885,20 +885,13 @@ Polygon its_convex_hull_2d_above(const indexed_triangle_set &its, const Transfor
 indexed_triangle_set its_make_cube(double xd, double yd, double zd)
 {
     auto x = float(xd), y = float(yd), z = float(zd);
-    /*return {
+    return {
         { {0, 1, 2}, {0, 2, 3}, {4, 5, 6}, {4, 6, 7},
           {0, 4, 7}, {0, 7, 1}, {1, 7, 6}, {1, 6, 2},
           {2, 6, 5}, {2, 5, 3}, {4, 0, 3}, {4, 3, 5} },
         { {x, y, 0}, {x, 0, 0}, {0, 0, 0}, {0, y, 0},
           {x, y, z}, {0, y, z}, {0, 0, z}, {x, 0, z} }
-    };*/
-    return {
-        { {0, 1, 2}, {0, 2, 3}, {4, 5, 6}, {4, 6, 7},
-          {0, 4, 7}, {0, 7, 1}, {1, 7, 6}, {1, 6, 2},
-          {2, 5, 6}, {2, 5, 3}, {4, 0, 3}, /*{4, 3, 5}*/ },
-        { {x, y, 0}, {x, 0, 0}, {0, 0, 0}, {0, y, 0},
-          {x, y, z}, {0, y, z}, {0, 0, z}, {x, 0, z} }
-     };
+    };
 }
 
 indexed_triangle_set its_make_prism(float width, float length, float height)
