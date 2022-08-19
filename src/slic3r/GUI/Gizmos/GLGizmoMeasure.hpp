@@ -50,7 +50,6 @@ private:
     std::vector<std::unique_ptr<GLModel>> m_plane_models;
 
     void update_if_needed();
-    void set_flattening_data(const ModelObject* model_object);
 
 public:
     GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
@@ -63,6 +62,7 @@ public:
     bool on_mouse(const wxMouseEvent &mouse_event) override;
 
     void data_changed() override;
+
 protected:
     bool on_init() override;
     std::string on_get_name() const override;
