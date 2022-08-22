@@ -14,6 +14,8 @@
 
 namespace Slic3r {
 
+class ModelVolume;
+
 enum class ModelVolumeType : int;
 
 namespace Measure { class Measuring; }
@@ -35,12 +37,13 @@ private:
     // This holds information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;
     std::vector<ModelVolumeType> m_volumes_types;
-    Vec3d m_first_instance_scale;
-    Vec3d m_first_instance_mirror;
+    Vec3d m_first_instance_scale{ Vec3d::Ones() };
+    Vec3d m_first_instance_mirror{ Vec3d::Ones() };
 
     bool m_mouse_left_down = false; // for detection left_up of this gizmo
     bool m_planes_valid = false;
     const ModelObject* m_old_model_object = nullptr;
+    const ModelVolume* m_old_model_volume = nullptr;
     std::vector<const Transform3d*> instances_matrices;
 
     int m_mouse_pos_x;
