@@ -66,6 +66,8 @@ struct Info
 
     bool operator==(const Info& rhs) const
     {
+        if (rhs.gcodes.empty() && this->gcodes.empty())
+            return true; // don't respect to the comparison of the mode, when g_codes are empty
         return  (rhs.mode   == this->mode   ) &&
                 (rhs.gcodes == this->gcodes );
     }
