@@ -121,12 +121,12 @@ void SurfaceCollection::remove_type(const SurfaceType type)
         surfaces.erase(surfaces.begin() + j, surfaces.end());
 }
 
-void SurfaceCollection::remove_type(const SurfaceType type, Polygons *polygons)
+void SurfaceCollection::remove_type(const SurfaceType type, ExPolygons *polygons)
 {
     size_t j = 0;
     for (size_t i = 0; i < surfaces.size(); ++ i) {
         if (Surface &surface = surfaces[i]; surface.surface_type == type) {
-            polygons_append(*polygons, to_polygons(std::move(surface.expolygon)));
+            polygons->emplace_back(std::move(surface.expolygon));
         } else {
             if (j < i)
                 std::swap(surfaces[i], surfaces[j]);
