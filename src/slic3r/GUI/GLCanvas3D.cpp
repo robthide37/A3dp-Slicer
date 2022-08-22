@@ -6152,7 +6152,11 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
     float noitems_width = top_tb_width - size * items_cnt; // width of separators and borders in top toolbars 
 
     // calculate scale needed for items in all top toolbars
-    float new_h_scale = (cnv_size.get_width() - noitems_width) / (items_cnt * GLToolbar::Default_Icons_Size);
+    // the std::max() is there because on some Linux dialects/virtual machines this code is called when the canvas has not been properly initialized yet,
+    // leading to negative values for the scale.
+    // See: https://github.com/prusa3d/PrusaSlicer/issues/8563
+    //      https://github.com/supermerill/SuperSlicer/issues/854
+    float new_h_scale = std::max((cnv_size.get_width() - noitems_width), 1.0f) / (items_cnt * GLToolbar::Default_Icons_Size);
 
     items_cnt = m_gizmos.get_selectable_icons_cnt() + 3; // +3 means a place for top and view toolbars and separators in gizmos toolbar
 
