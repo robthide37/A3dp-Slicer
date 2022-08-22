@@ -119,21 +119,25 @@ void SelectionInfo::on_update()
     const Selection& selection = get_pool()->get_canvas()->get_selection();
     if (selection.is_single_full_instance()) {
         m_model_object = selection.get_model()->objects[selection.get_object_idx()];
+        m_model_volume = nullptr;
         m_z_shift = selection.get_first_volume()->get_sla_shift_z();
     }
-    else
+    else {
         m_model_object = nullptr;
+        if (selection.is_single_volume())
+            m_model_volume = selection.get_model()->objects[selection.get_object_idx()]->volumes[selection.get_first_volume()->volume_idx()];
+    }
 }
 
 void SelectionInfo::on_release()
 {
     m_model_object = nullptr;
+    m_model_volume = nullptr;
 }
 
 int SelectionInfo::get_active_instance() const
 {
-    const Selection& selection = get_pool()->get_canvas()->get_selection();
-    return selection.get_instance_idx();
+    return get_pool()->get_canvas()->get_selection().get_instance_idx();
 }
 
 
@@ -329,12 +333,18 @@ void Raycaster::on_update()
 {
     wxBusyCursor wait;
     const ModelObject* mo = get_pool()->selection_info()->model_object();
+    const ModelVolume* mv = get_pool()->selection_info()->model_volume();
 
-    if (! mo)
+    if (mo == nullptr && mv == nullptr)
         return;
 
+    std::vector<ModelVolume*> mvs;
+    if (mv != nullptr)
+        mvs.push_back(const_cast<ModelVolume*>(mv));
+    else
+        mvs = mo->volumes;
+
     std::vector<const TriangleMesh*> meshes;
-    const std::vector<ModelVolume*>& mvs = mo->volumes;
     if (mvs.size() == 1) {
         assert(mvs.front()->is_model_part());
         const HollowedMesh* hollowed_mesh_tracker = get_pool()->hollowed_mesh();
@@ -342,9 +352,9 @@ void Raycaster::on_update()
             meshes.push_back(hollowed_mesh_tracker->get_hollowed_mesh());
     }
     if (meshes.empty()) {
-        for (const ModelVolume* mv : mvs) {
-            if (mv->is_model_part())
-                meshes.push_back(&mv->mesh());
+        for (const ModelVolume* v : mvs) {
+            if (v->is_model_part())
+                meshes.push_back(&v->mesh());
         }
     }
 

@@ -64,12 +64,14 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
 void GLGizmoMeasure::data_changed()
 {
     const Selection &  selection    = m_parent.get_selection();
-    const ModelObject *model_object = nullptr;
+    const ModelObject* model_object = nullptr;
+    const ModelVolume* model_volume = nullptr;
     if (selection.is_single_full_instance() ||
         selection.is_from_single_object() ) {        
         model_object = selection.get_model()->objects[selection.get_object_idx()];
-    }    
-    if (model_object != m_old_model_object)
+        model_volume = model_object->volumes[selection.get_first_volume()->volume_idx()];
+    }
+    if (model_object != m_old_model_object || model_volume != m_old_model_volume)
         update_if_needed();
 }
 
@@ -109,6 +111,10 @@ bool GLGizmoMeasure::on_is_activable() const
 
 void GLGizmoMeasure::on_render()
 {
+    // do not render if the user is panning/rotating the 3d scene
+    if (m_parent.is_mouse_dragging())
+        return;
+
     const Selection& selection = m_parent.get_selection();
 
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
@@ -126,33 +132,34 @@ void GLGizmoMeasure::on_render()
 #endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glLineWidth(2.f));
 
-    if (selection.is_single_full_instance()) {
-        const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
+    if (selection.is_single_volume() || selection.is_single_volume_instance()) {
+        const Transform3d& model_matrix = selection.get_first_volume()->world_matrix();
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d view_model_matrix = camera.get_view_matrix() *
-            Geometry::assemble_transform(selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z() * Vec3d::UnitZ()) * m;
+            Geometry::assemble_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * model_matrix;
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         
         update_if_needed();
 
-        m_imgui->begin(std::string("DEBUG"));
-        
-        m_imgui->checkbox(wxString("Show all features"), m_show_all);
-        m_imgui->checkbox(wxString("Show all planes"), m_show_planes);
-
         Vec3f pos;
         Vec3f normal;
         size_t facet_idx;
-        m_c->raycaster()->raycasters().front()->unproject_on_mesh(Vec2d(m_mouse_pos_x, m_mouse_pos_y), m, camera, pos, normal, nullptr, &facet_idx);
+        m_c->raycaster()->raycasters().front()->unproject_on_mesh(Vec2d(m_mouse_pos_x, m_mouse_pos_y), model_matrix, camera, pos, normal, nullptr, &facet_idx);
+
+#define ENABLE_DEBUG_DIALOG 0
+#if ENABLE_DEBUG_DIALOG
+        m_imgui->begin(std::string("DEBUG"));
+        m_imgui->checkbox(wxString("Show all features"), m_show_all);
+        m_imgui->checkbox(wxString("Show all planes"), m_show_planes);
         ImGui::Separator();
         m_imgui->text(std::string("face_idx: ") + std::to_string(facet_idx));
         m_imgui->text(std::string("pos_x: ") + std::to_string(pos.x()));
         m_imgui->text(std::string("pos_y: ") + std::to_string(pos.y()));
         m_imgui->text(std::string("pos_z: ") + std::to_string(pos.z()));
-
-
+        m_imgui->end();
+#endif // ENABLE_DEBUG_DIALOG
 
         std::vector<Measure::SurfaceFeature> features;
          if (m_show_all) {
@@ -230,8 +237,6 @@ void GLGizmoMeasure::on_render()
         if (m_show_planes)
             for (const auto& glmodel : m_plane_models)
                 glmodel->render();
-        
-        m_imgui->end();
     }
 
     glsafe(::glEnable(GL_CULL_FACE));
@@ -251,57 +256,70 @@ void GLGizmoMeasure::on_render()
 
 void GLGizmoMeasure::update_if_needed()
 {
+    auto do_update = [this](const ModelObject* object, const ModelVolume* volume) {
+        const indexed_triangle_set& its = (volume != nullptr) ? volume->mesh().its : object->volumes.front()->mesh().its;
+        m_measuring.reset(new Measure::Measuring(its));
+        m_plane_models.clear();
+        const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
+        for (const std::vector<int>& triangle_indices : planes_triangles) {
+            m_plane_models.emplace_back(std::unique_ptr<GLModel>(new GLModel()));
+            GUI::GLModel::Geometry init_data;
+            init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3 };
+            init_data.color = ColorRGBA(0.9f, 0.9f, 0.9f, 0.5f);
+            int i = 0;
+            for (int idx : triangle_indices) {
+                init_data.add_vertex(its.vertices[its.indices[idx][0]]);
+                init_data.add_vertex(its.vertices[its.indices[idx][1]]);
+                init_data.add_vertex(its.vertices[its.indices[idx][2]]);
+                init_data.add_triangle(i, i + 1, i + 2);
+                i += 3;
+            }
+            m_plane_models.back()->init_from(std::move(init_data));
+        }
+
+        // Let's save what we calculated it from:
+        m_volumes_matrices.clear();
+        m_volumes_types.clear();
+        m_first_instance_scale = Vec3d::Ones();
+        m_first_instance_mirror = Vec3d::Ones();
+        if (object != nullptr) {
+            for (const ModelVolume* vol : object->volumes) {
+                m_volumes_matrices.push_back(vol->get_matrix());
+                m_volumes_types.push_back(vol->type());
+            }
+            m_first_instance_scale = object->instances.front()->get_scaling_factor();
+            m_first_instance_mirror = object->instances.front()->get_mirror();
+        }
+        m_old_model_object = object;
+        m_old_model_volume = volume;
+    };
+
     const ModelObject* mo = m_c->selection_info()->model_object();
-    if (m_state != On || ! mo || mo->instances.empty())
+    const ModelVolume* mv = m_c->selection_info()->model_volume();
+    if (m_state != On || (mo == nullptr && mv == nullptr))
         return;
 
-    if (! m_measuring || mo != m_old_model_object
-     || mo->volumes.size() != m_volumes_matrices.size())
-        goto UPDATE;
+    if (mo == nullptr)
+        mo = mv->get_object();
+
+    if (mo->instances.empty())
+        return;
+
+    if (!m_measuring || mo != m_old_model_object || mv != m_old_model_volume || mo->volumes.size() != m_volumes_matrices.size())
+        do_update(mo, mv);
 
     // We want to recalculate when the scale changes - some planes could (dis)appear.
-    if (! mo->instances.front()->get_scaling_factor().isApprox(m_first_instance_scale)
-     || ! mo->instances.front()->get_mirror().isApprox(m_first_instance_mirror))
-        goto UPDATE;
+    if (!mo->instances.front()->get_scaling_factor().isApprox(m_first_instance_scale) ||
+        !mo->instances.front()->get_mirror().isApprox(m_first_instance_mirror))
+        do_update(mo, mv);
 
-    for (unsigned int i=0; i < mo->volumes.size(); ++i)
-        if (! mo->volumes[i]->get_matrix().isApprox(m_volumes_matrices[i])
-         || mo->volumes[i]->type() != m_volumes_types[i])
-            goto UPDATE;
-
-    return;
-
-UPDATE:
-    const indexed_triangle_set& its = mo->volumes.front()->mesh().its;
-    m_measuring.reset(new Measure::Measuring(its));
-    m_plane_models.clear();
-    const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
-    for (const std::vector<int>& triangle_indices : planes_triangles) {
-        m_plane_models.emplace_back(std::unique_ptr<GLModel>(new GLModel()));
-        GUI::GLModel::Geometry init_data;
-        init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3 };
-        init_data.color = ColorRGBA(0.9f, 0.9f, 0.9f, 0.5f);
-        int i = 0;
-        for (int idx : triangle_indices) {  
-            init_data.add_vertex(its.vertices[its.indices[idx][0]]);
-            init_data.add_vertex(its.vertices[its.indices[idx][1]]);
-            init_data.add_vertex(its.vertices[its.indices[idx][2]]);
-            init_data.add_triangle(i, i+1, i+2);
-            i+=3;
+    for (unsigned int i = 0; i < mo->volumes.size(); ++i) {
+        if (!mo->volumes[i]->get_matrix().isApprox(m_volumes_matrices[i]) ||
+            mo->volumes[i]->type() != m_volumes_types[i]) {
+            do_update(mo, mv);
+            break;
         }
-        m_plane_models.back()->init_from(std::move(init_data));
     }
-
-    // Let's save what we calculated it from:
-    m_volumes_matrices.clear();
-    m_volumes_types.clear();
-    for (const ModelVolume* vol : mo->volumes) {
-        m_volumes_matrices.push_back(vol->get_matrix());
-        m_volumes_types.push_back(vol->type());
-    }
-    m_first_instance_scale = mo->instances.front()->get_scaling_factor();
-    m_first_instance_mirror = mo->instances.front()->get_mirror();
-    m_old_model_object = mo;
 }
 
 } // namespace GUI
