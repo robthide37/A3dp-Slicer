@@ -20,3 +20,7 @@ prusaslicer_add_cmake_project(OCCT
 		-DBUILD_MODULE_ModelingData=OFF
 		-DBUILD_MODULE_Visualization=OFF
 )
+
+if (MSVC)
+    add_debug_dep(dep_OCCT)
+endif ()
