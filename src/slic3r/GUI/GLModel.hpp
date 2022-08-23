@@ -363,16 +363,13 @@ namespace GUI {
     GLModel::Geometry diamond(unsigned int resolution);
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    // create a sphere with the given resolution and smooth normals
+    // create a sphere with smooth normals
     // the origin of the sphere is in its center
-    // the radius of the sphere is the given value
     GLModel::Geometry smooth_sphere(unsigned int resolution, float radius);
-    // create a cylinder with the given resolution and smooth normals
-    // the axis of the cylinder is the given value
-    // the radius of the cylinder is the given value
-    // the height of the cylinder is the given value
-    // the origin of the cylinder is in the center of the cap face having axis == 0
-    GLModel::Geometry smooth_cylinder(Axis axis, unsigned int resolution, float radius, float height);
+    // create a cylinder with smooth normals
+    // the axis of the cylinder is the Z axis
+    // the origin of the cylinder is the center of its bottom cap face
+    GLModel::Geometry smooth_cylinder(unsigned int resolution, float radius, float height);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace GUI

@@ -23,7 +23,7 @@ GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filen
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
     m_vbo_sphere.init_from(smooth_sphere(16, 7.5f));
-    m_vbo_cylinder.init_from(smooth_cylinder(Z, 16, 5.0f, 1.0f));
+    m_vbo_cylinder.init_from(smooth_cylinder(16, 5.0f, 1.0f));
 }
 
 bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)

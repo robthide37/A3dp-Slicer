@@ -2275,7 +2275,7 @@ GLModel::Geometry smooth_sphere(unsigned int resolution, float radius)
     return data;
 }
 
-GLModel::Geometry smooth_cylinder(Axis axis, unsigned int resolution, float radius, float height)
+GLModel::Geometry smooth_cylinder(unsigned int resolution, float radius, float height)
 {
     resolution = std::max<unsigned int>(4, resolution);
 
@@ -2287,39 +2287,19 @@ GLModel::Geometry smooth_cylinder(Axis axis, unsigned int resolution, float radi
     data.reserve_vertices(sectorCount * 4 + 2);
     data.reserve_indices(sectorCount * 4 * 3);
 
-    auto generate_vertices_on_circle = [sectorCount, sectorStep](Axis axis, float radius) {
+    auto generate_vertices_on_circle = [sectorCount, sectorStep](float radius) {
         std::vector<Vec3f> ret;
         ret.reserve(sectorCount);
         for (unsigned int i = 0; i < sectorCount; ++i) {
             // from 0 to 2pi
             const float sectorAngle = (i != sectorCount) ? sectorStep * i : 0.0f;
-            const float x1 = radius * std::cos(sectorAngle);
-            const float x2 = radius * std::sin(sectorAngle);
-
-            Vec3f v;
-            switch (axis)
-            {
-            case X: { v = Vec3f(0.0f, x1, x2);  break; }
-            case Y: { v = Vec3f(-x1, 0.0f, x2); break; }
-            case Z: { v = Vec3f(x1, x2, 0.0f);  break; }
-            default: { assert(false); break; }
-            }
-
-            ret.emplace_back(v);
+            ret.emplace_back(radius * std::cos(sectorAngle), radius * std::sin(sectorAngle), 0.0f);
         }
         return ret;
     };
 
-    const std::vector<Vec3f> base_vertices = generate_vertices_on_circle(axis, radius);
-
-    Vec3f h;
-    switch (axis)
-    {
-    case X: { h = height * Vec3f::UnitX(); break; }
-    case Y: { h = height * Vec3f::UnitY(); break; }
-    case Z: { h = height * Vec3f::UnitZ(); break; }
-    default: { assert(false); break; }
-    }
+    const std::vector<Vec3f> base_vertices = generate_vertices_on_circle(radius);
+    const Vec3f h = height * Vec3f::UnitZ();
 
     // stem vertices
     for (unsigned int i = 0; i < sectorCount; ++i) {
@@ -2342,14 +2322,7 @@ GLModel::Geometry smooth_cylinder(Axis axis, unsigned int resolution, float radi
     // bottom cap vertices
     Vec3f cap_center = Vec3f::Zero();
     unsigned int cap_center_id = data.vertices_count();
-    Vec3f normal;
-    switch (axis)
-    {
-    case X: { normal = -Vec3f::UnitX(); break; }
-    case Y: { normal = -Vec3f::UnitY(); break; }
-    case Z: { normal = -Vec3f::UnitZ(); break; }
-    default: { assert(false); break; }
-    }
+    Vec3f normal = -Vec3f::UnitZ();
 
     data.add_vertex(cap_center, normal);
     for (unsigned int i = 0; i < sectorCount; ++i) {
