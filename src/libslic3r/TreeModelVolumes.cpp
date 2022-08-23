@@ -297,7 +297,7 @@ const Polygons& TreeModelVolumes::getCollision(const coord_t orig_radius, LayerI
 {
     const coord_t radius = this->ceilRadius(orig_radius, min_xy_dist);
     if (std::optional<std::reference_wrapper<const Polygons>> result = m_collision_cache.getArea({ radius, layer_idx }); result)
-        return result.value().get();
+        return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate collision at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
         TreeSupport::showError("Not precalculated Collision requested.", false);
@@ -312,7 +312,7 @@ const Polygons& TreeModelVolumes::getCollisionHolefree(coord_t radius, LayerInde
     assert(radius == this->ceilRadius(radius));
     assert(radius < m_increase_until_radius + m_current_min_xy_dist_delta);
     if (std::optional<std::reference_wrapper<const Polygons>> result = m_collision_cache_holefree.getArea({ radius, layer_idx }); result)
-        return result.value().get();
+        return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate collision holefree at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
         TreeSupport::showError("Not precalculated Holefree Collision requested.", false);
@@ -334,7 +334,7 @@ const Polygons& TreeModelVolumes::getAvoidance(const coord_t orig_radius, LayerI
     if (std::optional<std::reference_wrapper<const Polygons>> result = 
             this->avoidance_cache(type, to_model).getArea({ radius, layer_idx }); 
         result)
-        return result.value().get();
+        return (*result).get();
 
     if (m_precalculated) {
         if (to_model) {
@@ -357,7 +357,7 @@ const Polygons& TreeModelVolumes::getPlaceableAreas(const coord_t orig_radius, L
 
     const coord_t radius = ceilRadius(orig_radius);
     if (std::optional<std::reference_wrapper<const Polygons>> result = m_placeable_areas_cache.getArea({ radius, layer_idx }); result)
-        return result.value().get();
+        return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Placeable Areas at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
         TreeSupport::showError("Not precalculated Placeable areas requested.", false);
@@ -380,7 +380,7 @@ const Polygons& TreeModelVolumes::getWallRestriction(const coord_t orig_radius, 
     if (std::optional<std::reference_wrapper<const Polygons>> result = 
         (min_xy_dist ? m_wall_restrictions_cache_min : m_wall_restrictions_cache).getArea({ radius, layer_idx });
         result)
-        return result.value().get();
+        return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Wall restricions at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
         TreeSupport::showError(
