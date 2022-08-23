@@ -186,7 +186,9 @@ static std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_
     // as different settings in the same group may only occur in the tip, which uses the original settings objects from the meshes.
     for (size_t object_id = 0; object_id < print_object_ids.size(); ++ object_id) {
         const PrintObject       &print_object  = *print.get_object(object_id);
+#ifndef _NDEBUG
         const PrintObjectConfig &object_config = print_object.config();
+#endif // _NDEBUG
         // Support must be enabled and set to Tree style.
         assert(object_config.support_material);
         assert(object_config.support_material_style == smsTree);
@@ -243,11 +245,11 @@ static bool inline g_showed_performance_warning = false;
 void TreeSupport::showError(std::string message, bool critical)
 { // todo Remove!  ONLY FOR PUBLIC BETA!!
 
-    std::string bugtype = std::string(critical ? " This is a critical bug. It may cause missing or malformed branches.\n" : "This bug should only decrease performance.\n");
-    bool show = (critical && !g_showed_critical_error) || (!critical && !g_showed_performance_warning);
+#if defined(_WIN32) && defined(TREE_SUPPORT_SHOW_ERRORS)
+    auto bugtype = std::string(critical ? " This is a critical bug. It may cause missing or malformed branches.\n" : "This bug should only decrease performance.\n");
+    bool show    = (critical && !g_showed_critical_error) || (!critical && !g_showed_performance_warning);
     (critical ? g_showed_critical_error : g_showed_performance_warning) = true;
 
-#if defined(_WIN32) && defined(TREE_SUPPORT_SHOW_ERRORS)
     if (show)
         MessageBoxA(nullptr, std::string("TreeSupport_2 MOD detected an error while generating the tree support.\nPlease report this back to me with profile and model.\nRevision 5.0\n" + message + "\n" + bugtype).c_str(), 
             "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
@@ -312,7 +314,7 @@ static bool layer_has_overhangs(const Layer &layer)
  * \param storage[in] Background storage to access meshes.
  * \param currently_processing_meshes[in] Indexes of all meshes that are processed in this iteration
  */
-static [[nodiscard]] LayerIndex precalculate(const Print &print, const std::vector<Polygons> &overhangs, const TreeSupport::TreeSupportSettings &config, const std::vector<size_t> &object_ids, TreeModelVolumes &volumes)
+[[nodiscard]] static LayerIndex precalculate(const Print &print, const std::vector<Polygons> &overhangs, const TreeSupport::TreeSupportSettings &config, const std::vector<size_t> &object_ids, TreeModelVolumes &volumes)
 {
     // calculate top most layer that is relevant for support
     LayerIndex max_layer = 0;
@@ -2450,7 +2452,7 @@ void TreeSupport::generateBranchAreas(
                             else {
                                 // try a fuzzy inside as sometimes the point should be on the border, but is not because of rounding errors...
                                 Point from = elem->result_on_layer;
-                                Polygons &to = to_polygons(std::move(part));
+                                Polygons to = to_polygons(std::move(part));
                                 moveInside(to, from, 0);
                                 if ((elem->result_on_layer - from).cast<double>().norm() < scaled<double>(0.025))
                                     polygons_with_correct_center = union_(polygons_with_correct_center, to);

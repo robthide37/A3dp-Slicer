@@ -575,12 +575,14 @@ private:
             switch (type) {
             case AvoidanceType::Fast:       return m_avoidance_cache_to_model;
             case AvoidanceType::Slow:       return m_avoidance_cache_to_model_slow;
+            case AvoidanceType::Count:      assert(false);
             case AvoidanceType::FastSafe:   return m_avoidance_cache_holefree_to_model;
             }
         } else {
             switch (type) {
             case AvoidanceType::Fast:       return m_avoidance_cache;
             case AvoidanceType::Slow:       return m_avoidance_cache_slow;
+            case AvoidanceType::Count:      assert(false);
             case AvoidanceType::FastSafe:   return m_avoidance_cache_holefree;
             }
         }
