@@ -2288,7 +2288,22 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
 {
     const coordf_t min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
     const coordf_t range_random_point_dist = fuzzy_skin_point_dist / 2.;
-    coordf_t dist_left_over = coordf_t(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
+    coordf_t dist_next_point = //min_dist_between_points / 4 + (coordf_t(rand()) * range_random_point_dist / double(RAND_MAX)); // the distance to be traversed on the line before making the first new point
+        coordf_t(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
+
+    // check if the paths length is enough for at least 3 points, or return.
+    {
+        coordf_t min_dist = min_dist_between_points * 3;
+        for (const ExtrusionPath& path : paths) {
+            min_dist -= path.length();
+            if (min_dist < 0)
+                break;
+        }
+        if (min_dist > 0) {
+            // Too small, can't fuzzy.
+            return;
+        }
+    }
 
     const Point last_point = paths.back().last_point();
     //not always a loop, with arachne
@@ -2302,9 +2317,11 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
 #endif
     Point p0 = is_loop ? last_point : paths.front().first_point();
     const Point* previous_point = is_loop ? &last_point : &paths.front().first_point();
-    for (ExtrusionPath &path : paths) {
+    for (size_t idx_path = 0; idx_path < paths.size(); idx_path++) {
+        ExtrusionPath& path = paths[idx_path];
         Points out;
         size_t next_idx = 1;
+        assert(path.size() > 1);
         // it always follow
         assert(p0 == path.polyline.points.front());
         out.reserve(path.polyline.points.size());
@@ -2315,26 +2332,45 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
             // 'a' is the (next) new point between p0 and p1
             Vec2d  p0p1 = (p1 - p0).cast<double>();
             coordf_t p0p1_size = p0p1.norm();
-            // so that p0p1_size - dist_last_point evaulates to dist_left_over - p0p1_size
-            coordf_t dist_last_point = dist_left_over + p0p1_size * 2.;
-            for (coordf_t p0pa_dist = dist_left_over; p0pa_dist < p0p1_size;
-                p0pa_dist += min_dist_between_points + coordf_t(rand()) * range_random_point_dist / double(RAND_MAX))
-            {
-                coordf_t r = coordf_t(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
-                out.emplace_back(p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
-                dist_last_point = p0pa_dist;
+            //skip points too close to each other.
+            if (dist_next_point < p0p1_size) {
+                coordf_t p0pa_dist;
+                for (p0pa_dist = dist_next_point; p0pa_dist < p0p1_size;
+                    p0pa_dist += min_dist_between_points + coordf_t(rand()) * range_random_point_dist / double(RAND_MAX))
+                {
+                    coordf_t r = coordf_t(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
+                    out.emplace_back(p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
+                }
+                dist_next_point = p0pa_dist - p0p1_size;
+                p0 = p1;
+            } else {
+                dist_next_point -= p0p1_size;
             }
-            dist_left_over = p0p1_size - dist_last_point;
-            p0 = p1;
         }
-        path.polyline.points = std::move(out);
-        previous_point = &path.polyline.points.back();
+        if (out.size() <= 1) {
+            //too small, erase
+            path.polyline.points.clear();
+            paths.erase(paths.begin() + idx_path);
+            idx_path--;
+        } else {
+            p0 = path.polyline.points.back();
+            path.polyline.points = std::move(out);
+            previous_point = &path.polyline.points.back();
+        }
     }
+    assert(!paths.empty());
     if (is_loop) {
         assert(paths.front().polyline.points.front() != paths.back().polyline.points.back());
+        //the first point is the old one. remove it and try to make another point if needed.
+        if (paths.front().size() > 2 && fuzzy_skin_point_dist * 2 > paths.back().last_point().distance_to(paths.front().polyline.points[1])) {
+            //distance small enough and enough pionts to delete the first, just erase
+            paths.front().polyline.points.erase(paths.front().polyline.points.begin());
+        }//TODO: else
+        //loop -> last point is the same as the first
         paths.back().polyline.points.push_back(paths.front().polyline.points.front());
         assert(paths.front().polyline.points.front() == paths.back().polyline.points.back());
     } else {
+        //line -> ensure you end with the same last point
         paths.back().polyline.points.push_back(last_point);
     }
 #ifdef _DEBUG
