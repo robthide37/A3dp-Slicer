@@ -94,22 +94,8 @@ void GLModel::Geometry::add_vertex(const Vec3f& position)
 void GLModel::Geometry::add_vertex(const Vec3f& position, const Vec2f& tex_coord)
 {
     assert(format.vertex_layout == EVertexLayout::P3T2);
-    vertices.emplace_back(position.x());
-    vertices.emplace_back(position.y());
-    vertices.emplace_back(position.z());
-    vertices.emplace_back(tex_coord.x());
-    vertices.emplace_back(tex_coord.y());
-}
-
-void GLModel::Geometry::add_vertex(const Vec3f& position, const Vec3f& normal)
-{
-    assert(format.vertex_layout == EVertexLayout::P3N3);
-    vertices.emplace_back(position.x());
-    vertices.emplace_back(position.y());
-    vertices.emplace_back(position.z());
-    vertices.emplace_back(normal.x());
-    vertices.emplace_back(normal.y());
-    vertices.emplace_back(normal.z());
+    vertices.insert(vertices.end(), position.data(), position.data() + 3);
+    vertices.insert(vertices.end(), tex_coord.data(), tex_coord.data() + 2);
 }
 
 void GLModel::Geometry::add_index(unsigned int id)
@@ -121,13 +107,6 @@ void GLModel::Geometry::add_line(unsigned int id1, unsigned int id2)
 {
     indices.emplace_back(id1);
     indices.emplace_back(id2);
-}
-
-void GLModel::Geometry::add_triangle(unsigned int id1, unsigned int id2, unsigned int id3)
-{
-    indices.emplace_back(id1);
-    indices.emplace_back(id2);
-    indices.emplace_back(id3);
 }
 
 Vec2f GLModel::Geometry::extract_position_2(size_t id) const

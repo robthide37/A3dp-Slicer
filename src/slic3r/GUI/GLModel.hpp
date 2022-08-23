@@ -4,6 +4,7 @@
 #include "libslic3r/Point.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/Color.hpp"
+#include "libslic3r/Utils.hpp"
 #include <vector>
 #include <string>
 
@@ -85,13 +86,19 @@ namespace GUI {
             ColorRGBA color{ ColorRGBA::BLACK() };
 
             void reserve_vertices(size_t vertices_count) { vertices.reserve(vertices_count * vertex_stride_floats(format)); }
+            void reserve_more_vertices(size_t vertices_count) { vertices.reserve(next_highest_power_of_2(vertices.size() + vertices_count * vertex_stride_floats(format))); }
             void reserve_indices(size_t indices_count) { indices.reserve(indices_count); }
+            void reserve_more_indices(size_t indices_count) { indices.reserve(next_highest_power_of_2(indices.size() + indices_count)); }
 
             void add_vertex(const Vec2f& position);                          // EVertexLayout::P2
             void add_vertex(const Vec2f& position, const Vec2f& tex_coord);  // EVertexLayout::P2T2
             void add_vertex(const Vec3f& position);                          // EVertexLayout::P3
             void add_vertex(const Vec3f& position, const Vec2f& tex_coord);  // EVertexLayout::P3T2
-            void add_vertex(const Vec3f& position, const Vec3f& normal);     // EVertexLayout::P3N3
+            void add_vertex(const Vec3f& position, const Vec3f& normal) {    // EVertexLayout::P3N3
+                assert(format.vertex_layout == EVertexLayout::P3N3);
+                vertices.insert(vertices.end(), position.data(), position.data() + 3);
+                vertices.insert(vertices.end(), normal.data(), normal.data() + 3);
+            }
 
             void set_vertex(size_t id, const Vec3f& position, const Vec3f& normal); // EVertexLayout::P3N3
 
@@ -99,7 +106,11 @@ namespace GUI {
 
             void add_index(unsigned int id);
             void add_line(unsigned int id1, unsigned int id2);
-            void add_triangle(unsigned int id1, unsigned int id2, unsigned int id3);
+            void add_triangle(unsigned int id1, unsigned int id2, unsigned int id3){
+                indices.emplace_back(id1);
+                indices.emplace_back(id2);
+                indices.emplace_back(id3);
+            }
 
             Vec2f extract_position_2(size_t id) const;
             Vec3f extract_position_3(size_t id) const;
