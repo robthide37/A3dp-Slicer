@@ -41,7 +41,7 @@ public:
 
     bool is_external_perimeter() const {
         assert(origin_entity != nullptr);
-        return origin_entity->role() == erExternalPerimeter;
+        return origin_entity->role() == erExternalPerimeter || origin_entity->role() == erOverhangPerimeter;
     }
 
     Vec2f a;
@@ -363,9 +363,11 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         const auto to_vec3f = [layer_z](const Vec2f &point) {
             return Vec3f(point.x(), point.y(), layer_z);
         };
-        float overhang_dist = tan(params.overhang_angle_deg * PI / 180.0f)*layer_region->layer()->height;
-        float min_malformation_dist = tan(params.malformation_angle_span_deg.first * PI / 180.0f)*layer_region->layer()->height;
-        float max_malformation_dist = tan(params.malformation_angle_span_deg.second * PI / 180.0f)*layer_region->layer()->height;
+        float overhang_dist = tan(params.overhang_angle_deg * PI / 180.0f) * layer_region->layer()->height;
+        float min_malformation_dist = tan(params.malformation_angle_span_deg.first * PI / 180.0f)
+                * layer_region->layer()->height;
+        float max_malformation_dist = tan(params.malformation_angle_span_deg.second * PI / 180.0f)
+                * layer_region->layer()->height;
 
         Points points { };
         entity->collect_points(points);
@@ -387,9 +389,14 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
         }
 
+        if (entity->total_volume() < params.supportable_volume_threshold) {
+            checked_lines_out.insert(checked_lines_out.end(), lines.begin(), lines.end());
+            return;
+        }
+
         ExtrusionPropertiesAccumulator bridging_acc { };
         ExtrusionPropertiesAccumulator malformation_acc { };
-        bridging_acc.add_distance(params.bridge_distance);
+        bridging_acc.add_distance(params.bridge_distance + 1.0f);
         const float flow_width = get_flow_width(layer_region, entity->role());
 
         for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
@@ -416,7 +423,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 bool in_layer_dist_condition = bridging_acc.distance
                         > params.bridge_distance / (1.0f + (bridging_acc.max_curvature
                                 * params.bridge_distance_decrease_by_curvature_factor / PI));
-                bool between_layers_condition = fabs(dist_from_prev_layer) > 3.0f*flow_width ||
+                bool between_layers_condition = fabs(dist_from_prev_layer) > 3.0f * flow_width ||
                         prev_layer_lines.get_line(nearest_line_idx).malformation > 3.0f * layer_region->layer()->height;
 
                 if (in_layer_dist_condition && between_layers_condition) {
@@ -427,14 +434,17 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
 
             //malformation
-            if (fabs(dist_from_prev_layer) < 3.0f*flow_width) {
+            if (fabs(dist_from_prev_layer) < 3.0f * flow_width) {
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
                 current_line.malformation += 0.9 * nearest_line.malformation;
             }
             if (dist_from_prev_layer > min_malformation_dist && dist_from_prev_layer < max_malformation_dist) {
                 malformation_acc.add_distance(current_line.len);
-                current_line.malformation += layer_region->layer()->height * (0.5f +
-                       1.5f * (malformation_acc.max_curvature / PI) * gauss(malformation_acc.distance, 5.0f, 1.0f, 0.2f));
+                current_line.malformation += layer_region->layer()->height
+                        * (0.5f
+                                +
+                                1.5f * (malformation_acc.max_curvature / PI)
+                                        * gauss(malformation_acc.distance, 5.0f, 1.0f, 0.2f));
             } else {
                 malformation_acc.reset();
             }
@@ -464,12 +474,13 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
         }
     }
 
-    std::vector<LinesDistancer> islands; // these search trees will be used to determine to which island does the extrusion begin
-    std::vector<std::vector<size_t>> island_extrusions; //final assigment of each extrusion to an island
+    std::vector<LinesDistancer> islands; // these search trees will be used to determine to which island does the extrusion belong.
+    std::vector<std::vector<size_t>> island_extrusions; //final assigment of each extrusion to an island.
     // initliaze the search from external perimeters - at the beginning, there is island candidate for each external perimeter.
     // some of them will disappear (e.g. holes)
     for (size_t e = 0; e < extrusions.size(); ++e) {
-        if (layer_lines[extrusions[e].first].is_external_perimeter()) {
+        if (layer_lines[extrusions[e].first].origin_entity->is_loop() &&
+                layer_lines[extrusions[e].first].is_external_perimeter()) {
             std::vector<ExtrusionLine> copy(extrusions[e].second - extrusions[e].first);
             for (size_t ex_line_idx = extrusions[e].first; ex_line_idx < extrusions[e].second; ++ex_line_idx) {
                 copy[ex_line_idx - extrusions[e].first] = layer_lines[ex_line_idx];
@@ -478,8 +489,8 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
             island_extrusions.push_back( { e });
         }
     }
-    // backup code if islands not found - this can currently happen, as external perimeters may be also pure overhang perimeters, and there is no
-    // way to distinguish external extrusions with total certainty.
+
+    // backup code if islands not found
     // If that happens, just make the first extrusion into island - it may be wrong, but it won't crash.
     if (islands.empty() && !extrusions.empty()) {
         std::vector<ExtrusionLine> copy(extrusions[0].second - extrusions[0].first);
@@ -492,9 +503,13 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
 
     // assign non external extrusions to islands
     for (size_t e = 0; e < extrusions.size(); ++e) {
-        if (!layer_lines[extrusions[e].first].is_external_perimeter()) {
+        if (!layer_lines[extrusions[e].first].origin_entity->is_loop() ||
+                !layer_lines[extrusions[e].first].is_external_perimeter()) {
             bool island_assigned = false;
             for (size_t i = 0; i < islands.size(); ++i) {
+                if (island_extrusions[i].empty()) {
+                    continue;
+                }
                 size_t _idx = 0;
                 Vec2f _pt = Vec2f::Zero();
                 if (islands[i].signed_distance_from_lines(layer_lines[extrusions[e].first].a, _idx, _pt) < 0) {
@@ -506,24 +521,6 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
             if (!island_assigned) { // If extrusion is not assigned for some reason, push it into the first island. As with the previous backup code,
                 // it may be wrong, but it won't crash
                 island_extrusions[0].push_back(e);
-            }
-        }
-    }
-    // merge islands which are embedded within each other (mainly holes)
-    for (size_t i = 0; i < islands.size(); ++i) {
-        if (islands[i].get_lines().empty()) {
-            continue;
-        }
-        for (size_t j = 0; j < islands.size(); ++j) {
-            if (islands[j].get_lines().empty() || i == j) {
-                continue;
-            }
-            size_t _idx;
-            Vec2f _pt;
-            if (islands[i].signed_distance_from_lines(islands[j].get_line(0).a, _idx, _pt) < 0) {
-                island_extrusions[i].insert(island_extrusions[i].end(), island_extrusions[j].begin(),
-                        island_extrusions[j].end());
-                island_extrusions[j].clear();
             }
         }
     }
@@ -559,7 +556,8 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                     // Bottom infill lines can be quite long, and algined, so the middle approximaton used above does not work
                     Vec2f dir = (line.b - line.a).normalized();
                     float segment_length = flow_width; // segments of size flow_width
-                    for (float segment_middle_dist = std::min(line.len, segment_length * 0.5f); segment_middle_dist < line.len;
+                    for (float segment_middle_dist = std::min(line.len, segment_length * 0.5f);
+                            segment_middle_dist < line.len;
                             segment_middle_dist += segment_length) {
                         Vec2f segment_middle = line.a + segment_middle_dist * dir;
                         island.sticking_second_moment_of_area_accumulator += segment_length * flow_width
@@ -723,7 +721,8 @@ public:
         }
         Vec3f centroid = centroid_accumulator / area;
         float extreme_fiber_dist = line_alg::distance_to(
-                Linef(centroid.head<2>().cast<double>(), (centroid.head<2>() + Vec2f(line_dir.y(), -line_dir.x())).cast<double>()),
+                Linef(centroid.head<2>().cast<double>(),
+                        (centroid.head<2>() + Vec2f(line_dir.y(), -line_dir.x())).cast<double>()),
                 extreme_point.head<2>().cast<double>());
         float elastic_section_modulus = area * directional_xy_variance / extreme_fiber_dist;
 
@@ -760,7 +759,7 @@ public:
                 return 1.0f;
 
             Vec3f bed_centroid = this->sticking_centroid_accumulator / this->sticking_area;
-            float bed_yield_torque = - compute_elastic_section_modulus(
+            float bed_yield_torque = -compute_elastic_section_modulus(
                     line_dir,
                     extreme_point,
                     this->sticking_centroid_accumulator,
@@ -771,7 +770,8 @@ public:
 
             Vec2f bed_weight_arm = (mass_centroid.head<2>() - bed_centroid.head<2>());
             float bed_weight_arm_len = bed_weight_arm.norm();
-            float bed_weight_dir_xy_variance = compute_directional_xy_variance(bed_weight_arm, this->sticking_centroid_accumulator,
+            float bed_weight_dir_xy_variance = compute_directional_xy_variance(bed_weight_arm,
+                    this->sticking_centroid_accumulator,
                     this->sticking_second_moment_of_area_accumulator,
                     this->sticking_second_moment_of_area_covariance_accumulator,
                     this->sticking_area);
@@ -1019,6 +1019,13 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
         for (size_t island_idx = 0; island_idx < islands_graph[layer_idx].islands.size(); ++island_idx) {
             const Island &island = islands_graph[layer_idx].islands[island_idx];
             ObjectPart &part = active_object_parts.access(prev_island_to_object_part_mapping[island_idx]);
+
+            //skip small drops of material - if they grow in size, they will be supported in next layers;
+            // if they dont grow, they are not worthy
+            if (part.get_volume() < params.supportable_volume_threshold) {
+                continue;
+            }
+
             IslandConnection &weakest_conn = prev_island_weakest_connection[island_idx];
 #ifdef DETAILED_DEBUG_LOGS
             weakest_conn.print_info("weakest connection info: ");
@@ -1132,7 +1139,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
     }
     for (const auto &line : layer_lines) {
         if (line.malformation > 0.0f) {
-            Vec3f color = value_to_rgbf(0, 1.0f, line.malformation);
+            Vec3f color = value_to_rgbf(-EPSILON, 1.0f, line.malformation);
             fprintf(malform_f, "v %f %f %f  %f %f %f\n", line.b[0],
                     line.b[1], layer->slice_z, color[0], color[1], color[2]);
         }

@@ -24,13 +24,16 @@ struct Params {
     }
 
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
-    const float bridge_distance = 15.0f; //mm
-    const float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / (this factor * (curvature / PI) )
+    const float bridge_distance = 12.0f; //mm
+    const float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / (1 + this factor * (curvature / PI) )
     const float overhang_angle_deg = 80.0f;
     const std::pair<float,float> malformation_angle_span_deg = std::pair<float, float> { 45.0f, 80.0f };
 
     const float min_distance_between_support_points = 3.0f; //mm
     const float support_points_interface_radius = 1.5f; // mm
+
+    // NOTE: Currently disabled, does not work correctly due to inability of the algorithm to correctly detect islands at each layer
+    const float supportable_volume_threshold = 0.0f; // mm^3
 
     std::string filament_type;
     const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.
