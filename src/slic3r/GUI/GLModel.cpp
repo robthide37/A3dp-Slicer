@@ -2253,6 +2253,110 @@ GLModel::Geometry smooth_sphere(unsigned int resolution, float radius)
 
     return data;
 }
+
+GLModel::Geometry smooth_cylinder(Axis axis, unsigned int resolution, float radius, float height)
+{
+    resolution = std::max<unsigned int>(4, resolution);
+
+    const unsigned int sectorCount = resolution;
+    const float sectorStep = 2.0f * float(M_PI) / float(sectorCount);
+
+    GLModel::Geometry data;
+    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+    data.reserve_vertices(sectorCount * 4 + 2);
+    data.reserve_indices(sectorCount * 4 * 3);
+
+    auto generate_vertices_on_circle = [sectorCount, sectorStep](Axis axis, float radius) {
+        std::vector<Vec3f> ret;
+        ret.reserve(sectorCount);
+        for (unsigned int i = 0; i < sectorCount; ++i) {
+            // from 0 to 2pi
+            const float sectorAngle = (i != sectorCount) ? sectorStep * i : 0.0f;
+            const float x1 = radius * std::cos(sectorAngle);
+            const float x2 = radius * std::sin(sectorAngle);
+
+            Vec3f v;
+            switch (axis)
+            {
+            case X: { v = Vec3f(0.0f, x1, x2);  break; }
+            case Y: { v = Vec3f(-x1, 0.0f, x2); break; }
+            case Z: { v = Vec3f(x1, x2, 0.0f);  break; }
+            default: { assert(false); break; }
+            }
+
+            ret.emplace_back(v);
+        }
+        return ret;
+    };
+
+    const std::vector<Vec3f> base_vertices = generate_vertices_on_circle(axis, radius);
+
+    Vec3f h;
+    switch (axis)
+    {
+    case X: { h = height * Vec3f::UnitX(); break; }
+    case Y: { h = height * Vec3f::UnitY(); break; }
+    case Z: { h = height * Vec3f::UnitZ(); break; }
+    default: { assert(false); break; }
+    }
+
+    // stem vertices
+    for (unsigned int i = 0; i < sectorCount; ++i) {
+        const Vec3f& v = base_vertices[i];
+        const Vec3f n = v.normalized();
+        data.add_vertex(v, n);
+        data.add_vertex(v + h, n);
+    }
+
+    // stem triangles
+    for (unsigned int i = 0; i < sectorCount; ++i) {
+        unsigned int v1 = i * 2;
+        unsigned int v2 = (i < sectorCount - 1) ? v1 + 2 : 0;
+        unsigned int v3 = v2 + 1;
+        unsigned int v4 = v1 + 1;
+        data.add_triangle(v1, v2, v3);
+        data.add_triangle(v1, v3, v4);
+    }
+
+    // bottom cap vertices
+    Vec3f cap_center = Vec3f::Zero();
+    unsigned int cap_center_id = data.vertices_count();
+    Vec3f normal;
+    switch (axis)
+    {
+    case X: { normal = -Vec3f::UnitX(); break; }
+    case Y: { normal = -Vec3f::UnitY(); break; }
+    case Z: { normal = -Vec3f::UnitZ(); break; }
+    default: { assert(false); break; }
+    }
+
+    data.add_vertex(cap_center, normal);
+    for (unsigned int i = 0; i < sectorCount; ++i) {
+        data.add_vertex(base_vertices[i], normal);
+    }
+
+    // bottom cap triangles
+    for (unsigned int i = 0; i < sectorCount; ++i) {
+        data.add_triangle(cap_center_id, (i < sectorCount - 1) ? cap_center_id + i + 2 : cap_center_id + 1, cap_center_id + i + 1);
+    }
+
+    // top cap vertices
+    cap_center += h;
+    cap_center_id = data.vertices_count();
+    normal = -normal;
+
+    data.add_vertex(cap_center, normal);
+    for (unsigned int i = 0; i < sectorCount; ++i) {
+        data.add_vertex(base_vertices[i] + h, normal);
+    }
+
+    // top cap triangles
+    for (unsigned int i = 0; i < sectorCount; ++i) {
+        data.add_triangle(cap_center_id, cap_center_id + i + 1, (i < sectorCount - 1) ? cap_center_id + i + 2 : cap_center_id + 1);
+    }
+
+    return data;
+}
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace GUI

@@ -11,6 +11,7 @@
 
 #include <memory>
 
+#define ENABLE_DEBUG_DIALOG 0
 
 namespace Slic3r {
 
@@ -48,8 +49,10 @@ private:
 
     int m_mouse_pos_x;
     int m_mouse_pos_y;
+#if ENABLE_DEBUG_DIALOG
     bool m_show_all = false;
     bool m_show_planes = false;
+#endif // ENABLE_DEBUG_DIALOG
     std::vector<std::unique_ptr<GLModel>> m_plane_models;
 
     void update_if_needed();
