@@ -8,6 +8,7 @@
 
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Measure.hpp"
+#include "libslic3r/PresetBundle.hpp"
 
 #include <numeric>
 
@@ -21,8 +22,8 @@ static const Slic3r::ColorRGBA HOVER_COLOR = { 0.8f, 0.2f, 0.2f, 1.0f };
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
-    m_vbo_sphere.init_from(its_make_sphere(1., M_PI/32.));
-    m_vbo_cylinder.init_from(its_make_cylinder(1., 1.));
+    m_vbo_sphere.init_from(smooth_sphere(16, 7.5f));
+    m_vbo_cylinder.init_from(smooth_cylinder(Z, 16, 5.0f, 1.0f));
 }
 
 bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
@@ -106,7 +107,9 @@ std::string GLGizmoMeasure::on_get_name() const
 bool GLGizmoMeasure::on_is_activable() const
 {
     const Selection& selection = m_parent.get_selection();
-    return selection.is_single_volume() || selection.is_single_volume_instance();
+    return (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA) ?
+        selection.is_single_full_instance() :
+        selection.is_single_volume() || selection.is_single_volume_instance();
 }
 
 void GLGizmoMeasure::on_render()
@@ -117,30 +120,27 @@ void GLGizmoMeasure::on_render()
 
     const Selection& selection = m_parent.get_selection();
 
-    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)
         return;
     
     shader->start_using();
+    shader->set_uniform("emission_factor", 0.25f);
 
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glEnable(GL_BLEND));
-#if ENABLE_GL_CORE_PROFILE
-    if (!OpenGLManager::get_gl_info().is_core_profile())
-#endif // ENABLE_GL_CORE_PROFILE
-        glsafe(::glLineWidth(2.f));
 
-    if (selection.is_single_volume() || selection.is_single_volume_instance()) {
+    if ((wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA && selection.is_single_full_instance()) ||
+        (selection.is_single_volume() || selection.is_single_volume_instance())) {
         const Transform3d& model_matrix = selection.get_first_volume()->world_matrix();
         const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d view_model_matrix = camera.get_view_matrix() *
-            Geometry::assemble_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * model_matrix;
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        const float inv_zoom = camera.get_inv_zoom();
 
-        shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        
+
         update_if_needed();
 
         Vec3f pos;
@@ -148,7 +148,6 @@ void GLGizmoMeasure::on_render()
         size_t facet_idx;
         m_c->raycaster()->raycasters().front()->unproject_on_mesh(Vec2d(m_mouse_pos_x, m_mouse_pos_y), model_matrix, camera, pos, normal, nullptr, &facet_idx);
 
-#define ENABLE_DEBUG_DIALOG 0
 #if ENABLE_DEBUG_DIALOG
         m_imgui->begin(std::string("DEBUG"));
         m_imgui->checkbox(wxString("Show all features"), m_show_all);
@@ -162,34 +161,46 @@ void GLGizmoMeasure::on_render()
 #endif // ENABLE_DEBUG_DIALOG
 
         std::vector<Measure::SurfaceFeature> features;
-         if (m_show_all) {
+#if ENABLE_DEBUG_DIALOG
+        if (m_show_all) {
             features = m_measuring->get_all_features(); // EXPENSIVE - debugging only.
             features.erase(std::remove_if(features.begin(), features.end(),
                            [](const Measure::SurfaceFeature& f) {
                             return f.get_type() == Measure::SurfaceFeatureType::Plane;
                             }), features.end());
-         } else {
+        }
+        else {
+#endif // ENABLE_DEBUG_DIALOG
             std::optional<Measure::SurfaceFeature> feat = m_measuring->get_feature(facet_idx, pos.cast<double>());
-            if (feat)
+            if (feat.has_value())
                 features.emplace_back(*feat);
-         }
-
-            
+#if ENABLE_DEBUG_DIALOG
+        }
+#endif // ENABLE_DEBUG_DIALOG
             
         for (const Measure::SurfaceFeature& feature : features) {
-
-            if (feature.get_type() == Measure::SurfaceFeatureType::Point) {
-                Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(feature.get_point()));
-                view_feature_matrix.scale(0.5);
-                shader->set_uniform("view_model_matrix", view_feature_matrix);
+            switch (feature.get_type()) {
+            case Measure::SurfaceFeatureType::Point:
+            {
+                const Vec3d& position = feature.get_point();
+                const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(position) * Geometry::scale_transform(inv_zoom);
+                const Transform3d view_model_matrix = view_matrix * feature_matrix;
+                shader->set_uniform("view_model_matrix", view_model_matrix);
+                const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+                shader->set_uniform("view_normal_matrix", view_normal_matrix);
                 m_vbo_sphere.set_color(HOVER_COLOR);
                 m_vbo_sphere.render();
+                break;
             }
-            else if (feature.get_type() == Measure::SurfaceFeatureType::Circle) {
-                const auto& [c, radius, n] = feature.get_circle();
-                Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(c));
-                view_feature_matrix.scale(0.5);
-                shader->set_uniform("view_model_matrix", view_feature_matrix);
+            case Measure::SurfaceFeatureType::Circle:
+            {
+                const auto& [center, radius, n] = feature.get_circle();
+                // render center
+                const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(center) * Geometry::scale_transform(inv_zoom);
+                const Transform3d view_model_matrix = view_matrix * feature_matrix;
+                shader->set_uniform("view_model_matrix", view_model_matrix);
+                const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+                shader->set_uniform("view_normal_matrix", view_normal_matrix);
                 m_vbo_sphere.set_color(HOVER_COLOR);
                 m_vbo_sphere.render();
 
@@ -198,45 +209,69 @@ void GLGizmoMeasure::on_render()
                 if (rad.squaredNorm() < 0.1)
                     rad = n.cross(Vec3d::UnitY());
                 rad *= radius * rad.norm();
-                const int N = 20;
-                for (int i=0; i<N; ++i) {
-                    rad = Eigen::AngleAxisd(6.28/N, n) * rad;
-                    view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(c));
-                    view_feature_matrix = view_feature_matrix * Transform3d(Eigen::Translation3d(rad));
-                    view_feature_matrix.scale(N/100.);
-                    shader->set_uniform("view_model_matrix", view_feature_matrix);
+                const int N = 32;
+                m_vbo_sphere.set_color(HOVER_COLOR);
+                for (int i = 0; i < N; ++i) {
+                    rad = Eigen::AngleAxisd(2.0 * M_PI / N, n) * rad;
+                    const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(center + rad) * Geometry::scale_transform(N / 100.0 * inv_zoom);
+                    const Transform3d view_model_matrix = view_matrix * feature_matrix;
+                    shader->set_uniform("view_model_matrix", view_model_matrix);
+                    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+                    shader->set_uniform("view_normal_matrix", view_normal_matrix);
                     m_vbo_sphere.render();
                 }
+                break;
             }
-            else if (feature.get_type() == Measure::SurfaceFeatureType::Edge) {
+            case Measure::SurfaceFeatureType::Edge:
+            {
                 const auto& [start, end] = feature.get_edge();
-                Transform3d view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(start));
-                auto q  = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start);
-                view_feature_matrix *= q;
-                view_feature_matrix.scale(Vec3d(0.075, 0.075, (end - start).norm()));
-                shader->set_uniform("view_model_matrix", view_feature_matrix);
+                auto q = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start);
+                const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(start) * q *
+                    Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (end - start).norm() });
+                const Transform3d view_model_matrix = view_matrix * feature_matrix;
+                shader->set_uniform("view_model_matrix", view_model_matrix);
+                const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+                shader->set_uniform("view_normal_matrix", view_normal_matrix);
                 m_vbo_cylinder.set_color(HOVER_COLOR);
                 m_vbo_cylinder.render();
-                if (feature.get_extra_point()) {
-                    Vec3d pin = *feature.get_extra_point();
-                    view_feature_matrix = view_model_matrix * Transform3d(Eigen::Translation3d(pin));
-                    view_feature_matrix.scale(0.5);
-                    shader->set_uniform("view_model_matrix", view_feature_matrix);
+
+/*
+                std::optional<Vec3d> extra_point = feature.get_extra_point();
+                if (extra_point.has_value()) {
+                    const Vec3d pin = *extra_point;
+                    const Transform3d feature_matrix = Geometry::translation_transform(pin + selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) *
+                        Geometry::scale_transform(inv_zoom) * model_matrix;
+                    const Transform3d view_model_matrix = view_matrix * feature_matrix;
+                    shader->set_uniform("view_model_matrix", view_model_matrix);
+                    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+                    shader->set_uniform("view_normal_matrix", view_normal_matrix);
                     m_vbo_sphere.set_color(HOVER_COLOR);
                     m_vbo_sphere.render();
                 }
+*/
+                break;
             }
-            else if (feature.get_type() == Measure::SurfaceFeatureType::Plane) {
+            case Measure::SurfaceFeatureType::Plane:
+            {
                 const auto& [idx, normal, pt] = feature.get_plane();
                 assert(idx < m_plane_models.size());
+                const Transform3d view_model_matrix = view_matrix * model_matrix;
+                shader->set_uniform("view_model_matrix", view_model_matrix);
+                const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+                shader->set_uniform("view_normal_matrix", view_normal_matrix);
                 m_plane_models[idx]->set_color(HOVER_COLOR);
                 m_plane_models[idx]->render();
-            }   
+                break;
+            }
+            }
         }
-        shader->set_uniform("view_model_matrix", view_model_matrix);
+#if ENABLE_DEBUG_DIALOG
         if (m_show_planes)
-            for (const auto& glmodel : m_plane_models)
+            for (const auto& glmodel : m_plane_models) {
+                glmodel->set_color(HOVER_COLOR);
                 glmodel->render();
+            }
+#endif // ENABLE_DEBUG_DIALOG
     }
 
     glsafe(::glEnable(GL_CULL_FACE));
@@ -263,14 +298,19 @@ void GLGizmoMeasure::update_if_needed()
         const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
         for (const std::vector<int>& triangle_indices : planes_triangles) {
             m_plane_models.emplace_back(std::unique_ptr<GLModel>(new GLModel()));
-            GUI::GLModel::Geometry init_data;
-            init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3 };
+            GLModel::Geometry init_data;
+            init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
             init_data.color = ColorRGBA(0.9f, 0.9f, 0.9f, 0.5f);
             int i = 0;
             for (int idx : triangle_indices) {
-                init_data.add_vertex(its.vertices[its.indices[idx][0]]);
-                init_data.add_vertex(its.vertices[its.indices[idx][1]]);
-                init_data.add_vertex(its.vertices[its.indices[idx][2]]);
+                const Vec3f& v0 = its.vertices[its.indices[idx][0]];
+                const Vec3f& v1 = its.vertices[its.indices[idx][1]];
+                const Vec3f& v2 = its.vertices[its.indices[idx][2]];
+
+                const Vec3f n = (v1 - v0).cross(v2 - v0).normalized();
+                init_data.add_vertex(v0, n);
+                init_data.add_vertex(v1, n);
+                init_data.add_vertex(v2, n);
                 init_data.add_triangle(i, i + 1, i + 2);
                 i += 3;
             }
