@@ -874,9 +874,9 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
         if (area(expoly) <= 0.)
             ::MessageBoxA(nullptr, "TreeSupport infill negative area", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
 #endif // _WIN32
-        assert(intersecting_edges(expoly).empty());
+        assert(intersecting_edges(to_polygons(expoly)).empty());
 #ifdef _WIN32
-        if (! intersecting_edges(expoly).empty())
+        if (! intersecting_edges(to_polygons(expoly)).empty())
             ::MessageBoxA(nullptr, "TreeSupport infill self intersections", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
 #endif // _WIN32
         Surface surface(stInternal, std::move(expoly));
@@ -1926,13 +1926,13 @@ void TreeSupport::increaseAreas(std::unordered_map<SupportElement, Polygons>& to
             constexpr bool increase_radius = true, no_error = true, use_min_radius = true, move = true; // aliases for better readability
 
             // Determine in which order configurations are checked if they result in a valid influence area. Check will stop if a valid area is found
-            std::deque<AreaIncreaseSettings> order;
+            std::vector<AreaIncreaseSettings> order;
             auto insertSetting = [&](AreaIncreaseSettings settings, bool back) {
                 if (std::find(order.begin(), order.end(), settings) == order.end()) {
                     if (back)
                         order.emplace_back(settings);
                     else
-                        order.emplace_front(settings);
+                        order.insert(order.begin(), settings);
                 }
             };
 
@@ -1973,7 +1973,7 @@ void TreeSupport::increaseAreas(std::unordered_map<SupportElement, Polygons>& to
 
             if (elem.use_min_xy_dist)
             {
-                std::deque<AreaIncreaseSettings> new_order;
+                std::vector<AreaIncreaseSettings> new_order;
                 // if the branch currently has to use min_xy_dist check if the configuration would also be valid with the regular xy_distance before checking with use_min_radius (Only happens when Support Distance priority is z overrides xy )
                 for (AreaIncreaseSettings settings : order)
                 {
@@ -2444,15 +2444,16 @@ void TreeSupport::generateBranchAreas(
                     // if larger area did not fix the problem, all parts off the nozzle path that do not contain the center point are removed, hoping for the best
                     if (nozzle_path.size() > 1) {
                         Polygons polygons_with_correct_center;
-                        for (const ExPolygon &part : nozzle_path) {
+                        for (ExPolygon &part : nozzle_path) {
                             if (part.contains(elem->result_on_layer))
                                 polygons_with_correct_center = union_(polygons_with_correct_center, part);
                             else {
                                 // try a fuzzy inside as sometimes the point should be on the border, but is not because of rounding errors...
                                 Point from = elem->result_on_layer;
-                                moveInside(part, from, 0);
+                                Polygons &to = to_polygons(std::move(part));
+                                moveInside(to, from, 0);
                                 if ((elem->result_on_layer - from).cast<double>().norm() < scaled<double>(0.025))
-                                    polygons_with_correct_center = union_(polygons_with_correct_center, part);
+                                    polygons_with_correct_center = union_(polygons_with_correct_center, to);
                             }
                         }
                         // Increase the area again, to ensure the nozzle path when calculated later is very similar to the one assumed above.

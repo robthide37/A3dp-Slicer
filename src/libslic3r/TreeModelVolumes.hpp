@@ -211,7 +211,8 @@ public:
     {
         Slow,
         FastSafe,
-        Fast
+        Fast,
+        Count
     };
 
     /*!
@@ -220,7 +221,7 @@ public:
      * Knowledge about branch angle is used to only calculate avoidances and collisions that may actually be needed.
      * Not calling precalculate() will cause the class to lazily calculate avoidances and collisions as needed, which will be a lot slower on systems with more then one or two cores!
      */
-    void precalculate(coord_t max_layer);
+    void precalculate(const coord_t max_layer);
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer.
@@ -233,7 +234,7 @@ public:
      * \param min_xy_dist Is the minimum xy distance used.
      * \return Polygons object
      */
-    const Polygons& getCollision(coord_t radius, LayerIndex layer_idx, bool min_xy_dist) const;
+    const Polygons& getCollision(const coord_t radius, LayerIndex layer_idx, bool min_xy_dist) const;
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches
@@ -277,8 +278,12 @@ public:
      * \param min_xy_dist is the minimum xy distance used.
      * \return The rounded radius
      */
-    coord_t ceilRadius(coord_t radius, bool min_xy_dist) const {
-        return this->ceilRadius(min_xy_dist ? radius : radius + m_current_min_xy_dist_delta);
+    coord_t ceilRadius(const coord_t radius, const bool min_xy_dist) const {
+        assert(radius >= 0);
+        return min_xy_dist ? 
+            this->ceilRadius(radius) :
+            // special case as if a radius 0 is requested it could be to ensure correct xy distance. As such it is beneficial if the collision is as close to the configured values as possible.
+            radius > 0 ? this->ceilRadius(radius + m_current_min_xy_dist_delta) : m_current_min_xy_dist_delta;
     }
     /*!
      * \brief Round \p radius upwards to the maximum that would still round up to the same value as the provided one.
@@ -288,6 +293,7 @@ public:
      * \return The maximum radius, resulting in the same rounding.
      */
     coord_t getRadiusNextCeil(coord_t radius, bool min_xy_dist) const {
+        assert(radius > 0);
         return min_xy_dist ?
             this->ceilRadius(radius) :
             this->ceilRadius(radius + m_current_min_xy_dist_delta) - m_current_min_xy_dist_delta;
@@ -313,10 +319,21 @@ private:
             for (auto& d : in)
                 this->data.emplace(d.first, std::move(d.second));
         }
-        void insert(std::vector<std::pair<RadiusLayerPair, Polygons>> && in) {
+        void insert(std::vector<std::pair<RadiusLayerPair, Polygons>> &&in) {
             std::lock_guard<std::mutex> guard(this->mutex);
             for (auto& d : in)
                 this->data.emplace(d.first, std::move(d.second));
+        }
+        // by layer
+        void insert(std::vector<std::pair<coord_t, Polygons>> &&in, coord_t radius) {
+            std::lock_guard<std::mutex> guard(this->mutex);
+            for (auto &d : in)
+                this->data.emplace(RadiusLayerPair{ radius, d.first }, std::move(d.second));
+        }
+        void insert(std::vector<Polygons> &&in, coord_t first_layer_idx, coord_t radius) {
+            std::lock_guard<std::mutex> guard(this->mutex);
+            for (auto &d : in)
+                this->data.emplace(RadiusLayerPair{ radius, first_layer_idx ++ }, std::move(d));
         }
         /*!
          * \brief Checks a cache for a given RadiusLayerPair and returns it if it is found
@@ -359,19 +376,20 @@ private:
      * The result is a 2D area that would cause nodes of given radius to
      * collide with the model or be inside a hole.
      * A Hole is defined as an area, in which a branch with m_increase_until_radius radius would collide with the wall.
+     * minimum xy distance is always used.
      * \param radius The radius of the node of interest
      * \param layer_idx The layer of interest
      * \param min_xy_dist Is the minimum xy distance used.
      * \return Polygons object
      */
-    const Polygons& getCollisionHolefree(coord_t radius, LayerIndex layer_idx, bool min_xy_dist) const;
+    const Polygons& getCollisionHolefree(coord_t radius, LayerIndex layer_idx) const;
 
     /*!
      * \brief Round \p radius upwards to either a multiple of m_radius_sample_resolution or a exponentially increasing value
      *
      * \param radius The radius of the node of interest
      */
-    coord_t ceilRadius(coord_t radius) const;
+    coord_t ceilRadius(const coord_t radius) const;
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer.
@@ -380,18 +398,8 @@ private:
      * collide with the model. Result is saved in the cache.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateCollision(std::deque<RadiusLayerPair> keys);
-    /*!
-     * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer.
-     *
-     * The result is a 2D area that would cause nodes of given radius to
-     * collide with the model. Result is saved in the cache.
-     * \param key RadiusLayerPairs the requested areas. The radius will be calculated up to the provided layer.
-     */
-    void calculateCollision(RadiusLayerPair key)
-    {
-        calculateCollision(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) });
-    }
+    void calculateCollision(const std::vector<RadiusLayerPair> &keys);
+    void calculateCollision(const coord_t radius, const LayerIndex max_layer_idx);
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer. Holes are removed.
      *
@@ -400,7 +408,7 @@ private:
      * A Hole is defined as an area, in which a branch with m_increase_until_radius radius would collide with the wall.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateCollisionHolefree(std::deque<RadiusLayerPair> keys);
+    void calculateCollisionHolefree(const std::vector<RadiusLayerPair> &keys);
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer. Holes are removed.
@@ -412,7 +420,7 @@ private:
      */
     void calculateCollisionHolefree(RadiusLayerPair key)
     {
-        calculateCollisionHolefree(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) });
+        calculateCollisionHolefree(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) });
     }
 
     /*!
@@ -422,7 +430,7 @@ private:
      * collide with the model. Result is saved in the cache.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateAvoidance(std::deque<RadiusLayerPair> keys);
+    void calculateAvoidance(const std::vector<RadiusLayerPair> &keys, bool to_build_plate, bool to_model);
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model.
@@ -431,9 +439,9 @@ private:
      * collide with the model. Result is saved in the cache.
      * \param key RadiusLayerPair of the requested areas. It will be calculated up to the provided layer.
      */
-    void calculateAvoidance(RadiusLayerPair key)
+    void calculateAvoidance(RadiusLayerPair key, bool to_build_plate, bool to_model)
     {
-        calculateAvoidance(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) });
+        calculateAvoidance(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, to_build_plate, to_model);
     }
 
     /*!
@@ -441,38 +449,16 @@ private:
      * Result is saved in the cache.
      * \param key RadiusLayerPair of the requested areas. It will be calculated up to the provided layer.
      */
-    void calculatePlaceables(RadiusLayerPair key)
-    {
-        calculatePlaceables(std::deque<RadiusLayerPair>{ key });
-    }
+    void calculatePlaceables(const coord_t radius, const LayerIndex max_required_layer);
+
 
     /*!
      * \brief Creates the areas where a branch of a given radius can be placed on the model.
      * Result is saved in the cache.
      * \param keys RadiusLayerPair of the requested areas. The radius will be calculated up to the provided layer.
      */
-    void calculatePlaceables(std::deque<RadiusLayerPair> keys);
+    void calculatePlaceables(const std::vector<RadiusLayerPair> &keys);
 
-    /*!
-     * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model without being able to place a branch with given radius on a single layer.
-     *
-     * The result is a 2D area that would cause nodes of radius \p radius to
-     * collide with the model in a not wanted way. Result is saved in the cache.
-     * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
-     */
-    void calculateAvoidanceToModel(std::deque<RadiusLayerPair> keys);
-
-    /*!
-     * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model without being able to place a branch with given radius on a single layer.
-     *
-     * The result is a 2D area that would cause nodes of radius \p radius to
-     * collide with the model in a not wanted way. Result is saved in the cache.
-     * \param key RadiusLayerPair of the requested areas. The radius will be calculated up to the provided layer.
-     */
-    void calculateAvoidanceToModel(RadiusLayerPair key)
-    {
-        calculateAvoidanceToModel(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) });
-    }
     /*!
      * \brief Creates the areas that can not be passed when expanding an area downwards. As such these areas are an somewhat abstract representation of a wall (as in a printed object).
      *
@@ -480,7 +466,7 @@ private:
      *
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateWallRestrictions(std::deque<RadiusLayerPair> keys);
+    void calculateWallRestrictions(const std::vector<RadiusLayerPair> &keys);
 
     /*!
      * \brief Creates the areas that can not be passed when expanding an area downwards. As such these areas are an somewhat abstract representation of a wall (as in a printed object).
@@ -489,7 +475,7 @@ private:
      */
     void calculateWallRestrictions(RadiusLayerPair key)
     {
-        calculateWallRestrictions(std::deque<RadiusLayerPair>{ RadiusLayerPair(key) });
+        calculateWallRestrictions(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) });
     }
 
     /*!
@@ -556,9 +542,9 @@ private:
      */
     std::vector<Polygons> m_anti_overhang;
     /*!
-     * \brief Radii that can be ignored by ceilRadius as they will never be requested.
+     * \brief Radii that can be ignored by ceilRadius as they will never be requested, sorted.
      */
-    std::unordered_set<coord_t> m_ignorable_radii;
+    std::vector<coord_t> m_ignorable_radii;
 
     /*!
      * \brief Smallest radius a branch can have. This is the radius of a SupportElement with DTT=0.
@@ -581,18 +567,39 @@ private:
      * \brief Caches to avoid holes smaller than the radius until which the radius is always increased, as they are free of holes. 
      * Also called safe avoidances, as they are safe regarding not running into holes.
      */
-    RadiusLayerPolygonCache m_avoidance_cache_holefree;
-    RadiusLayerPolygonCache m_avoidance_cache_holefree_to_model;
+    RadiusLayerPolygonCache     m_avoidance_cache_holefree;
+    RadiusLayerPolygonCache     m_avoidance_cache_holefree_to_model;
+
+    RadiusLayerPolygonCache& avoidance_cache(const AvoidanceType type, const bool to_model) {
+        if (to_model) {
+            switch (type) {
+            case AvoidanceType::Fast:       return m_avoidance_cache_to_model;
+            case AvoidanceType::Slow:       return m_avoidance_cache_to_model_slow;
+            case AvoidanceType::FastSafe:   return m_avoidance_cache_holefree_to_model;
+            }
+        } else {
+            switch (type) {
+            case AvoidanceType::Fast:       return m_avoidance_cache;
+            case AvoidanceType::Slow:       return m_avoidance_cache_slow;
+            case AvoidanceType::FastSafe:   return m_avoidance_cache_holefree;
+            }
+        }
+        assert(false);
+        return m_avoidance_cache;
+    }
+    const RadiusLayerPolygonCache& avoidance_cache(const AvoidanceType type, const bool to_model) const {
+        return const_cast<TreeModelVolumes*>(this)->avoidance_cache(type, to_model);
+    }
 
     /*!
      * \brief Caches to represent walls not allowed to be passed over.
      */
-    RadiusLayerPolygonCache m_wall_restrictions_cache;
+    RadiusLayerPolygonCache     m_wall_restrictions_cache;
 
     // A different cache for min_xy_dist as the maximal safe distance an influence area can be increased(guaranteed overlap of two walls in consecutive layer) 
     // is much smaller when min_xy_dist is used. This causes the area of the wall restriction to be thinner and as such just using the min_xy_dist wall 
     // restriction would be slower.    
-    RadiusLayerPolygonCache m_wall_restrictions_cache_min;
+    RadiusLayerPolygonCache     m_wall_restrictions_cache_min;
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     std::unique_ptr<std::mutex> m_critical_progress { std::make_unique<std::mutex>() };
