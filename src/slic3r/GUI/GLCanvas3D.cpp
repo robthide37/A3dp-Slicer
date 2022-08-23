@@ -7135,6 +7135,11 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
         return volume;
     };
     const size_t    volumes_cnt_initial = m_volumes.volumes.size();
+    // Limit the number of threads as the code below does not scale well due to memory pressure.
+    // (most of the time is spent in malloc / free / memmove)
+    // Not using all the threads leaves some of the threads to G-code generator.
+    tbb::task_arena limited_arena(std::min(tbb::this_task_arena::max_concurrency(), 4));
+    limited_arena.execute([&ctxt, grain_size, &new_volume, is_selected_separate_extruder, this]{
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, ctxt.layers.size(), grain_size),
         [&ctxt, &new_volume, is_selected_separate_extruder, this](const tbb::blocked_range<size_t>& range) {
@@ -7309,6 +7314,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
             vol->indexed_vertex_array.shrink_to_fit();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     });
+    }); // task arena
 
     BOOST_LOG_TRIVIAL(debug) << "Loading print object toolpaths in parallel - finalizing results" << m_volumes.log_memory_info() << log_memory_info();
     // Remove empty volumes from the newly added volumes.

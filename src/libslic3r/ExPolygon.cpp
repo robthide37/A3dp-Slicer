@@ -12,27 +12,6 @@
 
 namespace Slic3r {
 
-ExPolygon::operator Points() const
-{
-    Points points;
-    Polygons pp = *this;
-    for (Polygons::const_iterator poly = pp.begin(); poly != pp.end(); ++poly) {
-        for (Points::const_iterator point = poly->points.begin(); point != poly->points.end(); ++point)
-            points.push_back(*point);
-    }
-    return points;
-}
-
-ExPolygon::operator Polygons() const
-{
-    return to_polygons(*this);
-}
-
-ExPolygon::operator Polylines() const
-{
-    return to_polylines(*this);
-}
-
 void ExPolygon::scale(double factor)
 {
     contour.scale(factor);
@@ -149,7 +128,7 @@ bool ExPolygon::overlaps(const ExPolygon &other) const
     svg.draw_outline(*this);
     svg.draw_outline(other, "blue");
     #endif
-    Polylines pl_out = intersection_pl((Polylines)other, *this);
+    Polylines pl_out = intersection_pl(to_polylines(other), *this);
     #if 0
     svg.draw(pl_out, "red");
     #endif

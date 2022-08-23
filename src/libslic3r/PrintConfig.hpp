@@ -60,7 +60,7 @@ enum InfillPattern : int {
     ipRectilinear, ipMonotonic, ipAlignedRectilinear, ipGrid, ipTriangles, ipStars, ipCubic, ipLine, ipConcentric, ipHoneycomb, ip3DHoneycomb,
     ipGyroid, ipHilbertCurve, ipArchimedeanChords, ipOctagramSpiral, ipAdaptiveCubic, ipSupportCubic, ipSupportBase,
     ipLightning,
-ipCount,
+    ipCount,
 };
 
 enum class IroningType {
@@ -85,7 +85,7 @@ enum SupportMaterialPattern {
 };
 
 enum SupportMaterialStyle {
-    smsGrid, smsSnug,
+    smsGrid, smsSnug, smsTree,
 };
 
 enum SupportMaterialInterfacePattern {

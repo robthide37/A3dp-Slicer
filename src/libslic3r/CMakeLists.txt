@@ -256,6 +256,10 @@ set(SLIC3R_SOURCES
     Technologies.hpp
     Tesselate.cpp
     Tesselate.hpp
+    TreeSupport.cpp
+    TreeSupport.hpp
+    TreeModelVolumes.cpp
+    TreeModelVolumes.hpp
     TriangleMesh.cpp
     TriangleMesh.hpp
     TriangleMeshSlicer.cpp

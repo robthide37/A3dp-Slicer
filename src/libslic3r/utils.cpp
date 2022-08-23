@@ -129,7 +129,9 @@ void disable_multi_threading()
 {
     // Disable parallelization so the Shiny profiler works
 #ifdef TBB_HAS_GLOBAL_CONTROL
-    tbb::global_control(tbb::global_control::max_allowed_parallelism, 1);
+	{
+		static tbb::global_control gc(tbb::global_control::max_allowed_parallelism, 1);
+	}
 #else // TBB_HAS_GLOBAL_CONTROL
     static tbb::task_scheduler_init *tbb_init = new tbb::task_scheduler_init(1);
     UNUSED(tbb_init);
