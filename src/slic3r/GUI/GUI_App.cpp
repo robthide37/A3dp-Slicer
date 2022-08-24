@@ -2828,6 +2828,11 @@ NotificationManager * GUI_App::notification_manager()
     return plater_->get_notification_manager();
 }
 
+GalleryDialog* GUI_App::gallery_dialog()
+{
+    return mainframe->gallery_dialog();
+}
+
 // extruders count from selected printer preset
 int GUI_App::extruders_cnt() const
 {

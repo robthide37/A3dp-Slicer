@@ -1409,9 +1409,8 @@ void ObjectList::load_subobject(ModelVolumeType type, bool from_galery/* = false
 
     wxArrayString input_files;
     if (from_galery) {
-        GalleryDialog dlg(this);
-        if (dlg.ShowModal() != wxID_CLOSE)
-            dlg.get_input_files(input_files);
+        if (wxGetApp().gallery_dialog()->show() != wxID_CLOSE)
+            wxGetApp().gallery_dialog()->get_input_files(input_files);
     }
     else
         wxGetApp().import_model(wxGetApp().tab_panel()->GetPage(0), input_files);
@@ -1737,10 +1736,10 @@ void ObjectList::load_shape_object_from_gallery()
         return;// Add nothing if something is selected on 3DScene
 
     wxArrayString input_files;
-    GalleryDialog gallery_dlg(this);
-    if (gallery_dlg.ShowModal() == wxID_CLOSE)
+    GalleryDialog* gallery_dlg = wxGetApp().gallery_dialog();
+    if (gallery_dlg->show() == wxID_CLOSE)
         return;
-    gallery_dlg.get_input_files(input_files);
+    gallery_dlg->get_input_files(input_files);
     if (input_files.IsEmpty())
         return;
     load_shape_object_from_gallery(input_files);
