@@ -66,6 +66,8 @@
 // Enable picking using raytracing
 #define ENABLE_RAYCAST_PICKING (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
 #define ENABLE_RAYCAST_PICKING_DEBUG (0 && ENABLE_RAYCAST_PICKING)
+// Enable debug code for Measure Gizmo
+#define ENABLE_MEASURE_GIZMO_DEBUG (0 && ENABLE_2_5_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_

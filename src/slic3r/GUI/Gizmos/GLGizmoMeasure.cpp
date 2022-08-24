@@ -114,11 +114,11 @@ bool GLGizmoMeasure::on_is_activable() const
 
 void GLGizmoMeasure::on_render()
 {
-#if !ENABLE_DEBUG_DIALOG
+#if !ENABLE_MEASURE_GIZMO_DEBUG
     // do not render if the user is panning/rotating the 3d scene
     if (m_parent.is_mouse_dragging())
         return;
-#endif // !ENABLE_DEBUG_DIALOG
+#endif // !ENABLE_MEASURE_GIZMO_DEBUG
 
     const Selection& selection = m_parent.get_selection();
 
@@ -134,7 +134,7 @@ void GLGizmoMeasure::on_render()
         size_t facet_idx;
         m_c->raycaster()->raycasters().front()->unproject_on_mesh(Vec2d(m_mouse_pos_x, m_mouse_pos_y), model_matrix, camera, pos, normal, nullptr, &facet_idx);
 
-#if ENABLE_DEBUG_DIALOG
+#if ENABLE_MEASURE_GIZMO_DEBUG
         m_imgui->begin(std::string("DEBUG"));
         m_imgui->checkbox(wxString("Show all features"), m_show_all);
         m_imgui->checkbox(wxString("Show all planes"), m_show_planes);
@@ -144,33 +144,35 @@ void GLGizmoMeasure::on_render()
         m_imgui->text(std::string("pos_y: ") + std::to_string(pos.y()));
         m_imgui->text(std::string("pos_z: ") + std::to_string(pos.z()));
         m_imgui->end();
-#endif // ENABLE_DEBUG_DIALOG
+#endif // ENABLE_MEASURE_GIZMO_DEBUG
 
         std::vector<Measure::SurfaceFeature> features;
-#if ENABLE_DEBUG_DIALOG
-        if (m_show_all) {
-            features = m_measuring->get_all_features(); // EXPENSIVE - debugging only.
-            features.erase(std::remove_if(features.begin(), features.end(),
-                [](const Measure::SurfaceFeature& f) {
-                    return f.get_type() == Measure::SurfaceFeatureType::Plane;
-                }), features.end());
+#if ENABLE_MEASURE_GIZMO_DEBUG
+        if (m_show_all || m_show_planes) {
+            features = m_measuring->get_all_features();
+            if (!m_show_planes)
+                features.erase(std::remove_if(features.begin(), features.end(),
+                    [](const Measure::SurfaceFeature& f) {
+                        return f.get_type() == Measure::SurfaceFeatureType::Plane;
+                    }), features.end());
+            if (!m_show_all)
+                features.erase(std::remove_if(features.begin(), features.end(),
+                    [](const Measure::SurfaceFeature& f) {
+                        return f.get_type() != Measure::SurfaceFeatureType::Plane;
+                    }), features.end());
         }
         else {
             if (!m_parent.is_mouse_dragging()) {
-#endif // ENABLE_DEBUG_DIALOG
+#endif // ENABLE_MEASURE_GIZMO_DEBUG
                 std::optional<Measure::SurfaceFeature> feat = m_measuring->get_feature(facet_idx, pos.cast<double>());
                 if (feat.has_value())
                     features.emplace_back(*feat);
-#if ENABLE_DEBUG_DIALOG
+#if ENABLE_MEASURE_GIZMO_DEBUG
             }
         }
-#endif // ENABLE_DEBUG_DIALOG
+#endif // ENABLE_MEASURE_GIZMO_DEBUG
 
-#if ENABLE_DEBUG_DIALOG
-        if (features.empty() && !m_show_planes)
-#else
         if (features.empty())
-#endif // ENABLE_DEBUG_DIALOG
             return;
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
@@ -253,18 +255,6 @@ void GLGizmoMeasure::on_render()
             }
             }
         }
-#if ENABLE_DEBUG_DIALOG
-        if (m_show_planes) {
-            const Transform3d view_model_matrix = view_matrix * model_matrix;
-            shader->set_uniform("view_model_matrix", view_model_matrix);
-            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-            shader->set_uniform("view_normal_matrix", view_normal_matrix);
-            for (GLModel& glmodel : m_plane_models_cache) {
-                glmodel.set_color(HOVER_COLOR);
-                glmodel.render();
-            }
-        }
-#endif // ENABLE_DEBUG_DIALOG
         shader->stop_using();
     }
 }

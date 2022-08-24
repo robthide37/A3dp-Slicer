@@ -69,9 +69,11 @@ public:
     explicit Measuring(const indexed_triangle_set& its);
     ~Measuring();
     
+#if ENABLE_MEASURE_GIZMO_DEBUG
     // Return a reference to a list of all features identified on the its.
     // Use only for debugging. Expensive, do not call often.
-    [[deprecated]] std::vector<SurfaceFeature> get_all_features() const;
+    std::vector<SurfaceFeature> get_all_features() const;
+#endif // ENABLE_MEASURE_GIZMO_DEBUG
 
     // Given a face_idx where the mouse cursor points, return a feature that
     // should be highlighted (if any).
