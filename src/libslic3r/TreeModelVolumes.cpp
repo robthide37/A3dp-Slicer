@@ -591,16 +591,33 @@ void TreeModelVolumes::calculateAvoidance(const std::vector<RadiusLayerPair> &ke
             // The following loop propagating avoidance regions bottom up is inherently serial.
             const bool  collision_holefree = (task.slow() || task.holefree()) && task.radius < m_increase_until_radius + m_current_min_xy_dist_delta;
             const float max_move           = task.slow() ? m_max_move_slow : m_max_move;
+            // Limiting the offset step so that unioning the shrunk latest_avoidance with the current layer collisions
+            // will not create gaps in the resulting avoidance region letting a tree support branch tunneling through an object wall.
+            float move_step      = 1.9 * std::max(task.radius, m_current_min_xy_dist);
+            int   move_steps     = round_up_divide<int>(max_move, move_step);
+            assert(move_steps > 0);
+            float last_move_step = max_move - (move_steps - 1) * move_step;
+            if (last_move_step < scaled<float>(0.05)) {
+                assert(move_steps > 1);
+                if (move_steps > 1) {
+                    // Avoid taking a very short last step, stretch the other steps a bit instead.
+                    move_step = max_move / (-- move_steps);
+                    last_move_step = move_step;
+                }
+            }
             // minDist as the delta was already added, also avoidance for layer 0 will return the collision.
             Polygons    latest_avoidance   = getAvoidance(task.radius, task.start_layer - 1, task.type, task.to_model, true);
             std::vector<std::pair<RadiusLayerPair, Polygons>> data;
             data.reserve(task.max_required_layer + 1 - task.start_layer);
             for (LayerIndex layer_idx = task.start_layer; layer_idx <= task.max_required_layer; ++ layer_idx) {
-                latest_avoidance = union_(
-                    // Propagate avoidance region from the layers below, adjust for allowed tilt of the tree branch.
-                    offset(union_ex(latest_avoidance), -max_move, ClipperLib::jtRound, m_min_resolution),
-                    // Add current layer collisions.
-                    collision_holefree ? getCollisionHolefree(task.radius, layer_idx) : getCollision(task.radius, layer_idx, true));
+                // Merge current layer collisions with shrunk last_avoidance.
+                const Polygons &current_layer_collisions = collision_holefree ? getCollisionHolefree(task.radius, layer_idx) : getCollision(task.radius, layer_idx, true);
+                // For mildly steep branch angles only one step will be taken.
+                for (size_t istep = 0; istep < move_steps; ++ istep)
+                    latest_avoidance = union_(current_layer_collisions,
+                        offset(latest_avoidance,
+                            istep + 1 == move_steps ? - last_move_step : - move_step,
+                            ClipperLib::jtRound, m_min_resolution));
                 if (task.to_model)
                     latest_avoidance = diff(latest_avoidance, getPlaceableAreas(task.radius, layer_idx));
                 latest_avoidance = polygons_simplify(latest_avoidance, m_min_resolution);
