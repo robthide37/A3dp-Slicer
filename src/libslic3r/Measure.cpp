@@ -1,3 +1,4 @@
+#include "libslic3r/libslic3r.h"
 #include "Measure.hpp"
 
 #include "libslic3r/Geometry/Circle.hpp"
@@ -407,10 +408,12 @@ Measuring::Measuring(const indexed_triangle_set& its)
 Measuring::~Measuring() {}
 
 
+#if ENABLE_MEASURE_GIZMO_DEBUG
 std::vector<SurfaceFeature> Measuring::get_all_features() const
 {
     return priv->get_all_features();
 }
+#endif // ENABLE_MEASURE_GIZMO_DEBUG
 
 
 std::optional<SurfaceFeature> Measuring::get_feature(size_t face_idx, const Vec3d& point) const

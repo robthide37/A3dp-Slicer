@@ -11,8 +11,6 @@
 
 #include <memory>
 
-#define ENABLE_DEBUG_DIALOG 0
-
 namespace Slic3r {
 
 class ModelVolume;
@@ -51,10 +49,10 @@ private:
 
     int m_mouse_pos_x;
     int m_mouse_pos_y;
-#if ENABLE_DEBUG_DIALOG
+#if ENABLE_MEASURE_GIZMO_DEBUG
     bool m_show_all = false;
     bool m_show_planes = false;
-#endif // ENABLE_DEBUG_DIALOG
+#endif // ENABLE_MEASURE_GIZMO_DEBUG
 
     void update_if_needed();
 
