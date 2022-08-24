@@ -370,6 +370,10 @@ namespace GUI {
     // the axis of the cylinder is the Z axis
     // the origin of the cylinder is the center of its bottom cap face
     GLModel::Geometry smooth_cylinder(unsigned int resolution, float radius, float height);
+    // create a torus with smooth normals
+    // the axis of the torus is the Z axis
+    // the origin of the torus is in its center
+    GLModel::Geometry smooth_torus(unsigned int primary_resolution, unsigned int secondary_resolution, float radius, float thickness);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace GUI
