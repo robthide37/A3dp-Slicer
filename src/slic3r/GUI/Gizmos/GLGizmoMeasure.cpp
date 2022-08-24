@@ -233,23 +233,28 @@ void GLGizmoMeasure::on_render()
             case Measure::SurfaceFeatureType::Plane:
             {
                 const auto& [idx, normal, pt] = feature.get_plane();
-                assert(idx < m_plane_models.size());
+                assert(idx < m_plane_models_cache.size());
                 const Transform3d view_model_matrix = view_matrix * model_matrix;
                 shader->set_uniform("view_model_matrix", view_model_matrix);
                 const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
                 shader->set_uniform("view_normal_matrix", view_normal_matrix);
-                m_plane_models[idx]->set_color(HOVER_COLOR);
-                m_plane_models[idx]->render();
+                m_plane_models_cache[idx].set_color(HOVER_COLOR);
+                m_plane_models_cache[idx].render();
                 break;
             }
             }
         }
 #if ENABLE_DEBUG_DIALOG
-        if (m_show_planes)
-            for (const auto& glmodel : m_plane_models) {
-                glmodel->set_color(HOVER_COLOR);
-                glmodel->render();
+        if (m_show_planes) {
+            const Transform3d view_model_matrix = view_matrix * model_matrix;
+            shader->set_uniform("view_model_matrix", view_model_matrix);
+            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+            shader->set_uniform("view_normal_matrix", view_normal_matrix);
+            for (GLModel& glmodel : m_plane_models_cache) {
+                glmodel.set_color(HOVER_COLOR);
+                glmodel.render();
             }
+        }
 #endif // ENABLE_DEBUG_DIALOG
     }
 
@@ -270,17 +275,14 @@ void GLGizmoMeasure::on_render()
 
 void GLGizmoMeasure::update_if_needed()
 {
-    auto do_update = [this](const ModelObject* object, const ModelVolume* volume) {
-        const indexed_triangle_set& its = (volume != nullptr) ? volume->mesh().its : object->volumes.front()->mesh().its;
-        m_measuring.reset(new Measure::Measuring(its));
-        m_plane_models.clear();
+    auto update_plane_models_cache = [this](const indexed_triangle_set& its) {
+        m_plane_models_cache.clear();
         const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
         for (const std::vector<int>& triangle_indices : planes_triangles) {
-            m_plane_models.emplace_back(std::unique_ptr<GLModel>(new GLModel()));
+            m_plane_models_cache.emplace_back(GLModel());
             GLModel::Geometry init_data;
             init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
-            init_data.color = ColorRGBA(0.9f, 0.9f, 0.9f, 0.5f);
-            int i = 0;
+            unsigned int i = 0;
             for (int idx : triangle_indices) {
                 const Vec3f& v0 = its.vertices[its.indices[idx][0]];
                 const Vec3f& v1 = its.vertices[its.indices[idx][1]];
@@ -293,8 +295,15 @@ void GLGizmoMeasure::update_if_needed()
                 init_data.add_triangle(i, i + 1, i + 2);
                 i += 3;
             }
-            m_plane_models.back()->init_from(std::move(init_data));
+            m_plane_models_cache.back().init_from(std::move(init_data));
         }
+    };
+
+    auto do_update = [this, update_plane_models_cache](const ModelObject* object, const ModelVolume* volume) {
+        const indexed_triangle_set& its = (volume != nullptr) ? volume->mesh().its : object->volumes.front()->mesh().its;
+        m_measuring.reset(new Measure::Measuring(its));
+
+        update_plane_models_cache(its);
 
         // Let's save what we calculated it from:
         m_volumes_matrices.clear();
@@ -306,7 +315,7 @@ void GLGizmoMeasure::update_if_needed()
                 m_volumes_matrices.push_back(vol->get_matrix());
                 m_volumes_types.push_back(vol->type());
             }
-            m_first_instance_scale = object->instances.front()->get_scaling_factor();
+            m_first_instance_scale  = object->instances.front()->get_scaling_factor();
             m_first_instance_mirror = object->instances.front()->get_mirror();
         }
         m_old_model_object = object;
