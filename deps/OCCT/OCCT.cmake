@@ -21,6 +21,7 @@ prusaslicer_add_cmake_project(OCCT
 		-DBUILD_MODULE_Visualization=OFF
 )
 
-if (MSVC)
-    add_debug_dep(dep_OCCT)
-endif ()
+# TODO: debug mode does not compile
+# if (MSVC)
+#   add_debug_dep(dep_OCCT)
+# endif ()

@@ -380,6 +380,7 @@ function(slic3r_remap_configs targets from_Cfg to_Cfg)
     
         foreach(tgt ${targets})
             if(TARGET ${tgt})
+                message(STATUS "remapping target ${tgt}")
                 set_target_properties(${tgt} PROPERTIES MAP_IMPORTED_CONFIG_${from_CFG} ${to_Cfg})
             endif()
         endforeach()
