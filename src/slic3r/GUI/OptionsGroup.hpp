@@ -18,6 +18,11 @@
     #define wxOSX true
 #else
     #define wxOSX false
+#endif 
+#ifdef __WXGTK3__
+    #define wxGTK3 true
+#else
+    #define wxGTK3 false
 #endif
 
 #define BORDER(a, b) ((wxOSX ? a : b))

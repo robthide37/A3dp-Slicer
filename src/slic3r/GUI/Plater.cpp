@@ -867,11 +867,7 @@ Sidebar::Sidebar(Plater *parent)
     if (p->mode_sizer)
         scrolled_sizer->Add(p->mode_sizer, 0, wxALIGN_CENTER_HORIZONTAL);
 
-#ifdef __WXGTK3__
-    int size_margin = wxLEFT | wxRIGHT;
-#else
-    int size_margin = wxLEFT;
-#endif // __WXGTK3__
+    int size_margin = wxGTK3 ? wxLEFT | wxRIGHT : wxLEFT;
 
     is_msw ?
         scrolled_sizer->Add(p->presets_panel, 0, wxEXPAND | size_margin, margin_5) :

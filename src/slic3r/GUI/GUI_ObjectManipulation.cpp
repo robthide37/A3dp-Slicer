@@ -257,9 +257,9 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         //    axis_name->SetForegroundColour(wxColour(axes_color_text[axis_idx]));
 
         sizer = new wxBoxSizer(wxHORIZONTAL);
-        // Under OSX we use font, smaller than default font, so
+        // Under OSX or Linux with GTK3 we use font, smaller than default font, so
         // there is a next trick for an equivalent layout of coordinates combobox and axes labels in they own sizers
-        if (wxOSX) 
+        if (wxOSX || wxGTK3)
             sizer->SetMinSize(-1, m_word_local_combo->GetBestHeight(-1));
         sizer->Add(axis_name, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, border);
 
