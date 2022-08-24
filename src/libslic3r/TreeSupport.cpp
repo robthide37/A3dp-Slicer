@@ -278,30 +278,54 @@ static bool layer_has_overhangs(const Layer &layer)
 {
     std::vector<Polygons> out(print_object.layer_count(), Polygons{});
 
-    const bool              support_auto = print_object.config().support_material_auto.value;
-    std::vector<Polygons>   enforcers_layers{ print_object.slice_support_enforcers() };
-    std::vector<Polygons>   blockers_layers{ print_object.slice_support_blockers() };
+    const PrintObjectConfig &config                 = print_object.config();
+    const bool               support_auto           = config.support_material_auto.value;
+    const int                support_enforce_layers = config.support_material_enforce_layers.value;
+    std::vector<Polygons>    enforcers_layers{ print_object.slice_support_enforcers() };
+    std::vector<Polygons>    blockers_layers{ print_object.slice_support_blockers() };
     print_object.project_and_append_custom_facets(false, EnforcerBlockerType::ENFORCER, enforcers_layers);
     print_object.project_and_append_custom_facets(false, EnforcerBlockerType::BLOCKER, blockers_layers);
+    const int                support_threshold      = config.support_material_threshold.value;
+    const bool               support_threshold_auto = support_threshold == 0;
+    // +1 makes the threshold inclusive
+    double                   tan_threshold          = support_threshold_auto ? 0. : tan(M_PI * double(support_threshold + 1) / 180.);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(1, out.size()),
-        [&print_object, &enforcers_layers, &blockers_layers, support_auto, &out](const tbb::blocked_range<size_t> &range) {
-        for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
-            if (layer_has_overhangs(*print_object.get_layer(layer_idx))) {
-                Polygons overhangs;
-                const bool has_enforcers = ! enforcers_layers.empty() && ! enforcers_layers[layer_idx].empty();
-                if (support_auto) {
-                    overhangs = layer_overhangs(*print_object.get_layer(layer_idx));
-                    if (! blockers_layers.empty() && ! blockers_layers[layer_idx].empty())
-                        // Has some support blockers at this layer, apply them to the overhangs.
-                        // Enforcers have priority over blockers: Clip blockers by enforcers.
-                        overhangs = diff(overhangs, has_enforcers ? diff(blockers_layers[layer_idx], enforcers_layers[layer_idx]) : blockers_layers[layer_idx]);
-                } else if (has_enforcers) {
-                    // Has some support enforcers at this layer, apply them to the overhangs.
-                    overhangs = intersection(layer_overhangs(*print_object.get_layer(layer_idx)), enforcers_layers[layer_idx]);
-                } else
-                    continue;
-                out[layer_idx] = std::move(overhangs);
+        [&print_object, &enforcers_layers, &blockers_layers, support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, &out](const tbb::blocked_range<size_t> &range) {
+        for (size_t layer_id = range.begin(); layer_id < range.end(); ++ layer_id)
+            if (layer_has_overhangs(*print_object.get_layer(layer_id))) {
+                const Polygons raw_overhangs  = layer_overhangs(*print_object.get_layer(layer_id));
+                Polygons       overhangs;
+                const bool     enforced_layer = layer_id < support_enforce_layers;
+                if (support_auto || enforced_layer) {
+                    const Layer    &lower_layer       = *print_object.get_layer(layer_id - 1);
+                    const Polygons &clipped_overhangs = enforced_layer || blockers_layers.empty() || blockers_layers[layer_id].empty() ?
+                        raw_overhangs :
+                        diff(raw_overhangs, blockers_layers[layer_id]);
+                    float           lower_layer_offset;
+                    if (enforced_layer)
+                        lower_layer_offset = 0;
+                    else if (support_threshold_auto) {
+                        float external_perimeter_width = 0;
+                        for (const LayerRegion *layerm : lower_layer.regions())
+                            external_perimeter_width += layerm->flow(frExternalPerimeter).scaled_width();
+                        external_perimeter_width /= lower_layer.region_count();
+                        lower_layer_offset = float(0.5 * external_perimeter_width);
+                    } else
+                        lower_layer_offset = scaled<float>(lower_layer.height / tan_threshold);
+                    overhangs = lower_layer_offset == 0 ?
+                        diff(clipped_overhangs, lower_layer.lslices) :
+                        diff(clipped_overhangs, offset(lower_layer.lslices, lower_layer_offset));
+                }
+                if (! enforcers_layers.empty() && ! enforcers_layers[layer_id].empty()) {
+                    // Has some support enforcers at this layer, apply them to the overhangs, don't apply the support threshold angle.
+                    if (Polygons enforced_overhangs = intersection(raw_overhangs, enforcers_layers[layer_id]); ! enforced_overhangs.empty())
+                        if (overhangs.empty())
+                            overhangs = std::move(enforced_overhangs);
+                        else
+                            overhangs = union_(overhangs, enforced_overhangs);
+                }
+                out[layer_id] = std::move(overhangs);
             }
     });
 
@@ -1075,6 +1099,7 @@ void TreeSupport::generateInitialAreas(
     const size_t support_roof_layers = mesh_group_settings.support_roof_enable ? (mesh_group_settings.support_roof_height + mesh_config.layer_height / 2) / mesh_config.layer_height : 0;
     const bool roof_enabled = support_roof_layers != 0;
     const bool force_tip_to_roof = (mesh_config.min_radius * mesh_config.min_radius * M_PI > mesh_group_settings.minimum_roof_area) && roof_enabled;
+    //FIXME mesh_group_settings.support_angle does not apply to enforcers and also it does not apply to automatic support angle (by half the external perimeter width).
     const coord_t max_overhang_speed = (mesh_group_settings.support_angle < 0.5 * M_PI) ? (coord_t)(tan(mesh_group_settings.support_angle) * mesh_config.layer_height) : std::numeric_limits<coord_t>::max();
     const size_t max_overhang_insert_lag = std::max((size_t)round_up_divide(mesh_config.xy_distance, max_overhang_speed / 2), 2 * mesh_config.z_distance_top_layers); // cap for how much layer below the overhang a new support point may be added, as other than with regular support every new inserted point may cause extra material and time cost.  Could also be an user setting or differently calculated. Idea is that if an overhang does not turn valid in double the amount of layers a slope of support angle would take to travel xy_distance, nothing reasonable will come from it. The 2*z_distance_delta is only a catch for when the support angle is very high.
 
@@ -1204,7 +1229,10 @@ void TreeSupport::generateInitialAreas(
             const Polygons &overhang_raw = overhangs[layer_idx + z_distance_delta];
             Polygons overhang_regular = safeOffsetInc(overhang_raw, mesh_group_settings.support_offset, relevant_forbidden, mesh_config.min_radius * 1.75 + mesh_config.xy_min_distance, 0, 1);
             // offset ensures that areas that could be supported by a part of a support line, are not considered unsupported overhang
-            Polygons remaining_overhang = intersection(diff(offset(union_ex(overhang_raw), mesh_group_settings.support_offset, jtMiter, 1.2), offset(union_ex(overhang_regular), mesh_config.support_line_width * 0.5, jtMiter, 1.2)), relevant_forbidden);
+            Polygons remaining_overhang = intersection(
+                diff(offset(union_ex(overhang_raw), mesh_group_settings.support_offset, jtMiter, 1.2), 
+                     offset(union_ex(overhang_regular), mesh_config.support_line_width * 0.5, jtMiter, 1.2)),
+                relevant_forbidden);
             coord_t extra_total_offset_acc = 0;
 
             // Offset the area to compensate for large tip radiis. Offset happens in multiple steps to ensure the tip is as close to the original overhang as possible.
