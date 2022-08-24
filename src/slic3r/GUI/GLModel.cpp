@@ -2271,7 +2271,7 @@ GLModel::Geometry smooth_cylinder(unsigned int resolution, float radius, float h
         ret.reserve(sectorCount);
         for (unsigned int i = 0; i < sectorCount; ++i) {
             // from 0 to 2pi
-            const float sectorAngle = (i != sectorCount) ? sectorStep * i : 0.0f;
+            const float sectorAngle = sectorStep * i;
             ret.emplace_back(radius * std::cos(sectorAngle), radius * std::sin(sectorAngle), 0.0f);
         }
         return ret;
@@ -2326,6 +2326,51 @@ GLModel::Geometry smooth_cylinder(unsigned int resolution, float radius, float h
     // top cap triangles
     for (unsigned int i = 0; i < sectorCount; ++i) {
         data.add_triangle(cap_center_id, cap_center_id + i + 1, (i < sectorCount - 1) ? cap_center_id + i + 2 : cap_center_id + 1);
+    }
+
+    return data;
+}
+
+GLModel::Geometry smooth_torus(unsigned int primary_resolution, unsigned int secondary_resolution, float radius, float thickness)
+{
+    primary_resolution = std::max<unsigned int>(4, primary_resolution);
+    secondary_resolution = std::max<unsigned int>(4, secondary_resolution);
+    const unsigned int torusSectorCount = primary_resolution;
+    const float torusSectorStep = 2.0f * float(M_PI) / float(torusSectorCount);
+    const unsigned int sectionSectorCount = secondary_resolution;
+    const float sectionSectorStep = 2.0f * float(M_PI) / float(sectionSectorCount);
+
+    GLModel::Geometry data;
+    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+    data.reserve_vertices(torusSectorCount * sectionSectorCount);
+    data.reserve_indices(torusSectorCount * sectionSectorCount * 2 * 3);
+
+    // vertices
+    for (unsigned int i = 0; i < torusSectorCount; ++i) {
+        const float sectionAngle = torusSectorStep * i;
+        const Vec3f sectionCenter(radius * std::cos(sectionAngle), radius * std::sin(sectionAngle), 0.0f);
+        for (unsigned int j = 0; j < sectionSectorCount; ++j) {
+            const float circleAngle = sectionSectorStep * j;
+            const float thickness_xy = thickness * std::cos(circleAngle);
+            const float thickness_z  = thickness * std::sin(circleAngle);
+            const Vec3f v(thickness_xy * std::cos(sectionAngle), thickness_xy * std::sin(sectionAngle), thickness_z);
+            data.add_vertex(sectionCenter + v, (Vec3f)v.normalized());
+        }
+    }
+
+    // triangles
+    for (unsigned int i = 0; i < torusSectorCount; ++i) {
+        const unsigned int ii = i * sectionSectorCount;
+        const unsigned int ii_next = ((i + 1) % torusSectorCount) * sectionSectorCount;
+        for (unsigned int j = 0; j < sectionSectorCount; ++j) {
+            const unsigned int j_next = (j + 1) % sectionSectorCount;
+            const unsigned int i0 = ii + j;
+            const unsigned int i1 = ii_next + j;
+            const unsigned int i2 = ii_next + j_next;
+            const unsigned int i3 = ii + j_next;
+            data.add_triangle(i0, i1, i2);
+            data.add_triangle(i0, i2, i3);
+        }
     }
 
     return data;

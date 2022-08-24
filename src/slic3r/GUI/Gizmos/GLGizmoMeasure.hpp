@@ -32,8 +32,9 @@ class GLGizmoMeasure : public GLGizmoBase
 private:
     std::unique_ptr<Measure::Measuring> m_measuring;
 
-    GLModel m_vbo_sphere;
-    GLModel m_vbo_cylinder;
+    GLModel m_sphere;
+    GLModel m_cylinder;
+    GLModel m_circle;
 
     // This holds information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;

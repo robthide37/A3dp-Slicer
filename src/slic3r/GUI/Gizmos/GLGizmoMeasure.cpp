@@ -22,8 +22,8 @@ static const Slic3r::ColorRGBA HOVER_COLOR = { 0.8f, 0.2f, 0.2f, 1.0f };
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
-    m_vbo_sphere.init_from(smooth_sphere(16, 7.5f));
-    m_vbo_cylinder.init_from(smooth_cylinder(16, 5.0f, 1.0f));
+    m_sphere.init_from(smooth_sphere(16, 7.5f));
+    m_cylinder.init_from(smooth_cylinder(16, 5.0f, 1.0f));
 }
 
 bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
@@ -188,38 +188,32 @@ void GLGizmoMeasure::on_render()
                 shader->set_uniform("view_model_matrix", view_model_matrix);
                 const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
                 shader->set_uniform("view_normal_matrix", view_normal_matrix);
-                m_vbo_sphere.set_color(HOVER_COLOR);
-                m_vbo_sphere.render();
+                m_sphere.set_color(HOVER_COLOR);
+                m_sphere.render();
                 break;
             }
             case Measure::SurfaceFeatureType::Circle:
             {
                 const auto& [center, radius, n] = feature.get_circle();
                 // render center
-                const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(center) * Geometry::scale_transform(inv_zoom);
-                const Transform3d view_model_matrix = view_matrix * feature_matrix;
-                shader->set_uniform("view_model_matrix", view_model_matrix);
-                const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-                shader->set_uniform("view_normal_matrix", view_normal_matrix);
-                m_vbo_sphere.set_color(HOVER_COLOR);
-                m_vbo_sphere.render();
+                const Transform3d center_matrix = model_matrix * Geometry::translation_transform(center) * Geometry::scale_transform(inv_zoom);
+                const Transform3d center_view_model_matrix = view_matrix * center_matrix;
+                shader->set_uniform("view_model_matrix", center_view_model_matrix);
+                const Matrix3d center_view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * center_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+                shader->set_uniform("view_normal_matrix", center_view_normal_matrix);
+                m_sphere.set_color(HOVER_COLOR);
+                m_sphere.render();
 
-                // Now draw the circle itself - let's take a funny shortcut:
-                Vec3d rad = n.cross(Vec3d::UnitX());
-                if (rad.squaredNorm() < 0.1)
-                    rad = n.cross(Vec3d::UnitY());
-                rad *= radius * rad.norm();
-                const int N = 32;
-                m_vbo_sphere.set_color(HOVER_COLOR);
-                for (int i = 0; i < N; ++i) {
-                    rad = Eigen::AngleAxisd(2.0 * M_PI / N, n) * rad;
-                    const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(center + rad) * Geometry::scale_transform(N / 100.0 * inv_zoom);
-                    const Transform3d view_model_matrix = view_matrix * feature_matrix;
-                    shader->set_uniform("view_model_matrix", view_model_matrix);
-                    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-                    shader->set_uniform("view_normal_matrix", view_normal_matrix);
-                    m_vbo_sphere.render();
-                }
+                m_circle.reset();
+                m_circle.init_from(smooth_torus(64, 16, float(radius), 5.0f * inv_zoom));
+
+                const Transform3d circle_matrix = model_matrix * Geometry::translation_transform(center);
+                const Transform3d circle_view_model_matrix = view_matrix * circle_matrix;
+                shader->set_uniform("view_model_matrix", circle_view_model_matrix);
+                const Matrix3d circle_view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * circle_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+                shader->set_uniform("view_normal_matrix", circle_view_normal_matrix);
+                m_circle.set_color(HOVER_COLOR);
+                m_circle.render();
                 break;
             }
             case Measure::SurfaceFeatureType::Edge:
@@ -232,23 +226,8 @@ void GLGizmoMeasure::on_render()
                 shader->set_uniform("view_model_matrix", view_model_matrix);
                 const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
                 shader->set_uniform("view_normal_matrix", view_normal_matrix);
-                m_vbo_cylinder.set_color(HOVER_COLOR);
-                m_vbo_cylinder.render();
-
-/*
-                std::optional<Vec3d> extra_point = feature.get_extra_point();
-                if (extra_point.has_value()) {
-                    const Vec3d pin = *extra_point;
-                    const Transform3d feature_matrix = Geometry::translation_transform(pin + selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) *
-                        Geometry::scale_transform(inv_zoom) * model_matrix;
-                    const Transform3d view_model_matrix = view_matrix * feature_matrix;
-                    shader->set_uniform("view_model_matrix", view_model_matrix);
-                    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-                    shader->set_uniform("view_normal_matrix", view_normal_matrix);
-                    m_vbo_sphere.set_color(HOVER_COLOR);
-                    m_vbo_sphere.render();
-                }
-*/
+                m_cylinder.set_color(HOVER_COLOR);
+                m_cylinder.render();
                 break;
             }
             case Measure::SurfaceFeatureType::Plane:
