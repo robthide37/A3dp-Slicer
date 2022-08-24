@@ -110,7 +110,7 @@ void export_support_surface_type_legend_to_svg(SVG &svg, const Point &pos)
     svg.draw_legend(Point(pos_x, pos_y), "intermediate"   , support_surface_type_to_color_name(SupporLayerType::Intermediate));
 }
 
-void export_print_z_polygons_to_svg(const char *path, SupportGeneratorLayer ** const layers, size_t n_layers)
+void export_print_z_polygons_to_svg(const char *path, SupportGeneratorLayer ** const layers, int n_layers)
 {
     BoundingBox bbox;
     for (int i = 0; i < n_layers; ++ i)
@@ -129,10 +129,10 @@ void export_print_z_polygons_to_svg(const char *path, SupportGeneratorLayer ** c
 }
 
 void export_print_z_polygons_and_extrusions_to_svg(
-    const char                                      *path, 
+    const char                        *path, 
     SupportGeneratorLayer ** const     layers, 
-    size_t                                           n_layers,
-    SupportLayer                                    &support_layer)
+    int                                n_layers,
+    SupportLayer                      &support_layer)
 {
     BoundingBox bbox;
     for (int i = 0; i < n_layers; ++ i)

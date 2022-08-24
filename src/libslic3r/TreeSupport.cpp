@@ -186,9 +186,9 @@ static std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_
     // as different settings in the same group may only occur in the tip, which uses the original settings objects from the meshes.
     for (size_t object_id = 0; object_id < print_object_ids.size(); ++ object_id) {
         const PrintObject       &print_object  = *print.get_object(object_id);
-#ifndef _NDEBUG
+#ifndef NDEBUG
         const PrintObjectConfig &object_config = print_object.config();
-#endif // _NDEBUG
+#endif // NDEBUG
         // Support must be enabled and set to Tree style.
         assert(object_config.support_material);
         assert(object_config.support_material_style == smsTree);
@@ -347,7 +347,7 @@ static bool layer_has_overhangs(const Layer &layer)
     for (size_t object_id : object_ids) {
         const PrintObject &print_object         = *print.get_object(object_id);
         int                max_support_layer_id = 0;
-        for (int layer_id = 1; layer_id < print_object.layer_count(); ++ layer_id)
+        for (int layer_id = 1; layer_id < int(print_object.layer_count()); ++ layer_id)
             if (! overhangs[layer_id].empty())
                 max_support_layer_id = layer_id;
         max_layer = std::max(max_support_layer_id - int(config.z_distance_top_layers), 0);
@@ -995,7 +995,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
     }
 
     coord_t step_size = safe_step_size;
-    size_t steps = distance > last_step_offset_without_check ? (distance - last_step_offset_without_check) / step_size : 0;
+    int     steps = distance > last_step_offset_without_check ? (distance - last_step_offset_without_check) / step_size : 0;
     if (distance - steps * step_size > last_step_offset_without_check) {
         if ((steps + 1) * step_size <= distance)
             // This will be the case when last_step_offset_without_check >= safe_step_size
@@ -1015,7 +1015,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
             steps = distance / step_size;
     }
     // offset in steps
-    for (size_t i = 0; i < steps; i++) {
+    for (int i = 0; i < steps; ++ i) {
         ret = diff(offset(ret, step_size, ClipperLib::jtRound, scaled<float>(0.01)), collision_trimmed());
         // ensure that if many offsets are done the performance does not suffer extremely by the new vertices of jtRound.
         if (i % 10 == 7)
@@ -2309,7 +2309,7 @@ bool TreeSupport::setToModelContact(std::vector<std::set<SupportElement*>>& move
             moveInside(*checked[last_successfull_layer - layer_idx]->area, best);
         checked[last_successfull_layer - layer_idx]->result_on_layer = best;
 
-        BOOST_LOG_TRIVIAL(debug) << "Added gracious Support On Model Point (" << best.x() << "," << best.y() << "). The current layer is ", last_successfull_layer;
+        BOOST_LOG_TRIVIAL(debug) << "Added gracious Support On Model Point (" << best.x() << "," << best.y() << "). The current layer is " << last_successfull_layer;
 
         return last_successfull_layer != layer_idx;
     }
@@ -2320,11 +2320,10 @@ bool TreeSupport::setToModelContact(std::vector<std::set<SupportElement*>>& move
             moveInside(*first_elem->area, best);
         first_elem->result_on_layer = best;
         first_elem->to_model_gracious = false;
-        BOOST_LOG_TRIVIAL(debug) << "Added NON gracious Support On Model Point (" << best.x() << "," << best.y() << "). The current layer is ", layer_idx;
+        BOOST_LOG_TRIVIAL(debug) << "Added NON gracious Support On Model Point (" << best.x() << "," << best.y() << "). The current layer is " << layer_idx;
         return false;
     }
 }
-
 
 void TreeSupport::createNodesFromArea(std::vector<std::set<SupportElement*>>& move_bounds)
 {

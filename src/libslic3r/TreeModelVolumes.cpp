@@ -465,10 +465,10 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
                         Polygons collisions;
                         for (int i = -z_distance_bottom_layers; i <= z_distance_top_layers; ++ i) {
                             int j = layer_idx + i - min_layer_bottom;
-                            if (j >= 0 && j < collision_areas_offsetted.size())
+                            if (j >= 0 && j < int(collision_areas_offsetted.size()))
                                 append(collisions, collision_areas_offsetted[j]);
                         }
-                        collisions = last && layer_idx < anti_overhang.size() ? union_(collisions, offset(union_ex(anti_overhang[layer_idx]), radius, ClipperLib::jtMiter, 1.2)) : union_(collisions);
+                        collisions = last && layer_idx < int(anti_overhang.size()) ? union_(collisions, offset(union_ex(anti_overhang[layer_idx]), radius, ClipperLib::jtMiter, 1.2)) : union_(collisions);
                         auto &dst = data[layer_idx - (min_layer_last + 1)];
                         if (last) {
                             if (! dst.empty())
@@ -490,7 +490,7 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
                         assert(layer_idx_below >= 0);
                         auto &current = collision_areas_offsetted[layer_idx - min_layer_bottom];
                         auto &below   = collision_areas_offsetted[layer_idx_below];
-                        auto placable = diff(below, layer_idx < anti_overhang.size() ? union_(current, anti_overhang[layer_idx - (z_distance_bottom_layers + 1)]) : current);
+                        auto placable = diff(below, layer_idx < int(anti_overhang.size()) ? union_(current, anti_overhang[layer_idx - (z_distance_bottom_layers + 1)]) : current);
                         auto &dst     = data_placeable[layer_idx - (min_layer_last + 1)];
                         if (last) {
                             if (! dst.empty())
@@ -524,10 +524,10 @@ void TreeModelVolumes::calculateCollisionHolefree(const std::vector<RadiusLayerP
     for (long long unsigned int i = 0; i < keys.size(); i++)
         max_layer = std::max(max_layer, keys[i].second);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, max_layer + 1, keys.size()),
-        [&](const tbb::blocked_range<size_t> &range) {
+    tbb::parallel_for(tbb::blocked_range<LayerIndex>(0, max_layer + 1, keys.size()),
+        [&](const tbb::blocked_range<LayerIndex> &range) {
         RadiusLayerPolygonCacheData data;
-        for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
+        for (LayerIndex layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
             for (RadiusLayerPair key : keys)
                 if (layer_idx <= key.second) {
                     // Logically increase the collision by m_increase_until_radius
@@ -565,7 +565,7 @@ void TreeModelVolumes::calculateAvoidance(const std::vector<RadiusLayerPair> &ke
     std::vector<AvoidanceTask> avoidance_tasks;
     avoidance_tasks.reserve((int(to_build_plate) + int(to_model)) * keys.size() * size_t(AvoidanceType::Count));
 
-    for (int iter_idx = 0; iter_idx < 2 * keys.size() * size_t(AvoidanceType::Count); ++ iter_idx) {
+    for (int iter_idx = 0; iter_idx < 2 * int(keys.size()) * int(AvoidanceType::Count); ++ iter_idx) {
         AvoidanceTask task{
             AvoidanceType(iter_idx % int(AvoidanceType::Count)),
             keys[iter_idx / 6].first,  // radius
@@ -666,7 +666,7 @@ void TreeModelVolumes::calculatePlaceables(const coord_t radius, const LayerInde
 
     tbb::parallel_for(tbb::blocked_range<LayerIndex>(std::max(1, start_layer), max_required_layer + 1),
         [this, &data, radius, start_layer](const tbb::blocked_range<LayerIndex>& range) {
-            for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
+            for (LayerIndex layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
                 data[layer_idx - start_layer] = offset(union_ex(getPlaceableAreas(0, layer_idx)), - radius, jtMiter, 1.2);
         });
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
@@ -730,7 +730,7 @@ void TreeModelVolumes::calculateWallRestrictions(const std::vector<RadiusLayerPa
                 data_min.assign(buffer_size, Polygons{});
             tbb::parallel_for(tbb::blocked_range<LayerIndex>(min_layer_bottom, max_required_layer + 1),
                 [this, &data, &data_min, radius, min_layer_bottom](const tbb::blocked_range<LayerIndex> &range) {
-                for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
+                for (LayerIndex layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
                     data[layer_idx - min_layer_bottom] = polygons_simplify(
                         // radius contains m_current_min_xy_dist_delta already if required
                         intersection(getCollision(0, layer_idx, false), getCollision(radius, layer_idx - 1, true)),
