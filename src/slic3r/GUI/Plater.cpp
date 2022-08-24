@@ -868,9 +868,9 @@ Sidebar::Sidebar(Plater *parent)
         scrolled_sizer->Add(p->mode_sizer, 0, wxALIGN_CENTER_HORIZONTAL);
 
 #ifdef __WXGTK3__
-    wxDirection size_margin = wxLEFT | wxRIGHT;
+    int size_margin = wxLEFT | wxRIGHT;
 #else
-    wxDirection size_margin = wxLEFT;
+    int size_margin = wxLEFT;
 #endif // __WXGTK3__
 
     is_msw ?
@@ -998,7 +998,7 @@ void Sidebar::init_filament_combo(PlaterPresetComboBox **combo, const int extr_i
     auto /***/sizer_filaments = this->p->sizer_filaments;
     sizer_filaments->Add(combo_and_btn_sizer, 1, wxEXPAND |
 #ifdef __WXGTK3__
-        wxRIGHT, margin_5);
+        wxRIGHT, int(0.5 * wxGetApp().em_unit()));
 #else
         wxBOTTOM, 1);
 #endif // __WXGTK3__
