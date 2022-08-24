@@ -35,6 +35,7 @@ private:
     GLModel m_sphere;
     GLModel m_cylinder;
     GLModel m_circle;
+    std::vector<GLModel> m_plane_models_cache;
 
     // This holds information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;
@@ -54,7 +55,6 @@ private:
     bool m_show_all = false;
     bool m_show_planes = false;
 #endif // ENABLE_DEBUG_DIALOG
-    std::vector<std::unique_ptr<GLModel>> m_plane_models;
 
     void update_if_needed();
 
