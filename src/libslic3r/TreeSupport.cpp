@@ -226,6 +226,7 @@ static std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_
     return grouped_meshes;
 }
 
+#if 0
 // todo remove as only for debugging relevant
 [[nodiscard]] static std::string getPolygonAsString(const Polygons& poly)
 {
@@ -238,6 +239,7 @@ static std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_
         }
     return ret;
 }
+#endif
 
 //todo Remove! Only relevant for public BETA!
 static bool inline g_showed_critical_error = false;
@@ -2122,16 +2124,13 @@ void TreeSupport::increaseAreas(std::unordered_map<SupportElement, Polygons>& to
 
 void TreeSupport::createLayerPathing(std::vector<std::set<SupportElement*>>& move_bounds)
 {
-    const double data_size_inverse = 1 / double(move_bounds.size());
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
+    const double data_size_inverse = 1 / double(move_bounds.size());
     double progress_total = TREE_PROGRESS_PRECALC_AVO + TREE_PROGRESS_PRECALC_COLL + TREE_PROGRESS_GENERATE_NODES;
 #endif // SLIC3R_TREESUPPORTS_PROGRESS
 
     auto dur_inc = std::chrono::duration_values<std::chrono::nanoseconds>::zero();
     auto dur_merge = std::chrono::duration_values<std::chrono::nanoseconds>::zero();
-
-    auto dur_inc_recent = std::chrono::duration_values<std::chrono::nanoseconds>::zero();
-    auto dur_merge_recent = std::chrono::duration_values<std::chrono::nanoseconds>::zero();
 
     LayerIndex last_merge = move_bounds.size();
     bool new_element = false;
@@ -2672,7 +2671,12 @@ void TreeSupport::finalizeInterfaceAndSupportAreas(
                             support_roof->polygons = diff(support_roof->polygons, support_layer_storage[layer_idx]);
                             break;
     //FIXME
-    #if 0
+    #if 1
+                        case InterfacePreference::INTERFACE_LINES_OVERWRITE_SUPPORT:
+                        case InterfacePreference::SUPPORT_LINES_OVERWRITE_INTERFACE:
+                            assert(false);
+                            [[fallthrough]];
+    #else
                         case InterfacePreference::INTERFACE_LINES_OVERWRITE_SUPPORT:
                         {
                             // Hatch the support roof interfaces, offset them by their line width and subtract them from support base.
@@ -2790,7 +2794,7 @@ void TreeSupport::drawAreas(
     auto t_drop = std::chrono::high_resolution_clock::now();
     // single threaded combining all dropped down support areas to the right layers. ONLY COPYS DATA!
     for (coord_t i = 0; i < static_cast<coord_t>(dropped_down_areas.size()); i++)
-        for (std::pair<LayerIndex, Polygons> pair : dropped_down_areas[i])
+        for (std::pair<LayerIndex, Polygons> &pair : dropped_down_areas[i])
             append(support_layer_storage[pair.first], std::move(pair.second));
 
     // single threaded combining all support areas to the right layers. ONLY COPYS DATA!

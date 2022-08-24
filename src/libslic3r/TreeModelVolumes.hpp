@@ -509,6 +509,7 @@ private:
      * \brief Does at least one mesh allow support to rest on a model.
      */
     bool m_support_rests_on_model;
+#ifdef SLIC3R_TREESUPPORTS_PROGRESS
     /*!
      * \brief The progress of the precalculate function for communicating it to the progress bar.
      */
@@ -523,6 +524,7 @@ private:
      * Required for the progress bar the behave as expected when areas have to be calculated multiple times
      */
     double m_progress_offset;
+#endif // SLIC3R_TREESUPPORTS_PROGRESS
     /*!
      * \brief Increase radius in the resulting drawn branches, even if the avoidance does not allow it. Will be cut later to still fit.
      */

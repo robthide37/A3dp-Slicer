@@ -396,7 +396,6 @@ SupportParameters::SupportParameters(const PrintObject &object)
 }
 
 PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object, const SlicingParameters &slicing_params) :
-    m_object                (object),
     m_print_config          (&object->print()->config()),
     m_object_config         (&object->config()),
     m_slicing_params        (slicing_params),
@@ -795,6 +794,9 @@ public:
         )
     {
         switch (m_style) {
+        case smsTree:
+            assert(false);
+            [[fallthrough]];
         case smsGrid:
         {
     #ifdef SUPPORT_USE_AGG_RASTERIZER

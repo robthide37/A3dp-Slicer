@@ -108,8 +108,10 @@ TreeModelVolumes::TreeModelVolumes(
     const coord_t max_move, const coord_t max_move_slow, size_t current_mesh_idx, 
     double progress_multiplier, double progress_offset, const std::vector<Polygons>& additional_excluded_areas) :
     // -2 to avoid rounding errors
-    m_max_move{ std::max<coord_t>(max_move - 2, 0) }, m_max_move_slow{ std::max<coord_t>(max_move_slow - 2, 0) }, 
-    m_progress_multiplier{ progress_multiplier }, m_progress_offset{ progress_offset }, 
+    m_max_move{ std::max<coord_t>(max_move - 2, 0) }, m_max_move_slow{ std::max<coord_t>(max_move_slow - 2, 0) },
+#ifdef SLIC3R_TREESUPPORTS_PROGRESS
+    m_progress_multiplier{ progress_multiplier }, m_progress_offset{ progress_offset },
+#endif // SLIC3R_TREESUPPORTS_PROGRESS
     m_machine_border{ calculateMachineBorderCollision(build_volume.polygon()) }
 {
 #if 0
@@ -428,7 +430,6 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
         if (const std::vector<Polygons> &outlines = m_layer_outlines[outline_idx].second; ! outlines.empty()) {
             const TreeSupportMeshGroupSettings  &settings = m_layer_outlines[outline_idx].first;
             const coord_t       layer_height              = settings.layer_height;
-            const bool          support_rests_on_model    = ! settings.support_material_buildplate_only;
             const coord_t       z_distance_bottom         = settings.support_bottom_distance;
             const int           z_distance_bottom_layers  = round_up_divide<int>(z_distance_bottom, layer_height);
             const int           z_distance_top_layers     = round_up_divide<int>(settings.support_top_distance, layer_height);
@@ -482,7 +483,7 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
             if (calculate_placable) {
                 // Calculating both the collision areas and placable areas.
                 tbb::parallel_for(tbb::blocked_range<LayerIndex>(std::max(min_layer_last + 1, z_distance_bottom_layers + 1), max_layer_idx + 1),
-                    [&collision_areas_offsetted, &anti_overhang = m_anti_overhang, min_layer_bottom, radius, z_distance_bottom_layers, z_distance_top_layers, last, min_resolution = m_min_resolution, &data_placeable, min_layer_last]
+                    [&collision_areas_offsetted, &anti_overhang = m_anti_overhang, min_layer_bottom, z_distance_bottom_layers, last, min_resolution = m_min_resolution, &data_placeable, min_layer_last]
                 (const tbb::blocked_range<LayerIndex>& range) {
                     for (LayerIndex layer_idx = range.begin(); layer_idx != range.end(); ++ layer_idx) {
                         LayerIndex layer_idx_below = layer_idx - (z_distance_bottom_layers + 1) - min_layer_bottom;
