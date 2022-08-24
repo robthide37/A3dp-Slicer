@@ -292,9 +292,10 @@ static bool layer_has_overhangs(const Layer &layer)
     // +1 makes the threshold inclusive
     double                   tan_threshold          = support_threshold_auto ? 0. : tan(M_PI * double(support_threshold + 1) / 180.);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(1, out.size()),
-        [&print_object, &enforcers_layers, &blockers_layers, support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, &out](const tbb::blocked_range<size_t> &range) {
-        for (size_t layer_id = range.begin(); layer_id < range.end(); ++ layer_id)
+    tbb::parallel_for(tbb::blocked_range<LayerIndex>(1, out.size()),
+        [&print_object, &enforcers_layers, &blockers_layers, support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, &out]
+        (const tbb::blocked_range<LayerIndex> &range) {
+        for (LayerIndex layer_id = range.begin(); layer_id < range.end(); ++ layer_id)
             if (layer_has_overhangs(*print_object.get_layer(layer_id))) {
                 const Polygons raw_overhangs  = layer_overhangs(*print_object.get_layer(layer_id));
                 Polygons       overhangs;
@@ -319,14 +320,10 @@ static bool layer_has_overhangs(const Layer &layer)
                         diff(clipped_overhangs, lower_layer.lslices) :
                         diff(clipped_overhangs, offset(lower_layer.lslices, lower_layer_offset));
                 }
-                if (! enforcers_layers.empty() && ! enforcers_layers[layer_id].empty()) {
+                if (! enforcers_layers.empty() && ! enforcers_layers[layer_id].empty())
                     // Has some support enforcers at this layer, apply them to the overhangs, don't apply the support threshold angle.
                     if (Polygons enforced_overhangs = intersection(raw_overhangs, enforcers_layers[layer_id]); ! enforced_overhangs.empty())
-                        if (overhangs.empty())
-                            overhangs = std::move(enforced_overhangs);
-                        else
-                            overhangs = union_(overhangs, enforced_overhangs);
-                }
+                        overhangs = overhangs.empty() ? std::move(enforced_overhangs) : union_(overhangs, enforced_overhangs);
                 out[layer_id] = std::move(overhangs);
             }
     });
@@ -2803,11 +2800,11 @@ void TreeSupport::drawAreas(
         auto &this_layers              = support_layer_storage[layer_idx];
         size_t cnt_roofs  = 0;
         size_t cnt_layers = 0;
-        for (const std::pair<SupportElement*, Polygons> &data_pair : this_layer_tree_polygons)
+        for (const std::pair<const SupportElement*, Polygons> &data_pair : this_layer_tree_polygons)
             ++ (data_pair.first->missing_roof_layers > data_pair.first->distance_to_top ? cnt_roofs : cnt_layers);
         this_roofs.reserve(this_roofs.size() + cnt_roofs);
         this_layers.reserve(this_layers.size() + cnt_layers);
-        for (const std::pair<SupportElement*, Polygons> &data_pair : this_layer_tree_polygons) {
+        for (const std::pair<const SupportElement*, Polygons> &data_pair : this_layer_tree_polygons) {
             auto &src = const_cast<Polygons&>(data_pair.second);
             std::move(std::begin(src), std::end(src), std::back_inserter(data_pair.first->missing_roof_layers > data_pair.first->distance_to_top ? this_roofs : this_layers));
         }

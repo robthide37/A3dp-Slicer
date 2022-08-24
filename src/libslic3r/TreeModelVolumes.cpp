@@ -615,7 +615,7 @@ void TreeModelVolumes::calculateAvoidance(const std::vector<RadiusLayerPair> &ke
                 // Merge current layer collisions with shrunk last_avoidance.
                 const Polygons &current_layer_collisions = collision_holefree ? getCollisionHolefree(task.radius, layer_idx) : getCollision(task.radius, layer_idx, true);
                 // For mildly steep branch angles only one step will be taken.
-                for (size_t istep = 0; istep < move_steps; ++ istep)
+                for (int istep = 0; istep < move_steps; ++ istep)
                     latest_avoidance = union_(current_layer_collisions,
                         offset(latest_avoidance,
                             istep + 1 == move_steps ? - last_move_step : - move_step,
