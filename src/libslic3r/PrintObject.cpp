@@ -26,8 +26,6 @@
 
 #include <tbb/parallel_for.h>
 
-#include <Shiny/Shiny.h>
-
 using namespace std::literals;
 
 //! macro used to mark string used at localization,
@@ -1037,8 +1035,6 @@ void PrintObject::process_external_surfaces()
 
 void PrintObject::discover_vertical_shells()
 {
-    PROFILE_FUNC();
-
     BOOST_LOG_TRIVIAL(info) << "Discovering vertical shells..." << log_memory_info();
 
     struct DiscoverVerticalShellsCacheEntry
@@ -1149,8 +1145,6 @@ void PrintObject::discover_vertical_shells()
     }
 
     for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
-        PROFILE_BLOCK(discover_vertical_shells_region);
-
         const PrintRegion &region = this->printing_region(region_id);
         if (! region.config().ensure_vertical_shell_thickness.value)
             // This region will be handled by discover_horizontal_shells().
@@ -1200,7 +1194,6 @@ void PrintObject::discover_vertical_shells()
             (const tbb::blocked_range<size_t>& range) {
                 // printf("discover_vertical_shells from %d to %d\n", range.begin(), range.end());
                 for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
-                    PROFILE_BLOCK(discover_vertical_shells_region_layer);
                     m_print->throw_if_canceled();
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
         			static size_t debug_idx = 0;
@@ -1225,88 +1218,82 @@ void PrintObject::discover_vertical_shells()
                     ExPolygons shell_ex;
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
                     float min_perimeter_infill_spacing = float(infill_line_spacing) * 1.05f;
-                    {
-                        PROFILE_BLOCK(discover_vertical_shells_region_layer_collect);
 #if 0
 // #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
-                        {
-        					Slic3r::SVG svg_cummulative(debug_out_path("discover_vertical_shells-perimeters-before-union-run%d.svg", debug_idx), this->bounding_box());
-                            for (int n = (int)idx_layer - n_extra_bottom_layers; n <= (int)idx_layer + n_extra_top_layers; ++ n) {
-                                if (n < 0 || n >= (int)m_layers.size())
-                                    continue;
-                                ExPolygons &expolys = m_layers[n]->perimeter_expolygons;
-                                for (size_t i = 0; i < expolys.size(); ++ i) {
-        							Slic3r::SVG svg(debug_out_path("discover_vertical_shells-perimeters-before-union-run%d-layer%d-expoly%d.svg", debug_idx, n, i), get_extents(expolys[i]));
-                                    svg.draw(expolys[i]);
-                                    svg.draw_outline(expolys[i].contour, "black", scale_(0.05));
-                                    svg.draw_outline(expolys[i].holes, "blue", scale_(0.05));
-                                    svg.Close();
+                    {
+        				Slic3r::SVG svg_cummulative(debug_out_path("discover_vertical_shells-perimeters-before-union-run%d.svg", debug_idx), this->bounding_box());
+                        for (int n = (int)idx_layer - n_extra_bottom_layers; n <= (int)idx_layer + n_extra_top_layers; ++ n) {
+                            if (n < 0 || n >= (int)m_layers.size())
+                                continue;
+                            ExPolygons &expolys = m_layers[n]->perimeter_expolygons;
+                            for (size_t i = 0; i < expolys.size(); ++ i) {
+        						Slic3r::SVG svg(debug_out_path("discover_vertical_shells-perimeters-before-union-run%d-layer%d-expoly%d.svg", debug_idx, n, i), get_extents(expolys[i]));
+                                svg.draw(expolys[i]);
+                                svg.draw_outline(expolys[i].contour, "black", scale_(0.05));
+                                svg.draw_outline(expolys[i].holes, "blue", scale_(0.05));
+                                svg.Close();
 
-                                    svg_cummulative.draw(expolys[i]);
-                                    svg_cummulative.draw_outline(expolys[i].contour, "black", scale_(0.05));
-                                    svg_cummulative.draw_outline(expolys[i].holes, "blue", scale_(0.05));
-                                }
+                                svg_cummulative.draw(expolys[i]);
+                                svg_cummulative.draw_outline(expolys[i].contour, "black", scale_(0.05));
+                                svg_cummulative.draw_outline(expolys[i].holes, "blue", scale_(0.05));
                             }
                         }
+                    }
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
-			        	polygons_append(holes, cache_top_botom_regions[idx_layer].holes);
-			        	if (int n_top_layers = region_config.top_solid_layers.value; n_top_layers > 0) {
-                            // Gather top regions projected to this layer.
-                            coordf_t print_z = layer->print_z;
-	                        for (int i = int(idx_layer) + 1; 
-	                        	i < int(cache_top_botom_regions.size()) && 
-	                        		(i < int(idx_layer) + n_top_layers ||
-	                        		 m_layers[i]->print_z - print_z < region_config.top_solid_min_thickness - EPSILON);
-	                        	++ i) {
-	                            const DiscoverVerticalShellsCacheEntry &cache = cache_top_botom_regions[i];
-								if (! holes.empty())
-									holes = intersection(holes, cache.holes);
-								if (! cache.top_surfaces.empty()) {
-		                            polygons_append(shell, cache.top_surfaces);
-		                            // Running the union_ using the Clipper library piece by piece is cheaper 
-		                            // than running the union_ all at once.
-	                               shell = union_(shell);
-	                           }
+			        polygons_append(holes, cache_top_botom_regions[idx_layer].holes);
+			        if (int n_top_layers = region_config.top_solid_layers.value; n_top_layers > 0) {
+                        // Gather top regions projected to this layer.
+                        coordf_t print_z = layer->print_z;
+	                    for (int i = int(idx_layer) + 1; 
+	                        i < int(cache_top_botom_regions.size()) && 
+	                        	(i < int(idx_layer) + n_top_layers ||
+	                        		m_layers[i]->print_z - print_z < region_config.top_solid_min_thickness - EPSILON);
+	                        ++ i) {
+	                        const DiscoverVerticalShellsCacheEntry &cache = cache_top_botom_regions[i];
+							if (! holes.empty())
+								holes = intersection(holes, cache.holes);
+							if (! cache.top_surfaces.empty()) {
+		                        polygons_append(shell, cache.top_surfaces);
+		                        // Running the union_ using the Clipper library piece by piece is cheaper 
+		                        // than running the union_ all at once.
+	                            shell = union_(shell);
 	                        }
 	                    }
-	                    if (int n_bottom_layers = region_config.bottom_solid_layers.value; n_bottom_layers > 0) {
-                            // Gather bottom regions projected to this layer.
-                            coordf_t bottom_z = layer->bottom_z();
-	                        for (int i = int(idx_layer) - 1;
-	                        	i >= 0 &&
-	                        		(i > int(idx_layer) - n_bottom_layers ||
-	                        		 bottom_z - m_layers[i]->bottom_z() < region_config.bottom_solid_min_thickness - EPSILON);
-	                        	-- i) {
-	                            const DiscoverVerticalShellsCacheEntry &cache = cache_top_botom_regions[i];
-								if (! holes.empty())
-									holes = intersection(holes, cache.holes);
-								if (! cache.bottom_surfaces.empty()) {
-		                            polygons_append(shell, cache.bottom_surfaces);
-		                            // Running the union_ using the Clipper library piece by piece is cheaper 
-		                            // than running the union_ all at once.
-		                            shell = union_(shell);
-		                        }
-	                        }
+	                }
+	                if (int n_bottom_layers = region_config.bottom_solid_layers.value; n_bottom_layers > 0) {
+                        // Gather bottom regions projected to this layer.
+                        coordf_t bottom_z = layer->bottom_z();
+	                    for (int i = int(idx_layer) - 1;
+	                        i >= 0 &&
+	                        	(i > int(idx_layer) - n_bottom_layers ||
+	                        		bottom_z - m_layers[i]->bottom_z() < region_config.bottom_solid_min_thickness - EPSILON);
+	                        -- i) {
+	                        const DiscoverVerticalShellsCacheEntry &cache = cache_top_botom_regions[i];
+							if (! holes.empty())
+								holes = intersection(holes, cache.holes);
+							if (! cache.bottom_surfaces.empty()) {
+		                        polygons_append(shell, cache.bottom_surfaces);
+		                        // Running the union_ using the Clipper library piece by piece is cheaper 
+		                        // than running the union_ all at once.
+		                        shell = union_(shell);
+		                    }
 	                    }
+	                }
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
-                        {
-        					Slic3r::SVG svg(debug_out_path("discover_vertical_shells-perimeters-before-union-%d.svg", debug_idx), get_extents(shell));
-                            svg.draw(shell);
-                            svg.draw_outline(shell, "black", scale_(0.05));
-                            svg.Close(); 
-                        }
+                    {
+        				Slic3r::SVG svg(debug_out_path("discover_vertical_shells-perimeters-before-union-%d.svg", debug_idx), get_extents(shell));
+                        svg.draw(shell);
+                        svg.draw_outline(shell, "black", scale_(0.05));
+                        svg.Close(); 
+                    }
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 #if 0
-                        {
-                            PROFILE_BLOCK(discover_vertical_shells_region_layer_shell_);
-        //                    shell = union_(shell, true);
-                            shell = union_(shell, false); 
-                        }
+//                    shell = union_(shell, true);
+                    shell = union_(shell, false); 
 #endif
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
-                        shell_ex = union_safety_offset_ex(shell);
+                    shell_ex = union_safety_offset_ex(shell);
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
-                    }
 
                     //if (shell.empty())
                     //    continue;
@@ -1433,10 +1420,6 @@ void PrintObject::discover_vertical_shells()
 		}
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
     } // for each region
-
-    // Write the profiler measurements to file
-//    PROFILE_UPDATE();
-//    PROFILE_OUTPUT(debug_out_path("discover_vertical_shells-profile.txt").c_str());
 }
 
 // This method applies bridge flow to the first internal solid layer above sparse infill.

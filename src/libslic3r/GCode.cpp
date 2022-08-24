@@ -53,8 +53,6 @@
     using slic3r_tbb_filtermode = tbb::filter;
 #endif
 
-#include <Shiny/Shiny.h>
-
 using namespace std::literals::string_view_literals;
 
 #if 0
@@ -735,8 +733,6 @@ namespace DoExport {
 
 void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
 {
-    PROFILE_CLEAR();
-
     CNumericLocalesSetter locales_setter;
 
     // Does the file exist? If so, we hope that it is still valid.
@@ -828,10 +824,6 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
 
     BOOST_LOG_TRIVIAL(info) << "Exporting G-code finished" << log_memory_info();
     print->set_done(psGCodeExport);
-
-    // Write the profiler measurements to file
-    PROFILE_UPDATE();
-    PROFILE_OUTPUT(debug_out_path("gcode-export-profile.txt").c_str());
 }
 
 // free functions called by GCode::_do_export()
@@ -1048,8 +1040,6 @@ std::vector<const PrintInstance*> sort_object_instances_by_model_order(const Pri
 
 void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
-    PROFILE_FUNC();
-
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
 

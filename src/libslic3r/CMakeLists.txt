@@ -461,10 +461,6 @@ if(WIN32)
     target_link_libraries(libslic3r Psapi.lib)
 endif()
 
-if(SLIC3R_PROFILE)
-    target_link_libraries(libslic3r Shiny)
-endif()
-
 if (APPLE)
     # This flag prevents the need for minimum SDK version 10.14
     # currently, PS targets v10.12

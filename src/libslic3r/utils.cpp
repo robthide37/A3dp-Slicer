@@ -127,7 +127,7 @@ static struct RunOnInit {
 
 void disable_multi_threading()
 {
-    // Disable parallelization so the Shiny profiler works
+    // Disable parallelization to simplify debugging.
 #ifdef TBB_HAS_GLOBAL_CONTROL
 	{
 		static tbb::global_control gc(tbb::global_control::max_allowed_parallelism, 1);

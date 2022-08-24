@@ -244,7 +244,6 @@ set(SLIC3R_GUI_SOURCES
     Utils/PresetUpdater.hpp
     Utils/Process.cpp
     Utils/Process.hpp
-    Utils/Profile.hpp
     Utils/UndoRedo.cpp
     Utils/UndoRedo.hpp
     Utils/HexFile.cpp
