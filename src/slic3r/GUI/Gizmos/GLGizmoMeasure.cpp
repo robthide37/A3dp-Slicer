@@ -114,34 +114,20 @@ bool GLGizmoMeasure::on_is_activable() const
 
 void GLGizmoMeasure::on_render()
 {
+#if !ENABLE_DEBUG_DIALOG
     // do not render if the user is panning/rotating the 3d scene
     if (m_parent.is_mouse_dragging())
         return;
+#endif // !ENABLE_DEBUG_DIALOG
 
     const Selection& selection = m_parent.get_selection();
 
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-    if (shader == nullptr)
-        return;
-    
-    shader->start_using();
-    shader->set_uniform("emission_factor", 0.25f);
-
-    glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
-
-    glsafe(::glEnable(GL_DEPTH_TEST));
-    glsafe(::glEnable(GL_BLEND));
-
     if ((wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA && selection.is_single_full_instance()) ||
         (selection.is_single_volume() || selection.is_single_volume_instance())) {
+        update_if_needed();
+
         const Transform3d& model_matrix = selection.get_first_volume()->world_matrix();
         const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d& view_matrix = camera.get_view_matrix();
-        const float inv_zoom = camera.get_inv_zoom();
-
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-
-        update_if_needed();
 
         Vec3f pos;
         Vec3f normal;
@@ -165,19 +151,42 @@ void GLGizmoMeasure::on_render()
         if (m_show_all) {
             features = m_measuring->get_all_features(); // EXPENSIVE - debugging only.
             features.erase(std::remove_if(features.begin(), features.end(),
-                           [](const Measure::SurfaceFeature& f) {
-                            return f.get_type() == Measure::SurfaceFeatureType::Plane;
-                            }), features.end());
+                [](const Measure::SurfaceFeature& f) {
+                    return f.get_type() == Measure::SurfaceFeatureType::Plane;
+                }), features.end());
         }
         else {
+            if (!m_parent.is_mouse_dragging()) {
 #endif // ENABLE_DEBUG_DIALOG
-            std::optional<Measure::SurfaceFeature> feat = m_measuring->get_feature(facet_idx, pos.cast<double>());
-            if (feat.has_value())
-                features.emplace_back(*feat);
+                std::optional<Measure::SurfaceFeature> feat = m_measuring->get_feature(facet_idx, pos.cast<double>());
+                if (feat.has_value())
+                    features.emplace_back(*feat);
 #if ENABLE_DEBUG_DIALOG
+            }
         }
 #endif // ENABLE_DEBUG_DIALOG
-            
+
+#if ENABLE_DEBUG_DIALOG
+        if (features.empty() && !m_show_planes)
+#else
+        if (features.empty())
+#endif // ENABLE_DEBUG_DIALOG
+            return;
+
+        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+        if (shader == nullptr)
+            return;
+    
+        shader->start_using();
+        shader->set_uniform("emission_factor", 0.25f);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+
+        glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
+        glsafe(::glEnable(GL_DEPTH_TEST));
+
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        const float inv_zoom = camera.get_inv_zoom();
+
         for (const Measure::SurfaceFeature& feature : features) {
             switch (feature.get_type()) {
             case Measure::SurfaceFeatureType::Point:
@@ -256,15 +265,9 @@ void GLGizmoMeasure::on_render()
             }
         }
 #endif // ENABLE_DEBUG_DIALOG
+        shader->stop_using();
     }
-
-    glsafe(::glEnable(GL_CULL_FACE));
-    glsafe(::glDisable(GL_BLEND));
-
-    shader->stop_using();
 }
-
-
 
 
 
