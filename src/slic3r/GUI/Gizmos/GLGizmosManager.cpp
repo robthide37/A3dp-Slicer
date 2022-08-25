@@ -21,7 +21,9 @@
 #include "slic3r/GUI/Gizmos/GLGizmoSeam.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoSimplify.hpp"
+#if ENABLE_MEASURE_GIZMO
 #include "slic3r/GUI/Gizmos/GLGizmoMeasure.hpp"
+#endif // ENABLE_MEASURE_GIZMO
 
 #include "libslic3r/format.hpp"
 #include "libslic3r/Model.hpp"
@@ -107,7 +109,9 @@ bool GLGizmosManager::init()
     m_gizmos.emplace_back(new GLGizmoSeam(m_parent, "seam.svg", 8));
     m_gizmos.emplace_back(new GLGizmoMmuSegmentation(m_parent, "mmu_segmentation.svg", 9));
     m_gizmos.emplace_back(new GLGizmoSimplify(m_parent, "cut.svg", 10));
+#if ENABLE_MEASURE_GIZMO
     m_gizmos.emplace_back(new GLGizmoMeasure(m_parent, "measure.svg", 11));
+#endif // ENABLE_MEASURE_GIZMO
 
     m_common_gizmos_data.reset(new CommonGizmosDataPool(&m_parent));
 
