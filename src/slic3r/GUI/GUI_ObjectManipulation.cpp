@@ -1328,6 +1328,15 @@ void ObjectManipulation::set_coordinates_type(ECoordinatesType type)
     canvas->set_as_dirty();
     canvas->request_extra_frame();
 }
+
+ECoordinatesType ObjectManipulation::get_coordinates_type() const
+{
+    const wxString og_name = get_og()->get_name();
+    if (og_name.Contains(_L("Group manipulation")))
+        return ECoordinatesType::World;
+
+    return m_coordinates_type;
+}
 #endif // ENABLE_WORLD_COORDINATE
 
 void ObjectManipulation::msw_rescale()

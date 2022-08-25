@@ -176,9 +176,8 @@ public:
 	void			show_field(const t_config_option_key& opt_key, bool show = true);
 	void			hide_field(const t_config_option_key& opt_key) {  show_field(opt_key, false);  }
 
-	void			set_name(const wxString& new_name) {
-							stb->SetLabel(new_name);
-    }
+	void			set_name(const wxString& new_name) { stb->SetLabel(new_name); }
+	wxString		get_name() const { return stb->GetLabel(); }
 
 	inline void		enable() { for (auto& field : m_fields) field.second->enable(); }
     inline void		disable() { for (auto& field : m_fields) field.second->disable(); }
