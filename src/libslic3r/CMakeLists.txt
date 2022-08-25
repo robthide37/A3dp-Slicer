@@ -388,9 +388,11 @@ cmake_policy(POP)
 
 add_library(libslic3r_cgal STATIC 
     CutSurface.hpp CutSurface.cpp
+    IntersectionPoints.hpp IntersectionPoints.cpp
     MeshBoolean.hpp MeshBoolean.cpp
     TryCatchSignal.hpp TryCatchSignal.cpp
-    Triangulation.hpp Triangulation.cpp)
+    Triangulation.hpp Triangulation.cpp
+)
 target_include_directories(libslic3r_cgal PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 # Reset compile options of libslic3r_cgal. Despite it being linked privately, CGAL options

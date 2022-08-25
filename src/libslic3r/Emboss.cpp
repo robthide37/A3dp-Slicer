@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <boost/nowide/convert.hpp>
 #include <ClipperUtils.hpp> // union_ex
+#include "IntersectionPoints.hpp"
 
 #define STB_TRUETYPE_IMPLEMENTATION // force following include to generate implementation
 #include "imgui/imstb_truetype.h" // stbtt_fontinfo
@@ -32,14 +33,6 @@ public:
 
     static EmbossStyle create_style(std::wstring name, std::wstring path);
 
-    /// <summary>
-    /// TODO: move to ExPolygon utils
-    /// Remove multi points. When exist multi point dilate it by rect 3x3 and union result.
-    /// </summary>
-    /// <param name="expolygons">Shape which can contain same point, will be extended by dilatation rects</param>
-    /// <returns>ExPolygons with only unique points</returns>
-    static ExPolygons dilate_to_unique_points(ExPolygons &expolygons);
-
     // scale and convert float to int coordinate
     static Point to_point(const stbtt__point &point);
 };
@@ -67,6 +60,112 @@ std::optional<stbtt_fontinfo> Private::load_font_info(
         return {};
     }
     return font_info;
+}
+
+ExPolygons Emboss::heal_shape(const Polygons &shape) {
+    // When edit this code check that font 'ALIENATE.TTF' and glyph 'i' still work
+    // fix of self intersections
+    // http://www.angusj.com/delphi/clipper/documentation/Docs/Units/ClipperLib/Functions/SimplifyPolygon.htm
+    ClipperLib::Paths paths = ClipperLib::SimplifyPolygons(ClipperUtils::PolygonsProvider(shape));
+    ClipperLib::CleanPolygons(paths);
+    Polygons polygons = to_polygons(paths);    
+    static const Points pts_2x2({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)});
+    static const Points pts_3x3({Point(-1, -1), Point(1, -1), Point(1, 1), Point(-1, 1)});
+    
+    // do not remove all duplicits but do it better way
+    Points duplicits = collect_duplications(to_points(polygons));
+    if (!duplicits.empty()) {
+        polygons.reserve(polygons.size() + duplicits.size());
+        for (const Point &p : duplicits) {
+            Slic3r::Polygon rect_3x3(pts_3x3);
+            rect_3x3.translate(p);
+            polygons.push_back(rect_3x3);
+        }
+    }
+    ExPolygons res = Slic3r::union_ex(polygons, ClipperLib::pftNonZero);
+
+    Slic3r::Polygons holes;
+    int max_iteration = 10;
+    while (--max_iteration){
+        Pointfs intersections = intersection_points(res);
+        Points duplicits = collect_duplications(to_points(res));
+        if (intersections.empty() && duplicits.empty()) break;
+        
+        holes.clear();
+        holes.reserve(intersections.size() + duplicits.size());
+
+        // Fix self intersection in result by subtracting hole 2x2
+        if (!intersections.empty()) {
+            for (const Vec2d &p : intersections) {
+                Slic3r::Polygon hole(pts_2x2);
+                Point tr(std::floor(p.x()), std::floor(p.y()));
+                hole.translate(tr);
+                holes.push_back(hole);
+            }
+        }
+
+        // fix duplicit points by hole 3x3 around duplicit point
+        if (!duplicits.empty()) {
+            holes.reserve(duplicits.size());
+            for (const Point &p : duplicits) {
+                Slic3r::Polygon hole(pts_3x3);
+                hole.translate(p);
+                holes.push_back(hole);
+            }
+        }
+
+        holes = Slic3r::union_(holes);
+        res = Slic3r::diff_ex(res, holes, ApplySafetyOffset::Yes);
+    }
+    /* VISUALIZATION of BAD symbols for debug
+    {
+        double svg_scale = Emboss::SHAPE_SCALE / unscale<double>(1.);
+        BoundingBox bb(to_points(shape));
+        //bb.scale(svg_scale);
+        SVG svg("C:/data/temp/fix_self_intersection.svg", bb);
+        svg.draw(shape);
+        // svg.draw(polygons, "orange");
+        svg.draw(res, "green");
+
+        svg.draw(duplicits, "lightgray", 13 / Emboss::SHAPE_SCALE);
+        Points duplicits3 = collect_duplications(to_points(res));
+        svg.draw(duplicits3, "black", 7 / Emboss::SHAPE_SCALE);
+        
+        Pointfs pts2 = intersection_points(res);
+        Points pts_i; pts_i.reserve(pts2.size());
+        for (auto p : pts2) pts_i.push_back(p.cast<int>());
+        svg.draw(pts_i, "red", 8 / Emboss::SHAPE_SCALE);
+    } //*/
+
+    if (max_iteration == 0) { 
+        assert(false);
+        BoundingBox bb = get_extents(shape);
+        Point size = bb.size();
+        if (size.x() < 10) bb.max.x() += 10;
+        if (size.y() < 10) bb.max.y() += 10;
+
+        Polygon rect({ // CCW
+            bb.min,
+            {bb.max.x(), bb.min.y()},
+            bb.max,
+            {bb.min.x(), bb.max.y()}
+        });
+
+        Point offset = bb.size()*0.1;
+        Polygon hole({ // CW
+            bb.min + offset,
+            {bb.min.x()+offset.x(), bb.max.y()-offset.y()},
+            bb.max - offset,
+            {bb.max.x()-offset.x(), bb.min.y()+offset.y()}
+        });
+        ExPolygon res(rect, hole);
+        // BAD symbol
+        return {res};
+    }
+
+    assert(intersection_points(res).empty());
+    assert(collect_duplications(to_points(res)).empty());
+    return res;
 }
 
 std::optional<Emboss::Glyph> Private::get_glyph(const stbtt_fontinfo &font_info, int unicode_letter, float flatness)
@@ -127,12 +226,7 @@ std::optional<Emboss::Glyph> Private::get_glyph(const stbtt_fontinfo &font_info,
         std::reverse(pts.begin(), pts.end());
         glyph_polygons.emplace_back(pts);
     }
-    
-    // fix for bad defined fonts
-    glyph.shape = Slic3r::union_ex(glyph_polygons);
-
-    // inner cw - hole
-    // outer ccw - contour
+    glyph.shape = Emboss::heal_shape(glyph_polygons);
     return glyph;
 }
 
@@ -175,28 +269,25 @@ const Emboss::Glyph* Private::get_glyph(
     glyph_opt->left_side_bearing = 
         static_cast<int>(glyph_opt->left_side_bearing / Emboss::SHAPE_SCALE);
 
-    if (font_prop.boldness.has_value()) {
-        float delta = *font_prop.boldness / Emboss::SHAPE_SCALE / font_prop.size_in_mm;
-        glyph_opt->shape = offset_ex(glyph_opt->shape, delta);
-    }
-
-    if (font_prop.skew.has_value()) {
-        const float &ratio = *font_prop.skew;
-        auto skew = [&ratio](Slic3r::Polygon &polygon) {
-            for (Slic3r::Point &p : polygon.points) { p.x() += p.y() * ratio; }
-        };
-        for (ExPolygon &expolygon : glyph_opt->shape) {
-            skew(expolygon.contour);
-            for (Slic3r::Polygon &hole : expolygon.holes) skew(hole);
+    if (!glyph_opt->shape.empty()) {
+        if (font_prop.boldness.has_value()) {
+            float delta = *font_prop.boldness / Emboss::SHAPE_SCALE /
+                          font_prop.size_in_mm;
+            glyph_opt->shape = Slic3r::union_ex(offset_ex(glyph_opt->shape, delta));
+        }
+        if (font_prop.skew.has_value()) {
+            const float &ratio = *font_prop.skew;
+            auto         skew  = [&ratio](Slic3r::Polygon &polygon) {
+                for (Slic3r::Point &p : polygon.points) {
+                    p.x() += p.y() * ratio;
+                }
+            };
+            for (ExPolygon &expolygon : glyph_opt->shape) {
+                skew(expolygon.contour);
+                for (Slic3r::Polygon &hole : expolygon.holes) skew(hole);
+            }
         }
     }
-
-    // union of shape
-    // (for sure) I do not believe in font corectness
-    // modification like bold or skew could create artefacts
-    glyph_opt->shape = Slic3r::union_ex(glyph_opt->shape);
-    // unify multipoints with similar position. Could appear after union
-    dilate_to_unique_points(glyph_opt->shape); 
     auto it = cache.insert({unicode, std::move(*glyph_opt)});
     assert(it.second);
     return &it.first->second;
@@ -206,72 +297,6 @@ EmbossStyle Private::create_style(std::wstring name, std::wstring path) {
     return { boost::nowide::narrow(name.c_str()),
              boost::nowide::narrow(path.c_str()),
              EmbossStyle::Type::file_path, FontProp() };
-}
-
-ExPolygons Private::dilate_to_unique_points(ExPolygons &expolygons)
-{   
-    std::set<Point> points;
-    std::set<Point> multi_points;
-    auto find_multipoint = [&points, &multi_points](const Points &pts) {
-        for (const Point &p : pts) {
-            auto it = points.find(p);
-            if (it != points.end())
-                multi_points.insert(p);
-            else
-                points.insert(p);
-        }
-    };
-    for (const ExPolygon &expolygon : expolygons) {
-        find_multipoint(expolygon.contour.points);
-        for (const Slic3r::Polygon &hole : expolygon.holes)
-            find_multipoint(hole.points);
-    }
-    // speed up, no multipoints
-    if (multi_points.empty()) return expolygons;
-
-    // CCW rectangle around zero with size 3*3 px for dilatation
-    const Points rect_3_3{Point(1, 1), Point(-1, 1), Point(-1, -1), Point(1, -1)};
-    const Points rect_side{Point(1, 0), Point(0, 1), Point(-1, 0), Point(0, -1)};
-
-    // all new added points for reduction
-    std::set<Point> rects_points;
-
-    // extends expolygons with dilatation rectangle
-    expolygons.reserve(expolygons.size() + multi_points.size());
-    for (const Point &multi_point : multi_points) {
-        Slic3r::Polygon rect(rect_3_3); // copy points
-        rect.translate(multi_point);
-        for (const Point& p : rect.points) rects_points.insert(p);
-        // add side point to be sure with result
-        for (const Point& p : rect_side) rects_points.insert(p + multi_point);
-        expolygons.emplace_back(rect);
-    }
-    ExPolygons result = union_ex(expolygons);
-
-    // reduce new created close points
-    auto reduce_close_points = [&rects_points](Points &pts) {
-        bool is_first = false;
-        size_t offset = 0;
-        bool is_prev_rect = false;
-        for (size_t i = 0; i < pts.size(); i++) { 
-            const Point &p = pts[i];
-            bool is_rect = (rects_points.find(p) != rects_points.end());
-            if (is_prev_rect && is_rect) ++offset;
-            if (offset != 0) pts[i - offset] = p;
-            if (i == 0 && is_rect) is_first = true;
-            is_prev_rect = is_rect;
-        }
-        // remove last
-        if (is_first && is_prev_rect) ++offset;
-        if (offset != 0)
-            pts.erase(pts.begin() + (pts.size() - offset), pts.end());        
-    };
-    for (ExPolygon &expolygon : result) {
-        reduce_close_points(expolygon.contour.points);
-        for (Slic3r::Polygon &hole : expolygon.holes)
-            reduce_close_points(hole.points);
-    }
-    return result;
 }
 
 Point Private::to_point(const stbtt__point &point) {
@@ -627,7 +652,6 @@ ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache,
                                const FontProp &font_prop)
 {
     assert(font_with_cache.has_value());
-
     std::optional<stbtt_fontinfo> font_info_opt;    
     Point    cursor(0, 0);
     ExPolygons result;
@@ -671,8 +695,7 @@ ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache,
         cursor.x() += glyph_ptr->advance_width;
         expolygons_append(result, std::move(expolygons));
     }
-    result = Slic3r::union_ex(result);
-    return Private::dilate_to_unique_points(result);
+    return Slic3r::union_ex(result);
 }
 
 void Emboss::apply_transformation(const FontProp &font_prop,
@@ -777,37 +800,136 @@ double Emboss::get_shape_scale(const FontProp &fp, const FontFile &ff)
     return scale * Emboss::SHAPE_SCALE;
 }
 
-indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
-                                            const IProjection &projection)
+static void store_trinagulation(
+    const ExPolygons         &shape,
+    const std::vector<Vec3i> &triangles,
+    const char               *file_name = "C:/data/temp/triangulation.svg",
+    double                    scale     = 1e5)
 {
-    indexed_triangle_set result;
-    size_t count_point = count_points(shape2d);
-    result.vertices.reserve(2 * count_point);
+    BoundingBox bb;
+    for (const auto &expoly : shape) bb.merge(expoly.contour.points);
+    bb.scale(scale);
+    SVG svg_vis(file_name, bb);
+    svg_vis.draw(shape, "gray", .7f);
+    Points pts = to_points(shape);
+    svg_vis.draw(pts, "black", 4 * scale);
+    for (const Vec3i &t : triangles) {
+        Slic3r::Polygon triangle({pts[t[0]], pts[t[1]], pts[t[2]]});
+        triangle.scale(scale);
+        svg_vis.draw(triangle, "green");
+    }
+}
+namespace priv {
 
+void add_quad(uint32_t              i1,
+              uint32_t              i2,
+              indexed_triangle_set &result,
+              uint32_t              count_point)
+{
+    // bottom indices
+    uint32_t i1_ = i1 + count_point;
+    uint32_t i2_ = i2 + count_point;
+    result.indices.emplace_back(i2, i2_, i1);
+    result.indices.emplace_back(i1_, i1, i2_);
+};
+
+indexed_triangle_set polygons2model_unique(
+    const ExPolygons          &shape2d,
+    const Emboss::IProjection &projection,
+    const Points              &points)
+{
+    // CW order of triangle indices
+    std::vector<Vec3i> shape_triangles=Triangulation::triangulate(shape2d, points);
+    uint32_t           count_point     = points.size();
+
+    indexed_triangle_set result;
+    result.vertices.reserve(2 * count_point);
+    std::vector<Vec3f> &front_points = result.vertices; // alias
+    std::vector<Vec3f>  back_points;
+    back_points.reserve(count_point);
+
+    for (const Point &p : points) {
+        auto p2 = projection.create_front_back(p);
+        front_points.push_back(p2.first);
+        back_points.push_back(p2.second);
+    }    
+    
+    // insert back points, front are already in
+    result.vertices.insert(result.vertices.end(),
+                           std::make_move_iterator(back_points.begin()),
+                           std::make_move_iterator(back_points.end()));
+    result.indices.reserve(shape_triangles.size() * 2 + points.size() * 2);
+    // top triangles - change to CCW
+    for (const Vec3i &t : shape_triangles)
+        result.indices.emplace_back(t.x(), t.z(), t.y());
+    // bottom triangles - use CW
+    for (const Vec3i &t : shape_triangles)
+        result.indices.emplace_back(t.x() + count_point, 
+                                    t.y() + count_point,
+                                    t.z() + count_point);
+
+    // quads around - zig zag by triangles
+    size_t polygon_offset = 0;
+    auto add_quads = [&polygon_offset,&result, &count_point]
+    (const Slic3r::Polygon& polygon) {
+        uint32_t polygon_points = polygon.points.size();
+        // previous index
+        uint32_t prev = polygon_offset + polygon_points - 1;
+        for (uint32_t p = 0; p < polygon_points; ++p) { 
+            uint32_t index = polygon_offset + p;
+            add_quad(prev, index, result, count_point);
+            prev = index;
+        }
+        polygon_offset += polygon_points;
+    };
+
+    for (const ExPolygon &expolygon : shape2d) {
+        add_quads(expolygon.contour);
+        for (const Slic3r::Polygon &hole : expolygon.holes) add_quads(hole);
+    }   
+
+    return result;
+}
+
+indexed_triangle_set polygons2model_duplicit(
+    const ExPolygons          &shape2d,
+    const Emboss::IProjection &projection,
+    const Points              &points,
+    const Points              &duplicits)
+{
+    // CW order of triangle indices
+    std::vector<uint32_t> changes = Triangulation::create_changes(points, duplicits);
+    std::vector<Vec3i> shape_triangles = Triangulation::triangulate(shape2d, points, changes);
+    uint32_t count_point = *std::max_element(changes.begin(), changes.end()) + 1;
+
+    indexed_triangle_set result;
+    result.vertices.reserve(2 * count_point);
     std::vector<Vec3f> &front_points = result.vertices;
     std::vector<Vec3f>  back_points;
     back_points.reserve(count_point);
 
-    auto insert_point = [&projection, &front_points,
-                         &back_points](const Polygon& polygon) {
-        for (const Point& p : polygon.points) {
-            auto p2 = projection.create_front_back(p);
-            front_points.emplace_back(p2.first);
-            back_points.emplace_back(p2.second);
-        }
-    };
-    for (const ExPolygon &expolygon : shape2d) {
-        insert_point(expolygon.contour);
-        for (const Polygon &hole : expolygon.holes) insert_point(hole);
+    uint32_t max_index = std::numeric_limits<uint32_t>::max();
+    for (uint32_t i = 0; i < changes.size(); ++i) { 
+        uint32_t index = changes[i];
+        if (max_index != std::numeric_limits<uint32_t>::max() &&
+            index <= max_index) continue; // duplicit point
+        assert(index == max_index + 1);
+        assert(front_points.size() == index);
+        assert(back_points.size() == index);
+        max_index = index;
+        const Point &p = points[i];
+        auto p2 = projection.create_front_back(p);
+        front_points.push_back(p2.first);
+        back_points.push_back(p2.second);
     }
+    assert(max_index+1 == count_point);    
+    
     // insert back points, front are already in
     result.vertices.insert(result.vertices.end(),
                            std::make_move_iterator(back_points.begin()),
                            std::make_move_iterator(back_points.end()));
 
-    // CW order of triangle indices
-    std::vector<Vec3i> shape_triangles = Triangulation::triangulate(shape2d);
-    result.indices.reserve(shape_triangles.size() * 2 + count_point * 2);
+    result.indices.reserve(shape_triangles.size() * 2 + points.size() * 2);
     // top triangles - change to CCW
     for (const Vec3i &t : shape_triangles)
         result.indices.emplace_back(t.x(), t.z(), t.y());
@@ -818,27 +940,36 @@ indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
 
     // quads around - zig zag by triangles
     size_t polygon_offset = 0;
-    auto add_quads = [&result,&polygon_offset, count_point](const Polygon& polygon) {
+    auto add_quads = [&polygon_offset, &result, count_point, &changes]
+    (const Slic3r::Polygon &polygon) {
         uint32_t polygon_points = polygon.points.size();
-        for (uint32_t p = 0; p < polygon_points; p++) { 
-            uint32_t i = polygon_offset + p;
-            // previous index
-            uint32_t ip = (p == 0) ? (polygon_offset + polygon_points - 1) : (i - 1);
-            // bottom indices
-            uint32_t i2  = i + count_point;
-            uint32_t ip2 = ip + count_point;
-
-            result.indices.emplace_back(i, i2, ip);
-            result.indices.emplace_back(ip2, ip, i2);
+        // previous index
+        uint32_t prev = changes[polygon_offset + polygon_points - 1];
+        for (uint32_t p = 0; p < polygon_points; ++p) {
+            uint32_t index = changes[polygon_offset + p];
+            if (prev == index) continue;
+            add_quad(prev, index, result, count_point);
+            prev = index;
         }
         polygon_offset += polygon_points;
     };
-    
+
     for (const ExPolygon &expolygon : shape2d) {
         add_quads(expolygon.contour);
-        for (const Polygon &hole : expolygon.holes) add_quads(hole);
+        for (const Slic3r::Polygon &hole : expolygon.holes) add_quads(hole);
     }
     return result;
+}
+} // namespace priv
+
+indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
+                                            const IProjection &projection)
+{
+    Points points = to_points(shape2d);    
+    Points duplicits = collect_duplications(points);
+    return (duplicits.empty()) ?
+        priv::polygons2model_unique(shape2d, projection, points) :
+        priv::polygons2model_duplicit(shape2d, projection, points, duplicits);
 }
 
 std::pair<Vec3f, Vec3f> Emboss::ProjectZ::create_front_back(const Point &p) const

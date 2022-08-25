@@ -34,15 +34,37 @@ public:
     static Indices triangulate(const Polygons &polygons);
     static Indices triangulate(const ExPolygons &expolygons);
 
-    /// <summary>
-    /// Filter out triagles without both side edge or inside half edges
-    /// Main purpose: Filter out triangles which lay outside of ExPolygon
-    /// given to triangulation
-    /// </summary>
-    /// <param name="indices">Triangles</param>
-    /// <param name="half_edges">Only outer edges</param>
-    static void remove_outer(Indices &indices, const HalfEdges &half_edges);
+    // Map for convert original index to set without duplication
+    //              from_index<to_index>
+    using Changes = std::vector<uint32_t>;
 
+    /// <summary>
+    /// Create conversion map from original index into new 
+    /// with respect of duplicit point
+    /// </summary>
+    /// <param name="points">input set of points</param>
+    /// <param name="duplicits">duplicit points collected from points</param>
+    /// <returns>Conversion map for point index</returns>
+    static Changes create_changes(const Points &points, const Points &duplicits);
+
+    /// <summary>
+    /// Triangulation for expolygons, speed up when points are already collected
+    /// NOTE: Not working properly for ExPolygons with multiple point on same coordinate
+    /// You should check it by "collect_changes"
+    /// </summary>
+    /// <param name="expolygons">Input shape to triangulation - define edges</param>
+    /// <param name="points">Points from expolygons</param>
+    /// <returns>Triangle indices</returns>
+    static Indices triangulate(const ExPolygons &expolygons, const Points& points);
+
+    /// <summary>
+    /// Triangulation for expolygons containing multiple points with same coordinate
+    /// </summary>
+    /// <param name="expolygons">Input shape to triangulation - define edge</param>
+    /// <param name="points">Points from expolygons</param>
+    /// <param name="changes">Changes swap for indicies into points</param>
+    /// <returns>Triangle indices</returns>
+    static Indices triangulate(const ExPolygons &expolygons, const Points& points, const Changes& changes);
 };
 
 } // namespace Slic3r

@@ -36,9 +36,7 @@ void NSVGUtils::flatten_cubic_bez(Polygon &polygon,
     flatten_cubic_bez(polygon, tessTol, p1234, p234, p34, p4, level);
 }
 
-ExPolygons NSVGUtils::to_ExPolygons(NSVGimage *image,
-                                    float      tessTol,
-                                    int        max_level)
+Polygons NSVGUtils::to_polygons(NSVGimage *image, float tessTol, int max_level)
 {
     Polygons polygons;
     for (NSVGshape *shape = image->shapes; shape != NULL;
@@ -59,14 +57,23 @@ ExPolygons NSVGUtils::to_ExPolygons(NSVGimage *image,
                     flatten_cubic_bez(polygon, tessTol, p1, p2, p3, p4,
                                       max_level);
                 }
-                if (path->closed) {
+                if (path->closed && !polygon.empty()) {
                     polygons.push_back(polygon);
                     polygon = Slic3r::Polygon();
                 }
             }
         }
-        polygons.push_back(polygon);
+        if (!polygon.empty())
+            polygons.push_back(polygon);
     }
+    return polygons;
+}
+
+ExPolygons NSVGUtils::to_ExPolygons(NSVGimage *image,
+                                    float      tessTol,
+                                    int        max_level)
+{
+    Polygons polygons = to_polygons(image, tessTol, max_level);
 
     // Fix Y axis
     for (Polygon &polygon : polygons)

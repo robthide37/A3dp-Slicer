@@ -129,6 +129,19 @@ inline Lines to_lines(const ExPolygons &src)
     return lines;
 }
 
+inline Points to_points(const ExPolygons &src)
+{
+    Points points;
+    size_t count = count_points(src);
+    points.reserve(count);
+    for (const ExPolygon &expolygon : src) {
+        append(points, expolygon.contour.points);
+        for (const Polygon &hole : expolygon.holes)
+            append(points, hole.points);
+    }
+    return points;
+}
+
 inline Polylines to_polylines(const ExPolygon &src)
 {
     Polylines polylines;

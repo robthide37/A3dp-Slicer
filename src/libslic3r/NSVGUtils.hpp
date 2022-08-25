@@ -25,6 +25,10 @@ public:
     static ExPolygons to_ExPolygons(NSVGimage *image,
                                     float      tessTol   = 10.,
                                     int        max_level = 10);
+    // convert svg paths to Polygons
+    static Polygons to_polygons(NSVGimage *image,
+                                float      tessTol   = 10.,
+                                int        max_level = 10);
 };
 } // namespace Slic3r
 #endif // slic3r_NSVGUtils_hpp_

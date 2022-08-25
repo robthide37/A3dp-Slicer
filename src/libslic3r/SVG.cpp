@@ -377,4 +377,10 @@ void SVG::export_expolygons(const char *path, const std::vector<std::pair<Slic3r
     svg.Close();
 }
 
+float SVG::to_svg_coord(float x)
+{
+    // return x;
+    return unscale<float>(x) * 10.f;
 }
+
+} // namespace Slic3r

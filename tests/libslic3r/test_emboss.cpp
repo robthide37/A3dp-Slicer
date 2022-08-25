@@ -6,7 +6,7 @@
 #include <optional>
 #include <libslic3r/AABBTreeIndirect.hpp>
 #include <libslic3r/Utils.hpp> // for next_highest_power_of_2()
-
+#include <libslic3r/IntersectionPoints.hpp>
 using namespace Slic3r;
 
 namespace Private{
@@ -155,6 +155,119 @@ TEST_CASE("Convert glyph % to model", "[Emboss]")
     indexed_triangle_set its = Emboss::polygons2model(shape, projection);
 
     CHECK(!its.indices.empty());    
+}
+
+//#define VISUALIZE
+#ifdef VISUALIZE
+TEST_CASE("Visualize glyph from font", "[Emboss]")
+{
+    std::string font_path = "C:/data/ALIENATO.TTF";
+    std::string text      = "i";
+
+    Emboss::FontFileWithCache font(
+        Emboss::create_font_file(font_path.c_str()));
+    REQUIRE(font.has_value());
+    FontProp fp;
+    fp.size_in_mm     = 8;
+    fp.emboss         = 4;
+    ExPolygons shapes = Emboss::text2shapes(font, text.c_str(), fp);
+
+    // char letter = 'i';
+    // unsigned int font_index = 0; // collection
+    // float        flatness   = 5;
+    // auto glyph = Emboss::letter2glyph(*font.font_file, font_index, letter,
+    // flatness); ExPolygons shapes2 = glyph->shape; { SVG
+    //svg("C:/data/temp/stored_letter.svg", get_extents(shapes2));
+    //svg.draw(shapes2); } // debug shape
+
+    REQUIRE(!shapes.empty());
+    //{ SVG svg("C:/data/temp/shapes.svg"); svg.draw(shapes); } // debug shape
+
+    float                z_depth = 100.f;
+    Emboss::ProjectZ     projection(z_depth);
+    indexed_triangle_set its = Emboss::polygons2model(shapes, projection);
+    its_write_obj(its, "C:/data/temp/bad_glyph.obj");
+
+    CHECK(!its.indices.empty());
+    TriangleMesh tm(its);
+    auto         s = tm.stats();
+}
+#endif // VISUALIZE
+
+#include "test_utils.hpp"
+#include "nanosvg/nanosvg.h"    // load SVG file
+#include "libslic3r/NSVGUtils.hpp"
+void heal_and_check(const Polygons &polygons)
+{
+    Pointfs intersections_prev = intersection_points(polygons);
+    Points  polygons_points    = to_points(polygons);
+    Points  duplicits_prev     = collect_duplications(polygons_points);
+
+    ExPolygons shape = Emboss::heal_shape(polygons);
+
+    // Is default shape for unhealabled shape?
+    bool is_default_shape = 
+        shape.size() == 1 && 
+        shape.front().contour.points.size() == 4 &&
+        shape.front().holes.size() == 1 &&
+        shape.front().holes.front().points.size() == 4 ;
+    CHECK(!is_default_shape);
+
+    Pointfs intersections = intersection_points(shape);
+    Points  shape_points  = to_points(shape);
+    Points  duplicits     = collect_duplications(shape_points);
+    //{
+    //    BoundingBox bb(polygons_points);
+    //    // bb.scale(svg_scale);
+    //    SVG svg("C:/data/temp/test_visualization.svg", bb);
+    //    svg.draw(polygons, "gray"); // input
+    //    svg.draw(shape, "green"); // output
+
+    //    Points pts;
+    //    pts.reserve(intersections.size());
+    //    for (const Vec2d &intersection : intersections)
+    //        pts.push_back(intersection.cast<int>());
+    //    svg.draw(pts, "red", 10);
+    //    svg.draw(duplicits, "orenge", 10);
+    //}
+
+    CHECK(intersections.empty());
+    CHECK(duplicits.empty());
+}
+
+void scale(Polygons &polygons, double multiplicator) {
+    for (Polygon &polygon : polygons)
+        for (Point &p : polygon) p *= multiplicator;
+}
+
+TEST_CASE("Heal of damaged polygons", "[Emboss]")
+{
+    // Shape loaded from svg is letter 'i' from font 'ALIENATE.TTF'
+    std::string file_name = "contour_ALIENATO.TTF_glyph_i.svg";
+    std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + file_name;
+    NSVGimage *image = nsvgParseFromFile(file_path.c_str(), "px", 96.0f);
+    Polygons polygons = NSVGUtils::to_polygons(image);
+    nsvgDelete(image);
+
+    heal_and_check(polygons);
+
+    Polygons scaled_shape = polygons; // copy
+    scale(scaled_shape, 1 / Emboss::SHAPE_SCALE);
+    heal_and_check(scaled_shape);
+
+    // different scale
+    scale(scaled_shape, 10.);
+    heal_and_check(scaled_shape);
+
+    // check reverse order of points
+    Polygons reverse_shape = polygons;
+    for (Polygon &p : reverse_shape)
+        std::reverse(p.points.begin(), p.points.end());
+    heal_and_check(scaled_shape);
+
+#ifdef VISUALIZE
+    CHECK(false);
+#endif // VISUALIZE
 }
 
 TEST_CASE("Convert text with glyph cache to model", "[Emboss]")

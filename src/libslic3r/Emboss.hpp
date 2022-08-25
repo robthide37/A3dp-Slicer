@@ -156,6 +156,13 @@ public:
     static ExPolygons text2shapes(FontFileWithCache &font, const char *text, const FontProp &font_prop);
 
     /// <summary>
+    /// Fix intersections and self intersections in polygons glyph shape 
+    /// </summary>
+    /// <param name="shape">Input shape to heal</param>
+    /// <returns>Healed shapes</returns>
+    static ExPolygons heal_shape(const Polygons &shape);
+
+    /// <summary>
     /// Use data from font property to modify transformation
     /// </summary>
     /// <param name="font_prop">Z-move as surface distance(FontProp::distance)

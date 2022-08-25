@@ -6,31 +6,21 @@
 using namespace Slic3r;
 
 namespace Private{
-void store_trinagulation(const ExPolygons &        shape,
+void store_trinagulation(const ExPolygons &shape,
                          const std::vector<Vec3i> &triangles,
-                         const char* file_name = "Triangulation_visualization.svg",
-                         double                    scale = 1e5)
+                         const char* file_name = "C:/data/temp/triangulation.svg",
+                         double scale = 1e5)
 {
     BoundingBox bb;
     for (const auto &expoly : shape) bb.merge(expoly.contour.points);
     bb.scale(scale);
     SVG svg_vis(file_name, bb);
     svg_vis.draw(shape, "gray", .7f);
+    Points pts = to_points(shape);
+    svg_vis.draw(pts, "black", 4 * scale);
 
-    size_t count = count_points(shape);
-    Points points;
-    points.reserve(count);
-    auto insert_point = [](const Slic3r::Polygon &polygon, Points &points) {
-        for (const Point &p : polygon.points) points.emplace_back(p);
-    };
-    for (const ExPolygon &expolygon : shape) {
-        insert_point(expolygon.contour, points);
-        for (const Slic3r::Polygon &hole : expolygon.holes)
-            insert_point(hole, points);
-    }
-
-    for (const auto &t : triangles) {
-        Polygon triangle({points[t[0]], points[t[1]], points[t[2]]});
+    for (const Vec3i &t : triangles) {
+        Slic3r::Polygon triangle({pts[t[0]], pts[t[1]], pts[t[2]]});
         triangle.scale(scale);
         svg_vis.draw(triangle, "green");
     }
@@ -119,18 +109,19 @@ TEST_CASE("Triangulation M shape polygon", "[triangulation]")
 }
 
 // same point in triangulation are not Supported
-//TEST_CASE("Triangulation 2 polygons with same point", "[triangulation][not supported]") 
-//{
-//    Slic3r::Polygon polygon1 = {
-//        Point(416, 346), Point(445, 362),
-//        Point(463, 389), Point(469, 427) /* This point */,
-//        Point(445, 491)
-//    };
-//    Slic3r::Polygon polygon2 = {
-//        Point(495, 488), Point(469, 427) /* This point */,
-//        Point(495, 364)
-//    };
-//    ExPolygons shape2d = {ExPolygon(polygon1), ExPolygon(polygon2)};
-//    std::vector<Vec3i> shape_triangles = Triangulation::triangulate(shape2d);
-//    store_trinagulation(shape2d, shape_triangles);
-//}
+TEST_CASE("Triangulation 2 polygons with same point", "[triangulation]") 
+{
+    Slic3r::Polygon polygon1 = {
+        Point(416, 346), Point(445, 362),
+        Point(463, 389), Point(469, 427) /* This point */,
+        Point(445, 491)
+    };
+    Slic3r::Polygon polygon2 = {
+        Point(495, 488), Point(469, 427) /* This point */,
+        Point(495, 364)
+    };
+    ExPolygons shape2d = {ExPolygon(polygon1), ExPolygon(polygon2)};
+    std::vector<Vec3i> shape_triangles = Triangulation::triangulate(shape2d);
+    //Private::store_trinagulation(shape2d, shape_triangles);
+    CHECK(shape_triangles.size() == 4);
+}
