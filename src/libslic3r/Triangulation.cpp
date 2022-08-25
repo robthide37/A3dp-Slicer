@@ -6,8 +6,7 @@
 #include <CGAL/spatial_sort.h>
 
 using namespace Slic3r;
-namespace Slic3r::Private {
-
+namespace priv{
 inline void insert_edges(Triangulation::HalfEdges &edges, uint32_t &offset, const Polygon &polygon, const Triangulation::Changes& changes) {
     const Points &pts = polygon.points;
     uint32_t size = static_cast<uint32_t>(pts.size());
@@ -35,9 +34,32 @@ inline void insert_edges(Triangulation::HalfEdges &edges, uint32_t &offset, cons
     offset += size;
 }
 
-} // namespace Private
+inline bool has_bidirectional_constrained(
+    const Triangulation::HalfEdges &constrained)
+{
+    for (const auto &c : constrained) {
+        auto key = std::make_pair(c.second, c.first);
+        auto it  = std::lower_bound(constrained.begin(), constrained.end(),
+                                    key);
+        if (it != constrained.end() && *it == key) return true;
+    }
+    return false;
+}
 
-#define VISUALIZE_TRIANGULATION
+inline bool has_self_intersection(
+    const Points                   &points,
+    const Triangulation::HalfEdges &constrained_half_edges)
+{
+    Lines lines;
+    lines.reserve(constrained_half_edges.size());
+    for (const auto &he : constrained_half_edges)
+        lines.emplace_back(points[he.first], points[he.second]);
+    return !intersection_points(lines).empty();
+}
+
+} // namespace priv
+
+//#define VISUALIZE_TRIANGULATION
 #ifdef VISUALIZE_TRIANGULATION
 #include "admesh/stl.h" // indexed triangle set
 static void visualize(const Points                 &points,
@@ -53,38 +75,19 @@ static void visualize(const Points                 &points,
 }
 #endif // VISUALIZE_TRIANGULATION
 
-static bool has_bidirectional_constrained(const Triangulation::HalfEdges &constrained) {
-    for (const auto &c : constrained) {
-        auto key = std::make_pair(c.second, c.first);
-        auto it  = std::lower_bound(constrained.begin(), constrained.end(), key);
-        if (it != constrained.end() && *it == key) return true;        
-    }
-    return false;
-}
-
-static bool has_self_intersection(const Points &points,
-    const Triangulation::HalfEdges &constrained_half_edges)
-{
-    Lines lines;
-    lines.reserve(constrained_half_edges.size());
-    for (const auto &he : constrained_half_edges)
-        lines.emplace_back(points[he.first], points[he.second]);
-    return !intersection_points(lines).empty();
-}
-
 Triangulation::Indices Triangulation::triangulate(const Points    &points,
                                                   const HalfEdges &constrained_half_edges)
 {
     assert(!points.empty());
     assert(!constrained_half_edges.empty());
     // edges can NOT contain bidirectional constrained
-    assert(!has_bidirectional_constrained(constrained_half_edges));
+    assert(!priv::has_bidirectional_constrained(constrained_half_edges));
     // constrained must be sorted
     assert(std::is_sorted(constrained_half_edges.begin(),
                           constrained_half_edges.end()));
     // check that there is only unique poistion of points
     assert(std::adjacent_find(points.begin(), points.end()) == points.end());
-    assert(!has_self_intersection(points, constrained_half_edges));
+    assert(!priv::has_self_intersection(points, constrained_half_edges));
     // use cgal triangulation
     using K   = CGAL::Exact_predicates_inexact_constructions_kernel;
     using Vb  = CGAL::Triangulation_vertex_base_with_info_2<uint32_t, K>;
@@ -126,10 +129,6 @@ Triangulation::Indices Triangulation::triangulate(const Points    &points,
     // Unmark constrained edges of outside faces.
     size_t num_faces = 0;
     for (CDT::Face_handle fh : faces) {
-        for (int i = 0; i < 3; ++i) if (fh->vertex(i)->info() == 752) { 
-            int j = 42;
-        }
-
         for (int i = 0; i < 3; ++i) {
             if (!fh->is_constrained(i)) continue;
             auto key = std::make_pair(fh->vertex((i + 2) % 3)->info(), fh->vertex((i + 1) % 3)->info());
@@ -202,7 +201,7 @@ Triangulation::Indices Triangulation::triangulate(const Polygon &polygon)
     HalfEdges edges;
     edges.reserve(pts.size());
     uint32_t offset = 0;
-    Private::insert_edges(edges, offset, polygon);
+    priv::insert_edges(edges, offset, polygon);
     std::sort(edges.begin(), edges.end());
     return triangulate(pts, edges);
 }
@@ -219,7 +218,7 @@ Triangulation::Indices Triangulation::triangulate(const Polygons &polygons)
 
     for (const Polygon &polygon : polygons) {
         Slic3r::append(points, polygon.points);
-        Private::insert_edges(edges, offset, polygon);
+        priv::insert_edges(edges, offset, polygon);
     }
 
     std::sort(edges.begin(), edges.end());
@@ -255,9 +254,9 @@ Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons, 
     edges.reserve(points.size());
     uint32_t offset = 0;
     for (const ExPolygon &expolygon : expolygons) {
-        Private::insert_edges(edges, offset, expolygon.contour);
+        priv::insert_edges(edges, offset, expolygon.contour);
         for (const Polygon &hole : expolygon.holes)
-            Private::insert_edges(edges, offset, hole);
+            priv::insert_edges(edges, offset, hole);
     }
     std::sort(edges.begin(), edges.end());
     return triangulate(points, edges);
@@ -278,9 +277,9 @@ Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons, 
     edges.reserve(points.size());
     uint32_t offset = 0;
     for (const ExPolygon &expolygon : expolygons) {
-        Private::insert_edges(edges, offset, expolygon.contour, changes);
+        priv::insert_edges(edges, offset, expolygon.contour, changes);
         for (const Polygon &hole : expolygon.holes)
-            Private::insert_edges(edges, offset, hole, changes);
+            priv::insert_edges(edges, offset, hole, changes);
     }
 
     std::sort(edges.begin(), edges.end());

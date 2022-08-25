@@ -800,25 +800,6 @@ double Emboss::get_shape_scale(const FontProp &fp, const FontFile &ff)
     return scale * Emboss::SHAPE_SCALE;
 }
 
-static void store_trinagulation(
-    const ExPolygons         &shape,
-    const std::vector<Vec3i> &triangles,
-    const char               *file_name = "C:/data/temp/triangulation.svg",
-    double                    scale     = 1e5)
-{
-    BoundingBox bb;
-    for (const auto &expoly : shape) bb.merge(expoly.contour.points);
-    bb.scale(scale);
-    SVG svg_vis(file_name, bb);
-    svg_vis.draw(shape, "gray", .7f);
-    Points pts = to_points(shape);
-    svg_vis.draw(pts, "black", 4 * scale);
-    for (const Vec3i &t : triangles) {
-        Slic3r::Polygon triangle({pts[t[0]], pts[t[1]], pts[t[2]]});
-        triangle.scale(scale);
-        svg_vis.draw(triangle, "green");
-    }
-}
 namespace priv {
 
 void add_quad(uint32_t              i1,

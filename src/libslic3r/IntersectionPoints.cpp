@@ -112,7 +112,7 @@ Slic3r::Pointfs compute_intersections(const Slic3r::Lines &lines)
     // IMPROVE0: BoundingBoxes of Polygons
     // IMPROVE1: Polygon's neighbor lines can't intersect
     // e.g. use indices to Point to find same points
-    // IMPROVE2: Bentley–Ottmann_algorithm
+    // IMPROVE2: Use BentleyOttmann algorithm
     // https://doc.cgal.org/latest/Surface_sweep_2/index.html -- CGAL implementation is significantly slower
     // https://stackoverflow.com/questions/4407493/is-there-a-robust-c-implementation-of-the-bentley-ottmann-algorithm
     Pointfs pts;
