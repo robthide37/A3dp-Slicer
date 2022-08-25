@@ -2981,7 +2981,6 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
         const Geometry::Transformation& curr_inst_trafo_i = volume_i->get_instance_transformation();
         const Vec3d curr_inst_rotation_i = curr_inst_trafo_i.get_rotation();
         const Vec3d& curr_inst_scaling_factor_i = curr_inst_trafo_i.get_scaling_factor();
-        const Vec3d& curr_inst_mirror_i = curr_inst_trafo_i.get_mirror();
         const Vec3d old_inst_rotation_i = m_cache.volumes_data[i].get_instance_transform().get_rotation();
 #else
         const Vec3d& rotation = volume_i->get_instance_rotation();
@@ -3054,7 +3053,7 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
 
 #if ENABLE_WORLD_COORDINATE
             volume_j->set_instance_transformation(Geometry::assemble_transform(new_inst_offset_j, new_inst_rotation_j,
-                curr_inst_scaling_factor_i, curr_inst_mirror_i));
+                curr_inst_scaling_factor_i));
 #else
             volume_j->set_instance_scaling_factor(scaling_factor);
             volume_j->set_instance_mirror(mirror);
