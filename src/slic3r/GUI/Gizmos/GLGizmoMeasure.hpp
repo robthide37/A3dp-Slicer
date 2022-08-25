@@ -1,15 +1,10 @@
 #ifndef slic3r_GLGizmoMeasure_hpp_
 #define slic3r_GLGizmoMeasure_hpp_
 
+#if ENABLE_MEASURE_GIZMO
+
 #include "GLGizmoBase.hpp"
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GLModel.hpp"
-#else
-#include "slic3r/GUI/3DScene.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-
-#include <memory>
 
 namespace Slic3r {
 
@@ -80,5 +75,7 @@ protected:
 
 } // namespace GUI
 } // namespace Slic3r
+
+#endif // ENABLE_MEASURE_GIZMO
 
 #endif // slic3r_GLGizmoMeasure_hpp_

@@ -14,6 +14,8 @@
 
 #include <GL/glew.h>
 
+#if ENABLE_MEASURE_GIZMO
+
 namespace Slic3r {
 namespace GUI {
 
@@ -261,20 +263,6 @@ void GLGizmoMeasure::on_render()
 
 
 
-#if ! ENABLE_LEGACY_OPENGL_REMOVAL
-    #error NOT IMPLEMENTED
-#endif
-#if ! ENABLE_GL_SHADERS_ATTRIBUTES
-    #error NOT IMPLEMENTED
-#endif
-
-void GLGizmoMeasure::on_render_for_picking()
-{
-}
-
-
-
-
 void GLGizmoMeasure::update_if_needed()
 {
     auto update_plane_models_cache = [this](const indexed_triangle_set& its) {
@@ -354,3 +342,5 @@ void GLGizmoMeasure::update_if_needed()
 
 } // namespace GUI
 } // namespace Slic3r
+
+#endif // ENABLE_MEASURE_GIZMO
