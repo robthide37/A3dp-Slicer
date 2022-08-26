@@ -597,6 +597,12 @@ void ConfigOptionsGroup::back_to_sys_value(const std::string& opt_key)
 void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, const std::string& opt_key)
 {
 	boost::any value;
+	if (opt_key == "bed_shape") {
+        for (const std::string& key : {"bed_custom_texture", "bed_custom_model"}) {
+            value = config.opt_string(key);
+            this->change_opt_value(key, value);
+        }
+	}
 	if (opt_key == "extruders_count") {
 		auto   *nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("nozzle_diameter"));
 		value = int(nozzle_diameter->values.size());
