@@ -90,28 +90,24 @@ void Polygon::douglas_peucker(double tolerance)
 
 // Does an unoriented polygon contain a point?
 // Tested by counting intersections along a horizontal line.
-bool Polygon::contains(const Point &point) const
+bool Polygon::contains(const Point &p) const
 {
     // http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html
     bool result = false;
     Points::const_iterator i = this->points.begin();
     Points::const_iterator j = this->points.end() - 1;
-    for (; i != this->points.end(); j = i++) {
-        //FIXME this test is not numerically robust. Particularly, it does not handle horizontal segments at y == point(1) well.
-        // Does the ray with y == point(1) intersect this line segment?
+    for (; i != this->points.end(); j = ++ i) 
+        if (i->y() > p.y() != j->y() > p.y())
 #if 1
-        if ( (((*i)(1) > point(1)) != ((*j)(1) > point(1)))
-            && ((double)point(0) < (double)((*j)(0) - (*i)(0)) * (double)(point(1) - (*i)(1)) / (double)((*j)(1) - (*i)(1)) + (double)(*i)(0)) )
-            result = !result;
+            if (Vec2d v = (*j - *i).cast<double>();
+                // p.x() is below the line
+                p.x() - i->x() < double(p.y() - i->y()) * v.x() / v.y())
 #else
-        if (((*i)(1) > point(1)) != ((*j)(1) > point(1))) {
             // Orientation predicated relative to i-th point.
-            double orient = (double)(point(0) - (*i)(0)) * (double)((*j)(1) - (*i)(1)) - (double)(point(1) - (*i)(1)) * (double)((*j)(0) - (*i)(0));
-            if (((*i)(1) > (*j)(1)) ? (orient > 0.) : (orient < 0.))
-                result = !result;
-        }
+            if (double orient = (double)(p.x() - i->x()) * (double)(j->y() - i->y()) - (double)(p.y() - i->y()) * (double)(j->x() - i->x());
+                (i->y() > j->y()) ? (orient > 0.) : (orient < 0.))
 #endif
-    }
+                result = !result;
     return result;
 }
 
@@ -518,6 +514,18 @@ void remove_collinear(Polygons &polys)
 {
 	for (Polygon &poly : polys)
 		remove_collinear(poly);
+}
+
+bool contains(const Polygons &polygons, const Point &p, bool border_result)
+{
+    int poly_count_inside = 0;
+    for (const Polygon &poly : polygons) {
+        const int is_inside_this_poly = ClipperLib::PointInPolygon(p, poly.points);
+        if (is_inside_this_poly == -1)
+            return border_result;
+        poly_count_inside += is_inside_this_poly;
+    }
+    return (poly_count_inside % 2) == 1;
 }
 
 }

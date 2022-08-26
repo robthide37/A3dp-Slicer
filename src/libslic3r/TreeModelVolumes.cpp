@@ -79,7 +79,8 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
     this->support_pattern           = config.support_material_pattern;
     this->support_line_spacing      = scaled<coord_t>(config.support_material_spacing.value);
 //    this->support_bottom_offset     = 
-    this->support_wall_count        = config.support_material_with_sheath ? 1 : 0;
+//    this->support_wall_count        = config.support_material_with_sheath ? 1 : 0;
+    this->support_wall_count        = 1;
     this->support_roof_line_distance = scaled<coord_t>(config.support_material_interface_spacing.value) + this->support_roof_line_width;
 //    this->minimum_support_area      = 
 //    this->minimum_bottom_area       = 
@@ -411,7 +412,7 @@ void TreeModelVolumes::calculateCollision(const std::vector<RadiusLayerPair> &ke
 
 void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex max_layer_idx)
 {
-    assert(radius == this->ceilRadius(radius));
+//    assert(radius == this->ceilRadius(radius));
 
     // Process the outlines from least layers to most layers so that the final union will run over the longest vector.
     std::vector<size_t> layer_outline_indices(m_layer_outlines.size(), 0);
