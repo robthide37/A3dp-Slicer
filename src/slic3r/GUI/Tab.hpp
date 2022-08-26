@@ -408,7 +408,6 @@ public:
 	~TabPrint() {}
 
 	void		build() override;
-	void		reload_config() override;
 	void		update_description_lines() override;
 	void		toggle_options() override;
 	void		update() override;
@@ -442,7 +441,6 @@ public:
 	~TabFilament() {}
 
 	void		build() override;
-	void		reload_config() override;
 	void		update_description_lines() override;
 	void		toggle_options() override;
 	void		update() override;
@@ -515,7 +513,6 @@ public:
     ~TabSLAMaterial() {}
 
 	void		build() override;
-	void		reload_config() override;
 	void		toggle_options() override;
 	void		update() override;
     void		init_options_list() override;
@@ -532,7 +529,6 @@ public:
 	ogStaticText* m_support_object_elevation_description_line = nullptr;
 
     void		build() override;
-	void		reload_config() override;
 	void		update_description_lines() override;
 	void		toggle_options() override;
     void		update() override;
