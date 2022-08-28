@@ -509,7 +509,9 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
     Polygon polygon = loop.polygon();
     bool was_clockwise = polygon.make_counter_clockwise();
     const coord_t  nozzle_r   = coord_t(scale_(0.5 * nozzle_dmr) + 0.5);
-    float last_pos_weight = 1.f;
+    Point seam_mod_pos;
+    float last_pos_weight = 2.f;
+    float seam_mod_weight = 0.f;
     float angle_weight = 1.f;
     if (seam_position == spCustom)
         seam_position = spCost;
@@ -538,27 +540,28 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
     assert(layer_idx < po->layer_count());
 
     const bool custom_seam = loop.role() == erExternalPerimeter && this->is_custom_seam_on_layer(layer_idx, po_idx);
+    bool has_custom_seam_modifier = false;
+    if (print_object_instance_idx < po->instances().size())
+        for (ModelVolume* v : po->model_object()->volumes)
+            if (v->is_seam_position()) {
+                has_custom_seam_modifier = true;
+                break;
+            }
 
-    if (custom_seam) {
+    if (custom_seam || has_custom_seam_modifier) {
         // Seam enf/blockers can begin and end in between the original vertices.
         // Let add extra points in between and update the leghths.
         polygon.densify(MINIMAL_POLYGON_SIDE);
     }
 
-    bool has_seam_custom = false;
-    if(print_object_instance_idx < po->instances().size())
-        for (ModelVolume* v : po->model_object()->volumes)
-            if (v->is_seam_position()) {
-                has_seam_custom = true;
-                break;
-            }
-    if (has_seam_custom) {
+    if (has_custom_seam_modifier) {
         // Look for all lambda-seam-modifiers below current z, choose the highest one
         ModelVolume* v_lambda_seam = nullptr;
         Vec3d lambda_pos;
         double lambda_z = 0;
         double lambda_dist = 0;
         double lambda_radius = 0;
+        double max_lambda_radius = 0;
         //get model_instance (like from po->model_object()->instances, but we don't have the index for that array)
         const ModelInstance* model_instance = po->instances()[print_object_instance_idx].model_instance;
         for (ModelVolume* v : po->model_object()->volumes) {
@@ -576,7 +579,7 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
                 Vec3d polygon_3dpoint{ unscaled(nearest.x()), unscaled(nearest.y()), (double)layer.print_z };
                 double test_lambda_dist = (polygon_3dpoint - test_lambda_pos).norm();
                 double sphere_radius = po->model_object()->instance_bounding_box(0, true).size().x() / 2;
-
+                max_lambda_radius = std::max(max_lambda_radius, sphere_radius);
 
                 //use this one if the first or nearer (in z, or in xy if same z)
                 if (v_lambda_seam == nullptr
@@ -593,11 +596,24 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
 
         if (v_lambda_seam != nullptr) {
             // Found, get the center point and apply rotation and scaling of Model instance. Continues to spAligned if not found or Weight set to Zero.
-            last_pos = Point::new_scale(lambda_pos.x(), lambda_pos.y());
+            seam_mod_pos = Point::new_scale(lambda_pos.x(), lambda_pos.y());
             // Weight is set by user and stored in the radius of the sphere
-            last_pos_weight = std::max(0.0, std::round(100 * (lambda_radius)));
-            if (last_pos_weight > 0.0)
-                seam_position = spCustom;
+            seam_mod_weight = 1.f + 100 * (lambda_radius/max_lambda_radius);
+            if (seam_mod_weight > 0.0) {
+                seam_mod_weight += 1.;
+                if (seam_position == spAligned) {
+                    last_pos_weight = 0; 
+                    angle_weight = 0;
+                } else if(seam_position == spExtremlyAligned) {
+                    last_pos_weight = 1.f;
+                    angle_weight = 0;
+                } else {
+                    seam_position = spCustom;
+                    last_pos_weight = 0;
+                }
+            }
+        } else {
+            has_custom_seam_modifier = false;
         }
     }
 
@@ -607,13 +623,29 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
         double travel_cost = 1;
         if (seam_position == spAligned || seam_position == spExtremlyAligned) {
             // Seam is aligned to the seam at the preceding layer.
+            bool has_last_layer_pos = false;
             if (po != nullptr) {
                 std::optional<Point> pos = m_seam_history.get_last_seam(m_po_list[po_idx], layer_po->print_z, loop.polygon().bounding_box());
                 if (pos.has_value()) {
                     last_pos = *pos;
+                    has_last_layer_pos = true;
                 }
-                // TODO: check why i put it out of the if
-                last_pos_weight = is_custom_enforcer_on_layer(layer_idx, po_idx) ? 0.f : 1.f;
+                // deactivate if activated and spAligned and is_custom_enforcer_on_layer
+                if (last_pos_weight > 0 && seam_position == spAligned && is_custom_enforcer_on_layer(layer_idx, po_idx)) {
+                    last_pos_weight = 0.f;
+                }
+            }
+            // even with spExtremlyAligned, still use the custom enforcer at the start
+            if (seam_position == spExtremlyAligned) {
+                if (custom_seam) {
+                    seam_position = spAligned;
+                } else if (has_custom_seam_modifier && !has_last_layer_pos) {
+                    seam_position = spAligned;
+                }
+            }
+            if (has_custom_seam_modifier && !has_last_layer_pos) {
+                //if seam modifier and no previous data, don't use last pos
+                last_pos_weight = 0;
             }
         } else if (seam_position == spRear) {
             // Object is centered around (0,0) in its current coordinate system.
@@ -639,12 +671,18 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
 
 
         // Insert a projection of last_pos into the polygon.
-        size_t last_pos_proj_idx;
-        {
+        size_t last_pos_proj_idx = 0;
+        if(last_pos_weight > 0){
             Points::const_iterator it = project_point_to_polygon_and_insert(polygon, last_pos, 0.1 * nozzle_r);
             last_pos_proj_idx = it - polygon.points.begin();
         }
         Point last_pos_proj = polygon.points[last_pos_proj_idx];
+        size_t seam_mod_pos_proj_idx = 0;
+        if (seam_mod_weight > 0) {
+            Points::const_iterator it = project_point_to_polygon_and_insert(polygon, seam_mod_pos, 0.1 * nozzle_r);
+            seam_mod_pos_proj_idx = it - polygon.points.begin();
+        }
+        Point seam_mod_pos_proj = polygon.points[seam_mod_pos_proj_idx];
 
         if (seam_position != spExtremlyAligned) {
 
@@ -675,40 +713,41 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
                 if (was_clockwise)
                     ccwAngle = -ccwAngle;
                 float penalty = 0;
-                //if (ccwAngle < -float(0.6 * PI))
-                //    penalty = 0.f;
-                //else if (ccwAngle > float(0.6 * PI))
-                //    
-                //    penalty = penaltyConvexVertex;
                 //else 
-                if (ccwAngle < 0.f) {
-                    // We love Sharp reflex vertex (high negative ccwAngle). It hides the seam perfectly.
-                    // Interpolate penalty between maximum and zero.
-                    penalty = penaltyFlatSurface * bspline_kernel(ccwAngle);
-                } else  if (ccwAngle > float(0.67 * PI)) {
-                    //penalize too sharp convex angle, it's best to be nearer to ~100°
-                    penalty = penaltyConvexVertex + (penaltyFlatSurface - penaltyConvexVertex) * bspline_kernel((PI - ccwAngle) * 1.5);
-                } else {
-                    // Interpolate penalty between maximum and the penalty for a convex vertex.
-                    penalty = penaltyConvexVertex + (penaltyFlatSurface - penaltyConvexVertex) * bspline_kernel(ccwAngle);
+                if (angle_weight > 0) {
+                    if (ccwAngle < 0.f) {
+                        // We love Sharp reflex vertex (high negative ccwAngle). It hides the seam perfectly.
+                        // Interpolate penalty between maximum and zero.
+                        penalty = penaltyFlatSurface * bspline_kernel(ccwAngle);
+                    } else  if (ccwAngle > float(0.67 * PI)) {
+                        //penalize too sharp convex angle, it's best to be nearer to ~100°
+                        penalty = penaltyConvexVertex + (penaltyFlatSurface - penaltyConvexVertex) * bspline_kernel((PI - ccwAngle) * 1.5);
+                    } else {
+                        // Interpolate penalty between maximum and the penalty for a convex vertex.
+                        penalty = penaltyConvexVertex + (penaltyFlatSurface - penaltyConvexVertex) * bspline_kernel(ccwAngle);
+                    }
+                    penalty *= angle_weight;
                 }
-                penalty *= angle_weight;
-                if (po != nullptr && travel_cost >= 1) {
-                    //TODO maybe delete this code path, it's not used in prusa and may not be optimal. At least, document why it's here.
-                    penalty += last_pos_weight * polygon.points[i].distance_to(last_pos_proj) / dist_max;
-                    penalties[i] = std::max(0.f, penalty);
-                } else {
-                    // Give a negative penalty for points close to the last point or the prefered seam location.
-                    float dist_to_last_pos_proj = (i < last_pos_proj_idx) ?
-                        std::min(lengths[last_pos_proj_idx] - lengths[i], lengths.back() - lengths[last_pos_proj_idx] + lengths[i]) :
-                        std::min(lengths[i] - lengths[last_pos_proj_idx], lengths.back() - lengths[i] + lengths[last_pos_proj_idx]);
-                    penalty -= last_pos_weight * bspline_kernel(dist_to_last_pos_proj / dist_max);
-                    penalties[i] = std::max(0.f, penalty);
-                    if (prefer_nearest) {
-                        // This hack limits the search around the nearest position projection.
-                        penalties[i] += dist_to_last_pos_proj > 6.f * nozzle_r ? 100.f : 0.f;
+                if (last_pos_weight > 0) {
+                    if (po != nullptr && travel_cost >= 1) {
+                        //TODO maybe delete this code path, it's not used in prusa and may not be optimal. At least, document why it's here.
+                        penalty += last_pos_weight * polygon.points[i].distance_to(last_pos_proj) / dist_max;
+                    } else {
+                        // Give a negative penalty for points close to the last point or the prefered seam location.
+                        float dist_to_last_pos_proj = (i < last_pos_proj_idx) ?
+                            std::min(lengths[last_pos_proj_idx] - lengths[i], lengths.back() - lengths[last_pos_proj_idx] + lengths[i]) :
+                            std::min(lengths[i] - lengths[last_pos_proj_idx], lengths.back() - lengths[i] + lengths[last_pos_proj_idx]);
+                        penalty -= last_pos_weight * bspline_kernel(dist_to_last_pos_proj / dist_max);
+                        if (prefer_nearest) {
+                            // This hack limits the search around the nearest position projection.
+                            penalty += dist_to_last_pos_proj > 6.f * nozzle_r ? 100.f : 0.f;
+                        }
                     }
                 }
+                if (seam_mod_weight > 0) {
+                    penalty += seam_mod_weight * polygon.points[i].distance_to(seam_mod_pos_proj) / dist_max;
+                }
+                penalties[i] = std::max(0.f, penalty);
             }
 
             // Penalty for overhangs.
@@ -1125,7 +1164,7 @@ std::optional<Point> SeamHistory::get_last_seam(const PrintObject* po, double la
         return out;
 
     // Get seam was called for different layer than last time.
-    std::map<const PrintObject*, std::vector<SeamPoint>>* data_last_layer = nullptr;
+    std::map<const PrintObject*, std::vector<SeamPoint>>* data_last_layer = layer_z  > m_data.begin()->first * 1.01 ? &m_data.begin()->second : nullptr;
     for (auto it = m_data.begin() + 1; it != m_data.end(); ++it) {
         if (it->first == layer_z) {
             data_last_layer = &std::prev(it)->second;

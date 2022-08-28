@@ -1651,9 +1651,6 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
     // Bounding box of the selected instance in world coordinate system including the translation, without modifiers.
     BoundingBoxf3 instance_bb = model_object.instance_bounding_box(instance_idx);
 
-    if(type == ModelVolumeType::SEAM_POSITION)
-        model_object.config.set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spCustom));
-
     TriangleMesh mesh = create_mesh(type_name, instance_bb);
     
 	// Mesh will be centered when loading.
