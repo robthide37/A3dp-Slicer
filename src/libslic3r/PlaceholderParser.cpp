@@ -1721,7 +1721,7 @@ void PlaceholderParser::append_custom_variables(std::map<std::string, std::vecto
             }
         }
         //if nothing, then it's strings
-        if (is_not_string && is_not_numeric && is_not_bool) {
+        if (!is_not_string && is_not_numeric && is_not_bool) {
             string_values = values;
             is_not_string = false;
         }
