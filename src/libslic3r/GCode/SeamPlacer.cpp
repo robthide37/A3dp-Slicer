@@ -1178,16 +1178,17 @@ std::optional<Point> SeamHistory::get_last_seam(const PrintObject* po, double la
 void SeamHistory::add_seam(const PrintObject* po, const Point& pos, double layer_z, const BoundingBox& island_bb)
 {
     std::map<const PrintObject*, std::vector<SeamPoint>>* data_this_layer = nullptr;
-    for (auto it = m_data.begin(); it != m_data.end(); ++it) {
+    for (std::vector<std::pair<double, std::map<const PrintObject*, std::vector<SeamPoint>>>>::iterator it = m_data.begin(); it != m_data.end(); ++it) {
         if (it->first == layer_z) {
             data_this_layer = &it->second;
             break;
         }
         if (it->first >= layer_z) {
             //add it before
-            m_data.emplace(it);
-            it->first = layer_z;
-            data_this_layer = &it->second;
+            auto it_new = m_data.emplace(it);
+            it_new->first = layer_z;
+            data_this_layer = &it_new->second;
+            break;
         }
     }
     if (data_this_layer == nullptr) {
