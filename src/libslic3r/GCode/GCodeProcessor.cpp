@@ -2683,7 +2683,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         if (m_height == 0.0f)
             m_height = DEFAULT_TOOLPATH_HEIGHT;
 
-        if (m_end_position[Z] == 0.0f)
+        if (m_end_position[Z] == 0.0f || (m_extrusion_role == erCustom && m_layer_id == 0))
             m_end_position[Z] = m_height;
 
 #if ENABLE_PROCESS_G2_G3_LINES
