@@ -5691,7 +5691,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBools{ false });
 
     def = this->add("wipe_inside_end", coBools);
-    def->label = L("Wipe inside at start");
+    def->label = L("Wipe inside at end");
     def->category = OptionCategory::extruders;
     def->tooltip = L("This flag will wipe the nozzle a bit inward after extruding an external perimeter."
         " The wipe_extra_perimeter is executed first, then this move inward before the retraction wipe."
