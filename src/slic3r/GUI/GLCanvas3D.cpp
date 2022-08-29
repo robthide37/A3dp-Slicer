@@ -2234,7 +2234,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 #if ENABLE_LEGACY_OPENGL_REMOVAL
                                 volume.model.init_from(mesh);
 #if ENABLE_RAYCAST_PICKING
-                                volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(mesh));
+                                volume.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<TriangleMesh>(mesh));
 #endif // ENABLE_RAYCAST_PICKING
 #else
                                 volume.indexed_vertex_array.load_mesh(mesh);
@@ -2254,7 +2254,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 #if ENABLE_RAYCAST_PICKING
                                 const TriangleMesh& new_mesh = m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh();
                                 volume.model.init_from(new_mesh);
-                                volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(new_mesh));
+                                volume.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<TriangleMesh>(new_mesh));
 #else
                                 volume.model.init_from(m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh());
 #endif // ENABLE_RAYCAST_PICKING

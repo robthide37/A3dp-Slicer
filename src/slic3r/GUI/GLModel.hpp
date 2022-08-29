@@ -129,6 +129,8 @@ namespace GUI {
             size_t vertices_size_bytes() const  { return vertices_size_floats() * sizeof(float); }
             size_t indices_size_bytes() const { return indices.size() * index_stride_bytes(*this); }
 
+            indexed_triangle_set get_as_indexed_triangle_set() const;
+
             static size_t vertex_stride_floats(const Format& format);
             static size_t vertex_stride_bytes(const Format& format) { return vertex_stride_floats(format) * sizeof(float); }
 

@@ -7,7 +7,6 @@
 #include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
 
 #include "libslic3r/Model.hpp"
-#include "libslic3r/Measure.hpp"
 #include "libslic3r/PresetBundle.hpp"
 
 #include <numeric>
@@ -20,12 +19,22 @@ namespace Slic3r {
 namespace GUI {
 
 static const Slic3r::ColorRGBA HOVER_COLOR = { 0.8f, 0.2f, 0.2f, 1.0f };
+static const int POINT_ID         = 100;
+static const int EDGE_ID          = 200;
+static const int CIRCLE_ID        = 300;
+static const int CIRCLE_CENTER_ID = 301;
+static const int PLANE_ID         = 400;
 
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
-    m_sphere.init_from(smooth_sphere(16, 7.5f));
-    m_cylinder.init_from(smooth_cylinder(16, 5.0f, 1.0f));
+    GLModel::Geometry sphere_geometry = smooth_sphere(16, 7.5f);
+    m_sphere.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(sphere_geometry.get_as_indexed_triangle_set())));
+    m_sphere.model.init_from(std::move(sphere_geometry));
+
+    GLModel::Geometry cylinder_geometry = smooth_cylinder(16, 5.0f, 1.0f);
+    m_cylinder.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(cylinder_geometry.get_as_indexed_triangle_set())));
+    m_cylinder.model.init_from(std::move(cylinder_geometry));
 }
 
 bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
@@ -130,6 +139,7 @@ void GLGizmoMeasure::on_render()
 
         const Transform3d& model_matrix = selection.get_first_volume()->world_matrix();
         const Camera& camera = wxGetApp().plater()->get_camera();
+        const float inv_zoom = (float)camera.get_inv_zoom();
 
         Vec3f pos;
         Vec3f normal;
@@ -174,8 +184,70 @@ void GLGizmoMeasure::on_render()
         }
 #endif // ENABLE_MEASURE_GIZMO_DEBUG
 
-        if (features.empty())
-            return;
+        if (m_features != features) {
+            GLGizmoMeasure::on_unregister_raycasters_for_picking();
+            m_features = features;
+            if (m_features.empty())
+                return;
+
+#if !ENABLE_MEASURE_GIZMO_DEBUG
+            for (const Measure::SurfaceFeature& feature : m_features) {
+                switch (feature.get_type()) {
+                case Measure::SurfaceFeatureType::Point:
+                {
+                    m_raycasters.insert({ POINT_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID, *m_sphere.mesh_raycaster) });
+                    break;
+                }
+                case Measure::SurfaceFeatureType::Edge:
+                {
+                    m_raycasters.insert({ EDGE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, EDGE_ID, *m_cylinder.mesh_raycaster) });
+                    break;
+                }
+                case Measure::SurfaceFeatureType::Circle:
+                {
+                    const auto& [center, radius, n] = feature.get_circle();
+                    m_circle.reset();
+                    GLModel::Geometry circle_geometry = smooth_torus(64, 16, float(radius), 5.0f * inv_zoom);
+                    m_circle.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(circle_geometry.get_as_indexed_triangle_set())));
+                    m_circle.model.init_from(std::move(circle_geometry));
+
+                    m_raycasters.insert({ CIRCLE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_ID, *m_circle.mesh_raycaster) });
+                    m_raycasters.insert({ CIRCLE_CENTER_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_CENTER_ID, *m_sphere.mesh_raycaster) });
+                    break;
+                }
+                case Measure::SurfaceFeatureType::Plane:
+                {
+                    const auto& [idx, normal, pt] = feature.get_plane();
+                    const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
+                    const std::vector<int>& triangle_indices = planes_triangles[idx];
+
+                    const indexed_triangle_set its = (m_old_model_volume != nullptr) ? m_old_model_volume->mesh().its : m_old_model_object->volumes.front()->mesh().its;
+                    GLModel::Geometry init_data;
+                    init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+                    unsigned int i = 0;
+                    for (int idx : triangle_indices) {
+                        const Vec3f& v0 = its.vertices[its.indices[idx][0]];
+                        const Vec3f& v1 = its.vertices[its.indices[idx][1]];
+                        const Vec3f& v2 = its.vertices[its.indices[idx][2]];
+
+                        const Vec3f n = (v1 - v0).cross(v2 - v0).normalized();
+                        init_data.add_vertex(v0, n);
+                        init_data.add_vertex(v1, n);
+                        init_data.add_vertex(v2, n);
+                        init_data.add_triangle(i, i + 1, i + 2);
+                        i += 3;
+                    }
+
+                    m_plane.reset();
+                    m_plane.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(init_data.get_as_indexed_triangle_set())));
+                    m_plane.model.init_from(std::move(init_data));
+                    m_raycasters.insert({ PLANE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, PLANE_ID, *m_plane.mesh_raycaster) });
+                    break;
+                }
+                }
+            }
+#endif // !ENABLE_MEASURE_GIZMO_DEBUG
+        }
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
         if (shader == nullptr)
@@ -189,9 +261,8 @@ void GLGizmoMeasure::on_render()
         glsafe(::glEnable(GL_DEPTH_TEST));
 
         const Transform3d& view_matrix = camera.get_view_matrix();
-        const float inv_zoom = camera.get_inv_zoom();
 
-        for (const Measure::SurfaceFeature& feature : features) {
+        for (const Measure::SurfaceFeature& feature : m_features) {
             switch (feature.get_type()) {
             case Measure::SurfaceFeatureType::Point:
             {
@@ -201,8 +272,11 @@ void GLGizmoMeasure::on_render()
                 shader->set_uniform("view_model_matrix", view_model_matrix);
                 const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
                 shader->set_uniform("view_normal_matrix", view_normal_matrix);
-                m_sphere.set_color(HOVER_COLOR);
-                m_sphere.render();
+                m_sphere.model.set_color(HOVER_COLOR);
+                m_sphere.model.render();
+                auto it = m_raycasters.find(POINT_ID);
+                if (it != m_raycasters.end() && it->second != nullptr)
+                    it->second->set_transform(feature_matrix);
                 break;
             }
             case Measure::SurfaceFeatureType::Circle:
@@ -214,19 +288,22 @@ void GLGizmoMeasure::on_render()
                 shader->set_uniform("view_model_matrix", center_view_model_matrix);
                 const Matrix3d center_view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * center_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
                 shader->set_uniform("view_normal_matrix", center_view_normal_matrix);
-                m_sphere.set_color(HOVER_COLOR);
-                m_sphere.render();
-
-                m_circle.reset();
-                m_circle.init_from(smooth_torus(64, 16, float(radius), 5.0f * inv_zoom));
+                m_sphere.model.set_color(HOVER_COLOR);
+                m_sphere.model.render();
+                auto it = m_raycasters.find(CIRCLE_CENTER_ID);
+                if (it != m_raycasters.end() && it->second != nullptr)
+                    it->second->set_transform(center_matrix);
 
                 const Transform3d circle_matrix = model_matrix * Geometry::translation_transform(center);
                 const Transform3d circle_view_model_matrix = view_matrix * circle_matrix;
                 shader->set_uniform("view_model_matrix", circle_view_model_matrix);
                 const Matrix3d circle_view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * circle_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
                 shader->set_uniform("view_normal_matrix", circle_view_normal_matrix);
-                m_circle.set_color(HOVER_COLOR);
-                m_circle.render();
+                m_circle.model.set_color(HOVER_COLOR);
+                m_circle.model.render();
+                it = m_raycasters.find(CIRCLE_ID);
+                if (it != m_raycasters.end() && it->second != nullptr)
+                    it->second->set_transform(circle_matrix);
                 break;
             }
             case Measure::SurfaceFeatureType::Edge:
@@ -239,8 +316,11 @@ void GLGizmoMeasure::on_render()
                 shader->set_uniform("view_model_matrix", view_model_matrix);
                 const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
                 shader->set_uniform("view_normal_matrix", view_normal_matrix);
-                m_cylinder.set_color(HOVER_COLOR);
-                m_cylinder.render();
+                m_cylinder.model.set_color(HOVER_COLOR);
+                m_cylinder.model.render();
+                auto it = m_raycasters.find(EDGE_ID);
+                if (it != m_raycasters.end() && it->second != nullptr)
+                    it->second->set_transform(feature_matrix);
                 break;
             }
             case Measure::SurfaceFeatureType::Plane:
@@ -253,6 +333,9 @@ void GLGizmoMeasure::on_render()
                 shader->set_uniform("view_normal_matrix", view_normal_matrix);
                 m_plane_models_cache[idx].set_color(HOVER_COLOR);
                 m_plane_models_cache[idx].render();
+                auto it = m_raycasters.find(PLANE_ID);
+                if (it != m_raycasters.end() && it->second != nullptr)
+                    it->second->set_transform(model_matrix);
                 break;
             }
             }
@@ -338,6 +421,19 @@ void GLGizmoMeasure::update_if_needed()
             break;
         }
     }
+}
+
+void GLGizmoMeasure::on_register_raycasters_for_picking()
+{
+    // the features are rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(true);
+}
+
+void GLGizmoMeasure::on_unregister_raycasters_for_picking()
+{
+    m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo);
+    m_parent.set_raycaster_gizmos_on_top(false);
+    m_raycasters.clear();
 }
 
 } // namespace GUI

@@ -680,7 +680,7 @@ public:
 
 #if ENABLE_RAYCAST_PICKING
     std::shared_ptr<SceneRaycasterItem> add_raycaster_for_picking(SceneRaycaster::EType type, int id, const MeshRaycaster& raycaster,
-        const Transform3d& trafo, bool use_back_faces = false) {
+        const Transform3d& trafo = Transform3d::Identity(), bool use_back_faces = false) {
         return m_scene_raycaster.add_raycaster(type, id, raycaster, trafo, use_back_faces);
     }
     void remove_raycasters_for_picking(SceneRaycaster::EType type, int id) {

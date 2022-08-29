@@ -278,6 +278,21 @@ void GLModel::Geometry::remove_vertex(size_t id)
     }
 }
 
+indexed_triangle_set GLModel::Geometry::get_as_indexed_triangle_set() const
+{
+    indexed_triangle_set its;
+    its.vertices.reserve(vertices_count());
+    for (size_t i = 0; i < vertices_count(); ++i) {
+        its.vertices.emplace_back(extract_position_3(i));
+    }
+    its.indices.reserve(indices_count() / 3);
+    for (size_t i = 0; i < indices_count() / 3; ++i) {
+        const size_t tri_id = i * 3;
+        its.indices.emplace_back(extract_index(tri_id), extract_index(tri_id + 1), extract_index(tri_id + 2));
+    }
+    return its;
+}
+
 size_t GLModel::Geometry::vertex_stride_floats(const Format& format)
 {
     switch (format.vertex_layout)
