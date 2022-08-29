@@ -96,7 +96,7 @@ bool Polygon::contains(const Point &p) const
     bool result = false;
     Points::const_iterator i = this->points.begin();
     Points::const_iterator j = this->points.end() - 1;
-    for (; i != this->points.end(); j = ++ i) 
+    for (; i != this->points.end(); j = i ++)
         if (i->y() > p.y() != j->y() > p.y())
 #if 1
             if (Vec2d v = (*j - *i).cast<double>();
