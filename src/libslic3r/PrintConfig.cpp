@@ -1042,6 +1042,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("HIPS");
     def->enum_values.push_back("EDGE");
     def->enum_values.push_back("NGEN");
+    def->enum_values.push_back("PA");
     def->enum_values.push_back("NYLON");
     def->enum_values.push_back("PVA");
     def->enum_values.push_back("PC");
