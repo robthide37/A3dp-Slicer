@@ -49,6 +49,16 @@ public:
     // For anything, return an extra point that should also be considered a part of this.
     std::optional<Vec3d> get_extra_point() const { assert(m_type != SurfaceFeatureType::Undef); return m_pt3; }
 
+    bool operator == (const SurfaceFeature& other) const {
+        if (this->m_type != other.m_type) return false;
+        if (!this->m_pt1.isApprox(other.m_pt1)) return false;
+        if (!this->m_pt2.isApprox(other.m_pt2)) return false;
+        if (this->m_pt3.has_value() && !other.m_pt3.has_value()) return false;
+        if (!this->m_pt3.has_value() && other.m_pt3.has_value()) return false;
+        if (this->m_pt3.has_value() && other.m_pt3.has_value() && !(*this->m_pt3).isApprox(*other.m_pt3)) return false;
+        return this->m_value == other.m_value;
+    }
+
 private:
     SurfaceFeatureType m_type = SurfaceFeatureType::Undef;
     Vec3d m_pt1;

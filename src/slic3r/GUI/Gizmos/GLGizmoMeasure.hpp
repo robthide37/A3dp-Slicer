@@ -5,6 +5,7 @@
 
 #include "GLGizmoBase.hpp"
 #include "slic3r/GUI/GLModel.hpp"
+#include "libslic3r/Measure.hpp"
 
 namespace Slic3r {
 
@@ -25,10 +26,14 @@ class GLGizmoMeasure : public GLGizmoBase
 private:
     std::unique_ptr<Measure::Measuring> m_measuring;
 
-    GLModel m_sphere;
-    GLModel m_cylinder;
-    GLModel m_circle;
+    PickingModel m_sphere;
+    PickingModel m_cylinder;
+    PickingModel m_circle;
+    PickingModel m_plane;
+
     std::vector<GLModel> m_plane_models_cache;
+    std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
+    std::vector<Measure::SurfaceFeature> m_features;
 
     // This holds information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;
@@ -53,7 +58,7 @@ private:
 
 public:
     GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
-        
+
     /// <summary>
     /// Apply rotation on select plane
     /// </summary>
@@ -71,6 +76,9 @@ protected:
     void on_render_for_picking() override;
     void on_set_state() override;
     CommonGizmosDataID on_get_requirements() const override;
+
+    virtual void on_register_raycasters_for_picking() override;
+    virtual void on_unregister_raycasters_for_picking() override;
 };
 
 } // namespace GUI

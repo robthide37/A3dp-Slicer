@@ -148,8 +148,8 @@ void GLGizmoSlaSupports::on_register_raycasters_for_picking()
 
     if (m_editing_mode && !m_editing_cache.empty()) {
         for (size_t i = 0; i < m_editing_cache.size(); ++i) {
-            m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_sphere.mesh_raycaster, Transform3d::Identity()),
-                m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_cone.mesh_raycaster, Transform3d::Identity()));
+            m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_sphere.mesh_raycaster),
+                m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_cone.mesh_raycaster));
         }
         update_raycasters_for_picking_transform();
     }
