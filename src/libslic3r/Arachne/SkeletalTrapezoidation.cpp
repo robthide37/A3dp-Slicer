@@ -451,8 +451,23 @@ SkeletalTrapezoidation::SkeletalTrapezoidation(const Polygons& polys, const Bead
     constructFromPolygons(polys);
 }
 
+static bool has_finite_edge_with_non_finite_vertex(const Geometry::VoronoiDiagram &voronoi_diagram)
+{
+    for (const VoronoiUtils::vd_t::edge_type &edge : voronoi_diagram.edges()) {
+        if (edge.is_finite()) {
+            assert(edge.vertex0() != nullptr && edge.vertex1() != nullptr);
+            if (edge.vertex0() == nullptr || edge.vertex1() == nullptr || !VoronoiUtils::is_finite(*edge.vertex0()) ||
+                !VoronoiUtils::is_finite(*edge.vertex1()))
+                return true;
+        }
+    }
+    return false;
+}
 
 static bool detect_missing_voronoi_vertex(const Geometry::VoronoiDiagram &voronoi_diagram, const std::vector<SkeletalTrapezoidation::Segment> &segments) {
+    if (has_finite_edge_with_non_finite_vertex(voronoi_diagram))
+        return true;
+
     for (VoronoiUtils::vd_t::cell_type cell : voronoi_diagram.cells()) {
         if (!cell.incident_edge())
             continue; // There is no spoon
@@ -471,7 +486,8 @@ static bool detect_missing_voronoi_vertex(const Geometry::VoronoiDiagram &vorono
             VoronoiUtils::vd_t::edge_type *ending_vd_edge                  = nullptr;
             VoronoiUtils::vd_t::edge_type *edge                            = cell.incident_edge();
             do {
-                if (edge->is_infinite()) continue;
+                if (edge->is_infinite() || edge->vertex0() == nullptr || edge->vertex1() == nullptr || !VoronoiUtils::is_finite(*edge->vertex0()) || !VoronoiUtils::is_finite(*edge->vertex1()))
+                    continue;
 
                 Vec2i64 v0 = VoronoiUtils::p(edge->vertex0());
                 Vec2i64 v1 = VoronoiUtils::p(edge->vertex1());
