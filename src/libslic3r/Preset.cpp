@@ -1876,13 +1876,23 @@ bool PhysicalPrinterCollection::delete_preset_from_printers( const std::string& 
     return true;
 }
 
+void PhysicalPrinterCollection::rename_preset_in_printers(const std::string& old_preset_name, const std::string& new_preset_name)
+{
+    for (PhysicalPrinter& printer : m_printers)
+        if (printer.delete_preset(old_preset_name)) {
+            printer.add_preset(new_preset_name);
+            printer.update_preset_names_in_config();
+            printer.save();
+        }
+}
+
 // Get list of printers which have more than one preset and "preset_names" preset is one of them
-std::vector<std::string> PhysicalPrinterCollection::get_printers_with_preset(const std::string& preset_name)
+std::vector<std::string> PhysicalPrinterCollection::get_printers_with_preset(const std::string& preset_name, bool respect_only_preset /*= true*/)
 {
     std::vector<std::string> printers;
 
     for (auto printer : m_printers) {
-        if (printer.preset_names.size() == 1)
+        if (!respect_only_preset && printer.preset_names.size() == 1)
             continue;
         if (printer.preset_names.find(preset_name) != printer.preset_names.end())
             printers.emplace_back(printer.name);

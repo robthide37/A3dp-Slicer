@@ -7,6 +7,7 @@
 
 #include <wx/sizer.h>
 #include <wx/stattext.h>
+#include <wx/textctrl.h>
 #include <wx/wupdlock.h>
 
 #include "libslic3r/PresetBundle.hpp"
@@ -54,27 +55,42 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBox
         values.push_back(preset.name);
     }
 
-    wxStaticText* label_top = new wxStaticText(m_parent, wxID_ANY, from_u8((boost::format(_utf8(L("Save %s as:"))) % into_u8(tab->title())).str()));
+    std::string label_str = m_parent->is_for_rename() ?_utf8(L("Rename %s to:")) : _utf8(L("Save %s as:"));
+    wxStaticText* label_top = new wxStaticText(m_parent, wxID_ANY, from_u8((boost::format(label_str) % into_u8(tab->title())).str()));
 
     m_valid_bmp = new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("tick_mark"));
 
-    m_combo = new wxComboBox(m_parent, wxID_ANY, from_u8(preset_name), wxDefaultPosition, wxSize(35 * wxGetApp().em_unit(), -1));
-    for (const std::string& value : values)
-        m_combo->Append(from_u8(value));
+    if (m_parent->is_for_rename()) {
+#ifdef _WIN32
+        long style = wxBORDER_SIMPLE;
+#else
+        long style = 0L;
+#endif
+        m_text_ctrl = new wxTextCtrl(m_parent, wxID_ANY, from_u8(preset_name), wxDefaultPosition, wxSize(35 * wxGetApp().em_unit(), -1), style);
+        m_text_ctrl->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { update(); });
+    }
+    else {
+        m_combo = new wxComboBox(m_parent, wxID_ANY, from_u8(preset_name), wxDefaultPosition, wxSize(35 * wxGetApp().em_unit(), -1));
+        for (const std::string& value : values)
+            m_combo->Append(from_u8(value));
 
-    m_combo->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { update(); });
+        m_combo->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { update(); });
 #ifdef __WXOSX__
-    // Under OSX wxEVT_TEXT wasn't invoked after change selection in combobox,
-    // So process wxEVT_COMBOBOX too
-    m_combo->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) { update(); });
+        // Under OSX wxEVT_TEXT wasn't invoked after change selection in combobox,
+        // So process wxEVT_COMBOBOX too
+        m_combo->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) { update(); });
 #endif //__WXOSX__
+    }
 
     m_valid_label = new wxStaticText(m_parent, wxID_ANY, "");
     m_valid_label->SetFont(wxGetApp().bold_font());
 
     wxBoxSizer* combo_sizer = new wxBoxSizer(wxHORIZONTAL);
-    combo_sizer->Add(m_valid_bmp,   0, wxALIGN_CENTER_VERTICAL | wxRIGHT, BORDER_W);
-    combo_sizer->Add(m_combo,       1, wxEXPAND, BORDER_W);
+    combo_sizer->Add(m_valid_bmp,    0, wxALIGN_CENTER_VERTICAL | wxRIGHT, BORDER_W);
+    if (m_parent->is_for_rename())
+        combo_sizer->Add(m_text_ctrl,1, wxEXPAND, BORDER_W);
+    else
+        combo_sizer->Add(m_combo,    1, wxEXPAND, BORDER_W);
 
     sizer->Add(label_top,       0, wxEXPAND | wxTOP| wxBOTTOM, BORDER_W);
     sizer->Add(combo_sizer,     0, wxEXPAND | wxBOTTOM, BORDER_W);
@@ -88,7 +104,8 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBox
 
 void SavePresetDialog::Item::update()
 {
-    m_preset_name = into_u8(m_combo->GetValue());
+    bool rename = m_parent->is_for_rename();
+    m_preset_name = into_u8(rename ? m_text_ctrl->GetValue() : m_combo->GetValue());
 
     m_valid_type = Valid;
     wxString info_line;
@@ -119,23 +136,34 @@ void SavePresetDialog::Item::update()
 
     const Preset* existing = m_presets->find_preset(m_preset_name, false);
     if (m_valid_type == Valid && existing && (existing->is_default || existing->is_system)) {
-        info_line = _L("Cannot overwrite a system profile.");
+        info_line = rename ? _L("The supplied name is used for a system profile.") :
+                             _L("Cannot overwrite a system profile.");
         m_valid_type = NoValid;
     }
 
     if (m_valid_type == Valid && existing && (existing->is_external)) {
-        info_line = _L("Cannot overwrite an external profile.");
+        info_line = rename ? _L("The supplied name is used for a external profile.") :
+                             _L("Cannot overwrite an external profile.");
         m_valid_type = NoValid;
     }
 
-    if (m_valid_type == Valid && existing && m_preset_name != m_presets->get_selected_preset_name())
+    if (m_valid_type == Valid && existing)
     {
-        if (existing->is_compatible)
-            info_line = from_u8((boost::format(_u8L("Preset with name \"%1%\" already exists.")) % m_preset_name).str());
-        else
-            info_line = from_u8((boost::format(_u8L("Preset with name \"%1%\" already exists and is incompatible with selected printer.")) % m_preset_name).str());
-        info_line += "\n" + _L("Note: This preset will be replaced after saving");
-        m_valid_type = Warning;
+        if (m_preset_name == m_presets->get_selected_preset_name()) {
+            if (!rename && m_presets->get_edited_preset().is_dirty)
+                info_line = _L("Just save preset modifications");
+            else
+                info_line = _L("Nothing changed");
+            m_valid_type = Valid;
+        }
+        else {
+            if (existing->is_compatible)
+                info_line = from_u8((boost::format(_u8L("Preset with name \"%1%\" already exists.")) % m_preset_name).str());
+            else
+                info_line = from_u8((boost::format(_u8L("Preset with name \"%1%\" already exists and is incompatible with selected printer.")) % m_preset_name).str());
+            info_line += "\n" + _L("Note: This preset will be replaced after saving");
+            m_valid_type = Warning;
+        }
     }
 
     if (m_valid_type == Valid && m_preset_name.empty()) {
@@ -157,6 +185,9 @@ void SavePresetDialog::Item::update()
         info_line = _L("The name cannot be the same as a preset alias name.");
         m_valid_type = NoValid;
     }
+
+    if (!m_parent->get_info_line_extention().IsEmpty() && m_valid_type != NoValid)
+        info_line += "\n\n" + m_parent->get_info_line_extention();
 
     m_valid_label->SetLabel(info_line);
     m_valid_label->Show(!info_line.IsEmpty());
@@ -194,11 +225,18 @@ SavePresetDialog::SavePresetDialog(wxWindow* parent, Preset::Type type, std::str
 }
 
 SavePresetDialog::SavePresetDialog(wxWindow* parent, std::vector<Preset::Type> types, std::string suffix)
-    : DPIDialog(parent, wxID_ANY, _L("Save preset"), wxDefaultPosition, wxSize(45 * wxGetApp().em_unit(), 5 * wxGetApp().em_unit()), wxDEFAULT_DIALOG_STYLE | wxICON_WARNING | wxRESIZE_BORDER)
+    : DPIDialog(parent, wxID_ANY, _L("Save presets"), wxDefaultPosition, wxSize(45 * wxGetApp().em_unit(), 5 * wxGetApp().em_unit()), wxDEFAULT_DIALOG_STYLE | wxICON_WARNING | wxRESIZE_BORDER)
 {
     build(types, suffix);
 }
 
+SavePresetDialog::SavePresetDialog(wxWindow* parent, Preset::Type type, bool rename, const wxString& info_line_extention)
+    : DPIDialog(parent, wxID_ANY, _L("Rename preset"), wxDefaultPosition, wxSize(45 * wxGetApp().em_unit(), 5 * wxGetApp().em_unit()), wxDEFAULT_DIALOG_STYLE | wxICON_WARNING | wxRESIZE_BORDER),
+    m_use_for_rename(rename),
+    m_info_line_extention(info_line_extention)
+{
+    build(std::vector<Preset::Type>{type});
+}
 SavePresetDialog::~SavePresetDialog()
 {
     for (auto  item : m_items) {
