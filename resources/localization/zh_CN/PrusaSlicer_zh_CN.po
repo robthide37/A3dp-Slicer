@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-08-12 10:25+0200\n"
-"PO-Revision-Date: 2022-07-22 21:49+0800\n"
+"PO-Revision-Date: 2022-08-22 12:37+0800\n"
 "Last-Translator: Bral@qq.com\n"
 "Language-Team: \n"
 "Language: zh_CN\n"
@@ -3291,11 +3291,11 @@ msgstr ""
 
 #: src/slic3r/GUI/GUI_App.cpp:980
 msgid "Import"
-msgstr "进口"
+msgstr "导入"
 
 #: src/slic3r/GUI/GUI_App.cpp:981
 msgid "Don't import"
-msgstr "不要进口"
+msgstr "不要导入"
 
 #: src/slic3r/GUI/GUI_App.cpp:989
 msgid "Continue and import newer configuration?"
@@ -13639,6 +13639,8 @@ msgid ""
 "perimeters with variable extrusion width. This setting also affects the "
 "Concentric infill."
 msgstr ""
+"经典轮廓生成器产生具有恒定挤出宽度的轮廓，并且对于非常薄的区域使用间隙填充。 "
+"Arachne 引擎产生具有可变挤出宽度的轮廓。这个设置也会影响回环填充。"
 
 #: src/libslic3r/PrintConfig.cpp:3074
 msgid "Classic"
@@ -13659,6 +13661,8 @@ msgid ""
 "perimeter segments. If expressed as a percentage (for example 100%), it will "
 "be computed based on the nozzle diameter."
 msgstr ""
+"当随着零件变薄而在不同数量的轮廓之间过渡时，会分配出一定的空间来分割或连接轮"
+"廓段。如果用百分比表示（例如 100%），它将根据喷嘴直径计算出来。"
 
 #: src/libslic3r/PrintConfig.cpp:3091
 msgid "Perimeter transitioning filter margin"
@@ -13721,6 +13725,9 @@ msgid ""
 "a percentage (for example 25%), it will be computed based on the nozzle "
 "diameter."
 msgstr ""
+"薄型特征的最小厚度。比这个值薄的模型特征将不被打印，而比最小特征尺寸厚的特征"
+"将被加宽到最小轮廓的宽度。如果以百分比表示（例如 25%），它将根据喷嘴直径计"
+"算。"
 
 #: src/libslic3r/PrintConfig.cpp:3140
 msgid "Minimum perimeter width"
