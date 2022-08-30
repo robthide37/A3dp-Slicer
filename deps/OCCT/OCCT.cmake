@@ -2,7 +2,6 @@ prusaslicer_add_cmake_project(OCCT
     #LMBBS: changed version to 7.6.2
     URL https://github.com/Open-Cascade-SAS/OCCT/archive/refs/tags/V7_6_2.zip
     URL_HASH SHA256=c696b923593e8c18d059709717dbf155b3e72fdd283c8522047a790ec3a432c5
-    # SOURCE_DIR c:/Users/mesza/Workspace/prusa3d/PrusaSlicer/dep_OCCT
 
     PATCH_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/occt_toolkit.cmake ./adm/cmake/
     CMAKE_ARGS
