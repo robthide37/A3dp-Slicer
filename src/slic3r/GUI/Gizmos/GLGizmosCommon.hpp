@@ -24,6 +24,10 @@ enum class SLAGizmoEventType : unsigned char {
     Dragging,
     Delete,
     SelectAll,
+#if ENABLE_MEASURE_GIZMO
+    CtrlDown,
+    CtrlUp,
+#endif // ENABLE_MEASURE_GIZMO
     ShiftUp,
     AltUp,
     ApplyChanges,

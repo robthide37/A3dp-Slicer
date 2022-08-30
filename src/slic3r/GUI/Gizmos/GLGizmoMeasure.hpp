@@ -5,6 +5,7 @@
 
 #include "GLGizmoBase.hpp"
 #include "slic3r/GUI/GLModel.hpp"
+#include "slic3r/GUI/GUI_Utils.hpp"
 #include "libslic3r/Measure.hpp"
 
 namespace Slic3r {
@@ -18,12 +19,19 @@ namespace Measure { class Measuring; }
 
 namespace GUI {
 
+enum class SLAGizmoEventType : unsigned char;
 
 class GLGizmoMeasure : public GLGizmoBase
 {
 // This gizmo does not use grabbers. The m_hover_id relates to polygon managed by the class itself.
 
-private:
+    enum class EMode : unsigned char
+    {
+        BasicSelection,
+        ExtendedSelection
+    };
+
+    EMode m_mode{ EMode::BasicSelection };
     std::unique_ptr<Measure::Measuring> m_measuring;
 
     PickingModel m_sphere;
@@ -49,10 +57,8 @@ private:
 
     int m_mouse_pos_x;
     int m_mouse_pos_y;
-#if ENABLE_MEASURE_GIZMO_DEBUG
-    bool m_show_all = false;
-    bool m_show_planes = false;
-#endif // ENABLE_MEASURE_GIZMO_DEBUG
+
+    KeyAutoRepeatFilter m_ctrl_kar_filter;
 
     void update_if_needed();
 
@@ -68,6 +74,8 @@ public:
 
     void data_changed() override;
 
+    bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
+
 protected:
     bool on_init() override;
     std::string on_get_name() const override;
@@ -77,6 +85,7 @@ protected:
     void on_set_state() override;
     CommonGizmosDataID on_get_requirements() const override;
 
+    virtual void on_render_input_window(float x, float y, float bottom_limit) override;
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
 };

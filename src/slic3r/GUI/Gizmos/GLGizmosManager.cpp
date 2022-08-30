@@ -294,6 +294,10 @@ bool GLGizmosManager::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_p
         return dynamic_cast<GLGizmoSeam*>(m_gizmos[Seam].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
     else if (m_current == MmuSegmentation)
         return dynamic_cast<GLGizmoMmuSegmentation*>(m_gizmos[MmuSegmentation].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
+#if ENABLE_MEASURE_GIZMO
+    else if (m_current == Measure)
+        return dynamic_cast<GLGizmoMeasure*>(m_gizmos[Measure].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
+#endif // ENABLE_MEASURE_GIZMO
     else
         return false;
 }
@@ -499,8 +503,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
 
     bool processed = false;
 
-    if ((evt.GetModifiers() & ctrlMask) != 0)
-    {
+    if ((evt.GetModifiers() & ctrlMask) != 0) {
         switch (keyCode)
         {
 #ifdef __APPLE__
@@ -518,15 +521,13 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         }
         }
     }
-    else if (!evt.HasModifiers())
-    {
+    else if (!evt.HasModifiers()) {
         switch (keyCode)
         {
         // key ESC
         case WXK_ESCAPE:
         {
-            if (m_current != Undefined)
-            {
+            if (m_current != Undefined) {
                 if ((m_current != SlaSupports) || !gizmo_event(SLAGizmoEventType::DiscardChanges))
                     reset_all_states();
 
@@ -563,8 +564,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         case 'A':
         case 'a':
         {
-            if (m_current == SlaSupports)
-            {
+            if (m_current == SlaSupports) {
                 gizmo_event(SLAGizmoEventType::AutomaticGeneration);
                 // set as processed no matter what's returned by gizmo_event() to avoid the calling canvas to process 'A' as arrange
                 processed = true;
@@ -582,8 +582,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         case 'F':
         case 'f':
         {
-            if (m_current == Scale)
-            {
+            if (m_current == Scale) {
                 if (!is_dragging())
                     wxGetApp().plater()->scale_selection_to_fit_print_volume();
 
@@ -595,8 +594,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         }
     }
 
-    if (!processed && !evt.HasModifiers())
-    {
+    if (!processed && !evt.HasModifiers()) {
         if (handle_shortcut(keyCode))
             processed = true;
     }
@@ -612,10 +610,8 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
     const int keyCode = evt.GetKeyCode();
     bool processed = false;
 
-    if (evt.GetEventType() == wxEVT_KEY_UP)
-    {
-        if (m_current == SlaSupports || m_current == Hollow)
-        {
+    if (evt.GetEventType() == wxEVT_KEY_UP) {
+        if (m_current == SlaSupports || m_current == Hollow) {
             bool is_editing = true;
             bool is_rectangle_dragging = false;
 
@@ -629,33 +625,33 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
                 is_rectangle_dragging = gizmo->is_selection_rectangle_dragging();
             }
 
-            if (keyCode == WXK_SHIFT)
-            {
+            if (keyCode == WXK_SHIFT) {
                 // shift has been just released - SLA gizmo might want to close rectangular selection.
                 if (gizmo_event(SLAGizmoEventType::ShiftUp) || (is_editing && is_rectangle_dragging))
                     processed = true;
             }
-            else if (keyCode == WXK_ALT)
-            {
+            else if (keyCode == WXK_ALT) {
                 // alt has been just released - SLA gizmo might want to close rectangular selection.
                 if (gizmo_event(SLAGizmoEventType::AltUp) || (is_editing && is_rectangle_dragging))
                     processed = true;
             }
         }
+#if ENABLE_MEASURE_GIZMO
+        else if (m_current == Measure && keyCode == WXK_CONTROL) {
+            gizmo_event(SLAGizmoEventType::CtrlUp, Vec2d::Zero(), false);
+        }
+#endif // ENABLE_MEASURE_GIZMO
 
 //        if (processed)
 //            m_parent.set_cursor(GLCanvas3D::Standard);
     }
-    else if (evt.GetEventType() == wxEVT_KEY_DOWN)
-    {
-        if ((m_current == SlaSupports) && ((keyCode == WXK_SHIFT) || (keyCode == WXK_ALT))
-          && dynamic_cast<GLGizmoSlaSupports*>(get_current())->is_in_editing_mode())
-        {
+    else if (evt.GetEventType() == wxEVT_KEY_DOWN) {
+        if (m_current == SlaSupports && (keyCode == WXK_SHIFT || keyCode == WXK_ALT)
+          && dynamic_cast<GLGizmoSlaSupports*>(get_current())->is_in_editing_mode()) {
 //            m_parent.set_cursor(GLCanvas3D::Cross);
             processed = true;
         }
-        else if (m_current == Cut)
-        {
+        else if (m_current == Cut) {
             auto do_move = [this, &processed](double delta_z) {
                 GLGizmoCut* cut = dynamic_cast<GLGizmoCut*>(get_current());
                 cut->set_cut_z(delta_z + cut->get_cut_z());
@@ -668,11 +664,17 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
             case WXK_NUMPAD_DOWN: case WXK_DOWN: { do_move(-1.0); break; }
             default: { break; }
             }
-        } else if (m_current == Simplify && keyCode == WXK_ESCAPE) {
+        }
+        else if (m_current == Simplify && keyCode == WXK_ESCAPE) {
             GLGizmoSimplify *simplify = dynamic_cast<GLGizmoSimplify *>(get_current());
             if (simplify != nullptr) 
                 processed = simplify->on_esc_key_down();
         }
+#if ENABLE_MEASURE_GIZMO
+        else if (m_current == Measure && keyCode == WXK_CONTROL) {
+            gizmo_event(SLAGizmoEventType::CtrlDown, Vec2d::Zero(), true);
+        }
+#endif // ENABLE_MEASURE_GIZMO
     }
 
     if (processed)

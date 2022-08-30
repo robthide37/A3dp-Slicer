@@ -19,6 +19,9 @@
 #if ENABLE_RAYCAST_PICKING
 #include "SceneRaycaster.hpp"
 #endif // ENABLE_RAYCAST_PICKING
+#if ENABLE_MEASURE_GIZMO
+#include "GUI_Utils.hpp"
+#endif // ENABLE_MEASURE_GIZMO
 
 #include "libslic3r/Slicing.hpp"
 
@@ -135,6 +138,7 @@ private:
     wxTimer* m_timer;
 };
 
+#if !ENABLE_MEASURE_GIZMO
 class KeyAutoRepeatFilter
 {
     size_t m_count{ 0 };
@@ -144,6 +148,7 @@ public:
     void reset_count() { m_count = 0; }
     bool is_first() const { return m_count == 0; }
 };
+#endif // !ENABLE_MEASURE_GIZMO
 
 wxDECLARE_EVENT(EVT_GLCANVAS_OBJECT_SELECT, SimpleEvent);
 

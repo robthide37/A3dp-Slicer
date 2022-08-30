@@ -59,6 +59,10 @@ public:
         return this->m_value == other.m_value;
     }
 
+    bool operator != (const SurfaceFeature& other) const {
+        return !operator == (other);
+    }
+
 private:
     SurfaceFeatureType m_type = SurfaceFeatureType::Undef;
     Vec3d m_pt1;
@@ -79,11 +83,9 @@ public:
     explicit Measuring(const indexed_triangle_set& its);
     ~Measuring();
     
-#if ENABLE_MEASURE_GIZMO_DEBUG
     // Return a reference to a list of all features identified on the its.
     // Use only for debugging. Expensive, do not call often.
     std::vector<SurfaceFeature> get_all_features() const;
-#endif // ENABLE_MEASURE_GIZMO_DEBUG
 
     // Given a face_idx where the mouse cursor points, return a feature that
     // should be highlighted (if any).
