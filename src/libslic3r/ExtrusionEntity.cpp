@@ -75,7 +75,7 @@ void ExtrusionPath::polygons_covered_by_spacing(Polygons &out, const float spaci
     //TODO: check BRIDGE_FLOW here
     auto flow = bridge 
         ? Flow::bridging_flow(this->width, 0.f) 
-        : Flow(this->width, this->height, 0.f, spacing_ratio);
+        : Flow::new_from_width(this->width, 0.f, this->height, spacing_ratio);
     polygons_append(out, offset(this->polyline, 0.5f * float(flow.scaled_spacing()) + scaled_epsilon));
 }
 

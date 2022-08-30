@@ -11,7 +11,6 @@
 #include "utils/linearAlg2D.hpp"
 #include "EdgeGrid.hpp"
 #include "utils/SparseLineGrid.hpp"
-#include "Flow.hpp"
 #include "Geometry.hpp"
 #include "utils/PolylineStitcher.hpp"
 #include "SVG.hpp"
@@ -24,12 +23,15 @@
 namespace Slic3r::Arachne
 {
 
-WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t bead_width_0, const coord_t bead_width_x,
+WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t bead_spacing_0, const coord_t bead_width_0,
+                             const coord_t bead_spacing_x, const coord_t bead_width_x,
                              const size_t inset_count, const coord_t wall_0_inset, const coordf_t layer_height,
                              const PrintObjectConfig &print_object_config, const PrintConfig &print_config)
     : outline(outline)
-    , bead_width_0(bead_width_0)
-    , bead_width_x(bead_width_x)
+    , perimeter_width_0(bead_width_0)
+    , perimeter_width_x(bead_width_x)
+    , bead_spacing_0(bead_spacing_0)
+    , bead_spacing_x(bead_spacing_x)
     , inset_count(inset_count)
     , wall_0_inset(wall_0_inset)
     , layer_height(layer_height)
@@ -497,18 +499,15 @@ const std::vector<VariableWidthLines> &WallToolPaths::generate()
         return toolpaths;
     }
 
-    const float external_perimeter_extrusion_width = Flow::rounded_rectangle_extrusion_width_from_spacing(unscale<float>(bead_width_0), float(this->layer_height));
-    const float perimeter_extrusion_width          = Flow::rounded_rectangle_extrusion_width_from_spacing(unscale<float>(bead_width_x), float(this->layer_height));
-
-    const double wall_split_middle_threshold = std::clamp(2. * unscaled<double>(this->min_bead_width) / external_perimeter_extrusion_width - 1., 0.01, 0.99); // For an uneven nr. of lines: When to split the middle wall into two.
-    const double wall_add_middle_threshold   = std::clamp(unscaled<double>(this->min_bead_width) / perimeter_extrusion_width, 0.01, 0.99); // For an even nr. of lines: When to add a new middle in between the innermost two walls.
+    const double wall_split_middle_threshold = std::clamp(2. * unscaled(this->min_bead_width) / unscaled(this->perimeter_width_0) - 1., 0.01, 0.99); // For an uneven nr. of lines: When to split the middle wall into two.
+    const double wall_add_middle_threshold   = std::clamp(unscaled(this->min_bead_width) / unscaled(this->perimeter_width_x), 0.01, 0.99); // For an even nr. of lines: When to add a new middle in between the innermost two walls.
 
     const int wall_distribution_count = this->print_object_config.wall_distribution_count.value;
     const size_t max_bead_count = (inset_count < std::numeric_limits<coord_t>::max() / 2) ? 2 * inset_count : std::numeric_limits<coord_t>::max();
     const auto beading_strat = BeadingStrategyFactory::makeStrategy
         (
-            bead_width_0,
-            bead_width_x,
+            bead_spacing_0,
+            bead_spacing_x,
             wall_transition_length,
             transitioning_angle,
             print_thin_walls,
@@ -534,7 +533,7 @@ const std::vector<VariableWidthLines> &WallToolPaths::generate()
     );
     wall_maker.generateToolpaths(toolpaths);
 
-    stitchToolPaths(toolpaths, this->bead_width_x);
+    stitchToolPaths(toolpaths, this->bead_spacing_x);
 
     removeSmallLines(toolpaths);
 
@@ -631,7 +630,7 @@ void WallToolPaths::stitchToolPaths(std::vector<VariableWidthLines> &toolpaths, 
                 continue;
             }
             wall_polygon.is_closed = true;
-            wall_lines.emplace_back(std::move(wall_polygon)); // add stitched polygons to result
+            wall_lines.push_back(std::move(wall_polygon)); // add stitched polygons to result
         }
 #ifdef DEBUG
         for (ExtrusionLine& line : wall_lines)

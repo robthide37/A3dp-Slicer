@@ -2937,7 +2937,9 @@ bool FillRectilinear::fill_surface_by_lines(const Surface *surface, const FillPa
         surface->expolygon, 
         - rotate_vector.first, 
         (scale_t(0 /*this->overlap*/ - /*(0.5 - INFILL_OVERLAP_OVER_SPACING)*/ 0.05 * this->get_spacing())), // outer offset, have to be > to the inner one (less negative)
-        (scale_t(0 /*this->overlap*/ - 0.48f * this->get_spacing()))); // inner offset (don't put 0.5, as it will cut full-filled area when it's exactly at the right place)
+        // inner offset (don't put 0.5, as it will cut full-filled area when it's exactly at the right place)
+        // Note: this will put the fill 2% too far into the perimeter.
+        (scale_t(0 /*this->overlap*/ - 0.48f * this->get_spacing())));
     if (poly_with_offset.n_contours_inner == 0) {
         // Not a single infill line fits.
         //Prusa: maybe one shall trigger the gap fill here?

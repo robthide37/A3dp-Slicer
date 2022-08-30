@@ -145,7 +145,10 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
 
     coord_t scaled_resolution = get_resolution(0, false, &surface);
     scaled_resolution = (scaled_resolution < SCALED_EPSILON ? SCALED_EPSILON : scaled_resolution);
-    ExPolygons last = offset_ex(surface.expolygon.simplify_p(scaled_resolution), -float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
+    coord_t ext_displacement = (this->get_ext_perimeter_width() / 2. - this->get_ext_perimeter_spacing() / 2.);
+    ExPolygons last = (ext_displacement != 0)
+        ? offset_ex(surface.expolygon.simplify_p(scaled_resolution),  -ext_displacement)
+        : union_ex(surface.expolygon.simplify_p(scaled_resolution));
 
     //increase surface for milling_post-process
     if (this->mill_extra_size > SCALED_EPSILON) {
@@ -160,7 +163,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
 
     Polygons   last_p = to_polygons(last);
 
-    Arachne::WallToolPaths wallToolPaths(last_p, ext_perimeter_spacing, perimeter_spacing, coord_t(loop_number + 1), 0, this->layer->height, *this->object_config, *this->print_config);
+    Arachne::WallToolPaths wallToolPaths(last_p, this->get_ext_perimeter_spacing(), this->get_ext_perimeter_width(), this->get_perimeter_spacing(), this->get_perimeter_width(), coord_t(loop_number + 1), 0, this->layer->height, *this->object_config, *this->print_config);
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
     loop_number = int(perimeters.size()) - 1;
 
@@ -340,9 +343,9 @@ void PerimeterGenerator::process()
     this->m_mm3_per_mm_overhang = this->overhang_flow.mm3_per_mm();
 
     //gap fill
-    this->gap_fill_spacing_external = this->config->gap_fill_overlap.get_abs_value(this->ext_perimeter_flow.with_spacing_ratio(1).scaled_spacing())
+    this->gap_fill_spacing_external = this->config->gap_fill_overlap.get_abs_value(this->ext_perimeter_flow.with_spacing_ratio_from_width(1).scaled_spacing())
         + this->ext_perimeter_flow.scaled_width() * (1 - this->config->gap_fill_overlap.get_abs_value(1.));
-    this->gap_fill_spacing = this->config->gap_fill_overlap.get_abs_value(this->perimeter_flow.with_spacing_ratio(1).scaled_spacing())
+    this->gap_fill_spacing = this->config->gap_fill_overlap.get_abs_value(this->perimeter_flow.with_spacing_ratio_from_width(1).scaled_spacing())
         + this->perimeter_flow.scaled_width() * (1 - this->config->gap_fill_overlap.get_abs_value(1.));
 
     // solid infill

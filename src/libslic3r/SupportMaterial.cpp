@@ -4188,7 +4188,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     ((raft_layer.contact_polygons == nullptr) ? Polygons() : *raft_layer.contact_polygons);
                 if (! to_infill_polygons.empty()) {
                     assert(! raft_layer.bridging);
-                    Flow flow(float(m_support_params.raft_flow.width()), float(raft_layer.height), m_support_params.raft_flow.nozzle_diameter(), m_support_params.raft_flow.spacing_ratio());
+                    Flow flow = Flow::new_from_width(float(m_support_params.raft_flow.width()), m_support_params.raft_flow.nozzle_diameter(), float(raft_layer.height), m_support_params.raft_flow.spacing_ratio());
                     Fill * filler = m_support_params.with_sheath ? filler_support_with_sheath.get() : filler_support.get();
                     filler->angle = raft_angle_base;
                     filler->link_max_length = scale_t(m_support_params.raft_flow.spacing() * link_max_length_factor / m_support_params.support_density);
@@ -4226,7 +4226,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 assert(! raft_layer.bridging);
                 float nzd = m_support_params.raft_interface_flow.nozzle_diameter();
                 flow = !raft_layer.bridging ?
-                    Flow(float(m_support_params.raft_interface_flow.width()), float(raft_layer.height), nzd, m_support_params.raft_interface_flow.spacing_ratio()) :
+                    Flow::new_from_width(float(m_support_params.raft_interface_flow.width()), nzd, float(raft_layer.height), m_support_params.raft_interface_flow.spacing_ratio()) :
                     Flow::bridging_flow(nzd * std::sqrt(m_support_params.raft_bridge_flow_ratio), nzd);
                 density       = float(m_support_params.interface_density);
             } else

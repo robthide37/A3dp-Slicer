@@ -81,7 +81,7 @@ struct FillParams
     ExtrusionRole role      { erNone };
 
     // flow to use
-    Flow        flow        = Flow(0.f, 0.f, 0.f, 1.f); // width,  height,  nozzle_diameter, spacing_ratio
+    Flow        flow        {};
 
     // to order the fills by priority
     int32_t     priority    = 0;

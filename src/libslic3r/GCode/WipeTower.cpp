@@ -1415,7 +1415,8 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
         const Slic3r::Flow brim_flow = 
              Flow::new_from_config_width(
             frPerimeter,
-            *Flow::extrusion_option("brim_extrusion_width", brim_region_config),
+            *Flow::extrusion_width_option("brim", brim_region_config),
+            *Flow::extrusion_spacing_option("brim", brim_region_config),
             (float)m_nozzle_diameter,
             (float)m_layer_height,
             (m_current_tool < m_config->nozzle_diameter.values.size()) ? m_object_config->get_computed_value("filament_max_overlap", m_current_tool) : 1

@@ -826,8 +826,9 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::str
                     if (max_layer_height < EPSILON) max_layer_height = nozzle_diameter * 0.75;
                     if (min_layer_height > max_layer_height) return { PrintBase::PrintValidationError::pveWrongSettings, L("Min layer height can't be greater than Max layer height") };
                     if (max_layer_height > nozzle_diameter) return { PrintBase::PrintValidationError::pveWrongSettings, L("Max layer height can't be greater than nozzle diameter") };
-                    double skirt_width = Flow::new_from_config_width(frPerimeter, 
-                        *Flow::extrusion_option("skirt_extrusion_width", m_default_region_config), 
+                    double skirt_width = Flow::new_from_config_width(frPerimeter,
+                        *Flow::extrusion_width_option("skirt", m_default_region_config),
+                        *Flow::extrusion_spacing_option("skirt", m_default_region_config),
                         (float)m_config.nozzle_diameter.get_at(extruder_id), 
                         print_first_layer_height,
                         1,0 //don't care, all i want if width from width
@@ -964,7 +965,8 @@ Flow Print::brim_flow(size_t extruder_id, const PrintObjectConfig& brim_config) 
     tempConf.parent = &brim_config;
     return Flow::new_from_config_width(
         frPerimeter,
-        *Flow::extrusion_option("brim_extrusion_width", tempConf),
+        *Flow::extrusion_width_option("brim", tempConf),
+        *Flow::extrusion_spacing_option("brim", tempConf),
         (float)m_config.nozzle_diameter.get_at(extruder_id),
         (float)get_first_layer_height(),
         (extruder_id < m_config.nozzle_diameter.values.size()) ? brim_config.get_computed_value("filament_max_overlap", extruder_id) : 1
@@ -995,7 +997,8 @@ Flow Print::skirt_flow(size_t extruder_id, bool first_layer/*=false*/) const
     //send m_default_object_config becasue it's the lowest config needed (extrusion_option need config from object & print)
     return Flow::new_from_config_width(
         frPerimeter,
-        *Flow::extrusion_option("skirt_extrusion_width", m_default_region_config),
+        *Flow::extrusion_width_option("skirt", m_default_region_config),
+        *Flow::extrusion_spacing_option("skirt", m_default_region_config),
         (float)max_nozzle_diam,
         (float)get_first_layer_height(),
         1 // hard to say what extruder we have here(many) m_default_region_config.get_computed_value("filament_max_overlap", extruder -1),
