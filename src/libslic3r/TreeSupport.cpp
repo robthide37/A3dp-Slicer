@@ -1102,7 +1102,7 @@ void TreeSupport::generateInitialAreas(
         ;
     const size_t support_roof_layers = mesh_group_settings.support_roof_enable ? (mesh_group_settings.support_roof_height + mesh_config.layer_height / 2) / mesh_config.layer_height : 0;
     const bool roof_enabled = support_roof_layers != 0;
-    const bool force_tip_to_roof = (mesh_config.min_radius * mesh_config.min_radius * M_PI > mesh_group_settings.minimum_roof_area) && roof_enabled;
+    const bool force_tip_to_roof = sqr<double>(mesh_config.min_radius) * M_PI > mesh_group_settings.minimum_roof_area && roof_enabled;
     //FIXME mesh_group_settings.support_angle does not apply to enforcers and also it does not apply to automatic support angle (by half the external perimeter width).
     const coord_t max_overhang_speed = (mesh_group_settings.support_angle < 0.5 * M_PI) ? (coord_t)(tan(mesh_group_settings.support_angle) * mesh_config.layer_height) : std::numeric_limits<coord_t>::max();
     const size_t max_overhang_insert_lag = std::max((size_t)round_up_divide(mesh_config.xy_distance, max_overhang_speed / 2), 2 * mesh_config.z_distance_top_layers); // cap for how much layer below the overhang a new support point may be added, as other than with regular support every new inserted point may cause extra material and time cost.  Could also be an user setting or differently calculated. Idea is that if an overhang does not turn valid in double the amount of layers a slope of support angle would take to travel xy_distance, nothing reasonable will come from it. The 2*z_distance_delta is only a catch for when the support angle is very high.

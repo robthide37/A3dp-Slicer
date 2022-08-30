@@ -179,6 +179,13 @@ private:
     ExtrusionRole m_role;
 };
 
+class ExtrusionPathOriented : public ExtrusionPath
+{
+public:
+    ExtrusionPathOriented(ExtrusionRole role, double mm3_per_mm, float width, float height) : ExtrusionPath(role, mm3_per_mm, width, height) {}
+    virtual bool can_reverse() const { return false; }
+};
+
 typedef std::vector<ExtrusionPath> ExtrusionPaths;
 
 // Single continuous extrusion path, possibly with varying extrusion thickness, extrusion height or bridging / non bridging.
@@ -330,12 +337,12 @@ inline void extrusion_paths_append(ExtrusionPaths &dst, Polylines &&polylines, E
     polylines.clear();
 }
 
-inline void extrusion_entities_append_paths(ExtrusionEntitiesPtr &dst, const Polylines &polylines, ExtrusionRole role, double mm3_per_mm, float width, float height)
+inline void extrusion_entities_append_paths(ExtrusionEntitiesPtr &dst, const Polylines &polylines, ExtrusionRole role, double mm3_per_mm, float width, float height, bool can_reverse = true)
 {
     dst.reserve(dst.size() + polylines.size());
     for (const Polyline &polyline : polylines)
         if (polyline.is_valid()) {
-            ExtrusionPath *extrusion_path = new ExtrusionPath(role, mm3_per_mm, width, height);
+            ExtrusionPath* extrusion_path = can_reverse ? new ExtrusionPath(role, mm3_per_mm, width, height) : new ExtrusionPathOriented(role, mm3_per_mm, width, height);
             dst.push_back(extrusion_path);
             extrusion_path->polyline = polyline;
         }
