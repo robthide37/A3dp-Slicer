@@ -64,6 +64,13 @@ public:
 
 typedef std::vector<PerimeterGeneratorLoop> PerimeterGeneratorLoops;
 
+struct ProcessSurfaceResult {
+    ExPolygons inner_perimeter;
+    ExPolygons gap_srf;
+    ExPolygons top_fills;
+    ExPolygons fill_clip;
+};
+
 class PerimeterGenerator {
 public:
     // Inputs:
@@ -78,6 +85,7 @@ public:
     const PrintRegionConfig     *config;
     const PrintObjectConfig     *object_config;
     const PrintConfig           *print_config;
+    bool                         use_arachne = false;
     // Outputs:
     ExtrusionEntityCollection   *loops;
     ExtrusionEntityCollection   *gap_fill;
@@ -108,8 +116,7 @@ public:
             m_ext_mm3_per_mm(-1), m_mm3_per_mm(-1), m_mm3_per_mm_overhang(-1)
         {}
 
-    void        process_classic();
-    void        process_arachne();
+    void        process();
 
     double      ext_mm3_per_mm()        const { return m_ext_mm3_per_mm; }
     double      mm3_per_mm()            const { return m_mm3_per_mm; }
@@ -132,6 +139,25 @@ private:
     ClipperLib_Z::Paths _lower_slices_bridge_speed_small_clipperpaths;
     ClipperLib_Z::Paths _lower_slices_bridge_speed_big_clipperpaths;
 
+    //process data
+    coord_t perimeter_width; coord_t get_perimeter_width() { return perimeter_width; }
+    coord_t perimeter_spacing; coord_t get_perimeter_spacing() { return perimeter_spacing; }
+    coord_t ext_perimeter_width; coord_t get_ext_perimeter_width() { return ext_perimeter_width; }
+    coord_t ext_perimeter_spacing; coord_t get_ext_perimeter_spacing() { return ext_perimeter_spacing; }
+    coord_t ext_perimeter_spacing2; coord_t get_ext_perimeter_spacing2() { return ext_perimeter_spacing2; }
+    coord_t gap_fill_spacing; coord_t get_gap_fill_spacing() { return gap_fill_spacing; }
+    coord_t gap_fill_spacing_external; coord_t get_gap_fill_spacing_external() { return gap_fill_spacing_external; }
+    coord_t infill_gap; coord_t get_infill_gap() { return infill_gap; }
+    coord_t solid_infill_spacing; coord_t get_solid_infill_spacing() { return solid_infill_spacing; }
+    bool round_peri;
+    coord_t min_round_spacing; coord_t get_min_round_spacing() { return min_round_spacing; }
+    ExPolygons unmillable;
+    coord_t mill_extra_size;
+
+    ProcessSurfaceResult process_classic(int& loop_number, const Surface& surface);
+    ProcessSurfaceResult process_arachne(int& loop_number, const Surface& surface);
+    
+    void        processs_no_bridge(Surfaces& all_surfaces);
     ExtrusionPaths create_overhangs(const Polyline& loop_polygons, ExtrusionRole role, bool is_external) const;
     ExtrusionPaths create_overhangs(const ClipperLib_Z::Path& loop_polygons, ExtrusionRole role, bool is_external) const;
 
