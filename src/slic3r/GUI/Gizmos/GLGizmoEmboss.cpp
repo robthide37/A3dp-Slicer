@@ -2311,10 +2311,16 @@ void GLGizmoEmboss::draw_advanced()
     int min_char_gap = -half_ascent, max_char_gap = half_ascent;
     if (rev_slider(tr.char_gap, font_prop.char_gap, def_char_gap, _u8L("Revert gap between letters"), 
         min_char_gap, max_char_gap, units_fmt, _L("Distance between letters"))){
-        Limits::apply(font_prop.char_gap, limits.char_gap);
-        // char gap is stored inside of imgui font atlas
-        m_style_manager.clear_imgui_font();
-        exist_change = true;
+        // Condition prevent recalculation when insertint out of limits value by imgui input
+        if (!Limits::apply(font_prop.char_gap, limits.char_gap) ||
+            m_volume == nullptr ||
+            !m_volume->text_configuration.has_value() ||
+            !m_volume->text_configuration->style.prop.char_gap.has_value() ||
+            m_volume->text_configuration->style.prop.char_gap != font_prop.char_gap) {        
+            // char gap is stored inside of imgui font atlas
+            m_style_manager.clear_imgui_font();
+            exist_change = true;
+        }
     }
 
     // input gap between lines
@@ -2323,10 +2329,16 @@ void GLGizmoEmboss::draw_advanced()
     int  min_line_gap = -half_ascent, max_line_gap = half_ascent;
     if (rev_slider(tr.line_gap, font_prop.line_gap, def_line_gap, _u8L("Revert gap between lines"), 
         min_line_gap, max_line_gap, units_fmt, _L("Distance between lines"))){
-        Limits::apply(font_prop.line_gap, limits.line_gap);
-        // line gap is planed to be stored inside of imgui font atlas
-        m_style_manager.clear_imgui_font();
-        exist_change = true;
+        // Condition prevent recalculation when insertint out of limits value by imgui input
+        if (!Limits::apply(font_prop.line_gap, limits.line_gap) ||
+            m_volume == nullptr ||
+            !m_volume->text_configuration.has_value() ||
+            !m_volume->text_configuration->style.prop.line_gap.has_value() ||
+            m_volume->text_configuration->style.prop.line_gap != font_prop.line_gap) {        
+            // line gap is planed to be stored inside of imgui font atlas
+            m_style_manager.clear_imgui_font();
+            exist_change = true;
+        }
     }
 
     // input boldness
@@ -2334,8 +2346,12 @@ void GLGizmoEmboss::draw_advanced()
         &stored_style->prop.boldness : nullptr;
     if (rev_slider(tr.boldness, font_prop.boldness, def_boldness, _u8L("Undo boldness"), 
         limits.boldness.gui.min, limits.boldness.gui.max, units_fmt, _L("Tiny / Wide glyphs"))){
-        Limits::apply(font_prop.boldness, limits.boldness.values);
-        exist_change = true;
+        if (!Limits::apply(font_prop.boldness, limits.boldness.values) ||
+            m_volume == nullptr ||
+            !m_volume->text_configuration.has_value() ||
+            !m_volume->text_configuration->style.prop.boldness.has_value() ||
+            m_volume->text_configuration->style.prop.boldness != font_prop.boldness)
+            exist_change = true;
     }
 
     // input italic
@@ -2343,8 +2359,12 @@ void GLGizmoEmboss::draw_advanced()
         &stored_style->prop.skew : nullptr;
     if (rev_slider(tr.italic, font_prop.skew, def_skew, _u8L("Undo letter's skew"),
         limits.skew.gui.min, limits.skew.gui.max, "%.2f", _L("Italic strength ratio"))){
-        Limits::apply(font_prop.skew, limits.skew.values);
-        exist_change = true;
+        if (!Limits::apply(font_prop.skew, limits.skew.values) ||
+            m_volume == nullptr ||
+            !m_volume->text_configuration.has_value() ||
+            !m_volume->text_configuration->style.prop.skew.has_value() ||
+            m_volume->text_configuration->style.prop.skew != font_prop.skew)
+            exist_change = true;
     }
     
     // input surface distance
