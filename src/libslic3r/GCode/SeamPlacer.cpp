@@ -1551,7 +1551,7 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
     const size_t layer_index = layer->id() - po->slicing_parameters().raft_layers();
     const double unscaled_z = layer->slice_z;
 
-    auto get_next_loop_point = [loop](ExtrusionLoop::ClosestPathPoint current) {
+    auto get_next_loop_point = [&loop](ExtrusionLoop::ClosestPathPoint current) {
         current.segment_idx += 1;
         if (current.segment_idx >= loop.paths[current.path_idx].polyline.points.size()) {
             current.path_idx = next_idx_modulo(current.path_idx, loop.paths.size());
