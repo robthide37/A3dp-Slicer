@@ -408,12 +408,10 @@ Measuring::Measuring(const indexed_triangle_set& its)
 Measuring::~Measuring() {}
 
 
-#if ENABLE_MEASURE_GIZMO_DEBUG
 std::vector<SurfaceFeature> Measuring::get_all_features() const
 {
     return priv->get_all_features();
 }
-#endif // ENABLE_MEASURE_GIZMO_DEBUG
 
 
 std::optional<SurfaceFeature> Measuring::get_feature(size_t face_idx, const Vec3d& point) const
