@@ -460,6 +460,16 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             ImGui::TableSetColumnIndex(1);
             m_imgui->text(value);
         };
+        auto format_double = [](double value) {
+            char buf[1024];
+            sprintf(buf, "%.3f", value);
+            return std::string(buf);
+        };
+        auto format_vec3 = [](const Vec3d& v) {
+            char buf[1024];
+            sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", v.x(), v.y(), v.z());
+            return std::string(buf);
+        };
 
         const Transform3d volume_matrix = m_parent.get_selection().get_first_volume()->world_matrix();
         const Measure::SurfaceFeatureType type = m_curr_feature->get_type();
@@ -471,9 +481,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     case Measure::SurfaceFeatureType::Point:
                     {
                         const Vec3d position = volume_matrix * m_curr_feature->get_point();
-                        char buf[1024];
-                        sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", position.x(), position.y(), position.z());
-                        add_row_to_table(_u8L("Position") + ":", std::string(buf));
+                        add_row_to_table(_u8L("Position") + ":", format_vec3(position));
                         break;
                     }
                     case Measure::SurfaceFeatureType::Edge:
@@ -481,11 +489,8 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         auto [from, to] = m_curr_feature->get_edge();
                         from = volume_matrix * from;
                         to = volume_matrix * to;
-                        char buf[1024];
-                        sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", from.x(), from.y(), from.z());
-                        add_row_to_table(_u8L("From") + ":", std::string(buf));
-                        sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", to.x(), to.y(), to.z());
-                        add_row_to_table(_u8L("To") + ":", std::string(buf));
+                        add_row_to_table(_u8L("From") + ":", format_vec3(from));
+                        add_row_to_table(_u8L("To") + ":", format_vec3(to));
                         break;
                     }
                     case Measure::SurfaceFeatureType::Circle:
@@ -493,13 +498,9 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         auto [center, radius, normal] = m_curr_feature->get_circle();
                         center = volume_matrix * center;
                         normal = volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
-                        char buf[1024];
-                        sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", center.x(), center.y(), center.z());
-                        add_row_to_table(_u8L("Center") + ":", std::string(buf));
-                        sprintf(buf, "%.3f", radius);
-                        add_row_to_table(_u8L("Radius") + ":", std::string(buf));
-                        sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", normal.x(), normal.y(), normal.z());
-                        add_row_to_table(_u8L("Normal") + ":", std::string(buf));
+                        add_row_to_table(_u8L("Center") + ":", format_vec3(center));
+                        add_row_to_table(_u8L("Radius") + ":", format_double(radius));
+                        add_row_to_table(_u8L("Normal") + ":", format_vec3(normal));
                         break;
                     }
                     case Measure::SurfaceFeatureType::Plane:
@@ -507,11 +508,8 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         auto [idx, normal, origin] = m_curr_feature->get_plane();
                         origin = volume_matrix * origin;
                         normal = volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
-                        char buf[1024];
-                        sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", origin.x(), origin.y(), origin.z());
-                        add_row_to_table(_u8L("Origin") + ":", std::string(buf));
-                        sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", normal.x(), normal.y(), normal.z());
-                        add_row_to_table(_u8L("Normal") + ":", std::string(buf));
+                        add_row_to_table(_u8L("Origin") + ":", format_vec3(origin));
+                        add_row_to_table(_u8L("Normal") + ":", format_vec3(normal));
                         break;
                     }
                     }

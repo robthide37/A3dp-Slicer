@@ -49,9 +49,9 @@ class GLGizmoMeasure : public GLGizmoBase
     Vec3d m_first_instance_scale{ Vec3d::Ones() };
     Vec3d m_first_instance_mirror{ Vec3d::Ones() };
 
-    bool m_mouse_left_down = false; // for detection left_up of this gizmo
-    const ModelObject* m_old_model_object = nullptr;
-    const ModelVolume* m_old_model_volume = nullptr;
+    bool m_mouse_left_down{ false }; // for detection left_up of this gizmo
+    const ModelObject* m_old_model_object{ nullptr };
+    const ModelVolume* m_old_model_volume{ nullptr };
 
     Vec2d m_mouse_pos{ Vec2d::Zero() };
 
