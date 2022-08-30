@@ -41,7 +41,7 @@ class GLGizmoMeasure : public GLGizmoBase
 
     std::vector<GLModel> m_plane_models_cache;
     std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
-    std::vector<Measure::SurfaceFeature> m_features;
+    std::optional<Measure::SurfaceFeature> m_curr_feature;
 
     // This holds information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;
@@ -50,13 +50,10 @@ class GLGizmoMeasure : public GLGizmoBase
     Vec3d m_first_instance_mirror{ Vec3d::Ones() };
 
     bool m_mouse_left_down = false; // for detection left_up of this gizmo
-    bool m_planes_valid = false;
     const ModelObject* m_old_model_object = nullptr;
     const ModelVolume* m_old_model_volume = nullptr;
-    std::vector<const Transform3d*> instances_matrices;
 
-    int m_mouse_pos_x;
-    int m_mouse_pos_y;
+    Vec2d m_mouse_pos{ Vec2d::Zero() };
 
     KeyAutoRepeatFilter m_ctrl_kar_filter;
 
