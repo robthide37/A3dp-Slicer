@@ -2192,7 +2192,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             }
 
 
-            current_group->register_to_search(option.opt.opt_key, option.opt, id);
+            current_group->register_to_search(option.opt.opt_key, option.opt, id, false);
             //if (need_to_notified_search)
             //    Search::OptionsSearcher::register_label_override(option.opt.opt_key, option.opt.label, option.opt.full_label, option.opt.tooltip);
 

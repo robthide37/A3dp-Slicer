@@ -51,9 +51,13 @@ static char marker_by_type(Preset::Type type, PrinterTechnology pt)
 	}
 }
 
-std::string Option::opt_key() const
+std::string Option::opt_key_with_idx() const
 {
-    return boost::nowide::narrow(key);
+    std::string str = boost::nowide::narrow(key);
+    if (idx >= 0) {
+        str += "#" + std::to_string(idx);
+    }
+    return str;
 }
 
 void FoundOption::get_marked_label_and_tooltip(const char** label_, const char** tooltip_) const
@@ -74,20 +78,19 @@ void change_opt_key(std::string& opt_key, DynamicPrintConfig* config, int& cnt)
         opt_key += "#" + std::to_string(0);
 }
 
-static Option create_option(const std::string& opt_key, Preset::Type type, const GroupAndCategory& gc)
+static Option create_option(const std::string& opt_key, const int16_t opt_idx, Preset::Type type, const GroupAndCategory& gc)
 {
     wxString suffix;
     wxString suffix_local;
     if (gc.category == "Machine limits") {
-        suffix = opt_key.back() == '1' ? L("Stealth") : L("Normal");
+        suffix = opt_idx == 1 ? L("Stealth") : L("Normal");
         suffix_local = " " + _(suffix);
         suffix = " " + suffix;
     }
 
     wxString category = gc.category;
     if (type == Preset::TYPE_PRINTER && category.Contains("Extruder ")) {
-        std::string opt_idx = opt_key.substr(opt_key.find("#") + 1);
-        category = wxString::Format("%s %d", "Extruder", atoi(opt_idx.c_str()) + 1);
+        category = wxString::Format("%s %d", "Extruder", opt_idx + 1);
     }
 
     const ConfigOptionDef& opt = gc.gui_opt;
@@ -108,7 +111,7 @@ static Option create_option(const std::string& opt_key, Preset::Type type, const
     }
 
     if (!label.IsEmpty())
-        return Option{ boost::nowide::widen(opt.opt_key), type, opt.mode,
+        return Option{ boost::nowide::widen(opt.opt_key), type, opt_idx, opt.mode,
                                     (label + suffix).ToStdWstring(), (local_label + suffix_local).ToStdWstring(),
                                     gc.group.ToStdWstring(), _(gc.group).ToStdWstring(),
                                     category.ToStdWstring(), GUI::Tab::translate_category(category, type).ToStdWstring() ,
@@ -148,15 +151,15 @@ const GroupAndCategory& OptionsSearcher::get_group_and_category(const std::strin
 void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type type)
 {
     const ConfigDef* defs = config->def();
-    auto emplace = [this, type](const std::string grp_key)
+    auto emplace_option = [this, type](const std::string grp_key, const int16_t idx)
     {
         for (const GroupAndCategory& gc : groups_and_categories[grp_key]) {
             if (gc.group.IsEmpty() || gc.category.IsEmpty())
                 return;
 
-            Option option = create_option(gc.gui_opt.opt_key, type, gc);
+            Option option = create_option(gc.gui_opt.opt_key, idx, type, gc);
             if (!option.label.empty()) {
-                options.emplace_back(option);
+                options.push_back(std::move(option));
             }
 
             //wxString suffix;
@@ -214,11 +217,11 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
         //}
 
         if (cnt == 0)
-            emplace(key);
+            emplace_option(key, -1);
         else
             for (int i = 0; i < cnt; ++i)
                 // ! It's very important to use "#". opt_key#n is a real option key used in GroupAndCategory
-                emplace(key + "#" + std::to_string(i));
+                emplace_option(key + "#" + std::to_string(i), i);
     }
 }
 
@@ -503,19 +506,41 @@ const Option& OptionsSearcher::get_option(size_t pos_in_filter) const
 
 const Option& OptionsSearcher::get_option(const std::string& opt_key, Preset::Type type) const
 {
-    auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(opt_key), type }));
-    assert(it != options.end());
+    int16_t idx = -1;
+    size_t pos_hash = opt_key.find('#');
+    if (pos_hash == std::string::npos) {
+        auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(opt_key), type, idx }));
+        assert(it != options.end());
+        return options[it - options.begin()];
+    } else {
+        std::string raw_opt_key = opt_key.substr(0, pos_hash);
+        std::string opt_idx = opt_key.substr(pos_hash + 1);
+        idx = atoi(opt_idx.c_str());
+        auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(raw_opt_key), type, idx }));
+        assert(it != options.end());
+        return options[it - options.begin()];
+    }
 
-    return options[it - options.begin()];
 }
 
 Option OptionsSearcher::get_option_names(const std::string& opt_key, Preset::Type type) const
 {
-    auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(opt_key), type }));
-    if (it != options.end() && it->key == boost::nowide::widen(opt_key))
+    int16_t idx = -1;
+    size_t pos_hash = opt_key.find('#');
+    std::vector<Search::Option>::const_iterator it;
+    if (pos_hash == std::string::npos) {
+        it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(opt_key), type, idx }));
+    } else {
+        std::string raw_opt_key = opt_key.substr(0, pos_hash);
+        std::string opt_idx = opt_key.substr(pos_hash + 1);
+        idx = atoi(opt_idx.c_str());
+        it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(raw_opt_key), type, idx }));
+    }
+    if (it != options.end() && it->opt_key_with_idx() == opt_key)
         return *it;
     std::string key = get_key(opt_key, type);
     if (it != options.end() && groups_and_categories.find(key) == groups_and_categories.end()) {
+        //TODO check why needed
         size_t pos = key.find('#');
         if (pos == std::string::npos)
             return *it;
@@ -525,7 +550,7 @@ Option OptionsSearcher::get_option_names(const std::string& opt_key, Preset::Typ
         if(groups_and_categories.find(zero_opt_key) == groups_and_categories.end())
             return *it;
 
-        return create_option(opt_key, type, get_group_and_category(zero_opt_key, ConfigOptionMode::comNone));
+        return create_option(opt_key, idx, type, get_group_and_category(zero_opt_key, ConfigOptionMode::comNone));
     }
 
     
@@ -533,7 +558,7 @@ Option OptionsSearcher::get_option_names(const std::string& opt_key, Preset::Typ
     if (gc.group.IsEmpty() || gc.category.IsEmpty())
         return *it;
 
-    return create_option(opt_key, type, gc);
+    return create_option(opt_key, idx, type, gc);
 }
 
 void OptionsSearcher::show_dialog()
@@ -564,14 +589,18 @@ void OptionsSearcher::dlg_msw_rescale()
         search_dialog->msw_rescale();
 }
 
-void OptionsSearcher::add_key(const std::string& opt_key, Preset::Type type, const wxString& group, const wxString& category, const ConfigOptionDef& gui_opt)
+void OptionsSearcher::add_key(const std::string& opt_key, Preset::Type type, const wxString& group, const wxString& category, const ConfigOptionDef& gui_opt, bool reset)
 {
     std::string key = get_key(opt_key, type);
     auto it = groups_and_categories.find(key);
     if (it == groups_and_categories.end()) {
         groups_and_categories[key] = { GroupAndCategory{group, category, gui_opt} };
     } else {
-        it->second.push_back(GroupAndCategory{ group, category, gui_opt });
+        //remove all entry from old presets
+        if (reset)
+            it->second.clear();
+        //add new preset (multiple for tags)
+        it->second.push_back(GroupAndCategory{ group, category, gui_opt});
     }
 }
 

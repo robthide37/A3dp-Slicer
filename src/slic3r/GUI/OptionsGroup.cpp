@@ -628,10 +628,10 @@ Option ConfigOptionsGroup::get_option(const std::string& opt_key, int opt_index 
 	return Option(*m_config->def()->get(opt_key), opt_id);
 }
 
-void ConfigOptionsGroup::register_to_search(const std::string& opt_key, const ConfigOptionDef& option_def, int opt_index /*= -1*/)
+void ConfigOptionsGroup::register_to_search(const std::string& opt_key, const ConfigOptionDef& option_def, int opt_index /*= -1*/, bool reset)
 { // fill group and category values just for options from Settings Tab
     std::string opt_id = opt_index == -1 ? opt_key : opt_key + "#" + std::to_string(opt_index);
-    wxGetApp().sidebar().get_searcher().add_key(opt_id, static_cast<Preset::Type>(this->config_type()), this->title, this->config_category(), option_def);
+    wxGetApp().sidebar().get_searcher().add_key(opt_id, static_cast<Preset::Type>(this->config_type()), this->title, this->config_category(), option_def, reset);
 }
 
 
