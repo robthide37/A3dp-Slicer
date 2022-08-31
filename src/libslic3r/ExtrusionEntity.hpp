@@ -183,6 +183,9 @@ class ExtrusionPathOriented : public ExtrusionPath
 {
 public:
     ExtrusionPathOriented(ExtrusionRole role, double mm3_per_mm, float width, float height) : ExtrusionPath(role, mm3_per_mm, width, height) {}
+    ExtrusionEntity* clone() const override { return new ExtrusionPathOriented(*this); }
+    // Create a new object, initialize it with this object using the move semantics.
+    ExtrusionEntity* clone_move() override { return new ExtrusionPathOriented(std::move(*this)); }
     virtual bool can_reverse() const { return false; }
 };
 
