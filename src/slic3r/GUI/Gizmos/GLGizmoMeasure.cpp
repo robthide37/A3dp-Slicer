@@ -273,6 +273,7 @@ void GLGizmoMeasure::on_render()
                     Vec3f n;
                     const Transform3d& trafo = it->second->get_transform();
                     it->second->get_raycaster()->unproject_on_mesh(m_mouse_pos, trafo, camera, p, n);
+                    p = { 0.0f, 0.0f, p.z() };
                     m_curr_ex_feature_position = trafo * p.cast<double>();
                 }
                 break;
@@ -294,6 +295,10 @@ void GLGizmoMeasure::on_render()
                         Vec3f n;
                         const Transform3d& trafo = it->second->get_transform();
                         it->second->get_raycaster()->unproject_on_mesh(m_mouse_pos, trafo, camera, p, n);
+                        float angle = std::atan2(p.y(), p.x());
+                        if (angle < 0.0f)
+                            angle += 2.0f * float(M_PI);
+                        p = float(radius) * Vec3f(std::cos(angle), std::sin(angle), 0.0f);
                         m_curr_ex_feature_position = trafo * p.cast<double>();
                     }
                 }
