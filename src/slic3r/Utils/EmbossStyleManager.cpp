@@ -346,10 +346,7 @@ void EmbossStyleManager::init_style_images(const Vec2i &max_size,
 
 void EmbossStyleManager::free_style_images() {
     if (!m_exist_style_images) return;
-    if (!is_activ_font()) return;
-
     GLuint tex_id = 0;
-    
     for (Item &it : m_style_items) {
         if (tex_id == 0 && it.image.has_value())
             tex_id = (GLuint)(intptr_t) it.image->texture_id;
@@ -475,6 +472,5 @@ bool EmbossStyleManager::set_wx_font(const wxFont &wx_font, std::unique_ptr<Embo
     // update string path
     style.path = WxFontUtils::store_wxFont(wx_font);
     clear_imgui_font();
-    free_style_images();
     return true;
 }

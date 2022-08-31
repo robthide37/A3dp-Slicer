@@ -89,7 +89,7 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
     }
 
     // Set up result
-    pixels = std::vector<unsigned char>(width * height, {0});
+    pixels = std::vector<unsigned char>(4*width * height, {255});
 
     // upload sub textures
     for (EmbossStyleManager::StyleImage &image : images) {
@@ -116,7 +116,7 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
                     size_t index = (offset.y() + y)*w + offset.x() + x;
                     assert(index < size);
                     if (index >= size) continue;
-                    pix[index] = ptr2[y * width + x] / gray_level;
+                    pix[4*index+3] = ptr2[y * width + x] / gray_level;
                 }
             return sla::EncodedRaster();
         };
@@ -128,14 +128,14 @@ void CreateFontStyleImagesJob::finalize(bool canceled, std::exception_ptr &)
 {
     // upload texture on GPU
     GLuint tex_id;
-    GLenum target = GL_TEXTURE_2D, format = GL_ALPHA, type = GL_UNSIGNED_BYTE;
+    GLenum target = GL_TEXTURE_2D, format = GL_RGBA, type = GL_UNSIGNED_BYTE;
     GLint  level = 0, border = 0;
     glsafe(::glGenTextures(1, &tex_id));
     glsafe(::glBindTexture(target, tex_id));
     glsafe(::glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
     glsafe(::glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
     GLint w = width, h=height;
-    glsafe(::glTexImage2D(target, level, GL_ALPHA, w, h, border, format, type,
+    glsafe(::glTexImage2D(target, level, GL_RGBA, w, h, border, format, type,
                           (const void *) pixels.data()));
 
     // set up texture id

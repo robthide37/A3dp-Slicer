@@ -62,7 +62,7 @@ void CreateFontImageJob::process(Ctl &ctl)
     if (m_tex_size.x() > m_input.size.x()) m_tex_size.x() = m_input.size.x();
 
     // Set up result
-    m_result = std::vector<unsigned char>(m_tex_size.x() * m_tex_size.y(), {0});
+    m_result = std::vector<unsigned char>(m_tex_size.x() * m_tex_size.y() * 4, {255});
 
     sla::Resolution resolution(m_tex_size.x(), m_tex_size.y());
     double pixel_dim = SCALING_FACTOR / scale;
@@ -85,7 +85,7 @@ void CreateFontImageJob::process(Ctl &ctl)
                 size_t index = y*w + x;
                 assert(index < size);
                 if (index >= size) continue;
-                pix[index] = ptr2[y * width + x] / gray_level;
+                pix[3+4*index] = ptr2[y * width + x] / gray_level;
             }
         return sla::EncodedRaster();
     };

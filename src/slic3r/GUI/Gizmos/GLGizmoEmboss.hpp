@@ -108,6 +108,7 @@ private:
     void draw_style_save_button(bool is_modified);
     void draw_style_save_as_popup();
     void draw_style_add_button();
+    void init_font_name_texture();
     void draw_font_list();
     void draw_style_edit();
     bool draw_italic_button();

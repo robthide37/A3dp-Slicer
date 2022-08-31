@@ -1240,32 +1240,35 @@ void GLGizmoEmboss::init_face_names() {
     std::sort(m_face_names.names.begin(), m_face_names.names.end());
 }
 
+// create texture for visualization font face
+void GLGizmoEmboss::init_font_name_texture() {
+    // check if already exists
+    GLuint &id = m_face_names.texture_id; 
+    if (id != 0) return;
+    // create texture for font
+    GLenum target = GL_TEXTURE_2D;
+    glsafe(::glGenTextures(1, &id));
+    glsafe(::glBindTexture(target, id));
+    glsafe(::glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+    glsafe(::glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+    const Vec2i &size = m_gui_cfg->face_name_size;
+    GLint w = size.x(), h = m_face_names.names.size() * size.y();
+    std::vector<unsigned char> data(4*w * h, {0});
+    const GLenum format = GL_RGBA, type = GL_UNSIGNED_BYTE;
+    const GLint level = 0, internal_format = GL_RGBA, border = 0;
+    glsafe(::glTexImage2D(target, level, internal_format, w, h, border, format, type, data.data()));
+
+    // bind default texture
+    GLuint no_texture_id = 0;
+    glsafe(::glBindTexture(target, no_texture_id));
+
+    // no one is initialized yet
+    m_face_names.exist_textures = std::vector<bool>(m_face_names.names.size(), {false});
+}
+
 #include "slic3r/GUI/Jobs/CreateFontNameImageJob.hpp"
 void GLGizmoEmboss::draw_font_list()
 {
-    // Create of texture for font name
-    auto init_texture = [&face_names = m_face_names, size = m_gui_cfg->face_name_size]() {
-        // check if already exists
-        GLuint &id = face_names.texture_id; 
-        if (id != 0) return;
-        // create texture for font
-        GLenum target = GL_TEXTURE_2D, format = GL_ALPHA,
-               type = GL_UNSIGNED_BYTE;
-        GLint level = 0, border = 0;
-        glsafe(::glGenTextures(1, &id));
-        glsafe(::glBindTexture(target, id));
-        glsafe(::glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-        glsafe(::glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-        GLint w = size.x(), h = face_names.names.size() * size.y();
-        std::vector<unsigned char> data(w * h, {0});
-        glsafe(::glTexImage2D(target, level, GL_ALPHA, w, h, border, format, type, data.data()));
-        // bind default texture
-        GLuint no_texture_id = 0;
-        glsafe(::glBindTexture(target, no_texture_id));
-
-        // no one is initialized yet
-        face_names.exist_textures = std::vector<bool>(face_names.names.size(), {false});
-    };
     auto init_trancated_names = [&face_names = m_face_names, 
         width = m_gui_cfg->face_name_max_width]() { 
         if (!face_names.names_truncated.empty()) return;
@@ -1288,7 +1291,7 @@ void GLGizmoEmboss::draw_font_list()
     wxString del_facename;
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if (!m_face_names.is_init) init_face_names();
-        init_texture();
+        init_font_name_texture();
         if (m_face_names.names_truncated.empty()) init_trancated_names();
         ImTextureID tex_id = (void *) (intptr_t) m_face_names.texture_id;
         for (const wxString &face_name : m_face_names.names) {
@@ -1309,6 +1312,11 @@ void GLGizmoEmboss::draw_font_list()
                 ImGui::IsItemVisible()) {
                 m_face_names.exist_textures[index] = true;
                 std::string text = m_text.empty() ? "AaBbCc" : m_text;
+                                
+                const unsigned char gray_level = 5;
+                // format type and level must match to texture data
+                const GLenum format = GL_RGBA, type = GL_UNSIGNED_BYTE;
+                const GLint level = 0;
                 // render text to texture
                 FontImageData data{text,
                                    face_name,
@@ -1316,8 +1324,11 @@ void GLGizmoEmboss::draw_font_list()
                                    m_face_names.texture_id,
                                    index,
                                    m_gui_cfg->face_name_size,
-                                   &m_allow_update_rendered_font
-                };
+                                   &m_allow_update_rendered_font,
+                                   gray_level,
+                                   format,
+                                   type,
+                                   level};
                 auto job = std::make_unique<CreateFontImageJob>(std::move(data));
                 auto& worker = wxGetApp().plater()->get_ui_job_worker();
                 queue_job(worker, std::move(job));
@@ -1767,7 +1778,7 @@ void GLGizmoEmboss::draw_style_list() {
             bool is_selected = (index == m_style_manager.get_style_index());
 
             ImVec2 select_size(0,m_gui_cfg->max_style_image_size.y()); // 0,0 --> calculate in draw
-            const std::optional<EmbossStyleManager::StyleImage> img = item.image;            
+            const std::optional<EmbossStyleManager::StyleImage> &img = item.image;            
             // allow click delete button
             ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; 
             if (ImGui::Selectable(item.truncated_name.c_str(), is_selected, flags, select_size)) {
