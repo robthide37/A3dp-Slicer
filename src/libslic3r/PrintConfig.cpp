@@ -3511,7 +3511,7 @@ void PrintConfigDef::init_fff_params()
         "to set the highest print speed you want to allow."
         "\nThis can be expressed as a percentage (for example: 100%) over the machine Max Feedrate for X axis.");
     def->sidetext = L("mm/s or %");
-    def->ratio_over = "machine_max_acceleration_x";
+    def->ratio_over = "machine_max_feedrate_x";
     def->min = 1;
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(80, false));

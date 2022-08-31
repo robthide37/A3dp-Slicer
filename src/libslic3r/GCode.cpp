@@ -1056,7 +1056,8 @@ namespace DoExport {
 	        // volumetric speed as the volumetric speed produced by printing the 
 	        // smallest cross-section at the maximum speed: any larger cross-section
 	        // will need slower feedrates.
-	        volumetric_speed = *std::min_element(mm3_per_mm.begin(), mm3_per_mm.end()) * print.config().max_print_speed.value;
+            double max_print_speed = print.config().get_computed_value("max_print_speed");
+            volumetric_speed = *std::min_element(mm3_per_mm.begin(), mm3_per_mm.end()) * max_print_speed;
 	        // limit such volumetric speed with max_volumetric_speed if set
 	        if (print.config().max_volumetric_speed.value > 0)
 	            volumetric_speed = std::min(volumetric_speed, print.config().max_volumetric_speed.value);
