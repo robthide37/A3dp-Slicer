@@ -1724,22 +1724,21 @@ wxBitmapBundle ObjectDataViewModel::GetVolumeIcon(
 {
     const std::vector<wxBitmapBundle*>& bitmaps = node.is_text_volume() ? m_text_volume_bmps : m_volume_bmps;
     if (warning_icon_name.empty())
-        return *m_volume_bmps[static_cast<int>(node.GetType())];
+        return *bitmaps[static_cast<int>(node.GetVolumeType())];
 
-    std::string scaled_bitmap_name = warning_icon_name + std::to_string(node.GetType());
+    std::string scaled_bitmap_name = warning_icon_name +
+                                     std::to_string(node.GetType()) +
+                                     (node.is_text_volume() ?"text": "");
     scaled_bitmap_name += "-em" + std::to_string(wxGetApp().em_unit()) + (wxGetApp().dark_mode() ? "-dm" : "-lm");
 
-    // TODO: usi text bitmap
+    // TODO: use scale cache
     wxBitmapBundle *bmp = m_bitmap_cache->find_bndl(scaled_bitmap_name);
     if (bmp == nullptr) {
         std::vector<wxBitmapBundle*> bmps;
-
         bmps.emplace_back(&GetWarningBitmap(warning_icon_name));
-        bmps.emplace_back(m_volume_bmps[static_cast<int>(node.GetType())]);
-
+        bmps.emplace_back(bitmaps[static_cast<int>(node.GetVolumeType())]);
         bmp = m_bitmap_cache->insert_bndl(scaled_bitmap_name, bmps);
     }
-
     return *bmp;
 }
 

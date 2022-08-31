@@ -190,7 +190,7 @@ public:
     InfoItemType    GetInfoItemType() const         { return m_info_item_type; }
 	void			SetIdx(const int& idx);
 	int             GetIdx() const                  { return m_idx; }
-    ModelVolumeType GetVolumeType()                 { return m_volume_type; }
+    ModelVolumeType GetVolumeType() const           { return m_volume_type; }
 	t_layer_height_range    GetLayerRange() const   { return m_layer_range; }
     wxString        GetExtruder()                   { return m_extruder; }
     PrintIndicator  IsPrintable() const             { return m_printable; }
@@ -237,7 +237,6 @@ public:
     bool        update_settings_digest(const std::vector<std::string>& categories);
     int         volume_type() const { return int(m_volume_type); }
     bool        is_text_volume() const { return m_is_text_volume; }
-    void        msw_rescale();
     void        sys_color_changed();
 
 #ifndef NDEBUG
