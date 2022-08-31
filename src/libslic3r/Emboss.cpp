@@ -969,6 +969,10 @@ Vec3f Emboss::ProjectZ::project(const Vec3f &point) const
     return res;
 }
 
+std::optional<Point> Emboss::ProjectZ::unproject(const Vec3f &p) const {
+    return Point(p.x() / SHAPE_SCALE, p.y() / SHAPE_SCALE);
+}
+
 Transform3d Emboss::create_transformation_onto_surface(const Vec3f &position,
                                                        const Vec3f &normal,
                                                        float        up_limit)
@@ -1040,4 +1044,9 @@ std::pair<Vec3f, Vec3f> Emboss::OrthoProject::create_front_back(const Point &p) 
 Vec3f Emboss::OrthoProject::project(const Vec3f &point) const
 {
     return point + m_direction;
+}
+
+std::optional<Point> Emboss::OrthoProject::unproject(const Vec3f &p) const {
+    Vec3d pp = m_matrix_inv * p.cast<double>();
+    return Point(pp.x(), pp.y());
 }

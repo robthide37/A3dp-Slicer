@@ -232,6 +232,8 @@ public:
         /// second - back spatial point
         /// </returns>
         virtual std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const = 0;
+
+        virtual std::optional<Point> unproject(const Vec3f &p) const = 0;
     };
 
     /// <summary>
@@ -259,6 +261,7 @@ public:
         // Inherited via IProject
         std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const override;
         Vec3f project(const Vec3f &point) const override;
+        std::optional<Point> unproject(const Vec3f &p) const override;
         float m_depth;
     };
 
@@ -280,6 +283,9 @@ public:
         Vec3f project(const Vec3f &point) const override{
             return core->project(point);
         }
+        std::optional<Point> unproject(const Vec3f &p) const override {
+            return core->unproject(p / m_scale);
+        }
     };
 
     class OrthoProject3f : public Emboss::IProject3f
@@ -295,13 +301,15 @@ public:
         Transform3d m_matrix;
         // size and direction of emboss for ortho projection
         Vec3f       m_direction;
+        Transform3d m_matrix_inv;
     public:
         OrthoProject(Transform3d matrix, Vec3f direction)
-            : m_matrix(matrix), m_direction(direction)
+            : m_matrix(matrix), m_direction(direction), m_matrix_inv(matrix.inverse())
         {}
         // Inherited via IProject
         std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const override;
         Vec3f project(const Vec3f &point) const override;
+        std::optional<Point> unproject(const Vec3f &p) const override;     
     };
 };
 
