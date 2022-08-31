@@ -226,7 +226,8 @@ Triangulation::Indices Triangulation::triangulate(const Polygons &polygons)
 }
 
 Triangulation::Indices Triangulation::triangulate(const ExPolygon &expolygon){
-    return triangulate({expolygon});
+    ExPolygons expolys({expolygon}); 
+    return triangulate(expolys);
 }
 
 Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons){
