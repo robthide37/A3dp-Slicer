@@ -225,6 +225,10 @@ Triangulation::Indices Triangulation::triangulate(const Polygons &polygons)
     return triangulate(points, edges);
 }
 
+Triangulation::Indices Triangulation::triangulate(const ExPolygon &expolygon){
+    return triangulate({expolygon});
+}
+
 Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons){
     Points pts = to_points(expolygons);
     Points d_pts = collect_duplications(pts);

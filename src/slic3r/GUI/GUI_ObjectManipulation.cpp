@@ -126,7 +126,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
     // Load bitmaps to be used for the mirroring buttons:
     m_mirror_bitmap_on     = ScalableBitmap(parent, "mirroring_on");
     m_mirror_bitmap_off    = ScalableBitmap(parent, "mirroring_off");
-    m_mirror_bitmap_hidden = ScalableBitmap(parent, "mirroring_transparent.png");
+    m_mirror_bitmap_hidden = ScalableBitmap(parent, "mirroring_transparent");
 
     const int border = wxOSX ? 0 : 4;
     const int em = wxGetApp().em_unit();
@@ -257,9 +257,9 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         //    axis_name->SetForegroundColour(wxColour(axes_color_text[axis_idx]));
 
         sizer = new wxBoxSizer(wxHORIZONTAL);
-        // Under OSX we use font, smaller than default font, so
+        // Under OSX or Linux with GTK3 we use font, smaller than default font, so
         // there is a next trick for an equivalent layout of coordinates combobox and axes labels in they own sizers
-        if (wxOSX) 
+        if (wxOSX || wxGTK3)
             sizer->SetMinSize(-1, m_word_local_combo->GetBestHeight(-1));
         sizer->Add(axis_name, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, border);
 
@@ -1009,7 +1009,7 @@ void ObjectManipulation::update_warning_icon_state(const MeshErrorsInfo& warning
         m_manifold_warning_bmp = ScalableBitmap(m_parent, warning_icon_name);
     const wxString& tooltip = warning.tooltip;
     m_fix_throught_netfab_bitmap->SetBitmap(tooltip.IsEmpty() ? wxNullBitmap : m_manifold_warning_bmp.bmp());
-    m_fix_throught_netfab_bitmap->SetMinSize(tooltip.IsEmpty() ? wxSize(0,0) : m_manifold_warning_bmp.bmp().GetSize());
+    m_fix_throught_netfab_bitmap->SetMinSize(tooltip.IsEmpty() ? wxSize(0,0) : m_manifold_warning_bmp.GetSize());
     m_fix_throught_netfab_bitmap->SetToolTip(tooltip);
 }
 
@@ -1328,6 +1328,15 @@ void ObjectManipulation::set_coordinates_type(ECoordinatesType type)
     canvas->set_as_dirty();
     canvas->request_extra_frame();
 }
+
+ECoordinatesType ObjectManipulation::get_coordinates_type() const
+{
+    const wxString og_name = get_og()->get_name();
+    if (og_name.Contains(_L("Group manipulation")))
+        return ECoordinatesType::World;
+
+    return m_coordinates_type;
+}
 #endif // ENABLE_WORLD_COORDINATE
 
 void ObjectManipulation::msw_rescale()
@@ -1336,25 +1345,10 @@ void ObjectManipulation::msw_rescale()
     m_item_name->SetMinSize(wxSize(20*em, wxDefaultCoord));
     msw_rescale_word_local_combo(m_word_local_combo);
     m_word_local_combo_sizer->SetMinSize(wxSize(-1, m_word_local_combo->GetBestHeight(-1)));
-    m_manifold_warning_bmp.msw_rescale();
 
     const wxString& tooltip = m_fix_throught_netfab_bitmap->GetToolTipText();
     m_fix_throught_netfab_bitmap->SetBitmap(tooltip.IsEmpty() ? wxNullBitmap : m_manifold_warning_bmp.bmp());
-    m_fix_throught_netfab_bitmap->SetMinSize(tooltip.IsEmpty() ? wxSize(0, 0) : m_manifold_warning_bmp.bmp().GetSize());
-
-    m_mirror_bitmap_on.msw_rescale();
-    m_mirror_bitmap_off.msw_rescale();
-    m_mirror_bitmap_hidden.msw_rescale();
-    m_reset_scale_button->msw_rescale();
-    m_reset_rotation_button->msw_rescale();
-#if ENABLE_WORLD_COORDINATE
-    m_reset_skew_button->msw_rescale();
-#endif /// ENABLE_WORLD_COORDINATE
-    m_drop_to_bed_button->msw_rescale();
-    m_lock_bnt->msw_rescale();
-
-    for (int id = 0; id < 3; ++id)
-        m_mirror_buttons[id].first->msw_rescale();
+    m_fix_throught_netfab_bitmap->SetMinSize(tooltip.IsEmpty() ? wxSize(0, 0) : m_manifold_warning_bmp.GetSize());
 
     // rescale label-heights
     // Text trick to grid sizer layout:
@@ -1383,20 +1377,16 @@ void ObjectManipulation::sys_color_changed()
     for (ManipulationEditor* editor : m_editors)
         editor->sys_color_changed(this);
 
-    // btn...->msw_rescale() updates icon on button, so use it
-    m_mirror_bitmap_on.msw_rescale();
-    m_mirror_bitmap_off.msw_rescale();
-    m_mirror_bitmap_hidden.msw_rescale();
-    m_reset_scale_button->msw_rescale();
-    m_reset_rotation_button->msw_rescale();
-#if ENABLE_WORLD_COORDINATE
-    m_reset_skew_button->msw_rescale();
-#endif // ENABLE_WORLD_COORDINATE
-    m_drop_to_bed_button->msw_rescale();
-    m_lock_bnt->msw_rescale();
+    m_mirror_bitmap_on.sys_color_changed();
+    m_mirror_bitmap_off.sys_color_changed();
+    m_mirror_bitmap_hidden.sys_color_changed();
+    m_reset_scale_button->sys_color_changed();
+    m_reset_rotation_button->sys_color_changed();
+    m_drop_to_bed_button->sys_color_changed();
+    m_lock_bnt->sys_color_changed();
 
     for (int id = 0; id < 3; ++id)
-        m_mirror_buttons[id].first->msw_rescale();
+        m_mirror_buttons[id].first->sys_color_changed();
 }
 
 #if ENABLE_WORLD_COORDINATE
@@ -1452,12 +1442,7 @@ ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
     {
         parent->set_focused_editor(nullptr);
 
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        // if the widgets loosing focus is a manipulator field, call kill_focus
-        if (dynamic_cast<ManipulationEditor*>(e.GetEventObject()) != nullptr)
-#else
         if (!m_enter_pressed)
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
             kill_focus(parent);
 
         e.Skip();

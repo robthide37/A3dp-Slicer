@@ -106,11 +106,11 @@ private:
     GLTexture m_icons_texture;
     bool m_icons_texture_dirty;
     BackgroundTexture m_background_texture;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLTexture m_arrow_texture;
 #else
     BackgroundTexture m_arrow_texture;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     Layout m_layout;
     EType m_current;
     EType m_hover;
@@ -138,11 +138,11 @@ public:
 
     bool init();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     bool init_arrow(const std::string& filename);
 #else
     bool init_arrow(const BackgroundTexture::Metadata& arrow_texture);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     template<class Archive>
     void load(Archive& ar)
@@ -214,7 +214,9 @@ public:
     bool is_hiding_instances() const;
 
     void render_current_gizmo() const;
+#if !ENABLE_RAYCAST_PICKING
     void render_current_gizmo_for_picking_pass() const;
+#endif // !ENABLE_RAYCAST_PICKING
     void render_painter_gizmo();
 
     void render_overlay();
@@ -243,11 +245,11 @@ private:
                      bool              alt_down       = false,
                      bool              control_down   = false);
     
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_background(float left, float top, float right, float bottom, float border_w, float border_h) const;
 #else
     void render_background(float left, float top, float right, float bottom, float border) const;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     void do_render_overlay() const;
 

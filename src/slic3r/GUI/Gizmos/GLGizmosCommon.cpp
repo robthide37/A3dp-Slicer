@@ -213,10 +213,8 @@ void InstancesHider::render_cut() const
         else
             clipper->set_limiting_plane(ClippingPlane::ClipsNothing());
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPushMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
+        glsafe(::glPushMatrix());
         if (mv->is_model_part())
             glsafe(::glColor3f(0.8f, 0.3f, 0.0f));
         else {
@@ -224,17 +222,26 @@ void InstancesHider::render_cut() const
             glsafe(::glColor4fv(color.data()));
         }
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+        bool depth_test_enabled = ::glIsEnabled(GL_DEPTH_TEST);
+#else
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
         glsafe(::glDisable(GL_DEPTH_TEST));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         clipper->render_cut(mv->is_model_part() ? ColorRGBA(0.8f, 0.3f, 0.0f, 1.0f) : color_from_model_volume(*mv));
 #else
         clipper->render_cut();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+        if (depth_test_enabled)
+            glsafe(::glEnable(GL_DEPTH_TEST));
+#else
         glsafe(::glPopAttrib());
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
         ++clipper_id;
     }
@@ -344,7 +351,11 @@ void Raycaster::on_update()
     if (meshes != m_old_meshes) {
         m_raycasters.clear();
         for (const TriangleMesh* mesh : meshes)
+#if ENABLE_RAYCAST_PICKING
+            m_raycasters.emplace_back(new MeshRaycaster(std::make_shared<const TriangleMesh>(*mesh)));
+#else
             m_raycasters.emplace_back(new MeshRaycaster(*mesh));
+#endif // ENABLE_RAYCAST_PICKING
         m_old_meshes = meshes;
     }
 }
@@ -427,18 +438,14 @@ void ObjectClipper::render_cut() const
         clipper->set_plane(*m_clp);
         clipper->set_transformation(trafo);
         clipper->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPushMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         clipper->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f });
 #else
+        glsafe(::glPushMatrix());
         glsafe(::glColor3f(1.0f, 0.37f, 0.0f));
         clipper->render_cut();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         ++clipper_id;
     }
@@ -548,18 +555,14 @@ void SupportsClipper::render_cut() const
     m_clipper->set_plane(*ocl->get_clipping_plane());
     m_clipper->set_transformation(supports_trafo);
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-    glsafe(::glPushMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     m_clipper->render_cut({ 1.0f, 0.f, 0.37f, 1.0f });
 #else
+    glsafe(::glPushMatrix());
     glsafe(::glColor3f(1.0f, 0.f, 0.37f));
     m_clipper->render_cut();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 

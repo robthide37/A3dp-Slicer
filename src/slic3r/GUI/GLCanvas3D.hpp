@@ -16,6 +16,9 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GCodeViewer.hpp"
 #include "Camera.hpp"
+#if ENABLE_RAYCAST_PICKING
+#include "SceneRaycaster.hpp"
+#endif // ENABLE_RAYCAST_PICKING
 
 #include "libslic3r/Slicing.hpp"
 
@@ -257,15 +260,8 @@ class GLCanvas3D
             GLModel baseline;
             GLModel profile;
             GLModel background;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             float old_canvas_width{ 0.0f };
-#else
-            Rect old_bar_rect;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             std::vector<double> old_layer_height_profile;
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-            bool dirty{ false };
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         };
         Profile m_profile;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -295,9 +291,9 @@ class GLCanvas3D
         static float get_cursor_z_relative(const GLCanvas3D& canvas);
         static bool bar_rect_contains(const GLCanvas3D& canvas, float x, float y);
         static Rect get_bar_rect_screen(const GLCanvas3D& canvas);
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         static Rect get_bar_rect_viewport(const GLCanvas3D& canvas);
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         static float get_overlay_window_width() { return LayersEditing::s_overlay_window_width; }
 
         float object_max_z() const { return m_object_max_z; }
@@ -307,13 +303,13 @@ class GLCanvas3D
     private:
         bool is_initialized() const;
         void generate_layer_height_texture();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         void render_active_object_annotations(const GLCanvas3D& canvas);
         void render_profile(const GLCanvas3D& canvas);
 #else
         void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect);
         void render_profile(const Rect& bar_rect);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         void update_slicing_parameters();
 
         static float thickness_bar_width(const GLCanvas3D &canvas);        
@@ -496,6 +492,9 @@ public:
 private:
     wxGLCanvas* m_canvas;
     wxGLContext* m_context;
+#if ENABLE_RAYCAST_PICKING
+    SceneRaycaster m_scene_raycaster;
+#endif // ENABLE_RAYCAST_PICKING
     Bed3D &m_bed;
 #if ENABLE_RETINA_GL
     std::unique_ptr<RetinaHelper> m_retina_helper;
@@ -518,6 +517,9 @@ private:
     bool m_event_handlers_bound{ false };
 
     GLVolumeCollection m_volumes;
+#if ENABLE_OPENGL_ES
+    TriangleMesh m_wipe_tower_mesh;
+#endif // ENABLE_OPENGL_ES
     GCodeViewer m_gcode_viewer;
 
     RenderTimer m_render_timer;
@@ -675,6 +677,27 @@ public:
 
     bool init();
     void post_event(wxEvent &&event);
+
+#if ENABLE_RAYCAST_PICKING
+    std::shared_ptr<SceneRaycasterItem> add_raycaster_for_picking(SceneRaycaster::EType type, int id, const MeshRaycaster& raycaster,
+        const Transform3d& trafo, bool use_back_faces = false) {
+        return m_scene_raycaster.add_raycaster(type, id, raycaster, trafo, use_back_faces);
+    }
+    void remove_raycasters_for_picking(SceneRaycaster::EType type, int id) {
+        m_scene_raycaster.remove_raycasters(type, id);
+    }
+    void remove_raycasters_for_picking(SceneRaycaster::EType type) {
+        m_scene_raycaster.remove_raycasters(type);
+    }
+
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* get_raycasters_for_picking(SceneRaycaster::EType type) {
+        return m_scene_raycaster.get_raycasters(type);
+    }
+
+    void set_raycaster_gizmos_on_top(bool value) {
+        m_scene_raycaster.set_gizmos_on_top(value);
+    }
+#endif // ENABLE_RAYCAST_PICKING
 
     void set_as_dirty();
     void requires_check_outside_state() { m_requires_check_outside_state = true; }
@@ -983,18 +1006,16 @@ private:
     void _picking_pass();
     void _rectangular_selection_picking_pass();
     void _render_background();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void _render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes);
     void _render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom);
 #else
     void _render_bed(bool bottom, bool show_axes);
     void _render_bed_for_picking(bool bottom);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
-#if ENABLE_SHOW_TOOLPATHS_COG
     void _render_gcode_cog();
-#endif // ENABLE_SHOW_TOOLPATHS_COG
     void _render_selection();
     void _render_sequential_clearance();
 #if ENABLE_RENDER_SELECTION_CENTER
@@ -1002,7 +1023,11 @@ private:
 #endif // ENABLE_RENDER_SELECTION_CENTER
     void _check_and_update_toolbar_icon_scale();
     void _render_overlays();
+#if ENABLE_RAYCAST_PICKING
+    void _render_volumes_for_picking(const Camera& camera) const;
+#else
     void _render_volumes_for_picking() const;
+#endif // ENABLE_RAYCAST_PICKING
     void _render_current_gizmo() const;
     void _render_gizmos_overlay();
     void _render_main_toolbar();

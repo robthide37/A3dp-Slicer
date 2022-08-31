@@ -282,7 +282,7 @@ public:
     bool                can_merge_to_multipart_object() const;
     bool                can_merge_to_single_object() const;
 
-    wxPoint             get_mouse_position_in_control() const { return wxGetMousePosition() - this->GetScreenPosition(); }
+    wxPoint             get_mouse_position_in_control() const;
     wxBoxSizer*         get_sizer() {return  m_sizer;}
     int                 get_selected_obj_idx() const;
     ModelConfig&        get_item_config(const wxDataViewItem& item) const;

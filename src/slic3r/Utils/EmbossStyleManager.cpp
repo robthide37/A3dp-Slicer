@@ -379,11 +379,11 @@ float EmbossStyleManager::get_imgui_font_size(const FontProp         &prop,
 
 ImFont *EmbossStyleManager::create_imgui_font(const std::string &text)
 {
+    // inspiration inside of ImGuiWrapper::init_font
     auto& ff = m_style_cache.font_file;
     if (!ff.has_value()) return nullptr;
     const Emboss::FontFile &font_file = *ff.font_file;
 
-    // TODO: Create glyph range
     ImFontGlyphRangesBuilder builder;
     builder.AddRanges(m_imgui_init_glyph_range);
     if (!text.empty())
@@ -427,7 +427,7 @@ ImFont *EmbossStyleManager::create_imgui_font(const std::string &text)
 
     unsigned char *pixels;
     int            width, height;
-    m_style_cache.atlas.GetTexDataAsAlpha8(&pixels, &width, &height);
+    m_style_cache.atlas.GetTexDataAsRGBA32(&pixels, &width, &height);
 
     // Upload texture to graphics system
     GLint last_texture;
@@ -442,8 +442,10 @@ ImFont *EmbossStyleManager::create_imgui_font(const std::string &text)
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
     glsafe(::glPixelStorei(GL_UNPACK_ROW_LENGTH, 0));
-    glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0,
-                          GL_ALPHA, GL_UNSIGNED_BYTE, pixels));
+    if (OpenGLManager::are_compressed_textures_supported())
+        glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels));
+    else
+        glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels));
 
     // Store our identifier
     m_style_cache.atlas.TexID = (ImTextureID) (intptr_t) font_texture;

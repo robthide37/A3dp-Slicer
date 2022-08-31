@@ -32,6 +32,7 @@ public:
                                const HalfEdges &half_edges);
     static Indices triangulate(const Polygon &polygon);
     static Indices triangulate(const Polygons &polygons);
+    static Indices triangulate(const ExPolygon &expolygon);
     static Indices triangulate(const ExPolygons &expolygons);
 
     // Map for convert original index to set without duplication

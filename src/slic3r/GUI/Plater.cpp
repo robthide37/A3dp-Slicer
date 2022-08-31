@@ -180,7 +180,6 @@ public:
 
     bool        showing_manifold_warning_icon;
     void        show_sizer(bool show);
-    void        msw_rescale();
     void        update_warning_icon(const std::string& warning_icon_name);
 };
 
@@ -210,7 +209,7 @@ ObjectInfo::ObjectInfo(wxWindow *parent) :
 
     init_info_label(&info_size, _L("Size"));
 
-    info_icon = new wxStaticBitmap(parent, wxID_ANY, create_scaled_bitmap("info"));
+    info_icon = new wxStaticBitmap(parent, wxID_ANY, *get_bmp_bundle("info"));
     info_icon->SetToolTip(_L("For a multipart object, this value isn't accurate.\n"
                              "It doesn't take account of intersections and negative volumes."));
     auto* volume_info_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -223,7 +222,7 @@ ObjectInfo::ObjectInfo(wxWindow *parent) :
 
     info_manifold = new wxStaticText(parent, wxID_ANY, "");
     info_manifold->SetFont(wxGetApp().small_font());
-    manifold_warning_icon = new wxStaticBitmap(parent, wxID_ANY, create_scaled_bitmap(m_warning_icon_name));
+    manifold_warning_icon = new wxStaticBitmap(parent, wxID_ANY, *get_bmp_bundle(m_warning_icon_name));
     auto *sizer_manifold = new wxBoxSizer(wxHORIZONTAL);
     sizer_manifold->Add(manifold_warning_icon, 0, wxLEFT, 2);
     sizer_manifold->Add(info_manifold, 0, wxLEFT, 2);
@@ -242,17 +241,11 @@ void ObjectInfo::show_sizer(bool show)
         manifold_warning_icon->Show(showing_manifold_warning_icon && show);
 }
 
-void ObjectInfo::msw_rescale()
-{
-    manifold_warning_icon->SetBitmap(create_scaled_bitmap(m_warning_icon_name));
-    info_icon->SetBitmap(create_scaled_bitmap("info"));
-}
-
 void ObjectInfo::update_warning_icon(const std::string& warning_icon_name)
 {
     if ((showing_manifold_warning_icon = !warning_icon_name.empty())) {
         m_warning_icon_name = warning_icon_name;
-        manifold_warning_icon->SetBitmap(create_scaled_bitmap(m_warning_icon_name));
+        manifold_warning_icon->SetBitmap(*get_bmp_bundle(m_warning_icon_name));
     }
 }
 
@@ -350,9 +343,6 @@ void FreqChangedParams::msw_rescale()
 {
     m_og->msw_rescale();
     m_og_sla->msw_rescale();
-
-    for (auto btn: m_empty_buttons)
-        btn->msw_rescale();
 }
 
 void FreqChangedParams::sys_color_changed()
@@ -361,7 +351,7 @@ void FreqChangedParams::sys_color_changed()
     m_og_sla->sys_color_changed();
 
     for (auto btn: m_empty_buttons)
-        btn->msw_rescale();
+        btn->sys_color_changed();
 
     wxGetApp().UpdateDarkUI(m_wiping_dialog_button, true);
 }
@@ -450,7 +440,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
      */
     auto empty_widget = [this] (wxWindow* parent) {
         auto sizer = new wxBoxSizer(wxHORIZONTAL);
-        auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_transparent.png", wxEmptyString,
+        auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_transparent", wxEmptyString,
             wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER | wxTRANSPARENT_WINDOW);
         sizer->Add(btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, int(0.3 * wxGetApp().em_unit()));
         m_empty_buttons.push_back(btn);
@@ -508,7 +498,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
             }
         }));
 
-        auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_transparent.png", wxEmptyString,
+        auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_transparent", wxEmptyString,
                                       wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER | wxTRANSPARENT_WINDOW);
         sizer->Add(btn , 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT,
             int(0.3 * wxGetApp().em_unit()));
@@ -798,7 +788,9 @@ Sidebar::Sidebar(Plater *parent)
 
     p->sizer_filaments = new wxBoxSizer(wxVERTICAL);
 
-    auto init_combo = [this](PlaterPresetComboBox **combo, wxString label, Preset::Type preset_type, bool filament) {
+    const int margin_5 = int(0.5 * wxGetApp().em_unit());// 5;
+
+    auto init_combo = [this, margin_5](PlaterPresetComboBox **combo, wxString label, Preset::Type preset_type, bool filament) {
         auto *text = new wxStaticText(p->presets_panel, wxID_ANY, label + " :");
         text->SetFont(wxGetApp().small_font());
         *combo = new PlaterPresetComboBox(p->presets_panel, preset_type);
@@ -813,9 +805,19 @@ Sidebar::Sidebar(Plater *parent)
         auto *sizer_filaments = this->p->sizer_filaments;
         sizer_presets->Add(text, 0, wxALIGN_LEFT | wxEXPAND | wxRIGHT, 4);
         if (! filament) {
-            sizer_presets->Add(combo_and_btn_sizer, 0, wxEXPAND | wxBOTTOM, 1);
+            sizer_presets->Add(combo_and_btn_sizer, 0, wxEXPAND | 
+#ifdef __WXGTK3__
+                wxRIGHT, margin_5);
+#else
+                wxBOTTOM, 1);
+#endif // __WXGTK3__
         } else {
-            sizer_filaments->Add(combo_and_btn_sizer, 0, wxEXPAND | wxBOTTOM, 1);
+            sizer_filaments->Add(combo_and_btn_sizer, 0, wxEXPAND |
+#ifdef __WXGTK3__
+                wxRIGHT, margin_5);
+#else
+                wxBOTTOM, 1);
+#endif // __WXGTK3__
             (*combo)->set_extruder_idx(0);
             sizer_presets->Add(sizer_filaments, 1, wxEXPAND);
         }
@@ -828,13 +830,15 @@ Sidebar::Sidebar(Plater *parent)
     init_combo(&p->combo_sla_material,  _L("SLA material"),       Preset::TYPE_SLA_MATERIAL,  false);
     init_combo(&p->combo_printer,       _L("Printer"),            Preset::TYPE_PRINTER,       false);
 
-    const int margin_5  = int(0.5*wxGetApp().em_unit());// 5;
-
     p->sizer_params = new wxBoxSizer(wxVERTICAL);
 
     // Frequently changed parameters
     p->frequently_changed_parameters = new FreqChangedParams(p->scrolled);
-    p->sizer_params->Add(p->frequently_changed_parameters->get_sizer(), 0, wxEXPAND | wxTOP | wxBOTTOM, wxOSX ? 1 : margin_5);
+    p->sizer_params->Add(p->frequently_changed_parameters->get_sizer(), 0, wxEXPAND | wxTOP | wxBOTTOM
+#ifdef __WXGTK3__
+        | wxRIGHT
+#endif // __WXGTK3__
+        , wxOSX ? 1 : margin_5);
 
     // Object List
     p->object_list = new ObjectList(p->scrolled);
@@ -862,12 +866,15 @@ Sidebar::Sidebar(Plater *parent)
     // Sizer in the scrolled area
     if (p->mode_sizer)
         scrolled_sizer->Add(p->mode_sizer, 0, wxALIGN_CENTER_HORIZONTAL);
+
+    int size_margin = wxGTK3 ? wxLEFT | wxRIGHT : wxLEFT;
+
     is_msw ?
-        scrolled_sizer->Add(p->presets_panel, 0, wxEXPAND | wxLEFT, margin_5) :
-        scrolled_sizer->Add(p->sizer_presets, 0, wxEXPAND | wxLEFT, margin_5);
-    scrolled_sizer->Add(p->sizer_params, 1, wxEXPAND | wxLEFT, margin_5);
-    scrolled_sizer->Add(p->object_info, 0, wxEXPAND | wxTOP | wxLEFT, margin_5);
-    scrolled_sizer->Add(p->sliced_info, 0, wxEXPAND | wxTOP | wxLEFT, margin_5);
+        scrolled_sizer->Add(p->presets_panel, 0, wxEXPAND | size_margin, margin_5) :
+        scrolled_sizer->Add(p->sizer_presets, 0, wxEXPAND | size_margin, margin_5);
+    scrolled_sizer->Add(p->sizer_params, 1, wxEXPAND | size_margin, margin_5);
+    scrolled_sizer->Add(p->object_info, 0, wxEXPAND | wxTOP | size_margin, margin_5);
+    scrolled_sizer->Add(p->sliced_info, 0, wxEXPAND | wxTOP | size_margin, margin_5);
 
     // Buttons underneath the scrolled area
 
@@ -985,7 +992,12 @@ void Sidebar::init_filament_combo(PlaterPresetComboBox **combo, const int extr_i
                             int(0.3*wxGetApp().em_unit()));
 
     auto /***/sizer_filaments = this->p->sizer_filaments;
-    sizer_filaments->Add(combo_and_btn_sizer, 1, wxEXPAND | wxBOTTOM, 1);
+    sizer_filaments->Add(combo_and_btn_sizer, 1, wxEXPAND |
+#ifdef __WXGTK3__
+        wxRIGHT, int(0.5 * wxGetApp().em_unit()));
+#else
+        wxBOTTOM, 1);
+#endif // __WXGTK3__
 }
 
 void Sidebar::remove_unused_filament_combos(const size_t current_extruder_count)
@@ -1103,9 +1115,6 @@ void Sidebar::msw_rescale()
 {
     SetMinSize(wxSize(40 * wxGetApp().em_unit(), -1));
 
-    if (p->mode_sizer)
-        p->mode_sizer->msw_rescale();
-
     for (PlaterPresetComboBox* combo : std::vector<PlaterPresetComboBox*> { p->combo_print,
                                                                 p->combo_sla_print,
                                                                 p->combo_sla_material,
@@ -1117,14 +1126,8 @@ void Sidebar::msw_rescale()
     p->frequently_changed_parameters->msw_rescale();
     p->object_list->msw_rescale();
     p->object_manipulation->msw_rescale();
-    p->object_settings->msw_rescale();
     p->object_layers->msw_rescale();
 
-    p->object_info->msw_rescale();
-
-    p->btn_send_gcode->msw_rescale();
-//    p->btn_eject_device->msw_rescale();
-	p->btn_export_gcode_removable->msw_rescale();
 #ifdef _WIN32
     const int scaled_height = p->btn_export_gcode_removable->GetBitmapHeight();
 #else
@@ -1145,14 +1148,13 @@ void Sidebar::sys_color_changed()
 
     for (wxWindow* win : std::vector<wxWindow*>{ this, p->sliced_info->GetStaticBox(), p->object_info->GetStaticBox(), p->btn_reslice, p->btn_export_gcode })
         wxGetApp().UpdateDarkUI(win);
-    p->object_info->msw_rescale();
     for (wxWindow* win : std::vector<wxWindow*>{ p->scrolled, p->presets_panel })
         wxGetApp().UpdateAllStaticTextDarkUI(win);
     for (wxWindow* btn : std::vector<wxWindow*>{ p->btn_reslice, p->btn_export_gcode })
         wxGetApp().UpdateDarkUI(btn, true);
 
     if (p->mode_sizer)
-        p->mode_sizer->msw_rescale();
+        p->mode_sizer->sys_color_changed();
     p->frequently_changed_parameters->sys_color_changed();
     p->object_settings->sys_color_changed();
 #endif
@@ -1170,11 +1172,12 @@ void Sidebar::sys_color_changed()
     p->object_layers->sys_color_changed();
 
     // btn...->msw_rescale() updates icon on button, so use it
-    p->btn_send_gcode->msw_rescale();
+    p->btn_send_gcode->sys_color_changed();
 //    p->btn_eject_device->msw_rescale();
-    p->btn_export_gcode_removable->msw_rescale();
+    p->btn_export_gcode_removable->sys_color_changed();
 
     p->scrolled->Layout();
+    p->scrolled->Refresh();
 
     p->searcher.dlg_sys_color_changed();
 }
@@ -2420,9 +2423,20 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     const auto loading = _L("Loading") + dots;
 
-    // Create wxProgressDialog on heap, see the linux ifdef below.
-    auto progress_dlg = new wxProgressDialog(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
+    // The situation with wxProgressDialog is quite interesting here.
+    // On Linux (only), there are issues when FDM/SLA is switched during project file loading (disabling of controls,
+    // see a comment below). This can be bypassed by creating the wxProgressDialog on heap and destroying it
+    // when loading a project file. However, creating the dialog on heap causes issues on macOS, where it does not
+    // appear at all. Therefore, we create the dialog on stack on Win and macOS, and on heap on Linux, which
+    // is the only system that needed the workarounds in the first place.
+#ifdef __linux__
+    auto progress_dlg = new wxProgressDialog(loading, "", 100, find_toplevel_parent(q), wxPD_APP_MODAL | wxPD_AUTO_HIDE);
     Slic3r::ScopeGuard([&progress_dlg](){ if (progress_dlg) progress_dlg->Destroy(); progress_dlg = nullptr; });
+#else
+    wxProgressDialog progress_dlg_stack(loading, "", 100, find_toplevel_parent(q), wxPD_APP_MODAL | wxPD_AUTO_HIDE);
+    wxProgressDialog* progress_dlg = &progress_dlg_stack;    
+#endif
+    
 
     wxBusyCursor busy;
 
@@ -3137,6 +3151,8 @@ void Plater::priv::split_object()
         for (size_t idx : idxs)
         {
             get_selection().add_object((unsigned int)idx, false);
+            // update printable state for new volumes on canvas3D
+            q->canvas3D()->update_instance_printable_state_for_object(idx);
         }
     }
 }
@@ -3323,6 +3339,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 
         sidebar->set_btn_label(ActionButtonType::abExport, _(label_btn_export));
         sidebar->set_btn_label(ActionButtonType::abSendGCode, _(label_btn_send));
+        dirty_state.update_from_preview();
 
         const wxString slice_string = background_process.running() && wxGetApp().get_mode() == comSimple ?
                                       _L("Slicing") + dots : _L("Slice now");
@@ -3861,9 +3878,12 @@ void Plater::priv::reload_from_disk()
                 new_volume->set_type(old_volume->type());
                 new_volume->set_material_id(old_volume->material_id());
 #if ENABLE_WORLD_COORDINATE
-                new_volume->set_transformation(Geometry::translation_transform(old_volume->source.transform.get_offset()) *
-                    old_volume->get_transformation().get_matrix_no_offset() * old_volume->source.transform.get_matrix_no_offset());
-                new_volume->translate(new_volume->get_transformation().get_matrix_no_offset() * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+                new_volume->set_transformation(
+                    old_volume->get_transformation().get_matrix() *
+                    old_volume->source.transform.get_matrix_no_offset() *
+                    Geometry::translation_transform(new_volume->source.mesh_offset - old_volume->source.mesh_offset) *
+                    new_volume->source.transform.get_matrix_no_offset().inverse()
+                    );
 #else
                 new_volume->set_transformation(Geometry::assemble_transform(old_volume->source.transform.get_offset()) *
                                                old_volume->get_transformation().get_matrix(true) *
@@ -5573,7 +5593,7 @@ void ProjectDropDialog::on_dpi_changed(const wxRect& suggested_rect)
 
 bool Plater::load_files(const wxArrayString& filenames)
 {
-    const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa)", std::regex::icase);
+    const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa|step|stp)", std::regex::icase);
     const std::regex pattern_gcode_drop(".*[.](gcode|g)", std::regex::icase);
 
     std::vector<fs::path> paths;
@@ -6976,8 +6996,6 @@ void Plater::msw_rescale()
     p->view3D->get_canvas3d()->msw_rescale();
 
     p->sidebar->msw_rescale();
-
-    p->menus.msw_rescale();
 
     Layout();
     GetParent()->Layout();

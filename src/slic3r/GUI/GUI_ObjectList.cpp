@@ -222,6 +222,14 @@ ObjectList::ObjectList(wxWindow* parent) :
 
     Bind(wxEVT_DATAVIEW_ITEM_VALUE_CHANGED, &ObjectList::ItemValueChanged,  this);
 
+    Bind(wxEVT_DATAVIEW_ITEM_ACTIVATED, [this](wxDataViewEvent& event) {
+        wxDataViewItem item;
+        wxDataViewColumn* col;
+        this->HitTest(this->get_mouse_position_in_control(), item, col);
+        this->EditItem(item, col);
+        event.StopPropagation();
+        });
+
     Bind(wxCUSTOMEVT_LAST_VOLUME_IS_DELETED, [this](wxCommandEvent& e)   { last_volume_is_deleted(e.GetInt()); });
 
     Bind(wxEVT_SIZE, ([this](wxSizeEvent &e) { 
@@ -986,12 +994,11 @@ void ObjectList::extruder_editing()
     if (!item || !(m_objects_model->GetItemType(item) & (itVolume | itObject)))
         return;
 
-    const int column_width = GetColumn(colExtruder)->GetWidth() + wxSystemSettings::GetMetric(wxSYS_VSCROLL_X) + 5;
-
-    wxPoint pos = this->get_mouse_position_in_control();
-    wxSize size = wxSize(column_width, -1);
-    pos.x = GetColumn(colName)->GetWidth() + GetColumn(colPrint)->GetWidth() + 5;
-    pos.y -= GetTextExtent("m").y;
+    wxRect rect = this->GetItemRect(item, GetColumn(colExtruder));
+    wxPoint pos = rect.GetPosition();
+    pos.y -= 4;
+    wxSize size = rect.GetSize();
+    size.SetWidth(size.GetWidth() + 8);
 
     apply_extruder_selector(&m_extruder_editor, this, L("default"), pos, size);
 
@@ -1417,9 +1424,8 @@ void ObjectList::load_subobject(ModelVolumeType type, bool from_galery/* = false
 
     wxArrayString input_files;
     if (from_galery) {
-        GalleryDialog dlg(this);
-        if (dlg.ShowModal() != wxID_CLOSE)
-            dlg.get_input_files(input_files);
+        if (wxGetApp().gallery_dialog()->show() != wxID_CLOSE)
+            wxGetApp().gallery_dialog()->get_input_files(input_files);
     }
     else
         wxGetApp().import_model(wxGetApp().tab_panel()->GetPage(0), input_files);
@@ -1745,10 +1751,10 @@ void ObjectList::load_shape_object_from_gallery()
         return;// Add nothing if something is selected on 3DScene
 
     wxArrayString input_files;
-    GalleryDialog gallery_dlg(this);
-    if (gallery_dlg.ShowModal() == wxID_CLOSE)
+    GalleryDialog* gallery_dlg = wxGetApp().gallery_dialog();
+    if (gallery_dlg->show() == wxID_CLOSE)
         return;
-    gallery_dlg.get_input_files(input_files);
+    gallery_dlg->get_input_files(input_files);
     if (input_files.IsEmpty())
         return;
     load_shape_object_from_gallery(input_files);
@@ -2091,6 +2097,8 @@ void ObjectList::split()
         Expand(parent);
 
     changed_object(obj_idx);
+    // update printable state for new volumes on canvas3D
+    wxGetApp().plater()->canvas3D()->update_instance_printable_state_for_object(obj_idx);
 }
 
 void ObjectList::merge(bool to_multipart_object)
@@ -2204,8 +2212,12 @@ void ObjectList::merge(bool to_multipart_object)
             const Vec3d mirror    = transformation.get_mirror();
             const Vec3d rotation  = transformation.get_rotation();
 
-            if (object->id() == (*m_objects)[obj_idxs.front()]->id())
+            if (object->id() == (*m_objects)[obj_idxs.front()]->id()) {
                 new_object->add_instance();
+                new_object->instances[0]->printable = false;
+            }
+            new_object->instances[0]->printable |= object->instances[0]->printable;
+
             const Transform3d& volume_offset_correction = transformation.get_matrix();
 
             // merge volumes
@@ -2270,6 +2282,9 @@ void ObjectList::merge(bool to_multipart_object)
         add_object_to_list(m_objects->size() - 1);
         select_item(m_objects_model->GetItemById(m_objects->size() - 1));
         update_selections_on_canvas();
+
+        // update printable state for new volumes on canvas3D
+        wxGetApp().plater()->canvas3D()->update_instance_printable_state_for_object(int(model->objects.size()) - 1);
     }
     // merge all parts to the one single object
     // all part's settings will be lost
@@ -2459,6 +2474,21 @@ bool ObjectList::can_merge_to_single_object() const
 
     // selected object should be multipart
     return (*m_objects)[obj_idx]->volumes.size() > 1;
+}
+
+wxPoint ObjectList::get_mouse_position_in_control() const
+{
+    wxPoint pt = wxGetMousePosition() - this->GetScreenPosition();
+
+#ifdef __APPLE__
+    // Workaround for OSX. From wxWidgets 3.1.6 Hittest doesn't respect to the header of wxDataViewCtrl
+    if (wxDataViewItem top_item = this->GetTopItem(); top_item.IsOk()) {
+        auto rect = this->GetItemRect(top_item, this->GetColumn(0));
+        pt.y -= rect.y;
+    }
+#endif // __APPLE__
+
+    return pt;
 }
 
 // NO_PARAMETERS function call means that changed object index will be determine from Selection() 
@@ -4274,9 +4304,6 @@ void ObjectList::msw_rescale()
     GetColumn(colExtruder)->SetWidth( 8 * em);
     GetColumn(colEditing )->SetWidth( 3 * em);
 
-    // rescale/update existing items with bitmaps
-    m_objects_model->Rescale();
-
     Layout();
 }
 
@@ -4284,7 +4311,10 @@ void ObjectList::sys_color_changed()
 {
     wxGetApp().UpdateDVCDarkUI(this, true);
 
-    msw_rescale();
+    // update existing items with bitmaps
+    m_objects_model->UpdateBitmaps();
+
+    Layout();
 }
 
 void ObjectList::ItemValueChanged(wxDataViewEvent &event)

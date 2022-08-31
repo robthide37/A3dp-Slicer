@@ -55,7 +55,10 @@ public:
 
     // IDs of the Vertex Array Objects, into which the geometry has been loaded.
     // Zero if the VBOs are not sent to GPU yet.
-    unsigned int              vertices_VBO_id{0};
+#if ENABLE_GL_CORE_PROFILE
+    unsigned int              vertices_VAO_id{ 0 };
+#endif // ENABLE_GL_CORE_PROFILE
+    unsigned int              vertices_VBO_id{ 0 };
     std::vector<unsigned int> triangle_indices_VBO_ids;
 };
 
@@ -66,13 +69,13 @@ public:
         : TriangleSelectorGUI(mesh), m_colors(colors), m_default_volume_color(default_volume_color), m_gizmo_scene(2 * (colors.size() + 1)) {}
     ~TriangleSelectorMmGui() override = default;
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render(ImGuiWrapper* imgui, const Transform3d& matrix) override;
 #else
     // Render current selection. Transformation matrices are supposed
     // to be already set.
     void render(ImGuiWrapper* imgui) override;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 private:
     void update_render_data();

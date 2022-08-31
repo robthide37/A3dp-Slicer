@@ -351,10 +351,20 @@ Transform3d rotation_transform(const Vec3d& rotation)
     return transform;
 }
 
+void scale_transform(Transform3d& transform, double scale)
+{
+    return scale_transform(transform, scale * Vec3d::Ones());
+}
+
 void scale_transform(Transform3d& transform, const Vec3d& scale)
 {
     transform = Transform3d::Identity();
     transform.scale(scale);
+}
+
+Transform3d scale_transform(double scale)
+{
+    return scale_transform(scale * Vec3d::Ones());
 }
 
 Transform3d scale_transform(const Vec3d& scale)
@@ -567,7 +577,6 @@ void Transformation::set_scaling_factor(const Vec3d& scaling_factor)
 void Transformation::set_scaling_factor(Axis axis, double scaling_factor)
 {
 #if ENABLE_WORLD_COORDINATE
-    assert(scaling_factor > 0.0);
     auto [rotation, scale] = extract_rotation_scale(m_matrix);
     scale(axis, axis) = scaling_factor;
 

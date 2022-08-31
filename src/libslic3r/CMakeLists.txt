@@ -111,6 +111,8 @@ set(SLIC3R_SOURCES
     Format/SL1_SVG.cpp
     Format/pwmx.hpp
     Format/pwmx.cpp
+    Format/STEP.hpp
+    Format/STEP.cpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp
@@ -260,6 +262,10 @@ set(SLIC3R_SOURCES
     Tesselate.cpp
     Tesselate.hpp
     TextConfiguration.hpp
+    TreeSupport.cpp
+    TreeSupport.hpp
+    TreeModelVolumes.cpp
+    TreeModelVolumes.hpp
     TriangleMesh.cpp
     TriangleMesh.hpp
     TriangleMeshSlicer.cpp
@@ -325,6 +331,12 @@ set(SLIC3R_SOURCES
     SLA/ReprojectPointsOnMesh.hpp
     SLA/DefaultSupportTree.hpp
     SLA/DefaultSupportTree.cpp
+    SLA/BranchingTreeSLA.hpp
+    SLA/BranchingTreeSLA.cpp
+    BranchingTree/BranchingTree.cpp
+    BranchingTree/BranchingTree.hpp
+    BranchingTree/PointCloud.cpp
+    BranchingTree/PointCloud.hpp
 
     Arachne/BeadingStrategy/BeadingStrategy.hpp
     Arachne/BeadingStrategy/BeadingStrategy.cpp
@@ -388,6 +400,7 @@ cmake_policy(POP)
 
 add_library(libslic3r_cgal STATIC 
     CutSurface.hpp CutSurface.cpp
+    Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp
     IntersectionPoints.hpp IntersectionPoints.cpp
     MeshBoolean.hpp MeshBoolean.cpp
     TryCatchSignal.hpp TryCatchSignal.cpp
@@ -447,16 +460,17 @@ target_link_libraries(libslic3r
     qoi
     )
 
+if (APPLE)
+    # TODO: we need to fix notarization with the separate shared library
+    target_link_libraries(libslic3r OCCTWrapper)
+endif ()
+
 if (TARGET OpenVDB::openvdb)
     target_link_libraries(libslic3r OpenVDB::openvdb)
 endif()
 
 if(WIN32)
     target_link_libraries(libslic3r Psapi.lib)
-endif()
-
-if(SLIC3R_PROFILE)
-    target_link_libraries(libslic3r Shiny)
 endif()
 
 if (APPLE)

@@ -77,8 +77,8 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
 
     if (params.density > 0.9999f && !params.dont_adjust) {
         coord_t                loops_count = std::max(bbox_size.x(), bbox_size.y()) / min_spacing + 1;
-        Polygons               polygons    = offset(expolygon, min_spacing / 2);
-        Arachne::WallToolPaths wallToolPaths(polygons, min_spacing, min_spacing, loops_count, 0, *this->print_object_config, *this->print_config);
+        Polygons               polygons    = offset(expolygon, float(min_spacing) / 2.f);
+        Arachne::WallToolPaths wallToolPaths(polygons, min_spacing, min_spacing, loops_count, 0, params.layer_height, *this->print_object_config, *this->print_config);
 
         std::vector<Arachne::VariableWidthLines>    loops = wallToolPaths.getToolPaths();
         std::vector<const Arachne::ExtrusionLine *> all_extrusions;
@@ -106,6 +106,7 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
                 thick_polyline.points.emplace_back(thick_polyline.points.front());
             }
             thick_polylines_out.emplace_back(std::move(thick_polyline));
+            last_pos = thick_polylines_out.back().last_point();
         }
 
         // clip the paths to prevent the extruder from getting exactly on the first point of the loop

@@ -137,7 +137,8 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialPattern)
 
 static const t_config_enum_values s_keys_map_SupportMaterialStyle {
     { "grid",           smsGrid },
-    { "snug",           smsSnug }
+    { "snug",           smsSnug },
+    { "tree",           smsTree }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialStyle)
 
@@ -175,6 +176,12 @@ static const t_config_enum_values s_keys_map_SLAMaterialSpeed = {
     {"high_viscosity",  slamsHighViscosity}
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLAMaterialSpeed);
+
+static inline const t_config_enum_values s_keys_map_SLASupportTreeType = {
+    {"default", int(sla::SupportTreeType::Default)},
+    {"branching",   int(sla::SupportTreeType::Branching)}
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLASupportTreeType);
 
 static const t_config_enum_values s_keys_map_BrimType = {
     {"no_brim",         btNoBrim},
@@ -1044,6 +1051,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("HIPS");
     def->enum_values.push_back("EDGE");
     def->enum_values.push_back("NGEN");
+    def->enum_values.push_back("PA");
     def->enum_values.push_back("NYLON");
     def->enum_values.push_back("PVA");
     def->enum_values.push_back("PC");
@@ -2770,8 +2778,10 @@ void PrintConfigDef::init_fff_params()
     def->enum_keys_map = &ConfigOptionEnum<SupportMaterialStyle>::get_enum_values();
     def->enum_values.push_back("grid");
     def->enum_values.push_back("snug");
+    def->enum_values.push_back("tree");
     def->enum_labels.push_back(L("Grid"));
     def->enum_labels.push_back(L("Snug"));
+    def->enum_labels.push_back(L("Tree"));
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<SupportMaterialStyle>(smsGrid));
 
@@ -3069,7 +3079,8 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Layers and Perimeters");
     def->tooltip = L("Classic perimeter generator produces perimeters with constant extrusion width and for "
                       "very thin areas is used gap-fill. "
-                      "Arachne engine produces perimeters with variable extrusion width.");
+                      "Arachne engine produces perimeters with variable extrusion width. "
+                      "This setting also affects the Concentric infill.");
     def->enum_keys_map = &ConfigOptionEnum<PerimeterGeneratorType>::get_enum_values();
     def->enum_values.push_back("classic");
     def->enum_values.push_back("arachne");
@@ -3078,15 +3089,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Arachne));
 
-    def = this->add("wall_transition_length", coFloat);
+    def = this->add("wall_transition_length", coFloatOrPercent);
     def->label = L("Perimeter transition length");
     def->category = L("Advanced");
     def->tooltip  = L("When transitioning between different numbers of perimeters as the part becomes "
-                       "thinner, a certain amount of space is allotted to split or join the perimeter segments.");
-    def->sidetext = L("mm");
+                       "thinner, a certain amount of space is allotted to split or join the perimeter segments. "
+                       "If expressed as a percentage (for example 100%), it will be computed based on the nozzle diameter.");
+    def->sidetext = L("mm or %");
     def->mode = comExpert;
     def->min = 0;
-    def->set_default_value(new ConfigOptionFloat(0.4));
+    def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
 
     def = this->add("wall_transition_filter_deviation", coFloatOrPercent);
     def->label = L("Perimeter transitioning filter margin");
@@ -3125,46 +3137,17 @@ void PrintConfigDef::init_fff_params()
     def->min = 1;
     def->set_default_value(new ConfigOptionInt(1));
 
-    def = this->add("wall_split_middle_threshold", coPercent);
-    def->label = L("Split middle perimeter threshold");
-    def->category = L("Advanced");
-    def->tooltip  = L("The smallest extrusion width, as a factor of the normal extrusion width, above which the middle "
-                       "perimeter (if there is one) will be split into two. Reduce this setting to use more, thinner "
-                       "perimeters. Increase to use fewer, wider perimeters. Note that this applies -as if- the entire "
-                       "shape should be filled with perimeter, so the middle here refers to the middle of the object "
-                       "between two outer edges of the shape, even if there actually is infill or other extrusion types in "
-                       "the print instead of the perimeter.");
-    def->sidetext = L("%");
-    def->mode = comAdvanced;
-    def->min = 1;
-    def->max = 99;
-    def->set_default_value(new ConfigOptionPercent(50));
-
-    def = this->add("wall_add_middle_threshold", coPercent);
-    def->label = L("Add middle perimeter threshold");
-    def->category = L("Advanced");
-    def->tooltip  = L("The smallest extrusion width, as a factor of the normal extrusion width, above which a middle "
-                       "perimeter (if there wasn't one already) will be added. Reduce this setting to use more, "
-                       "thinner perimeters. Increase to use fewer, wider perimeters. Note that this applies -as if- the "
-                       "entire shape should be filled with perimeter, so the middle here refers to the middle of the "
-                       "object between two outer edges of the shape, even if there actually is infill or other "
-                       "extrusion types in the print instead of the perimeter.");
-    def->sidetext = L("%");
-    def->mode = comAdvanced;
-    def->min = 1;
-    def->max = 99;
-    def->set_default_value(new ConfigOptionPercent(75));
-
-    def = this->add("min_feature_size", coFloat);
+    def = this->add("min_feature_size", coFloatOrPercent);
     def->label = L("Minimum feature size");
     def->category = L("Advanced");
     def->tooltip  = L("Minimum thickness of thin features. Model features that are thinner than this value will "
                        "not be printed, while features thicker than the Minimum feature size will be widened to "
-                       "the Minimum perimeter width.");
-    def->sidetext = L("mm");
+                       "the Minimum perimeter width. "
+                       "If expressed as a percentage (for example 25%), it will be computed based on the nozzle diameter.");
+    def->sidetext = L("mm or %");
     def->mode = comExpert;
     def->min = 0;
-    def->set_default_value(new ConfigOptionFloat(0.1));
+    def->set_default_value(new ConfigOptionFloatOrPercent(25, true));
 
     def = this->add("min_bead_width", coFloatOrPercent);
     def->label = L("Minimum perimeter width");
@@ -3564,6 +3547,17 @@ void PrintConfigDef::init_sla_params()
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionBool(true));
 
+    def = this->add("support_tree_type", coEnum);
+    def->label = L("Support tree type");
+    def->tooltip = L("Support tree building strategy");
+    def->enum_keys_map = &ConfigOptionEnum<sla::SupportTreeType>::get_enum_values();
+    def->enum_values = ConfigOptionEnum<sla::SupportTreeType>::get_enum_names();
+    def->enum_labels = ConfigOptionEnum<sla::SupportTreeType>::get_enum_names();
+    def->enum_labels[0] = L("Default");
+    def->enum_labels[1] = L("Branching");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum(sla::SupportTreeType::Default));
+
     def = this->add("support_head_front_diameter", coFloat);
     def->label = L("Pinhead front diameter");
     def->category = L("Supports");
@@ -3649,13 +3643,17 @@ void PrintConfigDef::init_sla_params()
     def = this->add("support_pillar_widening_factor", coFloat);
     def->label = L("Pillar widening factor");
     def->category = L("Supports");
-    def->tooltip = L("Merging bridges or pillars into another pillars can "
-                     "increase the radius. Zero means no increase, one means "
-                     "full increase.");
+    def->tooltip  = L(
+         "Merging bridges or pillars into another pillars can "
+          "increase the radius. Zero means no increase, one means "
+          "full increase. The exact amount of increase is unspecified and can "
+          "change in the future. What is garanteed is that thickness will not "
+          "exceed \"support_base_diameter\"");
+
     def->min = 0;
     def->max = 1;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(0.0));
+    def->set_default_value(new ConfigOptionFloat(0.15));
 
     def = this->add("support_base_diameter", coFloat);
     def->label = L("Support base diameter");
@@ -4027,6 +4025,8 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         "serial_port", "serial_speed",
         // Introduced in some PrusaSlicer 2.3.1 alpha, later renamed or removed.
         "fuzzy_skin_perimeter_mode", "fuzzy_skin_shape",
+        // Introduced in PrusaSlicer 2.3.0-alpha2, later replaced by automatic calculation based on extrusion width.
+        "wall_add_middle_threshold", "wall_split_middle_threshold",
     };
 
     // In PrusaSlicer 2.3.0-alpha0 the "monotonous" infill was introduced, which was later renamed to "monotonic".
@@ -4439,6 +4439,20 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def->tooltip = L("Visualize an already sliced and saved G-code");
     def->cli = "gcodeviewer";
     def->set_default_value(new ConfigOptionBool(false));
+
+#if ENABLE_GL_CORE_PROFILE
+    def = this->add("opengl-version", coString);
+    def->label = L("OpenGL version");
+    def->tooltip = L("Select the specified OpenGL version");
+    def->cli = "opengl-version";
+    def->set_default_value(new ConfigOptionString());
+
+    def = this->add("opengl-debug", coBool);
+    def->label = L("OpenGL debug output");
+    def->tooltip = L("Activate OpenGL debug output on graphic cards which support it");
+    def->cli = "opengl-debug";
+    def->set_default_value(new ConfigOptionBool(false));
+#endif // ENABLE_GL_CORE_PROFILE
 
     def = this->add("slice", coBool);
     def->label = L("Slice");

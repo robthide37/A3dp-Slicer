@@ -454,12 +454,15 @@ void PreferencesDialog::build()
 			  "If disabled, you can reorder Model Parts, Negative Volumes and Modifiers. But one of the model parts have to be on the first place."),
 			app_config->get("order_volumes") == "1");
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
 		append_bool_option(m_optgroup_gui, "non_manifold_edges",
 			L("Show non-manifold edges"),
 			L("If enabled, shows non-manifold edges."),
 			app_config->get("non_manifold_edges") == "1");
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
+
+		append_bool_option(m_optgroup_gui, "allow_auto_color_change",
+			L("Allow automatically color change"),
+			L("If enabled, related notification will be shown, when sliced object looks like a logo or a sign."),
+			app_config->get("allow_auto_color_change") == "1");
 
 #ifdef _MSW_DARK_MODE
 		append_bool_option(m_optgroup_gui, "tabs_as_menu",

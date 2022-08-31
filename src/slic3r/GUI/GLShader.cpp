@@ -301,14 +301,11 @@ void GLShaderProgram::set_uniform(int id, const Matrix3f& value) const
         glsafe(::glUniformMatrix3fv(id, 1, GL_FALSE, static_cast<const GLfloat*>(value.data())));
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
 void GLShaderProgram::set_uniform(int id, const Matrix3d& value) const
 {
     set_uniform(id, (Matrix3f)value.cast<float>());
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-#if ENABLE_GL_IMGUI_SHADERS
 void GLShaderProgram::set_uniform(int id, const Matrix4f& value) const
 {
     if (id >= 0)
@@ -319,7 +316,17 @@ void GLShaderProgram::set_uniform(int id, const Matrix4d& value) const
 {
     set_uniform(id, (Matrix4f)value.cast<float>());
 }
-#endif // ENABLE_GL_IMGUI_SHADERS
+
+void GLShaderProgram::set_uniform(int id, const Vec2f& value) const
+{
+    if (id >= 0)
+        glsafe(::glUniform2fv(id, 1, static_cast<const GLfloat*>(value.data())));
+}
+
+void GLShaderProgram::set_uniform(int id, const Vec2d& value) const
+{
+    set_uniform(id, static_cast<Vec2f>(value.cast<float>()));
+}
 
 void GLShaderProgram::set_uniform(int id, const Vec3f& value) const
 {

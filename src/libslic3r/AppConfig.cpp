@@ -151,10 +151,8 @@ void AppConfig::set_defaults()
         if (get("order_volumes").empty())
             set("order_volumes", "1");
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
         if (get("non_manifold_edges").empty())
             set("non_manifold_edges", "1");
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
         if (get("clear_undo_redo_stack_on_new_project").empty())
             set("clear_undo_redo_stack_on_new_project", "1");
@@ -186,6 +184,9 @@ void AppConfig::set_defaults()
 
     if (get("show_hints").empty())
         set("show_hints", "1");
+
+    if (get("allow_auto_color_change").empty())
+        set("allow_auto_color_change", "1");
 
     if (get("allow_ip_resolve").empty())
         set("allow_ip_resolve", "1");

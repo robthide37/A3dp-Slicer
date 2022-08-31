@@ -85,11 +85,11 @@ bool GLToolbarItem::update_enabled_state()
     return ret;
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLToolbarItem::render(const GLCanvas3D& parent, unsigned int tex_id, float left, float right, float bottom, float top, unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) const
 #else
 void GLToolbarItem::render(unsigned int tex_id, float left, float right, float bottom, float top, unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) const
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     auto uvs = [this](unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) -> GLTexture::Quad_UVs {
         assert(tex_width != 0 && tex_height != 0);
@@ -118,7 +118,7 @@ void GLToolbarItem::render(unsigned int tex_id, float left, float right, float b
     GLTexture::render_sub_texture(tex_id, left, right, bottom, top, uvs(tex_width, tex_height, icon_size));
 
     if (is_pressed()) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Size cnv_size = parent.get_canvas_size();
         const float cnv_w = (float)cnv_size.get_width();
         const float cnv_h = (float)cnv_size.get_height();
@@ -136,7 +136,7 @@ void GLToolbarItem::render(unsigned int tex_id, float left, float right, float b
             m_data.left.render_callback(left, right, bottom, top);
         else if (m_last_action_type == Right && m_data.right.can_render())
             m_data.right.render_callback(left, right, bottom, top);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 }
 
@@ -202,7 +202,7 @@ bool GLToolbar::init(const BackgroundTexture::Metadata& background_texture)
     return res;
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 bool GLToolbar::init_arrow(const std::string& filename)
 {
     if (m_arrow_texture.get_id() != 0)
@@ -228,7 +228,7 @@ bool GLToolbar::init_arrow(const BackgroundTexture::Metadata& arrow_texture)
 
     return res;
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 GLToolbar::Layout::EType GLToolbar::get_layout_type() const
 {
@@ -693,7 +693,7 @@ void GLToolbar::update_hover_state(const Vec2d& mouse_pos, GLCanvas3D& parent)
     }
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLToolbar::update_hover_state_horizontal(const Vec2d& mouse_pos, GLCanvas3D& parent)
 {
     const Size cnv_size = parent.get_canvas_size();
@@ -1108,7 +1108,7 @@ void GLToolbar::update_hover_state_vertical(const Vec2d& mouse_pos, GLCanvas3D& 
         }
     }
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 GLToolbarItem* GLToolbar::get_item(const std::string& item_name)
 {
@@ -1135,7 +1135,7 @@ int GLToolbar::contains_mouse(const Vec2d& mouse_pos, const GLCanvas3D& parent) 
     }
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 int GLToolbar::contains_mouse_horizontal(const Vec2d& mouse_pos, const GLCanvas3D& parent) const
 {
     const Size cnv_size = parent.get_canvas_size();
@@ -1428,9 +1428,9 @@ int GLToolbar::contains_mouse_vertical(const Vec2d& mouse_pos, const GLCanvas3D&
 
     return -1;
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLToolbar::render_background(float left, float top, float right, float bottom, float border_w, float border_h) const
 {
     const unsigned int tex_id = m_background_texture.texture.get_id();
@@ -1584,9 +1584,9 @@ void GLToolbar::render_background(float left, float top, float right, float bott
             GLTexture::render_sub_texture(tex_id, internal_right, right, bottom, internal_bottom, { { internal_right_uv, bottom_uv }, { right_uv, bottom_uv }, { right_uv, internal_bottom_uv }, { internal_right_uv, internal_bottom_uv } });
     }
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLToolbar::render_arrow(const GLCanvas3D& parent, GLToolbarItem* highlighted_item)
 {
     // arrow texture not initialized
@@ -1721,9 +1721,9 @@ void GLToolbar::render_arrow(const GLCanvas3D& parent, GLToolbarItem* highlighte
         GLTexture::render_sub_texture(tex_id, internal_left, internal_right, internal_bottom, internal_top, { { internal_left_uv, internal_top_uv }, { internal_right_uv, internal_top_uv }, { internal_right_uv, internal_bottom_uv }, { internal_left_uv, internal_bottom_uv } });
     }
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLToolbar::render_horizontal(const GLCanvas3D& parent)
 {
     const Size cnv_size = parent.get_canvas_size();
@@ -1927,7 +1927,7 @@ void GLToolbar::render_vertical(const GLCanvas3D& parent)
         }
     }
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 bool GLToolbar::generate_icons_texture()
 {

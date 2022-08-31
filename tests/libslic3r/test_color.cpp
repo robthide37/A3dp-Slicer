@@ -20,6 +20,7 @@ SCENARIO("Color encoding/decoding cycle", "[Color]") {
     }
 }
 
+#if !ENABLE_RAYCAST_PICKING
 SCENARIO("Color picking encoding/decoding cycle", "[Color]") {
     GIVEN("Picking color") {
         const ColorRGB src_rgb(static_cast<unsigned char>(255), static_cast<unsigned char>(127), static_cast<unsigned char>(63));
@@ -33,5 +34,6 @@ SCENARIO("Color picking encoding/decoding cycle", "[Color]") {
         }
     }
 }
+#endif // !ENABLE_RAYCAST_PICKING
 
 

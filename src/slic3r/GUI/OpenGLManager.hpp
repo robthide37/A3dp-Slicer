@@ -6,6 +6,9 @@
 class wxWindow;
 class wxGLCanvas;
 class wxGLContext;
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+class wxGLAttributes;
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
 namespace Slic3r {
 namespace GUI {
@@ -24,6 +27,7 @@ public:
     class GLInfo
     {
         bool m_detected{ false };
+        bool m_core_profile{ false };
         int m_max_tex_size{ 0 };
         float m_max_anisotropy{ 0.0f };
 
@@ -40,7 +44,18 @@ public:
         const std::string& get_vendor() const;
         const std::string& get_renderer() const;
 
+        bool is_core_profile() const { return m_core_profile; }
+        void set_core_profile(bool value) { m_core_profile = value; }
+
         bool is_mesa() const;
+        bool is_es() const {
+            return
+#if ENABLE_OPENGL_ES
+                true;
+#else
+                false;
+#endif // ENABLE_OPENGL_ES
+        }
 
         int get_max_tex_size() const;
         float get_max_anisotropy() const;
@@ -51,6 +66,10 @@ public:
         // If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
         // Otherwise HTML formatted for the system info dialog.
         std::string to_string(bool for_github) const;
+
+#if ENABLE_GL_CORE_PROFILE
+        std::vector<std::string> get_extensions_list() const;
+#endif // ENABLE_GL_CORE_PROFILE
 
     private:
         void detect() const;
@@ -76,6 +95,9 @@ private:
 
     bool m_gl_initialized{ false };
     wxGLContext* m_context{ nullptr };
+#if ENABLE_OPENGL_DEBUG_OPTION
+    bool m_debug_enabled{ false };
+#endif // ENABLE_OPENGL_DEBUG_OPTION
     GLShadersManager m_shaders_manager;
     static GLInfo s_gl_info;
 #ifdef __APPLE__ 
@@ -86,12 +108,21 @@ private:
     static EMultisampleState s_multisample;
     static EFramebufferType s_framebuffers_type;
 
+    static bool m_use_manually_generated_mipmaps;
 public:
     OpenGLManager() = default;
     ~OpenGLManager();
 
     bool init_gl();
+#if ENABLE_GL_CORE_PROFILE
+#if ENABLE_OPENGL_DEBUG_OPTION
+    wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version, bool enable_debug);
+#else
+    wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version);
+#endif // ENABLE_OPENGL_DEBUG_OPTION
+#else
     wxGLContext* init_glcontext(wxGLCanvas& canvas);
+#endif // ENABLE_GL_CORE_PROFILE
 
     GLShaderProgram* get_shader(const std::string& shader_name) { return m_shaders_manager.get_shader(shader_name); }
     GLShaderProgram* get_current_shader() { return m_shaders_manager.get_current_shader(); }
@@ -102,9 +133,14 @@ public:
     static EFramebufferType get_framebuffers_type() { return s_framebuffers_type; }
     static wxGLCanvas* create_wxglcanvas(wxWindow& parent);
     static const GLInfo& get_gl_info() { return s_gl_info; }
+    static bool use_manually_generated_mipmaps() { return m_use_manually_generated_mipmaps; }
 
 private:
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+    static void detect_multisample(const wxGLAttributes& attribList);
+#else
     static void detect_multisample(int* attribList);
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 };
 
 } // namespace GUI

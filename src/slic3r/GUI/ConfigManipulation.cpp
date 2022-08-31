@@ -323,8 +323,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("wall_transition_filter_deviation", have_arachne);
     toggle_field("wall_transition_angle", have_arachne);
     toggle_field("wall_distribution_count", have_arachne);
-    toggle_field("wall_split_middle_threshold", have_arachne);
-    toggle_field("wall_add_middle_threshold", have_arachne);
     toggle_field("min_feature_size", have_arachne);
     toggle_field("min_bead_width", have_arachne);
     toggle_field("thin_walls", !have_arachne);
@@ -363,21 +361,26 @@ void ConfigManipulation::update_print_sla_config(DynamicPrintConfig* config, con
 void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
 {
     bool supports_en = config->opt_bool("supports_enable");
+    sla::SupportTreeType treetype = config->opt_enum<sla::SupportTreeType>("support_tree_type");
+    bool is_default_tree = treetype == sla::SupportTreeType::Default;
+    bool is_branching_tree = treetype == sla::SupportTreeType::Branching;
 
     toggle_field("support_head_front_diameter", supports_en);
     toggle_field("support_head_penetration", supports_en);
     toggle_field("support_head_width", supports_en);
     toggle_field("support_pillar_diameter", supports_en);
     toggle_field("support_small_pillar_diameter_percent", supports_en);
-    toggle_field("support_max_bridges_on_pillar", supports_en);
-    toggle_field("support_pillar_connection_mode", supports_en);
+    toggle_field("support_max_bridges_on_pillar", supports_en && is_default_tree);
+    toggle_field("support_pillar_connection_mode", supports_en && is_default_tree);
+    toggle_field("support_tree_type", supports_en);
     toggle_field("support_buildplate_only", supports_en);
     toggle_field("support_base_diameter", supports_en);
     toggle_field("support_base_height", supports_en);
     toggle_field("support_base_safety_distance", supports_en);
     toggle_field("support_critical_angle", supports_en);
     toggle_field("support_max_bridge_length", supports_en);
-    toggle_field("support_max_pillar_link_distance", supports_en);
+    toggle_field("support_max_pillar_link_distance", supports_en && is_default_tree);
+    toggle_field("support_pillar_widening_factor", supports_en && is_branching_tree);
     toggle_field("support_points_density_relative", supports_en);
     toggle_field("support_points_minimal_distance", supports_en);
 

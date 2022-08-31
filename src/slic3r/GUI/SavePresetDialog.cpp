@@ -56,7 +56,7 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBox
 
     wxStaticText* label_top = new wxStaticText(m_parent, wxID_ANY, from_u8((boost::format(_utf8(L("Save %s as:"))) % into_u8(tab->title())).str()));
 
-    m_valid_bmp = new wxStaticBitmap(m_parent, wxID_ANY, create_scaled_bitmap("tick_mark", m_parent));
+    m_valid_bmp = new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("tick_mark"));
 
     m_combo = new wxComboBox(m_parent, wxID_ANY, from_u8(preset_name), wxDefaultPosition, wxSize(35 * wxGetApp().em_unit(), -1));
     for (const std::string& value : values)
@@ -173,7 +173,7 @@ void SavePresetDialog::Item::update_valid_bmp()
 {
     std::string bmp_name =  m_valid_type == Warning ? "exclamation" :
                             m_valid_type == NoValid ? "cross"       : "tick_mark" ;
-    m_valid_bmp->SetBitmap(create_scaled_bitmap(bmp_name, m_parent));
+    m_valid_bmp->SetBitmap(*get_bmp_bundle(bmp_name));
 }
 
 void SavePresetDialog::Item::accept()

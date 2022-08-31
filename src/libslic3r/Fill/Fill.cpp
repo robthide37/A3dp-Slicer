@@ -389,6 +389,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         params.anchor_length_max = surface_fill.params.anchor_length_max;
         params.resolution        = resolution;
         params.use_arachne       = perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric;
+        params.layer_height      = m_regions[surface_fill.region_id]->layer()->height;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
 			// Spacing is modified by the filler to indicate adjustments. Reset it for each expolygon.
@@ -426,14 +427,13 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                     for (const ThickPolyline &thick_polyline : thick_polylines) {
                         Flow new_flow = surface_fill.params.flow.with_spacing(float(f->spacing));
 
-                        ExtrusionPaths paths = thick_polyline_to_extrusion_paths(thick_polyline, surface_fill.params.extrusion_role, new_flow, scaled<float>(0.05), 0);
+                        ExtrusionMultiPath multi_path = thick_polyline_to_multi_path(thick_polyline, surface_fill.params.extrusion_role, new_flow, scaled<float>(0.05), float(SCALED_EPSILON));
                         // Append paths to collection.
-                        if (!paths.empty()) {
-                            if (paths.front().first_point() == paths.back().last_point())
-                                eec->entities.emplace_back(new ExtrusionLoop(std::move(paths)));
+                        if (!multi_path.empty()) {
+                            if (multi_path.paths.front().first_point() == multi_path.paths.back().last_point())
+                                eec->entities.emplace_back(new ExtrusionLoop(std::move(multi_path.paths)));
                             else
-                                for (ExtrusionPath &path : paths)
-                                    eec->entities.emplace_back(new ExtrusionPath(std::move(path)));
+                                eec->entities.emplace_back(new ExtrusionMultiPath(std::move(multi_path)));
                         }
                     }
 

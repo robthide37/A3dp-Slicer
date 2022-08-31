@@ -39,16 +39,16 @@ enum class EnforcedBlockedSeamPoint {
 
 // struct representing single perimeter loop
 struct Perimeter {
-    size_t start_index;
-    size_t end_index; //inclusive!
-    size_t seam_index;
-    float flow_width;
+    size_t start_index{};
+    size_t end_index{}; //inclusive!
+    size_t seam_index{};
+    float flow_width{};
 
     // During alignment, a final position may be stored here. In that case, finalized is set to true.
     // Note that final seam position is not limited to points of the perimeter loop. In theory it can be any position
     // Random position also uses this flexibility to set final seam point position
     bool finalized = false;
-    Vec3f final_seam_position;
+    Vec3f final_seam_position = Vec3f::Zero();
 };
 
 //Struct over which all processing of perimeters is done. For each perimeter point, its respective candidate is created,
@@ -113,13 +113,10 @@ public:
     //square of number of rays per sample point
     static constexpr size_t sqr_rays_per_sample_point = 5;
 
-    // arm length used during angles computation
-    static constexpr float polygon_local_angles_arm_distance = 0.3f;
-    // value for angles with penalty lower than this threshold - such angles will be snapped to their original position instead of spline interpolated position
-    static constexpr float sharp_angle_penalty_snapping_threshold = 0.6f;
-
-    // max tolerable distance from the previous layer is overhang_distance_tolerance_factor * flow_width
-    static constexpr float overhang_distance_tolerance_factor = 0.5f;
+    // snapping angle - angles larger than this value will be snapped to during seam painting
+    static constexpr float sharp_angle_snapping_threshold = 55.0f * float(PI) / 180.0f;
+    // overhang angle for seam placement that still yields good results, in degrees, measured from vertical direction
+    static constexpr float overhang_angle_threshold = 50.0f * float(PI) / 180.0f;
 
     // determines angle importance compared to visibility ( neutral value is 1.0f. )
     static constexpr float angle_importance_aligned = 0.6f;
@@ -131,8 +128,8 @@ public:
     // When searching for seam clusters for alignment:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
     static constexpr float seam_align_score_tolerance = 0.3f;
-    // seam_align_tolerable_dist - if next layer closest point is too far away, break aligned string
-    static constexpr float seam_align_tolerable_dist = 1.0f;
+    // seam_align_tolerable_dist_factor - how far to search for seam from current position, final dist is seam_align_tolerable_dist_factor * flow_width
+    static constexpr float seam_align_tolerable_dist_factor = 4.0f;
     // minimum number of seams needed in cluster to make alignment happen
     static constexpr size_t seam_align_minimum_string_seams = 6;
     // millimeters covered by spline; determines number of splines for the given string
@@ -154,8 +151,7 @@ private:
     void align_seam_points(const PrintObject *po, const SeamPlacerImpl::SeamComparator &comparator);
     std::vector<std::pair<size_t, size_t>> find_seam_string(const PrintObject *po,
             std::pair<size_t, size_t> start_seam,
-            const SeamPlacerImpl::SeamComparator &comparator,
-            float& string_weight) const;
+            const SeamPlacerImpl::SeamComparator &comparator) const;
     std::optional<std::pair<size_t, size_t>> find_next_seam_in_layer(
             const std::vector<PrintObjectSeamData::LayerSeams> &layers,
             const Vec3f& projected_position,

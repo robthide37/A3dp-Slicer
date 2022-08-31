@@ -143,13 +143,12 @@ std::map<std::string, std::string> SettingsFactory::CATEGORY_ICON =
     { L("Hollowing")            , "hollowing"   }
 };
 
-wxBitmap SettingsFactory::get_category_bitmap(const std::string& category_name, bool menu_bmp /*= true*/)
+wxBitmapBundle* SettingsFactory::get_category_bitmap(const std::string& category_name)
 {
     if (CATEGORY_ICON.find(category_name) == CATEGORY_ICON.end())
-        return wxNullBitmap;
-    return menu_bmp ? create_menu_bitmap(CATEGORY_ICON.at(category_name)) : create_scaled_bitmap(CATEGORY_ICON.at(category_name));
+        return get_bmp_bundle("empty");
+    return get_bmp_bundle(CATEGORY_ICON.at(category_name));
 }
-
 
 //-------------------------------------
 //            MenuFactory
@@ -166,11 +165,11 @@ const std::vector<std::pair<std::string, std::string>> MenuFactory::ADD_VOLUME_M
 };
 
 // Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
-const std::vector<std::string> MenuFactory::TEXT_VOLUME_ICONS {
-//       text_volume bitmap name
-        {"add_text_part" },           // ~ModelVolumeType::MODEL_PART
-        {"add_text_negative" },       // ~ModelVolumeType::NEGATIVE_VOLUME
-        {"add_text_modifier"},        // ~ModelVolumeType::PARAMETER_MODIFIER
+const std::vector<std::pair<std::string, std::string>> MenuFactory::TEXT_VOLUME_ICONS {
+//       menu_item Name              menu_item bitmap name
+        {L("Add text"),             "add_text_part"},        // ~ModelVolumeType::MODEL_PART
+        {L("Add negative text"),    "add_text_negative" },   // ~ModelVolumeType::NEGATIVE_VOLUME
+        {L("Add text modifier"),    "add_text_modifier"},    // ~ModelVolumeType::PARAMETER_MODIFIER
 };
 
 static Plater* plater()
@@ -439,21 +438,21 @@ static void create_freq_settings_popupmenu(wxMenu* menu, const bool is_object_se
 #endif
 }
 
-std::vector<wxBitmap> MenuFactory::get_volume_bitmaps()
+std::vector<wxBitmapBundle*> MenuFactory::get_volume_bitmaps()
 {
-    std::vector<wxBitmap> volume_bmps;
+    std::vector<wxBitmapBundle*> volume_bmps;
     volume_bmps.reserve(ADD_VOLUME_MENU_ITEMS.size());
     for (auto item : ADD_VOLUME_MENU_ITEMS)
-        volume_bmps.push_back(create_menu_bitmap(item.second));
+        volume_bmps.push_back(get_bmp_bundle(item.second));
     return volume_bmps;
 }
 
-std::vector<wxBitmap> MenuFactory::get_text_volume_bitmaps()
+std::vector<wxBitmapBundle*> MenuFactory::get_text_volume_bitmaps()
 {
-    std::vector<wxBitmap> volume_bmps;
+    std::vector<wxBitmapBundle*> volume_bmps;
     volume_bmps.reserve(TEXT_VOLUME_ICONS.size());
     for (auto item : TEXT_VOLUME_ICONS)
-        volume_bmps.push_back(create_menu_bitmap(item));
+        volume_bmps.push_back(get_bmp_bundle(item.second));
     return volume_bmps;
 }
 
@@ -659,7 +658,7 @@ wxMenuItem* MenuFactory::append_menu_item_settings(wxMenu* menu_)
 
     // Add full settings list
     auto  menu_item = new wxMenuItem(menu, wxID_ANY, menu_name);
-    menu_item->SetBitmap(create_menu_bitmap("cog"));
+    menu_item->SetBitmap(*get_bmp_bundle("cog"));
     menu_item->SetSubMenu(create_settings_popupmenu(menu, is_object_settings, item));
 
     return menu->Append(menu_item);
@@ -804,7 +803,7 @@ void MenuFactory::append_menu_item_change_extruder(wxMenu* menu)
             return;
     }
 
-    std::vector<wxBitmap*> icons = get_extruder_color_icons(true);
+    std::vector<wxBitmapBundle*> icons = get_extruder_color_icons(true);
     wxMenu* extruder_selection_menu = new wxMenu();
     const wxString& name = sels.Count() == 1 ? names[0] : names[1];
 
@@ -823,7 +822,7 @@ void MenuFactory::append_menu_item_change_extruder(wxMenu* menu)
             (is_active_extruder ? " (" + _L("active") + ")" : "");
 
         append_menu_item(extruder_selection_menu, wxID_ANY, item_name, "",
-            [i](wxCommandEvent&) { obj_list()->set_extruder_for_selected_items(i); }, *icons[icon_idx], menu,
+            [i](wxCommandEvent&) { obj_list()->set_extruder_for_selected_items(i); }, icons[icon_idx], menu,
             [is_active_extruder]() { return !is_active_extruder; }, m_parent);
 
     }
@@ -1232,12 +1231,6 @@ void MenuFactory::update_default_menu()
     create_default_menu();
 }
 
-void MenuFactory::msw_rescale()
-{
-    for (MenuWithSeparators* menu : { &m_object_menu, &m_sla_object_menu, &m_part_menu, &m_default_menu })
-        msw_rescale_menu(dynamic_cast<wxMenu*>(menu));
-}
-
 #ifdef _WIN32
 // For this class is used code from stackoverflow:
 // https://stackoverflow.com/questions/257288/is-it-possible-to-write-a-template-to-check-for-a-functions-existence
@@ -1267,7 +1260,7 @@ static void update_menu_item_def_colors(T* item)
 void MenuFactory::sys_color_changed()
 {
     for (MenuWithSeparators* menu : { &m_object_menu, &m_sla_object_menu, &m_part_menu, &m_default_menu }) {
-        msw_rescale_menu(dynamic_cast<wxMenu*>(menu));// msw_rescale_menu updates just icons, so use it
+        sys_color_changed_menu(dynamic_cast<wxMenu*>(menu));// msw_rescale_menu updates just icons, so use it
 #ifdef _WIN32 
         // but under MSW we have to update item's bachground color
         for (wxMenuItem* item : menu->GetMenuItems())
@@ -1280,14 +1273,17 @@ void MenuFactory::sys_color_changed(wxMenuBar* menubar)
 {
     for (size_t id = 0; id < menubar->GetMenuCount(); id++) {
         wxMenu* menu = menubar->GetMenu(id);
-        msw_rescale_menu(menu);
+        sys_color_changed_menu(menu);
+#ifndef __linux__
+        menu->SetupBitmaps();
 #ifdef _WIN32 
         // but under MSW we have to update item's bachground color
         for (wxMenuItem* item : menu->GetMenuItems())
             update_menu_item_def_colors(item);
 #endif
+#endif
     }
-    menubar->Refresh();
+//    menubar->Refresh();
 }
 
 

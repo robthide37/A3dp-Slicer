@@ -33,6 +33,7 @@ class PrintHostQueueDialog;
 class Plater;
 class MainFrame;
 class PreferencesDialog;
+class GalleryDialog;
 
 enum QuickSlice
 {
@@ -146,6 +147,7 @@ public:
 	void 		shutdown();
 
     Plater*     plater() { return m_plater; }
+    GalleryDialog* gallery_dialog();
 
     void        update_title();
 
@@ -207,6 +209,7 @@ public:
     PreferencesDialog*    preferences_dialog { nullptr };
     PrintHostQueueDialog* m_printhost_queue_dlg;
 //    std::shared_ptr<ProgressStatusBar>  m_statusbar;
+    GalleryDialog*        m_gallery_dialog{ nullptr };
 
 #ifdef __APPLE__
     std::unique_ptr<wxTaskBarIcon> m_taskbar_icon;

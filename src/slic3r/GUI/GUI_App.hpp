@@ -47,6 +47,7 @@ class ObjectLayers;
 class Plater;
 class NotificationManager;
 struct GUI_InitParams;
+class GalleryDialog;
 
 
 
@@ -55,6 +56,7 @@ enum FileType
     FT_STL,
     FT_OBJ,
     FT_OBJECT,
+    FT_STEP,
     FT_AMF,
     FT_3MF,
     FT_GCODE,
@@ -296,6 +298,7 @@ public:
     const Plater*        plater() const;
     Model&      		 model();
     NotificationManager * notification_manager();
+    GalleryDialog *     gallery_dialog();
 
     // Parameters extracted from the command line to be passed to GUI after initialization.
     GUI_InitParams* init_params { nullptr };

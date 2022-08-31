@@ -30,17 +30,23 @@ namespace GUI {
         m_end_corner = mouse_position;
     }
 
+#if ENABLE_RAYCAST_PICKING
+    std::vector<unsigned int> GLSelectionRectangle::contains(const std::vector<Vec3d>& points) const
+#else
     std::vector<unsigned int> GLSelectionRectangle::stop_dragging(const GLCanvas3D& canvas, const std::vector<Vec3d>& points)
+#endif // ENABLE_RAYCAST_PICKING
     {
         std::vector<unsigned int> out;
 
+#if !ENABLE_RAYCAST_PICKING
         if (!is_dragging())
             return out;
 
         m_state = EState::Off;
+#endif // !ENABLE_RAYCAST_PICKING
 
         // bounding box created from the rectangle corners - will take care of order of the corners
-        BoundingBox rectangle(Points{ Point(m_start_corner.cast<coord_t>()), Point(m_end_corner.cast<coord_t>()) });
+        const BoundingBox rectangle(Points{ Point(m_start_corner.cast<coord_t>()), Point(m_end_corner.cast<coord_t>()) });
 
         // Iterate over all points and determine whether they're in the rectangle.
         const Camera &camera = wxGetApp().plater()->get_camera();
@@ -65,7 +71,7 @@ namespace GUI {
             return;
 
         const Size cnv_size = canvas.get_canvas_size();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const float cnv_width = (float)cnv_size.get_width();
         const float cnv_height = (float)cnv_size.get_height();
         if (cnv_width == 0.0f || cnv_height == 0.0f)
@@ -93,9 +99,13 @@ namespace GUI {
         const float top    = (float)std::max(start.y(), end.y()) * inv_zoom;
         const float right  = (float)std::max(start.x(), end.x()) * inv_zoom;
         const float bottom = (float)std::min(start.y(), end.y()) * inv_zoom;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-        glsafe(::glLineWidth(1.5f));
+#if ENABLE_GL_CORE_PROFILE
+        const bool core_profile = OpenGLManager::get_gl_info().is_core_profile();
+        if (!core_profile)
+#endif // ENABLE_GL_CORE_PROFILE
+            glsafe(::glLineWidth(1.5f));
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
         float color[3];
         color[0] = (m_state == EState::Select) ? 0.3f : 1.0f;
@@ -106,7 +116,7 @@ namespace GUI {
 
         glsafe(::glDisable(GL_DEPTH_TEST));
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPushMatrix());
         glsafe(::glLoadIdentity());
         // ensure that the rectangle is renderered inside the frustrum
@@ -114,14 +124,28 @@ namespace GUI {
         // ensure that the overlay fits the frustrum near z plane
         const double gui_scale = camera.get_gui_scale();
         glsafe(::glScaled(gui_scale, gui_scale, 1.0));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if !ENABLE_OPENGL_ES
+#if ENABLE_GL_CORE_PROFILE
+        if (!core_profile) {
+#endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glPushAttrib(GL_ENABLE_BIT));
         glsafe(::glLineStipple(4, 0xAAAA));
         glsafe(::glEnable(GL_LINE_STIPPLE));
+#if ENABLE_GL_CORE_PROFILE
+        }
+#endif // ENABLE_GL_CORE_PROFILE
+#endif // !ENABLE_OPENGL_ES
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_OPENGL_ES
+        GLShaderProgram* shader = wxGetApp().get_shader("dashed_lines");
+#elif ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = core_profile ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_OPENGL_ES
         if (shader != nullptr) {
             shader->start_using();
 
@@ -131,11 +155,44 @@ namespace GUI {
                 m_rectangle.reset();
 
                 GLModel::Geometry init_data;
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+                init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P4 };
+                init_data.reserve_vertices(8);
+                init_data.reserve_indices(8);
+#else
                 init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P2 };
                 init_data.reserve_vertices(4);
                 init_data.reserve_indices(4);
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
                 // vertices
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+                const float width = right - left;
+                const float height = top - bottom;
+                float perimeter = 0.0f;
+
+                init_data.add_vertex(Vec4f(left, bottom, 0.0f, perimeter));
+                perimeter += width;
+                init_data.add_vertex(Vec4f(right, bottom, 0.0f, perimeter));
+
+                init_data.add_vertex(Vec4f(right, bottom, 0.0f, perimeter));
+                perimeter += height;
+                init_data.add_vertex(Vec4f(right, top, 0.0f, perimeter));
+
+                init_data.add_vertex(Vec4f(right, top, 0.0f, perimeter));
+                perimeter += width;
+                init_data.add_vertex(Vec4f(left, top, 0.0f, perimeter));
+
+                init_data.add_vertex(Vec4f(left, top, 0.0f, perimeter));
+                perimeter += height;
+                init_data.add_vertex(Vec4f(left, bottom, 0.0f, perimeter));
+
+                // indices
+                init_data.add_line(0, 1);
+                init_data.add_line(2, 3);
+                init_data.add_line(4, 5);
+                init_data.add_line(6, 7);
+#else
                 init_data.add_vertex(Vec2f(left, bottom));
                 init_data.add_vertex(Vec2f(right, bottom));
                 init_data.add_vertex(Vec2f(right, top));
@@ -146,14 +203,25 @@ namespace GUI {
                 init_data.add_index(1);
                 init_data.add_index(2);
                 init_data.add_index(3);
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
                 m_rectangle.init_from(std::move(init_data));
             }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             shader->set_uniform("view_model_matrix", Transform3d::Identity());
             shader->set_uniform("projection_matrix", Transform3d::Identity());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_OPENGL_ES
+            shader->set_uniform("dash_size", 0.01f);
+            shader->set_uniform("gap_size", 0.0075f);
+#elif ENABLE_GL_CORE_PROFILE
+            if (core_profile) {
+            const std::array<int, 4>& viewport = wxGetApp().plater()->get_camera().get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("dash_size", 0.01f);
+            shader->set_uniform("gap_size", 0.0075f);
+            }
+#endif // ENABLE_OPENGL_ES
 
             m_rectangle.set_color(ColorRGBA((m_state == EState::Select) ? 0.3f : 1.0f, (m_state == EState::Select) ? 1.0f : 0.3f, 0.3f, 1.0f));
             m_rectangle.render();
@@ -168,11 +236,16 @@ namespace GUI {
         glsafe(::glEnd());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if !ENABLE_OPENGL_ES
+#if ENABLE_GL_CORE_PROFILE
+        if (!core_profile)
+#endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glPopAttrib());
+#endif // !ENABLE_OPENGL_ES
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
 } // namespace GUI

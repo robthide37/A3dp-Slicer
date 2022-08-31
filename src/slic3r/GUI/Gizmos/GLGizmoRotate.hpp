@@ -6,6 +6,7 @@
 namespace Slic3r {
 namespace GUI {
 class Selection;
+
 class GLGizmoRotate : public GLGizmoBase
 {
     static const float Offset;
@@ -39,9 +40,6 @@ private:
     Transform3d m_orient_matrix{ Transform3d::Identity() };
 #endif // ENABLE_WORLD_COORDINATE
 
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    GLModel m_cone;
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
     GLModel m_scale;
@@ -89,13 +87,16 @@ public:
     /// <returns>Return True when use the information otherwise False.</returns>
     bool on_mouse(const wxMouseEvent &mouse_event) override;
     void dragging(const UpdateData &data);
+
 protected:
     bool on_init() override;
     std::string on_get_name() const override { return ""; }
     void on_start_dragging() override;
     void on_dragging(const UpdateData &data) override;
     void on_render() override;
+#if !ENABLE_RAYCAST_PICKING
     void on_render_for_picking() override;
+#endif // !ENABLE_RAYCAST_PICKING
 
 private:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -113,15 +114,12 @@ private:
     void render_angle() const;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void render_grabber(const BoundingBoxf3& box);
-#if !ENABLE_GIZMO_GRABBER_REFACTOR
-    void render_grabber_extension(const BoundingBoxf3& box, bool picking);
-#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     Transform3d local_transform(const Selection& selection) const;
 #else
     void transform_to_local(const Selection& selection) const;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // returns the intersection of the mouse ray with the plane perpendicular to the gizmo axis, in local coordinate
 #if ENABLE_WORLD_COORDINATE
@@ -187,11 +185,16 @@ protected:
     void on_dragging(const UpdateData &data) override;
         
     void on_render() override;
+#if ENABLE_RAYCAST_PICKING
+    virtual void on_register_raycasters_for_picking() override;
+    virtual void on_unregister_raycasters_for_picking() override;
+#else
     void on_render_for_picking() override {
         for (GLGizmoRotate& g : m_gizmos) {
             g.render_for_picking();
         }
     }
+#endif // ENABLE_RAYCAST_PICKING
 
     void on_render_input_window(float x, float y, float bottom_limit) override;
 

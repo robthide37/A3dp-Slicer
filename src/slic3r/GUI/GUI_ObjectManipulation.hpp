@@ -207,7 +207,7 @@ public:
     bool        get_uniform_scaling() const { return m_uniform_scale; }
 #if ENABLE_WORLD_COORDINATE
     void             set_coordinates_type(ECoordinatesType type);
-    ECoordinatesType get_coordinates_type() const { return m_coordinates_type; }
+    ECoordinatesType get_coordinates_type() const;
     bool             is_world_coordinates() const { return m_coordinates_type == ECoordinatesType::World; }
     bool             is_instance_coordinates() const { return m_coordinates_type == ECoordinatesType::Instance; }
     bool             is_local_coordinates() const { return m_coordinates_type == ECoordinatesType::Local; }

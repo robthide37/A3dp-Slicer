@@ -107,15 +107,24 @@ void GLGizmoCut::on_render()
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_CORE_PROFILE
+    const Vec3d diff = plane_center - m_old_center;
+    // Z changed when move with cut plane
+    // X and Y changed when move with cutted object
+    bool is_changed = std::abs(diff.x()) > EPSILON || std::abs(diff.y()) > EPSILON || std::abs(diff.z()) > EPSILON;
+#endif // ENABLE_GL_CORE_PROFILE
+
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
+#if !ENABLE_GL_CORE_PROFILE
         const Vec3d diff = plane_center - m_old_center;
         // Z changed when move with cut plane
         // X and Y changed when move with cutted object
         bool  is_changed = std::abs(diff.x()) > EPSILON ||
                            std::abs(diff.y()) > EPSILON ||
                            std::abs(diff.z()) > EPSILON;
+#endif // !ENABLE_GL_CORE_PROFILE
         m_old_center = plane_center;
 
         if (!m_plane.is_initialized() || is_changed) {
@@ -140,11 +149,9 @@ void GLGizmoCut::on_render()
             m_plane.init_from(std::move(init_data));
         }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         m_plane.render();
 #else
@@ -158,6 +165,23 @@ void GLGizmoCut::on_render()
     glsafe(::glEnd());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if ENABLE_GL_CORE_PROFILE
+        shader->stop_using();
+    }
+
+    shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+    if (shader != nullptr) {
+        shader->start_using();
+
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        const std::array<int, 4>& viewport = camera.get_viewport();
+        shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+        shader->set_uniform("width", 0.5f);
+        shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
+
         glsafe(::glEnable(GL_CULL_FACE));
         glsafe(::glDisable(GL_BLEND));
 
@@ -167,7 +191,10 @@ void GLGizmoCut::on_render()
 
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
-        glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
+#if ENABLE_GL_CORE_PROFILE
+        if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+            glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         if (!m_grabber_connection.is_initialized() || is_changed) {
             m_grabber_connection.reset();
@@ -189,6 +216,11 @@ void GLGizmoCut::on_render()
         }
 
         m_grabber_connection.render();
+
+#if ENABLE_GL_CORE_PROFILE
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix()* Geometry::assemble_transform(m_cut_contours.shift));
+        m_cut_contours.contours.render();
+#endif // ENABLE_GL_CORE_PROFILE
 
         shader->stop_using();
     }
@@ -213,35 +245,48 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 
+#if !ENABLE_GL_CORE_PROFILE
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix()* Geometry::assemble_transform(m_cut_contours.shift));
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glLineWidth(2.0f));
-        m_cut_contours.contours.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+    glsafe(::glPushMatrix());
+    glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+    glsafe(::glLineWidth(2.0f));
+    m_cut_contours.contours.render();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
     }
+#else
+    glsafe(::glPopMatrix());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-    }
+#endif // !ENABLE_GL_CORE_PROFILE
+}
 
+#if ENABLE_RAYCAST_PICKING
+void GLGizmoCut::on_register_raycasters_for_picking()
+{
+    // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(true);
+}
+
+void GLGizmoCut::on_unregister_raycasters_for_picking()
+{
+    m_parent.set_raycaster_gizmos_on_top(false);
+}
+#else
 void GLGizmoCut::on_render_for_picking()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
     render_grabbers_for_picking(m_parent.get_selection().get_bounding_box());
 }
+#endif // ENABLE_RAYCAST_PICKING
 
 void GLGizmoCut::on_render_input_window(float x, float y, float bottom_limit)
 {
@@ -377,19 +422,13 @@ void GLGizmoCut::update_contours()
         volumes_trafos[i] = model_object->volumes[i]->get_matrix();
     }
 
-    bool trafos_match = volumes_trafos.size() == m_cut_contours.volumes_trafos.size();
-    if (trafos_match) {
-        for (size_t i = 0; i < model_object->volumes.size(); ++i) {
-            if (!volumes_trafos[i].isApprox(m_cut_contours.volumes_trafos[i])) {
-                trafos_match = false;
-                break;
-            }
-        }
-    }
+    bool trafos_match = std::equal(volumes_trafos.begin(), volumes_trafos.end(),
+            m_cut_contours.volumes_trafos.begin(), m_cut_contours.volumes_trafos.end(),
+            [](const Transform3d& a, const Transform3d& b) { return a.isApprox(b); });
 
     if (0.0 < m_cut_z && m_cut_z < m_max_z) {
         if (m_cut_contours.cut_z != m_cut_z || m_cut_contours.object_id != model_object->id() ||
-            m_cut_contours.instance_idx != instance_idx || m_cut_contours.volumes_idxs != volumes_idxs || 
+            m_cut_contours.instance_idx != instance_idx || m_cut_contours.volumes_idxs != volumes_idxs ||
             !trafos_match) {
             m_cut_contours.cut_z = m_cut_z;
 

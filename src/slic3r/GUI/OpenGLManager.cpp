@@ -2,6 +2,9 @@
 #include "OpenGLManager.hpp"
 
 #include "GUI.hpp"
+#if ENABLE_GL_CORE_PROFILE
+#include "GUI_Init.hpp"
+#endif // ENABLE_GL_CORE_PROFILE
 #include "I18N.hpp"
 #include "3DScene.hpp"
 
@@ -30,6 +33,7 @@ namespace GUI {
 std::string gl_get_string_safe(GLenum param, const std::string& default_value)
 {
     const char* value = (const char*)::glGetString(param);
+    glcheck();
     return std::string((value != nullptr) ? value : default_value);
 }
 
@@ -95,10 +99,10 @@ float OpenGLManager::GLInfo::get_max_anisotropy() const
 
 void OpenGLManager::GLInfo::detect() const
 {
-    *const_cast<std::string*>(&m_version) = gl_get_string_safe(GL_VERSION, "N/A");
+    *const_cast<std::string*>(&m_version)      = gl_get_string_safe(GL_VERSION, "N/A");
     *const_cast<std::string*>(&m_glsl_version) = gl_get_string_safe(GL_SHADING_LANGUAGE_VERSION, "N/A");
-    *const_cast<std::string*>(&m_vendor) = gl_get_string_safe(GL_VENDOR, "N/A");
-    *const_cast<std::string*>(&m_renderer) = gl_get_string_safe(GL_RENDERER, "N/A");
+    *const_cast<std::string*>(&m_vendor)       = gl_get_string_safe(GL_VENDOR, "N/A");
+    *const_cast<std::string*>(&m_renderer)     = gl_get_string_safe(GL_RENDERER, "N/A");
 
     int* max_tex_size = const_cast<int*>(&m_max_tex_size);
     glsafe(::glGetIntegerv(GL_MAX_TEXTURE_SIZE, max_tex_size));
@@ -126,8 +130,16 @@ static bool version_greater_or_equal_to(const std::string& version, unsigned int
     if (tokens.empty())
         return false;
 
+#if ENABLE_OPENGL_ES
+    const std::string version_container = (tokens.size() > 1 && boost::istarts_with(tokens[1], "ES")) ? tokens[2] : tokens[0];
+#endif // ENABLE_OPENGL_ES
+
     std::vector<std::string> numbers;
+#if ENABLE_OPENGL_ES
+    boost::split(numbers, version_container, boost::is_any_of("."), boost::token_compress_on);
+#else
     boost::split(numbers, tokens[0], boost::is_any_of("."), boost::token_compress_on);
+#endif // ENABLE_OPENGL_ES
 
     unsigned int gl_major = 0;
     unsigned int gl_minor = 0;
@@ -180,14 +192,21 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
 
     out << h2_start << "OpenGL installation" << h2_end << line_end;
     out << b_start << "GL version:   " << b_end << m_version << line_end;
+#if ENABLE_GL_CORE_PROFILE
+    out << b_start << "Profile:      " << b_end << (is_core_profile() ? "Core" : "Compatibility") << line_end;
+#endif // ENABLE_GL_CORE_PROFILE
     out << b_start << "Vendor:       " << b_end << m_vendor << line_end;
     out << b_start << "Renderer:     " << b_end << m_renderer << line_end;
     out << b_start << "GLSL version: " << b_end << m_glsl_version << line_end;
 
     {
+#if ENABLE_GL_CORE_PROFILE
+        std::vector<std::string>  extensions_list = get_extensions_list();
+#else
+        const std::string extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
         std::vector<std::string> extensions_list;
-        std::string extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
         boost::split(extensions_list, extensions_str, boost::is_any_of(" "), boost::token_compress_on);
+#endif // ENABLE_GL_CORE_PROFILE
 
         if (!extensions_list.empty()) {
             if (for_github)
@@ -208,8 +227,34 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
     return out.str();
 }
 
+#if ENABLE_GL_CORE_PROFILE
+std::vector<std::string> OpenGLManager::GLInfo::get_extensions_list() const
+{
+    std::vector<std::string> ret;
+
+    if (is_core_profile()) {
+        GLint n = 0;
+        glsafe(::glGetIntegerv(GL_NUM_EXTENSIONS, &n));
+        ret.reserve(n);
+        for (GLint i = 0; i < n; ++i) {
+            const char* extension = (const char*)::glGetStringi(GL_EXTENSIONS, i);
+            glcheck();
+            if (extension != nullptr)
+                ret.emplace_back(extension);
+        }
+    }
+    else {
+        const std::string extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
+        boost::split(ret, extensions_str, boost::is_any_of(" "), boost::token_compress_on);
+    }
+
+    return ret;
+}
+#endif // ENABLE_GL_CORE_PROFILE
+
 OpenGLManager::GLInfo OpenGLManager::s_gl_info;
 bool OpenGLManager::s_compressed_textures_supported = false;
+bool OpenGLManager::m_use_manually_generated_mipmaps = true;
 OpenGLManager::EMultisampleState OpenGLManager::s_multisample = OpenGLManager::EMultisampleState::Unknown;
 OpenGLManager::EFramebufferType OpenGLManager::s_framebuffers_type = OpenGLManager::EFramebufferType::Unknown;
 
@@ -235,19 +280,83 @@ OpenGLManager::~OpenGLManager()
 #endif //__APPLE__
 }
 
+#if ENABLE_OPENGL_DEBUG_OPTION
+#ifdef _WIN32
+static void APIENTRY CustomGLDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity, GLsizei length, const char* message, const void* userParam)
+#else
+static void CustomGLDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity, GLsizei length, const char* message, const void* userParam)
+#endif // _WIN32
+{
+    if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+        return;
+
+    std::string out = "OpenGL DEBUG message [";
+    switch (type)
+    {
+    case GL_DEBUG_TYPE_ERROR:               out += "Error"; break;
+    case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: out += "Deprecated Behaviour"; break;
+    case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  out += "Undefined Behaviour"; break;
+    case GL_DEBUG_TYPE_PORTABILITY:         out += "Portability"; break;
+    case GL_DEBUG_TYPE_PERFORMANCE:         out += "Performance"; break;
+    case GL_DEBUG_TYPE_MARKER:              out += "Marker"; break;
+    case GL_DEBUG_TYPE_PUSH_GROUP:          out += "Push Group"; break;
+    case GL_DEBUG_TYPE_POP_GROUP:           out += "Pop Group"; break;
+    case GL_DEBUG_TYPE_OTHER:               out += "Other"; break;
+    }
+    out += "/";
+    switch (source)
+    {
+    case GL_DEBUG_SOURCE_API:             out += "API"; break;
+    case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   out += "Window System"; break;
+    case GL_DEBUG_SOURCE_SHADER_COMPILER: out += "Shader Compiler"; break;
+    case GL_DEBUG_SOURCE_THIRD_PARTY:     out += "Third Party"; break;
+    case GL_DEBUG_SOURCE_APPLICATION:     out += "Application"; break;
+    case GL_DEBUG_SOURCE_OTHER:           out += "Other"; break;
+    }
+    out += "/";
+    switch (severity)
+    {
+    case GL_DEBUG_SEVERITY_HIGH:         out += "high"; break;
+    case GL_DEBUG_SEVERITY_MEDIUM:       out += "medium"; break;
+    case GL_DEBUG_SEVERITY_LOW:          out += "low"; break;
+    case GL_DEBUG_SEVERITY_NOTIFICATION: out += "notification"; break;
+    }
+    out += "]:\n";
+    std::cout << out << "(" << id << "): " << message << "\n\n";
+}
+#endif // ENABLE_OPENGL_DEBUG_OPTION
+
 bool OpenGLManager::init_gl()
 {
     if (!m_gl_initialized) {
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+        glewExperimental = true;
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
         GLenum err = glewInit();
         if (err != GLEW_OK) {
             BOOST_LOG_TRIVIAL(error) << "Unable to init glew library: " << glewGetErrorString(err);
             return false;
         }
+
+#if ENABLE_GL_CORE_PROFILE
+        do {
+            // glewInit() generates an OpenGL GL_INVALID_ENUM error
+            err = ::glGetError();
+        } while (err != GL_NO_ERROR);
+#endif // ENABLE_GL_CORE_PROFILE
+
         m_gl_initialized = true;
+#if ENABLE_GL_CORE_PROFILE
+        if (GLEW_ARB_texture_compression)
+            s_compressed_textures_supported = true;
+        else
+            s_compressed_textures_supported = false;
+#else
         if (GLEW_EXT_texture_compression_s3tc)
             s_compressed_textures_supported = true;
         else
             s_compressed_textures_supported = false;
+#endif // ENABLE_GL_CORE_PROFILE
 
         if (GLEW_ARB_framebuffer_object)
             s_framebuffers_type = EFramebufferType::Arb;
@@ -256,12 +365,27 @@ bool OpenGLManager::init_gl()
         else
             s_framebuffers_type = EFramebufferType::Unknown;
 
+#if ENABLE_OPENGL_ES
         bool valid_version = s_gl_info.is_version_greater_or_equal_to(2, 0);
+#elif ENABLE_GL_CORE_PROFILE
+        bool valid_version = s_gl_info.is_core_profile() ? s_gl_info.is_version_greater_or_equal_to(3, 2) : s_gl_info.is_version_greater_or_equal_to(2, 0);
+#else
+        bool valid_version = s_gl_info.is_version_greater_or_equal_to(2, 0);
+#endif // ENABLE_OPENGL_ES
+
         if (!valid_version) {
             // Complain about the OpenGL version.
             wxString message = from_u8((boost::format(
+#if ENABLE_OPENGL_ES
+                _utf8(L("PrusaSlicer requires OpenGL ES 2.0 capable graphics driver to run correctly, \n"
+                    "while OpenGL version %s, render %s, vendor %s was detected."))) % s_gl_info.get_version() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
+#elif ENABLE_GL_CORE_PROFILE
+                _utf8(L("PrusaSlicer requires OpenGL %s capable graphics driver to run correctly, \n"
+                    "while OpenGL version %s, render %s, vendor %s was detected."))) % (s_gl_info.is_core_profile() ? "3.3" : "2.0") % s_gl_info.get_version() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
+#else
                 _utf8(L("PrusaSlicer requires OpenGL 2.0 capable graphics driver to run correctly, \n"
                     "while OpenGL version %s, render %s, vendor %s was detected."))) % s_gl_info.get_version() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
+#endif // ENABLE_OPENGL_ES
             message += "\n";
         	message += _L("You may need to update your graphics card driver.");
 #ifdef _WIN32
@@ -279,16 +403,141 @@ bool OpenGLManager::init_gl()
                     _utf8(L("Unable to load the following shaders:\n%s"))) % error).str());
                 wxMessageBox(message, wxString("PrusaSlicer - ") + _L("Error loading shaders"), wxOK | wxICON_ERROR);
             }
+#if ENABLE_OPENGL_DEBUG_OPTION
+            if (m_debug_enabled && GLEW_KHR_debug) {
+                ::glEnable(GL_DEBUG_OUTPUT);
+                ::glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+                ::glDebugMessageCallback(CustomGLDebugOutput, nullptr);
+                ::glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+            }
+#endif // ENABLE_OPENGL_DEBUG_OPTION
         }
+
+#ifdef _WIN32
+        // Since AMD driver version 22.7.1, there is probably some bug in the driver that causes the issue with the missing
+        // texture of the bed. It seems that this issue only triggers when mipmaps are generated manually
+        // (combined with a texture compression) and when mipmaps are generated through OpenGL glGenerateMipmap is working.
+        // So, for newer drivers than 22.6.1, the last working driver version, we use mipmaps generated through OpenGL.
+        if (const auto gl_info = OpenGLManager::get_gl_info(); boost::contains(gl_info.get_vendor(), "ATI Technologies Inc.")) {
+            // WHQL drivers seem to have one more version number at the end besides non-WHQL drivers.
+            //     WHQL: 4.6.14800 Compatibility Profile Context 22.6.1 30.0.21023.1015
+            // Non-WHQL: 4.6.0 Compatibility Profile Context 22.8.1.220810
+            std::regex version_rgx(R"(Compatibility\sProfile\sContext\s(\d+)\.(\d+)\.(\d+))");
+            if (std::smatch matches; std::regex_search(gl_info.get_version(), matches, version_rgx) && matches.size() == 4) {
+                int version_major = std::stoi(matches[1].str());
+                int version_minor = std::stoi(matches[2].str());
+                int version_patch = std::stoi(matches[3].str());
+                BOOST_LOG_TRIVIAL(debug) << "Found AMD driver version: " << version_major << "." << version_minor << "." << version_patch;
+
+                if (version_major > 22 || (version_major == 22 && version_minor > 6) || (version_major == 22 && version_minor == 6 && version_patch > 1)) {
+                    m_use_manually_generated_mipmaps = false;
+                    BOOST_LOG_TRIVIAL(debug) << "Mipmapping through OpenGL was enabled.";
+                }
+            } else {
+                BOOST_LOG_TRIVIAL(error) << "Not recognized format of version.";
+            }
+        } else {
+            BOOST_LOG_TRIVIAL(error) << "Unable to parse version of AMD driver.";
+        }
+#endif
     }
 
     return true;
 }
 
+#if ENABLE_GL_CORE_PROFILE
+#if ENABLE_OPENGL_DEBUG_OPTION
+wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version, bool enable_debug)
+#else
+wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version)
+#endif // ENABLE_OPENGL_DEBUG_OPTION
+#else
 wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
+#endif // ENABLE_GL_CORE_PROFILE
 {
     if (m_context == nullptr) {
+#if ENABLE_OPENGL_ES
+        wxGLContextAttrs attrs;
+        attrs.PlatformDefaults().ES2().MajorVersion(2).EndList();
+        m_context = new wxGLContext(&canvas, nullptr, &attrs);
+#elif ENABLE_GL_CORE_PROFILE
+#if ENABLE_OPENGL_DEBUG_OPTION
+        m_debug_enabled = enable_debug;
+#endif // ENABLE_OPENGL_DEBUG_OPTION
+
+        const int gl_major = required_opengl_version.first;
+        const int gl_minor = required_opengl_version.second;
+        const bool supports_core_profile = (gl_major < 3) ? false : (gl_major > 3) ? true : gl_minor >= 2;
+
+        if (gl_major == 0) {
+            // search for highest supported core profile version
+            // disable wxWidgets logging to avoid showing the log dialog in case the following code fails generating a valid gl context
+            wxLogNull logNo;
+            for (auto v = OpenGLVersions::core.rbegin(); v != OpenGLVersions::core.rend(); ++v) {
+                wxGLContextAttrs attrs;
+#if ENABLE_OPENGL_DEBUG_OPTION
+                attrs.PlatformDefaults().MajorVersion(v->first).MinorVersion(v->second).CoreProfile().ForwardCompatible();
+                if (m_debug_enabled)
+                    attrs.DebugCtx();
+                attrs.EndList();
+#else
+                attrs.PlatformDefaults().MajorVersion(gl_major).MinorVersion(gl_minor).CoreProfile().ForwardCompatible().EndList();
+#endif // ENABLE_OPENGL_DEBUG_OPTION
+                m_context = new wxGLContext(&canvas, nullptr, &attrs);
+                if (m_context->IsOK()) {
+                    s_gl_info.set_core_profile(true);
+                    break;
+                }
+                else {
+                    delete m_context;
+                    m_context = nullptr;
+                }
+            }
+        }
+
+        if (m_context == nullptr) {
+            // search for requested core profile version 
+            if (supports_core_profile) {
+                // disable wxWidgets logging to avoid showing the log dialog in case the following code fails generating a valid gl context
+                wxLogNull logNo;
+                wxGLContextAttrs attrs;
+#if ENABLE_OPENGL_DEBUG_OPTION
+                attrs.PlatformDefaults().MajorVersion(gl_major).MinorVersion(gl_minor).CoreProfile().ForwardCompatible();
+                if (m_debug_enabled)
+                    attrs.DebugCtx();
+                attrs.EndList();
+#else
+                attrs.PlatformDefaults().MajorVersion(gl_major).MinorVersion(gl_minor).CoreProfile().ForwardCompatible().EndList();
+#endif // ENABLE_OPENGL_DEBUG_OPTION
+                m_context = new wxGLContext(&canvas, nullptr, &attrs);
+                if (!m_context->IsOK()) {
+                    BOOST_LOG_TRIVIAL(error) << "Unable to create context for required OpenGL " << gl_major << "." << gl_minor;
+                    delete m_context;
+                    m_context = nullptr;
+                }
+                else
+                    s_gl_info.set_core_profile(true);
+            }
+        }
+
+#if ENABLE_OPENGL_DEBUG_OPTION
+        if (m_context == nullptr) {
+            wxGLContextAttrs attrs;
+            attrs.PlatformDefaults();
+            if (m_debug_enabled)
+                attrs.DebugCtx();
+            attrs.EndList();
+            // if no valid context was created use the default one
+            m_context = new wxGLContext(&canvas, nullptr, &attrs);
+        }
+#else
+        if (m_context == nullptr)
+            // if no valid context was created use the default one
+            m_context = new wxGLContext(&canvas);
+#endif // ENABLE_OPENGL_DEBUG_OPTION
+#else
         m_context = new wxGLContext(&canvas);
+#endif // ENABLE_OPENGL_ES
 
 #ifdef __APPLE__ 
         // Part of hack to remove crash when closing the application on OSX 10.9.5 when building against newer wxWidgets
@@ -302,8 +551,16 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
 
 wxGLCanvas* OpenGLManager::create_wxglcanvas(wxWindow& parent)
 {
-    int attribList[] = { 
-    	WX_GL_RGBA,
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+    wxGLAttributes attribList;
+    attribList.PlatformDefaults().RGBA().DoubleBuffer().MinRGBA(8, 8, 8, 8).Depth(24).SampleBuffers(1).Samplers(4).EndList();
+#ifdef __APPLE__
+    // on MAC the method RGBA() has no effect
+    attribList.SetNeedsARB(true);
+#endif // __APPLE__
+#else
+    int attribList[] = {
+        WX_GL_RGBA,
     	WX_GL_DOUBLEBUFFER,
     	// RGB channels each should be allocated with 8 bit depth. One should almost certainly get these bit depths by default.
       	WX_GL_MIN_RED, 			8,
@@ -317,6 +574,7 @@ wxGLCanvas* OpenGLManager::create_wxglcanvas(wxWindow& parent)
     	WX_GL_SAMPLES, 			4,
     	0
     };
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
     if (s_multisample == EMultisampleState::Unknown) {
         detect_multisample(attribList);
@@ -324,13 +582,30 @@ wxGLCanvas* OpenGLManager::create_wxglcanvas(wxWindow& parent)
 //        std::cout << "Multisample " << (can_multisample() ? "enabled" : "disabled") << std::endl;
     }
 
-    if (! can_multisample())
+    if (!can_multisample())
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+    {
+        attribList.Reset();
+        attribList.PlatformDefaults().RGBA().DoubleBuffer().MinRGBA(8, 8, 8, 8).Depth(24).EndList();
+#ifdef __APPLE__
+        // on MAC the method RGBA() has no effect
+        attribList.SetNeedsARB(true);
+#endif // __APPLE__
+    }
+
+    return new wxGLCanvas(&parent, attribList, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxWANTS_CHARS);
+#else
         attribList[12] = 0;
 
     return new wxGLCanvas(&parent, wxID_ANY, attribList, wxDefaultPosition, wxDefaultSize, wxWANTS_CHARS);
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 }
 
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+void OpenGLManager::detect_multisample(const wxGLAttributes& attribList)
+#else
 void OpenGLManager::detect_multisample(int* attribList)
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 {
     int wxVersion = wxMAJOR_VERSION * 10000 + wxMINOR_VERSION * 100 + wxRELEASE_NUMBER;
     bool enable_multisample = wxVersion >= 30003;

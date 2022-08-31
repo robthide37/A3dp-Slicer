@@ -5,6 +5,7 @@ add_executable(${_TEST_NAME}_tests
 	test_3mf.cpp
 	test_aabbindirect.cpp
 	test_kdtreeindirect.cpp
+	test_arachne.cpp
 	test_clipper_offset.cpp
 	test_clipper_utils.cpp
 	test_color.cpp
@@ -22,6 +23,7 @@ add_executable(${_TEST_NAME}_tests
 	test_meshboolean.cpp
 	test_marchingsquares.cpp
 	test_timeutils.cpp
+	test_utils.cpp
 	test_voronoi.cpp
     test_optimizers.cpp
     test_png_io.cpp

@@ -53,8 +53,6 @@
     using slic3r_tbb_filtermode = tbb::filter;
 #endif
 
-#include <Shiny/Shiny.h>
-
 using namespace std::literals::string_view_literals;
 
 #if 0
@@ -735,8 +733,6 @@ namespace DoExport {
 
 void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
 {
-    PROFILE_CLEAR();
-
     CNumericLocalesSetter locales_setter;
 
     // Does the file exist? If so, we hope that it is still valid.
@@ -828,10 +824,6 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
 
     BOOST_LOG_TRIVIAL(info) << "Exporting G-code finished" << log_memory_info();
     print->set_done(psGCodeExport);
-
-    // Write the profiler measurements to file
-    PROFILE_UPDATE();
-    PROFILE_OUTPUT(debug_out_path("gcode-export-profile.txt").c_str());
 }
 
 // free functions called by GCode::_do_export()
@@ -1048,8 +1040,6 @@ std::vector<const PrintInstance*> sort_object_instances_by_model_order(const Pri
 
 void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
-    PROFILE_FUNC();
-
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
 
@@ -2639,6 +2629,12 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view descr
         // thus empty path segments will not be produced by G-code export.
         loop.split_at(last_pos, false, scaled<double>(0.0015));
 
+    for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
+        assert(it->polyline.points.size() >= 2);
+        assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+    }
+    assert(loop.paths.front().first_point() == loop.paths.back().last_point());
+
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
     // we discard it in that case
@@ -2665,8 +2661,21 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view descr
     // reset acceleration
     gcode += m_writer.set_acceleration((unsigned int)(m_config.default_acceleration.value + 0.5));
 
-    if (m_wipe.enable)
-        m_wipe.path = paths.front().polyline;  // TODO: don't limit wipe to last path
+    if (m_wipe.enable) {
+        m_wipe.path = paths.front().polyline;
+
+        for (auto it = std::next(paths.begin()); it != paths.end(); ++it) {
+            if (is_bridge(it->role()))
+                break; // Don't perform a wipe on bridges.
+
+            assert(it->polyline.points.size() >= 2);
+            assert(m_wipe.path.points.back() == it->polyline.first_point());
+            if (m_wipe.path.points.back() != it->polyline.first_point())
+                break; // ExtrusionLoop is interrupted in some place.
+
+            m_wipe.path.points.insert(m_wipe.path.points.end(), it->polyline.points.begin() + 1, it->polyline.points.end());
+        }
+    }
 
     // make a little move inwards before leaving loop
     if (paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 1 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 3) {
@@ -2709,6 +2718,10 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view descr
 
 std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, const std::string_view description, double speed)
 {
+    for (auto it = std::next(multipath.paths.begin()); it != multipath.paths.end(); ++it) {
+        assert(it->polyline.points.size() >= 2);
+        assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+    }
     // extrude along the path
     std::string gcode;
     for (ExtrusionPath path : multipath.paths) {
@@ -2716,8 +2729,20 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, const std::s
         gcode += this->_extrude(path, description, speed);
     }
     if (m_wipe.enable) {
-        m_wipe.path = std::move(multipath.paths.back().polyline);  // TODO: don't limit wipe to last path
+        m_wipe.path = std::move(multipath.paths.back().polyline);
         m_wipe.path.reverse();
+
+        for (auto it = std::next(multipath.paths.rbegin()); it != multipath.paths.rend(); ++it) {
+            if (is_bridge(it->role()))
+                break; // Do not perform a wipe on bridges.
+
+            assert(it->polyline.points.size() >= 2);
+            assert(m_wipe.path.points.back() == it->polyline.last_point());
+            if (m_wipe.path.points.back() != it->polyline.last_point())
+                break; // ExtrusionMultiPath is interrupted in some place.
+
+            m_wipe.path.points.insert(m_wipe.path.points.end(), it->polyline.points.rbegin() + 1, it->polyline.points.rend());
+        }
     }
     // reset acceleration
     gcode += m_writer.set_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
@@ -3134,15 +3159,26 @@ bool GCode::needs_retraction(const Polyline &travel, ExtrusionRole role)
         return false;
     }
 
-    if (role == erSupportMaterial) {
-        const SupportLayer* support_layer = dynamic_cast<const SupportLayer*>(m_layer);
-        //FIXME support_layer->support_islands.contains should use some search structure!
-        if (support_layer != NULL && ! intersection_pl(travel, support_layer->support_islands).empty())
-            // skip retraction if this is a travel move inside a support material island
-            //FIXME not retracting over a long path may cause oozing, which in turn may result in missing material
-            // at the end of the extrusion path!
-            return false;
-    }
+    if (role == erSupportMaterial)
+        if (const SupportLayer *support_layer = dynamic_cast<const SupportLayer*>(m_layer);
+            support_layer != nullptr && ! support_layer->support_islands_bboxes.empty()) {
+            BoundingBox bbox_travel = get_extents(travel);
+            Polylines   trimmed;
+            bool        trimmed_initialized = false;
+            for (const BoundingBox &bbox : support_layer->support_islands_bboxes)
+                if (bbox.overlap(bbox_travel)) {
+                    const auto &island = support_layer->support_islands[&bbox - support_layer->support_islands_bboxes.data()];
+                    trimmed = trimmed_initialized ? diff_pl(trimmed, island) : diff_pl(travel, island);
+                    trimmed_initialized = true;
+                    if (trimmed.empty())
+                        // skip retraction if this is a travel move inside a support material island
+                        //FIXME not retracting over a long path may cause oozing, which in turn may result in missing material
+                        // at the end of the extrusion path!
+                        return false;
+                    // Not sure whether updating the boudning box isn't too expensive.
+                    //bbox_travel = get_extents(trimmed);
+                }
+        }
 
     if (m_config.only_retract_when_crossing_perimeters && m_layer != nullptr &&
         m_config.fill_density.value > 0 && m_layer->any_internal_region_slice_contains(travel))

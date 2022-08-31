@@ -88,10 +88,8 @@ void SVG::draw(const ExPolygon &expolygon, std::string fill, const float fill_op
     this->fill = fill;
     
     std::string d;
-    Polygons pp = expolygon;
-    for (Polygons::const_iterator p = pp.begin(); p != pp.end(); ++p) {
-        d += this->get_path_d(*p, true) + " ";
-    }
+    for (const Polygon &p : to_polygons(expolygon))
+        d += this->get_path_d(p, true) + " ";
     this->path(d, true, 0, fill_opacity);
 }
 
@@ -274,26 +272,29 @@ std::string SVG::get_path_d(const ClipperLib::Path &path, double scale, bool clo
     return d.str();
 }
 
-void SVG::draw_text(const Point &pt, const char *text, const char *color)
+void SVG::draw_text(const Point &pt, const char *text, const char *color, const coordf_t font_size)
 {
     fprintf(this->f,
-        "<text x=\"%f\" y=\"%f\" font-family=\"sans-serif\" font-size=\"20px\" fill=\"%s\">%s</text>",
-        to_svg_x(pt(0)-origin(0)),
-        to_svg_y(pt(1)-origin(1)),
+        R"(<text x="%f" y="%f" font-family="sans-serif" font-size="%fpx" fill="%s">%s</text>)",
+        to_svg_x(float(pt.x() - origin.x())),
+        to_svg_y(float(pt.y() - origin.y())),
+        font_size,
         color, text);
 }
 
-void SVG::draw_legend(const Point &pt, const char *text, const char *color)
+void SVG::draw_legend(const Point &pt, const char *text, const char *color, const coordf_t font_size)
 {
     fprintf(this->f,
-        "<circle cx=\"%f\" cy=\"%f\" r=\"10\" fill=\"%s\"/>",
-        to_svg_x(pt(0)-origin(0)),
-        to_svg_y(pt(1)-origin(1)),
+        R"(<circle cx="%f" cy="%f" r="%f" fill="%s"/>)",
+        to_svg_x(float(pt.x() - origin.x())),
+        to_svg_y(float(pt.y() - origin.y())),
+        font_size,
         color);
     fprintf(this->f,
-        "<text x=\"%f\" y=\"%f\" font-family=\"sans-serif\" font-size=\"10px\" fill=\"%s\">%s</text>",
-        to_svg_x(pt(0)-origin(0)) + 20.f,
-        to_svg_y(pt(1)-origin(1)),
+        R"(<text x="%f" y="%f" font-family="sans-serif" font-size="%fpx" fill="%s">%s</text>)",
+        to_svg_x(float(pt.x() - origin.x())) + 20.f,
+        to_svg_y(float(pt.y() - origin.y())),
+        font_size,
         "black", text);
 }
 
@@ -356,7 +357,7 @@ void SVG::export_expolygons(const char *path, const std::vector<std::pair<Slic3r
     for (const auto &exp_with_attr : expolygons_with_attributes)
     	if (exp_with_attr.second.radius_points > 0)
 			for (const ExPolygon &expoly : exp_with_attr.first)
-    			svg.draw((Points)expoly, exp_with_attr.second.color_points, exp_with_attr.second.radius_points);
+    			svg.draw(to_points(expoly), exp_with_attr.second.color_points, exp_with_attr.second.radius_points);
 
     // Export legend.
     // 1st row

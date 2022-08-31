@@ -34,9 +34,6 @@ public:
     Polygon  contour;
     Polygons holes;
 
-    operator Points() const;
-    operator Polygons() const;
-    operator Polylines() const;
     void clear() { contour.points.clear(); holes.clear(); }
     void scale(double factor);
     void translate(double x, double y) { this->translate(Point(coord_t(x), coord_t(y))); }
@@ -88,6 +85,14 @@ inline size_t count_points(const ExPolygons &expolys)
         for (const auto &hole : expoly.holes) 
             n_points += hole.points.size();
     }
+    return n_points;
+}
+
+inline size_t count_points(const ExPolygon &expoly)
+{
+    size_t n_points = expoly.contour.points.size();
+    for (const auto &hole : expoly.holes) 
+        n_points += hole.points.size();    
     return n_points;
 }
 
@@ -296,6 +301,16 @@ inline ExPolygons to_expolygons(Polygons &&polys)
     for (size_t idx = 0; idx < polys.size(); ++idx)
         ex_polys[idx].contour = std::move(polys[idx]);
     return ex_polys;
+}
+
+inline Points to_points(const ExPolygon &expoly)
+{
+    Points out;
+    out.reserve(count_points(expoly));
+    append(out, expoly.contour.points);
+    for (const Polygon &hole : expoly.holes)
+        append(out, hole.points);
+    return out;
 }
 
 inline void polygons_append(Polygons &dst, const ExPolygon &src) 

@@ -20,6 +20,7 @@ class GalleryDialog : public DPIDialog
 {
     wxListCtrl*     m_list_ctrl  { nullptr };
     wxImageList*    m_image_list { nullptr };
+    wxButton*       m_ok_btn     { nullptr };
 
     struct Item {
         std::string name;
@@ -48,9 +49,10 @@ class GalleryDialog : public DPIDialog
     void update();
 
 public:
-    GalleryDialog(wxWindow* parent, bool modify_gallery = false);
+    GalleryDialog(wxWindow* parent);
     ~GalleryDialog();
 
+    int show(bool show_from_menu = false);
     void get_input_files(wxArrayString& input_files);
     bool load_files(const wxArrayString& input_files);
 

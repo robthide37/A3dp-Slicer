@@ -62,6 +62,10 @@ class GCodeViewer
         };
 
         EFormat format{ EFormat::Position };
+#if ENABLE_GL_CORE_PROFILE
+        // vaos id
+        std::vector<unsigned int> vaos;
+#endif // ENABLE_GL_CORE_PROFILE
         // vbos id
         std::vector<unsigned int> vbos;
         // sizes of the buffers, in bytes, used in export to obj
@@ -162,6 +166,10 @@ class GCodeViewer
     // ibo buffer containing indices data (for lines/triangles) used to render a specific toolpath type
     struct IBuffer
     {
+#if ENABLE_GL_CORE_PROFILE
+        // id of the associated vertex array buffer
+        unsigned int vao{ 0 };
+#endif // ENABLE_GL_CORE_PROFILE
         // id of the associated vertex buffer
         unsigned int vbo{ 0 };
         // ibo id
@@ -379,7 +387,6 @@ class GCodeViewer
         bool visible{ false };
     };
 
-#if ENABLE_SHOW_TOOLPATHS_COG
     // helper to render center of gravity
     class COG
     {
@@ -423,7 +430,6 @@ class GCodeViewer
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
     };
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 
     // helper to render extrusion paths
     struct Extrusions
@@ -558,8 +564,11 @@ class GCodeViewer
     struct SequentialRangeCap
     {
         TBuffer* buffer{ nullptr };
-        unsigned int ibo{ 0 };
+#if ENABLE_GL_CORE_PROFILE
+        unsigned int vao{ 0 };
+#endif // ENABLE_GL_CORE_PROFILE
         unsigned int vbo{ 0 };
+        unsigned int ibo{ 0 };
         ColorRGBA color;
 
         ~SequentialRangeCap();
@@ -780,9 +789,7 @@ private:
     Extrusions m_extrusions;
     SequentialView m_sequential_view;
     Shells m_shells;
-#if ENABLE_SHOW_TOOLPATHS_COG
     COG m_cog;
-#endif // ENABLE_SHOW_TOOLPATHS_COG
     EViewType m_view_type{ EViewType::FeatureType };
     bool m_legend_enabled{ true };
 #if ENABLE_PREVIEW_LAYOUT
@@ -798,7 +805,6 @@ private:
 #if ENABLE_GCODE_VIEWER_STATISTICS
     Statistics m_statistics;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
-    std::array<float, 2> m_detected_point_sizes = { 0.0f, 0.0f };
     GCodeProcessorResult::SettingsIds m_settings_ids;
     std::array<SequentialRangeCap, 2> m_sequential_range_caps;
 #if ENABLE_PREVIEW_LAYER_TIME
@@ -832,9 +838,7 @@ public:
 
     void reset();
     void render();
-#if ENABLE_SHOW_TOOLPATHS_COG
     void render_cog() { m_cog.render(); }
-#endif // ENABLE_SHOW_TOOLPATHS_COG
 
     bool has_data() const { return !m_roles.empty(); }
     bool can_export_toolpaths() const;
@@ -906,4 +910,3 @@ private:
 } // namespace Slic3r
 
 #endif // slic3r_GCodeViewer_hpp_
-

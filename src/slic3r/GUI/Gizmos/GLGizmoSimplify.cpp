@@ -696,7 +696,30 @@ void GLGizmoSimplify::update_model(const State::Data &data)
         auto color = glmodel.get_color();
         // when not reset it keeps old shape
         glmodel.reset();
+#if ENABLE_OPENGL_ES
+        GLModel::Geometry init_data;
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3E3 };
+        init_data.reserve_vertices(3 * its.indices.size());
+        init_data.reserve_indices(3 * its.indices.size());
+
+        // vertices + indices
+        std::array<Vec3f, 3> barycentric_coords = { Vec3f::UnitX(), Vec3f::UnitY(), Vec3f::UnitZ() };
+        unsigned int vertices_counter = 0;
+        for (uint32_t i = 0; i < its.indices.size(); ++i) {
+            const stl_triangle_vertex_indices face = its.indices[i];
+            const stl_vertex                  vertex[3] = { its.vertices[face[0]], its.vertices[face[1]], its.vertices[face[2]] };
+            const stl_vertex                  n = face_normal_normalized(vertex);
+            for (size_t j = 0; j < 3; ++j) {
+                init_data.add_vertex(vertex[j], n, barycentric_coords[j]);
+            }
+            vertices_counter += 3;
+            init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
+        }
+
+        glmodel.init_from(std::move(init_data));
+#else
         glmodel.init_from(its);
+#endif // ENABLE_OPENGL_ES
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         glmodel.set_color(color);
 #else
@@ -736,47 +759,69 @@ void GLGizmoSimplify::on_render()
         GLModel &glmodel = it->second;
 
         const Transform3d trafo_matrix = selected_volume->world_matrix();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(trafo_matrix.data()));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         auto* gouraud_shader = wxGetApp().get_shader("gouraud_light");
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+        bool depth_test_enabled = ::glIsEnabled(GL_DEPTH_TEST);
+#else
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
         glsafe(::glEnable(GL_DEPTH_TEST));
         gouraud_shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d view_model_matrix = camera.get_view_matrix() * trafo_matrix;
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        const Transform3d view_model_matrix = view_matrix * trafo_matrix;
         gouraud_shader->set_uniform("view_model_matrix", view_model_matrix);
         gouraud_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        gouraud_shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * trafo_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+        gouraud_shader->set_uniform("view_normal_matrix", view_normal_matrix);
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         glmodel.render();
         gouraud_shader->stop_using();
 
         if (m_show_wireframe) {
+#if ENABLE_OPENGL_ES
+            auto* contour_shader = wxGetApp().get_shader("wireframe");
+#else
             auto *contour_shader = wxGetApp().get_shader("mm_contour");
+#endif // ENABLE_OPENGL_ES
             contour_shader->start_using();
             contour_shader->set_uniform("offset", OpenGLManager::get_gl_info().is_mesa() ? 0.0005 : 0.00001);
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             contour_shader->set_uniform("view_model_matrix", view_model_matrix);
             contour_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
             const ColorRGBA color = glmodel.get_color();
             glmodel.set_color(ColorRGBA::WHITE());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-            glsafe(::glLineWidth(1.0f));
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_CORE_PROFILE
+            if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+                glsafe(::glLineWidth(1.0f));
+#if !ENABLE_OPENGL_ES
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
+#endif // !ENABLE_OPENGL_ES
             glmodel.render();
+#if !ENABLE_OPENGL_ES
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_OPENGL_ES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             glmodel.set_color(color);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             contour_shader->stop_using();
         }
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+        if (depth_test_enabled)
+            glsafe(::glEnable(GL_DEPTH_TEST));
+#else
         glsafe(::glPopAttrib());
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 }
 

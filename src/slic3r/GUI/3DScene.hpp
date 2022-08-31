@@ -10,6 +10,9 @@
 #include "libslic3r/Color.hpp"
 
 #include "GLModel.hpp"
+#if ENABLE_RAYCAST_PICKING
+#include "MeshUtils.hpp"
+#endif // ENABLE_RAYCAST_PICKING
 
 #include <functional>
 #include <optional>
@@ -306,7 +309,6 @@ private:
 
     SinkingContours m_sinking_contours;
 
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     class NonManifoldEdges
     {
         GLVolume& m_parent;
@@ -323,7 +325,6 @@ private:
     };
 
     NonManifoldEdges m_non_manifold_edges;
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 public:
     // Color of the triangles / quads held by this volume.
@@ -392,6 +393,10 @@ public:
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GUI::GLModel            model;
+#if ENABLE_RAYCAST_PICKING
+    // raycaster used for picking
+    std::unique_ptr<GUI::MeshRaycaster> mesh_raycaster;
+#endif // ENABLE_RAYCAST_PICKING
 #else
     // Interleaved triangles & normals with indexed triangles & quads.
     GLIndexedVertexArray        indexed_vertex_array;
@@ -567,9 +572,7 @@ public:
     bool                is_sinking() const;
     bool                is_below_printbed() const;
     void                render_sinking_contours();
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     void                render_non_manifold_edges();
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     // Return an estimate of the memory consumed by this class.
     size_t 				cpu_memory_used() const {
@@ -635,9 +638,7 @@ private:
 
     Slope m_slope;
     bool m_show_sinking_contours{ false };
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     bool m_show_non_manifold_edges{ true };
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 public:
     GLVolumePtrs volumes;
@@ -668,11 +669,21 @@ public:
         size_t                          timestamp);
 
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+#if ENABLE_OPENGL_ES
+    int load_wipe_tower_preview(
+        float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh = nullptr);
+#else
     int load_wipe_tower_preview(
         float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width);
+#endif // ENABLE_OPENGL_ES
+#else
+#if ENABLE_OPENGL_ES
+    int load_wipe_tower_preview(
+        int obj_idx, float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh = nullptr);
 #else
     int load_wipe_tower_preview(
         int obj_idx, float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width);
+#endif // ENABLE_OPENGL_ES
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 #else
     std::vector<int> load_object(
@@ -711,28 +722,23 @@ public:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLVolume* new_toolpath_volume(const ColorRGBA& rgba);
     GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba);
-#else
-    GLVolume* new_toolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
-    GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
     // Render the volumes by OpenGL.
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render(ERenderType type, bool disable_cullface, const Transform3d& view_matrix, const Transform3d& projection_matrix,
         std::function<bool(const GLVolume&)> filter_func = std::function<bool(const GLVolume&)>()) const;
 #else
+    GLVolume* new_toolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
+    GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
+    // Render the volumes by OpenGL.
     void render(ERenderType type, bool disable_cullface, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func = std::function<bool(const GLVolume&)>()) const;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
     // Finalize the initialization of the geometry & indices,
     // upload the geometry and indices to OpenGL VBO objects
     // and shrink the allocated data, possibly relasing it if it has been loaded into the VBOs.
     void finalize_geometry(bool opengl_initialized) { for (auto* v : volumes) v->finalize_geometry(opengl_initialized); }
     // Release the geometry data assigned to the volumes.
     // If OpenGL VBOs were allocated, an OpenGL context has to be active to release them.
-    void release_geometry() { for (auto *v : volumes) v->release_geometry(); }
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
+    void release_geometry() { for (auto* v : volumes) v->release_geometry(); }
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+
     // Clear the geometry
     void clear() { for (auto *v : volumes) delete v; volumes.clear(); }
 
@@ -754,9 +760,7 @@ public:
     void set_slope_normal_z(float normal_z) { m_slope.normal_z = normal_z; }
     void set_default_slope_normal_z() { m_slope.normal_z = -::cos(Geometry::deg2rad(90.0f - 45.0f)); }
     void set_show_sinking_contours(bool show) { m_show_sinking_contours = show; }
-#if ENABLE_SHOW_NON_MANIFOLD_EDGES
     void set_show_non_manifold_edges(bool show) { m_show_non_manifold_edges = show; }
-#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     // returns true if all the volumes are completely contained in the print volume
     // returns the containment state in the given out_state, if non-null

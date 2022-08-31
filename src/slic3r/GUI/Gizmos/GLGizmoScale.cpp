@@ -5,9 +5,9 @@
 #if ENABLE_WORLD_COORDINATE
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #endif // ENABLE_WORLD_COORDINATE
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <GL/glew.h>
 
@@ -367,9 +367,13 @@ void GLGizmoScale3D::on_render()
     }
 #endif // ENABLE_WORLD_COORDINATE
 
-    glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
+#if ENABLE_GL_CORE_PROFILE
+    if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
+
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Transform3d base_matrix = local_transform(selection);
     for (int i = 0; i < 10; ++i) {
         m_grabbers[i].matrix = base_matrix;
@@ -377,7 +381,7 @@ void GLGizmoScale3D::on_render()
 #else
     glsafe(::glPushMatrix());
     transform_to_local(selection);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const float grabber_mean_size = (float)((m_bounding_box.size().x() + m_bounding_box.size().y() + m_bounding_box.size().z()) / 3.0);
 #else
@@ -388,10 +392,13 @@ void GLGizmoScale3D::on_render()
     if (m_hover_id == -1) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
 #if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
@@ -399,7 +406,12 @@ void GLGizmoScale3D::on_render()
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
 #endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
             if (m_grabbers[0].enabled && m_grabbers[1].enabled)
                 render_grabbers_connection(0, 1, m_grabbers[0].color);
             if (m_grabbers[2].enabled && m_grabbers[3].enabled)
@@ -439,10 +451,13 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 0 || m_hover_id == 1) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
 #if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
@@ -450,7 +465,12 @@ void GLGizmoScale3D::on_render()
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
 #endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
             render_grabbers_connection(0, 1, m_grabbers[0].color);
             shader->stop_using();
         }
@@ -476,10 +496,13 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 2 || m_hover_id == 3) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
 #if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
@@ -487,7 +510,12 @@ void GLGizmoScale3D::on_render()
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
 #endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
             render_grabbers_connection(2, 3, m_grabbers[2].color);
             shader->stop_using();
         }
@@ -513,10 +541,13 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 4 || m_hover_id == 5) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
 #if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
@@ -524,7 +555,12 @@ void GLGizmoScale3D::on_render()
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
 #endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
             render_grabbers_connection(4, 5, m_grabbers[4].color);
             shader->stop_using();
         }
@@ -550,10 +586,13 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id >= 6) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
 #if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
@@ -561,7 +600,12 @@ void GLGizmoScale3D::on_render()
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
 #endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
             render_grabbers_connection(6, 7, m_drag_color);
             render_grabbers_connection(7, 8, m_drag_color);
             render_grabbers_connection(8, 9, m_drag_color);
@@ -593,17 +637,29 @@ void GLGizmoScale3D::on_render()
     }
 
 #if ENABLE_WORLD_COORDINATE
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_WORLD_COORDINATE
 }
 
+#if ENABLE_RAYCAST_PICKING
+void GLGizmoScale3D::on_register_raycasters_for_picking()
+{
+    // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(true);
+}
+
+void GLGizmoScale3D::on_unregister_raycasters_for_picking()
+{
+    m_parent.set_raycaster_gizmos_on_top(false);
+}
+#else
 void GLGizmoScale3D::on_render_for_picking()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Transform3d base_matrix = local_transform(m_parent.get_selection());
     for (int i = 0; i < 10; ++i) {
         m_grabbers[i].matrix = base_matrix;
@@ -611,15 +667,16 @@ void GLGizmoScale3D::on_render_for_picking()
 #else
     glsafe(::glPushMatrix());
     transform_to_local(m_parent.get_selection());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     render_grabbers_for_picking(m_bounding_box);
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 #else
     render_grabbers_for_picking(m_parent.get_selection().get_bounding_box());
 #endif // ENABLE_WORLD_COORDINATE
 }
+#endif // !ENABLE_RAYCAST_PICKING
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color)
@@ -844,7 +901,7 @@ double GLGizmoScale3D::calc_ratio(const UpdateData& data) const
 }
 
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 Transform3d GLGizmoScale3D::local_transform(const Selection& selection) const
 {
     Transform3d ret = Geometry::assemble_transform(m_center);
@@ -869,7 +926,7 @@ void GLGizmoScale3D::transform_to_local(const Selection& selection) const
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_WORLD_COORDINATE
 
 } // namespace GUI

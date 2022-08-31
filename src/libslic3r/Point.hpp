@@ -46,8 +46,10 @@ using Vec3i64 = Eigen::Matrix<int64_t,  3, 1, Eigen::DontAlign>;
 // Vector types with a double coordinate base type.
 using Vec2f   = Eigen::Matrix<float,    2, 1, Eigen::DontAlign>;
 using Vec3f   = Eigen::Matrix<float,    3, 1, Eigen::DontAlign>;
+using Vec4f   = Eigen::Matrix<float,    4, 1, Eigen::DontAlign>;
 using Vec2d   = Eigen::Matrix<double,   2, 1, Eigen::DontAlign>;
 using Vec3d   = Eigen::Matrix<double,   3, 1, Eigen::DontAlign>;
+using Vec4d   = Eigen::Matrix<double,   4, 1, Eigen::DontAlign>;
 
 using Points         = std::vector<Point>;
 using PointPtrs      = std::vector<Point*>;
@@ -140,9 +142,9 @@ public:
     Point() : Vec2crd(0, 0) {}
     Point(int32_t x, int32_t y) : Vec2crd(coord_t(x), coord_t(y)) {}
     Point(int64_t x, int64_t y) : Vec2crd(coord_t(x), coord_t(y)) {}
-    Point(double x, double y) : Vec2crd(coord_t(lrint(x)), coord_t(lrint(y))) {}
+    Point(double x, double y) : Vec2crd(coord_t(std::round(x)), coord_t(std::round(y))) {}
     Point(const Point &rhs) { *this = rhs; }
-	explicit Point(const Vec2d& rhs) : Vec2crd(coord_t(lrint(rhs.x())), coord_t(lrint(rhs.y()))) {}
+	explicit Point(const Vec2d& rhs) : Vec2crd(coord_t(std::round(rhs.x())), coord_t(std::round(rhs.y()))) {}
 	// This constructor allows you to construct Point from Eigen expressions
     template<typename OtherDerived>
     Point(const Eigen::MatrixBase<OtherDerived> &other) : Vec2crd(other) {}
@@ -283,7 +285,7 @@ namespace int128 {
 
 // To be used by std::unordered_map, std::unordered_multimap and friends.
 struct PointHash {
-    size_t operator()(const Vec2crd &pt) const {
+    size_t operator()(const Vec2crd &pt) const noexcept {
         return coord_t((89 * 31 + int64_t(pt.x())) * 31 + pt.y());
     }
 };
