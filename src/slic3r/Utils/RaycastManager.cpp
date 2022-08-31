@@ -26,7 +26,11 @@ void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
                               });
         if (item == m_raycasters.end()) {
             // add new raycaster
+#if ENABLE_RAYCAST_PICKING
+            auto raycaster = std::make_unique<MeshRaycaster>(volume->get_mesh_shared_ptr());
+#else // !ENABLE_RAYCAST_PICKING
             auto raycaster = std::make_unique<MeshRaycaster>(volume->mesh());
+#endif // ENABLE_RAYCAST_PICKING
             m_raycasters.emplace_back(std::make_pair(oid, std::move(raycaster)));
         } else {
             size_t index = item - m_raycasters.begin();

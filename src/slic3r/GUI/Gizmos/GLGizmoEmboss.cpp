@@ -413,22 +413,22 @@ void GLGizmoEmboss::on_render() {
 #else
         const GLVolume& gl_volume = *selection.get_volume(*selection.get_volume_idxs().begin());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
 #else
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(m_temp_transformation->data()));                
         GLShaderProgram *shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         shader->start_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d matrix = camera.get_view_matrix() * (*m_temp_transformation);
         shader->set_uniform("view_model_matrix", matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // dragging object must be selected so draw it with correct color
         //auto color = gl_volume.color;
@@ -457,9 +457,9 @@ void GLGizmoEmboss::on_render() {
         if (is_transparent) glsafe(::glDisable(GL_BLEND));
 
         shader->stop_using();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     // Do NOT render rotation grabbers when dragging object
@@ -470,9 +470,18 @@ void GLGizmoEmboss::on_render() {
     }
 }
 
+#if ENABLE_RAYCAST_PICKING
+void GLGizmoEmboss::on_register_raycasters_for_picking(){
+    m_rotate_gizmo.register_raycasters_for_picking();
+}
+void GLGizmoEmboss::on_unregister_raycasters_for_picking(){
+    m_rotate_gizmo.unregister_raycasters_for_picking();
+}
+#else // !ENABLE_RAYCAST_PICKING
 void GLGizmoEmboss::on_render_for_picking() {
     m_rotate_gizmo.render_for_picking();
 }
+#endif // ENABLE_RAYCAST_PICKING
 
 #ifdef SHOW_FINE_POSITION
 // draw suggested position of window

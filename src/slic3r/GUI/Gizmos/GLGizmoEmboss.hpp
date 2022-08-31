@@ -56,7 +56,12 @@ protected:
     bool on_init() override;
     std::string on_get_name() const override;
     void on_render() override;
-    void on_render_for_picking() override;    
+#if ENABLE_RAYCAST_PICKING
+    virtual void on_register_raycasters_for_picking() override;
+    virtual void on_unregister_raycasters_for_picking() override;
+#else // !ENABLE_RAYCAST_PICKING
+    void on_render_for_picking() override;
+#endif // ENABLE_RAYCAST_PICKING
     void on_render_input_window(float x, float y, float bottom_limit) override;
     bool on_is_activable() const override { return true; }
     bool on_is_selectable() const override { return false; }
