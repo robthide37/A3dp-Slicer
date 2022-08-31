@@ -257,8 +257,50 @@ void GLGizmoMeasure::on_render()
                 }
             }
         }
-        else if (m_mode == EMode::ExtendedSelection)
-            m_curr_ex_feature_position = position_on_model.cast<double>();
+        else if (is_hovering_on_extended_selection) {
+            switch (m_curr_feature->get_type())
+            {
+            case Measure::SurfaceFeatureType::Point:
+            {
+                m_curr_ex_feature_position = model_matrix * m_curr_feature->get_point();
+                break;
+            }
+            case Measure::SurfaceFeatureType::Edge:
+            {
+                auto it = m_raycasters.find(EDGE_ID);
+                if (it != m_raycasters.end() && it->second != nullptr) {
+                    Vec3f p;
+                    Vec3f n;
+                    const Transform3d& trafo = it->second->get_transform();
+                    it->second->get_raycaster()->unproject_on_mesh(m_mouse_pos, trafo, camera, p, n);
+                    m_curr_ex_feature_position = trafo * p.cast<double>();
+                }
+                break;
+            }
+            case Measure::SurfaceFeatureType::Plane:
+            {
+                m_curr_ex_feature_position = model_matrix * position_on_model.cast<double>();
+                break;
+            }
+            case Measure::SurfaceFeatureType::Circle:
+            {
+                const auto& [center, radius, normal] = m_curr_feature->get_circle();
+                if (m_hover_id == POINT_ID)
+                    m_curr_ex_feature_position = model_matrix * center;
+                else {
+                    auto it = m_raycasters.find(CIRCLE_ID);
+                    if (it != m_raycasters.end() && it->second != nullptr) {
+                        Vec3f p;
+                        Vec3f n;
+                        const Transform3d& trafo = it->second->get_transform();
+                        it->second->get_raycaster()->unproject_on_mesh(m_mouse_pos, trafo, camera, p, n);
+                        m_curr_ex_feature_position = trafo * p.cast<double>();
+                    }
+                }
+                break;
+            }
+            }
+        }
 
         if (!m_curr_feature.has_value())
             return;
@@ -355,7 +397,7 @@ void GLGizmoMeasure::on_render()
 
         if (is_hovering_on_extended_selection && m_curr_ex_feature_position.has_value()) {
             if (m_hover_id != POINT_ID) {
-                Transform3d matrix = model_matrix * Geometry::translation_transform(*m_curr_ex_feature_position) * Geometry::scale_transform(inv_zoom);
+                const Transform3d matrix = Geometry::translation_transform(*m_curr_ex_feature_position) * Geometry::scale_transform(inv_zoom);
                 set_matrix_uniforms(matrix);
                 m_sphere.model.set_color(EXTENDED_HOVER_COLOR);
                 m_sphere.model.render();
@@ -541,7 +583,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             }
         }
         else if (m_mode == EMode::ExtendedSelection) {
-            if (m_hover_id != -1) {
+            if (m_hover_id != -1 && m_curr_ex_feature_position.has_value()) {
                 std::string header;
                 switch (feature_type) {
                 case Measure::SurfaceFeatureType::Point:  { header = _u8L("Vertex"); break; }
@@ -552,9 +594,8 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 }
 
                 if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-                    const Vec3d position = volume_matrix * *m_curr_ex_feature_position;
                     if (ImGui::BeginTable("Data", 2)) {
-                        add_row_to_table(_u8L("Position") + ":", format_vec3(position));
+                        add_row_to_table(_u8L("Position") + ":", format_vec3(*m_curr_ex_feature_position));
                         ImGui::EndTable();
                     }
                 }
