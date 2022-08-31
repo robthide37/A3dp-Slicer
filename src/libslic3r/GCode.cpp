@@ -232,7 +232,7 @@ std::string Wipe::wipe(GCode& gcodegen, bool toolchange)
                     gcode += gcodegen.writer().set_speed(wipe_speed, "", gcodegen.enable_cooling_markers() ? ";_WIPE" : "");
                 gcode += gcodegen.writer().extrude_to_xy(
                     gcodegen.point_to_gcode(line.b),
-                    -dE,
+                    gcodegen.config().use_firmware_retraction? 0 : -dE,
                     "wipe and retract"
                 );
             }
