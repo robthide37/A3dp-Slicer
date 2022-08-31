@@ -42,6 +42,7 @@ class GLGizmoMeasure : public GLGizmoBase
     std::vector<GLModel> m_plane_models_cache;
     std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
     std::optional<Measure::SurfaceFeature> m_curr_feature;
+    std::optional<Vec3d> m_curr_ex_feature_position;
 
     // This holds information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;

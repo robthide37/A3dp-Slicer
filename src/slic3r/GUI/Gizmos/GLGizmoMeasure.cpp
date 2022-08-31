@@ -21,7 +21,7 @@ std::string surface_feature_type_as_string(Slic3r::Measure::SurfaceFeatureType t
     {
     default:
     case Slic3r::Measure::SurfaceFeatureType::Undef:  { return L("Undefined"); }
-    case Slic3r::Measure::SurfaceFeatureType::Point:  { return L("Point"); }
+    case Slic3r::Measure::SurfaceFeatureType::Point:  { return L("Vertex"); }
     case Slic3r::Measure::SurfaceFeatureType::Edge:   { return L("Edge"); }
     case Slic3r::Measure::SurfaceFeatureType::Circle: { return L("Circle"); }
     case Slic3r::Measure::SurfaceFeatureType::Plane:  { return L("Plane"); }
@@ -32,14 +32,21 @@ namespace Slic3r {
 namespace GUI {
 
 static const Slic3r::ColorRGBA BASIC_HOVER_COLOR    = { 0.8f, 0.2f, 0.2f, 1.0f };
-static const Slic3r::ColorRGBA EXTENDED_HOVER_COLOR = { 0.2f, 0.8f, 0.2f, 1.0f };
+static const Slic3r::ColorRGBA EXTENDED_HOVER_COLOR = { 0.8f, 0.8f, 0.2f, 1.0f };
 static const Slic3r::ColorRGBA LOCK_COLOR           = { 0.5f, 0.5f, 0.5f, 1.0f };
 
 static const int POINT_ID         = 100;
 static const int EDGE_ID          = 200;
 static const int CIRCLE_ID        = 300;
-static const int CIRCLE_CENTER_ID = 301;
 static const int PLANE_ID         = 400;
+
+static const std::string CTRL_STR =
+#ifdef __APPLE__
+"⌘"
+#else
+"Ctrl"
+#endif //__APPLE__
+;
 
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
@@ -127,8 +134,11 @@ bool GLGizmoMeasure::on_init()
 
 void GLGizmoMeasure::on_set_state()
 {
-    if (m_state == Off)
+    if (m_state == Off) {
         m_ctrl_kar_filter.reset_count();
+        m_curr_feature.reset();
+        m_curr_ex_feature_position.reset();
+    }
     else
         m_mode = EMode::BasicSelection;
 }
@@ -167,16 +177,19 @@ void GLGizmoMeasure::on_render()
         const Camera& camera = wxGetApp().plater()->get_camera();
         const float inv_zoom = (float)camera.get_inv_zoom();
 
-        Vec3f pos;
-        Vec3f normal;
+        Vec3f position_on_model;
+        Vec3f normal_on_model;
         size_t facet_idx;
-        m_c->raycaster()->raycasters().front()->unproject_on_mesh(m_mouse_pos, model_matrix, camera, pos, normal, nullptr, &facet_idx);
+        m_c->raycaster()->raycasters().front()->unproject_on_mesh(m_mouse_pos, model_matrix, camera, position_on_model, normal_on_model, nullptr, &facet_idx);
+
+        const bool is_hovering_on_extended_selection = m_mode == EMode::ExtendedSelection && m_hover_id != -1;
 
         std::optional<Measure::SurfaceFeature> curr_feature;
         if (m_mode == EMode::BasicSelection)
-            curr_feature = m_measuring->get_feature(facet_idx, pos.cast<double>());
+            curr_feature = m_measuring->get_feature(facet_idx, position_on_model.cast<double>());
 
         if (m_mode == EMode::BasicSelection) {
+            m_curr_ex_feature_position.reset();
             if (m_curr_feature != curr_feature) {
                 GLGizmoMeasure::on_unregister_raycasters_for_picking();
                 m_curr_feature = curr_feature;
@@ -196,7 +209,7 @@ void GLGizmoMeasure::on_render()
                 }
                 case Measure::SurfaceFeatureType::Circle:
                 {
-                    const auto& [center, radius, n] = m_curr_feature->get_circle();
+                    const auto& [center, radius, normal] = m_curr_feature->get_circle();
 
                     // TODO: check for changed inv_zoom
 
@@ -206,12 +219,12 @@ void GLGizmoMeasure::on_render()
                     m_circle.model.init_from(std::move(circle_geometry));
 
                     m_raycasters.insert({ CIRCLE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_ID, *m_circle.mesh_raycaster) });
-                    m_raycasters.insert({ CIRCLE_CENTER_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_CENTER_ID, *m_sphere.mesh_raycaster) });
+                    m_raycasters.insert({ POINT_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID, *m_sphere.mesh_raycaster) });
                     break;
                 }
                 case Measure::SurfaceFeatureType::Plane:
                 {
-                    const auto& [idx, normal, pt] = m_curr_feature->get_plane();
+                    const auto& [idx, normal, point] = m_curr_feature->get_plane();
 
                     // TODO: check for changed idx
 
@@ -244,6 +257,8 @@ void GLGizmoMeasure::on_render()
                 }
             }
         }
+        else if (m_mode == EMode::ExtendedSelection)
+            m_curr_ex_feature_position = position_on_model.cast<double>();
 
         if (!m_curr_feature.has_value())
             return;
@@ -261,23 +276,27 @@ void GLGizmoMeasure::on_render()
 
         const Transform3d& view_matrix = camera.get_view_matrix();
 
-        ColorRGBA color;
+        ColorRGBA feature_color;
         switch (m_mode)
         {
-        case EMode::BasicSelection:    { color = BASIC_HOVER_COLOR; break; }
-        case EMode::ExtendedSelection: { color = LOCK_COLOR; break; }
+        case EMode::BasicSelection:    { feature_color = BASIC_HOVER_COLOR; break; }
+        case EMode::ExtendedSelection: { feature_color = LOCK_COLOR; break; }
         }
+
+        auto set_matrix_uniforms = [shader, &view_matrix](const Transform3d& model_matrix) {
+            const Transform3d view_model_matrix = view_matrix * model_matrix;
+            shader->set_uniform("view_model_matrix", view_model_matrix);
+            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+            shader->set_uniform("view_normal_matrix", view_normal_matrix);
+        };
 
         switch (m_curr_feature->get_type()) {
         case Measure::SurfaceFeatureType::Point:
         {
             const Vec3d& position = m_curr_feature->get_point();
             const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(position) * Geometry::scale_transform(inv_zoom);
-            const Transform3d view_model_matrix = view_matrix * feature_matrix;
-            shader->set_uniform("view_model_matrix", view_model_matrix);
-            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-            shader->set_uniform("view_normal_matrix", view_normal_matrix);
-            m_sphere.model.set_color(color);
+            set_matrix_uniforms(feature_matrix);
+            m_sphere.model.set_color(is_hovering_on_extended_selection ? EXTENDED_HOVER_COLOR : feature_color);
             m_sphere.model.render();
             auto it = m_raycasters.find(POINT_ID);
             if (it != m_raycasters.end() && it->second != nullptr)
@@ -289,23 +308,17 @@ void GLGizmoMeasure::on_render()
             const auto& [center, radius, n] = m_curr_feature->get_circle();
             // render center
             const Transform3d center_matrix = model_matrix * Geometry::translation_transform(center) * Geometry::scale_transform(inv_zoom);
-            const Transform3d center_view_model_matrix = view_matrix * center_matrix;
-            shader->set_uniform("view_model_matrix", center_view_model_matrix);
-            const Matrix3d center_view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * center_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-            shader->set_uniform("view_normal_matrix", center_view_normal_matrix);
-            m_sphere.model.set_color(color);
+            set_matrix_uniforms(center_matrix);
+            m_sphere.model.set_color((is_hovering_on_extended_selection && m_hover_id == POINT_ID) ? EXTENDED_HOVER_COLOR : feature_color);
             m_sphere.model.render();
-            auto it = m_raycasters.find(CIRCLE_CENTER_ID);
+            auto it = m_raycasters.find(POINT_ID);
             if (it != m_raycasters.end() && it->second != nullptr)
                 it->second->set_transform(center_matrix);
 
             // render circle
             const Transform3d circle_matrix = model_matrix * Geometry::translation_transform(center);
-            const Transform3d circle_view_model_matrix = view_matrix * circle_matrix;
-            shader->set_uniform("view_model_matrix", circle_view_model_matrix);
-            const Matrix3d circle_view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * circle_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-            shader->set_uniform("view_normal_matrix", circle_view_normal_matrix);
-            m_circle.model.set_color(color);
+            set_matrix_uniforms(circle_matrix);
+            m_circle.model.set_color(feature_color);
             m_circle.model.render();
             it = m_raycasters.find(CIRCLE_ID);
             if (it != m_raycasters.end() && it->second != nullptr)
@@ -318,11 +331,8 @@ void GLGizmoMeasure::on_render()
             auto q = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start);
             const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(start) * q *
                 Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (end - start).norm() });
-            const Transform3d view_model_matrix = view_matrix * feature_matrix;
-            shader->set_uniform("view_model_matrix", view_model_matrix);
-            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * feature_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-            shader->set_uniform("view_normal_matrix", view_normal_matrix);
-            m_cylinder.model.set_color(color);
+            set_matrix_uniforms(feature_matrix);
+            m_cylinder.model.set_color(feature_color);
             m_cylinder.model.render();
             auto it = m_raycasters.find(EDGE_ID);
             if (it != m_raycasters.end() && it->second != nullptr)
@@ -333,17 +343,23 @@ void GLGizmoMeasure::on_render()
         {
             const auto& [idx, normal, pt] = m_curr_feature->get_plane();
             assert(idx < m_plane_models_cache.size());
-            const Transform3d view_model_matrix = view_matrix * model_matrix;
-            shader->set_uniform("view_model_matrix", view_model_matrix);
-            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-            shader->set_uniform("view_normal_matrix", view_normal_matrix);
-            m_plane_models_cache[idx].set_color(color);
+            set_matrix_uniforms(model_matrix);
+            m_plane_models_cache[idx].set_color(feature_color);
             m_plane_models_cache[idx].render();
             auto it = m_raycasters.find(PLANE_ID);
             if (it != m_raycasters.end() && it->second != nullptr)
                 it->second->set_transform(model_matrix);
             break;
         }
+        }
+
+        if (is_hovering_on_extended_selection && m_curr_ex_feature_position.has_value()) {
+            if (m_hover_id != POINT_ID) {
+                Transform3d matrix = model_matrix * Geometry::translation_transform(*m_curr_ex_feature_position) * Geometry::scale_transform(inv_zoom);
+                set_matrix_uniforms(matrix);
+                m_sphere.model.set_color(EXTENDED_HOVER_COLOR);
+                m_sphere.model.render();
+            }
         }
 
         shader->stop_using();
@@ -450,70 +466,97 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             last_y = y;
     }
 
-    if (!m_curr_feature.has_value())
-        m_imgui->text(_u8L("Select features to measure"));
-    else {
-        auto add_row_to_table = [this](const wxString& label, const std::string& value) {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, label);
-            ImGui::TableSetColumnIndex(1);
-            m_imgui->text(value);
-        };
-        auto format_double = [](double value) {
-            char buf[1024];
-            sprintf(buf, "%.3f", value);
-            return std::string(buf);
-        };
-        auto format_vec3 = [](const Vec3d& v) {
-            char buf[1024];
-            sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", v.x(), v.y(), v.z());
-            return std::string(buf);
-        };
+    auto add_row_to_table = [this](const wxString& label, const std::string& value) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, label);
+        ImGui::TableSetColumnIndex(1);
+        m_imgui->text(value);
+    };
+    auto format_double = [](double value) {
+        char buf[1024];
+        sprintf(buf, "%.3f", value);
+        return std::string(buf);
+    };
+    auto format_vec3 = [](const Vec3d& v) {
+        char buf[1024];
+        sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", v.x(), v.y(), v.z());
+        return std::string(buf);
+    };
 
+    if (ImGui::BeginTable("Commands", 2)) {
+        add_row_to_table(_u8L("Left mouse button"), (m_mode == EMode::BasicSelection) ? _u8L("Select feature") : _u8L("Select point"));
+        if (m_mode == EMode::BasicSelection && m_hover_id != -1)
+            add_row_to_table(CTRL_STR, _u8L("Enable point selection"));
+        ImGui::EndTable();
+    }
+
+    if (m_curr_feature.has_value()) {
         const Transform3d volume_matrix = m_parent.get_selection().get_first_volume()->world_matrix();
-        const Measure::SurfaceFeatureType type = m_curr_feature->get_type();
-        if (type != Measure::SurfaceFeatureType::Undef) {
-            if (ImGui::CollapsingHeader(surface_feature_type_as_string(type).c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-                if (ImGui::BeginTable("Data", 2)) {
-                    switch (type)
-                    {
-                    case Measure::SurfaceFeatureType::Point:
-                    {
-                        const Vec3d position = volume_matrix * m_curr_feature->get_point();
+        const Measure::SurfaceFeatureType feature_type = m_curr_feature->get_type();
+        if (m_mode == EMode::BasicSelection) {
+            if (feature_type != Measure::SurfaceFeatureType::Undef) {
+                if (ImGui::CollapsingHeader(surface_feature_type_as_string(feature_type).c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+                    if (ImGui::BeginTable("Data", 2)) {
+                        switch (feature_type)
+                        {
+                        case Measure::SurfaceFeatureType::Point:
+                        {
+                            const Vec3d position = volume_matrix * m_curr_feature->get_point();
+                            add_row_to_table(_u8L("Position") + ":", format_vec3(position));
+                            break;
+                        }
+                        case Measure::SurfaceFeatureType::Edge:
+                        {
+                            auto [from, to] = m_curr_feature->get_edge();
+                            from = volume_matrix * from;
+                            to = volume_matrix * to;
+                            add_row_to_table(_u8L("From") + ":", format_vec3(from));
+                            add_row_to_table(_u8L("To") + ":", format_vec3(to));
+                            break;
+                        }
+                        case Measure::SurfaceFeatureType::Circle:
+                        {
+                            auto [center, radius, normal] = m_curr_feature->get_circle();
+                            center = volume_matrix * center;
+                            normal = volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
+                            add_row_to_table(_u8L("Center") + ":", format_vec3(center));
+                            add_row_to_table(_u8L("Radius") + ":", format_double(radius));
+                            add_row_to_table(_u8L("Normal") + ":", format_vec3(normal));
+                            break;
+                        }
+                        case Measure::SurfaceFeatureType::Plane:
+                        {
+                            auto [idx, normal, origin] = m_curr_feature->get_plane();
+                            origin = volume_matrix * origin;
+                            normal = volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
+                            add_row_to_table(_u8L("Origin") + ":", format_vec3(origin));
+                            add_row_to_table(_u8L("Normal") + ":", format_vec3(normal));
+                            break;
+                        }
+                        }
+                        ImGui::EndTable();
+                    }
+                }
+            }
+        }
+        else if (m_mode == EMode::ExtendedSelection) {
+            if (m_hover_id != -1) {
+                std::string header;
+                switch (feature_type) {
+                case Measure::SurfaceFeatureType::Point:  { header = _u8L("Vertex"); break; }
+                case Measure::SurfaceFeatureType::Edge:   { header = _u8L("Point on edge"); break; }
+                case Measure::SurfaceFeatureType::Circle: { header = (m_hover_id == POINT_ID) ? _u8L("Center of circle") : _u8L("Point on circle"); break; }
+                case Measure::SurfaceFeatureType::Plane:  { header = _u8L("Point on plane"); break; }
+                default: { assert(false); break; }
+                }
+
+                if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+                    const Vec3d position = volume_matrix * *m_curr_ex_feature_position;
+                    if (ImGui::BeginTable("Data", 2)) {
                         add_row_to_table(_u8L("Position") + ":", format_vec3(position));
-                        break;
+                        ImGui::EndTable();
                     }
-                    case Measure::SurfaceFeatureType::Edge:
-                    {
-                        auto [from, to] = m_curr_feature->get_edge();
-                        from = volume_matrix * from;
-                        to = volume_matrix * to;
-                        add_row_to_table(_u8L("From") + ":", format_vec3(from));
-                        add_row_to_table(_u8L("To") + ":", format_vec3(to));
-                        break;
-                    }
-                    case Measure::SurfaceFeatureType::Circle:
-                    {
-                        auto [center, radius, normal] = m_curr_feature->get_circle();
-                        center = volume_matrix * center;
-                        normal = volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
-                        add_row_to_table(_u8L("Center") + ":", format_vec3(center));
-                        add_row_to_table(_u8L("Radius") + ":", format_double(radius));
-                        add_row_to_table(_u8L("Normal") + ":", format_vec3(normal));
-                        break;
-                    }
-                    case Measure::SurfaceFeatureType::Plane:
-                    {
-                        auto [idx, normal, origin] = m_curr_feature->get_plane();
-                        origin = volume_matrix * origin;
-                        normal = volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
-                        add_row_to_table(_u8L("Origin") + ":", format_vec3(origin));
-                        add_row_to_table(_u8L("Normal") + ":", format_vec3(normal));
-                        break;
-                    }
-                    }
-                    ImGui::EndTable();
                 }
             }
         }
@@ -526,18 +569,6 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
         m_imgui->set_requires_extra_frame();
     }
 
-    if (m_curr_feature.has_value() && m_mode == EMode::BasicSelection) {
-        static const std::string ctrl =
-#ifdef __APPLE__
-                "⌘"
-#else
-                "Ctrl"
-#endif //__APPLE__
-                ;
-
-        ImGui::Separator();
-        m_imgui->text(_u8L("Press") + " " + ctrl + " " + _u8L("to enable extended selection"));
-    }
     m_imgui->end();
 }
 
