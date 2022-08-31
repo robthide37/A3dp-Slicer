@@ -930,6 +930,7 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     m_time_processor.export_remaining_time_enabled = config.remaining_times.value;
     m_use_volumetric_e = config.use_volumetric_e;
 
+    // first_layer_height is in region config now. so won't be available here now. use m_forced_height from HEIGHT tag.
     const ConfigOptionFloatOrPercent* first_layer_height = config.option<ConfigOptionFloatOrPercent>("first_layer_height");
     if (first_layer_height != nullptr)
         m_first_layer_height = std::abs(first_layer_height->value);
@@ -3589,14 +3590,18 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_extruder_id,
         m_cp_color.current,
 #if ENABLE_Z_OFFSET_CORRECTION
-        Vec3f(float(m_end_position[X]), float(m_end_position[Y]), float(m_processing_start_custom_gcode ? m_first_layer_height : m_end_position[Z] - m_z_offset)) + m_extruder_offsets[m_extruder_id],
+        //note: m_first_layer_height may not be set. use m_end_position instead if it's the case
+        Vec3f(float(m_end_position[X]), float(m_end_position[Y]), 
+            float(m_processing_start_custom_gcode 
+                ? ((m_first_layer_height == 0 && m_end_position[Z] > 0) ? m_end_position[Z] : m_first_layer_height)
+                : m_end_position[Z] - m_z_offset)) + m_extruder_offsets[m_extruder_id],
 #else
         Vec3f(float(m_end_position[X]), float(m_end_position[Y]), float(m_processing_start_custom_gcode ? m_first_layer_height : m_end_position[Z])) + m_extruder_offsets[m_extruder_id],
 #endif // ENABLE_Z_OFFSET_CORRECTION
         float(m_end_position[E] - m_start_position[E]), // delta_extruder
         m_feedrate,
         m_width,
-        m_height,
+        (m_height == 0 && m_forced_height > 0) ? m_forced_height : m_height,
         m_mm3_per_mm,
         m_fan_speed,
         m_extruder_temps[m_extruder_id],
