@@ -5465,8 +5465,13 @@ void GLCanvas3D::_picking_pass()
                     // do not add the volume id if any gizmo is active and CTRL is pressed
                     if (m_gizmos.get_current_type() == GLGizmosManager::EType::Undefined || !wxGetKeyState(WXK_CONTROL)) {
                         m_hover_volume_idxs.emplace_back(hit.raycaster_id);
+#if !ENABLE_MEASURE_GIZMO
                         m_gizmos.set_hover_id(-1);
+#endif // !ENABLE_MEASURE_GIZMO
                     }
+#if ENABLE_MEASURE_GIZMO
+                    m_gizmos.set_hover_id(-1);
+#endif // ENABLE_MEASURE_GIZMO
                 }
             }
             else
@@ -5477,8 +5482,8 @@ void GLCanvas3D::_picking_pass()
         case SceneRaycaster::EType::Gizmo:
         {
             const Size& cnv_size = get_canvas_size();
-            bool inside = 0 <= m_mouse.position.x() && m_mouse.position.x() < cnv_size.get_width() &&
-                          0 <= m_mouse.position.y() && m_mouse.position.y() < cnv_size.get_height();
+            const bool inside = 0 <= m_mouse.position.x() && m_mouse.position.x() < cnv_size.get_width() &&
+                0 <= m_mouse.position.y() && m_mouse.position.y() < cnv_size.get_height();
             m_gizmos.set_hover_id(inside ? hit.raycaster_id : -1);
             break;
         }
