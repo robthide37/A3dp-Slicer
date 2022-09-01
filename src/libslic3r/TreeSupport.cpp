@@ -1066,12 +1066,8 @@ void TreeSupport::generateInitialAreas(
     SupportGeneratorLayersPtr               &top_interface_layers,
     SupportGeneratorLayerStorage            &layer_storage)
 {
-    Polygon base_circle;
-    const auto base_radius = scaled<int>(0.01);
-    for (unsigned int i = 0; i < SUPPORT_TREE_CIRCLE_RESOLUTION; ++ i) {
-        const double angle = static_cast<double>(i) / SUPPORT_TREE_CIRCLE_RESOLUTION * (2.0 * M_PI);
-        base_circle.points.emplace_back(coord_t(cos(angle) * base_radius), coord_t(sin(angle) * base_radius));
-    }
+    static constexpr const auto     base_radius = scaled<int>(0.01);
+    const Polygon                   base_circle = make_circle(base_radius, SUPPORT_TREE_CIRCLE_RESOLUTION);
     TreeSupportMeshGroupSettings    mesh_group_settings(print_object);
     TreeSupportSettings             mesh_config{ mesh_group_settings };
     SupportParameters               support_params(print_object);
@@ -1117,7 +1113,7 @@ void TreeSupport::generateInitialAreas(
         [this, &print_object, &overhangs, &mesh_config, &mesh_group_settings, &support_params, 
          z_distance_delta, min_xy_dist, force_tip_to_roof, roof_enabled, support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length, max_overhang_insert_lag,
          &base_circle, &mutex_layer_storage, &mutex_movebounds, &top_contacts, &layer_storage, &already_inserted,
-         &move_bounds, &base_radius](const tbb::blocked_range<size_t> &range) {
+         &move_bounds](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
             if (overhangs[layer_idx + z_distance_delta].empty())
                 continue;
@@ -2405,12 +2401,8 @@ void TreeSupport::generateBranchAreas(
     constexpr int progress_report_steps = 10;
 #endif // SLIC3R_TREESUPPORTS_PROGRESS
 
-    Polygon branch_circle; // Pre-generate a circle with correct diameter so that we don't have to recompute those (co)sines every time.
-    for (unsigned int i = 0; i < SUPPORT_TREE_CIRCLE_RESOLUTION; ++ i) {
-        const double angle = static_cast<double>(i) / SUPPORT_TREE_CIRCLE_RESOLUTION * (2.0 * M_PI);
-        branch_circle.points.emplace_back(coord_t(cos(angle) * m_config.branch_radius), coord_t(sin(angle) * m_config.branch_radius));
-    }
-
+    // Pre-generate a circle with correct diameter so that we don't have to recompute those (co)sines every time.
+    const Polygon         branch_circle = make_circle(m_config.branch_radius, SUPPORT_TREE_CIRCLE_RESOLUTION);
     std::vector<Polygons> linear_inserts(linear_data.size());
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
