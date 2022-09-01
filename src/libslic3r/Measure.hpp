@@ -68,7 +68,7 @@ private:
     Vec3d m_pt1;
     Vec3d m_pt2;
     std::optional<Vec3d> m_pt3;
-    double m_value;
+    double m_value{ 0.0 };
 };
 
 
