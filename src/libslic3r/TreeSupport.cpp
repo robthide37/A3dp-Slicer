@@ -1310,7 +1310,7 @@ void TreeSupport::generateInitialAreas(
                 overhang_roofs = safeOffsetInc(overhangs[layer_idx + z_distance_delta], support_roof_offset, relevant_forbidden, mesh_config.min_radius * 2 + mesh_config.xy_min_distance, 0, 1);
                 if (mesh_group_settings.minimum_support_area > 0)
                     remove_small(overhang_roofs, mesh_group_settings.minimum_roof_area);
-                overhang_regular = diff(overhang_regular, overhang_roofs);
+                overhang_regular = diff(overhang_regular, overhang_roofs, ApplySafetyOffset::Yes);
                 for (ExPolygon &roof_part : union_ex(overhang_roofs))
                     overhang_processing.emplace_back(std::move(roof_part), true);
             }
