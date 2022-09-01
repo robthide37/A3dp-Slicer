@@ -307,7 +307,7 @@ void TreeSupport::showError(std::string message, bool critical)
                     raw_overhangs_calculated = true;
                 }
                 if (! (enforced_layer || blockers_layers.empty() || blockers_layers[layer_id].empty()))
-                    overhangs = diff(overhangs, blockers_layers[layer_id]);
+                    overhangs = diff(overhangs, blockers_layers[layer_id], ApplySafetyOffset::Yes);
             }
             if (! enforcers_layers.empty() && ! enforcers_layers[layer_id].empty())
                 // Has some support enforcers at this layer, apply them to the overhangs, don't apply the support threshold angle.
