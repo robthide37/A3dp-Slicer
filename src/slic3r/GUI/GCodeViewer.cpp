@@ -3288,6 +3288,7 @@ void GCodeViewer::render_toolpaths()
             shader->set_uniform("emission_factor", 0.0f);
         }
         else {
+            shader->set_uniform("emission_factor", 0.15f);
 #if ENABLE_LEGACY_OPENGL_REMOVAL
             const int position_id = shader->get_attrib_location("v_position");
             const int normal_id   = shader->get_attrib_location("v_normal");
