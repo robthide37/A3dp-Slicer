@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-08-12 10:25+0200\n"
-"PO-Revision-Date: 2022-03-04 17:01+0100\n"
+"PO-Revision-Date: 2022-08-31 19:19+0200\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: ca\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 3.0.1\n"
+"X-Generator: Poedit 3.1.1\n"
 
 #: src/slic3r/GUI/AboutDialog.cpp:45 src/slic3r/GUI/AboutDialog.cpp:305
 msgid "Portions copyright"
@@ -3277,7 +3277,7 @@ msgstr ""
 
 #: src/slic3r/GUI/GUI_App.cpp:270
 msgid "Artwork model by Leslie Ing"
-msgstr "Model artístic de Leslie Ing"
+msgstr "Model artístic Leslie Ing"
 
 #: src/slic3r/GUI/GUI_App.cpp:411
 #, boost-format
@@ -5122,7 +5122,7 @@ msgstr "S'ha fet la importació."
 
 #: src/slic3r/GUI/Jobs/SLAImportJob.cpp:187
 msgid "The file does not exist."
-msgstr ""
+msgstr "El fitxer no existeix."
 
 #: src/slic3r/GUI/Jobs/SLAImportJob.cpp:221
 msgid ""
@@ -6786,7 +6786,7 @@ msgstr "El nom proporcionat és buit. No es pot desar."
 
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:634
 msgid "You have to enter a printer name."
-msgstr ""
+msgstr "Heu d'introduir un nom d'impressora."
 
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:642
 #, boost-format
@@ -7678,6 +7678,8 @@ msgstr ""
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:896
 msgid "Ask for unsaved changes in presets when selecting new preset"
 msgstr ""
+"Preguntar sempre pels canvis no guardats en predefinits en seleccionar un "
+"nou predefinit"
 
 #: src/slic3r/GUI/Preferences.cpp:244
 msgid ""
@@ -8818,7 +8820,7 @@ msgstr "Velocitat automàtica (avançat)"
 
 #: src/slic3r/GUI/Tab.cpp:1615
 msgid "Pressure equalizer (experimental)"
-msgstr ""
+msgstr "Equalitzador de pressió (experimental)"
 
 #: src/slic3r/GUI/Tab.cpp:1619
 msgid "Multiple Extruders"
@@ -8846,7 +8848,7 @@ msgstr "Altre"
 
 #: src/slic3r/GUI/Tab.cpp:1674
 msgid "Arachne perimeter generator"
-msgstr ""
+msgstr "Generador perimetral d'aracne"
 
 #: src/slic3r/GUI/Tab.cpp:1682 src/slic3r/GUI/Tab.cpp:4731
 msgid "Output options"
@@ -10981,13 +10983,15 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:275
 msgid "Format of G-code thumbnails"
-msgstr ""
+msgstr "Format de les miniatures del codi G"
 
 #: src/libslic3r/PrintConfig.cpp:276
 msgid ""
 "Format of G-code thumbnails: PNG for best quality, JPG for smallest size, "
 "QOI for low memory firmware"
 msgstr ""
+"Format de les miniatures del codi G: PNG per a la millor qualitat, JPG per a "
+"la mida més petita, QOI per al firmware de memòria baixa"
 
 #: src/libslic3r/PrintConfig.cpp:287
 msgid ""
@@ -12926,6 +12930,12 @@ msgid ""
 "extrusion width, 0.2 mm extrusion height, feedrate 20 mm/s) to 5.4 mm³/s "
 "(feedrate 60 mm/s) will take at least 2 seconds."
 msgstr ""
+"Aquesta configuració experimental s'utilitza per limitar la velocitat de "
+"canvi de la velocitat d'extrusió per a una transició de menor velocitat a "
+"major velocitat. Un valor d'1,8 mm³/s² garanteix que un canvi de la "
+"velocitat d'extrusió d'1,8 mm³/s (amplada d'extrusió de 0,45 mm, alçada "
+"d'extrusió de 0,2 mm, taxa d'alimentació de 20 mm/s) a 5,4 mm³/s (taxa "
+"d'alimentació 60 mm/s) trigarà almenys 2 segons."
 
 #: src/libslic3r/PrintConfig.cpp:1812 src/libslic3r/PrintConfig.cpp:1824
 msgid "mm³/s²"
@@ -12943,6 +12953,12 @@ msgid ""
 "extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) to 1.8 mm³/s "
 "(feedrate 20 mm/s) will take at least 2 seconds."
 msgstr ""
+"Aquesta configuració experimental s'utilitza per limitar la velocitat de "
+"canvi en la velocitat d'extrusió per a una transició de major velocitat a "
+"menor velocitat. Un valor d'1,8 mm³/s² garanteix que un canvi de la "
+"velocitat d'extrusió de 5,4 mm³/s (amplada d'extrusió de 0,45 mm, alçada "
+"d'extrusió de 0,2 mm, taxa d'alimentació de 60 mm/s) a 1,8 mm³/s (taxa "
+"d'alimentació 20 mm/s) trigarà almenys 2 segons."
 
 #: src/libslic3r/PrintConfig.cpp:1830 src/libslic3r/PrintConfig.cpp:1839
 msgid "Min"
@@ -14528,7 +14544,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:3065
 msgid "Perimeter generator"
-msgstr ""
+msgstr "Generador de perímetres"
 
 #: src/libslic3r/PrintConfig.cpp:3067
 msgid ""
@@ -14537,18 +14553,22 @@ msgid ""
 "perimeters with variable extrusion width. This setting also affects the "
 "Concentric infill."
 msgstr ""
+"El generador perimetral clàssic produeix perímetres amb amplada d'extrusió "
+"constant i per a zones molt fines s'utilitza l'ompliment de buits. El motor "
+"aracne produeix perímetres amb una amplada d'extrusió variable. Aquesta "
+"configuració també afecta el farciment concèntric."
 
 #: src/libslic3r/PrintConfig.cpp:3074
 msgid "Classic"
-msgstr ""
+msgstr "Clàssic"
 
 #: src/libslic3r/PrintConfig.cpp:3075
 msgid "Arachne"
-msgstr ""
+msgstr "Aràcne"
 
 #: src/libslic3r/PrintConfig.cpp:3080
 msgid "Perimeter transition length"
-msgstr ""
+msgstr "Longitud de transició perimetral"
 
 #: src/libslic3r/PrintConfig.cpp:3082
 msgid ""
@@ -14557,10 +14577,14 @@ msgid ""
 "perimeter segments. If expressed as a percentage (for example 100%), it will "
 "be computed based on the nozzle diameter."
 msgstr ""
+"Quan es fa la transició entre diferents nombres de perímetres a mesura que "
+"la peça es fa més fina, s'assigna una certa quantitat d'espai per dividir o "
+"unir els segments perimetrals. Si s'expressa en percentatge (per exemple "
+"100%), es calcularà en funció del diàmetre de la boquilla( nozzle )."
 
 #: src/libslic3r/PrintConfig.cpp:3091
 msgid "Perimeter transitioning filter margin"
-msgstr ""
+msgstr "Marge de filtre de transició perimetral"
 
 #: src/libslic3r/PrintConfig.cpp:3093
 msgid ""
@@ -14573,10 +14597,18 @@ msgid ""
 "as a percentage (for example 25%), it will be computed based on the nozzle "
 "diameter."
 msgstr ""
+"Eviteu la transició d'anada i tornada entre un perímetre addicional i un de "
+"menys. Aquest marge amplia el rang d'amplades d'extrusió que segueixen a "
+"[Amplada perimetral mínima - marge, 2 * Amplada perimetral mínima + marge]. "
+"L'augment d'aquest marge redueix el nombre de transicions, cosa que redueix "
+"el nombre d'inicis / parades d'extrusió i el temps de viatge. No obstant "
+"això, una gran variació de l'amplada d'extrusió pot provocar problemes de "
+"subextrusió o sobreesxtrusió. Si s'expressa en percentatge (per exemple "
+"25%), es calcularà en funció del diàmetre de la boquilla( nozzle )."
 
 #: src/libslic3r/PrintConfig.cpp:3106
 msgid "Perimeter transitioning threshold angle"
-msgstr ""
+msgstr "Angle llindar de transició perimetral"
 
 #: src/libslic3r/PrintConfig.cpp:3108
 msgid ""
@@ -14586,10 +14618,15 @@ msgid ""
 "remaining space. Reducing this setting reduces the number and length of "
 "these center perimeters, but may leave gaps or overextrude."
 msgstr ""
+"Quan crear transicions entre nombres parells i senars de perímetres. Una "
+"forma de falca amb un angle superior a aquest paràmetre no tindrà "
+"transicions i no s'imprimiran perímetres al centre per omplir l'espai "
+"restant. La reducció d'aquesta configuració redueix el nombre i la longitud "
+"d'aquests perímetres centrals, però pot deixar buits o sobreesforços."
 
 #: src/libslic3r/PrintConfig.cpp:3119
 msgid "Perimeter distribution count"
-msgstr ""
+msgstr "Recompte de distribució perimetral"
 
 #: src/libslic3r/PrintConfig.cpp:3121
 msgid ""
@@ -14597,10 +14634,13 @@ msgid ""
 "needs to be spread. Lower values mean that the outer perimeters don't change "
 "in width."
 msgstr ""
+"El nombre de perímetres, comptats des del centre, sobre els quals s'ha de "
+"repartir la variació. Els valors més baixos signifiquen que els perímetres "
+"exteriors no canvien d'amplada."
 
 #: src/libslic3r/PrintConfig.cpp:3128
 msgid "Minimum feature size"
-msgstr ""
+msgstr "Mida mínima de la característica"
 
 #: src/libslic3r/PrintConfig.cpp:3130
 msgid ""
@@ -14610,10 +14650,15 @@ msgid ""
 "a percentage (for example 25%), it will be computed based on the nozzle "
 "diameter."
 msgstr ""
+"Gruix mínim de característiques fines. Les característiques del model més "
+"primes que aquest valor no s'imprimiran, mentre que les característiques més "
+"gruixudes que la mida mínima de la característica mínima s'ampliaran a "
+"l'amplada mínima del perímetre. Si s'expressa en percentatge (per exemple "
+"25%), es calcularà en funció del diàmetre de la boquilla."
 
 #: src/libslic3r/PrintConfig.cpp:3140
 msgid "Minimum perimeter width"
-msgstr ""
+msgstr "Amplada perimetral mínima"
 
 #: src/libslic3r/PrintConfig.cpp:3142
 msgid ""
@@ -14623,6 +14668,11 @@ msgid ""
 "thick as the feature itself. If expressed as a percentage (for example 85%), "
 "it will be computed based on the nozzle diameter."
 msgstr ""
+"Amplada del perímetre que substituirà les característiques primes (segons la "
+"mida mínima de la característica) del model. Si l'amplada perimetral mínima "
+"és més fina que el gruix de la característica, el perímetre es farà tan "
+"gruixut com la característica mateixa. Si s'expressa en percentatge (per "
+"exemple 85%), es calcularà en funció del diàmetre de la boquilla."
 
 #: src/libslic3r/PrintConfig.cpp:3210
 msgid "Display width"
@@ -14724,15 +14774,15 @@ msgstr "Temps de la inclinació lenta"
 
 #: src/libslic3r/PrintConfig.cpp:3280 src/libslic3r/PrintConfig.cpp:3898
 msgid "High viscosity"
-msgstr ""
+msgstr "Alta viscositat"
 
 #: src/libslic3r/PrintConfig.cpp:3281
 msgid "Tilt for high viscosity resin"
-msgstr ""
+msgstr "Inclinació per resina d'alta viscositat"
 
 #: src/libslic3r/PrintConfig.cpp:3282
 msgid "Time of the super slow tilt"
-msgstr ""
+msgstr "Temps de la inclinació súper lenta"
 
 #: src/libslic3r/PrintConfig.cpp:3289
 msgid "Area fill"
@@ -15984,6 +16034,11 @@ msgid ""
 "user profiles? You can view and move back and forth between snapshots using "
 "the Configuration - <a>Configuration snapshots menu</a>."
 msgstr ""
+"Instantànies de la configuració\n"
+"Sabies que es pot retrocedir a una còpia de seguretat completa de tots els "
+"perfils del sistema i dels usuaris? Podeu veure i avançar entre les "
+"instantànies utilitzant el menú Configuració - <a>Instantànies de "
+"configuració</a>."
 
 #: resources/data/hints.ini: [hint:Minimum shell thickness]
 msgid ""
@@ -16029,6 +16084,10 @@ msgid ""
 "surfaces, save a lot of the filament, and decrease the print time? Read more "
 "in the documentation."
 msgstr ""
+"Farciment lleuger\n"
+"Sabíeu que podeu utilitzar el farciment lleuger( lightning ) per suportar "
+"només les superfícies superiors, estalviar molt del filament i disminuir el "
+"temps d'impressió? Llegiu-ne més a la documentació."
 
 #: resources/data/hints.ini: [hint:Fullscreen mode]
 msgid ""
