@@ -75,7 +75,7 @@ struct Bundle
 	const std::string& vendor_id() const { return vendor_profile->id; }
 };
 
-struct BundleMap : std::unordered_map<std::string /* = vendor ID */, Bundle>
+struct BundleMap : std::map<std::string /* = vendor ID */, Bundle>
 {
 	static BundleMap load();
 
