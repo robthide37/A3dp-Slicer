@@ -91,7 +91,7 @@ struct TreeSupportMeshGroupSettings {
     // A list of integer line directions to use. Elements from the list are used sequentially as the layers progress and when the end 
     // of the list is reached, it starts at the beginning again. The list items are separated by commas and the whole list is contained 
     // in square brackets. Default is an empty list which means use the default angle 0 degrees.
-    std::vector<double>             support_infill_angles                   {};
+//    std::vector<double>             support_infill_angles                   {};
     // Enable Support Roof
     // Generate a dense slab of material between the top of support and the model. This will create a skin between the model and support.
     bool                            support_roof_enable                     { false };

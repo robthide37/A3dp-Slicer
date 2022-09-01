@@ -165,8 +165,8 @@ TreeModelVolumes::TreeModelVolumes(
     const TreeSupport::TreeSupportSettings config{ m_layer_outlines[m_current_outline_idx].first };
     if (! config.support_xy_overrides_z) {
         m_current_min_xy_dist = config.xy_min_distance;
-        if (TreeSupport::TreeSupportSettings::has_to_rely_on_min_xy_dist_only)
-            m_current_min_xy_dist = std::max(m_current_min_xy_dist, coord_t(100));
+        if (TreeSupport::TreeSupportSettings::soluble)
+            m_current_min_xy_dist = std::max(m_current_min_xy_dist, scaled<coord_t>(0.1));
         m_current_min_xy_dist_delta = std::max(config.xy_distance - m_current_min_xy_dist, coord_t(0));
     } else {
         m_current_min_xy_dist = config.xy_distance;

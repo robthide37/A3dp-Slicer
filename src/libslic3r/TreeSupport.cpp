@@ -173,11 +173,9 @@ static std::vector<std::pair<TreeSupport::TreeSupportSettings, std::vector<size_
     for (size_t object_id = 0; object_id < print_object_ids.size(); ++ object_id) {
         const PrintObject       &print_object  = *print.get_object(object_id);
         const PrintObjectConfig &object_config = print_object.config();
-        if (object_config.support_material_interface_layers >= 2)
-            TreeSupport::TreeSupportSettings::some_model_contains_thick_roof = true;
         if (object_config.support_material_contact_distance < EPSILON)
             // || min_feature_size < scaled<coord_t>(0.1) that is the minimum line width
-            TreeSupport::TreeSupportSettings::has_to_rely_on_min_xy_dist_only = true;
+            TreeSupport::TreeSupportSettings::soluble = true;
     }
 
     size_t largest_printed_mesh_idx = 0;
@@ -531,6 +529,7 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
  * \param layer_idx[in] The current layer.
  * \return All lines of the \p polylines object, with information for each point regarding in which avoidance it is currently valid in.
  */
+// Called by TreeSupport::generateInitialAreas()
 [[nodiscard]] static LineInformations convertLinesToInternal(
     const TreeModelVolumes &volumes, const TreeSupport::TreeSupportSettings &config,
     const Polylines &polylines, LayerIndex layer_idx)

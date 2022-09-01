@@ -85,7 +85,6 @@ public:
     void generateSupportAreas(Print &print, const BuildVolume &build_volume, const std::vector<size_t>& print_object_ids);
     void generateSupportAreas(PrintObject &print_object);
 
-
     //todo Remove! Only relevant for public BETA!
     static bool inline showed_critical=false;
     static bool inline showed_performance=false;
@@ -382,7 +381,7 @@ public:
               z_distance_top_layers(round_up_divide(mesh_group_settings.support_top_distance, layer_height)),
               z_distance_bottom_layers(round_up_divide(mesh_group_settings.support_bottom_distance, layer_height)),
               performance_interface_skip_layers(round_up_divide(mesh_group_settings.support_interface_skip_height, layer_height)),
-              support_infill_angles(mesh_group_settings.support_infill_angles),
+//              support_infill_angles(mesh_group_settings.support_infill_angles),
               support_roof_angles(mesh_group_settings.support_roof_angles),
               roof_pattern(mesh_group_settings.support_roof_pattern),
               support_pattern(mesh_group_settings.support_pattern),
@@ -402,37 +401,11 @@ public:
             // safeOffsetInc can only work in steps of the size xy_min_distance in the worst case => xy_min_distance has to be a bit larger than 0 in this worst case and should be large enough for performance to not suffer extremely
             // When for all meshes the z bottom and top distance is more than one layer though the worst case is xy_min_distance + min_feature_size
             // This is not the best solution, but the only one to ensure areas can not lag though walls at high maximum_move_distance.
-            if (has_to_rely_on_min_xy_dist_only)
-                xy_min_distance = std::max(coord_t(100), xy_min_distance); // If set to low rounding errors WILL cause errors. Best to keep it above 25.
+            if (soluble)
+                // If set to low rounding errors WILL cause errors. Best to keep it above 25.
+                xy_min_distance = std::max(scaled<coord_t>(0.1), xy_min_distance);
 
             xy_distance = std::max(xy_distance, xy_min_distance);
-
-            // (logic) from getInterfaceAngles in FFFGcodeWriter.
-            auto getInterfaceAngles = [&](std::vector<double>& angles, SupportMaterialInterfacePattern pattern) {
-                if (angles.empty())
-                {
-                    if (pattern == SupportMaterialInterfacePattern::smipConcentric)
-                        angles.push_back(0); // Concentric has no rotation.
-                    /*
-                    else if (pattern == SupportMaterialInterfacePattern::TRIANGLES)
-                        angles.push_back(90); // Triangular support interface shouldn't alternate every layer.
-                    */
-                    else {
-                        if (TreeSupportSettings::some_model_contains_thick_roof) {
-                            // Some roofs are quite thick.
-                            // Alternate between the two kinds of diagonal: / and \ .
-                            angles.push_back(M_PI / 4.);
-                            angles.push_back(3. * M_PI / 4.);
-                        }
-                        if (angles.empty())
-                            angles.push_back(M_PI / 2.); // Perpendicular to support lines.
-                    }
-                }
-            };
-
-            //getInterfaceAngles(support_infill_angles, support_pattern);
-            support_infill_angles = { M_PI / 2. };
-            getInterfaceAngles(support_roof_angles, roof_pattern);
 //            const std::unordered_map<std::string, InterfacePreference> interface_map = { { "support_area_overwrite_interface_area", InterfacePreference::SUPPORT_AREA_OVERWRITES_INTERFACE }, { "interface_area_overwrite_support_area", InterfacePreference::INTERFACE_AREA_OVERWRITES_SUPPORT }, { "support_lines_overwrite_interface_area", InterfacePreference::SUPPORT_LINES_OVERWRITE_INTERFACE }, { "interface_lines_overwrite_support_area", InterfacePreference::INTERFACE_LINES_OVERWRITE_SUPPORT }, { "nothing", InterfacePreference::NOTHING } };
 //            interface_preference = interface_map.at(mesh_group_settings.get<std::string>("support_interface_priority"));
 //FIXME this was the default
@@ -448,8 +421,7 @@ public:
     public:
         // some static variables dependent on other meshes that are not currently processed.
         // Has to be static because TreeSupportConfig will be used in TreeModelVolumes as this reduces redundancy.
-        inline static bool some_model_contains_thick_roof = false;
-        inline static bool has_to_rely_on_min_xy_dist_only = false;
+        inline static bool soluble = false;
         /*!
          * \brief Width of a single line of support.
          */
@@ -545,7 +517,7 @@ public:
         /*!
          * \brief User specified angles for the support infill.
          */
-        std::vector<double> support_infill_angles;
+//        std::vector<double> support_infill_angles;
         /*!
          * \brief User specified angles for the support roof infill.
          */
@@ -605,7 +577,9 @@ public:
                    support_rests_on_model == other.support_rests_on_model && increase_radius_until_layer == other.increase_radius_until_layer && min_dtt_to_model == other.min_dtt_to_model && max_to_model_radius_increase == other.max_to_model_radius_increase && maximum_move_distance == other.maximum_move_distance && maximum_move_distance_slow == other.maximum_move_distance_slow && z_distance_bottom_layers == other.z_distance_bottom_layers && support_line_width == other.support_line_width && 
                    support_xy_overrides_z == other.support_xy_overrides_z && support_line_spacing == other.support_line_spacing && support_roof_line_width == other.support_roof_line_width && // can not be set on a per-mesh basis currently, so code to enable processing different roof line width in the same iteration seems useless.
                    support_bottom_offset == other.support_bottom_offset && support_wall_count == other.support_wall_count && support_pattern == other.support_pattern && roof_pattern == other.roof_pattern && // can not be set on a per-mesh basis currently, so code to enable processing different roof patterns in the same iteration seems useless.
-                   support_roof_angles == other.support_roof_angles && support_infill_angles == other.support_infill_angles && increase_radius_until_radius == other.increase_radius_until_radius && support_bottom_layers == other.support_bottom_layers && layer_height == other.layer_height && z_distance_top_layers == other.z_distance_top_layers && resolution == other.resolution && // Infill generation depends on deviation and resolution.
+                   support_roof_angles == other.support_roof_angles && 
+                   //support_infill_angles == other.support_infill_angles && 
+                   increase_radius_until_radius == other.increase_radius_until_radius && support_bottom_layers == other.support_bottom_layers && layer_height == other.layer_height && z_distance_top_layers == other.z_distance_top_layers && resolution == other.resolution && // Infill generation depends on deviation and resolution.
                    support_roof_line_distance == other.support_roof_line_distance && interface_preference == other.interface_preference
                    && min_feature_size == other.min_feature_size // interface_preference should be identical to ensure the tree will correctly interact with the roof.
                    // The infill class now wants the settings object and reads a lot of settings, and as the infill class is used to calculate support roof lines for interface-preference. Not all of these may be required to be identical, but as I am not sure, better safe than sorry
