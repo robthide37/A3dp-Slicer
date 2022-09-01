@@ -106,7 +106,7 @@ void MeasuringImpl::update_planes()
             int facet_idx = facet_queue[-- facet_queue_cnt];
             const stl_normal& this_normal = face_normals[facet_idx];
             if (is_same_normal(this_normal, *normal_ptr)) {
-                const Vec3i& face = m_its.indices[facet_idx];
+//                const Vec3i& face = m_its.indices[facet_idx];
 
                 m_face_to_plane[facet_idx] = m_planes.size() - 1;
                 m_planes.back().facets.emplace_back(facet_idx);
@@ -132,7 +132,7 @@ void MeasuringImpl::update_planes()
         for (int face_id=0; face_id<int(facets.size()); ++face_id) {
             assert(m_face_to_plane[facets[face_id]] == plane_id);
             for (int edge_id=0; edge_id<3; ++edge_id) {
-                if (visited[face_id][edge_id] || m_face_to_plane[face_neighbors[facets[face_id]][edge_id]] == plane_id) {
+                if (visited[face_id][edge_id] || (int)m_face_to_plane[face_neighbors[facets[face_id]][edge_id]] == plane_id) {
                     visited[face_id][edge_id] = true;
                     continue;
                 }
@@ -158,7 +158,7 @@ void MeasuringImpl::update_planes()
                 do {
                     const Halfedge_index he_orig = he;
                     he = sm.next_around_target(he);
-                    while ( m_face_to_plane[sm.face(he)] == plane_id && he != he_orig)
+                    while ( (int)m_face_to_plane[sm.face(he)] == plane_id && he != he_orig)
                         he = sm.next_around_target(he);
                     he = sm.opposite(he);
                     
@@ -200,7 +200,7 @@ void MeasuringImpl::extract_features()
     std::vector<double> lengths;
 
 
-    for (int i=0; i<m_planes.size(); ++i) {
+    for (int i=0; i<(int)m_planes.size(); ++i) {
         PlaneData& plane = m_planes[i];
         plane.surface_features.clear();
         const Vec3d& normal = plane.normal;
@@ -220,7 +220,7 @@ void MeasuringImpl::extract_features()
             for (int i=0; i<int(border.size()); ++i) {
                 const Vec3d& v2 = (i == 0 ? border[0] - border[border.size()-1]
                                         : border[i] - border[i-1]);
-                const Vec3d& v1 = i == border.size()-1 ? border[0] - border.back()
+                const Vec3d& v1 = i == (int)border.size()-1 ? border[0] - border.back()
                                                     : border[i+1] - border[i];
                 double angle = atan2(-normal.dot(v1.cross(v2)), -v1.dot(v2)) + M_PI;
                 if (angle > M_PI)
@@ -236,10 +236,10 @@ void MeasuringImpl::extract_features()
             bool circle = false;
             std::vector<SurfaceFeature> circles;
             std::vector<std::pair<size_t, size_t>> circles_idxs;
-            for (int i=1; i<angles.size(); ++i) {
+            for (int i=1; i<(int)angles.size(); ++i) {
                 if (Slic3r::is_approx(lengths[i], lengths[i-1])
                     && Slic3r::is_approx(angles[i], angles[i-1])
-                    && i != angles.size()-1 ) {
+                    && i != (int)angles.size()-1 ) {
                     // circle
                     if (! circle) {
                         circle = true;
@@ -267,7 +267,7 @@ void MeasuringImpl::extract_features()
                 if (angle > polygon_lower_threshold) {
                     if (angle < polygon_upper_threshold) {
                         const Vec3d center = std::get<0>(circles[i].get_circle());
-                        for (int j=circles_idxs[i].first + 1; j<=circles_idxs[i].second; ++j)
+                        for (int j=(int)circles_idxs[i].first + 1; j<=(int)circles_idxs[i].second; ++j)
                             plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
                                 border[j-1], border[j], std::make_optional(center), 0.));
                     } else {
@@ -286,7 +286,7 @@ void MeasuringImpl::extract_features()
             // We have the circles. Now go around again and pick edges.
             int cidx = 0; // index of next circle in the way
             for (int i=1; i<int(border.size()); ++i) {
-                if (cidx < circles_idxs.size() && i > circles_idxs[cidx].first)
+                if (cidx < (int)circles_idxs.size() && i > (int)circles_idxs[cidx].first)
                     i = circles_idxs[cidx++].second;
                 else plane.surface_features.emplace_back(SurfaceFeature(
                         SurfaceFeatureType::Edge, border[i-1], border[i], std::optional<Vec3d>(), 0.));

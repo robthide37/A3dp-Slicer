@@ -200,6 +200,7 @@ void GLGizmoMeasure::on_render()
                     return;
 
                 switch (m_curr_feature->get_type()) {
+                default: { assert(false); break; }
                 case Measure::SurfaceFeatureType::Point:
                 {
                     m_raycasters.insert({ POINT_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID, *m_sphere.mesh_raycaster) });
@@ -265,6 +266,7 @@ void GLGizmoMeasure::on_render()
         else if (is_hovering_on_extended_selection) {
             switch (m_curr_feature->get_type())
             {
+            default: { assert(false); break; }
             case Measure::SurfaceFeatureType::Point:
             {
                 m_curr_ex_feature_position = model_matrix * m_curr_feature->get_point();
@@ -342,7 +344,9 @@ void GLGizmoMeasure::on_render()
             shader->set_uniform("view_normal_matrix", view_normal_matrix);
         };
 
-        switch (m_curr_feature->get_type()) {
+        switch (m_curr_feature->get_type())
+        {
+        default: { assert(false); break; }
         case Measure::SurfaceFeatureType::Point:
         {
             const Vec3d& position = m_curr_feature->get_point();
@@ -552,6 +556,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     if (ImGui::BeginTable("Data", 2)) {
                         switch (feature_type)
                         {
+                        default: { assert(false); break; }
                         case Measure::SurfaceFeatureType::Point:
                         {
                             const Vec3d position = volume_matrix * m_curr_feature->get_point();
