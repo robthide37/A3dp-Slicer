@@ -48,6 +48,30 @@ static const std::string CTRL_STR =
 #endif //__APPLE__
 ;
 
+static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const std::vector<std::vector<int>>& planes_triangles, int idx)
+{
+    assert(0 <= idx && idx < (int)planes_triangles.size());
+    const std::vector<int>& triangle_indices = planes_triangles[idx];
+
+    GLModel::Geometry init_data;
+    init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+    unsigned int i = 0;
+    for (int idx : triangle_indices) {
+        const Vec3f& v0 = its.vertices[its.indices[idx][0]];
+        const Vec3f& v1 = its.vertices[its.indices[idx][1]];
+        const Vec3f& v2 = its.vertices[its.indices[idx][2]];
+
+        const Vec3f n = (v1 - v0).cross(v2 - v0).normalized();
+        init_data.add_vertex(v0, n);
+        init_data.add_vertex(v1, n);
+        init_data.add_vertex(v2, n);
+        init_data.add_triangle(i, i + 1, i + 2);
+        i += 3;
+    }
+
+    return init_data;
+}
+
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
@@ -232,26 +256,9 @@ void GLGizmoMeasure::on_render()
                     const auto& [idx, normal, point] = m_curr_feature->get_plane();
                     if (m_last_plane_idx != idx) {
                         m_last_plane_idx = idx;
-                        const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
-                        const std::vector<int>& triangle_indices = planes_triangles[idx];
-
                         const indexed_triangle_set its = (m_old_model_volume != nullptr) ? m_old_model_volume->mesh().its : m_old_model_object->volumes.front()->mesh().its;
-                        GLModel::Geometry init_data;
-                        init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
-                        unsigned int i = 0;
-                        for (int idx : triangle_indices) {
-                            const Vec3f& v0 = its.vertices[its.indices[idx][0]];
-                            const Vec3f& v1 = its.vertices[its.indices[idx][1]];
-                            const Vec3f& v2 = its.vertices[its.indices[idx][2]];
-
-                            const Vec3f n = (v1 - v0).cross(v2 - v0).normalized();
-                            init_data.add_vertex(v0, n);
-                            init_data.add_vertex(v1, n);
-                            init_data.add_vertex(v2, n);
-                            init_data.add_triangle(i, i + 1, i + 2);
-                            i += 3;
-                        }
-
+                        const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
+                        GLModel::Geometry init_data = init_plane_data(its, planes_triangles, idx);
                         m_plane.reset();
                         m_plane.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(init_data.get_as_indexed_triangle_set())));
                         m_plane.model.init_from(std::move(init_data));
@@ -427,23 +434,9 @@ void GLGizmoMeasure::update_if_needed()
     auto update_plane_models_cache = [this](const indexed_triangle_set& its) {
         m_plane_models_cache.clear();
         const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
-        for (const std::vector<int>& triangle_indices : planes_triangles) {
+        for (int idx = 0; idx < (int)planes_triangles.size(); ++idx) {
             m_plane_models_cache.emplace_back(GLModel());
-            GLModel::Geometry init_data;
-            init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
-            unsigned int i = 0;
-            for (int idx : triangle_indices) {
-                const Vec3f& v0 = its.vertices[its.indices[idx][0]];
-                const Vec3f& v1 = its.vertices[its.indices[idx][1]];
-                const Vec3f& v2 = its.vertices[its.indices[idx][2]];
-
-                const Vec3f n = (v1 - v0).cross(v2 - v0).normalized();
-                init_data.add_vertex(v0, n);
-                init_data.add_vertex(v1, n);
-                init_data.add_vertex(v2, n);
-                init_data.add_triangle(i, i + 1, i + 2);
-                i += 3;
-            }
+            GLModel::Geometry init_data = init_plane_data(its, planes_triangles, idx);
             m_plane_models_cache.back().init_from(std::move(init_data));
         }
     };
