@@ -44,11 +44,13 @@ class GLGizmoMeasure : public GLGizmoBase
     std::optional<Measure::SurfaceFeature> m_curr_feature;
     std::optional<Vec3d> m_curr_ex_feature_position;
 
-    // This holds information to decide whether recalculation is necessary:
+    // These hold information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;
     std::vector<ModelVolumeType> m_volumes_types;
     Vec3d m_first_instance_scale{ Vec3d::Ones() };
     Vec3d m_first_instance_mirror{ Vec3d::Ones() };
+    float m_last_inv_zoom{ 0.0f };
+    int m_last_plane_idx{ -1 };
 
     bool m_mouse_left_down{ false }; // for detection left_up of this gizmo
     const ModelObject* m_old_model_object{ nullptr };

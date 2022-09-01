@@ -106,6 +106,9 @@ void GLGizmoMeasure::data_changed()
     }
     if (model_object != m_old_model_object || model_volume != m_old_model_volume)
         update_if_needed();
+
+    m_last_inv_zoom = 0.0f;
+    m_last_plane_idx = -1;
 }
 
 bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
@@ -211,12 +214,13 @@ void GLGizmoMeasure::on_render()
                 {
                     const auto& [center, radius, normal] = m_curr_feature->get_circle();
 
-                    // TODO: check for changed inv_zoom
-
-                    m_circle.reset();
-                    GLModel::Geometry circle_geometry = smooth_torus(64, 16, float(radius), 5.0f * inv_zoom);
-                    m_circle.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(circle_geometry.get_as_indexed_triangle_set())));
-                    m_circle.model.init_from(std::move(circle_geometry));
+                    if (m_last_inv_zoom != inv_zoom) {
+                        m_last_inv_zoom = inv_zoom;
+                        m_circle.reset();
+                        GLModel::Geometry circle_geometry = smooth_torus(64, 16, float(radius), 5.0f * inv_zoom);
+                        m_circle.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(circle_geometry.get_as_indexed_triangle_set())));
+                        m_circle.model.init_from(std::move(circle_geometry));
+                    }
 
                     m_raycasters.insert({ CIRCLE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_ID, *m_circle.mesh_raycaster) });
                     m_raycasters.insert({ POINT_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID, *m_sphere.mesh_raycaster) });
@@ -225,32 +229,33 @@ void GLGizmoMeasure::on_render()
                 case Measure::SurfaceFeatureType::Plane:
                 {
                     const auto& [idx, normal, point] = m_curr_feature->get_plane();
+                    if (m_last_plane_idx != idx) {
+                        m_last_plane_idx = idx;
+                        const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
+                        const std::vector<int>& triangle_indices = planes_triangles[idx];
 
-                    // TODO: check for changed idx
+                        const indexed_triangle_set its = (m_old_model_volume != nullptr) ? m_old_model_volume->mesh().its : m_old_model_object->volumes.front()->mesh().its;
+                        GLModel::Geometry init_data;
+                        init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+                        unsigned int i = 0;
+                        for (int idx : triangle_indices) {
+                            const Vec3f& v0 = its.vertices[its.indices[idx][0]];
+                            const Vec3f& v1 = its.vertices[its.indices[idx][1]];
+                            const Vec3f& v2 = its.vertices[its.indices[idx][2]];
 
-                    const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
-                    const std::vector<int>& triangle_indices = planes_triangles[idx];
+                            const Vec3f n = (v1 - v0).cross(v2 - v0).normalized();
+                            init_data.add_vertex(v0, n);
+                            init_data.add_vertex(v1, n);
+                            init_data.add_vertex(v2, n);
+                            init_data.add_triangle(i, i + 1, i + 2);
+                            i += 3;
+                        }
 
-                    const indexed_triangle_set its = (m_old_model_volume != nullptr) ? m_old_model_volume->mesh().its : m_old_model_object->volumes.front()->mesh().its;
-                    GLModel::Geometry init_data;
-                    init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
-                    unsigned int i = 0;
-                    for (int idx : triangle_indices) {
-                        const Vec3f& v0 = its.vertices[its.indices[idx][0]];
-                        const Vec3f& v1 = its.vertices[its.indices[idx][1]];
-                        const Vec3f& v2 = its.vertices[its.indices[idx][2]];
-
-                        const Vec3f n = (v1 - v0).cross(v2 - v0).normalized();
-                        init_data.add_vertex(v0, n);
-                        init_data.add_vertex(v1, n);
-                        init_data.add_vertex(v2, n);
-                        init_data.add_triangle(i, i + 1, i + 2);
-                        i += 3;
+                        m_plane.reset();
+                        m_plane.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(init_data.get_as_indexed_triangle_set())));
+                        m_plane.model.init_from(std::move(init_data));
                     }
 
-                    m_plane.reset();
-                    m_plane.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(init_data.get_as_indexed_triangle_set())));
-                    m_plane.model.init_from(std::move(init_data));
                     m_raycasters.insert({ PLANE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, PLANE_ID, *m_plane.mesh_raycaster) });
                     break;
                 }
