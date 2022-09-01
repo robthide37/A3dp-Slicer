@@ -64,10 +64,6 @@ struct TreeSupportMeshGroupSettings {
     // The thickness of the support floors. This controls the number of dense layers that are printed on top of places of a model on which support rests.
     coord_t                         support_bottom_height                   { scaled<coord_t>(1.) };
     bool                            support_material_buildplate_only        { false };
-    // Support Distance Priority
-    // Whether the Support X/Y Distance overrides the Support Z Distance or vice versa. When X/Y overrides Z the X/Y distance can push away 
-    // the support from the model, influencing the actual Z distance to the overhang. We can disable this by not applying the X/Y distance around overhangs.
-    bool                            support_xy_overrides_z                  { false };
     // Support X/Y Distance
     // Distance of the support structure from the print in the X/Y directions.
     // minimum: 0, maximum warning: 1.5 * machine_nozzle_tip_outer_diameter
@@ -75,7 +71,6 @@ struct TreeSupportMeshGroupSettings {
     // Minimum Support X/Y Distance
     // Distance of the support structure from the overhang in the X/Y directions.
     // minimum_value: 0,  minimum warning": support_xy_distance - support_line_width * 2, maximum warning: support_xy_distance
-    // Used if ! support_xy_overrides_z.
     coord_t                         support_xy_distance_overhang            { scaled<coord_t>(0.2) };
     // Support Top Distance
     // Distance from the top of the support to the print.

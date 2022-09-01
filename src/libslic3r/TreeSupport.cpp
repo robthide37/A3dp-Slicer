@@ -534,22 +534,22 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
     const TreeModelVolumes &volumes, const TreeSupport::TreeSupportSettings &config,
     const Polylines &polylines, LayerIndex layer_idx)
 {
-    const bool xy_overrides_z = config.support_xy_overrides_z;
+    const bool min_xy_dist = config.xy_distance > config.xy_min_distance;
 
     LineInformations result;
     // Also checks if the position is valid, if it is NOT, it deletes that point
     for (const Polyline &line : polylines) {
         LineInformation res_line;
         for (Point p : line) {
-            if (! contains(volumes.getAvoidance(config.getRadius(0), layer_idx, TreeModelVolumes::AvoidanceType::FastSafe, false, !xy_overrides_z), p))
+            if (! contains(volumes.getAvoidance(config.getRadius(0), layer_idx, TreeModelVolumes::AvoidanceType::FastSafe, false, min_xy_dist), p))
                 res_line.emplace_back(p, LineStatus::TO_BP_SAFE);
-            else if (! contains(volumes.getAvoidance(config.getRadius(0), layer_idx, TreeModelVolumes::AvoidanceType::Fast, false, !xy_overrides_z), p))
+            else if (! contains(volumes.getAvoidance(config.getRadius(0), layer_idx, TreeModelVolumes::AvoidanceType::Fast, false, min_xy_dist), p))
                 res_line.emplace_back(p, LineStatus::TO_BP);
-            else if (config.support_rests_on_model && ! contains(volumes.getAvoidance(config.getRadius(0), layer_idx, TreeModelVolumes::AvoidanceType::FastSafe, true, !xy_overrides_z), p))
+            else if (config.support_rests_on_model && ! contains(volumes.getAvoidance(config.getRadius(0), layer_idx, TreeModelVolumes::AvoidanceType::FastSafe, true, min_xy_dist), p))
                 res_line.emplace_back(p, LineStatus::TO_MODEL_GRACIOUS_SAFE);
-            else if (config.support_rests_on_model && ! contains(volumes.getAvoidance(config.getRadius(0), layer_idx, TreeModelVolumes::AvoidanceType::Fast, true, !xy_overrides_z), p))
+            else if (config.support_rests_on_model && ! contains(volumes.getAvoidance(config.getRadius(0), layer_idx, TreeModelVolumes::AvoidanceType::Fast, true, min_xy_dist), p))
                 res_line.emplace_back(p, LineStatus::TO_MODEL_GRACIOUS);
-            else if (config.support_rests_on_model && ! contains(volumes.getCollision(config.getRadius(0), layer_idx, !xy_overrides_z), p))
+            else if (config.support_rests_on_model && ! contains(volumes.getCollision(config.getRadius(0), layer_idx, min_xy_dist), p))
                 res_line.emplace_back(p, LineStatus::TO_MODEL);
             else if (!res_line.empty()) {
                 result.emplace_back(res_line);
@@ -596,13 +596,14 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
     size_t current_layer, std::pair<Point, LineStatus> &p)
 {
     using AvoidanceType = TreeSupport::AvoidanceType;
-    if (! contains(volumes.getAvoidance(config.getRadius(0), current_layer - 1, p.second == LineStatus::TO_BP_SAFE ? AvoidanceType::FastSafe : AvoidanceType::Fast, false, !config.support_xy_overrides_z), p.first))
+    const bool min_xy_dist = config.xy_distance > config.xy_min_distance;
+    if (! contains(volumes.getAvoidance(config.getRadius(0), current_layer - 1, p.second == LineStatus::TO_BP_SAFE ? AvoidanceType::FastSafe : AvoidanceType::Fast, false, min_xy_dist), p.first))
         return true;
     if (config.support_rests_on_model && (p.second != LineStatus::TO_BP && p.second != LineStatus::TO_BP_SAFE))
         return ! contains(
             p.second == LineStatus::TO_MODEL_GRACIOUS || p.second == LineStatus::TO_MODEL_GRACIOUS_SAFE ? 
-                volumes.getAvoidance(config.getRadius(0), current_layer - 1, p.second == LineStatus::TO_MODEL_GRACIOUS_SAFE ? AvoidanceType::FastSafe : AvoidanceType::Fast, true, !config.support_xy_overrides_z) :
-                volumes.getCollision(config.getRadius(0), current_layer - 1, !config.support_xy_overrides_z),
+                volumes.getAvoidance(config.getRadius(0), current_layer - 1, p.second == LineStatus::TO_MODEL_GRACIOUS_SAFE ? AvoidanceType::FastSafe : AvoidanceType::Fast, true, min_xy_dist) :
+                volumes.getCollision(config.getRadius(0), current_layer - 1, min_xy_dist),
             p.first);
     return false;
 }
@@ -1079,7 +1080,8 @@ void TreeSupport::generateInitialAreas(
 
     const size_t z_distance_delta = mesh_config.z_distance_top_layers + 1; // To ensure z_distance_top_layers are left empty between the overhang (zeroth empty layer), the support has to be added z_distance_top_layers+1 layers below
 
-    const bool xy_overrides_z = mesh_config.support_xy_overrides_z;
+    const bool min_xy_dist = mesh_config.xy_distance > mesh_config.xy_min_distance;
+
 #if 0
     if (mesh.overhang_areas.size() <= z_distance_delta)
         return;
@@ -1095,7 +1097,7 @@ void TreeSupport::generateInitialAreas(
     //FIXME Vojtech: This is not sufficient for support enforcers to work.
     //FIXME There is no account for the support overhang angle.
     //FIXME There is no account for the width of the collision regions.
-    const coord_t extra_outset = std::max(coord_t(0), mesh_config.min_radius - mesh_config.support_line_width) + (xy_overrides_z ? 0 : mesh_config.support_line_width / 2)
+    const coord_t extra_outset = std::max(coord_t(0), mesh_config.min_radius - mesh_config.support_line_width) + (min_xy_dist ? mesh_config.support_line_width / 2 : 0)
         //FIXME this is a heuristic value for support enforcers to work.
 //        + 10 * mesh_config.support_line_width;
         ;
@@ -1113,7 +1115,7 @@ void TreeSupport::generateInitialAreas(
     std::mutex mutex_layer_storage, mutex_movebounds;
     tbb::parallel_for(tbb::blocked_range<size_t>(1, num_support_layers - z_distance_delta),
         [this, &print_object, &overhangs, &mesh_config, &mesh_group_settings, &support_params, 
-         z_distance_delta, xy_overrides_z, force_tip_to_roof, roof_enabled, support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length, max_overhang_insert_lag,
+         z_distance_delta, min_xy_dist, force_tip_to_roof, roof_enabled, support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length, max_overhang_insert_lag,
          &base_circle, &mutex_layer_storage, &mutex_movebounds, &top_contacts, &layer_storage, &already_inserted,
          &move_bounds, &base_radius](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
@@ -1123,9 +1125,9 @@ void TreeSupport::generateInitialAreas(
             Polygons relevant_forbidden;
             {
                 const Polygons &relevant_forbidden_raw = (mesh_config.support_rests_on_model ?
-                    (SUPPORT_TREE_ONLY_GRACIOUS_TO_MODEL ? m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx, AvoidanceType::Fast, true, !xy_overrides_z) :
-                        m_volumes.getCollision(mesh_config.getRadius(0), layer_idx, !xy_overrides_z)) :
-                    m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx, AvoidanceType::Fast, false, !xy_overrides_z));
+                    (SUPPORT_TREE_ONLY_GRACIOUS_TO_MODEL ? m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx, AvoidanceType::Fast, true, min_xy_dist) :
+                        m_volumes.getCollision(mesh_config.getRadius(0), layer_idx, min_xy_dist)) :
+                    m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx, AvoidanceType::Fast, false, min_xy_dist));
                 // prevent rounding errors down the line, points placed directly on the line of the forbidden area may not be added otherwise.
                 relevant_forbidden = offset(union_ex(relevant_forbidden_raw), scaled<float>(0.005), jtMiter, 1.2);
             }
@@ -1153,7 +1155,7 @@ void TreeSupport::generateInitialAreas(
                     if (! already_inserted[insert_layer].count(p.first / ((mesh_config.min_radius + 1) / 10))) {
                         // normalize the point a bit to also catch points which are so close that inserting it would achieve nothing
                         already_inserted[insert_layer].emplace(p.first / ((mesh_config.min_radius + 1) / 10));
-                        SupportElement* elem = new SupportElement(dtt, insert_layer, p.first, to_bp, gracious, !xy_overrides_z, dont_move_until, roof, safe_radius, force_tip_to_roof, skip_ovalisation);
+                        SupportElement* elem = new SupportElement(dtt, insert_layer, p.first, to_bp, gracious, min_xy_dist, dont_move_until, roof, safe_radius, force_tip_to_roof, skip_ovalisation);
                         elem->area = new Polygons();
                         validate_range(circle);
                         elem->area->emplace_back(std::move(circle));
@@ -1263,8 +1265,7 @@ void TreeSupport::generateInitialAreas(
                 }
                 // If the xy distance overrides the z distance, some support needs to be inserted further down.
                 //=> Analyze which support points do not fit on this layer and check if they will fit a few layers down (while adding them an infinite amount of layers down would technically be closer the the setting description, it would not produce reasonable results. )
-                if (xy_overrides_z)
-                {
+                if (! min_xy_dist) {
                     LineInformations overhang_lines;
                     {
                         //Vojtech: Generate support heads at support_tree_branch_distance spacing by producing a zig-zag infill at support_tree_branch_distance spacing,
@@ -1285,10 +1286,9 @@ void TreeSupport::generateInitialAreas(
                         }
                         validate_range(overhang_lines);
                     }
-
                     for (size_t lag_ctr = 1; lag_ctr <= max_overhang_insert_lag && !overhang_lines.empty() && layer_idx - coord_t(lag_ctr) >= 1; lag_ctr++) {
                         // get least restricted avoidance for layer_idx-lag_ctr
-                        const Polygons &relevant_forbidden_below = (mesh_config.support_rests_on_model ? (SUPPORT_TREE_ONLY_GRACIOUS_TO_MODEL ? m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - lag_ctr, AvoidanceType::Fast, true, !xy_overrides_z) : m_volumes.getCollision(mesh_config.getRadius(0), layer_idx - lag_ctr, !xy_overrides_z)) : m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - lag_ctr, AvoidanceType::Fast, false, !xy_overrides_z));
+                        const Polygons &relevant_forbidden_below = (mesh_config.support_rests_on_model ? (SUPPORT_TREE_ONLY_GRACIOUS_TO_MODEL ? m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - lag_ctr, AvoidanceType::Fast, true, min_xy_dist) : m_volumes.getCollision(mesh_config.getRadius(0), layer_idx - lag_ctr, min_xy_dist)) : m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - lag_ctr, AvoidanceType::Fast, false, min_xy_dist));
                         // it is not required to offset the forbidden area here as the points wont change: If points here are not inside the forbidden area neither will they be later when placing these points, as these are the same points.
                         auto evaluatePoint = [&](std::pair<Point, LineStatus> p) { return contains(relevant_forbidden_below, p.first); };
 
@@ -1344,9 +1344,9 @@ void TreeSupport::generateInitialAreas(
                         {
                             const Polygons &forbidden_next_raw = mesh_config.support_rests_on_model ? 
                                 (SUPPORT_TREE_ONLY_GRACIOUS_TO_MODEL ? 
-                                    m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), AvoidanceType::Fast, true, !xy_overrides_z) : 
-                                    m_volumes.getCollision(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), !xy_overrides_z)) : 
-                                m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), AvoidanceType::Fast, false, !xy_overrides_z);
+                                    m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), AvoidanceType::Fast, true, min_xy_dist) :
+                                    m_volumes.getCollision(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), min_xy_dist)) :
+                                m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), AvoidanceType::Fast, false, min_xy_dist);
                             // prevent rounding errors down the line
                             forbidden_next = offset(union_ex(forbidden_next_raw), scaled<float>(0.005), jtMiter, 1.2);
                         }

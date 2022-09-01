@@ -63,7 +63,6 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
             config.support_material_interface_layers.value) * this->layer_height :
         0;
     this->support_material_buildplate_only = config.support_material_buildplate_only;
-//    this->support_xy_overrides_z    = 
     this->support_xy_distance       = scaled<coord_t>(config.support_material_xy_spacing.get_abs_value(external_perimeter_width));
     // Separation of interfaces, it is likely smaller than support_xy_distance.
     this->support_xy_distance_overhang = std::min(this->support_xy_distance, scaled<coord_t>(0.5 * external_perimeter_width));
@@ -163,15 +162,9 @@ TreeModelVolumes::TreeModelVolumes(
     }
 
     const TreeSupport::TreeSupportSettings config{ m_layer_outlines[m_current_outline_idx].first };
-    if (! config.support_xy_overrides_z) {
-        m_current_min_xy_dist = config.xy_min_distance;
-        if (TreeSupport::TreeSupportSettings::soluble)
-            m_current_min_xy_dist = std::max(m_current_min_xy_dist, scaled<coord_t>(0.1));
-        m_current_min_xy_dist_delta = std::max(config.xy_distance - m_current_min_xy_dist, coord_t(0));
-    } else {
-        m_current_min_xy_dist = config.xy_distance;
-        m_current_min_xy_dist_delta = 0;
-    }
+    m_current_min_xy_dist = config.xy_min_distance;
+    m_current_min_xy_dist_delta = config.xy_distance - m_current_min_xy_dist;
+    assert(m_current_min_xy_dist_delta >= 0);
     m_increase_until_radius = config.increase_radius_until_radius;
     m_radius_0 = config.getRadius(0);
 
@@ -436,12 +429,14 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
             const int           z_distance_top_layers     = round_up_divide<int>(settings.support_top_distance, layer_height);
             const LayerIndex    max_required_layer        = std::min<LayerIndex>(outlines.size(), max_layer_idx + std::max(coord_t(1), z_distance_top_layers));
             const LayerIndex    min_layer_bottom          = std::max<LayerIndex>(0, min_layer_last - int(z_distance_bottom_layers));
-            // technically this causes collision for the normal xy_distance to be larger by m_current_min_xy_dist_delta for all 
-            // not currently processing meshes as this delta will be added at request time.
-            // avoiding this would require saving each collision for each outline_idx separately.
-            // and later for each avoidance... But avoidance calculation has to be for the whole scene and can NOT be done for each outline_idx separately and combined later.
-            // so avoiding this inaccuracy seems infeasible as it would require 2x the avoidance calculations => 0.5x the performance.
-            const coord_t       xy_distance               = outline_idx == m_current_outline_idx ? m_current_min_xy_dist : settings.support_xy_distance;
+            const coord_t       xy_distance               = outline_idx == m_current_outline_idx ? m_current_min_xy_dist : 
+                // technically this causes collision for the normal xy_distance to be larger by m_current_min_xy_dist_delta for all 
+                // not currently processing meshes as this delta will be added at request time.
+                // avoiding this would require saving each collision for each outline_idx separately.
+                // and later for each avoidance... But avoidance calculation has to be for the whole scene and can NOT be done for each outline_idx separately and combined later.
+                // so avoiding this inaccuracy seems infeasible as it would require 2x the avoidance calculations => 0.5x the performance.
+                //FIXME support_xy_distance is not corrected for "soluble" flag, see TreeSupportSettings constructor.
+                settings.support_xy_distance;
 
             // 1) Calculate offsets of collision areas in parallel.
             std::vector<Polygons> collision_areas_offsetted(max_required_layer + 1 - min_layer_bottom);

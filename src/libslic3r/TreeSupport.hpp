@@ -374,10 +374,9 @@ public:
               increase_radius_until_layer(increase_radius_until_radius <= branch_radius ? tip_layers * (increase_radius_until_radius / branch_radius) : (increase_radius_until_radius - branch_radius) / (branch_radius * diameter_angle_scale_factor)),
               support_rests_on_model(! mesh_group_settings.support_material_buildplate_only),
               xy_distance(mesh_group_settings.support_xy_distance),
+              xy_min_distance(std::min(mesh_group_settings.support_xy_distance, mesh_group_settings.support_xy_distance_overhang)),
               bp_radius(mesh_group_settings.support_tree_bp_diameter / 2),
               diameter_scale_bp_radius(std::min(sin(0.7) * layer_height / branch_radius, 1.0 / (branch_radius / (support_line_width / 2.0)))), // Either 40? or as much as possible so that 2 lines will overlap by at least 50%, whichever is smaller.
-              support_xy_overrides_z(mesh_group_settings.support_xy_overrides_z),
-              xy_min_distance(support_xy_overrides_z ? xy_distance : mesh_group_settings.support_xy_distance_overhang),
               z_distance_top_layers(round_up_divide(mesh_group_settings.support_top_distance, layer_height)),
               z_distance_bottom_layers(round_up_divide(mesh_group_settings.support_bottom_distance, layer_height)),
               performance_interface_skip_layers(round_up_divide(mesh_group_settings.support_interface_skip_height, layer_height)),
@@ -398,14 +397,15 @@ public:
         {
             layer_start_bp_radius = (bp_radius - branch_radius) / (branch_radius * diameter_scale_bp_radius);
 
-            // safeOffsetInc can only work in steps of the size xy_min_distance in the worst case => xy_min_distance has to be a bit larger than 0 in this worst case and should be large enough for performance to not suffer extremely
-            // When for all meshes the z bottom and top distance is more than one layer though the worst case is xy_min_distance + min_feature_size
-            // This is not the best solution, but the only one to ensure areas can not lag though walls at high maximum_move_distance.
-            if (soluble)
-                // If set to low rounding errors WILL cause errors. Best to keep it above 25.
-                xy_min_distance = std::max(scaled<coord_t>(0.1), xy_min_distance);
+            if (TreeSupport::TreeSupportSettings::soluble) {
+                // safeOffsetInc can only work in steps of the size xy_min_distance in the worst case => xy_min_distance has to be a bit larger than 0 in this worst case and should be large enough for performance to not suffer extremely
+                // When for all meshes the z bottom and top distance is more than one layer though the worst case is xy_min_distance + min_feature_size
+                // This is not the best solution, but the only one to ensure areas can not lag though walls at high maximum_move_distance.
+                xy_min_distance = std::max(xy_min_distance, scaled<coord_t>(0.1));
+                xy_distance     = std::max(xy_distance, xy_min_distance);
+            }
+            
 
-            xy_distance = std::max(xy_distance, xy_min_distance);
 //            const std::unordered_map<std::string, InterfacePreference> interface_map = { { "support_area_overwrite_interface_area", InterfacePreference::SUPPORT_AREA_OVERWRITES_INTERFACE }, { "interface_area_overwrite_support_area", InterfacePreference::INTERFACE_AREA_OVERWRITES_SUPPORT }, { "support_lines_overwrite_interface_area", InterfacePreference::SUPPORT_LINES_OVERWRITE_INTERFACE }, { "interface_lines_overwrite_support_area", InterfacePreference::INTERFACE_LINES_OVERWRITE_SUPPORT }, { "nothing", InterfacePreference::NOTHING } };
 //            interface_preference = interface_map.at(mesh_group_settings.get<std::string>("support_interface_priority"));
 //FIXME this was the default
@@ -495,10 +495,6 @@ public:
          */
         double diameter_scale_bp_radius;
         /*!
-         * \brief Should Z distance override X/Y distance, or the other way around.
-         */
-        bool support_xy_overrides_z;
-        /*!
          * \brief minimum xy_distance. Only relevant when Z overrides XY, otherwise equal to xy_distance-
          */
         coord_t xy_min_distance;
@@ -575,7 +571,7 @@ public:
             return branch_radius == other.branch_radius && tip_layers == other.tip_layers && diameter_angle_scale_factor == other.diameter_angle_scale_factor && layer_start_bp_radius == other.layer_start_bp_radius && bp_radius == other.bp_radius && diameter_scale_bp_radius == other.diameter_scale_bp_radius && min_radius == other.min_radius && xy_min_distance == other.xy_min_distance && // as a recalculation of the collision areas is required to set a new min_radius.
                    xy_distance - xy_min_distance == other.xy_distance - other.xy_min_distance && // if the delta of xy_min_distance and xy_distance is different the collision areas have to be recalculated.
                    support_rests_on_model == other.support_rests_on_model && increase_radius_until_layer == other.increase_radius_until_layer && min_dtt_to_model == other.min_dtt_to_model && max_to_model_radius_increase == other.max_to_model_radius_increase && maximum_move_distance == other.maximum_move_distance && maximum_move_distance_slow == other.maximum_move_distance_slow && z_distance_bottom_layers == other.z_distance_bottom_layers && support_line_width == other.support_line_width && 
-                   support_xy_overrides_z == other.support_xy_overrides_z && support_line_spacing == other.support_line_spacing && support_roof_line_width == other.support_roof_line_width && // can not be set on a per-mesh basis currently, so code to enable processing different roof line width in the same iteration seems useless.
+                   support_line_spacing == other.support_line_spacing && support_roof_line_width == other.support_roof_line_width && // can not be set on a per-mesh basis currently, so code to enable processing different roof line width in the same iteration seems useless.
                    support_bottom_offset == other.support_bottom_offset && support_wall_count == other.support_wall_count && support_pattern == other.support_pattern && roof_pattern == other.roof_pattern && // can not be set on a per-mesh basis currently, so code to enable processing different roof patterns in the same iteration seems useless.
                    support_roof_angles == other.support_roof_angles && 
                    //support_infill_angles == other.support_infill_angles && 
