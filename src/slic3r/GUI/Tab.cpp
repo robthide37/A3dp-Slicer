@@ -603,16 +603,10 @@ void Tab::update_changed_ui()
     if (m_type == Preset::TYPE_PRINTER) {
         {
             auto check_bed_custom_options = [](std::vector<std::string>& keys) {
-                bool was_deleted = false;
-                for (std::vector<std::string>::iterator it = keys.begin(); it != keys.end(); ) {
-                    if (*it == "bed_custom_texture" || *it == "bed_custom_model") {
-                        it = keys.erase(it);
-                        was_deleted = true;
-                    }
-                    else
-                        ++it;
-                }
-                if (was_deleted && std::find(keys.begin(), keys.end(), "bed_shape") == keys.end())
+                size_t old_keys_size = keys.size();
+                keys.erase(std::remove_if(keys.begin(), keys.end(), [](const std::string& key) { 
+                    return key == "bed_custom_texture" || key == "bed_custom_model"; }), keys.end());
+                if (old_keys_size != keys.size() && std::find(keys.begin(), keys.end(), "bed_shape") == keys.end())
                     keys.emplace_back("bed_shape");
             };
             check_bed_custom_options(dirty_options);
