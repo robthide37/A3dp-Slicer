@@ -34,15 +34,23 @@ class GLGizmoMeasure : public GLGizmoBase
         struct Item
         {
             EMode mode{ EMode::BasicSelection };
+            std::string source;
             std::optional<Measure::SurfaceFeature> feature;
 
             bool operator == (const Item& other) const {
                 if (this->mode != other.mode) return false;
+                if (this->source != other.source) return false;
                 return this->feature == other.feature;
             }
 
             bool operator != (const Item& other) const {
                 return !operator == (other);
+            }
+
+            void reset() {
+                mode = EMode::BasicSelection;
+                source.clear();
+                feature.reset();
             }
         };
 
@@ -50,8 +58,8 @@ class GLGizmoMeasure : public GLGizmoBase
         Item second;
 
         void reset() {
-            first.feature.reset();
-            second.feature.reset();
+            first.reset();
+            second.reset();
         }
 
         bool operator == (const SelectedFeatures& other) const {
@@ -75,7 +83,7 @@ class GLGizmoMeasure : public GLGizmoBase
     std::vector<GLModel> m_plane_models_cache;
     std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
     std::optional<Measure::SurfaceFeature> m_curr_feature;
-    std::optional<Vec3d> m_curr_ex_feature_position;
+    std::optional<Vec3d> m_curr_point_on_feature_position;
 
     // These hold information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;
