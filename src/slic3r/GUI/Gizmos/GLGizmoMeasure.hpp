@@ -23,12 +23,45 @@ enum class SLAGizmoEventType : unsigned char;
 
 class GLGizmoMeasure : public GLGizmoBase
 {
-// This gizmo does not use grabbers. The m_hover_id relates to polygon managed by the class itself.
-
     enum class EMode : unsigned char
     {
         BasicSelection,
         ExtendedSelection
+    };
+
+    struct SelectedFeatures
+    {
+        struct Item
+        {
+            EMode mode{ EMode::BasicSelection };
+            std::optional<Measure::SurfaceFeature> feature;
+
+            bool operator == (const Item& other) const {
+                if (this->mode != other.mode) return false;
+                return this->feature == other.feature;
+            }
+
+            bool operator != (const Item& other) const {
+                return !operator == (other);
+            }
+        };
+
+        Item first;
+        Item second;
+
+        void reset() {
+            first.feature.reset();
+            second.feature.reset();
+        }
+
+        bool operator == (const SelectedFeatures& other) const {
+            if (this->first != other.first) return false;
+            return this->second == other.second;
+        }
+
+        bool operator != (const SelectedFeatures& other) const {
+            return !operator == (other);
+        }
     };
 
     EMode m_mode{ EMode::BasicSelection };
@@ -59,6 +92,8 @@ class GLGizmoMeasure : public GLGizmoBase
     Vec2d m_mouse_pos{ Vec2d::Zero() };
 
     KeyAutoRepeatFilter m_ctrl_kar_filter;
+
+    SelectedFeatures m_selected_features;
 
     void update_if_needed();
 

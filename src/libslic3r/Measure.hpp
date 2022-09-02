@@ -107,7 +107,11 @@ struct MeasurementResult {
     std::optional<double> angle;
     std::optional<double> distance_infinite;
     std::optional<double> distance_strict;
-    std::optional<Vec3d> distance_xyz;
+    std::optional<Vec3d>  distance_xyz;
+
+    bool has_any_data() const {
+        return angle.has_value() || distance_infinite.has_value() || distance_strict.has_value() || distance_xyz.has_value();
+    }
 };
 
 // Returns distance/angle between two SurfaceFeatures.
