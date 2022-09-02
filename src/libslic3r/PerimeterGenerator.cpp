@@ -235,7 +235,7 @@ static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy
     }
 
     if (ext_lines.back().p == ext_lines.front().p) // Connect endpoints.
-        out.back().p = out.front().p;
+        out.front().p = out.back().p;
 
     if (out.size() >= 3)
         ext_lines.junctions = std::move(out);
