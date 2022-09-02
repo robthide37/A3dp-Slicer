@@ -33,9 +33,6 @@ public:
     bool get_groups(wxArrayString &groups) const override;
     bool get_printers(wxArrayString &printers) const override;
 
-protected:
-    virtual bool validate_version_text(const boost::optional<std::string> &version_text) const;
-
 private:
     std::string host;
     std::string apikey;
