@@ -457,12 +457,9 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
 //        if (m_config.branch_radius==2121)
 //            BOOST_LOG_TRIVIAL(error) << "Why ask questions when you already know the answer twice.\n (This is not a real bug, please dont report it.)";
         
-        for (auto &layer : move_bounds) {
-            for (auto elem : layer) {
-                delete elem->area;
+        for (auto &layer : move_bounds)
+            for (auto elem : layer)
                 delete elem;
-            }
-        }
 
         auto remove_undefined_layers = [](SupportGeneratorLayersPtr &layers) {
             layers.erase(std::remove_if(layers.begin(), layers.end(), [](const SupportGeneratorLayer* ptr) { return ptr == nullptr; }), layers.end());
@@ -593,7 +590,7 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
  */
 [[nodiscard]] static bool evaluatePointForNextLayerFunction(
     const TreeModelVolumes &volumes, const TreeSupport::TreeSupportSettings &config,
-    size_t current_layer, std::pair<Point, LineStatus> &p)
+    size_t current_layer, const std::pair<Point, LineStatus> &p)
 {
     using AvoidanceType = TreeSupport::AvoidanceType;
     const bool min_xy_dist = config.xy_distance > config.xy_min_distance;
@@ -616,47 +613,25 @@ void TreeSupport::generateSupportAreas(Print &print, const BuildVolume &build_vo
  * \return A pair with which points are still valid in the first slot and which are not in the second slot.
  */
 template<typename EvaluatePointFn>
-[[nodiscard]] static std::pair<LineInformations, LineInformations> splitLines(LineInformations lines, EvaluatePointFn evaluatePoint)
+[[nodiscard]] static std::pair<LineInformations, LineInformations> splitLines(const LineInformations &lines, EvaluatePointFn evaluatePoint)
 {
     // assumes all Points on the current line are valid
 
-    LineInformations keep(1);
-    LineInformations set_free(1);
-    enum STATE
-    {
-        keeping,
-        freeing
-    };
-    for (std::vector<std::pair<Point, LineStatus>> line : lines) {
-        STATE current = keeping;
+    LineInformations keep;
+    LineInformations set_free;
+    for (const std::vector<std::pair<Point, LineStatus>> &line : lines) {
+        bool            current_keep = true;
         LineInformation resulting_line;
-        for (std::pair<Point, LineStatus> me : line) {
-            if (evaluatePoint(me)) {
-                if (keeping != current) {
-                    if (!resulting_line.empty()) {
-                        set_free.emplace_back(resulting_line);
-                        resulting_line.clear();
-                    }
-                    current = keeping;
-                }
-                resulting_line.emplace_back(me);
-            } else {
-                if (freeing != current) {
-                    if (!resulting_line.empty()) {
-                        keep.emplace_back(resulting_line);
-                        resulting_line.clear();
-                    }
-                    current = freeing;
-                }
-                resulting_line.emplace_back(me);
+        for (const std::pair<Point, LineStatus> &me : line) {
+            if (evaluatePoint(me) != current_keep) {
+                if (! resulting_line.empty())
+                    (current_keep ? &keep : &set_free)->emplace_back(std::move(resulting_line));
+                current_keep = !current_keep;
             }
+            resulting_line.emplace_back(me);
         }
-        if (!resulting_line.empty()) {
-            if (current == keeping)
-                keep.emplace_back(resulting_line);
-            else
-                set_free.emplace_back(resulting_line);
-        }
+        if (! resulting_line.empty())
+            (current_keep ? &keep : &set_free)->emplace_back(std::move(resulting_line));
     }
     validate_range(keep);
     validate_range(set_free);
@@ -1088,7 +1063,9 @@ void TreeSupport::generateInitialAreas(
     // This calculates how far one has to move on the x-axis so that y=r-support_line_width/2. 
     // In other words how far does one need to move on the x-axis to be support_line_width/2 away from the circle line.
     // As a circle is round this length is identical for every axis as long as the 90 degrees angle between both remains.
-    const coord_t circle_length_to_half_linewidth_change = mesh_config.min_radius < mesh_config.support_line_width ? mesh_config.min_radius / 2 : sqrt(sqr(mesh_config.min_radius) - sqr(mesh_config.min_radius - mesh_config.support_line_width / 2));
+    const coord_t circle_length_to_half_linewidth_change = mesh_config.min_radius < mesh_config.support_line_width ? 
+        mesh_config.min_radius / 2 : 
+        sqrt(sqr(mesh_config.min_radius) - sqr(mesh_config.min_radius - mesh_config.support_line_width / 2));
     // Extra support offset to compensate for larger tip radiis. Also outset a bit more when z overwrites xy, because supporting something with a part of a support line is better than not supporting it at all.
     //FIXME Vojtech: This is not sufficient for support enforcers to work.
     //FIXME There is no account for the support overhang angle.
@@ -1097,12 +1074,18 @@ void TreeSupport::generateInitialAreas(
         //FIXME this is a heuristic value for support enforcers to work.
 //        + 10 * mesh_config.support_line_width;
         ;
-    const size_t support_roof_layers = mesh_group_settings.support_roof_enable ? (mesh_group_settings.support_roof_height + mesh_config.layer_height / 2) / mesh_config.layer_height : 0;
-    const bool roof_enabled = support_roof_layers != 0;
-    const bool force_tip_to_roof = sqr<double>(mesh_config.min_radius) * M_PI > mesh_group_settings.minimum_roof_area && roof_enabled;
+    const size_t  support_roof_layers = mesh_group_settings.support_roof_enable ? mesh_group_settings.support_roof_height + mesh_config.layer_height / 2 / mesh_config.layer_height : 0;
+    const bool    roof_enabled        = support_roof_layers != 0;
+    const bool    force_tip_to_roof   = sqr<double>(mesh_config.min_radius) * M_PI > mesh_group_settings.minimum_roof_area && roof_enabled;
     //FIXME mesh_group_settings.support_angle does not apply to enforcers and also it does not apply to automatic support angle (by half the external perimeter width).
-    const coord_t max_overhang_speed = (mesh_group_settings.support_angle < 0.5 * M_PI) ? (coord_t)(tan(mesh_group_settings.support_angle) * mesh_config.layer_height) : std::numeric_limits<coord_t>::max();
-    const size_t max_overhang_insert_lag = std::max((size_t)round_up_divide(mesh_config.xy_distance, max_overhang_speed / 2), 2 * mesh_config.z_distance_top_layers); // cap for how much layer below the overhang a new support point may be added, as other than with regular support every new inserted point may cause extra material and time cost.  Could also be an user setting or differently calculated. Idea is that if an overhang does not turn valid in double the amount of layers a slope of support angle would take to travel xy_distance, nothing reasonable will come from it. The 2*z_distance_delta is only a catch for when the support angle is very high.
+    //used by max_overhang_insert_lag, only if not min_xy_dist.
+    const coord_t max_overhang_speed  = mesh_group_settings.support_angle < 0.5 * M_PI ? coord_t(tan(mesh_group_settings.support_angle) * mesh_config.layer_height) : std::numeric_limits<coord_t>::max();
+    // cap for how much layer below the overhang a new support point may be added, as other than with regular support every new inserted point 
+    // may cause extra material and time cost.  Could also be an user setting or differently calculated. Idea is that if an overhang 
+    // does not turn valid in double the amount of layers a slope of support angle would take to travel xy_distance, nothing reasonable will come from it. 
+    // The 2*z_distance_delta is only a catch for when the support angle is very high.
+    // Used only if not min_xy_dist.
+    const coord_t max_overhang_insert_lag = std::max<coord_t>(round_up_divide(mesh_config.xy_distance, max_overhang_speed / 2), 2 * mesh_config.z_distance_top_layers);
 
     //FIXME 
     size_t num_support_layers = print_object.layer_count();
@@ -1133,35 +1116,36 @@ void TreeSupport::generateInitialAreas(
                 return generateSupportInfillLines(area, support_params, roof, layer_idx, support_infill_distance);
             };
 
-            auto addPointAsInfluenceArea = [&](std::pair<Point, LineStatus> p, size_t dtt, LayerIndex insert_layer, size_t dont_move_until, bool roof, bool skip_ovalisation)
-            {
-                bool to_bp = p.second == LineStatus::TO_BP || p.second == LineStatus::TO_BP_SAFE;
-                bool gracious = to_bp || p.second == LineStatus::TO_MODEL_GRACIOUS || p.second == LineStatus::TO_MODEL_GRACIOUS_SAFE;
-                bool safe_radius = p.second == LineStatus::TO_BP_SAFE || p.second == LineStatus::TO_MODEL_GRACIOUS_SAFE;
-                if (!mesh_config.support_rests_on_model && !to_bp) {
-                    BOOST_LOG_TRIVIAL(warning) << "Tried to add an invalid support point";
-                    TreeSupport::showError("Unable to add tip. Some overhang may not be supported correctly.", true);
-                    return;
-                }
-                Polygon circle;
-                for (Point corner : base_circle)
-                    circle.points.emplace_back(p.first + corner);
-                {
-                    std::lock_guard<std::mutex> critical_section_movebounds(mutex_movebounds);
-                    if (! already_inserted[insert_layer].count(p.first / ((mesh_config.min_radius + 1) / 10))) {
-                        // normalize the point a bit to also catch points which are so close that inserting it would achieve nothing
-                        already_inserted[insert_layer].emplace(p.first / ((mesh_config.min_radius + 1) / 10));
-                        SupportElement* elem = new SupportElement(dtt, insert_layer, p.first, to_bp, gracious, min_xy_dist, dont_move_until, roof, safe_radius, force_tip_to_roof, skip_ovalisation);
-                        elem->area = new Polygons();
-                        validate_range(circle);
-                        elem->area->emplace_back(std::move(circle));
-                        move_bounds[insert_layer].emplace(elem);
-                    }
-                }
-            };
-
+            // roof_tip_layers = force_tip_to_roof ? support_roof_layers - dtt_roof : 0
+            // insert_layer_idx = layer_idx - dtt_roof
+            // supports_roof = dtt_roof > 0
+            // dont_move_until = roof_enabled ? support_roof_layers - dtt_roof : 0
             auto addLinesAsInfluenceAreas = [&](LineInformations lines, size_t roof_tip_layers, LayerIndex insert_layer_idx, bool supports_roof, size_t dont_move_until)
             {
+                auto addPointAsInfluenceArea = [&](std::pair<Point, LineStatus> p, size_t dtt, LayerIndex insert_layer, size_t dont_move_until, bool roof, bool skip_ovalisation)
+                {
+                    bool to_bp = p.second == LineStatus::TO_BP || p.second == LineStatus::TO_BP_SAFE;
+                    bool gracious = to_bp || p.second == LineStatus::TO_MODEL_GRACIOUS || p.second == LineStatus::TO_MODEL_GRACIOUS_SAFE;
+                    bool safe_radius = p.second == LineStatus::TO_BP_SAFE || p.second == LineStatus::TO_MODEL_GRACIOUS_SAFE;
+                    if (!mesh_config.support_rests_on_model && !to_bp) {
+                        BOOST_LOG_TRIVIAL(warning) << "Tried to add an invalid support point";
+                        TreeSupport::showError("Unable to add tip. Some overhang may not be supported correctly.", true);
+                        return;
+                    }
+                    Polygons circle{ base_circle };
+                    circle.front().translate(p.first);
+                    {
+                        std::lock_guard<std::mutex> critical_section_movebounds(mutex_movebounds);
+                        Point hash_pos = p.first / ((mesh_config.min_radius + 1) / 10);
+                        if (! already_inserted[insert_layer].count(hash_pos)) {
+                            // normalize the point a bit to also catch points which are so close that inserting it would achieve nothing
+                            already_inserted[insert_layer].emplace(hash_pos);
+                            move_bounds[insert_layer].emplace(
+                                new SupportElement(dtt, insert_layer, p.first, to_bp, gracious, min_xy_dist, dont_move_until, roof, safe_radius, force_tip_to_roof, skip_ovalisation, std::move(circle)));
+                        }
+                    }
+                };
+
                 validate_range(lines);
                 // Add tip area as roof (happens when minimum roof area > minimum tip area) if possible
                 size_t dtt_roof_tip;
@@ -1179,30 +1163,30 @@ void TreeSupport::generateInitialAreas(
 #endif
                     };
 
-                    std::pair<LineInformations, LineInformations> split = 
-                        // keep all lines that are still valid on the next layer
-                        splitLines(lines, [this, insert_layer_idx, dtt_roof_tip](std::pair<Point, LineStatus> &p){ return evaluatePointForNextLayerFunction(m_volumes, m_config, insert_layer_idx - dtt_roof_tip, p); });
-
-                    for (LineInformation line : split.second) // add all points that would not be valid
-                        for (std::pair<Point, LineStatus> point_data : line)
-                            addPointAsInfluenceArea(point_data, 0, insert_layer_idx - dtt_roof_tip, roof_tip_layers - dtt_roof_tip, dtt_roof_tip != 0, false);
-
-                    // not all roofs are guaranteed to actually generate lines, so filter these out and add them as points
-                    split = splitLines(split.first, evaluateRoofWillGenerate);
-                    lines = split.first;
-
-                    for (LineInformation line : split.second)
-                        for (std::pair<Point, LineStatus> point_data : line)
-                            addPointAsInfluenceArea(point_data, 0, insert_layer_idx - dtt_roof_tip, roof_tip_layers - dtt_roof_tip, dtt_roof_tip != 0, false);
+                    {
+                        std::pair<LineInformations, LineInformations> split =
+                            // keep all lines that are still valid on the next layer
+                            splitLines(lines, [this, insert_layer_idx, dtt_roof_tip](const std::pair<Point, LineStatus> &p){ return evaluatePointForNextLayerFunction(m_volumes, m_config, insert_layer_idx - dtt_roof_tip, p); });
+                        LineInformations points = std::move(split.second);
+                        // Not all roofs are guaranteed to actually generate lines, so filter these out and add them as points.
+                        split = splitLines(split.first, evaluateRoofWillGenerate);
+                        lines = std::move(split.first);
+                        append(points, split.second);
+                        // add all points that would not be valid
+                        for (const LineInformation &line : points)
+                            for (const std::pair<Point, LineStatus> &point_data : line)
+                                addPointAsInfluenceArea(point_data, 0, insert_layer_idx - dtt_roof_tip, roof_tip_layers - dtt_roof_tip, dtt_roof_tip != 0, false);
+                    }
 
                     // add all tips as roof to the roof storage
                     Polygons added_roofs;
-                    for (LineInformation line : lines)
-                        for (std::pair<Point, LineStatus> p : line) {
-                            Polygon roof_circle;
-                            for (Point corner : base_circle)
-                                roof_circle.points.emplace_back(p.first + corner * mesh_config.min_radius / base_radius);
-                            added_roofs.emplace_back(roof_circle);
+                    for (const LineInformation &line : lines)
+                        //FIXME sweep the tip radius along the line?
+                        for (const std::pair<Point, LineStatus> &p : line) {
+                            Polygon roof_circle{ base_circle };
+                            roof_circle.scale(mesh_config.min_radius / base_radius);
+                            roof_circle.translate(p.first);
+                            added_roofs.emplace_back(std::move(roof_circle));
                         }
                     if (! added_roofs.empty()) {
                         added_roofs = union_(added_roofs);
@@ -1290,7 +1274,8 @@ void TreeSupport::generateInitialAreas(
 
                         std::pair<LineInformations, LineInformations> split = splitLines(overhang_lines, evaluatePoint); // keep all lines that are invalid
                         overhang_lines = split.first;
-                        LineInformations fresh_valid_points = convertLinesToInternal(m_volumes, m_config, convertInternalToLines(split.second), layer_idx - lag_ctr); // set all now valid lines to their correct LineStatus. Easiest way is to just discard Avoidance information for each point and evaluate them again.
+                        // Set all now valid lines to their correct LineStatus. Easiest way is to just discard Avoidance information for each point and evaluate them again.
+                        LineInformations fresh_valid_points = convertLinesToInternal(m_volumes, m_config, convertInternalToLines(split.second), layer_idx - lag_ctr);
                         validate_range(fresh_valid_points);
 
                         addLinesAsInfluenceAreas(fresh_valid_points, (force_tip_to_roof && lag_ctr <= support_roof_layers) ? support_roof_layers : 0, layer_idx - lag_ctr, false, roof_enabled ? support_roof_layers : 0);
@@ -1344,18 +1329,19 @@ void TreeSupport::generateInitialAreas(
                                     m_volumes.getCollision(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), min_xy_dist)) :
                                 m_volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), AvoidanceType::Fast, false, min_xy_dist);
                             // prevent rounding errors down the line
+                            //FIXME maybe use SafetyOffset::Yes at the following diff() instead?
                             forbidden_next = offset(union_ex(forbidden_next_raw), scaled<float>(0.005), jtMiter, 1.2);
                         }
                         Polygons overhang_outset_next = diff(overhang_outset, forbidden_next);
                         if (area(overhang_outset_next) < mesh_group_settings.minimum_roof_area) {
                             // next layer down the roof area would be to small so we have to insert our roof support here. Also convert squaremicrons to squaremilimeter
-                            size_t dtt_before = dtt_roof > 0 ? dtt_roof - 1 : 0;
                             if (dtt_roof != 0) {
+                                size_t dtt_before = dtt_roof > 0 ? dtt_roof - 1 : 0;
                                 // Produce support head points supporting an interface layer: First produce the interface lines, then sample them.
                                 overhang_lines = convertLinesToInternal(m_volumes, m_config, 
                                     ensureMaximumDistancePolyline(generateLines(last_overhang, true, layer_idx - dtt_before), connect_length, 1), layer_idx - dtt_before);
                                 overhang_lines = splitLines(overhang_lines, 
-                                    [this, layer_idx, dtt_before](std::pair<Point, LineStatus> &p){ return evaluatePointForNextLayerFunction(m_volumes, m_config, layer_idx - dtt_before, p); }).first;
+                                    [this, layer_idx, dtt_before](const std::pair<Point, LineStatus> &p){ return evaluatePointForNextLayerFunction(m_volumes, m_config, layer_idx - dtt_before, p); }).first;
                             }
                             break;
                         }
@@ -1825,7 +1811,7 @@ std::optional<TreeSupport::SupportElement> TreeSupport::increaseSingleArea(AreaI
             polygons_simplify(increased, scaled<float>(0.025));
     } else 
         // if no movement is done the areas keep parent area as no move == offset(0)
-        increased = *parent->area;
+        increased = parent->area;
 
     if (mergelayer || current_elem.to_buildplate) {
         to_bp_data = safeUnion(diff_clipped(increased, m_volumes.getAvoidance(radius, layer_idx - 1, settings.type, false, settings.use_min_distance)));
@@ -2030,7 +2016,7 @@ void TreeSupport::increaseAreas(std::unordered_map<SupportElement, Polygons>& to
                 }
                 order = new_order;
             }
-            if (elem.to_buildplate || (elem.to_model_gracious && intersection(*parent->area, m_volumes.getPlaceableAreas(radius, layer_idx)).empty())) // error case
+            if (elem.to_buildplate || (elem.to_model_gracious && intersection(parent->area, m_volumes.getPlaceableAreas(radius, layer_idx)).empty())) // error case
             {
                 // it is normal that we wont be able to find a new area at some point in time if we wont be able to reach layer 0 aka have to connect with the model
                 insertSetting({ AvoidanceType::Fast, fast_speed, !increase_radius, !no_error, elem.use_min_xy_dist, move }, true);
@@ -2049,12 +2035,12 @@ void TreeSupport::increaseAreas(std::unordered_map<SupportElement, Polygons>& to
                     if (offset_slow.empty() && (settings.increase_speed == slow_speed || !offset_independant_faster)) {
                         // offsetting in 2 steps makes our offsetted area rounder preventing (rounding) errors created by to pointy areas. At this point one can see that the Polygons class 
                         // was never made for precision in the single digit micron range.
-                        offset_slow = safeOffsetInc(*parent->area, extra_speed + extra_slow_speed + m_config.maximum_move_distance_slow, wall_restriction, safe_movement_distance, offset_independant_faster ? safe_movement_distance + radius : 0, 2); 
+                        offset_slow = safeOffsetInc(parent->area, extra_speed + extra_slow_speed + m_config.maximum_move_distance_slow, wall_restriction, safe_movement_distance, offset_independant_faster ? safe_movement_distance + radius : 0, 2); 
                     }
 
                     if ((settings.increase_speed != slow_speed) && offset_fast.empty()) {
                         if (offset_independant_faster)
-                            offset_fast = safeOffsetInc(*parent->area, extra_speed + m_config.maximum_move_distance, wall_restriction, safe_movement_distance, offset_independant_faster ? safe_movement_distance + radius : 0, 1);
+                            offset_fast = safeOffsetInc(parent->area, extra_speed + m_config.maximum_move_distance, wall_restriction, safe_movement_distance, offset_independant_faster ? safe_movement_distance + radius : 0, 1);
                         else {
                             const coord_t delta_slow_fast = m_config.maximum_move_distance - (m_config.maximum_move_distance_slow + extra_slow_speed);
                             offset_fast = safeOffsetInc(offset_slow, delta_slow_fast, wall_restriction, safe_movement_distance, safe_movement_distance + radius, offset_independant_faster ? 2 : 1);
@@ -2065,8 +2051,8 @@ void TreeSupport::increaseAreas(std::unordered_map<SupportElement, Polygons>& to
                 if (!settings.no_error) { 
                     // ERROR CASE
                     // if the area becomes for whatever reason something that clipper sees as a line, offset would stop working, so ensure that even if if wrongly would be a line, it still actually has an area that can be increased
-                    Polygons lines_offset = offset(to_polylines(*parent->area), scaled<float>(0.005), jtMiter, 1.2);
-                    Polygons base_error_area = union_(*parent->area, lines_offset);
+                    Polygons lines_offset = offset(to_polylines(parent->area), scaled<float>(0.005), jtMiter, 1.2);
+                    Polygons base_error_area = union_(parent->area, lines_offset);
                     result = increaseSingleArea(settings, layer_idx, parent, base_error_area, to_bp_data, to_model_data, inc_wo_collision, (m_config.maximum_move_distance + extra_speed) * 1.5, mergelayer);
 #ifdef TREE_SUPPORT_SHOW_ERRORS
                     BOOST_LOG_TRIVIAL(error)
@@ -2118,10 +2104,7 @@ void TreeSupport::increaseAreas(std::unordered_map<SupportElement, Polygons>& to
                 {
                     std::lock_guard<std::mutex> critical_section_newLayer(critical_sections);
                     if (bypass_merge) {
-                        validate_range(max_influence_area);
-                        Polygons* new_area = new Polygons(max_influence_area);
-                        SupportElement* next = new SupportElement(elem, new_area);
-                        bypass_merge_areas.emplace_back(next);
+                        bypass_merge_areas.emplace_back(new SupportElement(elem, std::move(max_influence_area)));
                     } else {
                         influence_areas.emplace(elem, max_influence_area);
                         if (elem.to_buildplate)
@@ -2130,8 +2113,7 @@ void TreeSupport::increaseAreas(std::unordered_map<SupportElement, Polygons>& to
                             to_model_areas.emplace(elem, to_model_data);
                     }
                 }
-            }
-            else
+            } else
                 parent->result_on_layer = Point(-1, -1); // If the bottom most point of a branch is set, later functions will assume that the position is valid, and ignore it. But as branches connecting with the model that are to small have to be culled, the bottom most point has to be not set. A point can be set on the top most tip layer (maybe more if it should not move for a few layers).
         }
     });
@@ -2205,11 +2187,10 @@ void TreeSupport::createLayerPathing(std::vector<std::set<SupportElement*>>& mov
             const SupportElement &elem = tup.first;
             validate_range(tup.second);
             validate_range(safeUnion(tup.second));
-            Polygons* new_area = new Polygons(safeUnion(tup.second));
-            SupportElement* next = new SupportElement(elem, new_area);
-            move_bounds[layer_idx - 1].emplace(next);
-
-            if (area(*new_area) < tiny_area_threshold) {
+            Polygons new_area = safeUnion(tup.second);
+            double   new_area_area = area(new_area);
+            move_bounds[layer_idx - 1].emplace(new SupportElement(elem, std::move(new_area)));
+            if (new_area_area < tiny_area_threshold) {
                 BOOST_LOG_TRIVIAL(error) << "Insert Error of Influence area on layer " << layer_idx - 1 << ". Origin of " << elem.parents.size() << " areas. Was to bp " << elem.to_buildplate;
                 TreeSupport::showError("Insert error of area after merge.\n", true);
             }
@@ -2217,7 +2198,7 @@ void TreeSupport::createLayerPathing(std::vector<std::set<SupportElement*>>& mov
 
         // Place already fully constructed elements in the output.
         for (SupportElement* elem : bypass_merge_areas) {
-            if (area(*elem->area) < tiny_area_threshold) {
+            if (area(elem->area) < tiny_area_threshold) {
                 BOOST_LOG_TRIVIAL(error) << "Insert Error of Influence area bypass on layer " << layer_idx - 1;
                 TreeSupport::showError("Insert error of area after bypassing merge.\n", true);
             }
@@ -2251,8 +2232,8 @@ void TreeSupport::setPointsOnAreas(const SupportElement* elem)
             continue;
 
         Point from = elem->result_on_layer;
-        if (! contains(*next_elem->area, from)) {
-            moveInside(*next_elem->area, from, 0); // Move inside has edgecases (see tests) so DONT use Polygons.inside to confirm correct move, Error with distance 0 is <= 1
+        if (! contains(next_elem->area, from)) {
+            moveInside(next_elem->area, from, 0); // Move inside has edgecases (see tests) so DONT use Polygons.inside to confirm correct move, Error with distance 0 is <= 1
             // it is not required to check if how far this move moved a point as is can be larger than maximum_movement_distance. While this seems like a problem it may for example occur after merges.
         }
         next_elem->result_on_layer = from;
@@ -2274,7 +2255,7 @@ bool TreeSupport::setToModelContact(std::vector<std::set<SupportElement*>>& move
 
         for (LayerIndex layer_check = layer_idx; check->next_height >= layer_check; layer_check++)
         {
-            if (! intersection(*check->area, m_volumes.getPlaceableAreas(m_config.getCollisionRadius(*check), layer_check)).empty()) {
+            if (! intersection(check->area, m_volumes.getPlaceableAreas(m_config.getCollisionRadius(*check), layer_check)).empty()) {
                 set = true;
                 last_successfull_layer = layer_check;
             }
@@ -2299,7 +2280,6 @@ bool TreeSupport::setToModelContact(std::vector<std::set<SupportElement*>>& move
                 for (LayerIndex layer = layer_idx; layer <= first_elem->next_height; layer++)
                 {
                     move_bounds[layer].erase(checked[layer - layer_idx]);
-                    delete checked[layer - layer_idx]->area;
                     delete checked[layer - layer_idx];
                 }
             }
@@ -2315,14 +2295,13 @@ bool TreeSupport::setToModelContact(std::vector<std::set<SupportElement*>>& move
         for (LayerIndex layer = layer_idx + 1; layer < last_successfull_layer - 1; layer++)
         {
             move_bounds[layer].erase(checked[layer - layer_idx]);
-            delete checked[layer - layer_idx]->area;
             delete checked[layer - layer_idx];
         }
 
         // Guess a point inside the influence area, in which the branch will be placed in.
         Point best = checked[last_successfull_layer - layer_idx]->next_position;
-        if (! contains(*checked[last_successfull_layer - layer_idx]->area, best))
-            moveInside(*checked[last_successfull_layer - layer_idx]->area, best);
+        if (! contains(checked[last_successfull_layer - layer_idx]->area, best))
+            moveInside(checked[last_successfull_layer - layer_idx]->area, best);
         checked[last_successfull_layer - layer_idx]->result_on_layer = best;
 
         BOOST_LOG_TRIVIAL(debug) << "Added gracious Support On Model Point (" << best.x() << "," << best.y() << "). The current layer is " << last_successfull_layer;
@@ -2332,8 +2311,8 @@ bool TreeSupport::setToModelContact(std::vector<std::set<SupportElement*>>& move
     else // can not add graceful => just place it here and hope for the best
     {
         Point best = first_elem->next_position;
-        if (! contains(*first_elem->area, best))
-            moveInside(*first_elem->area, best);
+        if (! contains(first_elem->area, best))
+            moveInside(first_elem->area, best);
         first_elem->result_on_layer = best;
         first_elem->to_model_gracious = false;
         BOOST_LOG_TRIVIAL(debug) << "Added NON gracious Support On Model Point (" << best.x() << "," << best.y() << "). The current layer is " << layer_idx;
@@ -2346,8 +2325,8 @@ void TreeSupport::createNodesFromArea(std::vector<std::set<SupportElement*>>& mo
     // Initialize points on layer 0, with a "random" point in the influence area. Point is chosen based on an inaccurate estimate where the branches will split into two, but every point inside the influence area would produce a valid result.
     for (SupportElement* init : move_bounds[0]) {
         Point p = init->next_position;
-        if (! contains(*init->area, p))
-            moveInside(*init->area, p, 0);
+        if (! contains(init->area, p))
+            moveInside(init->area, p, 0);
         init->result_on_layer = p;
         setPointsOnAreas(init); // also set the parent nodes, as these will be required for the first iteration of the loop below
     }
@@ -2384,7 +2363,6 @@ void TreeSupport::createNodesFromArea(std::vector<std::set<SupportElement*>>& mo
         // delete all not needed support elements
         for (SupportElement* del : remove) {
             move_bounds[layer_idx].erase(del);
-            delete del->area;
             delete del;
         }
         remove.clear();

@@ -111,16 +111,16 @@ public:
     {
         explicit SupportElement(
             coord_t distance_to_top, size_t target_height, Point target_position, bool to_buildplate, bool to_model_gracious, bool use_min_xy_dist, size_t dont_move_until, 
-            bool supports_roof, bool can_use_safe_radius, bool force_tips_to_roof, bool skip_ovalisation) : 
+            bool supports_roof, bool can_use_safe_radius, bool force_tips_to_roof, bool skip_ovalisation, Polygons &&newArea) : 
             target_height(target_height), target_position(target_position), next_position(target_position), next_height(target_height), effective_radius_height(distance_to_top), 
-            to_buildplate(to_buildplate), distance_to_top(distance_to_top), area(nullptr), result_on_layer(target_position), increased_to_model_radius(0), to_model_gracious(to_model_gracious), 
+            to_buildplate(to_buildplate), distance_to_top(distance_to_top), result_on_layer(target_position), increased_to_model_radius(0), to_model_gracious(to_model_gracious), 
             elephant_foot_increases(0), use_min_xy_dist(use_min_xy_dist), supports_roof(supports_roof), dont_move_until(dont_move_until), can_use_safe_radius(can_use_safe_radius), 
-            last_area_increase(AreaIncreaseSettings{ AvoidanceType::Fast, 0, false, false, false, false }), missing_roof_layers(force_tips_to_roof ? dont_move_until : 0), skip_ovalisation(skip_ovalisation)
+            last_area_increase(AreaIncreaseSettings{ AvoidanceType::Fast, 0, false, false, false, false }), missing_roof_layers(force_tips_to_roof ? dont_move_until : 0), skip_ovalisation(skip_ovalisation), 
+            area(std::move(newArea))
         {
         }
 
-
-        explicit SupportElement(const SupportElement& elem, Polygons* newArea = nullptr)
+        explicit SupportElement(const SupportElement& elem, Polygons &&newArea)
             : // copy constructor with possibility to set a new area
               target_height(elem.target_height),
               target_position(elem.target_position),
@@ -129,7 +129,7 @@ public:
               effective_radius_height(elem.effective_radius_height),
               to_buildplate(elem.to_buildplate),
               distance_to_top(elem.distance_to_top),
-              area(newArea != nullptr ? newArea : elem.area),
+              area(std::move(newArea)),
               result_on_layer(elem.result_on_layer),
               increased_to_model_radius(elem.increased_to_model_radius),
               to_model_gracious(elem.to_model_gracious),
@@ -178,7 +178,7 @@ public:
         explicit SupportElement(
             const SupportElement& first, const SupportElement& second, size_t next_height, Point next_position, 
             coord_t increased_to_model_radius, const TreeSupportSettings& config) : 
-            next_position(next_position), next_height(next_height), area(nullptr), increased_to_model_radius(increased_to_model_radius), 
+            next_position(next_position), next_height(next_height), increased_to_model_radius(increased_to_model_radius), 
             use_min_xy_dist(first.use_min_xy_dist || second.use_min_xy_dist), supports_roof(first.supports_roof || second.supports_roof), 
             dont_move_until(std::max(first.dont_move_until, second.dont_move_until)), can_use_safe_radius(first.can_use_safe_radius || second.can_use_safe_radius), 
             missing_roof_layers(std::min(first.missing_roof_layers, second.missing_roof_layers)), skip_ovalisation(false)
@@ -265,7 +265,7 @@ public:
          * \brief The resulting influence area.
          * Will only be set in the results of createLayerPathing, and will be nullptr inside!
          */
-        Polygons* area;
+        Polygons area;
 
         /*!
          * \brief The resulting center point around which a circle will be drawn later.
