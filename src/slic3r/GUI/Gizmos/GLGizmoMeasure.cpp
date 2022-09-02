@@ -15,19 +15,6 @@
 
 #if ENABLE_MEASURE_GIZMO
 
-std::string surface_feature_type_as_string(Slic3r::Measure::SurfaceFeatureType type)
-{
-    switch (type)
-    {
-    default:
-    case Slic3r::Measure::SurfaceFeatureType::Undef:  { return L("Undefined"); }
-    case Slic3r::Measure::SurfaceFeatureType::Point:  { return L("Vertex"); }
-    case Slic3r::Measure::SurfaceFeatureType::Edge:   { return L("Edge"); }
-    case Slic3r::Measure::SurfaceFeatureType::Circle: { return L("Circle"); }
-    case Slic3r::Measure::SurfaceFeatureType::Plane:  { return L("Plane"); }
-    }
-}
-
 namespace Slic3r {
 namespace GUI {
 
@@ -46,6 +33,32 @@ static const std::string CTRL_STR =
 "Ctrl"
 #endif //__APPLE__
 ;
+
+static std::string surface_feature_type_as_string(Measure::SurfaceFeatureType type)
+{
+    switch (type)
+    {
+    default:
+    case Measure::SurfaceFeatureType::Undef:  { return L("Undefined"); }
+    case Measure::SurfaceFeatureType::Point:  { return L("Vertex"); }
+    case Measure::SurfaceFeatureType::Edge:   { return L("Edge"); }
+    case Measure::SurfaceFeatureType::Circle: { return L("Circle"); }
+    case Measure::SurfaceFeatureType::Plane:  { return L("Plane"); }
+    }
+}
+
+static std::string point_on_feature_type_as_string(Measure::SurfaceFeatureType type, int hover_id)
+{
+    std::string ret;
+    switch (type) {
+    case Measure::SurfaceFeatureType::Point:  { ret = _u8L("Vertex"); break; }
+    case Measure::SurfaceFeatureType::Edge:   { ret = _u8L("Point on edge"); break; }
+    case Measure::SurfaceFeatureType::Circle: { ret = (hover_id == POINT_ID) ? _u8L("Center of circle") : _u8L("Point on circle"); break; }
+    case Measure::SurfaceFeatureType::Plane:  { ret = _u8L("Point on plane"); break; }
+    default: { assert(false); break; }
+    }
+    return ret;
+}
 
 static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const std::vector<std::vector<int>>& planes_triangles, int idx)
 {
@@ -97,9 +110,9 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             m_mouse_left_down = true;
 
             auto set_item_from_feature = [this]() {
-                const SelectedFeatures::Item item = { m_mode, (m_mode == EMode::ExtendedSelection) ?
-                    Measure::SurfaceFeature(Measure::SurfaceFeatureType::Point, *m_curr_ex_feature_position, Vec3d::Zero(), std::nullopt, 0.0) :
-                    m_curr_feature };
+                const SelectedFeatures::Item item = { m_mode,
+                    (m_mode == EMode::ExtendedSelection) ? point_on_feature_type_as_string(m_curr_feature->get_type(), m_hover_id) : surface_feature_type_as_string(m_curr_feature->get_type()),
+                    (m_mode == EMode::ExtendedSelection) ? Measure::SurfaceFeature(Measure::SurfaceFeatureType::Point, *m_curr_point_on_feature_position, Vec3d::Zero(), std::nullopt, 0.0) : m_curr_feature };
                 return item;
             };
 
@@ -179,7 +192,7 @@ void GLGizmoMeasure::on_set_state()
     if (m_state == Off) {
         m_ctrl_kar_filter.reset_count();
         m_curr_feature.reset();
-        m_curr_ex_feature_position.reset();
+        m_curr_point_on_feature_position.reset();
     }
     else
         m_mode = EMode::BasicSelection;
@@ -231,7 +244,7 @@ void GLGizmoMeasure::on_render()
             curr_feature = m_measuring->get_feature(facet_idx, position_on_model.cast<double>());
 
         if (m_mode == EMode::BasicSelection) {
-            m_curr_ex_feature_position.reset();
+            m_curr_point_on_feature_position.reset();
             if (m_curr_feature != curr_feature) {
                 GLGizmoMeasure::on_unregister_raycasters_for_picking();
                 m_curr_feature = curr_feature;
@@ -291,7 +304,7 @@ void GLGizmoMeasure::on_render()
             default: { assert(false); break; }
             case Measure::SurfaceFeatureType::Point:
             {
-                m_curr_ex_feature_position = model_matrix * m_curr_feature->get_point();
+                m_curr_point_on_feature_position = model_matrix * m_curr_feature->get_point();
                 break;
             }
             case Measure::SurfaceFeatureType::Edge:
@@ -303,20 +316,20 @@ void GLGizmoMeasure::on_render()
                     const Transform3d& trafo = it->second->get_transform();
                     it->second->get_raycaster()->unproject_on_mesh(m_mouse_pos, trafo, camera, p, n);
                     p = { 0.0f, 0.0f, p.z() };
-                    m_curr_ex_feature_position = trafo * p.cast<double>();
+                    m_curr_point_on_feature_position = trafo * p.cast<double>();
                 }
                 break;
             }
             case Measure::SurfaceFeatureType::Plane:
             {
-                m_curr_ex_feature_position = model_matrix * position_on_model.cast<double>();
+                m_curr_point_on_feature_position = model_matrix * position_on_model.cast<double>();
                 break;
             }
             case Measure::SurfaceFeatureType::Circle:
             {
                 const auto& [center, radius, normal] = m_curr_feature->get_circle();
                 if (m_hover_id == POINT_ID)
-                    m_curr_ex_feature_position = model_matrix * center;
+                    m_curr_point_on_feature_position = model_matrix * center;
                 else {
                     auto it = m_raycasters.find(CIRCLE_ID);
                     if (it != m_raycasters.end() && it->second != nullptr) {
@@ -328,7 +341,7 @@ void GLGizmoMeasure::on_render()
                         if (angle < 0.0f)
                             angle += 2.0f * float(M_PI);
                         p = float(radius) * Vec3f(std::cos(angle), std::sin(angle), 0.0f);
-                        m_curr_ex_feature_position = trafo * p.cast<double>();
+                        m_curr_point_on_feature_position = trafo * p.cast<double>();
                     }
                 }
                 break;
@@ -490,12 +503,11 @@ void GLGizmoMeasure::on_render()
                 (m_selected_features.second.mode == EMode::BasicSelection) ? model_matrix : Transform3d::Identity(), inv_zoom, false);
         }
 
-        if (is_hovering_on_extended_selection && m_curr_ex_feature_position.has_value()) {
+        if (is_hovering_on_extended_selection && m_curr_point_on_feature_position.has_value()) {
             if (m_hover_id != POINT_ID) {
-                const Transform3d matrix = Geometry::translation_transform(*m_curr_ex_feature_position) * Geometry::scale_transform(inv_zoom);
+                const Transform3d matrix = Geometry::translation_transform(*m_curr_point_on_feature_position) * Geometry::scale_transform(inv_zoom);
                 set_matrix_uniforms(matrix);
                 m_sphere.model.set_color(hover_selection_color());
-//                m_sphere.model.set_color(EXTENDED_HOVER_COLOR);
                 m_sphere.model.render();
             }
         }
@@ -591,12 +603,12 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             last_y = y;
     }
 
-    auto add_row_to_table = [this](const std::string& label, const ImVec4& label_color, const std::string& value, const ImVec4& value_color) {
+    auto add_row_to_table = [this](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        m_imgui->text_colored(label_color, label);
+        m_imgui->text_colored(col_1_color, col_1);
         ImGui::TableSetColumnIndex(1);
-        m_imgui->text_colored(value_color, value);
+        m_imgui->text_colored(col_2_color, col_2);
     };
 
     auto format_double = [](double value) {
@@ -671,20 +683,11 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             }
         }
         else if (m_mode == EMode::ExtendedSelection) {
-            if (m_hover_id != -1 && m_curr_ex_feature_position.has_value()) {
-                std::string header;
-                switch (feature_type) {
-                case Measure::SurfaceFeatureType::Point:  { header = _u8L("Vertex"); break; }
-                case Measure::SurfaceFeatureType::Edge:   { header = _u8L("Point on edge"); break; }
-                case Measure::SurfaceFeatureType::Circle: { header = (m_hover_id == POINT_ID) ? _u8L("Center of circle") : _u8L("Point on circle"); break; }
-                case Measure::SurfaceFeatureType::Plane:  { header = _u8L("Point on plane"); break; }
-                default: { assert(false); break; }
-                }
-
+            if (m_hover_id != -1 && m_curr_point_on_feature_position.has_value()) {
                 ImGui::Separator();
-                m_imgui->text(header + ":");
+                m_imgui->text(point_on_feature_type_as_string(feature_type, m_hover_id) + ":");
                 if (ImGui::BeginTable("Data", 2)) {
-                    add_row_to_table(_u8L("Position"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(*m_curr_ex_feature_position),
+                    add_row_to_table(_u8L("Position"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(*m_curr_point_on_feature_position),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::EndTable();
                 }
@@ -693,12 +696,12 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     }
 
     ImGui::Separator();
-    m_imgui->text(_u8L("Selection"));
-    if (ImGui::BeginTable("Selection", 2)) {
-        add_row_to_table("1", ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR), m_selected_features.first.feature.has_value() ?
-            surface_feature_type_as_string(m_selected_features.first.feature->get_type()) : _u8L("None"), ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR));
-        add_row_to_table("2", ImGuiWrapper::to_ImVec4(SELECTED_2ND_COLOR), m_selected_features.second.feature.has_value() ?
-            surface_feature_type_as_string(m_selected_features.second.feature->get_type()) : _u8L("None"), ImGuiWrapper::to_ImVec4(SELECTED_2ND_COLOR));
+    const ImGuiTableFlags flags = /*ImGuiTableFlags_SizingStretchSame | */ImGuiTableFlags_BordersOuter | /*ImGuiTableFlags_BordersV | */ImGuiTableFlags_BordersH;
+    if (ImGui::BeginTable("Selection", 2, flags)) {
+        add_row_to_table(_u8L("Selection") + " 1:", ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR), m_selected_features.first.feature.has_value() ?
+            m_selected_features.first.source : _u8L("None"), ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR));
+        add_row_to_table(_u8L("Selection") + " 2:", ImGuiWrapper::to_ImVec4(SELECTED_2ND_COLOR), m_selected_features.second.feature.has_value() ?
+            m_selected_features.second.source : _u8L("None"), ImGuiWrapper::to_ImVec4(SELECTED_2ND_COLOR));
         ImGui::EndTable();
     }
 
