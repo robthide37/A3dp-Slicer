@@ -3311,9 +3311,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-            handle_sidebar_focus_event("", false);
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3321,9 +3318,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        handle_sidebar_focus_event("", false);
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3331,9 +3325,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        handle_sidebar_focus_event("", false);
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3341,9 +3332,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        handle_sidebar_focus_event("", false);
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3388,9 +3376,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
         }
 
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        handle_sidebar_focus_event("", false);
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3405,39 +3390,27 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_mouse.set_move_start_threshold_position_2D_as_invalid();
     }
 
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-    if (evt.ButtonDown()) {
-        std::string curr_sidebar_field = m_sidebar_field;
-        handle_sidebar_focus_event("", false);
-        if (boost::algorithm::istarts_with(curr_sidebar_field, "layer"))
-            // restore visibility of layers hints after left clicking on the 3D scene
-            m_sidebar_field = curr_sidebar_field;
-        if (wxWindow::FindFocus() != m_canvas)
-            // Grab keyboard focus on any mouse click event.
-            m_canvas->SetFocus();
-    }
-#else
     if (evt.ButtonDown() && wxWindow::FindFocus() != m_canvas)
         // Grab keyboard focus on any mouse click event.
         m_canvas->SetFocus();
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
 
     if (evt.Entering()) {
 //#if defined(__WXMSW__) || defined(__linux__)
 //        // On Windows and Linux needs focus in order to catch key events
-#if !ENABLE_OBJECT_MANIPULATOR_FOCUS
-        // Set focus in order to remove it from sidebar fields
-#endif // !ENABLE_OBJECT_MANIPULATOR_FOCUS
+        // Set focus in order to remove it from object list
         if (m_canvas != nullptr) {
-#if !ENABLE_OBJECT_MANIPULATOR_FOCUS
-            // Only set focus, if the top level window of this canvas is active.
+            // Only set focus, if the top level window of this canvas is active
+            // and ObjectList has a focus
             auto p = dynamic_cast<wxWindow*>(evt.GetEventObject());
             while (p->GetParent())
                 p = p->GetParent();
-            auto *top_level_wnd = dynamic_cast<wxTopLevelWindow*>(p);
-            if (top_level_wnd && top_level_wnd->IsActive())
+#ifdef __WIN32__
+            wxWindow* const obj_list = wxGetApp().obj_list()->GetMainWindow();
+#else
+            wxWindow* const obj_list = wxGetApp().obj_list();
+#endif
+            if (obj_list == p->FindFocus())
                 m_canvas->SetFocus();
-#endif // !ENABLE_OBJECT_MANIPULATOR_FOCUS
             m_mouse.position = pos.cast<double>();
             m_tooltip_enabled = false;
             // 1) forces a frame render to ensure that m_hover_volume_idxs is updated even when the user right clicks while
@@ -7135,6 +7108,11 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
         return volume;
     };
     const size_t    volumes_cnt_initial = m_volumes.volumes.size();
+    // Limit the number of threads as the code below does not scale well due to memory pressure.
+    // (most of the time is spent in malloc / free / memmove)
+    // Not using all the threads leaves some of the threads to G-code generator.
+    tbb::task_arena limited_arena(std::min(tbb::this_task_arena::max_concurrency(), 4));
+    limited_arena.execute([&ctxt, grain_size, &new_volume, is_selected_separate_extruder, this]{
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, ctxt.layers.size(), grain_size),
         [&ctxt, &new_volume, is_selected_separate_extruder, this](const tbb::blocked_range<size_t>& range) {
@@ -7309,6 +7287,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
             vol->indexed_vertex_array.shrink_to_fit();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     });
+    }); // task arena
 
     BOOST_LOG_TRIVIAL(debug) << "Loading print object toolpaths in parallel - finalizing results" << m_volumes.log_memory_info() << log_memory_info();
     // Remove empty volumes from the newly added volumes.

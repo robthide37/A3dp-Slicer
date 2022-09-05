@@ -626,7 +626,8 @@ PrintObjectRegions::BoundingBox find_modifier_volume_extents(const PrintObjectRe
             const PrintObjectRegions::VolumeRegion &parent_region  = layer_range.volume_regions[parent_region_id];
             const PrintObjectRegions::BoundingBox  *parent_extents = find_volume_extents(layer_range, *parent_region.model_volume);
             assert(parent_extents);
-            out.extend(*parent_extents);
+            out.clamp(*parent_extents);
+            assert(! out.isEmpty());
             if (parent_region.model_volume->is_model_part())
                 break;
             parent_region_id = parent_region.parent;

@@ -896,6 +896,7 @@ static boost::optional<Semver> parse_semver_from_ini(std::string path)
 void GUI_App::init_app_config()
 {
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
+
 //  SetAppName(SLIC3R_APP_KEY);
 	SetAppName(SLIC3R_APP_KEY "-alpha");
 //  SetAppName(SLIC3R_APP_KEY "-beta");
@@ -2826,6 +2827,11 @@ wxBookCtrlBase* GUI_App::tab_panel() const
 NotificationManager * GUI_App::notification_manager()
 {
     return plater_->get_notification_manager();
+}
+
+GalleryDialog* GUI_App::gallery_dialog()
+{
+    return mainframe->gallery_dialog();
 }
 
 // extruders count from selected printer preset

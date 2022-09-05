@@ -168,6 +168,7 @@ protected:
 	ScalableButton*		m_search_btn;
 	ScalableButton*		m_btn_compare_preset;
 	ScalableButton*		m_btn_save_preset;
+	ScalableButton*		m_btn_rename_preset;
 	ScalableButton*		m_btn_delete_preset;
 	ScalableButton*		m_btn_edit_ph_printer {nullptr};
 	ScalableButton*		m_btn_hide_incompatible_presets;
@@ -322,6 +323,7 @@ public:
 
 	void		compare_preset();
 	void		save_preset(std::string name = std::string(), bool detach = false);
+	void		rename_preset();
 	void		delete_preset();
 	void		toggle_show_hide_incompatible();
 	void		update_show_hide_incompatible_button();
@@ -408,7 +410,6 @@ public:
 	~TabPrint() {}
 
 	void		build() override;
-	void		reload_config() override;
 	void		update_description_lines() override;
 	void		toggle_options() override;
 	void		update() override;
@@ -442,7 +443,6 @@ public:
 	~TabFilament() {}
 
 	void		build() override;
-	void		reload_config() override;
 	void		update_description_lines() override;
 	void		toggle_options() override;
 	void		update() override;
@@ -515,7 +515,6 @@ public:
     ~TabSLAMaterial() {}
 
 	void		build() override;
-	void		reload_config() override;
 	void		toggle_options() override;
 	void		update() override;
     void		init_options_list() override;
@@ -532,7 +531,6 @@ public:
 	ogStaticText* m_support_object_elevation_description_line = nullptr;
 
     void		build() override;
-	void		reload_config() override;
 	void		update_description_lines() override;
 	void		toggle_options() override;
     void		update() override;

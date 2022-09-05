@@ -23,8 +23,8 @@ void GCodeWriter::apply_print_config(const PrintConfig &print_config)
     bool use_mach_limits = print_config.gcode_flavor.value == gcfMarlinLegacy
                         || print_config.gcode_flavor.value == gcfMarlinFirmware
                         || print_config.gcode_flavor.value == gcfRepRapFirmware;
-    m_max_acceleration = std::lrint((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) ?
-        print_config.machine_max_acceleration_extruding.values.front() : 0);
+    m_max_acceleration = static_cast<unsigned int>(std::round((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) ?
+        print_config.machine_max_acceleration_extruding.values.front() : 0));
 }
 
 void GCodeWriter::set_extruders(std::vector<unsigned int> extruder_ids)

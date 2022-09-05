@@ -257,9 +257,9 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         //    axis_name->SetForegroundColour(wxColour(axes_color_text[axis_idx]));
 
         sizer = new wxBoxSizer(wxHORIZONTAL);
-        // Under OSX we use font, smaller than default font, so
+        // Under OSX or Linux with GTK3 we use font, smaller than default font, so
         // there is a next trick for an equivalent layout of coordinates combobox and axes labels in they own sizers
-        if (wxOSX) 
+        if (wxOSX || wxGTK3)
             sizer->SetMinSize(-1, m_word_local_combo->GetBestHeight(-1));
         sizer->Add(axis_name, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, border);
 
@@ -590,7 +590,10 @@ void ObjectManipulation::update_ui_from_settings()
 
         for (int i = 0; i < 3; ++i) {
             auto update = [this, i](/*ManipulationEditorKey*/int key_id, const Vec3d& new_value) {
-                wxString new_text = double_to_string(m_imperial_units ? new_value(i) * mm_to_in : new_value(i), 2);
+                double value = new_value(i);
+                if (m_imperial_units)
+                    value *= mm_to_in;
+                wxString new_text = double_to_string(value, m_imperial_units && key_id == 3/*meSize*/ ? 4 : 2);
                 const int id = key_id * 3 + i;
                 if (id >= 0) m_editors[id]->set_value(new_text);
             };
@@ -776,14 +779,22 @@ void ObjectManipulation::update_if_dirty()
 
     for (int i = 0; i < 3; ++ i) {
         auto update = [this, i](Vec3d &cached, Vec3d &cached_rounded, ManipulationEditorKey key_id, const Vec3d &new_value) {
-			wxString new_text = double_to_string(new_value(i), 2);
+			wxString new_text = double_to_string(new_value(i), m_imperial_units && key_id == meSize ? 4 : 2);
 			double new_rounded;
 			new_text.ToDouble(&new_rounded);
 			if (std::abs(cached_rounded(i) - new_rounded) > EPSILON) {
 				cached_rounded(i) = new_rounded;
                 const int id = key_id*3+i;
-                if (m_imperial_units && (key_id == mePosition || key_id == meSize))
-                    new_text = double_to_string(new_value(i)*mm_to_in, 2);
+                if (m_imperial_units) {
+                    double inch_value = new_value(i) * mm_to_in;
+                    if (key_id == mePosition)
+                        new_text = double_to_string(inch_value, 2);
+                    if (key_id == meSize) {
+                        if(std::abs(m_cache.size_inches(i) - inch_value) > EPSILON)
+                            m_cache.size_inches(i) = inch_value;
+                        new_text = double_to_string(inch_value, 4);
+                    }
+                }
                 if (id >= 0) m_editors[id]->set_value(new_text);
             }
 			cached(i) = new_value(i);
@@ -1137,6 +1148,13 @@ void ObjectManipulation::change_size_value(int axis, double value)
     if (value <= 0.0)
         return;
 
+    if (m_imperial_units) {
+        if (std::abs(m_cache.size_inches(axis) - value) < EPSILON)
+            return;
+        m_cache.size_inches(axis) = value;
+        value *= in_to_mm;
+    }
+
     if (std::abs(m_cache.size_rounded(axis) - value) < EPSILON)
         return;
 
@@ -1237,11 +1255,11 @@ void ObjectManipulation::on_change(const std::string& opt_key, int axis, double 
     if (!m_cache.is_valid())
         return;
 
-    if (m_imperial_units && (opt_key == "position" || opt_key == "size"))
-        new_value *= in_to_mm;
-
-    if (opt_key == "position")
+    if (opt_key == "position") {
+        if (m_imperial_units)
+            new_value *= in_to_mm;
         change_position_value(axis, new_value);
+    }
     else if (opt_key == "rotation")
         change_rotation_value(axis, new_value);
     else if (opt_key == "scale") {
@@ -1327,6 +1345,15 @@ void ObjectManipulation::set_coordinates_type(ECoordinatesType type)
     canvas->get_gizmos_manager().update_data();
     canvas->set_as_dirty();
     canvas->request_extra_frame();
+}
+
+ECoordinatesType ObjectManipulation::get_coordinates_type() const
+{
+    const wxString og_name = get_og()->get_name();
+    if (og_name.Contains(_L("Group manipulation")))
+        return ECoordinatesType::World;
+
+    return m_coordinates_type;
 }
 #endif // ENABLE_WORLD_COORDINATE
 
@@ -1433,12 +1460,7 @@ ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
     {
         parent->set_focused_editor(nullptr);
 
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        // if the widgets loosing focus is a manipulator field, call kill_focus
-        if (dynamic_cast<ManipulationEditor*>(e.GetEventObject()) != nullptr)
-#else
         if (!m_enter_pressed)
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
             kill_focus(parent);
 
         e.Skip();

@@ -18,6 +18,11 @@
     #define wxOSX true
 #else
     #define wxOSX false
+#endif 
+#ifdef __WXGTK3__
+    #define wxGTK3 true
+#else
+    #define wxGTK3 false
 #endif
 
 #define BORDER(a, b) ((wxOSX ? a : b))
@@ -171,9 +176,8 @@ public:
 	void			show_field(const t_config_option_key& opt_key, bool show = true);
 	void			hide_field(const t_config_option_key& opt_key) {  show_field(opt_key, false);  }
 
-	void			set_name(const wxString& new_name) {
-							stb->SetLabel(new_name);
-    }
+	void			set_name(const wxString& new_name) { stb->SetLabel(new_name); }
+	wxString		get_name() const { return stb->GetLabel(); }
 
 	inline void		enable() { for (auto& field : m_fields) field.second->enable(); }
     inline void		disable() { for (auto& field : m_fields) field.second->disable(); }

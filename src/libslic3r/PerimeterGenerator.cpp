@@ -21,12 +21,12 @@
 
 namespace Slic3r {
 
-ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance, const float merge_tolerance)
+ExtrusionMultiPath thick_polyline_to_multi_path(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance, const float merge_tolerance)
 {
-    ExtrusionPaths paths;
-    ExtrusionPath path(role);
-    ThickLines lines = thick_polyline.thicklines();
-    
+    ExtrusionMultiPath multi_path;
+    ExtrusionPath      path(role);
+    ThickLines         lines = thick_polyline.thicklines();
+
     for (int i = 0; i < (int)lines.size(); ++i) {
         const ThickLine& line = lines[i];
         assert(line.a_width >= SCALED_EPSILON && line.b_width >= SCALED_EPSILON);
@@ -38,8 +38,8 @@ ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_poly
                 path.polyline.points.back() = line.b; // If the variable path is non-empty, connect this tiny line to it.
             else if (i + 1 < (int)lines.size()) // If there is at least one following line, connect this tiny line to it.
                 lines[i + 1].a = line.a;
-            else if (!paths.empty())
-                paths.back().polyline.points.back() = line.b; // Connect this tiny line to the last finished path.
+            else if (!multi_path.paths.empty())
+                multi_path.paths.back().polyline.points.back() = line.b; // Connect this tiny line to the last finished path.
 
             // If any of the above isn't satisfied, then remove this tiny line.
             continue;
@@ -103,40 +103,38 @@ ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_poly
                 path.polyline.append(line.b);
             } else {
                 // we need to initialize a new line
-                paths.emplace_back(std::move(path));
+                multi_path.paths.emplace_back(std::move(path));
                 path = ExtrusionPath(role);
                 -- i;
             }
         }
     }
     if (path.polyline.is_valid())
-        paths.emplace_back(std::move(path));
-    return paths;
+        multi_path.paths.emplace_back(std::move(path));
+    return multi_path;
 }
 
-static void variable_width(const ThickPolylines& polylines, ExtrusionRole role, const Flow &flow, std::vector<ExtrusionEntity*> &out)
+static void variable_width(const ThickPolylines &polylines, ExtrusionRole role, const Flow &flow, std::vector<ExtrusionEntity *> &out)
 {
-	// This value determines granularity of adaptive width, as G-code does not allow
-	// variable extrusion within a single move; this value shall only affect the amount
-	// of segments, and any pruning shall be performed before we apply this tolerance.
-	const auto tolerance = float(scale_(0.05));
-	for (const ThickPolyline &p : polylines) {
-		ExtrusionPaths paths = thick_polyline_to_extrusion_paths(p, role, flow, tolerance, tolerance);
-		// Append paths to collection.
-        if (!paths.empty()) {
-            for (auto it = std::next(paths.begin()); it != paths.end(); ++it) {
+    // This value determines granularity of adaptive width, as G-code does not allow
+    // variable extrusion within a single move; this value shall only affect the amount
+    // of segments, and any pruning shall be performed before we apply this tolerance.
+    const auto tolerance = float(scale_(0.05));
+    for (const ThickPolyline &p : polylines) {
+        ExtrusionMultiPath multi_path = thick_polyline_to_multi_path(p, role, flow, tolerance, tolerance);
+        // Append paths to collection.
+        if (!multi_path.paths.empty()) {
+            for (auto it = std::next(multi_path.paths.begin()); it != multi_path.paths.end(); ++it) {
                 assert(it->polyline.points.size() >= 2);
                 assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
             }
 
-            if (paths.front().first_point() == paths.back().last_point()) {
-                out.emplace_back(new ExtrusionLoop(std::move(paths)));
-            } else {
-				for (ExtrusionPath &path : paths)
-					out.emplace_back(new ExtrusionPath(std::move(path)));
-			}
-		}
-	}
+            if (multi_path.paths.front().first_point() == multi_path.paths.back().last_point())
+                out.emplace_back(new ExtrusionLoop(std::move(multi_path.paths)));
+            else
+                out.emplace_back(new ExtrusionMultiPath(std::move(multi_path)));
+        }
+    }
 }
 
 // Hierarchy of perimeters.
@@ -534,10 +532,35 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator &p
                 else
                     extrusion_loop.make_clockwise();
 
+                for (auto it = std::next(extrusion_loop.paths.begin()); it != extrusion_loop.paths.end(); ++it) {
+                    assert(it->polyline.points.size() >= 2);
+                    assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+                }
+                assert(extrusion_loop.paths.front().first_point() == extrusion_loop.paths.back().last_point());
+
                 extrusion_coll.append(std::move(extrusion_loop));
-            } else
-                for (ExtrusionPath &path : paths)
-                    extrusion_coll.append(ExtrusionPath(std::move(path)));
+            } else {
+                // Because we are processing one ExtrusionLine all ExtrusionPaths should form one connected path.
+                // But there is possibility that due to numerical issue there is poss
+                assert([&paths = std::as_const(paths)]() -> bool {
+                    for (auto it = std::next(paths.begin()); it != paths.end(); ++it)
+                        if (std::prev(it)->polyline.last_point() != it->polyline.first_point())
+                            return false;
+                    return true;
+                }());
+                ExtrusionMultiPath multi_path;
+                multi_path.paths.emplace_back(std::move(paths.front()));
+
+                for (auto it_path = std::next(paths.begin()); it_path != paths.end(); ++it_path) {
+                    if (multi_path.paths.back().last_point() != it_path->first_point()) {
+                        extrusion_coll.append(ExtrusionMultiPath(std::move(multi_path)));
+                        multi_path = ExtrusionMultiPath();
+                    }
+                    multi_path.paths.emplace_back(std::move(*it_path));
+                }
+
+                extrusion_coll.append(ExtrusionMultiPath(std::move(multi_path)));
+            }
         }
     }
 

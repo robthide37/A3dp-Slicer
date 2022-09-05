@@ -3,6 +3,7 @@
 #include <CGAL/Surface_sweep_2_algorithms.h>
 
 #include "libslic3r/Geometry/Voronoi.hpp"
+#include "libslic3r/Arachne/utils/VoronoiUtils.hpp"
 
 #include "VoronoiUtilsCgal.hpp"
 
@@ -28,7 +29,8 @@ bool VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(const VD &voronoi_
         if (edge.color() != 0)
             continue;
 
-        if (edge.is_finite() && edge.is_linear()) {
+        if (edge.is_finite() && edge.is_linear() && edge.vertex0() != nullptr && edge.vertex1() != nullptr &&
+            Arachne::VoronoiUtils::is_finite(*edge.vertex0()) && Arachne::VoronoiUtils::is_finite(*edge.vertex1())) {
             segments.emplace_back(to_cgal_point(*edge.vertex0()), to_cgal_point(*edge.vertex1()));
             edge.color(1);
             assert(edge.twin() != nullptr);
@@ -73,7 +75,8 @@ bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VoronoiDiagram &vor
 
         do {
             // FIXME Lukas H.: Also process parabolic segments.
-            if (edge->is_finite() && edge->is_linear())
+            if (edge->is_finite() && edge->is_linear() && edge->vertex0() != nullptr && edge->vertex1() != nullptr &&
+                Arachne::VoronoiUtils::is_finite(*edge->vertex0()) && Arachne::VoronoiUtils::is_finite(*edge->vertex1()))
                 edges.emplace_back(edge);
 
             edge = edge->rot_next();

@@ -10,7 +10,6 @@
 
 #include "LocalesUtils.hpp"
 
-#include <Shiny/Shiny.h>
 #include <fast_float/fast_float.h>
 
 namespace Slic3r {
@@ -37,14 +36,11 @@ void GCodeReader::apply_config(const DynamicPrintConfig &config)
 
 const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, GCodeLine &gline, std::pair<const char*, const char*> &command)
 {
-    PROFILE_FUNC();
-
     assert(is_decimal_separator_point());
     
     // command and args
     const char *c = ptr;
     {
-        PROFILE_BLOCK(command_and_args);
         // Skip the whitespaces.
         command.first = skip_whitespaces(c);
         // Skip the command.
@@ -98,10 +94,8 @@ const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, G
     for (; ! is_end_of_line(*c); ++ c);
 
     // Copy the raw string including the comment, without the trailing newlines.
-    if (c > ptr) {
-        PROFILE_BLOCK(copy_raw_string);
+    if (c > ptr)
         gline.m_raw.assign(ptr, c);
-    }
 
     // Skip the trailing newlines.
 	if (*c == '\r')
@@ -117,7 +111,6 @@ const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, G
 
 void GCodeReader::update_coordinates(GCodeLine &gline, std::pair<const char*, const char*> &command)
 {
-    PROFILE_FUNC();
     if (*command.first == 'G') {
         int cmd_len = int(command.second - command.first);
         if ((cmd_len == 2 && (command.first[1] == '0' || command.first[1] == '1')) ||

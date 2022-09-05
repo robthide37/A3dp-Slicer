@@ -748,7 +748,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
 {
     // Load the preset over a default preset, so that the missing fields are filled in from the default preset.
     DynamicPrintConfig cfg(this->default_preset_for(combined_config).config);
-    const auto        &keys = cfg.keys();
+    t_config_option_keys keys = std::move(cfg.keys());
     cfg.apply_only(combined_config, keys, true);
     std::string                 &inherits = Preset::inherits(cfg);
     if (select == LoadAndSelect::Never) {
@@ -792,6 +792,13 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
             // the differences will be shown in the preset editor against the referenced profile.
             this->select_preset(it - m_presets.begin());
             // The source config may contain keys from many possible preset types. Just copy those that relate to this preset.
+
+            // Following keys are not used neither by the UI nor by the slicing core, therefore they are not important 
+            // Erase them from config appl to avoid redundant "dirty" parameter in loaded preset.
+            for (const char* key : { "print_settings_id", "filament_settings_id", "sla_print_settings_id", "sla_material_settings_id", "printer_settings_id",
+                                     "printer_model", "printer_variant", "default_print_profile", "default_filament_profile", "default_sla_print_profile", "default_sla_material_profile" })
+                keys.erase(std::remove(keys.begin(), keys.end(), key), keys.end());
+
             this->get_edited_preset().config.apply_only(combined_config, keys, true);
             this->update_dirty();
             // Don't save the newly loaded project as a "saved into project" state.
@@ -1869,13 +1876,23 @@ bool PhysicalPrinterCollection::delete_preset_from_printers( const std::string& 
     return true;
 }
 
+void PhysicalPrinterCollection::rename_preset_in_printers(const std::string& old_preset_name, const std::string& new_preset_name)
+{
+    for (PhysicalPrinter& printer : m_printers)
+        if (printer.delete_preset(old_preset_name)) {
+            printer.add_preset(new_preset_name);
+            printer.update_preset_names_in_config();
+            printer.save();
+        }
+}
+
 // Get list of printers which have more than one preset and "preset_names" preset is one of them
-std::vector<std::string> PhysicalPrinterCollection::get_printers_with_preset(const std::string& preset_name)
+std::vector<std::string> PhysicalPrinterCollection::get_printers_with_preset(const std::string& preset_name, bool respect_only_preset /*= true*/)
 {
     std::vector<std::string> printers;
 
     for (auto printer : m_printers) {
-        if (printer.preset_names.size() == 1)
+        if (!respect_only_preset && printer.preset_names.size() == 1)
             continue;
         if (printer.preset_names.find(preset_name) != printer.preset_names.end())
             printers.emplace_back(printer.name);

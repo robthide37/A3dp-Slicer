@@ -427,14 +427,13 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                     for (const ThickPolyline &thick_polyline : thick_polylines) {
                         Flow new_flow = surface_fill.params.flow.with_spacing(float(f->spacing));
 
-                        ExtrusionPaths paths = thick_polyline_to_extrusion_paths(thick_polyline, surface_fill.params.extrusion_role, new_flow, scaled<float>(0.05), 0);
+                        ExtrusionMultiPath multi_path = thick_polyline_to_multi_path(thick_polyline, surface_fill.params.extrusion_role, new_flow, scaled<float>(0.05), float(SCALED_EPSILON));
                         // Append paths to collection.
-                        if (!paths.empty()) {
-                            if (paths.front().first_point() == paths.back().last_point())
-                                eec->entities.emplace_back(new ExtrusionLoop(std::move(paths)));
+                        if (!multi_path.empty()) {
+                            if (multi_path.paths.front().first_point() == multi_path.paths.back().last_point())
+                                eec->entities.emplace_back(new ExtrusionLoop(std::move(multi_path.paths)));
                             else
-                                for (ExtrusionPath &path : paths)
-                                    eec->entities.emplace_back(new ExtrusionPath(std::move(path)));
+                                eec->entities.emplace_back(new ExtrusionMultiPath(std::move(multi_path)));
                         }
                     }
 

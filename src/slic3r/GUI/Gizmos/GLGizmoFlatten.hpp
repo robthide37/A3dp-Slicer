@@ -55,7 +55,6 @@ private:
 #endif // ENABLE_RAYCAST_PICKING
     bool m_mouse_left_down = false; // for detection left_up of this gizmo
     const ModelObject* m_old_model_object = nullptr;
-    std::vector<const Transform3d*> instances_matrices;
 
     void update_planes();
     bool is_plane_update_necessary() const;
