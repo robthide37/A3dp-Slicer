@@ -249,12 +249,11 @@ void GLGizmoMeasure::on_render()
         Vec3f position_on_model;
         Vec3f normal_on_model;
         size_t model_facet_idx;
-        m_c->raycaster()->raycasters().front()->unproject_on_mesh(m_mouse_pos, model_matrix, camera, position_on_model, normal_on_model, nullptr, &model_facet_idx);
-
+        const bool mouse_on_object = m_c->raycaster()->raycasters().front()->unproject_on_mesh(m_mouse_pos, model_matrix, camera, position_on_model, normal_on_model, nullptr, &model_facet_idx);
         const bool is_hovering_on_locked_feature = m_mode == EMode::ExtendedSelection && m_hover_id != -1;
 
         if (m_mode == EMode::BasicSelection) {
-            std::optional<Measure::SurfaceFeature> curr_feature = m_measuring->get_feature(model_facet_idx, position_on_model.cast<double>());
+            std::optional<Measure::SurfaceFeature> curr_feature = mouse_on_object ? m_measuring->get_feature(model_facet_idx, position_on_model.cast<double>()) : std::nullopt;
             m_curr_point_on_feature_position.reset();
             if (m_curr_feature != curr_feature) {
                 GLGizmoMeasure::on_unregister_raycasters_for_picking();
@@ -552,7 +551,7 @@ void GLGizmoMeasure::update_if_needed()
         // Let's save what we calculated it from:
         m_volumes_matrices.clear();
         m_volumes_types.clear();
-        m_first_instance_scale = Vec3d::Ones();
+        m_first_instance_scale  = Vec3d::Ones();
         m_first_instance_mirror = Vec3d::Ones();
         if (object != nullptr) {
             for (const ModelVolume* vol : object->volumes) {
