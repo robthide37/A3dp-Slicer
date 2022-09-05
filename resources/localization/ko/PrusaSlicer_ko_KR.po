@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-09-05 13:40+0200\n"
+"POT-Creation-Date: 2022-09-05 15:33+0200\n"
 "PO-Revision-Date: 2020-02-28 09:34+0900\n"
 "Last-Translator: lee hak-min <hangmini12@naver.com>\n"
 "Language-Team: ulsanether\n"
@@ -3355,8 +3355,8 @@ msgid "Choose one file (3MF/AMF):"
 msgstr "파일(3MF/AMF) 선택:"
 
 #: src/slic3r/GUI/GUI_App.cpp:1871
-msgid "Choose one or more files (STL/OBJ/AMF/3MF/PRUSA/STEP):"
-msgstr "파일을 선택하세요 (STL/OBJ/AMF/3MF/PRUSA/STEP):"
+msgid "Choose one or more files (STL/3MF/STEP/OBJ/AMF/PRUSA):"
+msgstr "파일을 선택하세요 (STL/3MF/STEP/OBJ/AMF/PRUSA):"
 
 #: src/slic3r/GUI/GUI_App.cpp:1883
 msgid "Choose one file (GCODE/.GCO/.G/.ngc/NGC):"
@@ -4869,7 +4869,7 @@ msgid "New project, clear plater"
 msgstr ""
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:78
-msgid "Open project STL/OBJ/AMF/3MF with config, clear plater"
+msgid "Open project AMF/3MF with config, clear plater"
 msgstr ""
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:79
@@ -4885,7 +4885,7 @@ msgid "(Re)slice"
 msgstr "(Re)슬라이스"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:83
-msgid "Import STL/OBJ/AMF/3MF/STEP without config, keep plater"
+msgid "Import STL/3MF/STEP/OBJ/AMF without config, keep plater"
 msgstr ""
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:84
@@ -5604,8 +5604,8 @@ msgid "Save current project file as"
 msgstr "현재 프로젝트 파일을 다른 이름으로 저장"
 
 #: src/slic3r/GUI/MainFrame.cpp:1208
-msgid "Import STL/OBJ/AM&F/3MF/STEP"
-msgstr "가져오기 STL/OBJ/AM&F/3MF/STEP"
+msgid "Import STL/3MF/STEP/OBJ/AM&F"
+msgstr "가져오기 STL/3MF/STEP/OBJ/AM&F"
 
 #: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Load a model"

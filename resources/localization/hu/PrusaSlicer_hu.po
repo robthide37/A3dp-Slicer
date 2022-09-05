@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-09-05 13:40+0200\n"
+"POT-Creation-Date: 2022-09-05 15:33+0200\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -3568,8 +3568,8 @@ msgid "Choose one file (3MF/AMF):"
 msgstr "Válasszon ki egy fájlt (3MF/AMF):"
 
 #: src/slic3r/GUI/GUI_App.cpp:1871
-msgid "Choose one or more files (STL/OBJ/AMF/3MF/PRUSA/STEP):"
-msgstr "Válasszon ki egy vagy több fájlt (STL/OBJ/AMF/3MF/PRUSA/STEP):"
+msgid "Choose one or more files (STL/3MF/STEP/OBJ/AMF/PRUSA):"
+msgstr "Válasszon ki egy vagy több fájlt (STL/3MF/STEP/OBJ/AMF/PRUSA):"
 
 #: src/slic3r/GUI/GUI_App.cpp:1883
 msgid "Choose one file (GCODE/.GCO/.G/.ngc/NGC):"
@@ -5139,8 +5139,8 @@ msgid "New project, clear plater"
 msgstr "Új projekt, üres tárgyasztal"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:78
-msgid "Open project STL/OBJ/AMF/3MF with config, clear plater"
-msgstr "STL/OBJ/AMF/3MF projekt megnyitása konfigurációval, üres tárgyasztal"
+msgid "Open project AMF/3MF with config, clear plater"
+msgstr "AMF/3MF projekt megnyitása konfigurációval, üres tárgyasztal"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:79
 msgid "Save project (3mf)"
@@ -5155,7 +5155,7 @@ msgid "(Re)slice"
 msgstr "(Újra)szeletelés"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:83
-msgid "Import STL/OBJ/AMF/3MF/STEP without config, keep plater"
+msgid "Import STL/3MF/STEP/OBJ/AMF without config, keep plater"
 msgstr ""
 "STL/OBJ/AMF/3MF/STEP Importálása konfiguráció nélkül, a tárgyasztal megtartásával"
 
@@ -5899,8 +5899,8 @@ msgid "Save current project file as"
 msgstr "Aktuális projekt fájl mentése másként"
 
 #: src/slic3r/GUI/MainFrame.cpp:1208
-msgid "Import STL/OBJ/AM&F/3MF/STEP"
-msgstr "STL/OBJ/AM&F/3MF/STEP Importálása"
+msgid "Import STL/3MF/STEP/OBJ/AM&F"
+msgstr "STL/3MF/STEP/OBJ/AM&F Importálása"
 
 #: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Load a model"

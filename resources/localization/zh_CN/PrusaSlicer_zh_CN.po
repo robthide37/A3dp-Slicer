@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-09-05 13:40+0200\n"
+"POT-Creation-Date: 2022-09-05 15:33+0200\n"
 "PO-Revision-Date: 2022-08-22 12:37+0800\n"
 "Last-Translator: Bral@qq.com\n"
 "Language-Team: \n"
@@ -3436,8 +3436,8 @@ msgid "Choose one file (3MF/AMF):"
 msgstr "选择一个文件 (3MF/AMF):"
 
 #: src/slic3r/GUI/GUI_App.cpp:1871
-msgid "Choose one or more files (STL/OBJ/AMF/3MF/PRUSA/STEP):"
-msgstr "选择一个或多个文件  (STL/OBJ/AMF/3MF/PRUSA/STEP):"
+msgid "Choose one or more files (STL/3MF/STEP/OBJ/AMF/PRUSA):"
+msgstr "选择一个或多个文件  (STL/3MF/STEP/OBJ/AMF/PRUSA):"
 
 #: src/slic3r/GUI/GUI_App.cpp:1883
 msgid "Choose one file (GCODE/.GCO/.G/.ngc/NGC):"
@@ -4956,8 +4956,8 @@ msgid "New project, clear plater"
 msgstr "新项目，清盘"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:78
-msgid "Open project STL/OBJ/AMF/3MF with config, clear plater"
-msgstr "使用配置打开项目 STL/OBJ/AMF/3MF，清除模板"
+msgid "Open project AMF/3MF with config, clear plater"
+msgstr "使用配置打开项目 AMF/3MF，清除模板"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:79
 msgid "Save project (3mf)"
@@ -4972,8 +4972,8 @@ msgid "(Re)slice"
 msgstr "重新切片"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:83
-msgid "Import STL/OBJ/AMF/3MF/STEP without config, keep plater"
-msgstr "导入 STL/OBJ/AMF/3MF/STEP 而不配置，保留模板"
+msgid "Import STL/3MF/STEP/OBJ/AMF without config, keep plater"
+msgstr "导入 STL/3MF/STEP/OBJ/AMF 而不配置，保留模板"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:84
 msgid "Import Config from ini/amf/3mf/gcode"
@@ -5697,8 +5697,8 @@ msgid "Save current project file as"
 msgstr "将当前项目文件另存为"
 
 #: src/slic3r/GUI/MainFrame.cpp:1208
-msgid "Import STL/OBJ/AM&F/3MF/STEP"
-msgstr "导入 STL/OBJ/AM&F/3MF/STEP"
+msgid "Import STL/3MF/STEP/OBJ/AM&F"
+msgstr "导入 STL/3MF/STEP/OBJ/AM&F"
 
 #: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Load a model"

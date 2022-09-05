@@ -2081,8 +2081,8 @@ msgid "Choose one or more files (STL, OBJ):"
 msgstr "1つ以上のファイル(STL, OBJ)を選択します："
 
 #: src/slic3r/GUI/GUI_App.cpp:1870
-msgid "Choose one or more files (STL/OBJ/AMF/3MF/PRUSA/STEP):"
-msgstr "1つ以上のファイルの選択(STL/OBJ/AMF/3MF/PRUSA/STEP):"
+msgid "Choose one or more files (STL/3MF/STEP/OBJ/AMF/PRUSA):"
+msgstr "1つ以上のファイルの選択(STL/3MF/STEP/OBJ/AMF/PRUSA):"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1361
 msgid "Choose the type of firmware used by your printer."
@@ -5963,12 +5963,12 @@ msgid "Import STL (Imperial Units)"
 msgstr "STLのインポート(インチ)"
 
 #: src/slic3r/GUI/MainFrame.cpp:1208
-msgid "Import STL/OBJ/AM&F/3MF/STEP"
-msgstr "STL/OBJ/AMF/3MF/STEPのインポート(&F)"
+msgid "Import STL/3MF/STEP/OBJ/AM&F"
+msgstr "STL/3MF/STEP/OBJ/AMFのインポート(&F)"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:83
-msgid "Import STL/OBJ/AMF/3MF/STEP without config, keep plater"
-msgstr "既存のプレートを保持しながらSTL/OBJ/AMF/3MF/STEPを設定なしでインポート"
+msgid "Import STL/3MF/STEP/OBJ/AMF without config, keep plater"
+msgstr "既存のプレートを保持しながらSTL/3MF/STEP/OBJ/AMFを設定なしでインポート"
 
 #: src/slic3r/GUI/Plater.cpp:5293
 msgid "Import config only"
@@ -8124,8 +8124,8 @@ msgid "Open new instance"
 msgstr "新しいインスタンスを開く"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:78
-msgid "Open project STL/OBJ/AMF/3MF with config, clear plater"
-msgstr "プロジェクトSTL/OBJ/AMF/3MFを設定を含めて開き、プレートをクリアします"
+msgid "Open project AMF/3MF with config, clear plater"
+msgstr "プロジェクトAMF/3MFを設定を含めて開き、プレートをクリアします"
 
 #: src/slic3r/GUI/MainFrame.cpp:1082
 #, c-format, boost-format
