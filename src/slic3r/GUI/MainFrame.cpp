@@ -622,6 +622,13 @@ void MainFrame::shutdown()
     wxGetApp().plater_ = nullptr;
 }
 
+GalleryDialog* MainFrame::gallery_dialog()
+{
+    if (!m_gallery_dialog)
+        m_gallery_dialog = new GalleryDialog(this);
+    return m_gallery_dialog;
+}
+
 void MainFrame::update_title()
 {
     wxString title = wxEmptyString;
@@ -1413,11 +1420,10 @@ void MainFrame::init_menubar_as_editor()
 
         windowMenu->AppendSeparator();
         append_menu_item(windowMenu, wxID_ANY, _L("Shape Gallery"), _L("Open the dialog to modify shape gallery"),
-            [this](wxCommandEvent&) { 
-                GalleryDialog dlg(this, true);
-                if (dlg.ShowModal() == wxID_OK) {
+            [this](wxCommandEvent&) {
+                if (gallery_dialog()->show(true) == wxID_OK) {
                     wxArrayString input_files;
-                    dlg.get_input_files(input_files);
+                    m_gallery_dialog->get_input_files(input_files);
                     if (!input_files.IsEmpty())
                         m_plater->sidebar().obj_list()->load_shape_object_from_gallery(input_files);
                 }

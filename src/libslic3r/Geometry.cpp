@@ -577,7 +577,6 @@ void Transformation::set_scaling_factor(const Vec3d& scaling_factor)
 void Transformation::set_scaling_factor(Axis axis, double scaling_factor)
 {
 #if ENABLE_WORLD_COORDINATE
-    assert(scaling_factor > 0.0);
     auto [rotation, scale] = extract_rotation_scale(m_matrix);
     scale(axis, axis) = scaling_factor;
 

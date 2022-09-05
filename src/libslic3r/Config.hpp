@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <float.h>
 #include "libslic3r.h"
 #include "clonable_ptr.hpp"
 #include "Exception.hpp"
@@ -1766,8 +1767,8 @@ public:
     // <min, max> limit of a numeric input.
     // If not set, the <min, max> is set to <INT_MIN, INT_MAX>
     // By setting min=0, only nonnegative input is allowed.
-    int                                 min = INT_MIN;
-    int                                 max = INT_MAX;
+    float                               min = -FLT_MAX;
+    float                               max =  FLT_MAX;
     // To check if it's not a typo and a % is missing
     double                              max_literal = 1;
     ConfigOptionMode                    mode = comSimple;

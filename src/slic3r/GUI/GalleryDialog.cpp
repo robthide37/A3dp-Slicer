@@ -65,7 +65,7 @@ bool GalleryDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& f
 }
 
 
-GalleryDialog::GalleryDialog(wxWindow* parent, bool modify_gallery/* = false*/) :
+GalleryDialog::GalleryDialog(wxWindow* parent) :
     DPIDialog(parent, wxID_ANY, _L("Shape Gallery"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
 #ifndef _WIN32
@@ -94,12 +94,9 @@ GalleryDialog::GalleryDialog(wxWindow* parent, bool modify_gallery/* = false*/) 
 #endif
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxOK | wxCLOSE);
-    wxButton* ok_btn = static_cast<wxButton*>(FindWindowById(wxID_OK, this));
-    ok_btn->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { evt.Enable(!m_selected_items.empty()); });
-    if (modify_gallery) {
-        ok_btn->SetLabel(_L("Add to bed"));
-        ok_btn->SetToolTip(_L("Add selected shape(s) to the bed"));
-    }
+    m_ok_btn = static_cast<wxButton*>(FindWindowById(wxID_OK, this));
+    m_ok_btn->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { evt.Enable(!m_selected_items.empty()); });
+
     static_cast<wxButton*>(FindWindowById(wxID_CLOSE, this))->Bind(wxEVT_BUTTON, [this](wxCommandEvent&){ this->EndModal(wxID_CLOSE); });
     this->SetEscapeId(wxID_CLOSE);
     auto add_btn = [this, buttons]( size_t pos, int& ID, wxString title, wxString tooltip,
@@ -138,6 +135,14 @@ GalleryDialog::GalleryDialog(wxWindow* parent, bool modify_gallery/* = false*/) 
 
 GalleryDialog::~GalleryDialog()
 {   
+}
+
+int GalleryDialog::show(bool show_from_menu) 
+{
+    m_ok_btn->SetLabel(  show_from_menu ? _L("Add to bed")                       : _L("OK"));
+    m_ok_btn->SetToolTip(show_from_menu ? _L("Add selected shape(s) to the bed") : "");
+
+    return this->ShowModal();
 }
 
 bool GalleryDialog::can_delete() 
@@ -314,7 +319,7 @@ static void generate_thumbnail_from_model(const std::string& filename)
 
     fs::path out_path = fs::path(filename);
     out_path.replace_extension("png");
-    image.SaveFile(out_path.string(), wxBITMAP_TYPE_PNG);
+    image.SaveFile(from_u8(out_path.string()), wxBITMAP_TYPE_PNG);
 }
 
 void GalleryDialog::load_label_icon_list()
@@ -360,8 +365,6 @@ void GalleryDialog::load_label_icon_list()
     int px_cnt = (int)(em_unit() * IMG_PX_CNT * 0.1f + 0.5f);
     m_image_list = new wxImageList(px_cnt, px_cnt);
 #endif
-
-    std::string ext = ".png";
 
     for (const auto& item : list_items) {
         fs::path model_path = fs::path((item.is_system ? m_sys_dir_path : m_cust_dir_path) + item.name);

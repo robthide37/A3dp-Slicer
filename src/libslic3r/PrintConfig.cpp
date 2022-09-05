@@ -137,7 +137,8 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialPattern)
 
 static const t_config_enum_values s_keys_map_SupportMaterialStyle {
     { "grid",           smsGrid },
-    { "snug",           smsSnug }
+    { "snug",           smsSnug },
+    { "tree",           smsTree }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialStyle)
 
@@ -1050,6 +1051,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("HIPS");
     def->enum_values.push_back("EDGE");
     def->enum_values.push_back("NGEN");
+    def->enum_values.push_back("PA");
     def->enum_values.push_back("NYLON");
     def->enum_values.push_back("PVA");
     def->enum_values.push_back("PC");
@@ -2776,8 +2778,10 @@ void PrintConfigDef::init_fff_params()
     def->enum_keys_map = &ConfigOptionEnum<SupportMaterialStyle>::get_enum_values();
     def->enum_values.push_back("grid");
     def->enum_values.push_back("snug");
+    def->enum_values.push_back("tree");
     def->enum_labels.push_back(L("Grid"));
     def->enum_labels.push_back(L("Snug"));
+    def->enum_labels.push_back(L("Tree"));
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<SupportMaterialStyle>(smsGrid));
 

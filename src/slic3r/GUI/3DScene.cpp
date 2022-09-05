@@ -1648,6 +1648,13 @@ static void thick_lines_to_geometry(
     double width_initial = 0.0;
     double bottom_z_initial = 0.0;
 
+    // Reserve for a smooth path. Likley the path will not be that smooth, but better than nothing.
+    // Allocated 1.5x more data than minimum.
+    // Number of indices, not triangles.
+    geometry.reserve_more_indices((lines.size() * 8 * 3) * 3 / 2);
+    // Number of vertices, not floats.
+    geometry.reserve_more_vertices(((lines.size() + 1) * 4) * 3 / 2);
+
     // loop once more in case of closed loops
     const size_t lines_end = closed ? (lines.size() + 1) : lines.size();
     for (size_t ii = 0; ii < lines_end; ++ii) {

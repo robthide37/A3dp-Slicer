@@ -184,6 +184,9 @@ void AppConfig::set_defaults()
     if (get("show_hints").empty())
         set("show_hints", "1");
 
+    if (get("allow_auto_color_change").empty())
+        set("allow_auto_color_change", "1");
+
     if (get("allow_ip_resolve").empty())
         set("allow_ip_resolve", "1");
 

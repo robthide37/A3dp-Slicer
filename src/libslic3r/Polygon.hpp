@@ -250,6 +250,12 @@ inline Polygons to_polygons(std::vector<Points> &&paths)
     return out;
 }
 
+// Returns true if inside. Returns border_result if on boundary.
+bool contains(const Polygons& polygons, const Point& p, bool border_result = true);
+
+Polygon make_circle(double radius, double error);
+Polygon make_circle_num_segments(double radius, size_t num_segments);
+
 } // Slic3r
 
 // start Boost

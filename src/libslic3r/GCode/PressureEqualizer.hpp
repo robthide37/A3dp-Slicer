@@ -193,8 +193,6 @@ private:
     // Push a G-code line to the output.
     void push_line_to_output(size_t line_idx, float new_feedrate, const char *comment);
 
-    inline bool is_just_feedrate_provided(const GCodeLine &line);
-
 public:
     std::queue<LayerResult*> m_layer_results;
 
