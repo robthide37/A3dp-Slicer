@@ -308,7 +308,6 @@ void GLGizmoMeasure::on_render()
             }
         }
         else if (is_hovering_on_locked_feature) {
-            auto default_callback = [](const Vec3f& v) { return v; };
             auto position_on_feature = [this](int feature_type_id, const Camera& camera, std::function<Vec3f(const Vec3f&)> callback = nullptr) -> Vec3d {
                 auto it = m_raycasters.find(feature_type_id);
                 if (it != m_raycasters.end() && it->second != nullptr) {
@@ -317,9 +316,11 @@ void GLGizmoMeasure::on_render()
                     const Transform3d& trafo = it->second->get_transform();
                     bool res = it->second->get_raycaster()->closest_hit(m_mouse_pos, trafo, camera, p, n);
                     assert(res);
-                    if (callback)
-                        p = callback(p);
-                    return trafo * p.cast<double>();
+                    if (res) {
+                        if (callback)
+                            p = callback(p);
+                        return trafo * p.cast<double>();
+                    }
                 }
                 return Vec3d::Zero();
             };
