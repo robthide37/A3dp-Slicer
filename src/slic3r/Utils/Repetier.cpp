@@ -148,6 +148,7 @@ bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
 
     if(upload_data.post_action == PrintHostPostUploadAction::StartPrint) {
         http.form_add("name", upload_filename.string());
+        http.form_add("autostart", "true"); // See https://github.com/prusa3d/PrusaSlicer/issues/7807#issuecomment-1235519371
     }
 
     http.form_add("a", "upload")
