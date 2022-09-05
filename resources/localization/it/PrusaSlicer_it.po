@@ -2119,8 +2119,8 @@ msgid "Choose one or more files (STL, OBJ):"
 msgstr "Scegli uno o più file (STL, OBJ):"
 
 #: src/slic3r/GUI/GUI_App.cpp:1870
-msgid "Choose one or more files (STL/OBJ/AMF/3MF/PRUSA):"
-msgstr "Seleziona uno o più file (STL/OBJ/AMF/3MF/PRUSA):"
+msgid "Choose one or more files (STL/OBJ/AMF/3MF/PRUSA/STEP):"
+msgstr "Seleziona uno o più file (STL/OBJ/AMF/3MF/PRUSA/STEP):"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1361
 msgid "Choose the type of firmware used by your printer."
@@ -6091,12 +6091,12 @@ msgid "Import STL (Imperial Units)"
 msgstr "Importa STL (unità imperiali)"
 
 #: src/slic3r/GUI/MainFrame.cpp:1208
-msgid "Import STL/OBJ/AM&F/3MF"
-msgstr "Importa STL/OBJ/AM&F/3MF"
+msgid "Import STL/OBJ/AM&F/3MF/STEP"
+msgstr "Importa STL/OBJ/AM&F/3MF/STEP"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:83
-msgid "Import STL/OBJ/AMF/3MF without config, keep plater"
-msgstr "Importa STL/OBJ/AMF/3MF senza configurazione, mantieni piano"
+msgid "Import STL/OBJ/AMF/3MF/STEP without config, keep plater"
+msgstr "Importa STL/OBJ/AMF/3MF/STEP senza configurazione, mantieni piano"
 
 #: src/slic3r/GUI/Plater.cpp:5293
 msgid "Import config only"
