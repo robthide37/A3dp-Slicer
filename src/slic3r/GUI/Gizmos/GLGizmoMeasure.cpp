@@ -276,8 +276,9 @@ void GLGizmoMeasure::on_render()
                 case Measure::SurfaceFeatureType::Circle:
                 {
                     const auto [center, radius, normal] = m_curr_feature->get_circle();
-                    if (m_last_inv_zoom != inv_zoom) {
+                    if (m_last_inv_zoom != inv_zoom || m_last_circle != m_curr_feature) {
                         m_last_inv_zoom = inv_zoom;
+                        m_last_circle   = m_curr_feature;
                         m_circle.reset();
                         GLModel::Geometry circle_geometry = smooth_torus(64, 16, float(radius), 5.0f * inv_zoom);
                         m_circle.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(circle_geometry.get_as_indexed_triangle_set())));
