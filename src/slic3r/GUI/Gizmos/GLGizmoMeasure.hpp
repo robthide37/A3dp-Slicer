@@ -93,6 +93,7 @@ class GLGizmoMeasure : public GLGizmoBase
     Vec3d m_first_instance_scale{ Vec3d::Ones() };
     Vec3d m_first_instance_mirror{ Vec3d::Ones() };
     float m_last_inv_zoom{ 0.0f };
+    std::optional<Measure::SurfaceFeature> m_last_circle;
     int m_last_plane_idx{ -1 };
 
     bool m_mouse_left_down{ false }; // for detection left_up of this gizmo
