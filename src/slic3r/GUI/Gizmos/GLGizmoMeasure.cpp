@@ -89,11 +89,11 @@ GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filen
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
     GLModel::Geometry sphere_geometry = smooth_sphere(16, 7.5f);
-    m_sphere.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(sphere_geometry.get_as_indexed_triangle_set())));
+    m_sphere.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(sphere_geometry.get_as_indexed_triangle_set()));
     m_sphere.model.init_from(std::move(sphere_geometry));
 
     GLModel::Geometry cylinder_geometry = smooth_cylinder(16, 5.0f, 1.0f);
-    m_cylinder.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(cylinder_geometry.get_as_indexed_triangle_set())));
+    m_cylinder.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(cylinder_geometry.get_as_indexed_triangle_set()));
     m_cylinder.model.init_from(std::move(cylinder_geometry));
 }
 
@@ -205,7 +205,7 @@ void GLGizmoMeasure::on_set_state()
         m_scene_raycaster_state.clear();
         m_scene_raycasters = m_parent.get_raycasters_for_picking(SceneRaycaster::EType::Volume);
         if (m_scene_raycasters != nullptr) {
-            for (const auto r : *m_scene_raycasters) {
+            for (const auto& r : *m_scene_raycasters) {
                 m_scene_raycaster_state.emplace_back(r->is_active());
             }
         }
@@ -281,7 +281,7 @@ void GLGizmoMeasure::on_render()
                         m_last_circle   = m_curr_feature;
                         m_circle.reset();
                         GLModel::Geometry circle_geometry = smooth_torus(64, 16, float(radius), 5.0f * inv_zoom);
-                        m_circle.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(circle_geometry.get_as_indexed_triangle_set())));
+                        m_circle.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(circle_geometry.get_as_indexed_triangle_set()));
                         m_circle.model.init_from(std::move(circle_geometry));
                     }
 
@@ -298,7 +298,7 @@ void GLGizmoMeasure::on_render()
                         const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
                         GLModel::Geometry init_data = init_plane_data(its, planes_triangles, idx);
                         m_plane.reset();
-                        m_plane.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(init_data.get_as_indexed_triangle_set())));
+                        m_plane.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(init_data.get_as_indexed_triangle_set()));
                         m_plane.model.init_from(std::move(init_data));
                     }
 
