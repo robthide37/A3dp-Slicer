@@ -3,6 +3,7 @@
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 
 #include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
 
@@ -664,6 +665,9 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
         ImGui::EndTable();
     }
 
+    const bool use_inches = wxGetApp().app_config->get("use_inches") == "1";
+    const std::string units = use_inches ? _u8L(" (in)") : _u8L(" (mm)");
+
     if (m_curr_feature.has_value()) {
         const Transform3d volume_matrix = m_parent.get_selection().get_first_volume()->world_matrix();
         const Measure::SurfaceFeatureType feature_type = m_curr_feature->get_type();
@@ -677,7 +681,9 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     default: { assert(false); break; }
                     case Measure::SurfaceFeatureType::Point:
                     {
-                        const Vec3d position = volume_matrix * m_curr_feature->get_point();
+                        Vec3d position = volume_matrix * m_curr_feature->get_point();
+                        if (use_inches)
+                            position = ObjectManipulation::mm_to_in * position;
                         add_row_to_table(_u8L("Position"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(position), ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         break;
                     }
@@ -686,9 +692,13 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         auto [from, to] = m_curr_feature->get_edge();
                         from = volume_matrix * from;
                         to = volume_matrix * to;
+                        if (use_inches) {
+                            from = ObjectManipulation::mm_to_in * from;
+                            to   = ObjectManipulation::mm_to_in * to;
+                        }
                         add_row_to_table(_u8L("From"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(from), ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         add_row_to_table(_u8L("To"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(to), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-                        add_row_to_table(_u8L("Length") + _u8L(" (mm)"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double((to - from).norm()), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+                        add_row_to_table(_u8L("Length") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double((to - from).norm()), ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         break;
                     }
                     case Measure::SurfaceFeatureType::Circle:
@@ -696,8 +706,12 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         auto [center, radius, normal] = m_curr_feature->get_circle();
                         center = volume_matrix * center;
                         normal = volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
+                        if (use_inches) {
+                            center = ObjectManipulation::mm_to_in * center;
+                            radius = ObjectManipulation::mm_to_in * radius;
+                        }
                         add_row_to_table(_u8L("Center"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(center), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-                        add_row_to_table(_u8L("Radius") + _u8L(" (mm)"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(radius), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+                        add_row_to_table(_u8L("Radius") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double(radius), ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         add_row_to_table(_u8L("Normal"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(normal), ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         break;
                     }
@@ -706,6 +720,8 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         auto [idx, normal, origin] = m_curr_feature->get_plane();
                         origin = volume_matrix * origin;
                         normal = volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
+                        if (use_inches)
+                            origin = ObjectManipulation::mm_to_in * origin;
                         add_row_to_table(_u8L("Origin"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(origin), ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         add_row_to_table(_u8L("Normal"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(normal), ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         break;
@@ -720,7 +736,10 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 ImGui::Separator();
                 m_imgui->text(point_on_feature_type_as_string(feature_type, m_hover_id) + ":");
                 if (ImGui::BeginTable("Data", 2)) {
-                    add_row_to_table(_u8L("Position"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(*m_curr_point_on_feature_position),
+                    Vec3d position = ObjectManipulation::mm_to_in * *m_curr_point_on_feature_position;
+                    if (use_inches)
+                        position = ObjectManipulation::mm_to_in * position;
+                    add_row_to_table(_u8L("Position"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(position),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::EndTable();
                 }
@@ -756,15 +775,24 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 }
                 if (measure.distance_infinite.has_value()) {
-                    add_row_to_table(_u8L("Distance Infinite") + _u8L(" (mm)"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(*measure.distance_infinite),
+                    double distance = ObjectManipulation::mm_to_in * *measure.distance_infinite;
+                    if (use_inches)
+                        distance = ObjectManipulation::mm_to_in * distance;
+                    add_row_to_table(_u8L("Distance Infinite") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 }
                 if (measure.distance_strict.has_value()) {
-                    add_row_to_table(_u8L("Distance Strict") + _u8L(" (mm)"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(*measure.distance_strict),
+                    double distance = ObjectManipulation::mm_to_in * *measure.distance_strict;
+                    if (use_inches)
+                        distance = ObjectManipulation::mm_to_in * distance;
+                    add_row_to_table(_u8L("Distance Strict") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 }
                 if (measure.distance_xyz.has_value()) {
-                    add_row_to_table(_u8L("Distance XYZ") + _u8L(" (mm)"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(*measure.distance_xyz),
+                    Vec3d distance = ObjectManipulation::mm_to_in * *measure.distance_xyz;
+                    if (use_inches)
+                        distance = ObjectManipulation::mm_to_in * distance;
+                    add_row_to_table(_u8L("Distance XYZ") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(distance),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 }
                 ImGui::EndTable();
