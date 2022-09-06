@@ -138,12 +138,18 @@ static int run_script(const std::string &script, const std::string &gcode, std::
         need_absolute_path = true;
     }
     
-    //try to find the file, in different directories
-    std::wstring absolute_command_path = Slic3r::find_full_path(boost::filesystem::path(command)).generic_wstring();
-    if (absolute_command_path.empty()) {
-        if (need_absolute_path) {
-            throw Slic3r::RuntimeError(std::string("The configured post-processing script does not exist: ") + boost::nowide::narrow(command));
-        } else {
+    std::wstring absolute_command_path;
+    //check if it's an exe
+    if (!need_absolute_path && boost::iends_with(command, ".exe")) {
+        // exe: it may come from the path, don't check.
+        absolute_command_path = command;
+    } else {
+        //try to find the file, in different directories
+        absolute_command_path = Slic3r::find_full_path(boost::filesystem::path(command)).generic_wstring();
+        if (absolute_command_path.empty()) {
+            if (need_absolute_path) {
+                BOOST_LOG_TRIVIAL(warning) << "The configured post-processing script may not exist: " << command;
+            }
             absolute_command_path = command;
         }
     }
@@ -184,15 +190,23 @@ static int run_script(const std::string &script, const std::string &gcode, std::
     } else if (boost::iends_with(command, L".py")) {
         BOOST_LOG_TRIVIAL(trace) << boost::format("Executing script : detecting python script");
         // This is a python script. Run it through the python interpreter.
-        command_line = "python ";
+        command_line = "python3 ";
         need_absolute_path = true;
     }
-    //try to find the file, in different directories
-    std::string absolute_command_path = Slic3r::find_full_path(boost::filesystem::path(command)).generic_string();
-    if (absolute_command_path.empty()) {
-        if (need_absolute_path) {
-            throw Slic3r::RuntimeError(std::string("The configured post-processing script does not exist: ") + command);
-        } else {
+
+    std::string absolute_command_path;
+
+    //check if it's an exe/command (ie it doesn't have an extension)
+    if (!need_absolute_path && command.find('.') != std::string::npos) {
+        // command: it may come from the path, don't check.
+        absolute_command_path = command;
+    } else {
+        //try to find the file, in different directories
+        absolute_command_path = Slic3r::find_full_path(boost::filesystem::path(command)).generic_string();
+        if (absolute_command_path.empty()) {
+            if (need_absolute_path) {
+                BOOST_LOG_TRIVIAL(warning) << "The configured post-processing script may not exist: " << command;
+            }
             absolute_command_path = command;
         }
     }
