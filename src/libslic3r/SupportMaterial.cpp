@@ -43,6 +43,9 @@
     #include "SVG.hpp"
 #endif
 
+#pragma message ("TODO: Wrap svg usages in DEBUG ifdef and remove the following include")
+#include "SVG.hpp"
+
 // #undef NDEBUG
 #include <cassert>
 
