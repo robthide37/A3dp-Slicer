@@ -64,9 +64,9 @@ public:
     }
 
 private:
-    SurfaceFeatureType m_type = SurfaceFeatureType::Undef;
-    Vec3d m_pt1;
-    Vec3d m_pt2;
+    SurfaceFeatureType m_type{ SurfaceFeatureType::Undef };
+    Vec3d m_pt1{ Vec3d::Zero() };
+    Vec3d m_pt2{ Vec3d::Zero() };
     std::optional<Vec3d> m_pt3;
     double m_value{ 0.0 };
 };
