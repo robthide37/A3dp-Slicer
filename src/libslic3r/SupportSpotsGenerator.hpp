@@ -66,7 +66,7 @@ struct Issues {
     std::vector<SupportPoint> support_points;
 };
 
-std::vector<size_t> quick_search(const PrintObject *po, const Params &params);
+// std::vector<size_t> quick_search(const PrintObject *po, const Params &params);
 Issues full_search(const PrintObject *po, const Params &params);
 
 }

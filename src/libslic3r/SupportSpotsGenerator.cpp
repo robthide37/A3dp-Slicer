@@ -31,8 +31,8 @@ public:
     ExtrusionLine() :
             a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0f), origin_entity(nullptr) {
     }
-    ExtrusionLine(const Vec2f &_a, const Vec2f &_b, const ExtrusionEntity *origin_entity) :
-            a(_a), b(_b), len((_a - _b).norm()), origin_entity(origin_entity) {
+    ExtrusionLine(const Vec2f &a, const Vec2f &b, const ExtrusionEntity *origin_entity) :
+            a(a), b(b), len((a - b).norm()), origin_entity(origin_entity) {
     }
 
     float length() {
@@ -510,9 +510,9 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                 if (island_extrusions[i].empty()) {
                     continue;
                 }
-                size_t _idx = 0;
-                Vec2f _pt = Vec2f::Zero();
-                if (islands[i].signed_distance_from_lines(layer_lines[extrusions[e].first].a, _idx, _pt) < 0) {
+                size_t idx = 0;
+                Vec2f pt = Vec2f::Zero();
+                if (islands[i].signed_distance_from_lines(layer_lines[extrusions[e].first].a, idx, pt) < 0) {
                     island_extrusions[i].push_back(e);
                     island_assigned = true;
                     break;
@@ -579,7 +579,7 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
         result.islands.push_back(island);
     }
 
-    //LayerIslands structure built. Now determine connections and their areas to the previous layer using raterization.
+    //LayerIslands structure built. Now determine connections and their areas to the previous layer using rasterization.
     PixelGrid current_layer_grid = prev_layer_grid;
     current_layer_grid.clear();
     // build index image of current layer
@@ -1040,10 +1040,10 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                 } else {
                     unchecked_dist = line.len;
                     Vec2f target_point;
-                    size_t _idx;
+                    size_t idx;
                     Vec3f pivot_site_search_point = to_3d(Vec2f(line.b + (line.b - line.a).normalized() * 300.0f),
                             layer_z);
-                    island_lines_dist.signed_distance_from_lines(pivot_site_search_point.head<2>(), _idx,
+                    island_lines_dist.signed_distance_from_lines(pivot_site_search_point.head<2>(), idx,
                             target_point);
                     Vec3f support_point = to_3d(target_point, layer_z);
                     auto force = part.is_stable_while_extruding(weakest_conn, line, support_point, layer_z, params);
@@ -1239,9 +1239,9 @@ void debug_export(Issues issues, std::string file_name) {
 }
 #endif
 
-std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
-    return {};
-}
+// std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
+//     return {};
+// }
 
 Issues full_search(const PrintObject *po, const Params &params) {
     auto [local_issues, graph] = check_extrusions_and_build_graph(po, params);
