@@ -3150,15 +3150,7 @@ variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Fl
         // default: extrude a thin wall that doesn't go outside of the specified width.
         double wanted_width = unscaled(line.a_width);
         //if gapfill or arachne, the width is in fact the spacing.
-        if (role == erThinWall) {
-            // thinwall : check if th width isn't too small (negative spacing)
-            if (unscale<coordf_t>(line.a_width) < 2 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), flow.spacing_ratio())) {
-                //width (too) small, be sure to not extrude with negative spacing.
-                //we began to fall back to spacing gradually even before the spacing go into the negative
-                //  to make extrusion1 < extrusion2 if width1 < width2 even if width2 is too small. 
-                wanted_width = unscaled(line.a_width) * 0.35 + 1.3 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), flow.spacing_ratio());
-            }
-        } else {
+        if (role != erThinWall) {
             if (role == erOverhangPerimeter && flow.bridge()) {
                 // for Arachne overhangs: keep the bridge width.
                 wanted_width = flow.width();
@@ -3167,6 +3159,14 @@ variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Fl
                 // of a square extrusion ended with semi circles.
                 wanted_width = Flow::rounded_rectangle_extrusion_width_from_spacing(unscaled(line.a_width), flow.height(), flow.spacing_ratio());
             }
+        }
+        // check if the width isn't too small (negative spacing)
+        // 1.f spacing ratio, because it's to get the really minimum. 0 spacing ratio will makes that irrelevant.
+        if (unscale<coordf_t>(line.a_width) < 2 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), 1.f)) {
+            //width (too) small, be sure to not extrude with negative spacing.
+            //we began to fall back to spacing gradually even before the spacing go into the negative
+            //  to make extrusion1 < extrusion2 if width1 < width2 even if width2 is too small. 
+            wanted_width = unscaled(line.a_width) * 0.35 + 1.3 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), 1.f);
         }
 
         if (path.polyline.points.empty()) {
