@@ -30,7 +30,7 @@ struct Params {
     const std::pair<float,float> malformation_angle_span_deg = std::pair<float, float> { 45.0f, 80.0f };
 
     const float min_distance_between_support_points = 3.0f; //mm
-    const float support_points_interface_radius = 1.5f; // mm
+    const float support_points_interface_radius = 2.0f; // mm
 
     // NOTE: Currently disabled, does not work correctly due to inability of the algorithm to correctly detect islands at each layer
     const float supportable_volume_threshold = 0.0f; // mm^3
@@ -52,6 +52,11 @@ struct Params {
         } else { //PLA default value - defensive approach, PLA has quite low adhesion
             return 0.018f * 1e6f;
         }
+    }
+
+    //just return PLA adhesion value as value for supports
+    float get_support_spots_adhesion_strength() const {
+         return 0.018f * 1e6f; 
     }
 };
 

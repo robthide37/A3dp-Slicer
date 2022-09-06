@@ -1,5 +1,6 @@
 #include "SupportSpotsGenerator.hpp"
 
+#include "ExtrusionEntity.hpp"
 #include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
 #include "tbb/blocked_range2d.h"
@@ -346,6 +347,41 @@ float gauss(float value, float mean_x_coord, float mean_value, float falloff_spe
     return mean_value * (std::exp(exponent) - 1.0f) / (std::exp(1.0f) - 1.0f);
 }
 
+void push_lines(const ExtrusionEntity *e, std::vector<ExtrusionLine>& destination)
+{
+    assert(!e->is_collection());
+    Polyline pl = e->as_polyline();
+    for (int point_idx = 0; point_idx < int(pl.points.size() - 1); ++point_idx) {
+        Vec2f         start = unscaled(pl.points[point_idx]).cast<float>();
+        Vec2f         next  = unscaled(pl.points[point_idx + 1]).cast<float>();
+        ExtrusionLine line{start, next, e};
+        destination.push_back(line);
+    }
+}
+
+std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length_limit)
+{
+    assert(!e->is_collection());
+    Polyline pl = e->as_polyline();
+    std::vector<ExtrusionLine> lines;
+    lines.reserve(pl.points.size() * 1.5f);
+    for (int point_idx = 0; point_idx < int(pl.points.size() - 1); ++point_idx) {
+        Vec2f start        = unscaled(pl.points[point_idx]).cast<float>();
+        Vec2f next         = unscaled(pl.points[point_idx + 1]).cast<float>();
+        Vec2f v            = next - start; // vector from next to current
+        float dist_to_next = v.norm();
+        v.normalize();
+        int   lines_count = int(std::ceil(dist_to_next / length_limit));
+        float step_size   = dist_to_next / lines_count;
+        for (int i = 0; i < lines_count; ++i) {
+            Vec2f a(start + v * (i * step_size));
+            Vec2f b(start + v * ((i + 1) * step_size));
+            lines.emplace_back(a, b, e);
+        }
+    }
+    return lines;
+}
+
 void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         std::vector<ExtrusionLine> &checked_lines_out,
         float layer_z,
@@ -371,23 +407,8 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
 
         Points points { };
         entity->collect_points(points);
-        std::vector<ExtrusionLine> lines;
-        lines.reserve(points.size() * 1.5f);
-        lines.emplace_back(unscaled(points[0]).cast<float>(), unscaled(points[0]).cast<float>(), entity);
-        for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
-            Vec2f start = unscaled(points[point_idx]).cast<float>();
-            Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
-            Vec2f v = next - start; // vector from next to current
-            float dist_to_next = v.norm();
-            v.normalize();
-            int lines_count = int(std::ceil(dist_to_next / params.bridge_distance));
-            float step_size = dist_to_next / lines_count;
-            for (int i = 0; i < lines_count; ++i) {
-                Vec2f a(start + v * (i * step_size));
-                Vec2f b(start + v * ((i + 1) * step_size));
-                lines.emplace_back(a, b, entity);
-            }
-        }
+        std::vector<ExtrusionLine> lines = to_short_lines(entity, params.bridge_distance);
+        if (lines.empty()) return;
 
         if (entity->total_volume() < params.supportable_volume_threshold) {
             checked_lines_out.insert(checked_lines_out.end(), lines.begin(), lines.end());
@@ -440,11 +461,9 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
             if (dist_from_prev_layer > min_malformation_dist && dist_from_prev_layer < max_malformation_dist) {
                 malformation_acc.add_distance(current_line.len);
-                current_line.malformation += layer_region->layer()->height
-                        * (0.5f
-                                +
-                                1.5f * (malformation_acc.max_curvature / PI)
-                                        * gauss(malformation_acc.distance, 5.0f, 1.0f, 0.2f));
+                current_line.malformation += layer_region->layer()->height *
+                                             (0.5f + 1.5f * (malformation_acc.max_curvature / PI) *
+                                                         gauss(malformation_acc.distance, 5.0f, 1.0f, 0.2f));
             } else {
                 malformation_acc.reset();
             }
@@ -1049,18 +1068,20 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                     auto force = part.is_stable_while_extruding(weakest_conn, line, support_point, layer_z, params);
                     if (force > 0) {
                         if (!supports_presence_grid.position_taken(support_point)) {
-                            float area = params.support_points_interface_radius * params.support_points_interface_radius
-                                    * float(PI);
+                            float area = std::min(float(unscaled(line.origin_entity->length())),
+                             params.support_points_interface_radius * params.support_points_interface_radius
+                                    * float(PI));
+                            float altered_area = area * params.get_support_spots_adhesion_strength() / params.get_bed_adhesion_yield_strength();
                             part.add_support_point(support_point, area);
                             issues.support_points.emplace_back(support_point, force,
                                     to_3d(Vec2f(line.b - line.a).normalized(), 0.0f));
                             supports_presence_grid.take_position(support_point);
 
-                            weakest_conn.area += area;
-                            weakest_conn.centroid_accumulator += support_point * area;
-                            weakest_conn.second_moment_of_area_accumulator += area
+                            weakest_conn.area += altered_area;
+                            weakest_conn.centroid_accumulator += support_point * altered_area;
+                            weakest_conn.second_moment_of_area_accumulator += altered_area
                                     * support_point.head<2>().cwiseProduct(support_point.head<2>());
-                            weakest_conn.second_moment_of_area_covariance_accumulator += area * support_point.x()
+                            weakest_conn.second_moment_of_area_covariance_accumulator += altered_area * support_point.x()
                                     * support_point.y();
                         }
                     }
@@ -1090,32 +1111,12 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
     for (const LayerRegion *layer_region : layer->regions()) {
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
             for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-                Points points { };
-                perimeter->collect_points(points);
-                for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
-                    Vec2f start = unscaled(points[point_idx]).cast<float>();
-                    Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
-                    ExtrusionLine line { start, next, perimeter };
-                    layer_lines.push_back(line);
-                }
-                if (perimeter->is_loop()) {
-                    Vec2f start = unscaled(points[points.size() - 1]).cast<float>();
-                    Vec2f next = unscaled(points[0]).cast<float>();
-                    ExtrusionLine line { start, next, perimeter };
-                    layer_lines.push_back(line);
-                }
+                push_lines(perimeter, layer_lines);
             } // perimeter
         } // ex_entity
         for (const ExtrusionEntity *ex_entity : layer_region->fills.entities) {
             for (const ExtrusionEntity *fill : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-                Points points { };
-                fill->collect_points(points);
-                for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
-                    Vec2f start = unscaled(points[point_idx]).cast<float>();
-                    Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
-                    ExtrusionLine line { start, next, fill };
-                    layer_lines.push_back(line);
-                }
+                push_lines(fill, layer_lines);
             } // fill
         } // ex_entity
     } // region
@@ -1165,14 +1166,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
                         check_extrusion_entity_stability(fill, layer_lines, layer->slice_z, layer_region,
                                 external_lines, issues, params);
                     } else {
-                        Points points { };
-                        fill->collect_points(points);
-                        for (int point_idx = 0; point_idx < int(points.size() - 1); ++point_idx) {
-                            Vec2f start = unscaled(points[point_idx]).cast<float>();
-                            Vec2f next = unscaled(points[point_idx + 1]).cast<float>();
-                            ExtrusionLine line { start, next, fill };
-                            layer_lines.push_back(line);
-                        }
+                        push_lines(fill, layer_lines);
                     }
                 } // fill
             } // ex_entity
