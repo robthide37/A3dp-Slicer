@@ -203,6 +203,7 @@ int SceneRaycaster::base_id(EType type)
     return -1;
 }
 
+#if ENABLE_RAYCAST_PICKING_DEBUG
 size_t SceneRaycaster::active_beds_count() const
 {
     size_t count = 0;
@@ -229,6 +230,7 @@ size_t SceneRaycaster::active_gizmos_count() const
     }
     return count;
 }
+#endif // ENABLE_RAYCAST_PICKING_DEBUG
 
 int SceneRaycaster::encode_id(EType type, int id) { return base_id(type) + id; }
 int SceneRaycaster::decode_id(EType type, int id) { return id - base_id(type); }
