@@ -203,6 +203,33 @@ int SceneRaycaster::base_id(EType type)
     return -1;
 }
 
+size_t SceneRaycaster::active_beds_count() const
+{
+    size_t count = 0;
+    for (const auto& item : m_bed) {
+        if (item->is_active()) ++count;
+    }
+    return count;
+}
+
+size_t SceneRaycaster::active_volumes_count() const
+{
+    size_t count = 0;
+    for (const auto& item : m_volumes) {
+        if (item->is_active()) ++count;
+    }
+    return count;
+}
+
+size_t SceneRaycaster::active_gizmos_count() const
+{
+    size_t count = 0;
+    for (const auto& item : m_gizmos) {
+        if (item->is_active()) ++count;
+    }
+    return count;
+}
+
 int SceneRaycaster::encode_id(EType type, int id) { return base_id(type) + id; }
 int SceneRaycaster::decode_id(EType type, int id) { return id - base_id(type); }
 
