@@ -143,8 +143,8 @@ public:
 	// delete all controls from the option group
 	void		clear(bool destroy_custom_ctrl = false);
 
-	// ask for each script option to recompute their value
-	void		update_script_presets();
+	// ask for each script option to recompute their value. If init is true, it will ask for get/set even if the Field isn't created.
+	void		update_script_presets(bool init = false);
 
     Line		create_single_option_line(const Option& option, const std::string& path = std::string()) const;
     void		append_single_option_line(const Option& option, const std::string& path = std::string()) { append_line(create_single_option_line(option, path)); }

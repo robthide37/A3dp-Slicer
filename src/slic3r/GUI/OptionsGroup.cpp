@@ -589,11 +589,10 @@ void OptionsGroup::on_change_OG(const t_config_option_key& opt_id, const boost::
 		m_on_change(opt_id, value);
 }
 
-void OptionsGroup::update_script_presets() {
+void OptionsGroup::update_script_presets(bool init) {
     for (auto& key_opt : m_options) {
         if (key_opt.second.opt.is_script) {
-            Field* field = get_field(key_opt.first);
-            if (field) {
+            if (init || get_field(key_opt.first)) {
                 boost::any val = key_opt.second.script->call_script_function_get_value(key_opt.second.opt);
                 if (val.empty()) {
                     MessageDialog(nullptr, "Error, can't find the script to get the value for the widget '" + key_opt.first + "'", _L("Error"), wxOK | wxICON_ERROR).ShowModal();

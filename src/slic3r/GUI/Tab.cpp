@@ -1082,6 +1082,15 @@ void Tab::reload_config()
 {
     if (m_active_page)
         m_active_page->reload_config();
+    //also reload scripted that aren't on the active page.
+    for (PageShp page : m_pages) {
+        if (page.get() != m_active_page) {
+            for (auto group : page->m_optgroups) {
+                // ask for activated the preset even if the gui isn't created, as the script may want to modify the conf.
+                group->update_script_presets(true);
+            }
+        }
+    }
 }
 
 void Tab::update_mode()
@@ -2120,35 +2129,17 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         option.opt.max_literal = { boost::lexical_cast<double>(params[i].substr(12, params[i].size() - 12).c_str()), false };
 
                 } else if (is_script) {
-                    if (params[i] == "bool") {
-                        option.opt.type = coBool;
-                        option.opt.set_default_value(new ConfigOptionBool(false));
-                    } else if (boost::starts_with(params[i], "int")) {
-                        option.opt.type = coInt;
-                        option.opt.set_default_value(new ConfigOptionInt(0));
-                        fct_add_enum(params[i]);
-                    } else if (boost::starts_with(params[i], "float")) {
-                        option.opt.type = coFloat;
-                        option.opt.set_default_value(new ConfigOptionFloat(0.));
-                        fct_add_enum(params[i]);
-                    } else if (boost::starts_with(params[i], "percent")) {
-                        option.opt.type = coPercent;
-                        option.opt.set_default_value(new ConfigOptionPercent(0));
-                        fct_add_enum(params[i]);
-                    } else if (boost::starts_with(params[i], "float_or_percent")) {
-                        option.opt.type = coFloatOrPercent;
-                        option.opt.set_default_value(new ConfigOptionFloatOrPercent(0.f, false));
-                        fct_add_enum(params[i]);
-                    } else if (boost::starts_with(params[i], "string")) {
-                        option.opt.type = coString;
-                        option.opt.set_default_value(new ConfigOptionString(""));
-                        fct_add_enum(params[i]);
-                    } else if (params[i] == "bools") {
+                    //be careful, "floatX" has to deteted before "float".
+                    if (params[i] == "bools") {
                         option.opt.type = coBools;
                         option.opt.set_default_value(new ConfigOptionBools{ false });
                     } else if (boost::starts_with(params[i], "ints")) {
                         option.opt.type = coInts;
                         option.opt.set_default_value(new ConfigOptionInts{ 0 });
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "floats_or_percents")) {
+                        option.opt.type = coFloatsOrPercents;
+                        option.opt.set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{0.f, false} });
                         fct_add_enum(params[i]);
                     } else if (boost::starts_with(params[i], "floats")) {
                         option.opt.type = coFloats;
@@ -2158,13 +2149,32 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         option.opt.type = coPercents;
                         option.opt.set_default_value(new ConfigOptionPercents{ 0 });
                         fct_add_enum(params[i]);
-                    } else if (boost::starts_with(params[i], "floats_or_percents")) {
-                        option.opt.type = coFloatsOrPercents;
-                        option.opt.set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{0.f, false} });
-                        fct_add_enum(params[i]);
                     } else if (boost::starts_with(params[i], "strings")) {
                         option.opt.type = coStrings;
                         option.opt.set_default_value(new ConfigOptionString{ "" });
+                        fct_add_enum(params[i]);
+                    } else if (params[i] == "bool") {
+                        option.opt.type = coBool;
+                        option.opt.set_default_value(new ConfigOptionBool(false));
+                    } else if (boost::starts_with(params[i], "int")) {
+                        option.opt.type = coInt;
+                        option.opt.set_default_value(new ConfigOptionInt(0));
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "float_or_percent")) {
+                        option.opt.type = coFloatOrPercent;
+                        option.opt.set_default_value(new ConfigOptionFloatOrPercent(0.f, false));
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "float")) {
+                        option.opt.type = coFloat;
+                        option.opt.set_default_value(new ConfigOptionFloat(0.));
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "percent")) {
+                        option.opt.type = coPercent;
+                        option.opt.set_default_value(new ConfigOptionPercent(0));
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "string")) {
+                        option.opt.type = coString;
+                        option.opt.set_default_value(new ConfigOptionString(""));
                         fct_add_enum(params[i]);
                     } else if (boost::starts_with(params[i], "enum")) {
                         option.opt.type = coEnum;

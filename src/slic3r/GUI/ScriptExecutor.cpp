@@ -191,25 +191,25 @@ void as_set_float(std::string& key, float f_val)
         double new_val = round(f_val);
         // only update if difference is significant
         if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
-            return;
-        conf.set_key_value(key, new ConfigOptionFloat(f_val));
+            new_val = old_value; // don't return int these check, as it can escpae a refresh of the scripted widget
+        conf.set_key_value(key, new ConfigOptionFloat(new_val));
     } else if (result.second->type() == ConfigOptionType::coFloats) {
         ConfigOptionFloats* new_opt = static_cast<ConfigOptionFloats*>(result.second->clone());
+        double new_val = round(f_val);
         if (!new_opt->values.empty()) {
             // only update if difference is significant
             double old_value = new_opt->values.front();
-            double new_val = round(f_val);
             if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
-                return;
+                new_val = old_value;
         }
-        new_opt->set_at(f_val, 0);
+        new_opt->set_at(new_val, 0);
         conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coPercent) {
         double percent_f = floor(f_val * 100000. + 0.5) / 1000.;
         // only update if difference is significant
         double old_value = result.second->getFloat();
         if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
-            return;
+            percent_f = old_value;
         conf.set_key_value(key, new ConfigOptionPercent(percent_f));
     } else if (result.second->type() == ConfigOptionType::coPercents) {
         ConfigOptionPercents* new_opt = static_cast<ConfigOptionPercents*>(result.second->clone());
@@ -218,29 +218,29 @@ void as_set_float(std::string& key, float f_val)
             // only update if difference is significant
             double old_value = new_opt->values.front();
             if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
-                return;
+                percent_f = old_value;
         }
         new_opt->set_at(percent_f, 0);
         conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coFloatOrPercent) {
+        double new_val = round(f_val);
         if (!static_cast<const ConfigOptionFloatOrPercent*>(result.second)->percent) {
             // only update if difference is significant
             double old_value = result.second->getFloat();
-            double new_val = round(f_val);
             if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
-                return;
+                new_val = old_value;
         }
-        conf.set_key_value(key, new ConfigOptionFloatOrPercent(f_val, false));
+        conf.set_key_value(key, new ConfigOptionFloatOrPercent(new_val, false));
     } else if (result.second->type() == ConfigOptionType::coFloatsOrPercents) {
         ConfigOptionFloatsOrPercents* new_opt = static_cast<ConfigOptionFloatsOrPercents*>(result.second->clone());
+        double new_val = round(f_val);
         if (!new_opt->values.empty() && !new_opt->values.front().percent) {
             // only update if difference is significant
             double old_value = new_opt->values.front().value;
-            double new_val = round(f_val);
             if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
-                return;
+                new_val = old_value;
         }
-        new_opt->set_at(FloatOrPercent{ f_val, false}, 0);
+        new_opt->set_at(FloatOrPercent{ new_val, false}, 0);
         conf.set_key_value(key, new_opt);
     }
 }
@@ -265,7 +265,7 @@ void as_set_percent(std::string& key, float f_val)
         // only update if difference is significant
         double old_value = result.second->getFloat() * 100;
         if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
-            return;
+            percent_f = old_value; // don't return int these check, as it can escpae a refresh of the scripted widget
         conf.set_key_value(key, new ConfigOptionFloat(percent_f / 100.));
     } else if (result.second->type() == ConfigOptionType::coFloats) {
         ConfigOptionFloats* new_opt = static_cast<ConfigOptionFloats*>(result.second->clone());
@@ -273,7 +273,7 @@ void as_set_percent(std::string& key, float f_val)
             // only update if difference is significant
             double old_value = new_opt->values.front() * 100;
             if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
-                return;
+                percent_f = old_value;
         }
         new_opt->set_at(percent_f / 100., 0);
         conf.set_key_value(key, new_opt);
@@ -281,7 +281,7 @@ void as_set_percent(std::string& key, float f_val)
         // only update if difference is significant
         double old_value = get_coll(key).second->getFloat();
         if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
-            return;
+            percent_f = old_value;
         conf.set_key_value(key, new ConfigOptionPercent(percent_f));
     } else if (result.second->type() == ConfigOptionType::coPercents) {
         ConfigOptionPercents* new_opt = static_cast<ConfigOptionPercents*>(result.second->clone());
@@ -289,7 +289,7 @@ void as_set_percent(std::string& key, float f_val)
             // only update if difference is significant
             double old_value = new_opt->values.front();
             if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
-                return;
+                percent_f = old_value;
         }
         new_opt->set_at(percent_f, 0);
         conf.set_key_value(key, new_opt);
@@ -298,7 +298,7 @@ void as_set_percent(std::string& key, float f_val)
             // only update if difference is significant
             double old_value = result.second->getFloat();
             if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
-                return;
+                percent_f = old_value;
         }
         conf.set_key_value(key, new ConfigOptionFloatOrPercent(percent_f, true));
     } else if (result.second->type() == ConfigOptionType::coFloatsOrPercents) {
@@ -307,7 +307,7 @@ void as_set_percent(std::string& key, float f_val)
             // only update if difference is significant
             double old_value = new_opt->values.front().value;
             if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
-                return;
+                percent_f = old_value;
         }
         new_opt->set_at(FloatOrPercent{ percent_f, true }, 0);
         conf.set_key_value(key, new_opt);
@@ -1017,51 +1017,55 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     int res = ctx->Execute();
     int32_t ret_int;
     float ret_float;
-    boost::any ret_val;
+    boost::any field_val;
+    boost::any opt_val;
     switch (def.type) {
     case coBool:
-    case coBools: { ret_int = ctx->GetReturnDWord(); ret_val = uint8_t(ret_int < 0 ? 2 : ret_int); break; } //CheckBox
+    case coBools: { ret_int = ctx->GetReturnDWord(); field_val = uint8_t(ret_int < 0 ? 2 : ret_int); opt_val = uint8_t((ret_int > 0)?1:0); break; } //CheckBox
     case coInt:
-    case coInts: { ret_int = ctx->GetReturnDWord(); ret_val = int32_t(ret_int); break; } //SpinCtrl
+    case coInts: { ret_int = ctx->GetReturnDWord(); field_val = int32_t(ret_int); opt_val = int(ret_int); break; } //SpinCtrl
     case coString:
-    case coStrings: { ret_val = from_u8(ret_str); break; } //TextCtrl
+    case coStrings: { field_val = from_u8(ret_str); opt_val = ret_str; break; } //TextCtrl
     case coPercent:
     case coPercents: ret_percent = true;
+    case coFloat:
+    case coFloats: opt_val = double(ctx->GetReturnFloat());
     case coFloatOrPercent:
     case coFloatsOrPercents:
-    case coFloat:
-    case coFloats: {
+    {
         ret_float = ctx->GetReturnFloat();
         wxString ret_wstring = double_to_string(ret_float);
         if (ret_percent)
             ret_wstring += '%';
-        ret_val = ret_wstring; //TextCtrl
+        field_val = ret_wstring; //TextCtrl
+        if (opt_val.empty()) { opt_val = ret_wstring.ToStdString(); }
         break;
     }
     case coPoint:
-    case coPoints: { ret_float = ctx->GetReturnFloat(); ret_val = Vec2d{ ret_float, ret_float };   break; } //FIXME PointCtrl
-    case coPoint3: { ret_float = ctx->GetReturnFloat(); ret_val = Vec3d{ ret_float, ret_float, ret_float };  break; }
+    case coPoints: { ret_float = ctx->GetReturnFloat(); field_val = Vec2d{ ret_float, ret_float }; opt_val = double(ctx->GetReturnFloat()); break; } //FIXME PointCtrl
+    case coPoint3: { ret_float = ctx->GetReturnFloat(); field_val = Vec3d{ ret_float, ret_float, ret_float }; opt_val = double(ctx->GetReturnFloat());  break; }
     case coEnum: { 
         ret_int = ctx->GetReturnDWord();
         if (ret_int >= 0 && ret_int < def.enum_values.size()) {
-            ret_val = int32_t(ret_int);
+            field_val = int32_t(ret_int);
         } else {
-            ret_val = int32_t(0);
+            field_val = int32_t(0);
             for (size_t i = 0; i < def.enum_values.size(); i++) {
                 if (ret_str == def.enum_values[i])
-                    ret_val = int32_t(i);
+                    field_val = int32_t(i);
             }
         }
+        opt_val = field_val;
         break; //Choice
     }
     }
     if (m_need_refresh) {
-        refresh(def, ret_val);
+        refresh(def, opt_val);
     }
-    if (ret_val.empty()) {
+    if (field_val.empty()) {
         std::cout << "Error nullptr for script\n";
     }
-    return ret_val;
+    return field_val;
 }
 
 void ScriptContainer::refresh(const ConfigOptionDef& def, boost::any value)
@@ -1072,7 +1076,7 @@ void ScriptContainer::refresh(const ConfigOptionDef& def, boost::any value)
         return;
     //if bool, need to change the int in bool
     if (def.type == coBool || def.type == coBools) {
-        value = bool(boost::any_cast<uint8_t>(value) == 1);
+        value = bool(boost::any_cast<uint8_t>(value) != 0);
     }
     m_currently_reset.push_back(def.opt_key);
     call_script_function_set(def, value);
