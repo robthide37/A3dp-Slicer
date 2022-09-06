@@ -110,20 +110,13 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
         if (m_hover_id != -1) {
             m_mouse_left_down = true;
 
-            auto set_item_from_feature = [this]() {
-                const SelectedFeatures::Item item = { m_mode,
-                    (m_mode == EMode::ExtendedSelection) ? point_on_feature_type_as_string(m_curr_feature->get_type(), m_hover_id) : surface_feature_type_as_string(m_curr_feature->get_type()),
-                    (m_mode == EMode::ExtendedSelection) ? Measure::SurfaceFeature(*m_curr_point_on_feature_position) : m_curr_feature };
-                return item;
-            };
-
             if (m_selected_features.first.feature.has_value()) {
-                const SelectedFeatures::Item item = set_item_from_feature();
+                const SelectedFeatures::Item item = item_from_feature();
                 if (m_selected_features.first != item)
                     m_selected_features.second = item;
             }
             else
-                m_selected_features.first = set_item_from_feature();
+                m_selected_features.first = item_from_feature();
 
             return true;
         }
@@ -138,6 +131,16 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             // responsible for mouse left up after selecting plane
             m_mouse_left_down = false;
             return true;
+        }
+    }
+    else if (mouse_event.RightDown()) {
+        if (m_hover_id != -1) {
+            if (m_selected_features.first.feature.has_value()) {
+                if (m_selected_features.first == item_from_feature()) {
+                    m_selected_features.reset();
+                    m_imgui->set_requires_extra_frame();
+                }
+            }
         }
     }
     else if (mouse_event.Leaving())
@@ -612,6 +615,14 @@ void GLGizmoMeasure::restore_scene_raycasters_state()
     }
 }
 
+GLGizmoMeasure::SelectedFeatures::Item GLGizmoMeasure::item_from_feature() const
+{
+    const SelectedFeatures::Item item = { m_mode,
+        (m_mode == EMode::ExtendedSelection) ? point_on_feature_type_as_string(m_curr_feature->get_type(), m_hover_id) : surface_feature_type_as_string(m_curr_feature->get_type()),
+        (m_mode == EMode::ExtendedSelection) ? Measure::SurfaceFeature(*m_curr_point_on_feature_position) : m_curr_feature };
+    return item;
+}
+
 void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit)
 {
     static std::optional<Measure::SurfaceFeature> last_feature;
@@ -679,6 +690,14 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 ImGui::Dummy(ImVec2(rect_size, rect_size));
             }
             );
+
+        if (m_hover_id != -1) {
+            if (m_selected_features.first.feature.has_value()) {
+                if (m_selected_features.first == item_from_feature())
+                    add_strings_row_to_table(_u8L("Right mouse button"), ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Restart selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            }
+        }
+
         if (m_mode == EMode::BasicSelection && m_hover_id != -1)
             add_strings_row_to_table(CTRL_STR, ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Enable point selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
         ImGui::EndTable();
@@ -776,12 +795,12 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
         ImGui::EndTable();
     }
 
-    if (m_selected_features.first.feature.has_value()) {
-        if (m_imgui->button(_u8L("Restart"))) {
-            m_selected_features.reset();
-            m_imgui->set_requires_extra_frame();
-        }
-    }
+    //if (m_selected_features.first.feature.has_value()) {
+    //    if (m_imgui->button(_u8L("Restart"))) {
+    //        m_selected_features.reset();
+    //        m_imgui->set_requires_extra_frame();
+    //    }
+    //}
 
     if (m_selected_features.second.feature.has_value()) {
         const Measure::MeasurementResult measure = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature);
