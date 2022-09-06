@@ -567,11 +567,16 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
         for (ModelVolume* v : po->model_object()->volumes) {
             if (v->is_seam_position()) {
                 //xy in object coordinates, z in plater coordinates
-                // created/moved shpere have offset in their transformation, and loaded ones have their loaded transformation in the source transformation.
-                Vec3d test_lambda_pos = model_instance->transform_vector((v->get_transformation() * v->source.transform).get_offset(), false);
-                // remove shift, as we used the transform_vector(.., FALSE). that way, we have a correct z vs the layer height, and same for the x and y vs polygon.
-                test_lambda_pos.x() -= unscaled(po->instances()[print_object_instance_idx].shift.x());
-                test_lambda_pos.y() -= unscaled(po->instances()[print_object_instance_idx].shift.y());
+                // seems like it's now in the base transformation, no more need to go via the source.transform
+                Vec3d test_lambda_pos = model_instance->transform_vector(v->get_offset(), true);
+                // OLD: created/moved shpere have offset in their transformation, and loaded ones have their loaded transformation in the source transformation.
+                if (v->source.transform.get_offset().x() != 0 && std::abs(v->get_offset().x() - v->source.transform.get_offset().x()) > 0.001) {
+                    test_lambda_pos = model_instance->transform_vector((v->get_transformation() * v->source.transform).get_offset(), false);
+                    // remove shift, as we used the transform_vector(.., FALSE). that way, we have a correct z vs the layer height, and same for the x and y vs polygon.
+                    test_lambda_pos.x() -= unscaled(po->instances()[print_object_instance_idx].shift.x());
+                    test_lambda_pos.y() -= unscaled(po->instances()[print_object_instance_idx].shift.y());
+                    assert(false);
+                }
 
                 double test_lambda_z = std::abs(layer.print_z - test_lambda_pos.z());
                 Point xy_lambda(scale_(test_lambda_pos.x()), scale_(test_lambda_pos.y()));
