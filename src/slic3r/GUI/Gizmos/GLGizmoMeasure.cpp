@@ -109,6 +109,13 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
     else if (mouse_event.LeftDown()) {
         if (m_hover_id != -1) {
             m_mouse_left_down = true;
+            
+            auto item_from_feature = [this]() {
+                const SelectedFeatures::Item item = { m_mode,
+                    (m_mode == EMode::ExtendedSelection) ? point_on_feature_type_as_string(m_curr_feature->get_type(), m_hover_id) : surface_feature_type_as_string(m_curr_feature->get_type()),
+                    (m_mode == EMode::ExtendedSelection) ? Measure::SurfaceFeature(*m_curr_point_on_feature_position) : m_curr_feature };
+                return item;
+            };
 
             if (m_selected_features.first.feature.has_value()) {
                 const SelectedFeatures::Item item = item_from_feature();
@@ -133,15 +140,9 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             return true;
         }
     }
-    else if (mouse_event.RightDown()) {
-        if (m_hover_id != -1) {
-            if (m_selected_features.first.feature.has_value()) {
-                if (m_selected_features.first == item_from_feature()) {
-                    m_selected_features.reset();
-                    m_imgui->set_requires_extra_frame();
-                }
-            }
-        }
+    else if (mouse_event.RightDown() && mouse_event.CmdDown()) {
+        m_selected_features.reset();
+        m_imgui->set_requires_extra_frame();
     }
     else if (mouse_event.Leaving())
         m_mouse_left_down = false;
@@ -615,14 +616,6 @@ void GLGizmoMeasure::restore_scene_raycasters_state()
     }
 }
 
-GLGizmoMeasure::SelectedFeatures::Item GLGizmoMeasure::item_from_feature() const
-{
-    const SelectedFeatures::Item item = { m_mode,
-        (m_mode == EMode::ExtendedSelection) ? point_on_feature_type_as_string(m_curr_feature->get_type(), m_hover_id) : surface_feature_type_as_string(m_curr_feature->get_type()),
-        (m_mode == EMode::ExtendedSelection) ? Measure::SurfaceFeature(*m_curr_point_on_feature_position) : m_curr_feature };
-    return item;
-}
-
 void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit)
 {
     static std::optional<Measure::SurfaceFeature> last_feature;
@@ -691,12 +684,8 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             }
             );
 
-        if (m_hover_id != -1) {
-            if (m_selected_features.first.feature.has_value()) {
-                if (m_selected_features.first == item_from_feature())
-                    add_strings_row_to_table(_u8L("Right mouse button"), ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Restart selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-            }
-        }
+        if (m_selected_features.first.feature.has_value())
+            add_strings_row_to_table(CTRL_STR + "+" + _u8L("Right mouse button"), ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Restart selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
 
         if (m_mode == EMode::BasicSelection && m_hover_id != -1)
             add_strings_row_to_table(CTRL_STR, ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Enable point selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
