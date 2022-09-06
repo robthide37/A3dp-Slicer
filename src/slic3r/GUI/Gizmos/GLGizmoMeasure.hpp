@@ -110,6 +110,7 @@ class GLGizmoMeasure : public GLGizmoBase
 
     void disable_scene_raycasters();
     void restore_scene_raycasters_state();
+    SelectedFeatures::Item item_from_feature() const;
 
 public:
     GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
