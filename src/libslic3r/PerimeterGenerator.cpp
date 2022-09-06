@@ -253,7 +253,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
             }
         }
 
-        auto& best_path = all_extrusions[best_candidate];
+        Arachne::ExtrusionLine* best_path = all_extrusions[best_candidate];
         ordered_extrusions.push_back({ best_path, best_path->is_contour(), false });
         processed[best_candidate] = true;
         for (size_t unlocked_idx : blocking[best_candidate])
@@ -2330,7 +2330,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
             // Note that we set loop role to ContourInternalPerimeter
             // also when loop is both internal and external (i.e.
             // there's only one contour loop).
-            loop_role = ExtrusionLoopRole::elrInternal;
+            loop_role = (ExtrusionLoopRole)(loop_role | ExtrusionLoopRole::elrInternal);
         }
         if (!loop.is_contour) {
             loop_role = (ExtrusionLoopRole)(loop_role | ExtrusionLoopRole::elrHole);
@@ -2459,10 +2459,21 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
             continue;
 
         const bool    is_external = extrusion->inset_idx == 0;
-        ExtrusionRole role = is_external ? erExternalPerimeter : erPerimeter;
         ExtrusionLoopRole loop_role = ExtrusionLoopRole::elrDefault;
+        ExtrusionRole role = is_external ? erExternalPerimeter : erPerimeter;
         if (biggest_inset_idx == extrusion->inset_idx) {
-            loop_role = ExtrusionLoopRole(ExtrusionLoopRole::elrInternal | ExtrusionLoopRole::elrFirstLoop);
+            // Note that we set loop role to ContourInternalPerimeter
+            // also when loop is both internal and external (i.e.
+            // there's only one contour loop).
+            loop_role = (ExtrusionLoopRole)(loop_role | ExtrusionLoopRole::elrInternal | ExtrusionLoopRole::elrFirstLoop);
+        }
+        if (!pg_extrusion.is_contour) {
+            loop_role = (ExtrusionLoopRole)(loop_role | ExtrusionLoopRole::elrHole);
+        }
+        if (this->config->external_perimeters_vase.value && this->config->external_perimeters_first.value && is_external) {
+            if ((pg_extrusion.is_contour && this->config->external_perimeters_nothole.value) || (!pg_extrusion.is_contour && this->config->external_perimeters_hole.value)) {
+                loop_role = (ExtrusionLoopRole)(loop_role | ExtrusionLoopRole::elrVase);
+            }
         }
 
         // fuzzy_extrusion_line() don't work. I can use fuzzy_paths() anyway, not a big deal.
