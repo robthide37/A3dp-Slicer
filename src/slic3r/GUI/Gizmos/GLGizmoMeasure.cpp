@@ -113,7 +113,7 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             auto set_item_from_feature = [this]() {
                 const SelectedFeatures::Item item = { m_mode,
                     (m_mode == EMode::ExtendedSelection) ? point_on_feature_type_as_string(m_curr_feature->get_type(), m_hover_id) : surface_feature_type_as_string(m_curr_feature->get_type()),
-                    (m_mode == EMode::ExtendedSelection) ? Measure::SurfaceFeature(Measure::SurfaceFeatureType::Point, *m_curr_point_on_feature_position, Vec3d::Zero(), std::nullopt, 0.0) : m_curr_feature };
+                    (m_mode == EMode::ExtendedSelection) ? Measure::SurfaceFeature(*m_curr_point_on_feature_position) : m_curr_feature };
                 return item;
             };
 
@@ -331,7 +331,7 @@ void GLGizmoMeasure::on_render()
             default: { assert(false); break; }
             case Measure::SurfaceFeatureType::Point:
             {
-                m_curr_point_on_feature_position = model_matrix * m_curr_feature->get_point();
+                m_curr_point_on_feature_position = position_on_feature(POINT_ID, camera);
                 break;
             }
             case Measure::SurfaceFeatureType::Edge:

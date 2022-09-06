@@ -44,19 +44,28 @@ public:
     std::tuple<Vec3d, double, Vec3d> get_circle() const { assert(m_type == SurfaceFeatureType::Circle); return std::make_tuple(m_pt1, m_value, m_pt2); }
 
     // For planes, return index into vector provided by Measuring::get_plane_triangle_indices, normal and point.
-    std::tuple<int, Vec3d, Vec3d> get_plane() const { return std::make_tuple(int(m_value), m_pt1, m_pt2); }
+    std::tuple<int, Vec3d, Vec3d> get_plane() const { assert(m_type == SurfaceFeatureType::Plane); return std::make_tuple(int(m_value), m_pt1, m_pt2); }
 
     // For anything, return an extra point that should also be considered a part of this.
     std::optional<Vec3d> get_extra_point() const { assert(m_type != SurfaceFeatureType::Undef); return m_pt3; }
 
     bool operator == (const SurfaceFeature& other) const {
         if (this->m_type != other.m_type) return false;
-        if (!this->m_pt1.isApprox(other.m_pt1)) return false;
-        if (!this->m_pt2.isApprox(other.m_pt2)) return false;
-        if (this->m_pt3.has_value() && !other.m_pt3.has_value()) return false;
-        if (!this->m_pt3.has_value() && other.m_pt3.has_value()) return false;
-        if (this->m_pt3.has_value() && other.m_pt3.has_value() && !(*this->m_pt3).isApprox(*other.m_pt3)) return false;
-        return this->m_value == other.m_value;
+        switch (this->m_type)
+        {
+        case SurfaceFeatureType::Undef: { break; }
+        case SurfaceFeatureType::Point: { return (this->m_pt1.isApprox(other.m_pt1)); }
+        case SurfaceFeatureType::Edge: {
+            return (this->m_pt1.isApprox(other.m_pt1) && this->m_pt2.isApprox(other.m_pt2)) ||
+                   (this->m_pt1.isApprox(other.m_pt2) && this->m_pt2.isApprox(other.m_pt1));
+        }
+        case SurfaceFeatureType::Plane:
+        case SurfaceFeatureType::Circle: {
+            return (this->m_pt1.isApprox(other.m_pt1) && this->m_pt2.isApprox(other.m_pt2) && std::abs(this->m_value - other.m_value) < EPSILON);
+        }
+        }
+
+        return false;
     }
 
     bool operator != (const SurfaceFeature& other) const {
