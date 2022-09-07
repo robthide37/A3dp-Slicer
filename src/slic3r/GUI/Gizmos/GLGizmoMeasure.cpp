@@ -229,9 +229,12 @@ std::string GLGizmoMeasure::on_get_name() const
 bool GLGizmoMeasure::on_is_activable() const
 {
     const Selection& selection = m_parent.get_selection();
-    return (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA) ?
+    bool res = (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA) ?
         selection.is_single_full_instance() :
         selection.is_single_volume() || selection.is_single_volume_instance();
+    if (res)
+        res &= !selection.get_first_volume()->is_sinking();
+    return res;
 }
 
 void GLGizmoMeasure::on_render()
