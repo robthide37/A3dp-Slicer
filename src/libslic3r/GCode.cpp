@@ -2736,7 +2736,7 @@ GCode::LayerResult GCode::process_layer(
             print.config().before_layer_gcode.value, m_writer.tool()->id(), &config)
             + "\n";
     }
-    // print z move to next layer UNLESS
+    // print z move to next layer UNLESS (HACK for superslicer#1775)
     // if it's going to the first layer, then we may want to delay the move in these condition:
     // there is no "after layer change gcode" and it's the first move from the unknown
     if (print.config().layer_gcode.value.empty() && !m_last_pos_defined && m_config.start_gcode_manual && (
@@ -2745,6 +2745,9 @@ GCode::LayerResult GCode::process_layer(
         ||   // or lift_min is higher than the first layer height.
          m_config.lift_min.value > layer.print_z
             )) {
+        // still do the retraction
+        gcode += m_writer.retract();
+        gcode += m_writer.reset_e();
         m_delayed_layer_change = this->change_layer(print_z); //HACK for superslicer#1775
     } else {
         //extra lift on layer change if multiple objects
