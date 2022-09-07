@@ -78,6 +78,7 @@
 #define ENABLE_RAYCAST_PICKING_DEBUG (0 && ENABLE_RAYCAST_PICKING)
 // Enable Measure Gizmo
 #define ENABLE_MEASURE_GIZMO (1 && ENABLE_RAYCAST_PICKING)
+#define ENABLE_MEASURE_GIZMO_DEBUG (0 && ENABLE_MEASURE_GIZMO)
 
 
 #endif // _prusaslicer_technologies_h_
