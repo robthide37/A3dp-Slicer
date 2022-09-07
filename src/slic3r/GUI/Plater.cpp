@@ -6225,7 +6225,17 @@ bool Plater::export_3mf(const boost::filesystem::path& output_path)
     ThumbnailData thumbnail_data;
     ThumbnailsParams thumbnail_params = { {}, false, true, true, true };
     p->generate_thumbnail(thumbnail_data, THUMBNAIL_SIZE_3MF.first, THUMBNAIL_SIZE_3MF.second, thumbnail_params, Camera::EType::Ortho);
-    bool ret = Slic3r::store_3mf(path_u8.c_str(), &p->model, export_config ? &cfg : nullptr, full_pathnames, &thumbnail_data);
+    bool ret = false;
+    try
+    {
+        ret = Slic3r::store_3mf(path_u8.c_str(), &p->model, export_config ? &cfg : nullptr, full_pathnames, &thumbnail_data);
+    }
+    catch (boost::filesystem::filesystem_error& e)
+    {
+        const wxString what = _("Unable to save file") + ": " + path_u8 + "\n" + e.code().message();
+        MessageDialog dlg(this, what, _("Error saving 3mf file"), wxOK | wxICON_ERROR);
+        dlg.ShowModal();
+    }
     if (ret) {
         // Success
 //        p->statusbar()->set_status_text(format_wxstr(_L("3MF file exported to %s"), path));
