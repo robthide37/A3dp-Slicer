@@ -33,12 +33,10 @@ class GLGizmoMeasure : public GLGizmoBase
     {
         struct Item
         {
-            EMode mode{ EMode::BasicSelection };
             std::string source;
             std::optional<Measure::SurfaceFeature> feature;
 
             bool operator == (const Item& other) const {
-                if (this->mode != other.mode) return false;
                 if (this->source != other.source) return false;
                 return this->feature == other.feature;
             }
@@ -48,7 +46,6 @@ class GLGizmoMeasure : public GLGizmoBase
             }
 
             void reset() {
-                mode = EMode::BasicSelection;
                 source.clear();
                 feature.reset();
             }
@@ -62,12 +59,12 @@ class GLGizmoMeasure : public GLGizmoBase
             second.reset();
         }
 
-        bool operator == (const SelectedFeatures& other) const {
+        bool operator == (const SelectedFeatures & other) const {
             if (this->first != other.first) return false;
             return this->second == other.second;
         }
 
-        bool operator != (const SelectedFeatures& other) const {
+        bool operator != (const SelectedFeatures & other) const {
             return !operator == (other);
         }
     };
@@ -80,6 +77,7 @@ class GLGizmoMeasure : public GLGizmoBase
     PickingModel m_circle;
     PickingModel m_plane;
 
+    Transform3d m_volume_matrix{ Transform3d::Identity() };
     std::vector<GLModel> m_plane_models_cache;
     std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
     std::optional<Measure::SurfaceFeature> m_curr_feature;
@@ -110,6 +108,10 @@ class GLGizmoMeasure : public GLGizmoBase
 
     void disable_scene_raycasters();
     void restore_scene_raycasters_state();
+
+#if ENABLE_MEASURE_GIZMO_DEBUG
+    void render_debug_dialog();
+#endif // ENABLE_MEASURE_GIZMO_DEBUG
 
 public:
     GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
