@@ -365,6 +365,7 @@ std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length
     Polyline pl = e->as_polyline();
     std::vector<ExtrusionLine> lines;
     lines.reserve(pl.points.size() * 1.5f);
+    lines.emplace_back(unscaled(pl.points[0]).cast<float>(), unscaled(pl.points[0]).cast<float>(), e);
     for (int point_idx = 0; point_idx < int(pl.points.size() - 1); ++point_idx) {
         Vec2f start        = unscaled(pl.points[point_idx]).cast<float>();
         Vec2f next         = unscaled(pl.points[point_idx + 1]).cast<float>();
@@ -415,6 +416,9 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
 
         for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
             ExtrusionLine &current_line = lines[line_idx];
+            if (line_idx + 1 == lines.size() && current_line.b != lines.begin()->a) {
+                bridging_acc.add_distance(params.bridge_distance + 1.0f);
+            }
             float curr_angle = 0;
             if (line_idx + 1 < lines.size()) {
                 const Vec2f v1 = current_line.b - current_line.a;

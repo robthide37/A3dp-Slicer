@@ -282,7 +282,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
                     "dont_support_bridges", "support_material_extrusion_width", "support_material_contact_distance",
                     "support_material_xy_spacing" })
         toggle_field(el, have_support_material);
-//    toggle_field("support_material_threshold", have_support_material_auto);
+    toggle_field("support_material_threshold", have_support_material_auto);
     toggle_field("support_material_bottom_contact_distance", have_support_material && ! have_support_soluble);
     toggle_field("support_material_closing_radius", have_support_material && support_material_style == smsSnug);
 
