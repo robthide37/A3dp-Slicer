@@ -31,6 +31,7 @@ class BitmapCache;
 class PresetComboBox : public BitmapComboBox
 {
     bool m_show_all { false };
+    bool m_show_modif_preset_separately{ false };
 public:
     PresetComboBox(wxWindow* parent, Preset::Type preset_type, const wxSize& size = wxDefaultSize, PresetBundle* preset_bundle = nullptr);
     ~PresetComboBox();
@@ -65,6 +66,7 @@ public:
     void edit_physical_printer();
     void add_physical_printer();
     bool del_physical_printer(const wxString& note_string = wxEmptyString);
+    void show_modif_preset_separately() { m_show_modif_preset_separately = true; }
 
     virtual wxString get_preset_name(const Preset& preset); 
     Preset::Type     get_type() { return m_type; }
