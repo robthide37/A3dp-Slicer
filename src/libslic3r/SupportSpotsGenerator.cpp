@@ -16,8 +16,8 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
 
-//#define DETAILED_DEBUG_LOGS
-//#define DEBUG_FILES
+// #define DETAILED_DEBUG_LOGS
+// #define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -66,8 +66,8 @@ auto get_b(ExtrusionLine &&l) {
 
 namespace SupportSpotsGenerator {
 
-SupportPoint::SupportPoint(const Vec3f &position, float force, const Vec3f &direction) :
-        position(position), force(force), direction(direction) {
+SupportPoint::SupportPoint(const Vec3f &position, float force, float spot_radius, const Vec3f &direction) :
+        position(position), force(force), spot_radius(spot_radius), direction(direction) {
 }
 
 class LinesDistancer {
@@ -405,15 +405,8 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         float max_malformation_dist = tan(params.malformation_angle_span_deg.second * PI / 180.0f)
                 * layer_region->layer()->height;
 
-        Points points { };
-        entity->collect_points(points);
         std::vector<ExtrusionLine> lines = to_short_lines(entity, params.bridge_distance);
         if (lines.empty()) return;
-
-        if (entity->total_volume() < params.supportable_volume_threshold) {
-            checked_lines_out.insert(checked_lines_out.end(), lines.begin(), lines.end());
-            return;
-        }
 
         ExtrusionPropertiesAccumulator bridging_acc { };
         ExtrusionPropertiesAccumulator malformation_acc { };
@@ -429,6 +422,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 curr_angle = angle(v1, v2);
             }
             bridging_acc.add_angle(curr_angle);
+            // malformation in concave angles does not happen
             malformation_acc.add_angle(std::max(0.0f, curr_angle));
 
             size_t nearest_line_idx;
@@ -444,11 +438,11 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 bool in_layer_dist_condition = bridging_acc.distance
                         > params.bridge_distance / (1.0f + (bridging_acc.max_curvature
                                 * params.bridge_distance_decrease_by_curvature_factor / PI));
-                bool between_layers_condition = fabs(dist_from_prev_layer) > 3.0f * flow_width ||
+                bool between_layers_condition = fabs(dist_from_prev_layer) > flow_width ||
                         prev_layer_lines.get_line(nearest_line_idx).malformation > 3.0f * layer_region->layer()->height;
 
                 if (in_layer_dist_condition && between_layers_condition) {
-                    issues.support_points.emplace_back(to_vec3f(current_line.b), 0.0f, Vec3f(0.f, 0.0f, -1.0f));
+                    issues.support_points.emplace_back(to_vec3f(current_line.b), 0.0f, params.support_points_interface_radius, Vec3f(0.f, 0.0f, -1.0f));
                     current_line.support_point_generated = true;
                     bridging_acc.reset();
                 }
@@ -562,7 +556,7 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
             for (size_t lidx = extrusions[extrusion_idx].first; lidx < extrusions[extrusion_idx].second; ++lidx) {
                 line_to_island_mapping[lidx] = result.islands.size();
                 const ExtrusionLine &line = layer_lines[lidx];
-                float volume = line.origin_entity->min_mm3_per_mm() * line.len;
+                float volume = line.len * layer->height * flow_width * PI / 4.0f;
                 island.volume += volume;
                 island.volume_centroid_accumulator += to_3d(Vec2f((line.a + line.b) / 2.0f), float(layer->slice_z))
                         * volume;
@@ -630,6 +624,15 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
                         * current_layer_grid.pixel_area();
             }
         }
+    }
+
+    // filter out very small connection areas, they brake the graph building
+    for (Island &island : result.islands) {
+        std::vector<size_t> conns_to_remove;
+        for (const auto &conn : island.connected_islands) {
+            if (conn.second.area < params.connections_min_considerable_area) { conns_to_remove.push_back(conn.first); }
+        }
+        for (size_t conn : conns_to_remove) { island.connected_islands.erase(conn); }
     }
 
     return {result, current_layer_grid};
@@ -1039,12 +1042,6 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
             const Island &island = islands_graph[layer_idx].islands[island_idx];
             ObjectPart &part = active_object_parts.access(prev_island_to_object_part_mapping[island_idx]);
 
-            //skip small drops of material - if they grow in size, they will be supported in next layers;
-            // if they dont grow, they are not worthy
-            if (part.get_volume() < params.supportable_volume_threshold) {
-                continue;
-            }
-
             IslandConnection &weakest_conn = prev_island_weakest_connection[island_idx];
 #ifdef DETAILED_DEBUG_LOGS
             weakest_conn.print_info("weakest connection info: ");
@@ -1068,21 +1065,21 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                     auto force = part.is_stable_while_extruding(weakest_conn, line, support_point, layer_z, params);
                     if (force > 0) {
                         if (!supports_presence_grid.position_taken(support_point)) {
-                            float area = std::min(float(unscaled(line.origin_entity->length())),
-                             params.support_points_interface_radius * params.support_points_interface_radius
-                                    * float(PI));
-                            float altered_area = area * params.get_support_spots_adhesion_strength() / params.get_bed_adhesion_yield_strength();
-                            part.add_support_point(support_point, area);
-                            issues.support_points.emplace_back(support_point, force,
-                                    to_3d(Vec2f(line.b - line.a).normalized(), 0.0f));
+                            float orig_area = params.support_points_interface_radius * params.support_points_interface_radius * float(PI);
+                            // artifically lower the area for materials that have strong bed adhesion, as this adhesion does not apply for support points
+                            float       altered_area = orig_area * params.get_support_spots_adhesion_strength() / params.get_bed_adhesion_yield_strength();
+                            part.add_support_point(support_point, altered_area);
+
+                            float radius = part.get_volume() < params.small_parts_threshold ? params.small_parts_support_points_interface_radius : params.support_points_interface_radius;
+                            issues.support_points.emplace_back(support_point, force, radius, to_3d(Vec2f(line.b - line.a).normalized(), 0.0f));
                             supports_presence_grid.take_position(support_point);
 
                             weakest_conn.area += altered_area;
                             weakest_conn.centroid_accumulator += support_point * altered_area;
-                            weakest_conn.second_moment_of_area_accumulator += altered_area
-                                    * support_point.head<2>().cwiseProduct(support_point.head<2>());
-                            weakest_conn.second_moment_of_area_covariance_accumulator += altered_area * support_point.x()
-                                    * support_point.y();
+                            weakest_conn.second_moment_of_area_accumulator += altered_area *
+                                                                              support_point.head<2>().cwiseProduct(support_point.head<2>());
+                            weakest_conn.second_moment_of_area_covariance_accumulator += altered_area * support_point.x() *
+                                                                                         support_point.y();
                         }
                     }
                 }
@@ -1104,7 +1101,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
     std::vector<LayerIslands> islands_graph;
     std::vector<ExtrusionLine> layer_lines;
     float flow_width = get_flow_width(po->layers()[po->layer_count() - 1]->regions()[0], erExternalPerimeter);
-    PixelGrid prev_layer_grid(po, flow_width);
+    PixelGrid prev_layer_grid(po, flow_width*2.0f);
 
 // PREPARE BASE LAYER
     const Layer *layer = po->layers()[0];

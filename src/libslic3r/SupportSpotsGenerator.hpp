@@ -30,40 +30,41 @@ struct Params {
     const std::pair<float,float> malformation_angle_span_deg = std::pair<float, float> { 45.0f, 80.0f };
 
     const float min_distance_between_support_points = 3.0f; //mm
-    const float support_points_interface_radius = 2.0f; // mm
-
-    // NOTE: Currently disabled, does not work correctly due to inability of the algorithm to correctly detect islands at each layer
-    const float supportable_volume_threshold = 0.0f; // mm^3
+    const float support_points_interface_radius = 1.5f; // mm
+    const float connections_min_considerable_area = 1.5f; //mm^2
+    const float small_parts_threshold = 5.0f; //mm^3
+    const float small_parts_support_points_interface_radius = 3.0f; // mm
 
     std::string filament_type;
     const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.
     const float max_acceleration = 9 * 1000.0f; // mm/s^2 ; max acceleration of object (bed) in XY (NOTE: The max hit is received by the object in the jerk phase, so the usual machine limits are too low)
-    const float filament_density = 1.25e-3f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
-    const float material_yield_strength = 33.0f * 1e6f; // (g*mm/s^2)/mm^2; 33 MPa is yield strength of ABS, which has the lowest yield strength from common materials.
+    const double filament_density = 1.25e-3f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
+    const double material_yield_strength = 33.0f * 1e6f; // (g*mm/s^2)/mm^2; 33 MPa is yield strength of ABS, which has the lowest yield strength from common materials.
     const float standard_extruder_conflict_force = 20.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... );
     const float malformations_additive_conflict_extruder_force = 300.0f * gravity_constant; // for areas with possible high layered curled filaments
 
     // MPa * 1e^6 = (g*mm/s^2)/mm^2 = g/(mm*s^2); yield strength of the bed surface
-    float get_bed_adhesion_yield_strength() const {
+    double get_bed_adhesion_yield_strength() const {
         if (filament_type == "PLA") {
-            return 0.018f * 1e6f;
+            return 0.018 * 1e6;
         } else if (filament_type == "PET" || filament_type == "PETG") {
-            return 0.3f * 1e6f;
+            return 0.3 * 1e6;
         } else { //PLA default value - defensive approach, PLA has quite low adhesion
-            return 0.018f * 1e6f;
+            return 0.018 * 1e6;
         }
     }
 
     //just return PLA adhesion value as value for supports
-    float get_support_spots_adhesion_strength() const {
-         return 0.018f * 1e6f; 
+    double get_support_spots_adhesion_strength() const {
+         return 0.018f * 1e6; 
     }
 };
 
 struct SupportPoint {
-    SupportPoint(const Vec3f &position, float force, const Vec3f &direction);
+    SupportPoint(const Vec3f &position, float force, float spot_radius, const Vec3f &direction);
     Vec3f position;
     float force;
+    float spot_radius;
     Vec3f direction;
 };
 

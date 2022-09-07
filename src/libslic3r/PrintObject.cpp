@@ -435,7 +435,7 @@ void PrintObject::generate_support_spots()
                         Vec3f point = Vec3f(inv_transform.cast<float>() * support_point.position);
                         Vec3f origin = Vec3f(
                                 inv_transform.cast<float>() * Vec3f(support_point.position.x(), support_point.position.y(), 0.0f));
-                        selector.enforce_spot(point, origin, 1.5f);
+                        selector.enforce_spot(point, origin, support_point.spot_radius);
                     }
 
                     model_volume->supported_facets.set(selector.selector);
