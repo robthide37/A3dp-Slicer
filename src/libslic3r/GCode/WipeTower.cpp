@@ -96,10 +96,7 @@ public:
                 && m_tool_name[this->m_current_tool][0] != static_cast<char>(('0' + this->m_current_tool))) {
                 m_gcode += "SET_PRESSURE_ADVANCE ADVANCE=0 EXTRUDER=" + m_tool_name[this->m_current_tool] + "\n";
             } else {
-                m_gcode += "SET_PRESSURE_ADVANCE ADVANCE=0 EXTRUDER=extruder";
-                if (this->m_current_tool > 0)
-                    m_gcode += std::to_string(this->m_current_tool);
-                m_gcode += "\n";
+                m_gcode += "SET_PRESSURE_ADVANCE ADVANCE=0\n";
             }
         } else {
             m_gcode += std::string("M900 K0\n");
