@@ -24,6 +24,7 @@ Vec3d get_normal(const AABBMesh        &mesh,
     Vec3d p;
 
     mesh.squared_distance(picking_point, faceid, p);
+    assert(int(faceid) < int(mesh.get_triangle_mesh()->indices.size()));
 
     auto trindex = mesh.indices(faceid);
 
@@ -89,9 +90,10 @@ Vec3d get_normal(const AABBMesh        &mesh,
         }
     } else if (edge_idx >= 0) { // the point is on and edge
         size_t neighbor_face = mesh.face_neighbor_index()[faceid](edge_idx);
-
-        neigh.emplace_back(mesh.normal_by_face_id(faceid));
-        neigh.emplace_back(mesh.normal_by_face_id(neighbor_face));
+        if (neighbor_face < mesh.indices().size()) {
+            neigh.emplace_back(mesh.normal_by_face_id(faceid));
+            neigh.emplace_back(mesh.normal_by_face_id(neighbor_face));
+        }
     }
 
     if (!neigh.empty()) { // there were neighbors to count with
