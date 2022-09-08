@@ -277,7 +277,51 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
 
         preferences_dialog = new PreferencesDialog(this);
     }
+
+    // bind events from DiffDlg
+
+    bind_diff_dialog();
 }
+
+void MainFrame::bind_diff_dialog()
+{
+    auto get_tab = [](Preset::Type type) {
+        Tab* null_tab = nullptr;
+        for (Tab* tab : wxGetApp().tabs_list)
+            if (tab->type() == type)
+                return tab;
+        return null_tab;
+    };
+
+    auto transfer = [this, get_tab](Preset::Type type) {
+        get_tab(type)->transfer_options(diff_dialog.get_left_preset_name(type),
+                                        diff_dialog.get_right_preset_name(type),
+                                        std::move(diff_dialog.get_selected_options(type)));
+    };
+
+    auto save = [this, get_tab](Preset::Type type) {
+        get_tab(type)->save_options(diff_dialog.get_left_preset_name(type),
+                                    diff_dialog.get_right_preset_name(type),
+                                    std::move(diff_dialog.get_selected_options(type)));
+    };
+
+    auto process_options = [this](std::function<void(Preset::Type)> process) {
+        const Preset::Type diff_dlg_type = diff_dialog.view_type();
+        if (diff_dlg_type == Preset::TYPE_INVALID) {
+            for (const Preset::Type& type : diff_dialog.printer_technology() == ptFFF ? 
+                                            std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
+                                            std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL } )
+                process(type);
+        }
+        else
+            process(diff_dlg_type);
+    };
+
+    diff_dialog.Bind(EVT_DIFF_DIALOG_TRANSFER,  [this, process_options, transfer](SimpleEvent&) { process_options(transfer); });
+
+    diff_dialog.Bind(EVT_DIFF_DIALOG_SAVE,      [this, process_options, save](SimpleEvent&)     { process_options(save); });
+}
+
 
 #ifdef _MSW_DARK_MODE
 static wxString pref() { return " [ "; }
@@ -2130,9 +2174,6 @@ void MainFrame::add_to_recent_projects(const wxString& filename)
 
 void MainFrame::technology_changed()
 {
-    // upadte DiffDlg
-    diff_dialog.update_presets();
-
     // update menu titles
     PrinterTechnology pt = plater()->printer_technology();
     if (int id = m_menubar->FindMenu(pt == ptFFF ? _L("Material Settings") : _L("Filament Settings")); id != wxNOT_FOUND)

@@ -107,6 +107,7 @@ class MainFrame : public DPIFrame
     bool can_delete() const;
     bool can_delete_all() const;
     bool can_reslice() const;
+    void bind_diff_dialog();
 
     // MenuBar items changeable in respect to printer technology 
     enum MenuItems
