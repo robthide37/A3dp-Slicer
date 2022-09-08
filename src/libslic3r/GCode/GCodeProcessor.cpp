@@ -2683,7 +2683,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         if (m_height == 0.0f)
             m_height = DEFAULT_TOOLPATH_HEIGHT;
 
-        if (m_end_position[Z] == 0.0f)
+        if (m_end_position[Z] == 0.0f || (m_extrusion_role == erCustom && m_layer_id == 0))
             m_end_position[Z] = m_height;
 
 #if ENABLE_PROCESS_G2_G3_LINES
@@ -2913,7 +2913,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     }
 
     if (m_spiral_vase_active && !m_result.spiral_vase_layers.empty()) {
-        if (m_result.spiral_vase_layers.back().first == FLT_MAX && delta_pos[Z] > 0.0)
+        if (m_result.spiral_vase_layers.back().first == FLT_MAX && delta_pos[Z] >= 0.0)
             // replace layer height placeholder with correct value
             m_result.spiral_vase_layers.back().first = static_cast<float>(m_end_position[Z]);
         if (!m_result.moves.empty())
@@ -3779,8 +3779,13 @@ void GCodeProcessor::post_process()
     }
 
     auto process_used_filament = [&](std::string& gcode_line) {
-        auto process_tag = [](std::string& gcode_line, const std::string& tag, const std::vector<double>& values) {
-            if (boost::algorithm::istarts_with(gcode_line, tag)) {
+        // Prefilter for parsing speed.
+        if (gcode_line.size() < 8 || gcode_line[0] != ';' || gcode_line[1] != ' ')
+            return false;
+        if (const char c = gcode_line[2]; c != 'f' && c != 't')
+            return false;
+        auto process_tag = [](std::string& gcode_line, const std::string_view tag, const std::vector<double>& values) {
+            if (boost::algorithm::starts_with(gcode_line, tag)) {
                 gcode_line = tag;
                 char buf[1024];
                 for (size_t i = 0; i < values.size(); ++i) {

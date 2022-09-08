@@ -47,6 +47,7 @@ class ObjectLayers;
 class Plater;
 class NotificationManager;
 struct GUI_InitParams;
+class GalleryDialog;
 
 
 
@@ -296,6 +297,7 @@ public:
     const Plater*        plater() const;
     Model&      		 model();
     NotificationManager * notification_manager();
+    GalleryDialog *     gallery_dialog();
 
     // Parameters extracted from the command line to be passed to GUI after initialization.
     GUI_InitParams* init_params { nullptr };

@@ -1215,7 +1215,11 @@ bool GLCanvas3D::init()
         return false;
 
     glsafe(::glClearColor(1.0f, 1.0f, 1.0f, 1.0f));
+#if ENABLE_OPENGL_ES
+    glsafe(::glClearDepthf(1.0f));
+#else
     glsafe(::glClearDepth(1.0f));
+#endif // ENABLE_OPENGL_ES
 
     glsafe(::glDepthFunc(GL_LESS));
 
@@ -2082,6 +2086,9 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             if (volume->is_wipe_tower) {
                 // There is only one wipe tower.
                 assert(volume_idx_wipe_tower_old == -1);
+#if ENABLE_OPENGL_ES
+                m_wipe_tower_mesh.clear();
+#endif // ENABLE_OPENGL_ES
                 volume_idx_wipe_tower_old = (int)volume_id;
             }
             if (!m_reload_delayed) {
@@ -2330,13 +2337,25 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+#if ENABLE_OPENGL_ES
+            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
+                x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
+                brim_width, &m_wipe_tower_mesh);
+#else
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
                 brim_width);
+#endif // ENABLE_OPENGL_ES
+#else
+#if ENABLE_OPENGL_ES
+            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
+                1000, x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
+                brim_width, &m_wipe_tower_mesh);
 #else
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 1000, x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
                 brim_width);
+#endif // ENABLE_OPENGL_ES
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 #else
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
@@ -3298,9 +3317,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-            handle_sidebar_focus_event("", false);
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3308,9 +3324,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        handle_sidebar_focus_event("", false);
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3318,9 +3331,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        handle_sidebar_focus_event("", false);
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3328,9 +3338,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        handle_sidebar_focus_event("", false);
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3380,9 +3387,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             wxGetApp().obj_list()->selection_changed();
         }
 
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        handle_sidebar_focus_event("", false);
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3397,39 +3401,27 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_mouse.set_move_start_threshold_position_2D_as_invalid();
     }
 
-#if ENABLE_OBJECT_MANIPULATOR_FOCUS
-    if (evt.ButtonDown()) {
-        std::string curr_sidebar_field = m_sidebar_field;
-        handle_sidebar_focus_event("", false);
-        if (boost::algorithm::istarts_with(curr_sidebar_field, "layer"))
-            // restore visibility of layers hints after left clicking on the 3D scene
-            m_sidebar_field = curr_sidebar_field;
-        if (wxWindow::FindFocus() != m_canvas)
-            // Grab keyboard focus on any mouse click event.
-            m_canvas->SetFocus();
-    }
-#else
     if (evt.ButtonDown() && wxWindow::FindFocus() != m_canvas)
         // Grab keyboard focus on any mouse click event.
         m_canvas->SetFocus();
-#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
 
     if (evt.Entering()) {
 //#if defined(__WXMSW__) || defined(__linux__)
 //        // On Windows and Linux needs focus in order to catch key events
-#if !ENABLE_OBJECT_MANIPULATOR_FOCUS
-        // Set focus in order to remove it from sidebar fields
-#endif // !ENABLE_OBJECT_MANIPULATOR_FOCUS
+        // Set focus in order to remove it from object list
         if (m_canvas != nullptr) {
-#if !ENABLE_OBJECT_MANIPULATOR_FOCUS
-            // Only set focus, if the top level window of this canvas is active.
+            // Only set focus, if the top level window of this canvas is active
+            // and ObjectList has a focus
             auto p = dynamic_cast<wxWindow*>(evt.GetEventObject());
             while (p->GetParent())
                 p = p->GetParent();
-            auto *top_level_wnd = dynamic_cast<wxTopLevelWindow*>(p);
-            if (top_level_wnd && top_level_wnd->IsActive())
+#ifdef __WIN32__
+            wxWindow* const obj_list = wxGetApp().obj_list()->GetMainWindow();
+#else
+            wxWindow* const obj_list = wxGetApp().obj_list();
+#endif
+            if (obj_list == p->FindFocus())
                 m_canvas->SetFocus();
-#endif // !ENABLE_OBJECT_MANIPULATOR_FOCUS
             m_mouse.position = pos.cast<double>();
             m_tooltip_enabled = false;
             // 1) forces a frame render to ensure that m_hover_volume_idxs is updated even when the user right clicks while
@@ -5516,28 +5508,41 @@ void GLCanvas3D::_picking_pass()
     }
     default: { break; }
     }
+
+    auto add_strings_row_to_table = [&imgui](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(col_1_color, col_1.c_str());
+        ImGui::TableSetColumnIndex(1);
+        imgui.text_colored(col_2_color, col_2.c_str());
+    };
+
     char buf[1024];
     if (hit.type != SceneRaycaster::EType::None) {
-        sprintf(buf, "Object ID: %d", hit.raycaster_id);
-        imgui.text(std::string(buf));
-        sprintf(buf, "Type: %s", object_type.c_str());
-        imgui.text(std::string(buf));
-        sprintf(buf, "Position: %.3f, %.3f, %.3f", hit.position.x(), hit.position.y(), hit.position.z());
-        imgui.text(std::string(buf));
-        sprintf(buf, "Normal: %.3f, %.3f, %.3f", hit.normal.x(), hit.normal.y(), hit.normal.z());
-        imgui.text(std::string(buf));
+        if (ImGui::BeginTable("Hit", 2)) {
+            add_strings_row_to_table("Object ID", ImGuiWrapper::COL_ORANGE_LIGHT, std::to_string(hit.raycaster_id), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table("Type", ImGuiWrapper::COL_ORANGE_LIGHT, object_type, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            sprintf(buf, "%.3f, %.3f, %.3f", hit.position.x(), hit.position.y(), hit.position.z());
+            add_strings_row_to_table("Position", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            sprintf(buf, "%.3f, %.3f, %.3f", hit.normal.x(), hit.normal.y(), hit.normal.z());
+            add_strings_row_to_table("Normal", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            ImGui::EndTable();
+        }
     }
     else
         imgui.text("NO HIT");
 
     ImGui::Separator();
     imgui.text("Registered for picking:");
-    sprintf(buf, "Beds: %d", (int)m_scene_raycaster.beds_count());
-    imgui.text(std::string(buf));
-    sprintf(buf, "Volumes: %d", (int)m_scene_raycaster.volumes_count());
-    imgui.text(std::string(buf));
-    sprintf(buf, "Gizmo elements: %d", (int)m_scene_raycaster.gizmos_count());
-    imgui.text(std::string(buf));
+    if (ImGui::BeginTable("Raycasters", 2)) {
+        sprintf(buf, "%d (%d)", (int)m_scene_raycaster.beds_count(), (int)m_scene_raycaster.active_beds_count());
+        add_strings_row_to_table("Beds", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        sprintf(buf, "%d (%d)", (int)m_scene_raycaster.volumes_count(), (int)m_scene_raycaster.active_volumes_count());
+        add_strings_row_to_table("Volumes", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        sprintf(buf, "%d (%d)", (int)m_scene_raycaster.gizmos_count(), (int)m_scene_raycaster.active_gizmos_count());
+        add_strings_row_to_table("Gizmo elements", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        ImGui::EndTable();
+    }
     imgui.end();
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 }
@@ -5654,7 +5659,11 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
                 glsafe(::glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render_tex, 0));
                 glsafe(::glGenRenderbuffers(1, &render_depth));
                 glsafe(::glBindRenderbuffer(GL_RENDERBUFFER, render_depth));
+#if ENABLE_OPENGL_ES
+                glsafe(::glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height));
+#else
                 glsafe(::glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height));
+#endif // ENABLE_OPENGL_ES
                 glsafe(::glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, render_depth));
             }
             else {
@@ -6141,7 +6150,11 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
     float noitems_width = top_tb_width - size * items_cnt; // width of separators and borders in top toolbars 
 
     // calculate scale needed for items in all top toolbars
-    float new_h_scale = (cnv_size.get_width() - noitems_width) / (items_cnt * GLToolbar::Default_Icons_Size);
+    // the std::max() is there because on some Linux dialects/virtual machines this code is called when the canvas has not been properly initialized yet,
+    // leading to negative values for the scale.
+    // See: https://github.com/prusa3d/PrusaSlicer/issues/8563
+    //      https://github.com/supermerill/SuperSlicer/issues/854
+    float new_h_scale = std::max((cnv_size.get_width() - noitems_width), 1.0f) / (items_cnt * GLToolbar::Default_Icons_Size);
 
     items_cnt = m_gizmos.get_selectable_icons_cnt() + 3; // +3 means a place for top and view toolbars and separators in gizmos toolbar
 
@@ -7120,6 +7133,11 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
         return volume;
     };
     const size_t    volumes_cnt_initial = m_volumes.volumes.size();
+    // Limit the number of threads as the code below does not scale well due to memory pressure.
+    // (most of the time is spent in malloc / free / memmove)
+    // Not using all the threads leaves some of the threads to G-code generator.
+    tbb::task_arena limited_arena(std::min(tbb::this_task_arena::max_concurrency(), 4));
+    limited_arena.execute([&ctxt, grain_size, &new_volume, is_selected_separate_extruder, this]{
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, ctxt.layers.size(), grain_size),
         [&ctxt, &new_volume, is_selected_separate_extruder, this](const tbb::blocked_range<size_t>& range) {
@@ -7294,6 +7312,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
             vol->indexed_vertex_array.shrink_to_fit();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     });
+    }); // task arena
 
     BOOST_LOG_TRIVIAL(debug) << "Loading print object toolpaths in parallel - finalizing results" << m_volumes.log_memory_info() << log_memory_info();
     // Remove empty volumes from the newly added volumes.

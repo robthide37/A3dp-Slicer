@@ -669,17 +669,32 @@ inline void PressureEqualizer::push_to_output(const char *text, const size_t len
     output_buffer[output_buffer_length] = 0;
 }
 
-inline bool PressureEqualizer::is_just_feedrate_provided(const GCodeLine &line)
+inline bool is_just_line_with_extrude_set_speed_tag(const std::string &line)
 {
-    return line.pos_provided[4] && !line.pos_provided[0] && !line.pos_provided[1] && !line.pos_provided[2] && !line.pos_provided[3];
+    if (line.empty() && !boost::starts_with(line, "G1 ") && !boost::ends_with(line, EXTRUDE_SET_SPEED_TAG))
+        return false;
+
+    const char       *p_line   = line.data() + 3;
+    const char *const line_end = line.data() + line.length() - 1;
+    while (!is_eol(*p_line)) {
+        if (toupper(*p_line++) == 'F')
+            break;
+        else
+            return false;
+    }
+    parse_float(p_line, line_end - p_line);
+    eatws(p_line);
+    p_line += EXTRUDE_SET_SPEED_TAG.length();
+    return p_line <= line_end && is_eol(*p_line);
 }
 
 void PressureEqualizer::push_line_to_output(const size_t line_idx, const float new_feedrate, const char *comment)
 {
     const GCodeLine &line = this->m_gcode_lines[line_idx];
-    if (line_idx > 0) {
-        const GCodeLine &prev_line = this->m_gcode_lines[line_idx - 1];
-        if (prev_line.extrude_set_speed_tag && this->is_just_feedrate_provided(prev_line))
+    if (line_idx > 0 && output_buffer_length > 0) {
+        const std::string prev_line_str = std::string(output_buffer.begin() + int(this->output_buffer_prev_length),
+                                                      output_buffer.begin() + int(this->output_buffer_length) + 1);
+        if (is_just_line_with_extrude_set_speed_tag(prev_line_str))
             this->output_buffer_length = this->output_buffer_prev_length; // Remove the last line because it only sets the speed for an empty block of g-code lines, so it is useless.
         else
             push_to_output(EXTRUDE_END_TAG.data(), EXTRUDE_END_TAG.length(), true);

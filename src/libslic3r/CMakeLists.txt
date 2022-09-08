@@ -256,6 +256,10 @@ set(SLIC3R_SOURCES
     Technologies.hpp
     Tesselate.cpp
     Tesselate.hpp
+    TreeSupport.cpp
+    TreeSupport.hpp
+    TreeModelVolumes.cpp
+    TreeModelVolumes.hpp
     TriangleMesh.cpp
     TriangleMesh.hpp
     TriangleMeshSlicer.cpp
@@ -455,10 +459,6 @@ endif()
 
 if(WIN32)
     target_link_libraries(libslic3r Psapi.lib)
-endif()
-
-if(SLIC3R_PROFILE)
-    target_link_libraries(libslic3r Shiny)
 endif()
 
 if (APPLE)

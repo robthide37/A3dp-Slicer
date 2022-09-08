@@ -56,6 +56,9 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::PreferencesHoverButton, "notification_preferences_hover"},
     {ImGui::SliderFloatEditBtnIcon, "edit_button"                   },
     {ImGui::SliderFloatEditBtnPressedIcon, "edit_button_pressed"    },
+};
+
+static const std::map<const wchar_t, std::string> font_icons_large = {
 #if ENABLE_LEGEND_TOOLBAR_ICONS
     {ImGui::LegendTravel          , "legend_travel"                 },
     {ImGui::LegendWipe            , "legend_wipe"                   },
@@ -74,9 +77,6 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::WarningMarkerSmall    , "notification_warning"          },
     {ImGui::ExpandBtn             , "expand_btn"                    },
     {ImGui::CollapseBtn           , "collapse_btn"                  },
-};
-
-static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::CloseNotifButton        , "notification_close"              },
     {ImGui::CloseNotifHoverButton   , "notification_close_hover"        },
     {ImGui::EjectButton             , "notification_eject_sd"           },
@@ -98,7 +98,6 @@ static const std::map<const wchar_t, std::string> font_icons_large = {
 
 static const std::map<const wchar_t, std::string> font_icons_extra_large = {
     {ImGui::ClippyMarker            , "notification_clippy"             },
-
 };
 
 const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.33f, 0.33f, 0.33f, 1.0f };
@@ -546,7 +545,7 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
 
     // let the label string start with "##" to hide the automatic label from ImGui::SliderFloat()
-    bool label_visible = !boost::algorithm::istarts_with(label, "##");
+    bool label_visible = !boost::algorithm::starts_with(label, "##");
     std::string str_label = label_visible ? std::string("##") + std::string(label) : std::string(label);
 
     // removes 2nd evenience of "##", if present
@@ -1484,7 +1483,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     draw_data->ScaleClipRects(io.DisplayFramebufferScale);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
     // Backup GL state
     GLenum last_active_texture;       glsafe(::glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture));
     GLuint last_program;              glsafe(::glGetIntegerv(GL_CURRENT_PROGRAM, (GLint*)&last_program));
@@ -1541,7 +1540,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     glsafe(::glEnable(GL_TEXTURE_2D));
     glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
     glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE));
-#endif // ENABLE_GL_CORE_PROFILE
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     // Setup viewport, orthographic projection matrix
@@ -1683,7 +1682,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_GL_CORE_PROFILE
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
     // Restore modified GL state
     glsafe(::glBindTexture(GL_TEXTURE_2D, last_texture));
     glsafe(::glActiveTexture(last_active_texture));
@@ -1717,7 +1716,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     glsafe(::glPolygonMode(GL_BACK, (GLenum)last_polygon_mode[1])));
     glsafe(::glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]));
     glsafe(::glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]));
-#endif // ENABLE_GL_CORE_PROFILE
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();

@@ -113,12 +113,10 @@ public:
     //square of number of rays per sample point
     static constexpr size_t sqr_rays_per_sample_point = 5;
 
-    // arm length used during angles computation
-    static constexpr float polygon_local_angles_arm_distance = 0.3f;
     // snapping angle - angles larger than this value will be snapped to during seam painting
     static constexpr float sharp_angle_snapping_threshold = 55.0f * float(PI) / 180.0f;
     // overhang angle for seam placement that still yields good results, in degrees, measured from vertical direction
-    static constexpr float overhang_angle_threshold = 45.0f * float(PI) / 180.0f;
+    static constexpr float overhang_angle_threshold = 50.0f * float(PI) / 180.0f;
 
     // determines angle importance compared to visibility ( neutral value is 1.0f. )
     static constexpr float angle_importance_aligned = 0.6f;
@@ -145,8 +143,7 @@ public:
     void place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first, const Point &last_pos) const;
 
 private:
-    void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info,
-            const SeamPosition configured_seam_preference);
+    void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info);
     void calculate_candidates_visibility(const PrintObject *po,
             const SeamPlacerImpl::GlobalModelInfo &global_model_info);
     void calculate_overhangs_and_layer_embedding(const PrintObject *po);

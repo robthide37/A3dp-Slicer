@@ -459,6 +459,11 @@ void PreferencesDialog::build()
 			L("If enabled, shows non-manifold edges."),
 			app_config->get("non_manifold_edges") == "1");
 
+		append_bool_option(m_optgroup_gui, "allow_auto_color_change",
+			L("Allow automatically color change"),
+			L("If enabled, related notification will be shown, when sliced object looks like a logo or a sign."),
+			app_config->get("allow_auto_color_change") == "1");
+
 #ifdef _MSW_DARK_MODE
 		append_bool_option(m_optgroup_gui, "tabs_as_menu",
 			L("Set settings tabs as menu items (experimental)"),

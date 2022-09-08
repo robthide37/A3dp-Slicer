@@ -395,8 +395,7 @@ struct GlobalModelInfo {
 ;
 
 //Extract perimeter polygons of the given layer
-Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition configured_seam_preference,
-        std::vector<const LayerRegion*> &corresponding_regions_out) {
+Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerRegion*> &corresponding_regions_out) {
     Polygons polygons;
     for (const LayerRegion *layer_region : layer->regions()) {
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
@@ -411,9 +410,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
                         }
                     }
 
-                    if (role == ExtrusionRole::erExternalPerimeter
-                            || (is_perimeter(role)
-                                    && configured_seam_preference == spRandom)) { //for random seam alignment, extract all perimeters
+                    if (role == ExtrusionRole::erExternalPerimeter) {
                         Points p;
                         perimeter->collect_points(p);
                         polygons.emplace_back(std::move(p));
@@ -455,6 +452,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     }
     Polygon polygon = orig_polygon;
     bool was_clockwise = polygon.make_counter_clockwise();
+    float angle_arm_len = region != nullptr ? region->flow(FlowRole::frExternalPerimeter).nozzle_diameter() : 0.5f;
 
     std::vector<float> lengths { };
     for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
@@ -462,7 +460,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     }
     lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
     std::vector<float> polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
-            SeamPlacer::polygon_local_angles_arm_distance);
+            angle_arm_len);
 
     result.perimeters.push_back( { });
     Perimeter &perimeter = result.perimeters.back();
@@ -949,6 +947,10 @@ void pick_random_seam_point(const std::vector<SeamCandidate> &perimeter_points, 
     };
     std::vector<Viable> viables;
 
+    const Vec3f pseudornd_seed = perimeter_points[viable_example_index].position;
+    float rand = std::abs(sin(pseudornd_seed.dot(Vec3f(12.9898f,78.233f, 133.3333f))) * 43758.5453f);
+    rand = rand - (int) rand;
+
     for (size_t index = start_index; index < end_index; ++index) {
         if (comparator.are_similar(perimeter_points[index], perimeter_points[viable_example_index])) {
             // index ok, push info into viables
@@ -976,7 +978,7 @@ void pick_random_seam_point(const std::vector<SeamCandidate> &perimeter_points, 
     float len_sum = std::accumulate(viables.begin(), viables.end(), 0.0f, [](const float acc, const Viable &v) {
         return acc + v.edge_length;
     });
-    float picked_len = len_sum * (rand() / (float(RAND_MAX) + 1));
+    float picked_len = len_sum * rand;
 
     size_t point_idx = 0;
     while (picked_len - viables[point_idx].edge_length > 0) {
@@ -997,11 +999,7 @@ class PerimeterDistancer {
 
 public:
     PerimeterDistancer(const Layer *layer) {
-        static const float eps = float(scale_(layer->object()->config().slice_closing_radius.value));
-        // merge with offset
-        ExPolygons merged = layer->merged(eps);
-        // ofsset back
-        ExPolygons layer_outline = offset_ex(merged, -eps);
+        ExPolygons layer_outline = layer->lslices;
         for (const ExPolygon &island : layer_outline) {
             assert(island.contour.is_counter_clockwise());
             for (const auto &line : island.contour.lines()) {
@@ -1017,8 +1015,8 @@ public:
         tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
     }
 
-    float distance_from_perimeter(const Point &point) const {
-        Vec2d p = unscale(point);
+    float distance_from_perimeter(const Vec2f &point) const {
+        Vec2d p = point.cast<double>();
         size_t hit_idx_out { };
         Vec2d hit_point_out = Vec2d::Zero();
         auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, p, hit_idx_out, hit_point_out);
@@ -1043,14 +1041,13 @@ public:
 // Parallel process and extract each perimeter polygon of the given print object.
 // Gather SeamCandidates of each layer into vector and build KDtree over them
 // Store results in the SeamPlacer variables m_seam_per_object
-void SeamPlacer::gather_seam_candidates(const PrintObject *po,
-        const SeamPlacerImpl::GlobalModelInfo &global_model_info, const SeamPosition configured_seam_preference) {
+void SeamPlacer::gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
     using namespace SeamPlacerImpl;
     PrintObjectSeamData &seam_data = m_seam_per_object.emplace(po, PrintObjectSeamData { }).first->second;
     seam_data.layers.resize(po->layer_count());
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
-            [po, configured_seam_preference, &global_model_info, &seam_data]
+            [po, &global_model_info, &seam_data]
             (tbb::blocked_range<size_t> r) {
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
                     PrintObjectSeamData::LayerSeams &layer_seams = seam_data.layers[layer_idx];
@@ -1058,7 +1055,7 @@ void SeamPlacer::gather_seam_candidates(const PrintObject *po,
                     auto unscaled_z = layer->slice_z;
                     std::vector<const LayerRegion*> regions;
                     //NOTE corresponding region ptr may be null, if the layer has zero perimeters
-                    Polygons polygons = extract_perimeter_polygons(layer, configured_seam_preference, regions);
+                    Polygons polygons = extract_perimeter_polygons(layer, regions);
                     for (size_t poly_index = 0; poly_index < polygons.size(); ++poly_index) {
                         process_perimeter_polygon(polygons[poly_index], unscaled_z,
                                 regions[poly_index], global_model_info, layer_seams);
@@ -1110,20 +1107,19 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                     std::unique_ptr<PerimeterDistancer> current_layer_distancer = std::make_unique<PerimeterDistancer>(po->layers()[layer_idx]);
 
                     for (SeamCandidate &perimeter_point : layers[layer_idx].points) {
-                        Point point = Point::new_scale(Vec2f { perimeter_point.position.head<2>() });
+                        Vec2f point = Vec2f { perimeter_point.position.head<2>() };
                         if (prev_layer_distancer.get() != nullptr) {
-                            perimeter_point.overhang = (prev_layer_distancer->distance_from_perimeter(point)
-                                    + 0.5f * perimeter_point.perimeter.flow_width
+                            perimeter_point.overhang = prev_layer_distancer->distance_from_perimeter(point)
+                                    + 0.6f * perimeter_point.perimeter.flow_width
                                     - tan(SeamPlacer::overhang_angle_threshold)
-                                            * po->layers()[layer_idx]->height)
-                                    / (3.0f * perimeter_point.perimeter.flow_width);
-                            //NOTE disables the feature to place seams on slowly decreasing areas. Remove the following line to enable.
-                            perimeter_point.overhang = perimeter_point.overhang < 0.0f ? 0.0f : perimeter_point.overhang;
+                                            * po->layers()[layer_idx]->height;
+                            perimeter_point.overhang =
+                                    perimeter_point.overhang < 0.0f ? 0.0f : perimeter_point.overhang;
                         }
 
                         if (should_compute_layer_embedding) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
                             perimeter_point.embedded_distance = current_layer_distancer->distance_from_perimeter(point)
-                                    + 0.5f * perimeter_point.perimeter.flow_width;
+                                    + 0.6f * perimeter_point.perimeter.flow_width;
                         }
                     }
 
@@ -1381,7 +1377,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 observations[index] = current.position.head<2>();
                 observation_points[index] = current.position.z();
                 weights[index] = angle_weight(current.local_ccw_angle);
-                float sign = layer_angle > 2.0 * std::abs(current.local_ccw_angle) ? -1.0f : 1.0f;
+                float sign = layer_angle > 2.0 * std::abs(current.local_ccw_angle) ? -0.8f : 1.0f;
                 if (current.type == EnforcedBlockedSeamPoint::Enforced) {
                     sign = 1.0f;
                     weights[index] += 3.0f;
@@ -1399,10 +1395,10 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             // Perimeter structure of the point; also set flag aligned to true
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const auto &pair = seam_string[index];
-                float t = std::min(1.0f, std::abs(layers[pair.first].points[pair.second].local_ccw_angle)
-                        / SeamPlacer::sharp_angle_snapping_threshold);
+                float t = std::min(1.0f, std::pow(std::abs(layers[pair.first].points[pair.second].local_ccw_angle)
+                        / SeamPlacer::sharp_angle_snapping_threshold, 3.0f));
                 if (layers[pair.first].points[pair.second].type == EnforcedBlockedSeamPoint::Enforced){
-                    t = std::max(0.7f, t);
+                    t = std::max(0.4f, t);
                 }
 
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
@@ -1468,7 +1464,7 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
             throw_if_canceled_func();
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: gather_seam_candidates: start";
-            gather_seam_candidates(po, global_model_info, configured_seam_preference);
+            gather_seam_candidates(po, global_model_info);
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: gather_seam_candidates: end";
             throw_if_canceled_func();
@@ -1533,16 +1529,40 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
     const size_t layer_index = layer->id() - po->slicing_parameters().raft_layers();
     const double unscaled_z = layer->slice_z;
 
+    auto get_next_loop_point = [loop](ExtrusionLoop::ClosestPathPoint current) {
+        current.segment_idx += 1;
+        if (current.segment_idx >= loop.paths[current.path_idx].polyline.points.size()) {
+            current.path_idx = next_idx_modulo(current.path_idx, loop.paths.size());
+            current.segment_idx = 0;
+        }
+        current.foot_pt = loop.paths[current.path_idx].polyline.points[current.segment_idx];
+        return current;
+    };
+
     const PrintObjectSeamData::LayerSeams &layer_perimeters =
             m_seam_per_object.find(layer->object())->second.layers[layer_index];
 
-    // Find the closest perimeter in the SeamPlacer to the first point of this loop.
-    size_t closest_perimeter_point_index;
-    {
-        const Point &fp = loop.first_point();
-        Vec2f unscaled_p = unscaled<float>(fp);
-        closest_perimeter_point_index = find_closest_point(*layer_perimeters.points_tree.get(),
-                to_3d(unscaled_p, float(unscaled_z)));
+    // Find the closest perimeter in the SeamPlacer to this loop.
+    // Repeat search until two consecutive points of the loop are found, that result in the same closest_perimeter
+    // This is beacuse with arachne, T-Junctions may exist and sometimes the wrong perimeter was chosen
+    size_t closest_perimeter_point_index = 0;
+    { // local space for the closest_perimeter_point_index
+        Perimeter *closest_perimeter = nullptr;
+        ExtrusionLoop::ClosestPathPoint closest_point{0,0,loop.paths[0].polyline.points[0]};
+        size_t points_count = std::accumulate(loop.paths.begin(), loop.paths.end(), 0, [](size_t acc,const ExtrusionPath& p) {
+           return acc + p.polyline.points.size();
+        });
+        for (size_t i = 0; i < points_count; ++i) {
+            Vec2f unscaled_p = unscaled<float>(closest_point.foot_pt);
+            closest_perimeter_point_index = find_closest_point(*layer_perimeters.points_tree.get(),
+                    to_3d(unscaled_p, float(unscaled_z)));
+            if (closest_perimeter != &layer_perimeters.points[closest_perimeter_point_index].perimeter) {
+                closest_perimeter = &layer_perimeters.points[closest_perimeter_point_index].perimeter;
+                closest_point = get_next_loop_point(closest_point);
+            } else {
+                break;
+            }
+        }
     }
 
     Vec3f seam_position;
@@ -1562,13 +1582,12 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
 
     Point seam_point = Point::new_scale(seam_position.x(), seam_position.y());
 
-    if (const SeamCandidate &perimeter_point = layer_perimeters.points[seam_index];
-    (po->config().seam_position == spNearest || po->config().seam_position == spAligned) &&
-            loop.role() == ExtrusionRole::erPerimeter && //Hopefully internal perimeter
-            (seam_position - perimeter_point.position).squaredNorm() < 4.0f && // seam is on perimeter point
-            perimeter_point.local_ccw_angle < -EPSILON // In concave angles
-                    ) { // In this case, we are at internal perimeter, where the external perimeter has seam in concave angle. We want to align
-            // the internal seam into the concave corner, and not on the perpendicular projection on the closest edge (which is what the split_at function does)
+    if (loop.role() == ExtrusionRole::erPerimeter) { //Hopefully inner perimeter
+        const SeamCandidate &perimeter_point = layer_perimeters.points[seam_index];
+        ExtrusionLoop::ClosestPathPoint projected_point = loop.get_closest_path_and_point(seam_point, false);
+        // determine depth of the seam point.
+        float depth = (float) unscale(Point(seam_point - projected_point.foot_pt)).norm();
+        float beta_angle = cos(perimeter_point.local_ccw_angle / 2.0f);
         size_t index_of_prev =
                 seam_index == perimeter_point.perimeter.start_index ?
                                                                       perimeter_point.perimeter.end_index - 1 :
@@ -1578,18 +1597,46 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
                                                                         perimeter_point.perimeter.start_index :
                                                                         seam_index + 1;
 
-        Vec2f dir_to_middle =
-                ((perimeter_point.position - layer_perimeters.points[index_of_prev].position).head<2>().normalized()
-                        + (perimeter_point.position - layer_perimeters.points[index_of_next].position).head<2>().normalized())
-                        * 0.5;
+        if ((seam_position - perimeter_point.position).squaredNorm() < depth && // seam is on perimeter point
+                perimeter_point.local_ccw_angle < -EPSILON // In concave angles
+                        ) { // In this case, we are at internal perimeter, where the external perimeter has seam in concave angle. We want to align
+                // the internal seam into the concave corner, and not on the perpendicular projection on the closest edge (which is what the split_at function does)
+            Vec2f dir_to_middle =
+                    ((perimeter_point.position - layer_perimeters.points[index_of_prev].position).head<2>().normalized()
+                            + (perimeter_point.position - layer_perimeters.points[index_of_next].position).head<2>().normalized())
+                            * 0.5;
+            depth = 1.4142 * depth / beta_angle;
+            // There are some nice geometric identities in determination of the correct depth of new seam point.
+            //overshoot the target depth, in concave angles it will correctly snap to the corner; TODO: find out why such big overshoot is needed.
+            Vec2f final_pos = perimeter_point.position.head<2>() + depth * dir_to_middle;
+            projected_point = loop.get_closest_path_and_point(Point::new_scale(final_pos.x(), final_pos.y()), false);
+        } else { // not concave angle, in that case the nearest point is the good candidate
+            // but for staggering, we also need to recompute depth of the inner perimter, because in convex corners, the distance is larger than layer width
+            // we want the perpendicular depth, not distance to nearest point
+            depth = depth * beta_angle / 1.4142;
+        }
 
-        ExtrusionLoop::ClosestPathPoint projected_point = loop.get_closest_path_and_point(seam_point, true);
-        //get closest projected point, determine depth of the seam point.
-        float depth = (float) unscale(Point(seam_point - projected_point.foot_pt)).norm();
-        float angle_factor = cos(-perimeter_point.local_ccw_angle / 2.0f); // There are some nice geometric identities in determination of the correct depth of new seam point.
-        //overshoot the target depth, in concave angles it will correctly snap to the corner; TODO: find out why such big overshoot is needed.
-        Vec2f final_pos = perimeter_point.position.head<2>() + (1.4142 * depth / angle_factor) * dir_to_middle;
-        seam_point = Point::new_scale(final_pos.x(), final_pos.y());
+        seam_point = projected_point.foot_pt;
+
+        //lastly, for internal perimeters, do the staggering if requested
+        if (po->config().staggered_inner_seams && loop.length() > 0.0) {
+            //fix depth, it is sometimes strongly underestimated
+            depth = std::max(loop.paths[projected_point.path_idx].width, depth);
+
+            while (depth > 0.0f) {
+                auto next_point = get_next_loop_point(projected_point);
+                Vec2f a = unscale(projected_point.foot_pt).cast<float>();
+                Vec2f b = unscale(next_point.foot_pt).cast<float>();
+                float dist = (a - b).norm();
+                if (dist > depth) {
+                    Vec2f final_pos = a + (b - a) * depth / dist;
+                    next_point.foot_pt = Point::new_scale(final_pos.x(), final_pos.y());
+                }
+                depth -= dist;
+                projected_point = next_point;
+            }
+            seam_point = projected_point.foot_pt;
+        }
     }
 
     // Because the G-code export has 1um resolution, don't generate segments shorter than 1.5 microns,

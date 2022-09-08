@@ -788,7 +788,9 @@ Sidebar::Sidebar(Plater *parent)
 
     p->sizer_filaments = new wxBoxSizer(wxVERTICAL);
 
-    auto init_combo = [this](PlaterPresetComboBox **combo, wxString label, Preset::Type preset_type, bool filament) {
+    const int margin_5 = int(0.5 * wxGetApp().em_unit());// 5;
+
+    auto init_combo = [this, margin_5](PlaterPresetComboBox **combo, wxString label, Preset::Type preset_type, bool filament) {
         auto *text = new wxStaticText(p->presets_panel, wxID_ANY, label + " :");
         text->SetFont(wxGetApp().small_font());
         *combo = new PlaterPresetComboBox(p->presets_panel, preset_type);
@@ -803,9 +805,19 @@ Sidebar::Sidebar(Plater *parent)
         auto *sizer_filaments = this->p->sizer_filaments;
         sizer_presets->Add(text, 0, wxALIGN_LEFT | wxEXPAND | wxRIGHT, 4);
         if (! filament) {
-            sizer_presets->Add(combo_and_btn_sizer, 0, wxEXPAND | wxBOTTOM, 1);
+            sizer_presets->Add(combo_and_btn_sizer, 0, wxEXPAND | 
+#ifdef __WXGTK3__
+                wxRIGHT, margin_5);
+#else
+                wxBOTTOM, 1);
+#endif // __WXGTK3__
         } else {
-            sizer_filaments->Add(combo_and_btn_sizer, 0, wxEXPAND | wxBOTTOM, 1);
+            sizer_filaments->Add(combo_and_btn_sizer, 0, wxEXPAND |
+#ifdef __WXGTK3__
+                wxRIGHT, margin_5);
+#else
+                wxBOTTOM, 1);
+#endif // __WXGTK3__
             (*combo)->set_extruder_idx(0);
             sizer_presets->Add(sizer_filaments, 1, wxEXPAND);
         }
@@ -818,13 +830,15 @@ Sidebar::Sidebar(Plater *parent)
     init_combo(&p->combo_sla_material,  _L("SLA material"),       Preset::TYPE_SLA_MATERIAL,  false);
     init_combo(&p->combo_printer,       _L("Printer"),            Preset::TYPE_PRINTER,       false);
 
-    const int margin_5  = int(0.5*wxGetApp().em_unit());// 5;
-
     p->sizer_params = new wxBoxSizer(wxVERTICAL);
 
     // Frequently changed parameters
     p->frequently_changed_parameters = new FreqChangedParams(p->scrolled);
-    p->sizer_params->Add(p->frequently_changed_parameters->get_sizer(), 0, wxEXPAND | wxTOP | wxBOTTOM, wxOSX ? 1 : margin_5);
+    p->sizer_params->Add(p->frequently_changed_parameters->get_sizer(), 0, wxEXPAND | wxTOP | wxBOTTOM
+#ifdef __WXGTK3__
+        | wxRIGHT
+#endif // __WXGTK3__
+        , wxOSX ? 1 : margin_5);
 
     // Object List
     p->object_list = new ObjectList(p->scrolled);
@@ -852,12 +866,15 @@ Sidebar::Sidebar(Plater *parent)
     // Sizer in the scrolled area
     if (p->mode_sizer)
         scrolled_sizer->Add(p->mode_sizer, 0, wxALIGN_CENTER_HORIZONTAL);
+
+    int size_margin = wxGTK3 ? wxLEFT | wxRIGHT : wxLEFT;
+
     is_msw ?
-        scrolled_sizer->Add(p->presets_panel, 0, wxEXPAND | wxLEFT, margin_5) :
-        scrolled_sizer->Add(p->sizer_presets, 0, wxEXPAND | wxLEFT, margin_5);
-    scrolled_sizer->Add(p->sizer_params, 1, wxEXPAND | wxLEFT, margin_5);
-    scrolled_sizer->Add(p->object_info, 0, wxEXPAND | wxTOP | wxLEFT, margin_5);
-    scrolled_sizer->Add(p->sliced_info, 0, wxEXPAND | wxTOP | wxLEFT, margin_5);
+        scrolled_sizer->Add(p->presets_panel, 0, wxEXPAND | size_margin, margin_5) :
+        scrolled_sizer->Add(p->sizer_presets, 0, wxEXPAND | size_margin, margin_5);
+    scrolled_sizer->Add(p->sizer_params, 1, wxEXPAND | size_margin, margin_5);
+    scrolled_sizer->Add(p->object_info, 0, wxEXPAND | wxTOP | size_margin, margin_5);
+    scrolled_sizer->Add(p->sliced_info, 0, wxEXPAND | wxTOP | size_margin, margin_5);
 
     // Buttons underneath the scrolled area
 
@@ -975,7 +992,12 @@ void Sidebar::init_filament_combo(PlaterPresetComboBox **combo, const int extr_i
                             int(0.3*wxGetApp().em_unit()));
 
     auto /***/sizer_filaments = this->p->sizer_filaments;
-    sizer_filaments->Add(combo_and_btn_sizer, 1, wxEXPAND | wxBOTTOM, 1);
+    sizer_filaments->Add(combo_and_btn_sizer, 1, wxEXPAND |
+#ifdef __WXGTK3__
+        wxRIGHT, int(0.5 * wxGetApp().em_unit()));
+#else
+        wxBOTTOM, 1);
+#endif // __WXGTK3__
 }
 
 void Sidebar::remove_unused_filament_combos(const size_t current_extruder_count)
@@ -3335,6 +3357,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 
         sidebar->set_btn_label(ActionButtonType::abExport, _(label_btn_export));
         sidebar->set_btn_label(ActionButtonType::abSendGCode, _(label_btn_send));
+        dirty_state.update_from_preview();
 
         const wxString slice_string = background_process.running() && wxGetApp().get_mode() == comSimple ?
                                       _L("Slicing") + dots : _L("Slice now");
@@ -6255,7 +6278,17 @@ bool Plater::export_3mf(const boost::filesystem::path& output_path)
     ThumbnailData thumbnail_data;
     ThumbnailsParams thumbnail_params = { {}, false, true, true, true };
     p->generate_thumbnail(thumbnail_data, THUMBNAIL_SIZE_3MF.first, THUMBNAIL_SIZE_3MF.second, thumbnail_params, Camera::EType::Ortho);
-    bool ret = Slic3r::store_3mf(path_u8.c_str(), &p->model, export_config ? &cfg : nullptr, full_pathnames, &thumbnail_data);
+    bool ret = false;
+    try
+    {
+        ret = Slic3r::store_3mf(path_u8.c_str(), &p->model, export_config ? &cfg : nullptr, full_pathnames, &thumbnail_data);
+    }
+    catch (boost::filesystem::filesystem_error& e)
+    {
+        const wxString what = _("Unable to save file") + ": " + path_u8 + "\n" + e.code().message();
+        MessageDialog dlg(this, what, _("Error saving 3mf file"), wxOK | wxICON_ERROR);
+        dlg.ShowModal();
+    }
     if (ret) {
         // Success
 //        p->statusbar()->set_status_text(format_wxstr(_L("3MF file exported to %s"), path));

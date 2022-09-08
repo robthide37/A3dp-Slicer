@@ -6,8 +6,6 @@
 #include <libslic3r/AABBTreeIndirect.hpp>
 #include <libslic3r/SLA/EigenMesh3D.hpp>
 
-#include <Shiny/Shiny.h>
-
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable: 4244)
@@ -42,53 +40,42 @@ void profile(const TriangleMesh &mesh)
 
     Eigen::MatrixXd occlusion_output0;
     {
-        AABBTreeIndirect::Tree3f tree;
-        {
-            PROFILE_BLOCK(AABBIndirect_Init);
-            tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(mesh.its.vertices, mesh.its.indices);
-        }
-        {
-            PROFILE_BLOCK(EigenMesh3D_AABBIndirectF_AmbientOcclusion);
-            occlusion_output0.resize(num_vertices, 1);
-            for (int ivertex = 0; ivertex < num_vertices; ++ ivertex) {
-                const Eigen::Vector3d origin = mesh.its.vertices[ivertex].template cast<double>();
-                const Eigen::Vector3d normal = vertex_normals.row(ivertex).template cast<double>();
-                int num_hits = 0;
-                for (int s = 0; s < num_samples; s++) {
-                    Eigen::Vector3d d = dirs.row(s);
-                    if(d.dot(normal) < 0) {
-                        // reverse ray
-                        d *= -1;
-                    }
-                    igl::Hit hit;
-                    if (AABBTreeIndirect::intersect_ray_first_hit(mesh.its.vertices, mesh.its.indices, tree, (origin + 1e-4 * d).eval(), d, hit))
-                        ++ num_hits;
+        AABBTreeIndirect::Tree3f tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(mesh.its.vertices, mesh.its.indices);
+        occlusion_output0.resize(num_vertices, 1);
+        for (int ivertex = 0; ivertex < num_vertices; ++ ivertex) {
+            const Eigen::Vector3d origin = mesh.its.vertices[ivertex].template cast<double>();
+            const Eigen::Vector3d normal = vertex_normals.row(ivertex).template cast<double>();
+            int num_hits = 0;
+            for (int s = 0; s < num_samples; s++) {
+                Eigen::Vector3d d = dirs.row(s);
+                if(d.dot(normal) < 0) {
+                    // reverse ray
+                    d *= -1;
                 }
-                occlusion_output0(ivertex) = (double)num_hits/(double)num_samples;
+                igl::Hit hit;
+                if (AABBTreeIndirect::intersect_ray_first_hit(mesh.its.vertices, mesh.its.indices, tree, (origin + 1e-4 * d).eval(), d, hit))
+                    ++ num_hits;
             }
+            occlusion_output0(ivertex) = (double)num_hits/(double)num_samples;
         }
-
-        {
-            PROFILE_BLOCK(EigenMesh3D_AABBIndirectFF_AmbientOcclusion);
-            occlusion_output0.resize(num_vertices, 1);
-            for (int ivertex = 0; ivertex < num_vertices; ++ ivertex) {
-                const Eigen::Vector3d origin = mesh.its.vertices[ivertex].template cast<double>();
-                const Eigen::Vector3d normal = vertex_normals.row(ivertex).template cast<double>();
-                int num_hits = 0;
-                for (int s = 0; s < num_samples; s++) {
-                    Eigen::Vector3d d = dirs.row(s);
-                    if(d.dot(normal) < 0) {
-                        // reverse ray
-                        d *= -1;
-                    }
-                    igl::Hit hit;
-                    if (AABBTreeIndirect::intersect_ray_first_hit(mesh.its.vertices, mesh.its.indices, tree, 
-                            Eigen::Vector3f((origin + 1e-4 * d).template cast<float>()),
-                            Eigen::Vector3f(d.template cast<float>()), hit))
-                        ++ num_hits;
+        occlusion_output0.resize(num_vertices, 1);
+        for (int ivertex = 0; ivertex < num_vertices; ++ ivertex) {
+            const Eigen::Vector3d origin = mesh.its.vertices[ivertex].template cast<double>();
+            const Eigen::Vector3d normal = vertex_normals.row(ivertex).template cast<double>();
+            int num_hits = 0;
+            for (int s = 0; s < num_samples; s++) {
+                Eigen::Vector3d d = dirs.row(s);
+                if(d.dot(normal) < 0) {
+                    // reverse ray
+                    d *= -1;
                 }
-                occlusion_output0(ivertex) = (double)num_hits/(double)num_samples;
+                igl::Hit hit;
+                if (AABBTreeIndirect::intersect_ray_first_hit(mesh.its.vertices, mesh.its.indices, tree, 
+                        Eigen::Vector3f((origin + 1e-4 * d).template cast<float>()),
+                        Eigen::Vector3f(d.template cast<float>()), hit))
+                    ++ num_hits;
             }
+            occlusion_output0(ivertex) = (double)num_hits/(double)num_samples;
         }
     }
 
@@ -100,31 +87,23 @@ void profile(const TriangleMesh &mesh)
             vertices.emplace_back(V.row(i).transpose());
         for (int i = 0; i < F.rows(); ++ i)
             triangles.emplace_back(F.row(i).transpose());
-        AABBTreeIndirect::Tree3d tree;
-        {
-            PROFILE_BLOCK(AABBIndirectD_Init);
-            tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(vertices, triangles);
-        }
-
-        {
-            PROFILE_BLOCK(EigenMesh3D_AABBIndirectD_AmbientOcclusion);
-            occlusion_output1.resize(num_vertices, 1);
-            for (int ivertex = 0; ivertex < num_vertices; ++ ivertex) {
-                const Eigen::Vector3d origin = V.row(ivertex).template cast<double>();
-                const Eigen::Vector3d normal = vertex_normals.row(ivertex).template cast<double>();
-                int num_hits = 0;
-                for (int s = 0; s < num_samples; s++) {
-                    Eigen::Vector3d d = dirs.row(s);
-                    if(d.dot(normal) < 0) {
-                        // reverse ray
-                        d *= -1;
-                    }
-                    igl::Hit hit;
-                    if (AABBTreeIndirect::intersect_ray_first_hit(vertices, triangles, tree, Eigen::Vector3d(origin + 1e-4 * d), d, hit))
-                        ++ num_hits;
+        AABBTreeIndirect::Tree3d tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(vertices, triangles);
+        occlusion_output1.resize(num_vertices, 1);
+        for (int ivertex = 0; ivertex < num_vertices; ++ ivertex) {
+            const Eigen::Vector3d origin = V.row(ivertex).template cast<double>();
+            const Eigen::Vector3d normal = vertex_normals.row(ivertex).template cast<double>();
+            int num_hits = 0;
+            for (int s = 0; s < num_samples; s++) {
+                Eigen::Vector3d d = dirs.row(s);
+                if(d.dot(normal) < 0) {
+                    // reverse ray
+                    d *= -1;
                 }
-                occlusion_output1(ivertex) = (double)num_hits/(double)num_samples;
+                igl::Hit hit;
+                if (AABBTreeIndirect::intersect_ray_first_hit(vertices, triangles, tree, Eigen::Vector3d(origin + 1e-4 * d), d, hit))
+                    ++ num_hits;
             }
+            occlusion_output1(ivertex) = (double)num_hits/(double)num_samples;
         }
     }
 
@@ -133,29 +112,23 @@ void profile(const TriangleMesh &mesh)
     Eigen::MatrixXd occlusion_output2;
     {
         igl::AABB<Eigen::MatrixXd, 3> AABB;
-        {
-            PROFILE_BLOCK(EigenMesh3D_AABB_Init);
-            AABB.init(V, F);
-        }
-        {
-            PROFILE_BLOCK(EigenMesh3D_AABB_AmbientOcclusion);
-            occlusion_output2.resize(num_vertices, 1);
-            for (int ivertex = 0; ivertex < num_vertices; ++ ivertex) {
-                const Eigen::Vector3d origin = V.row(ivertex).template cast<double>();
-                const Eigen::Vector3d normal = vertex_normals.row(ivertex).template cast<double>();
-                int num_hits = 0;
-                for (int s = 0; s < num_samples; s++) {
-                    Eigen::Vector3d d = dirs.row(s);
-                    if(d.dot(normal) < 0) {
-                        // reverse ray
-                        d *= -1;
-                    }
-                    igl::Hit hit;
-                    if (AABB.intersect_ray(V, F, origin + 1e-4 * d, d, hit))
-                        ++ num_hits;
+        AABB.init(V, F);
+        occlusion_output2.resize(num_vertices, 1);
+        for (int ivertex = 0; ivertex < num_vertices; ++ ivertex) {
+            const Eigen::Vector3d origin = V.row(ivertex).template cast<double>();
+            const Eigen::Vector3d normal = vertex_normals.row(ivertex).template cast<double>();
+            int num_hits = 0;
+            for (int s = 0; s < num_samples; s++) {
+                Eigen::Vector3d d = dirs.row(s);
+                if(d.dot(normal) < 0) {
+                    // reverse ray
+                    d *= -1;
                 }
-                occlusion_output2(ivertex) = (double)num_hits/(double)num_samples;
+                igl::Hit hit;
+                if (AABB.intersect_ray(V, F, origin + 1e-4 * d, d, hit))
+                    ++ num_hits;
             }
+            occlusion_output2(ivertex) = (double)num_hits/(double)num_samples;
         }
     }
 
@@ -166,37 +139,28 @@ void profile(const TriangleMesh &mesh)
         igl::AABB<MapMatrixXfUnaligned, 3> AABB;
         auto vertices = MapMatrixXfUnaligned(mesh.its.vertices.front().data(), mesh.its.vertices.size(), 3);
         auto faces = MapMatrixXiUnaligned(mesh.its.indices.front().data(), mesh.its.indices.size(), 3);
-        {
-            PROFILE_BLOCK(EigenMesh3D_AABBf_Init);
-            AABB.init(
-                vertices,
-                faces);
-        }
+        AABB.init(
+            vertices,
+            faces);
 
-        {
-            PROFILE_BLOCK(EigenMesh3D_AABBf_AmbientOcclusion);
-            occlusion_output3.resize(num_vertices, 1);
-            for (int ivertex = 0; ivertex < num_vertices; ++ ivertex) {
-                const Eigen::Vector3d origin = mesh.its.vertices[ivertex].template cast<double>();
-                const Eigen::Vector3d normal = vertex_normals.row(ivertex).template cast<double>();
-                int num_hits = 0;
-                for (int s = 0; s < num_samples; s++) {
-                    Eigen::Vector3d d = dirs.row(s);
-                    if(d.dot(normal) < 0) {
-                        // reverse ray
-                        d *= -1;
-                    }
-                    igl::Hit hit;
-                    if (AABB.intersect_ray(vertices, faces, (origin + 1e-4 * d).eval().template cast<float>(), d.template cast<float>(), hit))
-                        ++ num_hits;
+        occlusion_output3.resize(num_vertices, 1);
+        for (int ivertex = 0; ivertex < num_vertices; ++ ivertex) {
+            const Eigen::Vector3d origin = mesh.its.vertices[ivertex].template cast<double>();
+            const Eigen::Vector3d normal = vertex_normals.row(ivertex).template cast<double>();
+            int num_hits = 0;
+            for (int s = 0; s < num_samples; s++) {
+                Eigen::Vector3d d = dirs.row(s);
+                if(d.dot(normal) < 0) {
+                    // reverse ray
+                    d *= -1;
                 }
-                occlusion_output3(ivertex) = (double)num_hits/(double)num_samples;
+                igl::Hit hit;
+                if (AABB.intersect_ray(vertices, faces, (origin + 1e-4 * d).eval().template cast<float>(), d.template cast<float>(), hit))
+                    ++ num_hits;
             }
+            occlusion_output3(ivertex) = (double)num_hits/(double)num_samples;
         }
     }
-
-    PROFILE_UPDATE();
-    PROFILE_OUTPUT(nullptr);
 }
 
 int main(const int argc, const char *argv[])

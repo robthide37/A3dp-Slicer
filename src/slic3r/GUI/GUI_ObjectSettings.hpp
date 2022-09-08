@@ -30,6 +30,7 @@ public:
 
     virtual wxSizer*    get_sizer();
     ConfigOptionsGroup* get_og() { return m_og.get(); }
+    const ConfigOptionsGroup* get_og() const { return m_og.get(); }
     wxWindow*           parent() const {return m_parent; }
 };
 

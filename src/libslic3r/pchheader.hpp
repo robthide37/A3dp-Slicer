@@ -133,6 +133,4 @@
 #include "libslic3r.h"
 #include "libslic3r_version.h"
 
-#include <Shiny/Shiny.h>
-
 #include <admesh/stl.h>

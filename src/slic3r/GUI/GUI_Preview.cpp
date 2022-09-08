@@ -705,8 +705,18 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
         m_layers_slider->SetLayersTimes(print_mode_stat.layers_times, print_mode_stat.time);
     }
 
+    // check if ticks_info_from_model contains ColorChange g-code
+    bool color_change_already_exists = false;
+    for (const CustomGCode::Item& gcode: ticks_info_from_model.gcodes)
+        if (gcode.type == CustomGCode::Type::ColorChange) {
+            color_change_already_exists = true;
+            break;
+        }
+
     // Suggest the auto color change, if model looks like sign
-    if (m_layers_slider->IsNewPrint())
+    if (!color_change_already_exists &&
+        wxGetApp().app_config->get("allow_auto_color_change") == "1" && 
+        m_layers_slider->IsNewPrint())
     {
         const Print& print = wxGetApp().plater()->fff_print();
 
@@ -803,6 +813,7 @@ void Preview::update_layers_slider_mode()
 
                     for (const auto& range : object->layer_config_ranges)
                         if (range.second.has("extruder") &&
+                            range.second.option("extruder")->getInt() != 0 && // extruder isn't default
                             range.second.option("extruder")->getInt() != extruder)
                             return false;
                 }

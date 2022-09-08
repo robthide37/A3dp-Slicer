@@ -101,7 +101,7 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, SurfaceCollec
     g.overhang_flow         = this->bridging_flow(frPerimeter);
     g.solid_infill_flow     = this->flow(frSolidInfill);
 
-    if (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne)
+    if (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne && !spiral_vase)
         g.process_arachne();
     else
         g.process_classic();
@@ -386,10 +386,12 @@ void LayerRegion::prepare_fill_surfaces()
     bool spiral_vase = this->layer()->object()->print()->config().spiral_vase;
 
     // if no solid layers are requested, turn top/bottom surfaces to internal
+    // For Lightning infill, infill_only_where_needed is ignored because both
+    // do a similar thing, and their combination doesn't make much sense.
     if (! spiral_vase && this->region().config().top_solid_layers == 0) {
         for (Surface &surface : this->fill_surfaces.surfaces)
             if (surface.is_top())
-                surface.surface_type = this->layer()->object()->config().infill_only_where_needed ? stInternalVoid : stInternal;
+                surface.surface_type = this->layer()->object()->config().infill_only_where_needed && this->region().config().fill_pattern != ipLightning ? stInternalVoid : stInternal;
     }
     if (this->region().config().bottom_solid_layers == 0) {
         for (Surface &surface : this->fill_surfaces.surfaces)

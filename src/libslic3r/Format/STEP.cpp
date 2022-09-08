@@ -64,11 +64,11 @@ LoadStepFn get_load_step_fn()
             load_step_fn = reinterpret_cast<LoadStepFn>(dlsym(plugin_ptr, fn_name));
             if (!load_step_fn) {
                 dlclose(plugin_ptr);
-                throw Slic3r::RuntimeError(std::string("Cannot load function from OCCTWrapper.dll: ") + fn_name
+                throw Slic3r::RuntimeError(std::string("Cannot load function from OCCTWrapper.so: ") + fn_name
                                            + "\n\n" + dlerror());
             }
         } else {
-            throw Slic3r::RuntimeError(std::string("Cannot load OCCTWrapper.dll:\n\n") + dlerror());
+            throw Slic3r::RuntimeError(std::string("Cannot load OCCTWrapper.so:\n\n") + dlerror());
         }
 #endif
     }

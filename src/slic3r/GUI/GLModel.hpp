@@ -4,6 +4,7 @@
 #include "libslic3r/Point.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/Color.hpp"
+#include "libslic3r/Utils.hpp"
 #include <vector>
 #include <string>
 
@@ -58,13 +59,16 @@ namespace GUI {
 
             enum class EVertexLayout : unsigned char
             {
-                P2,   // position 2 floats
-                P2T2, // position 2 floats + texture coords 2 floats
-                P3,   // position 3 floats
-                P3T2, // position 3 floats + texture coords 2 floats
-                P3N3, // position 3 floats + normal 3 floats
+                P2,     // position 2 floats
+                P2T2,   // position 2 floats + texture coords 2 floats
+                P3,     // position 3 floats
+                P3T2,   // position 3 floats + texture coords 2 floats
+                P3N3,   // position 3 floats + normal 3 floats
                 P3N3T2, // position 3 floats + normal 3 floats + texture coords 2 floats
-                P4,   // position 4 floats
+#if ENABLE_OPENGL_ES
+                P3N3E3, // position 3 floats + normal 3 floats + extra 3 floats
+#endif // ENABLE_OPENGL_ES
+                P4,     // position 4 floats
             };
 
             enum class EIndexType : unsigned char
@@ -87,14 +91,23 @@ namespace GUI {
             ColorRGBA color{ ColorRGBA::BLACK() };
 
             void reserve_vertices(size_t vertices_count) { vertices.reserve(vertices_count * vertex_stride_floats(format)); }
+            void reserve_more_vertices(size_t vertices_count) { vertices.reserve(next_highest_power_of_2(vertices.size() + vertices_count * vertex_stride_floats(format))); }
             void reserve_indices(size_t indices_count) { indices.reserve(indices_count); }
+            void reserve_more_indices(size_t indices_count) { indices.reserve(next_highest_power_of_2(indices.size() + indices_count)); }
 
             void add_vertex(const Vec2f& position);                                              // EVertexLayout::P2
             void add_vertex(const Vec2f& position, const Vec2f& tex_coord);                      // EVertexLayout::P2T2
             void add_vertex(const Vec3f& position);                                              // EVertexLayout::P3
             void add_vertex(const Vec3f& position, const Vec2f& tex_coord);                      // EVertexLayout::P3T2
-            void add_vertex(const Vec3f& position, const Vec3f& normal);                         // EVertexLayout::P3N3
+            void add_vertex(const Vec3f& position, const Vec3f& normal) {                        // EVertexLayout::P3N3
+                assert(format.vertex_layout == EVertexLayout::P3N3);
+                vertices.insert(vertices.end(), position.data(), position.data() + 3);
+                vertices.insert(vertices.end(), normal.data(), normal.data() + 3);
+            }
             void add_vertex(const Vec3f& position, const Vec3f& normal, const Vec2f& tex_coord); // EVertexLayout::P3N3T2
+#if ENABLE_OPENGL_ES
+            void add_vertex(const Vec3f& position, const Vec3f& normal, const Vec3f& extra);     // EVertexLayout::P3N3E3
+#endif // ENABLE_OPENGL_ES
             void add_vertex(const Vec4f& position);                                              // EVertexLayout::P4
 
             void set_vertex(size_t id, const Vec3f& position, const Vec3f& normal); // EVertexLayout::P3N3
@@ -103,7 +116,11 @@ namespace GUI {
 
             void add_index(unsigned int id);
             void add_line(unsigned int id1, unsigned int id2);
-            void add_triangle(unsigned int id1, unsigned int id2, unsigned int id3);
+            void add_triangle(unsigned int id1, unsigned int id2, unsigned int id3){
+                indices.emplace_back(id1);
+                indices.emplace_back(id2);
+                indices.emplace_back(id3);
+            }
 
             Vec2f extract_position_2(size_t id) const;
             Vec3f extract_position_3(size_t id) const;
@@ -141,11 +158,21 @@ namespace GUI {
             static size_t tex_coord_offset_floats(const Format& format);
             static size_t tex_coord_offset_bytes(const Format& format) { return tex_coord_offset_floats(format) * sizeof(float); }
 
+#if ENABLE_OPENGL_ES
+            static size_t extra_stride_floats(const Format& format);
+            static size_t extra_stride_bytes(const Format& format) { return extra_stride_floats(format) * sizeof(float); }
+            static size_t extra_offset_floats(const Format& format);
+            static size_t extra_offset_bytes(const Format& format) { return extra_offset_floats(format) * sizeof(float); }
+#endif // ENABLE_OPENGL_ES
+
             static size_t index_stride_bytes(const Geometry& data);
 
             static bool has_position(const Format& format);
             static bool has_normal(const Format& format);
             static bool has_tex_coord(const Format& format);
+#if ENABLE_OPENGL_ES
+            static bool has_extra(const Format& format);
+#endif // ENABLE_OPENGL_ES
 #else
             struct Entity
             {

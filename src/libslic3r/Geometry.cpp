@@ -550,12 +550,16 @@ void Transformation::set_rotation(Axis axis, double rotation)
 Vec3d Transformation::get_scaling_factor() const
 {
     const Transform3d scale = extract_scale(m_matrix);
-    return { scale(0, 0), scale(1, 1), scale(2, 2) };
+    return { std::abs(scale(0, 0)), std::abs(scale(1, 1)), std::abs(scale(2, 2)) };
 }
 
 Transform3d Transformation::get_scaling_factor_matrix() const
 {
-    return extract_scale(m_matrix);
+    Transform3d scale = extract_scale(m_matrix);
+    scale(0, 0) = std::abs(scale(0, 0));
+    scale(1, 1) = std::abs(scale(1, 1));
+    scale(2, 2) = std::abs(scale(2, 2));
+    return scale;
 }
 #endif // ENABLE_WORLD_COORDINATE
 
@@ -578,6 +582,7 @@ void Transformation::set_scaling_factor(Axis axis, double scaling_factor)
 {
 #if ENABLE_WORLD_COORDINATE
     assert(scaling_factor > 0.0);
+
     auto [rotation, scale] = extract_rotation_scale(m_matrix);
     scale(axis, axis) = scaling_factor;
 
@@ -601,8 +606,11 @@ Vec3d Transformation::get_mirror() const
 
 Transform3d Transformation::get_mirror_matrix() const
 {
-    const Vec3d scale = get_scaling_factor();
-    return scale_transform({ scale.x() / std::abs(scale.x()), scale.y() / std::abs(scale.y()), scale.z() / std::abs(scale.z()) });
+    Transform3d scale = extract_scale(m_matrix);
+    scale(0, 0) = scale(0, 0) / std::abs(scale(0, 0));
+    scale(1, 1) = scale(1, 1) / std::abs(scale(1, 1));
+    scale(2, 2) = scale(2, 2) / std::abs(scale(2, 2));
+    return scale;
 }
 #endif // ENABLE_WORLD_COORDINATE
 
@@ -618,13 +626,17 @@ void Transformation::set_mirror(const Vec3d& mirror)
             copy(i) /= abs_mirror(i);
     }
 
-    const Vec3d curr_scale = get_scaling_factor();
-    const Vec3d signs = curr_scale.cwiseProduct(copy);
-    set_scaling_factor({
-        signs.x() < 0.0 ? std::abs(curr_scale.x()) * copy.x() : curr_scale.x(),
-        signs.y() < 0.0 ? std::abs(curr_scale.y()) * copy.y() : curr_scale.y(),
-        signs.z() < 0.0 ? std::abs(curr_scale.z()) * copy.z() : curr_scale.z()
-        });
+    auto [rotation, scale] = extract_rotation_scale(m_matrix);
+    const Vec3d curr_scales = { scale(0, 0), scale(1, 1), scale(2, 2) };
+    const Vec3d signs = curr_scales.cwiseProduct(copy);
+
+    if (signs[0] < 0.0) scale(0, 0) = -scale(0, 0);
+    if (signs[1] < 0.0) scale(1, 1) = -scale(1, 1);
+    if (signs[2] < 0.0) scale(2, 2) = -scale(2, 2);
+
+    const Vec3d offset = get_offset();
+    m_matrix = rotation * scale;
+    m_matrix.translation() = offset;
 #else
     set_mirror(X, mirror.x());
     set_mirror(Y, mirror.y());
@@ -641,9 +653,15 @@ void Transformation::set_mirror(Axis axis, double mirror)
         mirror /= abs_mirror;
 
 #if ENABLE_WORLD_COORDINATE
-    const double curr_scale = get_scaling_factor(axis);
+    auto [rotation, scale] = extract_rotation_scale(m_matrix);
+    const double curr_scale = scale(axis, axis);
     const double sign = curr_scale * mirror;
-    set_scaling_factor(axis, sign < 0.0 ? std::abs(curr_scale) * mirror : curr_scale);
+
+    if (sign < 0.0) scale(axis, axis) = -scale(axis, axis);
+
+    const Vec3d offset = get_offset();
+    m_matrix = rotation * scale;
+    m_matrix.translation() = offset;
 #else
     if (m_mirror(axis) != mirror) {
         m_mirror(axis) = mirror;
@@ -747,7 +765,6 @@ Transform3d Transformation::get_matrix_no_scaling_factor() const
 {
     Transformation copy(*this);
     copy.reset_scaling_factor();
-    copy.reset_mirror();
     return copy.get_matrix();
 }
 #else

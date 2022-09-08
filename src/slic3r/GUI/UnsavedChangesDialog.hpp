@@ -42,6 +42,7 @@ class ModelNode
     std::string         m_icon_name;
     // saved values for colors if they exist
     wxString            m_old_color;
+    wxString            m_mod_color;
     wxString            m_new_color;
 
 #ifdef __linux__
@@ -56,14 +57,17 @@ public:
 #ifdef __linux__
     wxIcon      m_icon;
     wxIcon      m_old_color_bmp;
+    wxIcon      m_mod_color_bmp;
     wxIcon      m_new_color_bmp;
 #else
     wxBitmap    m_icon;
     wxBitmap    m_old_color_bmp;
+    wxBitmap    m_mod_color_bmp;
     wxBitmap    m_new_color_bmp;
 #endif //__linux__
     wxString    m_text;
     wxString    m_old_value;
+    wxString    m_mod_value;
     wxString    m_new_value;
 
     // TODO/FIXME:
@@ -78,7 +82,7 @@ public:
     bool                m_container {true};
 
     // preset(root) node
-    ModelNode(Preset::Type preset_type, wxWindow* parent_win, const wxString& text, const std::string& icon_name);
+    ModelNode(Preset::Type preset_type, wxWindow* parent_win, const wxString& text, const std::string& icon_name, const wxString& new_val_column_text);
 
     // category node
     ModelNode(ModelNode* parent, const wxString& text, const std::string& icon_name);
@@ -87,7 +91,7 @@ public:
     ModelNode(ModelNode* parent, const wxString& text);
 
     // option node
-    ModelNode(ModelNode* parent, const wxString& text, const wxString& old_value, const wxString& new_value);
+    ModelNode(ModelNode* parent, const wxString& text, const wxString& old_value, const wxString& mod_value, const wxString& new_value);
 
     bool                IsContainer() const         { return m_container; }
     bool                IsToggled() const           { return m_toggle; }
@@ -122,17 +126,20 @@ class DiffModel : public wxDataViewModel
     ModelNode *AddOption(ModelNode *group_node,
                          wxString   option_name,
                          wxString   old_value,
+                         wxString   mod_value,
                          wxString   new_value);
     ModelNode *AddOptionWithGroup(ModelNode *category_node,
                                   wxString   group_name,
                                   wxString   option_name,
                                   wxString   old_value,
+                                  wxString   mod_value,
                                   wxString   new_value);
     ModelNode *AddOptionWithGroupAndCategory(ModelNode *preset_node,
                                              wxString   category_name,
                                              wxString   group_name,
                                              wxString   option_name,
                                              wxString   old_value,
+                                             wxString   mod_value,
                                              wxString   new_value,
                                              const std::string category_icon_name);
 
@@ -141,6 +148,7 @@ public:
         colToggle,
         colIconText,
         colOldValue,
+        colModValue,
         colNewValue,
         colMax
     };
@@ -150,9 +158,9 @@ public:
 
     void            SetAssociatedControl(wxDataViewCtrl* ctrl) { m_ctrl = ctrl; }
 
-    wxDataViewItem  AddPreset(Preset::Type type, wxString preset_name, PrinterTechnology pt);
+    wxDataViewItem  AddPreset(Preset::Type type, wxString preset_name, PrinterTechnology pt, wxString new_preset_name = wxString());
     wxDataViewItem  AddOption(Preset::Type type, wxString category_name, wxString group_name, wxString option_name,
-                              wxString old_value, wxString new_value, const std::string category_icon_name);
+                              wxString old_value, wxString mod_value, wxString new_value, const std::string category_icon_name);
 
     void            UpdateItemEnabling(wxDataViewItem item);
     bool            IsEnabledItem(const wxDataViewItem& item);
@@ -193,6 +201,7 @@ class DiffViewCtrl : public wxDataViewCtrl
         std::string     opt_key;
         wxString        opt_name;
         wxString        old_val;
+        wxString        mod_val;
         wxString        new_val;
         Preset::Type    type;
         bool            is_long{ false };
@@ -217,7 +226,7 @@ public:
     void    AppendToggleColumn_(const wxString& label, unsigned model_column, int width);
     void    Rescale(int em = 0);
     void    Append(const std::string& opt_key, Preset::Type type, wxString category_name, wxString group_name, wxString option_name,
-                   wxString old_value, wxString new_value, const std::string category_icon_name);
+                   wxString old_value, wxString mod_value, wxString new_value, const std::string category_icon_name);
     void    Clear();
 
     wxString    get_short_string(wxString full_string);
@@ -227,6 +236,7 @@ public:
     void        set_em_unit(int em) { m_em_unit = em; }
     bool        has_unselected_options();
     bool        has_long_strings() { return m_has_long_strings; }
+    bool        has_new_value_column() { return this->GetColumnCount() == DiffModel::colMax; }
 
     std::vector<std::string> options(Preset::Type type, bool selected);
     std::vector<std::string> selected_options();
@@ -280,14 +290,14 @@ public:
     };
 
     // show unsaved changes when preset is switching
-    UnsavedChangesDialog(Preset::Type type, PresetCollection* dependent_presets, const std::string& new_selected_preset);
+    UnsavedChangesDialog(Preset::Type type, PresetCollection* dependent_presets, const std::string& new_selected_preset = std::string());
     // show unsaved changes for all another cases
     UnsavedChangesDialog(const wxString& caption, const wxString& header, const std::string& app_config_key, int act_buttons);
     ~UnsavedChangesDialog() {}
 
     void build(Preset::Type type, PresetCollection* dependent_presets, const std::string& new_selected_preset, const wxString& header = "");
     void update(Preset::Type type, PresetCollection* dependent_presets, const std::string& new_selected_preset, const wxString& header);
-    void update_tree(Preset::Type type, PresetCollection *presets);
+    void update_tree(Preset::Type type, PresetCollection *presets, const std::string& new_selected_preset);
     void show_info_line(Action action, std::string preset_name = "");
     void update_config(Action action);
     void close(Action action);
@@ -320,8 +330,8 @@ protected:
 class FullCompareDialog : public wxDialog
 {
 public:
-    FullCompareDialog(const wxString& option_name, const wxString& old_value, const wxString& new_value,
-                      const wxString& old_value_header, const wxString& new_value_header);
+    FullCompareDialog(const wxString& option_name, const wxString& old_value, const wxString& mod_value, const wxString& new_value,
+                      const wxString& old_value_header, const wxString& mod_value_header, const wxString& new_value_header);
     ~FullCompareDialog() {}
 };
 

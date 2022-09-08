@@ -197,6 +197,8 @@ public:
     // Polygons covered by the supports: base, interface and contact areas.
     // Used to suppress retraction if moving for a support extrusion over these support_islands.
     ExPolygons                  support_islands;
+    // Slightly inflated bounding boxes of the above, for faster intersection query.
+    std::vector<BoundingBox>    support_islands_bboxes;
     // Extrusion paths for the support base and for the support interface and contacts.
     ExtrusionEntityCollection   support_fills;
 

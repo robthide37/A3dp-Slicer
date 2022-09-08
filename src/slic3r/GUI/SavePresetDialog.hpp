@@ -10,6 +10,7 @@
 class wxString;
 class wxStaticText;
 class wxComboBox;
+class wxTextCtrl;
 class wxStaticBitmap;
 
 namespace Slic3r {
@@ -52,6 +53,7 @@ class SavePresetDialog : public DPIDialog
         SavePresetDialog*   m_parent        {nullptr};
         wxStaticBitmap*     m_valid_bmp     {nullptr};
         wxComboBox*         m_combo         {nullptr};
+        wxTextCtrl*         m_text_ctrl     {nullptr};
         wxStaticText*       m_valid_label   {nullptr};
 
         PresetCollection*   m_presets       {nullptr};
@@ -68,11 +70,16 @@ class SavePresetDialog : public DPIDialog
 
     std::string         m_ph_printer_name;
     std::string         m_old_preset_name;
+    bool                m_use_for_rename{false};
+    wxString            m_info_line_extention{wxEmptyString};
 
 public:
 
+    const wxString& get_info_line_extention() { return m_info_line_extention; }
+
     SavePresetDialog(wxWindow* parent, Preset::Type type, std::string suffix = "");
     SavePresetDialog(wxWindow* parent, std::vector<Preset::Type> types, std::string suffix = "");
+    SavePresetDialog(wxWindow* parent, Preset::Type type, bool rename, const wxString& info_line_extention);
     ~SavePresetDialog();
 
     void AddItem(Preset::Type type, const std::string& suffix);
@@ -84,6 +91,7 @@ public:
     void add_info_for_edit_ph_printer(wxBoxSizer *sizer);
     void update_info_for_edit_ph_printer(const std::string &preset_name);
     void layout();
+    bool is_for_rename() { return m_use_for_rename; }
 
 protected:
     void on_dpi_changed(const wxRect& suggested_rect) override;
