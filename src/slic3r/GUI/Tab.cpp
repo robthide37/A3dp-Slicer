@@ -778,9 +778,9 @@ void Tab::update_changed_ui()
         if (edited_preset.config.option(opt_key)->is_phony())
             //ensure that osCurrentPhony is in the bitmask 
             m_options_list[opt_key] |= osCurrentPhony;
-        if (selected_preset.config.option(opt_key)->is_phony())
+        if (selected_preset.config.option(opt_key) && selected_preset.config.option(opt_key)->is_phony())
             m_options_list[opt_key] |= osInitPhony;
-        if (system_preset && system_preset->config.option(opt_key)->is_phony())
+        if (system_preset && system_preset->config.option(opt_key) && system_preset->config.option(opt_key)->is_phony())
             m_options_list[opt_key] |= osSystemPhony;
     }
 

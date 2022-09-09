@@ -973,6 +973,8 @@ Polylines reorder_brim_polyline(Polylines lines, ExtrusionEntityCollection& out,
 }
 
 
+//note: unbrimmable must keep its ordering. don't union_ex it.
+
 //TODO: test if no regression vs old _make_brim.
 // this new one can extrude brim for an object inside an other object.
 void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& objects, ExPolygons& unbrimmable, ExtrusionEntityCollection& out) {
@@ -1263,7 +1265,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
             float(print.get_first_layer_height())
         );
 
-        unbrimmable = union_ex(unbrimmable, offset_ex(mouse_ears_ex, flow.scaled_spacing() / 2));
+        append(unbrimmable, offset_ex(mouse_ears_ex, flow.scaled_spacing() / 2));
 
     } else /* brim_config.brim_ears_pattern.value == InfillPattern::ipRectilinear */ {
 

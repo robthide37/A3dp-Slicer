@@ -836,13 +836,21 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(150,true));
-    
+
     def = this->add("brim_inside_holes", coBool);
     def->label = L("Brim inside holes");
-    def->full_label = L("Brim inside holes");
     def->category = OptionCategory::skirtBrim;
     def->tooltip = L("Allow to create a brim over an island when it's inside a hole (or surrounded by an object)."
         "\nIncompatible with brim_width_interior, as it enables it with brim_width width.");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("brim_per_object", coBool);
+    def->label = L("Brim per object");
+    def->category = OptionCategory::skirtBrim;
+    def->tooltip = L("Create a brim per object instead of a brim for the plater."
+        " Useful for complete_object or if you have your brim detaching before printing the object."
+        "\nBe aware that the brim may be truncated if objects are too close together..");
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -1045,14 +1053,6 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::output;
     def->tooltip = L("When using 'Complete individual objects', the default behavior is to draw the skirt around each object."
         " if you prefer to have only one skirt for the whole platter, use this option.");
-    def->mode = comAdvancedE | comSuSi;
-    def->set_default_value(new ConfigOptionBool(false));
-
-    def = this->add("complete_objects_one_brim", coBool);
-    def->label = L("Print all brim at startup");
-    def->category = OptionCategory::output;
-    def->tooltip = L("When using 'Complete individual objects', the default behavior is to draw the brim at the beginning of each object."
-        " if you prefer to have more place for you objects, you can print all the brims at the beginning, so ther is less problem with collision.");
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -7242,6 +7242,8 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         "fuzzy_skin_perimeter_mode", "fuzzy_skin_shape",
         // Introduced in PrusaSlicer 2.3.0-alpha2, later replaced by automatic calculation based on extrusion width.
         "wall_add_middle_threshold", "wall_split_middle_threshold",
+        //replaced by brim_per_object, but can't translate the value as the old one is only used for complete_objects (and the default are differents).
+        "complete_objects_one_brim",
     };
 
     // In PrusaSlicer 2.3.0-alpha0 the "monotonic" infill was introduced, which was later renamed to "monotonous".
@@ -7413,10 +7415,10 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "brim_ears_pattern",
 "brim_ears",
 "brim_inside_holes",
+"brim_per_object",
 "brim_speed",
 "brim_width_interior",
 "chamber_temperature",
-"complete_objects_one_brim",
 "complete_objects_one_skirt",
 "complete_objects_sort",
 "curve_smoothing_angle_concave",

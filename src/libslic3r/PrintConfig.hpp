@@ -696,6 +696,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                brim_ears_detection_length))
     ((ConfigOptionFloat,                brim_ears_max_angle))
     ((ConfigOptionEnum<InfillPattern>,  brim_ears_pattern))
+    ((ConfigOptionBool,                 brim_per_object))
     ((ConfigOptionFloat,                brim_separation))
     //((ConfigOptionEnum<BrimType>,       brim_type))
     ((ConfigOptionBool,                 clip_multipart_objects))

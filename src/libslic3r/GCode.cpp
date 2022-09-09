@@ -1603,8 +1603,6 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
             print.skirt_first_layer()->visit(bbvisitor);
         } else if (print.skirt().entities().size() > 0) {
             print.skirt().visit(bbvisitor);
-        } else if (print.config().complete_objects_one_brim.value && !print.brim().empty()) {
-            print.brim().visit(bbvisitor);
         } else {
             print.brim().visit(bbvisitor);
             for (const PrintObject* po : print.objects()) {
@@ -3033,7 +3031,7 @@ GCode::LayerResult GCode::process_layer(
             //to go to the object-only skirt or brim, or to the object  (May be overriden here but I don't care)
             set_extra_lift(m_last_layer_z, layer.id(), print.config(), m_writer, extruder_id);
         }
-        //extrude object-only skirt
+        //extrude object-only skirt (for sequential)
         //TODO: use it also for wiping like the other one (as they are exlusiev)
         if (single_object_instance_idx != size_t(-1) && !layers.front().object()->skirt().empty()
             && extruder_id == layer_tools.extruders.front()) {
@@ -3049,19 +3047,20 @@ GCode::LayerResult GCode::process_layer(
                         gcode += this->extrude_entity(*ee, "");
             }
         }
-        //extrude object-only brim
+        //extrude object-only brim (for sequential)
         if (single_object_instance_idx != size_t(-1) && !layers.front().object()->brim().empty()
             && extruder_id == layer_tools.extruders.front()) {
 
-            const PrintObject *print_object = layers.front().object();
+            const PrintObject* print_object = layers.front().object();
             this->set_origin(unscale(print_object->instances()[single_object_instance_idx].shift));
             if (this->m_layer != nullptr && this->m_layer->id() == 0) {
                 m_avoid_crossing_perimeters.use_external_mp(true);
-                for (const ExtrusionEntity *ee : print_object->brim().entities())
+                for (const ExtrusionEntity* ee : print_object->brim().entities())
                     gcode += this->extrude_entity(*ee, "brim");
                 m_avoid_crossing_perimeters.use_external_mp(false);
                 m_avoid_crossing_perimeters.disable_once();
             }
+            
         }
 
 
@@ -3131,6 +3130,22 @@ GCode::LayerResult GCode::process_layer(
                     instance_to_print.object_by_extruder.support->chained_path_from(m_last_pos, instance_to_print.object_by_extruder.support_extrusion_role));
                     m_layer = layer_to_print.layer();
                     m_object_layer_over_raft = object_layer_over_raft;
+                }
+                //extrude instance-only brim
+                if (this->m_layer != nullptr && this->m_layer->id() == 0 && single_object_instance_idx == size_t(-1) && !instance_to_print.print_object.brim().empty()) {
+                    assert(instance_to_print.instance_id < instance_to_print.print_object.brim().items_count());
+                    this->set_origin(0., 0.);
+                    if (this->m_layer != nullptr && this->m_layer->id() == 0) {
+                        m_avoid_crossing_perimeters.use_external_mp(true);
+                        assert(instance_to_print.print_object.brim().entities()[instance_to_print.instance_id]->is_collection());
+                        if (const ExtrusionEntityCollection* coll = dynamic_cast<const ExtrusionEntityCollection*>(instance_to_print.print_object.brim().entities()[instance_to_print.instance_id])) {
+                            for (const ExtrusionEntity* ee : coll->entities())
+                                gcode += this->extrude_entity(*ee, "brim");
+                        }
+                        m_avoid_crossing_perimeters.use_external_mp(false);
+                        m_avoid_crossing_perimeters.disable_once();
+                    }
+                    this->set_origin(unscale(offset));
                 }
                 //FIXME order islands?
                 // Sequential tool path ordering of multiple parts within the same object, aka. perimeter tracking (#5511)

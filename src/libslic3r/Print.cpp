@@ -229,9 +229,9 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
             || opt_key == "brim_ears_detection_length"
             || opt_key == "brim_ears_max_angle"
             || opt_key == "brim_ears_pattern"
+            || opt_key == "brim_per_object"
             || opt_key == "brim_separation"
             || opt_key == "complete_objects_one_skirt"
-            || opt_key == "complete_objects_one_brim"
             || opt_key == "draft_shield"
             || opt_key == "min_skirt_length"
             || opt_key == "ooze_prevention"
@@ -500,7 +500,7 @@ bool Print::sequential_print_horizontal_clearance_valid(const Print &print, Poly
 	std::map<ObjectID, Polygon> map_model_object_to_convex_hull;
     const double dist_grow = min_object_distance(static_cast<const ConfigBase*>(&print.full_print_config()), 0) * 2;
 	for (const PrintObject *print_object : print.objects()) {
-        const double object_grow = print.config().complete_objects_one_brim ? dist_grow : std::max(dist_grow, print_object->config().brim_width.value);
+        const double object_grow = (print.config().complete_objects && !print_object->config().brim_per_object) ? dist_grow : std::max(dist_grow, print_object->config().brim_width.value);
 	    assert(! print_object->model_object()->instances.empty());
 	    assert(! print_object->instances().empty());
 	    ObjectID model_object_id = print_object->model_object()->id();
@@ -1102,14 +1102,17 @@ void Print::process()
         //group object per brim settings
         m_first_layer_convex_hull.points.clear();
         std::vector<std::vector<PrintObject*>> obj_groups;
+        bool brim_per_object = false;
         for (PrintObject *obj : m_objects) {
             obj->m_brim.clear();
+            brim_per_object = brim_per_object || obj->config().brim_per_object.value;
             bool added = false;
             for (std::vector<PrintObject*> &obj_group : obj_groups) {
                 if (obj_group.front()->config().brim_ears.value == obj->config().brim_ears.value
                     && obj_group.front()->config().brim_ears_max_angle.value == obj->config().brim_ears_max_angle.value
                     && obj_group.front()->config().brim_ears_pattern.value == obj->config().brim_ears_pattern.value
                     && obj_group.front()->config().brim_inside_holes.value == obj->config().brim_inside_holes.value
+                    && obj_group.front()->config().brim_per_object.value == obj->config().brim_per_object.value
                     && obj_group.front()->config().brim_separation.value == obj->config().brim_separation.value
                     && obj_group.front()->config().brim_width.value == obj->config().brim_width.value
                     && obj_group.front()->config().brim_width_interior.value == obj->config().brim_width_interior.value
@@ -1124,7 +1127,8 @@ void Print::process()
             }
         }
         ExPolygons brim_area;
-        if (obj_groups.size() > 1) {
+        //get the objects areas, to not print brim on it (if needed)
+        if (obj_groups.size() > 1 || brim_per_object) {
             for (std::vector<PrintObject*> &obj_group : obj_groups)
                 for (const PrintObject *object : obj_group)
                     if (!object->m_layers.empty())
@@ -1136,36 +1140,61 @@ void Print::process()
                             }
                         }
         }
+        //print brim per brim region
         for (std::vector<PrintObject*> &obj_group : obj_groups) {
             const PrintObjectConfig &brim_config = obj_group.front()->config();
             if (brim_config.brim_width > 0 || brim_config.brim_width_interior > 0) {
                 this->set_status(57, L("Generating brim"));
-                if (config().complete_objects && !config().complete_objects_one_brim) {
+                if (brim_config.brim_per_object) {
                     for (PrintObject *obj : obj_group) {
                         //get flow
                         std::set<uint16_t> set_extruders = this->object_extruders(PrintObjectPtrs{ obj });
                         append(set_extruders, this->support_material_extruders());
                         Flow        flow = this->brim_flow(set_extruders.empty() ? get_print_region(0).config().perimeter_extruder - 1 : *set_extruders.begin(), obj->config());
-                        //don't consider other objects/instances. It's not possible because it's duplicated by some code afterward... i think.
-                        brim_area.clear();
-                        //create a brim "pattern" (one per object)
-                        const std::vector<PrintInstance> copies{ obj->instances() };
-                        obj->m_instances.clear();
-                        obj->m_instances.emplace_back();
-                        if (brim_config.brim_width > 0) {
-                            if (brim_config.brim_ears)
-                                make_brim_ears(*this, flow, { obj }, brim_area, obj->m_brim);
-                            else
-                                make_brim(*this, flow, { obj }, brim_area, obj->m_brim);
+                        //if complete objects
+                        if (config().complete_objects) {
+                            //don't consider other objects/instances, as they aren't colliding.
+                            brim_area.clear();
+                            const std::vector<PrintInstance> copies = obj->instances();
+                            obj->m_instances.clear();
+                            obj->m_instances.emplace_back();
+                            //create a brim "pattern" (one per object)
+                            if (brim_config.brim_width > 0) {
+                                if (brim_config.brim_ears)
+                                    make_brim_ears(*this, flow, { obj }, brim_area, obj->m_brim);
+                                else
+                                    make_brim(*this, flow, { obj }, brim_area, obj->m_brim);
+                            }
+                            if (brim_config.brim_width_interior > 0) {
+                                make_brim_interior(*this, flow, { obj }, brim_area, obj->m_brim);
+                            }
+                            obj->m_instances = copies;
+                        } else {
+                            brim_area = union_ex(brim_area);
+                            // create a brim per instance
+                            const std::vector<PrintInstance> copies = obj->instances();
+                            for (const PrintInstance& instance : copies) {
+                                obj->m_instances.clear();
+                                obj->m_instances.push_back(instance);
+                                ExtrusionEntityCollection entity_brim;
+                                if (brim_config.brim_width > 0) {
+                                    if (brim_config.brim_ears)
+                                        make_brim_ears(*this, flow, { obj }, brim_area, entity_brim);
+                                    else
+                                        make_brim(*this, flow, { obj }, brim_area, entity_brim);
+                                }
+                                if (brim_config.brim_width_interior > 0) {
+                                    make_brim_interior(*this, flow, { obj }, brim_area, entity_brim);
+                                }
+                                obj->m_brim.append(std::move(entity_brim));
+                            }
+                            obj->m_instances = copies;
                         }
-                        if (brim_config.brim_width_interior > 0) {
-                            make_brim_interior(*this, flow, { obj }, brim_area, obj->m_brim);
-                        }
-                        obj->m_instances = copies;
                     }
                 } else {
-                    if (obj_groups.size() > 1)
+                    if (obj_groups.size() > 1) {
                         brim_area = union_ex(brim_area);
+                    }
                     //get the first extruder in the list for these objects... replicating gcode generation
                     std::set<uint16_t> set_extruders = this->object_extruders(m_objects);
                     append(set_extruders, this->support_material_extruders());

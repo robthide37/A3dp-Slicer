@@ -2033,7 +2033,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "complete_objects",
         "complete_objects_sort",
         "complete_objects_one_skirt",
-        "complete_objects_one_brim",
+        "brim_per_object",
         "duplicate_distance", 
         "draft_shield",
         "extruder_clearance_radius",

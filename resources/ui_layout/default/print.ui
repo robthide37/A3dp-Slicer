@@ -240,6 +240,7 @@ group:Brim
 		setting:brim_ears_pattern
 	end_line
 	setting:brim_separation
+	setting:brim_per_object
 
 page:Support material:support
 
@@ -465,7 +466,6 @@ group:Plater
 group:Sequential printing
 	setting:tags$Advanced$Expert$Prusa:complete_objects
 	setting:complete_objects_one_skirt
-	setting:complete_objects_one_brim
 	setting:complete_objects_sort
 	line:Extruder clearance (mm)
 		setting:width$6:extruder_clearance_radius
