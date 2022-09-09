@@ -1609,7 +1609,8 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &fi
 
     m_mainframe.Raise();
     m_mainframe.select_tab(size_t(0));
-    m_plater.select_view_3D("3D");
+    if (wxGetApp().is_editor())
+        m_plater.select_view_3D("3D");
     bool res = m_plater.load_files(filenames);
     m_mainframe.update_title();
     return res;

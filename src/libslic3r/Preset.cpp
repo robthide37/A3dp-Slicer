@@ -1055,12 +1055,12 @@ const std::string& PresetCollection::get_suffix_modified() {
 
 // Return a preset by its name. If the preset is active, a temporary copy is returned.
 // If a preset is not found by its name, null is returned.
-Preset* PresetCollection::find_preset(const std::string &name, bool first_visible_if_not_found)
+Preset* PresetCollection::find_preset(const std::string &name, bool first_visible_if_not_found, bool respect_active_preset /*= true*/)
 {
     Preset key(m_type, name, false);
     auto it = this->find_preset_internal(name);
     // Ensure that a temporary copy is returned if the preset found is currently selected.
-    return (it != m_presets.end() && it->name == key.name) ? &this->preset(it - m_presets.begin()) :
+    return (it != m_presets.end() && it->name == key.name) ? &this->preset(it - m_presets.begin(), respect_active_preset) :
         first_visible_if_not_found ? &this->first_visible() : nullptr;
 }
 

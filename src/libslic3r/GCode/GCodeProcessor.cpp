@@ -1289,6 +1289,7 @@ void GCodeProcessor::reset()
     m_options_z_corrector.reset();
 
     m_spiral_vase_active = false;
+    m_kissslicer_toolchange_time_correction = 0.0f;
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     m_mm3_per_mm_compare.reset();
@@ -1347,6 +1348,8 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
             apply_config_simplify3d(filename);
         else if (m_producer == EProducer::SuperSlicer)
             apply_config_superslicer(filename);
+        else if (m_producer == EProducer::KissSlicer)
+            apply_config_kissslicer(filename);
     }
 
     // process gcode
@@ -1527,6 +1530,82 @@ void GCodeProcessor::apply_config_superslicer(const std::string& filename)
     config.apply(FullPrintConfig::defaults());
     load_from_superslicer_gcode_file(filename, config, ForwardCompatibilitySubstitutionRule::EnableSilent);
     apply_config(config);
+}
+
+void GCodeProcessor::apply_config_kissslicer(const std::string& filename)
+{
+    size_t found_counter = 0;
+    m_parser.parse_file_raw(filename, [this, &found_counter](GCodeReader& reader, const char* begin, const char* end) {
+        auto detect_flavor = [this](const std::string_view comment) {
+            static const std::string search_str = "firmware_type";
+            const size_t pos = comment.find(search_str);
+            if (pos != comment.npos) {
+                std::vector<std::string> elements;
+                boost::split(elements, comment, boost::is_any_of("="));
+                if (elements.size() == 2) {
+                    try
+                    {
+                        switch (std::stoi(elements[1]))
+                        {
+                        default: { break; }
+                        case 1:
+                        case 2:
+                        case 3: { m_flavor = gcfMarlinLegacy; break; }
+                        }
+                        return true;
+                    }
+                    catch (...)
+                    {
+                        // invalid data, do nothing
+                    }
+                }
+            }
+            return false;
+        };
+
+        auto detect_printer = [this](const std::string_view comment) {
+            static const std::string search_str = "printer_name";
+            const size_t pos = comment.find(search_str);
+            if (pos != comment.npos) {
+                std::vector<std::string> elements;
+                boost::split(elements, comment, boost::is_any_of("="));
+                if (elements.size() == 2) {
+                    elements[1] = boost::to_upper_copy(elements[1]);
+                    if (boost::contains(elements[1], "MK2.5") || boost::contains(elements[1], "MK3"))
+                        m_kissslicer_toolchange_time_correction = 18.0f; // MMU2
+                    else if (boost::contains(elements[1], "MK2"))
+                        m_kissslicer_toolchange_time_correction = 5.0f; // MMU
+                }
+                return true;
+            }
+
+            return false;
+        };
+
+        begin = skip_whitespaces(begin, end);
+        if (begin != end) {
+            if (*begin == ';') {
+                // Comment.
+                begin = skip_whitespaces(++begin, end);
+                end = remove_eols(begin, end);
+                if (begin != end) {
+                    const std::string_view comment(begin, end - begin);
+                    if (detect_flavor(comment) || detect_printer(comment))
+                        ++found_counter;
+                }
+
+                // we got the data,
+                // force early exit to avoid parsing the entire file
+                if (found_counter == 2)
+                    m_parser.quit_parsing();
+            }
+            else if (*begin == 'M' || *begin == 'G')
+                // the header has been fully parsed, quit search
+                m_parser.quit_parsing();
+        }
+        }
+    );
+    m_parser.reset();
 }
 
 std::vector<float> GCodeProcessor::get_layers_time(PrintEstimatedStatistics::ETimeMode mode) const
@@ -2559,7 +2638,7 @@ bool GCodeProcessor::process_bambustudio_tags(const std::string_view comment)
 bool GCodeProcessor::detect_producer(const std::string_view comment)
 {
     for (const auto& [id, search_string] : Producers) {
-        size_t pos = comment.find(search_string);
+        const size_t pos = comment.find(search_string);
         if (pos != comment.npos) {
             m_producer = id;
             BOOST_LOG_TRIVIAL(info) << "Detected gcode producer: " << search_string;
@@ -3615,7 +3694,8 @@ void GCodeProcessor::process_T(const std::string_view command)
             // T-1 is a valid gcode line for RepRap Firmwares (used to deselects all tools) see https://github.com/prusa3d/PrusaSlicer/issues/5677
             if ((m_flavor != gcfRepRapFirmware && m_flavor != gcfRepRapSprinter) || eid != -1)
                 BOOST_LOG_TRIVIAL(error) << "GCodeProcessor encountered an invalid toolchange (" << command << ").";
-        } else {
+        }
+        else {
             unsigned char id = static_cast<unsigned char>(eid);
             if (m_extruder_id != id) {
                 if (id >= m_result.extruder_colors.size())
@@ -3631,6 +3711,8 @@ void GCodeProcessor::process_T(const std::string_view command)
                     float extra_time = get_filament_unload_time(static_cast<size_t>(old_extruder_id));
                     m_time_processor.extruder_unloaded = false;
                     extra_time += get_filament_load_time(static_cast<size_t>(m_extruder_id));
+                    if (m_producer == EProducer::KissSlicer && m_flavor == gcfMarlinLegacy)
+                        extra_time += m_kissslicer_toolchange_time_correction;
                     simulate_st_synchronize(extra_time);
 
                     m_result.extruders_count = std::max<size_t>(m_result.extruders_count, m_extruder_id + 1);

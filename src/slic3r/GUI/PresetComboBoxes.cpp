@@ -231,7 +231,12 @@ static std::string suffix(Preset* preset)
 
 wxString PresetComboBox::get_preset_name(const Preset & preset)
 {
-    return from_u8(preset.name/* + suffix(preset)*/);
+    return from_u8(preset.name);
+}
+
+static wxString get_preset_name_with_suffix(const Preset & preset)
+{
+    return from_u8(preset.name + Preset::suffix_modified());
 }
 
 void PresetComboBox::update(std::string select_preset_name)
@@ -271,18 +276,32 @@ void PresetComboBox::update(std::string select_preset_name)
         auto bmp = get_bmp(bitmap_key, main_icon_name, "lock_closed", is_enabled, preset.is_compatible, preset.is_system || preset.is_default);
         assert(bmp);
 
-        if (!is_enabled)
+        if (!is_enabled) {
             incomp_presets.emplace(get_preset_name(preset), bmp);
+            if (preset.is_dirty && m_show_modif_preset_separately)
+                incomp_presets.emplace(get_preset_name_with_suffix(preset), bmp);
+        }
         else if (preset.is_default || preset.is_system)
         {
             Append(get_preset_name(preset), *bmp);
             validate_selection(preset.name == select_preset_name);
+            if (preset.is_dirty && m_show_modif_preset_separately) {
+                wxString preset_name = get_preset_name_with_suffix(preset);
+                Append(preset_name, *bmp);
+                validate_selection(into_u8(preset_name) == select_preset_name);
+            }
         }
         else
         {
             nonsys_presets.emplace(get_preset_name(preset), std::pair<wxBitmapBundle*, bool>(bmp, is_enabled));
             if (preset.name == select_preset_name || (select_preset_name.empty() && is_enabled))
                 selected = get_preset_name(preset);
+            if (preset.is_dirty && m_show_modif_preset_separately) {
+                wxString preset_name = get_preset_name_with_suffix(preset);
+                nonsys_presets.emplace(preset_name, std::pair<wxBitmapBundle*, bool>(bmp, is_enabled));
+                if (preset_name == select_preset_name || (select_preset_name.empty() && is_enabled))
+                    selected = preset_name;
+            }
         }
         if (i + 1 == m_collection->num_default_presets())
             set_label_marker(Append(separator(L("System presets")), NullBitmapBndl()));

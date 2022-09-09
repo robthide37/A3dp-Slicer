@@ -4173,7 +4173,7 @@ void GLCanvas3D::handle_sidebar_focus_event(const std::string& opt_key, bool foc
 
 void GLCanvas3D::handle_layers_data_focus_event(const t_layer_height_range range, const EditorType type)
 {
-    std::string field = "layer_" + std::to_string(type) + "_" + std::to_string(range.first) + "_" + std::to_string(range.second);
+    std::string field = "layer_" + std::to_string(type) + "_" + float_to_string_decimal_point(range.first) + "_" + float_to_string_decimal_point(range.second);
     handle_sidebar_focus_event(field, true);
 }
 
