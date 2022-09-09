@@ -2989,16 +2989,16 @@ void TabPrinter::milling_count_changed(size_t milling_count)
         is_count_changed = true;
     }
 
-    /* This function should be call in any case because of correct updating/rebuilding
-     * of unregular pages of a Printer Settings
-     */
-    build_unregular_pages(false);
+    if (is_count_changed) {
+        /* This function should be call in any case because of correct updating/rebuilding
+         * of unregular pages of a Printer Settings
+         */
+        build_unregular_pages(false);
 
-    //no gui listing for now
-    //if (is_count_changed) {
-    //    on_value_change("milling_count", milling_count);
-    //    wxGetApp().sidebar().update_objects_list_milling_column(milling_count);
-    //}
+        //propagate change
+        on_value_change("milling_count", milling_count);
+        //wxGetApp().sidebar().update_objects_list_milling_column(milling_count);
+    }
 }
 
 void TabPrinter::append_option_line_kinematics(ConfigOptionsGroupShp optgroup, const std::string opt_key, const std::string override_sidetext)
@@ -3287,8 +3287,10 @@ void TabPrinter::reload_config()
 
     // "extruders_count" doesn't update from the update_config(),
     // so update it implicitly
-    if (m_active_page && m_active_page->title() == "General")
+    if (m_active_page && m_active_page->get_field("extruders_count"))
         m_active_page->set_value("extruders_count", int(m_extruders_count));
+    if (m_active_page && m_active_page->get_field("milling_count"))
+        m_active_page->set_value("milling_count", int(m_milling_count));
 }
 
 void TabPrinter::activate_selected_page(std::function<void()> throw_if_canceled)
@@ -3297,8 +3299,10 @@ void TabPrinter::activate_selected_page(std::function<void()> throw_if_canceled)
 
     // "extruders_count" doesn't update from the update_config(),
     // so update it implicitly
-    if (m_active_page && m_active_page->title() == "General")
+    if (m_active_page && m_active_page->get_field("extruders_count"))
         m_active_page->set_value("extruders_count", int(m_extruders_count));
+    if (m_active_page && m_active_page->get_field("milling_count"))
+        m_active_page->set_value("milling_count", int(m_milling_count));
 }
 
 void TabPrinter::clear_pages()
@@ -4732,12 +4736,18 @@ void TabPrinter::cache_extruder_cnt()
         return;
 
     m_cache_extruder_count = m_extruders_count;
+    m_cache_milling_count = m_milling_count;
 }
 
 bool TabPrinter::apply_extruder_cnt_from_cache()
 {
     if (m_presets->get_edited_preset().printer_technology() == ptSLA)
         return false;
+
+    if (m_cache_milling_count > 0) {
+        m_presets->get_edited_preset().set_num_milling(m_cache_milling_count);
+        m_cache_milling_count = 0;
+    }
 
     if (m_cache_extruder_count > 0) {
         m_presets->get_edited_preset().set_num_extruders(m_cache_extruder_count);

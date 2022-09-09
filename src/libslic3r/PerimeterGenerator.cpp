@@ -801,6 +801,9 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
             if (unmillable.empty())
                 last = offset_ex(last, mill_extra_size);
             else {
+                //FIXME only work if mill_extra_size < mill_nozzle/2 (becasue it's the extra offset from unmillable)
+                //FIXME overhangs if mill_extra_size is too big
+                //FIXME merge with process_arachne?
                 ExPolygons growth = diff_ex(offset_ex(last, mill_extra_size), unmillable, ApplySafetyOffset::Yes);
                 last.insert(last.end(), growth.begin(), growth.end());
                 last = union_ex(last);

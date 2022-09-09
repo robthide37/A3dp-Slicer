@@ -2054,14 +2054,14 @@ void GCode::process_layers(
 
     // The pipeline elements are joined using const references, thus no copying is performed.
     output_stream.find_replace_supress();
-    if (m_spiral_vase && m_find_replace)
-        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & fan_mover & find_replace & output);
-    else if (m_spiral_vase)
-        tbb::parallel_pipeline(12, generator &  spiral_vase & cooling & fan_mover & output);
-    else if (m_find_replace)
-        tbb::parallel_pipeline(12, generator & cooling & fan_mover & find_replace & output);
-    else
-        tbb::parallel_pipeline(12, generator & cooling & fan_mover & output);
+    tbb::filter<void, GCode::LayerResult> pipeline_to_layerresult = generator;
+    if (m_spiral_vase)
+        pipeline_to_layerresult = pipeline_to_layerresult & spiral_vase;
+    tbb::filter<void, std::string> pipeline_to_string = pipeline_to_layerresult & cooling & fan_mover;
+    if (m_find_replace)
+        pipeline_to_string = pipeline_to_string & find_replace;
+    tbb::filter<void, void> full_pipeline = pipeline_to_string & output;
+    tbb::parallel_pipeline(12, full_pipeline);
     output_stream.find_replace_enable();
 }
 
@@ -2091,9 +2091,9 @@ void GCode::process_layers(
         });
     const auto spiral_vase = tbb::make_filter<GCode::LayerResult, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
         [&spiral_vase = *this->m_spiral_vase.get()](GCode::LayerResult in)->GCode::LayerResult {
-            spiral_vase.enable(in.spiral_vase_enable);
-            return { spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush };
-        });
+        spiral_vase.enable(in.spiral_vase_enable);
+        return { spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush };
+    });
     const auto cooling = tbb::make_filter<GCode::LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in)->std::string {
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
@@ -2128,14 +2128,14 @@ void GCode::process_layers(
 
     // The pipeline elements are joined using const references, thus no copying is performed.
     output_stream.find_replace_supress();
-    if (m_spiral_vase && m_find_replace)
-        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & fan_mover & find_replace & output);
-    else if (m_spiral_vase)
-        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & fan_mover & output);
-    else if (m_find_replace)
-        tbb::parallel_pipeline(12, generator & cooling & fan_mover & find_replace & output);
-    else
-        tbb::parallel_pipeline(12, generator & cooling & fan_mover & output);
+    tbb::filter<void, GCode::LayerResult> pipeline_to_layerresult = generator;
+    if (m_spiral_vase)
+        pipeline_to_layerresult = pipeline_to_layerresult & spiral_vase;
+    tbb::filter<void, std::string> pipeline_to_string = pipeline_to_layerresult & cooling & fan_mover;
+    if (m_find_replace)
+        pipeline_to_string = pipeline_to_string & find_replace;
+    tbb::filter<void, void> full_pipeline = pipeline_to_string & output;
+    tbb::parallel_pipeline(12, full_pipeline);
     output_stream.find_replace_enable();
 }
 
@@ -3162,14 +3162,6 @@ GCode::LayerResult GCode::process_layer(
         }
     }
 
-#if 0
-    // Apply spiral vase post-processing if this layer contains suitable geometry
-    // (we must feed all the G-code into the post-processor, including the first
-    // bottom non-spiral layers otherwise it will mess with positions)
-    // we apply spiral vase at this stage because it requires a full layer.
-    // Just a reminder: A spiral vase mode is allowed for a single object per layer, single material print only.
-    if (m_spiral_vase)
-        gcode = m_spiral_vase->process_layer(std::move(gcode));
 
 
     //add milling post-process if enabled
@@ -3210,10 +3202,10 @@ GCode::LayerResult GCode::process_layer(
                 check_add_eol(gcode);
             }
 
-            gcode += "\n; began print:";
+            gcode += "\n; began milling:\n";
             for (const LayerToPrint& ltp : layers) {
                 if (ltp.object_layer != nullptr) {
-                    for (const PrintInstance& print_instance : ltp.object()->instances()){
+                    for (const PrintInstance& print_instance : ltp.object()->instances()) {
                         this->set_origin(unscale(print_instance.shift));
                         for (const LayerRegion* lr : ltp.object_layer->regions()) {
                             if (!lr->milling.empty()) {
@@ -3227,7 +3219,7 @@ GCode::LayerResult GCode::process_layer(
             }
 
             //switch to extruder
-            m_placeholder_parser.set("current_extruder", milling_extruder_id);
+            m_placeholder_parser.set("current_extruder", current_extruder_filament);
             // Append the filament start G-code.
             const std::string& end_mill_gcode = m_config.milling_toolchange_end_gcode.get_at(0);
             if (!end_mill_gcode.empty()) {
@@ -3250,6 +3242,14 @@ GCode::LayerResult GCode::process_layer(
         }
     }
 
+#if 0
+    // Apply spiral vase post-processing if this layer contains suitable geometry
+    // (we must feed all the G-code into the post-processor, including the first
+    // bottom non-spiral layers otherwise it will mess with positions)
+    // we apply spiral vase at this stage because it requires a full layer.
+    // Just a reminder: A spiral vase mode is allowed for a single object per layer, single material print only.
+    if (m_spiral_vase)
+        gcode = m_spiral_vase->process_layer(std::move(gcode));
 
     // Apply cooling logic; this may alter speeds.
     if (m_cooling_buffer)
