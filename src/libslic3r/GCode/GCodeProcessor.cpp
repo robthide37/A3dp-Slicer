@@ -5,6 +5,7 @@
 #include "libslic3r/format.hpp"
 #include "GCodeProcessor.hpp"
 
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
