@@ -738,7 +738,7 @@ void BackgroundSlicingProcess::prepare_upload()
         
         ThumbnailsList thumbnails = this->render_thumbnails(
         	ThumbnailsParams{current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, true, true, true});
-        m_sla_print->export_print(source_path.string(),thumbnails, m_upload_job.upload_data.upload_path.string());
+        m_sla_print->export_print(source_path.string(),thumbnails, m_upload_job.upload_data.upload_path.filename().string());
     }
 
     m_print->set_status(100, (boost::format(_utf8(L("Scheduling upload to `%1%`. See Window -> Print Host Upload Queue"))) % m_upload_job.printhost->get_host()).str());
