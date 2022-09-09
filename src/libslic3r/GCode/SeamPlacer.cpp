@@ -663,8 +663,8 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po,
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: decimate: start";
-    its_short_edge_collpase(triangle_set, 25000);
-    its_short_edge_collpase(negative_volumes_set, 25000);
+    its_short_edge_collpase(triangle_set, SeamPlacer::fast_decimation_triangle_count_target);
+    its_short_edge_collpase(negative_volumes_set, SeamPlacer::fast_decimation_triangle_count_target);
 
     size_t negative_volumes_start_index = triangle_set.indices.size();
     its_merge(triangle_set, negative_volumes_set);
