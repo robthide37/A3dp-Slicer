@@ -1804,7 +1804,12 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         // Otherwise, boost::any_cast<size_t> causes an "unhandled unknown exception"
                         if (opt_key == "extruders_count" || opt_key == "single_extruder_multi_material") {
                             size_t extruders_count = size_t(boost::any_cast<int>(current_group->get_value("extruders_count")));
-                            tab->extruders_count_changed(extruders_count);
+                            if (opt_key == "extruders_count") {
+                                tab->extruders_count_changed(extruders_count);
+                            } else if (opt_key == "single_extruder_multi_material") {
+                                tab->build_unregular_pages(false);
+                                wxGetApp().sidebar().update_objects_list_extruder_column(extruders_count);
+                            }
                             init_options_list(); // m_options_list should be updated before UI updating
                             update_dirty();
                             if (opt_key == "single_extruder_multi_material") { // the single_extruder_multimaterial was added to force pages
@@ -3144,8 +3149,7 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
 
     n_before_extruders++; // kinematic page is always here
 
-    if (m_extruders_count_old == m_extruders_count ||
-        (m_has_single_extruder_MM_page && m_extruders_count == 1))
+    if (m_has_single_extruder_MM_page && (!m_config->opt_bool("single_extruder_multi_material") || m_extruders_count == 1))
     {
         // if we have a single extruder MM setup, add a page with configuration options:
         for (size_t i = 0; i < m_pages.size(); ++i) // first make sure it's not there already
@@ -3175,11 +3179,12 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
             page->clear();
         } else {
             m_pages.insert(m_pages.begin() + n_before_extruders, page);
-            n_before_extruders++;
             m_has_single_extruder_MM_page = true;
         }
         changed = true;
     }
+    if(m_has_single_extruder_MM_page)
+        n_before_extruders++;
 
     // Build missed extruder pages
     for (size_t extruder_idx = m_extruders_count_old; extruder_idx < m_extruders_count; ++extruder_idx) {
