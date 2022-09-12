@@ -852,12 +852,13 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
         }
         bool has_steep_overhang = false;
         if (this->layer->id() % 2 == 1 && this->config->overhangs_reverse //check if my option is set and good layer
-            && !last.empty() && !overhangs_unsupported.empty() //has something to work with
+            && !last.empty() //has something to work with
             ) {
+            ExPolygons overhangs = diff_ex(last, *lower_slices);
             coord_t offset = scale_t(config->overhangs_reverse_threshold.get_abs_value(this->perimeter_flow.width()));
             //version with: scale_(std::tan(PI * (0.5f / 90) * config->overhangs_reverse_threshold.value ) * this->layer->height)
 
-            if (offset_ex(overhangs_unsupported, -offset / 2.).size() > 0) {
+            if (offset_ex(overhangs, -offset / 2.).size() > 0) {
                 //allow this loop to be printed in reverse
                 has_steep_overhang = true;
             }
@@ -2440,7 +2441,10 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
                 coll_out.append(std::move(children.entities()));
                 coll_out.append(*eloop);
             } else {
-                eloop->make_clockwise();
+                if (loop.is_steep_overhang && this->layer->id() % 2 == 1)
+                    eloop->make_counter_clockwise();
+                else
+                    eloop->make_clockwise();
                 coll_out.append(*eloop);
                 coll_out.append(std::move(children.entities()));
             }
