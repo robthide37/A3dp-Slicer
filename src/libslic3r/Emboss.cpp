@@ -66,7 +66,7 @@ ExPolygons Emboss::heal_shape(const Polygons &shape) {
     // When edit this code check that font 'ALIENATE.TTF' and glyph 'i' still work
     // fix of self intersections
     // http://www.angusj.com/delphi/clipper/documentation/Docs/Units/ClipperLib/Functions/SimplifyPolygon.htm
-    ClipperLib::Paths paths = ClipperLib::SimplifyPolygons(ClipperUtils::PolygonsProvider(shape));
+    ClipperLib::Paths paths = ClipperLib::SimplifyPolygons(ClipperUtils::PolygonsProvider(shape), ClipperLib::pftNonZero);
     ClipperLib::CleanPolygons(paths);
     Polygons polygons = to_polygons(paths);    
     static const Points pts_2x2({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)});
@@ -82,6 +82,10 @@ ExPolygons Emboss::heal_shape(const Polygons &shape) {
             polygons.push_back(rect_3x3);
         }
     }
+
+    // TTF use non zero winding number
+    // https://docs.microsoft.com/en-us/typography/opentype/spec/ttch01
+    // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM01/Chap1.html
     ExPolygons res = Slic3r::union_ex(polygons, ClipperLib::pftNonZero);
 
     Slic3r::Polygons holes;
