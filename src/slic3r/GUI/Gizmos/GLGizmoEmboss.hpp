@@ -246,8 +246,11 @@ private:
     // cancel for previous update of volume to cancel finalize part
     std::shared_ptr<std::atomic<bool>> m_update_job_cancel;
 
-    // cancel for rendering font name
+    // cancel for rendering font name after close comboBox
     bool m_allow_update_rendered_font;
+    // protection for open too much font files together
+    // Gtk:ERROR:../../../../gtk/gtkiconhelper.c:494:ensure_surface_for_gicon: assertion failed (error == NULL): Failed to load /usr/share/icons/Yaru/48x48/status/image-missing.png: Error opening file /usr/share/icons/Yaru/48x48/status/image-missing.png: Too many open files (g-io-error-quark, 31)
+    unsigned int m_count_opened_font_files = 0; 
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;

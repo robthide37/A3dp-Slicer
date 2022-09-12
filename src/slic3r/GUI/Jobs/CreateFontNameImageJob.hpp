@@ -39,6 +39,10 @@ struct FontImageData
     // texture meta data
     GLenum format = GL_ALPHA, type = GL_UNSIGNED_BYTE;
     GLint  level = 0;
+
+    // prevent opening too much files
+    // it is decreased in finalize phase
+    unsigned int *count_opened_font_files = nullptr;
 };
 
 /// <summary>

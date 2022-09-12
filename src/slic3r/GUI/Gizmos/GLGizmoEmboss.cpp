@@ -1307,7 +1307,10 @@ void GLGizmoEmboss::draw_font_list()
             size_t index = &face_name - &m_face_names.names.front();
             ImGui::PushID(index);
             bool is_selected = (actual_face_name == face_name);
-            if (ImGui::Selectable(m_face_names.names_truncated[index].c_str(), is_selected)) {
+            ImVec2 selectable_size(0, m_gui_cfg->face_name_size.y());
+            ImGuiSelectableFlags flags = 0;
+            if (ImGui::Selectable(m_face_names.names_truncated[index].c_str(),
+                                  is_selected, flags, selectable_size)) {
                 if (!select_facename(face_name)) {
                     del_facename = face_name;
                     wxMessageBox(GUI::format(
@@ -1317,8 +1320,15 @@ void GLGizmoEmboss::draw_font_list()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", face_name.ToUTF8().data());
             if (is_selected) ImGui::SetItemDefaultFocus();
-            if (!m_face_names.exist_textures[index] && 
-                ImGui::IsItemVisible()) {
+            if (m_face_names.exist_textures[index]) {
+                ImGui::SameLine(m_gui_cfg->face_name_max_width);
+                ImVec2 size(m_gui_cfg->face_name_size.x(),
+                            m_gui_cfg->face_name_size.y()),
+                    uv0(0.f, index / (float) m_face_names.names.size()),
+                    uv1(1.f, (index + 1) / (float) m_face_names.names.size());
+                ImGui::Image(tex_id, size, uv0, uv1);
+            } else if (ImGui::IsItemVisible() && m_count_opened_font_files < 10) {
+                ++m_count_opened_font_files;
                 m_face_names.exist_textures[index] = true;
                 std::string text = m_text.empty() ? "AaBbCc" : m_text;
                                 
@@ -1337,17 +1347,13 @@ void GLGizmoEmboss::draw_font_list()
                                    gray_level,
                                    format,
                                    type,
-                                   level};
+                                   level,
+                                   &m_count_opened_font_files };
                 auto job = std::make_unique<CreateFontImageJob>(std::move(data));
                 auto& worker = wxGetApp().plater()->get_ui_job_worker();
                 queue_job(worker, std::move(job));
             }
-            ImGui::SameLine(m_gui_cfg->face_name_max_width);
-            ImVec2 size(m_gui_cfg->face_name_size.x(),
-                        m_gui_cfg->face_name_size.y()),
-                uv0(0.f, index / (float) m_face_names.names.size()),
-                uv1(1.f, (index + 1) / (float) m_face_names.names.size());
-            ImGui::Image(tex_id, size, uv0, uv1);
+            
             ImGui::PopID();
         }        
 #ifdef SHOW_FONT_COUNT

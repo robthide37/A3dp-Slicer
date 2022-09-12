@@ -94,6 +94,8 @@ void CreateFontImageJob::process(Ctl &ctl)
 
 void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
 {
+    if (m_input.count_opened_font_files)
+        --(*m_input.count_opened_font_files);
     if (canceled) return;
     if (! (* m_input.allow_update)) return;
     
