@@ -1,5 +1,7 @@
 #include "SeamPlacer.hpp"
 
+#include "Point.hpp"
+#include "libslic3r.h"
 #include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
 #include "tbb/parallel_reduce.h"
@@ -750,8 +752,9 @@ void gather_enforcers_blockers(GlobalModelInfo &result, const PrintObject *po) {
 struct SeamComparator {
     SeamPosition setup;
     float angle_importance;
-    explicit SeamComparator(SeamPosition setup) :
-            setup(setup) {
+    Vec2f rear_attractor;
+    explicit SeamComparator(SeamPosition setup, const Vec2f& rear_attractor = Vec2f::Zero()) :
+            setup(setup), rear_attractor(rear_attractor) {
         angle_importance =
                 setup == spNearest ? SeamPlacer::angle_importance_nearest : SeamPlacer::angle_importance_aligned;
     }
@@ -782,8 +785,9 @@ struct SeamComparator {
             return false;
         }
 
-        if (setup == SeamPosition::spRear && a.position.y() != b.position.y()) {
-            return a.position.y() > b.position.y();
+        if (setup == SeamPosition::spRear) {
+            return (a.position.head<2>() - rear_attractor).squaredNorm() <
+                   (b.position.head<2>() - rear_attractor).squaredNorm();
         }
 
         float distance_penalty_a = 0.0f;
@@ -845,7 +849,8 @@ struct SeamComparator {
         }
 
         if (setup == SeamPosition::spRear) {
-            return a.position.y() + SeamPlacer::seam_align_score_tolerance * 5.0f > b.position.y();
+            return (a.position.head<2>() - rear_attractor).squaredNorm() - a.perimeter.flow_width <
+                   (b.position.head<2>() - rear_attractor).squaredNorm();
         }
 
         float penalty_a = a.overhang + a.visibility
@@ -1474,7 +1479,9 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
     for (const PrintObject *po : print.objects()) {
         throw_if_canceled_func();
         SeamPosition configured_seam_preference = po->config().seam_position.value;
-        SeamComparator comparator { configured_seam_preference };
+        Vec2f rear_attractor = unscaled(po->bounding_box().center()).cast<float>() +
+            1.5f * Vec2f(0.0f, unscale<float>(po->bounding_box().max.y()));
+        SeamComparator comparator{configured_seam_preference, rear_attractor};
 
         {
             GlobalModelInfo global_model_info { };
