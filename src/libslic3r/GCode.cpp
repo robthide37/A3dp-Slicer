@@ -575,6 +575,19 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
 
     std::vector<std::pair<double, double>> warning_ranges;
 
+    //check for max nozzle diameter
+    const std::vector<double>& nozzle_diameters = object.print()->config().nozzle_diameter.values;
+    std::set<uint16_t> exctruder_ids = object.object_extruders();
+    double max_nozzle = 0;
+    for (uint16_t id : exctruder_ids) {
+        max_nozzle = std::max(max_nozzle, nozzle_diameters[id]);
+    }
+    if (max_nozzle == 0)
+        max_nozzle = nozzle_diameters.front();
+    double top_cd = object.config().support_material_contact_distance.get_abs_value(max_nozzle);
+    double bottom_cd = object.config().support_material_bottom_contact_distance.value == 0. ? top_cd : object.config().support_material_bottom_contact_distance.get_abs_value(max_nozzle);
+    double raft_cd = object.config().raft_contact_distance.value;
+
     // Pair the object layers with the support layers by z.
     size_t idx_object_layer  = 0;
     size_t idx_support_layer = 0;
@@ -611,28 +624,34 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
         if ((layer_to_print.object_layer && layer_to_print.object_layer->has_extrusions())
             // Allow empty support layers, as the support generator may produce no extrusions for non-empty support regions.
          || (layer_to_print.support_layer /* && layer_to_print.support_layer->has_extrusions() */)) {
-            //check for max nozzle diameter
-            const std::vector<double>& nozzle_diameters = object.print()->config().nozzle_diameter.values;
-            std::set<uint16_t> exctruder_ids = object.object_extruders();
-            double max_nozzle = 0;
-            for (uint16_t id : exctruder_ids) {
-                max_nozzle = std::max(max_nozzle, nozzle_diameters[id]);
-            }
-            if (max_nozzle == 0)
-                max_nozzle = nozzle_diameters.front();
-
-            double top_cd = object.config().support_material_contact_distance.get_abs_value(max_nozzle);
-            double bottom_cd = object.config().support_material_bottom_contact_distance.value == 0. ? top_cd : object.config().support_material_bottom_contact_distance.get_abs_value(max_nozzle);
 
             double extra_gap = (layer_to_print.support_layer ? bottom_cd : top_cd);
+            if (object.config().raft_layers.value > 0 && layer_to_print.layer()->id() <= object.config().raft_layers.value) {
+                extra_gap = raft_cd;
+            }
+            if (object.config().support_material_contact_distance_type.value == SupportZDistanceType::zdNone) {
+                extra_gap = 0;
+            } else if (object.config().support_material_contact_distance_type.value == SupportZDistanceType::zdFilament) {
+                //compute the height of bridge.
+                if (layer_to_print.layer()->id() > 0 && !layer_to_print.layer()->regions().empty()) {
+                    extra_gap += layer_to_print.layer()->regions().front()->bridging_flow(FlowRole::frSolidInfill).height();
+                } else {
+                    extra_gap += layer_to_print.layer()->height;
+                }
+            } else { //SupportZDistanceType::zdPlane
+                extra_gap += layer_to_print.layer()->height;
+            }
 
-            double maximal_print_z = (last_extrusion_layer ? last_extrusion_layer->print_z() : 0.)
-                + layer_to_print.layer()->height
-                + std::max(0., extra_gap);
+            double maximal_print_z = check_z_step(
+                (last_extrusion_layer ? last_extrusion_layer->print_z() : 0.) + std::max(0., extra_gap),
+                object.print()->config().z_step);
             // Negative support_contact_z is not taken into account, it can result in false positives in cases
             // where previous layer has object extrusions too (https://github.com/prusa3d/PrusaSlicer/issues/2752)
 
-            if (has_extrusions && !object.print()->config().allow_empty_layers && layer_to_print.print_z() > maximal_print_z + 2. * EPSILON)
+            if (has_extrusions && !object.print()->config().allow_empty_layers && layer_to_print.print_z() > maximal_print_z + 2. * EPSILON
+                //don't check for raft layers: there is an empty space between the last raft and the first layer
+                //&& (object.config().raft_layers.value == 0 || (layer_to_print.object_layer && layer_to_print.object_layer->id() > object.config().raft_layers.value)) 
+                )
                 warning_ranges.emplace_back(std::make_pair((last_extrusion_layer ? last_extrusion_layer->print_z() : 0.), layers_to_print.back().print_z()));
         }
         // Remember last layer with extrusions.
