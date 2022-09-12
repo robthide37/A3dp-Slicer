@@ -180,15 +180,23 @@ const ConfigOptionFloatOrPercent* Flow::extrusion_width_option(std::string opt_k
 const ConfigOptionFloatOrPercent* Flow::extrusion_spacing_option(std::string opt_key, const ConfigOptionResolver& config)
 {
     std::string opt_key_width;
-    if (boost::ends_with(opt_key, "_extrusion_width")) {
-        boost::replace_first(opt_key, "_width", "_spacing");
-    }
-    if (!boost::ends_with(opt_key, "_extrusion_spacing")) {
-        opt_key_width = opt_key + "_extrusion_width";
-        opt_key += "_extrusion_spacing";
-    } else {
+    if (boost::starts_with(opt_key, "skirt")) {
+        //skirt have only width setting
+        if (!boost::ends_with(opt_key, "_extrusion_width")) {
+            opt_key += "_extrusion_width";
+        }
         opt_key_width = opt_key;
-        boost::replace_first(opt_key_width, "_spacing", "_width");
+    } else {//brim
+        if (boost::ends_with(opt_key, "_extrusion_width")) {
+            boost::replace_first(opt_key, "_width", "_spacing");
+        }
+        if (!boost::ends_with(opt_key, "_extrusion_spacing")) {
+            opt_key_width = opt_key + "_extrusion_width";
+            opt_key += "_extrusion_spacing";
+        } else {
+            opt_key_width = opt_key;
+            boost::replace_first(opt_key_width, "_spacing", "_width");
+        }
     }
 
     const ConfigOptionFloatOrPercent* opt = config.option<ConfigOptionFloatOrPercent>(opt_key);
@@ -206,8 +214,10 @@ const ConfigOptionFloatOrPercent* Flow::extrusion_spacing_option(std::string opt
         }
     }
 
-    if (opt == nullptr)
+    if (opt == nullptr) {
+        opt_key = opt_key_width;
         opt = config.option<ConfigOptionFloatOrPercent>(opt_key_width);
+    }
 
     if (opt == nullptr)
         throw_on_missing_variable(opt_key, opt_key.c_str());

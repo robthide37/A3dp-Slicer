@@ -76,6 +76,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         && fill_density == 0
         && config->opt_bool("support_material") == false
         && config->opt_int("support_material_enforce_layers") == 0
+        && config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Classic
         && config->opt_bool("exact_last_layer_height") == false
         && config->opt_bool("ensure_vertical_shell_thickness") == true
         && config->opt_bool("infill_dense") == false
@@ -89,6 +90,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         wxString msg_text = _(L("The Spiral Vase mode requires:\n"
             "- no top solid layers\n"
             "- 0% fill density\n"
+            "- classic perimeter slicing\n"
             "- no support material\n"
             "- Ensure vertical shell thickness enabled\n"
             "- disabled 'no solid infill over perimeters'\n"
@@ -111,6 +113,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                 new_conf.set_key_value("top_solid_layers", new ConfigOptionInt(0));
             else if (this->local_config->get().optptr("fill_density"))
                 new_conf.set_key_value("fill_density", new ConfigOptionPercent(0));
+            else if (this->local_config->get().optptr("perimeter_generator"))
+                new_conf.set_key_value("perimeter_generator", new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Classic));
             else if (this->local_config->get().optptr("support_material"))
                 new_conf.set_key_value("support_material", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("support_material_enforce_layers"))
@@ -137,6 +141,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         } else if (answer == wxID_YES) {
             new_conf.set_key_value("top_solid_layers", new ConfigOptionInt(0));
             new_conf.set_key_value("fill_density", new ConfigOptionPercent(0));
+            new_conf.set_key_value("perimeter_generator", new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Classic));
             new_conf.set_key_value("support_material", new ConfigOptionBool(false));
             new_conf.set_key_value("support_material_enforce_layers", new ConfigOptionInt(0));
             new_conf.set_key_value("exact_last_layer_height", new ConfigOptionBool(false));
@@ -323,6 +328,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         "perimeter_generator"})
         toggle_field(el, have_perimeters);
 
+    bool has_spiral_vase = have_perimeters && config->opt_bool("spiral_vase");
 
     for (auto el : { "external_perimeters_vase", "external_perimeters_nothole", "external_perimeters_hole", "perimeter_bonding"})
         toggle_field(el, config->opt_bool("external_perimeters_first"));
@@ -385,7 +391,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         for (auto el : { "infill_every_layers", "infill_only_where_needed" })
             toggle_field(el, !have_infill_dense);
 
-    bool has_spiral_vase         = have_perimeters && config->opt_bool("spiral_vase");
     bool has_top_solid_infill 	 = config->opt_int("top_solid_layers") > 0 || has_spiral_vase;
     bool has_bottom_solid_infill = config->opt_int("bottom_solid_layers") > 0;
     bool has_solid_infill 		 = has_top_solid_infill || has_bottom_solid_infill || (have_infill && (config->opt_int("solid_infill_every_layers") > 0 || config->opt_float("solid_infill_below_area") > 0));
