@@ -1,7 +1,6 @@
 #include "GLGizmoEmboss.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
-#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
 #include "slic3r/GUI/MainFrame.hpp" // to update title when add text
 #include "slic3r/GUI/NotificationManager.hpp"
@@ -131,6 +130,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_allow_update_rendered_font(false)
 {
     m_rotate_gizmo.set_group_id(0);
+    m_rotate_gizmo.set_using_local_coordinate(true);
     // TODO: add suggestion to use https://fontawesome.com/
     // (copy & paste) unicode symbols from web    
     // paste HEX unicode into notepad move cursor after unicode press [alt] + [x]
@@ -596,16 +596,6 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 
 void GLGizmoEmboss::on_set_state()
 {
-    // set manipulator to be able to rotate with text
-    ObjectManipulation *manipul = wxGetApp().obj_manipul();
-    static ECoordinatesType prev_coordinate_type = ECoordinatesType::World;
-    if (GLGizmoBase::m_state == GLGizmoBase::Off)
-        manipul->set_coordinates_type(prev_coordinate_type); // set previous state
-    else if (GLGizmoBase::m_state == GLGizmoBase::On) {
-        prev_coordinate_type = manipul->get_coordinates_type();
-        manipul->set_coordinates_type(ECoordinatesType::Local);
-    }
-
     m_rotate_gizmo.set_state(GLGizmoBase::m_state);
 
     // Closing gizmo. e.g. selecting another one
