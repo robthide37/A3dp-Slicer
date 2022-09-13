@@ -254,6 +254,8 @@ private:
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
+    // Value is set only when dragging rotation to calculate actual angle
+    std::optional<float> m_rotate_start_angle;
 
     // when draging with text object hold screen offset of cursor from object center
     std::optional<Vec2d> m_dragging_mouse_offset;

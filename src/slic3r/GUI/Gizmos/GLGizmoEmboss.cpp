@@ -109,6 +109,16 @@ static bool is_text_empty(const std::string &text){
     return text.empty() ||
            text.find_first_not_of(" \n\t\r") == std::string::npos;
 }
+
+// Normalize radian angle from -PI to PI
+template<typename T> void to_range_pi_pi(T& angle)
+{
+    if (angle > PI || angle < -PI) {
+        int count = static_cast<int>(std::round(angle / (2 * PI)));
+        angle -= static_cast<T>(count * 2 * PI);
+    }
+}
+
 } // namespace
 
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
@@ -195,37 +205,36 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 
     assert(m_volume != nullptr);
     assert(m_volume->text_configuration.has_value());
+    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) 
+        return false;
 
-    static std::optional<float> start_angle;
     if (mouse_event.Dragging()) {
         auto &angle_opt = m_volume->text_configuration->style.prop.angle;
-        if (!start_angle.has_value()) {
-            start_angle = angle_opt.has_value() ? *angle_opt : 0.f;    
-        }
-        // temporary rotation
-        TransformationType transformation_type(TransformationType::Local);
+        float prev_angle = angle_opt.has_value() ? *angle_opt : 0.f;
+        if (!m_rotate_start_angle.has_value())
+            m_rotate_start_angle = angle_opt.has_value() ? *angle_opt : 0.f;        
         double angle = m_rotate_gizmo.get_angle();
+        angle -= PI / 2; // Grabber is upward
+
+        // temporary rotation
+        TransformationType transformation_type = TransformationType::Local_Relative_Joint;
         m_parent.get_selection().rotate(Vec3d(0., 0., angle), transformation_type);
 
-        // propagate angle into property
-        angle_opt = static_cast<float>(*start_angle + angle);
+        angle += *m_rotate_start_angle;
         // move to range <-M_PI, M_PI>
-        if (*angle_opt > M_PI || *angle_opt < -M_PI) {
-            int count = static_cast<int>(std::round(*angle_opt / (2 * M_PI)));
-            *angle_opt -= static_cast<float>(count * 2 * M_PI);
-        }
+        to_range_pi_pi(angle);
+        // propagate angle into property
+        angle_opt = static_cast<float>(angle);
+
         // do not store zero
         if (is_approx(*angle_opt, 0.f))
-            angle_opt.reset();
-        
+            angle_opt.reset();        
+
         // set into activ style
-        if (m_style_manager.is_activ_font()) {
+        assert(m_style_manager.is_activ_font());
+        if (m_style_manager.is_activ_font())
             m_style_manager.get_font_prop().angle = angle_opt;
-        }
-    } else if (mouse_event.LeftUp()) {
-        // apply rotation
-        m_parent.do_rotate(L("Text-Rotate"));
-        start_angle.reset();
+
     }
     return used;
 }
@@ -462,9 +471,11 @@ void GLGizmoEmboss::on_render() {
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
+    bool is_surface_dragging = m_temp_transformation.has_value();
     // Do NOT render rotation grabbers when dragging object
     bool is_rotate_by_grabbers = m_dragging;
-    if (!m_parent.is_dragging() || is_rotate_by_grabbers) {
+    if (!is_surface_dragging && 
+        (!m_parent.is_dragging() || is_rotate_by_grabbers)) {
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
         m_rotate_gizmo.render();
     }
@@ -640,7 +651,16 @@ void GLGizmoEmboss::on_stop_dragging()
     // TODO: when start second rotatiton previous rotation rotate draggers
     // This is fast fix for second try to rotate
     // When fixing, move grabber above text (not on side)
-    m_rotate_gizmo.set_angle(0);
+    m_rotate_gizmo.set_angle(PI/2);
+
+    // apply rotation
+    m_parent.do_rotate(L("Text-Rotate"));
+
+    m_rotate_start_angle.reset();
+
+    // recalculate for surface cut
+    const FontProp &font_prop = m_style_manager.get_style().prop;
+    if (font_prop.use_surface) process();
 }
 void GLGizmoEmboss::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(data); }
 
@@ -737,6 +757,9 @@ void GLGizmoEmboss::initialize()
     // initialize text styles
     m_style_manager.init(wxGetApp().app_config, create_default_styles());
     set_default_text();
+
+    // Set rotation gizmo upwardrotate 
+    m_rotate_gizmo.set_angle(PI/2);
 }
 
 EmbossStyles GLGizmoEmboss::create_default_styles()
@@ -2263,7 +2286,8 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     Selection &selection = m_parent.get_selection();
     assert(!selection.is_empty());
     selection.setup_cache();
-    selection.rotate(Vec3d(0., 0., relative_z_angle), TransformationType::Local);
+    TransformationType transformation_type = TransformationType::Local_Relative_Joint;
+    selection.rotate(Vec3d(0., 0., relative_z_angle), transformation_type);
 
     std::string snapshot_name; // empty meand no store undo / redo
     // NOTE: it use L instead of _L macro because prefix _ is appended
@@ -2433,10 +2457,7 @@ void GLGizmoEmboss::draw_advanced()
                    _L("Rotate text Clock-wise."))) {
         // convert back to radians and CCW
         angle = -angle_deg * M_PI / 180.0;
-        if (angle < M_PI || angle > M_PI) {
-            int count = std::round(*angle / 2 * M_PI);
-            angle     = *angle - count * (2 * M_PI);
-        }
+        to_range_pi_pi(*angle);
         if (is_approx(*angle, 0.f))
             angle.reset();
         
@@ -2444,6 +2465,8 @@ void GLGizmoEmboss::draw_advanced()
             m_volume->text_configuration->style.prop.angle = angle;
             float act_angle = angle.has_value() ? *angle : .0f;
             do_rotate(act_angle - prev_angle);
+            // recalculate for surface cut
+            if (font_prop.use_surface) process();
         }
     }
 
