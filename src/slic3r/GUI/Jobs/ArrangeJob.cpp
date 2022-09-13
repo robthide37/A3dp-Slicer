@@ -1,7 +1,6 @@
 #include "ArrangeJob.hpp"
 
 #include "libslic3r/BuildVolume.hpp"
-#include "libslic3r/MTUtils.hpp"
 #include "libslic3r/Model.hpp"
 
 #include "slic3r/GUI/Plater.hpp"
@@ -174,7 +173,7 @@ void ArrangeJob::process(Ctl &ctl)
            prepare();
            params = get_arrange_params(m_plater);
            bedpts = get_bed_shape(*m_plater->config());
-    }).wait();;
+    }).wait();
 
     auto   count  = unsigned(m_selected.size() + m_unprintable.size());
 
