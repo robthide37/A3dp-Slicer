@@ -451,3 +451,38 @@ TEST_CASE("Arachne - Missing infill", "[ArachneMissingInfill]") {
 
 //    REQUIRE(wallToolPaths.getInnerContour().size() == 1);
 }
+
+// This test case was distilled from GitHub issue #8849.
+// Missing part of the model after simplifying generated tool-paths by simplifyToolPaths.
+TEST_CASE("Arachne - #8849 - Missing part of model", "[ArachneMissingPart8849]") {
+    const Polygon poly_0 = {
+        Point(-29700000, -10600000),
+        Point(-28200000, -10600000),
+        Point( 20000000, -10600000),
+        Point( 20000000, - 9900000),
+        Point(-28200000, - 9900000),
+        Point(-28200000,         0),
+        Point(-29700000,         0),
+    };
+
+    Polygons polygons              = {poly_0};
+    coord_t  ext_perimeter_spacing = 449999;
+    coord_t  perimeter_spacing     = 757079;
+    coord_t  inset_count           = 2;
+
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.32, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    wall_tool_paths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
+
+#ifdef ARACHNE_DEBUG_OUT
+    export_perimeters_to_svg(debug_out_path("arachne-missing-part-8849.svg"), polygons, perimeters, union_ex(wall_tool_paths.getInnerContour()));
+#endif
+
+    int64_t total_extrusion_length= 0;
+    for (Arachne::VariableWidthLines &perimeter : perimeters)
+        for (Arachne::ExtrusionLine &extrusion_line : perimeter)
+            total_extrusion_length += extrusion_line.getLength();
+
+    // Total extrusion length should be around 30mm when the part is missing and around 120 when everything is ok.
+    // REQUIRE(total_extrusion_length >= scaled<int64_t>(120.));
+}
