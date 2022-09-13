@@ -167,12 +167,16 @@ void ArrangeJob::process(Ctl &ctl)
     static const auto arrangestr = _u8L("Arranging");
 
     ctl.update_status(0, arrangestr);
-    ctl.call_on_main_thread([this]{ prepare(); }).wait();;
 
-    arrangement::ArrangeParams params = get_arrange_params(m_plater);
+    arrangement::ArrangeParams params;
+    Points bedpts;
+    ctl.call_on_main_thread([this, &params, &bedpts]{
+           prepare();
+           params = get_arrange_params(m_plater);
+           bedpts = get_bed_shape(*m_plater->config());
+    }).wait();;
 
     auto   count  = unsigned(m_selected.size() + m_unprintable.size());
-    Points bedpts = get_bed_shape(*m_plater->config());
 
     params.stopcondition = [&ctl]() { return ctl.was_canceled(); };
 
