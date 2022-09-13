@@ -26,7 +26,9 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/find.hpp>
+#include <boost/algorithm/string/regex.hpp>
 #include <boost/foreach.hpp>
+#include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/beast/core/detail/base64.hpp>
@@ -1437,6 +1439,24 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
                     bounding_box.center().x(), bounding_box.center().y(), bounding_box.center().z(),
                     bounding_box.size().x(), bounding_box.size().y(), bounding_box.size().z()
                 );
+                if (print.config().gcode_flavor.value == gcfKlipper) {
+                    Polygon poly = print_object->model_object()->convex_hull_2d(
+                        print_instance.model_instance->get_matrix());
+                    poly.douglas_peucker(0.1);
+
+                    const boost::format format_point("[%f,%f]");
+                    std::string s_poly;
+                    for (const Point& point : poly.points)
+                        s_poly += (boost::format(format_point) % unscaled(point.x()) % unscaled(point.y())).str() + ",";
+                    s_poly += (boost::format(format_point) % unscaled(poly.points.front().x()) % unscaled(poly.points.front().y())).str();
+
+                    file.write_format("EXCLUDE_OBJECT_DEFINE NAME=%s_id_%d_copy_%d CENTER=%f,%f POLYGON=[%s]\n",
+                        boost::algorithm::replace_all_regex_copy(print_object->model_object()->name, boost::regex("[^\\w]+"), std::string("_")).c_str(),
+                        this->m_ordered_objects.size() - 1, copy_id,
+                        bounding_box.center().x(), bounding_box.center().y(),
+                        s_poly.c_str()
+                    );
+                }
             }
             copy_id++;
             nb_items++;
@@ -3165,6 +3185,22 @@ LayerResult GCode::process_layer(
                 // To control print speed of the 1st object layer printed over raft interface.
                 bool object_layer_over_raft = layer_to_print.object_layer && layer_to_print.object_layer->id() > 0 && 
                     instance_to_print.print_object.slicing_parameters().raft_layers() == layer_to_print.object_layer->id();
+                // Get data for gcode_label_objects
+                std::string instance_clean_name =
+                    boost::algorithm::replace_all_regex_copy(
+                        instance_to_print.print_object.model_object()->name,
+                        boost::regex("[^\\w]+"), std::string("_"));
+                std::string instance_id = std::to_string(
+                    std::find(this->m_ordered_objects.begin(),
+                              this->m_ordered_objects.end(),
+                              &instance_to_print.print_object) -
+                    this->m_ordered_objects.begin());
+                std::string instance_copy = std::to_string(
+                    instance_to_print.instance_id);
+                std::string instance_full_id = instance_clean_name + "_id_" +
+                                               instance_id + "_copy_" +
+                                               instance_copy;
+
                 m_config.apply(instance_to_print.print_object.config(), true);
                 m_layer = layer_to_print.layer();
                 m_object_layer_over_raft = object_layer_over_raft;
@@ -3173,9 +3209,11 @@ LayerResult GCode::process_layer(
                     m_avoid_crossing_perimeters.init_layer(*m_layer);
                 //print object label to help the printer firmware know where it is (for removing the objects)
                 if (this->config().gcode_label_objects) {
-                    m_gcode_label_objects_start = std::string("; printing object ") + instance_to_print.print_object.model_object()->name
-                        + " id:" + std::to_string(std::find(this->m_ordered_objects.begin(), this->m_ordered_objects.end(), &instance_to_print.print_object) - this->m_ordered_objects.begin())
-                        + " copy " + std::to_string(instance_to_print.instance_id) + "\n";
+                    m_gcode_label_objects_start =
+                        std::string("; printing object ") +
+                        instance_to_print.print_object.model_object()->name +
+                        " id:" + instance_id + " copy " + instance_copy +
+                        "\n";
                     if (print.config().gcode_flavor.value == gcfMarlinLegacy || print.config().gcode_flavor.value == gcfMarlinFirmware || print.config().gcode_flavor.value == gcfRepRap) {
                         size_t instance_plater_id = 0;
                         //get index of the current copy in the whole itemset;
@@ -3186,6 +3224,11 @@ LayerResult GCode::process_layer(
                                 instance_plater_id += obj->instances().size();
                         instance_plater_id += instance_to_print.instance_id;
                         m_gcode_label_objects_start += std::string("M486 S") + std::to_string(instance_plater_id) + "\n";
+                    } else if (print.config().gcode_flavor.value == gcfKlipper) {
+                        m_gcode_label_objects_start +=
+                            std::string("EXCLUDE_OBJECT_START NAME=") +
+                            instance_full_id +
+                            "\n";
                     }
                 }
                 // ask for a bigger lift for travel to object when moving to another object
@@ -3250,12 +3293,20 @@ LayerResult GCode::process_layer(
                 // Don't set m_gcode_label_objects_end if you don't had to write the m_gcode_label_objects_start.
                 if (m_gcode_label_objects_start != "") {
                     m_gcode_label_objects_start = "";
-                }else if (this->config().gcode_label_objects) {
+                } else if (this->config().gcode_label_objects) {
                     m_gcode_label_objects_end = std::string("; stop printing object ") + instance_to_print.print_object.model_object()->name
                         + " id:" + std::to_string((std::find(this->m_ordered_objects.begin(), this->m_ordered_objects.end(), &instance_to_print.print_object) - this->m_ordered_objects.begin()))
                         + " copy " + std::to_string(instance_to_print.instance_id) + "\n";
-                    if (print.config().gcode_flavor.value == gcfMarlinLegacy || print.config().gcode_flavor.value == gcfMarlinFirmware || print.config().gcode_flavor.value == gcfRepRap) {
-                        m_gcode_label_objects_end += std::string("M486 S-1") + "\n";
+                    if (print.config().gcode_flavor.value == gcfMarlinLegacy ||
+                        print.config().gcode_flavor.value == gcfMarlinFirmware ||
+                        print.config().gcode_flavor.value == gcfRepRap) {
+                        m_gcode_label_objects_end += std::string("M486 S-1") +
+                                                     "\n";
+                    } else if (print.config().gcode_flavor.value == gcfKlipper) {
+                        m_gcode_label_objects_end +=
+                            std::string("EXCLUDE_OBJECT_END NAME=") +
+                            instance_full_id +
+                            "\n";
                     }
                 }
             }
