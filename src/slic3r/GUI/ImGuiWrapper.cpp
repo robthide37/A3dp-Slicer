@@ -59,6 +59,9 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::PreferencesHoverButton, "notification_preferences_hover"},
     {ImGui::SliderFloatEditBtnIcon, "edit_button"                   },
     {ImGui::SliderFloatEditBtnPressedIcon, "edit_button_pressed"    },
+};
+
+static const std::map<const wchar_t, std::string> font_icons_large = {
 #if ENABLE_LEGEND_TOOLBAR_ICONS
     {ImGui::LegendTravel          , "legend_travel"                 },
     {ImGui::LegendWipe            , "legend_wipe"                   },
@@ -73,9 +76,6 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::LegendShells          , "legend_shells"                 },
     {ImGui::LegendToolMarker      , "legend_toolmarker"             },
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
-};
-
-static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::CloseNotifButton        , "notification_close"              },
     {ImGui::CloseNotifHoverButton   , "notification_close_hover"        },
     {ImGui::EjectButton             , "notification_eject_sd"           },
@@ -97,7 +97,6 @@ static const std::map<const wchar_t, std::string> font_icons_large = {
 
 static const std::map<const wchar_t, std::string> font_icons_extra_large = {
     {ImGui::ClippyMarker            , "notification_clippy"             },
-
 };
 
 const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.33f, 0.33f, 0.33f, 1.0f };

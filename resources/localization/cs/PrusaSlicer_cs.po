@@ -2135,8 +2135,8 @@ msgid "Choose one or more files (STL, OBJ):"
 msgstr "Vyberte jeden nebo více souborů (STL, OBJ):"
 
 #: src/slic3r/GUI/GUI_App.cpp:1870
-msgid "Choose one or more files (STL/OBJ/AMF/3MF/PRUSA):"
-msgstr "Vyberte jeden nebo více souborů (STL/OBJ/AMF/3MF/PRUSA):"
+msgid "Choose one or more files (STL/3MF/STEP/OBJ/AMF/PRUSA):"
+msgstr "Vyberte jeden nebo více souborů (STL/3MF/STEP/OBJ/AMF/PRUSA):"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1361
 msgid "Choose the type of firmware used by your printer."
@@ -6044,12 +6044,13 @@ msgid "Import STL (Imperial Units)"
 msgstr "Importovat STL (imperiální jednotky)"
 
 #: src/slic3r/GUI/MainFrame.cpp:1208
-msgid "Import STL/OBJ/AM&F/3MF"
-msgstr "Importovat STL/OBJ/AM&F/3MF"
+msgid "Import STL/3MF/STEP/OBJ/AM&F"
+msgstr "Importovat STL/3MF/STEP/OBJ/AM&F"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:83
-msgid "Import STL/OBJ/AMF/3MF without config, keep plater"
-msgstr "Importovat STL/OBJ/AMF/3MF bez konfigurace, zachová stávající podložku"
+msgid "Import STL/3MF/STEP/OBJ/AMF without config, keep plater"
+msgstr ""
+"Importovat STL/3MF/STEP/OBJ/AMF bez konfigurace, zachová stávající podložku"
 
 #: src/slic3r/GUI/Plater.cpp:5293
 msgid "Import config only"
@@ -8227,9 +8228,8 @@ msgid "Open new instance"
 msgstr "Otevřít novou instanci"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:78
-msgid "Open project STL/OBJ/AMF/3MF with config, clear plater"
-msgstr ""
-"Otevřít projekt STL/OBJ/AMF/3MF s konfigurací, odstranit modely na podložce"
+msgid "Open project AMF/3MF with config, clear plater"
+msgstr "Otevřít projekt AMF/3MF s konfigurací, odstranit modely na podložce"
 
 #: src/slic3r/GUI/MainFrame.cpp:1082
 #, c-format, boost-format

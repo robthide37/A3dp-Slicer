@@ -392,8 +392,8 @@ public:
 	const Preset&   default_preset(size_t idx = 0) const { assert(idx < m_num_default_presets); return m_presets[idx]; }
 	virtual const Preset& default_preset_for(const DynamicPrintConfig & /* config */) const { return this->default_preset(); }
     // Return a preset by an index. If the preset is active, a temporary copy is returned.
-    Preset&         preset(size_t idx)          { return (idx == m_idx_selected) ? m_edited_preset : m_presets[idx]; }
-    const Preset&   preset(size_t idx) const    { return const_cast<PresetCollection*>(this)->preset(idx); }
+    Preset&         preset(size_t idx, bool respect_active_preset = true)          { return (idx == m_idx_selected && respect_active_preset) ? m_edited_preset : m_presets[idx]; }
+    const Preset&   preset(size_t idx, bool respect_active_preset = true) const    { return const_cast<PresetCollection*>(this)->preset(idx); }
     void            discard_current_changes() {
         m_presets[m_idx_selected].reset_dirty();
         m_edited_preset = m_presets[m_idx_selected];
@@ -403,9 +403,9 @@ public:
 
     // Return a preset by its name. If the preset is active, a temporary copy is returned.
     // If a preset is not found by its name, null is returned.
-    Preset*         find_preset(const std::string &name, bool first_visible_if_not_found = false);
-    const Preset*   find_preset(const std::string &name, bool first_visible_if_not_found = false) const 
-        { return const_cast<PresetCollection*>(this)->find_preset(name, first_visible_if_not_found); }
+    Preset*         find_preset(const std::string &name, bool first_visible_if_not_found = false, bool respect_active_preset = true);
+    const Preset*   find_preset(const std::string &name, bool first_visible_if_not_found = false, bool respect_active_preset = true) const 
+        { return const_cast<PresetCollection*>(this)->find_preset(name, first_visible_if_not_found, respect_active_preset); }
 
     size_t          first_visible_idx() const;
     // Return index of the first compatible preset. Certainly at least the '- default -' preset shall be compatible.
@@ -734,9 +734,9 @@ public:
     // If there is last preset for the printer and first_check== false, then delete this printer
     // returns true if all presets were deleted successfully.
     bool            delete_preset_from_printers(const std::string& preset_name);
-
+    void            rename_preset_in_printers(const std::string& old_name, const std::string& new_name);
     // Get list of printers which have more than one preset and "preset_names" preset is one of them
-    std::vector<std::string> get_printers_with_preset( const std::string &preset_name);
+    std::vector<std::string> get_printers_with_preset( const std::string &preset_name, bool respect_only_preset = true);
     // Get list of printers which has only "preset_names" preset
     std::vector<std::string> get_printers_with_only_preset( const std::string &preset_name);
 

@@ -250,6 +250,8 @@ set(SLIC3R_SOURCES
     SlicingAdaptive.hpp
     Subdivide.cpp
     Subdivide.hpp
+    SupportSpotsGenerator.cpp
+    SupportSpotsGenerator.hpp
     SupportMaterial.cpp
     SupportMaterial.hpp
     Surface.cpp
@@ -283,6 +285,8 @@ set(SLIC3R_SOURCES
     TriangleSelector.hpp
     TriangleSetSampling.cpp
     TriangleSetSampling.hpp
+    TriangleSelectorWrapper.cpp
+    TriangleSelectorWrapper.hpp
     MTUtils.hpp
     Zipper.hpp
     Zipper.cpp

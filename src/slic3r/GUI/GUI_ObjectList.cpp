@@ -991,7 +991,7 @@ void ObjectList::show_context_menu(const bool evt_context_menu)
 void ObjectList::extruder_editing()
 {
     wxDataViewItem item = GetSelection();
-    if (!item || !(m_objects_model->GetItemType(item) & (itVolume | itObject)))
+    if (!item || !(m_objects_model->GetItemType(item) & (itVolume | itObject | itLayer)))
         return;
 
     wxRect rect = this->GetItemRect(item, GetColumn(colExtruder));
@@ -1016,6 +1016,7 @@ void ObjectList::extruder_editing()
 
         m_extruder_editor->Hide();
         update_extruder_in_config(item);
+        Refresh();
     };
 
     // to avoid event propagation to other sidebar items

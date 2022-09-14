@@ -157,7 +157,7 @@ namespace GUI {
                 GLModel::Geometry init_data;
 #if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
                 init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P4 };
-                init_data.reserve_vertices(8);
+                init_data.reserve_vertices(5);
                 init_data.reserve_indices(8);
 #else
                 init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P2 };
@@ -174,24 +174,18 @@ namespace GUI {
                 init_data.add_vertex(Vec4f(left, bottom, 0.0f, perimeter));
                 perimeter += width;
                 init_data.add_vertex(Vec4f(right, bottom, 0.0f, perimeter));
-
-                init_data.add_vertex(Vec4f(right, bottom, 0.0f, perimeter));
                 perimeter += height;
                 init_data.add_vertex(Vec4f(right, top, 0.0f, perimeter));
-
-                init_data.add_vertex(Vec4f(right, top, 0.0f, perimeter));
                 perimeter += width;
-                init_data.add_vertex(Vec4f(left, top, 0.0f, perimeter));
-
                 init_data.add_vertex(Vec4f(left, top, 0.0f, perimeter));
                 perimeter += height;
                 init_data.add_vertex(Vec4f(left, bottom, 0.0f, perimeter));
 
                 // indices
                 init_data.add_line(0, 1);
+                init_data.add_line(1, 2);
                 init_data.add_line(2, 3);
-                init_data.add_line(4, 5);
-                init_data.add_line(6, 7);
+                init_data.add_line(3, 4);
 #else
                 init_data.add_vertex(Vec2f(left, bottom));
                 init_data.add_vertex(Vec2f(right, bottom));

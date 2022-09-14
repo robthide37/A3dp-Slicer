@@ -1898,7 +1898,7 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
 {
     input_files.Clear();
     wxFileDialog dialog(parent ? parent : GetTopWindow(),
-        _L("Choose one or more files (STL/OBJ/AMF/3MF/PRUSA/STEP):"),
+        _L("Choose one or more files (STL/3MF/STEP/OBJ/AMF/PRUSA):"),
         from_u8(app_config->get_last_dir()), "",
         file_wildcards(FT_MODEL), wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
 
@@ -2522,9 +2522,9 @@ bool GUI_App::check_and_save_current_preset_changes(const wxString& caption, con
 {
     if (has_current_preset_changes()) {
         const std::string app_config_key = remember_choice ? "default_action_on_close_application" : "";
-        int act_buttons = UnsavedChangesDialog::ActionButtons::SAVE;
+        int act_buttons = ActionButtons::SAVE;
         if (dont_save_insted_of_discard)
-            act_buttons |= UnsavedChangesDialog::ActionButtons::DONT_SAVE;
+            act_buttons |= ActionButtons::DONT_SAVE;
         UnsavedChangesDialog dlg(caption, header, app_config_key, act_buttons);
         std::string act = app_config_key.empty() ? "none" : wxGetApp().app_config->get(app_config_key);
         if (act == "none" && dlg.ShowModal() == wxID_CANCEL)

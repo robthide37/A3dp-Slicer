@@ -834,14 +834,14 @@ void GLCanvas3D::Labels::render(const std::vector<const ModelInstance*>& sorted_
         imgui.begin(owner.title, ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
         float win_w = ImGui::GetWindowWidth();
-        float label_len = imgui.calc_text_size(owner.label).x;
+        float label_len = ImGui::CalcTextSize(owner.label.c_str()).x;
         ImGui::SetCursorPosX(0.5f * (win_w - label_len));
         ImGui::AlignTextToFramePadding();
         imgui.text(owner.label);
 
         if (!owner.print_order.empty()) {
             ImGui::Separator();
-            float po_len = imgui.calc_text_size(owner.print_order).x;
+            float po_len = ImGui::CalcTextSize(owner.print_order.c_str()).x;
             ImGui::SetCursorPosX(0.5f * (win_w - po_len));
             ImGui::AlignTextToFramePadding();
             imgui.text(owner.print_order);
@@ -4173,7 +4173,7 @@ void GLCanvas3D::handle_sidebar_focus_event(const std::string& opt_key, bool foc
 
 void GLCanvas3D::handle_layers_data_focus_event(const t_layer_height_range range, const EditorType type)
 {
-    std::string field = "layer_" + std::to_string(type) + "_" + std::to_string(range.first) + "_" + std::to_string(range.second);
+    std::string field = "layer_" + std::to_string(type) + "_" + float_to_string_decimal_point(range.first) + "_" + float_to_string_decimal_point(range.second);
     handle_sidebar_focus_event(field, true);
 }
 
@@ -5504,28 +5504,41 @@ void GLCanvas3D::_picking_pass()
     }
     default: { break; }
     }
+
+    auto add_strings_row_to_table = [&imgui](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(col_1_color, col_1.c_str());
+        ImGui::TableSetColumnIndex(1);
+        imgui.text_colored(col_2_color, col_2.c_str());
+    };
+
     char buf[1024];
     if (hit.type != SceneRaycaster::EType::None) {
-        sprintf(buf, "Object ID: %d", hit.raycaster_id);
-        imgui.text(std::string(buf));
-        sprintf(buf, "Type: %s", object_type.c_str());
-        imgui.text(std::string(buf));
-        sprintf(buf, "Position: %.3f, %.3f, %.3f", hit.position.x(), hit.position.y(), hit.position.z());
-        imgui.text(std::string(buf));
-        sprintf(buf, "Normal: %.3f, %.3f, %.3f", hit.normal.x(), hit.normal.y(), hit.normal.z());
-        imgui.text(std::string(buf));
+        if (ImGui::BeginTable("Hit", 2)) {
+            add_strings_row_to_table("Object ID", ImGuiWrapper::COL_ORANGE_LIGHT, std::to_string(hit.raycaster_id), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table("Type", ImGuiWrapper::COL_ORANGE_LIGHT, object_type, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            sprintf(buf, "%.3f, %.3f, %.3f", hit.position.x(), hit.position.y(), hit.position.z());
+            add_strings_row_to_table("Position", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            sprintf(buf, "%.3f, %.3f, %.3f", hit.normal.x(), hit.normal.y(), hit.normal.z());
+            add_strings_row_to_table("Normal", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            ImGui::EndTable();
+        }
     }
     else
         imgui.text("NO HIT");
 
     ImGui::Separator();
     imgui.text("Registered for picking:");
-    sprintf(buf, "Beds: %d", (int)m_scene_raycaster.beds_count());
-    imgui.text(std::string(buf));
-    sprintf(buf, "Volumes: %d", (int)m_scene_raycaster.volumes_count());
-    imgui.text(std::string(buf));
-    sprintf(buf, "Gizmo elements: %d", (int)m_scene_raycaster.gizmos_count());
-    imgui.text(std::string(buf));
+    if (ImGui::BeginTable("Raycasters", 2)) {
+        sprintf(buf, "%d (%d)", (int)m_scene_raycaster.beds_count(), (int)m_scene_raycaster.active_beds_count());
+        add_strings_row_to_table("Beds", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        sprintf(buf, "%d (%d)", (int)m_scene_raycaster.volumes_count(), (int)m_scene_raycaster.active_volumes_count());
+        add_strings_row_to_table("Volumes", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        sprintf(buf, "%d (%d)", (int)m_scene_raycaster.gizmos_count(), (int)m_scene_raycaster.active_gizmos_count());
+        add_strings_row_to_table("Gizmo elements", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        ImGui::EndTable();
+    }
     imgui.end();
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 }

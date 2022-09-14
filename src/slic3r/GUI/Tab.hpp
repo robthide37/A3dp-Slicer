@@ -168,6 +168,7 @@ protected:
 	ScalableButton*		m_search_btn;
 	ScalableButton*		m_btn_compare_preset;
 	ScalableButton*		m_btn_save_preset;
+	ScalableButton*		m_btn_rename_preset;
 	ScalableButton*		m_btn_delete_preset;
 	ScalableButton*		m_btn_edit_ph_printer {nullptr};
 	ScalableButton*		m_btn_hide_incompatible_presets;
@@ -321,7 +322,10 @@ public:
 	void		OnKeyDown(wxKeyEvent& event);
 
 	void		compare_preset();
+	void		transfer_options(const std::string&name_from, const std::string&name_to, std::vector<std::string> options);
+    void		save_options(const std::string &name_from, const std::string &name_to, std::vector<std::string> options);
 	void		save_preset(std::string name = std::string(), bool detach = false);
+	void		rename_preset();
 	void		delete_preset();
 	void		toggle_show_hide_incompatible();
 	void		update_show_hide_incompatible_button();
@@ -372,7 +376,7 @@ public:
 
     void            update_wiping_button_visibility();
 	void			activate_option(const std::string& opt_key, const wxString& category);
-	void			cache_config_diff(const std::vector<std::string>& selected_options);
+	void			cache_config_diff(const std::vector<std::string>& selected_options, const DynamicPrintConfig* config = nullptr);
 	void			apply_config_from_cache();
 
 	const std::map<wxString, std::string>& get_category_icon_map() { return m_category_icon; }
@@ -501,7 +505,7 @@ public:
 	bool 		supports_printer_technology(const PrinterTechnology /* tech */) const override { return true; }
 
 	wxSizer*	create_bed_shape_widget(wxWindow* parent);
-	void		cache_extruder_cnt();
+	void		cache_extruder_cnt(const DynamicPrintConfig* config = nullptr);
 	bool		apply_extruder_cnt_from_cache();
 };
 

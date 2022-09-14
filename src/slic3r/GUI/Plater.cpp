@@ -1609,7 +1609,8 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &fi
 
     m_mainframe.Raise();
     m_mainframe.select_tab(size_t(0));
-    m_plater.select_view_3D("3D");
+    if (wxGetApp().is_editor())
+        m_plater.select_view_3D("3D");
     bool res = m_plater.load_files(filenames);
     m_mainframe.update_title();
     return res;
@@ -5333,10 +5334,9 @@ void Plater::new_project()
                           (saved_project == wxID_YES ? _L("You can keep presets modifications to the new project or discard them") :
                           _L("You can keep presets modifications to the new project, discard them or save changes as new presets.\n"
                              "Note, if changes will be saved then new project wouldn't keep them"));
-        using ab = UnsavedChangesDialog::ActionButtons;
-        int act_buttons = ab::KEEP;
+        int act_buttons = ActionButtons::KEEP;
         if (saved_project == wxID_NO)
-            act_buttons |= ab::SAVE;
+            act_buttons |= ActionButtons::SAVE;
         if (!wxGetApp().check_and_keep_current_preset_changes(_L("Creating a new project"), header, act_buttons))
             return;
     }
@@ -6231,7 +6231,17 @@ bool Plater::export_3mf(const boost::filesystem::path& output_path)
     ThumbnailData thumbnail_data;
     ThumbnailsParams thumbnail_params = { {}, false, true, true, true };
     p->generate_thumbnail(thumbnail_data, THUMBNAIL_SIZE_3MF.first, THUMBNAIL_SIZE_3MF.second, thumbnail_params, Camera::EType::Ortho);
-    bool ret = Slic3r::store_3mf(path_u8.c_str(), &p->model, export_config ? &cfg : nullptr, full_pathnames, &thumbnail_data);
+    bool ret = false;
+    try
+    {
+        ret = Slic3r::store_3mf(path_u8.c_str(), &p->model, export_config ? &cfg : nullptr, full_pathnames, &thumbnail_data);
+    }
+    catch (boost::filesystem::filesystem_error& e)
+    {
+        const wxString what = _("Unable to save file") + ": " + path_u8 + "\n" + e.code().message();
+        MessageDialog dlg(this, what, _("Error saving 3mf file"), wxOK | wxICON_ERROR);
+        dlg.ShowModal();
+    }
     if (ret) {
         // Success
 //        p->statusbar()->set_status_text(format_wxstr(_L("3MF file exported to %s"), path));

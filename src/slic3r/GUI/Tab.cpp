@@ -29,6 +29,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/filesystem.hpp>
 #include "wxExtensions.hpp"
 #include "PresetComboBoxes.hpp"
 #include <wx/wupdlock.h>
@@ -150,6 +151,7 @@ void Tab::create_preset_tab()
 
     add_scaled_button(panel, &m_btn_compare_preset, "compare");
     add_scaled_button(panel, &m_btn_save_preset, "save");
+    add_scaled_button(panel, &m_btn_rename_preset, "edit");
     add_scaled_button(panel, &m_btn_delete_preset, "cross");
     if (m_type == Preset::Type::TYPE_PRINTER)
         add_scaled_button(panel, &m_btn_edit_ph_printer, "cog");
@@ -161,6 +163,8 @@ void Tab::create_preset_tab()
     m_btn_compare_preset->SetToolTip(_L("Compare this preset with some another"));
     // TRN "Save current Settings"
     m_btn_save_preset->SetToolTip(from_u8((boost::format(_utf8(L("Save current %s"))) % m_title).str()));
+    m_btn_rename_preset->SetToolTip(from_u8((boost::format(_utf8(L("Rename current %s"))) % m_title).str()));
+    m_btn_rename_preset->Hide();
     m_btn_delete_preset->SetToolTip(_(L("Delete this preset")));
     m_btn_delete_preset->Hide();
 
@@ -211,6 +215,8 @@ void Tab::create_preset_tab()
     m_hsizer->Add(m_presets_choice, 0, wxLEFT | wxRIGHT | wxTOP | wxALIGN_CENTER_VERTICAL, 3);
     m_hsizer->AddSpacer(int(4*scale_factor));
     m_hsizer->Add(m_btn_save_preset, 0, wxALIGN_CENTER_VERTICAL);
+    m_hsizer->AddSpacer(int(4*scale_factor));
+    m_hsizer->Add(m_btn_rename_preset, 0, wxALIGN_CENTER_VERTICAL);
     m_hsizer->AddSpacer(int(4 * scale_factor));
     m_hsizer->Add(m_btn_delete_preset, 0, wxALIGN_CENTER_VERTICAL);
     if (m_btn_edit_ph_printer) {
@@ -300,6 +306,7 @@ void Tab::create_preset_tab()
 
     m_btn_compare_preset->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) { compare_preset(); }));
     m_btn_save_preset->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) { save_preset(); }));
+    m_btn_rename_preset->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) { rename_preset(); }));
     m_btn_delete_preset->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) { delete_preset(); }));
     m_btn_hide_incompatible_presets->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) {
         toggle_show_hide_incompatible();
@@ -596,16 +603,10 @@ void Tab::update_changed_ui()
     if (m_type == Preset::TYPE_PRINTER) {
         {
             auto check_bed_custom_options = [](std::vector<std::string>& keys) {
-                bool was_deleted = false;
-                for (std::vector<std::string>::iterator it = keys.begin(); it != keys.end(); ) {
-                    if (*it == "bed_custom_texture" || *it == "bed_custom_model") {
-                        it = keys.erase(it);
-                        was_deleted = true;
-                    }
-                    else
-                        ++it;
-                }
-                if (was_deleted && std::find(keys.begin(), keys.end(), "bed_shape") == keys.end())
+                size_t old_keys_size = keys.size();
+                keys.erase(std::remove_if(keys.begin(), keys.end(), [](const std::string& key) { 
+                    return key == "bed_custom_texture" || key == "bed_custom_model"; }), keys.end());
+                if (old_keys_size != keys.size() && std::find(keys.begin(), keys.end(), "bed_shape") == keys.end())
                     keys.emplace_back("bed_shape");
             };
             check_bed_custom_options(dirty_options);
@@ -1182,9 +1183,9 @@ void Tab::activate_option(const std::string& opt_key, const wxString& category)
     m_highlighter.init(get_custom_ctrl_with_blinking_ptr(opt_key));
 }
 
-void Tab::cache_config_diff(const std::vector<std::string>& selected_options)
+void Tab::cache_config_diff(const std::vector<std::string>& selected_options, const DynamicPrintConfig* config/* = nullptr*/)
 {
-    m_cache_config.apply_only(m_presets->get_edited_preset().config, selected_options);
+    m_cache_config.apply_only(config ? *config : m_presets->get_edited_preset().config, selected_options);
 }
 
 void Tab::apply_config_from_cache()
@@ -1439,6 +1440,7 @@ void TabPrint::build()
 
         optgroup = page->new_optgroup(L("Advanced"));
         optgroup->append_single_option_line("seam_position", category_path + "seam-position");
+        optgroup->append_single_option_line("staggered_inner_seams", category_path + "staggered-inner-seams");
         optgroup->append_single_option_line("external_perimeters_first", category_path + "external-perimeters-first");
         optgroup->append_single_option_line("gap_fill_enabled", category_path + "fill-gaps");
         optgroup->append_single_option_line("perimeter_generator");
@@ -3183,6 +3185,7 @@ void Tab::update_btns_enabling()
     const Preset& preset = m_presets->get_edited_preset();
     m_btn_delete_preset->Show((m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection())
                               || (!preset.is_default && !preset.is_system));
+    m_btn_rename_preset->Show(!preset.is_default && !preset.is_system && !m_presets_choice->is_selected_physical_printer());
 
     if (m_btn_edit_ph_printer)
         m_btn_edit_ph_printer->SetToolTip( m_preset_bundle->physical_printers.has_selection() ?
@@ -3580,6 +3583,42 @@ void Tab::compare_preset()
     wxGetApp().mainframe->diff_dialog.show(m_type);
 }
 
+void Tab::transfer_options(const std::string &name_from, const std::string &name_to, std::vector<std::string> options)
+{
+    if (options.empty())
+        return;
+
+    Preset* preset_from = m_presets->find_preset(name_from);
+    Preset* preset_to = m_presets->find_preset(name_to);
+
+    if (m_type == Preset::TYPE_PRINTER) {
+         auto it = std::find(options.begin(), options.end(), "extruders_count");
+         if (it != options.end()) {
+             // erase "extruders_count" option from the list
+             options.erase(it);
+             // cache the extruders count
+             static_cast<TabPrinter*>(this)->cache_extruder_cnt(&preset_from->config);
+         }
+    }
+    cache_config_diff(options, &preset_from->config);
+
+    if (name_to != m_presets->get_edited_preset().name )
+        select_preset(preset_to->name);
+
+    apply_config_from_cache();
+    load_current_preset();
+}
+
+void Tab::save_options(const std::string &name_from, const std::string &name_to, std::vector<std::string> options)
+{
+    if (options.empty())
+        return;
+
+    Preset* preset_from = m_presets->find_preset(name_from);
+    Preset* preset_to = m_presets->find_preset(name_to);
+    
+}
+
 // Save the current preset into file.
 // This removes the "dirty" flag of the preset, possibly creates a new preset under a new name,
 // and activates the new preset.
@@ -3615,8 +3654,9 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     update_tab_ui();
     // Update the selection boxes at the plater.
     on_presets_changed();
-    // If current profile is saved, "delete preset" button have to be enabled
+    // If current profile is saved, "delete/rename preset" buttons have to be shown
     m_btn_delete_preset->Show();
+    m_btn_rename_preset->Show(!m_presets_choice->is_selected_physical_printer());
     m_btn_delete_preset->GetParent()->Layout();
 
     if (m_type == Preset::TYPE_PRINTER)
@@ -3665,6 +3705,60 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
         update_description_lines();
 }
 
+void Tab::rename_preset()
+{
+    if (m_presets_choice->is_selected_physical_printer())
+        return;
+
+    Preset& selected_preset = m_presets->get_selected_preset();
+    wxString msg;
+
+    if (m_type == Preset::TYPE_PRINTER && !m_preset_bundle->physical_printers.empty()) {
+        // Check preset for rename in physical printers
+        std::vector<std::string> ph_printers = m_preset_bundle->physical_printers.get_printers_with_preset(selected_preset.name);
+        if (!ph_printers.empty()) {
+            msg += _L_PLURAL("The physical printer below is based on the preset, you are going to rename.",
+                "The physical printers below are based on the preset, you are going to rename.", ph_printers.size());
+            for (const std::string& printer : ph_printers)
+                msg += "\n    \"" + from_u8(printer) + "\",";
+            msg.RemoveLast();
+            msg += "\n" + _L_PLURAL("Note, that the selected preset will be renamed in this printer too.",
+                "Note, that the selected preset will be renamed in these printers too.", ph_printers.size()) + "\n\n";
+        }
+    }
+
+    // get new name
+
+    SavePresetDialog dlg(m_parent, m_type, true, msg);
+    if (dlg.ShowModal() != wxID_OK)
+        return;
+    std::string new_name = into_u8(dlg.get_name());
+
+    if (new_name.empty() || new_name == m_presets->get_selected_preset().name)
+        return;
+
+    // rename selected and edited presets
+
+    std::string old_name = selected_preset.name;
+    std::string old_file_name = selected_preset.file;
+
+    selected_preset.name = new_name;
+    boost::replace_last(selected_preset.file, old_name, new_name);
+
+    Preset& edited_preset = m_presets->get_edited_preset();
+    edited_preset.name = new_name;
+    boost::replace_last(edited_preset.file, old_name, new_name);
+
+    // rename file with renamed preset configuration
+    boost::filesystem::rename(old_file_name, selected_preset.file);
+
+    // rename selected preset in printers, if it's needed
+    if (!msg.IsEmpty())
+        m_preset_bundle->physical_printers.rename_preset_in_printers(old_name, new_name);
+
+    m_presets_choice->update();
+}
+
 // Called for a currently selected preset.
 void Tab::delete_preset()
 {
@@ -3692,7 +3786,7 @@ void Tab::delete_preset()
         {
             // Check preset for delete in physical printers
             // Ask a customer about next action, if there is a printer with just one preset and this preset is equal to delete
-            std::vector<std::string> ph_printers        = physical_printers.get_printers_with_preset(current_preset.name);
+            std::vector<std::string> ph_printers        = physical_printers.get_printers_with_preset(current_preset.name, false);
             std::vector<std::string> ph_printers_only   = physical_printers.get_printers_with_only_preset(current_preset.name);
 
             if (!ph_printers.empty()) {
@@ -4209,12 +4303,15 @@ wxSizer* TabPrinter::create_bed_shape_widget(wxWindow* parent)
     return sizer;
 }
 
-void TabPrinter::cache_extruder_cnt()
+void TabPrinter::cache_extruder_cnt(const DynamicPrintConfig* config/* = nullptr*/)
 {
-    if (m_presets->get_edited_preset().printer_technology() == ptSLA)
+    const DynamicPrintConfig& cached_config = config ? *config : m_presets->get_edited_preset().config;
+    if (Preset::printer_technology(cached_config) == ptSLA)
         return;
 
-    m_cache_extruder_count = m_extruders_count;
+    // get extruders count 
+    auto* nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(cached_config.option("nozzle_diameter"));
+    m_cache_extruder_count = nozzle_diameter->values.size(); //m_extruders_count;
 }
 
 bool TabPrinter::apply_extruder_cnt_from_cache()
@@ -4224,6 +4321,7 @@ bool TabPrinter::apply_extruder_cnt_from_cache()
 
     if (m_cache_extruder_count > 0) {
         m_presets->get_edited_preset().set_num_extruders(m_cache_extruder_count);
+//        extruders_count_changed(m_cache_extruder_count);
         m_cache_extruder_count = 0;
         return true;
     }
