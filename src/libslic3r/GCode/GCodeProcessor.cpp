@@ -778,8 +778,7 @@ void GCodeProcessorResult::reset() {
     max_print_height = 0.0f;
     settings_ids.reset();
     extruders_count = 0;
-    extruder_colors = DEFAULT_EXTRUDER_COLORS;
-    assert(extruder_colors.size() == MIN_EXTRUDERS_COUNT);
+    extruder_colors = std::vector<std::string>();
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
 #if ENABLE_USED_FILAMENT_POST_PROCESS
@@ -871,6 +870,7 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
 {
     m_parser.apply_config(config);
 
+    m_producer = EProducer::PrusaSlicer;
     m_flavor = config.gcode_flavor;
 
     size_t extruders_count = config.nozzle_diameter.values.size();
@@ -1345,12 +1345,15 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
             config.load_from_gcode_file(filename, ForwardCompatibilitySubstitutionRule::EnableSilent);
             apply_config(config);
         }
-        else if (m_producer == EProducer::Simplify3D)
-            apply_config_simplify3d(filename);
-        else if (m_producer == EProducer::SuperSlicer)
-            apply_config_superslicer(filename);
-        else if (m_producer == EProducer::KissSlicer)
-            apply_config_kissslicer(filename);
+        else {
+            m_result.extruder_colors = DEFAULT_EXTRUDER_COLORS;
+
+            if (m_producer == EProducer::Simplify3D)
+                apply_config_simplify3d(filename);
+            else if (m_producer == EProducer::SuperSlicer)
+                apply_config_superslicer(filename);
+            else if (m_producer == EProducer::KissSlicer)
+                apply_config_kissslicer(filename);
     }
 
     // process gcode
@@ -3699,7 +3702,8 @@ void GCodeProcessor::process_T(const std::string_view command)
         else {
             unsigned char id = static_cast<unsigned char>(eid);
             if (m_extruder_id != id) {
-                if (id >= m_result.extruder_colors.size())
+                if (((m_producer == EProducer::PrusaSlicer || m_producer == EProducer::Slic3rPE || m_producer == EProducer::Slic3r) && id >= m_result.extruders_count) ||
+                    ((m_producer != EProducer::PrusaSlicer && m_producer != EProducer::Slic3rPE && m_producer != EProducer::Slic3r) && id >= m_result.extruder_colors.size()))
                     BOOST_LOG_TRIVIAL(error) << "GCodeProcessor encountered an invalid toolchange, maybe from a custom gcode.";
                 else {
                     unsigned char old_extruder_id = m_extruder_id;
