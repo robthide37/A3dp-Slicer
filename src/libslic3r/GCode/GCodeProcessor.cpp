@@ -1094,6 +1094,20 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
         }
     }
 
+    // With MM setups like Prusa MMU2, the filaments may be expected to be parked at the beginning.
+    // Remember the parking position so the initial load is not included in filament estimate.
+    const ConfigOptionBool* single_extruder_multi_material = config.option<ConfigOptionBool>("single_extruder_multi_material");
+    const ConfigOptionBool* wipe_tower = config.option<ConfigOptionBool>("wipe_tower");
+    const ConfigOptionFloat* parking_pos_retraction = config.option<ConfigOptionFloat>("parking_pos_retraction");
+    const ConfigOptionFloat* extra_loading_move = config.option<ConfigOptionFloat>("extra_loading_move");
+
+    if (single_extruder_multi_material != nullptr && wipe_tower != nullptr && parking_pos_retraction != nullptr && extra_loading_move != nullptr) {
+        if (single_extruder_multi_material->value && m_result.extruders_count > 1 && wipe_tower->value) {
+            m_parking_position = float(parking_pos_retraction->value);
+            m_extra_loading_move = float(extra_loading_move->value);
+        }
+    }
+
     bool use_machine_limits = false;
     const ConfigOptionEnum<MachineLimitsUsage>* machine_limits_usage = config.option<ConfigOptionEnum<MachineLimitsUsage>>("machine_limits_usage");
     if (machine_limits_usage != nullptr)
