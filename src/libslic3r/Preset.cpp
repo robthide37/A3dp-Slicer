@@ -947,6 +947,11 @@ bool PresetCollection::delete_current_preset()
 
 bool PresetCollection::delete_preset(const std::string& name)
 {
+    if (name == this->get_selected_preset().name)
+        return delete_current_preset();
+
+    const std::string selected_preset_name = this->get_selected_preset_name();
+
     auto it = this->find_preset_internal(name);
 
     const Preset& preset = *it;
@@ -957,6 +962,10 @@ bool PresetCollection::delete_preset(const std::string& name)
         boost::nowide::remove(preset.file.c_str());
     }
     m_presets.erase(it);
+
+    // update selected preset
+    this->select_preset_by_name(selected_preset_name, true);
+
     return true;
 }
 
