@@ -200,7 +200,8 @@ public:
 
     template<class Unit = TCompute<P>>
     inline Unit area() const BP2D_NOEXCEPT {
-        Unit s = std::signbit(width()) || std::signbit(height()) ? Unit(-1) : Unit(1);
+        constexpr TCoord<P> Zero{0};
+        Unit s = width() < Zero || height() < Zero ? Unit(-1) : Unit(1);
         return s * libnest2d::abs(width() * height());
     }
     
