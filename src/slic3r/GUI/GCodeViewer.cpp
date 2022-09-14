@@ -3860,8 +3860,8 @@ void GCodeViewer::render_legend(float& legend_height)
 
     if (m_view_type == EViewType::Tool) {
         // calculate used filaments data
-        used_filaments_m = std::vector<double>(m_extruder_ids.size(), 0.0);
-        used_filaments_g = std::vector<double>(m_extruder_ids.size(), 0.0);
+        used_filaments_m = std::vector<double>(m_extruders_count, 0.0);
+        used_filaments_g = std::vector<double>(m_extruders_count, 0.0);
         for (size_t extruder_id : m_extruder_ids) {
             if (m_print_statistics.volumes_per_extruder.find(extruder_id) == m_print_statistics.volumes_per_extruder.end())
                 continue;
@@ -4002,12 +4002,10 @@ void GCodeViewer::render_legend(float& legend_height)
 #endif // ENABLE_PREVIEW_LAYER_TIME
     case EViewType::Tool:                 {
         // shows only extruders actually used
-        size_t i = 0;
         for (unsigned char extruder_id : m_extruder_ids) {
-            if (used_filaments_m[i] > 0.0 && used_filaments_g[i] > 0.0)
+            if (used_filaments_m[extruder_id] > 0.0 && used_filaments_g[extruder_id] > 0.0)
                 append_item(EItemType::Rect, m_tool_colors[extruder_id], _u8L("Extruder") + " " + std::to_string(extruder_id + 1),
-                        true, "", 0.0f, 0.0f, offsets, used_filaments_m[i], used_filaments_g[i]);
-            ++i;
+                    true, "", 0.0f, 0.0f, offsets, used_filaments_m[extruder_id], used_filaments_g[extruder_id]);
         }
         break;
     }
