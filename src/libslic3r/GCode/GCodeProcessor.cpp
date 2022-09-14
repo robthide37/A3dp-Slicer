@@ -1354,6 +1354,7 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
                 apply_config_superslicer(filename);
             else if (m_producer == EProducer::KissSlicer)
                 apply_config_kissslicer(filename);
+        }
     }
 
     // process gcode
