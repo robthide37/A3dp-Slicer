@@ -210,7 +210,6 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 
     if (mouse_event.Dragging()) {
         auto &angle_opt = m_volume->text_configuration->style.prop.angle;
-        float prev_angle = angle_opt.has_value() ? *angle_opt : 0.f;
         if (!m_rotate_start_angle.has_value())
             m_rotate_start_angle = angle_opt.has_value() ? *angle_opt : 0.f;        
         double angle = m_rotate_gizmo.get_angle();
