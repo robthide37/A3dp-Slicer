@@ -758,40 +758,47 @@ void GLGizmoMeasure::render_dimensioning()
     };
 
     auto point_edge = [this, shader, point_point](const Vec3d& v, const std::pair<Vec3d, Vec3d>& e) {
-        const Vec3d e1v = v - e.first;
         const Vec3d e1e2 = e.second - e.first;
         const Vec3d e1e2_unit = e1e2.normalized();
-        const Vec3d v_proj_on_e1e2 = e.first + e1v.dot(e1e2_unit) * e1e2_unit;
-        point_point(v, v_proj_on_e1e2);
+        const Vec3d v_proj = e.first + e1e2_unit.dot(v - e.first) * e1e2_unit;
+        point_point(v, v_proj);
 
-        const Vec3d v_proj_on_e1e2e1 = v_proj_on_e1e2 - e.first;
-        bool on_e1_side = v_proj_on_e1e2e1.dot(e1e2) < 0.0;
-        bool on_e2_side = v_proj_on_e1e2e1.norm() > e1e2.norm();
+        const Vec3d v_proje1 = v_proj - e.first;
+        bool on_e1_side = v_proje1.dot(e1e2) < 0.0;
+        bool on_e2_side = v_proje1.norm() > e1e2.norm();
         if (on_e1_side || on_e2_side) {
             const Camera& camera = wxGetApp().plater()->get_camera();
             const Matrix4d projection_view_matrix = camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix();
             const std::array<int, 4>& viewport = camera.get_viewport();
             const Transform3d ss_to_ndc_matrix = DimensioningHelper::ndc_to_ss_matrix_inverse(viewport);
 
-            shader->set_uniform("projection_matrix", Transform3d::Identity());
-
-            const Vec2d v_proj_on_e1e2ss = DimensioningHelper::model_to_ss(v_proj_on_e1e2, m_volume_matrix, projection_view_matrix, viewport);
-            auto render_extension = [this, &v_proj_on_e1e2ss, &projection_view_matrix, &viewport, &ss_to_ndc_matrix, shader](const Vec3d& p) {
+            const Vec2d v_projss = DimensioningHelper::model_to_ss(v_proj, m_volume_matrix, projection_view_matrix, viewport);
+            auto render_extension = [this, &v_projss, &projection_view_matrix, &viewport, &ss_to_ndc_matrix, shader](const Vec3d& p) {
                 const Vec2d pss = DimensioningHelper::model_to_ss(p, m_volume_matrix, projection_view_matrix, viewport);
-                if (!pss.isApprox(v_proj_on_e1e2ss)) {
-                    const Vec2d pv_proj_on_e1e2ss = v_proj_on_e1e2ss - pss;
-                    const double pv_proj_on_e1e2ss_len = pv_proj_on_e1e2ss.norm();
+                if (!pss.isApprox(v_projss)) {
+                    const Vec2d pv_projss = v_projss - pss;
+                    const double pv_projss_len = pv_projss.norm();
 
-                    const auto q = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Vec3d(pv_proj_on_e1e2ss.x(), pv_proj_on_e1e2ss.y(), 0.0));
+                    const auto q = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Vec3d(pv_projss.x(), pv_projss.y(), 0.0));
 
+                    shader->set_uniform("projection_matrix", Transform3d::Identity());
                     shader->set_uniform("view_model_matrix", ss_to_ndc_matrix * Geometry::translation_transform({ pss.x(), pss.y(), 0.0 }) * q *
-                        Geometry::scale_transform({ pv_proj_on_e1e2ss_len, 1.0f, 1.0f }));
+                        Geometry::scale_transform({ pv_projss_len, 1.0f, 1.0f }));
                     m_dimensioning.line.render();
                 }
             };
 
             render_extension(on_e1_side ? e.first : e.second);
         }
+    };
+
+    auto point_plane = [this, shader, point_point](const Vec3d& v, const std::tuple<int, Vec3d, Vec3d>& p) {
+        const auto& [idx, normal, origin] = p;
+        const double distance = normal.dot(v - origin);
+        if (std::abs(distance) < EPSILON)
+            return;
+
+        point_point(v, v - distance * normal);
     };
 
     shader->start_using();
@@ -844,6 +851,14 @@ void GLGizmoMeasure::render_dimensioning()
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
         point_edge(m_selected_features.second.feature->get_point(), m_selected_features.first.feature->get_edge());
+    }
+    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
+        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Plane) {
+        point_plane(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_plane());
+    }
+    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Plane &&
+        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
+        point_plane(m_selected_features.second.feature->get_point(), m_selected_features.first.feature->get_plane());
     }
 
     glsafe(::glEnable(GL_DEPTH_TEST));
