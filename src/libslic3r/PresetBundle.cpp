@@ -425,16 +425,24 @@ void PresetBundle::load_installed_printers(const AppConfig &config)
         preset.set_visible_from_appconfig(config);
 }
 
-const std::string& PresetBundle::get_preset_name_by_alias( const Preset::Type& preset_type, const std::string& alias) const
+PresetCollection& PresetBundle::get_presets(Preset::Type type)
+{
+    assert(type >= Preset::TYPE_PRINT && type <= Preset::TYPE_PRINTER);
+
+    return  type == Preset::TYPE_PRINT          ? prints        :
+            type == Preset::TYPE_SLA_PRINT      ? sla_prints    :
+            type == Preset::TYPE_FILAMENT       ? filaments     :
+            type == Preset::TYPE_SLA_MATERIAL   ? sla_materials : printers;
+}
+
+
+const std::string& PresetBundle::get_preset_name_by_alias( const Preset::Type& preset_type, const std::string& alias)
 {
     // there are not aliases for Printers profiles
     if (preset_type == Preset::TYPE_PRINTER || preset_type == Preset::TYPE_INVALID)
         return alias;
 
-    const PresetCollection& presets = preset_type == Preset::TYPE_PRINT     ? prints :
-                                      preset_type == Preset::TYPE_SLA_PRINT ? sla_prints :
-                                      preset_type == Preset::TYPE_FILAMENT  ? filaments :
-                                      sla_materials;
+    const PresetCollection& presets = get_presets(preset_type);
 
     return presets.get_preset_name_by_alias(alias);
 }
@@ -442,10 +450,7 @@ const std::string& PresetBundle::get_preset_name_by_alias( const Preset::Type& p
 void PresetBundle::save_changes_for_preset(const std::string& new_name, Preset::Type type,
                                            const std::vector<std::string>& unselected_options)
 {
-    PresetCollection& presets = type == Preset::TYPE_PRINT          ? prints :
-                                type == Preset::TYPE_SLA_PRINT      ? sla_prints :
-                                type == Preset::TYPE_FILAMENT       ? filaments :
-                                type == Preset::TYPE_SLA_MATERIAL   ? sla_materials : printers;
+    PresetCollection& presets = get_presets(type);
 
     // if we want to save just some from selected options
     if (!unselected_options.empty()) {
@@ -466,6 +471,50 @@ void PresetBundle::save_changes_for_preset(const std::string& new_name, Preset::
         // synchronize the first filament presets.
         set_filament_preset(0, filaments.get_selected_preset_name());
     }
+}
+
+bool PresetBundle::transfer_and_save(Preset::Type type, const std::string& preset_from_name, const std::string& preset_to_name,
+                                     const std::string& preset_new_name, const std::vector<std::string>& options)
+{
+    if (options.empty())
+        return false;
+
+    PresetCollection& presets = get_presets(type);
+
+    const Preset* preset_from = presets.find_preset(preset_from_name, false, false);
+    const Preset* preset_to   = presets.find_preset(preset_to_name, false, false);
+    if (!preset_from || !preset_to)
+        return false;
+
+    // Find the preset with a new_name or create a new one,
+    // initialize it with the preset_to config.
+    Preset& preset = presets.get_preset_with_name(preset_new_name, preset_to);
+    if (preset.is_default || preset.is_external || preset.is_system)
+        // Cannot overwrite the default preset.
+        return false;
+
+    // Apply options from the preset_from_name.
+    preset.config.apply_only(preset_from->config, options);
+
+    // Store new_name preset to disk.
+    preset.save();
+
+    // update selection
+    presets.select_preset_by_name(preset_new_name, true);
+
+    // Mark the print & filament enabled if they are compatible with the currently selected preset.
+    // If saving the preset changes compatibility with other presets, keep the now incompatible dependent presets selected, however with a "red flag" icon showing that they are no more compatible.
+    update_compatible(PresetSelectCompatibleType::Never);
+
+    if (type == Preset::TYPE_PRINTER)
+        copy_bed_model_and_texture_if_needed(preset.config);
+
+    if (type == Preset::TYPE_FILAMENT) {
+        // synchronize the first filament presets.
+        set_filament_preset(0, filaments.get_selected_preset_name());
+    }
+
+    return true;
 }
 
 void PresetBundle::load_installed_filaments(AppConfig &config)

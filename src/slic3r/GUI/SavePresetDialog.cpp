@@ -8,7 +8,6 @@
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
-#include <wx/wupdlock.h>
 
 #include "libslic3r/PresetBundle.hpp"
 
@@ -22,25 +21,23 @@ using Slic3r::GUI::format_wxstr;
 namespace Slic3r {
 namespace GUI {
 
-#define BORDER_W 10
-
+constexpr auto BORDER_W = 10;
 
 //-----------------------------------------------
 //          SavePresetDialog::Item
 //-----------------------------------------------
 
-SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBoxSizer* sizer, SavePresetDialog* parent):
-    m_type(type),
-    m_parent(parent)
+std::string SavePresetDialog::Item::get_init_preset_name(const std::string &suffix)
 {
-    Tab* tab = wxGetApp().get_tab(m_type);
-    assert(tab);
-    m_presets = tab->get_presets();
+    PresetBundle*     preset_bundle = m_parent->get_preset_bundle();
+    if (!preset_bundle)
+        preset_bundle = wxGetApp().preset_bundle;
+    m_presets = &preset_bundle->get_presets(m_type);
 
     const Preset& sel_preset = m_presets->get_selected_preset();
-    std::string preset_name =   sel_preset.is_default ? "Untitled" :
-                                sel_preset.is_system ? (boost::format(("%1% - %2%")) % sel_preset.name % suffix).str() :
-                                sel_preset.name;
+    std::string preset_name = sel_preset.is_default ? "Untitled" :
+                              sel_preset.is_system ? (boost::format(("%1% - %2%")) % sel_preset.name % suffix).str() :
+                              sel_preset.name;
 
     // if name contains extension
     if (boost::iends_with(preset_name, ".ini")) {
@@ -48,18 +45,11 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBox
         preset_name.resize(len);
     }
 
-    std::vector<std::string> values;
-    for (const Preset& preset : *m_presets) {
-        if (preset.is_default || preset.is_system || preset.is_external)
-            continue;
-        values.push_back(preset.name);
-    }
+    return preset_name;
+}
 
-    std::string label_str = m_parent->is_for_rename() ?_utf8(L("Rename %s to:")) : _utf8(L("Save %s as:"));
-    wxStaticText* label_top = new wxStaticText(m_parent, wxID_ANY, from_u8((boost::format(label_str) % into_u8(tab->title())).str()));
-
-    m_valid_bmp = new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("tick_mark"));
-
+void SavePresetDialog::Item::init_input_name_ctrl(wxBoxSizer *input_name_sizer, const std::string preset_name)
+{
     if (m_parent->is_for_rename()) {
 #ifdef _WIN32
         long style = wxBORDER_SIMPLE;
@@ -68,10 +58,19 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBox
 #endif
         m_text_ctrl = new wxTextCtrl(m_parent, wxID_ANY, from_u8(preset_name), wxDefaultPosition, wxSize(35 * wxGetApp().em_unit(), -1), style);
         m_text_ctrl->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { update(); });
+
+        input_name_sizer->Add(m_text_ctrl,1, wxEXPAND, BORDER_W);
     }
     else {
+        std::vector<std::string> values;
+        for (const Preset&preset : *m_presets) {
+            if (preset.is_default || preset.is_system || preset.is_external)
+                continue;
+            values.push_back(preset.name);
+        }
+
         m_combo = new wxComboBox(m_parent, wxID_ANY, from_u8(preset_name), wxDefaultPosition, wxSize(35 * wxGetApp().em_unit(), -1));
-        for (const std::string& value : values)
+        for (const std::string&value : values)
             m_combo->Append(from_u8(value));
 
         m_combo->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { update(); });
@@ -80,20 +79,34 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBox
         // So process wxEVT_COMBOBOX too
         m_combo->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) { update(); });
 #endif //__WXOSX__
-    }
 
-    m_valid_label = new wxStaticText(m_parent, wxID_ANY, "");
+        input_name_sizer->Add(m_combo,    1, wxEXPAND, BORDER_W);
+    }
+}
+
+wxString SavePresetDialog::Item::get_top_label_text() const 
+{
+    const std::string label_str = m_parent->is_for_rename() ?_u8L("Rename %s to:") : _u8L("Save %s as:");
+    Tab* tab = wxGetApp().get_tab(m_type);
+    return from_u8((boost::format(label_str) % into_u8(tab->title())).str());
+}
+
+SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBoxSizer* sizer, SavePresetDialog* parent):
+    m_type(type),
+    m_parent(parent),
+    m_valid_bmp(new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("tick_mark"))),
+    m_valid_label(new wxStaticText(m_parent, wxID_ANY, ""))
+{
     m_valid_label->SetFont(wxGetApp().bold_font());
 
-    wxBoxSizer* combo_sizer = new wxBoxSizer(wxHORIZONTAL);
-    combo_sizer->Add(m_valid_bmp,    0, wxALIGN_CENTER_VERTICAL | wxRIGHT, BORDER_W);
-    if (m_parent->is_for_rename())
-        combo_sizer->Add(m_text_ctrl,1, wxEXPAND, BORDER_W);
-    else
-        combo_sizer->Add(m_combo,    1, wxEXPAND, BORDER_W);
+    wxStaticText* label_top = new wxStaticText(m_parent, wxID_ANY, get_top_label_text());
+
+    wxBoxSizer* input_name_sizer = new wxBoxSizer(wxHORIZONTAL);
+    input_name_sizer->Add(m_valid_bmp,    0, wxALIGN_CENTER_VERTICAL | wxRIGHT, BORDER_W);
+    init_input_name_ctrl(input_name_sizer, get_init_preset_name(suffix));
 
     sizer->Add(label_top,       0, wxEXPAND | wxTOP| wxBOTTOM, BORDER_W);
-    sizer->Add(combo_sizer,     0, wxEXPAND | wxBOTTOM, BORDER_W);
+    sizer->Add(input_name_sizer,0, wxEXPAND | wxBOTTOM, BORDER_W);
     sizer->Add(m_valid_label,   0, wxEXPAND | wxLEFT,   3*BORDER_W);
 
     if (m_type == Preset::TYPE_PRINTER)
@@ -107,7 +120,7 @@ void SavePresetDialog::Item::update()
     bool rename = m_parent->is_for_rename();
     m_preset_name = into_u8(rename ? m_text_ctrl->GetValue() : m_combo->GetValue());
 
-    m_valid_type = Valid;
+    m_valid_type = ValidationType::Valid;
     wxString info_line;
 
     const char* unusable_symbols = "<>[]:/\\|?*\"";
@@ -117,44 +130,44 @@ void SavePresetDialog::Item::update()
         if (m_preset_name.find_first_of(unusable_symbols[i]) != std::string::npos) {
             info_line = _L("The supplied name is not valid;") + "\n" +
                         _L("the following characters are not allowed:") + " " + unusable_symbols;
-            m_valid_type = NoValid;
+            m_valid_type = ValidationType::NoValid;
             break;
         }
     }
 
-    if (m_valid_type == Valid && m_preset_name.find(unusable_suffix) != std::string::npos) {
+    if (m_valid_type == ValidationType::Valid && m_preset_name.find(unusable_suffix) != std::string::npos) {
         info_line = _L("The supplied name is not valid;") + "\n" +
                     _L("the following suffix is not allowed:") + "\n\t" +
                     from_u8(PresetCollection::get_suffix_modified());
-        m_valid_type = NoValid;
+        m_valid_type = ValidationType::NoValid;
     }
 
-    if (m_valid_type == Valid && m_preset_name == "- default -") {
+    if (m_valid_type == ValidationType::Valid && m_preset_name == "- default -") {
         info_line = _L("The supplied name is not available.");
-        m_valid_type = NoValid;
+        m_valid_type = ValidationType::NoValid;
     }
 
     const Preset* existing = m_presets->find_preset(m_preset_name, false);
-    if (m_valid_type == Valid && existing && (existing->is_default || existing->is_system)) {
+    if (m_valid_type == ValidationType::Valid && existing && (existing->is_default || existing->is_system)) {
         info_line = rename ? _L("The supplied name is used for a system profile.") :
                              _L("Cannot overwrite a system profile.");
-        m_valid_type = NoValid;
+        m_valid_type = ValidationType::NoValid;
     }
 
-    if (m_valid_type == Valid && existing && (existing->is_external)) {
+    if (m_valid_type == ValidationType::Valid && existing && (existing->is_external)) {
         info_line = rename ? _L("The supplied name is used for a external profile.") :
                              _L("Cannot overwrite an external profile.");
-        m_valid_type = NoValid;
+        m_valid_type = ValidationType::NoValid;
     }
 
-    if (m_valid_type == Valid && existing)
+    if (m_valid_type == ValidationType::Valid && existing)
     {
         if (m_preset_name == m_presets->get_selected_preset_name()) {
             if (!rename && m_presets->get_edited_preset().is_dirty)
                 info_line = _L("Just save preset modifications");
             else
                 info_line = _L("Nothing changed");
-            m_valid_type = Valid;
+            m_valid_type = ValidationType::Valid;
         }
         else {
             if (existing->is_compatible)
@@ -162,31 +175,31 @@ void SavePresetDialog::Item::update()
             else
                 info_line = from_u8((boost::format(_u8L("Preset with name \"%1%\" already exists and is incompatible with selected printer.")) % m_preset_name).str());
             info_line += "\n" + _L("Note: This preset will be replaced after saving");
-            m_valid_type = Warning;
+            m_valid_type = ValidationType::Warning;
         }
     }
 
-    if (m_valid_type == Valid && m_preset_name.empty()) {
+    if (m_valid_type == ValidationType::Valid && m_preset_name.empty()) {
         info_line = _L("The name cannot be empty.");
-        m_valid_type = NoValid;
+        m_valid_type = ValidationType::NoValid;
     }
 
-    if (m_valid_type == Valid && m_preset_name.find_first_of(' ') == 0) {
+    if (m_valid_type == ValidationType::Valid && m_preset_name.find_first_of(' ') == 0) {
         info_line = _L("The name cannot start with space character.");
-        m_valid_type = NoValid;
+        m_valid_type = ValidationType::NoValid;
     }
 
-    if (m_valid_type == Valid && m_preset_name.find_last_of(' ') == m_preset_name.length()-1) {
+    if (m_valid_type == ValidationType::Valid && m_preset_name.find_last_of(' ') == m_preset_name.length()-1) {
         info_line = _L("The name cannot end with space character.");
-        m_valid_type = NoValid;
+        m_valid_type = ValidationType::NoValid;
     }
 
-    if (m_valid_type == Valid && m_presets->get_preset_name_by_alias(m_preset_name) != m_preset_name) {
+    if (m_valid_type == ValidationType::Valid && m_presets->get_preset_name_by_alias(m_preset_name) != m_preset_name) {
         info_line = _L("The name cannot be the same as a preset alias name.");
-        m_valid_type = NoValid;
+        m_valid_type = ValidationType::NoValid;
     }
 
-    if (!m_parent->get_info_line_extention().IsEmpty() && m_valid_type != NoValid)
+    if (!m_parent->get_info_line_extention().IsEmpty() && m_valid_type != ValidationType::NoValid)
         info_line += "\n\n" + m_parent->get_info_line_extention();
 
     m_valid_label->SetLabel(info_line);
@@ -202,14 +215,14 @@ void SavePresetDialog::Item::update()
 
 void SavePresetDialog::Item::update_valid_bmp()
 {
-    std::string bmp_name =  m_valid_type == Warning ? "exclamation" :
-                            m_valid_type == NoValid ? "cross"       : "tick_mark" ;
+    std::string bmp_name =  m_valid_type == ValidationType::Warning ? "exclamation" :
+                            m_valid_type == ValidationType::NoValid ? "cross"       : "tick_mark" ;
     m_valid_bmp->SetBitmap(*get_bmp_bundle(bmp_name));
 }
 
 void SavePresetDialog::Item::accept()
 {
-    if (m_valid_type == Warning)
+    if (m_valid_type == ValidationType::Warning)
         m_presets->delete_preset(m_preset_name);
 }
 
@@ -224,8 +237,9 @@ SavePresetDialog::SavePresetDialog(wxWindow* parent, Preset::Type type, std::str
     build(std::vector<Preset::Type>{type}, suffix);
 }
 
-SavePresetDialog::SavePresetDialog(wxWindow* parent, std::vector<Preset::Type> types, std::string suffix)
-    : DPIDialog(parent, wxID_ANY, _L("Save presets"), wxDefaultPosition, wxSize(45 * wxGetApp().em_unit(), 5 * wxGetApp().em_unit()), wxDEFAULT_DIALOG_STYLE | wxICON_WARNING | wxRESIZE_BORDER)
+SavePresetDialog::SavePresetDialog(wxWindow* parent, std::vector<Preset::Type> types, std::string suffix, PresetBundle* preset_bundle/* = nullptr*/)
+    : DPIDialog(parent, wxID_ANY, _L("Save presets"), wxDefaultPosition, wxSize(45 * wxGetApp().em_unit(), 5 * wxGetApp().em_unit()), wxDEFAULT_DIALOG_STYLE | wxICON_WARNING | wxRESIZE_BORDER),
+    m_preset_bundle(preset_bundle)
 {
     build(types, suffix);
 }

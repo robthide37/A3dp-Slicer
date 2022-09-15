@@ -29,7 +29,7 @@ class SavePresetDialog : public DPIDialog
 
     struct Item
     {
-        enum ValidationType
+        enum class ValidationType
         {
             Valid,
             NoValid,
@@ -41,15 +41,15 @@ class SavePresetDialog : public DPIDialog
         void            update_valid_bmp();
         void            accept();
 
-        bool            is_valid()      const { return m_valid_type != NoValid; }
+        bool            is_valid()      const { return m_valid_type != ValidationType::NoValid; }
         Preset::Type    type()          const { return m_type; }
         std::string     preset_name()   const { return m_preset_name; }
 
     private:
         Preset::Type    m_type;
-        ValidationType  m_valid_type;
         std::string		m_preset_name;
 
+        ValidationType      m_valid_type    {ValidationType::NoValid};
         SavePresetDialog*   m_parent        {nullptr};
         wxStaticBitmap*     m_valid_bmp     {nullptr};
         wxComboBox*         m_combo         {nullptr};
@@ -58,7 +58,11 @@ class SavePresetDialog : public DPIDialog
 
         PresetCollection*   m_presets       {nullptr};
 
-        void update();
+        std::string get_init_preset_name(const std::string &suffix);
+        void        init_input_name_ctrl(wxBoxSizer *input_name_sizer, std::string preset_name);
+        wxString    get_top_label_text() const ;
+
+        void        update();
     };
 
     std::vector<Item*>   m_items;
@@ -73,16 +77,21 @@ class SavePresetDialog : public DPIDialog
     bool                m_use_for_rename{false};
     wxString            m_info_line_extention{wxEmptyString};
 
+    PresetBundle*       m_preset_bundle{ nullptr };
+
 public:
 
     const wxString& get_info_line_extention() { return m_info_line_extention; }
 
     SavePresetDialog(wxWindow* parent, Preset::Type type, std::string suffix = "");
-    SavePresetDialog(wxWindow* parent, std::vector<Preset::Type> types, std::string suffix = "");
+    SavePresetDialog(wxWindow* parent, std::vector<Preset::Type> types, std::string suffix = "", PresetBundle* preset_bundle = nullptr);
     SavePresetDialog(wxWindow* parent, Preset::Type type, bool rename, const wxString& info_line_extention);
     ~SavePresetDialog();
 
     void AddItem(Preset::Type type, const std::string& suffix);
+
+    void set_preset_bundle(PresetBundle* preset_bundle) { m_preset_bundle = preset_bundle; }
+    PresetBundle* get_preset_bundle() const             { return m_preset_bundle; }
 
     std::string get_name();
     std::string get_name(Preset::Type type);

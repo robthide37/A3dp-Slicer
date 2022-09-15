@@ -2540,8 +2540,7 @@ bool GUI_App::check_and_save_current_preset_changes(const wxString& caption, con
             // synchronize config.ini with the current selections.
             preset_bundle->export_selections(*app_config);
 
-            MessageDialog(nullptr, _L_PLURAL("The preset modifications are successfully saved", 
-                                             "The presets modifications are successfully saved", dlg.get_names_and_types().size())).ShowModal();
+            MessageDialog(nullptr, dlg.msg_success_saved_modifications(dlg.get_names_and_types().size())).ShowModal();
         }
     }
 
@@ -2601,8 +2600,7 @@ bool GUI_App::check_and_keep_current_preset_changes(const wxString& caption, con
                 // synchronize config.ini with the current selections.
                 preset_bundle->export_selections(*app_config);
 
-                wxString text = _L_PLURAL("The preset modifications are successfully saved",
-                    "The presets modifications are successfully saved", preset_names_and_types.size());
+                wxString text = dlg.msg_success_saved_modifications(preset_names_and_types.size());
                 if (!is_called_from_configwizard)
                     text += "\n\n" + _L("For new project all modifications will be reseted");
 

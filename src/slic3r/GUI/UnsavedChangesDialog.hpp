@@ -16,7 +16,6 @@ namespace Slic3r {
 namespace GUI{
 
 wxDECLARE_EVENT(EVT_DIFF_DIALOG_TRANSFER, SimpleEvent);
-wxDECLARE_EVENT(EVT_DIFF_DIALOG_SAVE, SimpleEvent);
 
 // ----------------------------------------------------------------------------
 //                  ModelNode: a node inside DiffModel
@@ -321,6 +320,8 @@ public:
     std::vector<std::string> get_selected_options()                     { return m_tree->selected_options(); }
     bool                     has_unselected_options()                   { return m_tree->has_unselected_options(); }
 
+    static wxString msg_success_saved_modifications(size_t saved_presets_cnt);
+
 protected:
     void on_dpi_changed(const wxRect& suggested_rect) override;
     void on_sys_color_changed() override;
@@ -376,6 +377,7 @@ class DiffPresetDialog : public DPIDialog
     void update_compatibility(const std::string& preset_name, Preset::Type type, PresetBundle* preset_bundle);
          
     void button_event(Action act);
+    bool save();
 
     struct DiffPresets
     {
@@ -385,6 +387,17 @@ class DiffPresetDialog : public DPIDialog
     };
 
     std::vector<DiffPresets> m_preset_combos;
+
+    // attributes witch are used for save preset
+    struct PresetToSave
+    {
+        Preset::Type    type;
+        std::string     from_name;
+        std::string     to_name;
+        std::string     new_name;
+    };
+
+    std::vector<PresetToSave>  presets_to_saves;
 
 public:
     DiffPresetDialog(MainFrame*mainframe);
