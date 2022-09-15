@@ -367,7 +367,16 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
     case 'T':
     {
         // Activate an extruder head.
-        int new_extruder = parse_int(line);
+        int new_extruder = -1;
+        try {
+            new_extruder = parse_int(line);
+        } catch (Slic3r::InvalidArgument &) {
+            // Ignore invalid GCodes starting with T.
+            eatws(line);
+            break;
+        }
+        assert(new_extruder != -1);
+
         if (new_extruder != int(m_current_extruder)) {
             m_current_extruder = new_extruder;
             m_retracted = true;
