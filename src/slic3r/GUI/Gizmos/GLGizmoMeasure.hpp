@@ -76,6 +76,12 @@ class GLGizmoMeasure : public GLGizmoBase
     PickingModel m_cylinder;
     PickingModel m_circle;
     PickingModel m_plane;
+    struct Dimensioning
+    {
+        GLModel line;
+        GLModel triangle;
+    }; 
+    Dimensioning m_dimensioning;
 
     Transform3d m_volume_matrix{ Transform3d::Identity() };
     std::vector<GLModel> m_plane_models_cache;
@@ -108,6 +114,8 @@ class GLGizmoMeasure : public GLGizmoBase
 
     void disable_scene_raycasters();
     void restore_scene_raycasters_state();
+
+    void render_dimensioning();
 
 #if ENABLE_MEASURE_GIZMO_DEBUG
     void render_debug_dialog();

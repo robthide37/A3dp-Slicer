@@ -27,6 +27,9 @@ static const int EDGE_ID          = 200;
 static const int CIRCLE_ID        = 300;
 static const int PLANE_ID         = 400;
 
+static const float TRIANGLE_BASE = 16.0f;
+static const float TRIANGLE_HEIGHT = TRIANGLE_BASE * 1.618033f;
+
 static const std::string CTRL_STR =
 #ifdef __APPLE__
 "⌘"
@@ -537,6 +540,8 @@ void GLGizmoMeasure::on_render()
 
         shader->stop_using();
     }
+
+    render_dimensioning();
 }
 
 void GLGizmoMeasure::update_if_needed()
@@ -619,6 +624,147 @@ void GLGizmoMeasure::restore_scene_raycasters_state()
             (*m_scene_raycasters)[i]->set_active(m_scene_raycaster_state[i]);
         }
     }
+}
+
+void GLGizmoMeasure::render_dimensioning()
+{
+    if (!m_selected_features.first.feature.has_value() || !m_selected_features.second.feature.has_value())
+        return;
+
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    if (shader == nullptr)
+        return;
+
+    auto point_point_2D = [this, shader](const Vec3d& v1, const Vec3d& v2) {
+        if (v1.isApprox(v2))
+            return;
+
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        const Transform3d& projection_matrix = camera.get_projection_matrix();
+        const Matrix4d projection_view_matrix = projection_matrix.matrix() * view_matrix.matrix();
+        const std::array<int, 4>& viewport = camera.get_viewport();
+        const double inv_zoom = camera.get_inv_zoom();
+
+        auto model_to_world = [this](const Vec3d& model) {
+            return (Vec3d)(m_volume_matrix * model);
+        };
+
+        auto world_to_clip = [&projection_view_matrix](const Vec3d& world) {
+            return (Vec4d)(projection_view_matrix * Vec4d(world.x(), world.y(), world.z(), 1.0));
+        };
+
+        auto clip_to_ndc = [](const Vec4d& clip) {
+            return Vec2d(clip.x(), clip.y()) / clip.w();
+        };
+
+        const double half_w = 0.5 * double(viewport[2]);
+        const double half_h = 0.5 * double(viewport[3]);
+
+        auto ndc_to_ss = [&viewport, half_w, half_h](const Vec2d& ndc) {
+            return Vec2d(half_w * ndc.x() + double(viewport[0]) + half_w, half_h * ndc.y() + double(viewport[1]) + half_h);
+        };
+
+        Matrix4d ndc_to_ss_matrix;
+        ndc_to_ss_matrix << half_w, 0.0, 0.0, double(viewport[0]) + half_w,
+            0.0, half_h, 0.0, double(viewport[1]) + half_h,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0;
+
+        const Transform3d ss_to_ndc_matrix = Transform3d(ndc_to_ss_matrix.inverse());
+
+        // ndc coordinates
+        const Vec2d v1ndc = clip_to_ndc(world_to_clip(model_to_world(v1)));
+        const Vec2d v2ndc = clip_to_ndc(world_to_clip(model_to_world(v2)));
+        const Vec2d v12ndc = v2ndc - v1ndc;
+        const double v12ndc_len = v12ndc.norm();
+
+        // screen coordinates
+        const Vec2d v1ss = ndc_to_ss(v1ndc);
+        const Vec2d v2ss = ndc_to_ss(v2ndc);
+
+        if (v1ss.isApprox(v2ss))
+            return;
+
+        const Vec2d v12ss = v2ss - v1ss;
+        const double v12ss_len = v12ss.norm();
+
+        const bool overlap = v12ss_len - 2.0 * TRIANGLE_HEIGHT < 0.0;
+
+        const auto q12ss = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Vec3d(v12ss.x(), v12ss.y(), 0.0));
+        const auto q21ss = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Vec3d(-v12ss.x(), -v12ss.y(), 0.0));
+
+        shader->set_uniform("projection_matrix", Transform3d::Identity());
+
+        const Vec3d v1ss_3 = { v1ss.x(), v1ss.y(), 0.0 };
+        const Vec3d v2ss_3 = { v2ss.x(), v2ss.y(), 0.0 };
+
+        // stem
+        shader->set_uniform("view_model_matrix", overlap ?
+            ss_to_ndc_matrix * Geometry::translation_transform(v1ss_3) * q12ss * Geometry::translation_transform(-2.0 * TRIANGLE_HEIGHT * Vec3d::UnitX()) * Geometry::scale_transform({ v12ss_len + 4.0 * TRIANGLE_HEIGHT, 1.0f, 1.0f }) :
+            ss_to_ndc_matrix * Geometry::translation_transform(v1ss_3) * q12ss * Geometry::scale_transform({ v12ss_len, 1.0f, 1.0f }));
+            m_dimensioning.line.render();
+
+        // arrow 1
+        shader->set_uniform("view_model_matrix", overlap ?
+            ss_to_ndc_matrix * Geometry::translation_transform(v1ss_3) * q12ss :
+            ss_to_ndc_matrix * Geometry::translation_transform(v1ss_3) * q21ss);
+        m_dimensioning.triangle.render();
+
+        // arrow 2
+        shader->set_uniform("view_model_matrix", overlap ?
+            ss_to_ndc_matrix * Geometry::translation_transform(v2ss_3) * q21ss :
+            ss_to_ndc_matrix * Geometry::translation_transform(v2ss_3) * q12ss);
+        m_dimensioning.triangle.render();
+    };
+
+    shader->start_using();
+
+    if (!m_dimensioning.line.is_initialized()) {
+        GLModel::Geometry init_data;
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
+        init_data.color = ColorRGBA::WHITE();
+        init_data.reserve_vertices(2);
+        init_data.reserve_indices(2);
+
+        // vertices
+        init_data.add_vertex(Vec3f(0.0f, 0.0f, 0.0f));
+        init_data.add_vertex(Vec3f(1.0f, 0.0f, 0.0f));
+
+        // indices
+        init_data.add_line(0, 1);
+
+        m_dimensioning.line.init_from(std::move(init_data));
+    }
+
+    if (!m_dimensioning.triangle.is_initialized()) {
+        GLModel::Geometry init_data;
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
+        init_data.color = ColorRGBA::WHITE();
+        init_data.reserve_vertices(3);
+        init_data.reserve_indices(3);
+
+        // vertices
+        init_data.add_vertex(Vec3f(0.0f, 0.0f, 0.0f));
+        init_data.add_vertex(Vec3f(-TRIANGLE_HEIGHT, 0.5f * TRIANGLE_BASE, 0.0f));
+        init_data.add_vertex(Vec3f(-TRIANGLE_HEIGHT, -0.5f * TRIANGLE_BASE, 0.0f));
+
+        // indices
+        init_data.add_triangle(0, 1, 2);
+
+        m_dimensioning.triangle.init_from(std::move(init_data));
+    }
+
+    glsafe(::glDisable(GL_DEPTH_TEST));
+
+    if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
+        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
+        point_point_2D(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_point());
+    }
+
+    glsafe(::glEnable(GL_DEPTH_TEST));
+
+    shader->stop_using();
 }
 
 static void add_row_to_table(std::function<void(void)> col_1 = nullptr, std::function<void(void)> col_2 = nullptr)
