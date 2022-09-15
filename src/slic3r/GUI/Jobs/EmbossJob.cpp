@@ -13,7 +13,6 @@
 #include "slic3r/GUI/MainFrame.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
-#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoEmboss.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
 #include "slic3r/GUI/format.hpp"
@@ -190,11 +189,6 @@ void EmbossCreateVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
         canvas->update_instance_printable_state_for_object(object_idx);
 
     obj_list->selection_changed();
-
-    // WHY selection_changed set manipulation to world ???
-    // so I set it back to local --> RotationGizmo need it
-    ObjectManipulation *manipul = wxGetApp().obj_manipul();
-    manipul->set_coordinates_type(ECoordinatesType::Local);
 
     // redraw scene
     canvas->reload_scene(true);
@@ -613,17 +607,21 @@ void priv::update_volume(TriangleMesh &&mesh,
     volume->set_new_unique_id();
     volume->calculate_convex_hull();
     volume->get_object()->invalidate_bounding_box();
-    volume->name               = data.volume_name;
     volume->text_configuration = data.text_configuration;
 
-    // update volume in right panel( volume / object name)
     const Selection &selection = canvas->get_selection();
     const GLVolume * gl_volume = selection.get_volume(
         *selection.get_volume_idxs().begin());
     int object_idx = gl_volume->object_idx();
-    int volume_idx = gl_volume->volume_idx();
-    ObjectList *obj_list = app.obj_list();
-    obj_list->update_name_in_list(object_idx, volume_idx);
+
+    if (volume->name != data.volume_name) { 
+        volume->name = data.volume_name;
+
+        // update volume name in right panel( volume / object name)
+        int volume_idx = gl_volume->volume_idx();
+        ObjectList *obj_list = app.obj_list();
+        obj_list->update_name_in_list(object_idx, volume_idx);
+    }
 
     // update printable state on canvas
     if (volume->type() == ModelVolumeType::MODEL_PART)
