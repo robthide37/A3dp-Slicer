@@ -19,6 +19,10 @@
 namespace Slic3r {
 namespace GUI {
 
+using Edge = std::pair<Vec3d, Vec3d>;
+using Plane = std::tuple<int, Vec3d, Vec3d>;
+using Circle = std::tuple<Vec3d, double, Vec3d>;
+
 static const Slic3r::ColorRGBA SELECTED_1ST_COLOR   = { 0.25f, 0.75f, 0.75f, 1.0f };
 static const Slic3r::ColorRGBA SELECTED_2ND_COLOR   = { 0.75f, 0.25f, 0.75f, 1.0f };
 
@@ -62,6 +66,46 @@ static std::string point_on_feature_type_as_string(Measure::SurfaceFeatureType t
     default: { assert(false); break; }
     }
     return ret;
+}
+
+static std::tuple<double, Vec3d, Vec3d> distance_point_plane(const Vec3d& v, const Plane& p)
+{
+    const double distance = std::get<1>(p).dot(v - std::get<2>(p));
+    return std::make_tuple(std::abs(distance), v, v - distance * std::get<1>(p));
+}
+
+static std::tuple<double, Vec3d, Vec3d> distance_point_edge(const Vec3d& v, const Edge& e)
+{
+    const Vec3d e1v = v - e.first;
+    const Vec3d e1e2_unit = (e.second - e.first).normalized();
+    const Vec3d v_proj = e.first + e1e2_unit.dot(e1v) * e1e2_unit;
+    return std::make_tuple((e1v - v_proj).norm(), v, v_proj);
+}
+
+static std::tuple<double, Vec3d, Vec3d> distance_point_circle(const Vec3d& v, const Circle& c)
+{
+    const auto& [center, radius, normal] = c;
+    const auto [distance, v1, v2] = distance_point_plane(v, std::make_tuple(0, normal, center));
+    const Vec3d p_on_circle = center + radius * (v2 - center).normalized();
+    return std::make_tuple((v - p_on_circle).norm(), v, p_on_circle);
+}
+
+static std::tuple<double, Vec3d, Vec3d> min_distance_edge_edge(const Edge& e1, const Edge& e2)
+{
+    std::vector<std::tuple<double, Vec3d, Vec3d>> distances;
+    distances.emplace_back(std::make_tuple((e2.first - e1.first).norm(), e1.first, e2.first));
+    distances.emplace_back(std::make_tuple((e2.second - e1.first).norm(), e1.first, e2.second));
+    distances.emplace_back(std::make_tuple((e2.first - e1.second).norm(), e1.second, e2.first));
+    distances.emplace_back(std::make_tuple((e2.second - e1.second).norm(), e1.second, e2.second));
+    distances.emplace_back(distance_point_edge(e1.first, e2));
+    distances.emplace_back(distance_point_edge(e1.second, e2));
+    distances.emplace_back(distance_point_edge(e2.first, e1));
+    distances.emplace_back(distance_point_edge(e2.second, e1));
+    std::sort(distances.begin(), distances.end(),
+        [](const std::tuple<double, Vec3d, Vec3d>& item1, const std::tuple<double, Vec3d, Vec3d>& item2) {
+            return std::get<0>(item1) < std::get<0>(item2);
+        });
+    return distances.front();
 }
 
 static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const std::vector<std::vector<int>>& planes_triangles, int idx)
@@ -757,12 +801,11 @@ void GLGizmoMeasure::render_dimensioning()
         m_dimensioning.triangle.render();
     };
 
-    auto point_edge = [this, shader, point_point](const Vec3d& v, const std::pair<Vec3d, Vec3d>& e) {
-        const Vec3d e1e2 = e.second - e.first;
-        const Vec3d e1e2_unit = e1e2.normalized();
-        const Vec3d v_proj = e.first + e1e2_unit.dot(v - e.first) * e1e2_unit;
-        point_point(v, v_proj);
+    auto point_edge = [this, shader, point_point](const Vec3d& v, const Edge& e) {
+        const auto [distance, v1, v_proj] = distance_point_edge(v, e);
+        point_point(v1, v_proj);
 
+        const Vec3d e1e2 = e.second - e.first;
         const Vec3d v_proje1 = v_proj - e.first;
         bool on_e1_side = v_proje1.dot(e1e2) < 0.0;
         bool on_e2_side = v_proje1.norm() > e1e2.norm();
@@ -792,45 +835,18 @@ void GLGizmoMeasure::render_dimensioning()
         }
     };
 
-    auto point_plane = [shader, point_point](const Vec3d& v, const std::tuple<int, Vec3d, Vec3d>& p) {
-        const auto& [idx, normal, origin] = p;
-        const double distance = normal.dot(v - origin);
-        if (std::abs(distance) < EPSILON)
-            return;
-
-        point_point(v, v - distance * normal);
+    auto point_plane = [point_point](const Vec3d& v, const Plane& p) {
+        const auto [distance, v1, v2] = distance_point_plane(v, p);
+        point_point(v1, v2);
     };
 
-    auto edge_edge = [this, shader, point_point](const std::pair<Vec3d, Vec3d>& e1, const std::pair<Vec3d, Vec3d>& e2) {
-        auto min_distance_edge_edge = [](const std::pair<Vec3d, Vec3d>& e1, const std::pair<Vec3d, Vec3d>& e2) {
-            auto distance_point_edge = [](const Vec3d& v, const std::pair<Vec3d, Vec3d>& e) {
-                const Vec3d e1v = v - e.first;
-                const Vec3d e1e2_unit = (e.second - e.first).normalized();
-                const Vec3d v_proj = e.first + e1e2_unit.dot(v - e.first) * e1e2_unit;
-                return std::make_pair((e1v - v_proj).norm(), v_proj);
-            };
+    auto point_circle = [point_point](const Vec3d& v, const Circle& c) {
+        const auto [distance, v1, v2] = distance_point_circle(v, c);
+        point_point(v1, v2);
+    };
 
-            std::vector<std::tuple<double, Vec3d, Vec3d>> distances;
-            distances.emplace_back(std::make_tuple((e2.first - e1.first).norm(), e1.first, e2.first));
-            distances.emplace_back(std::make_tuple((e2.second - e1.first).norm(), e1.first, e2.second));
-            distances.emplace_back(std::make_tuple((e2.first - e1.second).norm(), e1.second, e2.first));
-            distances.emplace_back(std::make_tuple((e2.second - e1.second).norm(), e1.second, e2.second));
-            const auto dist_e11e2 = distance_point_edge(e1.first, e2);
-            distances.emplace_back(std::make_tuple(dist_e11e2.first, e1.first, dist_e11e2.second));
-            const auto dist_e12e2 = distance_point_edge(e1.second, e2);
-            distances.emplace_back(std::make_tuple(dist_e12e2.first, e1.second, dist_e12e2.second));
-            const auto dist_e21e1 = distance_point_edge(e2.first, e1);
-            distances.emplace_back(std::make_tuple(dist_e21e1.first, e2.first, dist_e21e1.second));
-            const auto dist_e22e1 = distance_point_edge(e2.second, e1);
-            distances.emplace_back(std::make_tuple(dist_e22e1.first, e2.second, dist_e22e1.second));
-            std::sort(distances.begin(), distances.end(),
-                [](const std::tuple<double, Vec3d, Vec3d>& item1, const std::tuple<double, Vec3d, Vec3d>& item2) {
-                    return std::get<0>(item1) < std::get<0>(item2);
-                });
-            return distances.front();
-        };
-
-        const auto [dist, v1, v2] = min_distance_edge_edge(e1, e2);
+    auto edge_edge = [point_point](const Edge& e1, const Edge& e2) {
+        const auto [distance, v1, v2] = min_distance_edge_edge(e1, e2);
         point_point(v1, v2);
     };
 
@@ -873,26 +889,42 @@ void GLGizmoMeasure::render_dimensioning()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
+    // point-point
     if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
         point_point(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_point());
     }
+    // point-edge
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
         point_edge(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_edge());
     }
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
-        point_edge(m_selected_features.second.feature->get_point(), m_selected_features.first.feature->get_edge());
-    }
+    // point-plane
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Plane) {
         point_plane(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_plane());
     }
+    // point-circle
+    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
+        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Circle) {
+        point_circle(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_circle());
+    }
+    // edge-point
+    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
+        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
+        point_edge(m_selected_features.second.feature->get_point(), m_selected_features.first.feature->get_edge());
+    }
+    // plane-point
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Plane &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
         point_plane(m_selected_features.second.feature->get_point(), m_selected_features.first.feature->get_plane());
     }
+    // circle-point
+    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Circle &&
+        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
+        point_circle(m_selected_features.second.feature->get_point(), m_selected_features.first.feature->get_circle());
+    }
+    // edge-edge
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
         edge_edge(m_selected_features.first.feature->get_edge(), m_selected_features.second.feature->get_edge());
