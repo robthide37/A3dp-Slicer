@@ -89,6 +89,14 @@ static std::tuple<double, Vec3d, Vec3d> distance_point_circle(const Vec3d& v, co
     return std::make_tuple((v - p_on_circle).norm(), v, p_on_circle);
 }
 
+static std::tuple<double, Vec3d, Vec3d> distance_plane_plane(const Plane& p1, const Plane& p2)
+{
+    const auto& [idx1, normal1, origin1] = p1;
+    const auto& [idx2, normal2, origin2] = p2;
+    return (std::abs(std::abs(normal1.dot(normal2)) - 1.0) < EPSILON) ? distance_point_plane(origin2, p1) :
+        std::make_tuple(0.0, Vec3d::Zero(), Vec3d::Zero());
+}
+
 static std::tuple<double, Vec3d, Vec3d> min_distance_edge_edge(const Edge& e1, const Edge& e2)
 {
     std::vector<std::tuple<double, Vec3d, Vec3d>> distances;
@@ -726,8 +734,6 @@ private:
         if (s_cache.viewport == viewport)
             return;
 
-        std::cout << "DimensioningHelper::update()\n";
-
         const double half_w = 0.5 * double(viewport[2]);
         const double half_h = 0.5 * double(viewport[3]);
         s_cache.ndc_to_ss_matrix << half_w, 0.0, 0.0, double(viewport[0]) + half_w,
@@ -849,6 +855,11 @@ void GLGizmoMeasure::render_dimensioning()
         point_point(v1, v2);
     };
 
+    auto plane_plane = [point_point](const Plane& p1, const Plane& p2) {
+        const auto [distance, v1, v2] = distance_plane_plane(p1, p2);
+        point_point(v1, v2);
+    };
+
     shader->start_using();
 
     if (!m_dimensioning.line.is_initialized()) {
@@ -927,6 +938,11 @@ void GLGizmoMeasure::render_dimensioning()
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
         edge_edge(m_selected_features.first.feature->get_edge(), m_selected_features.second.feature->get_edge());
+    }
+    // plane-plane
+    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Plane &&
+        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Plane) {
+        plane_plane(m_selected_features.first.feature->get_plane(), m_selected_features.second.feature->get_plane());
     }
 
     glsafe(::glEnable(GL_DEPTH_TEST));
