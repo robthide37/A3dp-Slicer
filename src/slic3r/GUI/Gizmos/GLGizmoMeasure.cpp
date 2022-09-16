@@ -792,13 +792,46 @@ void GLGizmoMeasure::render_dimensioning()
         }
     };
 
-    auto point_plane = [this, shader, point_point](const Vec3d& v, const std::tuple<int, Vec3d, Vec3d>& p) {
+    auto point_plane = [shader, point_point](const Vec3d& v, const std::tuple<int, Vec3d, Vec3d>& p) {
         const auto& [idx, normal, origin] = p;
         const double distance = normal.dot(v - origin);
         if (std::abs(distance) < EPSILON)
             return;
 
         point_point(v, v - distance * normal);
+    };
+
+    auto edge_edge = [this, shader, point_point](const std::pair<Vec3d, Vec3d>& e1, const std::pair<Vec3d, Vec3d>& e2) {
+        auto min_distance_edge_edge = [](const std::pair<Vec3d, Vec3d>& e1, const std::pair<Vec3d, Vec3d>& e2) {
+            auto distance_point_edge = [](const Vec3d& v, const std::pair<Vec3d, Vec3d>& e) {
+                const Vec3d e1v = v - e.first;
+                const Vec3d e1e2_unit = (e.second - e.first).normalized();
+                const Vec3d v_proj = e.first + e1e2_unit.dot(v - e.first) * e1e2_unit;
+                return std::make_pair((e1v - v_proj).norm(), v_proj);
+            };
+
+            std::vector<std::tuple<double, Vec3d, Vec3d>> distances;
+            distances.emplace_back(std::make_tuple((e2.first - e1.first).norm(), e1.first, e2.first));
+            distances.emplace_back(std::make_tuple((e2.second - e1.first).norm(), e1.first, e2.second));
+            distances.emplace_back(std::make_tuple((e2.first - e1.second).norm(), e1.second, e2.first));
+            distances.emplace_back(std::make_tuple((e2.second - e1.second).norm(), e1.second, e2.second));
+            const auto dist_e11e2 = distance_point_edge(e1.first, e2);
+            distances.emplace_back(std::make_tuple(dist_e11e2.first, e1.first, dist_e11e2.second));
+            const auto dist_e12e2 = distance_point_edge(e1.second, e2);
+            distances.emplace_back(std::make_tuple(dist_e12e2.first, e1.second, dist_e12e2.second));
+            const auto dist_e21e1 = distance_point_edge(e2.first, e1);
+            distances.emplace_back(std::make_tuple(dist_e21e1.first, e2.first, dist_e21e1.second));
+            const auto dist_e22e1 = distance_point_edge(e2.second, e1);
+            distances.emplace_back(std::make_tuple(dist_e22e1.first, e2.second, dist_e22e1.second));
+            std::sort(distances.begin(), distances.end(),
+                [](const std::tuple<double, Vec3d, Vec3d>& item1, const std::tuple<double, Vec3d, Vec3d>& item2) {
+                    return std::get<0>(item1) < std::get<0>(item2);
+                });
+            return distances.front();
+        };
+
+        const auto [dist, v1, v2] = min_distance_edge_edge(e1, e2);
+        point_point(v1, v2);
     };
 
     shader->start_using();
@@ -859,6 +892,10 @@ void GLGizmoMeasure::render_dimensioning()
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Plane &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
         point_plane(m_selected_features.second.feature->get_point(), m_selected_features.first.feature->get_plane());
+    }
+    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
+        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
+        edge_edge(m_selected_features.first.feature->get_edge(), m_selected_features.second.feature->get_edge());
     }
 
     glsafe(::glEnable(GL_DEPTH_TEST));
