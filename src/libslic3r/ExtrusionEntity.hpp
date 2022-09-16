@@ -469,9 +469,14 @@ public:
     const Point& last_point() const override { assert(this->first_point() == this->paths.back().polyline.points.back()); return this->first_point(); }
     Polygon polygon() const;
     double length() const override;
-    bool split_at_vertex(const Point &point);
-    void split_at(const Point &point, bool prefer_non_overhang);
-    std::pair<size_t, Point> get_closest_path_and_point(const Point& point, bool prefer_non_overhang) const;
+    bool split_at_vertex(const Point &point, const coordf_t scaled_epsilon = scale_d(0.001));
+    void split_at(const Point &point, bool prefer_non_overhang, const coordf_t scaled_epsilon = scale_d(0.001));
+    struct ClosestPathPoint {
+        size_t path_idx;
+        size_t segment_idx;
+        Point  foot_pt;
+    };
+    ClosestPathPoint get_closest_path_and_point(const Point& point, bool prefer_non_overhang) const;
     // Test, whether the point is extruded by a bridging flow.
     // This used to be used to avoid placing seams on overhangs, but now the EdgeGrid is used instead.
     bool has_overhang_point(const Point &point) const;

@@ -4135,10 +4135,19 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
         if (result != wxID_OK && result != wxID_APPLY)
             return;
         name = dlg.get_name();
-        }
+    }
+
+    // Print bed has to be updated, when printer preset is detached from the system preset
+    if (detach && m_type == Preset::TYPE_PRINTER)
+        m_config->opt_string("printer_model", true) = "";
 
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
     m_presets->save_current_preset(name, detach);
+
+    // Print bed has to be updated, when printer preset is detached from the system preset
+    if (detach && m_type == Preset::TYPE_PRINTER)
+        wxGetApp().mainframe->on_config_changed(m_config);
+
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     // If saving the preset changes compatibility with other presets, keep the now incompatible dependent presets selected, however with a "red flag" icon showing that they are no more compatible.
     m_preset_bundle->update_compatible(PresetSelectCompatibleType::Never);
@@ -4193,6 +4202,10 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
 
     // update preset comboboxes in DiffPresetDlg
     wxGetApp().mainframe->diff_dialog.update_presets(m_type);
+
+    //when "Detach from system preset" makes the btton disappear after click on it and detaching of the profile from system profile
+    if (detach)
+        update_description_lines();
 }
 
 // Called for a currently selected preset.

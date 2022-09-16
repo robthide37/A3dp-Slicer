@@ -3424,6 +3424,7 @@ static inline void fill_expolygon_generate_paths(
     new_params.role = role;
     filler->init_spacing(spacing, new_params);
     {
+        assert(!fill_params.use_arachne);
         Surface surface(stPosInternal | stDensSparse, std::move(expolygon));
         //TODO: catch exception here?
         filler->fill_surface_extrusion(&surface, new_params, dst);

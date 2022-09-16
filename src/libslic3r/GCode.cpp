@@ -3,7 +3,6 @@
 #include "GCode.hpp"
 #include "Exception.hpp"
 #include "ExtrusionEntity.hpp"
-#include "EdgeGrid.hpp"
 #include "Geometry/ConvexHull.hpp"
 #include "GCode/FanMover.hpp"
 #include "GCode/PrintExtents.hpp"
@@ -40,6 +39,8 @@
 #include "SVG.hpp"
 
 #include <tbb/parallel_for.h>
+#include <tbb/task_scheduler_observer.h>
+#include <tbb/enumerable_thread_specific.h>
 
 // Intel redesigned some TBB interface considerably when merging TBB with their oneAPI set of libraries, see GH #7332.
 // We are using quite an old TBB 2017 U7. Before we update our build servers, let's use the old API, which is deprecated in up to date TBB.
@@ -517,7 +518,7 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
                 bool ignore_sparse = false;
                 if (gcodegen.config().wipe_tower_no_sparse_layers.value) {
                     wipe_tower_z = m_last_wipe_tower_print_z;
-                    ignore_sparse = (m_tool_changes[m_layer_idx].size() == 1 && m_tool_changes[m_layer_idx].front().initial_tool == m_tool_changes[m_layer_idx].front().new_tool);
+                    ignore_sparse = (m_tool_changes[m_layer_idx].size() == 1 && m_tool_changes[m_layer_idx].front().initial_tool == m_tool_changes[m_layer_idx].front().new_tool && m_layer_idx != 0);
                     if (m_tool_change_idx == 0 && !ignore_sparse)
                         wipe_tower_z = m_last_wipe_tower_print_z + m_tool_changes[m_layer_idx].front().layer_height;
                 }
@@ -593,21 +594,22 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
     size_t idx_support_layer = 0;
     const LayerToPrint* last_extrusion_layer = nullptr;
     while (idx_object_layer < object.layers().size() || idx_support_layer < object.support_layers().size()) {
-        LayerToPrint layer_to_print;
-        layer_to_print.object_layer = (idx_object_layer < object.layers().size()) ? object.layers()[idx_object_layer++] : nullptr;
-        layer_to_print.support_layer = (idx_support_layer < object.support_layers().size()) ? object.support_layers()[idx_support_layer++] : nullptr;
-        if (layer_to_print.object_layer && layer_to_print.support_layer) {
-            if (layer_to_print.object_layer->print_z < layer_to_print.support_layer->print_z - EPSILON) {
-                layer_to_print.support_layer = nullptr;
+        LayerToPrint layer_to_add_to_print;
+        layer_to_add_to_print.object_layer = (idx_object_layer < object.layers().size()) ? object.layers()[idx_object_layer++] : nullptr;
+        layer_to_add_to_print.support_layer = (idx_support_layer < object.support_layers().size()) ? object.support_layers()[idx_support_layer++] : nullptr;
+        if (layer_to_add_to_print.object_layer && layer_to_add_to_print.support_layer) {
+            if (layer_to_add_to_print.object_layer->print_z < layer_to_add_to_print.support_layer->print_z - EPSILON) {
+                layer_to_add_to_print.support_layer = nullptr;
                 --idx_support_layer;
             }
-            else if (layer_to_print.support_layer->print_z < layer_to_print.object_layer->print_z - EPSILON) {
-                layer_to_print.object_layer = nullptr;
+            else if (layer_to_add_to_print.support_layer->print_z < layer_to_add_to_print.object_layer->print_z - EPSILON) {
+                layer_to_add_to_print.object_layer = nullptr;
                 --idx_object_layer;
             }
         }
 
-        layers_to_print.emplace_back(layer_to_print);
+        layers_to_print.push_back(std::move(layer_to_add_to_print));
+        const LayerToPrint& layer_to_print = layers_to_print.back();
 
         bool has_extrusions = (layer_to_print.object_layer && layer_to_print.object_layer->has_extrusions())
             || (layer_to_print.support_layer && layer_to_print.support_layer->has_extrusions());
@@ -630,7 +632,7 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
                 extra_gap = raft_cd;
             }
             if (object.config().support_material_contact_distance_type.value == SupportZDistanceType::zdNone) {
-                extra_gap = 0;
+                extra_gap = layer_to_print.layer()->height;
             } else if (object.config().support_material_contact_distance_type.value == SupportZDistanceType::zdFilament) {
                 //compute the height of bridge.
                 if (layer_to_print.layer()->id() > 0 && !layer_to_print.layer()->regions().empty()) {
@@ -1350,14 +1352,11 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
     if (print.config().spiral_vase.value)
         m_spiral_vase = make_unique<SpiralVase>(print.config());
-#ifdef HAS_PRESSURE_EQUALIZER
+
     if (print.config().max_volumetric_extrusion_rate_slope_positive.value > 0 ||
         print.config().max_volumetric_extrusion_rate_slope_negative.value > 0)
-        m_pressure_equalizer = make_unique<PressureEqualizer>(&print.config());
+        m_pressure_equalizer = make_unique<PressureEqualizer>(print.config());
     m_enable_extrusion_role_markers = (bool)m_pressure_equalizer;
-#else /* HAS_PRESSURE_EQUALIZER */
-    m_enable_extrusion_role_markers = false;
-#endif /* HAS_PRESSURE_EQUALIZER */
 
     // Write information on the generator.
     file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
@@ -1368,6 +1367,8 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     if(!thumbnails_end_file || !thumbnails_end_file->value) {
         const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
         const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+        // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
+        // If "thumbnails_format" is not defined, export to PNG.
         GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb,
             print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
             thumbnails_with_bed == nullptr ? false : thumbnails_with_bed->value,
@@ -1720,7 +1721,8 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     print.throw_if_canceled();
 
     // Collect custom seam data from all objects.
-    m_seam_placer.init(print);
+    std::function<void(void)> throw_if_canceled_func = [&print]() { print.throw_if_canceled();};
+    m_seam_placer.init(print, throw_if_canceled_func);
 
     //activate first extruder is multi-extruder and not in start-gcode
     if ((initial_extruder_id != (uint16_t)-1)) {
@@ -1826,7 +1828,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
                     set_extra_lift(0, 0, print.config(), m_writer, initial_extruder_id);
                 }
                 //reinit the seam placer on the new object
-                m_seam_placer.init(print);
+                m_seam_placer.init(print, throw_if_canceled_func);
                 // Reset the cooling buffer internal state (the current position, feed rate, accelerations).
                 m_cooling_buffer->reset(this->writer().get_position());
                 m_cooling_buffer->set_current_extruder(initial_extruder_id);
@@ -1834,10 +1836,6 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
                 // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
                 // and export G-code into file.
                 this->process_layers(print, print.m_print_statistics, tool_ordering, collect_layers_to_print(object), *print_object_instance_sequential_active - object.instances().data(), file);
-#ifdef HAS_PRESSURE_EQUALIZER
-                if (m_pressure_equalizer)
-                    file.write(m_pressure_equalizer->process("", true));
-#endif /* HAS_PRESSURE_EQUALIZER */
                 ++ finished_objects;
                 // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
                 // Reset it when starting another object from 1st layer.
@@ -1895,10 +1893,6 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
             // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
             // and export G-code into file.
             this->process_layers(print, print.m_print_statistics, tool_ordering, print_object_instances_ordering, layers_to_print, file);
-#ifdef HAS_PRESSURE_EQUALIZER
-            if (m_pressure_equalizer)
-                _file.write(m_pressure_equalizer->process("", true));
-#endif /* HAS_PRESSURE_EQUALIZER */
             if (m_wipe_tower)
                 // Purge the extruder, pull out the active filament.
                 file.write(m_wipe_tower->finalize(*this));
@@ -1989,6 +1983,8 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     if (thumbnails_end_file && thumbnails_end_file->value) {
         const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
         const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+        // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
+        // If "thumbnails_format" is not defined, export to PNG.
         GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, 
             print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
             thumbnails_with_bed==nullptr? false:thumbnails_with_bed->value,
@@ -1998,6 +1994,32 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     }
     print.throw_if_canceled();
 }
+
+// For unknown reasons and in sporadic cases when GCode export is processing, some participating thread
+// in tbb::parallel_pipeline has not set locales to "C", probably because this thread is newly spawned.
+// So in this class method on_scheduler_entry is called for every thread before it starts participating
+// in tbb::parallel_pipeline to ensure that locales are set correctly
+
+// For tbb::parallel_pipeline, it seems that on_scheduler_entry is called for every layer and every filter.
+// We ensure using thread-local storage that locales will be set to "C" just once for any participating thread.
+class TBBLocalesSetter : public tbb::task_scheduler_observer
+{
+public:
+    TBBLocalesSetter() { this->observe(true); }
+    ~TBBLocalesSetter() override { this->observe(false); };
+
+    void on_scheduler_entry(bool is_worker) override
+    {
+        if (bool &is_locales_sets = m_is_locales_sets.local(); !is_locales_sets) {
+            // Set locales of the worker thread to "C".
+            set_c_locales();
+            is_locales_sets = true;
+        }
+    }
+
+private:
+    tbb::enumerable_thread_specific<bool, tbb::cache_aligned_allocator<bool>, tbb::ets_key_usage_type::ets_key_per_instance> m_is_locales_sets{false};
+};
 
 // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
 // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
@@ -2012,12 +2034,19 @@ void GCode::process_layers(
 {
     // The pipeline is variable: The vase mode filter is optional.
     size_t layer_to_print_idx = 0;
-    const auto generator = tbb::make_filter<void, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [this, &print, &print_stat, &tool_ordering, &print_object_instances_ordering, &layers_to_print, &layer_to_print_idx](tbb::flow_control& fc) -> GCode::LayerResult {
+    const auto generator = tbb::make_filter<void, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
+        [this, &print, &print_stat, &tool_ordering, &print_object_instances_ordering, &layers_to_print, &layer_to_print_idx](tbb::flow_control& fc) -> LayerResult {
             CNumericLocalesSetter locales_setter;
-            if (layer_to_print_idx == layers_to_print.size()) {
-                fc.stop();
-                return GCode::LayerResult{};
+            if (layer_to_print_idx >= layers_to_print.size()) {
+                if ((!m_pressure_equalizer && layer_to_print_idx == layers_to_print.size()) || (m_pressure_equalizer && layer_to_print_idx == (layers_to_print.size() + 1))) {
+                    fc.stop();
+                    return LayerResult{};
+                } else {
+                    // Pressure equalizer need insert empty input. Because it returns one layer back.
+                    // Insert NOP (no operation) layer;
+                    ++layer_to_print_idx;
+                    return LayerResult::make_nop_layer_result();
+                }
             } else {
                 const std::pair<coordf_t, std::vector<LayerToPrint>>& layer = layers_to_print[layer_to_print_idx++];
                 const LayerTools& layer_tools = tool_ordering.tools_for_layer(layer.first);
@@ -2027,19 +2056,29 @@ void GCode::process_layers(
                 return this->process_layer(print, print_stat, layer.second, layer_tools, &layer == &layers_to_print.back(), &print_object_instances_ordering, size_t(-1));
             }
         });
-    const auto spiral_vase = tbb::make_filter<GCode::LayerResult, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [&spiral_vase = *this->m_spiral_vase.get()](GCode::LayerResult in) -> GCode::LayerResult {
+    const auto spiral_vase = tbb::make_filter<LayerResult, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
+        [&spiral_vase = *this->m_spiral_vase](LayerResult in) -> LayerResult {
+            if (in.nop_layer_result)
+                return in;
+
             CNumericLocalesSetter locales_setter;
             spiral_vase.enable(in.spiral_vase_enable);
-            return GCode::LayerResult{ spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush };
+            return LayerResult{ spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush };
         });
-    const auto cooling = tbb::make_filter<GCode::LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
-        [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in) -> std::string {
+    const auto pressure_equalizer = tbb::make_filter<LayerResult, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
+        [&pressure_equalizer = *this->m_pressure_equalizer](LayerResult in) -> LayerResult {
+            return pressure_equalizer.process_layer(std::move(in));
+        });
+    const auto cooling = tbb::make_filter<LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&cooling_buffer = *this->m_cooling_buffer](LayerResult in) -> std::string {
+             if (in.nop_layer_result)
+                return in.gcode;
+
             CNumericLocalesSetter locales_setter;
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
     const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
-        [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+        [&self = *this->m_find_replace](std::string s) -> std::string {
             CNumericLocalesSetter locales_setter;
             return self.process_layer(std::move(s));
         });
@@ -2069,11 +2108,17 @@ void GCode::process_layers(
         return in;
     });
 
+    // It registers a handler that sets locales to "C" before any TBB thread starts participating in tbb::parallel_pipeline.
+    // Handler is unregistered when the destructor is called.
+    TBBLocalesSetter locales_setter;
+
     // The pipeline elements are joined using const references, thus no copying is performed.
     output_stream.find_replace_supress();
-    tbb::filter<void, GCode::LayerResult> pipeline_to_layerresult = generator;
+    tbb::filter<void, LayerResult> pipeline_to_layerresult = generator;
     if (m_spiral_vase)
         pipeline_to_layerresult = pipeline_to_layerresult & spiral_vase;
+    if (m_pressure_equalizer)
+        pipeline_to_layerresult = pipeline_to_layerresult & pressure_equalizer;
     tbb::filter<void, std::string> pipeline_to_string = pipeline_to_layerresult & cooling & fan_mover;
     if (m_find_replace)
         pipeline_to_string = pipeline_to_string & find_replace;
@@ -2095,28 +2140,43 @@ void GCode::process_layers(
 {
     // The pipeline is variable: The vase mode filter is optional.
     size_t layer_to_print_idx = 0;
-    const auto generator = tbb::make_filter<void, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [this, &print, &print_stat, &tool_ordering, &layers_to_print, &layer_to_print_idx, single_object_idx](tbb::flow_control& fc) -> GCode::LayerResult {
-            if (layer_to_print_idx == layers_to_print.size()) {
+    const auto generator = tbb::make_filter<void, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
+        [this, &print, &print_stat, &tool_ordering, &layers_to_print, &layer_to_print_idx, single_object_idx](tbb::flow_control& fc) -> LayerResult {
+            if (layer_to_print_idx >= layers_to_print.size()) {
+                if ((!m_pressure_equalizer && layer_to_print_idx == layers_to_print.size()) || (m_pressure_equalizer && layer_to_print_idx == (layers_to_print.size() + 1))) {
                 fc.stop();
                 return {};
+            } else {
+                    // Pressure equalizer need insert empty input. Because it returns one layer back.
+                    // Insert NOP (no operation) layer;
+                    ++layer_to_print_idx;
+                    return LayerResult::make_nop_layer_result();
+                }
             } else {
                 LayerToPrint &layer = layers_to_print[layer_to_print_idx ++];
                 print.throw_if_canceled();
                 return this->process_layer(print, print_stat, { std::move(layer) }, tool_ordering.tools_for_layer(layer.print_z()), &layer == &layers_to_print.back(), nullptr, single_object_idx);
             }
         });
-    const auto spiral_vase = tbb::make_filter<GCode::LayerResult, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [&spiral_vase = *this->m_spiral_vase.get()](GCode::LayerResult in)->GCode::LayerResult {
+    const auto spiral_vase = tbb::make_filter<LayerResult, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
+        [&spiral_vase = *this->m_spiral_vase](LayerResult in)->LayerResult {
+            if (in.nop_layer_result)
+                return in;
         spiral_vase.enable(in.spiral_vase_enable);
         return { spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush };
     });
-    const auto cooling = tbb::make_filter<GCode::LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
-        [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in)->std::string {
+    const auto pressure_equalizer = tbb::make_filter<LayerResult, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
+        [&pressure_equalizer = *this->m_pressure_equalizer](LayerResult in) -> LayerResult {
+             return pressure_equalizer.process_layer(std::move(in));
+        });
+    const auto cooling = tbb::make_filter<LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&cooling_buffer = *this->m_cooling_buffer](LayerResult in)->std::string {
+            if (in.nop_layer_result)
+                return in.gcode;
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
     const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
-        [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+        [&self = *this->m_find_replace](std::string s) -> std::string {
             return self.process_layer(std::move(s));
         });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
@@ -2143,11 +2203,17 @@ void GCode::process_layers(
         return in;
     });
 
+    // It registers a handler that sets locales to "C" before any TBB thread starts participating in tbb::parallel_pipeline.
+    // Handler is unregistered when the destructor is called.
+    TBBLocalesSetter locales_setter;
+
     // The pipeline elements are joined using const references, thus no copying is performed.
     output_stream.find_replace_supress();
-    tbb::filter<void, GCode::LayerResult> pipeline_to_layerresult = generator;
+    tbb::filter<void, LayerResult> pipeline_to_layerresult = generator;
     if (m_spiral_vase)
         pipeline_to_layerresult = pipeline_to_layerresult & spiral_vase;
+    if (m_pressure_equalizer)
+        pipeline_to_layerresult = pipeline_to_layerresult & pressure_equalizer;
     tbb::filter<void, std::string> pipeline_to_string = pipeline_to_layerresult & cooling & fan_mover;
     if (m_find_replace)
         pipeline_to_string = pipeline_to_string & find_replace;
@@ -2653,7 +2719,7 @@ boost::regex regex_g92e0_gcode{ "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t
 // In non-sequential mode, process_layer is called per each print_z height with all object and support layers accumulated.
 // For multi-material prints, this routine minimizes extruder switches by gathering extruder specific extrusion paths
 // and performing the extruder specific extrusions together.
-GCode::LayerResult GCode::process_layer(
+LayerResult GCode::process_layer(
     const Print                             &print,
     PrintStatistics                         &print_stat,
     // Set of object & print layers of the same PrintObject and with the same print_z.
@@ -2687,7 +2753,7 @@ GCode::LayerResult GCode::process_layer(
         }
     }
     const Layer         &layer         = (object_layer != nullptr) ? *object_layer : *support_layer;
-    GCode::LayerResult   result { {}, layer.id(), false, last_layer };
+    LayerResult   result { {}, layer.id(), false, last_layer, false};
     if (layer_tools.extruders.empty())
         // Nothing to extrude.
         return result;
@@ -2991,7 +3057,6 @@ GCode::LayerResult GCode::process_layer(
     } // for objects
 
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
-    std::vector<std::unique_ptr<EdgeGrid::Grid>> lower_layer_edge_grids(layers.size());
     for (uint16_t extruder_id : layer_tools.extruders)
     {
         gcode += (layer_tools.has_wipe_tower && m_wipe_tower) ?
@@ -3176,8 +3241,9 @@ GCode::LayerResult GCode::process_layer(
                             extruder_id, 
                             print_wipe_extrusions != 0) : 
                         island.by_region;
+
                     gcode += this->extrude_infill(print, by_region_specific, true);
-                    gcode += this->extrude_perimeters(print, by_region_specific, lower_layer_edge_grids[instance_to_print.layer_id]);
+                    gcode += this->extrude_perimeters(print, by_region_specific);
                     gcode += this->extrude_infill(print, by_region_specific, false);
                     gcode += this->extrude_ironing(print, by_region_specific);
                 }
@@ -3291,13 +3357,11 @@ GCode::LayerResult GCode::process_layer(
             // Flush the cooling buffer at each object layer or possibly at the last layer, even if it contains just supports (This should not happen).
             object_layer || last_layer);
 
-#ifdef HAS_PRESSURE_EQUALIZER
     // Apply pressure equalization if enabled;
     // printf("G-code before filter:\n%s\n", gcode.c_str());
     if (m_pressure_equalizer)
         gcode = m_pressure_equalizer->process(gcode.c_str(), false);
     // printf("G-code after filter:\n%s\n", out.c_str());
-#endif /* HAS_PRESSURE_EQUALIZER */
 
     file.write(gcode);
 #endif
@@ -3414,31 +3478,10 @@ std::string GCode::change_layer(coordf_t print_z)
 }
 
 
-static std::unique_ptr<EdgeGrid::Grid> calculate_layer_edge_grid(const Layer& layer)
-{
-    auto out = make_unique<EdgeGrid::Grid>();
-
-    // Create the distance field for a layer below.
-    const coord_t distance_field_resolution = coord_t(scale_(1.) + 0.5);
-    out->create(layer.lslices, distance_field_resolution);
-    out->calculate_sdf();
-#if 0
-        {
-            static int iRun = 0;
-            BoundingBox bbox = (*lower_layer_edge_grid)->bbox();
-            bbox.min(0) -= scale_(5.f);
-            bbox.min(1) -= scale_(5.f);
-            bbox.max(0) += scale_(5.f);
-            bbox.max(1) += scale_(5.f);
-            EdgeGrid::save_png(*(*lower_layer_edge_grid), bbox, scale_(0.1f), debug_out_path("GCode_extrude_loop_edge_grid-%d.png", iRun++));
-        }
-#endif
-    return out;
-}
 
 
 //like extrude_loop but with varying z and two full round
-std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const std::string &description, double speed, std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid)
+std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const std::string &description, double speed)
 {
     //don't keep the speed
     speed = -1;
@@ -3446,15 +3489,12 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
     // next copies (if any) would not detect the correct orientation
     ExtrusionLoop loop_to_seam = original_loop;
 
-    if (m_layer->lower_layer && lower_layer_edge_grid != nullptr && ! *lower_layer_edge_grid)
-        *lower_layer_edge_grid = calculate_layer_edge_grid(*m_layer->lower_layer);
-
     // extrude all loops ccw
     //no! this was decided in perimeter_generator
     bool is_hole_loop = (loop_to_seam.loop_role() & ExtrusionLoopRole::elrHole) != 0;// loop.make_counter_clockwise();
     bool reverse_turn = loop_to_seam.polygon().is_clockwise() ^ is_hole_loop;
 
-    split_at_seam_pos(loop_to_seam, lower_layer_edge_grid, reverse_turn);
+    split_at_seam_pos(loop_to_seam, reverse_turn);
     const coordf_t full_loop_length = loop_to_seam.length();
 
     // don't clip the path ?
@@ -3696,7 +3736,7 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
     return gcode;
 }
 
-void GCode::split_at_seam_pos(ExtrusionLoop& loop, std::unique_ptr<EdgeGrid::Grid>* lower_layer_edge_grid, bool was_clockwise)
+void GCode::split_at_seam_pos(ExtrusionLoop& loop, bool was_clockwise)
 {
     if (loop.paths.empty())
         return;
@@ -3709,29 +3749,29 @@ void GCode::split_at_seam_pos(ExtrusionLoop& loop, std::unique_ptr<EdgeGrid::Gri
     // or randomize if requested
     Point last_pos = this->last_pos();
     //for first spiral, choose the seam, as the position will be very relevant.
-    if (m_spiral_vase_layer > 1 /* spiral vase is printign and it's after the transition layer (that one can find a good spot)*/) {
-            loop.split_at(last_pos, false);
-    /*} else {
-        const EdgeGrid::Grid* edge_grid_ptr = (lower_layer_edge_grid && *lower_layer_edge_grid)
-            ? lower_layer_edge_grid->get()
-            : nullptr;
-        Point seam = m_seam_placer.get_seam(*m_layer, seam_position, loop,
-            last_pos, EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0),
-            (m_layer == NULL ? nullptr : m_layer->object()),
-            m_print_object_instance_id,
-            was_clockwise,
-            edge_grid_ptr);
-        // Split the loop at the point with a minium penalty.
-        if (!loop.split_at_vertex(seam))
-            // The point is not in the original loop. Insert it.
-            loop.split_at(seam, true);*/
+    if (m_spiral_vase_layer > 1 /* spiral vase is printing and it's after the transition layer (that one can find a good spot)*/
+        || !m_seam_perimeters) {
+        // Because the G-code export has 1um resolution, don't generate segments shorter than "1.5 microns" (depends of gcode_precision_xyz)
+        double precision = pow(10, -m_config.gcode_precision_xyz.value);
+        precision *= 1.5;
+        loop.split_at(last_pos, false, scale_t(precision));
     } else {
-        m_seam_placer.place_seam(loop, *this->layer(),
-            this->last_pos(), m_config.external_perimeters_first,
-            EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4),
-            m_print_object_instance_id,
-            lower_layer_edge_grid ? lower_layer_edge_grid->get() : nullptr);
+        assert(m_layer != nullptr);
+        //FIXME update external_perimeters_first
+        m_seam_placer.place_seam(m_layer, loop,
+            m_config.external_perimeters_first, this->last_pos()
+            //EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4),
+            //m_print_object_instance_id,
+            //lower_layer_edge_grid ? lower_layer_edge_grid->get() : nullptr
+            );
     }
+#if _DEBUG
+    for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
+        assert(it->polyline.points.size() >= 2);
+        assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+    }
+    assert(loop.paths.front().first_point() == loop.paths.back().last_point());
+#endif
 }
 
 namespace check_wipe {
@@ -3788,8 +3828,15 @@ namespace check_wipe {
     }
 }
 
-std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::string &description, double speed, std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid)
+std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::string &description, double speed)
 {
+#if _DEBUG
+    for (auto it = std::next(original_loop.paths.begin()); it != original_loop.paths.end(); ++it) {
+        assert(it->polyline.points.size() >= 2);
+        assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+    }
+    assert(original_loop.paths.front().first_point() == original_loop.paths.back().last_point());
+#endif
 #if DEBUG_EXTRUSION_OUTPUT
     std::cout << "extrude loop_" << (original_loop.polygon().is_counter_clockwise() ? "ccw" : "clw") << ": ";
     for (const ExtrusionPath &path : original_loop.paths) {
@@ -3812,33 +3859,13 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         //exclude if min_layer_height * 2 > layer_height (increase from 2 to 3 because it's working but uses in-between)
         && this->m_layer->height >= m_config.min_layer_height.get_abs_value(m_writer.tool()->id(), nozzle_diam) * 2 - EPSILON
         ) {
-        return extrude_loop_vase(original_loop, description, speed, lower_layer_edge_grid);
+        return extrude_loop_vase(original_loop, description, speed);
     }
 
     // get a copy; don't modify the orientation of the original loop object otherwise
     // next copies (if any) would not detect the correct orientation
     ExtrusionLoop loop_to_seam = original_loop;
 
-    if (m_layer->lower_layer != nullptr && lower_layer_edge_grid != nullptr) {
-        if (! *lower_layer_edge_grid) {
-            // Create the distance field for a layer below.
-            const coord_t distance_field_resolution = coord_t(scale_(1.) + 0.5);
-            *lower_layer_edge_grid = make_unique<EdgeGrid::Grid>();
-            (*lower_layer_edge_grid)->create(m_layer->lower_layer->lslices, distance_field_resolution);
-            (*lower_layer_edge_grid)->calculate_sdf();
-            #if 0
-            {
-                static int iRun = 0;
-                BoundingBox bbox = (*lower_layer_edge_grid)->bbox();
-                bbox.min(0) -= scale_(5.f);
-                bbox.min(1) -= scale_(5.f);
-                bbox.max(0) += scale_(5.f);
-                bbox.max(1) += scale_(5.f);
-                EdgeGrid::save_png(*(*lower_layer_edge_grid), bbox, scale_(0.1f), debug_out_path("GCode_extrude_loop_edge_grid-%d.png", iRun++));
-            }
-            #endif
-        }
-    }
 
     // extrude all loops ccw
     //no! this was decided in perimeter_generator
@@ -3851,16 +3878,16 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         is_hole_loop = false;
     }
 
-    split_at_seam_pos(loop_to_seam, lower_layer_edge_grid, is_hole_loop);
+    split_at_seam_pos(loop_to_seam, is_hole_loop);
     const coordf_t full_loop_length = loop_to_seam.length();
     const bool is_full_loop_ccw = loop_to_seam.polygon().is_counter_clockwise();
     //after that point, loop_to_seam can be modified by 'paths', so don't use it anymore
 #if _DEBUG
-    for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
+    for (auto it = std::next(loop_to_seam.paths.begin()); it != loop_to_seam.paths.end(); ++it) {
         assert(it->polyline.points.size() >= 2);
         assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
     }
-    assert(loop.paths.front().first_point() == loop.paths.back().last_point());
+    assert(loop_to_seam.paths.front().first_point() == loop_to_seam.paths.back().last_point());
 #endif
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
@@ -4237,12 +4264,11 @@ std::string GCode::extrude_multi_path3D(const ExtrusionMultiPath3D &multipath3D,
     return gcode;
 }
 
-std::string GCode::extrude_entity(const ExtrusionEntity &entity, const std::string &description, double speed, std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid)
+std::string GCode::extrude_entity(const ExtrusionEntity &entity, const std::string &description, double speed)
 {
     this->visitor_gcode.clear();
     this->visitor_comment = description;
     this->visitor_speed = speed;
-    this->visitor_lower_layer_edge_grid = lower_layer_edge_grid;
     entity.visit(*this);
     return this->visitor_gcode;
 }
@@ -4347,24 +4373,17 @@ std::string GCode::extrude_path_3D(const ExtrusionPath3D &path, const std::strin
 }
 
 // Extrude perimeters: Decide where to put seams (hide or align seams).
-std::string GCode::extrude_perimeters(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region, std::unique_ptr<EdgeGrid::Grid> &lower_layer_edge_grid)
+std::string GCode::extrude_perimeters(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region)
 {
+    m_seam_perimeters = true;
     std::string gcode;
     for (const ObjectByExtruder::Island::Region &region : by_region)
         if (! region.perimeters.empty()) {
             m_region = &print.get_print_region(&region - &by_region.front());
-
-            // plan_perimeters tries to place seams, it needs to have the lower_layer_edge_grid calculated already.
-            if (m_layer->lower_layer && ! lower_layer_edge_grid)
-                lower_layer_edge_grid = calculate_layer_edge_grid(*m_layer->lower_layer);
-
-            m_seam_placer.plan_perimeters(std::vector<const ExtrusionEntity*>(region.perimeters.begin(), region.perimeters.end()),
-                *m_layer, m_config.seam_position,
-                this->last_pos(), EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4), (m_layer == NULL ? nullptr : m_layer->object()),
-                m_print_object_instance_id,
-                (lower_layer_edge_grid ? lower_layer_edge_grid.get() : nullptr));
+            // Apply region-specific settings
             m_config.apply(m_region->config());
             m_writer.apply_print_region_config(m_region->config());
+            m_seam_placer.external_perimeters_first = m_region->config().external_perimeters_first.value;
             if (m_config.print_temperature > 0)
                 gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
@@ -4372,9 +4391,9 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
             else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) // don't set it if disabled
                 gcode += m_writer.set_temperature(m_config.temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
             for (const ExtrusionEntity *ee : region.perimeters)
-                gcode += this->extrude_entity(*ee, "", -1., &lower_layer_edge_grid);
-            m_region = nullptr;
+                gcode += this->extrude_entity(*ee, "perimeter", -1.);
         }
+    m_seam_perimeters = false;
     return gcode;
 }
 
@@ -4452,7 +4471,6 @@ std::string GCode::extrude_support(const ExtrusionEntityCollection &support_fill
             visitor_gcode = "";
             visitor_comment = label;
             visitor_speed = speed;
-            visitor_lower_layer_edge_grid = nullptr;
             ee->visit(*this); // will call extrude_thing()
             gcode += visitor_gcode;
         }

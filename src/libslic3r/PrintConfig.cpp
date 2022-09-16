@@ -51,20 +51,20 @@ static const t_config_enum_values s_keys_map_PrinterTechnology{
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrinterTechnology)
 
 
-static const t_config_enum_values s_keys_map_CompleteObjectSort{
+static const t_config_enum_values s_keys_map_CompleteObjectSort {
     {"object", cosObject},
     {"lowy", cosY},
     {"lowz", cosZ},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(CompleteObjectSort)
 
-static const t_config_enum_values s_keys_map_OutputFormat{
+static const t_config_enum_values s_keys_map_OutputFormat {
     {"mCWS", ofMaskedCWS},
     {"SL1", ofSL1},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(OutputFormat)
 
-static const t_config_enum_values s_keys_map_WipeAlgo{
+static const t_config_enum_values s_keys_map_WipeAlgo {
     {"linear", waLinear},
     {"quadra", waQuadra},
     {"expo", waHyper},
@@ -89,7 +89,7 @@ static const t_config_enum_values s_keys_map_GCodeFlavor{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(GCodeFlavor)
 
-static const t_config_enum_values s_keys_map_MachineLimitsUsage{
+static const t_config_enum_values s_keys_map_MachineLimitsUsage {
     {"emit_to_gcode",       int(MachineLimitsUsage::EmitToGCode)},
     {"time_estimate_only",  int(MachineLimitsUsage::TimeEstimateOnly)},
     {"limits",              int(MachineLimitsUsage::Limits)},
@@ -97,7 +97,7 @@ static const t_config_enum_values s_keys_map_MachineLimitsUsage{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(MachineLimitsUsage)
 
-static const t_config_enum_values s_keys_map_PrintHostType{
+static const t_config_enum_values s_keys_map_PrintHostType {
     {"prusalink", htPrusaLink},
     {"octoprint", htOctoPrint},
     {"duet",    htDuet},
@@ -111,20 +111,20 @@ static const t_config_enum_values s_keys_map_PrintHostType{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrintHostType)
 
-static const t_config_enum_values s_keys_map_AuthorizationType{
+static const t_config_enum_values s_keys_map_AuthorizationType {
     {"key", atKeyPassword},
     {"user", atUserPassword},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(AuthorizationType)
 
-static const t_config_enum_values s_keys_map_BridgeType{
+static const t_config_enum_values s_keys_map_BridgeType {
     {"nozzle",  uint8_t(BridgeType::btFromNozzle)},
     {"height",  uint8_t(BridgeType::btFromHeight)},
     {"flow",    uint8_t(BridgeType::btFromFlow)},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(BridgeType)
 
-static const t_config_enum_values s_keys_map_FuzzySkinType{
+static const t_config_enum_values s_keys_map_FuzzySkinType {
     { "none",           int(FuzzySkinType::None) },
     { "external",       int(FuzzySkinType::External) },
     { "shell",          int(FuzzySkinType::Shell) },
@@ -132,7 +132,7 @@ static const t_config_enum_values s_keys_map_FuzzySkinType{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FuzzySkinType)
 
-static const t_config_enum_values s_keys_map_InfillPattern{
+static const t_config_enum_values s_keys_map_InfillPattern {
     {"rectilinear",         ipRectilinear},
     {"alignedrectilinear",  ipAlignedRectilinear},
     {"monotonic",           ipMonotonic},
@@ -159,53 +159,51 @@ static const t_config_enum_values s_keys_map_InfillPattern{
     {"sawtooth",            ipSawtooth},
     {"adaptivecubic",       ipAdaptiveCubic},
     {"supportcubic",        ipSupportCubic},
-#if HAS_LIGHTNING_INFILL
-    { "lightning",          ipLightning }
-#endif // HAS_LIGHTNING_INFILL
+    {"lightning",           ipLightning},
     {"auto",                ipAuto}
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(InfillPattern)
 
-static const t_config_enum_values s_keys_map_IroningType{
+static const t_config_enum_values s_keys_map_IroningType {
     {"top", int(IroningType::TopSurfaces)},
     {"topmost", int(IroningType::TopmostOnly)},
     {"solid", int(IroningType::AllSolid)},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(IroningType)
 
-static const t_config_enum_values s_keys_map_SlicingMode{
+static const t_config_enum_values s_keys_map_SlicingMode {
     { "regular",        int(SlicingMode::Regular) },
     { "even_odd",       int(SlicingMode::EvenOdd) },
     { "close_holes",    int(SlicingMode::CloseHoles) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SlicingMode)
 
-static const t_config_enum_values s_keys_map_SupportMaterialPattern{
+static const t_config_enum_values s_keys_map_SupportMaterialPattern {
     {"rectilinear", smpRectilinear},
     {"rectilinear-grid", smpRectilinearGrid},
     {"honeycomb", smpHoneycomb},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialPattern)
 
-static const t_config_enum_values s_keys_map_SupportMaterialStyle{
+static const t_config_enum_values s_keys_map_SupportMaterialStyle {
     { "grid",           smsGrid },
     { "snug",           smsSnug }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialStyle)
 
 //unused
-static const t_config_enum_values s_keys_map_SupportMaterialInterfacePattern{
+static const t_config_enum_values s_keys_map_SupportMaterialInterfacePattern {
     { "auto",           smipAuto },
     { "rectilinear",    smipRectilinear },
     { "concentric",     smipConcentric }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialInterfacePattern)
 
-static const t_config_enum_values s_keys_map_SeamPosition{
-        {"random", spRandom},
+static const t_config_enum_values s_keys_map_SeamPosition {
+        {"random",    spRandom},
         {"allrandom", spAllRandom},
-        {"nearest", spNearest}, // unused, replaced by cost
-        {"cost", spCost},
+        {"nearest",   spNearest}, // unused, replaced by cost
+        {"cost",      spCost},
         {"aligned", spAligned},
         {"contiguous", spExtremlyAligned},
         {"rear", spRear},
@@ -269,8 +267,9 @@ static const t_config_enum_values s_keys_map_SLAPillarConnectionMode{
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLAPillarConnectionMode)
 
 static const t_config_enum_values s_keys_map_SLAMaterialSpeed = {
-    {"slow", slamsSlow},
-    {"fast", slamsFast}
+    {"slow",            slamsSlow},
+    {"fast",            slamsFast},
+    {"high_viscosity",  slamsHighViscosity}
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLAMaterialSpeed);
 
@@ -1092,7 +1091,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comAdvancedE | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(91.5f));
+    def->set_default_value(new ConfigOptionFloat(91.5));
 
     def = this->add("cooling_tube_length", coFloat);
     def->label = L("Cooling tube length");
@@ -1101,7 +1100,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comAdvancedE | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(5.f));
+    def->set_default_value(new ConfigOptionFloat(5.));
 
     def = this->add("curve_smoothing_angle_convex", coFloat);
     def->label = L("Min convex angle");
@@ -2147,6 +2146,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("HIPS");
     def->enum_values.push_back("EDGE");
     def->enum_values.push_back("NGEN");
+    def->enum_values.push_back("PA");
     def->enum_values.push_back("NYLON");
     def->enum_values.push_back("PVA");
     def->enum_values.push_back("PC");
@@ -2290,9 +2290,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("scatteredrectilinear"); 
     def->enum_values.push_back("adaptivecubic");
     def->enum_values.push_back("supportcubic");
-#if HAS_LIGHTNING_INFILL
     def->enum_values.push_back("lightning");
-#endif // HAS_LIGHTNING_INFILL
     def->enum_labels.push_back(L("Rectilinear"));
     def->enum_labels.push_back(L("Monotonic"));
     def->enum_labels.push_back(L("Grid"));
@@ -2310,9 +2308,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Scattered Rectilinear"));
     def->enum_labels.push_back(L("Adaptive Cubic"));
     def->enum_labels.push_back(L("Support Cubic"));
-#if HAS_LIGHTNING_INFILL
     def->enum_labels.push_back(L("Lightning"));
-#endif // HAS_LIGHTNING_INFILL
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value( new ConfigOptionEnum<InfillPattern>(ipStars));
 
@@ -3128,7 +3124,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->category = OptionCategory::mmsetup;
     def->mode = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(0.f));
+    def->set_default_value(new ConfigOptionFloat(0.));
 
     def = this->add("ironing", coBool);
     def->label = L("Enable ironing");
@@ -3543,31 +3539,29 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0));
 
-#ifdef HAS_PRESSURE_EQUALIZER
     def = this->add("max_volumetric_extrusion_rate_slope_positive", coFloat);
     def->label = L("Max volumetric slope positive");
-    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate. "
+    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate "
+                       "for a transition from lower speed to higher speed. "
                    "A value of 1.8 mm³/s² ensures, that a change from the extrusion rate "
                    "of 1.8 mm³/s (0.45mm extrusion width, 0.2mm extrusion height, feedrate 20 mm/s) "
                    "to 5.4 mm³/s (feedrate 60 mm/s) will take at least 2 seconds.");
     def->sidetext = L("mm³/s²");
     def->min = 0;
     def->mode = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(0);
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("max_volumetric_extrusion_rate_slope_negative", coFloat);
     def->label = L("Max volumetric slope negative");
-    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate. "
+    def->tooltip = L("This experimental setting is used to limit the speed of change in extrusion rate "
+                       "for a transition from higher speed to lower speed. "
                    "A value of 1.8 mm³/s² ensures, that a change from the extrusion rate "
-                   "of 1.8 mm³/s (0.45mm extrusion width, 0.2mm extrusion height, feedrate 20 mm/s) "
-                   "to 5.4 mm³/s (feedrate 60 mm/s) will take at least 2 seconds.");
+                   "of 5.4 mm³/s (0.45 mm extrusion width, 0.2 mm extrusion height, feedrate 60 mm/s) "
+                   "to 1.8 mm³/s (feedrate 20 mm/s) will take at least 2 seconds.");
     def->sidetext = L("mm³/s²");
     def->min = 0;
     def->mode = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(0);
     def->set_default_value(new ConfigOptionFloat(0));
-#endif /* HAS_PRESSURE_EQUALIZER */
 
     def = this->add("min_fan_speed", coInts);
     def->label = L("Default fan speed");
@@ -3886,7 +3880,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comAdvancedE | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(92.f));
+    def->set_default_value(new ConfigOptionFloat(92.));
 
     def = this->add("extra_loading_move", coFloat);
     def->label = L("Extra loading distance");
@@ -3895,7 +3889,7 @@ void PrintConfigDef::init_fff_params()
                       " if negative, the loading move is shorter than unloading. ");
     def->sidetext = L("mm");
     def->mode = comAdvancedE | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(-2.f));
+    def->set_default_value(new ConfigOptionFloat(-2.));
 
     def = this->add("perimeter_acceleration", coFloatOrPercent);
     def->label = L("Internal");
@@ -5743,18 +5737,18 @@ void PrintConfigDef::init_fff_params()
                      "wipe tower. These values are used to simplify creation of the full purging "
                      "volumes below. ");
     def->mode = comSimpleAE | comPrusa;
-    def->set_default_value(new ConfigOptionFloats { 70.f, 70.f, 70.f, 70.f, 70.f, 70.f, 70.f, 70.f, 70.f, 70.f  });
+    def->set_default_value(new ConfigOptionFloats { 70., 70., 70., 70., 70., 70., 70., 70., 70., 70.  });
 
     def = this->add("wiping_volumes_matrix", coFloats);
     def->label = L("Purging volumes - matrix");
     def->tooltip = L("This matrix describes volumes (in cubic milimetres) required to purge the"
                      " new filament on the wipe tower for any given pair of tools. ");
     def->mode = comSimpleAE | comPrusa;
-    def->set_default_value(new ConfigOptionFloats {   0.f, 140.f, 140.f, 140.f, 140.f,
-                                                  140.f,   0.f, 140.f, 140.f, 140.f,
-                                                  140.f, 140.f,   0.f, 140.f, 140.f,
-                                                  140.f, 140.f, 140.f,   0.f, 140.f,
-                                                    140.f, 140.f, 140.f, 140.f,   0.f });
+    def->set_default_value(new ConfigOptionFloats {   0., 140., 140., 140., 140.,
+                                                    140.,   0., 140., 140., 140.,
+                                                    140., 140.,   0., 140., 140.,
+                                                    140., 140., 140.,   0., 140.,
+                                                    140., 140., 140., 140.,   0. });
 
 
     def = this->add("wipe_advanced", coBool);
@@ -6393,6 +6387,15 @@ void PrintConfigDef::init_sla_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(8.));
 
+    def = this->add("high_viscosity_tilt_time", coFloat);
+    def->label = L("High viscosity");
+    def->full_label = L("Tilt for high viscosity resin");
+    def->tooltip = L("Time of the super slow tilt");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(10.));
+
     def = this->add("area_fill", coFloat);
     def->label = L("Area fill");
     def->tooltip = L("The percentage of the bed area. \nIf the print area exceeds the specified value, \nthen a slow tilt will be used, otherwise - a fast tilt");
@@ -6839,7 +6842,7 @@ void PrintConfigDef::init_sla_params()
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comSimpleAE | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(1.f));
+    def->set_default_value(new ConfigOptionFloat(1.));
 
     def = this->add("pad_enable", coBool);
     def->label = L("Use pad");
@@ -7018,8 +7021,10 @@ void PrintConfigDef::init_sla_params()
     def->enum_keys_map = &ConfigOptionEnum<SLAMaterialSpeed>::get_enum_values();
     def->enum_values.push_back("slow");
     def->enum_values.push_back("fast");
+    def->enum_values.push_back("high_viscosity");
     def->enum_labels.push_back(L("Slow"));
     def->enum_labels.push_back(L("Fast"));
+    def->enum_labels.push_back(L("High viscosity"));
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<SLAMaterialSpeed>(slamsFast));
 
@@ -7235,9 +7240,6 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         "start_perimeters_at_concave_points", "start_perimeters_at_non_overhang", "randomize_start",
         "seal_position", "vibration_limit", "bed_size",
         "print_center", "g0", "threads", "pressure_advance", "wipe_tower_per_color_wipe",
-#ifndef HAS_PRESSURE_EQUALIZER
-        "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative",
-#endif /* HAS_PRESSURE_EQUALIZER */
         "cooling", "serial_port", "serial_speed",
         // Introduced in some PrusaSlicer 2.3.1 alpha, later renamed or removed.
         "fuzzy_skin_perimeter_mode", "fuzzy_skin_shape",
@@ -7940,6 +7942,7 @@ void DynamicPrintConfig::normalize_fdm()
         {
             this->opt<ConfigOptionInt>("top_solid_layers", true)->value = 0;
             this->opt<ConfigOptionPercent>("fill_density", true)->value = 0;
+            this->opt<ConfigOptionEnum<PerimeterGeneratorType>>("perimeter_generator", true)->value = PerimeterGeneratorType::Classic; 
             this->opt<ConfigOptionBool>("support_material", true)->value = false;
             this->opt<ConfigOptionInt>("solid_over_perimeters")->value = 0;
             this->opt<ConfigOptionInt>("support_material_enforce_layers")->value = 0;
@@ -7957,6 +7960,11 @@ void DynamicPrintConfig::normalize_fdm()
 //    if (auto* opt_gcode_resolution = this->opt<ConfigOptionFloat>("gcode_resolution", false); opt_gcode_resolution)
 //        // Resolution will be above 1um.
 //        opt_gcode_resolution->value = std::max(opt_gcode_resolution->value, 0.001);
+
+    if (auto *opt_min_bead_width = this->opt<ConfigOptionFloat>("min_bead_width", false); opt_min_bead_width)
+        opt_min_bead_width->value = std::max(opt_min_bead_width->value, 0.001);
+    if (auto *opt_wall_transition_length = this->opt<ConfigOptionFloat>("wall_transition_length", false); opt_wall_transition_length)
+        opt_wall_transition_length->value = std::max(opt_wall_transition_length->value, 0.001);
 
     if (auto *opt_min_bead_width = this->opt<ConfigOptionFloat>("min_bead_width", false); opt_min_bead_width)
         opt_min_bead_width->value = std::max(opt_min_bead_width->value, 0.001);

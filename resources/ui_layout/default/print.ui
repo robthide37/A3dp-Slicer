@@ -343,6 +343,9 @@ group:sidetext_width$7:Modifiers
 group:Autospeed (advanced)
 	setting:max_volumetric_speed
 	setting:max_print_speed
+group:Pressure equalizer (experimental)
+	setting:max_volumetric_extrusion_rate_slope_positive
+	setting:max_volumetric_extrusion_rate_slope_negative
 group:label_width$9:sidetext_width$8:Acceleration control (advanced)
 	line:Default acceleration
 		setting:width$4:default_acceleration

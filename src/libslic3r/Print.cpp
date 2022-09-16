@@ -16,6 +16,7 @@
 #include "GCode.hpp"
 #include "GCode/WipeTower.hpp"
 #include "Utils.hpp"
+#include "BuildVolume.hpp"
 
 #include <float.h>
 
@@ -139,10 +140,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "milling_offset",
         "milling_z_offset",
         "milling_z_lift",
-#ifdef HAS_PRESSURE_EQUALIZER
         "max_volumetric_extrusion_rate_slope_positive",
         "max_volumetric_extrusion_rate_slope_negative",
-#endif /* HAS_PRESSURE_EQUALIZER */
         "notes",
         "only_retract_when_crossing_perimeters",
         "output_filename_format",
@@ -518,7 +517,7 @@ bool Print::sequential_print_horizontal_clearance_valid(const Print &print, Poly
 	                        Geometry::assemble_transform(Vec3d{ 0.0, 0.0, model_instance0->get_offset().z() }, model_instance0->get_rotation(), model_instance0->get_scaling_factor(), model_instance0->get_mirror())),
                 	// Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
 	                // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
-	                float(scale_(0.5 * object_grow - EPSILON)),
+	                float(scale_(0.5 * object_grow - BuildVolume::BedEpsilon)),
 	                jtRound, scale_t(0.1)).front());
 	    }
 	    // Make a copy, so it may be rotated for instances.

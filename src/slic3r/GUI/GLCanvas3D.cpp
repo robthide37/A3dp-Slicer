@@ -1644,6 +1644,10 @@ void GLCanvas3D::select_all()
 {
     m_selection.add_all();
     m_dirty = true;
+    wxGetApp().obj_manipul()->set_dirty();
+    m_gizmos.reset_all_states();
+    m_gizmos.update_data();
+    post_event(SimpleEvent(EVT_GLCANVAS_OBJECT_SELECT));
 }
 
 void GLCanvas3D::deselect_all()
