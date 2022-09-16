@@ -924,6 +924,55 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
     this->get_selected_preset().save();
 }
 
+Preset& PresetCollection::get_preset_with_name(const std::string& new_name, const Preset* initial_preset)
+{
+    // 1) Find the preset with a new_name or create a new one,
+    // initialize it with the preset_to config.
+    auto it = this->find_preset_internal(new_name);
+    if (it != m_presets.end() && it->name == new_name) {
+        // Preset with the same name found.
+        Preset& preset = *it;
+        if (!preset.is_default && !preset.is_external && !preset.is_system) {
+            // Overwriting an existing preset if it isn't default/external/system
+            preset.config = initial_preset->config;
+            // The newly saved preset can be activated -> make it visible.
+            preset.is_visible = true;
+        }
+        return preset;
+    }
+
+    // Creating a new preset.
+    Preset& preset = *m_presets.insert(it, *initial_preset);
+    std::string& inherits = preset.inherits();
+    std::string   old_name = preset.name;
+    preset.name = new_name;
+    preset.file = this->path_from_name(new_name);
+    preset.vendor = nullptr;
+    preset.alias.clear();
+    preset.renamed_from.clear();
+    if (preset.is_system) {
+        // Inheriting from a system preset.
+        inherits = old_name;
+    }
+    else if (inherits.empty()) {
+        // Inheriting from a user preset. Link the new preset to the old preset.
+        // inherits = old_name;
+    }
+    else {
+        // Inherited from a user preset. Just maintain the "inherited" flag,
+        // meaning it will inherit from either the system preset, or the inherited user preset.
+    }
+    preset.is_default = false;
+    preset.is_system = false;
+    preset.is_external = false;
+    // The newly saved preset can be activated -> make it visible.
+    preset.is_visible = true;
+    // Just system presets have aliases
+    preset.alias.clear();
+
+    return preset;
+}
+
 bool PresetCollection::delete_current_preset()
 {
     const Preset &selected = this->get_selected_preset();
@@ -947,6 +996,11 @@ bool PresetCollection::delete_current_preset()
 
 bool PresetCollection::delete_preset(const std::string& name)
 {
+    if (name == this->get_selected_preset().name)
+        return delete_current_preset();
+
+    const std::string selected_preset_name = this->get_selected_preset_name();
+
     auto it = this->find_preset_internal(name);
 
     const Preset& preset = *it;
@@ -957,6 +1011,10 @@ bool PresetCollection::delete_preset(const std::string& name)
         boost::nowide::remove(preset.file.c_str());
     }
     m_presets.erase(it);
+
+    // update selected preset
+    this->select_preset_by_name(selected_preset_name, true);
+
     return true;
 }
 

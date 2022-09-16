@@ -38,7 +38,6 @@
 #include "../Utils/UndoRedo.hpp"
 #include "BitmapCache.hpp"
 #include "PhysicalPrinterDialog.hpp"
-#include "SavePresetDialog.hpp"
 #include "MsgDialog.hpp"
 
 // A workaround for a set of issues related to text fitting into gtk widgets:

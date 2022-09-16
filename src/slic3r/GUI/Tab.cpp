@@ -30,6 +30,8 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/exception/diagnostic_information.hpp>
+
 #include "wxExtensions.hpp"
 #include "PresetComboBoxes.hpp"
 #include <wx/wupdlock.h>
@@ -3710,12 +3712,11 @@ void Tab::rename_preset()
     if (m_presets_choice->is_selected_physical_printer())
         return;
 
-    Preset& selected_preset = m_presets->get_selected_preset();
     wxString msg;
 
     if (m_type == Preset::TYPE_PRINTER && !m_preset_bundle->physical_printers.empty()) {
         // Check preset for rename in physical printers
-        std::vector<std::string> ph_printers = m_preset_bundle->physical_printers.get_printers_with_preset(selected_preset.name);
+        std::vector<std::string> ph_printers = m_preset_bundle->physical_printers.get_printers_with_preset(m_presets->get_selected_preset().name);
         if (!ph_printers.empty()) {
             msg += _L_PLURAL("The physical printer below is based on the preset, you are going to rename.",
                 "The physical printers below are based on the preset, you are going to rename.", ph_printers.size());
@@ -3732,31 +3733,51 @@ void Tab::rename_preset()
     SavePresetDialog dlg(m_parent, m_type, true, msg);
     if (dlg.ShowModal() != wxID_OK)
         return;
-    std::string new_name = into_u8(dlg.get_name());
 
+    const std::string new_name = into_u8(dlg.get_name());
     if (new_name.empty() || new_name == m_presets->get_selected_preset().name)
         return;
 
-    // rename selected and edited presets
+    // Note: selected preset can be changed, if in SavePresetDialog was selected name of existing preset
+    Preset& selected_preset = m_presets->get_selected_preset();
+    Preset& edited_preset   = m_presets->get_edited_preset();
 
-    std::string old_name = selected_preset.name;
-    std::string old_file_name = selected_preset.file;
+    const std::string old_name      = selected_preset.name;
+    const std::string old_file_name = selected_preset.file;
 
-    selected_preset.name = new_name;
-    boost::replace_last(selected_preset.file, old_name, new_name);
+    assert(old_name == edited_preset.name);
 
-    Preset& edited_preset = m_presets->get_edited_preset();
-    edited_preset.name = new_name;
-    boost::replace_last(edited_preset.file, old_name, new_name);
+    using namespace boost;
+    try {
+        // rename selected and edited presets
 
-    // rename file with renamed preset configuration
-    boost::filesystem::rename(old_file_name, selected_preset.file);
+        selected_preset.name = new_name;
+        replace_last(selected_preset.file, old_name, new_name);
 
-    // rename selected preset in printers, if it's needed
-    if (!msg.IsEmpty())
-        m_preset_bundle->physical_printers.rename_preset_in_printers(old_name, new_name);
+        edited_preset.name = new_name;
+        replace_last(edited_preset.file, old_name, new_name);
+
+        // rename file with renamed preset configuration
+
+        filesystem::rename(old_file_name, selected_preset.file);
+
+        // rename selected preset in printers, if it's needed
+
+        if (!msg.IsEmpty())
+            m_preset_bundle->physical_printers.rename_preset_in_printers(old_name, new_name);
+    }
+    catch (const exception& ex) {
+        const std::string exception = diagnostic_information(ex);
+        printf("Can't rename a preset : %s", exception.c_str());
+    }
+
+    // sort presets after renaming
+    std::sort(m_presets->begin(), m_presets->end());
+    // update selection
+    m_presets->select_preset_by_name(new_name, true);
 
     m_presets_choice->update();
+    on_presets_changed();
 }
 
 // Called for a currently selected preset.

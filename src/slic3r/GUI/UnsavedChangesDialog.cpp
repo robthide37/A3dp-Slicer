@@ -36,7 +36,6 @@ namespace Slic3r {
 namespace GUI {
 
 wxDEFINE_EVENT(EVT_DIFF_DIALOG_TRANSFER, SimpleEvent);
-wxDEFINE_EVENT(EVT_DIFF_DIALOG_SAVE, SimpleEvent);
 
 
 // ----------------------------------------------------------------------------
@@ -1336,6 +1335,12 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
     searcher.sort_options_by_label();
 }
 
+wxString UnsavedChangesDialog::msg_success_saved_modifications(size_t saved_presets_cnt)
+{
+    return _L_PLURAL("The preset modifications are successfully saved",
+                     "The presets modifications are successfully saved", static_cast<unsigned int>(saved_presets_cnt));
+}
+
 void UnsavedChangesDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     int em = em_unit();
@@ -1488,10 +1493,11 @@ void DiffPresetDialog::create_presets_sizer()
             PresetComboBox*cb = (*cb_);
             cb->show_modif_preset_separately();
             cb->set_selection_changed_function([this, new_type, preset_bundle, cb](int selection) {
-                if (m_view_type == Preset::TYPE_INVALID) {
-                    std::string preset_name = Preset::remove_suffix_modified(cb->GetString(selection).ToUTF8().data());
+                std::string preset_name = Preset::remove_suffix_modified(cb->GetString(selection).ToUTF8().data());
+                if (m_view_type == Preset::TYPE_INVALID)
                     update_compatibility(preset_name, new_type, preset_bundle);
-                }
+                // update selection inside of related presets
+                preset_bundle->get_presets(new_type).select_preset_by_name(preset_name, true);
                 update_tree(); 
             });
             if (collection->get_selected_idx() != (size_t)-1)
@@ -2002,10 +2008,47 @@ void DiffPresetDialog::update_compatibility(const std::string& preset_name, Pres
     }
 }
 
+bool DiffPresetDialog::save()
+{
+    presets_to_saves.clear();
+
+    std::vector<Preset::Type> types_for_save;
+
+    for (const Preset::Type& type : m_pr_technology == ptFFF ?  std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
+                                                                std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL })
+        if (!m_tree->options(type, true).empty()) {
+            types_for_save.emplace_back(type);
+            presets_to_saves.emplace_back(PresetToSave{ type, get_left_preset_name(type), get_right_preset_name(type), get_right_preset_name(type) });
+        }
+
+    if (!types_for_save.empty()) {
+        SavePresetDialog save_dlg(this, types_for_save, _u8L("Modified"), m_preset_bundle_right.get());
+        if (save_dlg.ShowModal() != wxID_OK)
+            return false;
+
+        for (auto& preset : presets_to_saves) {
+            const std::string& name = save_dlg.get_name(preset.type);
+            if (!name.empty())
+                preset.new_name = name;
+        }
+    }
+    return true;
+}
+
 void DiffPresetDialog::button_event(Action act)
 {
     if (act == Action::Save) {
-        wxPostEvent(this, SimpleEvent(EVT_DIFF_DIALOG_SAVE));
+        if (save()) {
+            size_t saved_cnt = 0;
+            for (const auto& preset : presets_to_saves)
+                if (wxGetApp().preset_bundle->transfer_and_save(preset.type, preset.from_name, preset.to_name, preset.new_name, m_tree->options(preset.type, true)))
+                    saved_cnt++;
+
+            if (saved_cnt > 0)
+                MessageDialog(nullptr, UnsavedChangesDialog::msg_success_saved_modifications(saved_cnt)).ShowModal();
+
+            update_presets();
+        }
     }
     else {
         Hide();
@@ -2022,7 +2065,6 @@ std::string DiffPresetDialog::get_left_preset_name(Preset::Type type)
 
 std::string DiffPresetDialog::get_right_preset_name(Preset::Type type)
 {
-
     PresetComboBox* cb = m_preset_combos[int(type - Preset::TYPE_PRINT)].presets_right;
     return Preset::remove_suffix_modified(get_selection(cb));
 }
