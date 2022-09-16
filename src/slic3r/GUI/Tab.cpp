@@ -41,7 +41,6 @@
 #include "Plater.hpp"
 #include "MainFrame.hpp"
 #include "format.hpp"
-#include "PhysicalPrinterDialog.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "SavePresetDialog.hpp"
 #include "MsgDialog.hpp"
@@ -3187,7 +3186,8 @@ void Tab::update_btns_enabling()
     const Preset& preset = m_presets->get_edited_preset();
     m_btn_delete_preset->Show((m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection())
                               || (!preset.is_default && !preset.is_system));
-    m_btn_rename_preset->Show(!preset.is_default && !preset.is_system && !m_presets_choice->is_selected_physical_printer());
+    m_btn_rename_preset->Show(!preset.is_default && !preset.is_system && !preset.is_external && 
+                              !wxGetApp().preset_bundle->physical_printers.has_selection());
 
     if (m_btn_edit_ph_printer)
         m_btn_edit_ph_printer->SetToolTip( m_preset_bundle->physical_printers.has_selection() ?
