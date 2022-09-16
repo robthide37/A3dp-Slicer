@@ -163,8 +163,9 @@ void SavePresetDialog::Item::update()
     if (m_valid_type == ValidationType::Valid && existing)
     {
         if (m_preset_name == m_presets->get_selected_preset_name()) {
-            if (!rename && m_presets->get_edited_preset().is_dirty)
-                info_line = _L("Just save preset modifications");
+            if (!rename && m_presets->get_edited_preset().is_dirty ||
+                m_parent->get_preset_bundle()) // means that we save modifications from the DiffDialog
+                info_line = _L("Save preset modifications to existing user profile");
             else
                 info_line = _L("Nothing changed");
             m_valid_type = ValidationType::Valid;

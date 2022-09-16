@@ -47,14 +47,14 @@
 #include "Notebook.hpp"
 
 #ifdef WIN32
-	#include <commctrl.h>
+	#include <CommCtrl.h>
 #endif // WIN32
 
 namespace Slic3r {
 namespace GUI {
 
 Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
-    m_parent(parent), m_title(title), m_type(type)
+    m_parent(parent), m_type(type), m_title(title)
 {
     Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL/*, name*/);
     this->SetFont(Slic3r::GUI::wxGetApp().normal_font());
@@ -3609,16 +3609,6 @@ void Tab::transfer_options(const std::string &name_from, const std::string &name
 
     apply_config_from_cache();
     load_current_preset();
-}
-
-void Tab::save_options(const std::string &name_from, const std::string &name_to, std::vector<std::string> options)
-{
-    if (options.empty())
-        return;
-
-    Preset* preset_from = m_presets->find_preset(name_from);
-    Preset* preset_to = m_presets->find_preset(name_to);
-    
 }
 
 // Save the current preset into file.

@@ -15,7 +15,8 @@ class wxStaticText;
 namespace Slic3r {
 namespace GUI{
 
-wxDECLARE_EVENT(EVT_DIFF_DIALOG_TRANSFER, SimpleEvent);
+wxDECLARE_EVENT(EVT_DIFF_DIALOG_TRANSFER,       SimpleEvent);
+wxDECLARE_EVENT(EVT_DIFF_DIALOG_UPDATE_PRESETS, SimpleEvent);
 
 // ----------------------------------------------------------------------------
 //                  ModelNode: a node inside DiffModel
@@ -376,8 +377,9 @@ class DiffPresetDialog : public DPIDialog
     void update_controls_visibility(Preset::Type type = Preset::TYPE_INVALID);
     void update_compatibility(const std::string& preset_name, Preset::Type type, PresetBundle* preset_bundle);
          
-    void button_event(Action act);
-    bool save();
+    std::vector<std::string> get_options_to_save(Preset::Type type);
+    void                     button_event(Action act);
+    bool                     save();
 
     struct DiffPresets
     {
@@ -397,14 +399,14 @@ class DiffPresetDialog : public DPIDialog
         std::string     new_name;
     };
 
-    std::vector<PresetToSave>  presets_to_saves;
+    std::vector<PresetToSave>  presets_to_save;
 
 public:
     DiffPresetDialog(MainFrame*mainframe);
     ~DiffPresetDialog() override = default;
 
     void show(Preset::Type type = Preset::TYPE_INVALID);
-    void update_presets(Preset::Type type = Preset::TYPE_INVALID);
+    void update_presets(Preset::Type type = Preset::TYPE_INVALID, bool update_preset_bundles_from_app = true);
 
     Preset::Type        view_type() const           { return m_view_type; }
     PrinterTechnology   printer_technology() const  { return m_pr_technology; }
