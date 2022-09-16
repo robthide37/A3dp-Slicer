@@ -70,23 +70,22 @@ static std::string point_on_feature_type_as_string(Measure::SurfaceFeatureType t
 
 static std::tuple<double, Vec3d, Vec3d> distance_point_plane(const Vec3d& v, const Plane& p)
 {
-    const double distance = std::get<1>(p).dot(v - std::get<2>(p));
-    return std::make_tuple(std::abs(distance), v, v - distance * std::get<1>(p));
+    const auto& [idx, normal, origin] = p;
+    const Eigen::Hyperplane<double, 3> plane(normal, origin);
+    return std::make_tuple(plane.absDistance(v), v, plane.projection(v));
 }
 
 static std::tuple<double, Vec3d, Vec3d> distance_point_edge(const Vec3d& v, const Edge& e)
 {
-    const Vec3d e1v = v - e.first;
-    const Vec3d e1e2_unit = (e.second - e.first).normalized();
-    const Vec3d v_proj = e.first + e1e2_unit.dot(e1v) * e1e2_unit;
-    return std::make_tuple((e1v - v_proj).norm(), v, v_proj);
+    const Eigen::ParametrizedLine<double, 3> line(e.first, (e.second - e.first).normalized());
+    return std::make_tuple(line.distance(v), v, line.projection(v));
 }
 
 static std::tuple<double, Vec3d, Vec3d> distance_point_circle(const Vec3d& v, const Circle& c)
 {
     const auto& [center, radius, normal] = c;
-    const auto [distance, v1, v2] = distance_point_plane(v, std::make_tuple(0, normal, center));
-    const Vec3d p_on_circle = center + radius * (v2 - center).normalized();
+    const Eigen::Hyperplane<double, 3> plane(normal, center);
+    const Vec3d p_on_circle = center + radius * (plane.projection(v) - center).normalized();
     return std::make_tuple((v - p_on_circle).norm(), v, p_on_circle);
 }
 
