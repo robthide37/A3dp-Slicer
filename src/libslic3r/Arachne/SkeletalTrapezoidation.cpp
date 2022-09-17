@@ -619,8 +619,8 @@ void SkeletalTrapezoidation::constructFromPolygons(const Polygons& polys)
     // When any Voronoi vertex is missing, or the Voronoi diagram is not
     // planar, rotate the input polygon and try again.
     const bool   has_missing_voronoi_vertex = detect_missing_voronoi_vertex(voronoi_diagram, segments);
-    // Detection of non-planar Voronoi diagram detects at least GH issues #8474, #8514 and #8446.
-    const bool   is_voronoi_diagram_planar  = Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram);
+    // Detection of non-planar Voronoi diagram detects at least GH issues #8474, #8514, #8446 and #8846.
+    const bool   is_voronoi_diagram_planar  = Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segments);
     const double fix_angle                  = PI / 6;
 
     std::unordered_map<Point, Point, PointHash> vertex_mapping;
@@ -635,10 +635,10 @@ void SkeletalTrapezoidation::constructFromPolygons(const Polygons& polys)
         vertex_mapping = try_to_fix_degenerated_voronoi_diagram_by_rotation(voronoi_diagram, polys, polys_copy, segments, fix_angle);
 
         assert(!detect_missing_voronoi_vertex(voronoi_diagram, segments));
-        assert(Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram));
+        assert(Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segments));
         if (detect_missing_voronoi_vertex(voronoi_diagram, segments))
             BOOST_LOG_TRIVIAL(error) << "Detected missing Voronoi vertex even after the rotation of input.";
-        else if (!Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram))
+        else if (!Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segments))
             BOOST_LOG_TRIVIAL(error) << "Detected non-planar Voronoi diagram even after the rotation of input.";
     }
 
