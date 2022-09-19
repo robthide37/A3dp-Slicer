@@ -92,14 +92,22 @@ static std::tuple<double, Vec3d, Vec3d> distance_point_circle(const Vec3d& v, co
 static std::tuple<double, Vec3d, Vec3d> distance_edge_edge(const Edge& e1, const Edge& e2)
 {
     std::vector<std::tuple<double, Vec3d, Vec3d>> distances;
+    auto add_point_edge_distance = [&distances](const Vec3d& v, const Edge& e) {
+        const auto [distance, v1, v2] = distance_point_edge(v, e);
+        const Vec3d e1e2 = e.second - e.first;
+        const Vec3d e1v2 = v2 - e.first;
+        if (e1v2.dot(e1e2) >= 0.0 && e1v2.norm() < e1e2.norm())
+            distances.emplace_back(std::make_tuple(distance, v, v2));
+    };
+
     distances.emplace_back(std::make_tuple((e2.first - e1.first).norm(), e1.first, e2.first));
     distances.emplace_back(std::make_tuple((e2.second - e1.first).norm(), e1.first, e2.second));
     distances.emplace_back(std::make_tuple((e2.first - e1.second).norm(), e1.second, e2.first));
     distances.emplace_back(std::make_tuple((e2.second - e1.second).norm(), e1.second, e2.second));
-    distances.emplace_back(distance_point_edge(e1.first, e2));
-    distances.emplace_back(distance_point_edge(e1.second, e2));
-    distances.emplace_back(distance_point_edge(e2.first, e1));
-    distances.emplace_back(distance_point_edge(e2.second, e1));
+    add_point_edge_distance(e1.first, e2);
+    add_point_edge_distance(e1.second, e2);
+    add_point_edge_distance(e2.first, e1);
+    add_point_edge_distance(e2.second, e1);
     std::sort(distances.begin(), distances.end(),
         [](const std::tuple<double, Vec3d, Vec3d>& item1, const std::tuple<double, Vec3d, Vec3d>& item2) {
             return std::get<0>(item1) < std::get<0>(item2);
