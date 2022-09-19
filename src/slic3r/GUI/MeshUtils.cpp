@@ -177,7 +177,7 @@ void MeshClipper::recalculate_triangles()
 
     // Now do the cutting
     MeshSlicingParams slicing_params;
-    slicing_params.trafo.rotate(Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(up, Vec3d::UnitZ()));
+    slicing_params.trafo.rotate(Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(up_noscale.cast<double>(), Vec3d::UnitZ()));
 
     ExPolygons expolys = union_ex(slice_mesh(m_mesh->its, height_mesh, slicing_params));
 
@@ -188,7 +188,7 @@ void MeshClipper::recalculate_triangles()
 
     // Triangulate and rotate the cut into world coords:
     Eigen::Quaterniond q;
-    q.setFromTwoVectors(Vec3d::UnitZ(), up);
+    q.setFromTwoVectors(Vec3d::UnitZ(), up_noscale.cast<double>());
     Transform3d tr = Transform3d::Identity();
     tr.rotate(q);
     tr = m_trafo.get_matrix() * tr;
