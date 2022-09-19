@@ -89,15 +89,7 @@ static std::tuple<double, Vec3d, Vec3d> distance_point_circle(const Vec3d& v, co
     return std::make_tuple((v - p_on_circle).norm(), v, p_on_circle);
 }
 
-static std::tuple<double, Vec3d, Vec3d> distance_plane_plane(const Plane& p1, const Plane& p2)
-{
-    const auto& [idx1, normal1, origin1] = p1;
-    const auto& [idx2, normal2, origin2] = p2;
-    return (std::abs(std::abs(normal1.dot(normal2)) - 1.0) < EPSILON) ? distance_point_plane(origin2, p1) :
-        std::make_tuple(0.0, Vec3d::Zero(), Vec3d::Zero());
-}
-
-static std::tuple<double, Vec3d, Vec3d> min_distance_edge_edge(const Edge& e1, const Edge& e2)
+static std::tuple<double, Vec3d, Vec3d> distance_edge_edge(const Edge& e1, const Edge& e2)
 {
     std::vector<std::tuple<double, Vec3d, Vec3d>> distances;
     distances.emplace_back(std::make_tuple((e2.first - e1.first).norm(), e1.first, e2.first));
@@ -113,6 +105,37 @@ static std::tuple<double, Vec3d, Vec3d> min_distance_edge_edge(const Edge& e1, c
             return std::get<0>(item1) < std::get<0>(item2);
         });
     return distances.front();
+}
+
+static std::tuple<double, Vec3d, Vec3d> distance_edge_circle(const Edge& e, const Circle& c)
+{
+    const auto& [center, radius, normal] = c;
+    const Vec3d e1e2_unit = (e.second - e.first).normalized();
+    double dot = std::abs(e1e2_unit.dot(normal));
+
+    if (dot < EPSILON) {
+        // edge parallel to circle's plane
+        const Eigen::Hyperplane<double, 3> plane(e1e2_unit, center);
+        const Eigen::ParametrizedLine<double, 3> line(e.first, e1e2_unit);
+        const Vec3d inter = line.intersectionPoint(plane);
+        return distance_point_circle(inter, c);
+    }
+    else if (std::abs(dot - 1.0) < EPSILON)
+        // edge parallel to circle's normal
+        return distance_point_circle(e.first, c);
+    else {
+        const auto [distance1, v11, v12] = distance_point_circle(e.first, c);
+        const auto [distance2, v21, v22] = distance_point_circle(e.second, c);
+        return (distance1 <= distance2) ? std::make_tuple(distance1, v11, v12) : std::make_tuple(distance2, v21, v22);
+    }
+}
+
+static std::tuple<double, Vec3d, Vec3d> distance_plane_plane(const Plane& p1, const Plane& p2)
+{
+    const auto& [idx1, normal1, origin1] = p1;
+    const auto& [idx2, normal2, origin2] = p2;
+    return (std::abs(std::abs(normal1.dot(normal2)) - 1.0) < EPSILON) ? distance_point_plane(origin2, p1) :
+        std::make_tuple(0.0, Vec3d::Zero(), Vec3d::Zero());
 }
 
 static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const std::vector<std::vector<int>>& planes_triangles, int idx)
@@ -812,8 +835,8 @@ void GLGizmoMeasure::render_dimensioning()
 
         const Vec3d e1e2 = e.second - e.first;
         const Vec3d v_proje1 = v_proj - e.first;
-        bool on_e1_side = v_proje1.dot(e1e2) < 0.0;
-        bool on_e2_side = v_proje1.norm() > e1e2.norm();
+        const bool on_e1_side = v_proje1.dot(e1e2) < 0.0;
+        const bool on_e2_side = v_proje1.norm() > e1e2.norm();
         if (on_e1_side || on_e2_side) {
             const Camera& camera = wxGetApp().plater()->get_camera();
             const Matrix4d projection_view_matrix = camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix();
@@ -851,7 +874,12 @@ void GLGizmoMeasure::render_dimensioning()
     };
 
     auto edge_edge = [point_point](const Edge& e1, const Edge& e2) {
-        const auto [distance, v1, v2] = min_distance_edge_edge(e1, e2);
+        const auto [distance, v1, v2] = distance_edge_edge(e1, e2);
+        point_point(v1, v2);
+    };
+
+    auto edge_circle = [point_point](const Edge& e, const Circle& c) {
+        const auto [distance, v1, v2] = distance_edge_circle(e, c);
         point_point(v1, v2);
     };
 
@@ -939,10 +967,20 @@ void GLGizmoMeasure::render_dimensioning()
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
         edge_edge(m_selected_features.first.feature->get_edge(), m_selected_features.second.feature->get_edge());
     }
+    // edge-circle
+    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
+        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Circle) {
+        edge_circle(m_selected_features.first.feature->get_edge(), m_selected_features.second.feature->get_circle());
+    }
     // plane-plane
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Plane &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Plane) {
         plane_plane(m_selected_features.first.feature->get_plane(), m_selected_features.second.feature->get_plane());
+    }
+    // circle-edge
+    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Circle &&
+        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
+        edge_circle(m_selected_features.second.feature->get_edge(), m_selected_features.first.feature->get_circle());
     }
 
     glsafe(::glEnable(GL_DEPTH_TEST));
