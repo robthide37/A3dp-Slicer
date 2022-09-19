@@ -379,7 +379,7 @@ class DiffPresetDialog : public DPIDialog
          
     std::vector<std::string> get_options_to_save(Preset::Type type);
     void                     button_event(Action act);
-    bool                     save();
+    bool                     is_save_confirmed();
 
     struct DiffPresets
     {
