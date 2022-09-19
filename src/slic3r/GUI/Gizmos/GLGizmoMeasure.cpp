@@ -110,24 +110,25 @@ static std::tuple<double, Vec3d, Vec3d> distance_edge_edge(const Edge& e1, const
 static std::tuple<double, Vec3d, Vec3d> distance_edge_circle(const Edge& e, const Circle& c)
 {
     const auto& [center, radius, normal] = c;
-    const Vec3d e1e2_unit = (e.second - e.first).normalized();
-    double dot = std::abs(e1e2_unit.dot(normal));
+    const Vec3d e1e2 = (e.second - e.first);
+    const Vec3d e1e2_unit = e1e2.normalized();
 
-    if (dot < EPSILON) {
-        // edge parallel to circle's plane
-        const Eigen::Hyperplane<double, 3> plane(e1e2_unit, center);
-        const Eigen::ParametrizedLine<double, 3> line(e.first, e1e2_unit);
-        const Vec3d inter = line.intersectionPoint(plane);
-        return distance_point_circle(inter, c);
-    }
-    else if (std::abs(dot - 1.0) < EPSILON)
-        // edge parallel to circle's normal
-        return distance_point_circle(e.first, c);
-    else {
-        const auto [distance1, v11, v12] = distance_point_circle(e.first, c);
-        const auto [distance2, v21, v22] = distance_point_circle(e.second, c);
-        return (distance1 <= distance2) ? std::make_tuple(distance1, v11, v12) : std::make_tuple(distance2, v21, v22);
-    }
+    std::vector<std::tuple<double, Vec3d, Vec3d>> distances;
+    distances.emplace_back(distance_point_circle(e.first, c));
+    distances.emplace_back(distance_point_circle(e.second, c));
+
+    const Eigen::Hyperplane<double, 3> plane(e1e2_unit, center);
+    const Eigen::ParametrizedLine<double, 3> line(e.first, e1e2_unit);
+    const Vec3d inter = line.intersectionPoint(plane);
+    const Vec3d e1inter = inter - e.first;
+    if (e1inter.dot(e1e2) >= 0.0 && e1inter.norm() < e1e2.norm())
+        distances.emplace_back(distance_point_circle(inter, c));
+
+    std::sort(distances.begin(), distances.end(),
+        [](const std::tuple<double, Vec3d, Vec3d>& item1, const std::tuple<double, Vec3d, Vec3d>& item2) {
+            return std::get<0>(item1) < std::get<0>(item2);
+        });
+    return distances.front();
 }
 
 static std::tuple<double, Vec3d, Vec3d> distance_plane_plane(const Plane& p1, const Plane& p2)
