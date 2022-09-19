@@ -2,11 +2,9 @@
 #define slic3r_GLGizmoCut_hpp_
 
 #include "GLGizmoBase.hpp"
-#include "GLGizmoRotate.hpp"
-#include "GLGizmoMove.hpp"
 #include "slic3r/GUI/GLModel.hpp"
 #include "libslic3r/TriangleMesh.hpp"
-#include "libslic3r/ObjectID.hpp"
+#include "libslic3r/Model.hpp"
 
 namespace Slic3r {
 
@@ -100,9 +98,6 @@ class GLGizmoCut3D : public GLGizmoBase
 
     bool m_has_invalid_connector{ false };
 
-    Matrix3d m_rotation_matrix;
-    Vec3d    m_rotations{ Vec3d::Zero() };
-
     bool                                        m_show_shortcuts{ false };
     std::vector<std::pair<wxString, wxString>>  m_shortcuts;
 
@@ -150,7 +145,7 @@ public:
     bool on_mouse(const wxMouseEvent &mouse_event) override;
 
     void shift_cut_z(double delta);
-    void rotate_vec3d_around_center(Vec3d& vec, const Vec3d& angles, const Vec3d& center);
+    void rotate_vec3d_around_plane_center(Vec3d&vec);
     void put_connetors_on_cut_plane(const Vec3d& cp_normal, double cp_offset);
     void update_clipper();
     void update_clipper_on_render();
@@ -173,6 +168,13 @@ protected:
     void on_start_dragging() override;
     void on_stop_dragging() override;
     void on_render() override;
+
+    void render_debug_block();
+    void adjust_window_position(float x, float y, float bottom_limit);
+    void render_connectors_editing(CutConnectors &connectors);
+    void render_cut_plane_editing(CutConnectors &connectors);
+    void init_input_window_data(CutConnectors &connectors);
+    void render_input_window_warning() const;
 
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
@@ -204,12 +206,13 @@ private:
     void discard_cut_line_processing();
 
     void render_cut_plane();
-    void render_cut_center_graber();
+    void render_cut_center_grabber();
     void render_cut_line();
-    void perform_cut(const Selection& selection);
-    void set_center_pos(const Vec3d& center_pos, bool force = false);
+    void perform_cut(const Selection&selection);
+    void set_center_pos(const Vec3d&center_pos, bool force = false);
     bool update_bb();
     void init_picking_models();
+    void init_rendering_items();
     void reset_connectors();
     void update_connector_shape();
     void update_model_object();
