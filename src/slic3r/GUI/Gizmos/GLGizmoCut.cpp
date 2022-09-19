@@ -1942,7 +1942,9 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
                     update_model_object();
                     m_parent.set_as_dirty();
                 } else {
-                    m_c->object_clipper()->pass_mouse_click(pos_world);
+                    // Following would inform the clipper about the mouse click, so it can
+                    // toggle the respective contour as disabled.
+                    //m_c->object_clipper()->pass_mouse_click(pos_world);
                 }
 
                 return true;
