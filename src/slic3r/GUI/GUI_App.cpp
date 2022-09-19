@@ -2521,9 +2521,9 @@ bool GUI_App::check_and_save_current_preset_changes(const wxString& caption, con
 {
     if (has_current_preset_changes()) {
         const std::string app_config_key = remember_choice ? "default_action_on_close_application" : "";
-        int act_buttons = UnsavedChangesDialog::ActionButtons::SAVE;
+        int act_buttons = ActionButtons::SAVE;
         if (dont_save_insted_of_discard)
-            act_buttons |= UnsavedChangesDialog::ActionButtons::DONT_SAVE;
+            act_buttons |= ActionButtons::DONT_SAVE;
         UnsavedChangesDialog dlg(caption, header, app_config_key, act_buttons);
         std::string act = app_config_key.empty() ? "none" : wxGetApp().app_config->get(app_config_key);
         if (act == "none" && dlg.ShowModal() == wxID_CANCEL)
@@ -2540,8 +2540,7 @@ bool GUI_App::check_and_save_current_preset_changes(const wxString& caption, con
             // synchronize config.ini with the current selections.
             preset_bundle->export_selections(*app_config);
 
-            MessageDialog(nullptr, _L_PLURAL("The preset modifications are successfully saved", 
-                                             "The presets modifications are successfully saved", dlg.get_names_and_types().size())).ShowModal();
+            MessageDialog(nullptr, dlg.msg_success_saved_modifications(dlg.get_names_and_types().size())).ShowModal();
         }
     }
 
@@ -2601,8 +2600,7 @@ bool GUI_App::check_and_keep_current_preset_changes(const wxString& caption, con
                 // synchronize config.ini with the current selections.
                 preset_bundle->export_selections(*app_config);
 
-                wxString text = _L_PLURAL("The preset modifications are successfully saved",
-                    "The presets modifications are successfully saved", preset_names_and_types.size());
+                wxString text = dlg.msg_success_saved_modifications(preset_names_and_types.size());
                 if (!is_called_from_configwizard)
                     text += "\n\n" + _L("For new project all modifications will be reseted");
 

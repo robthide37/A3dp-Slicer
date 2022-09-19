@@ -17,6 +17,9 @@
 #include "Fill/FillAdaptive.hpp"
 #include "Fill/FillLightning.hpp"
 #include "Format/STL.hpp"
+#include "SupportSpotsGenerator.hpp"
+#include "TriangleSelectorWrapper.hpp"
+#include "format.hpp"
 
 #include <float.h>
 #include <string_view>
@@ -391,6 +394,65 @@ void PrintObject::ironing()
         m_print->throw_if_canceled();
         BOOST_LOG_TRIVIAL(debug) << "Ironing in parallel - end";
         this->set_done(posIroning);
+    }
+}
+
+
+/*
+std::vector<size_t> problematic_layers = SupportSpotsGenerator::quick_search(this);
+    if (!problematic_layers.empty()) {
+        std::cout << "Object needs supports" << std::endl;
+        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                L("Supportable issues found. Consider enabling supports for this object"));
+        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                L("Supportable issues found. Consider enabling supports for this object"));
+        for (size_t index = 0; index < std::min(problematic_layers.size(), size_t(4)); ++index) {
+            this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                    format(L("Layer with issues: %1%"), problematic_layers[index] + 1));
+        }
+    }
+ */
+void PrintObject::generate_support_spots()
+{
+    if (this->set_started(posSupportSpotsSearch)) {
+        BOOST_LOG_TRIVIAL(debug)
+        << "Searching support spots - start";
+        m_print->set_status(75, L("Searching support spots"));
+        if (this->m_config.support_material && !this->m_config.support_material_auto &&
+        std::all_of(this->model_object()->volumes.begin(), this->model_object()->volumes.end(),
+                [](const ModelVolume* mv){return mv->supported_facets.empty();})
+        ) {
+            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values};
+            SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this, params);
+            auto obj_transform = this->trafo_centered();
+            for (ModelVolume *model_volume : this->model_object()->volumes) {
+                if (model_volume->is_model_part()) {
+                    Transform3d mesh_transformation = obj_transform * model_volume->get_matrix();
+                    Transform3d inv_transform = mesh_transformation.inverse();
+                    TriangleSelectorWrapper selector { model_volume->mesh(), mesh_transformation};
+
+                    for (const SupportSpotsGenerator::SupportPoint &support_point : issues.support_points) {
+                        Vec3f point = Vec3f(inv_transform.cast<float>() * support_point.position);
+                        Vec3f origin = Vec3f(
+                                inv_transform.cast<float>() * Vec3f(support_point.position.x(), support_point.position.y(), 0.0f));
+                        selector.enforce_spot(point, origin, support_point.spot_radius);
+                    }
+
+                    model_volume->supported_facets.set(selector.selector);
+#if 0 //DEBUG export
+                    indexed_triangle_set copy = model_volume->mesh().its;
+                    its_transform(copy, obj_transform * model_transformation);
+                    its_write_obj(copy,
+                            debug_out_path(("model"+std::to_string(model_volume->id().id)+".obj").c_str()).c_str());
+#endif
+                }
+            }
+        }
+
+        m_print->throw_if_canceled();
+        BOOST_LOG_TRIVIAL(debug)
+           << "Searching support spots - end";
+        this->set_done(posSupportSpotsSearch);
     }
 }
 

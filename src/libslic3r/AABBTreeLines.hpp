@@ -1,8 +1,6 @@
 #ifndef SRC_LIBSLIC3R_AABBTREELINES_HPP_
 #define SRC_LIBSLIC3R_AABBTREELINES_HPP_
 
-#include "libslic3r/Point.hpp"
-#include "libslic3r/EdgeGrid.hpp"
 #include "libslic3r/AABBTreeIndirect.hpp"
 #include "libslic3r/Line.hpp"
 

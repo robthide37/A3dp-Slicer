@@ -341,6 +341,10 @@ public:
     // All presets are marked as not modified and the new preset is activated.
     void            save_current_preset(const std::string &new_name, bool detach = false);
 
+    // Find the preset with a new_name or create a new one,
+    // initialize it with the initial_preset config.
+    Preset&         get_preset_with_name(const std::string& new_name, const Preset* initial_preset);
+
     // Delete the current preset, activate the first visible preset.
     // returns true if the preset was deleted successfully.
     bool            delete_current_preset();

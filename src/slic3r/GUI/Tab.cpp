@@ -30,6 +30,8 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/exception/diagnostic_information.hpp>
+
 #include "wxExtensions.hpp"
 #include "PresetComboBoxes.hpp"
 #include <wx/wupdlock.h>
@@ -39,21 +41,20 @@
 #include "Plater.hpp"
 #include "MainFrame.hpp"
 #include "format.hpp"
-#include "PhysicalPrinterDialog.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "SavePresetDialog.hpp"
 #include "MsgDialog.hpp"
 #include "Notebook.hpp"
 
 #ifdef WIN32
-	#include <commctrl.h>
+	#include <CommCtrl.h>
 #endif // WIN32
 
 namespace Slic3r {
 namespace GUI {
 
 Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
-    m_parent(parent), m_title(title), m_type(type)
+    m_parent(parent), m_type(type), m_title(title)
 {
     Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL/*, name*/);
     this->SetFont(Slic3r::GUI::wxGetApp().normal_font());
@@ -1183,9 +1184,9 @@ void Tab::activate_option(const std::string& opt_key, const wxString& category)
     m_highlighter.init(get_custom_ctrl_with_blinking_ptr(opt_key));
 }
 
-void Tab::cache_config_diff(const std::vector<std::string>& selected_options)
+void Tab::cache_config_diff(const std::vector<std::string>& selected_options, const DynamicPrintConfig* config/* = nullptr*/)
 {
-    m_cache_config.apply_only(m_presets->get_edited_preset().config, selected_options);
+    m_cache_config.apply_only(config ? *config : m_presets->get_edited_preset().config, selected_options);
 }
 
 void Tab::apply_config_from_cache()
@@ -3185,7 +3186,8 @@ void Tab::update_btns_enabling()
     const Preset& preset = m_presets->get_edited_preset();
     m_btn_delete_preset->Show((m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection())
                               || (!preset.is_default && !preset.is_system));
-    m_btn_rename_preset->Show(!preset.is_default && !preset.is_system && !m_presets_choice->is_selected_physical_printer());
+    m_btn_rename_preset->Show(!preset.is_default && !preset.is_system && !preset.is_external && 
+                              !wxGetApp().preset_bundle->physical_printers.has_selection());
 
     if (m_btn_edit_ph_printer)
         m_btn_edit_ph_printer->SetToolTip( m_preset_bundle->physical_printers.has_selection() ?
@@ -3583,6 +3585,32 @@ void Tab::compare_preset()
     wxGetApp().mainframe->diff_dialog.show(m_type);
 }
 
+void Tab::transfer_options(const std::string &name_from, const std::string &name_to, std::vector<std::string> options)
+{
+    if (options.empty())
+        return;
+
+    Preset* preset_from = m_presets->find_preset(name_from);
+    Preset* preset_to = m_presets->find_preset(name_to);
+
+    if (m_type == Preset::TYPE_PRINTER) {
+         auto it = std::find(options.begin(), options.end(), "extruders_count");
+         if (it != options.end()) {
+             // erase "extruders_count" option from the list
+             options.erase(it);
+             // cache the extruders count
+             static_cast<TabPrinter*>(this)->cache_extruder_cnt(&preset_from->config);
+         }
+    }
+    cache_config_diff(options, &preset_from->config);
+
+    if (name_to != m_presets->get_edited_preset().name )
+        select_preset(preset_to->name);
+
+    apply_config_from_cache();
+    load_current_preset();
+}
+
 // Save the current preset into file.
 // This removes the "dirty" flag of the preset, possibly creates a new preset under a new name,
 // and activates the new preset.
@@ -3674,12 +3702,11 @@ void Tab::rename_preset()
     if (m_presets_choice->is_selected_physical_printer())
         return;
 
-    Preset& selected_preset = m_presets->get_selected_preset();
     wxString msg;
 
     if (m_type == Preset::TYPE_PRINTER && !m_preset_bundle->physical_printers.empty()) {
         // Check preset for rename in physical printers
-        std::vector<std::string> ph_printers = m_preset_bundle->physical_printers.get_printers_with_preset(selected_preset.name);
+        std::vector<std::string> ph_printers = m_preset_bundle->physical_printers.get_printers_with_preset(m_presets->get_selected_preset().name);
         if (!ph_printers.empty()) {
             msg += _L_PLURAL("The physical printer below is based on the preset, you are going to rename.",
                 "The physical printers below are based on the preset, you are going to rename.", ph_printers.size());
@@ -3696,31 +3723,51 @@ void Tab::rename_preset()
     SavePresetDialog dlg(m_parent, m_type, true, msg);
     if (dlg.ShowModal() != wxID_OK)
         return;
-    std::string new_name = into_u8(dlg.get_name());
 
+    const std::string new_name = into_u8(dlg.get_name());
     if (new_name.empty() || new_name == m_presets->get_selected_preset().name)
         return;
 
-    // rename selected and edited presets
+    // Note: selected preset can be changed, if in SavePresetDialog was selected name of existing preset
+    Preset& selected_preset = m_presets->get_selected_preset();
+    Preset& edited_preset   = m_presets->get_edited_preset();
 
-    std::string old_name = selected_preset.name;
-    std::string old_file_name = selected_preset.file;
+    const std::string old_name      = selected_preset.name;
+    const std::string old_file_name = selected_preset.file;
 
-    selected_preset.name = new_name;
-    boost::replace_last(selected_preset.file, old_name, new_name);
+    assert(old_name == edited_preset.name);
 
-    Preset& edited_preset = m_presets->get_edited_preset();
-    edited_preset.name = new_name;
-    boost::replace_last(edited_preset.file, old_name, new_name);
+    using namespace boost;
+    try {
+        // rename selected and edited presets
 
-    // rename file with renamed preset configuration
-    boost::filesystem::rename(old_file_name, selected_preset.file);
+        selected_preset.name = new_name;
+        replace_last(selected_preset.file, old_name, new_name);
 
-    // rename selected preset in printers, if it's needed
-    if (!msg.IsEmpty())
-        m_preset_bundle->physical_printers.rename_preset_in_printers(old_name, new_name);
+        edited_preset.name = new_name;
+        replace_last(edited_preset.file, old_name, new_name);
+
+        // rename file with renamed preset configuration
+
+        filesystem::rename(old_file_name, selected_preset.file);
+
+        // rename selected preset in printers, if it's needed
+
+        if (!msg.IsEmpty())
+            m_preset_bundle->physical_printers.rename_preset_in_printers(old_name, new_name);
+    }
+    catch (const exception& ex) {
+        const std::string exception = diagnostic_information(ex);
+        printf("Can't rename a preset : %s", exception.c_str());
+    }
+
+    // sort presets after renaming
+    std::sort(m_presets->begin(), m_presets->end());
+    // update selection
+    m_presets->select_preset_by_name(new_name, true);
 
     m_presets_choice->update();
+    on_presets_changed();
 }
 
 // Called for a currently selected preset.
@@ -4267,12 +4314,15 @@ wxSizer* TabPrinter::create_bed_shape_widget(wxWindow* parent)
     return sizer;
 }
 
-void TabPrinter::cache_extruder_cnt()
+void TabPrinter::cache_extruder_cnt(const DynamicPrintConfig* config/* = nullptr*/)
 {
-    if (m_presets->get_edited_preset().printer_technology() == ptSLA)
+    const DynamicPrintConfig& cached_config = config ? *config : m_presets->get_edited_preset().config;
+    if (Preset::printer_technology(cached_config) == ptSLA)
         return;
 
-    m_cache_extruder_count = m_extruders_count;
+    // get extruders count 
+    auto* nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(cached_config.option("nozzle_diameter"));
+    m_cache_extruder_count = nozzle_diameter->values.size(); //m_extruders_count;
 }
 
 bool TabPrinter::apply_extruder_cnt_from_cache()
@@ -4282,6 +4332,7 @@ bool TabPrinter::apply_extruder_cnt_from_cache()
 
     if (m_cache_extruder_count > 0) {
         m_presets->get_edited_preset().set_num_extruders(m_cache_extruder_count);
+//        extruders_count_changed(m_cache_extruder_count);
         m_cache_extruder_count = 0;
         return true;
     }

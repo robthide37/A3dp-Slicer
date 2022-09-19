@@ -575,6 +575,7 @@ namespace Slic3r {
         OptionsZCorrector m_options_z_corrector;
         size_t m_last_default_color_id;
         bool m_spiral_vase_active;
+        float m_kissslicer_toolchange_time_correction;
 #if ENABLE_GCODE_VIEWER_STATISTICS
         std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
@@ -648,6 +649,7 @@ namespace Slic3r {
         void apply_config(const DynamicPrintConfig& config);
         void apply_config_simplify3d(const std::string& filename);
         void apply_config_superslicer(const std::string& filename);
+        void apply_config_kissslicer(const std::string& filename);
         void process_gcode_line(const GCodeReader::GCodeLine& line, bool producers_enabled);
 
         // Process tags embedded into comments

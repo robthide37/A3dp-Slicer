@@ -1609,7 +1609,8 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &fi
 
     m_mainframe.Raise();
     m_mainframe.select_tab(size_t(0));
-    m_plater.select_view_3D("3D");
+    if (wxGetApp().is_editor())
+        m_plater.select_view_3D("3D");
     bool res = m_plater.load_files(filenames);
     m_mainframe.update_title();
     return res;
@@ -5347,10 +5348,9 @@ void Plater::new_project()
                           (saved_project == wxID_YES ? _L("You can keep presets modifications to the new project or discard them") :
                           _L("You can keep presets modifications to the new project, discard them or save changes as new presets.\n"
                              "Note, if changes will be saved then new project wouldn't keep them"));
-        using ab = UnsavedChangesDialog::ActionButtons;
-        int act_buttons = ab::KEEP;
+        int act_buttons = ActionButtons::KEEP;
         if (saved_project == wxID_NO)
-            act_buttons |= ab::SAVE;
+            act_buttons |= ActionButtons::SAVE;
         if (!wxGetApp().check_and_keep_current_preset_changes(_L("Creating a new project"), header, act_buttons))
             return;
     }
