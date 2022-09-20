@@ -16,6 +16,8 @@
 
 #include <igl/unproject.h>
 
+#include <cstdint>
+
 
 namespace Slic3r {
 namespace GUI {
@@ -163,21 +165,13 @@ void MeshClipper::recalculate_triangles()
 {
     m_result = ClipResult();
 
-
-#if ENABLE_WORLD_COORDINATE
-    const Transform3f instance_matrix_no_translation_no_scaling = m_trafo.get_rotation_matrix().cast<float>();
-#else
-    const Transform3f& instance_matrix_no_translation_no_scaling = m_trafo.get_matrix(true,false,true).cast<float>();
-#endif // ENABLE_WORLD_COORDINATE
-    // Calculate clipping plane normal in mesh coordinates.
-    const Vec3f up_noscale = instance_matrix_no_translation_no_scaling.inverse() * m_plane.get_normal().cast<float>();
-    const Vec3d up = up_noscale.cast<double>().cwiseProduct(m_trafo.get_scaling_factor());
-    // Calculate distance from mesh origin to the clipping plane (in mesh coordinates).
-    const float height_mesh = m_plane.distance(m_trafo.get_offset()) * (up_noscale.norm()/up.norm());
+    auto plane_mesh = Eigen::Hyperplane<double, 3>(m_plane.get_normal(), -m_plane.distance(Vec3d::Zero())).transform(m_trafo.get_matrix().inverse());
+    const Vec3d up = plane_mesh.normal();
+    const float height_mesh = -plane_mesh.offset();
 
     // Now do the cutting
     MeshSlicingParams slicing_params;
-    slicing_params.trafo.rotate(Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(up_noscale.cast<double>(), Vec3d::UnitZ()));
+    slicing_params.trafo.rotate(Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(up, Vec3d::UnitZ()));
 
     ExPolygons expolys = union_ex(slice_mesh(m_mesh->its, height_mesh, slicing_params));
 
@@ -188,7 +182,7 @@ void MeshClipper::recalculate_triangles()
 
     // Triangulate and rotate the cut into world coords:
     Eigen::Quaterniond q;
-    q.setFromTwoVectors(Vec3d::UnitZ(), up_noscale.cast<double>());
+    q.setFromTwoVectors(Vec3d::UnitZ(), up);
     Transform3d tr = Transform3d::Identity();
     tr.rotate(q);
     tr = m_trafo.get_matrix() * tr;
@@ -240,7 +234,7 @@ void MeshClipper::recalculate_triangles()
             // it so it lies on our line. This will be the figure to subtract
             // from the cut. The coordinates must not overflow after the transform,
             // make the rectangle a bit smaller.
-            const coord_t size = (std::numeric_limits<coord_t>::max() - scale_(std::max(std::abs(e*a), std::abs(e*b)))) / 4;
+            const coord_t size = (std::numeric_limits<coord_t>::max()/2 - scale_(std::max(std::abs(e*a), std::abs(e*b)))) / 4;
             Polygons ep {Polygon({Point(-size, 0), Point(size, 0), Point(size, 2*size), Point(-size, 2*size)})};
             ep.front().rotate(angle);
             ep.front().translate(scale_(-e * a), scale_(-e * b));
@@ -280,10 +274,42 @@ void MeshClipper::recalculate_triangles()
                 isl.model.init_from(std::move(init_data));
         }
 
-        if (m_contour_width != 0.) {
+        if (m_contour_width != 0. && ! exp.contour.empty()) {
             triangles2d.clear();
-            ExPolygons expolys_exp = offset_ex(exp, scale_(m_contour_width));
-            expolys_exp = diff_ex(expolys_exp, ExPolygons({exp}));
+
+            // The contours must not scale with the object. Check the scale factor
+            // in the respective directions, create a scaled copy of the ExPolygon
+            // offset it and then unscale the result again.
+
+            Transform3d t = tr;
+            t.translation() = Vec3d::Zero();
+            double scale_x = (t * Vec3d::UnitX()).norm();
+            double scale_y = (t * Vec3d::UnitY()).norm();
+
+            // To prevent overflow after scaling, downscale the input if needed:
+            double extra_scale = 1.;
+            int32_t limit = int32_t(std::min(std::numeric_limits<coord_t>::max() / (2. * scale_x), std::numeric_limits<coord_t>::max() / (2. * scale_y)));
+            int32_t max_coord = 0;
+            for (const Point& pt : exp.contour)
+                max_coord = std::max(max_coord, std::max(std::abs(pt.x()), std::abs(pt.y())));
+            if (max_coord + m_contour_width >= limit)
+                extra_scale = 0.9 * double(limit) / max_coord;            
+
+            ExPolygon exp_copy = exp;
+            if (extra_scale != 1.)
+                exp_copy.scale(extra_scale);
+            exp_copy.scale(scale_x, scale_y);
+
+            ExPolygons expolys_exp = offset_ex(exp_copy, scale_(m_contour_width));
+            expolys_exp = diff_ex(expolys_exp, ExPolygons({exp_copy}));
+
+            for (ExPolygon& e : expolys_exp) {
+                e.scale(1./scale_x, 1./scale_y);
+                if (extra_scale != 1.)
+                    e.scale(1./extra_scale);
+            }
+
+
             triangles2d = triangulate_expolygons_2f(expolys_exp, m_trafo.get_matrix().matrix().determinant() < 0.);
             GLModel::Geometry init_data = GLModel::Geometry();
             init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
