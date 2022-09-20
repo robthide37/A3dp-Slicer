@@ -242,7 +242,9 @@ void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
     
     // Move the unprintable items to the last virtual bed.
     for (ArrangePolygon &ap : m_unprintable) {
-        ap.bed_idx += beds + 1;
+        if (ap.bed_idx >= 0)
+            ap.bed_idx += beds + 1;
+
         ap.apply();
     }
 
