@@ -517,6 +517,7 @@ bool optimize_pinhead_placement(Ex                     policy,
                                 Head                  &head)
 {
     Vec3d n = get_normal(m.emesh, head.pos);
+    assert(std::abs(n.norm() - 1.0) < EPSILON);
 
     // for all normals the spherical coordinates are generated and
     // the polar angle is saturated to 45 degrees from the bottom then
