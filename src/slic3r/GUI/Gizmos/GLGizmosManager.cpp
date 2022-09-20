@@ -551,7 +551,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         case WXK_BACK:
         case WXK_DELETE:
         {
-            if ((m_current == SlaSupports || m_current == Hollow) && gizmo_event(SLAGizmoEventType::Delete))
+            if ((m_current == SlaSupports || m_current == Hollow || m_current == Cut) && gizmo_event(SLAGizmoEventType::Delete))
                 processed = true;
 
             break;

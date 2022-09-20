@@ -254,10 +254,8 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
 
     if (use_grabbers(mouse_event)) {
         if (m_hover_id >= m_connectors_group_id) {
-            if (mouse_event.LeftDown()) {
-                std::fill(m_selected.begin(), m_selected.end(), false);
-                m_selected_count = 0;
-            }
+            if (mouse_event.LeftDown() && !mouse_event.CmdDown()&& !mouse_event.AltDown())
+                unselect_all_connectors();
             if (mouse_event.LeftUp() && !mouse_event.ShiftDown())
                 gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), mouse_event.CmdDown());
         }
@@ -1012,99 +1010,103 @@ Vec3d GLGizmoCut3D::mouse_position_in_local_plane(Axis axis, const Linef3& mouse
     return transform(mouse_ray, m).intersect_plane(0.0);
 }
 
+void GLGizmoCut3D::dragging_grabber_z(const GLGizmoBase::UpdateData &data)
+{
+    Vec3d starting_box_center = m_plane_center - Vec3d::UnitZ(); // some Margin
+    rotate_vec3d_around_plane_center(starting_box_center);
+
+    const Vec3d&starting_drag_position = m_plane_center;
+    double      projection             = 0.0;
+
+    Vec3d starting_vec = starting_drag_position - starting_box_center;
+    if (starting_vec.norm() != 0.0) {
+        Vec3d mouse_dir = data.mouse_ray.unit_vector();
+        // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
+        // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
+        // in our case plane normal and ray direction are the same (orthogonal view)
+        // when moving to perspective camera the negative z unit axis of the camera needs to be transformed in world space and used as plane normal
+        Vec3d inters = data.mouse_ray.a + (starting_drag_position - data.mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
+        // vector from the starting position to the found intersection
+        Vec3d inters_vec = inters - starting_drag_position;
+
+        starting_vec.normalize();
+        // finds projection of the vector along the staring direction
+        projection = inters_vec.dot(starting_vec);
+    }
+    if (wxGetKeyState(WXK_SHIFT))
+        projection = m_snap_step * (double)std::round(projection / m_snap_step);
+
+    const Vec3d shift = starting_vec * projection;
+
+    // move  cut plane center
+    set_center(m_plane_center + shift);
+}
+
+void GLGizmoCut3D::dragging_grabber_xy(const GLGizmoBase::UpdateData &data)
+{
+    const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane((Axis)m_hover_id, data.mouse_ray));
+
+    const Vec2d orig_dir = Vec2d::UnitX();
+    const Vec2d new_dir  = mouse_pos.normalized();
+
+    const double two_pi = 2.0 * PI;
+
+    double theta = ::acos(std::clamp(new_dir.dot(orig_dir), -1.0, 1.0));
+    if (cross2(orig_dir, new_dir) < 0.0)
+        theta = two_pi - theta;
+
+    const double len = mouse_pos.norm();
+    // snap to coarse snap region
+    if (m_snap_coarse_in_radius <= len && len <= m_snap_coarse_out_radius) {
+        const double step = two_pi / double(SnapRegionsCount);
+        theta             = step * std::round(theta / step);
+    }
+    // snap to fine snap region (scale)
+    else if (m_snap_fine_in_radius <= len && len <= m_snap_fine_out_radius) {
+        const double step = two_pi / double(ScaleStepsCount);
+        theta             = step * std::round(theta / step);
+    }
+
+    if (is_approx(theta, two_pi))
+        theta = 0.0;
+    if (m_hover_id == X)
+        theta += 0.5 * PI;
+
+    Vec3d rotation = Vec3d::Zero();
+    rotation[m_hover_id] = theta;
+    m_rotation_m         = m_start_dragging_m * rotation_transform(rotation);
+
+    m_angle = theta;
+    while (m_angle > two_pi)
+        m_angle -= two_pi;
+    if (m_angle < 0.0)
+        m_angle += two_pi;
+
+    update_clipper();
+}
+
+void GLGizmoCut3D::dragging_connector(const GLGizmoBase::UpdateData &data)
+{
+    CutConnectors&          connectors = m_c->selection_info()->model_object()->cut_connectors;
+    std::pair<Vec3d, Vec3d> pos_and_normal;
+    Vec3d                   pos_world;
+
+    if (unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos_and_normal, pos_world)) {
+        connectors[m_hover_id - m_connectors_group_id].pos = pos_and_normal.first;
+        update_raycasters_for_picking_transform();
+    }
+}
+
 void GLGizmoCut3D::on_dragging(const UpdateData& data)
 {
     if (m_hover_id < 0)
         return;
-
-    CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;
-
-    if (m_hover_id == Z) {
-        Vec3d starting_box_center = m_plane_center - Vec3d::UnitZ();// some Margin
-        rotate_vec3d_around_plane_center(starting_box_center);
-
-        const Vec3d& starting_drag_position = m_plane_center;
-        double projection = 0.0;
-
-        Vec3d starting_vec = starting_drag_position - starting_box_center;
-        if (starting_vec.norm() != 0.0) {
-            Vec3d mouse_dir = data.mouse_ray.unit_vector();
-            // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
-            // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
-            // in our case plane normal and ray direction are the same (orthogonal view)
-            // when moving to perspective camera the negative z unit axis of the camera needs to be transformed in world space and used as plane normal
-            Vec3d inters = data.mouse_ray.a + (starting_drag_position - data.mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
-            // vector from the starting position to the found intersection
-            Vec3d inters_vec = inters - starting_drag_position;
-
-            starting_vec.normalize();
-            // finds projection of the vector along the staring direction
-            projection = inters_vec.dot(starting_vec);
-        }
-        if (wxGetKeyState(WXK_SHIFT))
-            projection = m_snap_step * (double)std::round(projection / m_snap_step);
-
-        Vec3d shift = starting_vec * projection;
-
-        // move  cut plane center
-        set_center(m_plane_center + shift);
-    }
-
-    else if (m_hover_id == X || m_hover_id == Y) {
-
-        Vec3d rotation = Vec3d::Zero();
-
-        const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane((Axis)m_hover_id, data.mouse_ray));
-
-        const Vec2d orig_dir = Vec2d::UnitX();
-        const Vec2d new_dir = mouse_pos.normalized();
-
-        const double two_pi = 2.0 * PI;
-
-        double theta = ::acos(std::clamp(new_dir.dot(orig_dir), -1.0, 1.0));
-        if (cross2(orig_dir, new_dir) < 0.0)
-            theta = two_pi - theta;
-
-        const double len = mouse_pos.norm();
-        // snap to coarse snap region
-        if (m_snap_coarse_in_radius <= len && len <= m_snap_coarse_out_radius) {
-            const double step = two_pi / double(SnapRegionsCount);
-            theta = step * std::round(theta / step);
-        }
-        else {
-            // snap to fine snap region (scale)
-            if (m_snap_fine_in_radius <= len && len <= m_snap_fine_out_radius) {
-                const double step = two_pi / double(ScaleStepsCount);
-                theta = step * std::round(theta / step);
-            }
-        }
-
-        if (theta == two_pi)
-            theta = 0.0;
-        if (m_hover_id == X)
-            theta += 0.5 * PI;
-
-        rotation[m_hover_id] = theta;
-        m_rotation_m = m_start_dragging_m * rotation_transform(rotation);
-
-        m_angle = theta;
-        while (m_angle > two_pi)
-            m_angle -= two_pi;
-        if (m_angle < 0.0)
-            m_angle += two_pi;
-
-        update_clipper();
-    }
-
+    if (m_hover_id == Z)
+        dragging_grabber_z(data);
+    else if (m_hover_id == X || m_hover_id == Y)
+        dragging_grabber_xy(data);
     else if (m_hover_id >= m_connectors_group_id && m_connector_mode == CutConnectorMode::Manual)
-    {
-        std::pair<Vec3d, Vec3d> pos_and_normal;
-        Vec3d pos_world;
-        if (!unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos_and_normal, pos_world))
-            return;
-        connectors[m_hover_id - m_connectors_group_id].pos    = pos_and_normal.first;
-        update_raycasters_for_picking_transform();
-    }
+        dragging_connector(data);
 }
 
 void GLGizmoCut3D::on_start_dragging()
@@ -1215,10 +1217,10 @@ bool GLGizmoCut3D::update_bb()
         m_grabber_connection_len = 0.75 * m_radius;// std::min<double>(0.75 * m_radius, 35.0);
         m_grabber_radius = m_grabber_connection_len * 0.85;
 
-        m_snap_coarse_in_radius   = m_grabber_radius / 3.0f;
-        m_snap_coarse_out_radius  = 2.0f * m_snap_coarse_in_radius;
+        m_snap_coarse_in_radius   = m_grabber_radius / 3.0;
+        m_snap_coarse_out_radius  = m_snap_coarse_in_radius * 2.;
         m_snap_fine_in_radius     = m_grabber_connection_len * 0.85;
-        m_snap_fine_out_radius    = m_grabber_connection_len * 1.15f;
+        m_snap_fine_out_radius    = m_grabber_connection_len * 1.15;
 
         m_plane.reset();
         m_cone.reset();
@@ -1276,11 +1278,20 @@ void GLGizmoCut3D::init_rendering_items()
         m_plane.init_from(its_make_square_plane(float(m_radius)));
 }
 
+void GLGizmoCut3D::render_clipper_cut()
+{
+    if (! m_connectors_editing)
+        ::glDisable(GL_DEPTH_TEST);
+    m_c->object_clipper()->render_cut();
+    if (! m_connectors_editing)
+        ::glEnable(GL_DEPTH_TEST);
+}
+
 void GLGizmoCut3D::on_render()
 {
     if (update_bb() || force_update_clipper_on_render) {
         update_clipper_on_render();
-        m_c->object_clipper()->set_behavior(m_connectors_editing, m_connectors_editing, 0.4f);
+        m_c->object_clipper()->set_behavior(m_connectors_editing, m_connectors_editing, 0.4);
     }
 
     init_picking_models();
@@ -1289,11 +1300,7 @@ void GLGizmoCut3D::on_render()
 
     render_connectors();
 
-    if (! m_connectors_editing)
-        ::glDisable(GL_DEPTH_TEST);
-    m_c->object_clipper()->render_cut();
-    if (! m_connectors_editing)
-        ::glEnable(GL_DEPTH_TEST);
+    render_clipper_cut();
 
     if (!m_hide_cut_plane && !m_connectors_editing) {
         render_cut_plane();
@@ -1303,7 +1310,7 @@ void GLGizmoCut3D::on_render()
     render_cut_line();
 }
 
-void GLGizmoCut3D::render_debug_block()
+void GLGizmoCut3D::render_debug_input_window()
 {
     m_imgui->begin(wxString("DEBUG"));
 
@@ -1342,9 +1349,20 @@ void GLGizmoCut3D::adjust_window_position(float x, float y, float bottom_limit)
     }
 }
 
-void GLGizmoCut3D::render_connectors_editing(CutConnectors &connectors)
+void GLGizmoCut3D::unselect_all_connectors()
 {
-    // add shortcuts panel
+    std::fill(m_selected.begin(), m_selected.end(), false);
+    m_selected_count = 0;
+}
+
+void GLGizmoCut3D::select_all_connectors()
+{
+    std::fill(m_selected.begin(), m_selected.end(), true);
+    m_selected_count = int(m_selected.size());
+}
+
+void GLGizmoCut3D::render_shortcuts()
+{
     if (m_imgui->button("? " + (m_show_shortcuts ? wxString(ImGui::CollapseBtn) : wxString(ImGui::ExpandBtn))))
         m_show_shortcuts = !m_show_shortcuts;
 
@@ -1354,6 +1372,19 @@ void GLGizmoCut3D::render_connectors_editing(CutConnectors &connectors)
             ImGui::SameLine(m_label_width);
             m_imgui->text(shortcut.second);
         }
+}
+
+void GLGizmoCut3D::apply_selected_connectors(std::function<void(size_t idx)> apply_fn)
+{
+    for (size_t idx = 0; idx < m_selected.size(); idx++)
+        if (m_selected[idx])
+            apply_fn(idx);
+}
+
+void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
+{
+    // add shortcuts panel
+    render_shortcuts();
 
     // Connectors section
 
@@ -1377,48 +1408,67 @@ void GLGizmoCut3D::render_connectors_editing(CutConnectors &connectors)
     bool type_changed = render_connect_type_radio_button(CutConnectorType::Plug);
     type_changed     |= render_connect_type_radio_button(CutConnectorType::Dowel);
     if (type_changed)
-        for (size_t idx = 0; idx < m_selected.size() ; idx++)
-            if (m_selected[idx])
-                connectors[idx].attribs.type = CutConnectorType(m_connector_type);
+        apply_selected_connectors([this, &connectors] (size_t idx) { connectors[idx].attribs.type = CutConnectorType(m_connector_type); });
 
     if (render_combo(_u8L("Style"), m_connector_styles, m_connector_style))
-        for (size_t idx = 0; idx < m_selected.size() ; idx++)
-            if (m_selected[idx])
-                connectors[idx].attribs.style = CutConnectorStyle(m_connector_style) ;
+        apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
 
     if (render_combo(_u8L("Shape"), m_connector_shapes, m_connector_shape_id))
-        for (size_t idx = 0; idx < m_selected.size() ; idx++)
-            if (m_selected[idx])
-                connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id);
+        apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id); });
 
     if (render_slider_double_input(_u8L("Depth ratio"), m_connector_depth_ratio, m_connector_depth_ratio_tolerance))
-        for (size_t idx = 0; idx < m_selected.size() ; idx++)
-            if (m_selected[idx]) {
-                auto&connector             = connectors[idx];
-                connector.height           = float(m_connector_depth_ratio);
-                connector.height_tolerance = 0.01f * float(m_connector_depth_ratio_tolerance);
-            }
+        apply_selected_connectors([this, &connectors](size_t idx) { 
+            connectors[idx].height           = float(m_connector_depth_ratio);
+            connectors[idx].height_tolerance = 0.01f * float(m_connector_depth_ratio_tolerance);
+        });
 
     if (render_slider_double_input(_u8L("Size"), m_connector_size, m_connector_size_tolerance))
-        for (size_t idx = 0; idx < m_selected.size(); idx++)
-            if (m_selected[idx]) {
-                auto&connector             = connectors[idx];
-                connector.radius           = float(m_connector_size * 0.5);
-                connector.radius_tolerance = 0.01f * float(m_connector_size_tolerance);
-            }
+        apply_selected_connectors([this, &connectors](size_t idx) { 
+            connectors[idx].radius           = float(m_connector_size * 0.5);
+            connectors[idx].radius_tolerance = 0.01f * float(m_connector_size_tolerance);
+        });
 
     if (m_imgui->button(_L("Confirm connectors"))) {
         m_clp_normal         = m_c->object_clipper()->get_clipping_plane()->get_normal();
-        m_connectors_editing = false;
-        update_raycasters_for_picking();
-        std::fill(m_selected.begin(), m_selected.end(), false);
-        m_selected_count = 0;
+        unselect_all_connectors();
+        set_connectors_editing(false);
     }
 
     m_parent.request_extra_frame();
 }
 
-void GLGizmoCut3D::render_cut_plane_editing(CutConnectors &connectors)
+void GLGizmoCut3D::render_build_size()
+{
+    double              koef     = m_imperial_units ? ObjectManipulation::mm_to_in : 1.0;
+    std::string         unit_str = m_imperial_units ? _u8L("inch") : _u8L("mm");
+    const BoundingBoxf3 tbb      = transformed_bounding_box();
+            
+    Vec3d    tbb_sz = tbb.size();
+    wxString size   =   "X: " + double_to_string(tbb_sz.x() * koef, 2) + unit_str +
+                     ",  Y: " + double_to_string(tbb_sz.y() * koef, 2) + unit_str +
+                     ",  Z: " + double_to_string(tbb_sz.z() * koef, 2) + unit_str;
+
+    ImGui::AlignTextToFramePadding();
+    m_imgui->text(_L("Build size"));
+    ImGui::SameLine(m_label_width);
+    m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, size);
+}
+
+void GLGizmoCut3D::reset_cut_plane()
+{
+    set_center(bounding_box().center());
+    m_rotation_m = Transform3d::Identity();
+    m_angle_arc.reset();
+    update_clipper();
+}
+
+void GLGizmoCut3D::set_connectors_editing(bool connectors_editing)
+{
+    m_connectors_editing = connectors_editing;
+    update_raycasters_for_picking();
+}
+
+void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 {
     // WIP : cut plane mode
     // render_combo(_u8L("Mode"), m_modes, m_mode);
@@ -1426,95 +1476,60 @@ void GLGizmoCut3D::render_cut_plane_editing(CutConnectors &connectors)
     if (m_mode == size_t(CutMode::cutPlanar)) {
         ImGui::AlignTextToFramePadding();
         m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Hold SHIFT key and connect some two points of an object to cut by line"));
+
         ImGui::Separator();
 
-        double              koef     = m_imperial_units ? ObjectManipulation::mm_to_in : 1.0;
-        std::string         unit_str = m_imperial_units ? _u8L("inch") : _u8L("mm");
-        const BoundingBoxf3 tbb      = transformed_bounding_box();
-            
-        Vec3d    tbb_sz = tbb.size();
-        wxString size   =   "X: " + double_to_string(tbb_sz.x() * koef, 2) + unit_str +
-                         ",  Y: " + double_to_string(tbb_sz.y() * koef, 2) + unit_str +
-                         ",  Z: " + double_to_string(tbb_sz.z() * koef, 2) + unit_str;
+        render_build_size();
 
-        ImGui::AlignTextToFramePadding();
-        m_imgui->text(_L("Build size"));
-        ImGui::SameLine(m_label_width);
-        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, size);
-            
         m_imgui->text(_L("Cut position: "));
         render_move_center_input(Z);
 
-        if (m_imgui->button("Reset cutting plane")) {
-            set_center(bounding_box().center());
-            m_rotation_m = Transform3d::Identity();
-            m_angle_arc.reset();
-            update_clipper();
-        }
+        if (m_imgui->button("Reset cutting plane"))
+            reset_cut_plane();
 
         ImGui::Separator();
 
+        auto render_part_action_line = [this, connectors](const wxString& info_label, const wxString& label, const wxString& suffix, bool& keep_part, bool& place_on_cut_part, bool& rotate_part) {
+            bool keep = true;
+
+            m_imgui->text(info_label);
+            ImGui::SameLine(m_label_width);
+            m_imgui->text(label);
+
+            ImGui::SameLine(2 * m_label_width);
+
+            m_imgui->disabled_begin(!connectors.empty());
+                m_imgui->checkbox(_L("Keep") + suffix, connectors.empty() ? keep_part : keep);
+            m_imgui->disabled_end();
+
+            ImGui::SameLine(3 * m_label_width);
+
+            m_imgui->disabled_begin(!keep_part);
+                if (m_imgui->checkbox(_L("Place on cut") + suffix, place_on_cut_part))
+                    rotate_part = false;
+                ImGui::SameLine();
+                if (m_imgui->checkbox(_L("Flip") + suffix, rotate_part))
+                    place_on_cut_part = false;
+            m_imgui->disabled_end();
+        };
+
         ImGui::AlignTextToFramePadding();
-        m_imgui->text(_L("After cut") + ": ");
-        bool keep = true;
-
-        ImGui::SameLine(m_label_width);
-        m_imgui->text(_L("Upper part"));
-        ImGui::SameLine(2 * m_label_width);
-
-        m_imgui->disabled_begin(!connectors.empty());
-        m_imgui->checkbox(_L("Keep") + "##upper", connectors.empty() ? m_keep_upper : keep);
-        m_imgui->disabled_end();
-        ImGui::SameLine(3 * m_label_width);
-
-        m_imgui->disabled_begin(!m_keep_upper);
-
-        m_imgui->disabled_begin(is_approx(Transformation(m_rotation_m).get_rotation().x(), 0.) && is_approx(Transformation(m_rotation_m).get_rotation().y(), 0.));
-        if (m_imgui->checkbox(_L("Place on cut") + "##upper", m_place_on_cut_upper))
-            m_rotate_upper = false;
-        m_imgui->disabled_end();
-
-        ImGui::SameLine();
-        if (m_imgui->checkbox(_L("Flip") + "##upper", m_rotate_upper))
-            m_place_on_cut_upper = false;
-
-        m_imgui->disabled_end();
-
-        m_imgui->text("");
-        ImGui::SameLine(m_label_width);
-        m_imgui->text(_L("Lower part"));
-        ImGui::SameLine(2 * m_label_width);
-
-        m_imgui->disabled_begin(!connectors.empty());
-
-        m_imgui->checkbox(_L("Keep") + "##lower", connectors.empty() ? m_keep_lower : keep);
-        m_imgui->disabled_end();
-        ImGui::SameLine(3 * m_label_width);
-        m_imgui->disabled_begin(!m_keep_lower);
-
-        if (m_imgui->checkbox(_L("Place on cut") + "##lower", m_place_on_cut_lower)) 
-            m_rotate_lower = false;
-        ImGui::SameLine();
-        if (m_imgui->checkbox(_L("Flip") + "##lower", m_rotate_lower))
-            m_place_on_cut_lower = false;
-
-        m_imgui->disabled_end();
+        render_part_action_line(_L("After cut") + ": ", _L("Upper part"), "##upper", m_keep_upper, m_place_on_cut_upper, m_rotate_upper);
+        render_part_action_line("",                   _L("Lower part"), "##lower", m_keep_lower, m_place_on_cut_lower, m_rotate_lower);
     }
 
     if (wxGetApp().plater()->printer_technology() == ptFFF) {
         m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
-        if (m_imgui->button(_L("Add/Edit connectors"))) {
-            m_connectors_editing = true;
-            update_raycasters_for_picking();
-        }
+            if (m_imgui->button(_L("Add/Edit connectors")))
+                set_connectors_editing(true);
         m_imgui->disabled_end();
     }
 
     ImGui::Separator();
 
     m_imgui->disabled_begin(!can_perform_cut());
-    if((m_keep_upper || m_keep_lower) && m_imgui->button(_L("Perform cut")))
-        perform_cut(m_parent.get_selection());;
+        if(m_imgui->button(_L("Perform cut")))
+            perform_cut(m_parent.get_selection());;
     m_imgui->disabled_end();
 }
 
@@ -1550,7 +1565,7 @@ void GLGizmoCut3D::render_input_window_warning() const
 
 void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 {
-    m_imgui->begin(_L("Cut"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    m_imgui->begin(get_name(), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
     // adjust window position to avoid overlap the view toolbar
     adjust_window_position(x, y, bottom_limit);
@@ -1560,15 +1575,15 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
     init_input_window_data(connectors);
 
     if (m_connectors_editing) // connectors mode
-        render_connectors_editing(connectors); 
+        render_connectors_input_window(connectors); 
     else
-        render_cut_plane_editing(connectors);
+        render_cut_plane_input_window(connectors);
 
     render_input_window_warning();
 
     m_imgui->end();
 
-    render_debug_block();
+    render_debug_input_window();
 }
 
 // get volume transformation regarding to the "border". Border is related from the size of connectors
@@ -1598,9 +1613,6 @@ Transform3d GLGizmoCut3D::get_volume_transformation(const ModelVolume* volume) c
 
 void GLGizmoCut3D::render_connectors()
 {
-    if (!m_connectors_editing)
-        return;
-
     ::glEnable(GL_DEPTH_TEST);
 
     if (cut_line_processing() || m_connector_mode == CutConnectorMode::Auto || !m_c->selection_info())
@@ -1631,7 +1643,7 @@ void GLGizmoCut3D::render_connectors()
 
     const ModelInstance* mi = mo->instances[inst_id];
     const Vec3d& instance_offset = mi->get_offset();
-    const float sla_shift        = m_c->selection_info()->get_sla_shift();
+    const double sla_shift       = double(m_c->selection_info()->get_sla_shift());
 
     const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
     const Vec3d& normal = cp && cp->is_active() ? cp->get_normal() : m_clp_normal;
@@ -1643,7 +1655,7 @@ void GLGizmoCut3D::render_connectors()
     for (size_t i = 0; i < connectors.size(); ++i) {
         const CutConnector& connector = connectors[i];
 
-        double height = connector.height;
+        double height = double(connector.height);
         // recalculate connector position to world position
         Vec3d pos = connector.pos + instance_offset;
         if (connector.attribs.type  == CutConnectorType::Dowel &&
@@ -1757,13 +1769,13 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         }
 
         plater->cut(object_idx, instance_idx, cut_center_offset, rotation,
-            only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
-            only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
-            only_if(m_place_on_cut_upper, ModelObjectCutAttribute::PlaceOnCutUpper) | 
-            only_if(m_place_on_cut_lower, ModelObjectCutAttribute::PlaceOnCutLower) | 
-            only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) | 
-            only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) | 
-            only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));
+                    only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
+                    only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
+                    only_if(m_place_on_cut_upper, ModelObjectCutAttribute::PlaceOnCutUpper) | 
+                    only_if(m_place_on_cut_lower, ModelObjectCutAttribute::PlaceOnCutLower) | 
+                    only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) | 
+                    only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) | 
+                    only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));
     }
     else {
         // the object is SLA-elevated and the plane is under it.
@@ -1907,6 +1919,85 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
     return false;
 }
 
+bool GLGizmoCut3D::add_connector(CutConnectors& connectors, const Vec2d& mouse_position)
+{
+    std::pair<Vec3d, Vec3d> pos_and_normal;
+    Vec3d pos_world;
+    if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal, pos_world)) {
+        const Vec3d& hit = pos_and_normal.first;
+
+        if (m_connectors_editing) {
+
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
+
+            connectors.emplace_back(hit, Transformation(m_rotation_m).get_rotation(),
+                                    float(m_connector_size) * 0.5f, float(m_connector_depth_ratio),
+                                    float(m_connector_size_tolerance) * 0.01f, float(m_connector_depth_ratio_tolerance) * 0.01f,
+                                    CutConnectorAttributes( CutConnectorType(m_connector_type),
+                                                            CutConnectorStyle(m_connector_style),
+                                                            CutConnectorShape(m_connector_shape_id)));
+            unselect_all_connectors();
+            m_selected.push_back(true);
+            assert(m_selected.size() == connectors.size());
+            update_model_object();
+            m_parent.set_as_dirty();
+        }
+        else {
+            // Following would inform the clipper about the mouse click, so it can
+            // toggle the respective contour as disabled.
+            //m_c->object_clipper()->pass_mouse_click(pos_world);
+        }
+
+        return true;
+    }
+    return false;
+}
+
+bool GLGizmoCut3D::delete_selected_connectors(CutConnectors& connectors)
+{
+    if (connectors.empty())
+        return false;
+
+    Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Delete connector"), UndoRedo::SnapshotType::GizmoAction);
+
+    // remove  connectors
+    for (int i = int(connectors.size()) - 1; i >= 0; i--)
+        if (m_selected[i])
+            connectors.erase(connectors.begin() + i);
+    // remove selections
+    m_selected.erase(std::remove_if(m_selected.begin(), m_selected.end(), [](const auto& selected) {
+        return selected; }), m_selected.end());
+
+    assert(m_selected.size() == connectors.size());
+    update_model_object();
+    m_parent.set_as_dirty();
+    return true;
+}
+
+void GLGizmoCut3D::select_connector(int idx, bool select)
+{
+    m_selected[idx] = select;
+    if (select)
+        ++m_selected_count;
+    else
+        --m_selected_count;
+}
+
+bool GLGizmoCut3D::is_selection_changed(bool alt_down, bool control_down)
+{
+    if (m_hover_id >= m_connectors_group_id) {
+        if (alt_down)
+            select_connector(m_hover_id - m_connectors_group_id, false);
+        else {
+            if (!control_down)
+                unselect_all_connectors();
+            select_connector(m_hover_id - m_connectors_group_id, true);
+        }
+        return true;
+    }
+    return false;
+}
+
 bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
 {
     if (is_dragging() || m_connector_mode == CutConnectorMode::Auto || (!m_keep_upper || !m_keep_lower))
@@ -1920,76 +2011,33 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
 
     if (action == SLAGizmoEventType::LeftDown && !shift_down) {
         // If there is no selection and no hovering, add new point
-        if (m_hover_id == -1 && !control_down && !alt_down) {
-            std::pair<Vec3d, Vec3d> pos_and_normal;
-            Vec3d pos_world;
-            if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal, pos_world)) {
-                const Vec3d& hit = pos_and_normal.first;
-
-                if (m_connectors_editing) {
-
-                    Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
-
-                    connectors.emplace_back(hit, Transformation(m_rotation_m).get_rotation(), 
-                                            float(m_connector_size * 0.5), float(m_connector_depth_ratio), 
-                                            float(0.01f * m_connector_size_tolerance), float(0.01f * m_connector_depth_ratio_tolerance),
-                                            CutConnectorAttributes( CutConnectorType(m_connector_type), 
-                                                                    CutConnectorStyle(m_connector_style), 
-                                                                    CutConnectorShape(m_connector_shape_id)));
-                    std::fill(m_selected.begin(), m_selected.end(), false);
-                    m_selected.push_back(true);
-                    assert(m_selected.size() == connectors.size());
-                    update_model_object();
-                    m_parent.set_as_dirty();
-                } else {
-                    // Following would inform the clipper about the mouse click, so it can
-                    // toggle the respective contour as disabled.
-                    //m_c->object_clipper()->pass_mouse_click(pos_world);
-                }
-
-                return true;
-            }
-            return false;
-        }
+        if (m_hover_id == -1 && !control_down && !alt_down)
+            return add_connector(connectors, mouse_position);
         return true;
     }
-    else if (action == SLAGizmoEventType::LeftUp && !shift_down && m_connectors_editing) {
-        if (m_hover_id >= m_connectors_group_id) {
-            if (alt_down) {
-                m_selected[m_hover_id - m_connectors_group_id] = false;
-                --m_selected_count;
-            }
-            else {
-                if (!control_down) {
-                    std::fill(m_selected.begin(), m_selected.end(), false);
-                    m_selected_count = 0;
-                }
-                m_selected[m_hover_id - m_connectors_group_id] = true;
-                ++m_selected_count;
-            }
-            return true;
-        }
-    }
-    else if (action == SLAGizmoEventType::RightDown && !shift_down && m_connectors_editing) {
+    if (!m_connectors_editing)
+        return false;
+
+    if (action == SLAGizmoEventType::LeftUp && !shift_down)
+        return is_selection_changed(alt_down, control_down);
+    
+    if (action == SLAGizmoEventType::RightDown && !shift_down) {
         // If any point is in hover state, this should initiate its move - return control back to GLCanvas:
         if (m_hover_id < m_connectors_group_id)
             return false;
+        unselect_all_connectors();
+        select_connector(m_hover_id - m_connectors_group_id, true);
+        return delete_selected_connectors(connectors);
+    }
+    
+    if (action == SLAGizmoEventType::Delete)
+        return delete_selected_connectors(connectors);
 
-        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Delete connector"), UndoRedo::SnapshotType::GizmoAction);
-
-        size_t connector_id = m_hover_id - m_connectors_group_id;
-        connectors.erase(connectors.begin() + connector_id);
-        m_selected.erase(m_selected.begin() + connector_id);
-        assert(m_selected.size() == connectors.size());
-        update_model_object();
-        m_parent.set_as_dirty();
-
+    if (action == SLAGizmoEventType::SelectAll) {
+        select_all_connectors();
         return true;
     }
-    else if (action == SLAGizmoEventType::SelectAll) {
-        std::fill(m_selected.begin(), m_selected.end(), true);
-        return true;
-    }
+
     return false;
 }
 

@@ -155,26 +155,40 @@ public:
     BoundingBoxf3   transformed_bounding_box(bool revert_move = false) const;
 
 protected:
-    bool on_init() override;
-    void on_load(cereal::BinaryInputArchive& ar) override;
-    void on_save(cereal::BinaryOutputArchive& ar) const override;
-    std::string on_get_name() const override;
-    void on_set_state() override;
+    bool               on_init() override;
+    void               on_load(cereal::BinaryInputArchive&ar) override;
+    void               on_save(cereal::BinaryOutputArchive&ar) const override;
+    std::string        on_get_name() const override;
+    void               on_set_state() override;
     CommonGizmosDataID on_get_requirements() const override;
-    void on_set_hover_id() override;
-    bool on_is_activable() const override;
-    Vec3d mouse_position_in_local_plane(Axis axis, const Linef3& mouse_ray) const;
-    void on_dragging(const UpdateData& data) override;
-    void on_start_dragging() override;
-    void on_stop_dragging() override;
-    void on_render() override;
+    void               on_set_hover_id() override;
+    bool               on_is_activable() const override;
+    Vec3d              mouse_position_in_local_plane(Axis axis, const Linef3&mouse_ray) const;
+    void               dragging_grabber_z(const GLGizmoBase::UpdateData &data);
+    void               dragging_grabber_xy(const GLGizmoBase::UpdateData &data);
+    void               dragging_connector(const GLGizmoBase::UpdateData &data);
+    void               on_dragging(const UpdateData&data) override;
+    void               on_start_dragging() override;
+    void               on_stop_dragging() override;
+    void               on_render() override;
 
-    void render_debug_block();
+    void render_debug_input_window();
     void adjust_window_position(float x, float y, float bottom_limit);
-    void render_connectors_editing(CutConnectors &connectors);
-    void render_cut_plane_editing(CutConnectors &connectors);
+    void unselect_all_connectors();
+    void select_all_connectors();
+    void render_shortcuts();
+    void apply_selected_connectors(std::function<void(size_t idx)> apply_fn);
+    void render_connectors_input_window(CutConnectors &connectors);
+    void render_build_size();
+    void reset_cut_plane();
+    void set_connectors_editing(bool connectors_editing);
+    void render_cut_plane_input_window(CutConnectors &connectors);
     void init_input_window_data(CutConnectors &connectors);
     void render_input_window_warning() const;
+    bool add_connector(CutConnectors&connectors, const Vec2d&mouse_position);
+    bool delete_selected_connectors(CutConnectors&connectors);
+    void select_connector(int idx, bool select);
+    bool is_selection_changed(bool alt_down, bool control_down);
 
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
@@ -213,6 +227,7 @@ private:
     bool update_bb();
     void init_picking_models();
     void init_rendering_items();
+    void render_clipper_cut();
     void reset_connectors();
     void update_connector_shape();
     void update_model_object();
