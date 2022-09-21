@@ -168,6 +168,13 @@ public:
                              const char        *tail = " ..");
 
     /// <summary>
+    /// Escape ## in data by add space between hashes
+    /// Needed when user written text is visualized by ImGui.
+    /// </summary>
+    /// <param name="text">In/Out text to be escaped</param>
+    static void escape_double_hash(std::string &text);
+
+    /// <summary>
     /// Suggest loacation of dialog window,
     /// dependent on actual visible thing on platter
     /// like Gizmo menu size, notifications, ...

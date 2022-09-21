@@ -1778,7 +1778,8 @@ void GLGizmoEmboss::draw_style_list() {
     std::string &trunc_name = m_style_manager.get_truncated_name();
     if (trunc_name.empty()) {
         // generate trunc name
-        const std::string &current_name  = actual_style.name;
+        std::string current_name = actual_style.name;
+        ImGuiWrapper::escape_double_hash(current_name);
         trunc_name = ImGuiWrapper::trunc(current_name, max_style_name_width);
     }
 

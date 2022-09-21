@@ -1365,6 +1365,16 @@ std::string ImGuiWrapper::trunc(const std::string &text,
     return std::string(result_text) + tail;
 }
 
+void ImGuiWrapper::escape_double_hash(std::string &text)
+{
+    // add space between hashes
+    const std::string search  = "##";
+    const std::string replace = "# #";
+    size_t pos = 0;
+    while ((pos = text.find(search, pos)) != std::string::npos) 
+        text.replace(pos, search.length(), replace);
+}
+
 ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &dialog_size,
                                       const Slic3r::Polygon &interest,
                                       const ImVec2 &canvas_size)

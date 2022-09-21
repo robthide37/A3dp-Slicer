@@ -278,8 +278,11 @@ void EmbossStyleManager::make_unique_name(std::string &name)
 
 void EmbossStyleManager::init_trunc_names(float max_width) { 
     for (auto &s : m_style_items)
-        if (s.truncated_name.empty())
-            s.truncated_name = ImGuiWrapper::trunc(s.style.name, max_width);
+        if (s.truncated_name.empty()) {
+            std::string name = s.style.name;
+            ImGuiWrapper::escape_double_hash(name);
+            s.truncated_name = ImGuiWrapper::trunc(name, max_width);
+        }
 }
 
 #include "slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp"
