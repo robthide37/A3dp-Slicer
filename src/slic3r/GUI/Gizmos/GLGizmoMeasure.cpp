@@ -31,7 +31,7 @@ static const int EDGE_ID          = 200;
 static const int CIRCLE_ID        = 300;
 static const int PLANE_ID         = 400;
 
-static const float TRIANGLE_BASE = 16.0f;
+static const float TRIANGLE_BASE = 10.0f;
 static const float TRIANGLE_HEIGHT = TRIANGLE_BASE * 1.618033f;
 
 static const std::string CTRL_STR =
@@ -782,6 +782,8 @@ DimensioningHelper::Cache DimensioningHelper::s_cache = { { 0, 0, 0, 0 }, Matrix
 
 void GLGizmoMeasure::render_dimensioning()
 {
+    static SelectedFeatures last_selected_features;
+
     if (!m_selected_features.first.feature.has_value() || !m_selected_features.second.feature.has_value())
         return;
 
@@ -844,8 +846,8 @@ void GLGizmoMeasure::render_dimensioning()
 
         const Vec3d e1e2 = e.second - e.first;
         const Vec3d v_proje1 = v_proj - e.first;
-        const bool on_e1_side = v_proje1.dot(e1e2) < 0.0;
-        const bool on_e2_side = v_proje1.norm() > e1e2.norm();
+        const bool on_e1_side = v_proje1.dot(e1e2) < -EPSILON;
+        const bool on_e2_side = !on_e1_side && v_proje1.norm() > e1e2.norm();
         if (on_e1_side || on_e2_side) {
             const Camera& camera = wxGetApp().plater()->get_camera();
             const Matrix4d projection_view_matrix = camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix();
@@ -882,9 +884,131 @@ void GLGizmoMeasure::render_dimensioning()
         point_point(v1, v2);
     };
 
-    auto edge_edge = [point_point](const Edge& e1, const Edge& e2) {
+    auto arc_edge_edge = [this, shader](Edge e1, Edge e2) {
+        Vec3d e1_unit = (e1.second - e1.first).normalized();
+        Vec3d e2_unit = (e2.second - e2.first).normalized();
+        const double dot = e1_unit.dot(e2_unit);
+        if (std::abs(std::abs(dot) - 1.0) < EPSILON)
+            // edges are parallel, return
+            return;
+
+        // project edges on the plane defined by them
+        Vec3d normal = e1_unit.cross(e2_unit).normalized();
+        const Eigen::Hyperplane<double, 3> plane(normal, e1.first);
+        Vec3d e11_proj = plane.projection(e1.first);
+        Vec3d e12_proj = plane.projection(e1.second);
+        Vec3d e21_proj = plane.projection(e2.first);
+        Vec3d e22_proj = plane.projection(e2.second);
+
+        const bool coplanar = (e2.first - e21_proj).norm() < EPSILON && (e2.second - e22_proj).norm() < EPSILON;
+
+        // rotate the plane to become the XY plane
+        auto qp = Eigen::Quaternion<double>::FromTwoVectors(normal, Vec3d::UnitZ());
+        auto qp_inverse = qp.inverse();
+        const Vec3d e11_rot = qp * e11_proj;
+        const Vec3d e12_rot = qp * e12_proj;
+        const Vec3d e21_rot = qp * e21_proj;
+        const Vec3d e22_rot = qp * e22_proj;
+
+        // discard Z
+        const Vec2d e11_rot_2d = Vec2d(e11_rot.x(), e11_rot.y());
+        const Vec2d e12_rot_2d = Vec2d(e12_rot.x(), e12_rot.y());
+        const Vec2d e21_rot_2d = Vec2d(e21_rot.x(), e21_rot.y());
+        const Vec2d e22_rot_2d = Vec2d(e22_rot.x(), e22_rot.y());
+
+        // find intersection of edges in XY plane
+        const Eigen::Hyperplane<double, 2> e1_rot_2d_line = Eigen::Hyperplane<double, 2>::Through(e11_rot_2d, e12_rot_2d);
+        const Eigen::Hyperplane<double, 2> e2_rot_2d_line = Eigen::Hyperplane<double, 2>::Through(e21_rot_2d, e22_rot_2d);
+        const Vec2d center_rot_2d = e1_rot_2d_line.intersection(e2_rot_2d_line);
+
+        // center in world coordinate
+        const Vec3d center = qp.inverse() * Vec3d(center_rot_2d.x(), center_rot_2d.y(), e11_rot.z());
+
+        // revert edges, if needed (we want them to move away from the center)
+        unsigned int revert_count = 0;
+        if ((center_rot_2d - e11_rot_2d).squaredNorm() > (center_rot_2d - e12_rot_2d).squaredNorm()) {
+            std::swap(e1.first, e1.second);
+            std::swap(e11_proj, e12_proj);
+            e1_unit = -e1_unit;
+            ++revert_count;
+        }
+        if ((center_rot_2d - e21_rot_2d).squaredNorm() > (center_rot_2d - e22_rot_2d).squaredNorm()) {
+            std::swap(e2.first, e2.second);
+            std::swap(e21_proj, e22_proj);
+            e2_unit = -e2_unit;
+            ++revert_count;
+        }
+
+        if (revert_count == 1) {
+            normal = -normal;
+            qp = Eigen::Quaternion<double>::FromTwoVectors(normal, Vec3d::UnitZ());
+            qp_inverse = qp.inverse();
+        }
+
+        // arc angle
+        const double angle = std::acos(std::clamp(e1_unit.dot(e2_unit), -1.0, 1.0));
+        // arc radius
+        const Vec3d e1_proj_mid = 0.5 * (e11_proj + e12_proj);
+        const Vec3d e2_proj_mid = 0.5 * (e21_proj + e22_proj);
+        const double radius = std::min((center - e1_proj_mid).norm(), (center - e2_proj_mid).norm());
+
+        if (!m_dimensioning.arc.is_initialized()) {
+            const unsigned int resolution = std::max<unsigned int>(2, 64 * angle / double(PI));
+            GLModel::Geometry init_data;
+            init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3 };
+            init_data.color = ColorRGBA::WHITE();
+            init_data.reserve_vertices(resolution + 1);
+            init_data.reserve_indices(resolution + 1);
+
+            // vertices + indices
+            const double step = angle / double(resolution);
+            for (unsigned int i = 0; i <= resolution; ++i) {
+                const double a = step * double(i);
+                const Vec3d v = radius * (Eigen::Quaternion<double>(Eigen::AngleAxisd(a, normal)) * e1_unit);
+                init_data.add_vertex((Vec3f)v.cast<float>());
+                init_data.add_index(i);
+            }
+
+            m_dimensioning.arc.init_from(std::move(init_data));
+        }
+
+        auto render_edge_entension = [this, shader, &center, radius](const Edge& e, bool coplanar) {
+            const Vec3d e1center = center - e.first;
+            const Vec3d e1e2 = e.second - e.first;
+            const bool on_e1_side = e1center.dot(e1e2) < -EPSILON;
+            const bool on_e2_side = !on_e1_side && e1center.norm() > e1e2.norm();
+            if (!coplanar || on_e1_side || on_e2_side) {
+                const Camera& camera = wxGetApp().plater()->get_camera();
+                shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+                auto render_extension = [this, shader, &camera, &center, radius, coplanar](const Vec3d& p) {
+                    const Vec3d centerp = p - center;
+                    const auto q = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), centerp.normalized());
+                    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center) * q *
+                        Geometry::scale_transform({ coplanar ? centerp.norm() : radius, 1.0f, 1.0f }));
+                    m_dimensioning.line.render();
+                };
+                render_extension(on_e1_side ? e.first : e.second);
+            }
+        };
+
+        auto render_arc = [this, shader, &center]() {
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center));
+            m_dimensioning.arc.render();
+        };
+
+        render_edge_entension({ e11_proj , e12_proj }, true);
+        render_edge_entension({ e21_proj , e22_proj }, coplanar);
+        render_arc();
+    };
+
+    auto edge_edge = [point_point, arc_edge_edge](const Edge& e1, const Edge& e2) {
+        // distance
         const auto [distance, v1, v2] = distance_edge_edge(e1, e2);
         point_point(v1, v2);
+        // arc
+        arc_edge_edge(e1, e2);
     };
 
     auto edge_circle = [point_point](const Edge& e, const Circle& c) {
@@ -933,6 +1057,9 @@ void GLGizmoMeasure::render_dimensioning()
 
         m_dimensioning.triangle.init_from(std::move(init_data));
     }
+
+    if (last_selected_features != m_selected_features)
+        m_dimensioning.arc.reset();
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
