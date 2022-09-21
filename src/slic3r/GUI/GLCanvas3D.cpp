@@ -2406,10 +2406,25 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         const bool partlyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Partly_Outside);
         const bool fullyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Fully_Outside);
 
-        _set_warning_notification(EWarning::ObjectClashed, partlyOut);
-        _set_warning_notification(EWarning::ObjectOutside, fullyOut);
-        if (printer_technology != ptSLA || !contained_min_one)
+        if (printer_technology != ptSLA) {
+            _set_warning_notification(EWarning::ObjectClashed, partlyOut);
+            _set_warning_notification(EWarning::ObjectOutside, fullyOut);
             _set_warning_notification(EWarning::SlaSupportsOutside, false);
+        }
+        else {
+            const auto [res, volume] = _is_any_volume_outside();
+            const bool is_support = volume != nullptr && volume->is_sla_support();
+            if (is_support) {
+                _set_warning_notification(EWarning::ObjectClashed, false);
+                _set_warning_notification(EWarning::ObjectOutside, false);
+                _set_warning_notification(EWarning::SlaSupportsOutside, partlyOut || fullyOut);
+            }
+            else {
+                _set_warning_notification(EWarning::ObjectClashed, partlyOut);
+                _set_warning_notification(EWarning::ObjectOutside, fullyOut);
+                _set_warning_notification(EWarning::SlaSupportsOutside, false);
+            }
+        }
 
         post_event(Event<bool>(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, 
                                contained_min_one && !m_model->objects.empty() && !partlyOut));
@@ -2516,6 +2531,7 @@ void GLCanvas3D::load_sla_preview()
 	    reset_volumes();
         _load_sla_shells();
         _update_sla_shells_outside_state();
+        _set_warning_notification_if_needed(EWarning::ObjectClashed);
         _set_warning_notification_if_needed(EWarning::SlaSupportsOutside);
     }
 }
@@ -5855,7 +5871,7 @@ void GLCanvas3D::_render_background()
         (current_printer_technology() != ptSLA || !m_volumes.empty());
 
         if (!m_volumes.empty())
-            use_error_color &= _is_any_volume_outside();
+            use_error_color &= _is_any_volume_outside().first;
         else
             use_error_color &= m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
     }
@@ -7650,8 +7666,19 @@ void GLCanvas3D::_set_warning_notification_if_needed(EWarning warning)
 {
     _set_current();
     bool show = false;
-    if (!m_volumes.empty())
-        show = _is_any_volume_outside();
+    if (!m_volumes.empty()) {
+        if (current_printer_technology() == ptSLA) {
+            const auto [res, volume] = _is_any_volume_outside();
+            if (res) {
+                if (warning == EWarning::ObjectClashed)
+                    show = !volume->is_sla_support();
+                else if (warning == EWarning::SlaSupportsOutside)
+                    show = volume->is_sla_support();
+            }
+        }
+        else
+            show = _is_any_volume_outside().first;
+    }
     else {
         if (wxGetApp().is_editor()) {
             if (current_printer_technology() != ptSLA)
@@ -7708,14 +7735,14 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
     }
 }
 
-bool GLCanvas3D::_is_any_volume_outside() const
+std::pair<bool, const GLVolume*> GLCanvas3D::_is_any_volume_outside() const
 {
     for (const GLVolume* volume : m_volumes.volumes) {
         if (volume != nullptr && volume->is_outside)
-            return true;
+            return std::make_pair(true, volume);
     }
 
-    return false;
+    return std::make_pair(false, nullptr);
 }
 
 void GLCanvas3D::_update_selection_from_hover()
