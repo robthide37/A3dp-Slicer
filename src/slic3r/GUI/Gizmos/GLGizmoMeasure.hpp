@@ -80,7 +80,8 @@ class GLGizmoMeasure : public GLGizmoBase
     {
         GLModel line;
         GLModel triangle;
-    }; 
+        GLModel arc;
+    };
     Dimensioning m_dimensioning;
 
     Transform3d m_volume_matrix{ Transform3d::Identity() };
