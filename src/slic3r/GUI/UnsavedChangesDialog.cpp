@@ -2016,12 +2016,15 @@ bool DiffPresetDialog::is_save_confirmed()
 
     std::vector<Preset::Type> types_for_save;
 
-    for (const Preset::Type& type : m_pr_technology == ptFFF ?  std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
-                                                                std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL })
+    const auto list = m_pr_technology == ptFFF ? std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
+        std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
+
+    for (const Preset::Type& type : list) {
         if (!m_tree->options(type, true).empty()) {
             types_for_save.emplace_back(type);
             presets_to_save.emplace_back(PresetToSave{ type, get_left_preset_name(type), get_right_preset_name(type), get_right_preset_name(type) });
         }
+    }
 
     if (!types_for_save.empty()) {
         SavePresetDialog save_dlg(this, types_for_save, _u8L("Modified"), m_preset_bundle_right.get());
