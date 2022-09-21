@@ -327,7 +327,7 @@ void GLGizmoCut3D::rotate_vec3d_around_plane_center(Vec3d&vec)
     vec = Transformation( assemble_transform(m_plane_center) * m_rotation_m * assemble_transform(-m_plane_center)).get_matrix() * vec;
 }
 
-void GLGizmoCut3D::put_connetors_on_cut_plane(const Vec3d& cp_normal, double cp_offset)
+void GLGizmoCut3D::put_connectors_on_cut_plane(const Vec3d& cp_normal, double cp_offset)
 {
     ModelObject* mo = m_c->selection_info()->model_object();
     if (CutConnectors& connectors = mo->cut_connectors; !connectors.empty()) {
@@ -369,7 +369,7 @@ void GLGizmoCut3D::update_clipper()
 
     m_c->object_clipper()->set_range_and_pos(normal, offset, dist);
 
-    put_connetors_on_cut_plane(normal, offset);
+    put_connectors_on_cut_plane(normal, offset);
 
     if (m_raycasters.empty())
         on_register_raycasters_for_picking();
@@ -487,7 +487,6 @@ bool GLGizmoCut3D::render_slider_double_input(const std::string& label, double& 
 
 void GLGizmoCut3D::render_move_center_input(int axis)
 {
-    ImGui::AlignTextToFramePadding();
     m_imgui->text(m_axis_names[axis]+":");
     ImGui::SameLine();
     ImGui::PushItemWidth(0.3f*m_control_width);
@@ -637,7 +636,7 @@ void GLGizmoCut3D::render_cut_center_grabber()
         line_shader->set_uniform("emission_factor", 0.1f);
         line_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
-        const Transform3d trafo = view_matrix * assemble_transform(Vec3d::Zero(), Vec3d::Zero(), Vec3d(1.0, 1.0, m_grabber_connection_len));
+        const Transform3d trafo = view_matrix * scale_transform(Vec3d(1.0, 1.0, m_grabber_connection_len));
         line_shader->set_uniform("view_model_matrix", trafo);
         line_shader->set_uniform("normal_matrix", (Matrix3d)trafo.matrix().block(0, 0, 3, 3).inverse().transpose());
         line_shader->set_uniform("width", 0.2f);
@@ -651,7 +650,7 @@ void GLGizmoCut3D::render_cut_center_grabber()
 
     auto render_rotation_snapping = [shader, camera, this](Axis axis, const ColorRGBA& color)
     {
-        Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::translation_transform(m_plane_center) * m_start_dragging_m;
+        Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_start_dragging_m;
 
         if (axis == X)
             view_model_matrix = view_model_matrix * rotation_transform( 0.5 * PI * Vec3d::UnitY()) * rotation_transform(-PI * Vec3d::UnitZ());
@@ -690,7 +689,7 @@ void GLGizmoCut3D::render_cut_center_grabber()
 
     if ((!m_dragging && m_hover_id < 0))
         render_grabber_connection(color);
-    render(m_sphere.model, color, view_matrix * assemble_transform(Vec3d::Zero(), Vec3d::Zero(), size * Vec3d::Ones()));
+    render(m_sphere.model, color, view_matrix * scale_transform(size));
 
     if (!m_dragging && m_hover_id < 0 || m_hover_id == Z)
     {
@@ -914,7 +913,7 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             return;
 
         const Vec3d& instance_offset = mo->instances[inst_id]->get_offset();
-        const float sla_shift = m_c->selection_info()->get_sla_shift();
+        const double sla_shift = double(m_c->selection_info()->get_sla_shift());
 
         const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
         const Vec3d& normal = cp && cp->is_active() ? cp->get_normal() : m_clp_normal;
@@ -922,7 +921,7 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
         for (size_t i = 0; i < connectors.size(); ++i) {
             const CutConnector& connector = connectors[i];
 
-            double height = connector.height;
+            float height = connector.height;
             // recalculate connector position to world position
             Vec3d pos = connector.pos + instance_offset;
             if (connector.attribs.type == CutConnectorType::Dowel &&
@@ -932,11 +931,8 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             }
             pos[Z] += sla_shift;
 
-            m_raycasters[i]->set_transform(assemble_transform(
-                pos,
-                Transformation(m_rotation_m).get_rotation(),
-                Vec3d(connector.radius, connector.radius, height)
-            ));
+            const Transform3d scale_trafo = scale_transform(Vec3f(connector.radius, connector.radius, height).cast<double>());
+            m_raycasters[i]->set_transform(translation_transform(pos) * m_rotation_m * scale_trafo);
         }
     }
     else {
@@ -959,7 +955,7 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
         m_raycasters[3]->set_transform(trafo * assemble_transform(offset, -0.5 * PI * Vec3d::UnitY(), scale));
 
         offset = 1.25 * size * Vec3d::UnitZ();
-        m_raycasters[4]->set_transform(trafo * assemble_transform(Vec3d::Zero(), Vec3d::Zero(), size * Vec3d::Ones()));
+        m_raycasters[4]->set_transform(trafo * scale_transform(size));
         m_raycasters[5]->set_transform(trafo * assemble_transform(-offset, PI * Vec3d::UnitX(), scale));
         m_raycasters[6]->set_transform(trafo * assemble_transform(offset, Vec3d::Zero(), scale));
     }
@@ -1400,7 +1396,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
 
     m_imgui->disabled_begin(connectors.empty());
     ImGui::SameLine(m_label_width);
-    if (m_imgui->button("  " + _L("Reset") + "  ##connectors"))
+    if (m_imgui->button(wxString(ImGui::RevertButton) + _L("Reset") + "  ##connectors"))
         reset_connectors();
     m_imgui->disabled_end();
 
@@ -1427,6 +1423,8 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
             connectors[idx].radius           = float(m_connector_size * 0.5);
             connectors[idx].radius_tolerance = 0.01f * float(m_connector_size_tolerance);
         });
+
+    ImGui::Separator();
 
     if (m_imgui->button(_L("Confirm connectors"))) {
         m_clp_normal         = m_c->object_clipper()->get_clipping_plane()->get_normal();
@@ -1475,34 +1473,43 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
     if (m_mode == size_t(CutMode::cutPlanar)) {
         ImGui::AlignTextToFramePadding();
+        m_imgui->text(wxString(ImGui::InfoMarkerSmall));
+        ImGui::SameLine();
         m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Hold SHIFT key and connect some two points of an object to cut by line"));
 
         ImGui::Separator();
 
         render_build_size();
 
+        ImGui::AlignTextToFramePadding();
         m_imgui->text(_L("Cut position: "));
+        ImGui::SameLine(m_label_width);
         render_move_center_input(Z);
-
-        if (m_imgui->button("Reset cutting plane"))
+        ImGui::SameLine();
+        if (m_imgui->button(wxString(ImGui::RevertButton) + _L("Reset cutting plane")))
             reset_cut_plane();
+
+        if (wxGetApp().plater()->printer_technology() == ptFFF) {
+            m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
+                if (m_imgui->button(_L("Add/Edit connectors")))
+                    set_connectors_editing(true);
+            m_imgui->disabled_end();
+        }
 
         ImGui::Separator();
 
-        auto render_part_action_line = [this, connectors](const wxString& info_label, const wxString& label, const wxString& suffix, bool& keep_part, bool& place_on_cut_part, bool& rotate_part) {
+        auto render_part_action_line = [this, connectors](const wxString& label, const wxString& suffix, bool& keep_part, bool& place_on_cut_part, bool& rotate_part) {
             bool keep = true;
-
-            m_imgui->text(info_label);
-            ImGui::SameLine(m_label_width);
+            ImGui::AlignTextToFramePadding();
             m_imgui->text(label);
 
-            ImGui::SameLine(2 * m_label_width);
+            ImGui::SameLine(m_label_width);
 
             m_imgui->disabled_begin(!connectors.empty());
                 m_imgui->checkbox(_L("Keep") + suffix, connectors.empty() ? keep_part : keep);
             m_imgui->disabled_end();
 
-            ImGui::SameLine(3 * m_label_width);
+            ImGui::SameLine(2 * m_label_width);
 
             m_imgui->disabled_begin(!keep_part);
                 if (m_imgui->checkbox(_L("Place on cut") + suffix, place_on_cut_part))
@@ -1513,23 +1520,16 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
             m_imgui->disabled_end();
         };
 
-        ImGui::AlignTextToFramePadding();
-        render_part_action_line(_L("After cut") + ": ", _L("Upper part"), "##upper", m_keep_upper, m_place_on_cut_upper, m_rotate_upper);
-        render_part_action_line("",                   _L("Lower part"), "##lower", m_keep_lower, m_place_on_cut_lower, m_rotate_lower);
-    }
-
-    if (wxGetApp().plater()->printer_technology() == ptFFF) {
-        m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
-            if (m_imgui->button(_L("Add/Edit connectors")))
-                set_connectors_editing(true);
-        m_imgui->disabled_end();
+        m_imgui->text(_L("After cut") + ": ");
+        render_part_action_line( _L("Upper part"), "##upper", m_keep_upper, m_place_on_cut_upper, m_rotate_upper);
+        render_part_action_line( _L("Lower part"), "##lower", m_keep_lower, m_place_on_cut_lower, m_rotate_lower);
     }
 
     ImGui::Separator();
 
     m_imgui->disabled_begin(!can_perform_cut());
         if(m_imgui->button(_L("Perform cut")))
-            perform_cut(m_parent.get_selection());;
+            perform_cut(m_parent.get_selection());
     m_imgui->disabled_end();
 }
 
@@ -1557,8 +1557,8 @@ void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
 
 void GLGizmoCut3D::render_input_window_warning() const
 {
-    if (wxGetApp().plater()->printer_technology() == ptFFF)
-        m_imgui->text(m_has_invalid_connector ? wxString(ImGui::WarningMarkerSmall) + _L("Invalid connectors detected.") : wxString());
+    if (wxGetApp().plater()->printer_technology() == ptFFF && m_has_invalid_connector)
+        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Invalid connectors detected."));
     if (!m_keep_upper && !m_keep_lower)
         m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Invalid state. \nNo one part is selected for keep after cut"));
 }
@@ -1655,7 +1655,7 @@ void GLGizmoCut3D::render_connectors()
     for (size_t i = 0; i < connectors.size(); ++i) {
         const CutConnector& connector = connectors[i];
 
-        double height = double(connector.height);
+        float height = connector.height;
         // recalculate connector position to world position
         Vec3d pos = connector.pos + instance_offset;
         if (connector.attribs.type  == CutConnectorType::Dowel &&
@@ -1694,11 +1694,8 @@ void GLGizmoCut3D::render_connectors()
 
         m_shapes[connector.attribs].model.set_color(render_color);
 
-        const Transform3d view_model_matrix = camera.get_view_matrix() * assemble_transform(
-            pos,
-            Transformation(m_rotation_m).get_rotation(),
-            Vec3d(connector.radius, connector.radius, height)
-        );
+        const Transform3d scale_trafo = scale_transform(Vec3f(connector.radius, connector.radius, height).cast<double>());
+        const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(pos) * m_rotation_m * scale_trafo;
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
@@ -1741,6 +1738,12 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
         Vec3d rotation = Transformation(m_rotation_m).get_rotation();
 
+        // FIXME experiments with transformations
+        const Vec3d recover_rot = Transformation(rotation_transform(rotation)).get_rotation();
+        if (recover_rot != rotation)
+            printf("\n ERROR! wrong recovered rotation");
+        ///////////////
+
         const bool has_connectors = !mo->cut_connectors.empty();
         {
             Plater::TakeSnapshot snapshot(plater, _L("Cut by Plane"));
@@ -1761,7 +1764,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                         Vec3d shifted_center = m_plane_center + Vec3d::UnitZ();
                         rotate_vec3d_around_plane_center(shifted_center);
                         Vec3d norm = (shifted_center - m_plane_center).normalized();
-                        connector.pos += norm * (0.5 * connector.height);
+                        connector.pos += norm * 0.5 * double(connector.height);
                     }
                 }
                 mo->apply_cut_connectors(_u8L("Connector"));

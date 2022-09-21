@@ -146,7 +146,7 @@ public:
 
     void shift_cut_z(double delta);
     void rotate_vec3d_around_plane_center(Vec3d&vec);
-    void put_connetors_on_cut_plane(const Vec3d& cp_normal, double cp_offset);
+    void put_connectors_on_cut_plane(const Vec3d& cp_normal, double cp_offset);
     void update_clipper();
     void update_clipper_on_render();
     void set_connectors_editing() { m_connectors_editing = true; }

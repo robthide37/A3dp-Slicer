@@ -172,6 +172,7 @@ namespace ImGui
     const wchar_t WarningMarkerSmall       = 0x2618;
     const wchar_t ExpandBtn                = 0x2619;
     const wchar_t CollapseBtn              = 0x2620;
+    const wchar_t InfoMarkerSmall          = 0x2621;
 
 //    void MyFunction(const char* name, const MyMatrix44& v);
 }
