@@ -526,29 +526,27 @@ void GLGizmoCut3D::render_connect_mode_radio_button(CutConnectorMode mode)
         m_connector_mode = mode;
 }
 
-bool GLGizmoCut3D::render_revert_button(const std::string& label_id)
+bool GLGizmoCut3D::render_reset_button(const std::string& label_id, const std::string& tooltip) const
 {
     const ImGuiStyle& style = ImGui::GetStyle();
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 1, style.ItemSpacing.y });
-    ImGui::SameLine(m_label_width);
 
     ImGui::PushStyleColor(ImGuiCol_Button, { 0.25f, 0.25f, 0.25f, 0.0f });
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.4f, 0.4f, 0.4f, 1.0f });
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.4f, 0.4f, 0.4f, 1.0f });
 
-    std::string label;
-    label += ImGui::RevertButton;
-    bool revert = ImGui::Button((label + "##" + label_id).c_str());
+    std::string btn_label;
+    btn_label += ImGui::RevertButton;
+    const bool revert = ImGui::Button((btn_label +"##" + label_id).c_str());
 
     ImGui::PopStyleColor(3);
 
     if (ImGui::IsItemHovered())
-        m_imgui->tooltip(into_u8(_L("Revert")).c_str(), ImGui::GetFontSize() * 20.0f);
+        m_imgui->tooltip(tooltip.c_str(), ImGui::GetFontSize() * 20.0f);
 
     ImGui::PopStyleVar();
 
-    ImGui::SameLine();
     return revert;
 }
 
@@ -1396,7 +1394,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
 
     m_imgui->disabled_begin(connectors.empty());
     ImGui::SameLine(m_label_width);
-    if (m_imgui->button(wxString(ImGui::RevertButton) + _L("Reset") + "  ##connectors"))
+    if (render_reset_button("connectors", _u8L("Remove connectors")))
         reset_connectors();
     m_imgui->disabled_end();
 
@@ -1486,7 +1484,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGui::SameLine(m_label_width);
         render_move_center_input(Z);
         ImGui::SameLine();
-        if (m_imgui->button(wxString(ImGui::RevertButton) + _L("Reset cutting plane")))
+        if (render_reset_button("cut_plane", _u8L("Reset cutting plane")))
             reset_cut_plane();
 
         if (wxGetApp().plater()->printer_technology() == ptFFF) {
@@ -1737,12 +1735,6 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
             return;
 
         Vec3d rotation = Transformation(m_rotation_m).get_rotation();
-
-        // FIXME experiments with transformations
-        const Vec3d recover_rot = Transformation(rotation_transform(rotation)).get_rotation();
-        if (recover_rot != rotation)
-            printf("\n ERROR! wrong recovered rotation");
-        ///////////////
 
         const bool has_connectors = !mo->cut_connectors.empty();
         {

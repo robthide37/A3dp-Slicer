@@ -210,7 +210,7 @@ private:
     bool render_slider_double_input(const std::string& label, double& value_in, int& tolerance_in);
     void render_move_center_input(int axis);
     void render_connect_mode_radio_button(CutConnectorMode mode);
-    bool render_revert_button(const std::string& label);
+    bool render_reset_button(const std::string& label_id, const std::string& tooltip) const;
     bool render_connect_type_radio_button(CutConnectorType type);
     Transform3d get_volume_transformation(const ModelVolume* volume) const;
     void render_connectors();
