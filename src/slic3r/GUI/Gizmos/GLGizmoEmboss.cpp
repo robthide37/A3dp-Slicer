@@ -1793,6 +1793,7 @@ void GLGizmoEmboss::draw_style_list() {
         if (!is_modified) return name;
         return name + " (" + _u8L("modified") + ")";
     };
+    std::optional<size_t> selected_style_index;
     if (ImGui::BeginCombo("##style_selector", add_text_modify(trunc_name).c_str())) {
         m_style_manager.init_style_images(m_gui_cfg->max_style_image_size, m_text);
         m_style_manager.init_trunc_names(max_style_name_width);
@@ -1810,16 +1811,7 @@ void GLGizmoEmboss::draw_style_list() {
             // allow click delete button
             ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; 
             if (ImGui::Selectable(item.truncated_name.c_str(), is_selected, flags, select_size)) {
-                fix_transformation(actual_style.prop, style.prop);
-                if (m_style_manager.load_style(index)) {
-                    process();
-                } else {
-                    wxString title = _L("Not valid style.");
-                    wxString message = GUI::format_wxstr(_L("Style '%1%' can't be used and will be removed from list."), style.name);
-                    MessageDialog not_loaded_style_message(nullptr, message, title, wxOK);
-                    not_loaded_style_message.ShowModal();
-                    m_style_manager.erase(index);
-                }
+                selected_style_index = index;
             } else if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", actual_style_name.c_str());
 
@@ -1858,6 +1850,31 @@ void GLGizmoEmboss::draw_style_list() {
         }
     }
         
+    // Check whether user wants lose actual style modification
+    if (selected_style_index.has_value() && is_modified) { 
+        wxString title   = _L("Style modification will be lost.");
+        const EmbossStyle &style = m_style_manager.get_styles()[*selected_style_index].style;        
+        wxString message = GUI::format_wxstr(_L("Changing style to '%1%' will discard actual style modification.\n\n Would you like to continue anyway?"), style.name);
+        MessageDialog not_loaded_style_message(nullptr, message, title, wxICON_WARNING | wxYES|wxNO);
+        if (not_loaded_style_message.ShowModal() != wxID_YES) 
+            selected_style_index.reset();
+    }
+
+    // selected style from combo box
+    if (selected_style_index.has_value()) {
+        const EmbossStyle &style = m_style_manager.get_styles()[*selected_style_index].style;
+        fix_transformation(actual_style.prop, style.prop);
+        if (m_style_manager.load_style(*selected_style_index)) {
+            process();
+        } else {
+            wxString title   = _L("Not valid style.");
+            wxString message = GUI::format_wxstr(_L("Style '%1%' can't be used and will be removed from list."), style.name);
+            MessageDialog not_loaded_style_message(nullptr, message, title, wxOK);
+            not_loaded_style_message.ShowModal();
+            m_style_manager.erase(*selected_style_index);
+        }
+    }
+
     ImGui::SameLine();
     draw_style_rename_button();
         
