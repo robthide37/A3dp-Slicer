@@ -3774,6 +3774,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 //m_selection.add(hover_volume_id); // add whole instance
                 m_selection.add_volumes(Selection::EMode::Volume, {(unsigned) hover_volume_id});
                 m_gizmos.open_gizmo(GLGizmosManager::EType::Emboss);
+                wxGetApp().obj_list()->update_selections();
                 return;
             }
         }
