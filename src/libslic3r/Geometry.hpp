@@ -375,11 +375,11 @@ Transform3d scale_transform(const Vec3d& scale);
 
 // Returns the euler angles extracted from the given rotation matrix
 // Warning -> The matrix should not contain any scale or shear !!!
-Vec3d extract_euler_angles(const Eigen::Matrix<double, 3, 3, Eigen::DontAlign>& rotation_matrix);
+Vec3d extract_rotation(const Eigen::Matrix<double, 3, 3, Eigen::DontAlign>& rotation_matrix);
 
 // Returns the euler angles extracted from the given affine transform
 // Warning -> The transform should not contain any shear !!!
-Vec3d extract_euler_angles(const Transform3d& transform);
+Vec3d extract_rotation(const Transform3d& transform);
 
 class Transformation
 {
