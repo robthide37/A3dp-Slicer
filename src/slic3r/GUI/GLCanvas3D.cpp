@@ -1111,11 +1111,20 @@ void GLCanvas3D::load_arrange_settings()
     std::string dist_fff_str =
         wxGetApp().app_config->get("arrange", "min_object_distance_fff");
 
+    std::string dist_bed_fff_str =
+        wxGetApp().app_config->get("arrange", "min_bed_distance_fff");
+
     std::string dist_fff_seq_print_str =
         wxGetApp().app_config->get("arrange", "min_object_distance_fff_seq_print");
 
+    std::string dist_bed_fff_seq_print_str =
+        wxGetApp().app_config->get("arrange", "min_bed_distance_fff_seq_print");
+
     std::string dist_sla_str =
         wxGetApp().app_config->get("arrange", "min_object_distance_sla");
+
+    std::string dist_bed_sla_str =
+        wxGetApp().app_config->get("arrange", "min_bed_distance_sla");
 
     std::string en_rot_fff_str =
         wxGetApp().app_config->get("arrange", "enable_rotation_fff");
@@ -1129,11 +1138,20 @@ void GLCanvas3D::load_arrange_settings()
     if (!dist_fff_str.empty())
         m_arrange_settings_fff.distance = string_to_float_decimal_point(dist_fff_str);
 
+    if (!dist_bed_fff_str.empty())
+        m_arrange_settings_fff.distance_from_bed = string_to_float_decimal_point(dist_bed_fff_str);
+
     if (!dist_fff_seq_print_str.empty())
         m_arrange_settings_fff_seq_print.distance = string_to_float_decimal_point(dist_fff_seq_print_str);
 
+    if (!dist_bed_fff_seq_print_str.empty())
+        m_arrange_settings_fff_seq_print.distance_from_bed = string_to_float_decimal_point(dist_bed_fff_seq_print_str);
+
     if (!dist_sla_str.empty())
         m_arrange_settings_sla.distance = string_to_float_decimal_point(dist_sla_str);
+
+    if (!dist_bed_sla_str.empty())
+        m_arrange_settings_sla.distance_from_bed = string_to_float_decimal_point(dist_bed_sla_str);
 
     if (!en_rot_fff_str.empty())
         m_arrange_settings_fff.enable_rotation = (en_rot_fff_str == "1" || en_rot_fff_str == "yes");
@@ -2388,10 +2406,25 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         const bool partlyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Partly_Outside);
         const bool fullyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Fully_Outside);
 
-        _set_warning_notification(EWarning::ObjectClashed, partlyOut);
-        _set_warning_notification(EWarning::ObjectOutside, fullyOut);
-        if (printer_technology != ptSLA || !contained_min_one)
+        if (printer_technology != ptSLA) {
+            _set_warning_notification(EWarning::ObjectClashed, partlyOut);
+            _set_warning_notification(EWarning::ObjectOutside, fullyOut);
             _set_warning_notification(EWarning::SlaSupportsOutside, false);
+        }
+        else {
+            const auto [res, volume] = _is_any_volume_outside();
+            const bool is_support = volume != nullptr && volume->is_sla_support();
+            if (is_support) {
+                _set_warning_notification(EWarning::ObjectClashed, false);
+                _set_warning_notification(EWarning::ObjectOutside, false);
+                _set_warning_notification(EWarning::SlaSupportsOutside, partlyOut || fullyOut);
+            }
+            else {
+                _set_warning_notification(EWarning::ObjectClashed, partlyOut);
+                _set_warning_notification(EWarning::ObjectOutside, fullyOut);
+                _set_warning_notification(EWarning::SlaSupportsOutside, false);
+            }
+        }
 
         post_event(Event<bool>(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, 
                                contained_min_one && !m_model->objects.empty() && !partlyOut));
@@ -2498,6 +2531,7 @@ void GLCanvas3D::load_sla_preview()
 	    reset_volumes();
         _load_sla_shells();
         _update_sla_shells_outside_state();
+        _set_warning_notification_if_needed(EWarning::ObjectClashed);
         _set_warning_notification_if_needed(EWarning::SlaSupportsOutside);
     }
 }
@@ -4550,11 +4584,13 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
 
     bool settings_changed = false;
     float dist_min = 0.f;
-    std::string dist_key = "min_object_distance", rot_key = "enable_rotation";
+    float dist_bed_min = 0.f;
+    std::string dist_key = "min_object_distance";
+    std::string dist_bed_key = "min_bed_distance";
+    std::string rot_key = "enable_rotation";
     std::string postfix;
 
     if (ptech == ptSLA) {
-        dist_min     = 0.f;
         postfix      = "_sla";
     } else if (ptech == ptFFF) {
         auto co_opt = m_config->option<ConfigOptionBool>("complete_objects");
@@ -4568,7 +4604,8 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     }
 
     dist_key += postfix;
-    rot_key  += postfix;
+    dist_bed_key += postfix;
+    rot_key += postfix;
 
     imgui->text(GUI::format_wxstr(_L("Press %1%left mouse button to enter the exact value"), shortkey_ctrl_prefix()));
 
@@ -4576,6 +4613,13 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
         settings.distance = std::max(dist_min, settings.distance);
         settings_out.distance = settings.distance;
         appcfg->set("arrange", dist_key.c_str(), float_to_string_decimal_point(settings_out.distance));
+        settings_changed = true;
+    }
+
+    if (imgui->slider_float(_L("Spacing from bed"), &settings.distance_from_bed, dist_bed_min, 100.0f, "%5.2f") || dist_bed_min > settings.distance_from_bed) {
+        settings.distance_from_bed = std::max(dist_bed_min, settings.distance_from_bed);
+        settings_out.distance_from_bed = settings.distance_from_bed;
+        appcfg->set("arrange", dist_bed_key.c_str(), float_to_string_decimal_point(settings_out.distance_from_bed));
         settings_changed = true;
     }
 
@@ -4591,6 +4635,7 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
         settings_out = ArrangeSettings{};
         settings_out.distance = std::max(dist_min, settings_out.distance);
         appcfg->set("arrange", dist_key.c_str(), float_to_string_decimal_point(settings_out.distance));
+        appcfg->set("arrange", dist_bed_key.c_str(), float_to_string_decimal_point(settings_out.distance_from_bed));
         appcfg->set("arrange", rot_key.c_str(), settings_out.enable_rotation? "1" : "0");
         settings_changed = true;
     }
@@ -5851,7 +5896,7 @@ void GLCanvas3D::_render_background()
         (current_printer_technology() != ptSLA || !m_volumes.empty());
 
         if (!m_volumes.empty())
-            use_error_color &= _is_any_volume_outside();
+            use_error_color &= _is_any_volume_outside().first;
         else
             use_error_color &= m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
     }
@@ -7646,8 +7691,19 @@ void GLCanvas3D::_set_warning_notification_if_needed(EWarning warning)
 {
     _set_current();
     bool show = false;
-    if (!m_volumes.empty())
-        show = _is_any_volume_outside();
+    if (!m_volumes.empty()) {
+        if (current_printer_technology() == ptSLA) {
+            const auto [res, volume] = _is_any_volume_outside();
+            if (res) {
+                if (warning == EWarning::ObjectClashed)
+                    show = !volume->is_sla_support();
+                else if (warning == EWarning::SlaSupportsOutside)
+                    show = volume->is_sla_support();
+            }
+        }
+        else
+            show = _is_any_volume_outside().first;
+    }
     else {
         if (wxGetApp().is_editor()) {
             if (current_printer_technology() != ptSLA)
@@ -7704,14 +7760,14 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
     }
 }
 
-bool GLCanvas3D::_is_any_volume_outside() const
+std::pair<bool, const GLVolume*> GLCanvas3D::_is_any_volume_outside() const
 {
     for (const GLVolume* volume : m_volumes.volumes) {
         if (volume != nullptr && volume->is_outside)
-            return true;
+            return std::make_pair(true, volume);
     }
 
-    return false;
+    return std::make_pair(false, nullptr);
 }
 
 void GLCanvas3D::_update_selection_from_hover()

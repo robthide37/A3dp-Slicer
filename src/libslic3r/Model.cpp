@@ -1917,7 +1917,7 @@ void ModelVolume::rotate(double angle, Axis axis)
 
 void ModelVolume::rotate(double angle, const Vec3d& axis)
 {
-    set_rotation(get_rotation() + Geometry::extract_euler_angles(Eigen::Quaterniond(Eigen::AngleAxisd(angle, axis)).toRotationMatrix()));
+    set_rotation(get_rotation() + Geometry::extract_rotation(Eigen::Quaterniond(Eigen::AngleAxisd(angle, axis)).toRotationMatrix()));
 }
 
 void ModelVolume::mirror(Axis axis)

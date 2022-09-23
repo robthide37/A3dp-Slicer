@@ -343,7 +343,7 @@ public:
 
     // Find the preset with a new_name or create a new one,
     // initialize it with the initial_preset config.
-    Preset& PresetCollection::get_preset_with_name(const std::string& new_name, const Preset* initial_preset);
+    Preset&         get_preset_with_name(const std::string& new_name, const Preset* initial_preset);
 
     // Delete the current preset, activate the first visible preset.
     // returns true if the preset was deleted successfully.

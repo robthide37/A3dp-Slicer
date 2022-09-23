@@ -965,7 +965,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 else {
                     // extracts rotations from the composed transformation
                     const Vec3d new_rotation = transformation_type.world() ?
-                        Geometry::extract_euler_angles(Geometry::assemble_transform(Vec3d::Zero(), rotation) * m_cache.volumes_data[i].get_instance_rotation_matrix()) :
+                        Geometry::extract_rotation(Geometry::assemble_transform(Vec3d::Zero(), rotation) * m_cache.volumes_data[i].get_instance_rotation_matrix()) :
                         transformation_type.absolute() ? rotation : rotation + m_cache.volumes_data[i].get_instance_rotation();
                     if (rot_axis_max == 2 && transformation_type.joint()) {
                         // Only allow rotation of multiple instances as a single rigid body when rotating around the Z axis.
@@ -986,7 +986,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                         v.set_volume_rotation(m_cache.volumes_data[i].get_volume_rotation() + rotation);
                     else {
                         const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
-                        const Vec3d new_rotation = Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
+                        const Vec3d new_rotation = Geometry::extract_rotation(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
                         v.set_volume_rotation(new_rotation);
                     }
                 }
@@ -996,7 +996,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                     else if (m_mode == Volume) {
                         // extracts rotations from the composed transformation
                         const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
-                        const Vec3d new_rotation = Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
+                        const Vec3d new_rotation = Geometry::extract_rotation(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
                         if (transformation_type.joint()) {
                             const Vec3d local_pivot = m_cache.volumes_data[i].get_instance_full_matrix().inverse() * m_cache.dragging_center;
                             const Vec3d offset = m * (m_cache.volumes_data[i].get_volume_position() - local_pivot);
@@ -1057,7 +1057,7 @@ void Selection::flattening_rotate(const Vec3d& normal)
             voldata.get_instance_scaling_factor().cwiseInverse(), voldata.get_instance_mirror()) * normal).normalized();
         // Additional rotation to align tnormal with the down vector in the world coordinate space.
         auto  extra_rotation = Eigen::Quaterniond().setFromTwoVectors(tnormal, -Vec3d::UnitZ());
-        v.set_instance_rotation(Geometry::extract_euler_angles(extra_rotation.toRotationMatrix() * m_cache.volumes_data[i].get_instance_rotation_matrix()));
+        v.set_instance_rotation(Geometry::extract_rotation(extra_rotation.toRotationMatrix() * m_cache.volumes_data[i].get_instance_rotation_matrix()));
 #endif // ENABLE_WORLD_COORDINATE
     }
 

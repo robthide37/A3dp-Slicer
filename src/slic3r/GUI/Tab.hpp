@@ -323,7 +323,6 @@ public:
 
 	void		compare_preset();
 	void		transfer_options(const std::string&name_from, const std::string&name_to, std::vector<std::string> options);
-    void		save_options(const std::string &name_from, const std::string &name_to, std::vector<std::string> options);
 	void		save_preset(std::string name = std::string(), bool detach = false);
 	void		rename_preset();
 	void		delete_preset();

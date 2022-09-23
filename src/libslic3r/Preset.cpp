@@ -932,8 +932,8 @@ Preset& PresetCollection::get_preset_with_name(const std::string& new_name, cons
     if (it != m_presets.end() && it->name == new_name) {
         // Preset with the same name found.
         Preset& preset = *it;
-        if (!preset.is_default && !preset.is_external && !preset.is_system) {
-            // Overwriting an existing preset if it isn't default/external/system
+        if (!preset.is_default && !preset.is_external && !preset.is_system && initial_preset->name != new_name) {
+            // Overwriting an existing preset if it isn't default/external/system or isn't an initial_preset
             preset.config = initial_preset->config;
             // The newly saved preset can be activated -> make it visible.
             preset.is_visible = true;
@@ -941,10 +941,12 @@ Preset& PresetCollection::get_preset_with_name(const std::string& new_name, cons
         return preset;
     }
 
+    const std::string selected_preset_name = this->get_selected_preset_name();
+
     // Creating a new preset.
     Preset& preset = *m_presets.insert(it, *initial_preset);
     std::string& inherits = preset.inherits();
-    std::string   old_name = preset.name;
+    std::string old_name = preset.name;
     preset.name = new_name;
     preset.file = this->path_from_name(new_name);
     preset.vendor = nullptr;
@@ -970,7 +972,16 @@ Preset& PresetCollection::get_preset_with_name(const std::string& new_name, cons
     // Just system presets have aliases
     preset.alias.clear();
 
-    return preset;
+    // sort printers and get new it
+    std::sort(m_presets.begin(), m_presets.end());
+
+    // set initial preset selection
+    this->select_preset_by_name(selected_preset_name, true);
+
+    it = this->find_preset_internal(new_name);
+    assert(it != m_presets.end());
+
+    return *it;
 }
 
 bool PresetCollection::delete_current_preset()

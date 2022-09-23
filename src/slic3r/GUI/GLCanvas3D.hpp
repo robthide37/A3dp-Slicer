@@ -1083,7 +1083,7 @@ private:
     // generates a warning notification containing the given message
     void _set_warning_notification(EWarning warning, bool state);
 
-    bool _is_any_volume_outside() const;
+    std::pair<bool, const GLVolume*> _is_any_volume_outside() const;
 
     // updates the selection from the content of m_hover_volume_idxs
     void _update_selection_from_hover();

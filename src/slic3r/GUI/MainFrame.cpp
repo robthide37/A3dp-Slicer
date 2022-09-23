@@ -299,6 +299,11 @@ void MainFrame::bind_diff_dialog()
                                         diff_dialog.get_selected_options(type));
     };
 
+    auto update_presets = [this, get_tab](Preset::Type type) {
+        get_tab(type)->update_preset_choice();
+        m_plater->sidebar().update_presets(type);
+    };
+
     auto process_options = [this](std::function<void(Preset::Type)> process) {
         const Preset::Type diff_dlg_type = diff_dialog.view_type();
         if (diff_dlg_type == Preset::TYPE_INVALID) {
@@ -311,7 +316,9 @@ void MainFrame::bind_diff_dialog()
             process(diff_dlg_type);
     };
 
-    diff_dialog.Bind(EVT_DIFF_DIALOG_TRANSFER,  [this, process_options, transfer](SimpleEvent&) { process_options(transfer); });
+    diff_dialog.Bind(EVT_DIFF_DIALOG_TRANSFER,      [this, process_options, transfer](SimpleEvent&)         { process_options(transfer); });
+
+    diff_dialog.Bind(EVT_DIFF_DIALOG_UPDATE_PRESETS,[this, process_options, update_presets](SimpleEvent&)   { process_options(update_presets); });
 }
 
 

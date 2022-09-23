@@ -86,15 +86,13 @@ public:
     SavePresetDialog(wxWindow* parent, Preset::Type type, std::string suffix = "");
     SavePresetDialog(wxWindow* parent, std::vector<Preset::Type> types, std::string suffix = "", PresetBundle* preset_bundle = nullptr);
     SavePresetDialog(wxWindow* parent, Preset::Type type, bool rename, const wxString& info_line_extention);
-    ~SavePresetDialog();
+    ~SavePresetDialog() override;
 
     void AddItem(Preset::Type type, const std::string& suffix);
 
-    void set_preset_bundle(PresetBundle* preset_bundle) { m_preset_bundle = preset_bundle; }
-    PresetBundle* get_preset_bundle() const             { return m_preset_bundle; }
-
-    std::string get_name();
-    std::string get_name(Preset::Type type);
+    PresetBundle*   get_preset_bundle() const { return m_preset_bundle; }
+    std::string     get_name();
+    std::string     get_name(Preset::Type type);
 
     bool enable_ok_btn() const;
     void add_info_for_edit_ph_printer(wxBoxSizer *sizer);

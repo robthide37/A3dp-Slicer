@@ -285,7 +285,7 @@ void GLGizmoScale3D::on_render()
 #else
         m_bounding_box = v.bounding_box();
         m_transform = v.world_matrix();
-        angles = Geometry::extract_euler_angles(m_transform);
+        angles = Geometry::extract_rotation(m_transform);
         // consider rotation+mirror only components of the transform for offsets
         offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v.get_instance_mirror());
         m_offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), v.get_volume_rotation(), Vec3d::Ones(), v.get_volume_mirror());

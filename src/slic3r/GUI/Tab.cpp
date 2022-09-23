@@ -41,21 +41,20 @@
 #include "Plater.hpp"
 #include "MainFrame.hpp"
 #include "format.hpp"
-#include "PhysicalPrinterDialog.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "SavePresetDialog.hpp"
 #include "MsgDialog.hpp"
 #include "Notebook.hpp"
 
 #ifdef WIN32
-	#include <commctrl.h>
+	#include <CommCtrl.h>
 #endif // WIN32
 
 namespace Slic3r {
 namespace GUI {
 
 Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
-    m_parent(parent), m_title(title), m_type(type)
+    m_parent(parent), m_type(type), m_title(title)
 {
     Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL/*, name*/);
     this->SetFont(Slic3r::GUI::wxGetApp().normal_font());
@@ -920,7 +919,7 @@ void Tab::update_visibility()
         page->update_visibility(m_mode, page.get() == m_active_page);
     rebuild_page_tree();
 
-    if (m_type == Preset::TYPE_SLA_PRINT || m_type == Preset::TYPE_PRINT)
+    if (m_type != Preset::TYPE_PRINTER)
         update_description_lines();
 
     Layout();
@@ -3187,7 +3186,8 @@ void Tab::update_btns_enabling()
     const Preset& preset = m_presets->get_edited_preset();
     m_btn_delete_preset->Show((m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection())
                               || (!preset.is_default && !preset.is_system));
-    m_btn_rename_preset->Show(!preset.is_default && !preset.is_system && !m_presets_choice->is_selected_physical_printer());
+    m_btn_rename_preset->Show(!preset.is_default && !preset.is_system && !preset.is_external && 
+                              !wxGetApp().preset_bundle->physical_printers.has_selection());
 
     if (m_btn_edit_ph_printer)
         m_btn_edit_ph_printer->SetToolTip( m_preset_bundle->physical_printers.has_selection() ?
@@ -3609,16 +3609,6 @@ void Tab::transfer_options(const std::string &name_from, const std::string &name
 
     apply_config_from_cache();
     load_current_preset();
-}
-
-void Tab::save_options(const std::string &name_from, const std::string &name_to, std::vector<std::string> options)
-{
-    if (options.empty())
-        return;
-
-    Preset* preset_from = m_presets->find_preset(name_from);
-    Preset* preset_to = m_presets->find_preset(name_to);
-    
 }
 
 // Save the current preset into file.

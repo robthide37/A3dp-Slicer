@@ -35,7 +35,8 @@ namespace Slic3r {
 
 namespace GUI {
 
-wxDEFINE_EVENT(EVT_DIFF_DIALOG_TRANSFER, SimpleEvent);
+wxDEFINE_EVENT(EVT_DIFF_DIALOG_TRANSFER,        SimpleEvent);
+wxDEFINE_EVENT(EVT_DIFF_DIALOG_UPDATE_PRESETS,  SimpleEvent);
 
 
 // ----------------------------------------------------------------------------
@@ -1384,7 +1385,7 @@ FullCompareDialog::FullCompareDialog(const wxString& option_name, const wxString
 
     wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(2, has_new_value_column ? 3 : 2, 1, 0);
     grid_sizer->SetFlexibleDirection(wxBOTH);
-    for (size_t col = 0 ; col < grid_sizer->GetCols(); col++)
+    for (int col = 0 ; col < grid_sizer->GetCols(); col++)
         grid_sizer->AddGrowableCol(col, 1);
     grid_sizer->AddGrowableRow(1,1);
 
@@ -1750,9 +1751,10 @@ void DiffPresetDialog::show(Preset::Type type /* = Preset::TYPE_INVALID*/)
     Show();
 }
 
-void DiffPresetDialog::update_presets(Preset::Type type)
+void DiffPresetDialog::update_presets(Preset::Type type, bool update_preset_bundles_from_app/* = true */)
 {
-    update_bundles_from_app();
+    if (update_preset_bundles_from_app)
+        update_bundles_from_app();
     update_controls_visibility(type);
 
     if (type == Preset::TYPE_INVALID)
@@ -2008,25 +2010,28 @@ void DiffPresetDialog::update_compatibility(const std::string& preset_name, Pres
     }
 }
 
-bool DiffPresetDialog::save()
+bool DiffPresetDialog::is_save_confirmed()
 {
-    presets_to_saves.clear();
+    presets_to_save.clear();
 
     std::vector<Preset::Type> types_for_save;
 
-    for (const Preset::Type& type : m_pr_technology == ptFFF ?  std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
-                                                                std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL })
+    const auto list = m_pr_technology == ptFFF ? std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
+        std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
+
+    for (const Preset::Type& type : list) {
         if (!m_tree->options(type, true).empty()) {
             types_for_save.emplace_back(type);
-            presets_to_saves.emplace_back(PresetToSave{ type, get_left_preset_name(type), get_right_preset_name(type), get_right_preset_name(type) });
+            presets_to_save.emplace_back(PresetToSave{ type, get_left_preset_name(type), get_right_preset_name(type), get_right_preset_name(type) });
         }
+    }
 
     if (!types_for_save.empty()) {
         SavePresetDialog save_dlg(this, types_for_save, _u8L("Modified"), m_preset_bundle_right.get());
         if (save_dlg.ShowModal() != wxID_OK)
             return false;
 
-        for (auto& preset : presets_to_saves) {
+        for (auto& preset : presets_to_save) {
             const std::string& name = save_dlg.get_name(preset.type);
             if (!name.empty())
                 preset.new_name = name;
@@ -2035,25 +2040,48 @@ bool DiffPresetDialog::save()
     return true;
 }
 
+std::vector<std::string> DiffPresetDialog::get_options_to_save(Preset::Type type)
+{
+    auto options = m_tree->options(type, true);
+
+    // erase "inherits" option from the list if it exists there
+    if (const auto it = std::find(options.begin(), options.end(), "inherits"); it != options.end())
+        options.erase(it);
+
+    if (type == Preset::TYPE_PRINTER) {
+        // erase "extruders_count" option from the list if it exists there
+        if (const auto it = std::find(options.begin(), options.end(), "extruders_count"); it != options.end())
+            options.erase(it);
+    }
+    return options;
+}
+
 void DiffPresetDialog::button_event(Action act)
 {
     if (act == Action::Save) {
-        if (save()) {
+        if (is_save_confirmed()) {
             size_t saved_cnt = 0;
-            for (const auto& preset : presets_to_saves)
-                if (wxGetApp().preset_bundle->transfer_and_save(preset.type, preset.from_name, preset.to_name, preset.new_name, m_tree->options(preset.type, true)))
+            for (const auto& preset : presets_to_save)
+                if (wxGetApp().preset_bundle->transfer_and_save(preset.type, preset.from_name, preset.to_name, preset.new_name, get_options_to_save(preset.type)))
                     saved_cnt++;
 
-            if (saved_cnt > 0)
-                MessageDialog(nullptr, UnsavedChangesDialog::msg_success_saved_modifications(saved_cnt)).ShowModal();
-
-            update_presets();
+            if (saved_cnt > 0) {
+                MessageDialog(this, UnsavedChangesDialog::msg_success_saved_modifications(saved_cnt)).ShowModal();
+                update_bundles_from_app();
+                for (const auto& preset : presets_to_save) {
+                    m_preset_bundle_left->get_presets(preset.type).select_preset_by_name(preset.from_name, true);
+                    m_preset_bundle_right->get_presets(preset.type).select_preset_by_name(preset.new_name, true);
+                }
+                update_presets(m_view_type, false);
+            }
         }
     }
     else {
         Hide();
         if (act == Action::Transfer)
             wxPostEvent(this, SimpleEvent(EVT_DIFF_DIALOG_TRANSFER));
+        else if (!presets_to_save.empty())
+            wxPostEvent(this, SimpleEvent(EVT_DIFF_DIALOG_UPDATE_PRESETS));
     }
 }
 

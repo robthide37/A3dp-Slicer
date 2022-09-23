@@ -481,9 +481,8 @@ bool PresetBundle::transfer_and_save(Preset::Type type, const std::string& prese
 
     PresetCollection& presets = get_presets(type);
 
-    const Preset* preset_from = presets.find_preset(preset_from_name, false, false);
     const Preset* preset_to   = presets.find_preset(preset_to_name, false, false);
-    if (!preset_from || !preset_to)
+    if (!preset_to)
         return false;
 
     // Find the preset with a new_name or create a new one,
@@ -494,13 +493,13 @@ bool PresetBundle::transfer_and_save(Preset::Type type, const std::string& prese
         return false;
 
     // Apply options from the preset_from_name.
+    const Preset* preset_from = presets.find_preset(preset_from_name, false, false);
+    if (!preset_from)
+        return false;
     preset.config.apply_only(preset_from->config, options);
 
     // Store new_name preset to disk.
     preset.save();
-
-    // update selection
-    presets.select_preset_by_name(preset_new_name, true);
 
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     // If saving the preset changes compatibility with other presets, keep the now incompatible dependent presets selected, however with a "red flag" icon showing that they are no more compatible.
