@@ -651,9 +651,10 @@ std::optional<Emboss::Glyph> Emboss::letter2glyph(const FontFile &font,
     return Private::get_glyph(*font_info_opt, letter, flatness);
 }
 
-ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache,
-                               const char *    text,
-                               const FontProp &font_prop)
+ExPolygons Emboss::text2shapes(FontFileWithCache    &font_with_cache,
+                               const char           *text,
+                               const FontProp       &font_prop,
+                               std::function<bool()> was_canceled)
 {
     assert(font_with_cache.has_value());
     std::optional<stbtt_fontinfo> font_info_opt;    
@@ -688,7 +689,11 @@ ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache,
         if (wc == '\r') continue;
 
         int unicode = static_cast<int>(wc);
-        const Glyph* glyph_ptr = Private::get_glyph(unicode, font, font_prop, cache, font_info_opt);
+        // check cancelation only before unknown symbol - loading of symbol could be timeconsuming on slow computer and dificult fonts
+        auto it = cache.find(unicode);
+        if (it == cache.end() && was_canceled != nullptr && was_canceled()) return {};
+        const Glyph *glyph_ptr = (it != cache.end())? &it->second :
+            Private::get_glyph(unicode, font, font_prop, cache, font_info_opt);
         if (glyph_ptr == nullptr) continue;
         
         // move glyph to cursor position

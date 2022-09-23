@@ -152,8 +152,9 @@ public:
     /// <param name="font">Define fonts + cache, which could extend</param>
     /// <param name="text">Characters to convert</param>
     /// <param name="font_prop">User defined property of the font</param>
+    /// <param name="was_canceled">Way to interupt processing</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    static ExPolygons text2shapes(FontFileWithCache &font, const char *text, const FontProp &font_prop);
+    static ExPolygons text2shapes(FontFileWithCache &font, const char *text, const FontProp &font_prop, std::function<bool()> was_canceled = nullptr);
 
     /// <summary>
     /// Fix intersections and self intersections in polygons glyph shape 

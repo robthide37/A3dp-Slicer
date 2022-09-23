@@ -45,8 +45,8 @@ void CreateFontImageJob::process(Ctl &ctl)
         text = text.substr(0, enter_pos);        
     }    
 
-    ExPolygons shapes = Emboss::text2shapes(font_file_with_cache,
-                                            text.c_str(), fp);
+    std::function<bool()> was_canceled = [&ctl]() -> bool { return ctl.was_canceled(); };
+    ExPolygons shapes = Emboss::text2shapes(font_file_with_cache, text.c_str(), fp, was_canceled);
     // normalize height of font
     BoundingBox bounding_box;
     for (ExPolygon &shape : shapes)

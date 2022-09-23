@@ -521,7 +521,7 @@ TriangleMesh priv::try_create_mesh(const EmbossDataBase &input, Emboss::FontFile
     assert(font.has_value());
     if (!font.has_value()) return {};
 
-    ExPolygons shapes = Emboss::text2shapes(font, text, prop);
+    ExPolygons shapes = Emboss::text2shapes(font, text, prop, was_canceled);
     if (shapes.empty()) return {};
     if (was_canceled()) return {};
 
