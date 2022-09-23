@@ -4935,6 +4935,8 @@ bool Plater::priv::can_increase_instances() const
      || q->canvas3D()->get_gizmos_manager().is_in_editing_mode())
             return false;
 
+    if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
+
     int obj_idx = get_selected_object_idx();
     return (0 <= obj_idx) && (obj_idx < (int)model.objects.size());
 }
@@ -4961,7 +4963,9 @@ bool Plater::priv::can_split_to_volumes() const
 
 bool Plater::priv::can_arrange() const
 {
-    return !model.objects.empty() && m_worker.is_idle();
+    if (model.objects.empty() && m_worker.is_idle()) return false;
+    if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
+    return true;
 }
 
 bool Plater::priv::can_layers_editing() const
