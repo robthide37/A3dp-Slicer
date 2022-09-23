@@ -83,8 +83,8 @@ bool EmbossStyleManager::store_styles_to_app_config(bool use_modification,
             m_style_cache.truncated_name.clear();
             m_style_cache.style_index = m_style_items.size();
             m_style_items.push_back({style});
-            m_style_cache.stored_wx_font = m_style_cache.wx_font;
         }
+        m_style_cache.stored_wx_font = m_style_cache.wx_font;
     }
 
     if (store_activ_index)
