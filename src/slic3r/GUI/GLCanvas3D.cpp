@@ -3728,6 +3728,23 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
     else
         evt.Skip();
 
+    // Detection of doubleclick on text to open emboss edit window
+    if (evt.LeftDClick() && m_gizmos.get_current() == nullptr && !m_hover_volume_idxs.empty()) { 
+        for (int hover_volume_id : m_hover_volume_idxs) { 
+            const GLVolume &hover_gl_volume = *m_volumes.volumes[hover_volume_id];
+            const ModelObject* hover_object = m_model->objects[hover_gl_volume.object_idx()];
+            int hover_volume_idx = hover_gl_volume.volume_idx();
+            const ModelVolume* hover_volume = hover_object->volumes[hover_volume_idx];
+            if (hover_volume->text_configuration.has_value()) {
+                //m_selection.set_mode(Selection::EMode::Volume);
+                //m_selection.add(hover_volume_id); // add whole instance
+                m_selection.add_volumes(Selection::EMode::Volume, {(unsigned) hover_volume_id});
+                m_gizmos.open_gizmo(GLGizmosManager::EType::Emboss);
+                return;
+            }
+        }
+    }
+
     if (m_moving)
         show_sinking_contours();
 
