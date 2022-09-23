@@ -573,12 +573,8 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         m_set_window_offset.reset();
     }
 
-    ImGuiWindowFlags flag = //ImGuiWindowFlags_AlwaysAutoResize 
-               //ImGuiWindowFlags_NoResize         
-               ImGuiWindowFlags_NoCollapse
-        ;
-    bool is_open = true;
-    if (ImGui::Begin(on_get_name().c_str(), &is_open, flag)) {
+    ImGuiWindowFlags flag = ImGuiWindowFlags_NoCollapse;
+    if (ImGui::Begin(on_get_name().c_str(), nullptr, flag)) {
         // Need to pop var before draw window
         ImGui::PopStyleVar(); // WindowMinSize
         draw_window();
@@ -586,11 +582,6 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         ImGui::PopStyleVar(); // WindowMinSize
     }
     ImGui::End();
-
-    // close button in header was hit
-    if (!is_open) { 
-        close();     
-    }
 }
 
 void GLGizmoEmboss::on_set_state()
