@@ -2,6 +2,7 @@
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
+#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #include "slic3r/GUI/MainFrame.hpp" // to update title when add text
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/Plater.hpp"
@@ -2135,11 +2136,26 @@ void GLGizmoEmboss::draw_style_edit() {
         process();
     }
 
+    bool use_inch = wxGetApp().app_config->get("use_inches") == "1";
+    const std::string revert_text_size = _u8L("Revert text size.");
     FontProp &font_prop = style.prop;
     const float * def_size = exist_stored_style? 
         &m_style_manager.get_stored_style()->prop.size_in_mm : nullptr;
-    if (rev_input(tr.size, font_prop.size_in_mm, def_size,
-                  _u8L("Revert text size."), 0.1f, 1.f, "%.1f mm")) {
+    bool is_size_changed = false;
+    if (use_inch) {
+        float size_in_inch = ObjectManipulation::mm_to_in * font_prop.size_in_mm;
+        float def_size_inch = exist_stored_style ? ObjectManipulation::mm_to_in * (*def_size) : 0.f;
+        if (def_size != nullptr) def_size = &def_size_inch;
+        if (rev_input(tr.size, size_in_inch, def_size, revert_text_size, 0.1f, 1.f, "%.2f in")) { 
+            font_prop.size_in_mm = ObjectManipulation::in_to_mm * size_in_inch;
+            is_size_changed = true;
+        }
+    } else {
+        if (rev_input(tr.size, font_prop.size_in_mm, def_size, revert_text_size, 0.1f, 1.f, "%.1f mm"))
+            is_size_changed = true;
+    }
+
+    if (is_size_changed) {
         // size can't be zero or negative
         Limits::apply(font_prop.size_in_mm, limits.size_in_mm);
 
@@ -2186,10 +2202,24 @@ void GLGizmoEmboss::draw_style_edit() {
     }
 #endif // SHOW_WX_WEIGHT_INPUT
 
+    const std::string revert_emboss_depth = _u8L("Revert embossed depth.");
     const float *def_depth = exist_stored_style ?
         &m_style_manager.get_stored_style()->prop.emboss : nullptr;
-    if (rev_input(tr.depth, font_prop.emboss, def_depth,
-        _u8L("Revert embossed depth."), 0.1f, 0.25, "%.2f mm")) {
+    bool is_depth_changed = false;
+    if (use_inch) {
+        float depthj_in_inch = ObjectManipulation::mm_to_in * font_prop.emboss;
+        float def_depth_inch = exist_stored_style ? ObjectManipulation::mm_to_in * (*def_depth) : 0.f;
+        if (def_depth != nullptr) def_depth = &def_depth_inch;
+        if (rev_input(tr.depth, depthj_in_inch, def_depth, revert_emboss_depth, 0.1f, 0.25, "%.3f in")) { 
+            font_prop.emboss = ObjectManipulation::in_to_mm * depthj_in_inch;
+            is_depth_changed = true;
+        }
+    } else {
+        if (rev_input(tr.depth, font_prop.emboss, def_depth, revert_emboss_depth, 0.1f, 0.25, "%.2f mm"))
+            is_depth_changed = true;
+    }
+
+    if (is_depth_changed) {
         Limits::apply(font_prop.emboss, limits.emboss);
         process();
     }    
@@ -2428,9 +2458,35 @@ void GLGizmoEmboss::draw_advanced()
     auto def_distance = stored_style ?
         &stored_style->prop.distance : nullptr;    
     m_imgui->disabled_begin(!allowe_surface_distance);
-    if (rev_slider(tr.surface_distance, distance, def_distance, _u8L("Undo translation"), 
-        min_distance, max_distance, "%.2f mm", _L("Distance center of text from model surface")) &&
-        m_volume != nullptr && m_volume->text_configuration.has_value()){
+    
+    bool use_inch = wxGetApp().app_config->get("use_inches") == "1";
+    const std::string undo_move_tooltip = _u8L("Undo translation");
+    const wxString move_tooltip = _L("Distance center of text from model surface");
+    bool is_moved = false;
+    if (use_inch) {
+        std::optional<float> distance_inch;
+        if (distance.has_value()) distance_inch = (*distance * ObjectManipulation::mm_to_in);
+        std::optional<float> def_distance_inch;
+        if (def_distance != nullptr) {
+            if (def_distance->has_value()) def_distance_inch = ObjectManipulation::mm_to_in * (*(*def_distance));
+            def_distance = &def_distance_inch;
+        }
+        min_distance *= ObjectManipulation::mm_to_in;
+        max_distance *= ObjectManipulation::mm_to_in;
+        if (rev_slider(tr.surface_distance, distance_inch, def_distance, undo_move_tooltip, min_distance, max_distance, "%.3f in", move_tooltip)) {
+            if (distance_inch.has_value()) {
+                font_prop.distance = *distance_inch * ObjectManipulation::in_to_mm;
+            } else {
+                font_prop.distance.reset();
+            }
+            is_moved = true;
+        }
+    } else {
+        if (rev_slider(tr.surface_distance, distance, def_distance, undo_move_tooltip, 
+        min_distance, max_distance, "%.2f mm", move_tooltip)) is_moved = true;
+    }
+
+    if (is_moved && m_volume != nullptr && m_volume->text_configuration.has_value()){
         m_volume->text_configuration->style.prop.distance = font_prop.distance;        
         float act_distance = font_prop.distance.has_value() ? *font_prop.distance : .0f;
         do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
