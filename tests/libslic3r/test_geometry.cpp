@@ -764,3 +764,27 @@ TEST_CASE("Convex polygon intersection test prusa polygons", "[Geometry][Rotcali
         REQUIRE(res == ref);
     }
 }
+
+
+TEST_CASE("Euler angles roundtrip", "[Geometry]") {
+    std::vector<Vec3d> euler_angles_vec = {{M_PI/2.,  -M_PI,    0.},
+                                           {M_PI,     -M_PI,    0.},
+                                           {M_PI,     -M_PI,    2*M_PI},
+                                           {0.,       0.,       M_PI},
+                                           {M_PI,     M_PI/2.,  0.},
+                                           {0.2,      0.3,      -0.5}};
+
+    // Also include all combinations of zero and +-pi/2:
+    for (double x : {0., M_PI/2., -M_PI/2.})
+       for (double y : {0., M_PI/2., -M_PI/2.})
+          for (double z : {0., M_PI/2., -M_PI/2.})
+              euler_angles_vec.emplace_back(x, y, z);
+
+    for (Vec3d& euler_angles : euler_angles_vec) {
+        Transform3d trafo1 = Geometry::rotation_transform(euler_angles);
+        euler_angles = Geometry::extract_rotation(trafo1);
+        Transform3d trafo2 = Geometry::rotation_transform(euler_angles);
+
+        REQUIRE(trafo1.isApprox(trafo2));
+    }
+}

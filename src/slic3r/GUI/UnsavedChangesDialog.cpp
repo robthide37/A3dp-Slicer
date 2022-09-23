@@ -2010,18 +2010,21 @@ void DiffPresetDialog::update_compatibility(const std::string& preset_name, Pres
     }
 }
 
-bool DiffPresetDialog::save()
+bool DiffPresetDialog::is_save_confirmed()
 {
     presets_to_save.clear();
 
     std::vector<Preset::Type> types_for_save;
 
-    for (const Preset::Type& type : m_pr_technology == ptFFF ?  std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
-                                                                std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL })
+    const auto list = m_pr_technology == ptFFF ? std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
+        std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
+
+    for (const Preset::Type& type : list) {
         if (!m_tree->options(type, true).empty()) {
             types_for_save.emplace_back(type);
             presets_to_save.emplace_back(PresetToSave{ type, get_left_preset_name(type), get_right_preset_name(type), get_right_preset_name(type) });
         }
+    }
 
     if (!types_for_save.empty()) {
         SavePresetDialog save_dlg(this, types_for_save, _u8L("Modified"), m_preset_bundle_right.get());
@@ -2056,7 +2059,7 @@ std::vector<std::string> DiffPresetDialog::get_options_to_save(Preset::Type type
 void DiffPresetDialog::button_event(Action act)
 {
     if (act == Action::Save) {
-        if (save()) {
+        if (is_save_confirmed()) {
             size_t saved_cnt = 0;
             for (const auto& preset : presets_to_save)
                 if (wxGetApp().preset_bundle->transfer_and_save(preset.type, preset.from_name, preset.to_name, preset.new_name, get_options_to_save(preset.type)))

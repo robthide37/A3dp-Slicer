@@ -919,7 +919,7 @@ void Tab::update_visibility()
         page->update_visibility(m_mode, page.get() == m_active_page);
     rebuild_page_tree();
 
-    if (m_type == Preset::TYPE_SLA_PRINT || m_type == Preset::TYPE_PRINT)
+    if (m_type != Preset::TYPE_PRINTER)
         update_description_lines();
 
     Layout();

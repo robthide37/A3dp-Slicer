@@ -497,11 +497,11 @@ void _arrange(
     mod_params.min_obj_distance = 0;
 
     AutoArranger<BinT> arranger{corrected_bin, mod_params, progressfn, stopfn};
-    
+
     auto infl = coord_t(std::ceil(params.min_obj_distance / 2.0));
     for (Item& itm : shapes) itm.inflate(infl);
     for (Item& itm : excludes) itm.inflate(infl);
-    
+
     remove_large_items(excludes, corrected_bin);
 
     // If there is something on the plate
@@ -511,7 +511,7 @@ void _arrange(
     inp.reserve(shapes.size() + excludes.size());
     for (auto &itm : shapes  ) inp.emplace_back(itm);
     for (auto &itm : excludes) inp.emplace_back(itm);
-    
+
     // Use the minimum bounding box rotation as a starting point.
     // TODO: This only works for convex hull. If we ever switch to concave
     // polygon nesting, a convex hull needs to be calculated.
@@ -528,7 +528,13 @@ void _arrange(
         }
     }
 
-    arranger(inp.begin(), inp.end());
+    if (sl::area(corrected_bin) > 0)
+        arranger(inp.begin(), inp.end());
+    else {
+        for (Item &itm : inp)
+            itm.binId(BIN_ID_UNSET);
+    }
+
     for (Item &itm : inp) itm.inflate(-infl);
 }
 

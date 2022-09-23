@@ -117,6 +117,7 @@ void FillBedJob::process(Ctl &ctl)
     arrangement::ArrangeParams params;
     params.allow_rotations  = settings.enable_rotation;
     params.min_obj_distance = scaled(settings.distance);
+    params.min_bed_distance = scaled(settings.distance_from_bed);
 
     bool do_stop = false;
     params.stopcondition = [&ctl, &do_stop]() {
