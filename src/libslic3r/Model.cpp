@@ -1359,7 +1359,7 @@ void ModelObject::split(ModelObjectPtrs* new_objects)
         size_t counter = 1;
         for (TriangleMesh &mesh : meshes) {
             // FIXME: crashes if not satisfied
-            if (mesh.facets_count() < 3)
+            if (mesh.facets_count() < 3 || mesh.has_zero_volume())
                 continue;
 
             // XXX: this seems to be the only real usage of m_model, maybe refactor this so that it's not needed?
@@ -1833,7 +1833,7 @@ size_t ModelVolume::split(unsigned int max_extruders)
     const Vec3d offset = this->get_offset();
 
     for (TriangleMesh &mesh : meshes) {
-        if (mesh.empty())
+        if (mesh.empty() || mesh.has_zero_volume())
             // Repair may have removed unconnected triangles, thus emptying the mesh.
             continue;
 
