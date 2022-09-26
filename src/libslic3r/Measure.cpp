@@ -518,7 +518,7 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
         const auto& [idx2, normal2, pt2] = f2.get_plane();
         double angle = 0.;
 
-        if (! normal1.isApprox(normal2)) {
+        if (normal1.isApprox(normal2)) {
             // The planes are parallel, calculate distance.
             Eigen::Hyperplane<double, 3> plane(normal1, pt1);
             result.distance_infinite = plane.absDistance(pt2);
