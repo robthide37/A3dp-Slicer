@@ -87,7 +87,6 @@ private:
 
 public:
 
-<<<<<<< master
     const wxString& get_info_line_extention() { return m_info_line_extention; }
 
     SavePresetDialog(wxWindow* parent, Preset::Type type, std::string suffix = "", bool template_filament = false);

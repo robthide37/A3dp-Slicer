@@ -912,7 +912,7 @@ void PlaterPresetComboBox::update()
     const AppConfig* app_config = wxGetApp().app_config;
     if (!template_presets.empty() && app_config->get("no_templates") == "0") {
         set_label_marker(Append(separator(L("Template presets")), wxNullBitmap));
-        for (std::map<wxString, wxBitmap*>::iterator it = template_presets.begin(); it != template_presets.end(); ++it) {
+        for (std::map<wxString, wxBitmapBundle*>::iterator it = template_presets.begin(); it != template_presets.end(); ++it) {
             Append(it->first, *it->second);
             validate_selection(it->first == selected_user_preset);
         }
@@ -1100,7 +1100,7 @@ void TabPresetComboBox::update()
 
          if (preset.is_default || preset.is_system) {
             if (preset.vendor && preset.vendor->templates_profile) {
-                template_presets.emplace(get_preset_name(preset), std::pair<wxBitmap*, bool>(bmp, is_enabled));
+                template_presets.emplace(get_preset_name(preset), std::pair<wxBitmapBundle*, bool>(bmp, is_enabled));
                 if (i == idx_selected)
                     selected = get_preset_name(preset);
             } else {
@@ -1125,7 +1125,7 @@ void TabPresetComboBox::update()
     const AppConfig* app_config = wxGetApp().app_config;
     if (!template_presets.empty() && app_config->get("no_templates") == "0") {
         set_label_marker(Append(separator(L("Template presets")), wxNullBitmap));
-        for (std::map<wxString, std::pair<wxBitmap*, bool>>::iterator it = template_presets.begin(); it != template_presets.end(); ++it) {
+        for (std::map<wxString, std::pair<wxBitmapBundle*, bool>>::iterator it = template_presets.begin(); it != template_presets.end(); ++it) {
             int item_id = Append(it->first, *it->second.first);
             bool is_enabled = it->second.second;
             if (!is_enabled)
