@@ -681,7 +681,8 @@ void GLGizmoEmboss::initialize()
         ImGui::CalcTextSize(tr.font.c_str()).x,
         ImGui::CalcTextSize(tr.size.c_str()).x,
         ImGui::CalcTextSize(tr.depth.c_str()).x});
-    cfg.input_offset = max_text_width + 3 * space + ImGui::GetTreeNodeToLabelSpacing();
+    cfg.input_offset = max_text_width 
+        + 3 * space + ImGui::GetTreeNodeToLabelSpacing();
 
     tr.use_surface = _u8L("Use surface");
     tr.char_gap = _u8L("Char gap");
@@ -700,8 +701,8 @@ void GLGizmoEmboss::initialize()
         ImGui::CalcTextSize(tr.surface_distance.c_str()).x,
         ImGui::CalcTextSize(tr.angle.c_str()).x,
         ImGui::CalcTextSize(tr.collection.c_str()).x });
-    cfg.advanced_input_offset = 
-        3 * space + 2* ImGui::GetTreeNodeToLabelSpacing() + max_advanced_text_width;
+    cfg.advanced_input_offset = max_advanced_text_width
+        + 3 * space + ImGui::GetTreeNodeToLabelSpacing();
 
     // calculate window size
     const ImGuiStyle &style = ImGui::GetStyle();
@@ -715,7 +716,8 @@ void GLGizmoEmboss::initialize()
                            // height + depth + close button
         tree_header +      // advance tree
         2 * style.WindowPadding.y;
-    float window_width = cfg.input_offset + cfg.input_width + style.WindowPadding.x * 2;
+    float window_width = cfg.style_offset + cfg.input_width + 2*style.WindowPadding.x 
+        + 4 * (cfg.icon_width + space);
     cfg.minimal_window_size = ImVec2(window_width, window_height);
 
     // 6 = charGap, LineGap, Bold, italic, surfDist, angle
@@ -981,6 +983,12 @@ void GLGizmoEmboss::close()
         mng.open_gizmo(GLGizmosManager::Emboss);
 }
 
+void GLGizmoEmboss::discard_and_close() { 
+    close(); 
+    auto plater = wxGetApp().plater();
+    plater->undo_to(2); // undo before open emboss gizmo
+}
+
 void GLGizmoEmboss::draw_window()
 {
 #ifdef ALLOW_DEBUG_MODE
@@ -1019,8 +1027,16 @@ void GLGizmoEmboss::draw_window()
     if (is_selected_style)
         m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_style_manager.get_style().path);
 #endif // SHOW_WX_FONT_DESCRIPTOR
-        
-    if (ImGui::Button(_u8L("Close").c_str())) close();
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImGuiWrapper::COL_GREY_DARK);
+    if (ImGui::Button(_u8L("Close").c_str()))
+        discard_and_close();
+    else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Discard changes on embossed text and close.").c_str());
+    ImGui::PopStyleColor();
+
+    ImGui::SameLine();
+    if (ImGui::Button(_u8L("Apply").c_str())) close();
 
     // Option to create text volume when reselecting volumes
     m_imgui->disabled_begin(!is_activ_font);
