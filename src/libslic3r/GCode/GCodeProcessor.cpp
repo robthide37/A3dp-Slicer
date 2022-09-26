@@ -1769,7 +1769,7 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool
                 switch (cmd[1]) {
                 case '1':
                     switch (cmd[2]) {
-                    case '0': { process_G10(line); break; } // Retract
+                    case '0': { process_G10(line); break; } // Retract or Set tool temperature
                     case '1': { process_G11(line); break; } // Unretract
                     default: break;
                     }
@@ -3232,6 +3232,23 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
 
 void GCodeProcessor::process_G10(const GCodeReader::GCodeLine& line)
 {
+    if (m_flavor == gcfRepRapFirmware) {
+        // similar to M104/M109
+        float new_temp;
+        if (line.has_value('S', new_temp)) {
+            size_t id = m_extruder_id;
+            float val;
+            if (line.has_value('P', val)) {
+                const size_t eid = static_cast<size_t>(val);
+                if (eid < m_extruder_temps.size())
+                    id = eid;
+            }
+
+            m_extruder_temps[id] = new_temp;
+            return;
+        }
+    }
+
     // stores retract move
     store_move_vertex(EMoveType::Retract);
 }
@@ -3441,18 +3458,22 @@ void GCodeProcessor::process_M108(const GCodeReader::GCodeLine& line)
 void GCodeProcessor::process_M109(const GCodeReader::GCodeLine& line)
 {
     float new_temp;
+    size_t id = (size_t)-1;
     if (line.has_value('R', new_temp)) {
         float val;
         if (line.has_value('T', val)) {
             const size_t eid = static_cast<size_t>(val);
             if (eid < m_extruder_temps.size())
-                m_extruder_temps[eid] = new_temp;
+                id = eid;
         }
         else
-            m_extruder_temps[m_extruder_id] = new_temp;
+            id = m_extruder_id;
     }
     else if (line.has_value('S', new_temp))
-        m_extruder_temps[m_extruder_id] = new_temp;
+        id = m_extruder_id;
+
+    if (id != (size_t)-1)
+        m_extruder_temps[id] = new_temp;
 }
 
 void GCodeProcessor::process_M132(const GCodeReader::GCodeLine& line)

@@ -674,7 +674,7 @@ namespace Slic3r {
         void process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise);
 #endif // ENABLE_PROCESS_G2_G3_LINES
 
-        // Retract
+        // Retract or Set tool temperature
         void process_G10(const GCodeReader::GCodeLine& line);
 
         // Unretract
