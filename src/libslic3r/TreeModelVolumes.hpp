@@ -22,10 +22,13 @@
 namespace Slic3r
 {
 
-using LayerIndex = int;
-
 class BuildVolume;
 class PrintObject;
+
+namespace FFFTreeSupport
+{
+
+using LayerIndex = int;
 
 struct TreeSupportMeshGroupSettings {
     TreeSupportMeshGroupSettings() = default;
@@ -194,15 +197,19 @@ class TreeModelVolumes
 public:
     TreeModelVolumes() = default;
     explicit TreeModelVolumes(const PrintObject &print_object, const BuildVolume &build_volume,
-        coord_t max_move, coord_t max_move_slow, size_t current_mesh_idx, double progress_multiplier, 
-        double progress_offset, const std::vector<Polygons> &additional_excluded_areas = {});
+        coord_t max_move, coord_t max_move_slow, size_t current_mesh_idx, 
+#ifdef SLIC3R_TREESUPPORTS_PROGRESS
+        double progress_multiplier, 
+        double progress_offset, 
+#endif // SLIC3R_TREESUPPORTS_PROGRESS
+        const std::vector<Polygons> &additional_excluded_areas = {});
     TreeModelVolumes(TreeModelVolumes&&) = default;
     TreeModelVolumes& operator=(TreeModelVolumes&&) = default;
 
     TreeModelVolumes(const TreeModelVolumes&) = delete;
     TreeModelVolumes& operator=(const TreeModelVolumes&) = delete;
 
-    enum class AvoidanceType
+    enum class AvoidanceType : int8_t
     {
         Slow,
         FastSafe,
@@ -605,6 +612,7 @@ private:
 #endif // SLIC3R_TREESUPPORTS_PROGRESS
 };
 
-}
+} // namespace FFFTreeSupport
+} // namespace Slic3r
 
 #endif //slic3r_TreeModelVolumes_hpp

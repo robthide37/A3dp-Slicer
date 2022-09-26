@@ -23,7 +23,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/task_group.h>
 
-namespace Slic3r
+namespace Slic3r::FFFTreeSupport
 {
 
 // or warning
@@ -106,7 +106,10 @@ TreeModelVolumes::TreeModelVolumes(
     const PrintObject &print_object,
     const BuildVolume &build_volume,
     const coord_t max_move, const coord_t max_move_slow, size_t current_mesh_idx, 
-    double progress_multiplier, double progress_offset, const std::vector<Polygons>& additional_excluded_areas) :
+#ifdef SLIC3R_TREESUPPORTS_PROGRESS
+    double progress_multiplier, double progress_offset, 
+#endif // SLIC3R_TREESUPPORTS_PROGRESS
+    const std::vector<Polygons>& additional_excluded_areas) :
     // -2 to avoid rounding errors
     m_max_move{ std::max<coord_t>(max_move - 2, 0) }, m_max_move_slow{ std::max<coord_t>(max_move_slow - 2, 0) },
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
@@ -161,7 +164,7 @@ TreeModelVolumes::TreeModelVolumes(
         m_min_resolution = std::min(m_min_resolution, data_pair.first.resolution);
     }
 
-    const TreeSupport::TreeSupportSettings config{ m_layer_outlines[m_current_outline_idx].first };
+    const TreeSupportSettings config{ m_layer_outlines[m_current_outline_idx].first };
     m_current_min_xy_dist = config.xy_min_distance;
     m_current_min_xy_dist_delta = config.xy_distance - m_current_min_xy_dist;
     assert(m_current_min_xy_dist_delta >= 0);
@@ -206,7 +209,7 @@ void TreeModelVolumes::precalculate(const coord_t max_layer)
     // Get the config corresponding to one mesh that is in the current group. Which one has to be irrelevant.
     // Not the prettiest way to do this, but it ensures some calculations that may be a bit more complex
     // like inital layer diameter are only done in once.
-    TreeSupport::TreeSupportSettings config(m_layer_outlines[m_current_outline_idx].first);
+    TreeSupportSettings config(m_layer_outlines[m_current_outline_idx].first);
 
     {
         // calculate which radius each layer in the tip may have.
@@ -297,7 +300,7 @@ const Polygons& TreeModelVolumes::getCollision(const coord_t orig_radius, LayerI
         return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate collision at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-        TreeSupport::showError("Not precalculated Collision requested.", false);
+        tree_supports_show_error("Not precalculated Collision requested.", false);
     }
     const_cast<TreeModelVolumes*>(this)->calculateCollision(radius, layer_idx);
     return getCollision(orig_radius, layer_idx, min_xy_dist);
@@ -312,7 +315,7 @@ const Polygons& TreeModelVolumes::getCollisionHolefree(coord_t radius, LayerInde
         return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate collision holefree at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-        TreeSupport::showError("Not precalculated Holefree Collision requested.", false);
+        tree_supports_show_error("Not precalculated Holefree Collision requested.", false);
     }
     const_cast<TreeModelVolumes*>(this)->calculateCollisionHolefree({ radius, layer_idx });
     return getCollisionHolefree(radius, layer_idx);
@@ -336,10 +339,10 @@ const Polygons& TreeModelVolumes::getAvoidance(const coord_t orig_radius, LayerI
     if (m_precalculated) {
         if (to_model) {
             BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Avoidance to model at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-            TreeSupport::showError("Not precalculated Avoidance(to model) requested.", false);
+            tree_supports_show_error("Not precalculated Avoidance(to model) requested.", false);
         } else {
             BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Avoidance at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-            TreeSupport::showError("Not precalculated Avoidance(to buildplate) requested.", false);
+            tree_supports_show_error("Not precalculated Avoidance(to buildplate) requested.", false);
         }
     }
     const_cast<TreeModelVolumes*>(this)->calculateAvoidance({ radius, layer_idx }, ! to_model, to_model);
@@ -357,7 +360,7 @@ const Polygons& TreeModelVolumes::getPlaceableAreas(const coord_t orig_radius, L
         return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Placeable Areas at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-        TreeSupport::showError("Not precalculated Placeable areas requested.", false);
+        tree_supports_show_error("Not precalculated Placeable areas requested.", false);
     }
     const_cast<TreeModelVolumes*>(this)->calculatePlaceables(radius, layer_idx);
     return getPlaceableAreas(orig_radius, layer_idx);
@@ -380,7 +383,7 @@ const Polygons& TreeModelVolumes::getWallRestriction(const coord_t orig_radius, 
         return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Wall restricions at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-        TreeSupport::showError(
+        tree_supports_show_error(
             min_xy_dist ? 
                 "Not precalculated Wall restriction of minimum xy distance requested )." :
                 "Not precalculated Wall restriction requested )."
@@ -774,4 +777,4 @@ coord_t TreeModelVolumes::ceilRadius(const coord_t radius) const
     return out;
 }
 
-}
+} // namespace Slic3r::FFFTreeSupport
