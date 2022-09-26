@@ -5967,7 +5967,7 @@ void Plater::cut(size_t obj_idx, size_t instance_idx, coordf_t z, ModelObjectCut
         selection.add_object((unsigned int)(last_id - i), i == 0);
 }
 
-void Slic3r::GUI::Plater::cut(size_t obj_idx, size_t instance_idx, const Vec3d& cut_center, const Vec3d& cut_rotation, ModelObjectCutAttributes attributes)
+void Slic3r::GUI::Plater::cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_matrix, ModelObjectCutAttributes attributes)
 {
     wxCHECK_RET(obj_idx < p->model.objects.size(), "obj_idx out of bounds");
     auto* object = p->model.objects[obj_idx];
@@ -5977,7 +5977,7 @@ void Slic3r::GUI::Plater::cut(size_t obj_idx, size_t instance_idx, const Vec3d& 
     this->suppress_snapshots();
     wxBusyCursor wait;
     
-    const auto new_objects = object->cut(instance_idx, cut_center, cut_rotation, attributes);
+    const auto new_objects = object->cut(instance_idx, cut_matrix, attributes);
 
     model().delete_object(obj_idx);
     sidebar().obj_list()->delete_object_from_list(obj_idx);

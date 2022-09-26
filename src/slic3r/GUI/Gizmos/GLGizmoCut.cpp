@@ -800,10 +800,9 @@ void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
 {
     ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, m_connectors_editing,//m_selected,
  //       m_connector_depth_ratio, m_connector_size, m_connector_mode, m_connector_type, m_connector_style, m_connector_shape_id,
-        m_ar_plane_center, m_ar_rotations);
+        m_ar_plane_center, m_rotation_m);
 
     set_center_pos(m_ar_plane_center, true);
-    m_rotation_m = rotation_transform(m_ar_rotations);
 
     force_update_clipper_on_render = true;
 
@@ -814,7 +813,7 @@ void GLGizmoCut3D::on_save(cereal::BinaryOutputArchive& ar) const
 { 
     ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, m_connectors_editing,//m_selected,
  //       m_connector_depth_ratio, m_connector_size, m_connector_mode, m_connector_type, m_connector_style, m_connector_shape_id,
-        m_ar_plane_center, m_ar_rotations);
+        m_ar_plane_center, m_start_dragging_m);
 }
 
 std::string GLGizmoCut3D::on_get_name() const
@@ -829,7 +828,7 @@ void GLGizmoCut3D::on_set_state()
 
         // initiate archived values
         m_ar_plane_center   = m_plane_center;
-        m_ar_rotations      = Transformation(m_rotation_m).get_rotation();
+        m_start_dragging_m  = m_rotation_m;
 
         m_parent.request_extra_frame();
     }
@@ -1119,8 +1118,6 @@ void GLGizmoCut3D::on_stop_dragging()
         m_angle_arc.reset();
         m_angle = 0.0;
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Rotate cut plane"), UndoRedo::SnapshotType::GizmoAction);
-        m_ar_rotations = Transformation(m_rotation_m).get_rotation();
-
         m_start_dragging_m = m_rotation_m;
     }
     else if (m_hover_id == Z) {
@@ -1436,7 +1433,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
 void GLGizmoCut3D::render_build_size()
 {
     double              koef     = m_imperial_units ? ObjectManipulation::mm_to_in : 1.0;
-    std::string         unit_str = m_imperial_units ? _u8L("inch") : _u8L("mm");
+    wxString            unit_str = " " + (m_imperial_units ? _L("in") : _L("mm"));
     const BoundingBoxf3 tbb      = transformed_bounding_box();
             
     Vec3d    tbb_sz = tbb.size();
@@ -1710,6 +1707,31 @@ bool GLGizmoCut3D::can_perform_cut() const
     return tbb.contains(m_plane_center);
 }
 
+void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, const bool has_connectors, bool &create_dowels_as_separate_object)
+{
+    if (has_connectors && m_connector_mode == CutConnectorMode::Manual) {
+        m_selected.clear();
+
+        for (CutConnector&connector : mo->cut_connectors) {
+            connector.rotation_m = m_rotation_m;
+
+            if (connector.attribs.type == CutConnectorType::Dowel) {
+                if (connector.attribs.style == CutConnectorStyle::Prizm)
+                    connector.height *= 2;
+                create_dowels_as_separate_object = true;
+            }
+            else {
+                // culculate shift of the connector center regarding to the position on the cut plane
+                Vec3d shifted_center = m_plane_center + Vec3d::UnitZ();
+                rotate_vec3d_around_plane_center(shifted_center);
+                Vec3d norm = (shifted_center - m_plane_center).normalized();
+                connector.pos += norm * 0.5 * double(connector.height);
+            }
+        }
+        mo->apply_cut_connectors(_u8L("Connector"));
+    }
+}
+
 void GLGizmoCut3D::perform_cut(const Selection& selection)
 {
     const int instance_idx = selection.get_instance_idx();
@@ -1717,53 +1739,29 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
     wxCHECK_RET(instance_idx >= 0 && object_idx >= 0, "GLGizmoCut: Invalid object selection");
 
-    // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
-    const GLVolume* first_glvolume = selection.get_first_volume();
-    const double object_cut_z = m_plane_center.z() - first_glvolume->get_sla_shift_z();
-
-    const Vec3d& instance_offset = wxGetApp().plater()->model().objects[object_idx]->instances[instance_idx]->get_offset();
-
-    Vec3d cut_center_offset = m_plane_center - instance_offset;
-    cut_center_offset[Z] -= first_glvolume->get_sla_shift_z();
-
     Plater* plater = wxGetApp().plater();
+    ModelObject* mo = plater->model().objects[object_idx];
+    if (!mo)
+        return;
 
-    bool create_dowels_as_separate_object = false;
+    // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
+    const double sla_shift_z    = selection.get_first_volume()->get_sla_shift_z();
+    const double object_cut_z   = m_plane_center.z() - sla_shift_z;
+
+    const Vec3d instance_offset = mo->instances[instance_idx]->get_offset();
+    Vec3d cut_center_offset     = m_plane_center - instance_offset;
+    cut_center_offset[Z] -= sla_shift_z;
+
     if (0.0 < object_cut_z && can_perform_cut()) {
-        ModelObject* mo = plater->model().objects[object_idx];
-        if(!mo)
-            return;
-
-        Vec3d rotation = Transformation(m_rotation_m).get_rotation();
-
+        bool create_dowels_as_separate_object = false;
         const bool has_connectors = !mo->cut_connectors.empty();
         {
-            Plater::TakeSnapshot snapshot(plater, _L("Cut by Plane"));
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by Plane"));
             // update connectors pos as offset of its center before cut performing
-            if (has_connectors && m_connector_mode == CutConnectorMode::Manual) {
-                m_selected.clear();
-
-                for (CutConnector& connector : mo->cut_connectors) {
-                    connector.rotation = rotation;
-
-                    if (connector.attribs.type == CutConnectorType::Dowel) {
-                        if (connector.attribs.style == CutConnectorStyle::Prizm)
-                            connector.height *= 2;
-                        create_dowels_as_separate_object = true;
-                    }
-                    else {
-                        // culculate shift of the connector center regarding to the position on the cut plane
-                        Vec3d shifted_center = m_plane_center + Vec3d::UnitZ();
-                        rotate_vec3d_around_plane_center(shifted_center);
-                        Vec3d norm = (shifted_center - m_plane_center).normalized();
-                        connector.pos += norm * 0.5 * double(connector.height);
-                    }
-                }
-                mo->apply_cut_connectors(_u8L("Connector"));
-            }
+            apply_connectors_in_model(mo, has_connectors, create_dowels_as_separate_object);
         }
 
-        plater->cut(object_idx, instance_idx, cut_center_offset, rotation,
+        plater->cut(object_idx, instance_idx, assemble_transform(cut_center_offset) * m_rotation_m,
                     only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
                     only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
                     only_if(m_place_on_cut_upper, ModelObjectCutAttribute::PlaceOnCutUpper) | 
@@ -1925,7 +1923,7 @@ bool GLGizmoCut3D::add_connector(CutConnectors& connectors, const Vec2d& mouse_p
 
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
 
-            connectors.emplace_back(hit, Transformation(m_rotation_m).get_rotation(),
+            connectors.emplace_back(hit, m_rotation_m,
                                     float(m_connector_size) * 0.5f, float(m_connector_depth_ratio),
                                     float(m_connector_size_tolerance) * 0.01f, float(m_connector_depth_ratio_tolerance) * 0.01f,
                                     CutConnectorAttributes( CutConnectorType(m_connector_type),

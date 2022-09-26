@@ -256,7 +256,7 @@ public:
     void toggle_layers_editing(bool enable);
 
     void cut(size_t obj_idx, size_t instance_idx, coordf_t z, ModelObjectCutAttributes attributes);
-    void cut(size_t obj_idx, size_t instance_idx, const Vec3d& cut_center, const Vec3d& cut_rotation, ModelObjectCutAttributes attributes);
+    void cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_matrix, ModelObjectCutAttributes attributes);
 
     void export_gcode(bool prefer_removable);
     void export_stl_obj(bool extended = false, bool selection_only = false);

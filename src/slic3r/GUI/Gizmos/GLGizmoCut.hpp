@@ -25,7 +25,6 @@ class GLGizmoCut3D : public GLGizmoBase
 
     // archived values 
     Vec3d m_ar_plane_center { Vec3d::Zero() };
-    Vec3d m_ar_rotations    { Vec3d::Zero() };
 
     Vec3d m_plane_center{ Vec3d::Zero() };
     // data to check position of the cut palne center on gizmo activation
@@ -216,6 +215,7 @@ private:
     void render_connectors();
 
     bool can_perform_cut() const;
+    void apply_connectors_in_model(ModelObject* mo, const bool has_connectors, bool &create_dowels_as_separate_object);
     bool cut_line_processing() const;
     void discard_cut_line_processing();
 
