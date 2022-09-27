@@ -100,6 +100,10 @@ public:
     size_t beds_count() const    { return m_bed.size(); }
     size_t volumes_count() const { return m_volumes.size(); }
     size_t gizmos_count() const  { return m_gizmos.size(); }
+
+    size_t active_beds_count() const;
+    size_t active_volumes_count() const;
+    size_t active_gizmos_count() const;
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 
 private:

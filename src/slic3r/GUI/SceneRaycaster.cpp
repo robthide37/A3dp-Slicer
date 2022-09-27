@@ -173,6 +173,31 @@ void SceneRaycaster::render_hit(const Camera& camera)
 
     shader->stop_using();
 }
+
+size_t SceneRaycaster::active_beds_count() const {
+    size_t count = 0;
+    for (const auto& b : m_bed) {
+        if (b->is_active())
+            ++count;
+    }
+    return count;
+}
+size_t SceneRaycaster::active_volumes_count() const {
+    size_t count = 0;
+    for (const auto& v : m_volumes) {
+        if (v->is_active())
+            ++count;
+    }
+    return count;
+}
+size_t SceneRaycaster::active_gizmos_count() const {
+    size_t count = 0;
+    for (const auto& g : m_gizmos) {
+        if (g->is_active())
+            ++count;
+    }
+    return count;
+}
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 
 std::vector<std::shared_ptr<SceneRaycasterItem>>* SceneRaycaster::get_raycasters(EType type)

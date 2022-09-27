@@ -5517,11 +5517,11 @@ void GLCanvas3D::_picking_pass()
 
     ImGui::Separator();
     imgui.text("Registered for picking:");
-    sprintf(buf, "Beds: %d", (int)m_scene_raycaster.beds_count());
+    sprintf(buf, "Beds: %d (%d)", (int)m_scene_raycaster.beds_count(), (int)m_scene_raycaster.active_beds_count());
     imgui.text(std::string(buf));
-    sprintf(buf, "Volumes: %d", (int)m_scene_raycaster.volumes_count());
+    sprintf(buf, "Volumes: %d (%d)", (int)m_scene_raycaster.volumes_count(), (int)m_scene_raycaster.active_volumes_count());
     imgui.text(std::string(buf));
-    sprintf(buf, "Gizmo elements: %d", (int)m_scene_raycaster.gizmos_count());
+    sprintf(buf, "Gizmo elements: %d (%d)", (int)m_scene_raycaster.gizmos_count(), (int)m_scene_raycaster.active_gizmos_count());
     imgui.text(std::string(buf));
     imgui.end();
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
