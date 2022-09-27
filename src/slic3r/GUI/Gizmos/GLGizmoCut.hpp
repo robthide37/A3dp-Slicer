@@ -149,6 +149,7 @@ public:
     void update_clipper();
     void update_clipper_on_render();
     void set_connectors_editing() { m_connectors_editing = true; }
+    void invalidate_cut_plane();
 
     BoundingBoxf3   bounding_box() const;
     BoundingBoxf3   transformed_bounding_box(bool revert_move = false) const;

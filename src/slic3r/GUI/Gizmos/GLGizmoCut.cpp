@@ -18,8 +18,16 @@
 namespace Slic3r {
 namespace GUI {
 
-static const double Margin = 20.0;
 static const ColorRGBA GRABBER_COLOR = ColorRGBA::YELLOW();
+
+// connector colors
+static const ColorRGBA PLAG_COLOR           = ColorRGBA::YELLOW();
+static const ColorRGBA DOWEL_COLOR          = ColorRGBA::DARK_YELLOW();
+static const ColorRGBA HOVERED_PLAG_COLOR   = ColorRGBA::CYAN();
+static const ColorRGBA HOVERED_DOWEL_COLOR  = ColorRGBA(0.0f, 0.5f, 0.5f, 1.0f);
+static const ColorRGBA SELECTED_PLAG_COLOR  = ColorRGBA::GRAY();
+static const ColorRGBA SELECTED_DOWEL_COLOR = ColorRGBA::DARK_GRAY();
+static const ColorRGBA CONNECTOR_DEF_COLOR  = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
 
 const unsigned int AngleResolution = 64;
 const unsigned int ScaleStepsCount = 72;
@@ -1426,8 +1434,6 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
         unselect_all_connectors();
         set_connectors_editing(false);
     }
-
-    m_parent.request_extra_frame();
 }
 
 void GLGizmoCut3D::render_build_size()
@@ -1455,10 +1461,22 @@ void GLGizmoCut3D::reset_cut_plane()
     update_clipper();
 }
 
+void GLGizmoCut3D::invalidate_cut_plane()
+{
+    m_rotation_m    = Transform3d::Identity();
+    m_plane_center  = Vec3d::Zero();
+    m_min_pos       = Vec3d::Zero();
+    m_max_pos       = Vec3d::Zero();
+    m_bb_center     = Vec3d::Zero();
+    m_center_offset = Vec3d::Zero();
+}
+
 void GLGizmoCut3D::set_connectors_editing(bool connectors_editing)
 {
     m_connectors_editing = connectors_editing;
     update_raycasters_for_picking();
+
+    m_parent.request_extra_frame();
 }
 
 void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
@@ -1661,13 +1679,14 @@ void GLGizmoCut3D::render_connectors()
         pos[Z] += sla_shift;
 
         // First decide about the color of the point.
-        if (size_t(m_hover_id- m_connectors_group_id) == i)
-            render_color = ColorRGBA::CYAN();
+        if (!m_connectors_editing)
+            render_color = CONNECTOR_DEF_COLOR;
+        else if (size_t(m_hover_id - m_connectors_group_id) == i)
+            render_color = connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR : HOVERED_PLAG_COLOR;
         else if (m_selected[i])
-            render_color = ColorRGBA::DARK_GRAY();
+            render_color = connector.attribs.type == CutConnectorType::Dowel ? SELECTED_DOWEL_COLOR : SELECTED_PLAG_COLOR;
         else // neither hover nor picking
-            render_color = m_connectors_editing ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f) : ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f);
-
+            render_color = connector.attribs.type == CutConnectorType::Dowel ? DOWEL_COLOR          : PLAG_COLOR;
         // ! #ysFIXME rework get_volume_transformation
         if (0) { // else { // neither hover nor picking
             int mesh_id = -1;
@@ -1773,6 +1792,8 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     else {
         // the object is SLA-elevated and the plane is under it.
     }
+
+    invalidate_cut_plane();
 }
 
 
@@ -2005,7 +2026,8 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
     if (action == SLAGizmoEventType::LeftDown && !shift_down) {
         // If there is no selection and no hovering, add new point
         if (m_hover_id == -1 && !control_down && !alt_down)
-            return add_connector(connectors, mouse_position);
+            if (!add_connector(connectors, mouse_position))
+                unselect_all_connectors();
         return true;
     }
     if (!m_connectors_editing)

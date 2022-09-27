@@ -38,7 +38,7 @@ static constexpr char LayerRootIcon[]   = "edit_layers_all";
 static constexpr char LayerIcon[]       = "edit_layers_some";
 static constexpr char WarningIcon[]     = "exclamation";
 static constexpr char WarningManifoldIcon[] = "exclamation_manifold";
-static constexpr char LockIcon[]        = "lock_closed";
+static constexpr char LockIcon[]        = "cut_";
 
 struct InfoItemAtributes {
     std::string name;
@@ -49,7 +49,7 @@ const std::map<InfoItemType, InfoItemAtributes> INFO_ITEMS{
 //           info_item Type                         info_item Name              info_item BitmapName
             { InfoItemType::CustomSupports,      {L("Paint-on supports"),       "fdm_supports_" },     },
             { InfoItemType::CustomSeam,          {L("Paint-on seam"),           "seam_" },             },
-            { InfoItemType::Cut,                 {L("Cut connectors"),          "cut_" },              },
+            { InfoItemType::CutConnectors,       {L("Cut connectors"),          "cut_connectors" },    },
             { InfoItemType::MmuSegmentation,     {L("Multimaterial painting"),  "mmu_segmentation_"},  },
             { InfoItemType::Sinking,             {L("Sinking"),                 "sinking"},            },
             { InfoItemType::VariableLayerHeight, {L("Variable layer height"),   "layers"},             },

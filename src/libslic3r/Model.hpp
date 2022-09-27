@@ -477,6 +477,7 @@ public:
     int         get_repaired_errors_count(const int vol_idx = -1) const;
 
     bool is_cut() const { return cut_id.id().valid(); }
+    bool has_connectors() const;
 
 private:
     friend class Model;
@@ -723,13 +724,25 @@ public:
     struct CutInfo
     {
         bool                is_connector{ false };
+        bool                is_processed{ true };
         CutConnectorType    connector_type{ CutConnectorType::Plug };
-        float               radius_tolerance;// [0.f : 1.f]
-        float               height_tolerance;// [0.f : 1.f]
+        float               radius_tolerance{ 0.f };// [0.f : 1.f]
+        float               height_tolerance{ 0.f };// [0.f : 1.f]
 
-        void discard() { is_connector = false; }
+        CutInfo() = default;
+        CutInfo(CutConnectorType type, float rad_tolerance, float h_tolerance) :
+        is_connector(true),
+        is_processed(false),
+        connector_type(type),
+        radius_tolerance(rad_tolerance),
+        height_tolerance(h_tolerance)
+        {}
+
+        void set_processed() { is_processed = true; }
     };
     CutInfo             cut_info;
+
+    bool                is_cut_connector() const { return cut_info.is_processed && cut_info.is_connector; }
 
     // The triangular model.
     const TriangleMesh& mesh() const { return *m_mesh.get(); }

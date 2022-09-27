@@ -97,6 +97,7 @@
 #include "MsgDialog.hpp"
 #include "ProjectDirtyStateManager.hpp"
 #include "Gizmos/GLGizmoSimplify.hpp" // create suggestion notification
+#include "Gizmos/GLGizmoCut.hpp"
 
 #ifdef __APPLE__
 #include "Gizmos/GLGizmosManager.hpp"
@@ -2980,6 +2981,9 @@ void Plater::priv::object_list_changed()
     const bool model_fits = view3D->get_canvas3d()->check_volumes_outside_state() == ModelInstancePVS_Inside;
 
     sidebar->enable_buttons(!model.objects.empty() && !export_in_progress && model_fits);
+
+    // invalidate CutGizmo after changes in ObjectList
+    static_cast<GLGizmoCut3D*>(q->canvas3D()->get_gizmos_manager().get_gizmo(GLGizmosManager::Cut))->invalidate_cut_plane();
 }
 
 void Plater::priv::select_all()

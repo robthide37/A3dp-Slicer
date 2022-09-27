@@ -51,7 +51,7 @@ enum class InfoItemType
     Undef,
     CustomSupports,
     CustomSeam,
-    Cut,
+    CutConnectors,
     MmuSegmentation,
     Sinking,
     VariableLayerHeight

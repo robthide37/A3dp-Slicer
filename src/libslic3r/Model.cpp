@@ -1191,11 +1191,21 @@ size_t ModelObject::parts_count() const
     return num;
 }
 
+bool ModelObject::has_connectors() const
+{
+    assert(is_cut());
+    for (const ModelVolume* v : this->volumes)
+        if (v->cut_info.is_connector)
+            return true;
+
+    return false;
+}
+
 indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes connector_attributes)
 {
     indexed_triangle_set connector_mesh;
 
-    int   sectorCount;
+    int   sectorCount {1};
     switch (CutConnectorShape(connector_attributes.shape)) {
     case CutConnectorShape::Triangle:
         sectorCount = 3;
@@ -1238,7 +1248,7 @@ void ModelObject::apply_cut_connectors(const std::string& new_name)
         new_volume->set_transformation(assemble_transform(connector.pos) * connector.rotation_m * 
                                        scale_transform(Vec3f(connector.radius, connector.radius, connector.height).cast<double>()));
 
-        new_volume->cut_info = { true, connector.attribs.type, connector.radius_tolerance, connector.height_tolerance };
+        new_volume->cut_info = { connector.attribs.type, connector.radius_tolerance, connector.height_tolerance };
         new_volume->name = new_name + "-" + std::to_string(++connector_id);
     }
     cut_id.increase_connectors_cnt(cut_connectors.size());
@@ -1298,7 +1308,8 @@ void ModelVolume::reset_extra_facets()
 
 void ModelVolume::apply_tolerance()
 {
-    if (!cut_info.is_connector)
+    assert(cut_info.is_connector);
+    if (cut_info.is_processed)
         return;
 
     Vec3d sf = get_scaling_factor();
@@ -1321,7 +1332,8 @@ void ModelVolume::apply_tolerance()
 void ModelObject::process_connector_cut(ModelVolume* volume, ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower, 
                                         std::vector<ModelObject*>& dowels, Vec3d& local_dowels_displace)
 {
-    volume->cut_info.discard();
+    assert(volume->cut_info.is_connector);
+    volume->cut_info.set_processed();
 
     const auto volume_matrix = volume->get_matrix();
 
@@ -1546,10 +1558,10 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
         volume->reset_extra_facets();
 
         if (!volume->is_model_part()) {
-            if (volume->cut_info.is_connector)
-                process_connector_cut(volume, attributes, upper, lower, dowels, local_dowels_displace);
-            else
+            if (volume->cut_info.is_processed)
                 process_modifier_cut(volume, instance_matrix, inverse_cut_matrix, attributes, upper, lower);
+            else
+                process_connector_cut(volume, attributes, upper, lower, dowels, local_dowels_displace);
         }
         else if (!volume->mesh().empty())
             process_solid_part_cut(volume, instance_matrix, cut_matrix, attributes, upper, lower, local_displace);

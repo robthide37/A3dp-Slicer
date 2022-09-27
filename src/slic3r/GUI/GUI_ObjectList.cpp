@@ -1881,13 +1881,8 @@ void ObjectList::del_info_item(const int obj_idx, InfoItemType type)
             mv->seam_facets.reset();
         break;
 
-    case InfoItemType::Cut:
-    if (0) { // #ysFIXME_Cut
-        cnv->get_gizmos_manager().reset_all_states();
-        Plater::TakeSnapshot(plater, _L("Remove cut connectors"));
-        (*m_objects)[obj_idx]->cut_connectors.clear();
-    } else
-        Slic3r::GUI::show_error(nullptr, _L("Connectors cannot be deleted from cut object."));
+    case InfoItemType::CutConnectors:
+        show_error(nullptr, _L("Connectors cannot be deleted from cut object."));
         break;
 
     case InfoItemType::MmuSegmentation:
@@ -2422,9 +2417,12 @@ bool ObjectList::is_splittable(bool to_objects)
             auto obj_idx = get_selected_obj_idx();
             if (obj_idx < 0)
                 return false;
-            if ((*m_objects)[obj_idx]->volumes.size() > 1)
+            const ModelObject* object = (*m_objects)[obj_idx];
+            if (object->is_cut())
+                return false;
+            if (object->volumes.size() > 1)
                 return true;
-            return (*m_objects)[obj_idx]->volumes[0]->is_splittable();
+            return object->volumes[0]->is_splittable();
         }
         return false;
     }
@@ -2595,19 +2593,13 @@ void ObjectList::part_selection_changed()
                     }
                     case InfoItemType::CustomSupports:
                     case InfoItemType::CustomSeam:
-//                    case InfoItemType::Cut:
                     case InfoItemType::MmuSegmentation:
                     {
                         GLGizmosManager::EType gizmo_type = info_type == InfoItemType::CustomSupports   ? GLGizmosManager::EType::FdmSupports :
                                                             info_type == InfoItemType::CustomSeam       ? GLGizmosManager::EType::Seam :
-                                                            info_type == InfoItemType::Cut              ? GLGizmosManager::EType::Cut :
                                                             GLGizmosManager::EType::MmuSegmentation;
                         if (gizmos_mgr.get_current_type() != gizmo_type)
                             gizmos_mgr.open_gizmo(gizmo_type);
-                        if (info_type == InfoItemType::Cut) {
-                            GLGizmoCut3D* cut = dynamic_cast<GLGizmoCut3D*>(gizmos_mgr.get_current());
-                            cut->set_connectors_editing();
-                        }
                         break;
                     }
                     case InfoItemType::Sinking: { break; }
@@ -2762,7 +2754,7 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
 
     for (InfoItemType type : {InfoItemType::CustomSupports,
                               InfoItemType::CustomSeam,
-                              InfoItemType::Cut,
+                              InfoItemType::CutConnectors,
                               InfoItemType::MmuSegmentation,
                               InfoItemType::Sinking,
                               InfoItemType::VariableLayerHeight}) {
@@ -2783,11 +2775,8 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
                                       });
             break;
 
-        case InfoItemType::Cut :
-        if (0) // #ysFIXME_Cut
-            should_show = !model_object->cut_connectors.empty();
-        else
-            should_show = model_object->is_cut() && model_object->volumes.size() > 1;
+        case InfoItemType::CutConnectors:
+            should_show = model_object->is_cut() && model_object->has_connectors() && model_object->volumes.size() > 1;
             break;
         case InfoItemType::VariableLayerHeight :
             should_show = printer_technology() == ptFFF
@@ -2841,9 +2830,20 @@ void ObjectList::add_object_to_list(size_t obj_idx, bool call_selection_changed)
 
     update_info_items(obj_idx, nullptr, call_selection_changed);
 
+    bool can_add_volumes = model_object->volumes.size() > 1;
+    if (can_add_volumes && model_object->is_cut()) {
+        int no_connectors_cnt = 0;
+        for (const ModelVolume* v : model_object->volumes)
+            if (!v->is_cut_connector())
+                no_connectors_cnt++;
+        can_add_volumes = no_connectors_cnt > 1;
+    }
+
     // add volumes to the object
-    if (model_object->volumes.size() > 1  && !model_object->is_cut()) {
+    if (can_add_volumes) {
         for (const ModelVolume* volume : model_object->volumes) {
+            if (model_object->is_cut() && volume->is_cut_connector())
+                continue;
             const wxDataViewItem& vol_item = m_objects_model->AddVolumeChild(item,
                 from_u8(volume->name),
                 volume->type(),
