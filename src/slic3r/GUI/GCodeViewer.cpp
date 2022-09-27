@@ -4282,15 +4282,25 @@ void GCodeViewer::render_legend(float& legend_height)
 
         float offset = calc_offset();
 
+        auto trim_text_if_needed = [](const std::string& txt) {
+            const float max_length = 250.0f;
+            const float length = ImGui::CalcTextSize(txt.c_str()).x;
+            if (length > max_length) {
+                const size_t new_len = txt.length() * max_length / length;
+                return txt.substr(0, new_len) + "...";
+            }
+            return txt;
+        };
+
         if (!m_settings_ids.printer.empty()) {
             imgui.text(_u8L("Printer") + ":");
             ImGui::SameLine(offset);
-            imgui.text(m_settings_ids.printer);
+            imgui.text(trim_text_if_needed(m_settings_ids.printer));
         }
         if (!m_settings_ids.print.empty()) {
             imgui.text(_u8L("Print settings") + ":");
             ImGui::SameLine(offset);
-            imgui.text(m_settings_ids.print);
+            imgui.text(trim_text_if_needed(m_settings_ids.print));
         }
         if (!m_settings_ids.filament.empty()) {
             for (unsigned char i : m_extruder_ids) {
@@ -4299,7 +4309,7 @@ void GCodeViewer::render_legend(float& legend_height)
                     txt += (m_extruder_ids.size() == 1) ? ":" : " " + std::to_string(i + 1);
                     imgui.text(txt);
                     ImGui::SameLine(offset);
-                    imgui.text(m_settings_ids.filament[i]);
+                    imgui.text(trim_text_if_needed(m_settings_ids.filament[i]));
                 }
             }
         }
