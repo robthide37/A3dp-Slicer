@@ -4261,26 +4261,8 @@ void GCodeViewer::render_legend(float& legend_height)
     show_settings &= (m_view_type == EViewType::FeatureType || m_view_type == EViewType::Tool);
     show_settings &= has_settings;
     if (show_settings) {
-        auto calc_offset = [this]() {
-            float ret = 0.0f;
-            if (!m_settings_ids.printer.empty())
-                ret = std::max(ret, ImGui::CalcTextSize((_u8L("Printer") + std::string(":")).c_str()).x);
-            if (!m_settings_ids.print.empty())
-                ret = std::max(ret, ImGui::CalcTextSize((_u8L("Print settings") + std::string(":")).c_str()).x);
-            if (!m_settings_ids.filament.empty()) {
-                for (unsigned char i : m_extruder_ids) {
-                    ret = std::max(ret, ImGui::CalcTextSize((_u8L("Filament") + " " + std::to_string(i + 1) + ":").c_str()).x);
-                }
-            }
-            if (ret > 0.0f)
-                ret += 2.0f * ImGui::GetStyle().ItemSpacing.x;
-            return ret;
-        };
-
         ImGui::Spacing();
         imgui.title(_u8L("Settings"));
-
-        float offset = calc_offset();
 
         auto trim_text_if_needed = [](const std::string& txt) {
             const float max_length = 250.0f;
@@ -4292,26 +4274,32 @@ void GCodeViewer::render_legend(float& legend_height)
             return txt;
         };
 
-        if (!m_settings_ids.printer.empty()) {
-            imgui.text(_u8L("Printer") + ":");
-            ImGui::SameLine(offset);
-            imgui.text(trim_text_if_needed(m_settings_ids.printer));
-        }
-        if (!m_settings_ids.print.empty()) {
-            imgui.text(_u8L("Print settings") + ":");
-            ImGui::SameLine(offset);
-            imgui.text(trim_text_if_needed(m_settings_ids.print));
-        }
-        if (!m_settings_ids.filament.empty()) {
-            for (unsigned char i : m_extruder_ids) {
-                if (i < static_cast<unsigned char>(m_settings_ids.filament.size()) && !m_settings_ids.filament[i].empty()) {
-                    std::string txt = _u8L("Filament");
-                    txt += (m_extruder_ids.size() == 1) ? ":" : " " + std::to_string(i + 1);
-                    imgui.text(txt);
-                    ImGui::SameLine(offset);
-                    imgui.text(trim_text_if_needed(m_settings_ids.filament[i]));
+        auto add_strings_row_to_table = [&imgui](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            imgui.text_colored(col_1_color, col_1.c_str());
+            ImGui::TableSetColumnIndex(1);
+            imgui.text_colored(col_2_color, col_2.c_str());
+        };
+
+        if (ImGui::BeginTable("Settings", 2)) {
+            if (!m_settings_ids.printer.empty())
+                add_strings_row_to_table(_u8L("Printer") + ":", ImGuiWrapper::COL_ORANGE_LIGHT,
+                    trim_text_if_needed(m_settings_ids.printer), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+            if (!m_settings_ids.print.empty())
+                add_strings_row_to_table(_u8L("Print settings") + ":", ImGuiWrapper::COL_ORANGE_LIGHT,
+                    trim_text_if_needed(m_settings_ids.print), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+            if (!m_settings_ids.filament.empty()) {
+                for (unsigned char i : m_extruder_ids) {
+                    if (i < static_cast<unsigned char>(m_settings_ids.filament.size()) && !m_settings_ids.filament[i].empty()) {
+                        std::string txt = _u8L("Filament");
+                        txt += (m_extruder_ids.size() == 1) ? ":" : " " + std::to_string(i + 1);
+                        add_strings_row_to_table(txt, ImGuiWrapper::COL_ORANGE_LIGHT,
+                            trim_text_if_needed(m_settings_ids.filament[i]), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+                    }
                 }
             }
+            ImGui::EndTable();
         }
     }
 
