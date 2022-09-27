@@ -116,11 +116,7 @@ void GCodeViewer::IBuffer::reset()
     count = 0;
 }
 
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
 bool GCodeViewer::Path::matches(const GCodeProcessorResult::MoveVertex& move, bool account_for_volumetric_rate) const
-#else
-bool GCodeViewer::Path::matches(const GCodeProcessorResult::MoveVertex& move) const
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
 {
     auto matches_percent = [](float value1, float value2, float max_percent) {
         return std::abs(value2 - value1) / value1 <= max_percent;
@@ -137,7 +133,6 @@ bool GCodeViewer::Path::matches(const GCodeProcessorResult::MoveVertex& move) co
     case EMoveType::Seam:
     case EMoveType::Extrude: {
         // use rounding to reduce the number of generated paths
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         if (account_for_volumetric_rate)
             return type == move.type && extruder_id == move.extruder_id && cp_color_id == move.cp_color_id && role == move.extrusion_role &&
                 move.position.z() <= sub_paths.front().first.position.z() && feedrate == move.feedrate && fan_speed == move.fan_speed &&
@@ -147,12 +142,6 @@ bool GCodeViewer::Path::matches(const GCodeProcessorResult::MoveVertex& move) co
             return type == move.type && extruder_id == move.extruder_id && cp_color_id == move.cp_color_id && role == move.extrusion_role &&
                 move.position.z() <= sub_paths.front().first.position.z() && feedrate == move.feedrate && fan_speed == move.fan_speed &&
                 height == round_to_bin(move.height) && width == round_to_bin(move.width);
-#else
-        return type == move.type && extruder_id == move.extruder_id && cp_color_id == move.cp_color_id && role == move.extrusion_role &&
-            move.position.z() <= sub_paths.front().first.position.z() && feedrate == move.feedrate && fan_speed == move.fan_speed &&
-            height == round_to_bin(move.height) && width == round_to_bin(move.width) &&
-            matches_percent(volumetric_rate, move.volumetric_rate(), 0.05f);
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     }
     case EMoveType::Travel: {
         return type == move.type && feedrate == move.feedrate && extruder_id == move.extruder_id && cp_color_id == move.cp_color_id;
@@ -771,19 +760,12 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     // avoid processing if called with the same gcode_result
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     if (m_last_result_id == gcode_result.id &&
         (m_last_view_type == m_view_type || (m_last_view_type != EViewType::VolumetricRate && m_view_type != EViewType::VolumetricRate)))
         return;
-#else
-    if (m_last_result_id == gcode_result.id)
-        return;
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
 
     m_last_result_id = gcode_result.id;
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     m_last_view_type = m_view_type;
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
 
     // release gpu memory, if used
     reset(); 
@@ -1360,15 +1342,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         // add current vertex
         add_vertex(curr);
     };
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     auto add_indices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, TBuffer& buffer,
         unsigned int ibuffer_id, IndexBuffer& indices, size_t move_id, bool account_for_volumetric_rate) {
             if (buffer.paths.empty() || prev.type != curr.type || !buffer.paths.back().matches(curr, account_for_volumetric_rate)) {
-#else
-    auto add_indices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, TBuffer& buffer,
-        unsigned int ibuffer_id, IndexBuffer& indices, size_t move_id) {
-            if (buffer.paths.empty() || prev.type != curr.type || !buffer.paths.back().matches(curr)) {
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
                 // add starting index
                 indices.push_back(static_cast<IBufferType>(indices.size()));
                 buffer.add_path(curr, ibuffer_id, indices.size() - 1, move_id - 1);
@@ -1387,13 +1363,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     };
 
     // format data into the buffers to be rendered as solid
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     auto add_vertices_as_solid = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, TBuffer& buffer,
         unsigned int vbuffer_id, VertexBuffer& vertices, size_t move_id, bool account_for_volumetric_rate) {
-#else
-    auto add_vertices_as_solid = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, TBuffer& buffer,
-        unsigned int vbuffer_id, VertexBuffer& vertices, size_t move_id) {
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         auto store_vertex = [](VertexBuffer& vertices, const Vec3f& position, const Vec3f& normal) {
             // append position
             vertices.push_back(position.x());
@@ -1405,11 +1376,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             vertices.push_back(normal.z());
         };
 
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         if (buffer.paths.empty() || prev.type != curr.type || !buffer.paths.back().matches(curr, account_for_volumetric_rate)) {
-#else
-        if (buffer.paths.empty() || prev.type != curr.type || !buffer.paths.back().matches(curr)) {
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
             buffer.add_path(curr, vbuffer_id, vertices.size(), move_id - 1);
             buffer.paths.back().sub_paths.back().first.position = prev.position;
         }
@@ -1454,15 +1421,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
         last_path.sub_paths.back().last = { vbuffer_id, vertices.size(), move_id, curr.position };
     };
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     auto add_indices_as_solid = [&](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr,
         const GCodeProcessorResult::MoveVertex* next, TBuffer& buffer, size_t& vbuffer_size, unsigned int ibuffer_id,
         IndexBuffer& indices, size_t move_id, bool account_for_volumetric_rate) {
-#else
-    auto add_indices_as_solid = [&](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr,
-        const GCodeProcessorResult::MoveVertex* next, TBuffer& buffer, size_t& vbuffer_size, unsigned int ibuffer_id, 
-        IndexBuffer& indices, size_t move_id) {
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
             static Vec3f prev_dir;
             static Vec3f prev_up;
             static float sq_prev_length;
@@ -1507,11 +1468,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 store_triangle(indices, v_offsets[4], v_offsets[5], v_offsets[6]);
             };
 
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
             if (buffer.paths.empty() || prev.type != curr.type || !buffer.paths.back().matches(curr, account_for_volumetric_rate)) {
-#else
-            if (buffer.paths.empty() || prev.type != curr.type || !buffer.paths.back().matches(curr)) {
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
                 buffer.add_path(curr, ibuffer_id, indices.size(), move_id - 1);
                 buffer.paths.back().sub_paths.back().first.position = prev.position;
             }
@@ -1595,11 +1552,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 vbuffer_size += 6;
             }
 
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
             if (next != nullptr && (curr.type != next->type || !last_path.matches(*next, account_for_volumetric_rate)))
-#else
-            if (next != nullptr && (curr.type != next->type || !last_path.matches(*next)))
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
                 // ending cap triangles
                 append_ending_cap_triangles(indices, is_first_segment ? first_seg_v_offsets : non_first_seg_v_offsets);
 
@@ -1737,9 +1690,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             m_sequential_view.gcode_ids.push_back(move.gcode_id);
     }
 
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     bool account_for_volumetric_rate = m_view_type == EViewType::VolumetricRate;
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
 
     std::vector<MultiVertexBuffer> vertices(m_buffers.size());
     std::vector<MultiIndexBuffer> indices(m_buffers.size());
@@ -1803,11 +1754,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             v_multibuffer.push_back(VertexBuffer());
             if (t_buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Triangle) {
                 Path& last_path = t_buffer.paths.back();
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
                 if (prev.type == curr.type && last_path.matches(curr, account_for_volumetric_rate))
-#else
-                if (prev.type == curr.type && last_path.matches(curr))
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
                     last_path.add_sub_path(prev, static_cast<unsigned int>(v_multibuffer.size()) - 1, 0, move_id - 1);
             }
         }
@@ -1817,11 +1764,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         switch (t_buffer.render_primitive_type)
         {
         case TBuffer::ERenderPrimitiveType::Line:     { add_vertices_as_line(prev, curr, v_buffer); break; }
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         case TBuffer::ERenderPrimitiveType::Triangle: { add_vertices_as_solid(prev, curr, t_buffer, static_cast<unsigned int>(v_multibuffer.size()) - 1, v_buffer, move_id, account_for_volumetric_rate); break; }
-#else
-        case TBuffer::ERenderPrimitiveType::Triangle: { add_vertices_as_solid(prev, curr, t_buffer, static_cast<unsigned int>(v_multibuffer.size()) - 1, v_buffer, move_id); break; }
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         case TBuffer::ERenderPrimitiveType::InstancedModel:
         {
             add_model_instance(curr, inst_buffer, inst_id_buffer, move_id);
@@ -2220,20 +2163,12 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         switch (t_buffer.render_primitive_type)
         {
         case TBuffer::ERenderPrimitiveType::Line: {
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
             add_indices_as_line(prev, curr, t_buffer, static_cast<unsigned int>(i_multibuffer.size()) - 1, i_buffer, move_id, account_for_volumetric_rate);
-#else
-            add_indices_as_line(prev, curr, t_buffer, static_cast<unsigned int>(i_multibuffer.size()) - 1, i_buffer, move_id);
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
             curr_vertex_buffer.second += t_buffer.max_vertices_per_segment();
             break;
         }
         case TBuffer::ERenderPrimitiveType::Triangle: {
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
             add_indices_as_solid(prev, curr, next, t_buffer, curr_vertex_buffer.second, static_cast<unsigned int>(i_multibuffer.size()) - 1, i_buffer, move_id, account_for_volumetric_rate);
-#else
-            add_indices_as_solid(prev, curr, next, t_buffer, curr_vertex_buffer.second, static_cast<unsigned int>(i_multibuffer.size()) - 1, i_buffer, move_id);
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
             break;
         }
         case TBuffer::ERenderPrimitiveType::BatchedModel: {
