@@ -4247,6 +4247,14 @@ void GCodeViewer::render_legend(float& legend_height)
     }
 #endif // !ENABLE_PREVIEW_LAYOUT
 
+    auto add_strings_row_to_table = [&imgui](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(col_1_color, col_1.c_str());
+        ImGui::TableSetColumnIndex(1);
+        imgui.text_colored(col_2_color, col_2.c_str());
+    };
+
     // settings section
     bool has_settings = false;
     has_settings |= !m_settings_ids.print.empty();
@@ -4272,14 +4280,6 @@ void GCodeViewer::render_legend(float& legend_height)
                 return txt.substr(0, new_len) + "...";
             }
             return txt;
-        };
-
-        auto add_strings_row_to_table = [&imgui](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            imgui.text_colored(col_1_color, col_1.c_str());
-            ImGui::TableSetColumnIndex(1);
-            imgui.text_colored(col_2_color, col_2.c_str());
         };
 
         if (ImGui::BeginTable("Settings", 2)) {
@@ -4333,24 +4333,17 @@ void GCodeViewer::render_legend(float& legend_height)
 
         imgui.title(time_title + ":");
 
-        std::string first_str = _u8L("First layer");
-        std::string total_str = _u8L("Total");
+        if (ImGui::BeginTable("Times", 2)) {
+            if (!time_mode.layers_times.empty()) {
+                add_strings_row_to_table(_u8L("First layer") + ":", ImGuiWrapper::COL_ORANGE_LIGHT,
+                    short_time(get_time_dhms(time_mode.layers_times.front())), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+            }
 
-        float max_len = 10.0f + ImGui::GetStyle().ItemSpacing.x;
-        if (time_mode.layers_times.empty())
-            max_len += ImGui::CalcTextSize(total_str.c_str()).x;
-        else
-            max_len += std::max(ImGui::CalcTextSize(first_str.c_str()).x, ImGui::CalcTextSize(total_str.c_str()).x);
+            add_strings_row_to_table(_u8L("Total") + ":", ImGuiWrapper::COL_ORANGE_LIGHT,
+                short_time(get_time_dhms(time_mode.time)), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
 
-        if (!time_mode.layers_times.empty()) {
-            imgui.text(first_str + ":");
-            ImGui::SameLine(max_len);
-            imgui.text(short_time(get_time_dhms(time_mode.layers_times.front())));
+            ImGui::EndTable();
         }
-
-        imgui.text(total_str + ":");
-        ImGui::SameLine(max_len);
-        imgui.text(short_time(get_time_dhms(time_mode.time)));
 
         auto show_mode_button = [this, &imgui, can_show_mode_button](const wxString& label, PrintEstimatedStatistics::ETimeMode mode) {
             if (can_show_mode_button(mode)) {
