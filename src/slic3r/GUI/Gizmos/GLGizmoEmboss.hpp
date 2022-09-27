@@ -101,6 +101,7 @@ private:
     // create volume from text - main functionality
     bool process();
     void close();
+    void discard_and_close();
     void draw_window();
     void draw_text_input();
     void draw_model_type();
