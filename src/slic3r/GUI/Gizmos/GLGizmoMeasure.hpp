@@ -89,8 +89,13 @@ class GLGizmoMeasure : public GLGizmoBase
     std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
     std::optional<Measure::SurfaceFeature> m_curr_feature;
     std::optional<Vec3d> m_curr_point_on_feature_position;
-    std::vector<std::shared_ptr<SceneRaycasterItem>>* m_scene_raycasters{ nullptr };
-    std::vector<bool> m_scene_raycaster_state;
+    struct SceneRaycasterState
+    {
+        std::shared_ptr<SceneRaycasterItem> raycaster{ nullptr };
+        bool state{true};
+
+    };
+    std::vector<SceneRaycasterState> m_scene_raycasters;
 
     // These hold information to decide whether recalculation is necessary:
     std::vector<Transform3d> m_volumes_matrices;

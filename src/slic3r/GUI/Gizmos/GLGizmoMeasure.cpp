@@ -372,11 +372,13 @@ void GLGizmoMeasure::on_set_state()
     else {
         m_mode = EMode::BasicSelection;
         // store current state of scene raycaster for later use
-        m_scene_raycaster_state.clear();
-        m_scene_raycasters = m_parent.get_raycasters_for_picking(SceneRaycaster::EType::Volume);
-        if (m_scene_raycasters != nullptr) {
-            for (const auto& r : *m_scene_raycasters) {
-                m_scene_raycaster_state.emplace_back(r->is_active());
+        m_scene_raycasters.clear();
+        auto scene_raycasters = m_parent.get_raycasters_for_picking(SceneRaycaster::EType::Volume);
+        if (scene_raycasters != nullptr) {
+            m_scene_raycasters.reserve(scene_raycasters->size());
+            for (auto r : *scene_raycasters) {
+                SceneRaycasterState state = { r, r->is_active() };
+                m_scene_raycasters.emplace_back(state);
             }
         }
     }
@@ -772,20 +774,15 @@ void GLGizmoMeasure::update_if_needed()
 
 void GLGizmoMeasure::disable_scene_raycasters()
 {
-    if (m_scene_raycasters != nullptr) {
-        for (auto r : *m_scene_raycasters) {
-            r->set_active(false);
-        }
+    for (auto r : m_scene_raycasters) {
+        r.raycaster->set_active(false);
     }
 }
 
 void GLGizmoMeasure::restore_scene_raycasters_state()
 {
-    if (m_scene_raycasters != nullptr) {
-        assert(m_scene_raycasters->size() == m_scene_raycaster_state.size());
-        for (size_t i = 0; i < m_scene_raycasters->size(); ++i) {
-            (*m_scene_raycasters)[i]->set_active(m_scene_raycaster_state[i]);
-        }
+    for (auto r : m_scene_raycasters) {
+        r.raycaster->set_active(r.state);
     }
 }
 
