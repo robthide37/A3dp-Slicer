@@ -432,13 +432,11 @@ class GCodeViewer
     {
         struct Range
         {
-#if ENABLE_PREVIEW_LAYER_TIME
             enum class EType : unsigned char
             {
                 Linear,
                 Logarithmic
             };
-#endif // ENABLE_PREVIEW_LAYER_TIME
 
             float min;
             float max;
@@ -454,13 +452,8 @@ class GCodeViewer
             }
             void reset() { min = FLT_MAX; max = -FLT_MAX; count = 0; }
 
-#if ENABLE_PREVIEW_LAYER_TIME
             float step_size(EType type = EType::Linear) const;
             ColorRGBA get_color_at(float value, EType type = EType::Linear) const;
-#else
-            float step_size() const { return (max - min) / (static_cast<float>(Range_Colors.size()) - 1.0f); }
-            ColorRGBA get_color_at(float value) const;
-#endif // ENABLE_PREVIEW_LAYER_TIME
         };
 
         struct Ranges
@@ -477,10 +470,8 @@ class GCodeViewer
             Range volumetric_rate;
             // Color mapping by extrusion temperature.
             Range temperature;
-#if ENABLE_PREVIEW_LAYER_TIME
             // Color mapping by layer time.
             std::array<Range, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> layer_time;
-#endif // ENABLE_PREVIEW_LAYER_TIME
 
             void reset() {
                 height.reset();
@@ -489,11 +480,9 @@ class GCodeViewer
                 fan_speed.reset();
                 volumetric_rate.reset();
                 temperature.reset();
-#if ENABLE_PREVIEW_LAYER_TIME
                 for (auto& range : layer_time) {
                     range.reset();
                 }
-#endif // ENABLE_PREVIEW_LAYER_TIME
             }
         };
 
@@ -752,10 +741,8 @@ public:
         FanSpeed,
         Temperature,
         VolumetricRate,
-#if ENABLE_PREVIEW_LAYER_TIME
         LayerTimeLinear,
         LayerTimeLogarithmic,
-#endif // ENABLE_PREVIEW_LAYER_TIME
         Tool,
         ColorPrint,
         Count
@@ -801,9 +788,7 @@ private:
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
     GCodeProcessorResult::SettingsIds m_settings_ids;
     std::array<SequentialRangeCap, 2> m_sequential_range_caps;
-#if ENABLE_PREVIEW_LAYER_TIME
     std::array<std::vector<float>, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> m_layers_times;
-#endif // ENABLE_PREVIEW_LAYER_TIME
 
     std::vector<CustomGCode::Item> m_custom_gcode_per_print_z;
 
