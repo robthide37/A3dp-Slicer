@@ -439,7 +439,6 @@ public:
     size_t materials_count() const;
     size_t facets_count() const;
     size_t parts_count() const;
-    ModelObjectPtrs cut(size_t instance, coordf_t z, ModelObjectCutAttributes attributes);
     static indexed_triangle_set get_connector_mesh(CutConnectorAttributes connector_attributes);
     void apply_cut_connectors(const std::string& name);
     // invalidate cut state for this and related objects from the whole model
@@ -768,6 +767,7 @@ public:
 	bool                is_support_blocker()    const { return m_type == ModelVolumeType::SUPPORT_BLOCKER; }
 	bool                is_support_modifier()   const { return m_type == ModelVolumeType::SUPPORT_BLOCKER || m_type == ModelVolumeType::SUPPORT_ENFORCER; }
     t_model_material_id material_id() const { return m_material_id; }
+    void                reset_extra_facets();
     void                apply_tolerance();
     void                set_material_id(t_model_material_id material_id);
     ModelMaterial*      material() const;

@@ -255,7 +255,6 @@ public:
     void convert_unit(ConversionType conv_type);
     void toggle_layers_editing(bool enable);
 
-    void cut(size_t obj_idx, size_t instance_idx, coordf_t z, ModelObjectCutAttributes attributes);
     void cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_matrix, ModelObjectCutAttributes attributes);
 
     void export_gcode(bool prefer_removable);
