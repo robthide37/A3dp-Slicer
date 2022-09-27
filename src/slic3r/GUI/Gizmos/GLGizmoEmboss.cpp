@@ -587,6 +587,10 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 
 void GLGizmoEmboss::on_set_state()
 {
+    // enable / disable bed from picking
+    // Rotation gizmo must work through bed
+    m_parent.set_raycaster_gizmos_on_top(GLGizmoBase::m_state == GLGizmoBase::On);
+
     m_rotate_gizmo.set_state(GLGizmoBase::m_state);
 
     // Closing gizmo. e.g. selecting another one
