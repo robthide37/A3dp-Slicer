@@ -23,9 +23,7 @@ class wxString;
 class wxMouseEvent;
 class wxKeyEvent;
 
-#if ENABLE_PREVIEW_LAYOUT
 struct IMGUI_API ImGuiWindow;
-#endif // ENABLE_PREVIEW_LAYOUT
 
 namespace Slic3r {
 namespace GUI {
@@ -42,9 +40,7 @@ class ImGuiWrapper
     bool m_disabled{ false };
     bool m_new_frame_open{ false };
     bool m_requires_extra_frame{ false };
-#if ENABLE_LEGEND_TOOLBAR_ICONS
     std::map<wchar_t, int> m_custom_glyph_rects_ids;
-#endif // ENABLE_LEGEND_TOOLBAR_ICONS
     std::string m_clipboard_text;
 
 public:
@@ -99,9 +95,7 @@ public:
 	bool button(const wxString& label, float width, float height);
     bool button(const wxString& label, const ImVec2 &size, bool enable); // default size = ImVec2(0.f, 0.f)
     bool radio_button(const wxString &label, bool active);
-#if ENABLE_PREVIEW_LAYOUT
     bool draw_radio_button(const std::string& name, float size, bool active, std::function<void(ImGuiWindow& window, const ImVec2& pos, float size)> draw_callback);
-#endif // ENABLE_PREVIEW_LAYOUT
     bool input_double(const std::string &label, const double &value, const std::string &format = "%.3f");
     bool input_double(const wxString &label, const double &value, const std::string &format = "%.3f");
     bool input_vec3(const std::string &label, const Vec3d &value, float width, const std::string &format = "%.3f");
@@ -221,9 +215,7 @@ public:
     static ColorRGBA from_ImU32(const ImU32& color);
     static ColorRGBA from_ImVec4(const ImVec4& color);
 
-#if ENABLE_LEGEND_TOOLBAR_ICONS
     ImFontAtlasCustomRect* GetTextureCustomRect(const wchar_t& tex_id);
-#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
     static const ImVec4 COL_GREY_DARK;
     static const ImVec4 COL_GREY_LIGHT;

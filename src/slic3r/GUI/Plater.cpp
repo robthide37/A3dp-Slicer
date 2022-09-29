@@ -1767,10 +1767,8 @@ struct Plater::priv
     bool are_view3D_labels_shown() const { return (current_panel == view3D) && view3D->get_canvas3d()->are_labels_shown(); }
     void show_view3D_labels(bool show) { if (current_panel == view3D) view3D->get_canvas3d()->show_labels(show); }
 
-#if ENABLE_PREVIEW_LAYOUT
     bool is_legend_shown() const { return (current_panel == preview) && preview->get_canvas3d()->is_legend_shown(); }
     void show_legend(bool show) { if (current_panel == preview) preview->get_canvas3d()->show_legend(show); }
-#endif // ENABLE_PREVIEW_LAYOUT
 
     bool is_sidebar_collapsed() const   { return sidebar->is_collapsed(); }
     void collapse_sidebar(bool collapse);
@@ -1785,9 +1783,6 @@ struct Plater::priv
     bool init_view_toolbar();
     bool init_collapse_toolbar();
 
-#if !ENABLE_PREVIEW_LAYOUT
-    void update_preview_bottom_toolbar();
-#endif // !ENABLE_PREVIEW_LAYOUT
     void update_preview_moves_slider();
     void enable_preview_moves_slider(bool enable);
 
@@ -4746,13 +4741,6 @@ bool Plater::priv::init_collapse_toolbar()
     return true;
 }
 
-#if !ENABLE_PREVIEW_LAYOUT
-void Plater::priv::update_preview_bottom_toolbar()
-{
-    preview->update_bottom_toolbar();
-}
-#endif // !ENABLE_PREVIEW_LAYOUT
-
 void Plater::priv::update_preview_moves_slider()
 {
     preview->update_moves_slider();
@@ -5733,10 +5721,8 @@ bool Plater::is_view3D_shown() const { return p->is_view3D_shown(); }
 bool Plater::are_view3D_labels_shown() const { return p->are_view3D_labels_shown(); }
 void Plater::show_view3D_labels(bool show) { p->show_view3D_labels(show); }
 
-#if ENABLE_PREVIEW_LAYOUT
 bool Plater::is_legend_shown() const { return p->is_legend_shown(); }
 void Plater::show_legend(bool show) { p->show_legend(show); }
-#endif // ENABLE_PREVIEW_LAYOUT
 
 bool Plater::is_sidebar_collapsed() const { return p->is_sidebar_collapsed(); }
 void Plater::collapse_sidebar(bool show) { p->collapse_sidebar(show); }
@@ -7094,13 +7080,6 @@ GLToolbar& Plater::get_collapse_toolbar()
     return p->collapse_toolbar;
 }
 
-#if !ENABLE_PREVIEW_LAYOUT
-void Plater::update_preview_bottom_toolbar()
-{
-    p->update_preview_bottom_toolbar();
-}
-#endif // !ENABLE_PREVIEW_LAYOUT
-
 void Plater::update_preview_moves_slider()
 {
     p->update_preview_moves_slider();
@@ -7209,12 +7188,10 @@ bool Plater::is_render_statistic_dialog_visible() const
     return p->show_render_statistic_dialog;
 }
 
-#if ENABLE_PREVIEW_LAYOUT
 void Plater::set_keep_current_preview_type(bool value)
 {
     p->preview->set_keep_current_preview_type(value);
 }
-#endif // ENABLE_PREVIEW_LAYOUT
 
 Plater::TakeSnapshot::TakeSnapshot(Plater *plater, const std::string &snapshot_name)
 : TakeSnapshot(plater, from_u8(snapshot_name)) {}

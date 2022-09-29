@@ -174,7 +174,7 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
     std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> grouped_meshes;
 
     //FIXME this is ugly, it does not belong here.
-    for (size_t object_id = 0; object_id < print_object_ids.size(); ++ object_id) {
+    for (size_t object_id : print_object_ids) {
         const PrintObject       &print_object  = *print.get_object(object_id);
         const PrintObjectConfig &object_config = print_object.config();
         if (object_config.support_material_contact_distance < EPSILON)
@@ -186,7 +186,7 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
 
     // Group all meshes that can be processed together. NOTE this is different from mesh-groups! Only one setting object is needed per group, 
     // as different settings in the same group may only occur in the tip, which uses the original settings objects from the meshes.
-    for (size_t object_id = 0; object_id < print_object_ids.size(); ++ object_id) {
+    for (size_t object_id : print_object_ids) {
         const PrintObject       &print_object  = *print.get_object(object_id);
 #ifndef NDEBUG
         const PrintObjectConfig &object_config = print_object.config();
@@ -868,6 +868,7 @@ inline SupportGeneratorLayer& layer_allocate(
     return layer_initialize(layer_storage.back(), layer_type, slicing_params, layer_idx);
 }
 
+using SupportElements = std::deque<SupportElement>;
 /*!
  * \brief Creates the initial influence areas (that can later be propagated down) by placing them below the overhang.
  *
@@ -878,14 +879,14 @@ inline SupportGeneratorLayer& layer_allocate(
  * \param storage[in] Background storage, required for adding roofs.
  */
 static void generate_initial_areas(
-    const PrintObject                       &print_object,
-    const TreeModelVolumes                  &volumes,
-    const TreeSupportSettings               &config,
-    const std::vector<Polygons>             &overhangs,
-    std::vector<std::set<SupportElement*>>  &move_bounds,
-    SupportGeneratorLayersPtr               &top_contacts,
-    SupportGeneratorLayersPtr               &top_interface_layers,
-    SupportGeneratorLayerStorage            &layer_storage)
+    const PrintObject               &print_object,
+    const TreeModelVolumes          &volumes,
+    const TreeSupportSettings       &config,
+    const std::vector<Polygons>     &overhangs,
+    std::vector<SupportElements>    &move_bounds,
+    SupportGeneratorLayersPtr       &top_contacts,
+    SupportGeneratorLayersPtr       &top_interface_layers,
+    SupportGeneratorLayerStorage    &layer_storage)
 {
     using                           AvoidanceType = TreeModelVolumes::AvoidanceType;
     static constexpr const auto     base_radius = scaled<int>(0.01);
@@ -950,10 +951,9 @@ static void generate_initial_areas(
             // take the least restrictive avoidance possible
             Polygons relevant_forbidden;
             {
-                const Polygons &relevant_forbidden_raw = (mesh_config.support_rests_on_model ?
-                    (SUPPORT_TREE_ONLY_GRACIOUS_TO_MODEL ? volumes.getAvoidance(mesh_config.getRadius(0), layer_idx, AvoidanceType::Fast, true, min_xy_dist) :
-                        volumes.getCollision(mesh_config.getRadius(0), layer_idx, min_xy_dist)) :
-                    volumes.getAvoidance(mesh_config.getRadius(0), layer_idx, AvoidanceType::Fast, false, min_xy_dist));
+                const Polygons &relevant_forbidden_raw = mesh_config.support_rests_on_model ?
+                    volumes.getCollision(mesh_config.getRadius(0), layer_idx, min_xy_dist) :
+                    volumes.getAvoidance(mesh_config.getRadius(0), layer_idx, AvoidanceType::Fast, false, min_xy_dist);
                 // prevent rounding errors down the line, points placed directly on the line of the forbidden area may not be added otherwise.
                 relevant_forbidden = offset(union_ex(relevant_forbidden_raw), scaled<float>(0.005), jtMiter, 1.2);
             }
@@ -991,7 +991,7 @@ static void generate_initial_areas(
                             state.target_height = insert_layer;
                             state.target_position = p.first;
                             state.next_position = p.first;
-                            state.next_height = insert_layer;
+                            state.layer_idx = insert_layer;
                             state.effective_radius_height = dtt;
                             state.to_buildplate = to_bp;
                             state.distance_to_top = dtt;
@@ -1006,7 +1006,7 @@ static void generate_initial_areas(
                             state.can_use_safe_radius = safe_radius;
                             state.missing_roof_layers = force_tip_to_roof ? dont_move_until : 0;
                             state.skip_ovalisation = skip_ovalisation;
-                            move_bounds[insert_layer].emplace(new SupportElement(state, std::move(circle)));
+                            move_bounds[insert_layer].emplace_back(state, std::move(circle));
                         }
                     }
                 };
@@ -1134,10 +1134,9 @@ static void generate_initial_areas(
                     }
                     for (size_t lag_ctr = 1; lag_ctr <= max_overhang_insert_lag && !overhang_lines.empty() && layer_idx - coord_t(lag_ctr) >= 1; lag_ctr++) {
                         // get least restricted avoidance for layer_idx-lag_ctr
-                        const Polygons &relevant_forbidden_below = (mesh_config.support_rests_on_model ? 
-                            (SUPPORT_TREE_ONLY_GRACIOUS_TO_MODEL ? volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - lag_ctr, AvoidanceType::Fast, true, min_xy_dist) : 
-                                volumes.getCollision(mesh_config.getRadius(0), layer_idx - lag_ctr, min_xy_dist)) : 
-                            volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - lag_ctr, AvoidanceType::Fast, false, min_xy_dist));
+                        const Polygons &relevant_forbidden_below = mesh_config.support_rests_on_model ? 
+                            volumes.getCollision(mesh_config.getRadius(0), layer_idx - lag_ctr, min_xy_dist) :
+                            volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - lag_ctr, AvoidanceType::Fast, false, min_xy_dist);
                         // it is not required to offset the forbidden area here as the points wont change: If points here are not inside the forbidden area neither will they be later when placing these points, as these are the same points.
                         auto evaluatePoint = [&](std::pair<Point, LineStatus> p) { return contains(relevant_forbidden_below, p.first); };
 
@@ -1193,9 +1192,7 @@ static void generate_initial_areas(
                         Polygons forbidden_next;
                         {
                             const Polygons &forbidden_next_raw = mesh_config.support_rests_on_model ? 
-                                (SUPPORT_TREE_ONLY_GRACIOUS_TO_MODEL ? 
-                                    volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), AvoidanceType::Fast, true, min_xy_dist) :
-                                    volumes.getCollision(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), min_xy_dist)) :
+                                volumes.getCollision(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), min_xy_dist) :
                                 volumes.getAvoidance(mesh_config.getRadius(0), layer_idx - (dtt_roof + 1), AvoidanceType::Fast, false, min_xy_dist);
                             // prevent rounding errors down the line
                             //FIXME maybe use SafetyOffset::Yes at the following diff() instead?
@@ -1390,6 +1387,13 @@ static unsigned int move_inside(const Polygons &polygons, Point &from, int dista
     return -1;
 }
 
+static Point move_inside_if_outside(const Polygons &polygons, Point from, int distance = 0, int64_t maxDist2 = std::numeric_limits<int64_t>::max())
+{
+    if (! contains(polygons, from))
+        move_inside(polygons, from);
+    return from;
+}
+
 /*!
  * \brief Checks if an influence area contains a valid subsection and returns the corresponding metadata and the new Influence area.
  *
@@ -1558,24 +1562,24 @@ struct SupportElementInfluenceAreas {
 };
 
 struct SupportElementMerging {
-    SupportElementState                                state;
+    SupportElementState                     state;
     /*!
      * \brief All elements in the layer above the current one that are supported by this element
      */
-    boost::container::small_vector<SupportElement*, 4> parents;
+    SupportElement::ParentIndices           parents;
 
-    SupportElementInfluenceAreas                       areas;
+    SupportElementInfluenceAreas            areas;
     // Bounding box of all influence areas.
-    Eigen::AlignedBox<coord_t, 2>                      bbox_data;
+    Eigen::AlignedBox<coord_t, 2>           bbox_data;
 
-    const Eigen::AlignedBox<coord_t, 2>&               bbox() const { return bbox_data;}
-    const Point                                        centroid() const { return (bbox_data.min() + bbox_data.max()) / 2; }
-    void                                               set_bbox(const BoundingBox& abbox) 
+    const Eigen::AlignedBox<coord_t, 2>&    bbox() const { return bbox_data;}
+    const Point                             centroid() const { return (bbox_data.min() + bbox_data.max()) / 2; }
+    void                                    set_bbox(const BoundingBox& abbox) 
         { Point eps { coord_t(SCALED_EPSILON), coord_t(SCALED_EPSILON) }; bbox_data = { abbox.min - eps, abbox.max + eps }; }
 
     // Called by the AABBTree builder to get an index into the vector of source elements.
     // Not needed, thus zero is returned.
-    static size_t                                      idx() { return 0; }
+    static size_t                           idx() { return 0; }
 };
 
 // #define TREESUPPORT_DEBUG_SVG
@@ -1599,8 +1603,16 @@ struct SupportElementMerging {
  * \param mergelayer[in] Will the merge method be called on this layer. This information is required as some calculation can be avoided if they are not required for merging.
  */
 static void increase_areas_one_layer(
-    const TreeModelVolumes &volumes, const TreeSupportSettings &config,
-    std::vector<SupportElementMerging> &merging_areas, const LayerIndex layer_idx, const bool mergelayer)
+    const TreeModelVolumes              &volumes,
+    const TreeSupportSettings           &config,
+    // New areas at the layer below layer_idx
+    std::vector<SupportElementMerging>  &merging_areas,
+    // Layer above merging_areas.
+    const LayerIndex                     layer_idx, 
+    // Layer elements above merging_areas.
+    SupportElements                     &layer_elements,
+    // If false, the merging_areas will not be merged for performance reasons.
+    const bool                           mergelayer)
 {
     using AvoidanceType = TreeModelVolumes::AvoidanceType;
 
@@ -1609,7 +1621,7 @@ static void increase_areas_one_layer(
         for (size_t merging_area_idx = range.begin(); merging_area_idx < range.end(); ++ merging_area_idx) {
             SupportElementMerging   &merging_area   = merging_areas[merging_area_idx];
             assert(merging_area.parents.size() == 1);
-            SupportElement          &parent         = *merging_area.parents.front();
+            SupportElement          &parent         = layer_elements[merging_area.parents.front()];
             SupportElementState      elem           = SupportElementState::propagate_down(parent.state);
             const Polygons          &wall_restriction = 
                 // Abstract representation of the model outline. If an influence area would move through it, it could teleport through a wall.
@@ -1786,10 +1798,10 @@ static void increase_areas_one_layer(
                     BOOST_LOG_TRIVIAL(warning)
 #endif // TREE_SUPPORT_SHOW_ERRORS
                           << "Influence area could not be increased! Data about the Influence area: "
-                             "Radius: " << radius << " at layer: " << layer_idx - 1 << " NextTarget: " << elem.next_height << " Distance to top: " << elem.distance_to_top << 
+                             "Radius: " << radius << " at layer: " << layer_idx - 1 << " NextTarget: " << elem.layer_idx << " Distance to top: " << elem.distance_to_top <<
                              " Elephant foot increases " << elem.elephant_foot_increases << " use_min_xy_dist " << elem.use_min_xy_dist << " to buildplate " << elem.to_buildplate << 
                              " gracious " << elem.to_model_gracious << " safe " << elem.can_use_safe_radius << " until move " << elem.dont_move_until << " \n "
-                             "Parent " << &parent << ": Radius: " << config.getCollisionRadius(parent.state) << " at layer: " << layer_idx << " NextTarget: " << parent.state.next_height <<
+                             "Parent " << &parent << ": Radius: " << config.getCollisionRadius(parent.state) << " at layer: " << layer_idx << " NextTarget: " << parent.state.layer_idx <<
                              " Distance to top: " << parent.state.distance_to_top << " Elephant foot increases " << parent.state.elephant_foot_increases << "  use_min_xy_dist " << parent.state.use_min_xy_dist <<
                              " to buildplate " << parent.state.to_buildplate << " gracious " << parent.state.to_model_gracious << " safe " << parent.state.can_use_safe_radius << " until move " << parent.state.dont_move_until;
                     tree_supports_show_error("Potentially lost branch!", true);
@@ -1852,12 +1864,12 @@ static void increase_areas_one_layer(
 }
 
 [[nodiscard]] static SupportElementState merge_support_element_states(
-    const SupportElementState &first, const SupportElementState &second, const Point &next_position, const coord_t next_height,
+    const SupportElementState &first, const SupportElementState &second, const Point &next_position, const coord_t layer_idx,
     const TreeSupportSettings &config)
 {
     SupportElementState out;
-    out.next_position = next_position;
-    out.next_height   = next_height;
+    out.next_position   = next_position;
+    out.layer_idx       = layer_idx;
     out.use_min_xy_dist = first.use_min_xy_dist || second.use_min_xy_dist;
     out.supports_roof   = first.supports_roof || second.supports_roof;
     out.dont_move_until = std::max(first.dont_move_until, second.dont_move_until);
@@ -1998,9 +2010,7 @@ static bool merge_influence_areas_two_elements(
     // calculate which point is closest to the point of the last merge (or tip center if no merge above it has happened)
     // used at the end to estimate where to best place the branch on the bottom most layer
     // could be replaced with a random point inside the new area
-    Point new_pos = dst.state.next_position;
-    if (! contains(intersect, new_pos))
-        move_inside(intersect, new_pos);
+    Point new_pos = move_inside_if_outside(intersect, dst.state.next_position);
 
     SupportElementState new_state = merge_support_element_states(dst.state, src.state, new_pos, layer_idx - 1, config);
     new_state.increased_to_model_radius = increased_to_model_radius == 0 ? 
@@ -2232,7 +2242,7 @@ static void merge_influence_areas(
  *
  * \param move_bounds[in,out] All currently existing influence areas
  */
-static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupportSettings &config, std::vector<std::set<SupportElement*>> &move_bounds)
+static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupportSettings &config, std::vector<SupportElements> &move_bounds)
 {
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     const double data_size_inverse = 1 / double(move_bounds.size());
@@ -2251,7 +2261,7 @@ static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupp
     // Calculate the influence areas for each layer below (Top down)
     // This is done by first increasing the influence area by the allowed movement distance, and merging them with other influence areas if possible
     for (int layer_idx = int(move_bounds.size()) - 1; layer_idx > 0; -- layer_idx)
-        if (const std::set<SupportElement*> &prev_layer = move_bounds[layer_idx]; ! prev_layer.empty()) {
+        if (SupportElements &prev_layer = move_bounds[layer_idx]; ! prev_layer.empty()) {
             // merging is expensive and only parallelized to a max speedup of 2. As such it may be useful in some cases to only merge every few layers to improve performance.
             bool had_new_element = new_element;
             const bool merge_this_layer = had_new_element || size_t(last_merge_layer_idx - layer_idx) >= merge_every_x_layers;
@@ -2262,17 +2272,17 @@ static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupp
             // ### Increase the influence areas by the allowed movement distance
             std::vector<SupportElementMerging> influence_areas;
             influence_areas.reserve(prev_layer.size());
-            std::transform(prev_layer.begin(), prev_layer.end(), std::back_inserter(influence_areas),
-                [](SupportElement* el) { 
-                    assert(! el->influence_area.empty());
-                    boost::container::small_vector<SupportElement*, 4> parents;
-                    parents.emplace_back(el);
-                    return SupportElementMerging{ el->state, parents };
-                });
-            increase_areas_one_layer(volumes, config, influence_areas, layer_idx, merge_this_layer);
+            for (int32_t element_idx = 0; element_idx < int32_t(prev_layer.size()); ++ element_idx) {
+                SupportElement &el = prev_layer[element_idx];
+                assert(!el.influence_area.empty());
+                SupportElement::ParentIndices parents;
+                parents.emplace_back(element_idx);
+                influence_areas.push_back({ el.state, parents });
+            }
+            increase_areas_one_layer(volumes, config, influence_areas, layer_idx, prev_layer, merge_this_layer);
 
             // Place already fully constructed elements to the output, remove them from influence_areas.
-            std::set<SupportElement*> &this_layer = move_bounds[layer_idx - 1];
+            SupportElements &this_layer = move_bounds[layer_idx - 1];
             influence_areas.erase(std::remove_if(influence_areas.begin(), influence_areas.end(),
                 [&this_layer, layer_idx](SupportElementMerging &elem) {
                     if (elem.areas.influence_areas.empty())
@@ -2284,7 +2294,7 @@ static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupp
                             tree_supports_show_error("Insert error of area after bypassing merge.\n", true);
                         }
                         // Move the area to output.
-                        this_layer.emplace(new SupportElement(elem.state, std::move(elem.parents), std::move(elem.areas.influence_areas)));
+                        this_layer.emplace_back(elem.state, std::move(elem.parents), std::move(elem.areas.influence_areas));
                         return true;
                     }
                     // Keep the area.
@@ -2316,7 +2326,7 @@ static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupp
                         BOOST_LOG_TRIVIAL(error) << "Insert Error of Influence area on layer " << layer_idx - 1 << ". Origin of " << elem.parents.size() << " areas. Was to bp " << elem.state.to_buildplate;
                         tree_supports_show_error("Insert error of area after merge.\n", true);
                     }
-                    this_layer.emplace(new SupportElement(elem.state, std::move(elem.parents), std::move(new_area)));
+                    this_layer.emplace_back(elem.state, std::move(elem.parents), std::move(new_area));
                 }
 
     #ifdef SLIC3R_TREESUPPORTS_PROGRESS
@@ -2334,27 +2344,39 @@ static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupp
  *
  * \param elem[in] The SupportElements, which parent's position should be determined.
  */
-static void set_points_on_areas(const SupportElement* elem)
+static void set_points_on_areas(const SupportElement &elem, SupportElements *layer_above)
 {
-    // Based on the branch center point of the current layer, the point on the next (further up) layer is calculated.
+    assert(!elem.state.deleted);
+    assert(layer_above != nullptr || elem.parents.empty());
 
-    if (! elem->state.result_on_layer_is_set()) {
+    // Based on the branch center point of the current layer, the point on the next (further up) layer is calculated.
+    if (! elem.state.result_on_layer_is_set()) {
         BOOST_LOG_TRIVIAL(error) << "Uninitialized support element";
         tree_supports_show_error("Uninitialized support element. A branch may be missing.\n", true);
         return;
     }
 
-    for (SupportElement* next_elem : elem->parents)
-        // if the value was set somewhere else it it kept. This happens when a branch tries not to move after being unable to create a roof.
-        if (! next_elem->state.result_on_layer_is_set()) {
-            Point from = elem->state.result_on_layer;
-            if (! contains(next_elem->influence_area, from)) {
-                move_inside(next_elem->influence_area, from, 0); // Move inside has edgecases (see tests) so DONT use Polygons.inside to confirm correct move, Error with distance 0 is <= 1
-                // it is not required to check if how far this move moved a point as is can be larger than maximum_movement_distance. While this seems like a problem it may for example occur after merges.
+    if (layer_above)
+        for (int32_t next_elem_idx : elem.parents) {
+            assert(next_elem_idx >= 0);
+            SupportElement &next_elem = (*layer_above)[next_elem_idx];
+            assert(! next_elem.state.deleted);
+            // if the value was set somewhere else it it kept. This happens when a branch tries not to move after being unable to create a roof.
+            if (! next_elem.state.result_on_layer_is_set()) {
+                // Move inside has edgecases (see tests) so DONT use Polygons.inside to confirm correct move, Error with distance 0 is <= 1
+                // it is not required to check if how far this move moved a point as is can be larger than maximum_movement_distance. 
+                // While this seems like a problem it may for example occur after merges.
+                next_elem.state.result_on_layer = move_inside_if_outside(next_elem.influence_area, elem.state.result_on_layer);
+                // do not call recursive because then amount of layers would be restricted by the stack size
             }
-            next_elem->state.result_on_layer = from;
-            // do not call recursive because then amount of layers would be restricted by the stack size
         }
+}
+
+static void set_to_model_contact_simple(SupportElement &elem)
+{
+    const Point best = move_inside_if_outside(elem.influence_area, elem.state.next_position);
+    elem.state.result_on_layer = best;
+    BOOST_LOG_TRIVIAL(debug) << "Added NON gracious Support On Model Point (" << best.x() << "," << best.y() << "). The current layer is " << elem.state.layer_idx;
 }
 
 /*!
@@ -2363,73 +2385,93 @@ static void set_points_on_areas(const SupportElement* elem)
  * \param move_bounds[in,out] All currently existing influence areas
  * \param first_elem[in,out] SupportElement that did not have its result_on_layer set meaning that it does not have a child element.
  * \param layer_idx[in] The current layer.
- * \return Should elem be deleted.
  */
-static bool set_to_model_contact(const TreeModelVolumes &volumes, const TreeSupportSettings &config, std::vector<std::set<SupportElement*>> &move_bounds, SupportElement *first_elem, const LayerIndex layer_idx)
+static void set_to_model_contact_to_model_gracious(
+    const TreeModelVolumes          &volumes, 
+    const TreeSupportSettings       &config, 
+    std::vector<SupportElements>    &move_bounds, 
+    SupportElement                  &first_elem)
 {
-    if (first_elem->state.to_model_gracious)
+    SupportElement *last_successfull_layer = nullptr;
+
+    // check for every layer upwards, up to the point where this influence area was created (either by initial insert or merge) if the branch could be placed on it, and highest up layer index.
     {
-        SupportElement* check = first_elem;
-
-        std::vector<SupportElement*> checked;
-        LayerIndex last_successfull_layer = layer_idx;
-        bool set = false;
-
-        // check for every layer upwards, up to the point where this influence area was created (either by initial insert or merge) if the branch could be placed on it, and highest up layer index.
-        for (LayerIndex layer_check = layer_idx; check->state.next_height >= layer_check; ++ layer_check) {
-            if (! intersection(check->influence_area, volumes.getPlaceableAreas(config.getCollisionRadius(check->state), layer_check)).empty()) {
-                set = true;
-                last_successfull_layer = layer_check;
-            }
-            checked.emplace_back(check);
-            if (check->parents.size() == 1)
-                check = check->parents[0];
-            else
-                // reached merge point
+        SupportElement *elem = &first_elem;
+        for (LayerIndex layer_check = elem->state.layer_idx;
+            ! intersection(elem->influence_area, volumes.getPlaceableAreas(config.getCollisionRadius(elem->state), layer_check)).empty();
+            elem = &move_bounds[++ layer_check][elem->parents.front()]) {
+            assert(elem->state.layer_idx == layer_check);
+            assert(! elem->state.deleted);
+            assert(elem->state.to_model_gracious);
+            last_successfull_layer = elem;
+            if (elem->parents.size() != 1)
+                // Reached merge point.
                 break;
         }
+    }
 
-        // Could not find valid placement, even though it should exist => error handling
-        if (!set) {
-            if (SUPPORT_TREE_ONLY_GRACIOUS_TO_MODEL) {
-                BOOST_LOG_TRIVIAL(warning) << "No valid placement found for to model gracious element on layer " << layer_idx << ": REMOVING BRANCH";
-                tree_supports_show_error("Could not fine valid placement on model! Removing this branch...", true);
-                for (LayerIndex layer = layer_idx; layer <= first_elem->state.next_height; ++ layer) {
-                    move_bounds[layer].erase(checked[layer - layer_idx]);
-                    delete checked[layer - layer_idx];
-                }
-            } else {
-                BOOST_LOG_TRIVIAL(warning) << "No valid placement found for to model gracious element on layer " << layer_idx;
-                tree_supports_show_error("Could not fine valid placement on model! Just placing it down anyway. Could cause floating branches.", true);
-                first_elem->state.to_model_gracious = false;
-                return set_to_model_contact(volumes, config, move_bounds, first_elem, layer_idx);
+    // Could not find valid placement, even though it should exist => error handling
+    if (last_successfull_layer == nullptr) {
+        BOOST_LOG_TRIVIAL(warning) << "No valid placement found for to model gracious element on layer " << first_elem.state.layer_idx;
+        tree_supports_show_error("Could not fine valid placement on model! Just placing it down anyway. Could cause floating branches.", true);
+        first_elem.state.to_model_gracious = false;
+        set_to_model_contact_simple(first_elem);
+    } else {
+        // Found a gracious area above first_elem. Remove all below last_successfull_layer.
+        {
+            LayerIndex parent_layer_idx = first_elem.state.layer_idx;
+            for (SupportElement *elem = &first_elem; elem != last_successfull_layer; elem = &move_bounds[++ parent_layer_idx][elem->parents.front()]) {
+                assert(! elem->state.deleted);
+                elem->state.deleted = true;
             }
         }
-
-        for (LayerIndex layer = layer_idx + 1; layer < last_successfull_layer - 1; ++ layer) {
-            move_bounds[layer].erase(checked[layer - layer_idx]);
-            delete checked[layer - layer_idx];
-        }
-
         // Guess a point inside the influence area, in which the branch will be placed in.
-        Point best = checked[last_successfull_layer - layer_idx]->state.next_position;
-        if (! contains(checked[last_successfull_layer - layer_idx]->influence_area, best))
-            move_inside(checked[last_successfull_layer - layer_idx]->influence_area, best);
-        checked[last_successfull_layer - layer_idx]->state.result_on_layer = best;
-
+        const Point best = move_inside_if_outside(last_successfull_layer->influence_area, last_successfull_layer->state.next_position);
+        last_successfull_layer->state.result_on_layer = best;
         BOOST_LOG_TRIVIAL(debug) << "Added gracious Support On Model Point (" << best.x() << "," << best.y() << "). The current layer is " << last_successfull_layer;
-
-        return last_successfull_layer != layer_idx;
     }
-    else // can not add graceful => just place it here and hope for the best
-    {
-        Point best = first_elem->state.next_position;
-        if (! contains(first_elem->influence_area, best))
-            move_inside(first_elem->influence_area, best);
-        first_elem->state.result_on_layer = best;
-        first_elem->state.to_model_gracious = false;
-        BOOST_LOG_TRIVIAL(debug) << "Added NON gracious Support On Model Point (" << best.x() << "," << best.y() << "). The current layer is " << layer_idx;
-        return false;
+}
+
+// Remove elements marked as "deleted", update indices to parents.
+static void remove_deleted_elements(std::vector<SupportElements> &move_bounds)
+{
+    std::vector<int32_t> map_parents;
+    std::vector<int32_t> map_current;
+    for (LayerIndex layer_idx = LayerIndex(move_bounds.size()) - 1; layer_idx >= 0; -- layer_idx) {
+        SupportElements &layer = move_bounds[layer_idx];
+        map_current.clear();
+        for (int32_t i = 0; i < int32_t(layer.size());) {
+            SupportElement &element = layer[i];
+            if (element.state.deleted) {
+                if (map_current.empty()) {
+                    // Initialize with identity map.
+                    map_current.assign(layer.size(), 0);
+                    std::iota(map_current.begin(), map_current.end(), 0);
+                }
+                // Delete all "deleted" elements from the end of the layer vector.
+                while (i < layer.size() && layer.back().state.deleted) {
+                    layer.pop_back();
+                    // Mark as deleted in the map.
+                    map_current[layer.size()] = -1;
+                }
+                assert(i == layer.size() || i + 1 < layer.size());
+                if (i + 1 < layer.size()) {
+                    element = std::move(layer.back());
+                    layer.pop_back();                    
+                    // Mark the current element as deleted.
+                    map_current[i] = -1;
+                    // Mark the moved element as moved to index i.
+                    map_current[layer.size()] = i;
+                }
+            } else {
+                // Current element is not deleted. Update its parent indices.
+                if (! map_parents.empty())
+                    for (int32_t &parent_idx : element.parents)
+                        parent_idx = map_parents[parent_idx];
+                ++ i;
+            }
+        }
+        std::swap(map_current, map_parents);
     }
 }
 
@@ -2439,58 +2481,67 @@ static bool set_to_model_contact(const TreeModelVolumes &volumes, const TreeSupp
  * \param move_bounds[in,out] All currently existing influence areas
  */
 static void create_nodes_from_area(
-    const TreeModelVolumes                 &volumes,
-    const TreeSupportSettings              &config,
-    std::vector<std::set<SupportElement*>> &move_bounds)
+    const TreeModelVolumes       &volumes,
+    const TreeSupportSettings    &config,
+    std::vector<SupportElements> &move_bounds)
 {
-    // Initialize points on layer 0, with a "random" point in the influence area. Point is chosen based on an inaccurate estimate where the branches will split into two, but every point inside the influence area would produce a valid result.
-    for (SupportElement* init : move_bounds[0]) {
-        Point p = init->state.next_position;
-        if (! contains(init->influence_area, p))
-            move_inside(init->influence_area, p, 0);
-        init->state.result_on_layer = p;
-        set_points_on_areas(init); // also set the parent nodes, as these will be required for the first iteration of the loop below
+    // Initialize points on layer 0, with a "random" point in the influence area. 
+    // Point is chosen based on an inaccurate estimate where the branches will split into two, but every point inside the influence area would produce a valid result.
+    for (SupportElement &init : move_bounds.front()) {
+        init.state.result_on_layer = move_inside_if_outside(init.influence_area, init.state.next_position);
+        // Also set the parent nodes, as these will be required for the first iteration of the loop below.
+        set_points_on_areas(init, move_bounds.size() > 1 ? &move_bounds[1] : nullptr);
     }
 
     for (LayerIndex layer_idx = 1; layer_idx < LayerIndex(move_bounds.size()); ++ layer_idx) {
-        std::unordered_set<SupportElement*> remove;
-        for (SupportElement* elem : move_bounds[layer_idx]) {
-            bool removed = false;
+        auto &layer       = move_bounds[layer_idx];
+        auto *layer_above = layer_idx + 1 < move_bounds.size() ? &move_bounds[layer_idx + 1] : nullptr;
+        for (SupportElement &elem : layer) {
+            assert(! elem.state.deleted);
+            assert(elem.state.layer_idx == layer_idx);
             // check if the resulting center point is not yet set
-            if (! elem->state.result_on_layer_is_set()) {
-                if (elem->state.to_buildplate || (!elem->state.to_buildplate && elem->state.distance_to_top < config.min_dtt_to_model && !elem->state.supports_roof)) {
-                    if (elem->state.to_buildplate) {
-                        BOOST_LOG_TRIVIAL(error) << "Uninitialized Influence area targeting " << elem->state.target_position.x() << "," << elem->state.target_position.y() << ") "
-                            "at target_height: " << elem->state.target_height << " layer: " << layer_idx;
+            if (! elem.state.result_on_layer_is_set()) {
+                if (elem.state.to_buildplate || (elem.state.distance_to_top < config.min_dtt_to_model && ! elem.state.supports_roof)) {
+                    if (elem.state.to_buildplate) {
+                        BOOST_LOG_TRIVIAL(error) << "Uninitialized Influence area targeting " << elem.state.target_position.x() << "," << elem.state.target_position.y() << ") "
+                            "at target_height: " << elem.state.target_height << " layer: " << layer_idx;
                         tree_supports_show_error("Uninitialized support element! A branch could be missing or exist partially.", true);
                     }
-                    remove.emplace(elem); // we dont need to remove yet the parents as they will have a lower dtt and also no result_on_layer set
-                    removed = true;
-                    for (SupportElement* parent : elem->parents)
+                    // we dont need to remove yet the parents as they will have a lower dtt and also no result_on_layer set
+                    elem.state.deleted = true;
+                    for (int32_t parent_idx : elem.parents)
                         // When the roof was not able to generate downwards enough, the top elements may have not moved, and have result_on_layer already set.
                         // As this branch needs to be removed => all parents result_on_layer have to be invalidated.
-                        parent->state.result_on_layer_reset();
+                        (*layer_above)[parent_idx].state.result_on_layer_reset();
                     continue;
                 } else {
                     // set the point where the branch will be placed on the model
-                    removed = set_to_model_contact(volumes, config, move_bounds, elem, layer_idx);
-                    if (removed)
-                        remove.emplace(elem);
+                    if (elem.state.to_model_gracious)
+                        set_to_model_contact_to_model_gracious(volumes, config, move_bounds, elem);
+                    else
+                        set_to_model_contact_simple(elem);
                 }
             }
-
-            if (!removed)
-                set_points_on_areas(elem); // element is valid now setting points in the layer above
+            if (! elem.state.deleted)
+                // element is valid now setting points in the layer above
+                set_points_on_areas(elem, layer_above);
         }
-
-        // delete all not needed support elements
-        for (SupportElement* del : remove) {
-            move_bounds[layer_idx].erase(del);
-            delete del;
-        }
-        remove.clear();
     }
+
+    remove_deleted_elements(move_bounds);
 }
+
+// For producing circular / elliptical areas from SupportElements (one DrawArea per one SupportElement)
+// and for smoothing those areas along the tree branches.
+struct DrawArea
+{
+    // Element to be processed.
+    SupportElement *element;
+    // Element below, if there is such an element. nullptr if element is a root of a tree.
+    SupportElement *child_element;
+    // Polygons to be extruded for this element.
+    Polygons        polygons;
+};
 
 /*!
  * \brief Draws circles around result_on_layer points of the influence areas
@@ -2499,63 +2550,55 @@ static void create_nodes_from_area(
  * \param layer_tree_polygons[out] Resulting branch areas with the layerindex they appear on. layer_tree_polygons.size() has to be at least linear_data.size() as each Influence area in linear_data will save have at least one (that's why it's a vector<vector>) corresponding branch area in layer_tree_polygons.
  * \param inverse_tree_order[in] A mapping that returns the child of every influence area.
  */
-static void generate_branch_areas(
-    const TreeModelVolumes                                          &volumes,
-    const TreeSupportSettings                                       &config,
-    std::vector<std::pair<LayerIndex, SupportElement*>>             &linear_data, 
-    std::vector<std::unordered_map<SupportElement*, Polygons>>      &layer_tree_polygons, 
-    const std::map<SupportElement*, SupportElement*>                &inverse_tree_order)
+static void generate_branch_areas(const TreeModelVolumes &volumes, const TreeSupportSettings &config, const std::vector<SupportElements> &move_bounds, std::vector<DrawArea> &linear_data)
 {
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     double progress_total = TREE_PROGRESS_PRECALC_AVO + TREE_PROGRESS_PRECALC_COLL + TREE_PROGRESS_GENERATE_NODES + TREE_PROGRESS_AREA_CALC;
     constexpr int progress_report_steps = 10;
+    const size_t progress_inserts_check_interval = linear_data.size() / progress_report_steps;
+    std::mutex critical_sections;
 #endif // SLIC3R_TREESUPPORTS_PROGRESS
 
     // Pre-generate a circle with correct diameter so that we don't have to recompute those (co)sines every time.
-    const Polygon         branch_circle = make_circle(config.branch_radius, SUPPORT_TREE_CIRCLE_RESOLUTION);
-    std::vector<Polygons> linear_inserts(linear_data.size());
+    const Polygon branch_circle = make_circle(config.branch_radius, SUPPORT_TREE_CIRCLE_RESOLUTION);
 
-#ifdef SLIC3R_TREESUPPORTS_PROGRESS
-    const size_t progress_inserts_check_interval = linear_data.size() / progress_report_steps;
-#endif // SLIC3R_TREESUPPORTS_PROGRESS
-
-    std::mutex critical_sections;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, linear_data.size()),
-        [&](const tbb::blocked_range<size_t> &range) {
+        [&volumes, &config, &move_bounds, &linear_data, &branch_circle](const tbb::blocked_range<size_t> &range) {
         for (size_t idx = range.begin(); idx < range.end(); ++ idx) {
-            const LayerIndex      layer_idx  = linear_data[idx].first;
-            const SupportElement *elem       = linear_data[idx].second;
-            const auto            it_elem    = inverse_tree_order.find(const_cast<SupportElement*>(elem));
-            const SupportElement* child_elem = it_elem == inverse_tree_order.end() ? nullptr : it_elem->second;
-            const coord_t         radius     = config.getRadius(*elem);
+            DrawArea             &draw_area  = linear_data[idx];
+            const LayerIndex      layer_idx  = draw_area.element->state.layer_idx;
+            const coord_t         radius     = config.getRadius(*draw_area.element);
             bool                  parent_uses_min = false;
 
             // Calculate multiple ovalized circles, to connect with every parent and child. Also generate regular circle for the current layer. Merge all these into one area.
             std::vector<std::pair<Point, coord_t>> movement_directions{ std::pair<Point, coord_t>(Point(0, 0), radius) };
-            if (!elem->state.skip_ovalisation) {
-                if (child_elem != nullptr) {
-                    const Point movement = child_elem->state.result_on_layer - elem->state.result_on_layer;
+            if (! draw_area.element->state.skip_ovalisation) {
+                if (draw_area.child_element != nullptr) {
+                    const Point movement = draw_area.child_element->state.result_on_layer - draw_area.element->state.result_on_layer;
                     movement_directions.emplace_back(movement, radius);
                 }
-                for (SupportElement *parent : elem->parents) {
-                    const Point movement = parent->state.result_on_layer - elem->state.result_on_layer;
-                    movement_directions.emplace_back(movement, std::max(config.getRadius(*parent), config.support_line_width));
-                    parent_uses_min |= parent->state.use_min_xy_dist;
+                const SupportElements *layer_above = layer_idx + 1 < move_bounds.size() ? &move_bounds[layer_idx + 1] : nullptr;
+                for (int32_t parent_idx : draw_area.element->parents) {
+                    const SupportElement &parent = (*layer_above)[parent_idx];
+                    const Point movement = parent.state.result_on_layer - draw_area.element->state.result_on_layer;
+                    //FIXME why max(..., config.support_line_width)?
+                    movement_directions.emplace_back(movement, std::max(config.getRadius(parent), config.support_line_width));
+                    parent_uses_min |= parent.state.use_min_xy_dist;
                 }
             }
 
-            double max_speed = 0;
-            auto generateArea = [&volumes, layer_idx, elem, &branch_circle, branch_radius = config.branch_radius, support_line_width = config.support_line_width, &movement_directions, &max_speed, parent_uses_min](
-                    coord_t aoffset) {
+            const Polygons &collision = volumes.getCollision(0, layer_idx, parent_uses_min || draw_area.element->state.use_min_xy_dist);
+            auto generateArea = [&collision, &draw_area, &branch_circle, branch_radius = config.branch_radius, support_line_width = config.support_line_width, &movement_directions]
+                    (coord_t aoffset, double &max_speed) {
                 Polygons poly;
-
+                max_speed = 0;
                 for (std::pair<Point, coord_t> movement : movement_directions) {
                     max_speed = std::max(max_speed, movement.first.cast<double>().norm());
 
                     // Visualization: https://jsfiddle.net/0zvcq39L/2/
                     // Ovalizes the circle to an ellipse, that contains both old center and new target position.
                     double used_scale = (movement.second + aoffset) / (1.0 * branch_radius);
-                    Point center_position = elem->state.result_on_layer + movement.first / 2;
+                    Point center_position = draw_area.element->state.result_on_layer + movement.first / 2;
                     const double moveX = movement.first.x() / (used_scale * branch_radius);
                     const double moveY = movement.first.y() / (used_scale * branch_radius);
                     const double vsize_inv = 0.5 / (0.01 + std::sqrt(moveX * moveX + moveY * moveY));
@@ -2572,48 +2615,48 @@ static void generate_branch_areas(
                     poly.emplace_back(std::move(circle));
                 }
 
-                poly = diff_clipped(offset(union_(poly), std::min(coord_t(50), support_line_width / 4), jtMiter, 1.2), 
-                    // There seem to be some rounding errors, causing a branch to be a tiny bit further away from the model that it has to be.
-                    // This can cause the tip to be slightly further away front the overhang (x/y wise) than optimal. This fixes it, and for every other part, 0.05mm will not be noticed.
-                    volumes.getCollision(0, layer_idx, parent_uses_min || elem->state.use_min_xy_dist));
+                // There seem to be some rounding errors, causing a branch to be a tiny bit further away from the model that it has to be.
+                // This can cause the tip to be slightly further away front the overhang (x/y wise) than optimal. This fixes it, and for every other part, 0.05mm will not be noticed.
+                poly = diff_clipped(offset(union_(poly), std::min(coord_t(50), support_line_width / 4), jtMiter, 1.2), collision);
                 return poly;
             };
 
-            bool fast_relative_movement = max_speed > radius * 0.75;
+            // Ensure branch area will not overlap with model/collision. This can happen because of e.g. ovalization or increase_until_radius.
+            double     max_speed;
+            Polygons   polygons = generateArea(0, max_speed);
+            const bool fast_relative_movement = max_speed > radius * 0.75;
 
-            // ensure branch area will not overlap with model/collision. This can happen because of e.g. ovalization or increase_until_radius.
-            linear_inserts[idx] = generateArea(0);
-
-            if (fast_relative_movement || config.getRadius(*elem) - config.getCollisionRadius(elem->state) > config.support_line_width) {
-                // simulate the path the nozzle will take on the outermost wall
-                // if multiple parts exist, the outer line will not go all around the support part potentially causing support material to be printed mid air
-                ExPolygons nozzle_path = offset_ex(linear_inserts[idx], -config.support_line_width / 2);
+            if (fast_relative_movement || config.getRadius(*draw_area.element) - config.getCollisionRadius(draw_area.element->state) > config.support_line_width) {
+                // Simulate the path the nozzle will take on the outermost wall.
+                // If multiple parts exist, the outer line will not go all around the support part potentially causing support material to be printed mid air.
+                ExPolygons nozzle_path = offset_ex(polygons, - config.support_line_width / 2);
                 if (nozzle_path.size() > 1) {
                     // Just try to make the area a tiny bit larger.
-                    linear_inserts[idx] = generateArea(config.support_line_width / 2);
-                    nozzle_path = offset_ex(linear_inserts[idx], -config.support_line_width / 2);
-
-                    // if larger area did not fix the problem, all parts off the nozzle path that do not contain the center point are removed, hoping for the best
+                    polygons = generateArea(config.support_line_width / 2, max_speed);
+                    nozzle_path = offset_ex(polygons, -config.support_line_width / 2);
+                    // If larger area did not fix the problem, all parts off the nozzle path that do not contain the center point are removed, hoping for the best.
                     if (nozzle_path.size() > 1) {
-                        Polygons polygons_with_correct_center;
+                        ExPolygons polygons_with_correct_center;
                         for (ExPolygon &part : nozzle_path) {
-                            if (part.contains(elem->state.result_on_layer))
-                                polygons_with_correct_center = union_(polygons_with_correct_center, part);
-                            else {
+                            bool drop = false;
+                            if (! part.contains(draw_area.element->state.result_on_layer)) {
                                 // try a fuzzy inside as sometimes the point should be on the border, but is not because of rounding errors...
-                                Point from = elem->state.result_on_layer;
-                                Polygons to = to_polygons(std::move(part));
-                                move_inside(to, from, 0);
-                                if ((elem->state.result_on_layer - from).cast<double>().norm() < scaled<double>(0.025))
-                                    polygons_with_correct_center = union_(polygons_with_correct_center, to);
+                                Point pt = draw_area.element->state.result_on_layer;
+                                move_inside(to_polygons(part), pt, 0);
+                                drop = (draw_area.element->state.result_on_layer - pt).cast<double>().norm() >= scaled<double>(0.025);
                             }
+                            if (! drop)
+                                polygons_with_correct_center.emplace_back(std::move(part));
                         }
                         // Increase the area again, to ensure the nozzle path when calculated later is very similar to the one assumed above.
-                        linear_inserts[idx] = offset(polygons_with_correct_center, config.support_line_width / 2, jtMiter, 1.2);
-                        linear_inserts[idx] = diff_clipped(linear_inserts[idx], volumes.getCollision(0, linear_data[idx].first, parent_uses_min || elem->state.use_min_xy_dist));
+                        polygons = diff_clipped(offset(polygons_with_correct_center, config.support_line_width / 2, jtMiter, 1.2), 
+                            //FIXME Vojtech: Clipping may split the region into multiple pieces again, reversing the fixing effort.
+                            collision);
                     }
                 }
             }
+
+            draw_area.polygons = std::move(polygons);
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
             if (idx % progress_inserts_check_interval == 0) {
@@ -2624,10 +2667,6 @@ static void generate_branch_areas(
 #endif
         }
     });
-
-    // single threaded combining all elements to the right layers. ONLY COPYS DATA!
-    for (coord_t i = 0; i < static_cast<coord_t>(linear_data.size()); i++)
-        layer_tree_polygons[linear_data[i].first].emplace(linear_data[i].second, linear_inserts[i]);
 }
 
 /*!
@@ -2635,7 +2674,11 @@ static void generate_branch_areas(
  *
  * \param layer_tree_polygons[in,out] Resulting branch areas with the layerindex they appear on.
  */
-static void smooth_branch_areas(const TreeSupportSettings &config, std::vector<std::unordered_map<SupportElement*, Polygons>> &layer_tree_polygons)
+static void smooth_branch_areas(
+    const TreeSupportSettings      &config,
+    std::vector<SupportElements>   &move_bounds,
+    std::vector<DrawArea>          &linear_data,
+    const std::vector<size_t>      &linear_data_layers)
 {
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     double progress_total = TREE_PROGRESS_PRECALC_AVO + TREE_PROGRESS_PRECALC_COLL + TREE_PROGRESS_GENERATE_NODES + TREE_PROGRESS_AREA_CALC + TREE_PROGRESS_GENERATE_BRANCH_AREAS;
@@ -2644,35 +2687,38 @@ static void smooth_branch_areas(const TreeSupportSettings &config, std::vector<s
     const coord_t max_radius_change_per_layer = 1 + config.support_line_width / 2; // this is the upper limit a radius may change per layer. +1 to avoid rounding errors
 
     // smooth upwards
-    for (LayerIndex layer_idx = 0; layer_idx < LayerIndex(layer_tree_polygons.size()) - 1; ++ layer_idx) {
-        std::vector<std::pair<SupportElement*, Polygons>> processing;
-        processing.insert(processing.end(), layer_tree_polygons[layer_idx].begin(), layer_tree_polygons[layer_idx].end());
-        std::vector<std::vector<std::pair<SupportElement*, Polygons>>> update_next(processing.size()); // with this a lock can be avoided
-
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, processing.size()),
+    for (LayerIndex layer_idx = 0; layer_idx < LayerIndex(move_bounds.size()) - 1; ++ layer_idx) {
+        const size_t processing_base       = linear_data_layers[layer_idx];
+        const size_t processing_base_above = linear_data_layers[layer_idx + 1];
+        const SupportElements &layer_above = move_bounds[layer_idx + 1];
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, processing_base_above - processing_base),
             [&](const tbb::blocked_range<size_t> &range) {
             for (size_t processing_idx = range.begin(); processing_idx < range.end(); ++ processing_idx) {
-                std::pair<SupportElement*, Polygons> data_pair = processing[processing_idx];
-                double max_outer_wall_distance = 0;
-                bool do_something = false;
-                for (SupportElement* parent : data_pair.first->parents)
-                    if (config.getRadius(parent->state) != config.getCollisionRadius(parent->state)) {
+                DrawArea &draw_area               = linear_data[processing_base + processing_idx];
+                double    max_outer_wall_distance = 0;
+                bool      do_something            = false;
+                for (int32_t parent_idx : draw_area.element->parents) {
+                    const SupportElement &parent = layer_above[parent_idx];
+                    if (config.getRadius(parent.state) != config.getCollisionRadius(parent.state)) {
                         do_something = true;
-                        max_outer_wall_distance = std::max(max_outer_wall_distance, (data_pair.first->state.result_on_layer - parent->state.result_on_layer).cast<double>().norm() - (config.getRadius(*data_pair.first) - config.getRadius(*parent)));
+                        max_outer_wall_distance = std::max(max_outer_wall_distance, (draw_area.element->state.result_on_layer - parent.state.result_on_layer).cast<double>().norm() - (config.getRadius(*draw_area.element) - config.getRadius(parent)));
                     }
+                }
                 max_outer_wall_distance += max_radius_change_per_layer; // As this change is a bit larger than what usually appears, lost radius can be slowly reclaimed over the layers.
                 if (do_something) {
-                    Polygons max_allowed_area = offset(data_pair.second, float(max_outer_wall_distance), jtMiter, 1.2);
-                    for (SupportElement* parent : data_pair.first->parents)
-                        if (config.getRadius(parent->state) != config.getCollisionRadius(parent->state))
-                            update_next[processing_idx].emplace_back(std::pair<SupportElement*, Polygons>(parent, intersection(layer_tree_polygons[layer_idx + 1][parent], max_allowed_area)));
+                    Polygons max_allowed_area = offset(draw_area.polygons, float(max_outer_wall_distance), jtMiter, 1.2);
+                    for (int32_t parent_idx : draw_area.element->parents) {
+                        const SupportElement &parent = layer_above[parent_idx];
+                        if (config.getRadius(parent.state) != config.getCollisionRadius(parent.state)) {
+                            // No other element on this layer than the current one may be connected to &parent,
+                            // thus it is safe to update parent's DrawArea directly.
+                            Polygons &dst = linear_data[processing_base_above + parent_idx].polygons;
+                            dst = intersection(dst, max_allowed_area);
+                        }
+                    }
                 }
             }
         });
-
-        for (std::vector<std::pair<SupportElement*, Polygons>> data_vector : update_next)
-            for (std::pair<SupportElement*, Polygons> data_pair : data_vector)
-                layer_tree_polygons[layer_idx + 1][data_pair.first] = data_pair.second;
     }
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
@@ -2681,45 +2727,41 @@ static void smooth_branch_areas(const TreeSupportSettings &config, std::vector<s
 #endif
 
     // smooth downwards
-    std::unordered_set<SupportElement*> updated_last_iteration;
-    for (int layer_idx = int(layer_tree_polygons.size()) - 2; layer_idx >= 0; -- layer_idx) {
-        std::vector<std::pair<SupportElement*, Polygons>> processing;
-        processing.insert(processing.end(), layer_tree_polygons[layer_idx].begin(), layer_tree_polygons[layer_idx].end());
-        std::vector<std::pair<SupportElement*, Polygons>> update_next(processing.size(), std::pair<SupportElement*, Polygons>(nullptr, Polygons())); // with this a lock can be avoided
-
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, processing.size()),
+    for (auto& element : move_bounds.back())
+        element.state.marked = false;
+    for (int layer_idx = int(move_bounds.size()) - 2; layer_idx >= 0; -- layer_idx) {
+        const size_t processing_base       = linear_data_layers[layer_idx];
+        const size_t processing_base_above = linear_data_layers[layer_idx + 1];
+        const SupportElements &layer_above = move_bounds[layer_idx + 1];
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, processing_base_above - processing_base),
             [&](const tbb::blocked_range<size_t> &range) {
             for (size_t processing_idx = range.begin(); processing_idx < range.end(); ++ processing_idx) {
-                std::pair<SupportElement*, Polygons> data_pair = processing[processing_idx];
-                bool do_something = false;
+                DrawArea &draw_area = linear_data[processing_base + processing_idx];
+                bool     do_something = false;
                 Polygons max_allowed_area;
-                for (size_t idx = 0; idx < data_pair.first->parents.size(); ++ idx) {
-                    SupportElement* parent = data_pair.first->parents[idx];
+                for (int32_t parent_idx : draw_area.element->parents) {
+                    const SupportElement &parent = layer_above[parent_idx];
                     coord_t max_outer_line_increase = max_radius_change_per_layer;
-                    Polygons result = offset(layer_tree_polygons[layer_idx + 1][parent], max_outer_line_increase, jtMiter, 1.2);
-                    Point direction = data_pair.first->state.result_on_layer - parent->state.result_on_layer;
+                    Polygons result = offset(linear_data[processing_base_above + parent_idx].polygons, max_outer_line_increase, jtMiter, 1.2);
+                    Point direction = draw_area.element->state.result_on_layer - parent.state.result_on_layer;
                     // move the polygons object
-                    for (auto& outer : result)
+                    for (auto &outer : result)
                         for (Point& p : outer)
                             p += direction;
                     append(max_allowed_area, std::move(result));
-                    do_something = do_something || updated_last_iteration.count(parent) || config.getCollisionRadius(parent->state) != config.getRadius(parent->state);
+                    do_something = do_something || parent.state.marked || config.getCollisionRadius(parent.state) != config.getRadius(parent.state);
                 }
-
                 if (do_something) {
-                    Polygons result = intersection(max_allowed_area, data_pair.second);
-                    if (area(result) < area(data_pair.second))
-                        update_next[processing_idx] = std::pair<SupportElement*, Polygons>(data_pair.first, result);
+                    // Trim the current drawing areas with max_allowed_area.
+                    Polygons result = intersection(max_allowed_area, draw_area.polygons);
+                    if (area(result) < area(draw_area.polygons)) {
+                        // Mark parent as modified to propagate down.
+                        draw_area.element->state.marked = true;
+                        draw_area.polygons = std::move(result);
+                    }
                 }
             }
         });
-
-        updated_last_iteration.clear();
-        for (const std::pair<SupportElement*, Polygons> &data_pair : update_next)
-            if (data_pair.first != nullptr) {
-                updated_last_iteration.emplace(data_pair.first);
-                layer_tree_polygons[layer_idx][data_pair.first] = data_pair.second;
-            }
     }
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
@@ -2738,27 +2780,27 @@ static void smooth_branch_areas(const TreeSupportSettings &config, std::vector<s
  */
 static void drop_non_gracious_areas(
     const TreeModelVolumes                                      &volumes,
-    std::vector<std::unordered_map<SupportElement*, Polygons>>  &layer_tree_polygons,
-    const std::vector<std::pair<LayerIndex, SupportElement*>>   &linear_data,
-    std::vector<std::vector<std::pair<LayerIndex, Polygons>>>   &dropped_down_areas,
-    const std::map<SupportElement*, SupportElement*>            &inverse_tree_order)
+    const std::vector<DrawArea>                                 &linear_data,
+    std::vector<Polygons>                                       &support_layer_storage)
 {
+    std::vector<std::vector<std::pair<LayerIndex, Polygons>>> dropped_down_areas(linear_data.size());
     tbb::parallel_for(tbb::blocked_range<size_t>(0, linear_data.size()),
         [&](const tbb::blocked_range<size_t> &range) {
-        for (size_t idx = range.begin(); idx < range.end(); ++ idx) {
-            SupportElement* elem = linear_data[idx].second;
-            bool non_gracious_model_contact = !elem->state.to_model_gracious && !inverse_tree_order.count(elem); // if a element has no child, it connects to whatever is below as no support further down for it will exist.
-            if (non_gracious_model_contact) {
-                Polygons rest_support = layer_tree_polygons[linear_data[idx].first][elem];
-                LayerIndex counter = 1;
-                while (area(rest_support) > tiny_area_threshold && counter < linear_data[idx].first) {
-                    rest_support = diff_clipped(rest_support, volumes.getCollision(0, linear_data[idx].first - counter, false));
-                    dropped_down_areas[idx].emplace_back(linear_data[idx].first - counter, rest_support);
-                    counter++;
+        for (size_t idx = range.begin(); idx < range.end(); ++ idx)
+            // If a element has no child, it connects to whatever is below as no support further down for it will exist.
+            if (const DrawArea &draw_element = linear_data[idx]; ! draw_element.element->state.to_model_gracious && draw_element.child_element == nullptr) {
+                Polygons rest_support;
+                const LayerIndex layer_idx_first = draw_element.element->state.layer_idx - 1;
+                for (LayerIndex layer_idx = layer_idx_first; area(rest_support) > tiny_area_threshold && layer_idx >= 0; -- layer_idx) {
+                    rest_support = diff_clipped(layer_idx == layer_idx_first ? draw_element.polygons : rest_support, volumes.getCollision(0, layer_idx, false));
+                    dropped_down_areas[idx].emplace_back(layer_idx, rest_support);
                 }
             }
-        }
     });
+
+    for (coord_t i = 0; i < static_cast<coord_t>(dropped_down_areas.size()); i++)
+        for (std::pair<LayerIndex, Polygons> &pair : dropped_down_areas[i])
+            append(support_layer_storage[pair.first], std::move(pair.second));
 }
 
 /*!
@@ -2907,65 +2949,82 @@ static void finalize_interface_and_support_areas(
  * \param storage[in,out] The storage where the support should be stored.
  */
 static void draw_areas(
-    PrintObject                             &print_object,
-    const TreeModelVolumes                  &volumes, 
-    const TreeSupportSettings               &config,
-    const std::vector<Polygons>             &overhangs,
-    std::vector<std::set<SupportElement*>>  &move_bounds,
+    PrintObject                     &print_object,
+    const TreeModelVolumes          &volumes, 
+    const TreeSupportSettings       &config,
+    const std::vector<Polygons>     &overhangs,
+    std::vector<SupportElements>    &move_bounds,
 
-    SupportGeneratorLayersPtr            	&bottom_contacts,
-    SupportGeneratorLayersPtr   	        &top_contacts,
-    SupportGeneratorLayersPtr               &intermediate_layers,
-    SupportGeneratorLayerStorage            &layer_storage)
+    SupportGeneratorLayersPtr       &bottom_contacts,
+    SupportGeneratorLayersPtr   	&top_contacts,
+    SupportGeneratorLayersPtr       &intermediate_layers,
+    SupportGeneratorLayerStorage    &layer_storage)
 {
     std::vector<Polygons> support_layer_storage(move_bounds.size());
     std::vector<Polygons> support_roof_storage(move_bounds.size());
-    std::map<SupportElement*, SupportElement*> inverese_tree_order; // in the tree structure only the parents can be accessed. Inverse this to be able to access the children.
-    std::vector<std::pair<LayerIndex, SupportElement*>> linear_data; // All SupportElements are put into a layer independent storage to improve parallelization. Was added at a point in time where this function had performance issues.
-                                                                     // These were fixed by creating less initial points, but i do not see a good reason to remove a working performance optimization.
-    for (LayerIndex layer_idx = 0; layer_idx < LayerIndex(move_bounds.size()); ++ layer_idx) {
-        for (SupportElement* elem : move_bounds[layer_idx]) {
-            // We either come from nowhere at the final layer or we had invalid parents 2. should never happen but just to be sure
-            if ((layer_idx > 0 && ((!inverese_tree_order.count(elem) && elem->state.target_height == layer_idx) || (inverese_tree_order.count(elem) && ! inverese_tree_order[elem]->state.result_on_layer_is_set()))))
-                continue;
-            for (SupportElement* par : elem->parents)
-                if (par->state.result_on_layer_is_set())
-                    inverese_tree_order.emplace(par, elem);
-            linear_data.emplace_back(layer_idx, elem);
+    // All SupportElements are put into a layer independent storage to improve parallelization.
+    std::vector<DrawArea> linear_data;
+    std::vector<size_t>   linear_data_layers;
+    {
+        std::vector<std::pair<SupportElement*, SupportElement*>> map_downwards_old;
+        std::vector<std::pair<SupportElement*, SupportElement*>> map_downwards_new;
+        for (LayerIndex layer_idx = 0; layer_idx < LayerIndex(move_bounds.size()); ++ layer_idx) {
+            SupportElements *layer_above = layer_idx + 1 < move_bounds.size() ? &move_bounds[layer_idx + 1] : nullptr;
+            map_downwards_new.clear();
+            linear_data_layers.emplace_back(linear_data.size());
+            std::sort(map_downwards_old.begin(), map_downwards_old.end(), [](auto &l, auto &r) { return l.first < r.first;  });
+            for (SupportElement &elem : move_bounds[layer_idx]) {
+                SupportElement *child = nullptr;
+                if (layer_idx > 0) {
+                    auto it = std::lower_bound(map_downwards_old.begin(), map_downwards_old.end(), &elem, [](auto &l, const SupportElement *r) { return l.first < r; });
+                    if (it != map_downwards_old.end() && it->first == &elem) {
+                        child = it->second;
+                        // Only one link points to a node above from below.
+                        assert(! (++ it != map_downwards_old.end() && it->first == &elem));
+                    }
+                    if ((! child && elem.state.target_height == layer_idx) || (child && !child->state.result_on_layer_is_set()))
+                        // We either come from nowhere at the final layer or we had invalid parents 2. should never happen but just to be sure
+                        continue;
+                }
+                for (int32_t parent_idx : elem.parents) {
+                    SupportElement &parent = (*layer_above)[parent_idx];
+                    if (parent.state.result_on_layer_is_set())
+                        map_downwards_new.emplace_back(&parent, &elem);
+                }
+                linear_data.push_back({ &elem, child });
+            }
+            std::swap(map_downwards_old, map_downwards_new);
         }
+        linear_data_layers.emplace_back(linear_data.size());
     }
 
-    std::vector<std::unordered_map<SupportElement*, Polygons>> layer_tree_polygons(move_bounds.size()); // reorder the processed data by layers again. The map also could be a vector<pair<SupportElement*,Polygons>>.
     auto t_start = std::chrono::high_resolution_clock::now();
     // Generate the circles that will be the branches.
-    generate_branch_areas(volumes, config, linear_data, layer_tree_polygons, inverese_tree_order);
+    generate_branch_areas(volumes, config, move_bounds, linear_data);
     auto t_generate = std::chrono::high_resolution_clock::now();
     // In some edgecases a branch may go though a hole, where the regular radius does not fit. This can result in an apparent jump in branch radius. As such this cases need to be caught and smoothed out.
-    smooth_branch_areas(config, layer_tree_polygons);
+    smooth_branch_areas(config, move_bounds, linear_data, linear_data_layers);
     auto t_smooth = std::chrono::high_resolution_clock::now();
     // drop down all trees that connect non gracefully with the model
-    std::vector<std::vector<std::pair<LayerIndex, Polygons>>> dropped_down_areas(linear_data.size());
-    drop_non_gracious_areas(volumes, layer_tree_polygons, linear_data, dropped_down_areas, inverese_tree_order);
+    drop_non_gracious_areas(volumes, linear_data, support_layer_storage);
     auto t_drop = std::chrono::high_resolution_clock::now();
-    // single threaded combining all dropped down support areas to the right layers. ONLY COPYS DATA!
-    for (coord_t i = 0; i < static_cast<coord_t>(dropped_down_areas.size()); i++)
-        for (std::pair<LayerIndex, Polygons> &pair : dropped_down_areas[i])
-            append(support_layer_storage[pair.first], std::move(pair.second));
 
-    // single threaded combining all support areas to the right layers. ONLY COPYS DATA!
-    for (LayerIndex layer_idx = 0; layer_idx < LayerIndex(layer_tree_polygons.size()); ++ layer_idx) {
-        auto &this_layer_tree_polygons = layer_tree_polygons[layer_idx];
-        auto &this_roofs               = support_roof_storage[layer_idx];
-        auto &this_layers              = support_layer_storage[layer_idx];
-        size_t cnt_roofs  = 0;
-        size_t cnt_layers = 0;
-        for (const std::pair<const SupportElement*, Polygons> &data_pair : this_layer_tree_polygons)
-            ++ (data_pair.first->state.missing_roof_layers > data_pair.first->state.distance_to_top ? cnt_roofs : cnt_layers);
-        this_roofs.reserve(this_roofs.size() + cnt_roofs);
-        this_layers.reserve(this_layers.size() + cnt_layers);
-        for (const std::pair<const SupportElement*, Polygons> &data_pair : this_layer_tree_polygons) {
-            auto &src = const_cast<Polygons&>(data_pair.second);
-            std::move(std::begin(src), std::end(src), std::back_inserter(data_pair.first->state.missing_roof_layers > data_pair.first->state.distance_to_top ? this_roofs : this_layers));
+    // Single threaded combining all support areas to the right layers.
+    {
+        auto begin = linear_data.begin();
+        for (LayerIndex layer_idx = 0; layer_idx < LayerIndex(move_bounds.size()); ++ layer_idx) {
+            size_t cnt_roofs = 0;
+            size_t cnt_layers = 0;
+            auto end = begin;
+            for (; end != linear_data.end() && end->element->state.layer_idx == layer_idx; ++ end)
+                ++ (end->element->state.missing_roof_layers > end->element->state.distance_to_top ? cnt_roofs : cnt_layers);
+            auto &this_roofs  = support_roof_storage[layer_idx];
+            auto &this_layers = support_layer_storage[layer_idx];
+            this_roofs.reserve(this_roofs.size() + cnt_roofs);
+            this_layers.reserve(this_layers.size() + cnt_layers);
+            for (auto it = begin; it != end; ++ it)
+                std::move(std::begin(it->polygons), std::end(it->polygons), std::back_inserter(it->element->state.missing_roof_layers > it->element->state.distance_to_top ? this_roofs : this_layers));
+            begin = end;
         }
     }
 
@@ -3053,7 +3112,7 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         auto t_precalc = std::chrono::high_resolution_clock::now();
 
         // value is the area where support may be placed. As this is calculated in CreateLayerPathing it is saved and reused in draw_areas
-        std::vector<std::set<SupportElement*>> move_bounds(num_support_layers);
+        std::vector<SupportElements> move_bounds(num_support_layers);
 
         // ### Place tips of the support tree
         SupportGeneratorLayersPtr    bottom_contacts(num_support_layers, nullptr);
@@ -3108,9 +3167,7 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
 //        if (config.branch_radius==2121)
 //            BOOST_LOG_TRIVIAL(error) << "Why ask questions when you already know the answer twice.\n (This is not a real bug, please dont report it.)";
         
-        for (auto &layer : move_bounds)
-            for (auto elem : layer)
-                delete elem;
+        move_bounds.clear();
 
         auto remove_undefined_layers = [](SupportGeneratorLayersPtr &layers) {
             layers.erase(std::remove_if(layers.begin(), layers.end(), [](const SupportGeneratorLayer* ptr) { return ptr == nullptr; }), layers.end());
