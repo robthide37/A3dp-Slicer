@@ -56,6 +56,9 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::PreferencesHoverButton, "notification_preferences_hover"},
     {ImGui::SliderFloatEditBtnIcon, "edit_button"                   },
     {ImGui::SliderFloatEditBtnPressedIcon, "edit_button_pressed"    },
+#if ENABLE_MEASURE_GIZMO
+    {ImGui::ClipboardBtnIcon      , "copy_menu"                     },
+#endif // ENABLE_MEASURE_GIZMO
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {
