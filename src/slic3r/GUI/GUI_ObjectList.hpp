@@ -288,6 +288,9 @@ public:
     void                changed_object(const int obj_idx = -1) const;
     void                part_selection_changed();
 
+    // Add object's volumes to the list
+    // Return selected items, if add_to_selection is defined 
+    wxDataViewItemArray add_volumes_to_object_in_list(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
     // Add object to the list
     void add_object_to_list(size_t obj_idx, bool call_selection_changed = true);
     // Delete object from the list
@@ -392,7 +395,7 @@ public:
     void toggle_printable_state();
 
     void set_extruder_for_selected_items(const int extruder) const ;
-    wxDataViewItemArray reorder_volumes_and_get_selection(int obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
+    wxDataViewItemArray reorder_volumes_and_get_selection(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
     void apply_volumes_order();
     bool has_paint_on_segmentation();
 

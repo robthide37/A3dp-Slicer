@@ -730,9 +730,9 @@ public:
         float               height_tolerance{ 0.f };// [0.f : 1.f]
 
         CutInfo() = default;
-        CutInfo(CutConnectorType type, float rad_tolerance, float h_tolerance) :
+        CutInfo(CutConnectorType type, float rad_tolerance, float h_tolerance, bool processed = false) :
         is_connector(true),
-        is_processed(false),
+        is_processed(processed),
         connector_type(type),
         radius_tolerance(rad_tolerance),
         height_tolerance(h_tolerance)

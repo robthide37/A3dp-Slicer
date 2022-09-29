@@ -373,13 +373,12 @@ void ObjectDataViewModel::UpdateBitmapForNode(ObjectDataViewModelNode* node, con
     UpdateBitmapForNode(node);
 }
 
-wxDataViewItem ObjectDataViewModel::Add(const wxString &name, 
-                                        const int extruder,
+wxDataViewItem ObjectDataViewModel::AddObject(const wxString &name, 
+                                        const wxString& extruder,
                                         const std::string& warning_icon_name,
                                         const bool has_lock)
 {
-    const wxString extruder_str = extruder == 0 ? _L("default") : wxString::Format("%d", extruder);
-	auto root = new ObjectDataViewModelNode(name, extruder_str);
+	auto root = new ObjectDataViewModelNode(name, extruder);
     // Add warning icon if detected auto-repaire
     UpdateBitmapForNode(root, warning_icon_name, has_lock);
 
@@ -394,37 +393,20 @@ wxDataViewItem ObjectDataViewModel::Add(const wxString &name,
 
 wxDataViewItem ObjectDataViewModel::AddVolumeChild( const wxDataViewItem &parent_item,
                                                     const wxString &name,
+                                                    const int volume_idx,
                                                     const Slic3r::ModelVolumeType volume_type,
-                                                    const std::string& warning_icon_name/* = std::string()*/,
-                                                    const int extruder/* = 0*/,
-                                                    const bool create_frst_child/* = true*/)
+                                                    const std::string& warning_icon_name,
+                                                    const wxString& extruder)
 {
 	ObjectDataViewModelNode *root = static_cast<ObjectDataViewModelNode*>(parent_item.GetID());
 	if (!root) return wxDataViewItem(0);
-
-    wxString extruder_str = extruder == 0 ? _(L("default")) : wxString::Format("%d", extruder);
 
     // get insertion position according to the existed Layers and/or Instances Items
     int insert_position = get_root_idx(root, itLayerRoot);
     if (insert_position < 0)
         insert_position = get_root_idx(root, itInstanceRoot);
 
-    if (create_frst_child && root->m_volumes_cnt == 0)
-    {
-        const Slic3r::ModelVolumeType type = Slic3r::ModelVolumeType::MODEL_PART;
-        const auto node = new ObjectDataViewModelNode(root, root->m_name, type, extruder_str, 0);
-        UpdateBitmapForNode(node, root->warning_icon_name(), root->has_lock());
-
-        insert_position < 0 ? root->Append(node) : root->Insert(node, insert_position);
-		// notify control
-		const wxDataViewItem child((void*)node);
-		ItemAdded(parent_item, child);
-
-        root->m_volumes_cnt++;
-        if (insert_position >= 0) insert_position++;
-	}
-
-    const auto node = new ObjectDataViewModelNode(root, name, volume_type, extruder_str, root->m_volumes_cnt);
+    const auto node = new ObjectDataViewModelNode(root, name, volume_type, extruder, volume_idx);
     UpdateBitmapForNode(node, warning_icon_name, root->has_lock() && volume_type < ModelVolumeType::PARAMETER_MODIFIER);
     insert_position < 0 ? root->Append(node) : root->Insert(node, insert_position);
 
@@ -631,13 +613,11 @@ wxDataViewItem ObjectDataViewModel::AddLayersRoot(const wxDataViewItem &parent_i
 
 wxDataViewItem ObjectDataViewModel::AddLayersChild(const wxDataViewItem &parent_item, 
                                                    const t_layer_height_range& layer_range,
-                                                   const int extruder/* = 0*/, 
+                                                   const wxString& extruder,
                                                    const int index /* = -1*/)
 {
     ObjectDataViewModelNode *parent_node = static_cast<ObjectDataViewModelNode*>(parent_item.GetID());
     if (!parent_node) return wxDataViewItem(0);
-
-    wxString extruder_str = extruder == 0 ? _(L("default")) : wxString::Format("%d", extruder);
 
     // get LayerRoot node
     ObjectDataViewModelNode *layer_root_node;
@@ -655,7 +635,7 @@ wxDataViewItem ObjectDataViewModel::AddLayersChild(const wxDataViewItem &parent_
     }
 
     // Add layer node
-    ObjectDataViewModelNode *layer_node = new ObjectDataViewModelNode(layer_root_node, layer_range, index, extruder_str);
+    ObjectDataViewModelNode *layer_node = new ObjectDataViewModelNode(layer_root_node, layer_range, index, extruder);
     if (index < 0)
         layer_root_node->Append(layer_node);
     else

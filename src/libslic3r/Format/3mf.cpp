@@ -409,6 +409,19 @@ namespace Slic3r {
             VolumeMetadataList volumes;
         };
 
+        struct CutObjectInfo
+        {
+            struct Connector
+            {
+                int     volume_id;
+                int     type;
+                float   r_tolerance;
+                float   h_tolerance;
+            };
+            CutObjectBase           id;
+            std::vector<Connector>  connectors;
+        };
+
         // Map from a 1 based 3MF object ID to a 0 based ModelObject index inside m_model->objects.
         typedef std::map<int, int> IdToModelObjectMap;
         typedef std::map<int, ComponentsList> IdToAliasesMap;
@@ -417,7 +430,7 @@ namespace Slic3r {
         typedef std::map<int, Geometry> IdToGeometryMap;
         typedef std::map<int, std::vector<coordf_t>> IdToLayerHeightsProfileMap;
         typedef std::map<int, t_layer_config_ranges> IdToLayerConfigRangesMap;
-        typedef std::map<int, CutObjectBase>         IdToCutObjectIdMap;
+        typedef std::map<int, CutObjectInfo>         IdToCutObjectInfoMap;
         typedef std::map<int, std::vector<sla::SupportPoint>> IdToSlaSupportPointsMap;
         typedef std::map<int, std::vector<sla::DrainHole>> IdToSlaDrainHolesMap;
 
@@ -445,7 +458,7 @@ namespace Slic3r {
         IdToGeometryMap m_geometries;
         CurrentConfig m_curr_config;
         IdToMetadataMap m_objects_metadata;
-        IdToCutObjectIdMap m_cut_object_ids;
+        IdToCutObjectInfoMap m_cut_object_infos;
         IdToLayerHeightsProfileMap m_layer_heights_profiles;
         IdToLayerConfigRangesMap m_layer_config_ranges;
         IdToSlaSupportPointsMap m_sla_support_points;
@@ -774,11 +787,6 @@ namespace Slic3r {
                 return false;
             }
 
-            // m_cut_object_ids are indexed by a 1 based model object index.
-            IdToCutObjectIdMap::iterator cut_object_id = m_cut_object_ids.find(object.second + 1);
-            if (cut_object_id != m_cut_object_ids.end())
-                model_object->cut_id = std::move(cut_object_id->second);
-
             // m_layer_heights_profiles are indexed by a 1 based model object index.
             IdToLayerHeightsProfileMap::iterator obj_layer_heights_profile = m_layer_heights_profiles.find(object.second + 1);
             if (obj_layer_heights_profile != m_layer_heights_profiles.end())
@@ -831,6 +839,19 @@ namespace Slic3r {
 
             if (!_generate_volumes(*model_object, obj_geometry->second, *volumes_ptr, config_substitutions))
                 return false;
+
+            // Apply cut information for object if any was loaded
+            // m_cut_object_ids are indexed by a 1 based model object index.
+            IdToCutObjectInfoMap::iterator cut_object_info = m_cut_object_infos.find(object.second + 1);
+            if (cut_object_info != m_cut_object_infos.end()) {
+                model_object->cut_id = cut_object_info->second.id;
+
+                for (auto connector : cut_object_info->second.connectors) {
+                    assert(0 <= connector.volume_id && connector.volume_id <= int(model_object->volumes.size()));
+                    model_object->volumes[connector.volume_id]->cut_info = 
+                        ModelVolume::CutInfo(CutConnectorType(connector.type), connector.r_tolerance, connector.h_tolerance, true);
+                }
+            }
         }
 
         // If instances contain a single volume, the volume offset should be 0,0,0
@@ -979,22 +1000,39 @@ namespace Slic3r {
                     continue;
                 }
 
-                IdToCutObjectIdMap::iterator object_item = m_cut_object_ids.find(obj_idx);
-                if (object_item != m_cut_object_ids.end()) {
+                IdToCutObjectInfoMap::iterator object_item = m_cut_object_infos.find(obj_idx);
+                if (object_item != m_cut_object_infos.end()) {
                     add_error("Found duplicated cut_object_id");
                     continue;
                 }
 
-                for (const auto& obj_cut_id : object_tree) {
-                    if (obj_cut_id.first != "cut_id")
-                        continue;
-                    pt::ptree cut_id_tree = obj_cut_id.second;
-                    ObjectID obj_id(cut_id_tree.get<size_t>("<xmlattr>.id"));
-                    CutObjectBase cut_id(ObjectID(cut_id_tree.get<size_t>("<xmlattr>.id")),
-                                         cut_id_tree.get<size_t>("<xmlattr>.check_sum"),
-                                         cut_id_tree.get<size_t>("<xmlattr>.connectors_cnt"));
-                    m_cut_object_ids.insert({ obj_idx, std::move(cut_id) });
+                CutObjectBase cut_id;
+                std::vector<CutObjectInfo::Connector>  connectors;
+
+                for (const auto& obj_cut_info : object_tree) {
+                    if (obj_cut_info.first == "cut_id") {
+                        pt::ptree cut_id_tree = obj_cut_info.second;
+                        cut_id = CutObjectBase(ObjectID( cut_id_tree.get<size_t>("<xmlattr>.id")),
+                                                         cut_id_tree.get<size_t>("<xmlattr>.check_sum"),
+                                                         cut_id_tree.get<size_t>("<xmlattr>.connectors_cnt"));
+                    }
+                    if (obj_cut_info.first == "connectors") {
+                        pt::ptree cut_connectors_tree = obj_cut_info.second;
+                        for (const auto& cut_connector : cut_connectors_tree) {
+                            if (cut_connector.first != "connector")
+                                continue;
+                            pt::ptree connector_tree = cut_connector.second;
+                            CutObjectInfo::Connector connector = {connector_tree.get<int>("<xmlattr>.volume_id"),
+                                                                  connector_tree.get<int>("<xmlattr>.type"),
+                                                                  connector_tree.get<float>("<xmlattr>.r_tolerance"),
+                                                                  connector_tree.get<float>("<xmlattr>.h_tolerance")};
+                            connectors.emplace_back(connector);
+                        }
+                    }
                 }
+
+                CutObjectInfo cut_info {cut_id, connectors};
+                m_cut_object_infos.insert({ obj_idx, cut_info });
             }
         }
     }
@@ -2865,6 +2903,18 @@ namespace Slic3r {
             cut_id_tree.put("<xmlattr>.id",             object->cut_id.id().id);
             cut_id_tree.put("<xmlattr>.check_sum",      object->cut_id.check_sum());
             cut_id_tree.put("<xmlattr>.connectors_cnt", object->cut_id.connectors_cnt());
+
+            int volume_idx = -1;
+            for (const ModelVolume* volume : object->volumes) {
+                ++volume_idx;
+                if (volume->is_cut_connector()) {
+                    pt::ptree& connectors_tree = obj_tree.add("connectors.connector", "");
+                    connectors_tree.put("<xmlattr>.volume_id",   volume_idx);
+                    connectors_tree.put("<xmlattr>.type",        int(volume->cut_info.connector_type));
+                    connectors_tree.put("<xmlattr>.r_tolerance", volume->cut_info.radius_tolerance);
+                    connectors_tree.put("<xmlattr>.h_tolerance", volume->cut_info.height_tolerance);
+                }
+            }
         }
 
         if (!tree.empty()) {
@@ -2876,6 +2926,10 @@ namespace Slic3r {
             boost::replace_all(out, "><object", ">\n <object");
             boost::replace_all(out, "><cut_id", ">\n  <cut_id");
             boost::replace_all(out, "></cut_id>", ">\n  </cut_id>");
+            boost::replace_all(out, "><connectors", ">\n  <connectors");
+            boost::replace_all(out, "></connectors>", ">\n  </connectors>");
+            boost::replace_all(out, "><connector", ">\n   <connector");
+            boost::replace_all(out, "></connector>", ">\n   </connector>");
             boost::replace_all(out, "></object>", ">\n </object>");
             // OR just 
             boost::replace_all(out, "><", ">\n<");

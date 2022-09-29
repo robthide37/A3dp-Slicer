@@ -271,16 +271,16 @@ public:
     ObjectDataViewModel();
     ~ObjectDataViewModel();
 
-    wxDataViewItem Add( const wxString &name,
-                        const int extruder,
+    wxDataViewItem AddObject( const wxString &name,
+                        const wxString& extruder,
                         const std::string& warning_icon_name,
                         const bool has_lock);
     wxDataViewItem AddVolumeChild(  const wxDataViewItem &parent_item,
                                     const wxString &name,
+                                    const int volume_idx,
                                     const Slic3r::ModelVolumeType volume_type,
-                                    const std::string& warning_icon_name = std::string(),
-                                    const int extruder = 0,
-                                    const bool create_frst_child = true);
+                                    const std::string& warning_icon_name,
+                                    const wxString& extruder);
     wxDataViewItem AddSettingsChild(const wxDataViewItem &parent_item);
     wxDataViewItem AddInfoChild(const wxDataViewItem &parent_item, InfoItemType info_type);
     wxDataViewItem AddInstanceChild(const wxDataViewItem &parent_item, size_t num);
@@ -288,7 +288,7 @@ public:
     wxDataViewItem AddLayersRoot(const wxDataViewItem &parent_item);
     wxDataViewItem AddLayersChild(  const wxDataViewItem &parent_item,
                                     const t_layer_height_range& layer_range,
-                                    const int extruder = 0,
+                                    const wxString& extruder,
                                     const int index = -1);
     size_t         GetItemIndexForFirstVolume(ObjectDataViewModelNode* node_parent);
     wxDataViewItem Delete(const wxDataViewItem &item);
