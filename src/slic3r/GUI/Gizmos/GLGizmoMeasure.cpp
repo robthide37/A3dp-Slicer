@@ -90,7 +90,7 @@ static Vec3d edge_direction(const Edge& e)
 /*
 
 
-// returns: distance, 1st vertex, 2nd vertex
+// returns: distance, 1st vertex, 2nd vertexs
 static std::tuple<double, Vec3d, Vec3d> distance_edge_edge(const Edge& e1, const Edge& e2)
 {
     std::vector<std::tuple<double, Vec3d, Vec3d>> distances;
