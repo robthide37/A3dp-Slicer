@@ -2,6 +2,7 @@
 #define slic3r_SurfaceMesh_hpp_
 
 #include <admesh/stl.h>
+#include <libslic3r/TriangleMesh.hpp>
 
 namespace Slic3r {
 

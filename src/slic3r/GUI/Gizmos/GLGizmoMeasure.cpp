@@ -16,14 +16,12 @@
 
 #include <GL/glew.h>
 
+#include <wx/clipbrd.h>
+
 #if ENABLE_MEASURE_GIZMO
 
 namespace Slic3r {
 namespace GUI {
-
-using Edge = std::pair<Vec3d, Vec3d>;
-using Plane = std::tuple<int, Vec3d, Vec3d>;
-using Circle = std::tuple<Vec3d, double, Vec3d>;
 
 static const Slic3r::ColorRGBA SELECTED_1ST_COLOR   = { 0.25f, 0.75f, 0.75f, 1.0f };
 static const Slic3r::ColorRGBA SELECTED_2ND_COLOR   = { 0.75f, 0.25f, 0.75f, 1.0f };
@@ -72,176 +70,9 @@ static std::string point_on_feature_type_as_string(Measure::SurfaceFeatureType t
     return ret;
 }
 
-static Vec3d vector_direction(const Vec3d& from, const Vec3d& to)
+static Vec3d edge_direction(const std::pair<Vec3d, Vec3d>& e)
 {
-    return (to - from).normalized();
-}
-
-static Vec3d edge_direction(const Edge& e)
-{
-    return vector_direction(e.first, e.second);
-}
-
-
-
-
-
-
-/*
-
-
-// returns: distance, 1st vertex, 2nd vertexs
-static std::tuple<double, Vec3d, Vec3d> distance_edge_edge(const Edge& e1, const Edge& e2)
-{
-    std::vector<std::tuple<double, Vec3d, Vec3d>> distances;
-    auto add_point_edge_distance = [&distances](const Vec3d& v, const Edge& e) {
-        const auto [distance, v1, v2] = distance_point_edge(v, e);
-        const Vec3d e1e2 = e.second - e.first;
-        const Vec3d e1v2 = v2 - e.first;
-        if (e1v2.dot(e1e2) >= 0.0 && e1v2.norm() < e1e2.norm())
-            distances.emplace_back(std::make_tuple(distance, v, v2));
-    };
-
-    distances.emplace_back(std::make_tuple((e2.first - e1.first).norm(), e1.first, e2.first));
-    distances.emplace_back(std::make_tuple((e2.second - e1.first).norm(), e1.first, e2.second));
-    distances.emplace_back(std::make_tuple((e2.first - e1.second).norm(), e1.second, e2.first));
-    distances.emplace_back(std::make_tuple((e2.second - e1.second).norm(), e1.second, e2.second));
-    add_point_edge_distance(e1.first, e2);
-    add_point_edge_distance(e1.second, e2);
-    add_point_edge_distance(e2.first, e1);
-    add_point_edge_distance(e2.second, e1);
-    std::sort(distances.begin(), distances.end(),
-        [](const std::tuple<double, Vec3d, Vec3d>& item1, const std::tuple<double, Vec3d, Vec3d>& item2) {
-            return std::get<0>(item1) < std::get<0>(item2);
-        });
-    return distances.front();
-}
-
-// returns: distance, 1st vertex, 2nd vertex
-static std::tuple<double, Vec3d, Vec3d> distance_edge_circle(const Edge& e, const Circle& c)
-{
-    const auto& [center, radius, normal] = c;
-    const Vec3d e1e2 = (e.second - e.first);
-    const Vec3d e1e2_unit = vector_direction(e.first, e.second);
-
-    std::vector<std::tuple<double, Vec3d, Vec3d>> distances;
-    distances.emplace_back(distance_point_circle(e.first, c));
-    distances.emplace_back(distance_point_circle(e.second, c));
-
-    const Eigen::Hyperplane<double, 3> plane(e1e2_unit, center);
-    const Eigen::ParametrizedLine<double, 3> line = Eigen::ParametrizedLine<double, 3>::Through(e.first, e.second);
-    const Vec3d inter = line.intersectionPoint(plane);
-    const Vec3d e1inter = inter - e.first;
-    if (e1inter.dot(e1e2) >= 0.0 && e1inter.norm() < e1e2.norm())
-        distances.emplace_back(distance_point_circle(inter, c));
-
-    std::sort(distances.begin(), distances.end(),
-        [](const std::tuple<double, Vec3d, Vec3d>& item1, const std::tuple<double, Vec3d, Vec3d>& item2) {
-            return std::get<0>(item1) < std::get<0>(item2);
-        });
-    return distances.front();
-}
-
-// returns: distance, 1st vertex, 2nd vertex
-static std::tuple<double, Vec3d, Vec3d> distance_plane_plane(const Plane& p1, const Plane& p2)
-{
-    const auto& [idx1, normal1, origin1] = p1;
-    const auto& [idx2, normal2, origin2] = p2;
-    return (std::abs(std::abs(normal1.dot(normal2)) - 1.0) < EPSILON) ? distance_point_plane(origin2, p1) :
-        std::make_tuple(0.0, Vec3d::Zero(), Vec3d::Zero());
-}
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// returns: angle in rad, center of arc, radius of arc, whether or not the edges are coplanar
-// After return, the edges are oriented so that they point away from their intersection point
-static std::tuple<double, Vec3d, double, bool> angle_edge_edge(Edge& e1, Edge& e2)
-{
-    Vec3d e1_unit = edge_direction(e1);
-    Vec3d e2_unit = edge_direction(e2);
-    const double dot = e1_unit.dot(e2_unit);
-    // are edges parallel ?
-    if (std::abs(std::abs(dot) - 1.0) < EPSILON)
-        return std::make_tuple(0.0, e1.first, 0.0, true);
-
-    // project edges on the plane defined by them
-    Vec3d normal = e1_unit.cross(e2_unit).normalized();
-    const Eigen::Hyperplane<double, 3> plane(normal, e1.first);
-    Vec3d e11_proj = plane.projection(e1.first);
-    Vec3d e12_proj = plane.projection(e1.second);
-    Vec3d e21_proj = plane.projection(e2.first);
-    Vec3d e22_proj = plane.projection(e2.second);
-
-    const bool coplanar = (e2.first - e21_proj).norm() < EPSILON && (e2.second - e22_proj).norm() < EPSILON;
-
-    // rotate the plane to become the XY plane
-    auto qp = Eigen::Quaternion<double>::FromTwoVectors(normal, Vec3d::UnitZ());
-    auto qp_inverse = qp.inverse();
-    const Vec3d e11_rot = qp * e11_proj;
-    const Vec3d e12_rot = qp * e12_proj;
-    const Vec3d e21_rot = qp * e21_proj;
-    const Vec3d e22_rot = qp * e22_proj;
-
-    // discard Z
-    const Vec2d e11_rot_2d = Vec2d(e11_rot.x(), e11_rot.y());
-    const Vec2d e12_rot_2d = Vec2d(e12_rot.x(), e12_rot.y());
-    const Vec2d e21_rot_2d = Vec2d(e21_rot.x(), e21_rot.y());
-    const Vec2d e22_rot_2d = Vec2d(e22_rot.x(), e22_rot.y());
-
-    // find intersection (arc center) of edges in XY plane
-    const Eigen::Hyperplane<double, 2> e1_rot_2d_line = Eigen::Hyperplane<double, 2>::Through(e11_rot_2d, e12_rot_2d);
-    const Eigen::Hyperplane<double, 2> e2_rot_2d_line = Eigen::Hyperplane<double, 2>::Through(e21_rot_2d, e22_rot_2d);
-    const Vec2d center_rot_2d = e1_rot_2d_line.intersection(e2_rot_2d_line);
-
-    // arc center in original coordinate
-    const Vec3d center = qp_inverse * Vec3d(center_rot_2d.x(), center_rot_2d.y(), e11_rot.z());
-
-    // ensure the edges are pointing away from the center
-    if ((center_rot_2d - e11_rot_2d).squaredNorm() > (center_rot_2d - e12_rot_2d).squaredNorm()) {
-        std::swap(e1.first, e1.second);
-        std::swap(e11_proj, e12_proj);
-        e1_unit = -e1_unit;
-    }
-    if ((center_rot_2d - e21_rot_2d).squaredNorm() > (center_rot_2d - e22_rot_2d).squaredNorm()) {
-        std::swap(e2.first, e2.second);
-        std::swap(e21_proj, e22_proj);
-        e2_unit = -e2_unit;
-    }
-
-    // arc angle
-    const double angle = std::acos(std::clamp(e1_unit.dot(e2_unit), -1.0, 1.0));
-    // arc radius
-    const Vec3d e1_proj_mid = 0.5 * (e11_proj + e12_proj);
-    const Vec3d e2_proj_mid = 0.5 * (e21_proj + e22_proj);
-    const double radius = std::min((center - e1_proj_mid).norm(), (center - e2_proj_mid).norm());
-
-    return std::make_tuple(angle, center, radius, coplanar);
+    return (e.second - e.first).normalized();
 }
 
 static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const std::vector<std::vector<int>>& planes_triangles, int idx)
@@ -984,11 +815,9 @@ void GLGizmoMeasure::render_dimensioning()
     };
 
 
-    auto point_edge = [this, shader, point_point](const Vec3d& v, const Edge& e) {
-        const double distance = m_measurement_result.distance_infinite->dist;
-        const Vec3d v1        = m_measurement_result.distance_infinite->from;
+    auto point_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
+        std::pair<Vec3d, Vec3d> e = f1.get_type() == Measure::SurfaceFeatureType::Edge ? f1.get_edge() : f2.get_edge();
         const Vec3d v_proj    = m_measurement_result.distance_infinite->to;
-        point_point(v1, v_proj);
 
         const Vec3d e1e2 = e.second - e.first;
         const Vec3d v_proje1 = v_proj - e.first;
@@ -1020,21 +849,30 @@ void GLGizmoMeasure::render_dimensioning()
         }
     };
 
-/*
-    auto arc_edge_edge = [this, shader](const Edge& e1, const Edge& e2, const double* const force_radius = nullptr) {
-        Edge e1copy = e1;
-        Edge e2copy = e2;
-        const auto [angle, center, radius, coplanar] = angle_edge_edge(e1copy, e2copy);
+    auto arc_edge_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2, double* const force_radius = nullptr) {
+        Measure::MeasurementResult res = Measure::get_measurement(f1, f2);
+        const double angle    = res.angle->angle;
+        const Vec3d  center   = res.angle->center;
+        const Vec3d  e1_unit  = res.angle->e1;
+        const Vec3d  e2_unit  = res.angle->e2;
+        const double radius   = res.angle->radius;
+        const bool   coplanar = res.angle->coplanar;
 
-        if (radius == 0.0)
+        std::pair<Vec3d, Vec3d> e1 = m_selected_features.first.feature->get_edge();
+        std::pair<Vec3d, Vec3d> e2 = m_selected_features.second.feature->get_edge();
+
+        if ((e1.second - e1.first).dot(e1_unit) < 0.)
+            std::swap(e1.first, e1.second);
+        if ((e2.second - e2.first).dot(e2_unit) < 0.)
+            std::swap(e2.first, e2.second);
+
+        if (radius == 0.)
             return;
 
         assert(force_radius == nullptr || *force_radius > 0.0);
 
-        const double draw_radius = (force_radius != nullptr) ? *force_radius : radius;
+        double draw_radius = force_radius ? *force_radius : radius;
 
-        const Vec3d e1_unit = edge_direction(e1copy);
-        const Vec3d e2_unit = edge_direction(e2copy);
         const Vec3d normal = e1_unit.cross(e2_unit).normalized();
 
         if (!m_dimensioning.arc.is_initialized()) {
@@ -1064,31 +902,33 @@ void GLGizmoMeasure::render_dimensioning()
         m_dimensioning.arc.render();
 
         // render edge 1 extension
-        const Vec3d e11e12 = e1copy.second - e1copy.first;
-        const Vec3d e11center = center - e1copy.first;
+        const Vec3d e11e12 = e1.second - e1.first;
+        const Vec3d e11center = center - e1.first;
         const double e11center_len = e11center.norm();
         if (e11center_len > EPSILON && e11center.dot(e11e12) < 0.0) {
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center) *
-                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), edge_direction(e1copy)) *
+                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), edge_direction(e1)) *
                 Geometry::scale_transform({ e11center_len, 1.0f, 1.0f }));
             m_dimensioning.line.render();
         }
 
         // render edge 2 extension
-        const Vec3d e21center = center - e2copy.first;
+        const Vec3d e21center = center - e2.first;
         const double e21center_len = e21center.norm();
         if (e21center_len > EPSILON) {
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center) *
-                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), edge_direction(e2copy)) *
+                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), edge_direction(e2)) *
                 Geometry::scale_transform({ (coplanar && (force_radius == nullptr)) ? e21center_len : draw_radius, 1.0f, 1.0f }));
             m_dimensioning.line.render();
         }
     };
 
+
+/*
     auto arc_edge_plane = [this, arc_edge_edge](const Edge& e, const Plane& p) {
         const auto& [idx, normal, origin] = p;
         const Vec3d e1e2 = e.second - e.first;
@@ -1122,29 +962,7 @@ void GLGizmoMeasure::render_dimensioning()
         const double radius = (inters - e1e2copy_mid).norm();
         arc_edge_edge(ecopy, edge_on_plane, &radius);
     };
-
-    auto edge_edge = [point_point, arc_edge_edge](const Edge& e1, const Edge& e2) {
-        // distance
-        const auto [distance, v1, v2] = distance_edge_edge(e1, e2);
-        point_point(v1, v2);
-        // arc
-        arc_edge_edge(e1, e2);
-    };
-
-    auto edge_plane = [point_point, arc_edge_plane](const Edge& e, const Plane& p) {
-        // arc
-        arc_edge_plane(e, p);
-    };
-
-    auto edge_circle = [point_point](const Edge& e, const Circle& c) {
-        const auto [distance, v1, v2] = distance_edge_circle(e, c);
-        point_point(v1, v2);
-    };
-
-    auto plane_plane = [point_point](const Plane& p1, const Plane& p2) {
-        const auto [distance, v1, v2] = distance_plane_plane(p1, p2);
-        point_point(v1, v2);
-    };*/
+*/
 
     shader->start_using();
 
@@ -1188,63 +1006,33 @@ void GLGizmoMeasure::render_dimensioning()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
-    // Render the arrow between the points that the backend passed:
     if (m_selected_features.second.feature.has_value()) {
+        // Render the arrow between the points that the backend passed:
         const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
                                           ? *m_measurement_result.distance_infinite
                                           : *m_measurement_result.distance_strict;
         point_point(dap.from, dap.to);
-    }
 
-    // Now if one of the features is an edge, draw also the extension of the edge to where the dist is measured:
-    // TODO...
+        const Measure::SurfaceFeature& f1 = *m_selected_features.first.feature;
+        const Measure::SurfaceFeature& f2 = *m_selected_features.second.feature;
+        Measure::SurfaceFeatureType ft1 = f1.get_type();
+        Measure::SurfaceFeatureType ft2 = f2.get_type();
 
 
-    // point-edge
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
-        point_edge(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_edge());
+        // Where needed, draw also the extension of the edge to where the dist is measured:
+        if ((int(ft1) | int(ft2)) ==
+              (int(Measure::SurfaceFeatureType::Point) | int(Measure::SurfaceFeatureType::Edge)))
+            point_edge(f1, f2);
+
+
+        // Now if there is an angle to show, draw the arc:
+        if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Edge)
+            arc_edge_edge(f1, f2);
+        //if (int(ft1) | int(ft2) == (int(Measure::SurfaceFeatureType::Edge) | int(Measure::SurfaceFeatureType::Plane)))
+        //    arc_edge_plane();
     }
 
     
-    /*
-    // edge-point
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
-        point_edge(m_selected_features.second.feature->get_point(), m_selected_features.first.feature->get_edge());
-    }
-    // edge-edge
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
-        edge_edge(m_selected_features.first.feature->get_edge(), m_selected_features.second.feature->get_edge());
-    }
-    // edge-plane
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Plane) {
-        edge_plane(m_selected_features.first.feature->get_edge(), m_selected_features.second.feature->get_plane());
-    }
-    // edge-circle
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Circle) {
-        edge_circle(m_selected_features.first.feature->get_edge(), m_selected_features.second.feature->get_circle());
-    }
-    // plane-edge
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Plane &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
-        edge_plane(m_selected_features.second.feature->get_edge(), m_selected_features.first.feature->get_plane());
-    }
-    // plane-plane
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Plane &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Plane) {
-        plane_plane(m_selected_features.first.feature->get_plane(), m_selected_features.second.feature->get_plane());
-    }
-    // circle-edge
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Circle &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
-        edge_circle(m_selected_features.second.feature->get_edge(), m_selected_features.first.feature->get_circle());
-    }
-*/
-
     glsafe(::glEnable(GL_DEPTH_TEST));
 
     shader->stop_using();
@@ -1533,7 +1321,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             if (ImGui::BeginTable("Measure", 3)) {
                 if (measure.angle.has_value()) {
                     ImGui::PushID((void*)(intptr_t)1);
-                    add_measure_row_to_table(_u8L("Angle") + _u8L(" (°)"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(Geometry::rad2deg(*measure.angle)),
+                    add_measure_row_to_table(_u8L("Angle") + _u8L(" (°)"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(Geometry::rad2deg(measure.angle->angle)),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
                 }
