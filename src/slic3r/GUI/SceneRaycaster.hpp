@@ -106,9 +106,10 @@ public:
     size_t active_gizmos_count() const;
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 
+    static int decode_id(EType type, int id);
+
 private:
     static int encode_id(EType type, int id);
-    static int decode_id(EType type, int id);
     static int base_id(EType type);
 };
 

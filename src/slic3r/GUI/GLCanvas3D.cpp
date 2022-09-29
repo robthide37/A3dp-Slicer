@@ -5501,28 +5501,49 @@ void GLCanvas3D::_picking_pass()
     }
     default: { break; }
     }
-    char buf[1024];
+
+    auto add_strings_row_to_table = [&imgui](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(col_1_color, col_1.c_str());
+        ImGui::TableSetColumnIndex(1);
+        imgui.text_colored(col_2_color, col_2.c_str());
+    };
+
     if (hit.type != SceneRaycaster::EType::None) {
-        sprintf(buf, "Object ID: %d", hit.raycaster_id);
-        imgui.text(std::string(buf));
-        sprintf(buf, "Type: %s", object_type.c_str());
-        imgui.text(std::string(buf));
-        sprintf(buf, "Position: %.3f, %.3f, %.3f", hit.position.x(), hit.position.y(), hit.position.z());
-        imgui.text(std::string(buf));
-        sprintf(buf, "Normal: %.3f, %.3f, %.3f", hit.normal.x(), hit.normal.y(), hit.normal.z());
-        imgui.text(std::string(buf));
+        if (ImGui::BeginTable("Hit", 2)) {
+            char buf[1024];
+            add_strings_row_to_table("Object ID:", ImGuiWrapper::COL_ORANGE_LIGHT,
+                std::to_string(hit.raycaster_id), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+            add_strings_row_to_table("Type:", ImGuiWrapper::COL_ORANGE_LIGHT,
+                object_type, ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+            sprintf(buf, "%.3f, %.3f, %.3f", hit.position.x(), hit.position.y(), hit.position.z());
+            add_strings_row_to_table("Position:", ImGuiWrapper::COL_ORANGE_LIGHT,
+                std::string(buf), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+            sprintf(buf, "%.3f, %.3f, %.3f", hit.normal.x(), hit.normal.y(), hit.normal.z());
+            add_strings_row_to_table("Normal:", ImGuiWrapper::COL_ORANGE_LIGHT,
+                std::string(buf), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+            ImGui::EndTable();
+        }
     }
     else
         imgui.text("NO HIT");
 
     ImGui::Separator();
     imgui.text("Registered for picking:");
-    sprintf(buf, "Beds: %d (%d)", (int)m_scene_raycaster.beds_count(), (int)m_scene_raycaster.active_beds_count());
-    imgui.text(std::string(buf));
-    sprintf(buf, "Volumes: %d (%d)", (int)m_scene_raycaster.volumes_count(), (int)m_scene_raycaster.active_volumes_count());
-    imgui.text(std::string(buf));
-    sprintf(buf, "Gizmo elements: %d (%d)", (int)m_scene_raycaster.gizmos_count(), (int)m_scene_raycaster.active_gizmos_count());
-    imgui.text(std::string(buf));
+    if (ImGui::BeginTable("Counters", 2)) {
+        char buf[1024];
+        sprintf(buf, "%d (%d)", (int)m_scene_raycaster.beds_count(), (int)m_scene_raycaster.active_beds_count());
+        add_strings_row_to_table("Beds:", ImGuiWrapper::COL_ORANGE_LIGHT,
+            std::string(buf), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+        sprintf(buf, "%d (%d)", (int)m_scene_raycaster.volumes_count(), (int)m_scene_raycaster.active_volumes_count());
+        add_strings_row_to_table("Volumes:", ImGuiWrapper::COL_ORANGE_LIGHT,
+            std::string(buf), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+        sprintf(buf, "%d (%d)", (int)m_scene_raycaster.gizmos_count(), (int)m_scene_raycaster.active_gizmos_count());
+        add_strings_row_to_table("Gizmo elements:", ImGuiWrapper::COL_ORANGE_LIGHT,
+            std::string(buf), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+        ImGui::EndTable();
+    }
     imgui.end();
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 }

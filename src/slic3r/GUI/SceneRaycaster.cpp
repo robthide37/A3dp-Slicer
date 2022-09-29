@@ -37,10 +37,10 @@ std::shared_ptr<SceneRaycasterItem> SceneRaycaster::add_raycaster(EType type, in
     const Transform3d& trafo, bool use_back_faces)
 {
     switch (type) {
-    case EType::Bed: { return m_bed.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo, use_back_faces)); }
+    case EType::Bed:    { return m_bed.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo, use_back_faces)); }
     case EType::Volume: { return m_volumes.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo, use_back_faces)); }
-    case EType::Gizmo: { return m_gizmos.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo, use_back_faces)); }
-    default: { assert(false);  return nullptr; }
+    case EType::Gizmo:  { return m_gizmos.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo, use_back_faces)); }
+    default:            { assert(false);  return nullptr; }
     };
 }
 

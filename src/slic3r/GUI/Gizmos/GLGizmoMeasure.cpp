@@ -30,6 +30,8 @@ static const int POINT_ID         = 100;
 static const int EDGE_ID          = 200;
 static const int CIRCLE_ID        = 300;
 static const int PLANE_ID         = 400;
+static const int SELECTION_1_ID   = 501;
+static const int SELECTION_2_ID   = 502;
 
 static const float TRIANGLE_BASE = 10.0f;
 static const float TRIANGLE_HEIGHT = TRIANGLE_BASE * 1.618033f;
@@ -47,11 +49,11 @@ static std::string surface_feature_type_as_string(Measure::SurfaceFeatureType ty
     switch (type)
     {
     default:
-    case Measure::SurfaceFeatureType::Undef:  { return L("Undefined"); }
-    case Measure::SurfaceFeatureType::Point:  { return L("Vertex"); }
-    case Measure::SurfaceFeatureType::Edge:   { return L("Edge"); }
-    case Measure::SurfaceFeatureType::Circle: { return L("Circle"); }
-    case Measure::SurfaceFeatureType::Plane:  { return L("Plane"); }
+    case Measure::SurfaceFeatureType::Undef:  { return _u8L("Undefined"); }
+    case Measure::SurfaceFeatureType::Point:  { return _u8L("Vertex"); }
+    case Measure::SurfaceFeatureType::Edge:   { return _u8L("Edge"); }
+    case Measure::SurfaceFeatureType::Circle: { return _u8L("Circle"); }
+    case Measure::SurfaceFeatureType::Plane:  { return _u8L("Plane"); }
     }
 }
 
@@ -277,20 +279,44 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             m_mouse_left_down = true;
             
             auto item_from_feature = [this]() {
-                const SelectedFeatures::Item item = {
-                    (m_mode == EMode::ExtendedSelection) ? point_on_feature_type_as_string(m_curr_feature->get_type(), m_hover_id) : surface_feature_type_as_string(m_curr_feature->get_type()),
-                    (m_mode == EMode::ExtendedSelection) ? Measure::SurfaceFeature(*m_curr_point_on_feature_position) : m_curr_feature };
+                SelectedFeatures::Item item;
+                if (m_hover_id == SELECTION_1_ID && m_selected_features.first.feature.has_value())
+                    item = m_selected_features.first;
+                else if (m_hover_id == SELECTION_2_ID && m_selected_features.second.feature.has_value())
+                    item = m_selected_features.second;
+                else {
+                    item = {
+                        (m_mode == EMode::ExtendedSelection) ? point_on_feature_type_as_string(m_curr_feature->get_type(), m_hover_id) : surface_feature_type_as_string(m_curr_feature->get_type()),
+                        (m_mode == EMode::ExtendedSelection) ? Measure::SurfaceFeature(*m_curr_point_on_feature_position) : m_curr_feature
+                    };
+                }
                 return item;
             };
 
             if (m_selected_features.first.feature.has_value()) {
-                const SelectedFeatures::Item item = item_from_feature();
-                if (m_selected_features.first != item)
-                    m_selected_features.second = item;
-            }
-            else
-                m_selected_features.first = item_from_feature();
+                auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
+                    [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SELECTION_2_ID; });
+                if (it != m_selection_raycasters.end())
+                    m_selection_raycasters.erase(it);
+                m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_2_ID);
 
+                const SelectedFeatures::Item item = item_from_feature();
+                if (m_selected_features.first != item) {
+                    if (m_selected_features.second == item)
+                        m_selected_features.second.reset();
+                    else {
+                        m_selected_features.second = item;
+                        if (m_mode == EMode::ExtendedSelection)
+                            m_selection_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_2_ID, *m_sphere.mesh_raycaster));
+                    }
+                }
+            }
+            else {
+                const SelectedFeatures::Item item = item_from_feature();
+                m_selected_features.first = item;
+                if (m_mode == EMode::ExtendedSelection)
+                    m_selection_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_1_ID, *m_sphere.mesh_raycaster));
+            }
             return true;
         }
 
@@ -308,6 +334,7 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
     }
     else if (mouse_event.RightDown() && mouse_event.CmdDown()) {
         m_selected_features.reset();
+        m_selection_raycasters.clear();
         m_imgui->set_requires_extra_frame();
     }
     else if (mouse_event.Leaving())
@@ -332,6 +359,7 @@ void GLGizmoMeasure::data_changed()
     m_last_inv_zoom = 0.0f;
     m_last_plane_idx = -1;
     m_selected_features.reset();
+    m_selection_raycasters.clear();
 }
 
 bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
@@ -435,7 +463,11 @@ void GLGizmoMeasure::on_render()
             std::optional<Measure::SurfaceFeature> curr_feature = mouse_on_object ? m_measuring->get_feature(model_facet_idx, position_on_model.cast<double>()) : std::nullopt;
             m_curr_point_on_feature_position.reset();
             if (m_curr_feature != curr_feature) {
-                GLGizmoMeasure::on_unregister_raycasters_for_picking();
+                m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID);
+                m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, EDGE_ID);
+                m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, PLANE_ID);
+                m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_ID);
+                m_raycasters.clear();
                 m_curr_feature = curr_feature;
                 if (!m_curr_feature.has_value())
                     return;
@@ -687,11 +719,23 @@ void GLGizmoMeasure::on_render()
             std::vector<ColorRGBA> colors;
             colors.emplace_back(SELECTED_1ST_COLOR);
             render_feature(*m_selected_features.first.feature, colors, m_volume_matrix, inv_zoom, false);
+            if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point) {
+                auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
+                    [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SELECTION_1_ID; });
+                if (it != m_selection_raycasters.end())
+                    (*it)->set_transform(m_volume_matrix * Geometry::translation_transform(m_selected_features.first.feature->get_point()) * Geometry::scale_transform(inv_zoom));
+            }
         }
         if (m_selected_features.second.feature.has_value() && (!m_curr_feature.has_value() || *m_curr_feature != *m_selected_features.second.feature)) {
             std::vector<ColorRGBA> colors;
             colors.emplace_back(SELECTED_2ND_COLOR);
             render_feature(*m_selected_features.second.feature, colors, m_volume_matrix, inv_zoom, false);
+            if (m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
+                auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
+                    [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SELECTION_2_ID; });
+                if (it != m_selection_raycasters.end())
+                    (*it)->set_transform(m_volume_matrix * Geometry::translation_transform(m_selected_features.second.feature->get_point()) * Geometry::scale_transform(inv_zoom));
+            }
         }
 
         if (is_hovering_on_locked_feature && m_curr_point_on_feature_position.has_value()) {
@@ -1269,7 +1313,7 @@ void GLGizmoMeasure::render_debug_dialog()
             add_strings_row_to_table(*m_imgui, "m_pt3", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(*extra_point), ImGui::GetStyleColorVec4(ImGuiCol_Text));
     };
 
-    m_imgui->begin(_L("Measure tool debug"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    m_imgui->begin(_L("Measure tool debug"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
     if (!m_selected_features.first.feature.has_value() && !m_selected_features.second.feature.has_value())
         m_imgui->text("Empty selection");
     else {
@@ -1323,7 +1367,10 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Left mouse button"));
             },
             [this]() {
-                m_imgui->text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), (m_mode == EMode::BasicSelection) ? _u8L("Select feature") : _u8L("Select point"));
+                m_imgui->text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text),
+                    m_selected_features.second.feature.has_value() ?
+                    ((m_mode == EMode::BasicSelection) ? _u8L("Select/Unselect feature") : _u8L("Select/Unselect point")) :
+                    ((m_mode == EMode::BasicSelection) ? _u8L("Select feature") : _u8L("Select point")));
                 ImGui::SameLine();
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
                 const float rect_size = ImGui::GetTextLineHeight();
@@ -1434,6 +1481,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     //if (m_selected_features.first.feature.has_value()) {
     //    if (m_imgui->button(_u8L("Restart"))) {
     //        m_selected_features.reset();
+    //        m_selection_raycasters.clear();
     //        m_imgui->set_requires_extra_frame();
     //    }
     //}
@@ -1498,6 +1546,7 @@ void GLGizmoMeasure::on_unregister_raycasters_for_picking()
     m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo);
     m_parent.set_raycaster_gizmos_on_top(false);
     m_raycasters.clear();
+    m_selection_raycasters.clear();
 }
 
 } // namespace GUI
