@@ -111,6 +111,7 @@ private:
 
 
 struct DistAndPoints {
+    DistAndPoints(double dist_, Vec3d from_, Vec3d to_) : dist(dist_), from(from_), to(to_) {}
     double dist;
     Vec3d from;
     Vec3d to;

@@ -498,7 +498,40 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
     ///////////////////////////////////////////////////////////////////////////
     } else if (f1.get_type() == SurfaceFeatureType::Edge) {
         if (f2.get_type() == SurfaceFeatureType::Edge) {
-            result.distance_infinite = std::make_optional(DistAndPoints{0., Vec3d::Zero(), Vec3d::Zero()}); // TODO
+
+            std::vector<DistAndPoints> distances;
+
+            auto add_point_edge_distance = [&distances](const Vec3d& v, const std::pair<Vec3d, Vec3d>& e) {
+                //const auto [distance, v1, v2] = distance_point_edge(v, SurfaceFeature(SurfaceFeatureType::Edge, e.first, e.second));
+
+                const MeasurementResult res = get_measurement(SurfaceFeature(v), SurfaceFeature(SurfaceFeatureType::Edge, e.first, e.second, std::optional<Vec3d>(), 0.));
+                double distance = res.distance_strict->dist;
+                Vec3d v1 = res.distance_strict->from;
+                Vec3d v2 = res.distance_strict->to;
+
+
+                const Vec3d e1e2 = e.second - e.first;
+                const Vec3d e1v2 = v2 - e.first;
+                if (e1v2.dot(e1e2) >= 0.0 && e1v2.norm() < e1e2.norm())
+                    distances.emplace_back(distance, v, v2);
+            };
+
+            std::pair<Vec3d, Vec3d> e1 = f1.get_edge();
+            std::pair<Vec3d, Vec3d> e2 = f2.get_edge();
+
+            distances.emplace_back((e2.first - e1.first).norm(), e1.first, e2.first);
+            distances.emplace_back((e2.second - e1.first).norm(), e1.first, e2.second);
+            distances.emplace_back((e2.first - e1.second).norm(), e1.second, e2.first);
+            distances.emplace_back((e2.second - e1.second).norm(), e1.second, e2.second);
+            add_point_edge_distance(e1.first, e2);
+            add_point_edge_distance(e1.second, e2);
+            add_point_edge_distance(e2.first, e1);
+            add_point_edge_distance(e2.second, e1);
+            auto it = std::min_element(distances.begin(), distances.end(),
+                [](const DistAndPoints& item1, const DistAndPoints& item2) {
+                    return item1.dist < item2.dist;
+                });
+            result.distance_infinite = std::make_optional(*it); // TODO
     ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Circle) {
             result.distance_infinite = std::make_optional(DistAndPoints{0., Vec3d::Zero(), Vec3d::Zero()}); // TODO
