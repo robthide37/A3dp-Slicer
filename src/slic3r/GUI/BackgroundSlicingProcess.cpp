@@ -211,6 +211,12 @@ void BackgroundSlicingProcess::thread_proc()
 	set_current_thread_name("slic3r_BgSlcPcs");
     name_tbb_thread_pool_threads_set_locale();
 
+    // Set "C" locales and enforce OSX QoS level on all threads entering an arena.
+    // The cost of the callback is quite low: The callback is called once per thread
+    // entering a parallel loop and the callback is guarded with a thread local
+    // variable to be executed just once.
+	TBBLocalesSetter setter;
+
 	assert(m_print != nullptr);
 	assert(m_print == m_fff_print || m_print == m_sla_print);
 	std::unique_lock<std::mutex> lck(m_mutex);

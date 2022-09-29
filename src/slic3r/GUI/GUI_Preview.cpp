@@ -222,10 +222,8 @@ bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
     m_choice_view_type->Append(_L("Fan speed"));
     m_choice_view_type->Append(_L("Temperature"));
     m_choice_view_type->Append(_L("Volumetric flow rate"));
-#if ENABLE_PREVIEW_LAYER_TIME
     m_choice_view_type->Append(_L("Layer time (linear)"));
     m_choice_view_type->Append(_L("Layer time (logarithmic)"));
-#endif // ENABLE_PREVIEW_LAYER_TIME
     m_choice_view_type->Append(_L("Tool"));
     m_choice_view_type->Append(_L("Color Print"));
     m_choice_view_type->SetSelection(0);
