@@ -160,8 +160,8 @@ private:
     EmbossDataBase create_emboss_data_base();
     bool load_configuration(ModelVolume *volume);
 
-    // Create notification when unknown font type is used
-    bool m_exist_notification;
+    // When open text loaded from .3mf it could be written with unknown font
+    bool m_is_unknown_font;
     void create_notification_not_valid_font(const TextConfiguration& tc);
     void remove_notification_not_valid_font();
 

@@ -259,19 +259,26 @@ void EmbossStyleManager::make_unique_name(std::string &name)
         return true;
     };
 
-    if (name.empty()) name = "font";
+    // Style name can't be empty so default name is set
+    if (name.empty()) name = "Text style";
+
+    // When name is already unique, nothing need to be changed
     if (is_unique(name)) return;
 
-    auto pos = name.find(" (");
-    if (pos != std::string::npos && name.find(")", pos) != std::string::npos) {
+    // when there is previous version of style name only find number
+    const char *prefix = " (";
+    const char  suffix  = ')';
+    auto pos = name.find_last_of(prefix);
+    if (name.c_str()[name.size() - 1] == suffix && 
+        pos != std::string::npos) {
         // short name by ord number
         name = name.substr(0, pos);
     }
 
-    int         order = 1; // start with value 2 to represents same font name
+    int order = 1; // start with value 2 to represents same font name
     std::string new_name;
     do {
-        new_name = name + " (" + std::to_string(++order) + ")";
+        new_name = name + prefix + std::to_string(++order) + suffix;
     } while (!is_unique(new_name));
     name = new_name;
 }

@@ -124,7 +124,7 @@ template<typename T> void to_range_pi_pi(T& angle)
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
     , m_volume(nullptr)
-    , m_exist_notification(false)
+    , m_is_unknown_font(false)
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
     , m_style_manager(m_imgui->get_glyph_ranges())
     , m_update_job_cancel(nullptr)
@@ -1009,6 +1009,12 @@ void GLGizmoEmboss::draw_window()
     if (!is_activ_font)
         m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Warning: No font is selected. Select correct one."));
     
+    // Disable all except selection of font, when open text from 3mf with unknown font
+    m_imgui->disabled_begin(m_is_unknown_font);
+    ScopeGuard unknown_font_sc([&]() { 
+        m_imgui->disabled_end(); 
+    });
+
     draw_text_input();
     draw_model_type();
     draw_style_list();
@@ -1040,7 +1046,13 @@ void GLGizmoEmboss::draw_window()
     ImGui::PopStyleColor();
 
     ImGui::SameLine();
-    if (ImGui::Button(_u8L("Apply").c_str())) close();
+    if (ImGui::Button(_u8L("Apply").c_str())) {
+        if (m_is_unknown_font) {
+            process();
+        } else {
+            close();
+        }
+    }
 
     // Option to create text volume when reselecting volumes
     m_imgui->disabled_begin(!is_activ_font);
@@ -1087,14 +1099,10 @@ void GLGizmoEmboss::draw_text_input()
     auto create_range_text = [&mng = m_style_manager, &text = m_text, &exist_unknown = m_text_contain_unknown_glyph]() {
         auto& ff = mng.get_font_file_with_cache();
         assert(ff.has_value());
-        const auto  &cn = mng.get_font_prop().collection_number;
+        const auto &cn = mng.get_font_prop().collection_number;
         unsigned int font_index = (cn.has_value()) ? *cn : 0;
         return Emboss::create_range_text(text, *ff.font_file, font_index, &exist_unknown);
     };
-
-    static const ImGuiInputTextFlags flags =
-        ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_AutoSelectAll;
-
     
     ImFont *imgui_font = m_style_manager.get_imgui_font();
     if (imgui_font == nullptr) {
@@ -1119,6 +1127,7 @@ void GLGizmoEmboss::draw_text_input()
     float  extra_height   = window_height - minimal_height;
     ImVec2 text_size(m_gui_cfg->text_size.x,
                      m_gui_cfg->text_size.y + extra_height);
+    const ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_AutoSelectAll;
     if (ImGui::InputTextMultiline("##Text", &m_text, text_size, flags)) {
         process();
         range_text = create_range_text();
@@ -1324,7 +1333,15 @@ void GLGizmoEmboss::draw_font_list()
     }
     const char * selected = (!actual_face_name.empty()) ?
         actual_face_name.ToUTF8().data() : " --- ";
+
     wxString del_facename;
+    ScopeGuard unknown_font_sc;
+    if (m_is_unknown_font) { 
+        m_imgui->disabled_end(); 
+        unknown_font_sc = ScopeGuard([&]() { 
+            m_imgui->disabled_begin(true); 
+        });
+    }
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if (!m_face_names.is_init) init_face_names();
         init_font_name_texture();
@@ -2821,8 +2838,8 @@ void GLGizmoEmboss::create_notification_not_valid_font(
     const TextConfiguration &tc)
 {
     // not neccessary, but for sure that old notification doesnt exist
-    if (m_exist_notification) remove_notification_not_valid_font();
-    m_exist_notification = true;
+    if (m_is_unknown_font) remove_notification_not_valid_font();
+    m_is_unknown_font = true;
 
     auto type = NotificationType::UnknownFont;
     auto level =
@@ -2859,8 +2876,8 @@ void GLGizmoEmboss::create_notification_not_valid_font(
 
 void GLGizmoEmboss::remove_notification_not_valid_font()
 {
-    if (!m_exist_notification) return;
-    m_exist_notification      = false;
+    if (!m_is_unknown_font) return;
+    m_is_unknown_font      = false;
     auto type                 = NotificationType::UnknownFont;
     auto notification_manager = wxGetApp().plater()->get_notification_manager();
     notification_manager->close_notification_of_type(type);
