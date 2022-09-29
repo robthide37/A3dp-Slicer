@@ -10,6 +10,8 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
 
+#include <imgui/imgui_internal.h>
+
 #include <numeric>
 
 #include <GL/glew.h>
@@ -1251,7 +1253,7 @@ static void add_row_to_table(std::function<void(void)> col_1 = nullptr, std::fun
     col_1();
     ImGui::TableSetColumnIndex(1);
     col_2();
-};
+}
 
 static void add_strings_row_to_table(ImGuiWrapper& imgui, const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color)
 {
@@ -1263,14 +1265,14 @@ static std::string format_double(double value)
     char buf[1024];
     sprintf(buf, "%.3f", value);
     return std::string(buf);
-};
+}
 
 static std::string format_vec3(const Vec3d& v)
 {
     char buf[1024];
     sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", v.x(), v.y(), v.z());
     return std::string(buf);
-};
+}
 
 #if ENABLE_MEASURE_GIZMO_DEBUG
 void GLGizmoMeasure::render_debug_dialog()
@@ -1486,36 +1488,75 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     //    }
     //}
 
+    auto add_measure_row_to_table = [this](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        m_imgui->text_colored(col_1_color, col_1);
+        ImGui::TableSetColumnIndex(1);
+        m_imgui->text_colored(col_2_color, col_2);
+        ImGui::TableSetColumnIndex(2);
+        ImGuiIO& io = ImGui::GetIO();
+        const ImTextureID tex_id = io.Fonts->TexID;
+        assert(io.Fonts->TexWidth > 0 && io.Fonts->TexHeight > 0);
+        float inv_tex_w = 1.0f / float(io.Fonts->TexWidth);
+        float inv_tex_h = 1.0f / float(io.Fonts->TexHeight);
+        const ImFontAtlasCustomRect* const rect = m_imgui->GetTextureCustomRect(ImGui::ClipboardBtnIcon);
+        const ImVec2 size = { float(rect->Width), float(rect->Height) };
+        const ImVec2 uv0 = ImVec2(float(rect->X) * inv_tex_w, float(rect->Y) * inv_tex_h);
+        const ImVec2 uv1 = ImVec2(float(rect->X + rect->Width) * inv_tex_w, float(rect->Y + rect->Height) * inv_tex_h);
+        ImGui::PushStyleColor(ImGuiCol_Button,        { 0.25f, 0.25f, 0.25f, 0.0f });
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.4f, 0.4f, 0.4f, 1.0f });
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  { 0.25f, 0.25f, 0.25f, 1.0f });
+        if (m_imgui->image_button(tex_id, size, uv0, uv1)) {
+            wxTheClipboard->Open();
+            wxTheClipboard->SetData(new wxTextDataObject(col_1 + ": " + col_2));
+            wxTheClipboard->Close();
+        }
+        ImGui::PopStyleColor(3);
+        if (ImGui::IsItemHovered()) {
+            const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
+            m_imgui->tooltip(into_u8(_L("Copy to clipboard")).c_str(), max_tooltip_width);
+        }
+    };
+
     if (m_selected_features.second.feature.has_value()) {
         const Measure::MeasurementResult measure = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature);
         ImGui::Separator();
         if (measure.has_any_data()) {
             m_imgui->text(_u8L("Measure") + ":");
-            if (ImGui::BeginTable("Measure", 2)) {
+            if (ImGui::BeginTable("Measure", 3)) {
                 if (measure.angle.has_value()) {
-                    add_strings_row_to_table(*m_imgui, _u8L("Angle") + _u8L(" (°)"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(Geometry::rad2deg(*measure.angle)),
+                    ImGui::PushID((void*)(intptr_t)1);
+                    add_measure_row_to_table(_u8L("Angle") + _u8L(" (°)"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(Geometry::rad2deg(*measure.angle)),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
+                    ImGui::PopID();
                 }
                 if (measure.distance_infinite.has_value()) {
                     double distance = *measure.distance_infinite;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
-                    add_strings_row_to_table(*m_imgui, _u8L("Distance Infinite") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance),
+                    ImGui::PushID((void*)(intptr_t)2);
+                    add_measure_row_to_table(_u8L("Distance Infinite") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
+                    ImGui::PopID();
                 }
                 if (measure.distance_strict.has_value()) {
                     double distance = *measure.distance_strict;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
-                    add_strings_row_to_table(*m_imgui, _u8L("Distance Strict") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance),
+                    ImGui::PushID((void*)(intptr_t)3);
+                    add_measure_row_to_table(_u8L("Distance Strict") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
+                    ImGui::PopID();
                 }
                 if (measure.distance_xyz.has_value()) {
                     Vec3d distance = *measure.distance_xyz;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
-                    add_strings_row_to_table(*m_imgui, _u8L("Distance XYZ") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(distance),
+                    ImGui::PushID((void*)(intptr_t)4);
+                    add_measure_row_to_table(_u8L("Distance XYZ") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(distance),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
+                    ImGui::PopID();
                 }
                 ImGui::EndTable();
             }
