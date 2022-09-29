@@ -773,14 +773,12 @@ private:
     COG m_cog;
     EViewType m_view_type{ EViewType::FeatureType };
     bool m_legend_enabled{ true };
-#if ENABLE_PREVIEW_LAYOUT
     struct LegendResizer
     {
         bool dirty{ true };
         void reset() { dirty = true; }
     };
     LegendResizer m_legend_resizer;
-#endif // ENABLE_PREVIEW_LAYOUT
     PrintEstimatedStatistics m_print_statistics;
     PrintEstimatedStatistics::ETimeMode m_time_estimate_mode{ PrintEstimatedStatistics::ETimeMode::Normal };
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -808,11 +806,7 @@ public:
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     // recalculate ranges in dependence of what is visible and sets tool/print colors
     void refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
-#if ENABLE_PREVIEW_LAYOUT
     void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
-#else
-    void refresh_render_paths();
-#endif // ENABLE_PREVIEW_LAYOUT
     void update_shells_color_by_extruder(const DynamicPrintConfig* config);
 
     void reset();
@@ -857,9 +851,7 @@ public:
     std::vector<CustomGCode::Item>& get_custom_gcode_per_print_z() { return m_custom_gcode_per_print_z; }
     size_t get_extruders_count() { return m_extruders_count; }
 
-#if ENABLE_PREVIEW_LAYOUT
     void invalidate_legend() { m_legend_resizer.reset(); }
-#endif // ENABLE_PREVIEW_LAYOUT
 
 private:
     void load_toolpaths(const GCodeProcessorResult& gcode_result);
@@ -868,9 +860,6 @@ private:
 #else
     void load_shells(const Print& print, bool initialized);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_PREVIEW_LAYOUT
-    void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
-#endif // !ENABLE_PREVIEW_LAYOUT
     void render_toolpaths();
     void render_shells();
     void render_legend(float& legend_height);

@@ -389,7 +389,6 @@ bool ImGuiWrapper::radio_button(const wxString &label, bool active)
     return ImGui::RadioButton(label_utf8.c_str(), active);
 }
 
-#if ENABLE_PREVIEW_LAYOUT
 bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool active,
     std::function<void(ImGuiWindow& window, const ImVec2& pos, float size)> draw_callback)
 {
@@ -423,7 +422,6 @@ bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool a
     IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window.DC.LastItemStatusFlags);
     return pressed;
 }
-#endif // ENABLE_PREVIEW_LAYOUT
 
 bool ImGuiWrapper::input_double(const std::string &label, const double &value, const std::string &format)
 {
@@ -671,14 +669,10 @@ bool ImGuiWrapper::image_button(ImTextureID user_texture_id, const ImVec2& size,
 bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags)
 {
     // this is to force the label to the left of the widget:
-#if ENABLE_PREVIEW_LAYOUT
     if (!label.empty()) {
-#endif // ENABLE_PREVIEW_LAYOUT
         text(label);
         ImGui::SameLine();
-#if ENABLE_PREVIEW_LAYOUT
     }
-#endif // ENABLE_PREVIEW_LAYOUT
 
     int selection_out = selection;
     bool res = false;
