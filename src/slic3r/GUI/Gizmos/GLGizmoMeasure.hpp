@@ -87,6 +87,7 @@ class GLGizmoMeasure : public GLGizmoBase
     Transform3d m_volume_matrix{ Transform3d::Identity() };
     std::vector<GLModel> m_plane_models_cache;
     std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
+    std::vector<std::shared_ptr<SceneRaycasterItem>> m_selection_raycasters;
     std::optional<Measure::SurfaceFeature> m_curr_feature;
     std::optional<Vec3d> m_curr_point_on_feature_position;
     struct SceneRaycasterState
