@@ -15,12 +15,12 @@ namespace Slic3r {
 namespace Measure {
 
 
-enum class SurfaceFeatureType {
-    Undef,
-    Point,
-    Edge,
-    Circle,
-    Plane
+enum class SurfaceFeatureType : int {
+    Undef  = 0,
+    Point  = 1 << 0,
+    Edge   = 1 << 1,
+    Circle = 1 << 2,
+    Plane  = 1 << 3
 };
 
 class SurfaceFeature {
@@ -117,8 +117,19 @@ struct DistAndPoints {
     Vec3d to;
 };
 
+struct AngleAndPoints {
+    AngleAndPoints(double angle_, Vec3d center_, Vec3d e1_, Vec3d e2_, double radius_, bool coplanar_)
+    : angle(angle_), center(center_), e1(e1_), e2(e2_), radius(radius_), coplanar(coplanar_) {}
+    double angle;
+    Vec3d center;
+    Vec3d e1;
+    Vec3d e2;
+    double radius;
+    bool coplanar;
+};
+
 struct MeasurementResult {
-    std::optional<double> angle;
+    std::optional<AngleAndPoints> angle;
     std::optional<DistAndPoints> distance_infinite;
     std::optional<DistAndPoints> distance_strict;
     std::optional<Vec3d>  distance_xyz;
