@@ -72,13 +72,6 @@ static std::string point_on_feature_type_as_string(Measure::SurfaceFeatureType t
     return ret;
 }
 
-static std::tuple<double, Vec3d, Vec3d> distance_point_plane(const Vec3d& v, const Plane& p)
-{
-    const auto& [idx, normal, origin] = p;
-    const Eigen::Hyperplane<double, 3> plane(normal, origin);
-    return std::make_tuple(plane.absDistance(v), v, plane.projection(v));
-}
-
 static Vec3d vector_direction(const Vec3d& from, const Vec3d& to)
 {
     return (to - from).normalized();
@@ -89,21 +82,13 @@ static Vec3d edge_direction(const Edge& e)
     return vector_direction(e.first, e.second);
 }
 
-// returns: distance, 1st vertex, 2nd vertex
-static std::tuple<double, Vec3d, Vec3d> distance_point_edge(const Vec3d& v, const Edge& e)
-{
-    const Eigen::ParametrizedLine<double, 3> line = Eigen::ParametrizedLine<double, 3>::Through(e.first, e.second);
-    return std::make_tuple(line.distance(v), v, line.projection(v));
-}
 
-// returns: distance, 1st vertex, 2nd vertex
-static std::tuple<double, Vec3d, Vec3d> distance_point_circle(const Vec3d& v, const Circle& c)
-{
-    const auto& [center, radius, normal] = c;
-    const Eigen::Hyperplane<double, 3> plane(normal, center);
-    const Vec3d p_on_circle = center + radius * vector_direction(center, plane.projection(v));
-    return std::make_tuple((v - p_on_circle).norm(), v, p_on_circle);
-}
+
+
+
+
+/*
+
 
 // returns: distance, 1st vertex, 2nd vertex
 static std::tuple<double, Vec3d, Vec3d> distance_edge_edge(const Edge& e1, const Edge& e2)
@@ -165,6 +150,34 @@ static std::tuple<double, Vec3d, Vec3d> distance_plane_plane(const Plane& p1, co
     return (std::abs(std::abs(normal1.dot(normal2)) - 1.0) < EPSILON) ? distance_point_plane(origin2, p1) :
         std::make_tuple(0.0, Vec3d::Zero(), Vec3d::Zero());
 }
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // returns: angle in rad, center of arc, radius of arc, whether or not the edges are coplanar
 // After return, the edges are oriented so that they point away from their intersection point
@@ -278,6 +291,9 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
     }
     else if (mouse_event.LeftDown()) {
         if (m_hover_id != -1) {
+            SelectedFeatures selected_features_old = m_selected_features;
+
+
             m_mouse_left_down = true;
             
             auto item_from_feature = [this]() {
@@ -319,6 +335,10 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
                 if (m_mode == EMode::ExtendedSelection)
                     m_selection_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_1_ID, *m_sphere.mesh_raycaster));
             }
+
+            if (m_selected_features != selected_features_old && m_selected_features.second.feature.has_value())
+                m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature);
+
             return true;
         }
 
@@ -963,8 +983,11 @@ void GLGizmoMeasure::render_dimensioning()
         m_dimensioning.triangle.render();
     };
 
+
     auto point_edge = [this, shader, point_point](const Vec3d& v, const Edge& e) {
-        const auto [distance, v1, v_proj] = distance_point_edge(v, e);
+        const double distance = m_measurement_result.distance_infinite->dist;
+        const Vec3d v1        = m_measurement_result.distance_infinite->from;
+        const Vec3d v_proj    = m_measurement_result.distance_infinite->to;
         point_point(v1, v_proj);
 
         const Vec3d e1e2 = e.second - e.first;
@@ -997,16 +1020,7 @@ void GLGizmoMeasure::render_dimensioning()
         }
     };
 
-    auto point_plane = [point_point](const Vec3d& v, const Plane& p) {
-        const auto [distance, v1, v2] = distance_point_plane(v, p);
-        point_point(v1, v2);
-    };
-
-    auto point_circle = [point_point](const Vec3d& v, const Circle& c) {
-        const auto [distance, v1, v2] = distance_point_circle(v, c);
-        point_point(v1, v2);
-    };
-
+/*
     auto arc_edge_edge = [this, shader](const Edge& e1, const Edge& e2, const double* const force_radius = nullptr) {
         Edge e1copy = e1;
         Edge e2copy = e2;
@@ -1130,7 +1144,7 @@ void GLGizmoMeasure::render_dimensioning()
     auto plane_plane = [point_point](const Plane& p1, const Plane& p2) {
         const auto [distance, v1, v2] = distance_plane_plane(p1, p2);
         point_point(v1, v2);
-    };
+    };*/
 
     shader->start_using();
 
@@ -1174,26 +1188,26 @@ void GLGizmoMeasure::render_dimensioning()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
-    // point-point
-    if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
-        point_point(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_point());
+    // Render the arrow between the points that the backend passed:
+    if (m_selected_features.second.feature.has_value()) {
+        const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
+                                          ? *m_measurement_result.distance_infinite
+                                          : *m_measurement_result.distance_strict;
+        point_point(dap.from, dap.to);
     }
+
+    // Now if one of the features is an edge, draw also the extension of the edge to where the dist is measured:
+    // TODO...
+
+
     // point-edge
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
         point_edge(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_edge());
     }
-    // point-plane
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Plane) {
-        point_plane(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_plane());
-    }
-    // point-circle
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Circle) {
-        point_circle(m_selected_features.first.feature->get_point(), m_selected_features.second.feature->get_circle());
-    }
+
+    
+    /*
     // edge-point
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Edge &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
@@ -1214,11 +1228,6 @@ void GLGizmoMeasure::render_dimensioning()
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Circle) {
         edge_circle(m_selected_features.first.feature->get_edge(), m_selected_features.second.feature->get_circle());
     }
-    // plane-point
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Plane &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
-        point_plane(m_selected_features.second.feature->get_point(), m_selected_features.first.feature->get_plane());
-    }
     // plane-edge
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Plane &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
@@ -1229,16 +1238,12 @@ void GLGizmoMeasure::render_dimensioning()
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Plane) {
         plane_plane(m_selected_features.first.feature->get_plane(), m_selected_features.second.feature->get_plane());
     }
-    // circle-point
-    else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Circle &&
-        m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
-        point_circle(m_selected_features.second.feature->get_point(), m_selected_features.first.feature->get_circle());
-    }
     // circle-edge
     else if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Circle &&
         m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
         edge_circle(m_selected_features.second.feature->get_edge(), m_selected_features.first.feature->get_circle());
     }
+*/
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
@@ -1520,7 +1525,8 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     };
 
     if (m_selected_features.second.feature.has_value()) {
-        const Measure::MeasurementResult measure = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature);
+        const Measure::MeasurementResult& measure = m_measurement_result;
+
         ImGui::Separator();
         if (measure.has_any_data()) {
             m_imgui->text(_u8L("Measure") + ":");
@@ -1532,7 +1538,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     ImGui::PopID();
                 }
                 if (measure.distance_infinite.has_value()) {
-                    double distance = *measure.distance_infinite;
+                    double distance = measure.distance_infinite->dist;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
                     ImGui::PushID((void*)(intptr_t)2);
@@ -1541,7 +1547,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     ImGui::PopID();
                 }
                 if (measure.distance_strict.has_value()) {
-                    double distance = *measure.distance_strict;
+                    double distance = measure.distance_strict->dist;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
                     ImGui::PushID((void*)(intptr_t)3);
