@@ -3537,7 +3537,6 @@ void GCodeViewer::render_legend(float& legend_height)
         }
         else {
             imgui.text(label);
-#if ENABLE_TRAVEL_TIME
             if (!time.empty()) {
                 ImGui::SameLine(offsets[0]);
                 imgui.text(time);
@@ -3553,9 +3552,6 @@ void GCodeViewer::render_legend(float& legend_height)
                 ImGui::TextUnformatted((percent > 0.0f) ? buf : "");
             }
             else if (used_filament_m > 0.0) {
-#else
-            if (used_filament_m > 0.0) {
-#endif // ENABLE_TRAVEL_TIME
                 char buf[64];
                 ImGui::SameLine(offsets[0]);
                 ::sprintf(buf, imperial_units ? "%.2f in" : "%.2f m", used_filament_m);
@@ -3868,9 +3864,7 @@ void GCodeViewer::render_legend(float& legend_height)
     {
     case EViewType::FeatureType:
     {
-#if ENABLE_TRAVEL_TIME
         max_time_percent = std::max(max_time_percent, time_mode.travel_time / time_mode.time);
-#endif // ENABLE_TRAVEL_TIME
 
         for (size_t i = 0; i < m_roles.size(); ++i) {
             ExtrusionRole role = m_roles[i];
@@ -3891,11 +3885,9 @@ void GCodeViewer::render_legend(float& legend_height)
             );
         }
 
-#if ENABLE_TRAVEL_TIME
         if (m_buffers[buffer_id(EMoveType::Travel)].visible)
             append_item(EItemType::Line, Travel_Colors[0], _u8L("Travel"), true, short_time(get_time_dhms(time_mode.travel_time)),
                 time_mode.travel_time / time_mode.time, max_time_percent, offsets, 0.0f, 0.0f);
-#endif // ENABLE_TRAVEL_TIME
 
         break;
     }
