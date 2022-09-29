@@ -37,7 +37,7 @@ public:
 
     // Try to create similar font, loaded from 3mf from different Computer
     static std::optional<wxFont> create_wxFont(const EmbossStyle &style);
-    // update font property by wxFont
+    // update font property by wxFont - without emboss depth and font size
     static void update_property(FontProp &font_prop, const wxFont &font);
 
     static bool is_italic(const wxFont &font);

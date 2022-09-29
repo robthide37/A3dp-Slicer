@@ -118,7 +118,14 @@ EmbossStyle WxFontUtils::create_emboss_style(const wxFont &font, const std::stri
     EmbossStyle::Type type     = get_actual_type();
 
     // synchronize font property with actual font
-    FontProp font_prop;    
+    FontProp font_prop; 
+
+    // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm): it
+    // is approximately 0.0139 inch or 352.8 um. But it is too small, so I
+    // decide use point size as mm for emboss
+    font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
+    font_prop.emboss     = font_prop.size_in_mm / 2.f;
+
     WxFontUtils::update_property(font_prop, font);
     return { name_item, fontDesc, type, font_prop };
 }
@@ -129,7 +136,7 @@ EmbossStyle WxFontUtils::get_os_font()
     wxFont       font        = wxSystemSettings::GetFont(system_font);
     EmbossStyle  es          = create_emboss_style(font);
     es.name += std::string(" (OS default)");
-    return create_emboss_style(font);
+    return es;
 }
 
 std::string WxFontUtils::get_human_readable_name(const wxFont &font)
@@ -233,13 +240,7 @@ std::optional<wxFont> WxFontUtils::create_wxFont(const EmbossStyle &style)
 
 void WxFontUtils::update_property(FontProp &font_prop, const wxFont &font)
 {
-    // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm): it
-    // is approximately 0.0139 inch or 352.8 um. But it is too small, so I
-    // decide use point size as mm for emboss
-    font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
-    font_prop.emboss     = font_prop.size_in_mm / 2.f;
-
-    wxString    wx_face_name = font.GetFaceName();
+    wxString wx_face_name = font.GetFaceName();
     std::string face_name((const char *) wx_face_name.ToUTF8());
     if (!face_name.empty()) font_prop.face_name = face_name;
 

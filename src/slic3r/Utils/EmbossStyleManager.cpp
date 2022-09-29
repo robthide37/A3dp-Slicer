@@ -474,6 +474,7 @@ bool EmbossStyleManager::set_wx_font(const wxFont &wx_font, std::unique_ptr<Embo
     style.type = WxFontUtils::get_actual_type();
     // update string path
     style.path = WxFontUtils::store_wxFont(wx_font);
+    WxFontUtils::update_property(style.prop, wx_font);
     clear_imgui_font();
     return true;
 }

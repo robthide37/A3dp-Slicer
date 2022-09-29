@@ -1256,6 +1256,9 @@ bool GLGizmoEmboss::select_facename(const wxString &facename) {
     const wxFontEncoding &encoding = m_face_names.encoding;
     wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(encoding));
     if (!wx_font.IsOk()) return false;
+    // wx font could change source file by size of font
+    int point_size = static_cast<int>(m_style_manager.get_font_prop().size_in_mm);
+    wx_font.SetPointSize(point_size);
     if (!m_style_manager.set_wx_font(wx_font)) return false;
     process();
     return true;
@@ -2832,9 +2835,18 @@ void GLGizmoEmboss::create_notification_not_valid_font(
     const std::string &origin_font_name = origin_family.has_value() ?
                                               *origin_family :
                                               tc.style.path;
-    const std::string &actual_font_name = actual_family.has_value() ?
-                                              *actual_family :
-                                              es.name;
+
+    std::string actual_wx_face_name;
+    if (!actual_family.has_value()) {
+        auto& wx_font = m_style_manager.get_wx_font();
+        if (wx_font.has_value()) {
+            wxString    wx_face_name = wx_font->GetFaceName();
+            actual_wx_face_name = std::string((const char *) wx_face_name.ToUTF8());
+        }
+    }
+
+    const std::string &actual_font_name = actual_family.has_value() ? *actual_family : 
+            (!actual_wx_face_name.empty() ? actual_wx_face_name : es.path);
 
     std::string text =
         GUI::format(_L("Can't load exactly same font(\"%1%\"), "
