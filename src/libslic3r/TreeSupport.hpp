@@ -54,7 +54,6 @@ static constexpr const coord_t SUPPORT_TREE_COLLISION_RESOLUTION = scaled<coord_
 
 // The number of vertices in each circle.
 static constexpr const size_t SUPPORT_TREE_CIRCLE_RESOLUTION = 25;
-static constexpr const bool SUPPORT_TREE_ONLY_GRACIOUS_TO_MODEL = false;
 static constexpr const bool SUPPORT_TREE_AVOID_SUPPORT_BLOCKER = true;
 
 enum class InterfacePreference
@@ -93,72 +92,18 @@ struct AreaIncreaseSettings
 
 struct TreeSupportSettings;
 
-struct SupportElementID
-{
-    /*!
-     * \brief The layer this support elements wants reach
-     */
-    LayerIndex  target_height;
-
-    /*!
-     * \brief The position this support elements wants to support on layer=target_height
-     */
-    Point       target_position;
-};
-
-struct SupportElementState : public SupportElementID
-{
-    /*!
-     * \brief The next position this support elements wants to reach. NOTE: This is mainly a suggestion regarding direction inside the influence area.
-     */
-    Point next_position;
-
-    /*!
-     * \brief The next height this support elements wants to reach
-     */
-    LayerIndex next_height;
-
-    /*!
-     * \brief The Effective distance to top of this element regarding radius increases and collision calculations.
-     */
-    uint32_t effective_radius_height;
-
-    /*!
-     * \brief The amount of layers this element is below the topmost layer of this branch.
-     */
-    uint32_t distance_to_top;
-
-    /*!
-     * \brief The resulting center point around which a circle will be drawn later.
-     * Will be set by setPointsOnAreas
-     */
-    Point result_on_layer { std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max() };
-    bool  result_on_layer_is_set() const { return this->result_on_layer != Point{ std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max() }; }
-    void  result_on_layer_reset() { this->result_on_layer = Point{ std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max() }; }
-    /*!
-     * \brief The amount of extra radius we got from merging branches that could have reached the buildplate, but merged with ones that can not.
-     */
-    coord_t increased_to_model_radius; // how much to model we increased only relevant for merging
-
-    /*!
-     * \brief Counter about the times the elephant foot was increased. Can be fractions for merge reasons.
-     */
-    double elephant_foot_increases;
-
-    /*!
-     * \brief The element trys not to move until this dtt is reached, is set to 0 if the element had to move.
-     */
-    uint32_t dont_move_until;
-
-    /*!
-     * \brief Settings used to increase the influence area to its current state.
-     */
-    AreaIncreaseSettings last_area_increase;
-
-    /*!
-     * \brief Amount of roof layers that were not yet added, because the branch needed to move.
-     */
-    uint32_t missing_roof_layers;
+// C++17 does not support in place initializers of bit values, thus a constructor zeroing the bits is provided.
+struct SupportElementStateBits {
+    SupportElementStateBits() :
+        to_buildplate(false),
+        to_model_gracious(false),
+        use_min_xy_dist(false),
+        supports_roof(false),
+        can_use_safe_radius(false),
+        skip_ovalisation(false),
+        deleted(false),
+        marked(false)
+        {}
 
     /*!
      * \brief The element trys to reach the buildplate
@@ -190,11 +135,83 @@ struct SupportElementState : public SupportElementID
      */
     bool skip_ovalisation : 1;
 
+    // Not valid anymore, to be deleted.
+    bool deleted : 1;
+
+    // General purpose flag marking a visited element.
+    bool marked : 1;
+};
+
+struct SupportElementState : public SupportElementStateBits
+{
+    /*!
+     * \brief The layer this support elements wants reach
+     */
+    LayerIndex  target_height;
+
+    /*!
+     * \brief The position this support elements wants to support on layer=target_height
+     */
+    Point       target_position;
+
+    /*!
+     * \brief The next position this support elements wants to reach. NOTE: This is mainly a suggestion regarding direction inside the influence area.
+     */
+    Point       next_position;
+
+    /*!
+     * \brief The next height this support elements wants to reach
+     */
+    LayerIndex  layer_idx;
+
+    /*!
+     * \brief The Effective distance to top of this element regarding radius increases and collision calculations.
+     */
+    uint32_t    effective_radius_height;
+
+    /*!
+     * \brief The amount of layers this element is below the topmost layer of this branch.
+     */
+    uint32_t    distance_to_top;
+
+    /*!
+     * \brief The resulting center point around which a circle will be drawn later.
+     * Will be set by setPointsOnAreas
+     */
+    Point result_on_layer { std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max() };
+    bool  result_on_layer_is_set() const { return this->result_on_layer != Point{ std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max() }; }
+    void  result_on_layer_reset() { this->result_on_layer = Point{ std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max() }; }
+    /*!
+     * \brief The amount of extra radius we got from merging branches that could have reached the buildplate, but merged with ones that can not.
+     */
+    coord_t     increased_to_model_radius; // how much to model we increased only relevant for merging
+
+    /*!
+     * \brief Counter about the times the elephant foot was increased. Can be fractions for merge reasons.
+     */
+    double      elephant_foot_increases;
+
+    /*!
+     * \brief The element trys not to move until this dtt is reached, is set to 0 if the element had to move.
+     */
+    uint32_t    dont_move_until;
+
+    /*!
+     * \brief Settings used to increase the influence area to its current state.
+     */
+    AreaIncreaseSettings last_area_increase;
+
+    /*!
+     * \brief Amount of roof layers that were not yet added, because the branch needed to move.
+     */
+    uint32_t    missing_roof_layers;
+
     // called by increase_single_area() and increaseAreas()
     [[nodiscard]] static SupportElementState propagate_down(const SupportElementState &src)
     {
         SupportElementState dst{ src };
         ++ dst.distance_to_top;
+        -- dst.layer_idx;
         // set to invalid as we are a new node on a new layer
         dst.result_on_layer_reset();
         dst.skip_ovalisation = false;
@@ -204,22 +221,32 @@ struct SupportElementState : public SupportElementID
 
 struct SupportElement
 {
+    using ParentIndices =
+#ifdef NDEBUG
+        // To reduce memory allocation in release mode.
+        boost::container::small_vector<int32_t, 4>;
+#else // NDEBUG
+        // To ease debugging.
+        std::vector<int32_t>;
+#endif // NDEBUG
+
 //    SupportElement(const SupportElementState &state) : SupportElementState(state) {}
     SupportElement(const SupportElementState &state, Polygons &&influence_area) : state(state), influence_area(std::move(influence_area)) {}
-    SupportElement(const SupportElementState &state, boost::container::small_vector<SupportElement*, 4> &&parents, Polygons &&influence_area) :
+    SupportElement(const SupportElementState &state, ParentIndices &&parents, Polygons &&influence_area) :
         state(state), parents(std::move(parents)), influence_area(std::move(influence_area)) {}
 
-    SupportElementState                                   state;
+    SupportElementState         state;
+
     /*!
      * \brief All elements in the layer above the current one that are supported by this element
      */
-    boost::container::small_vector<SupportElement*, 4>    parents;
+    ParentIndices               parents;
 
     /*!
      * \brief The resulting influence area.
      * Will only be set in the results of createLayerPathing, and will be nullptr inside!
      */
-    Polygons                                              influence_area;
+    Polygons                    influence_area;
 };
 
 /*!
