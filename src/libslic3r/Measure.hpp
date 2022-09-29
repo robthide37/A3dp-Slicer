@@ -110,12 +110,16 @@ private:
 };
 
 
-
+struct DistAndPoints {
+    double dist;
+    Vec3d from;
+    Vec3d to;
+};
 
 struct MeasurementResult {
     std::optional<double> angle;
-    std::optional<double> distance_infinite;
-    std::optional<double> distance_strict;
+    std::optional<DistAndPoints> distance_infinite;
+    std::optional<DistAndPoints> distance_strict;
     std::optional<Vec3d>  distance_xyz;
 
     bool has_any_data() const {
