@@ -41,8 +41,6 @@
 
 // Enable changes in preview layout
 #define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_5_0_ALPHA1)
-// Enable drawing the items in legend toolbar using icons
-#define ENABLE_LEGEND_TOOLBAR_ICONS (1 && ENABLE_PREVIEW_LAYOUT)
 // Enable removal of wipe tower magic object_id equal to 1000
 #define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of legacy OpenGL calls

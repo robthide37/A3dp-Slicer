@@ -40,9 +40,7 @@ class ImGuiWrapper
     bool m_disabled{ false };
     bool m_new_frame_open{ false };
     bool m_requires_extra_frame{ false };
-#if ENABLE_LEGEND_TOOLBAR_ICONS
     std::map<wchar_t, int> m_custom_glyph_rects_ids;
-#endif // ENABLE_LEGEND_TOOLBAR_ICONS
     std::string m_clipboard_text;
 
 public:
@@ -143,9 +141,7 @@ public:
     static ColorRGBA from_ImU32(const ImU32& color);
     static ColorRGBA from_ImVec4(const ImVec4& color);
 
-#if ENABLE_LEGEND_TOOLBAR_ICONS
     ImFontAtlasCustomRect* GetTextureCustomRect(const wchar_t& tex_id);
-#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
     static const ImVec4 COL_GREY_DARK;
     static const ImVec4 COL_GREY_LIGHT;
