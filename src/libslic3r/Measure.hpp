@@ -25,8 +25,8 @@ enum class SurfaceFeatureType : int {
 
 class SurfaceFeature {
 public:
-    SurfaceFeature(SurfaceFeatureType type, const Vec3d& pt1, const Vec3d& pt2, std::optional<Vec3d> pt3, double value)
-    : m_type{type}, m_pt1{pt1}, m_pt2{pt2}, m_pt3{pt3}, m_value{value} {}
+    SurfaceFeature(SurfaceFeatureType type, const Vec3d& pt1, const Vec3d& pt2, std::optional<Vec3d> pt3 = std::nullopt, double value = 0.0)
+        : m_type{ type }, m_pt1{ pt1 }, m_pt2{ pt2 }, m_pt3{ pt3 }, m_value{ value } {}
 
     explicit SurfaceFeature(const Vec3d& pt)
     : m_type{SurfaceFeatureType::Point}, m_pt1{pt} {}
@@ -157,6 +157,9 @@ inline Vec3d plane_normal(const SurfaceFeature& plane) {
 inline bool are_parallel(const Vec3d& v1, const Vec3d& v2) { return std::abs(std::abs(v1.dot(v2)) - 1.0) < EPSILON; }
 inline bool are_perpendicular(const Vec3d& v1, const Vec3d& v2) { return std::abs(v1.dot(v2)) < EPSILON; }
 
+inline bool are_parallel(const std::pair<Vec3d, Vec3d>& e1, const std::pair<Vec3d, Vec3d>& e2) {
+    return are_parallel(e1.second - e1.first, e2.second - e2.first);
+}
 inline bool are_parallel(const SurfaceFeature& f1, const SurfaceFeature& f2) {
     if (f1.get_type() == SurfaceFeatureType::Edge && f2.get_type() == SurfaceFeatureType::Edge)
         return are_parallel(edge_direction(f1), edge_direction(f2));
