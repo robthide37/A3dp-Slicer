@@ -597,114 +597,109 @@ static float get_grabber_mean_size(const BoundingBoxf3& bb)
     return float((bb.size().x() + bb.size().y() + bb.size().z()) / 3.0);
 }
 
-void GLGizmoCut3D::render_cut_center_grabber()
+void GLGizmoCut3D::render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix)
+{
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+    if (shader) {
+        shader->start_using();
+
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("projection_matrix", wxGetApp().plater()->get_camera().get_projection_matrix());
+
+        model.set_color(color);
+        model.render();
+
+        shader->stop_using();
+    }
+}
+
+void GLGizmoCut3D::render_line(GLModel& line_model, const ColorRGBA& color, Transform3d view_model_matrix, float width)
+{
+    GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+    if (shader) {
+        shader->start_using();
+
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("projection_matrix", wxGetApp().plater()->get_camera().get_projection_matrix());
+        shader->set_uniform("width", width);
+
+        line_model.set_color(color);
+        line_model.render();
+
+        shader->stop_using();
+    }
+}
+
+void GLGizmoCut3D::render_rotation_snapping(Axis axis, const ColorRGBA& color)
+{
+    GLShaderProgram* line_shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+    if (!line_shader)
+        return;
+
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_start_dragging_m;
+
+    if (axis == X)
+        view_model_matrix = view_model_matrix * rotation_transform(0.5 * PI * Vec3d::UnitY()) * rotation_transform(-PI * Vec3d::UnitZ());
+    else
+        view_model_matrix = view_model_matrix * rotation_transform(-0.5 * PI * Vec3d::UnitZ()) * rotation_transform(-0.5 * PI * Vec3d::UnitY());
+
+    line_shader->start_using();
+    line_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+    line_shader->set_uniform("view_model_matrix", view_model_matrix);
+    line_shader->set_uniform("width", 0.25f);
+
+    m_circle.render();
+    m_scale.render();
+    m_snap_radii.render();
+    m_reference_radius.render();
+    if (m_dragging) {
+        line_shader->set_uniform("width", 1.5f);
+        m_angle_arc.set_color(color);
+        m_angle_arc.render();
+    }
+
+    line_shader->stop_using();
+}
+
+void GLGizmoCut3D::render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix)
+{
+    const Transform3d line_view_matrix = view_matrix * scale_transform(Vec3d(1.0, 1.0, m_grabber_connection_len));
+
+    render_line(m_grabber_connection, color, line_view_matrix, 0.2f);
+};
+
+void GLGizmoCut3D::render_cut_plane_grabbers()
 {
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-    if (!shader)
-        return;
-
     ColorRGBA color = m_hover_id == Z ? complementary(GRABBER_COLOR) : GRABBER_COLOR;
 
-    const Camera& camera = wxGetApp().plater()->get_camera();
+    const Transform3d view_matrix = wxGetApp().plater()->get_camera().get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
+
     const Grabber& grabber = m_grabbers.front();
+    const float mean_size = get_grabber_mean_size(bounding_box());
 
-    const BoundingBoxf3 box = bounding_box();
-
-    const float mean_size = get_grabber_mean_size(box);
     double size = m_dragging && m_hover_id == Z ? double(grabber.get_dragging_half_size(mean_size)) : double(grabber.get_half_size(mean_size));
 
     Vec3d cone_scale = Vec3d(0.75 * size, 0.75 * size, 1.8 * size);
     Vec3d offset = 1.25 * size * Vec3d::UnitZ();
 
-    shader->start_using();
-    shader->set_uniform("emission_factor", 0.1f);
-    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-
-    const Transform3d view_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
-
-    auto render = [shader, this](GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix) {
-        shader->set_uniform("view_model_matrix", view_model_matrix);
-        shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-        model.set_color(color);
-        model.render();
-    };
-
-    auto render_grabber_connection = [shader, camera, view_matrix, this](const ColorRGBA& color)
-    {
-        shader->stop_using();
-        GLShaderProgram* line_shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
-        if (!line_shader)
-            return;
-
-        line_shader->start_using();
-        line_shader->set_uniform("emission_factor", 0.1f);
-        line_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-
-        const Transform3d trafo = view_matrix * scale_transform(Vec3d(1.0, 1.0, m_grabber_connection_len));
-        line_shader->set_uniform("view_model_matrix", trafo);
-        line_shader->set_uniform("normal_matrix", (Matrix3d)trafo.matrix().block(0, 0, 3, 3).inverse().transpose());
-        line_shader->set_uniform("width", 0.2f);
-
-        m_grabber_connection.set_color(color);
-        m_grabber_connection.render();
-
-        line_shader->stop_using();
-        shader->start_using();
-    };
-
-    auto render_rotation_snapping = [shader, camera, this](Axis axis, const ColorRGBA& color)
-    {
-        Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_start_dragging_m;
-
-        if (axis == X)
-            view_model_matrix = view_model_matrix * rotation_transform( 0.5 * PI * Vec3d::UnitY()) * rotation_transform(-PI * Vec3d::UnitZ());
-        else
-            view_model_matrix = view_model_matrix * rotation_transform(-0.5 * PI * Vec3d::UnitZ()) * rotation_transform(-0.5 * PI * Vec3d::UnitY());
-
-        shader->stop_using();
-
-        GLShaderProgram* line_shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
-        if (!line_shader)
-            return;
-
-        line_shader->start_using();
-        line_shader->set_uniform("emission_factor", 0.1f);
-        line_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-
-        line_shader->set_uniform("view_model_matrix", view_model_matrix);
-        line_shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-        line_shader->set_uniform("width", 0.25f);
-
-        m_circle.render();
-        m_scale.render();
-        m_snap_radii.render();
-        m_reference_radius.render();
-        if (m_dragging) {
-            line_shader->set_uniform("width", 1.5f);
-            m_angle_arc.set_color(color);
-            m_angle_arc.render();
-        }
-
-        line_shader->stop_using();
-        shader->start_using();
-    };
-
     // render Z grabber
 
     if ((!m_dragging && m_hover_id < 0))
-        render_grabber_connection(color);
-    render(m_sphere.model, color, view_matrix * scale_transform(size));
+        render_grabber_connection(color, view_matrix);
+    render_model(m_sphere.model, color, view_matrix * scale_transform(size));
 
     if (!m_dragging && m_hover_id < 0 || m_hover_id == Z)
     {
         const BoundingBoxf3 tbb = transformed_bounding_box();
         if (tbb.min.z() <= 0.0)
-            render(m_cone.model, color, view_matrix * assemble_transform(-offset, PI * Vec3d::UnitX(), cone_scale));
+            render_model(m_cone.model, color, view_matrix * assemble_transform(-offset, PI * Vec3d::UnitX(), cone_scale));
 
         if (tbb.max.z() >= 0.0)
-            render(m_cone.model, color, view_matrix * assemble_transform(offset, Vec3d::Zero(), cone_scale));
+            render_model(m_cone.model, color, view_matrix * assemble_transform(offset, Vec3d::Zero(), cone_scale));
     }
 
     // render top sphere for X/Y grabbers
@@ -714,7 +709,7 @@ void GLGizmoCut3D::render_cut_center_grabber()
         size = m_dragging ? double(grabber.get_dragging_half_size(mean_size)) : double(grabber.get_half_size(mean_size));
         color = m_hover_id == Y ? complementary(ColorRGBA::GREEN()) :
                 m_hover_id == X ? complementary(ColorRGBA::RED())   : ColorRGBA::GRAY();
-        render(m_sphere.model, color, view_matrix * assemble_transform(m_grabber_connection_len * Vec3d::UnitZ(), Vec3d::Zero(), size * Vec3d::Ones()));
+        render_model(m_sphere.model, color, view_matrix * assemble_transform(m_grabber_connection_len * Vec3d::UnitZ(), Vec3d::Zero(), size * Vec3d::Ones()));
     }
 
     // render X grabber
@@ -726,14 +721,14 @@ void GLGizmoCut3D::render_cut_center_grabber()
         color = m_hover_id == X ? complementary(ColorRGBA::RED()) : ColorRGBA::RED();
 
         if (m_hover_id == X) {
-            render_grabber_connection(color);
+            render_grabber_connection(color, view_matrix);
             render_rotation_snapping(X, color);
         }
 
         offset = Vec3d(0.0, 1.25 * size, m_grabber_connection_len);
-        render(m_cone.model, color, view_matrix * assemble_transform(offset, -0.5 * PI * Vec3d::UnitX(), cone_scale));
+        render_model(m_cone.model, color, view_matrix * assemble_transform(offset, -0.5 * PI * Vec3d::UnitX(), cone_scale));
         offset = Vec3d(0.0, -1.25 * size, m_grabber_connection_len);
-        render(m_cone.model, color, view_matrix * assemble_transform(offset, 0.5 * PI * Vec3d::UnitX(), cone_scale));
+        render_model(m_cone.model, color, view_matrix * assemble_transform(offset, 0.5 * PI * Vec3d::UnitX(), cone_scale));
     }
 
     // render Y grabber
@@ -745,17 +740,15 @@ void GLGizmoCut3D::render_cut_center_grabber()
         color = m_hover_id == Y ? complementary(ColorRGBA::GREEN()) : ColorRGBA::GREEN();
 
         if (m_hover_id == Y) {
-            render_grabber_connection(color);
+            render_grabber_connection(color, view_matrix);
             render_rotation_snapping(Y, color);
         }
 
         offset = Vec3d(1.25 * size, 0.0, m_grabber_connection_len);
-        render(m_cone.model, color, view_matrix * assemble_transform(offset, 0.5 * PI * Vec3d::UnitY(), cone_scale));
+        render_model(m_cone.model, color, view_matrix * assemble_transform(offset, 0.5 * PI * Vec3d::UnitY(), cone_scale));
         offset = Vec3d(-1.25 * size, 0.0, m_grabber_connection_len);
-        render(m_cone.model, color, view_matrix * assemble_transform(offset, -0.5 * PI * Vec3d::UnitY(), cone_scale));
+        render_model(m_cone.model, color, view_matrix * assemble_transform(offset, -0.5 * PI * Vec3d::UnitY(), cone_scale));
     }
-
-    shader->stop_using();
 }
 
 void GLGizmoCut3D::render_cut_line()
@@ -766,23 +759,10 @@ void GLGizmoCut3D::render_cut_line()
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
-    GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
-    if (shader != nullptr) {
-        shader->start_using();
+    m_cut_line.reset();
+    m_cut_line.init_from(its_make_line((Vec3f)m_line_beg.cast<float>(), (Vec3f)m_line_end.cast<float>()));
 
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("width", 0.25f);
-
-        m_cut_line.reset();
-        m_cut_line.init_from(its_make_line((Vec3f)m_line_beg.cast<float>(), (Vec3f)m_line_end.cast<float>()));
-
-        m_cut_line.set_color(GRABBER_COLOR);
-        m_cut_line.render();
-
-        shader->stop_using();
-    }
+    render_line(m_cut_line, GRABBER_COLOR, wxGetApp().plater()->get_camera().get_view_matrix(), 0.25f);
 }
 
 bool GLGizmoCut3D::on_init()
@@ -1303,7 +1283,7 @@ void GLGizmoCut3D::on_render()
 
     if (!m_hide_cut_plane && !m_connectors_editing) {
         render_cut_plane();
-        render_cut_center_grabber();
+        render_cut_plane_grabbers();
     }
 
     render_cut_line();

@@ -221,7 +221,11 @@ private:
     void discard_cut_line_processing();
 
     void render_cut_plane();
-    void render_cut_center_grabber();
+    void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
+    void render_line(GLModel& line_model, const ColorRGBA& color, Transform3d view_model_matrix, float width);
+    void render_rotation_snapping(Axis axis, const ColorRGBA& color);
+    void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix);
+    void render_cut_plane_grabbers();
     void render_cut_line();
     void perform_cut(const Selection&selection);
     void set_center_pos(const Vec3d&center_pos, bool force = false);

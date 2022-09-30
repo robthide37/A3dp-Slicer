@@ -343,6 +343,8 @@ public:
     void init_objects();
     bool multiple_selection() const ;
     bool is_selected(const ItemType type) const;
+    bool is_connectors_item_selected() const;
+    bool is_connectors_item_selected(const wxDataViewItemArray& sels) const;
     int  get_selected_layers_range_idx() const;
     void set_selected_layers_range_idx(const int range_idx) { m_selected_layers_range_idx = range_idx; }
     void set_selection_mode(SELECTION_MODE mode) { m_selection_mode = mode; }

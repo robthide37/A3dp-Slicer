@@ -763,7 +763,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
 #endif // ENABLE_WORLD_COORDINATE
         m_new_enabled = true;
     }
-    else if (obj_list->multiple_selection() || obj_list->is_selected(itInstanceRoot)) {
+    else if (obj_list->is_connectors_item_selected() || obj_list->multiple_selection() || obj_list->is_selected(itInstanceRoot)) {
         reset_settings_value();
 		m_new_move_label_string   = L("Translate");
 		m_new_rotate_label_string = L("Rotate");

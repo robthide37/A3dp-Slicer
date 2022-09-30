@@ -403,6 +403,13 @@ MeshErrorsInfo ObjectList::get_mesh_errors_info(const int obj_idx, const int vol
     if (obj_idx < 0)
         return { {}, {} }; // hide tooltip
 
+    const ModelObject* object = (*m_objects)[obj_idx];
+    if (vol_idx != -1 && vol_idx >= int(object->volumes.size())) {
+        if (sidebar_info)
+            *sidebar_info = _L("Wrong volume index ");
+        return { {}, {} }; // hide tooltip
+    }
+
     const TriangleMeshStats& stats = vol_idx == -1 ?
         (*m_objects)[obj_idx]->get_object_stl_stats() :
         (*m_objects)[obj_idx]->volumes[vol_idx]->mesh().stats();
@@ -2075,30 +2082,11 @@ void ObjectList::split()
 
     volume->split(nozzle_dmrs_cnt);
 
+    (*m_objects)[obj_idx]->input_file.clear();
+
     wxBusyCursor wait;
 
-    auto model_object = (*m_objects)[obj_idx];
-
-    auto parent = m_objects_model->GetTopParent(item);
-    if (parent)
-        m_objects_model->DeleteVolumeChildren(parent);
-    else
-        parent = item;
-
-    for (const ModelVolume* volume : model_object->volumes) {
-        const wxDataViewItem& vol_item = m_objects_model->AddVolumeChild(parent, from_u8(volume->name),
-            volume->type(),// is_modifier() ? ModelVolumeType::PARAMETER_MODIFIER : ModelVolumeType::MODEL_PART,
-            get_warning_icon_name(volume->mesh().stats()),
-            volume->config.has("extruder") ? volume->config.extruder() : 0,
-            false);
-        // add settings to the part, if it has those
-        add_settings_item(vol_item, &volume->config.get());
-    }
-
-    model_object->input_file.clear();
-
-    if (parent == item)
-        Expand(parent);
+    add_volumes_to_object_in_list(obj_idx);
 
     changed_object(obj_idx);
     // update printable state for new volumes on canvas3D
@@ -2524,7 +2512,14 @@ void ObjectList::part_selection_changed()
 
     GLGizmosManager& gizmos_mgr = wxGetApp().plater()->canvas3D()->get_gizmos_manager();
 
-    if ( multiple_selection() || (item && m_objects_model->GetItemType(item) == itInstanceRoot )) {
+    if (item && m_objects_model->GetItemType(item) == itInfo && m_objects_model->GetInfoItemType(item) == InfoItemType::CutConnectors) {
+        og_name = _L("Cut Connectors information");
+
+        update_and_show_manipulations = true;
+        enable_manipulation = false;
+        disable_ununiform_scale = true;
+    }
+    else if ( multiple_selection() || (item && m_objects_model->GetItemType(item) == itInstanceRoot )) {
         og_name = _L("Group manipulation");
 
         const Selection& selection = scene_selection();
@@ -2575,11 +2570,12 @@ void ObjectList::part_selection_changed()
             const wxDataViewItem parent = m_objects_model->GetParent(item);
             const ItemType parent_type = m_objects_model->GetItemType(parent);
             obj_idx = m_objects_model->GetObjectIdByItem(item);
+            ModelObject* object = (*m_objects)[obj_idx];
 
             if (parent == wxDataViewItem(nullptr)
              || type == itInfo) {
                 og_name = _L("Object manipulation");
-                m_config = &(*m_objects)[obj_idx]->config;
+                m_config = &object->config;
                 update_and_show_manipulations = true;
 
                 if (type == itInfo) {
@@ -2602,23 +2598,23 @@ void ObjectList::part_selection_changed()
                             gizmos_mgr.open_gizmo(gizmo_type);
                         break;
                     }
-                    case InfoItemType::Sinking: { break; }
+                    case InfoItemType::Sinking:
                     default: { break; }
                     }
                 }
                 else
-                    disable_ss_manipulation = (*m_objects)[obj_idx]->is_cut();
+                    disable_ss_manipulation = object->is_cut();
             }
             else {
                 if (type & itSettings) {
                     if (parent_type & itObject) {
                         og_name = _L("Object Settings to modify");
-                        m_config = &(*m_objects)[obj_idx]->config;
+                        m_config = &object->config;
                     }
                     else if (parent_type & itVolume) {
                         og_name = _L("Part Settings to modify");
                         volume_id = m_objects_model->GetVolumeIdByItem(parent);
-                        m_config = &(*m_objects)[obj_idx]->volumes[volume_id]->config;
+                        m_config = &object->volumes[volume_id]->config;
                     }
                     else if (parent_type & itLayer) {
                         og_name = _L("Layer range Settings to modify");
@@ -2629,17 +2625,17 @@ void ObjectList::part_selection_changed()
                 else if (type & itVolume) {
                     og_name = _L("Part manipulation");
                     volume_id = m_objects_model->GetVolumeIdByItem(item);
-                    m_config = &(*m_objects)[obj_idx]->volumes[volume_id]->config;
+                    m_config = &object->volumes[volume_id]->config;
                     update_and_show_manipulations = true;
-                    enable_manipulation = !(*m_objects)[obj_idx]->is_cut();
+                    enable_manipulation = !(object->is_cut() && object->volumes[volume_id]->is_cut_connector());
                 }
                 else if (type & itInstance) {
                     og_name = _L("Instance manipulation");
                     update_and_show_manipulations = true;
 
                     // fill m_config by object's values
-                    m_config = &(*m_objects)[obj_idx]->config;
-                    disable_ss_manipulation = (*m_objects)[obj_idx]->is_cut();
+                    m_config = &object->config;
+                    disable_ss_manipulation = object->is_cut();
                 }
                 else if (type & (itLayerRoot|itLayer)) {
                     og_name = type & itLayerRoot ? _L("Height ranges") : _L("Settings for height range");
@@ -2658,7 +2654,6 @@ void ObjectList::part_selection_changed()
         wxGetApp().obj_manipul()->get_og()->set_name(" " + og_name + " ");
 
         if (item) {
-            // wxGetApp().obj_manipul()->get_og()->set_value("object_name", m_objects_model->GetName(item));
             wxGetApp().obj_manipul()->update_item_name(m_objects_model->GetName(item));
             wxGetApp().obj_manipul()->update_warning_icon_state(get_mesh_errors_info(obj_idx, volume_id));
         }
@@ -2817,43 +2812,70 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
     }
 }
 
+static wxString extruder2str(int extruder)
+{
+    return extruder == 0 ? _L("default") : wxString::Format("%d", extruder);
+}
 
+static bool can_add_volumes_to_object(const ModelObject* object)
+{
+    bool can = object->volumes.size() > 1;
+
+    if (can && object->is_cut()) {
+        int no_connectors_cnt = 0;
+        for (const ModelVolume* v : object->volumes)
+            if (!v->is_cut_connector())
+                no_connectors_cnt++;
+        can = no_connectors_cnt > 1;
+    }
+
+    return can;
+}
+
+wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection/* = nullptr*/)
+{
+    wxDataViewItem object_item = m_objects_model->GetItemById(int(obj_idx));
+    m_objects_model->DeleteVolumeChildren(object_item);
+
+    wxDataViewItemArray items;
+
+    const ModelObject* object = (*m_objects)[obj_idx];
+    // add volumes to the object
+    if (can_add_volumes_to_object(object)) {
+        int volume_idx{ -1 };
+        for (const ModelVolume* volume : object->volumes) {
+            ++volume_idx;
+            if (object->is_cut() && volume->is_cut_connector())
+                continue;
+            const wxDataViewItem& vol_item = m_objects_model->AddVolumeChild(object_item,
+                from_u8(volume->name),
+                volume_idx,
+                volume->type(),
+                get_warning_icon_name(volume->mesh().stats()),
+                extruder2str(volume->config.has("extruder") ? volume->config.extruder() : 0));
+            add_settings_item(vol_item, &volume->config.get());
+
+            if (add_to_selection && add_to_selection(volume))
+                items.Add(vol_item);
+        }
+        Expand(object_item);
+    }
+
+    return items;
+}
 
 void ObjectList::add_object_to_list(size_t obj_idx, bool call_selection_changed)
 {
     auto model_object = (*m_objects)[obj_idx];
     const wxString& item_name = from_u8(model_object->name);
-    const auto item = m_objects_model->Add(item_name,
-                      model_object->config.has("extruder") ? model_object->config.extruder() : 0,
+    const auto item = m_objects_model->AddObject(item_name,
+                      extruder2str(model_object->config.has("extruder") ? model_object->config.extruder() : 0),
                       get_warning_icon_name(model_object->mesh().stats()),
                       model_object->is_cut());
 
     update_info_items(obj_idx, nullptr, call_selection_changed);
 
-    bool can_add_volumes = model_object->volumes.size() > 1;
-    if (can_add_volumes && model_object->is_cut()) {
-        int no_connectors_cnt = 0;
-        for (const ModelVolume* v : model_object->volumes)
-            if (!v->is_cut_connector())
-                no_connectors_cnt++;
-        can_add_volumes = no_connectors_cnt > 1;
-    }
-
-    // add volumes to the object
-    if (can_add_volumes) {
-        for (const ModelVolume* volume : model_object->volumes) {
-            if (model_object->is_cut() && volume->is_cut_connector())
-                continue;
-            const wxDataViewItem& vol_item = m_objects_model->AddVolumeChild(item,
-                from_u8(volume->name),
-                volume->type(),
-                get_warning_icon_name(volume->mesh().stats()),
-                volume->config.has("extruder") ? volume->config.extruder() : 0,
-                false);
-            add_settings_item(vol_item, &volume->config.get());
-        }
-        Expand(item);
-    }
+    add_volumes_to_object_in_list(obj_idx);
 
     // add instances to the object, if it has those
     if (model_object->instances.size()>1)
@@ -3327,7 +3349,7 @@ void ObjectList::add_layer_item(const t_layer_height_range& range,
 
     const auto layer_item = m_objects_model->AddLayersChild(layers_item, 
                                                             range, 
-                                                            config.opt_int("extruder"),
+                                                            extruder2str(config.opt_int("extruder")),
                                                             layer_idx);
     add_settings_item(layer_item, &config);
 }
@@ -3417,6 +3439,24 @@ bool ObjectList::is_selected(const ItemType type) const
     const wxDataViewItem& item = GetSelection();
     if (item)
         return m_objects_model->GetItemType(item) == type;
+
+    return false;
+}
+
+bool ObjectList::is_connectors_item_selected() const
+{
+    const wxDataViewItem& item = GetSelection();
+    if (item)
+        return m_objects_model->GetItemType(item) == itInfo && m_objects_model->GetInfoItemType(item) == InfoItemType::CutConnectors;
+
+    return false;
+}
+
+bool ObjectList::is_connectors_item_selected(const wxDataViewItemArray& sels) const
+{
+    for (auto item : sels)
+        if (m_objects_model->GetItemType(item) == itInfo && m_objects_model->GetInfoItemType(item) == InfoItemType::CutConnectors)
+            return true;
 
     return false;
 }
@@ -3547,11 +3587,18 @@ void ObjectList::update_selections()
         else {
         for (auto idx : selection.get_volume_idxs()) {
             const auto gl_vol = selection.get_volume(idx);
-			if (gl_vol->volume_idx() >= 0)
+            if (gl_vol->volume_idx() >= 0) {
                 // Only add GLVolumes with non-negative volume_ids. GLVolumes with negative volume ids
                 // are not associated with ModelVolumes, but they are temporarily generated by the backend
                 // (for example, SLA supports or SLA pad).
-                sels.Add(m_objects_model->GetItemByVolumeId(gl_vol->object_idx(), gl_vol->volume_idx()));
+                int obj_idx = gl_vol->object_idx();
+                int vol_idx = gl_vol->volume_idx();
+                assert(obj_idx >= 0 && vol_idx >= 0);
+                if (object(obj_idx)->volumes[vol_idx]->is_cut_connector())
+                    sels.Add(m_objects_model->GetInfoItemByType(m_objects_model->GetItemById(obj_idx), InfoItemType::CutConnectors));
+                else
+                    sels.Add(m_objects_model->GetItemByVolumeId(obj_idx, vol_idx));
+            }
         }
         m_selection_mode = smVolume; }
     }
@@ -3602,7 +3649,7 @@ void ObjectList::update_selections()
     if (sels.size() == 0 || m_selection_mode & smSettings)
         m_selection_mode = smUndef;
 
-    if (fix_cut_selection(sels)) {
+    if (fix_cut_selection(sels) || is_connectors_item_selected(sels)) {
         m_prevent_list_events = true;
 
         // If some part is selected, unselect all items except of selected parts of the current object
@@ -3616,7 +3663,7 @@ void ObjectList::update_selections()
             update_selections_on_canvas();
 
         // to update the toolbar and info sizer
-        if (!GetSelection() || m_objects_model->GetItemType(GetSelection()) == itObject) {
+        if (!GetSelection() || m_objects_model->GetItemType(GetSelection()) == itObject || is_connectors_item_selected()) {
             auto event = SimpleEvent(EVT_OBJ_LIST_OBJECT_SELECT);
             event.SetEventObject(this);
             wxPostEvent(this, event);
@@ -3662,16 +3709,29 @@ void ObjectList::update_selections_on_canvas()
             volume_idxs.insert(volume_idxs.end(), idxs.begin(), idxs.end());
         }
         else if (type == itInfo) {
-            // When selecting an info item, select one instance of the
-            // respective object - a gizmo may want to be opened.
-            int inst_idx = selection.get_instance_idx();
-            int scene_obj_idx = selection.get_object_idx();
-            mode = Selection::Instance;
-            // select first instance, unless an instance of the object is already selected
-            if (scene_obj_idx == -1 || inst_idx == -1 || scene_obj_idx != obj_idx)
-                inst_idx = 0;
-            std::vector<unsigned int> idxs = selection.get_volume_idxs_from_instance(obj_idx, inst_idx);
-            volume_idxs.insert(volume_idxs.end(), idxs.begin(), idxs.end());
+            if (m_objects_model->GetInfoItemType(item) == InfoItemType::CutConnectors) {
+                mode = Selection::Volume;
+
+                // When selecting CutConnectors info item, select all object volumes, which are marked as a connector
+                const ModelObject* obj = object(obj_idx);
+                for (unsigned int vol_idx = 0; vol_idx < obj->volumes.size(); vol_idx++)
+                    if (obj->volumes[vol_idx]->is_cut_connector()) {
+                        std::vector<unsigned int> idxs = selection.get_volume_idxs_from_volume(obj_idx, std::max(instance_idx, 0), vol_idx);
+                        volume_idxs.insert(volume_idxs.end(), idxs.begin(), idxs.end());
+                    }
+            }
+            else {
+                // When selecting an info item, select one instance of the
+                // respective object - a gizmo may want to be opened.
+                int inst_idx = selection.get_instance_idx();
+                int scene_obj_idx = selection.get_object_idx();
+                mode = Selection::Instance;
+                // select first instance, unless an instance of the object is already selected
+                if (scene_obj_idx == -1 || inst_idx == -1 || scene_obj_idx != obj_idx)
+                    inst_idx = 0;
+                std::vector<unsigned int> idxs = selection.get_volume_idxs_from_instance(obj_idx, inst_idx);
+                volume_idxs.insert(volume_idxs.end(), idxs.begin(), idxs.end());
+            }
         }
         else
         {
@@ -4569,33 +4629,14 @@ void ObjectList::set_extruder_for_selected_items(const int extruder) const
     wxGetApp().plater()->update();
 }
 
-wxDataViewItemArray ObjectList::reorder_volumes_and_get_selection(int obj_idx, std::function<bool(const ModelVolume*)> add_to_selection/* = nullptr*/)
+wxDataViewItemArray ObjectList::reorder_volumes_and_get_selection(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection/* = nullptr*/)
 {
-    wxDataViewItemArray items;
+    (*m_objects)[obj_idx]->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
 
-    ModelObject* object = (*m_objects)[obj_idx];
-    if (object->volumes.size() <= 1)
-        return items;
+    wxDataViewItemArray items = add_volumes_to_object_in_list(obj_idx, std::move(add_to_selection));
 
-    object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
+    changed_object(int(obj_idx));
 
-    wxDataViewItem object_item = m_objects_model->GetItemById(obj_idx);
-    m_objects_model->DeleteVolumeChildren(object_item);
-
-    for (const ModelVolume* volume : object->volumes) {
-        wxDataViewItem vol_item = m_objects_model->AddVolumeChild(object_item, from_u8(volume->name),
-            volume->type(),
-            get_warning_icon_name(volume->mesh().stats()),
-            volume->config.has("extruder") ? volume->config.extruder() : 0,
-            false);
-        // add settings to the part, if it has those
-        add_settings_item(vol_item, &volume->config.get());
-
-        if (add_to_selection && add_to_selection(volume))
-            items.Add(vol_item);
-    }
-
-    changed_object(obj_idx);
     return items;
 }
 
