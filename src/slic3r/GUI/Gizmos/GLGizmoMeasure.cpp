@@ -70,11 +70,6 @@ static std::string point_on_feature_type_as_string(Measure::SurfaceFeatureType t
     return ret;
 }
 
-static Vec3d edge_direction(const std::pair<Vec3d, Vec3d>& e)
-{
-    return (e.second - e.first).normalized();
-}
-
 static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const std::vector<std::vector<int>>& planes_triangles, int idx)
 {
     assert(0 <= idx && idx < (int)planes_triangles.size());
@@ -123,8 +118,6 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
     else if (mouse_event.LeftDown()) {
         if (m_hover_id != -1) {
             SelectedFeatures selected_features_old = m_selected_features;
-
-
             m_mouse_left_down = true;
             
             auto item_from_feature = [this]() {
@@ -834,7 +827,6 @@ void GLGizmoMeasure::render_dimensioning()
         m_dimensioning.triangle.render();
     };
 
-
     auto point_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
         std::pair<Vec3d, Vec3d> e = f1.get_type() == Measure::SurfaceFeatureType::Edge ? f1.get_edge() : f2.get_edge();
         const Vec3d v_proj    = m_measurement_result.distance_infinite->to;
@@ -929,7 +921,7 @@ void GLGizmoMeasure::render_dimensioning()
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center) *
-                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), edge_direction(e1)) *
+                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e1.first, e1.second)) *
                 Geometry::scale_transform({ e11center_len, 1.0f, 1.0f }));
             m_dimensioning.line.render();
         }
@@ -941,13 +933,11 @@ void GLGizmoMeasure::render_dimensioning()
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center) *
-                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), edge_direction(e2)) *
+                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e2.first, e2.second)) *
                 Geometry::scale_transform({ (coplanar && (force_radius == nullptr)) ? e21center_len : draw_radius, 1.0f, 1.0f }));
             m_dimensioning.line.render();
         }
     };
-
-
 
     auto arc_edge_plane = [this, arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
 
@@ -956,8 +946,8 @@ void GLGizmoMeasure::render_dimensioning()
 
         const auto& [idx, normal, origin] = p;
         const Vec3d e1e2 = e.second - e.first;
-        const double abs_dot = std::abs(normal.dot(edge_direction(e)));
-        if (abs_dot < EPSILON || std::abs(abs_dot - 1.0) < EPSILON)
+        const double abs_dot = std::abs(normal.dot(Measure::edge_direction(f1)));
+        if (Measure::are_parallel(f1, f2) || Measure::are_perpendicular(f1, f2))
             return;
 
         const Eigen::Hyperplane<double, 3> plane(normal, origin);
@@ -1052,11 +1042,10 @@ void GLGizmoMeasure::render_dimensioning()
         if (ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
             point_edge(*f1, *f2);
 
-
         // Now if there is an angle to show, draw the arc:
         if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Edge)
             arc_edge_edge(*f1, *f2);
-        if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Plane)
+        else if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Plane)
             arc_edge_plane(*f1, *f2);
     }
 
