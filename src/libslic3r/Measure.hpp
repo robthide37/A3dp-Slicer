@@ -142,6 +142,38 @@ struct MeasurementResult {
 // Returns distance/angle between two SurfaceFeatures.
 MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature& b);
 
+inline Vec3d edge_direction(const Vec3d& from, const Vec3d& to) { return (to - from).normalized(); }
+inline Vec3d edge_direction(const SurfaceFeature& edge) {
+    assert(edge.get_type() == SurfaceFeatureType::Edge);
+    const auto [from, to] = edge.get_edge();
+    return edge_direction(from, to);
+}
+
+inline Vec3d plane_normal(const SurfaceFeature& plane) {
+    assert(plane.get_type() == SurfaceFeatureType::Plane);
+    return std::get<1>(plane.get_plane());
+}
+
+inline bool are_parallel(const Vec3d& v1, const Vec3d& v2) { return std::abs(std::abs(v1.dot(v2)) - 1.0) < EPSILON; }
+inline bool are_perpendicular(const Vec3d& v1, const Vec3d& v2) { return std::abs(v1.dot(v2)) < EPSILON; }
+
+inline bool are_parallel(const SurfaceFeature& f1, const SurfaceFeature& f2) {
+    if (f1.get_type() == SurfaceFeatureType::Edge && f2.get_type() == SurfaceFeatureType::Edge)
+        return are_parallel(edge_direction(f1), edge_direction(f2));
+    else if (f1.get_type() == SurfaceFeatureType::Edge && f2.get_type() == SurfaceFeatureType::Plane)
+        return are_perpendicular(edge_direction(f1), plane_normal(f2));
+    else
+        return false;
+}
+
+inline bool are_perpendicular(const SurfaceFeature& f1, const SurfaceFeature& f2) {
+    if (f1.get_type() == SurfaceFeatureType::Edge && f2.get_type() == SurfaceFeatureType::Edge)
+        return are_perpendicular(edge_direction(f1), edge_direction(f2));
+    else if (f1.get_type() == SurfaceFeatureType::Edge && f2.get_type() == SurfaceFeatureType::Plane)
+        return are_parallel(edge_direction(f1), plane_normal(f2));
+    else
+        return false;
+}
 
 } // namespace Measure
 } // namespace Slic3r

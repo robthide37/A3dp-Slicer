@@ -633,11 +633,11 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
     } else if (f1.get_type() == SurfaceFeatureType::Plane) {
         assert(f2.get_type() == SurfaceFeatureType::Plane);
 
-        const auto& [idx1, normal1, pt1] = f1.get_plane();
-        const auto& [idx2, normal2, pt2] = f2.get_plane();
+        const auto [idx1, normal1, pt1] = f1.get_plane();
+        const auto [idx2, normal2, pt2] = f2.get_plane();
         double angle = 0.;
 
-        if (normal1.isApprox(normal2)) {
+        if (are_parallel(normal1, normal2)) {
             // The planes are parallel, calculate distance.
             Eigen::Hyperplane<double, 3> plane(normal1, pt1);
             result.distance_infinite = std::make_optional(DistAndPoints{plane.absDistance(pt2), Vec3d::Zero(), Vec3d::Zero()});
