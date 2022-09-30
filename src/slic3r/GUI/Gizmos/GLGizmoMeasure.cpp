@@ -887,8 +887,6 @@ void GLGizmoMeasure::render_dimensioning()
 
         double draw_radius = force_radius ? *force_radius : radius;
 
-        const Vec3d normal = e1_unit.cross(e2_unit).normalized();
-
         if (!m_dimensioning.arc.is_initialized()) {
             const unsigned int resolution = std::max<unsigned int>(2, 64 * angle / double(PI));
             GLModel::Geometry init_data;
@@ -898,6 +896,7 @@ void GLGizmoMeasure::render_dimensioning()
             init_data.reserve_indices(resolution + 1);
 
             // vertices + indices
+            const Vec3d normal = e1_unit.cross(e2_unit).normalized();
             const double step = angle / double(resolution);
             for (unsigned int i = 0; i <= resolution; ++i) {
                 const double a = step * double(i);
@@ -943,16 +942,19 @@ void GLGizmoMeasure::render_dimensioning()
 
     auto arc_edge_plane = [this, arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
         assert(f1.get_type() == Measure::SurfaceFeatureType::Edge && f2.get_type() == Measure::SurfaceFeatureType::Plane);
-        std::pair<Vec3d, Vec3d> e = f1.get_edge();
-        const auto [idx, normal, origin] = f2.get_plane();
         if (Measure::are_parallel(f1, f2) || Measure::are_perpendicular(f1, f2))
             return;
 
+        const std::pair<Vec3d, Vec3d> e = f1.get_edge();
+        const auto [idx, normal, origin] = f2.get_plane();
+
+        // ensure the edge is pointing away from the intersection
+        // 1st calculate instersection between edge and plane
         const Eigen::Hyperplane<double, 3> plane(normal, origin);
         const Eigen::ParametrizedLine<double, 3> line = Eigen::ParametrizedLine<double, 3>::Through(e.first, e.second);
         const Vec3d inters = line.intersectionPoint(plane);
 
-        // ensure the edge is pointing away from the intersection
+        // then verify edge direction and revert it, if needed
         std::pair<Vec3d, Vec3d> ecopy = e;
         if ((ecopy.first - inters).squaredNorm() > (ecopy.second - inters).squaredNorm())
             std::swap(ecopy.first, ecopy.second);
@@ -971,9 +973,9 @@ void GLGizmoMeasure::render_dimensioning()
 
         const Vec3d e1e2copy_mid = 0.5 * (ecopy.second + ecopy.first);
         const double radius = (inters - e1e2copy_mid).norm();
-        arc_edge_edge(Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, ecopy.second, ecopy.first, std::optional<Vec3d>(), 0.),
-                      Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, edge_on_plane.second, edge_on_plane.first, std::optional<Vec3d>(), 0.),
-                      &radius);
+        arc_edge_edge(Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, ecopy.first, ecopy.second),
+            Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, edge_on_plane.first, edge_on_plane.second),
+            &radius);
     };
 
 

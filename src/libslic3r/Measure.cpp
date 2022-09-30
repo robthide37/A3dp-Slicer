@@ -250,7 +250,7 @@ void MeasuringImpl::extract_features()
                         // Add the circle and remember indices into borders.
                         const auto& [center, radius] = get_center_and_radius(border, start_idx, i, trafo);
                         circles_idxs.emplace_back(start_idx, i);
-                        circles.emplace_back(SurfaceFeature(SurfaceFeatureType::Circle, center, plane.normal, std::optional<Vec3d>(), radius));
+                        circles.emplace_back(SurfaceFeature(SurfaceFeatureType::Circle, center, plane.normal, std::nullopt, radius));
                         circle = false;
                     }
                 }
@@ -269,7 +269,7 @@ void MeasuringImpl::extract_features()
                         const Vec3d center = std::get<0>(circles[i].get_circle());
                         for (int j=(int)circles_idxs[i].first + 1; j<=(int)circles_idxs[i].second; ++j)
                             plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
-                                border[j-1], border[j], std::make_optional(center), 0.));
+                                border[j - 1], border[j], std::make_optional(center)));
                     } else {
                         // This will be handled just like a regular edge.
                         circles_idxs.erase(circles_idxs.begin() + i);
@@ -288,8 +288,8 @@ void MeasuringImpl::extract_features()
             for (int i=1; i<int(border.size()); ++i) {
                 if (cidx < (int)circles_idxs.size() && i > (int)circles_idxs[cidx].first)
                     i = circles_idxs[cidx++].second;
-                else plane.surface_features.emplace_back(SurfaceFeature(
-                        SurfaceFeatureType::Edge, border[i-1], border[i], std::optional<Vec3d>(), 0.));
+                else
+                    plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge, border[i - 1], border[i]));
             }
 
             // FIXME Throw away / do not create edges which are parts of circles or
@@ -307,7 +307,7 @@ void MeasuringImpl::extract_features()
 
         // The last surface feature is the plane itself.
         plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Plane,
-            plane.normal, plane.borders.front().front(), std::optional<Vec3d>(), i + 0.0001));
+            plane.normal, plane.borders.front().front(), std::nullopt, i + 0.0001));
 
         plane.borders.clear();
         plane.borders.shrink_to_fit();
@@ -433,12 +433,11 @@ std::vector<std::vector<int>> Measuring::get_planes_triangle_indices() const
 
 static AngleAndPoints angle_edge_edge(const std::pair<Vec3d, Vec3d>& e1, const std::pair<Vec3d, Vec3d>& e2)
 {
-    Vec3d e1_unit = (e1.second - e1.first).normalized();
-    Vec3d e2_unit = (e2.second - e2.first).normalized();
-    const double dot = e1_unit.dot(e2_unit);
-    // are edges parallel ?
-    if (std::abs(std::abs(dot) - 1.0) < EPSILON)
+    if (are_parallel(e1, e2))
         return AngleAndPoints(0.0, e1.first, Vec3d::UnitX(), Vec3d::UnitX(), 0., true);
+
+    Vec3d e1_unit = edge_direction(e1.first, e1.second);
+    Vec3d e2_unit = edge_direction(e2.first, e2.second);
 
     // project edges on the plane defined by them
     Vec3d normal = e1_unit.cross(e2_unit).normalized();
@@ -562,7 +561,7 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
             std::vector<DistAndPoints> distances;
 
             auto add_point_edge_distance = [&distances](const Vec3d& v, const std::pair<Vec3d, Vec3d>& e) {
-                const MeasurementResult res = get_measurement(SurfaceFeature(v), SurfaceFeature(SurfaceFeatureType::Edge, e.first, e.second, std::optional<Vec3d>(), 0.));
+                const MeasurementResult res = get_measurement(SurfaceFeature(v), SurfaceFeature(SurfaceFeatureType::Edge, e.first, e.second));
                 double distance = res.distance_strict->dist;
                 Vec3d v2 = res.distance_strict->to;
 
