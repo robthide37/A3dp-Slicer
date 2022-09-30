@@ -504,7 +504,7 @@ void GLGizmoMeasure::on_render()
             {
                 const auto& [start, end] = feature.get_edge();
                 // render extra point
-                const std::optional<Vec3d> extra = m_curr_feature->get_extra_point();
+                const std::optional<Vec3d> extra = feature.get_extra_point();
                 if (extra.has_value()) {
                     const Transform3d point_matrix = model_matrix * Geometry::translation_transform(*extra) * Geometry::scale_transform(inv_zoom);
                     set_matrix_uniforms(point_matrix);
