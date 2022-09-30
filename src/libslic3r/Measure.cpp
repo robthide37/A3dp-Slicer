@@ -427,14 +427,12 @@ std::vector<std::vector<int>> Measuring::get_planes_triangle_indices() const
 }
 
 
+const AngleAndEdges AngleAndEdges::Dummy = { 0.0, Vec3d::Zero(), { Vec3d::Zero(), Vec3d::Zero() }, { Vec3d::Zero(), Vec3d::Zero() }, 0.0, true };
 
-
-
-
-static AngleAndPoints angle_edge_edge(const std::pair<Vec3d, Vec3d>& e1, const std::pair<Vec3d, Vec3d>& e2)
+static AngleAndEdges angle_edge_edge(std::pair<Vec3d, Vec3d> e1, std::pair<Vec3d, Vec3d> e2)
 {
     if (are_parallel(e1, e2))
-        return AngleAndPoints(0.0, e1.first, Vec3d::UnitX(), Vec3d::UnitX(), 0., true);
+        return AngleAndEdges::Dummy;
 
     Vec3d e1_unit = edge_direction(e1.first, e1.second);
     Vec3d e2_unit = edge_direction(e2.first, e2.second);
@@ -474,10 +472,12 @@ static AngleAndPoints angle_edge_edge(const std::pair<Vec3d, Vec3d>& e1, const s
     // ensure the edges are pointing away from the center
     if ((center_rot_2d - e11_rot_2d).squaredNorm() > (center_rot_2d - e12_rot_2d).squaredNorm()) {
         std::swap(e11_proj, e12_proj);
+        std::swap(e1.first, e1.second);
         e1_unit = -e1_unit;
     }
     if ((center_rot_2d - e21_rot_2d).squaredNorm() > (center_rot_2d - e22_rot_2d).squaredNorm()) {
         std::swap(e21_proj, e22_proj);
+        std::swap(e2.first, e2.second);
         e2_unit = -e2_unit;
     }
 
@@ -488,7 +488,7 @@ static AngleAndPoints angle_edge_edge(const std::pair<Vec3d, Vec3d>& e1, const s
     const Vec3d e2_proj_mid = 0.5 * (e21_proj + e22_proj);
     const double radius = std::min((center - e1_proj_mid).norm(), (center - e2_proj_mid).norm());
 
-    return AngleAndPoints(angle, center, e1_unit, e2_unit, radius, coplanar);
+    return { angle, center, e1, e2, radius, coplanar };
 }
 
 
@@ -644,7 +644,7 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
             // Planes are not parallel, calculate angle.
             angle = std::acos(std::abs(normal1.dot(normal2)));
         }
-        result.angle = std::make_optional(AngleAndPoints(angle, Vec3d::Zero(), Vec3d::UnitX(), Vec3d::UnitX(), 0., false)); // TODO
+        result.angle = std::make_optional(AngleAndEdges(angle, Vec3d::Zero(), { Vec3d::Zero(), Vec3d::Zero() }, { Vec3d::Zero(), Vec3d::Zero() }, 0., false)); // TODO
         result.distance_infinite = std::make_optional(DistAndPoints{0., Vec3d::Zero(), Vec3d::Zero()}); // TODO
     }
 

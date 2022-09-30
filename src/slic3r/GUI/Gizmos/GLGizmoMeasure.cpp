@@ -867,18 +867,10 @@ void GLGizmoMeasure::render_dimensioning()
         const Measure::MeasurementResult res = Measure::get_measurement(f1, f2);
         const double angle    = res.angle->angle;
         const Vec3d  center   = res.angle->center;
-        const Vec3d  e1_unit  = res.angle->e1;
-        const Vec3d  e2_unit  = res.angle->e2;
+        const std::pair<Vec3d, Vec3d> e1 = res.angle->e1;
+        const std::pair<Vec3d, Vec3d> e2 = res.angle->e2;
         const double radius   = res.angle->radius;
         const bool   coplanar = res.angle->coplanar;
-
-        std::pair<Vec3d, Vec3d> e1 = f1.get_edge();
-        std::pair<Vec3d, Vec3d> e2 = f2.get_edge();
-
-        if ((e1.second - e1.first).dot(e1_unit) < 0.)
-            std::swap(e1.first, e1.second);
-        if ((e2.second - e2.first).dot(e2_unit) < 0.)
-            std::swap(e2.first, e2.second);
 
         if (radius == 0.)
             return;
@@ -886,6 +878,9 @@ void GLGizmoMeasure::render_dimensioning()
         assert(force_radius == nullptr || *force_radius > 0.0);
 
         double draw_radius = force_radius ? *force_radius : radius;
+
+        const Vec3d e1_unit = Measure::edge_direction(e1);
+        const Vec3d e2_unit = Measure::edge_direction(e2);
 
         if (!m_dimensioning.arc.is_initialized()) {
             const unsigned int resolution = std::max<unsigned int>(2, 64 * angle / double(PI));
