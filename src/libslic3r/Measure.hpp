@@ -26,7 +26,7 @@ enum class SurfaceFeatureType : int {
 class SurfaceFeature {
 public:
     SurfaceFeature(SurfaceFeatureType type, const Vec3d& pt1, const Vec3d& pt2, std::optional<Vec3d> pt3 = std::nullopt, double value = 0.0)
-        : m_type{ type }, m_pt1{ pt1 }, m_pt2{ pt2 }, m_pt3{ pt3 }, m_value{ value } {}
+        : m_type(type), m_pt1(pt1), m_pt2(pt2), m_pt3(pt3), m_value(value) {}
 
     explicit SurfaceFeature(const Vec3d& pt)
     : m_type{SurfaceFeatureType::Point}, m_pt1{pt} {}
@@ -117,19 +117,21 @@ struct DistAndPoints {
     Vec3d to;
 };
 
-struct AngleAndPoints {
-    AngleAndPoints(double angle_, Vec3d center_, Vec3d e1_, Vec3d e2_, double radius_, bool coplanar_)
-    : angle(angle_), center(center_), e1(e1_), e2(e2_), radius(radius_), coplanar(coplanar_) {}
+struct AngleAndEdges {
+    AngleAndEdges(double angle_, const Vec3d& center_, const std::pair<Vec3d, Vec3d>& e1_, const std::pair<Vec3d, Vec3d>& e2_, double radius_, bool coplanar_)
+        : angle(angle_), center(center_), e1(e1_), e2(e2_), radius(radius_), coplanar(coplanar_) {}
     double angle;
     Vec3d center;
-    Vec3d e1;
-    Vec3d e2;
+    std::pair<Vec3d, Vec3d> e1;
+    std::pair<Vec3d, Vec3d> e2;
     double radius;
     bool coplanar;
+
+    static const AngleAndEdges Dummy;
 };
 
 struct MeasurementResult {
-    std::optional<AngleAndPoints> angle;
+    std::optional<AngleAndEdges> angle;
     std::optional<DistAndPoints> distance_infinite;
     std::optional<DistAndPoints> distance_strict;
     std::optional<Vec3d>  distance_xyz;
@@ -143,10 +145,10 @@ struct MeasurementResult {
 MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature& b);
 
 inline Vec3d edge_direction(const Vec3d& from, const Vec3d& to) { return (to - from).normalized(); }
+inline Vec3d edge_direction(const std::pair<Vec3d, Vec3d>& e) { return edge_direction(e.first, e.second); }
 inline Vec3d edge_direction(const SurfaceFeature& edge) {
     assert(edge.get_type() == SurfaceFeatureType::Edge);
-    const auto [from, to] = edge.get_edge();
-    return edge_direction(from, to);
+    return edge_direction(edge.get_edge());
 }
 
 inline Vec3d plane_normal(const SurfaceFeature& plane) {
