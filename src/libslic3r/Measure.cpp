@@ -429,7 +429,7 @@ std::vector<std::vector<int>> Measuring::get_planes_triangle_indices() const
 
 const AngleAndEdges AngleAndEdges::Dummy = { 0.0, Vec3d::Zero(), { Vec3d::Zero(), Vec3d::Zero() }, { Vec3d::Zero(), Vec3d::Zero() }, 0.0, true };
 
-static AngleAndEdges angle_edge_edge(std::pair<Vec3d, Vec3d> e1, std::pair<Vec3d, Vec3d> e2)
+static AngleAndEdges angle_edge_edge(const std::pair<Vec3d, Vec3d>& e1, const std::pair<Vec3d, Vec3d>& e2)
 {
     if (are_parallel(e1, e2))
         return AngleAndEdges::Dummy;
@@ -470,14 +470,16 @@ static AngleAndEdges angle_edge_edge(std::pair<Vec3d, Vec3d> e1, std::pair<Vec3d
     const Vec3d center = qp_inverse * Vec3d(center_rot_2d.x(), center_rot_2d.y(), e11_rot.z());
 
     // ensure the edges are pointing away from the center
+    std::pair<Vec3d, Vec3d> out_e1 = e1;
+    std::pair<Vec3d, Vec3d> out_e2 = e2;
     if ((center_rot_2d - e11_rot_2d).squaredNorm() > (center_rot_2d - e12_rot_2d).squaredNorm()) {
         std::swap(e11_proj, e12_proj);
-        std::swap(e1.first, e1.second);
+        std::swap(out_e1.first, out_e1.second);
         e1_unit = -e1_unit;
     }
     if ((center_rot_2d - e21_rot_2d).squaredNorm() > (center_rot_2d - e22_rot_2d).squaredNorm()) {
         std::swap(e21_proj, e22_proj);
-        std::swap(e2.first, e2.second);
+        std::swap(out_e2.first, out_e2.second);
         e2_unit = -e2_unit;
     }
 
@@ -488,9 +490,46 @@ static AngleAndEdges angle_edge_edge(std::pair<Vec3d, Vec3d> e1, std::pair<Vec3d
     const Vec3d e2_proj_mid = 0.5 * (e21_proj + e22_proj);
     const double radius = std::min((center - e1_proj_mid).norm(), (center - e2_proj_mid).norm());
 
-    return { angle, center, e1, e2, radius, coplanar };
+    return { angle, center, out_e1, out_e2, radius, coplanar };
 }
 
+static AngleAndEdges angle_edge_plane(const std::pair<Vec3d, Vec3d>& e, const std::tuple<int, Vec3d, Vec3d>& p)
+{
+    const auto& [idx, normal, origin] = p;
+    const Vec3d e1e2_unit = edge_direction(e);
+    if (are_parallel(e1e2_unit, normal) || are_perpendicular(e1e2_unit, normal))
+        return AngleAndEdges::Dummy;
+
+    // ensure the edge is pointing away from the intersection
+    // 1st calculate instersection between edge and plane
+    const Eigen::Hyperplane<double, 3> plane(normal, origin);
+    const Eigen::ParametrizedLine<double, 3> line = Eigen::ParametrizedLine<double, 3>::Through(e.first, e.second);
+    const Vec3d inters = line.intersectionPoint(plane);
+
+    // then verify edge direction and revert it, if needed
+    Vec3d e1 = e.first;
+    Vec3d e2 = e.second;
+    if ((e1 - inters).squaredNorm() > (e2 - inters).squaredNorm())
+        std::swap(e1, e2);
+
+    const Vec3d e1e2 = e2 - e1;
+    const double e1e2_len = e1e2.norm();
+
+    // calculate 2nd edge (on the plane)
+    const Vec3d temp = normal.cross(e1e2);
+    const Vec3d edge_on_plane_unit = normal.cross(temp).normalized();
+    std::pair<Vec3d, Vec3d> edge_on_plane = { origin, origin + e1e2_len * edge_on_plane_unit };
+
+    // ensure the 2nd edge is pointing in the correct direction
+    const Vec3d test_edge = (edge_on_plane.second - edge_on_plane.first).cross(e1e2);
+    if (test_edge.dot(temp) < 0.0)
+        edge_on_plane = { origin, origin - e1e2_len * edge_on_plane_unit };
+
+    AngleAndEdges ret = angle_edge_edge({ e1, e2 }, edge_on_plane);
+    const Vec3d e1e2copy_mid = 0.5 * (e1 + e2);
+    ret.radius = (inters - e1e2copy_mid).norm();
+    return ret;
+}
 
 
 
@@ -615,6 +654,7 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
     ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Plane) {
             result.distance_infinite = std::make_optional(DistAndPoints{0., Vec3d::Zero(), Vec3d::Zero()}); // TODO
+            result.angle = angle_edge_plane(f1.get_edge(), f2.get_plane());
         }
     ///////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////

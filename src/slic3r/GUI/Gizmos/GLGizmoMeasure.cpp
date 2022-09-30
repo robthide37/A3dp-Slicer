@@ -862,22 +862,20 @@ void GLGizmoMeasure::render_dimensioning()
         }
     };
 
-    auto arc_edge_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2, const double* force_radius = nullptr) {
+    auto arc_edge_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2, double radius = 0.0) {
         assert(f1.get_type() == Measure::SurfaceFeatureType::Edge && f2.get_type() == Measure::SurfaceFeatureType::Edge);
         const Measure::MeasurementResult res = Measure::get_measurement(f1, f2);
         const double angle    = res.angle->angle;
         const Vec3d  center   = res.angle->center;
         const std::pair<Vec3d, Vec3d> e1 = res.angle->e1;
         const std::pair<Vec3d, Vec3d> e2 = res.angle->e2;
-        const double radius   = res.angle->radius;
+        const double calc_radius = res.angle->radius;
         const bool   coplanar = res.angle->coplanar;
 
-        if (radius == 0.)
+        if (calc_radius == 0.0)
             return;
 
-        assert(force_radius == nullptr || *force_radius > 0.0);
-
-        double draw_radius = force_radius ? *force_radius : radius;
+        const double draw_radius = (radius > 0.0) ? radius : calc_radius;
 
         const Vec3d e1_unit = Measure::edge_direction(e1);
         const Vec3d e2_unit = Measure::edge_direction(e2);
@@ -930,49 +928,23 @@ void GLGizmoMeasure::render_dimensioning()
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center) *
                 Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e2.first, e2.second)) *
-                Geometry::scale_transform({ (coplanar && (force_radius == nullptr)) ? e21center_len : draw_radius, 1.0f, 1.0f }));
+                Geometry::scale_transform({ (coplanar && radius > 0.0) ? e21center_len : draw_radius, 1.0f, 1.0f }));
             m_dimensioning.line.render();
         }
     };
 
     auto arc_edge_plane = [this, arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
         assert(f1.get_type() == Measure::SurfaceFeatureType::Edge && f2.get_type() == Measure::SurfaceFeatureType::Plane);
-        if (Measure::are_parallel(f1, f2) || Measure::are_perpendicular(f1, f2))
+        const Measure::MeasurementResult res = Measure::get_measurement(f1, f2);
+        const std::pair<Vec3d, Vec3d> e1 = res.angle->e1;
+        const std::pair<Vec3d, Vec3d> e2 = res.angle->e2;
+        const double calc_radius = res.angle->radius;
+        if (calc_radius == 0.0)
             return;
 
-        const std::pair<Vec3d, Vec3d> e = f1.get_edge();
-        const auto [idx, normal, origin] = f2.get_plane();
-
-        // ensure the edge is pointing away from the intersection
-        // 1st calculate instersection between edge and plane
-        const Eigen::Hyperplane<double, 3> plane(normal, origin);
-        const Eigen::ParametrizedLine<double, 3> line = Eigen::ParametrizedLine<double, 3>::Through(e.first, e.second);
-        const Vec3d inters = line.intersectionPoint(plane);
-
-        // then verify edge direction and revert it, if needed
-        std::pair<Vec3d, Vec3d> ecopy = e;
-        if ((ecopy.first - inters).squaredNorm() > (ecopy.second - inters).squaredNorm())
-            std::swap(ecopy.first, ecopy.second);
-
-        // calculate 2nd edge (on the plane)
-        const Vec3d e1e2 = ecopy.second - ecopy.first;
-        const double e1e2_len = e1e2.norm();
-        const Vec3d temp = normal.cross(e1e2);
-        const Vec3d edge_on_plane_unit = normal.cross(temp).normalized();
-        std::pair<Vec3d, Vec3d> edge_on_plane = { origin, origin + e1e2_len * edge_on_plane_unit };
-
-        // ensure the 2nd edge is pointing in the correct direction
-        const Vec3d test_edge = (edge_on_plane.second - edge_on_plane.first).cross(e1e2);
-        if (test_edge.dot(temp) < 0.0)
-            edge_on_plane = { origin, origin - e1e2_len * edge_on_plane_unit };
-
-        const Vec3d e1e2copy_mid = 0.5 * (ecopy.second + ecopy.first);
-        const double radius = (inters - e1e2copy_mid).norm();
-        arc_edge_edge(Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, ecopy.first, ecopy.second),
-            Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, edge_on_plane.first, edge_on_plane.second),
-            &radius);
+        arc_edge_edge(Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, e1.first, e1.second),
+            Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, e2.first, e2.second), calc_radius);
     };
-
 
     shader->start_using();
 
