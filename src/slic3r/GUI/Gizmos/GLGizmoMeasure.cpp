@@ -828,7 +828,8 @@ void GLGizmoMeasure::render_dimensioning()
     };
 
     auto point_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
-        std::pair<Vec3d, Vec3d> e = f1.get_type() == Measure::SurfaceFeatureType::Edge ? f1.get_edge() : f2.get_edge();
+        assert(f1.get_type() == Measure::SurfaceFeatureType::Point && f2.get_type() == Measure::SurfaceFeatureType::Edge);
+        const std::pair<Vec3d, Vec3d> e = f2.get_edge();
         const Vec3d v_proj    = m_measurement_result.distance_infinite->to;
 
         const Vec3d e1e2 = e.second - e.first;
@@ -862,7 +863,8 @@ void GLGizmoMeasure::render_dimensioning()
     };
 
     auto arc_edge_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2, const double* force_radius = nullptr) {
-        Measure::MeasurementResult res = Measure::get_measurement(f1, f2);
+        assert(f1.get_type() == Measure::SurfaceFeatureType::Edge && f2.get_type() == Measure::SurfaceFeatureType::Edge);
+        const Measure::MeasurementResult res = Measure::get_measurement(f1, f2);
         const double angle    = res.angle->angle;
         const Vec3d  center   = res.angle->center;
         const Vec3d  e1_unit  = res.angle->e1;
@@ -940,13 +942,9 @@ void GLGizmoMeasure::render_dimensioning()
     };
 
     auto arc_edge_plane = [this, arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
-
-        std::pair<Vec3d, Vec3d> e = f1.get_type() == Measure::SurfaceFeatureType::Edge ? f1.get_edge() : f2.get_edge();
-        std::tuple<int, Vec3d, Vec3d> p = f1.get_type() == Measure::SurfaceFeatureType::Plane ? f1.get_plane() : f2.get_plane();
-
-        const auto& [idx, normal, origin] = p;
-        const Vec3d e1e2 = e.second - e.first;
-        const double abs_dot = std::abs(normal.dot(Measure::edge_direction(f1)));
+        assert(f1.get_type() == Measure::SurfaceFeatureType::Edge && f2.get_type() == Measure::SurfaceFeatureType::Plane);
+        std::pair<Vec3d, Vec3d> e = f1.get_edge();
+        const auto [idx, normal, origin] = f2.get_plane();
         if (Measure::are_parallel(f1, f2) || Measure::are_perpendicular(f1, f2))
             return;
 
@@ -956,21 +954,20 @@ void GLGizmoMeasure::render_dimensioning()
 
         // ensure the edge is pointing away from the intersection
         std::pair<Vec3d, Vec3d> ecopy = e;
-        Vec3d e1e2copy = e1e2;
-        if ((ecopy.first - inters).squaredNorm() > (ecopy.second - inters).squaredNorm()) {
+        if ((ecopy.first - inters).squaredNorm() > (ecopy.second - inters).squaredNorm())
             std::swap(ecopy.first, ecopy.second);
-            e1e2copy = -e1e2copy;
-        }
 
         // calculate 2nd edge (on the plane)
-        const Vec3d temp = normal.cross(e1e2copy);
+        const Vec3d e1e2 = ecopy.second - ecopy.first;
+        const double e1e2_len = e1e2.norm();
+        const Vec3d temp = normal.cross(e1e2);
         const Vec3d edge_on_plane_unit = normal.cross(temp).normalized();
-        std::pair<Vec3d, Vec3d> edge_on_plane = { origin, origin + e1e2copy.norm() * edge_on_plane_unit };
+        std::pair<Vec3d, Vec3d> edge_on_plane = { origin, origin + e1e2_len * edge_on_plane_unit };
 
         // ensure the 2nd edge is pointing in the correct direction
-        const Vec3d test_edge = (edge_on_plane.second - edge_on_plane.first).cross(e1e2copy);
+        const Vec3d test_edge = (edge_on_plane.second - edge_on_plane.first).cross(e1e2);
         if (test_edge.dot(temp) < 0.0)
-            edge_on_plane = { origin, origin - e1e2copy.norm() * edge_on_plane_unit };
+            edge_on_plane = { origin, origin - e1e2_len * edge_on_plane_unit };
 
         const Vec3d e1e2copy_mid = 0.5 * (ecopy.second + ecopy.first);
         const double radius = (inters - e1e2copy_mid).norm();
@@ -1035,8 +1032,10 @@ void GLGizmoMeasure::render_dimensioning()
         Measure::SurfaceFeatureType ft2 = f2->get_type();
 
         // Order features by type so following conditions are simple.
-        if (ft2 > ft2)
+        if (ft1 > ft2) {
             std::swap(ft1, ft2);
+            std::swap(f1, f2);
+        }
 
         // Where needed, draw also the extension of the edge to where the dist is measured:
         if (ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
@@ -1048,7 +1047,6 @@ void GLGizmoMeasure::render_dimensioning()
         else if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Plane)
             arc_edge_plane(*f1, *f2);
     }
-
     
     glsafe(::glEnable(GL_DEPTH_TEST));
 
