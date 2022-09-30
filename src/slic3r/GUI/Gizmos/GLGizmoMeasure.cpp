@@ -858,8 +858,8 @@ void GLGizmoMeasure::render_dimensioning()
         const double radius   = res.angle->radius;
         const bool   coplanar = res.angle->coplanar;
 
-        std::pair<Vec3d, Vec3d> e1 = m_selected_features.first.feature->get_edge();
-        std::pair<Vec3d, Vec3d> e2 = m_selected_features.second.feature->get_edge();
+        std::pair<Vec3d, Vec3d> e1 = f1.get_edge();
+        std::pair<Vec3d, Vec3d> e2 = f2.get_edge();
 
         if ((e1.second - e1.first).dot(e1_unit) < 0.)
             std::swap(e1.first, e1.second);
@@ -1019,23 +1019,25 @@ void GLGizmoMeasure::render_dimensioning()
                                           : *m_measurement_result.distance_strict;
         point_point(dap.from, dap.to);
 
-        const Measure::SurfaceFeature& f1 = *m_selected_features.first.feature;
-        const Measure::SurfaceFeature& f2 = *m_selected_features.second.feature;
-        Measure::SurfaceFeatureType ft1 = f1.get_type();
-        Measure::SurfaceFeatureType ft2 = f2.get_type();
+        const Measure::SurfaceFeature* f1 = &(*m_selected_features.first.feature);
+        const Measure::SurfaceFeature* f2 = &(*m_selected_features.second.feature);
+        Measure::SurfaceFeatureType ft1 = f1->get_type();
+        Measure::SurfaceFeatureType ft2 = f2->get_type();
 
+        // Order features by type so following conditions are simple.
+        if (ft2 > ft2)
+            std::swap(ft1, ft2);
 
         // Where needed, draw also the extension of the edge to where the dist is measured:
-        if ((int(ft1) | int(ft2)) ==
-              (int(Measure::SurfaceFeatureType::Point) | int(Measure::SurfaceFeatureType::Edge)))
-            point_edge(f1, f2);
+        if (ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
+            point_edge(*f1, *f2);
 
 
         // Now if there is an angle to show, draw the arc:
         if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Edge)
-            arc_edge_edge(f1, f2);
-        if (int(ft1) | int(ft2) == (int(Measure::SurfaceFeatureType::Edge) | int(Measure::SurfaceFeatureType::Plane)))
-            arc_edge_plane(f1, f2);
+            arc_edge_edge(*f1, *f2);
+        if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Plane)
+            arc_edge_plane(*f1, *f2);
     }
 
     
