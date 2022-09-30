@@ -574,16 +574,61 @@ TriangleMesh priv::create_default_mesh()
     return triangle_mesh;
 }
 
-void priv::update_volume(TriangleMesh &&mesh,
-                         const EmbossDataUpdate &data)
+void EmbossUpdateJob::update_volume(ModelVolume             *volume,
+                                    TriangleMesh           &&mesh,
+                                    const TextConfiguration &text_configuration,
+                                    const std::string       &volume_name)
+{
+    // check inputs
+    bool is_valid_input = 
+        volume != nullptr &&
+        !mesh.empty() && 
+        !volume_name.empty();
+    assert(is_valid_input);
+    if (!is_valid_input) return;
+
+    // update volume
+    volume->set_mesh(std::move(mesh));
+    volume->set_new_unique_id();
+    volume->calculate_convex_hull();
+    volume->get_object()->invalidate_bounding_box();
+    volume->text_configuration = text_configuration;
+        
+    GUI_App         &app        = wxGetApp(); // may be move to input
+    GLCanvas3D      *canvas     = app.plater()->canvas3D();
+    const Selection &selection  = canvas->get_selection();
+    const GLVolume  *gl_volume  = selection.get_volume(*selection.get_volume_idxs().begin());
+    int              object_idx = gl_volume->object_idx();
+
+    if (volume->name != volume_name) {
+        volume->name = volume_name;
+
+        // update volume name in right panel( volume / object name)
+        int         volume_idx = gl_volume->volume_idx();
+        ObjectList *obj_list   = app.obj_list();
+        obj_list->update_name_in_list(object_idx, volume_idx);
+    }
+
+    // update printable state on canvas
+    if (volume->type() == ModelVolumeType::MODEL_PART) 
+        canvas->update_instance_printable_state_for_object((size_t) object_idx);
+
+    // Move object on bed
+    if (GLGizmoEmboss::is_text_object(volume)) volume->get_object()->ensure_on_bed();
+
+    // redraw scene
+    bool refresh_immediately = false;
+    canvas->reload_scene(refresh_immediately);
+}
+
+void priv::update_volume(TriangleMesh &&mesh, const EmbossDataUpdate &data)
 {
     // for sure that some object will be created
     if (mesh.its.empty())
         return priv::create_message("Empty mesh can't be created.");
 
-    GUI_App &        app      = wxGetApp(); // may be move to input
-    Plater *         plater   = app.plater();
-    GLCanvas3D *     canvas   = plater->canvas3D();
+    Plater     *plater = wxGetApp().plater();
+    GLCanvas3D *canvas = plater->canvas3D();
 
     // Check emboss gizmo is still open
     GLGizmosManager &manager  = canvas->get_gizmos_manager();
@@ -602,38 +647,7 @@ void priv::update_volume(TriangleMesh &&mesh,
     if (tc.has_value() && tc->fix_3mf_tr.has_value())
         volume->set_transformation(volume->get_matrix() * tc->fix_3mf_tr->inverse());
 
-    // update volume
-    volume->set_mesh(std::move(mesh));
-    volume->set_new_unique_id();
-    volume->calculate_convex_hull();
-    volume->get_object()->invalidate_bounding_box();
-    volume->text_configuration = data.text_configuration;
-
-    const Selection &selection = canvas->get_selection();
-    const GLVolume * gl_volume = selection.get_volume(
-        *selection.get_volume_idxs().begin());
-    int object_idx = gl_volume->object_idx();
-
-    if (volume->name != data.volume_name) { 
-        volume->name = data.volume_name;
-
-        // update volume name in right panel( volume / object name)
-        int volume_idx = gl_volume->volume_idx();
-        ObjectList *obj_list = app.obj_list();
-        obj_list->update_name_in_list(object_idx, volume_idx);
-    }
-
-    // update printable state on canvas
-    if (volume->type() == ModelVolumeType::MODEL_PART)
-        canvas->update_instance_printable_state_for_object((size_t) object_idx);
-    
-    // Move object on bed
-    if (GLGizmoEmboss::is_text_object(volume))
-        volume->get_object()->ensure_on_bed();
-
-    // redraw scene
-    bool refresh_immediately = false;
-    canvas->reload_scene(refresh_immediately);
+    EmbossUpdateJob::update_volume(volume, std::move(mesh), data.text_configuration, data.volume_name);
 }
 
 ModelVolume *priv::get_volume(ModelObjectPtrs &objects,

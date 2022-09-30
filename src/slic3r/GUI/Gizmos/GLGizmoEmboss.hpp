@@ -241,6 +241,16 @@ private:
     // actual volume
     ModelVolume *m_volume;
 
+    // state of volume when open EmbossGizmo
+    struct EmbossVolume
+    {
+        TriangleMesh tm;
+        TextConfiguration tc;
+        Transform3d tr;
+        std::string name;
+    };
+    std::optional<EmbossVolume> m_unmodified_volume;
+
     // True when m_text contain character unknown by selected font
     bool m_text_contain_unknown_glyph = false;
 

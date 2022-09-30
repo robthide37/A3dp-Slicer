@@ -144,6 +144,18 @@ public:
     /// time between finished process and started finalize part.</param>
     /// <param name="">unused</param>
     void finalize(bool canceled, std::exception_ptr &eptr) override;
+
+    /// <summary>
+    /// Update text volume
+    /// </summary>
+    /// <param name="volume">Volume to be updated</param>
+    /// <param name="mesh">New Triangle mesh for volume</param>
+    /// <param name="text_configuration">Parametric description of volume</param>
+    /// <param name="volume_name">Name of volume</param>
+    static void update_volume(ModelVolume             *volume,
+                              TriangleMesh           &&mesh,
+                              const TextConfiguration &text_configuration,
+                              const std::string       &volume_name);
 };
 
 /// <summary>
