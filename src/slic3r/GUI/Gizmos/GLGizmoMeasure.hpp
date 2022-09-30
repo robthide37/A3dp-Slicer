@@ -70,7 +70,9 @@ class GLGizmoMeasure : public GLGizmoBase
     };
 
     EMode m_mode{ EMode::BasicSelection };
-    std::unique_ptr<Measure::Measuring> m_measuring;
+    Measure::MeasurementResult m_measurement_result;
+
+    std::unique_ptr<Measure::Measuring> m_measuring; // PIMPL
 
     PickingModel m_sphere;
     PickingModel m_cylinder;
