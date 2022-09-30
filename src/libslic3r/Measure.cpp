@@ -646,6 +646,7 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
             angle = std::acos(std::abs(normal1.dot(normal2)));
         }
         result.angle = std::make_optional(AngleAndPoints(angle, Vec3d::Zero(), Vec3d::UnitX(), Vec3d::UnitX(), 0., false)); // TODO
+        result.distance_infinite = std::make_optional(DistAndPoints{0., Vec3d::Zero(), Vec3d::Zero()}); // TODO
     }
 
 
