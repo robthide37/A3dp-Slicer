@@ -62,7 +62,7 @@ static std::string point_on_feature_type_as_string(Measure::SurfaceFeatureType t
     std::string ret;
     switch (type) {
     case Measure::SurfaceFeatureType::Point:  { ret = _u8L("Vertex"); break; }
-    case Measure::SurfaceFeatureType::Edge:   { ret = _u8L("Point on edge"); break; }
+    case Measure::SurfaceFeatureType::Edge:   { ret = (hover_id == POINT_ID) ? _u8L("Center of edge") : _u8L("Point on edge"); break; }
     case Measure::SurfaceFeatureType::Circle: { ret = (hover_id == POINT_ID) ? _u8L("Center of circle") : _u8L("Point on circle"); break; }
     case Measure::SurfaceFeatureType::Plane:  { ret = _u8L("Point on plane"); break; }
     default: { assert(false); break; }
@@ -335,6 +335,8 @@ void GLGizmoMeasure::on_render()
                 case Measure::SurfaceFeatureType::Edge:
                 {
                     m_raycasters.insert({ EDGE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, EDGE_ID, *m_cylinder.mesh_raycaster) });
+                    if (m_curr_feature->get_extra_point().has_value())
+                        m_raycasters.insert({ POINT_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID, *m_sphere.mesh_raycaster) });
                     break;
                 }
                 case Measure::SurfaceFeatureType::Circle:
@@ -400,7 +402,11 @@ void GLGizmoMeasure::on_render()
             }
             case Measure::SurfaceFeatureType::Edge:
             {
-                m_curr_point_on_feature_position = m_volume_matrix.inverse() * position_on_feature(EDGE_ID, camera, [](const Vec3f& v) { return Vec3f(0.0f, 0.0f, v.z()); });
+                const std::optional<Vec3d> extra = m_curr_feature->get_extra_point();
+                if (extra.has_value() && m_hover_id == POINT_ID)
+                    m_curr_point_on_feature_position = *extra;
+                else
+                    m_curr_point_on_feature_position = m_volume_matrix.inverse() * position_on_feature(EDGE_ID, camera, [](const Vec3f& v) { return Vec3f(0.0f, 0.0f, v.z()); });
                 break;
             }
             case Measure::SurfaceFeatureType::Plane:
@@ -497,11 +503,25 @@ void GLGizmoMeasure::on_render()
             case Measure::SurfaceFeatureType::Edge:
             {
                 const auto& [start, end] = feature.get_edge();
+                // render extra point
+                const std::optional<Vec3d> extra = m_curr_feature->get_extra_point();
+                if (extra.has_value()) {
+                    const Transform3d point_matrix = model_matrix * Geometry::translation_transform(*extra) * Geometry::scale_transform(inv_zoom);
+                    set_matrix_uniforms(point_matrix);
+                    m_sphere.model.set_color(colors.front());
+                    m_sphere.model.render();
+                    if (update_raycasters) {
+                        auto it = m_raycasters.find(POINT_ID);
+                        if (it != m_raycasters.end() && it->second != nullptr)
+                            it->second->set_transform(point_matrix);
+                    }
+                }
+                // render edge
                 const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(start) *
                     Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start) *
                     Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (end - start).norm() });
                 set_matrix_uniforms(feature_matrix);
-                m_cylinder.model.set_color(colors.front());
+                m_cylinder.model.set_color(colors.back());
                 m_cylinder.model.render();
                 if (update_raycasters) {
                     auto it = m_raycasters.find(EDGE_ID);
@@ -550,13 +570,13 @@ void GLGizmoMeasure::on_render()
                     colors.emplace_back(hover_selection_color());
                     break;
                 }
+                case Measure::SurfaceFeatureType::Edge:
                 case Measure::SurfaceFeatureType::Circle:
                 {
                     colors.emplace_back((m_hover_id == POINT_ID) ? hover_selection_color() : hovering_color());
                     colors.emplace_back(hovering_color());
                     break;
                 }
-                case Measure::SurfaceFeatureType::Edge:
                 case Measure::SurfaceFeatureType::Plane:
                 {
                     colors.emplace_back(hovering_color());
