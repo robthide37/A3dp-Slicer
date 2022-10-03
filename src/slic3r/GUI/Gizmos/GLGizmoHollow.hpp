@@ -31,7 +31,7 @@ public:
     void data_changed() override;
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
     void delete_selected_points();    
-    bool is_selection_rectangle_dragging() const {
+    bool is_selection_rectangle_dragging() const override {
         return m_selection_rectangle.is_dragging();
     }
         

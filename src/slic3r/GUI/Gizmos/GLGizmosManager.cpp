@@ -610,20 +610,11 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
 
     if (evt.GetEventType() == wxEVT_KEY_UP)
     {
-        if (m_current == SlaSupports || m_current == Hollow)
+        if (m_current == SlaSupports || m_current == Hollow || m_current == Cut)
         {
-            bool is_editing = true;
-            bool is_rectangle_dragging = false;
-
-            if (m_current == SlaSupports) {
-                GLGizmoSlaSupports* gizmo = dynamic_cast<GLGizmoSlaSupports*>(get_current());
-                is_editing = gizmo->is_in_editing_mode();
-                is_rectangle_dragging = gizmo->is_selection_rectangle_dragging();
-            }
-            else {
-                GLGizmoHollow* gizmo = dynamic_cast<GLGizmoHollow*>(get_current());
-                is_rectangle_dragging = gizmo->is_selection_rectangle_dragging();
-            }
+            GLGizmoBase* gizmo = get_current();
+            const bool is_editing             = m_current == Hollow ? true : gizmo->is_in_editing_mode();
+            const bool is_rectangle_dragging  = gizmo->is_selection_rectangle_dragging();
 
             if (keyCode == WXK_SHIFT)
             {
@@ -645,7 +636,7 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
     else if (evt.GetEventType() == wxEVT_KEY_DOWN)
     {
         if ((m_current == SlaSupports) && ((keyCode == WXK_SHIFT) || (keyCode == WXK_ALT))
-          && dynamic_cast<GLGizmoSlaSupports*>(get_current())->is_in_editing_mode())
+          && get_current()->is_in_editing_mode())
         {
 //            m_parent.set_cursor(GLCanvas3D::Cross);
             processed = true;
@@ -662,6 +653,9 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
             {
             case WXK_NUMPAD_UP:   case WXK_UP:   { do_move(1.0); break; }
             case WXK_NUMPAD_DOWN: case WXK_DOWN: { do_move(-1.0); break; }
+            case WXK_SHIFT :      case WXK_ALT: {
+                processed = get_current()->is_in_editing_mode();
+            }
             default: { break; }
             }
         } else if (m_current == Simplify && keyCode == WXK_ESCAPE) {

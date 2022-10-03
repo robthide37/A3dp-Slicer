@@ -212,6 +212,9 @@ public:
     void unregister_raycasters_for_picking() { unregister_grabbers_for_picking(); on_unregister_raycasters_for_picking(); }
 #endif // ENABLE_RAYCAST_PICKING
 
+    virtual bool is_in_editing_mode() const { return false; }
+    virtual bool is_selection_rectangle_dragging() const { return false; }
+
 protected:
     virtual bool on_init() = 0;
     virtual void on_load(cereal::BinaryInputArchive& ar) {}

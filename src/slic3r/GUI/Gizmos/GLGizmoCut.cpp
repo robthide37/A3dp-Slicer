@@ -28,6 +28,7 @@ static const ColorRGBA HOVERED_DOWEL_COLOR  = ColorRGBA(0.0f, 0.5f, 0.5f, 1.0f);
 static const ColorRGBA SELECTED_PLAG_COLOR  = ColorRGBA::GRAY();
 static const ColorRGBA SELECTED_DOWEL_COLOR = ColorRGBA::DARK_GRAY();
 static const ColorRGBA CONNECTOR_DEF_COLOR  = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
+static const ColorRGBA CONNECTOR_ERR_COLOR  = ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f);
 
 const unsigned int AngleResolution = 64;
 const unsigned int ScaleStepsCount = 72;
@@ -1287,6 +1288,8 @@ void GLGizmoCut3D::on_render()
     }
 
     render_cut_line();
+
+    m_selection_rectangle.render(m_parent);
 }
 
 void GLGizmoCut3D::render_debug_input_window()
@@ -1622,17 +1625,7 @@ void GLGizmoCut3D::render_connectors()
         m_selected.resize(connectors.size(), false);
     }
 
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-    if (shader == nullptr)
-        return;
-
-    shader->start_using();
-
-    ScopeGuard guard([shader]() { shader->stop_using(); });
-
-    const Camera& camera = wxGetApp().plater()->get_camera();
-
-    ColorRGBA render_color;
+    ColorRGBA render_color = CONNECTOR_DEF_COLOR;
 
     const ModelInstance* mi = mo->instances[inst_id];
     const Vec3d& instance_offset = mi->get_offset();
@@ -1656,11 +1649,11 @@ void GLGizmoCut3D::render_connectors()
             pos -= height * normal;
             height *= 2;
         }
-        pos[Z] += sla_shift;
+        pos += sla_shift * Vec3d::UnitZ();
 
         // First decide about the color of the point.
         if (!m_connectors_editing)
-            render_color = CONNECTOR_DEF_COLOR;
+            render_color = CONNECTOR_ERR_COLOR;
         else if (size_t(m_hover_id - m_connectors_group_id) == i)
             render_color = connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR : HOVERED_PLAG_COLOR;
         else if (m_selected[i])
@@ -1678,22 +1671,19 @@ void GLGizmoCut3D::render_connectors()
                 const Transform3d volume_trafo = get_volume_transformation(mv);
 
                 if (m_c->raycaster()->raycasters()[mesh_id]->is_valid_intersection(pos, -normal, instance_trafo * volume_trafo)) {
-                    render_color = m_connectors_editing ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f) : /*ColorRGBA(0.5f, 0.5f, 0.5f, 1.f)*/ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f);
+                    render_color = m_connectors_editing ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f) : CONNECTOR_ERR_COLOR;
                     break;
                 }
-                render_color = ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f);
+                render_color = CONNECTOR_ERR_COLOR;
                 m_has_invalid_connector = true;
             }
         }
 
-        m_shapes[connector.attribs].model.set_color(render_color);
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(pos) * m_rotation_m * 
+                                              scale_transform(Vec3f(connector.radius, connector.radius, height).cast<double>());
 
-        const Transform3d scale_trafo = scale_transform(Vec3f(connector.radius, connector.radius, height).cast<double>());
-        const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(pos) * m_rotation_m * scale_trafo;
-        shader->set_uniform("view_model_matrix", view_model_matrix);
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-
-        m_shapes[connector.attribs].model.render();
+        render_model(m_shapes[connector.attribs].model, render_color, view_model_matrix);
     }
 }
 
@@ -1992,6 +1982,29 @@ bool GLGizmoCut3D::is_selection_changed(bool alt_down, bool control_down)
     return false;
 }
 
+void GLGizmoCut3D::process_selection_rectangle(CutConnectors &connectors)
+{
+    GLSelectionRectangle::EState rectangle_status = m_selection_rectangle.get_state();
+
+    ModelObject* mo          = m_c->selection_info()->model_object();
+    int          active_inst = m_c->selection_info()->get_active_instance();
+
+    // First collect positions of all the points in world coordinates.
+    Transformation trafo = mo->instances[active_inst]->get_transformation();
+    trafo.set_offset(trafo.get_offset() + double(m_c->selection_info()->get_sla_shift()) * Vec3d::UnitZ());
+
+    std::vector<Vec3d> points;
+    for (const CutConnector&connector : connectors)
+        points.push_back(connector.pos + trafo.get_offset());
+
+    // Now ask the rectangle which of the points are inside.
+    std::vector<unsigned int> points_idxs = m_selection_rectangle.contains(points);
+    m_selection_rectangle.stop_dragging();
+
+    for (size_t idx : points_idxs)
+        select_connector(int(idx), rectangle_status == GLSelectionRectangle::EState::Select);
+}
+
 bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
 {
     if (is_dragging() || m_connector_mode == CutConnectorMode::Auto || (!m_keep_upper || !m_keep_lower))
@@ -2001,20 +2014,43 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
         (action == SLAGizmoEventType::LeftDown || action == SLAGizmoEventType::LeftUp || action == SLAGizmoEventType::Moving) )
         return process_cut_line(action, mouse_position);
 
+    if (!m_connectors_editing)
+        return false;
+
     CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;
 
-    if (action == SLAGizmoEventType::LeftDown && !shift_down) {
+    if (action == SLAGizmoEventType::LeftDown) {
+        if (shift_down || alt_down) {
+            // left down with shift - show the selection rectangle:
+            if (m_hover_id == -1)
+                m_selection_rectangle.start_dragging(mouse_position, shift_down ? GLSelectionRectangle::EState::Select : GLSelectionRectangle::EState::Deselect);
+        }
+        else
         // If there is no selection and no hovering, add new point
         if (m_hover_id == -1 && !control_down && !alt_down)
             if (!add_connector(connectors, mouse_position))
                 unselect_all_connectors();
         return true;
     }
-    if (!m_connectors_editing)
-        return false;
 
     if (action == SLAGizmoEventType::LeftUp && !shift_down)
         return is_selection_changed(alt_down, control_down);
+
+    // left up with selection rectangle - select points inside the rectangle:
+    if ((action == SLAGizmoEventType::LeftUp || action == SLAGizmoEventType::ShiftUp || action == SLAGizmoEventType::AltUp) && m_selection_rectangle.is_dragging()) {
+        // Is this a selection or deselection rectangle?
+        process_selection_rectangle(connectors);
+        return true;
+    }
+
+    // dragging the selection rectangle:
+    if (action == SLAGizmoEventType::Dragging) {
+        if (m_selection_rectangle.is_dragging()) {
+            m_selection_rectangle.dragging(mouse_position);
+            return true;
+        }
+        return false;
+    }
     
     if (action == SLAGizmoEventType::RightDown && !shift_down) {
         // If any point is in hover state, this should initiate its move - return control back to GLCanvas:

@@ -2,6 +2,7 @@
 #define slic3r_GLGizmoCut_hpp_
 
 #include "GLGizmoBase.hpp"
+#include "slic3r/GUI/GLSelectionRectangle.hpp"
 #include "slic3r/GUI/GLModel.hpp"
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Model.hpp"
@@ -95,6 +96,8 @@ class GLGizmoCut3D : public GLGizmoBase
     mutable std::vector<bool> m_selected; // which pins are currently selected
     int  m_selected_count{ 0 };
 
+    GLSelectionRectangle m_selection_rectangle;
+
     bool m_has_invalid_connector{ false };
 
     bool                                        m_show_shortcuts{ false };
@@ -135,6 +138,9 @@ public:
     std::string get_tooltip() const override;
     bool unproject_on_cut_plane(const Vec2d& mouse_pos, std::pair<Vec3d, Vec3d>& pos_and_normal, Vec3d& pos_world);
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
+
+    bool is_in_editing_mode() const override { return m_connectors_editing; }
+    bool is_selection_rectangle_dragging() const override { return m_selection_rectangle.is_dragging(); }
 
     /// <summary>
     /// Drag of plane
@@ -189,6 +195,7 @@ protected:
     bool delete_selected_connectors(CutConnectors&connectors);
     void select_connector(int idx, bool select);
     bool is_selection_changed(bool alt_down, bool control_down);
+    void process_selection_rectangle(CutConnectors &connectors);
 
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
