@@ -306,8 +306,17 @@ void MeasuringImpl::extract_features()
         }
 
         // The last surface feature is the plane itself.
+        Vec3d cog = Vec3d::Zero();
+        size_t counter = 0;
+        for (const std::vector<Vec3d>& b : plane.borders) {
+            for (size_t i = 1; i < b.size(); ++i) {
+                cog += b[i];
+                ++counter;
+            }
+        }
+        cog /= double(counter);
         plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Plane,
-            plane.normal, plane.borders.front().front(), std::nullopt, i + 0.0001));
+            plane.normal, cog, std::optional<Vec3d>(), i + 0.0001));
 
         plane.borders.clear();
         plane.borders.shrink_to_fit();
@@ -526,11 +535,48 @@ static AngleAndEdges angle_edge_plane(const std::pair<Vec3d, Vec3d>& e, const st
         edge_on_plane = { origin, origin - e1e2_len * edge_on_plane_unit };
 
     AngleAndEdges ret = angle_edge_edge({ e1, e2 }, edge_on_plane);
-    const Vec3d e1e2copy_mid = 0.5 * (e1 + e2);
-    ret.radius = (inters - e1e2copy_mid).norm();
+    ret.radius = (inters - 0.5 * (e1 + e2)).norm();
     return ret;
 }
 
+static AngleAndEdges angle_plane_plane(const std::tuple<int, Vec3d, Vec3d>& p1, const std::tuple<int, Vec3d, Vec3d>& p2)
+{
+    const auto& [idx1, normal1, origin1] = p1;
+    const auto& [idx2, normal2, origin2] = p2;
+
+    // are planes parallel ?
+    if (are_parallel(normal1, normal2))
+        return AngleAndEdges::Dummy;
+
+    auto intersection_plane_plane = [](const Vec3d& n1, const Vec3d& o1, const Vec3d& n2, const Vec3d& o2) {
+        Eigen::MatrixXd m(2, 3);
+        m << n1.x(), n1.y(), n1.z(), n2.x(), n2.y(), n2.z();
+        Eigen::VectorXd b(2);
+        b << o1.dot(n1), o2.dot(n2);
+        Eigen::VectorXd x = m.colPivHouseholderQr().solve(b);
+        return std::make_pair(n1.cross(n2).normalized(), Vec3d(x(0), x(1), x(2)));
+    };
+
+    // Calculate intersection line between planes
+    const auto [intersection_line_direction, intersection_line_origin] = intersection_plane_plane(normal1, origin1, normal2, origin2);
+
+    // Project planes' origin on intersection line
+    const Eigen::ParametrizedLine<double, 3> intersection_line = Eigen::ParametrizedLine<double, 3>(intersection_line_origin, intersection_line_direction);
+    const Vec3d origin1_proj = intersection_line.projection(origin1);
+    const Vec3d origin2_proj = intersection_line.projection(origin2);
+
+    // Calculate edges on planes
+    const Vec3d edge_on_plane1_unit = (origin1 - origin1_proj).normalized();
+    const Vec3d edge_on_plane2_unit = (origin2 - origin2_proj).normalized();
+    const double edges_angle = std::acos(std::clamp(edge_on_plane1_unit.dot(edge_on_plane2_unit), -1.0, 1.0));
+    const double radius = std::max(10.0, std::max((origin1 - origin1_proj).norm(), (origin2 - origin2_proj).norm()));
+    const std::pair<Vec3d, Vec3d> edge_on_plane1 = { origin1_proj + radius * edge_on_plane1_unit, origin1_proj + 2.0 * radius * edge_on_plane1_unit };
+    const std::pair<Vec3d, Vec3d> edge_on_plane2 = { origin2_proj + radius * edge_on_plane2_unit, origin2_proj + 2.0 * radius * edge_on_plane2_unit };
+
+    AngleAndEdges ret = angle_edge_edge(edge_on_plane1, edge_on_plane2);
+    ret.radius = radius;
+    return ret;
+}
 
 
 
@@ -684,7 +730,7 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
             // Planes are not parallel, calculate angle.
             angle = std::acos(std::abs(normal1.dot(normal2)));
         }
-        result.angle = std::make_optional(AngleAndEdges(angle, Vec3d::Zero(), { Vec3d::Zero(), Vec3d::Zero() }, { Vec3d::Zero(), Vec3d::Zero() }, 0., false)); // TODO
+        result.angle = angle_plane_plane(f1.get_plane(), f2.get_plane());
         result.distance_infinite = std::make_optional(DistAndPoints{0., Vec3d::Zero(), Vec3d::Zero()}); // TODO
     }
 
