@@ -44,6 +44,20 @@ static const std::string CTRL_STR =
 #endif //__APPLE__
 ;
 
+static std::string format_double(double value)
+{
+    char buf[1024];
+    sprintf(buf, "%.3f", value);
+    return std::string(buf);
+}
+
+static std::string format_vec3(const Vec3d& v)
+{
+    char buf[1024];
+    sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", v.x(), v.y(), v.z());
+    return std::string(buf);
+}
+
 static std::string surface_feature_type_as_string(Measure::SurfaceFeatureType type)
 {
     switch (type)
@@ -778,7 +792,7 @@ void GLGizmoMeasure::render_dimensioning()
     if (shader == nullptr)
         return;
 
-    auto point_point = [this, shader](const Vec3d& v1, const Vec3d& v2) {
+    auto point_point = [this, shader](const Vec3d& v1, const Vec3d& v2, float distance) {
         if (v1.isApprox(v2))
             return;
 
@@ -825,6 +839,23 @@ void GLGizmoMeasure::render_dimensioning()
             ss_to_ndc_matrix * Geometry::translation_transform(v2ss_3) * q21ss :
             ss_to_ndc_matrix * Geometry::translation_transform(v2ss_3) * q12ss);
         m_dimensioning.triangle.render();
+
+        if (distance > 0.0) {
+            const Vec2d label_position = 0.5 * (v1ss + v2ss);
+            m_imgui->set_next_window_pos(label_position.x(), viewport[3] - label_position.y(), ImGuiCond_Always, 0.0f, 1.0f);
+            m_imgui->set_next_window_bg_alpha(0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+            m_imgui->begin(_L("##distance"), ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+            ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+            std::string txt = format_double(distance) + " ";
+            if (wxGetApp().app_config->get("use_inches") == "1")
+                txt += _u8L("in");
+            else
+                txt += _u8L("mm");
+            m_imgui->text(txt);
+            m_imgui->end();
+            ImGui::PopStyleVar();
+        }
     };
 
     auto point_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
@@ -872,7 +903,7 @@ void GLGizmoMeasure::render_dimensioning()
         const double calc_radius = res.angle->radius;
         const bool   coplanar = res.angle->coplanar;
 
-        if (calc_radius == 0.0)
+        if (std::abs(angle) < EPSILON || std::abs(calc_radius) < EPSILON)
             return;
 
         const double draw_radius = (radius > 0.0) ? radius : calc_radius;
@@ -1006,7 +1037,7 @@ void GLGizmoMeasure::render_dimensioning()
         const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
                                           ? *m_measurement_result.distance_infinite
                                           : *m_measurement_result.distance_strict;
-        point_point(dap.from, dap.to);
+        point_point(dap.from, dap.to, dap.dist);
 
         const Measure::SurfaceFeature* f1 = &(*m_selected_features.first.feature);
         const Measure::SurfaceFeature* f2 = &(*m_selected_features.second.feature);
@@ -1051,20 +1082,6 @@ static void add_strings_row_to_table(ImGuiWrapper& imgui, const std::string& col
 {
     add_row_to_table([&]() { imgui.text_colored(col_1_color, col_1); }, [&]() { imgui.text_colored(col_2_color, col_2); });
 };
-
-static std::string format_double(double value)
-{
-    char buf[1024];
-    sprintf(buf, "%.3f", value);
-    return std::string(buf);
-}
-
-static std::string format_vec3(const Vec3d& v)
-{
-    char buf[1024];
-    sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", v.x(), v.y(), v.z());
-    return std::string(buf);
-}
 
 #if ENABLE_MEASURE_GIZMO_DEBUG
 void GLGizmoMeasure::render_debug_dialog()

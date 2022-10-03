@@ -663,10 +663,10 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
             distances.emplace_back((e2.second - e1.first).norm(), e1.first, e2.second);
             distances.emplace_back((e2.first - e1.second).norm(), e1.second, e2.first);
             distances.emplace_back((e2.second - e1.second).norm(), e1.second, e2.second);
-            add_point_edge_distance(e1.first, e2);
-            add_point_edge_distance(e1.second, e2);
-            add_point_edge_distance(e2.first, e1);
-            add_point_edge_distance(e2.second, e1);
+//            add_point_edge_distance(e1.first, e2);
+//            add_point_edge_distance(e1.second, e2);
+//            add_point_edge_distance(e2.first, e1);
+//            add_point_edge_distance(e2.second, e1);
             auto it = std::min_element(distances.begin(), distances.end(),
                 [](const DistAndPoints& item1, const DistAndPoints& item2) {
                     return item1.dist < item2.dist;
