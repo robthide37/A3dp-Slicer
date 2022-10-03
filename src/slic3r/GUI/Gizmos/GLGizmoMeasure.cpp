@@ -840,22 +840,18 @@ void GLGizmoMeasure::render_dimensioning()
             ss_to_ndc_matrix * Geometry::translation_transform(v2ss_3) * q12ss);
         m_dimensioning.triangle.render();
 
-        if (distance > 0.0) {
-            const Vec2d label_position = 0.5 * (v1ss + v2ss);
-            m_imgui->set_next_window_pos(label_position.x(), viewport[3] - label_position.y(), ImGuiCond_Always, 0.0f, 1.0f);
-            m_imgui->set_next_window_bg_alpha(0.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-            m_imgui->begin(_L("##distance"), ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
-            ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
-            std::string txt = format_double(distance) + " ";
-            if (wxGetApp().app_config->get("use_inches") == "1")
-                txt += _u8L("in");
-            else
-                txt += _u8L("mm");
-            m_imgui->text(txt);
-            m_imgui->end();
-            ImGui::PopStyleVar();
-        }
+        const Vec2d label_position = 0.5 * (v1ss + v2ss);
+        m_imgui->set_next_window_pos(label_position.x(), viewport[3] - label_position.y(), ImGuiCond_Always, 0.0f, 1.0f);
+        m_imgui->set_next_window_bg_alpha(0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        m_imgui->begin(_L("##distance"), ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+        const bool use_inches = wxGetApp().app_config->get("use_inches") == "1";
+        const std::string txt = use_inches ? format_double(ObjectManipulation::mm_to_in * distance) + " " + _u8L("in") :
+            format_double(distance) + " " + _u8L("mm");
+        m_imgui->text(txt);
+        m_imgui->end();
+        ImGui::PopStyleVar();
     };
 
     auto point_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
@@ -911,8 +907,11 @@ void GLGizmoMeasure::render_dimensioning()
         const Vec3d e1_unit = Measure::edge_direction(e1);
         const Vec3d e2_unit = Measure::edge_direction(e2);
 
+        const unsigned int resolution = std::max<unsigned int>(2, 64 * angle / double(PI));
+        const double step = angle / double(resolution);
+        const Vec3d normal = e1_unit.cross(e2_unit).normalized();
+
         if (!m_dimensioning.arc.is_initialized()) {
-            const unsigned int resolution = std::max<unsigned int>(2, 64 * angle / double(PI));
             GLModel::Geometry init_data;
             init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3 };
             init_data.color = ColorRGBA::WHITE();
@@ -920,8 +919,6 @@ void GLGizmoMeasure::render_dimensioning()
             init_data.reserve_indices(resolution + 1);
 
             // vertices + indices
-            const Vec3d normal = e1_unit.cross(e2_unit).normalized();
-            const double step = angle / double(resolution);
             for (unsigned int i = 0; i <= resolution; ++i) {
                 const double a = step * double(i);
                 const Vec3d v = draw_radius * (Eigen::Quaternion<double>(Eigen::AngleAxisd(a, normal)) * e1_unit);
@@ -943,8 +940,6 @@ void GLGizmoMeasure::render_dimensioning()
         const Vec3d e11center = center - e1.first;
         const double e11center_len = e11center.norm();
         if (e11center_len > EPSILON && e11center.dot(e11e12) < 0.0) {
-            const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center) *
                 Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e1.first, e1.second)) *
                 Geometry::scale_transform({ e11center_len, 1.0f, 1.0f }));
@@ -955,13 +950,29 @@ void GLGizmoMeasure::render_dimensioning()
         const Vec3d e21center = center - e2.first;
         const double e21center_len = e21center.norm();
         if (e21center_len > EPSILON) {
-            const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center) *
                 Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e2.first, e2.second)) *
                 Geometry::scale_transform({ (coplanar && radius > 0.0) ? e21center_len : draw_radius, 1.0f, 1.0f }));
             m_dimensioning.line.render();
         }
+
+        // world coordinates
+        const Vec3d label_position_world = Geometry::translation_transform(center) * (draw_radius * (Eigen::Quaternion<double>(Eigen::AngleAxisd(step * 0.5 * double(resolution), normal)) * e1_unit));
+
+        // screen coordinates
+        const std::array<int, 4>& viewport = camera.get_viewport();
+        const Vec2d label_position_ss = DimensioningHelper::model_to_ss(label_position_world, m_volume_matrix,
+            camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix(), viewport);
+
+        m_imgui->set_next_window_pos(label_position_ss.x(), viewport[3] - label_position_ss.y(), ImGuiCond_Always, 0.0f, 1.0f);
+        m_imgui->set_next_window_bg_alpha(0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        m_imgui->begin(_L("##angle"), ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+        std::string txt = format_double(Geometry::rad2deg(angle)) + "°";
+        m_imgui->text(txt);
+        m_imgui->end();
+        ImGui::PopStyleVar();
     };
 
     auto arc_edge_plane = [this, arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
@@ -1341,7 +1352,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
                 }
-                if (measure.distance_infinite.has_value()) {
+                if (measure.distance_infinite.has_value() && measure.distance_infinite->dist > 0.0) {
                     double distance = measure.distance_infinite->dist;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
@@ -1350,7 +1361,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
                 }
-                if (measure.distance_strict.has_value()) {
+                if (measure.distance_strict.has_value() && measure.distance_strict->dist > 0.0) {
                     double distance = measure.distance_strict->dist;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
@@ -1359,7 +1370,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
                 }
-                if (measure.distance_xyz.has_value()) {
+                if (measure.distance_xyz.has_value() && measure.distance_xyz->norm() > EPSILON) {
                     Vec3d distance = *measure.distance_xyz;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
