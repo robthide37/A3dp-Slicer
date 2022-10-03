@@ -940,9 +940,10 @@ void GLGizmoMeasure::render_dimensioning()
             const double angle = (endpoint_id == 1) ? 0.0 : step * double(resolution);
             const Vec3d position_model = Geometry::translation_transform(center) * (draw_radius * (Eigen::Quaternion<double>(Eigen::AngleAxisd(angle, normal)) * e1_unit));
             const Vec3d direction_model = (endpoint_id == 1) ? -normal.cross(position_model - center).normalized() : normal.cross(position_model - center).normalized();
+            const auto qz = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal);
+            const auto qx = Eigen::Quaternion<double>::FromTwoVectors(qz * Vec3d::UnitX(), direction_model);
             const Transform3d view_model_matrix = camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(position_model) *
-                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), direction_model) * Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal) *
-                Geometry::scale_transform(camera.get_inv_zoom());
+                qx * qz * Geometry::scale_transform(camera.get_inv_zoom());
             shader->set_uniform("view_model_matrix", view_model_matrix);
             m_dimensioning.triangle.render();
         };
