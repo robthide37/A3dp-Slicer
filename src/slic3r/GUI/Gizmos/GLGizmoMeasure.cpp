@@ -929,13 +929,30 @@ void GLGizmoMeasure::render_dimensioning()
             m_dimensioning.arc.init_from(std::move(init_data));
         }
 
-        // render arc
+        // arc
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center));
         m_dimensioning.arc.render();
 
-        // render edge 1 extension
+        // arrows
+        auto render_arrow = [this, shader, &camera, &normal, &center, &e1_unit, draw_radius, step, resolution](unsigned int endpoint_id) {
+            const double angle = (endpoint_id == 1) ? 0.0 : step * double(resolution);
+            const Vec3d position_model = Geometry::translation_transform(center) * (draw_radius * (Eigen::Quaternion<double>(Eigen::AngleAxisd(angle, normal)) * e1_unit));
+            const Vec3d direction_model = (endpoint_id == 1) ? -normal.cross(position_model - center).normalized() : normal.cross(position_model - center).normalized();
+            const Transform3d view_model_matrix = camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(position_model) *
+                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), direction_model) * Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal) *
+                Geometry::scale_transform(camera.get_inv_zoom());
+            shader->set_uniform("view_model_matrix", view_model_matrix);
+            m_dimensioning.triangle.render();
+        };
+
+        glsafe(::glDisable(GL_CULL_FACE));
+        render_arrow(1);
+        render_arrow(2);
+        glsafe(::glEnable(GL_CULL_FACE));
+
+        // edge 1 extension
         const Vec3d e11e12 = e1.second - e1.first;
         const Vec3d e11center = center - e1.first;
         const double e11center_len = e11center.norm();
@@ -946,7 +963,7 @@ void GLGizmoMeasure::render_dimensioning()
             m_dimensioning.line.render();
         }
 
-        // render edge 2 extension
+        // edge 2 extension
         const Vec3d e21center = center - e2.first;
         const double e21center_len = e21center.norm();
         if (e21center_len > EPSILON) {
@@ -956,12 +973,13 @@ void GLGizmoMeasure::render_dimensioning()
             m_dimensioning.line.render();
         }
 
-        // world coordinates
-        const Vec3d label_position_world = Geometry::translation_transform(center) * (draw_radius * (Eigen::Quaternion<double>(Eigen::AngleAxisd(step * 0.5 * double(resolution), normal)) * e1_unit));
+        // label
+        // label model coordinates
+        const Vec3d label_position_model = Geometry::translation_transform(center) * (draw_radius * (Eigen::Quaternion<double>(Eigen::AngleAxisd(step * 0.5 * double(resolution), normal)) * e1_unit));
 
-        // screen coordinates
+        // label screen coordinates
         const std::array<int, 4>& viewport = camera.get_viewport();
-        const Vec2d label_position_ss = DimensioningHelper::model_to_ss(label_position_world, m_volume_matrix,
+        const Vec2d label_position_ss = DimensioningHelper::model_to_ss(label_position_model, m_volume_matrix,
             camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix(), viewport);
 
         m_imgui->set_next_window_pos(label_position_ss.x(), viewport[3] - label_position_ss.y(), ImGuiCond_Always, 0.0f, 1.0f);
@@ -969,8 +987,7 @@ void GLGizmoMeasure::render_dimensioning()
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
         m_imgui->begin(_L("##angle"), ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
-        std::string txt = format_double(Geometry::rad2deg(angle)) + "°";
-        m_imgui->text(txt);
+        m_imgui->text(format_double(Geometry::rad2deg(angle)) + "°");
         m_imgui->end();
         ImGui::PopStyleVar();
     };
