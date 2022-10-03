@@ -946,6 +946,19 @@ void GLGizmoMeasure::render_dimensioning()
             Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, e2.first, e2.second), calc_radius);
     };
 
+    auto arc_plane_plane = [this, arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
+        assert(f1.get_type() == Measure::SurfaceFeatureType::Plane && f2.get_type() == Measure::SurfaceFeatureType::Plane);
+        const Measure::MeasurementResult res = Measure::get_measurement(f1, f2);
+        const std::pair<Vec3d, Vec3d> e1 = res.angle->e1;
+        const std::pair<Vec3d, Vec3d> e2 = res.angle->e2;
+        const double calc_radius = res.angle->radius;
+        if (calc_radius == 0.0)
+            return;
+
+        arc_edge_edge(Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, e1.first, e1.second),
+            Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, e2.first, e2.second), calc_radius);
+    };
+
     shader->start_using();
 
     if (!m_dimensioning.line.is_initialized()) {
@@ -1015,6 +1028,8 @@ void GLGizmoMeasure::render_dimensioning()
             arc_edge_edge(*f1, *f2);
         else if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Plane)
             arc_edge_plane(*f1, *f2);
+        else if (ft1 == Measure::SurfaceFeatureType::Plane && ft2 == Measure::SurfaceFeatureType::Plane)
+            arc_plane_plane(*f1, *f2);
     }
     
     glsafe(::glEnable(GL_DEPTH_TEST));
