@@ -3,6 +3,7 @@
 
 #include "libslic3r/AABBTreeIndirect.hpp"
 #include "libslic3r/Line.hpp"
+#include <type_traits>
 
 namespace Slic3r {
 
@@ -24,16 +25,16 @@ struct IndexedLinesDistancer {
 
     inline VectorType closest_point_to_origin(size_t primitive_index,
             ScalarType &squared_distance) {
-        VectorType nearest_point;
+        Vec<LineType::Dim, typename LineType::Scalar> nearest_point;
         const LineType &line = lines[primitive_index];
-        squared_distance = line_alg::distance_to_squared(line, origin, &nearest_point);
-        return nearest_point;
+        squared_distance = line_alg::distance_to_squared(line, origin.template cast<typename LineType::Scalar>(), &nearest_point);
+        return nearest_point.template cast<ScalarType>();
     }
 };
 
 }
 
-// Build a balanced AABB Tree over a vector of float lines, balancing the tree
+// Build a balanced AABB Tree over a vector of lines, balancing the tree
 // on centroids of the lines.
 // Epsilon is applied to the bounding boxes of the AABB Tree to cope with numeric inaccuracies
 // during tree traversal.
@@ -41,7 +42,7 @@ template<typename LineType>
 inline AABBTreeIndirect::Tree<2, typename LineType::Scalar> build_aabb_tree_over_indexed_lines(
         const std::vector<LineType> &lines,
         //FIXME do we want to apply an epsilon?
-        const float eps = 0)
+        const double eps = 0)
         {
     using TreeType = AABBTreeIndirect::Tree<2, typename LineType::Scalar>;
 //    using              CoordType      = typename TreeType::CoordType;
@@ -103,8 +104,49 @@ inline typename VectorType::Scalar squared_distance_to_indexed_lines(
                                   std::numeric_limits<Scalar>::infinity(), hit_idx_out, hit_point_out);
 }
 
-}
+template<typename LineType> class LinesDistancer
+{
+private:
+    std::vector<LineType> lines;
+    using Scalar   = typename LineType::Scalar;
+    using Floating = typename std::conditional<std::is_floating_point<Scalar>::value, Scalar, double>::type;
+    AABBTreeIndirect::Tree<2, Scalar> tree;
 
-}
+public:
+    explicit LinesDistancer(const std::vector<LineType> &lines) : lines(lines)
+    {
+        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(this->lines);
+    }
+
+    // negative sign means inside
+    std::tuple<Floating, size_t, Vec<2, Floating>> signed_distance_from_lines_extra(const Vec<2, Scalar> &point) const
+    {
+        size_t           nearest_line_index_out = size_t(-1);
+        Vec<2, Floating> nearest_point_out      = Vec<2, Floating>::Zero();
+        Vec<2, Floating> p                      = point.template cast<Floating>();
+        auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, p, nearest_line_index_out, nearest_point_out);
+
+        if (distance < 0) { return {std::numeric_limits<Floating>::infinity(), nearest_line_index_out, nearest_point_out}; }
+
+        distance              = sqrt(distance);
+        const LineType  &line = lines[nearest_line_index_out];
+        Vec<2, Floating> v1   = (line.b - line.a).template cast<Floating>();
+        Vec<2, Floating> v2   = (point - line.a).template cast<Floating>();
+        if ((v1.x() * v2.y()) - (v1.y() * v2.x()) > 0.0) { distance *= -1.0; }
+        return {distance, nearest_line_index_out, nearest_point_out};
+    }
+
+    Floating signed_distance_from_lines(const Vec<2, typename LineType::Scalar> &point) const
+    {
+        auto [dist, idx, np] = signed_distance_from_lines_extra(point);
+        return dist;
+    }
+
+    const LineType &get_line(size_t line_idx) const { return lines[line_idx]; }
+
+    const std::vector<LineType> &get_lines() const { return lines; }
+};
+
+}} // namespace Slic3r::AABBTreeLines
 
 #endif /* SRC_LIBSLIC3R_AABBTREELINES_HPP_ */
