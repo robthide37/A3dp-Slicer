@@ -564,6 +564,17 @@ bool Selection::is_sla_compliant() const
     return true;
 }
 
+bool Selection::is_single_text() const
+{
+    if (!is_single_volume_or_modifier())
+        return false;
+
+    const GLVolume* gl_volume = (*m_volumes)[*m_list.begin()];
+    const ModelVolume* model_volume = m_model->objects[gl_volume->object_idx()]->volumes[gl_volume->volume_idx()];
+    
+    return model_volume && model_volume->text_configuration.has_value();
+}
+
 bool Selection::contains_all_volumes(const std::vector<unsigned int>& volume_idxs) const
 {
     for (unsigned int i : volume_idxs) {

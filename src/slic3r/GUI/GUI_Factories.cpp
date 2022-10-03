@@ -469,47 +469,27 @@ void MenuFactory::append_menu_item_delete(wxMenu* menu)
 wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType type) {
     auto sub_menu = new wxMenu;
 
-    if (wxGetApp().get_mode() == comExpert && type != ModelVolumeType::INVALID) {
+    const ConfigOptionMode mode = wxGetApp().get_mode();
+
+    if (mode == comExpert   && type != ModelVolumeType::INVALID ||
+        mode == comAdvanced && type == ModelVolumeType::MODEL_PART) {
         append_menu_item(sub_menu, wxID_ANY, _L("Load") + " " + dots, "",
             [type](wxCommandEvent&) { obj_list()->load_subobject(type); }, "", menu);
         sub_menu->AppendSeparator();
     }
 
-    for (auto& item : { L("Box"), L("Cylinder"), L("Sphere"), L("Slab") })
-    {
-        if (type == ModelVolumeType::INVALID && strncmp(item, "Slab", 4) == 0)
-            continue;
-        append_menu_item(sub_menu, wxID_ANY, _(item), "",
-            [type, item](wxCommandEvent&) { obj_list()->load_generic_subobject(item, type); }, "", menu);
-    }
-
-    auto add_text = [type](wxCommandEvent &evt) {
-        GLCanvas3D *     canvas = plater()->canvas3D();
-        GLGizmosManager &mng = canvas->get_gizmos_manager();
-        if ((mng.get_current_type() == GLGizmosManager::Emboss ||
-            mng.open_gizmo(GLGizmosManager::Emboss))) {
-            GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(mng.get_current());
-            assert(emboss != nullptr);
-            if (emboss == nullptr) return;
-            auto screen_position = canvas->get_popup_menu_position();
-            assert(screen_position.has_value());
-            if(!screen_position.has_value()) return;
-            ModelVolumeType volume_type = type;
-            // no selected object means create new object
-            if (volume_type == ModelVolumeType::INVALID) 
-                volume_type = ModelVolumeType::MODEL_PART;
-            emboss->create_volume(volume_type, *screen_position);
+    if (!(type == ModelVolumeType::MODEL_PART && mode == comAdvanced))
+        for (auto& item : { L("Box"), L("Cylinder"), L("Sphere"), L("Slab") })
+        {
+            if (type == ModelVolumeType::INVALID && strncmp(item, "Slab", 4) == 0)
+                continue;
+            append_menu_item(sub_menu, wxID_ANY, _(item), "",
+                [type, item](wxCommandEvent&) { obj_list()->load_generic_subobject(item, type); }, "", menu);
         }
-    };
 
-    if (type == ModelVolumeType::MODEL_PART 
-        || type == ModelVolumeType::NEGATIVE_VOLUME 
-        || type == ModelVolumeType::PARAMETER_MODIFIER
-        || type == ModelVolumeType::INVALID // cannot use gizmo without selected object
-        )
-        append_menu_item(sub_menu, wxID_ANY, _L("Text"), "", add_text, "", menu);
+    append_menu_item_add_text(sub_menu, type);
 
-    if (wxGetApp().get_mode() >= comAdvanced) {
+    if (mode >= comAdvanced) {
         sub_menu->AppendSeparator();
         append_menu_item(sub_menu, wxID_ANY, _L("Gallery"), "",
             [type](wxCommandEvent&) { obj_list()->load_subobject(type, true); }, "", menu);
@@ -518,28 +498,64 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
     return sub_menu;
 }
 
+void MenuFactory::append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, bool is_submenu_item/* = true*/)
+{
+    auto add_text = [type](wxCommandEvent& evt) {
+        GLCanvas3D* canvas = plater()->canvas3D();
+        GLGizmosManager& mng = canvas->get_gizmos_manager();
+        if ((mng.get_current_type() == GLGizmosManager::Emboss ||
+            mng.open_gizmo(GLGizmosManager::Emboss))) {
+            GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(mng.get_current());
+            assert(emboss != nullptr);
+            if (emboss == nullptr) return;
+            auto screen_position = canvas->get_popup_menu_position();
+            assert(screen_position.has_value());
+            if (!screen_position.has_value()) return;
+            ModelVolumeType volume_type = type;
+            // no selected object means create new object
+            if (volume_type == ModelVolumeType::INVALID)
+                volume_type = ModelVolumeType::MODEL_PART;
+            emboss->create_volume(volume_type, *screen_position);
+        }
+    };
+
+    if (   type == ModelVolumeType::MODEL_PART
+        || type == ModelVolumeType::NEGATIVE_VOLUME
+        || type == ModelVolumeType::PARAMETER_MODIFIER
+        || type == ModelVolumeType::INVALID // cannot use gizmo without selected object
+        ) {
+        wxString item_name = is_submenu_item ? "" : _(ADD_VOLUME_MENU_ITEMS[int(type)].first) + ": ";
+        item_name += _L("Text");
+        const std::string icon_name = is_submenu_item ? "" : ADD_VOLUME_MENU_ITEMS[int(type)].second;
+        append_menu_item(menu, wxID_ANY, item_name, "", add_text, icon_name, menu);
+    }
+}
+
 void MenuFactory::append_menu_items_add_volume(wxMenu* menu)
 {
-    // Update "add" items(delete old & create new)  settings popupmenu
+    // Update "add" items(delete old & create new) items popupmenu
     for (auto& item : ADD_VOLUME_MENU_ITEMS) {
-        const auto settings_id = menu->FindItem(_(item.first));
-        if (settings_id != wxNOT_FOUND)
-            menu->Destroy(settings_id);
+        const wxString item_name = _(item.first);
+        int item_id = menu->FindItem(item_name);
+        if (item_id != wxNOT_FOUND)
+            menu->Destroy(item_id);
+
+        item_id = menu->FindItem(item_name + ": " + _L("Text"));
+        if (item_id != wxNOT_FOUND)
+            menu->Destroy(item_id);
     }
 
     // Update "Height range Modifier" item (delete old & create new)
     if (const auto range_id = menu->FindItem(_L("Height range Modifier")); range_id != wxNOT_FOUND)
         menu->Destroy(range_id);
 
-    const ConfigOptionMode mode = wxGetApp().get_mode();
+    if (const auto range_id = menu->FindItem(_L("Height range Modifier")); range_id != wxNOT_FOUND)
+        menu->Destroy(range_id);
 
-    if (mode == comAdvanced) {
-        append_menu_item(menu, wxID_ANY, _(ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::MODEL_PART)].first), "",
-            [](wxCommandEvent&) { obj_list()->load_subobject(ModelVolumeType::MODEL_PART); },
-            ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::MODEL_PART)].second, nullptr,
-            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
-    }
-    if (mode == comSimple) {
+    if (wxGetApp().get_mode() == comSimple) {
+        append_menu_item_add_text(menu, ModelVolumeType::MODEL_PART, false);
+        append_menu_item_add_text(menu, ModelVolumeType::NEGATIVE_VOLUME, false);
+
         append_menu_item(menu, wxID_ANY, _(ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::SUPPORT_ENFORCER)].first), "",
             [](wxCommandEvent&) { obj_list()->load_generic_subobject(L("Box"), ModelVolumeType::SUPPORT_ENFORCER); },
             ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::SUPPORT_ENFORCER)].second, nullptr,
@@ -552,11 +568,9 @@ void MenuFactory::append_menu_items_add_volume(wxMenu* menu)
         return;
     }
 
-    for (size_t type = (mode == comExpert ? 0 : 1); type < ADD_VOLUME_MENU_ITEMS.size(); type++)
-    {
-        auto& item = ADD_VOLUME_MENU_ITEMS[type];
-
-        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType(type));
+    int type = 0;
+    for (auto& item : ADD_VOLUME_MENU_ITEMS) {
+        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType(type++));
         append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
             []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
     }
@@ -1061,6 +1075,8 @@ void MenuFactory::create_text_part_menu()
 
     append_menu_item_delete(menu);
     append_menu_item_edit_text(menu);
+    append_menu_item_fix_through_netfabb(menu);
+    append_menu_item_simplify(menu);
 
     append_immutable_part_menu_items(menu);
 }
