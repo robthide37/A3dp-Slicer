@@ -44,9 +44,7 @@ namespace Slic3r {
         struct Mode
         {
             float time;
-#if ENABLE_TRAVEL_TIME
             float travel_time;
-#endif // ENABLE_TRAVEL_TIME
             std::vector<std::pair<CustomGCode::Type, std::pair<float, float>>> custom_gcode_times;
             std::vector<std::pair<EMoveType, float>> moves_times;
             std::vector<std::pair<ExtrusionRole, float>> roles_times;
@@ -54,9 +52,7 @@ namespace Slic3r {
 
             void reset() {
                 time = 0.0f;
-#if ENABLE_TRAVEL_TIME
                 travel_time = 0.0f;
-#endif // ENABLE_TRAVEL_TIME
                 custom_gcode_times.clear();
                 moves_times.clear();
                 roles_times.clear();
@@ -307,9 +303,7 @@ namespace Slic3r {
             float max_travel_acceleration; // mm/s^2
             float extrude_factor_override_percentage;
             float time; // s
-#if ENABLE_TRAVEL_TIME
             float travel_time; // s
-#endif // ENABLE_TRAVEL_TIME
             struct StopTime
             {
                 unsigned int g1_line_id;
@@ -635,10 +629,8 @@ namespace Slic3r {
 
         float get_time(PrintEstimatedStatistics::ETimeMode mode) const;
         std::string get_time_dhm(PrintEstimatedStatistics::ETimeMode mode) const;
-#if ENABLE_TRAVEL_TIME
         float get_travel_time(PrintEstimatedStatistics::ETimeMode mode) const;
         std::string get_travel_time_dhm(PrintEstimatedStatistics::ETimeMode mode) const;
-#endif // ENABLE_TRAVEL_TIME
         std::vector<std::pair<CustomGCode::Type, std::pair<float, float>>> get_custom_gcode_times(PrintEstimatedStatistics::ETimeMode mode, bool include_remaining) const;
 
         std::vector<std::pair<EMoveType, float>> get_moves_time(PrintEstimatedStatistics::ETimeMode mode) const;
@@ -674,7 +666,7 @@ namespace Slic3r {
         void process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise);
 #endif // ENABLE_PROCESS_G2_G3_LINES
 
-        // Retract
+        // Retract or Set tool temperature
         void process_G10(const GCodeReader::GCodeLine& line);
 
         // Unretract

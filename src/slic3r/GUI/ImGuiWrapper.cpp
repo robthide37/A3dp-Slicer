@@ -64,20 +64,18 @@ static const std::map<const wchar_t, std::string> font_icons = {
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {
-#if ENABLE_LEGEND_TOOLBAR_ICONS
-    {ImGui::LegendTravel          , "legend_travel"                 },
-    {ImGui::LegendWipe            , "legend_wipe"                   },
-    {ImGui::LegendRetract         , "legend_retract"                },
-    {ImGui::LegendDeretract       , "legend_deretract"              },
-    {ImGui::LegendSeams           , "legend_seams"                  },
-    {ImGui::LegendToolChanges     , "legend_toolchanges"            },
-    {ImGui::LegendColorChanges    , "legend_colorchanges"           },
-    {ImGui::LegendPausePrints     , "legend_pauseprints"            },
-    {ImGui::LegendCustomGCodes    , "legend_customgcodes"           },
-    {ImGui::LegendCOG             , "legend_cog"                    },
-    {ImGui::LegendShells          , "legend_shells"                 },
-    {ImGui::LegendToolMarker      , "legend_toolmarker"             },
-#endif // ENABLE_LEGEND_TOOLBAR_ICONS
+    {ImGui::LegendTravel            , "legend_travel"                   },
+    {ImGui::LegendWipe              , "legend_wipe"                     },
+    {ImGui::LegendRetract           , "legend_retract"                  },
+    {ImGui::LegendDeretract         , "legend_deretract"                },
+    {ImGui::LegendSeams             , "legend_seams"                    },
+    {ImGui::LegendToolChanges       , "legend_toolchanges"              },
+    {ImGui::LegendColorChanges      , "legend_colorchanges"             },
+    {ImGui::LegendPausePrints       , "legend_pauseprints"              },
+    {ImGui::LegendCustomGCodes      , "legend_customgcodes"             },
+    {ImGui::LegendCOG               , "legend_cog"                      },
+    {ImGui::LegendShells            , "legend_shells"                   },
+    {ImGui::LegendToolMarker        , "legend_toolmarker"               },
     {ImGui::CloseNotifButton        , "notification_close"              },
     {ImGui::CloseNotifHoverButton   , "notification_close_hover"        },
     {ImGui::EjectButton             , "notification_eject_sd"           },
@@ -396,7 +394,6 @@ bool ImGuiWrapper::radio_button(const wxString &label, bool active)
     return ImGui::RadioButton(label_utf8.c_str(), active);
 }
 
-#if ENABLE_PREVIEW_LAYOUT
 bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool active,
     std::function<void(ImGuiWindow& window, const ImVec2& pos, float size)> draw_callback)
 {
@@ -430,7 +427,6 @@ bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool a
     IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window.DC.LastItemStatusFlags);
     return pressed;
 }
-#endif // ENABLE_PREVIEW_LAYOUT
 
 bool ImGuiWrapper::input_double(const std::string &label, const double &value, const std::string &format)
 {
@@ -575,7 +571,6 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 1, style.ItemSpacing.y });
         ImGui::SameLine();
 
-#if ENABLE_LEGEND_TOOLBAR_ICONS
         ImGuiIO& io = ImGui::GetIO();
         assert(io.Fonts->TexWidth > 0 && io.Fonts->TexHeight > 0);
         float inv_tex_w = 1.0f / float(io.Fonts->TexWidth);
@@ -585,13 +580,11 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
         const ImVec2 size = { float(rect->Width), float(rect->Height) };
         const ImVec2 uv0 = ImVec2(float(rect->X) * inv_tex_w, float(rect->Y) * inv_tex_h);
         const ImVec2 uv1 = ImVec2(float(rect->X + rect->Width) * inv_tex_w, float(rect->Y + rect->Height) * inv_tex_h);
-#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
         ImGui::PushStyleColor(ImGuiCol_Button, { 0.25f, 0.25f, 0.25f, 0.0f });
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.4f, 0.4f, 0.4f, 1.0f });
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.4f, 0.4f, 0.4f, 1.0f });
 
-#if ENABLE_LEGEND_TOOLBAR_ICONS
         const ImTextureID tex_id = io.Fonts->TexID;
         if (image_button(tex_id, size, uv0, uv1, -1, ImVec4(0.0, 0.0, 0.0, 0.0), ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags_PressedOnClick)) {
             if (!slider_editing)
@@ -600,13 +593,6 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
                 ImGui::ClearActiveID();
             this->set_requires_extra_frame();
         }
-#else
-        std::wstring btn_name = ImGui::SliderFloatEditBtnIcon + boost::nowide::widen(str_label);
-        if (ImGui::Button(into_u8(btn_name).c_str())) {
-            ImGui::SetKeyboardFocusHere(-1);
-            this->set_requires_extra_frame();
-        }
-#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
         ImGui::PopStyleColor(3);
 
@@ -688,14 +674,10 @@ bool ImGuiWrapper::image_button(ImTextureID user_texture_id, const ImVec2& size,
 bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags)
 {
     // this is to force the label to the left of the widget:
-#if ENABLE_PREVIEW_LAYOUT
     if (!label.empty()) {
-#endif // ENABLE_PREVIEW_LAYOUT
         text(label);
         ImGui::SameLine();
-#if ENABLE_PREVIEW_LAYOUT
     }
-#endif // ENABLE_PREVIEW_LAYOUT
 
     int selection_out = selection;
     bool res = false;
@@ -1145,13 +1127,11 @@ bool ImGuiWrapper::want_any_input() const
     return io.WantCaptureMouse || io.WantCaptureKeyboard || io.WantTextInput;
 }
 
-#if ENABLE_LEGEND_TOOLBAR_ICONS
 ImFontAtlasCustomRect* ImGuiWrapper::GetTextureCustomRect(const wchar_t& tex_id)
 {
     auto item = m_custom_glyph_rects_ids.find(tex_id);
     return (item != m_custom_glyph_rects_ids.end()) ? ImGui::GetIO().Fonts->GetCustomRectByIndex(m_custom_glyph_rects_ids[tex_id]) : nullptr;
 }
-#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
 ImU32 ImGuiWrapper::to_ImU32(const ColorRGBA& color)
 {
@@ -1270,7 +1250,6 @@ void ImGuiWrapper::init_font(bool compress)
 
     int rect_id = io.Fonts->CustomRects.Size;  // id of the rectangle added next
     // add rectangles for the icons to the font atlas
-#if ENABLE_LEGEND_TOOLBAR_ICONS
     for (auto& icon : font_icons) {
         m_custom_glyph_rects_ids[icon.first] =
             io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz, icon_sz, 3.0 * font_scale + icon_sz);
@@ -1282,15 +1261,7 @@ void ImGuiWrapper::init_font(bool compress)
     for (auto& icon : font_icons_extra_large) {
         m_custom_glyph_rects_ids[icon.first] =
             io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 4, icon_sz * 4, 3.0 * font_scale + icon_sz * 4);
-}
-#else
-    for (auto& icon : font_icons)
-        io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz, icon_sz, 3.0 * font_scale + icon_sz);
-    for (auto& icon : font_icons_large)
-        io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 2, icon_sz * 2, 3.0 * font_scale + icon_sz * 2);
-    for (auto& icon : font_icons_extra_large)
-        io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 4, icon_sz * 4, 3.0 * font_scale + icon_sz * 4);
-#endif // ENABLE_LEGEND_TOOLBAR_ICONS
+    }
 
     // Build texture atlas
     unsigned char* pixels;

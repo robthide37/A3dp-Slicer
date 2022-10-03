@@ -220,11 +220,7 @@ class GCodeViewer
         unsigned char cp_color_id{ 0 };
         std::vector<Sub_Path> sub_paths;
 
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         bool matches(const GCodeProcessorResult::MoveVertex& move, bool account_for_volumetric_rate) const;
-#else
-        bool matches(const GCodeProcessorResult::MoveVertex& move) const;
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         size_t vertices_count() const {
             return sub_paths.empty() ? 0 : sub_paths.back().last.s_id - sub_paths.front().first.s_id + 1;
         }
@@ -436,13 +432,11 @@ class GCodeViewer
     {
         struct Range
         {
-#if ENABLE_PREVIEW_LAYER_TIME
             enum class EType : unsigned char
             {
                 Linear,
                 Logarithmic
             };
-#endif // ENABLE_PREVIEW_LAYER_TIME
 
             float min;
             float max;
@@ -458,13 +452,8 @@ class GCodeViewer
             }
             void reset() { min = FLT_MAX; max = -FLT_MAX; count = 0; }
 
-#if ENABLE_PREVIEW_LAYER_TIME
             float step_size(EType type = EType::Linear) const;
             ColorRGBA get_color_at(float value, EType type = EType::Linear) const;
-#else
-            float step_size() const { return (max - min) / (static_cast<float>(Range_Colors.size()) - 1.0f); }
-            ColorRGBA get_color_at(float value) const;
-#endif // ENABLE_PREVIEW_LAYER_TIME
         };
 
         struct Ranges
@@ -481,10 +470,8 @@ class GCodeViewer
             Range volumetric_rate;
             // Color mapping by extrusion temperature.
             Range temperature;
-#if ENABLE_PREVIEW_LAYER_TIME
             // Color mapping by layer time.
             std::array<Range, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> layer_time;
-#endif // ENABLE_PREVIEW_LAYER_TIME
 
             void reset() {
                 height.reset();
@@ -493,11 +480,9 @@ class GCodeViewer
                 fan_speed.reset();
                 volumetric_rate.reset();
                 temperature.reset();
-#if ENABLE_PREVIEW_LAYER_TIME
                 for (auto& range : layer_time) {
                     range.reset();
                 }
-#endif // ENABLE_PREVIEW_LAYER_TIME
             }
         };
 
@@ -756,10 +741,8 @@ public:
         FanSpeed,
         Temperature,
         VolumetricRate,
-#if ENABLE_PREVIEW_LAYER_TIME
         LayerTimeLinear,
         LayerTimeLogarithmic,
-#endif // ENABLE_PREVIEW_LAYER_TIME
         Tool,
         ColorPrint,
         Count
@@ -768,9 +751,7 @@ public:
 private:
     bool m_gl_data_initialized{ false };
     unsigned int m_last_result_id{ 0 };
-#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     EViewType m_last_view_type{ EViewType::Count };
-#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     size_t m_moves_count{ 0 };
     std::vector<TBuffer> m_buffers{ static_cast<size_t>(EMoveType::Extrude) };
     // bounding box of toolpaths
@@ -792,14 +773,12 @@ private:
     COG m_cog;
     EViewType m_view_type{ EViewType::FeatureType };
     bool m_legend_enabled{ true };
-#if ENABLE_PREVIEW_LAYOUT
     struct LegendResizer
     {
         bool dirty{ true };
         void reset() { dirty = true; }
     };
     LegendResizer m_legend_resizer;
-#endif // ENABLE_PREVIEW_LAYOUT
     PrintEstimatedStatistics m_print_statistics;
     PrintEstimatedStatistics::ETimeMode m_time_estimate_mode{ PrintEstimatedStatistics::ETimeMode::Normal };
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -807,9 +786,7 @@ private:
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
     GCodeProcessorResult::SettingsIds m_settings_ids;
     std::array<SequentialRangeCap, 2> m_sequential_range_caps;
-#if ENABLE_PREVIEW_LAYER_TIME
     std::array<std::vector<float>, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> m_layers_times;
-#endif // ENABLE_PREVIEW_LAYER_TIME
 
     std::vector<CustomGCode::Item> m_custom_gcode_per_print_z;
 
@@ -829,11 +806,7 @@ public:
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     // recalculate ranges in dependence of what is visible and sets tool/print colors
     void refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
-#if ENABLE_PREVIEW_LAYOUT
     void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
-#else
-    void refresh_render_paths();
-#endif // ENABLE_PREVIEW_LAYOUT
     void update_shells_color_by_extruder(const DynamicPrintConfig* config);
 
     void reset();
@@ -878,9 +851,7 @@ public:
     std::vector<CustomGCode::Item>& get_custom_gcode_per_print_z() { return m_custom_gcode_per_print_z; }
     size_t get_extruders_count() { return m_extruders_count; }
 
-#if ENABLE_PREVIEW_LAYOUT
     void invalidate_legend() { m_legend_resizer.reset(); }
-#endif // ENABLE_PREVIEW_LAYOUT
 
 private:
     void load_toolpaths(const GCodeProcessorResult& gcode_result);
@@ -889,9 +860,6 @@ private:
 #else
     void load_shells(const Print& print, bool initialized);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_PREVIEW_LAYOUT
-    void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
-#endif // !ENABLE_PREVIEW_LAYOUT
     void render_toolpaths();
     void render_shells();
     void render_legend(float& legend_height);

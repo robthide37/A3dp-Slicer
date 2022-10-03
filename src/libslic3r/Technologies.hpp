@@ -39,14 +39,6 @@
 //====================
 #define ENABLE_2_5_0_ALPHA1 1
 
-// Enable changes in preview layout
-#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_5_0_ALPHA1)
-// Enable drawing the items in legend toolbar using icons
-#define ENABLE_LEGEND_TOOLBAR_ICONS (1 && ENABLE_PREVIEW_LAYOUT)
-// Enable coloring of toolpaths in preview by layer time
-#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_5_0_ALPHA1)
-// Enable showing time estimate for travel moves in legend
-#define ENABLE_TRAVEL_TIME (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of wipe tower magic object_id equal to 1000
 #define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of legacy OpenGL calls
@@ -61,8 +53,6 @@
 #define ENABLE_GLMODEL_STATISTICS (0 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable rework of Reload from disk command
 #define ENABLE_RELOAD_FROM_DISK_REWORK (1 && ENABLE_2_5_0_ALPHA1)
-// Enable recalculating toolpaths when switching to/from volumetric rate visualization
-#define ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC (1 && ENABLE_2_5_0_ALPHA1)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
 // Enable modified camera control using mouse

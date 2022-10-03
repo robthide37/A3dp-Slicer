@@ -139,6 +139,7 @@ public:
     bool   empty() const { return this->facets_count() == 0; }
     bool   repaired() const;
     bool   is_splittable() const;
+    bool   has_zero_volume() const;
     // Estimate of the memory occupied by this structure, important for keeping an eye on the Undo / Redo stack allocation.
     size_t memsize() const;
 

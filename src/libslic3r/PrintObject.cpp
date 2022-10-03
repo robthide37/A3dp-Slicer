@@ -2198,8 +2198,7 @@ void PrintObject::combine_infill()
 void PrintObject::_generate_support_material()
 {
     if (m_config.support_material_style == smsTree) {
-        TreeSupport tree_support;
-        tree_support.generateSupportAreas(*this);
+        fff_tree_support_generate(*this, std::function<void()>([this](){ this->throw_if_canceled(); }));
     } else {
         PrintObjectSupportMaterial support_material(this, m_slicing_params);
         support_material.generate(*this);
