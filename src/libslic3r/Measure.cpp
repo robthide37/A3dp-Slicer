@@ -568,7 +568,6 @@ static AngleAndEdges angle_plane_plane(const std::tuple<int, Vec3d, Vec3d>& p1, 
     // Calculate edges on planes
     const Vec3d edge_on_plane1_unit = (origin1 - origin1_proj).normalized();
     const Vec3d edge_on_plane2_unit = (origin2 - origin2_proj).normalized();
-    const double edges_angle = std::acos(std::clamp(edge_on_plane1_unit.dot(edge_on_plane2_unit), -1.0, 1.0));
     const double radius = std::max(10.0, std::max((origin1 - origin1_proj).norm(), (origin2 - origin2_proj).norm()));
     const std::pair<Vec3d, Vec3d> edge_on_plane1 = { origin1_proj + radius * edge_on_plane1_unit, origin1_proj + 2.0 * radius * edge_on_plane1_unit };
     const std::pair<Vec3d, Vec3d> edge_on_plane2 = { origin2_proj + radius * edge_on_plane2_unit, origin2_proj + 2.0 * radius * edge_on_plane2_unit };
@@ -645,16 +644,16 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
         if (f2.get_type() == SurfaceFeatureType::Edge) {
             std::vector<DistAndPoints> distances;
 
-            auto add_point_edge_distance = [&distances](const Vec3d& v, const std::pair<Vec3d, Vec3d>& e) {
-                const MeasurementResult res = get_measurement(SurfaceFeature(v), SurfaceFeature(SurfaceFeatureType::Edge, e.first, e.second));
-                double distance = res.distance_strict->dist;
-                Vec3d v2 = res.distance_strict->to;
-
-                const Vec3d e1e2 = e.second - e.first;
-                const Vec3d e1v2 = v2 - e.first;
-                if (e1v2.dot(e1e2) >= 0.0 && e1v2.norm() < e1e2.norm())
-                    distances.emplace_back(distance, v, v2);
-            };
+//            auto add_point_edge_distance = [&distances](const Vec3d& v, const std::pair<Vec3d, Vec3d>& e) {
+//                const MeasurementResult res = get_measurement(SurfaceFeature(v), SurfaceFeature(SurfaceFeatureType::Edge, e.first, e.second));
+//                double distance = res.distance_strict->dist;
+//                Vec3d v2 = res.distance_strict->to;
+//
+//                const Vec3d e1e2 = e.second - e.first;
+//                const Vec3d e1v2 = v2 - e.first;
+//                if (e1v2.dot(e1e2) >= 0.0 && e1v2.norm() < e1e2.norm())
+//                    distances.emplace_back(distance, v, v2);
+//            };
 
             std::pair<Vec3d, Vec3d> e1 = f1.get_edge();
             std::pair<Vec3d, Vec3d> e2 = f2.get_edge();
