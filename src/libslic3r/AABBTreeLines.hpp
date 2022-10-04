@@ -1,6 +1,8 @@
 #ifndef SRC_LIBSLIC3R_AABBTREELINES_HPP_
 #define SRC_LIBSLIC3R_AABBTREELINES_HPP_
 
+#include "Utils.hpp"
+#include "libslic3r.h"
 #include "libslic3r/AABBTreeIndirect.hpp"
 #include "libslic3r/Line.hpp"
 #include <type_traits>
@@ -127,12 +129,26 @@ public:
         auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, p, nearest_line_index_out, nearest_point_out);
 
         if (distance < 0) { return {std::numeric_limits<Floating>::infinity(), nearest_line_index_out, nearest_point_out}; }
-
         distance              = sqrt(distance);
         const LineType  &line = lines[nearest_line_index_out];
         Vec<2, Floating> v1   = (line.b - line.a).template cast<Floating>();
         Vec<2, Floating> v2   = (point - line.a).template cast<Floating>();
-        if ((v1.x() * v2.y()) - (v1.y() * v2.x()) > 0.0) { distance *= -1.0; }
+        auto d1 = (v1.x() * v2.y()) - (v1.y() * v2.x()); 
+        
+        LineType second_line = line;
+        if ((line.a.template cast<Floating>() - nearest_point_out).squaredNorm() < SCALED_EPSILON) {
+            second_line = lines[prev_idx_modulo(nearest_line_index_out, lines.size())];
+        } else {
+            second_line = lines[next_idx_modulo(nearest_line_index_out, lines.size())];
+        }
+        v1   = (second_line.b - second_line.a).template cast<Floating>();
+        v2   = (point - second_line.a).template cast<Floating>();
+        auto d2 = (v1.x() * v2.y()) - (v1.y() * v2.x()); 
+        
+        auto d = abs(d1) > abs(d2) ? d1 : d2;
+        
+        if (d > 0.0) { distance *= -1.0; }
+        
         return {distance, nearest_line_index_out, nearest_point_out};
     }
 
