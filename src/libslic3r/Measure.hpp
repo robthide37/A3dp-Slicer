@@ -136,6 +136,10 @@ struct MeasurementResult {
     std::optional<DistAndPoints> distance_strict;
     std::optional<Vec3d>  distance_xyz;
 
+    bool has_distance_data() const {
+        return distance_infinite.has_value() || distance_strict.has_value();
+    }
+
     bool has_any_data() const {
         return angle.has_value() || distance_infinite.has_value() || distance_strict.has_value() || distance_xyz.has_value();
     }

@@ -1062,11 +1062,14 @@ void GLGizmoMeasure::render_dimensioning()
     glsafe(::glDisable(GL_DEPTH_TEST));
 
     if (m_selected_features.second.feature.has_value()) {
-        // Render the arrow between the points that the backend passed:
-        const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
-                                          ? *m_measurement_result.distance_infinite
-                                          : *m_measurement_result.distance_strict;
-        point_point(dap.from, dap.to, dap.dist);
+        const bool has_distance = m_measurement_result.has_distance_data();
+        if (has_distance) {
+            // Render the arrow between the points that the backend passed:
+            const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
+                ? *m_measurement_result.distance_infinite
+                : *m_measurement_result.distance_strict;
+            point_point(dap.from, dap.to, dap.dist);
+        }
 
         const Measure::SurfaceFeature* f1 = &(*m_selected_features.first.feature);
         const Measure::SurfaceFeature* f2 = &(*m_selected_features.second.feature);
@@ -1080,7 +1083,7 @@ void GLGizmoMeasure::render_dimensioning()
         }
 
         // Where needed, draw also the extension of the edge to where the dist is measured:
-        if (ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
+        if (has_distance && ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
             point_edge(*f1, *f2);
 
         // Now if there is an angle to show, draw the arc:
@@ -1370,7 +1373,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
                 }
-                if (measure.distance_infinite.has_value() && measure.distance_infinite->dist > 0.0) {
+                if (measure.distance_infinite.has_value()) {
                     double distance = measure.distance_infinite->dist;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
@@ -1379,7 +1382,8 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
                 }
-                if (measure.distance_strict.has_value() && measure.distance_strict->dist > 0.0) {
+                if (measure.distance_strict.has_value() &&
+                    (!measure.distance_infinite.has_value() || std::abs(measure.distance_strict->dist - measure.distance_infinite->dist) > EPSILON)) {
                     double distance = measure.distance_strict->dist;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
