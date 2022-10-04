@@ -891,13 +891,15 @@ void GLGizmoMeasure::render_dimensioning()
 
     auto arc_edge_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2, double radius = 0.0) {
         assert(f1.get_type() == Measure::SurfaceFeatureType::Edge && f2.get_type() == Measure::SurfaceFeatureType::Edge);
-        const Measure::MeasurementResult res = Measure::get_measurement(f1, f2);
-        const double angle    = res.angle->angle;
-        const Vec3d  center   = res.angle->center;
-        const std::pair<Vec3d, Vec3d> e1 = res.angle->e1;
-        const std::pair<Vec3d, Vec3d> e2 = res.angle->e2;
-        const double calc_radius = res.angle->radius;
-        const bool   coplanar = res.angle->coplanar;
+        if (!m_measurement_result.angle.has_value())
+            return;
+
+        const double angle = m_measurement_result.angle->angle;
+        const Vec3d  center = m_measurement_result.angle->center;
+        const std::pair<Vec3d, Vec3d> e1 = m_measurement_result.angle->e1;
+        const std::pair<Vec3d, Vec3d> e2 = m_measurement_result.angle->e2;
+        const double calc_radius = m_measurement_result.angle->radius;
+        const bool   coplanar = m_measurement_result.angle->coplanar;
 
         if (std::abs(angle) < EPSILON || std::abs(calc_radius) < EPSILON)
             return;
@@ -993,12 +995,15 @@ void GLGizmoMeasure::render_dimensioning()
         ImGui::PopStyleVar();
     };
 
-    auto arc_edge_plane = [arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
+    auto arc_edge_plane = [this, arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
         assert(f1.get_type() == Measure::SurfaceFeatureType::Edge && f2.get_type() == Measure::SurfaceFeatureType::Plane);
-        const Measure::MeasurementResult res = Measure::get_measurement(f1, f2);
-        const std::pair<Vec3d, Vec3d> e1 = res.angle->e1;
-        const std::pair<Vec3d, Vec3d> e2 = res.angle->e2;
-        const double calc_radius = res.angle->radius;
+        if (!m_measurement_result.angle.has_value())
+            return;
+
+        const std::pair<Vec3d, Vec3d> e1 = m_measurement_result.angle->e1;
+        const std::pair<Vec3d, Vec3d> e2 = m_measurement_result.angle->e2;
+        const double calc_radius = m_measurement_result.angle->radius;
+
         if (calc_radius == 0.0)
             return;
 
@@ -1006,12 +1011,12 @@ void GLGizmoMeasure::render_dimensioning()
             Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, e2.first, e2.second), calc_radius);
     };
 
-    auto arc_plane_plane = [arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
+    auto arc_plane_plane = [this, arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
         assert(f1.get_type() == Measure::SurfaceFeatureType::Plane && f2.get_type() == Measure::SurfaceFeatureType::Plane);
-        const Measure::MeasurementResult res = Measure::get_measurement(f1, f2);
-        const std::pair<Vec3d, Vec3d> e1 = res.angle->e1;
-        const std::pair<Vec3d, Vec3d> e2 = res.angle->e2;
-        const double calc_radius = res.angle->radius;
+        const std::pair<Vec3d, Vec3d> e1 = m_measurement_result.angle->e1;
+        const std::pair<Vec3d, Vec3d> e2 = m_measurement_result.angle->e2;
+        const double calc_radius = m_measurement_result.angle->radius;
+
         if (calc_radius == 0.0)
             return;
 
