@@ -1232,7 +1232,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     }
 
     const bool use_inches = wxGetApp().app_config->get("use_inches") == "1";
-    const std::string units = use_inches ? _u8L(" (in)") : _u8L(" (mm)");
+    const std::string units = use_inches ? " " + _u8L("in") : " " + _u8L("mm");
 
     if (m_curr_feature.has_value()) {
         const Measure::SurfaceFeatureType feature_type = m_curr_feature->get_type();
@@ -1263,7 +1263,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         }
                         add_strings_row_to_table(*m_imgui, _u8L("From"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(from), ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         add_strings_row_to_table(*m_imgui, _u8L("To"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(to), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-                        add_strings_row_to_table(*m_imgui, _u8L("Length") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double((to - from).norm()), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+                        add_strings_row_to_table(*m_imgui, _u8L("Length"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double((to - from).norm()) + units, ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         break;
                     }
                     case Measure::SurfaceFeatureType::Circle:
@@ -1276,7 +1276,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                             radius = ObjectManipulation::mm_to_in * radius;
                         }
                         add_strings_row_to_table(*m_imgui, _u8L("Center"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(center), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-                        add_strings_row_to_table(*m_imgui, _u8L("Radius") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double(radius), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+                        add_strings_row_to_table(*m_imgui, _u8L("Radius"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(radius) + units, ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         add_strings_row_to_table(*m_imgui, _u8L("Normal"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(normal), ImGui::GetStyleColorVec4(ImGuiCol_Text));
                         break;
                     }
@@ -1369,7 +1369,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             if (ImGui::BeginTable("Measure", 3)) {
                 if (measure.angle.has_value()) {
                     ImGui::PushID((void*)(intptr_t)1);
-                    add_measure_row_to_table(_u8L("Angle") + _u8L(" (°)"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(Geometry::rad2deg(measure.angle->angle)),
+                    add_measure_row_to_table(_u8L("Angle"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(Geometry::rad2deg(measure.angle->angle)) + "°",
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
                 }
@@ -1378,7 +1378,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
                     ImGui::PushID((void*)(intptr_t)2);
-                    add_measure_row_to_table(_u8L("Distance Infinite") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance),
+                    add_measure_row_to_table(_u8L("Distance Infinite"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
                 }
@@ -1388,7 +1388,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
                     ImGui::PushID((void*)(intptr_t)3);
-                    add_measure_row_to_table(_u8L("Distance Strict") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance),
+                    add_measure_row_to_table(_u8L("Distance Strict"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
                 }
@@ -1397,7 +1397,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
                     ImGui::PushID((void*)(intptr_t)4);
-                    add_measure_row_to_table(_u8L("Distance XYZ") + units, ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(distance),
+                    add_measure_row_to_table(_u8L("Distance XYZ"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(distance),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
                 }
