@@ -45,7 +45,11 @@ void CreateFontImageJob::process(Ctl &ctl)
         text = text.substr(0, enter_pos);        
     }    
 
-    std::function<bool()> was_canceled = [&ctl]() -> bool { return ctl.was_canceled(); };
+    std::function<bool()> was_canceled = [&ctl, cancel = m_input.cancel]() -> bool {
+        if (ctl.was_canceled()) return true;
+        if (cancel->load()) return true;
+        return false; 
+    };
     ExPolygons shapes = Emboss::text2shapes(font_file_with_cache, text.c_str(), fp, was_canceled);
     // normalize height of font
     BoundingBox bounding_box;
@@ -96,9 +100,10 @@ void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
 {
     if (m_input.count_opened_font_files)
         --(*m_input.count_opened_font_files);
-    if (canceled) return;
-    if (! (* m_input.allow_update)) return;
+    if (canceled || m_input.cancel->load()) return;
     
+    *m_input.is_created = true;
+
     // upload texture on GPU
     const GLenum target = GL_TEXTURE_2D;
     glsafe(::glBindTexture(target, m_input.texture_id));

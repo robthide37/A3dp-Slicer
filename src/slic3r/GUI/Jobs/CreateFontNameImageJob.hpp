@@ -29,9 +29,6 @@ struct FontImageData
     // And Limit for width
     Vec2i  size; // in px
 
-    // cancel, can be used only in finalize
-    bool *allow_update;
-
     // bigger value create darker image
     // divide value 255
     unsigned char gray_level = 5;
@@ -43,6 +40,9 @@ struct FontImageData
     // prevent opening too much files
     // it is decreased in finalize phase
     unsigned int *count_opened_font_files = nullptr;
+
+    std::shared_ptr<std::atomic<bool>> cancel = nullptr;
+    std::shared_ptr<bool> is_created = nullptr;
 };
 
 /// <summary>

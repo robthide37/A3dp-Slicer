@@ -192,6 +192,9 @@ private:
         Vec2i face_name_size = Vec2i(100, 0);
         float face_name_max_width = 100.f;
 
+        // maximal texture generate jobs running at once
+        unsigned int max_count_opened_font_files = 10;
+
         // Only translations needed for calc GUI size
         struct Translations
         {
@@ -222,17 +225,32 @@ private:
 
     EmbossStyleManager m_style_manager;
 
+    struct FaceName{
+        wxString name;
+        std::string name_truncated = "";
+
+        // State for generation of texture
+        // when start generate create share pointers
+        std::shared_ptr<std::atomic<bool>> cancel = nullptr;
+        // R/W only on main thread - finalize of job
+        std::shared_ptr<bool> is_created = nullptr;
+    };
+
     // Keep sorted list of loadable face names
     struct Facenames
     {
-        bool                  is_init = false;
-        std::vector<wxString> names;
-        wxFontEncoding        encoding;
+        // flag if face names was enumerated from OS
+        bool is_init = false;
 
-        std::vector<std::string> names_truncated;
-        GLuint                texture_id = 0;
-        // is texture started create?
-        std::vector<bool> exist_textures = {};
+        wxFontEncoding encoding;
+        std::vector<FaceName> faces;
+
+        // Identify if preview texture exists
+        GLuint texture_id = 0;
+                
+        // protection for open too much font files together
+        // Gtk:ERROR:../../../../gtk/gtkiconhelper.c:494:ensure_surface_for_gicon: assertion failed (error == NULL): Failed to load /usr/share/icons/Yaru/48x48/status/image-missing.png: Error opening file /usr/share/icons/Yaru/48x48/status/image-missing.png: Too many open files (g-io-error-quark, 31)
+        unsigned int count_opened_font_files = 0; 
     } m_face_names;
 
     // Text to emboss
@@ -256,12 +274,6 @@ private:
 
     // cancel for previous update of volume to cancel finalize part
     std::shared_ptr<std::atomic<bool>> m_update_job_cancel;
-
-    // cancel for rendering font name after close comboBox
-    bool m_allow_update_rendered_font;
-    // protection for open too much font files together
-    // Gtk:ERROR:../../../../gtk/gtkiconhelper.c:494:ensure_surface_for_gicon: assertion failed (error == NULL): Failed to load /usr/share/icons/Yaru/48x48/status/image-missing.png: Error opening file /usr/share/icons/Yaru/48x48/status/image-missing.png: Too many open files (g-io-error-quark, 31)
-    unsigned int m_count_opened_font_files = 0; 
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
