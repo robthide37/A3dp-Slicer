@@ -105,6 +105,9 @@ public:
     // call too often.
     std::vector<std::vector<int>> get_planes_triangle_indices() const;
     
+    // Returns the surface features of the plane with the given index
+    const std::vector<SurfaceFeature>& get_plane_features(unsigned int plane_id) const;
+
 private: 
     std::unique_ptr<MeasuringImpl> priv;
 };
@@ -146,7 +149,7 @@ struct MeasurementResult {
 };
 
 // Returns distance/angle between two SurfaceFeatures.
-MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature& b);
+MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature& b, const Measuring* measuring = nullptr);
 
 inline Vec3d edge_direction(const Vec3d& from, const Vec3d& to) { return (to - from).normalized(); }
 inline Vec3d edge_direction(const std::pair<Vec3d, Vec3d>& e) { return edge_direction(e.first, e.second); }

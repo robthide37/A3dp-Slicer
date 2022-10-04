@@ -175,7 +175,7 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             }
 
             if (m_selected_features != selected_features_old && m_selected_features.second.feature.has_value())
-                m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature);
+                m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
 
             return true;
         }
