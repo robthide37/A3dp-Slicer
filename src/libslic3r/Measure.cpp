@@ -708,7 +708,45 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
             result.distance_infinite = std::make_optional(DistAndPoints{it->dist, it->from, it->to});
     ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Plane) {
-            result.distance_infinite = std::make_optional(DistAndPoints{0., Vec3d::Zero(), Vec3d::Zero()}); // TODO
+            assert(measuring != nullptr);
+
+            const auto [from, to] = f1.get_edge();
+            const auto [idx, normal, origin] = f2.get_plane();
+
+            const Vec3d edge_unit = (to - from).normalized();
+            if (are_perpendicular(edge_unit, normal)) {
+                std::vector<DistAndPoints> distances;
+                const Eigen::Hyperplane<double, 3> plane(normal, origin);
+                distances.push_back(DistAndPoints{ plane.absDistance(from), from, plane.projection(from) });
+                distances.push_back(DistAndPoints{ plane.absDistance(to), to, plane.projection(to) });
+                auto it = std::min_element(distances.begin(), distances.end(),
+                    [](const DistAndPoints& item1, const DistAndPoints& item2) {
+                        return item1.dist < item2.dist;
+                    });
+                result.distance_infinite = std::make_optional(DistAndPoints{ it->dist, it->from, it->to });
+            }
+            else {
+                const std::vector<SurfaceFeature>& plane_features = measuring->get_plane_features(idx);
+                std::vector<DistAndPoints> distances;
+                for (const SurfaceFeature& sf : plane_features) {
+                    if (sf.get_type() == SurfaceFeatureType::Edge) {
+                        const auto m = get_measurement(sf, f1);
+                        if (!m.distance_infinite.has_value()) {
+                            distances.clear();
+                            break;
+                        }
+                        else
+                            distances.push_back(*m.distance_infinite);
+                    }
+                }
+                if (!distances.empty()) {
+                    auto it = std::min_element(distances.begin(), distances.end(),
+                        [](const DistAndPoints& item1, const DistAndPoints& item2) {
+                            return item1.dist < item2.dist;
+                        });
+                    result.distance_infinite = std::make_optional(DistAndPoints{ it->dist, it->from, it->to });
+                }
+            }
             result.angle = angle_edge_plane(f1.get_edge(), f2.get_plane());
         }
     ///////////////////////////////////////////////////////////////////////////
@@ -729,14 +767,23 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
                 const std::vector<SurfaceFeature>& plane_features = measuring->get_plane_features(idx2);
                 std::vector<DistAndPoints> distances;
                 for (const SurfaceFeature& sf : plane_features) {
-                    if (sf.get_type() == SurfaceFeatureType::Edge)
-                        distances.push_back(*get_measurement(sf, f1).distance_infinite);
+                    if (sf.get_type() == SurfaceFeatureType::Edge) {
+                        const auto m = get_measurement(sf, f1);
+                        if (!m.distance_infinite.has_value()) {
+                            distances.clear();
+                            break;
+                        }
+                        else
+                            distances.push_back(*m.distance_infinite);
+                    }
                 }
-                auto it = std::min_element(distances.begin(), distances.end(),
-                    [](const DistAndPoints& item1, const DistAndPoints& item2) {
-                        return item1.dist < item2.dist;
-                    });
-                result.distance_infinite = std::make_optional(DistAndPoints{ it->dist, it->from, it->to });
+                if (!distances.empty()) {
+                    auto it = std::min_element(distances.begin(), distances.end(),
+                        [](const DistAndPoints& item1, const DistAndPoints& item2) {
+                            return item1.dist < item2.dist;
+                        });
+                    result.distance_infinite = std::make_optional(DistAndPoints{ it->dist, it->from, it->to });
+                }
             }
         }
     ///////////////////////////////////////////////////////////////////////////
