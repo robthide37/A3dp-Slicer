@@ -19,6 +19,7 @@ set(SLIC3R_SOURCES
     pchheader.hpp
     AStar.hpp
     AABBTreeIndirect.hpp
+    AABBTreeLines.hpp
     AABBMesh.hpp
     AABBMesh.cpp
     BoundingBox.cpp
@@ -274,7 +275,6 @@ set(SLIC3R_SOURCES
     TriangleMeshSlicer.hpp
     MeshSplitImpl.hpp
     TriangulateWall.hpp
-    TriangulateWall.cpp
     utils.cpp
     Utils.hpp
     Time.cpp

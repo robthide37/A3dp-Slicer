@@ -1,6 +1,7 @@
 #ifndef slic3r_ExPolygon_hpp_
 #define slic3r_ExPolygon_hpp_
 
+#include "Point.hpp"
 #include "libslic3r.h"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
@@ -133,6 +134,28 @@ inline Lines to_lines(const ExPolygons &src)
     }
     return lines;
 }
+
+inline std::vector<Linef> to_linesf(const ExPolygons &src) 
+{
+    size_t n_lines = 0;
+    for (ExPolygons::const_iterator it_expoly = src.begin(); it_expoly != src.end(); ++ it_expoly) {
+        n_lines += it_expoly->contour.points.size();
+        for (size_t i = 0; i < it_expoly->holes.size(); ++ i)
+            n_lines += it_expoly->holes[i].points.size();
+    }
+    std::vector<Linef> lines;
+    lines.reserve(n_lines);
+    for (ExPolygons::const_iterator it_expoly = src.begin(); it_expoly != src.end(); ++ it_expoly) {
+        for (size_t i = 0; i <= it_expoly->holes.size(); ++ i) {
+            const Points &points = ((i == 0) ? it_expoly->contour : it_expoly->holes[i - 1]).points;
+            for (Points::const_iterator it = points.begin(); it != points.end()-1; ++it)
+                lines.push_back(Linef(unscaled(*it), unscaled(*(it + 1))));
+            lines.push_back(Linef(unscaled(points.back()), unscaled(points.front())));
+        }
+    }
+    return lines;
+}
+
 
 inline Points to_points(const ExPolygons &src)
 {

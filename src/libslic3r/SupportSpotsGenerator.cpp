@@ -1,6 +1,9 @@
 #include "SupportSpotsGenerator.hpp"
 
+#include "ExPolygon.hpp"
 #include "ExtrusionEntity.hpp"
+#include "Line.hpp"
+#include "Polygon.hpp"
 #include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
 #include "tbb/blocked_range2d.h"
@@ -70,45 +73,9 @@ SupportPoint::SupportPoint(const Vec3f &position, float force, float spot_radius
         position(position), force(force), spot_radius(spot_radius), direction(direction) {
 }
 
-class LinesDistancer {
-private:
-    std::vector<ExtrusionLine> lines;
-    AABBTreeIndirect::Tree<2, float> tree;
-
-public:
-    explicit LinesDistancer(const std::vector<ExtrusionLine> &lines) :
-            lines(lines) {
-        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(this->lines);
-    }
-
-    // negative sign means inside
-    float signed_distance_from_lines(const Vec2f &point, size_t &nearest_line_index_out,
-            Vec2f &nearest_point_out) const {
-        auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, point, nearest_line_index_out,
-                nearest_point_out);
-        if (distance < 0)
-            return std::numeric_limits<float>::infinity();
-
-        distance = sqrt(distance);
-        const ExtrusionLine &line = lines[nearest_line_index_out];
-        Vec2f v1 = line.b - line.a;
-        Vec2f v2 = point - line.a;
-        if ((v1.x() * v2.y()) - (v1.y() * v2.x()) > 0.0) {
-            distance *= -1;
-        }
-        return distance;
-    }
-
-    const ExtrusionLine& get_line(size_t line_idx) const {
-        return lines[line_idx];
-    }
-
-    const std::vector<ExtrusionLine>& get_lines() const {
-        return lines;
-    }
-};
-
 static const size_t NULL_ISLAND = std::numeric_limits<size_t>::max();
+
+using LD = AABBTreeLines::LinesDistancer<ExtrusionLine>;
 
 class PixelGrid {
     Vec2f pixel_size;
@@ -387,7 +354,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         std::vector<ExtrusionLine> &checked_lines_out,
         float layer_z,
         const LayerRegion *layer_region,
-        const LinesDistancer &prev_layer_lines,
+        const LD &prev_layer_lines,
         Issues &issues,
         const Params &params) {
 
@@ -429,11 +396,7 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             // malformation in concave angles does not happen
             malformation_acc.add_angle(std::max(0.0f, curr_angle));
 
-            size_t nearest_line_idx;
-            Vec2f nearest_point;
-            float dist_from_prev_layer = prev_layer_lines.signed_distance_from_lines(current_line.b, nearest_line_idx,
-                    nearest_point);
-
+            auto [dist_from_prev_layer, nearest_line_idx, nearest_point] = prev_layer_lines.signed_distance_from_lines_extra(current_line.b);
             if (fabs(dist_from_prev_layer) < overhang_dist) {
                 bridging_acc.reset();
             } else {
@@ -491,53 +454,18 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
         }
     }
 
-    std::vector<LinesDistancer> islands; // these search trees will be used to determine to which island does the extrusion belong.
-    std::vector<std::vector<size_t>> island_extrusions; //final assigment of each extrusion to an island.
-    // initliaze the search from external perimeters - at the beginning, there is island candidate for each external perimeter.
-    // some of them will disappear (e.g. holes)
-    for (size_t e = 0; e < extrusions.size(); ++e) {
-        if (layer_lines[extrusions[e].first].origin_entity->is_loop() &&
-                layer_lines[extrusions[e].first].is_external_perimeter()) {
-            std::vector<ExtrusionLine> copy(extrusions[e].second - extrusions[e].first);
-            for (size_t ex_line_idx = extrusions[e].first; ex_line_idx < extrusions[e].second; ++ex_line_idx) {
-                copy[ex_line_idx - extrusions[e].first] = layer_lines[ex_line_idx];
-            }
-            islands.emplace_back(copy);
-            island_extrusions.push_back( { e });
-        }
+    std::vector<AABBTreeLines::LinesDistancer<Line>> islands; // these search trees will be used to determine to which island does the extrusion belong.
+    for (const ExPolygon& island : layer->lslices) {
+        islands.emplace_back(to_lines(island));
     }
 
-    // backup code if islands not found
-    // If that happens, just make the first extrusion into island - it may be wrong, but it won't crash.
-    if (islands.empty() && !extrusions.empty()) {
-        std::vector<ExtrusionLine> copy(extrusions[0].second - extrusions[0].first);
-        for (size_t ex_line_idx = extrusions[0].first; ex_line_idx < extrusions[0].second; ++ex_line_idx) {
-            copy[ex_line_idx - extrusions[0].first] = layer_lines[ex_line_idx];
-        }
-        islands.emplace_back(copy);
-        island_extrusions.push_back( { 0 });
-    }
-
-    // assign non external extrusions to islands
-    for (size_t e = 0; e < extrusions.size(); ++e) {
-        if (!layer_lines[extrusions[e].first].origin_entity->is_loop() ||
-                !layer_lines[extrusions[e].first].is_external_perimeter()) {
-            bool island_assigned = false;
-            for (size_t i = 0; i < islands.size(); ++i) {
-                if (island_extrusions[i].empty()) {
-                    continue;
-                }
-                size_t idx = 0;
-                Vec2f pt = Vec2f::Zero();
-                if (islands[i].signed_distance_from_lines(layer_lines[extrusions[e].first].a, idx, pt) < 0) {
-                    island_extrusions[i].push_back(e);
-                    island_assigned = true;
-                    break;
-                }
-            }
-            if (!island_assigned) { // If extrusion is not assigned for some reason, push it into the first island. As with the previous backup code,
-                // it may be wrong, but it won't crash
-                island_extrusions[0].push_back(e);
+    std::vector<std::vector<size_t>> island_extrusions(islands.size(),
+                                                       std::vector<size_t>{}); // final assigment of each extrusion to an island.
+    for (size_t extrusion_idx = 0; extrusion_idx < extrusions.size(); extrusion_idx++) {
+        Point second_point = Point::new_scale(layer_lines[extrusions[extrusion_idx].first].b);
+        for (size_t island_idx = 0; island_idx < islands.size(); island_idx++) {
+            if (islands[island_idx].signed_distance_from_lines(second_point) <= 0.0) {
+                island_extrusions[island_idx].push_back(extrusion_idx);
             }
         }
     }
@@ -553,10 +481,14 @@ std::tuple<LayerIslands, PixelGrid> reckon_islands(
         }
 
         Island island { };
-        island.external_lines.insert(island.external_lines.end(),
-                layer_lines.begin() + extrusions[island_ex[0]].first,
-                layer_lines.begin() + extrusions[island_ex[0]].second);
         for (size_t extrusion_idx : island_ex) {
+            
+            if (layer_lines[extrusions[extrusion_idx].first].is_external_perimeter()) {
+                island.external_lines.insert(island.external_lines.end(),
+                layer_lines.begin() + extrusions[extrusion_idx].first,
+                layer_lines.begin() + extrusions[extrusion_idx].second);
+            }
+
             for (size_t lidx = extrusions[extrusion_idx].first; lidx < extrusions[extrusion_idx].second; ++lidx) {
                 line_to_island_mapping[lidx] = result.islands.size();
                 const ExtrusionLine &line = layer_lines[lidx];
@@ -1050,7 +982,7 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
 #ifdef DETAILED_DEBUG_LOGS
             weakest_conn.print_info("weakest connection info: ");
 #endif
-            LinesDistancer island_lines_dist(island.external_lines);
+            LD island_lines_dist(island.external_lines);
             float unchecked_dist = params.min_distance_between_support_points + 1.0f;
 
             for (const ExtrusionLine &line : island.external_lines) {
@@ -1059,12 +991,9 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
                     unchecked_dist += line.len;
                 } else {
                     unchecked_dist = line.len;
-                    Vec2f target_point;
-                    size_t idx;
                     Vec3f pivot_site_search_point = to_3d(Vec2f(line.b + (line.b - line.a).normalized() * 300.0f),
                             layer_z);
-                    island_lines_dist.signed_distance_from_lines(pivot_site_search_point.head<2>(), idx,
-                            target_point);
+                    auto [dist, nidx, target_point] = island_lines_dist.signed_distance_from_lines_extra(pivot_site_search_point.head<2>());
                     Vec3f support_point = to_3d(target_point, layer_z);
                     auto force = part.is_stable_while_extruding(weakest_conn, line, support_point, layer_z, params);
                     if (force > 0) {
@@ -1147,7 +1076,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
         }
     }
 #endif
-    LinesDistancer external_lines(layer_lines);
+    LD external_lines(layer_lines);
     layer_lines.clear();
     prev_layer_grid = layer_grid;
 
@@ -1199,7 +1128,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
             }
         }
 #endif
-        external_lines = LinesDistancer(layer_lines);
+        external_lines = LD(layer_lines);
         layer_lines.clear();
         prev_layer_grid = layer_grid;
     }
