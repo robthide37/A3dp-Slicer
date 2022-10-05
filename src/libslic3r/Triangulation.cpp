@@ -46,6 +46,13 @@ inline bool has_bidirectional_constrained(
     return false;
 }
 
+inline bool is_unique(const Points &points) { 
+    Points pts = points; // copy
+    std::sort(pts.begin(), pts.end());
+    auto it = std::adjacent_find(pts.begin(), pts.end());
+    return it == pts.end();
+}
+
 inline bool has_self_intersection(
     const Points                   &points,
     const Triangulation::HalfEdges &constrained_half_edges)
@@ -80,13 +87,15 @@ Triangulation::Indices Triangulation::triangulate(const Points    &points,
 {
     assert(!points.empty());
     assert(!constrained_half_edges.empty());
-    // edges can NOT contain bidirectional constrained
-    assert(!priv::has_bidirectional_constrained(constrained_half_edges));
     // constrained must be sorted
     assert(std::is_sorted(constrained_half_edges.begin(),
                           constrained_half_edges.end()));
+    // check that there is no duplicit constrained edge
+    assert(std::adjacent_find(constrained_half_edges.begin(), constrained_half_edges.end()) == constrained_half_edges.end());
+    // edges can NOT contain bidirectional constrained
+    assert(!priv::has_bidirectional_constrained(constrained_half_edges));
     // check that there is only unique poistion of points
-    assert(std::adjacent_find(points.begin(), points.end()) == points.end());
+    assert(priv::is_unique(points));
     assert(!priv::has_self_intersection(points, constrained_half_edges));
     // use cgal triangulation
     using K   = CGAL::Exact_predicates_inexact_constructions_kernel;
