@@ -6,6 +6,7 @@
 #include "libslic3r/AABBTreeIndirect.hpp"
 #include "libslic3r/Line.hpp"
 #include <type_traits>
+#include <vector>
 
 namespace Slic3r {
 
@@ -26,7 +27,7 @@ struct IndexedLinesDistancer {
     const VectorType origin;
 
     inline VectorType closest_point_to_origin(size_t primitive_index,
-            ScalarType &squared_distance) {
+            ScalarType &squared_distance) const {
         Vec<LineType::Dim, typename LineType::Scalar> nearest_point;
         const LineType &line = lines[primitive_index];
         squared_distance = line_alg::distance_to_squared(line, origin.template cast<typename LineType::Scalar>(), &nearest_point);
@@ -90,20 +91,35 @@ inline AABBTreeIndirect::Tree<2, typename LineType::Scalar> build_aabb_tree_over
 // Finding a closest line, its closest point and squared distance to the closest point
 // Returns squared distance to the closest point or -1 if the input is empty.
 template<typename LineType, typename TreeType, typename VectorType>
-inline typename VectorType::Scalar squared_distance_to_indexed_lines(
-        const std::vector<LineType> &lines,
-        const TreeType &tree,
-        const VectorType &point,
-        size_t &hit_idx_out,
-        Eigen::PlainObjectBase<VectorType> &hit_point_out)
-        {
-    using Scalar = typename VectorType::Scalar;
-    auto distancer = detail::IndexedLinesDistancer<LineType, TreeType, VectorType>
-            { lines, tree, point };
+inline typename VectorType::Scalar squared_distance_to_indexed_lines(const std::vector<LineType>        &lines,
+                                                                     const TreeType                     &tree,
+                                                                     const VectorType                   &point,
+                                                                     size_t                             &hit_idx_out,
+                                                                     Eigen::PlainObjectBase<VectorType> &hit_point_out)
+{
+    using Scalar   = typename VectorType::Scalar;
+    auto distancer = detail::IndexedLinesDistancer<LineType, TreeType, VectorType>{lines, tree, point};
     return tree.empty() ?
-                          Scalar(-1) :
-                          AABBTreeIndirect::detail::squared_distance_to_indexed_primitives_recursive(distancer, size_t(0), Scalar(0),
-                                  std::numeric_limits<Scalar>::infinity(), hit_idx_out, hit_point_out);
+               Scalar(-1) :
+               AABBTreeIndirect::detail::squared_distance_to_indexed_primitives_recursive(distancer, size_t(0), Scalar(0),
+                                                                                          std::numeric_limits<Scalar>::infinity(),
+                                                                                          hit_idx_out, hit_point_out);
+}
+
+// Returns all lines within the given radius limit
+template<typename LineType, typename TreeType, typename VectorType>
+inline std::vector<size_t> all_lines_in_radius(const std::vector<LineType> &lines,
+                                               const TreeType              &tree,
+                                               const VectorType            &point,
+                                               typename VectorType::Scalar max_distance_squared)
+{
+    auto distancer = detail::IndexedLinesDistancer<LineType, TreeType, VectorType>{lines, tree, point};
+
+    if (tree.empty()) { return {}; }
+
+    std::vector<size_t> found_lines{};
+    AABBTreeIndirect::detail::indexed_primitives_within_distance_squared_recurisve(distancer, size_t(0), max_distance_squared, found_lines);
+    return found_lines;
 }
 
 template<typename LineType> class LinesDistancer
@@ -156,6 +172,11 @@ public:
     {
         auto [dist, idx, np] = signed_distance_from_lines_extra(point);
         return dist;
+    }
+
+    std::vector<size_t> all_lines_in_radius(const Vec<2, typename LineType::Scalar> &point, Floating radius)
+    {
+        return all_lines_in_radius(this->lines, this->tree, point, radius * radius);
     }
 
     const LineType &get_line(size_t line_idx) const { return lines[line_idx]; }
