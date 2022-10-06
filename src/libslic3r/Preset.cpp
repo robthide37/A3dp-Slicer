@@ -1218,8 +1218,7 @@ size_t PresetCollection::update_compatible_internal(const PresetWithVendorProfil
         for (size_t idx_preset = m_num_default_presets; idx_preset < m_presets.size(); ++idx_preset) {
             if (m_presets[idx_preset].vendor && !m_presets[idx_preset].vendor->templates_profile && m_presets[idx_preset].is_compatible) {
                 std::string preset_alias = m_presets[idx_preset].alias;
-                for (size_t idx_in_templates = 0; idx_in_templates < indices_of_template_presets.size(); ++idx_in_templates) {
-                    size_t idx_of_template_in_presets = indices_of_template_presets[idx_in_templates];
+                for (size_t idx_of_template_in_presets : indices_of_template_presets) {
                     if (m_presets[idx_of_template_in_presets].alias == preset_alias) {
                         // unselect selected template filament if there is non-template alias compatible
                         if (idx_of_template_in_presets == m_idx_selected && (unselect_if_incompatible == PresetSelectCompatibleType::Always || unselect_if_incompatible == PresetSelectCompatibleType::OnlyIfWasCompatible)) {

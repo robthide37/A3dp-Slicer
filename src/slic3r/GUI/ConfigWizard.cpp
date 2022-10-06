@@ -1197,7 +1197,7 @@ void PageMaterials::select_material(int i)
     const std::string& alias_key = list_profile->get_data(i);
     if (checked && template_shown && !notification_shown) {
         notification_shown = true;
-        wxString message = _L("You have selelected template filament. Please note that these filaments are available for all printers but are NOT certain to be compatible with your printer. Do you still wish to have this filament selected?\n(This message won't be displayed again.)");
+        wxString message = _L("You have selected template filament. Please note that these filaments are available for all printers but are NOT certain to be compatible with your printer. Do you still wish to have this filament selected?\n(This message won't be displayed again.)");
         MessageDialog msg(this, message, _L("Notice"), wxYES_NO);
         if (msg.ShowModal() == wxID_NO) {
             list_profile->Check(i, false);
@@ -1608,6 +1608,8 @@ PageVendors::PageVendors(ConfigWizard *parent)
     for (const auto &pair : wizard_p()->bundles) {
         const VendorProfile *vendor = pair.second.vendor_profile;
         if (vendor->id == PresetBundle::PRUSA_BUNDLE) { continue; }
+        if (vendor->templates_profile)
+            continue;
 
         auto *cbox = new wxCheckBox(this, wxID_ANY, vendor->name);
         cbox->Bind(wxEVT_CHECKBOX, [=](wxCommandEvent &event) {
