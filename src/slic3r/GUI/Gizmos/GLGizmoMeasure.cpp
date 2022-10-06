@@ -467,93 +467,94 @@ void GLGizmoMeasure::on_render()
 
         auto render_feature = [this, set_matrix_uniforms](const Measure::SurfaceFeature& feature, const std::vector<ColorRGBA>& colors,
             const Transform3d& model_matrix, float inv_zoom, bool update_raycasters) {
-            switch (feature.get_type())
-            {
-            default: { assert(false); break; }
-            case Measure::SurfaceFeatureType::Point:
-            {
-                const Vec3d& position = feature.get_point();
-                const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(position) * Geometry::scale_transform(inv_zoom);
-                set_matrix_uniforms(feature_matrix);
-                m_sphere.model.set_color(colors.front());
-                m_sphere.model.render();
-                if (update_raycasters) {
-                    auto it = m_raycasters.find(POINT_ID);
-                    if (it != m_raycasters.end() && it->second != nullptr)
-                        it->second->set_transform(feature_matrix);
-                }
-                break;
-            }
-            case Measure::SurfaceFeatureType::Circle:
-            {
-                const auto& [center, radius, normal] = feature.get_circle();
-                // render center
-                const Transform3d center_matrix = model_matrix * Geometry::translation_transform(center) * Geometry::scale_transform(inv_zoom);
-                set_matrix_uniforms(center_matrix);
-                m_sphere.model.set_color(colors.front());
-                m_sphere.model.render();
-                if (update_raycasters) {
-                    auto it = m_raycasters.find(POINT_ID);
-                    if (it != m_raycasters.end() && it->second != nullptr)
-                        it->second->set_transform(center_matrix);
-                }
-                // render circle
-                const Transform3d circle_matrix = model_matrix * Geometry::translation_transform(center) * Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal);
-                set_matrix_uniforms(circle_matrix);
-                m_circle.model.set_color(colors.back());
-                m_circle.model.render();
-                if (update_raycasters) {
-                    auto it = m_raycasters.find(CIRCLE_ID);
-                    if (it != m_raycasters.end() && it->second != nullptr)
-                        it->second->set_transform(circle_matrix);
-                }
-                break;
-            }
-            case Measure::SurfaceFeatureType::Edge:
-            {
-                const auto& [start, end] = feature.get_edge();
-                // render extra point
-                const std::optional<Vec3d> extra = feature.get_extra_point();
-                if (extra.has_value()) {
-                    const Transform3d point_matrix = model_matrix * Geometry::translation_transform(*extra) * Geometry::scale_transform(inv_zoom);
-                    set_matrix_uniforms(point_matrix);
+                const Transform3d model_matrix_scale_inverse = Geometry::Transformation(model_matrix).get_scaling_factor_matrix().inverse();
+                switch (feature.get_type())
+                {
+                default: { assert(false); break; }
+                case Measure::SurfaceFeatureType::Point:
+                {
+                    const Vec3d& position = feature.get_point();
+                    const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(position) * model_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
+                    set_matrix_uniforms(feature_matrix);
                     m_sphere.model.set_color(colors.front());
                     m_sphere.model.render();
                     if (update_raycasters) {
                         auto it = m_raycasters.find(POINT_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
-                            it->second->set_transform(point_matrix);
+                            it->second->set_transform(feature_matrix);
                     }
+                    break;
                 }
-                // render edge
-                const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(start) *
-                    Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start) *
-                    Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (end - start).norm() });
-                set_matrix_uniforms(feature_matrix);
-                m_cylinder.model.set_color(colors.back());
-                m_cylinder.model.render();
-                if (update_raycasters) {
-                    auto it = m_raycasters.find(EDGE_ID);
-                    if (it != m_raycasters.end() && it->second != nullptr)
-                        it->second->set_transform(feature_matrix);
+                case Measure::SurfaceFeatureType::Circle:
+                {
+                    const auto& [center, radius, normal] = feature.get_circle();
+                    // render center
+                    const Transform3d center_matrix = model_matrix * Geometry::translation_transform(center) * model_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
+                    set_matrix_uniforms(center_matrix);
+                    m_sphere.model.set_color(colors.front());
+                    m_sphere.model.render();
+                    if (update_raycasters) {
+                        auto it = m_raycasters.find(POINT_ID);
+                        if (it != m_raycasters.end() && it->second != nullptr)
+                            it->second->set_transform(center_matrix);
+                    }
+                    // render circle
+                    const Transform3d circle_matrix = model_matrix * Geometry::translation_transform(center) * Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal);
+                    set_matrix_uniforms(circle_matrix);
+                    m_circle.model.set_color(colors.back());
+                    m_circle.model.render();
+                    if (update_raycasters) {
+                        auto it = m_raycasters.find(CIRCLE_ID);
+                        if (it != m_raycasters.end() && it->second != nullptr)
+                            it->second->set_transform(circle_matrix);
+                    }
+                    break;
                 }
-                break;
-            }
-            case Measure::SurfaceFeatureType::Plane:
-            {
-                const auto& [idx, normal, pt] = feature.get_plane();
-                assert(idx < m_plane_models_cache.size());
-                set_matrix_uniforms(model_matrix);
-                m_plane_models_cache[idx].set_color(colors.front());
-                m_plane_models_cache[idx].render();
-                if (update_raycasters) {
-                    auto it = m_raycasters.find(PLANE_ID);
-                    if (it != m_raycasters.end() && it->second != nullptr)
-                        it->second->set_transform(model_matrix);
+                case Measure::SurfaceFeatureType::Edge:
+                {
+                    const auto& [start, end] = feature.get_edge();
+                    // render extra point
+                    const std::optional<Vec3d> extra = feature.get_extra_point();
+                    if (extra.has_value()) {
+                        const Transform3d point_matrix = model_matrix * Geometry::translation_transform(*extra) * model_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
+                        set_matrix_uniforms(point_matrix);
+                        m_sphere.model.set_color(colors.front());
+                        m_sphere.model.render();
+                        if (update_raycasters) {
+                            auto it = m_raycasters.find(POINT_ID);
+                            if (it != m_raycasters.end() && it->second != nullptr)
+                                it->second->set_transform(point_matrix);
+                        }
+                    }
+                    // render edge
+                    const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(start) *
+                        Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start) *
+                        Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (end - start).norm() });
+                    set_matrix_uniforms(feature_matrix);
+                    m_cylinder.model.set_color(colors.back());
+                    m_cylinder.model.render();
+                    if (update_raycasters) {
+                        auto it = m_raycasters.find(EDGE_ID);
+                        if (it != m_raycasters.end() && it->second != nullptr)
+                            it->second->set_transform(feature_matrix);
+                    }
+                    break;
                 }
-                break;
-            }
-            }
+                case Measure::SurfaceFeatureType::Plane:
+                {
+                    const auto& [idx, normal, pt] = feature.get_plane();
+                    assert(idx < m_plane_models_cache.size());
+                    set_matrix_uniforms(model_matrix);
+                    m_plane_models_cache[idx].set_color(colors.front());
+                    m_plane_models_cache[idx].render();
+                    if (update_raycasters) {
+                        auto it = m_raycasters.find(PLANE_ID);
+                        if (it != m_raycasters.end() && it->second != nullptr)
+                            it->second->set_transform(model_matrix);
+                    }
+                    break;
+                }
+                }
         };
 
         auto hover_selection_color = [this]() {
