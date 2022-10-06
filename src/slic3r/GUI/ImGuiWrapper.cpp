@@ -426,36 +426,6 @@ bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool a
     return pressed;
 }
 
-bool ImGuiWrapper::input_double(const std::string &label, const double &value, const std::string &format)
-{
-    return ImGui::InputDouble(label.c_str(), const_cast<double*>(&value), 0.0f, 0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal);
-}
-
-bool ImGuiWrapper::input_double(const wxString &label, const double &value, const std::string &format)
-{
-    auto label_utf8 = into_u8(label);
-    return input_double(label_utf8, value, format);
-}
-
-bool ImGuiWrapper::input_vec3(const std::string &label, const Vec3d &value, float width, const std::string &format)
-{
-    bool value_changed = false;
-
-    ImGui::BeginGroup();
-
-    for (int i = 0; i < 3; ++i)
-    {
-        std::string item_label = (i == 0) ? "X" : ((i == 1) ? "Y" : "Z");
-        ImGui::PushID(i);
-        ImGui::PushItemWidth(width);
-        value_changed |= ImGui::InputDouble(item_label.c_str(), const_cast<double*>(&value(i)), 0.0f, 0.0f, format.c_str());
-        ImGui::PopID();
-    }
-    ImGui::EndGroup();
-
-    return value_changed;
-}
-
 bool ImGuiWrapper::checkbox(const wxString &label, bool &value)
 {
     auto label_utf8 = into_u8(label);
@@ -514,20 +484,20 @@ void ImGuiWrapper::text_wrapped(const wxString &label, float wrap_width)
 
 void ImGuiWrapper::tooltip(const char *label, float wrap_width)
 {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 4.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 4.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 8.0f, 8.0f });
     ImGui::BeginTooltip();
     ImGui::PushTextWrapPos(wrap_width);
     ImGui::TextUnformatted(label);
     ImGui::PopTextWrapPos();
     ImGui::EndTooltip();
+    ImGui::PopStyleVar(3);
 }
 
 void ImGuiWrapper::tooltip(const wxString &label, float wrap_width)
 {
-    ImGui::BeginTooltip();
-    ImGui::PushTextWrapPos(wrap_width);
-    ImGui::TextUnformatted(label.ToUTF8().data());
-    ImGui::PopTextWrapPos();
-    ImGui::EndTooltip();
+    tooltip(label.ToUTF8().data(), wrap_width);
 }
 
 ImVec2 ImGuiWrapper::get_slider_icon_size() const
@@ -667,6 +637,29 @@ bool ImGuiWrapper::image_button(ImTextureID user_texture_id, const ImVec2& size,
 
     const ImVec2 padding = (frame_padding >= 0) ? ImVec2((float)frame_padding, (float)frame_padding) : g.Style.FramePadding;
     return image_button_ex(id, user_texture_id, size, uv0, uv1, padding, bg_col, tint_col, flags);
+}
+
+bool ImGuiWrapper::image_button(const wchar_t icon, const wxString& tooltip)
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    const ImTextureID tex_id = io.Fonts->TexID;
+    assert(io.Fonts->TexWidth > 0 && io.Fonts->TexHeight > 0);
+    const float inv_tex_w = 1.0f / float(io.Fonts->TexWidth);
+    const float inv_tex_h = 1.0f / float(io.Fonts->TexHeight);
+    const ImFontAtlasCustomRect* const rect = GetTextureCustomRect(icon);
+    const ImVec2 size = { float(rect->Width), float(rect->Height) };
+    const ImVec2 uv0 = ImVec2(float(rect->X) * inv_tex_w, float(rect->Y) * inv_tex_h);
+    const ImVec2 uv1 = ImVec2(float(rect->X + rect->Width) * inv_tex_w, float(rect->Y + rect->Height) * inv_tex_h);
+    ImGui::PushStyleColor(ImGuiCol_Button, { 0.25f, 0.25f, 0.25f, 0.0f });
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.4f, 0.4f, 0.4f, 1.0f });
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.25f, 0.25f, 0.25f, 1.0f });
+    const bool res = image_button(tex_id, size, uv0, uv1);
+    ImGui::PopStyleColor(3);
+
+    if (!tooltip.empty() && ImGui::IsItemHovered())
+        this->tooltip(tooltip, ImGui::GetFontSize() * 20.0f);
+
+    return res;
 }
 
 bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags)

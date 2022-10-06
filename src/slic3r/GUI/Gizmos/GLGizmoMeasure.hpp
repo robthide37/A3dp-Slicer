@@ -118,6 +118,7 @@ class GLGizmoMeasure : public GLGizmoBase
     KeyAutoRepeatFilter m_ctrl_kar_filter;
 
     SelectedFeatures m_selected_features;
+    bool m_editing_distance{ false };
 
     void update_if_needed();
 

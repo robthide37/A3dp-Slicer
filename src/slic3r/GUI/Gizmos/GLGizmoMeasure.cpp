@@ -220,6 +220,7 @@ void GLGizmoMeasure::data_changed()
     m_last_plane_idx = -1;
     m_selected_features.reset();
     m_selection_raycasters.clear();
+    m_editing_distance = false;
 }
 
 bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
@@ -256,6 +257,7 @@ void GLGizmoMeasure::on_set_state()
         m_curr_feature.reset();
         m_curr_point_on_feature_position.reset();
         restore_scene_raycasters_state();
+        m_editing_distance = false;
     }
     else {
         m_mode = EMode::BasicSelection;
@@ -840,18 +842,79 @@ void GLGizmoMeasure::render_dimensioning()
             ss_to_ndc_matrix * Geometry::translation_transform(v2ss_3) * q12ss);
         m_dimensioning.triangle.render();
 
+        const bool use_inches = wxGetApp().app_config->get("use_inches") == "1";
+        const double value = use_inches ? ObjectManipulation::mm_to_in * distance : distance;
+        const std::string value_str = format_double(value);
+        const std::string units = use_inches ? _u8L("in") : _u8L("mm");
+        const float value_str_width = 20.0f + ImGui::CalcTextSize(value_str.c_str()).x;
+        static double edit_value = 0.0;
+
         const Vec2d label_position = 0.5 * (v1ss + v2ss);
         m_imgui->set_next_window_pos(label_position.x(), viewport[3] - label_position.y(), ImGuiCond_Always, 0.0f, 1.0f);
         m_imgui->set_next_window_bg_alpha(0.0f);
+
+        if (!m_editing_distance) {
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 1.0f, 1.0f });
+            m_imgui->begin(std::string("distance"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
+            ImGui::AlignTextToFramePadding();
+            m_imgui->text(value_str + " " + units);
+            ImGui::SameLine();
+            if (m_imgui->image_button(ImGui::SliderFloatEditBtnIcon, _L("Edit to scale"))) {
+                m_editing_distance = true;
+                edit_value = value;
+                m_imgui->requires_extra_frame();
+            }
+            m_imgui->end();
+            ImGui::PopStyleVar(3);
+        }
+
+        auto perform_scale = [this, value](double new_value, double old_value) {
+            if (new_value == old_value || new_value <= 0.0)
+                return;
+
+            const double ratio = new_value / old_value;
+            wxGetApp().plater()->take_snapshot(_L("Scale"));
+
+            TransformationType type;
+            type.set_world();
+            type.set_relative();
+            type.set_joint();
+
+            // apply scale
+            Selection& selection = m_parent.get_selection();
+            selection.setup_cache();
+            selection.scale(ratio * Vec3d::Ones(), type);
+            wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
+            wxGetApp().obj_manipul()->set_dirty();
+        };
+
+        if (m_editing_distance && !ImGui::IsPopupOpen("distance_popup"))
+            ImGui::OpenPopup("distance_popup");
+
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        m_imgui->begin(_L("##distance"), ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
-        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
-        const bool use_inches = wxGetApp().app_config->get("use_inches") == "1";
-        const std::string txt = use_inches ? format_double(ObjectManipulation::mm_to_in * distance) + " " + _u8L("in") :
-            format_double(distance) + " " + _u8L("mm");
-        m_imgui->text(txt);
-        m_imgui->end();
-        ImGui::PopStyleVar();
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 1.0f, 1.0f });
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 4.0f, 0.0f });
+        if (ImGui::BeginPopupModal("distance_popup", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration)) {
+            ImGui::PushItemWidth(value_str_width);
+            if (ImGui::InputDouble("##distance", &edit_value, 0.0f, 0.0f, "%.3f")) {
+            }
+            ImGui::SameLine();
+            if (m_imgui->button(_u8L("Scale"))) {
+                perform_scale(edit_value, value);
+                m_editing_distance = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (m_imgui->button(_u8L("Cancel"))) {
+                m_editing_distance = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::PopStyleVar(4);
     };
 
     auto point_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
@@ -1194,7 +1257,10 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     static float last_y = 0.0f;
     static float last_h = 0.0f;
 
-    m_imgui->begin(_L("Measure tool"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    if (m_editing_distance)
+        return;
+
+    m_imgui->begin(_u8L("Measure tool"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
     // adjust window position to avoid overlap the view toolbar
     const float win_h = ImGui::GetWindowHeight();
@@ -1341,27 +1407,10 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
         ImGui::TableSetColumnIndex(1);
         m_imgui->text_colored(col_2_color, col_2);
         ImGui::TableSetColumnIndex(2);
-        ImGuiIO& io = ImGui::GetIO();
-        const ImTextureID tex_id = io.Fonts->TexID;
-        assert(io.Fonts->TexWidth > 0 && io.Fonts->TexHeight > 0);
-        float inv_tex_w = 1.0f / float(io.Fonts->TexWidth);
-        float inv_tex_h = 1.0f / float(io.Fonts->TexHeight);
-        const ImFontAtlasCustomRect* const rect = m_imgui->GetTextureCustomRect(ImGui::ClipboardBtnIcon);
-        const ImVec2 size = { float(rect->Width), float(rect->Height) };
-        const ImVec2 uv0 = ImVec2(float(rect->X) * inv_tex_w, float(rect->Y) * inv_tex_h);
-        const ImVec2 uv1 = ImVec2(float(rect->X + rect->Width) * inv_tex_w, float(rect->Y + rect->Height) * inv_tex_h);
-        ImGui::PushStyleColor(ImGuiCol_Button,        { 0.25f, 0.25f, 0.25f, 0.0f });
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.4f, 0.4f, 0.4f, 1.0f });
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  { 0.25f, 0.25f, 0.25f, 1.0f });
-        if (m_imgui->image_button(tex_id, size, uv0, uv1)) {
+        if (m_imgui->image_button(ImGui::ClipboardBtnIcon, _L("Copy to clipboard"))) {
             wxTheClipboard->Open();
             wxTheClipboard->SetData(new wxTextDataObject(col_1 + ": " + col_2));
             wxTheClipboard->Close();
-        }
-        ImGui::PopStyleColor(3);
-        if (ImGui::IsItemHovered()) {
-            const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
-            m_imgui->tooltip(into_u8(_L("Copy to clipboard")).c_str(), max_tooltip_width);
         }
     };
 
@@ -1373,7 +1422,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             m_imgui->text(_u8L("Measure") + ":");
             if (ImGui::BeginTable("Measure", 3)) {
                 if (measure.angle.has_value()) {
-                    ImGui::PushID((void*)(intptr_t)1);
+                    ImGui::PushID("ClipboardAngle");
                     add_measure_row_to_table(_u8L("Angle"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(Geometry::rad2deg(measure.angle->angle)) + "°",
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
@@ -1382,7 +1431,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     double distance = measure.distance_infinite->dist;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
-                    ImGui::PushID((void*)(intptr_t)2);
+                    ImGui::PushID("ClipboardDistanceInfinite");
                     add_measure_row_to_table(_u8L("Distance Infinite"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
@@ -1392,7 +1441,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     double distance = measure.distance_strict->dist;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
-                    ImGui::PushID((void*)(intptr_t)3);
+                    ImGui::PushID("ClipboardDistanceStrict");
                     add_measure_row_to_table(_u8L("Distance Strict"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
@@ -1401,7 +1450,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     Vec3d distance = *measure.distance_xyz;
                     if (use_inches)
                         distance = ObjectManipulation::mm_to_in * distance;
-                    ImGui::PushID((void*)(intptr_t)4);
+                    ImGui::PushID("ClipboardDistanceXYZ");
                     add_measure_row_to_table(_u8L("Distance XYZ"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(distance),
                         ImGui::GetStyleColorVec4(ImGuiCol_Text));
                     ImGui::PopID();
