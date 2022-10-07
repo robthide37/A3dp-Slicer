@@ -1145,6 +1145,13 @@ ImFontAtlasCustomRect* ImGuiWrapper::GetTextureCustomRect(const wchar_t& tex_id)
 }
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
+#if ENABLE_MEASURE_GIZMO
+void ImGuiWrapper::disable_background_fadeout_animation()
+{
+    GImGui->DimBgRatio = 1.0f;
+}
+#endif // ENABLE_MEASURE_GIZMO
+
 ImU32 ImGuiWrapper::to_ImU32(const ColorRGBA& color)
 {
     return ImGui::GetColorU32({ color.r(), color.g(), color.b(), color.a() });

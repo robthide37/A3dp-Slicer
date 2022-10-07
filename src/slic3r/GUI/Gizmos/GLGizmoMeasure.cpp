@@ -903,6 +903,7 @@ void GLGizmoMeasure::render_dimensioning()
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 1.0f, 1.0f });
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 4.0f, 0.0f });
         if (ImGui::BeginPopupModal("distance_popup", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration)) {
+            m_imgui->disable_background_fadeout_animation();
             ImGui::PushItemWidth(value_str_width);
             if (ImGui::InputDouble("##distance", &edit_value, 0.0f, 0.0f, "%.3f")) {
             }

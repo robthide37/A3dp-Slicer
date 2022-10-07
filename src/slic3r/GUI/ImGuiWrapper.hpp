@@ -136,6 +136,10 @@ public:
     void set_requires_extra_frame() { m_requires_extra_frame = true; }
     void reset_requires_extra_frame() { m_requires_extra_frame = false; }
 
+#if ENABLE_MEASURE_GIZMO
+    void disable_background_fadeout_animation();
+#endif // ENABLE_MEASURE_GIZMO
+
     static ImU32 to_ImU32(const ColorRGBA& color);
     static ImVec4 to_ImVec4(const ColorRGBA& color);
     static ColorRGBA from_ImU32(const ImU32& color);
