@@ -1226,6 +1226,7 @@ bool GLGizmoCut3D::update_bb()
         if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info()) {
             clear_selection();
             m_selected.resize(selection->model_object()->cut_connectors.size(), false);
+            m_connectors_editing = !m_selected.empty();
         }
 
         return true;
@@ -1333,12 +1334,12 @@ void GLGizmoCut3D::adjust_window_position(float x, float y, float bottom_limit)
 
     ImGui::SetWindowPos(ImVec2(x, y), ImGuiCond_Always);
 
-    if (last_h != win_h || last_y != y) {
+    if (!is_approx(last_h, win_h) || !is_approx(last_y, y)) {
         // ask canvas for another frame to render the window in the correct position
         m_imgui->set_requires_extra_frame();
-        if (last_h != win_h)
+        if (!is_approx(last_h, win_h))
             last_h = win_h;
-        if (last_y != y)
+        if (!is_approx(last_y, y))
             last_y = y;
     }
 }
@@ -1773,9 +1774,9 @@ bool GLGizmoCut3D::can_perform_cut() const
     return tbb.contains(m_plane_center);
 }
 
-void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, const bool has_connectors, bool &create_dowels_as_separate_object)
+void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, bool &create_dowels_as_separate_object)
 {
-    if (has_connectors && m_connector_mode == CutConnectorMode::Manual) {
+    if (m_connector_mode == CutConnectorMode::Manual) {
         clear_selection();
 
         for (CutConnector&connector : mo->cut_connectors) {
@@ -1824,7 +1825,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         {
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by Plane"));
             // update connectors pos as offset of its center before cut performing
-            apply_connectors_in_model(mo, has_connectors, create_dowels_as_separate_object);
+            apply_connectors_in_model(mo, create_dowels_as_separate_object);
         }
 
         plater->cut(object_idx, instance_idx, assemble_transform(cut_center_offset) * m_rotation_m,

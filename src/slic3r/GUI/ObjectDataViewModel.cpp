@@ -1807,6 +1807,7 @@ void ObjectDataViewModel::UpdateLockIcon(const wxDataViewItem& item, bool has_lo
         for (const wxDataViewItem& child : children)
             UpdateLockIcon(child, has_lock);
     }
+    ItemChanged(item);
 }
 
 } // namespace GUI

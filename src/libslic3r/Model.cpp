@@ -1261,7 +1261,9 @@ void ModelObject::invalidate_cut()
 {
     for (ModelObject* obj : m_model->objects)
         if (obj != this && obj->cut_id.is_equal(this->cut_id))
-            obj->cut_id.ivalidate();
+            obj->cut_id.invalidate();
+    // invalidate own cut_id
+    this->cut_id.invalidate();
 }
 
 void ModelObject::synchronize_model_after_cut()
@@ -1276,6 +1278,10 @@ void ModelObject::synchronize_model_after_cut()
 
 void ModelObject::apply_cut_attributes(ModelObjectCutAttributes attributes)
 {
+    // we don't save cut information, if result will not contains all parts of initial object
+    if (!attributes.has(ModelObjectCutAttribute::KeepUpper) || !attributes.has(ModelObjectCutAttribute::KeepLower))
+        return;
+
     if (cut_id.id().invalid())
         cut_id.init();
     {

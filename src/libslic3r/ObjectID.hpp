@@ -161,7 +161,7 @@ public:
         return *this; 
     }
 
-    void ivalidate() { 
+    void invalidate() { 
         set_invalid_id();
         m_check_sum = 1;
         m_connectors_cnt = 0;

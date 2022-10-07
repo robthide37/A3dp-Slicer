@@ -685,6 +685,24 @@ wxMenuItem* MenuFactory::append_menu_item_printable(wxMenu* menu)
     return menu_item_printable;
 }
 
+void MenuFactory::append_menu_item_invalidate_cut_info(wxMenu* menu)
+{
+    const wxString menu_name = _L("Invalidate cut info");
+
+    bool is_cut = obj_list()->has_selected_cut_object();
+
+    auto menu_item_id = menu->FindItem(menu_name);
+    if (menu_item_id != wxNOT_FOUND) {
+        // Delete old menu item if selected object isn't cut
+        if (!is_cut)
+            menu->Destroy(menu_item_id);
+    }
+    else if (is_cut)
+        append_menu_item(menu, wxID_ANY, menu_name, "",
+            [](wxCommandEvent&) { obj_list()->invalidate_cut_info_for_selection(); }, "", menu,
+            []() { return true; }, m_parent);
+}
+
 void MenuFactory::append_menu_items_osx(wxMenu* menu)
 {
     append_menu_item(menu, wxID_ANY, _L("Rename"), "",
@@ -821,6 +839,8 @@ void MenuFactory::append_menu_items_convert_unit(wxMenu* menu, int insert_pos/* 
         ModelObjectPtrs objects;
         for (int obj_idx : obj_idxs) {
             ModelObject* object = obj_list()->object(obj_idx);
+            if (object->is_cut())
+                return false;
             if (vol_idxs.empty()) {
                 for (ModelVolume* volume : object->volumes)
                     if (volume_respects_conversion(volume, conver_type))
@@ -1021,6 +1041,7 @@ wxMenu* MenuFactory::object_menu()
     append_menu_item_settings(&m_object_menu);
     append_menu_item_change_extruder(&m_object_menu);
     update_menu_items_instance_manipulation(mtObjectFFF);
+    append_menu_item_invalidate_cut_info(&m_object_menu);
 
     return &m_object_menu;
 }
@@ -1030,6 +1051,7 @@ wxMenu* MenuFactory::sla_object_menu()
     append_menu_items_convert_unit(&m_sla_object_menu, 11);
     append_menu_item_settings(&m_sla_object_menu);
     update_menu_items_instance_manipulation(mtObjectSLA);
+    append_menu_item_invalidate_cut_info(&m_sla_object_menu);
 
     return &m_sla_object_menu;
 }

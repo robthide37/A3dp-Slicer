@@ -2443,9 +2443,41 @@ bool ObjectList::can_split_instances()
     return selection.is_multiple_full_instance() || selection.is_single_full_instance();
 }
 
+bool ObjectList::has_selected_cut_object() const
+{
+    wxDataViewItemArray sels;
+    GetSelections(sels);
+    if (sels.IsEmpty())
+        return false;
+
+    for (wxDataViewItem item : sels) {
+        const int obj_idx = m_objects_model->GetObjectIdByItem(item);
+        if (obj_idx >= 0 && object(obj_idx)->is_cut())
+            return true;
+    }
+
+    return false;
+}
+
+void ObjectList::invalidate_cut_info_for_selection()
+{
+    wxDataViewItemArray sels;
+    GetSelections(sels);
+    if (sels.IsEmpty())
+        return;
+
+    for (wxDataViewItem item : sels) {
+        const int obj_idx = m_objects_model->GetObjectIdByItem(item);
+        if (obj_idx >= 0 && object(obj_idx)->is_cut())
+            object(obj_idx)->invalidate_cut();
+    }
+
+    update_lock_icons_for_model();
+}
+
 bool ObjectList::can_merge_to_multipart_object() const
 {
-    if (printer_technology() == ptSLA)
+    if (printer_technology() == ptSLA || has_selected_cut_object())
         return false;
 
     wxDataViewItemArray sels;
