@@ -848,10 +848,10 @@ void GLGizmoMeasure::render_dimensioning()
         m_dimensioning.triangle.render();
 
         const bool use_inches = wxGetApp().app_config->get("use_inches") == "1";
-        const double value = use_inches ? ObjectManipulation::mm_to_in * distance : distance;
-        const std::string value_str = format_double(value);
+        const double curr_value = use_inches ? ObjectManipulation::mm_to_in * distance : distance;
+        const std::string curr_value_str = format_double(curr_value);
         const std::string units = use_inches ? _u8L("in") : _u8L("mm");
-        const float value_str_width = 20.0f + ImGui::CalcTextSize(value_str.c_str()).x;
+        const float value_str_width = 20.0f + ImGui::CalcTextSize(curr_value_str.c_str()).x;
         static double edit_value = 0.0;
 
         const Vec2d label_position = 0.5 * (v1ss + v2ss);
@@ -864,36 +864,16 @@ void GLGizmoMeasure::render_dimensioning()
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 1.0f, 1.0f });
             m_imgui->begin(std::string("distance"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
             ImGui::AlignTextToFramePadding();
-            m_imgui->text(value_str + " " + units);
+            m_imgui->text(curr_value_str + " " + units);
             ImGui::SameLine();
             if (m_imgui->image_button(ImGui::SliderFloatEditBtnIcon, _L("Edit to scale"))) {
                 m_editing_distance = true;
-                edit_value = value;
+                edit_value = curr_value;
                 m_imgui->requires_extra_frame();
             }
             m_imgui->end();
             ImGui::PopStyleVar(3);
         }
-
-        auto perform_scale = [this, value](double new_value, double old_value) {
-            if (new_value == old_value || new_value <= 0.0)
-                return;
-
-            const double ratio = new_value / old_value;
-            wxGetApp().plater()->take_snapshot(_L("Scale"));
-
-            TransformationType type;
-            type.set_world();
-            type.set_relative();
-            type.set_joint();
-
-            // apply scale
-            Selection& selection = m_parent.get_selection();
-            selection.setup_cache();
-            selection.scale(ratio * Vec3d::Ones(), type);
-            wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
-            wxGetApp().obj_manipul()->set_dirty();
-        };
 
         if (m_editing_distance && !ImGui::IsPopupOpen("distance_popup"))
             ImGui::OpenPopup("distance_popup");
@@ -903,21 +883,51 @@ void GLGizmoMeasure::render_dimensioning()
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 1.0f, 1.0f });
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 4.0f, 0.0f });
         if (ImGui::BeginPopupModal("distance_popup", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration)) {
+            auto perform_scale = [this](double new_value, double old_value) {
+                if (new_value == old_value || new_value <= 0.0)
+                    return;
+
+                const double ratio = new_value / old_value;
+                wxGetApp().plater()->take_snapshot(_L("Scale"));
+
+                TransformationType type;
+                type.set_world();
+                type.set_relative();
+                type.set_joint();
+
+                // apply scale
+                Selection& selection = m_parent.get_selection();
+                selection.setup_cache();
+                selection.scale(ratio * Vec3d::Ones(), type);
+                wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
+                wxGetApp().obj_manipul()->set_dirty();
+            };
+            auto action_exit = [this]() {
+                m_editing_distance = false;
+                ImGui::CloseCurrentPopup();
+            };
+            auto action_scale = [this, perform_scale, action_exit](double new_value, double old_value) {
+                perform_scale(new_value, old_value);
+                action_exit();
+            };
+
             m_imgui->disable_background_fadeout_animation();
             ImGui::PushItemWidth(value_str_width);
             if (ImGui::InputDouble("##distance", &edit_value, 0.0f, 0.0f, "%.3f")) {
             }
+
+            // handle keys input
+            if (ImGui::IsKeyPressedMap(ImGuiKey_Enter) || ImGui::IsKeyPressedMap(ImGuiKey_KeyPadEnter))
+                action_scale(edit_value, curr_value);
+            else if (ImGui::IsKeyPressedMap(ImGuiKey_Escape))
+                action_exit();
+
             ImGui::SameLine();
-            if (m_imgui->button(_u8L("Scale"))) {
-                perform_scale(edit_value, value);
-                m_editing_distance = false;
-                ImGui::CloseCurrentPopup();
-            }
+            if (m_imgui->button(_u8L("Scale")))
+                action_scale(edit_value, curr_value);
             ImGui::SameLine();
-            if (m_imgui->button(_u8L("Cancel"))) {
-                m_editing_distance = false;
-                ImGui::CloseCurrentPopup();
-            }
+            if (m_imgui->button(_u8L("Cancel")))
+                action_exit();
             ImGui::EndPopup();
         }
         ImGui::PopStyleVar(4);
