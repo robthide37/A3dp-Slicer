@@ -55,6 +55,8 @@ class GLGizmoCut3D : public GLGizmoBase
     Vec3d           m_line_beg{ Vec3d::Zero() };
     Vec3d           m_line_end{ Vec3d::Zero() };
 
+    Vec2d           m_ldown_mouse_position{ Vec2d::Zero() };
+
     GLModel m_plane;
     GLModel m_grabber_connection;
     GLModel m_cut_line;
@@ -82,11 +84,11 @@ class GLGizmoCut3D : public GLGizmoBase
     bool m_hide_cut_plane{ false };
     bool m_connectors_editing{ false };
 
-    double m_connector_depth_ratio{ 3.0 };
-    double m_connector_size{ 2.5 };
+    float m_connector_depth_ratio{ 3.f };
+    float m_connector_size{ 2.5f };
 
-    int m_connector_depth_ratio_tolerance{ 10 };
-    int m_connector_size_tolerance{ 0 };
+    float m_connector_depth_ratio_tolerance{ 0.1f };
+    float m_connector_size_tolerance{ 0.f };
 
     float m_label_width{ 150.0 };
     float m_control_width{ 200.0 };
@@ -194,7 +196,7 @@ protected:
     bool add_connector(CutConnectors&connectors, const Vec2d&mouse_position);
     bool delete_selected_connectors(CutConnectors&connectors);
     void select_connector(int idx, bool select);
-    bool is_selection_changed(bool alt_down, bool control_down);
+    bool is_selection_changed(bool alt_down, bool shift_down);
     void process_selection_rectangle(CutConnectors &connectors);
 
     virtual void on_register_raycasters_for_picking() override;
@@ -214,7 +216,7 @@ private:
     void set_center(const Vec3d& center);
     bool render_combo(const std::string& label, const std::vector<std::string>& lines, size_t& selection_idx);
     bool render_double_input(const std::string& label, double& value_in);
-    bool render_slider_double_input(const std::string& label, double& value_in, int& tolerance_in);
+    bool render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in);
     void render_move_center_input(int axis);
     void render_connect_mode_radio_button(CutConnectorMode mode);
     bool render_reset_button(const std::string& label_id, const std::string& tooltip) const;
@@ -240,8 +242,11 @@ private:
     void init_picking_models();
     void init_rendering_items();
     void render_clipper_cut();
+    void clear_selection();
     void reset_connectors();
+    void init_connector_shapes();
     void update_connector_shape();
+    void validate_connector_settings();
     void update_model_object();
     bool process_cut_line(SLAGizmoEventType action, const Vec2d& mouse_position);
 };

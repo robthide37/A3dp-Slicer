@@ -222,11 +222,13 @@ private:
 enum class CutConnectorType : int {
     Plug
     , Dowel
+    , Undef
 };
 
 enum class CutConnectorStyle : int {
     Prizm
     , Frustum
+    , Undef
     //,Claw
 };
 
@@ -235,6 +237,7 @@ enum class CutConnectorShape : int {
     , Square
     , Hexagon
     , Circle
+    , Undef
     //,D-shape
 };
 
