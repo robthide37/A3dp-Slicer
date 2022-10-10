@@ -19,6 +19,9 @@
 #include "Polyline.hpp"
 #include "MutablePolygon.hpp"
 #include "SupportMaterial.hpp"
+#include "TriangleMeshSlicer.hpp"
+#include "OpenVDBUtils.hpp"
+#include <openvdb/tools/VolumeToSpheres.h>
 
 #include <cassert>
 #include <chrono>
@@ -26,6 +29,7 @@
 #include <optional>
 #include <stdio.h>
 #include <string>
+#include <string_view>
 #ifdef _WIN32
     #include <windows.h> //todo Remove!  ONLY FOR PUBLIC BETA!!
 #endif // _WIN32
@@ -95,6 +99,20 @@ static inline void validate_range(const LineInformations &lines)
 {
     for (const LineInformation &l : lines)
         validate_range(l);
+}
+
+static inline void check_self_intersections(const Polygons &polygons, const std::string_view message)
+{
+#ifdef _WIN32
+    if (!intersecting_edges(polygons).empty())
+        ::MessageBoxA(nullptr, (std::string("TreeSupport infill self intersections: ") + std::string(message)).c_str(), "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
+#endif // _WIN32
+}
+static inline void check_self_intersections(const ExPolygon &expoly, const std::string_view message)
+{
+#ifdef _WIN32
+    check_self_intersections(to_polygons(expoly), message);
+#endif // _WIN32
 }
 
 static inline void clip_for_diff(const Polygon &src, const BoundingBox &bbox, Polygon &out)
@@ -323,6 +341,7 @@ void tree_supports_show_error(std::string message, bool critical)
                         lower_layer.lslices);
                     overhangs = overhangs.empty() ? std::move(enforced_overhangs) : union_(overhangs, enforced_overhangs);
                 }
+            check_self_intersections(overhangs, "generate_overhangs");
             out[layer_id] = std::move(overhangs);
         }
     });
@@ -675,7 +694,10 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
     return lines;
 #else
 #ifdef _WIN32
-    if (! BoundingBox(Point::new_scale(-170., -170.), Point::new_scale(170., 170.)).contains(get_extents(polygon)))
+    // Max dimensions for MK3
+//    if (! BoundingBox(Point::new_scale(-170., -170.), Point::new_scale(170., 170.)).contains(get_extents(polygon)))
+    // Max dimensions for XL
+    if (! BoundingBox(Point::new_scale(-250., -250.), Point::new_scale(250., 250.)).contains(get_extents(polygon)))
         ::MessageBoxA(nullptr, "TreeSupport infill kravsky", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
 #endif // _WIN32
 
@@ -702,10 +724,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
             ::MessageBoxA(nullptr, "TreeSupport infill negative area", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
 #endif // _WIN32
         assert(intersecting_edges(to_polygons(expoly)).empty());
-#ifdef _WIN32
-        if (! intersecting_edges(to_polygons(expoly)).empty())
-            ::MessageBoxA(nullptr, "TreeSupport infill self intersections", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
-#endif // _WIN32
+        check_self_intersections(expoly, "generate_support_infill_lines");
         Surface surface(stInternal, std::move(expoly));
         try {
             Polylines pl = filler->fill_surface(&surface, fill_params);
@@ -831,6 +850,11 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
     return union_(ret);
 }
 
+static double layer_z(const SlicingParameters &slicing_params, const size_t layer_idx)
+{
+    return slicing_params.object_print_z_min + slicing_params.first_object_layer_height + layer_idx * slicing_params.layer_height;
+}
+
 static inline SupportGeneratorLayer& layer_initialize(
     SupportGeneratorLayer   &layer_new,
     const SupporLayerType    layer_type,
@@ -838,7 +862,7 @@ static inline SupportGeneratorLayer& layer_initialize(
     const size_t             layer_idx)
 {
     layer_new.layer_type = layer_type;
-    layer_new.print_z  = slicing_params.object_print_z_min + slicing_params.first_object_layer_height + layer_idx * slicing_params.layer_height;
+    layer_new.print_z  = layer_z(slicing_params, layer_idx);
     layer_new.height   = layer_idx == 0 ? slicing_params.first_object_layer_height : slicing_params.layer_height;
     layer_new.bottom_z = layer_idx == 0 ? slicing_params.object_print_z_min : layer_new.print_z - layer_new.height;
     return layer_new;
@@ -1082,6 +1106,8 @@ static void generate_initial_areas(
                 overhang_regular = mesh_group_settings.support_offset == 0 ? 
                     overhang_raw :
                     safe_offset_inc(overhang_raw, mesh_group_settings.support_offset, relevant_forbidden, mesh_config.min_radius * 1.75 + mesh_config.xy_min_distance, 0, 1);
+                check_self_intersections(overhang_regular, "overhang_regular1");
+
                 // offset ensures that areas that could be supported by a part of a support line, are not considered unsupported overhang
                 Polygons remaining_overhang = intersection(
                     diff(mesh_group_settings.support_offset == 0 ?
@@ -1108,6 +1134,7 @@ static void generate_initial_areas(
                     remaining_overhang = diff(remaining_overhang, safe_offset_inc(overhang_regular, 1.5 * extra_total_offset_acc, raw_collision, offset_step, 0, 1));
                     // Extending the overhangs by the inflated remaining overhangs.
                     overhang_regular   = union_(overhang_regular, diff(safe_offset_inc(remaining_overhang, extra_total_offset_acc, raw_collision, offset_step, 0, 1), relevant_forbidden));
+                    check_self_intersections(overhang_regular, "overhang_regular2");
                 }
                 // If the xy distance overrides the z distance, some support needs to be inserted further down.
                 //=> Analyze which support points do not fit on this layer and check if they will fit a few layers down (while adding them an infinite amount of layers down would technically be closer the the setting description, it would not produce reasonable results. )
@@ -1159,6 +1186,7 @@ static void generate_initial_areas(
                 if (mesh_group_settings.minimum_support_area > 0)
                     remove_small(overhang_roofs, mesh_group_settings.minimum_roof_area);
                 overhang_regular = diff(overhang_regular, overhang_roofs, ApplySafetyOffset::Yes);
+                check_self_intersections(overhang_regular, "overhang_regular3");
                 for (ExPolygon &roof_part : union_ex(overhang_roofs))
                     overhang_processing.emplace_back(std::move(roof_part), true);
             }
@@ -3044,6 +3072,475 @@ static void draw_areas(
         "finalize_interface_and_support_areas " << dur_finalize << " ms";
 }
 
+#if 1
+// Test whether two circles, each on its own plane in 3D intersect.
+// Circles are considered intersecting, if the lowest point on one circle is below the other circle's plane.
+// Assumption: The two planes are oriented the same way.
+static bool circles_intersect(
+    const Vec3d &p1, const Vec3d &n1, const double r1, 
+    const Vec3d &p2, const Vec3d &n2, const double r2)
+{
+    assert(n1.dot(n2) >= 0);
+
+    const Vec3d z = n1.cross(n2);
+    const Vec3d dir1 = z.cross(n1);
+    const Vec3d lowest_point1 = p1 + dir1 * (r1 / dir1.norm());
+    assert(n2.dot(p1) >= n2.dot(lowest_point1));
+    if (n2.dot(lowest_point1) <= 0)
+        return true;
+    const Vec3d dir2 = z.cross(n2);
+    const Vec3d lowest_point2 = p2 + dir2 * (r2 / dir2.norm());
+    assert(n1.dot(p2) >= n1.dot(lowest_point2));
+    return n1.dot(lowest_point2) <= 0;
+}
+
+template<bool flip_normals>
+void triangulate_fan(indexed_triangle_set &its, int ifan, int ibegin, int iend)
+{
+    // at least 3 vertices, increasing order.
+    assert(ibegin + 3 <= iend);
+    assert(ibegin >= 0 && iend <= its.vertices.size());
+    assert(ifan >= 0 && ifan < its.vertices.size());
+    int num_faces = iend - ibegin;
+    its.indices.reserve(its.indices.size() + num_faces * 3);
+    for (int v = ibegin, u = iend - 1; v < iend; u = v ++) {
+        if (flip_normals)
+            its.indices.push_back({ ifan, u, v });
+        else
+            its.indices.push_back({ ifan, v, u });
+    }
+}
+
+static void triangulate_strip(indexed_triangle_set &its, int ibegin1, int iend1, int ibegin2, int iend2)
+{
+    // at least 3 vertices, increasing order.
+    assert(ibegin1 + 3 <= iend1);
+    assert(ibegin1 >= 0 && iend1 <= its.vertices.size());
+    assert(ibegin2 + 3 <= iend2);
+    assert(ibegin2 >= 0 && iend2 <= its.vertices.size());
+    int n1 = iend1 - ibegin1;
+    int n2 = iend2 - ibegin2;
+    its.indices.reserve(its.indices.size() + (n1 + n2) * 3);
+
+    // For the first vertex of 1st strip, find the closest vertex on the 2nd strip.
+    int istart2 = ibegin2;
+    {
+        const Vec3f &p1    = its.vertices[ibegin1];
+        auto         d2min = std::numeric_limits<float>::max();
+        for (int i = ibegin2; i < iend2; ++ i) {
+            const Vec3f &p2 = its.vertices[i];
+            const float d2  = (p2 - p1).squaredNorm();
+            if (d2 < d2min) {
+                d2min = d2;
+                istart2 = i;
+            }
+        }
+    }
+
+    // Now triangulate the strip zig-zag fashion taking always the shortest connection if possible.
+    for (int u = ibegin1, v = istart2; n1 > 0 || n2 > 0;) {
+        bool take_first;
+        int u2, v2;
+        auto update_u2 = [&u2, u, ibegin1, iend1]() {
+            u2 = u;
+            if (++ u2 == iend1)
+                u2 = ibegin1;
+        };
+        auto update_v2 = [&v2, v, ibegin2, iend2]() {
+            v2 = v;
+            if (++ v2 == iend2)
+                v2 = ibegin2;
+        };
+        if (n1 == 0) {
+            take_first = false;
+            update_v2();
+        } else if (n2 == 0) {
+            take_first = true;
+            update_u2();
+        } else {
+            update_u2();
+            update_v2();
+            float l1 = (its.vertices[u2] - its.vertices[v]).squaredNorm();
+            float l2 = (its.vertices[v2] - its.vertices[u]).squaredNorm();
+            take_first = l1 < l2;
+        }
+        if (take_first) {
+            its.indices.push_back({ u, u2, v });
+            -- n1;
+            u = u2;
+        } else {
+            its.indices.push_back({ u, v2, v });
+            -- n2;
+            v = v2;
+        }
+    }
+}
+
+// Discretize 3D circle, append to output vector, return ranges of indices of the points added.
+static std::pair<int, int> discretize_circle(const Vec3f &center, const Vec3f &normal, const float radius, const float eps, std::vector<Vec3f> &pts)
+{
+    // Calculate discretization step and number of steps.
+    float angle_step = 2. * acos(1. - eps / radius);
+    auto  nsteps     = int(ceil(2 * M_PI / angle_step));
+    angle_step = 2 * M_PI / nsteps;
+
+    // Prepare coordinate system for the circle plane.
+    Vec3f x = normal.cross(Vec3f(0.f, -1.f, 0.f)).normalized();
+    Vec3f y = normal.cross(x).normalized();
+    assert(std::abs(x.cross(y).dot(normal) - 1.f) < EPSILON);
+
+    // Discretize the circle.
+    int begin = int(pts.size());
+    pts.reserve(pts.size() + nsteps);
+    float angle = 0;
+    x *= radius;
+    y *= radius;
+    for (int i = 0; i < nsteps; ++ i) {
+        pts.emplace_back(center + x * cos(angle) + y * sin(angle));
+        angle += angle_step;
+    }
+    return { begin, int(pts.size()) };
+}
+
+static void extrude_branch(
+    const std::vector<SupportElement*>      &path, 
+    const TreeSupportSettings               &config,
+    const SlicingParameters                 &slicing_params,
+    const std::vector<SupportElements>      &move_bounds, 
+    indexed_triangle_set                    &result)
+{
+    Vec3d p1, p2, p3;
+    Vec3d v1, v2;
+    Vec3d nprev;
+    Vec3d ncurrent;
+    assert(path.size() >= 2);
+    static constexpr const float eps = 0.015f;
+    std::pair<int, int> prev_strip;
+
+//    char fname[2048];
+//    static int irun = 0;
+
+    for (size_t ipath = 1; ipath < path.size(); ++ ipath) {
+        const SupportElement &prev    = *path[ipath - 1];
+        const SupportElement &current = *path[ipath];
+        assert(prev.state.layer_idx + 1 == current.state.layer_idx);
+        p1 = to_3d(unscaled<double>(prev   .state.result_on_layer), layer_z(slicing_params, prev   .state.layer_idx));
+        p2 = to_3d(unscaled<double>(current.state.result_on_layer), layer_z(slicing_params, current.state.layer_idx));
+        v1 = (p2 - p1).normalized();
+        if (ipath == 1) {
+            nprev = v1;
+            // Extrude the bottom half sphere.
+            float radius     = unscaled<float>(config.getRadius(prev.state));
+            float angle_step = 2. * acos(1. - eps / radius);
+            auto  nsteps     = int(ceil(M_PI / (2. * angle_step)));
+            angle_step       = M_PI / (2. * nsteps);
+            int   ifan       = int(result.vertices.size());
+            result.vertices.emplace_back((p1 - nprev * radius).cast<float>());
+            float angle = angle_step;
+            for (int i = 1; i < nsteps; ++ i, angle += angle_step) {
+                std::pair<int, int> strip = discretize_circle((p1 - nprev * radius * cos(angle)).cast<float>(), nprev.cast<float>(), radius * sin(angle), eps, result.vertices);
+                if (i == 1)
+                    triangulate_fan<false>(result, ifan, strip.first, strip.second);
+                else
+                    triangulate_strip(result, prev_strip.first, prev_strip.second, strip.first, strip.second);
+//                sprintf(fname, "d:\\temp\\meshes\\tree-partial-%d.obj", ++ irun);
+//                its_write_obj(result, fname);
+                prev_strip = strip;
+            }
+        }
+        if (ipath + 1 == path.size()) {
+            // End of the tube.
+            ncurrent = v1;
+            // Extrude the top half sphere.
+            float radius = unscaled<float>(config.getRadius(current.state));
+            float angle_step = 2. * acos(1. - eps / radius);
+            auto  nsteps = int(ceil(M_PI / (2. * angle_step)));
+            angle_step = M_PI / (2. * nsteps);
+            float angle = M_PI / 2.;
+            for (int i = 0; i < nsteps; ++ i, angle -= angle_step) {
+                std::pair<int, int> strip = discretize_circle((p2 + ncurrent * radius * cos(angle)).cast<float>(), ncurrent.cast<float>(), radius * sin(angle), eps, result.vertices);
+                triangulate_strip(result, prev_strip.first, prev_strip.second, strip.first, strip.second);
+//                sprintf(fname, "d:\\temp\\meshes\\tree-partial-%d.obj", ++ irun);
+//                its_write_obj(result, fname);
+                prev_strip = strip;
+            }
+            int ifan = int(result.vertices.size());
+            result.vertices.emplace_back((p2 + ncurrent * radius).cast<float>());
+            triangulate_fan<true>(result, ifan, prev_strip.first, prev_strip.second);
+//            sprintf(fname, "d:\\temp\\meshes\\tree-partial-%d.obj", ++ irun);
+//            its_write_obj(result, fname);
+        } else {
+            const SupportElement &next = *path[ipath + 1];
+            assert(current.state.layer_idx + 1 == next.state.layer_idx);
+            p3 = to_3d(unscaled<double>(next.state.result_on_layer), layer_z(slicing_params, next.state.layer_idx));
+            v2 = (p3 - p2).normalized();
+            ncurrent = (v1 + v2).normalized();
+            float radius = unscaled<float>(config.getRadius(current.state));
+            std::pair<int, int> strip = discretize_circle(p2.cast<float>(), ncurrent.cast<float>(), radius, eps, result.vertices);
+            triangulate_strip(result, prev_strip.first, prev_strip.second, strip.first, strip.second);
+            prev_strip = strip;
+//            sprintf(fname, "d:\\temp\\meshes\\tree-partial-%d.obj", ++irun);
+//            its_write_obj(result, fname);
+        }
+#if 0
+        if (circles_intersect(p1, nprev, settings.getRadius(prev), p2, ncurrent, settings.getRadius(current))) {
+            // Cannot connect previous and current slice using a simple zig-zag triangulation,
+            // because the two circles intersect.
+
+        } else {
+            // Continue with chaining.
+
+        }
+#endif
+    }
+}
+#endif
+
+static void draw_branches(
+    PrintObject                     &print_object,
+    const TreeModelVolumes          &volumes, 
+    const TreeSupportSettings       &config,
+    const std::vector<Polygons>     &overhangs,
+    std::vector<SupportElements>    &move_bounds,
+
+    SupportGeneratorLayersPtr       &bottom_contacts,
+    SupportGeneratorLayersPtr       &top_contacts,
+    SupportGeneratorLayersPtr       &intermediate_layers,
+    SupportGeneratorLayerStorage    &layer_storage)
+{
+    static int irun = 0;
+
+    const SlicingParameters& slicing_params = print_object.slicing_parameters();
+
+    // All SupportElements are put into a layer independent storage to improve parallelization.
+    std::vector<std::pair<SupportElement*, int>> elements_with_link_down;
+    std::vector<size_t>                          linear_data_layers;
+    {
+        std::vector<std::pair<SupportElement*, int>> map_downwards_old;
+        std::vector<std::pair<SupportElement*, int>> map_downwards_new;
+        linear_data_layers.emplace_back(0);
+        for (LayerIndex layer_idx = 0; layer_idx < LayerIndex(move_bounds.size()); ++ layer_idx) {
+            SupportElements *layer_above = layer_idx + 1 < move_bounds.size() ? &move_bounds[layer_idx + 1] : nullptr;
+            map_downwards_new.clear();
+            std::sort(map_downwards_old.begin(), map_downwards_old.end(), [](auto& l, auto& r) { return l.first < r.first;  });
+            SupportElements &layer = move_bounds[layer_idx];
+            for (size_t elem_idx = 0; elem_idx < layer.size(); ++ elem_idx) {
+                SupportElement &elem = layer[elem_idx];
+                int child = -1;
+                if (layer_idx > 0) {
+                    auto it = std::lower_bound(map_downwards_old.begin(), map_downwards_old.end(), &elem, [](auto& l, const SupportElement* r) { return l.first < r; });
+                    if (it != map_downwards_old.end() && it->first == &elem) {
+                        child = it->second;
+                        // Only one link points to a node above from below.
+                        assert(!(++it != map_downwards_old.end() && it->first == &elem));
+                    }
+                    const SupportElement *pchild = child == -1 ? nullptr : &move_bounds[layer_idx - 1][child];
+                    if ((! pchild && elem.state.target_height == layer_idx) || (pchild && ! pchild->state.result_on_layer_is_set()))
+                        // We either come from nowhere at the final layer or we had invalid parents 2. should never happen but just to be sure
+                        continue;
+                }
+                for (int32_t parent_idx : elem.parents) {
+                    SupportElement &parent = (*layer_above)[parent_idx];
+                    if (parent.state.result_on_layer_is_set())
+                        map_downwards_new.emplace_back(&parent, elem_idx);
+                }
+
+                elements_with_link_down.push_back({ &elem, int(child) });
+            }
+            std::swap(map_downwards_old, map_downwards_new);
+            linear_data_layers.emplace_back(elements_with_link_down.size());
+        }
+    }
+
+    std::unique_ptr<openvdb::tools::ClosestSurfacePoint<openvdb::FloatGrid>> closest_surface_point;
+    {
+        TriangleMesh mesh = print_object.model_object()->raw_mesh();
+        mesh.transform(print_object.trafo_centered());
+        double scale = 10.;
+        openvdb::FloatGrid::Ptr grid = mesh_to_grid(mesh.its, {}, scale, 0., 0.);
+        closest_surface_point = openvdb::tools::ClosestSurfacePoint<openvdb::FloatGrid>::create(*grid);
+        std::vector<openvdb::Vec3R> pts, prev, projections;
+        std::vector<float> distances;
+        for (const std::pair<SupportElement*, int> &element : elements_with_link_down) {
+            Vec3d pt = to_3d(unscaled<double>(element.first->state.result_on_layer), layer_z(slicing_params, element.first->state.layer_idx)) * scale;
+            pts.push_back({ pt.x(), pt.y(), pt.z() });
+        }
+
+        const double collision_extra_gap = 1. * scale;
+        const double max_nudge_collision_avoidance = 2. * scale;
+        const double max_nudge_smoothing = 1. * scale;
+
+        for (size_t iter = 0; iter < 1000; ++ iter) {
+            prev = pts;
+            projections = pts;
+            distances.assign(pts.size(), std::numeric_limits<float>::max());
+            closest_surface_point->searchAndReplace(projections, distances);
+            size_t num_moved = 0;
+            for (size_t i = 0; i < projections.size(); ++ i) {
+                const SupportElement &element = *elements_with_link_down[i].first;
+                const int            below    = elements_with_link_down[i].second;
+                if (pts[i] != projections[i]) {
+                    // Nudge the circle center away from the collision.
+                    Vec3d v{ projections[i].x() - pts[i].x(), projections[i].y() - pts[i].y(), projections[i].z() - pts[i].z() };
+                    double depth = v.norm();
+                    assert(std::abs(distances[i] - depth) < EPSILON);
+                    double radius = unscaled<double>(config.getRadius(element.state)) * scale;
+                    if (depth < radius) {
+                        // Collision detected to be removed.
+                        ++ num_moved;
+                        double dxy = sqrt(sqr(radius) - sqr(v.z()));
+                        double nudge_dist_max = dxy - std::hypot(v.x(), v.y())
+                            //FIXME 1mm gap
+                            + collision_extra_gap;
+                        // Shift by maximum 2mm.
+                        double nudge_dist = std::min(std::max(0., nudge_dist_max), max_nudge_collision_avoidance);
+                        Vec2d nudge_v = to_2d(v).normalized() * (- nudge_dist);
+                        pts[i].x() += nudge_v.x();
+                        pts[i].y() += nudge_v.y();
+                    }
+                }
+                // Laplacian smoothing
+                if (! element.parents.empty() && (below != -1 || element.state.layer_idx == 0)) {
+                    Vec2d avg{ 0, 0 };
+                    const SupportElements &above = move_bounds[element.state.layer_idx + 1];
+                    const size_t           offset_above = linear_data_layers[element.state.layer_idx + 1];
+                    for (auto iparent : element.parents) {
+                        avg.x() += prev[offset_above + iparent].x();
+                        avg.y() += prev[offset_above + iparent].y();
+                    }
+                    size_t cnt = element.parents.size();
+                    if (below != -1) {
+                        const size_t offset_below = linear_data_layers[element.state.layer_idx - 1];
+                        avg.x() += prev[offset_below + below].x();
+                        avg.y() += prev[offset_below + below].y();
+                        ++ cnt;
+                    }
+                    avg /= double(cnt);
+                    static constexpr const double smoothing_factor = 0.5;
+                    Vec2d old_pos{ pts[i].x(), pts[i].y() };
+                    Vec2d new_pos = (1. - smoothing_factor) * old_pos + smoothing_factor * avg;
+                    Vec2d shift = new_pos - old_pos;
+                    double nudge_dist_max = shift.norm();
+                    // Shift by maximum 1mm, less than the collision avoidance factor.
+                    double nudge_dist = std::min(std::max(0., nudge_dist_max), max_nudge_smoothing);
+                    Vec2d nudge_v = shift.normalized() * nudge_dist;
+                    pts[i].x() += nudge_v.x();
+                    pts[i].y() += nudge_v.y();
+                }
+            }
+            printf("iteration: %d, moved: %d\n", int(iter), int(num_moved));
+            if (num_moved == 0)
+                break;
+        }
+
+#if 1
+        for (size_t i = 0; i < projections.size(); ++ i) {
+            elements_with_link_down[i].first->state.result_on_layer.x() = scaled<coord_t>(pts[i].x()) / scale;
+            elements_with_link_down[i].first->state.result_on_layer.y() = scaled<coord_t>(pts[i].y()) / scale;
+        }
+#endif
+    }
+
+    std::vector<Polygons> support_layer_storage(move_bounds.size());
+    std::vector<Polygons> support_roof_storage(move_bounds.size());
+
+    // Unmark all nodes.
+    for (SupportElements &elements : move_bounds)
+        for (SupportElement &element : elements)
+            element.state.marked = false;
+
+    // Traverse all nodes, generate tubes.
+    // Traversal stack with nodes and thier current parent
+    std::vector<SupportElement*> path;
+    indexed_triangle_set cummulative_mesh;
+    indexed_triangle_set partial_mesh;
+    indexed_triangle_set temp_mesh;
+    for (LayerIndex layer_idx = 0; layer_idx + 1 < LayerIndex(move_bounds.size()); ++ layer_idx) {
+        SupportElements &layer = move_bounds[layer_idx];
+        SupportElements &layer_above = move_bounds[layer_idx + 1];
+
+        for (SupportElement &start_element : layer)
+            if (! start_element.state.marked && ! start_element.parents.empty()) {
+                // Collect elements up to a bifurcation above.
+                start_element.state.marked = true;
+                for (size_t parent_idx = 0; parent_idx < start_element.parents.size(); ++ parent_idx) {
+                    path.clear();
+                    path.emplace_back(&start_element);
+                    // Traverse each branch until it branches again.
+                    SupportElement &first_parent = layer_above[start_element.parents[parent_idx]];
+                    assert(path.back()->state.layer_idx + 1 == first_parent.state.layer_idx);
+                    path.emplace_back(&first_parent);
+                    if (first_parent.parents.size() < 2)
+                        first_parent.state.marked = true;
+                    if (first_parent.parents.size() == 1) {
+                        for (SupportElement *parent = &first_parent;;) {
+                            SupportElement &next_parent = move_bounds[parent->state.layer_idx + 1][parent->parents.front()];
+                            assert(path.back()->state.layer_idx + 1 == next_parent.state.layer_idx);
+                            path.emplace_back(&next_parent);
+                            if (next_parent.parents.size() > 1)
+                                break;
+                            next_parent.state.marked = true;
+                            if (next_parent.parents.size() == 0)
+                                break;
+                            parent = &next_parent;
+                        }
+                    }
+                    // Triangulate the tube.
+                    partial_mesh.clear();
+                    extrude_branch(path, config, slicing_params, move_bounds, partial_mesh);
+#if 0
+                    char fname[2048];
+                    sprintf(fname, "d:\\temp\\meshes\\tree-raw-%d.obj", ++ irun);
+                    its_write_obj(partial_mesh, fname);
+#if 0
+                    temp_mesh.clear();
+                    cut_mesh(partial_mesh, layer_z(slicing_params, path.back()->state.layer_idx) + EPSILON, nullptr, &temp_mesh, false);
+                    sprintf(fname, "d:\\temp\\meshes\\tree-trimmed1-%d.obj", irun);
+                    its_write_obj(temp_mesh, fname);
+                    partial_mesh.clear();
+                    cut_mesh(temp_mesh, layer_z(slicing_params, path.front()->state.layer_idx) - EPSILON, &partial_mesh, nullptr, false);
+                    sprintf(fname, "d:\\temp\\meshes\\tree-trimmed2-%d.obj", irun);
+#endif
+                    its_write_obj(partial_mesh, fname);
+#endif
+                    its_merge(cummulative_mesh, partial_mesh);
+                }
+            }
+    }
+
+    std::vector<float> slice_z;
+    for (size_t layer_idx = 0; layer_idx < move_bounds.size(); ++ layer_idx) {
+        double print_z      = slicing_params.object_print_z_min + slicing_params.first_object_layer_height + layer_idx * slicing_params.layer_height;
+        double layer_height = layer_idx == 0 ? slicing_params.first_object_layer_height : slicing_params.layer_height;
+        slice_z.emplace_back(float(print_z - layer_height * 0.5));
+    }
+    // Remove the trailing slices.
+    while (! slice_z.empty())
+        if (move_bounds[slice_z.size() - 1].empty())
+            slice_z.pop_back();
+        else
+            break;
+
+#if 0
+    its_write_obj(cummulative_mesh, "d:\\temp\\meshes\\tree.obj");
+#endif
+
+    MeshSlicingParamsEx params;
+    params.closing_radius = float(print_object.config().slice_closing_radius.value);
+    params.mode = MeshSlicingParams::SlicingMode::Positive;
+    std::vector<ExPolygons> slices = slice_mesh_ex(cummulative_mesh, slice_z, params);
+    for (size_t layer_idx = 0; layer_idx < slice_z.size(); ++ layer_idx)
+        if (! slices[layer_idx].empty()) {
+            SupportGeneratorLayer *&l = intermediate_layers[layer_idx];
+            if (l == nullptr)
+                l = &layer_allocate(layer_storage, SupporLayerType::Base, slicing_params, layer_idx);
+            append(l->polygons, to_polygons(std::move(slices[layer_idx])));
+        }
+
+    finalize_interface_and_support_areas(print_object, volumes, config, overhangs, support_layer_storage, support_roof_storage,
+        bottom_contacts, top_contacts, intermediate_layers, layer_storage);
+}
+
 /*!
  * \brief Create the areas that need support.
  *
@@ -3147,8 +3644,13 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         auto t_place = std::chrono::high_resolution_clock::now();
 
         // ### draw these points as circles
+#if 0
         draw_areas(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
             bottom_contacts, top_contacts, intermediate_layers, layer_storage);
+#else
+        draw_branches(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
+            bottom_contacts, top_contacts, intermediate_layers, layer_storage);
+#endif
 
         auto t_draw = std::chrono::high_resolution_clock::now();
         auto dur_pre_gen = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_precalc - t_start).count();
