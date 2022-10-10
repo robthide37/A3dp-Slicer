@@ -119,6 +119,7 @@ class GLGizmoMeasure : public GLGizmoBase
 
     SelectedFeatures m_selected_features;
     bool m_editing_distance{ false };
+    bool m_is_editing_distance_first_frame{ true };
 
     void update_if_needed();
 

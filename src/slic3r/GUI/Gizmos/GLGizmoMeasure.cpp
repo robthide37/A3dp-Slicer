@@ -221,6 +221,7 @@ void GLGizmoMeasure::data_changed()
     m_selected_features.reset();
     m_selection_raycasters.clear();
     m_editing_distance = false;
+    m_is_editing_distance_first_frame = true;
 }
 
 bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
@@ -258,6 +259,7 @@ void GLGizmoMeasure::on_set_state()
         m_curr_point_on_feature_position.reset();
         restore_scene_raycasters_state();
         m_editing_distance = false;
+        m_is_editing_distance_first_frame = true;
     }
     else {
         m_mode = EMode::BasicSelection;
@@ -904,6 +906,7 @@ void GLGizmoMeasure::render_dimensioning()
             };
             auto action_exit = [this]() {
                 m_editing_distance = false;
+                m_is_editing_distance_first_frame = true;
                 ImGui::CloseCurrentPopup();
             };
             auto action_scale = [this, perform_scale, action_exit](double new_value, double old_value) {
@@ -914,6 +917,13 @@ void GLGizmoMeasure::render_dimensioning()
             m_imgui->disable_background_fadeout_animation();
             ImGui::PushItemWidth(value_str_width);
             if (ImGui::InputDouble("##distance", &edit_value, 0.0f, 0.0f, "%.3f")) {
+            }
+
+            // trick to auto-select text in the input widgets on 1st frame
+            if (m_is_editing_distance_first_frame) {
+                ImGui::SetKeyboardFocusHere(0);
+                m_is_editing_distance_first_frame = false;
+                m_imgui->set_requires_extra_frame();
             }
 
             // handle keys input
