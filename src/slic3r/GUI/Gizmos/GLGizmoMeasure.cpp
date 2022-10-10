@@ -317,7 +317,6 @@ void GLGizmoMeasure::on_render()
         (selection.is_single_volume() || selection.is_single_volume_instance())) {
         update_if_needed();
 
-        m_volume_matrix = selection.get_first_volume()->world_matrix();
         const Camera& camera = wxGetApp().plater()->get_camera();
         const float inv_zoom = (float)camera.get_inv_zoom();
 
@@ -397,7 +396,6 @@ void GLGizmoMeasure::on_render()
                     Vec3f n;
                     const Transform3d& trafo = it->second->get_transform();
                     bool res = it->second->get_raycaster()->closest_hit(m_mouse_pos, trafo, camera, p, n);
-                    assert(res);
                     if (res) {
                         if (callback)
                             p = callback(p);
@@ -472,15 +470,14 @@ void GLGizmoMeasure::on_render()
         };
 
         auto render_feature = [this, set_matrix_uniforms](const Measure::SurfaceFeature& feature, const std::vector<ColorRGBA>& colors,
-            const Transform3d& model_matrix, float inv_zoom, bool update_raycasters) {
-                const Transform3d model_matrix_scale_inverse = Geometry::Transformation(model_matrix).get_scaling_factor_matrix().inverse();
+            float inv_zoom, bool update_raycasters) {
                 switch (feature.get_type())
                 {
                 default: { assert(false); break; }
                 case Measure::SurfaceFeatureType::Point:
                 {
                     const Vec3d& position = feature.get_point();
-                    const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(position) * model_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
+                    const Transform3d feature_matrix = m_volume_matrix * Geometry::translation_transform(position) * m_volume_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
                     set_matrix_uniforms(feature_matrix);
                     m_sphere.model.set_color(colors.front());
                     m_sphere.model.render();
@@ -495,7 +492,7 @@ void GLGizmoMeasure::on_render()
                 {
                     const auto& [center, radius, normal] = feature.get_circle();
                     // render center
-                    const Transform3d center_matrix = model_matrix * Geometry::translation_transform(center) * model_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
+                    const Transform3d center_matrix = m_volume_matrix * Geometry::translation_transform(center) * m_volume_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
                     set_matrix_uniforms(center_matrix);
                     m_sphere.model.set_color(colors.front());
                     m_sphere.model.render();
@@ -505,7 +502,7 @@ void GLGizmoMeasure::on_render()
                             it->second->set_transform(center_matrix);
                     }
                     // render circle
-                    const Transform3d circle_matrix = model_matrix * Geometry::translation_transform(center) * Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal);
+                    const Transform3d circle_matrix = m_volume_matrix * Geometry::translation_transform(center) * Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal);
                     set_matrix_uniforms(circle_matrix);
                     m_circle.model.set_color(colors.back());
                     m_circle.model.render();
@@ -522,7 +519,7 @@ void GLGizmoMeasure::on_render()
                     // render extra point
                     const std::optional<Vec3d> extra = feature.get_extra_point();
                     if (extra.has_value()) {
-                        const Transform3d point_matrix = model_matrix * Geometry::translation_transform(*extra) * model_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
+                        const Transform3d point_matrix = m_volume_matrix * Geometry::translation_transform(*extra) * m_volume_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
                         set_matrix_uniforms(point_matrix);
                         m_sphere.model.set_color(colors.front());
                         m_sphere.model.render();
@@ -533,16 +530,16 @@ void GLGizmoMeasure::on_render()
                         }
                     }
                     // render edge
-                    const Transform3d feature_matrix = model_matrix * Geometry::translation_transform(start) *
+                    const Transform3d edge_matrix = m_volume_matrix * Geometry::translation_transform(start) *
                         Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start) *
                         Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (end - start).norm() });
-                    set_matrix_uniforms(feature_matrix);
+                    set_matrix_uniforms(edge_matrix);
                     m_cylinder.model.set_color(colors.back());
                     m_cylinder.model.render();
                     if (update_raycasters) {
                         auto it = m_raycasters.find(EDGE_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
-                            it->second->set_transform(feature_matrix);
+                            it->second->set_transform(edge_matrix);
                     }
                     break;
                 }
@@ -550,13 +547,13 @@ void GLGizmoMeasure::on_render()
                 {
                     const auto& [idx, normal, pt] = feature.get_plane();
                     assert(idx < m_plane_models_cache.size());
-                    set_matrix_uniforms(model_matrix);
+                    set_matrix_uniforms(m_volume_matrix);
                     m_plane_models_cache[idx].set_color(colors.front());
                     m_plane_models_cache[idx].render();
                     if (update_raycasters) {
                         auto it = m_raycasters.find(PLANE_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
-                            it->second->set_transform(model_matrix);
+                            it->second->set_transform(m_volume_matrix);
                     }
                     break;
                 }
@@ -601,13 +598,13 @@ void GLGizmoMeasure::on_render()
                 }
             }
 
-            render_feature(*m_curr_feature, colors, m_volume_matrix, inv_zoom, true);
+            render_feature(*m_curr_feature, colors, inv_zoom, true);
         }
 
         if (m_selected_features.first.feature.has_value() && (!m_curr_feature.has_value() || *m_curr_feature != *m_selected_features.first.feature)) {
             std::vector<ColorRGBA> colors;
             colors.emplace_back(SELECTED_1ST_COLOR);
-            render_feature(*m_selected_features.first.feature, colors, m_volume_matrix, inv_zoom, false);
+            render_feature(*m_selected_features.first.feature, colors, inv_zoom, false);
             if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point) {
                 auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
                     [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SELECTION_1_ID; });
@@ -618,7 +615,7 @@ void GLGizmoMeasure::on_render()
         if (m_selected_features.second.feature.has_value() && (!m_curr_feature.has_value() || *m_curr_feature != *m_selected_features.second.feature)) {
             std::vector<ColorRGBA> colors;
             colors.emplace_back(SELECTED_2ND_COLOR);
-            render_feature(*m_selected_features.second.feature, colors, m_volume_matrix, inv_zoom, false);
+            render_feature(*m_selected_features.second.feature, colors, inv_zoom, false);
             if (m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
                 auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
                     [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SELECTION_2_ID; });
@@ -629,7 +626,7 @@ void GLGizmoMeasure::on_render()
 
         if (is_hovering_on_locked_feature && m_curr_point_on_feature_position.has_value()) {
             if (m_hover_id != POINT_ID) {
-                const Transform3d matrix = m_volume_matrix * Geometry::translation_transform(*m_curr_point_on_feature_position) * Geometry::scale_transform(inv_zoom);
+                const Transform3d matrix = m_volume_matrix * Geometry::translation_transform(*m_curr_point_on_feature_position) * m_volume_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
                 set_matrix_uniforms(matrix);
                 m_sphere.model.set_color(hover_selection_color());
                 m_sphere.model.render();
@@ -675,6 +672,9 @@ void GLGizmoMeasure::update_if_needed()
         }
         m_old_model_object = object;
         m_old_model_volume = volume;
+
+        m_volume_matrix = m_parent.get_selection().get_first_volume()->world_matrix();
+        m_volume_matrix_scale_inverse = Geometry::Transformation(m_volume_matrix).get_scaling_factor_matrix().inverse();
     };
 
     const ModelObject* mo = m_c->selection_info()->model_object();
