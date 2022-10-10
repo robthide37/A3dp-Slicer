@@ -78,14 +78,14 @@ void GLGizmoSlaSupports::data_changed()
     if (mo) {
         if (mo->sla_points_status == sla::PointsStatus::Generating)
             get_data_from_backend();
-    }
 
 #if ENABLE_RAYCAST_PICKING
-    if (m_raycasters.empty())
-        on_register_raycasters_for_picking();
-    else
-        update_raycasters_for_picking_transform();
+        if (m_raycasters.empty())
+            on_register_raycasters_for_picking();
+        else
+            update_raycasters_for_picking_transform();
 #endif // ENABLE_RAYCAST_PICKING
+    }
 }
 
 
