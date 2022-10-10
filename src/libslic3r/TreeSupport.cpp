@@ -3537,6 +3537,16 @@ static void draw_branches(
             append(l->polygons, to_polygons(std::move(slices[layer_idx])));
         }
 
+    // Trim the slices.
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, intermediate_layers.size()),
+        [&](const tbb::blocked_range<size_t> &range) {
+            for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
+                if (SupportGeneratorLayer *layer = intermediate_layers[layer_idx]; layer) {
+                    Polygons &poly = intermediate_layers[layer_idx]->polygons;
+                    poly = diff_clipped(poly, volumes.getCollision(0, layer_idx, true));
+                }
+        });
+
     finalize_interface_and_support_areas(print_object, volumes, config, overhangs, support_layer_storage, support_roof_storage,
         bottom_contacts, top_contacts, intermediate_layers, layer_storage);
 }
