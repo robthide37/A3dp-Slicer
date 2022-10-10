@@ -1356,7 +1356,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
         if (m_mode == EMode::BasicSelection) {
             switch (feature_type)
             {
-            default: { assert(false); break; }
+            default: { break; }
             case Measure::SurfaceFeatureType::Point:
             {
                 Vec3d position = m_volume_matrix * m_curr_feature->get_point();
