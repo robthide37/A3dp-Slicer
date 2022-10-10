@@ -666,7 +666,13 @@ void TreeModelVolumes::calculatePlaceables(const coord_t radius, const LayerInde
     tbb::parallel_for(tbb::blocked_range<LayerIndex>(std::max(1, start_layer), max_required_layer + 1),
         [this, &data, radius, start_layer](const tbb::blocked_range<LayerIndex>& range) {
             for (LayerIndex layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
-                data[layer_idx - start_layer] = offset(union_ex(getPlaceableAreas(0, layer_idx)), - radius, jtMiter, 1.2);
+                data[layer_idx - start_layer] = offset(
+                    union_ex(getPlaceableAreas(0, layer_idx)), 
+                    // As a placeable area is calculated by (collision of the layer below) - (collision of the current layer) and the collision is offset by xy_distance, 
+                    // it can happen that a small line is considered a flat area to place something onto, even though it is mostly 
+                    // xy_distance that cant support it. Making the area smaller by xy_distance fixes this.
+                    - (radius + m_current_min_xy_dist + m_current_min_xy_dist_delta),
+                    jtMiter, 1.2);
         });
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     {
