@@ -909,7 +909,7 @@ void GLGizmoMeasure::render_dimensioning()
                 m_is_editing_distance_first_frame = true;
                 ImGui::CloseCurrentPopup();
             };
-            auto action_scale = [this, perform_scale, action_exit](double new_value, double old_value) {
+            auto action_scale = [perform_scale, action_exit](double new_value, double old_value) {
                 perform_scale(new_value, old_value);
                 action_exit();
             };
