@@ -135,16 +135,40 @@ inline Lines to_lines(const ExPolygons &src)
     return lines;
 }
 
-inline std::vector<Linef> to_unscaled_linesf(const ExPolygons &src) 
+// Line is from point index(see to_points) to next point.
+// Next point of last point in polygon is first polygon point.
+inline Linesf to_linesf(const ExPolygons &src, uint32_t count_lines = 0)
 {
-    size_t n_lines = 0;
-    for (ExPolygons::const_iterator it_expoly = src.begin(); it_expoly != src.end(); ++ it_expoly) {
-        n_lines += it_expoly->contour.points.size();
-        for (size_t i = 0; i < it_expoly->holes.size(); ++ i)
-            n_lines += it_expoly->holes[i].points.size();
+    assert(count_lines == 0 || count_lines == count_points(src));
+    if (count_lines == 0) count_lines = count_points(src);
+    Linesf lines;
+    lines.reserve(count_lines);
+    Vec2d prev_pd;
+    auto to_lines = [&lines, &prev_pd](const Points &pts) {
+        assert(pts.size() >= 3);
+        if (pts.size() < 2) return;
+        bool is_first = true;
+        for (const Point &p : pts) { 
+            Vec2d pd = p.cast<double>();
+            if (is_first) is_first = false;
+            else lines.emplace_back(prev_pd, pd);
+            prev_pd = pd;
+        }
+        lines.emplace_back(prev_pd, pts.front().cast<double>());
+    };
+    for (const ExPolygon& expoly: src) {
+        to_lines(expoly.contour.points);
+        for (const Polygon &hole : expoly.holes) 
+            to_lines(hole.points);
     }
-    std::vector<Linef> lines;
-    lines.reserve(n_lines);
+    assert(lines.size() == count_lines);
+    return lines;
+}
+
+inline Linesf to_unscaled_linesf(const ExPolygons &src)
+{
+    Linesf lines;
+    lines.reserve(count_points(src));
     for (ExPolygons::const_iterator it_expoly = src.begin(); it_expoly != src.end(); ++ it_expoly) {
         for (size_t i = 0; i <= it_expoly->holes.size(); ++ i) {
             const Points &points = ((i == 0) ? it_expoly->contour : it_expoly->holes[i - 1]).points;

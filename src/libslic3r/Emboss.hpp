@@ -164,6 +164,20 @@ public:
     static ExPolygons heal_shape(const Polygons &shape);
 
     /// <summary>
+    /// NOTE: call Slic3r::union_ex before this call
+    /// 
+    /// Heal (read: Fix) issues in expolygons:
+    ///  - self intersections
+    ///  - duplicit points
+    ///  - points close to line segments
+    /// </summary>
+    /// <param name="shape">In/Out shape to heal</param>
+    /// <param name="max_iteration">Heal could create another issue,
+    /// After healing it is checked again until shape is good or maximal count of iteration</param>
+    /// <returns>True when shapes is good otherwise False</returns>
+    static bool heal_shape(ExPolygons &shape, unsigned max_iteration = 10);
+
+    /// <summary>
     /// Use data from font property to modify transformation
     /// </summary>
     /// <param name="font_prop">Z-move as surface distance(FontProp::distance)
@@ -191,10 +205,10 @@ public:
     static std::string create_range_text(const std::string &text, const FontFile &font, unsigned int font_index, bool* exist_unknown = nullptr);    
 
     /// <summary>
-    /// calculate scale for glyph shape convert from shape points to mm
+    /// Calculate scale for glyph shape convert from shape points to mm
     /// </summary>
-    /// <param name="fp"></param>
-    /// <param name="ff"></param>
+    /// <param name="fp">Property of font</param>
+    /// <param name="ff">Font data</param>
     /// <returns>Conversion to mm</returns>
     static double get_shape_scale(const FontProp &fp, const FontFile &ff);
 

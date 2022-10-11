@@ -197,7 +197,7 @@ TEST_CASE("Visualize glyph from font", "[Emboss]")
 #include "test_utils.hpp"
 #include "nanosvg/nanosvg.h"    // load SVG file
 #include "libslic3r/NSVGUtils.hpp"
-void heal_and_check(const Polygons &polygons)
+ExPolygons heal_and_check(const Polygons &polygons)
 {
     Pointfs intersections_prev = intersection_points(polygons);
     Points  polygons_points    = to_points(polygons);
@@ -233,6 +233,7 @@ void heal_and_check(const Polygons &polygons)
 
     CHECK(intersections.empty());
     CHECK(duplicits.empty());
+    return shape;
 }
 
 void scale(Polygons &polygons, double multiplicator) {
@@ -268,6 +269,23 @@ TEST_CASE("Heal of damaged polygons", "[Emboss]")
 #ifdef VISUALIZE
     CHECK(false);
 #endif // VISUALIZE
+}
+
+TEST_CASE("Heal of points close to line", "[Emboss]")
+{
+    // Shape loaded from svg is letter 'i' from font 'ALIENATE.TTF'
+    std::string file_name = "points_close_to_line.svg";
+    std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + file_name;
+    NSVGimage *image = nsvgParseFromFile(file_path.c_str(), "px", 96.0f);
+    Polygons polygons = NSVGUtils::to_polygons(image);
+    nsvgDelete(image);
+    REQUIRE(polygons.size() == 1);
+    Polygon polygon = polygons.front();
+    polygon.points.pop_back();// NSVG put first point as last one when polygon is closed
+    ExPolygons expoly({ExPolygon(polygon)});
+    Emboss::heal_shape(expoly);
+    //{ SVG svg("C:/data/temp/healed.svg"); svg.draw(expoly);}
+    CHECK(expoly.size() == 3);
 }
 
 TEST_CASE("Convert text with glyph cache to model", "[Emboss]")
