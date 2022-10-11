@@ -329,7 +329,8 @@ void GLGizmoMeasure::on_render()
         if (m_mode == EMode::BasicSelection) {
             std::optional<Measure::SurfaceFeature> curr_feature = mouse_on_object ? m_measuring->get_feature(model_facet_idx, position_on_model.cast<double>()) : std::nullopt;
             m_curr_point_on_feature_position.reset();
-            if (m_curr_feature != curr_feature) {
+            if (m_curr_feature != curr_feature ||
+                (curr_feature.has_value() && curr_feature->get_type() == Measure::SurfaceFeatureType::Circle && (m_curr_feature != curr_feature || m_last_inv_zoom != inv_zoom))) {
                 m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID);
                 m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, EDGE_ID);
                 m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, PLANE_ID);
@@ -470,7 +471,7 @@ void GLGizmoMeasure::on_render()
         };
 
         auto render_feature = [this, set_matrix_uniforms](const Measure::SurfaceFeature& feature, const std::vector<ColorRGBA>& colors,
-            float inv_zoom, bool update_raycasters) {
+            float inv_zoom, bool update_raycasters_transform) {
                 switch (feature.get_type())
                 {
                 default: { assert(false); break; }
@@ -481,7 +482,7 @@ void GLGizmoMeasure::on_render()
                     set_matrix_uniforms(feature_matrix);
                     m_sphere.model.set_color(colors.front());
                     m_sphere.model.render();
-                    if (update_raycasters) {
+                    if (update_raycasters_transform) {
                         auto it = m_raycasters.find(POINT_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
                             it->second->set_transform(feature_matrix);
@@ -496,7 +497,7 @@ void GLGizmoMeasure::on_render()
                     set_matrix_uniforms(center_matrix);
                     m_sphere.model.set_color(colors.front());
                     m_sphere.model.render();
-                    if (update_raycasters) {
+                    if (update_raycasters_transform) {
                         auto it = m_raycasters.find(POINT_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
                             it->second->set_transform(center_matrix);
@@ -504,12 +505,19 @@ void GLGizmoMeasure::on_render()
                     // render circle
                     const Transform3d circle_matrix = m_volume_matrix * Geometry::translation_transform(center) * Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal);
                     set_matrix_uniforms(circle_matrix);
-                    m_circle.model.set_color(colors.back());
-                    m_circle.model.render();
-                    if (update_raycasters) {
+                    if (update_raycasters_transform) {
+                        m_circle.model.set_color(colors.back());
+                        m_circle.model.render();
                         auto it = m_raycasters.find(CIRCLE_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
                             it->second->set_transform(circle_matrix);
+                    }
+                    else {
+                        GLModel circle;
+                        GLModel::Geometry circle_geometry = smooth_torus(64, 16, float(radius), 5.0f * inv_zoom);
+                        circle.init_from(std::move(circle_geometry));
+                        circle.set_color(colors.back());
+                        circle.render();
                     }
                     break;
                 }
@@ -523,7 +531,7 @@ void GLGizmoMeasure::on_render()
                         set_matrix_uniforms(point_matrix);
                         m_sphere.model.set_color(colors.front());
                         m_sphere.model.render();
-                        if (update_raycasters) {
+                        if (update_raycasters_transform) {
                             auto it = m_raycasters.find(POINT_ID);
                             if (it != m_raycasters.end() && it->second != nullptr)
                                 it->second->set_transform(point_matrix);
@@ -536,7 +544,7 @@ void GLGizmoMeasure::on_render()
                     set_matrix_uniforms(edge_matrix);
                     m_cylinder.model.set_color(colors.back());
                     m_cylinder.model.render();
-                    if (update_raycasters) {
+                    if (update_raycasters_transform) {
                         auto it = m_raycasters.find(EDGE_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
                             it->second->set_transform(edge_matrix);
@@ -550,7 +558,7 @@ void GLGizmoMeasure::on_render()
                     set_matrix_uniforms(m_volume_matrix);
                     m_plane_models_cache[idx].set_color(colors.front());
                     m_plane_models_cache[idx].render();
-                    if (update_raycasters) {
+                    if (update_raycasters_transform) {
                         auto it = m_raycasters.find(PLANE_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
                             it->second->set_transform(m_volume_matrix);
@@ -602,8 +610,7 @@ void GLGizmoMeasure::on_render()
         }
 
         if (m_selected_features.first.feature.has_value() && (!m_curr_feature.has_value() || *m_curr_feature != *m_selected_features.first.feature)) {
-            std::vector<ColorRGBA> colors;
-            colors.emplace_back(SELECTED_1ST_COLOR);
+            const std::vector<ColorRGBA> colors = { SELECTED_1ST_COLOR };
             render_feature(*m_selected_features.first.feature, colors, inv_zoom, false);
             if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point) {
                 auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
@@ -613,8 +620,7 @@ void GLGizmoMeasure::on_render()
             }
         }
         if (m_selected_features.second.feature.has_value() && (!m_curr_feature.has_value() || *m_curr_feature != *m_selected_features.second.feature)) {
-            std::vector<ColorRGBA> colors;
-            colors.emplace_back(SELECTED_2ND_COLOR);
+            const std::vector<ColorRGBA> colors = { SELECTED_2ND_COLOR };
             render_feature(*m_selected_features.second.feature, colors, inv_zoom, false);
             if (m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
                 auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
