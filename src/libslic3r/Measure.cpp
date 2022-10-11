@@ -1,10 +1,11 @@
 #include "libslic3r/libslic3r.h"
 #include "Measure.hpp"
+#include "MeasureUtils.hpp"
 
 #include "libslic3r/Geometry/Circle.hpp"
 #include "libslic3r/SurfaceMesh.hpp"
 
-
+#if ENABLE_MEASURE_GIZMO
 
 namespace Slic3r {
 namespace Measure {
@@ -12,8 +13,6 @@ namespace Measure {
 
 constexpr double feature_hover_limit = 0.5; // how close to a feature the mouse must be to highlight it
 constexpr double edge_endpoint_limit = 0.5; // how close to an edge endpoint the mouse ...
-
-
 
 static std::pair<Vec3d, double> get_center_and_radius(const std::vector<Vec3d>& border, int start_idx, int end_idx, const Transform3d& trafo)
 {
@@ -754,7 +753,238 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
     ///////////////////////////////////////////////////////////////////////////
     } else if (f1.get_type() == SurfaceFeatureType::Circle) {
         if (f2.get_type() == SurfaceFeatureType::Circle) {
-            result.distance_infinite = std::make_optional(DistAndPoints{0., Vec3d::Zero(), Vec3d::Zero()}); // TODO
+            const auto [c0, r0, n0] = f1.get_circle();
+            const auto [c1, r1, n1] = f2.get_circle();
+
+            // The following code is an adaptation of the algorithm found in: 
+            // https://github.com/davideberly/GeometricTools/blob/master/GTE/Mathematics/DistCircle3Circle3.h
+            // and described in:
+            // https://www.geometrictools.com/Documentation/DistanceToCircle3.pdf
+
+            struct ClosestInfo
+            {
+                double sqrDistance{ 0.0 };
+                Vec3d circle0Closest{ Vec3d::Zero() };
+                Vec3d circle1Closest{ Vec3d::Zero() };
+
+                inline bool operator < (const ClosestInfo& other) const { return sqrDistance < other.sqrDistance; }
+            };
+            std::array<ClosestInfo, 16> candidates{};
+
+            const double zero = 0.0;
+
+            const Vec3d D = c1 - c0;
+
+            if (!are_parallel(n0, n1)) {
+                auto orthonormal_basis = [](const Vec3d& v) {
+                    std::array<Vec3d, 3> ret;
+                    ret[2] = v.normalized();
+                    int index;
+                    ret[2].maxCoeff(&index);
+                    switch (index)
+                    {
+                    case 0: { ret[0] = Vec3d(ret[2].y(), -ret[2].x(), 0.0).normalized(); break; }
+                    case 1: { ret[0] = Vec3d(0.0, ret[2].z(), -ret[2].y()).normalized(); break; }
+                    case 2: { ret[0] = Vec3d(-ret[2].z(), 0.0, ret[2].x()).normalized(); break; }
+                    }
+                    ret[1] = ret[2].cross(ret[0]).normalized();
+                    return ret;
+                };
+
+                // Get parameters for constructing the degree-8 polynomial phi.
+                const double one = 1.0;
+                const double two = 2.0;
+                const double  r0sqr = sqr(r0);
+                const double  r1sqr = sqr(r1);
+
+                // Compute U1 and V1 for the plane of circle1.
+                const std::array<Vec3d, 3> basis = orthonormal_basis(n1);
+                const Vec3d U1 = basis[0];
+                const Vec3d V1 = basis[1];
+
+                // Construct the polynomial phi(cos(theta)).
+                const Vec3d N0xD = n0.cross(D);
+                const Vec3d N0xU1 = n0.cross(U1);
+                const Vec3d N0xV1 = n0.cross(V1);
+                const double a0 = r1 * D.dot(U1);
+                const double a1 = r1 * D.dot(V1);
+                const double a2 = N0xD.dot(N0xD);
+                const double a3 = r1 * N0xD.dot(N0xU1);
+                const double a4 = r1 * N0xD.dot(N0xV1);
+                const double a5 = r1sqr * N0xU1.dot(N0xU1);
+                const double a6 = r1sqr * N0xU1.dot(N0xV1);
+                const double a7 = r1sqr * N0xV1.dot(N0xV1);
+                Polynomial1 p0{ a2 + a7, two * a3, a5 - a7 };
+                Polynomial1 p1{ two * a4, two * a6 };
+                Polynomial1 p2{ zero, a1 };
+                Polynomial1 p3{ -a0 };
+                Polynomial1 p4{ -a6, a4, two * a6 };
+                Polynomial1 p5{ -a3, a7 - a5 };
+                Polynomial1 tmp0{ one, zero, -one };
+                Polynomial1 tmp1 = p2 * p2 + tmp0 * p3 * p3;
+                Polynomial1 tmp2 = two * p2 * p3;
+                Polynomial1 tmp3 = p4 * p4 + tmp0 * p5 * p5;
+                Polynomial1 tmp4 = two * p4 * p5;
+                Polynomial1 p6 = p0 * tmp1 + tmp0 * p1 * tmp2 - r0sqr * tmp3;
+                Polynomial1 p7 = p0 * tmp2 + p1 * tmp1 - r0sqr * tmp4;
+
+                // Parameters for polynomial root finding. The roots[] array
+                // stores the roots. We need only the unique ones, which is
+                // the responsibility of the set uniqueRoots. The pairs[]
+                // array stores the (cosine,sine) information mentioned in the
+                // PDF. TODO: Choose the maximum number of iterations for root
+                // finding based on specific polynomial data?
+                const uint32_t maxIterations = 128;
+                int32_t degree = 0;
+                size_t numRoots = 0;
+                std::array<double, 8> roots{};
+                std::set<double> uniqueRoots{};
+                size_t numPairs = 0;
+                std::array<std::pair<double, double>, 16> pairs{};
+                double temp = zero;
+                double sn = zero;
+
+                if (p7.GetDegree() > 0 || p7[0] != zero) {
+                    // H(cs,sn) = p6(cs) + sn * p7(cs)
+                    Polynomial1 phi = p6 * p6 - tmp0 * p7 * p7;
+                    degree = static_cast<int32_t>(phi.GetDegree());
+                    assert(degree > 0);
+                    numRoots = RootsPolynomial::Find(degree, &phi[0], maxIterations, roots.data());
+                    for (size_t i = 0; i < numRoots; ++i) {
+                        uniqueRoots.insert(roots[i]);
+                    }
+
+                    for (auto const& cs : uniqueRoots) {
+                        if (std::fabs(cs) <= one) {
+                            temp = p7(cs);
+                            if (temp != zero) {
+                                sn = -p6(cs) / temp;
+                                pairs[numPairs++] = std::make_pair(cs, sn);
+                            }
+                            else {
+                                temp = std::max(one - sqr(cs), zero);
+                                sn = std::sqrt(temp);
+                                pairs[numPairs++] = std::make_pair(cs, sn);
+                                if (sn != zero)
+                                    pairs[numPairs++] = std::make_pair(cs, -sn);
+                            }
+                        }
+                    }
+                }
+                else {
+                    // H(cs,sn) = p6(cs)
+                    degree = static_cast<int32_t>(p6.GetDegree());
+                    assert(degree > 0);
+                    numRoots = RootsPolynomial::Find(degree, &p6[0], maxIterations, roots.data());
+                    for (size_t i = 0; i < numRoots; ++i) {
+                        uniqueRoots.insert(roots[i]);
+                    }
+
+                    for (auto const& cs : uniqueRoots) {
+                        if (std::fabs(cs) <= one) {
+                            temp = std::max(one - sqr(cs), zero);
+                            sn = std::sqrt(temp);
+                            pairs[numPairs++] = std::make_pair(cs, sn);
+                            if (sn != zero)
+                                pairs[numPairs++] = std::make_pair(cs, -sn);
+                        }
+                    }
+                }
+
+                for (size_t i = 0; i < numPairs; ++i) {
+                    ClosestInfo& info = candidates[i];
+                    Vec3d delta = D + r1 * (pairs[i].first * U1 + pairs[i].second * V1);
+                    info.circle1Closest = c0 + delta;
+                    const double N0dDelta = n0.dot(delta);
+                    const double lenN0xDelta = n0.cross(delta).norm();
+                    if (lenN0xDelta > 0.0) {
+                        const double diff = lenN0xDelta - r0;
+                        info.sqrDistance = sqr(N0dDelta) + sqr(diff);
+                        delta -= N0dDelta * n0;
+                        delta.normalize();
+                        info.circle0Closest = c0 + r0 * delta;
+                    }
+                    else {
+                        const Vec3d r0U0 = r0 * get_orthogonal(n0, true);
+                        const Vec3d diff = delta - r0U0;
+                        info.sqrDistance = diff.dot(diff);
+                        info.circle0Closest = c0 + r0U0;
+                    }
+                }
+
+                std::sort(candidates.begin(), candidates.begin() + numPairs);
+            }
+            else {
+                ClosestInfo& info = candidates[0];
+            
+                const double N0dD = n0.dot(D);
+                const Vec3d normProj = N0dD * n0;
+                const Vec3d compProj = D - normProj;
+                Vec3d U = compProj;
+                const double d = U.norm();
+                U.normalize();
+
+                // The configuration is determined by the relative location of the
+                // intervals of projection of the circles on to the D-line.
+                // Circle0 projects to [-r0,r0] and circle1 projects to
+                // [d-r1,d+r1].
+                const double dmr1 = d - r1;
+                double distance;
+                if (dmr1 >= r0) {
+                    // d >= r0 + r1
+                    // The circles are separated (d > r0 + r1) or tangent with one
+                    // outside the other (d = r0 + r1).
+                    distance = dmr1 - r0;
+                    info.circle0Closest = c0 + r0 * U;
+                    info.circle1Closest = c1 - r1 * U;
+                }
+                else {
+                    // d < r0 + r1
+                    // The cases implicitly use the knowledge that d >= 0.
+                    const double dpr1 = d + r1;
+                    if (dpr1 <= r0) {
+                        // Circle1 is inside circle0.
+                        distance = r0 - dpr1;
+                        if (d > 0.0) {
+                            info.circle0Closest = c0 + r0 * U;
+                            info.circle1Closest = c1 + r1 * U;
+                        }
+                        else {
+                            // The circles are concentric, so U = (0,0,0).
+                            // Construct a vector perpendicular to N0 to use for
+                            // closest points.
+                            U = get_orthogonal(n0, true);
+                            info.circle0Closest = c0 + r0 * U;
+                            info.circle1Closest = c1 + r1 * U;
+                        }
+                    }
+                    else if (dmr1 <= -r0) {
+                        // Circle0 is inside circle1.
+                        distance = -r0 - dmr1;
+                        if (d > 0.0) {
+                            info.circle0Closest = c0 - r0 * U;
+                            info.circle1Closest = c1 - r1 * U;
+                        }
+                        else {
+                            // The circles are concentric, so U = (0,0,0).
+                            // Construct a vector perpendicular to N0 to use for
+                            // closest points.
+                            U = get_orthogonal(n0, true);
+                            info.circle0Closest = c0 + r0 * U;
+                            info.circle1Closest = c1 + r1 * U;
+                        }
+                    }
+                    else {
+                        distance = (c1 - c0).norm();
+                        info.circle0Closest = c0;
+                        info.circle1Closest = c1;
+                    }
+                }
+
+                info.sqrDistance = distance * distance + N0dD * N0dD;
+            }
+
+            result.distance_infinite = std::make_optional(DistAndPoints{ std::sqrt(candidates[0].sqrDistance), candidates[0].circle0Closest, candidates[0].circle1Closest }); // TODO
     ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Plane) {
             assert(measuring != nullptr);
@@ -823,3 +1053,6 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
 
 } // namespace Measure
 } // namespace Slic3r
+
+
+#endif // ENABLE_MEASURE_GIZMO
