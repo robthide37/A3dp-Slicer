@@ -1043,6 +1043,26 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
     return result;
 }
 
+void DistAndPoints::transform(const Transform3d& trafo) {
+    from = trafo * from;
+    to = trafo * to;
+    dist = (to - from).norm();
+}
+
+void AngleAndEdges::transform(const Transform3d& trafo) {
+    const Vec3d old_e1 = e1.second - e1.first;
+    const Vec3d old_e2 = e2.second - e2.first;
+    center = trafo * center;
+    e1.first = trafo * e1.first;
+    e1.second = trafo * e1.second;
+    e2.first = trafo * e2.first;
+    e2.second = trafo * e2.second;
+    angle = std::acos(std::clamp(Measure::edge_direction(e1).dot(Measure::edge_direction(e2)), -1.0, 1.0));
+    const Vec3d new_e1 = e1.second - e1.first;
+    const Vec3d new_e2 = e2.second - e2.first;
+    const double average_scale = 0.5 * (new_e1.norm() / old_e1.norm() + new_e2.norm() / old_e2.norm());
+    radius = average_scale * radius;
+}
 
 
 

@@ -108,6 +108,81 @@ static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const 
     return init_data;
 }
 
+class TransformHelper
+{
+    struct Cache
+    {
+        std::array<int, 4> viewport;
+        Matrix4d ndc_to_ss_matrix;
+        Transform3d ndc_to_ss_matrix_inverse;
+    };
+
+    static Cache s_cache;
+
+public:
+    static Vec3d model_to_world(const Vec3d& model, const Transform3d& world_matrix) {
+        return world_matrix * model;
+    }
+
+    static Vec4d world_to_clip(const Vec3d& world, const Matrix4d& projection_view_matrix) {
+        return projection_view_matrix * Vec4d(world.x(), world.y(), world.z(), 1.0);
+    }
+
+    static Vec3d clip_to_ndc(const Vec4d& clip) {
+        return Vec3d(clip.x(), clip.y(), clip.z()) / clip.w();
+    }
+
+    static Vec2d ndc_to_ss(const Vec3d& ndc, const std::array<int, 4>& viewport) {
+        const double half_w = 0.5 * double(viewport[2]);
+        const double half_h = 0.5 * double(viewport[3]);
+        return { half_w * ndc.x() + double(viewport[0]) + half_w, half_h * ndc.y() + double(viewport[1]) + half_h };
+    };
+
+    static Vec4d model_to_clip(const Vec3d& model, const Transform3d& world_matrix, const Matrix4d& projection_view_matrix) {
+        return world_to_clip(model_to_world(model, world_matrix), projection_view_matrix);
+    }
+
+    static Vec3d model_to_ndc(const Vec3d& model, const Transform3d& world_matrix, const Matrix4d& projection_view_matrix) {
+        return clip_to_ndc(world_to_clip(model_to_world(model, world_matrix), projection_view_matrix));
+    }
+
+    static Vec2d model_to_ss(const Vec3d& model, const Transform3d& world_matrix, const Matrix4d& projection_view_matrix, const std::array<int, 4>& viewport) {
+        return ndc_to_ss(clip_to_ndc(world_to_clip(model_to_world(model, world_matrix), projection_view_matrix)), viewport);
+    }
+
+    static Vec2d world_to_ss(const Vec3d& world, const Matrix4d& projection_view_matrix, const std::array<int, 4>& viewport) {
+        return ndc_to_ss(clip_to_ndc(world_to_clip(world, projection_view_matrix)), viewport);
+    }
+
+    static const Matrix4d& ndc_to_ss_matrix(const std::array<int, 4>& viewport) {
+        update(viewport);
+        return s_cache.ndc_to_ss_matrix;
+    }
+
+    static const Transform3d ndc_to_ss_matrix_inverse(const std::array<int, 4>& viewport) {
+        update(viewport);
+        return s_cache.ndc_to_ss_matrix_inverse;
+    }
+
+private:
+    static void update(const std::array<int, 4>& viewport) {
+        if (s_cache.viewport == viewport)
+            return;
+
+        const double half_w = 0.5 * double(viewport[2]);
+        const double half_h = 0.5 * double(viewport[3]);
+        s_cache.ndc_to_ss_matrix << half_w, 0.0, 0.0, double(viewport[0]) + half_w,
+            0.0, half_h, 0.0, double(viewport[1]) + half_h,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0;
+
+        s_cache.ndc_to_ss_matrix_inverse = s_cache.ndc_to_ss_matrix.inverse();
+        s_cache.viewport = viewport;
+    }
+};
+
+TransformHelper::Cache TransformHelper::s_cache = { { 0, 0, 0, 0 }, Matrix4d::Identity(), Transform3d::Identity() };
+
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
@@ -174,8 +249,18 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
                     m_selection_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_1_ID, *m_sphere.mesh_raycaster));
             }
 
-            if (m_selected_features != selected_features_old && m_selected_features.second.feature.has_value())
+            if (m_selected_features != selected_features_old && m_selected_features.second.feature.has_value()) {
                 m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
+                // transform to world coordinates
+                if (m_measurement_result.angle.has_value())
+                    m_measurement_result.angle->transform(m_volume_matrix);
+                if (m_measurement_result.distance_infinite.has_value())
+                    m_measurement_result.distance_infinite->transform(m_volume_matrix);
+                if (m_measurement_result.distance_strict.has_value())
+                    m_measurement_result.distance_strict->transform(m_volume_matrix);
+                if (m_measurement_result.distance_xyz.has_value())
+                    m_measurement_result.distance_xyz = TransformHelper::model_to_world(*m_measurement_result.distance_xyz, m_volume_matrix);
+            }
 
             return true;
         }
@@ -725,77 +810,6 @@ void GLGizmoMeasure::restore_scene_raycasters_state()
     }
 }
 
-class DimensioningHelper
-{
-    struct Cache
-    {
-        std::array<int, 4> viewport;
-        Matrix4d ndc_to_ss_matrix;
-        Transform3d ndc_to_ss_matrix_inverse;
-    };
-
-    static Cache s_cache;
-
-public:
-    static Vec3d model_to_world(const Vec3d& model, const Transform3d& world_matrix) {
-        return world_matrix * model;
-    }
-
-    static Vec4d world_to_clip(const Vec3d& world, const Matrix4d& projection_view_matrix) {
-        return projection_view_matrix * Vec4d(world.x(), world.y(), world.z(), 1.0);
-    }
-
-    static Vec3d clip_to_ndc(const Vec4d& clip) {
-        return Vec3d(clip.x(), clip.y(), clip.z()) / clip.w();
-    }
-
-    static Vec2d ndc_to_ss(const Vec3d& ndc, const std::array<int, 4>& viewport) {
-        const double half_w = 0.5 * double(viewport[2]);
-        const double half_h = 0.5 * double(viewport[3]);
-        return { half_w * ndc.x() + double(viewport[0]) + half_w, half_h * ndc.y() + double(viewport[1]) + half_h };
-    };
-
-    static Vec4d model_to_clip(const Vec3d& model, const Transform3d& world_matrix, const Matrix4d& projection_view_matrix) {
-        return world_to_clip(model_to_world(model, world_matrix), projection_view_matrix);
-    }
-
-    static Vec3d model_to_ndc(const Vec3d& model, const Transform3d& world_matrix, const Matrix4d& projection_view_matrix) {
-        return clip_to_ndc(world_to_clip(model_to_world(model, world_matrix), projection_view_matrix));
-    }
-
-    static Vec2d model_to_ss(const Vec3d& model, const Transform3d& world_matrix, const Matrix4d& projection_view_matrix, const std::array<int, 4>& viewport) {
-        return ndc_to_ss(clip_to_ndc(world_to_clip(model_to_world(model, world_matrix), projection_view_matrix)), viewport);
-    }
-
-    static const Matrix4d& ndc_to_ss_matrix(const std::array<int, 4>& viewport) {
-        update(viewport);
-        return s_cache.ndc_to_ss_matrix;
-    }
-
-    static const Transform3d ndc_to_ss_matrix_inverse(const std::array<int, 4>& viewport) {
-        update(viewport);
-        return s_cache.ndc_to_ss_matrix_inverse;
-    }
-
-private:
-    static void update(const std::array<int, 4>& viewport) {
-        if (s_cache.viewport == viewport)
-            return;
-
-        const double half_w = 0.5 * double(viewport[2]);
-        const double half_h = 0.5 * double(viewport[3]);
-        s_cache.ndc_to_ss_matrix << half_w, 0.0, 0.0, double(viewport[0]) + half_w,
-                                    0.0, half_h, 0.0, double(viewport[1]) + half_h,
-                                    0.0, 0.0, 1.0, 0.0,
-                                    0.0, 0.0, 0.0, 1.0;
-
-        s_cache.ndc_to_ss_matrix_inverse = s_cache.ndc_to_ss_matrix.inverse();
-        s_cache.viewport = viewport;
-    }
-};
-
-DimensioningHelper::Cache DimensioningHelper::s_cache = { { 0, 0, 0, 0 }, Matrix4d::Identity(), Transform3d::Identity() };
-
 void GLGizmoMeasure::render_dimensioning()
 {
     static SelectedFeatures last_selected_features;
@@ -816,8 +830,8 @@ void GLGizmoMeasure::render_dimensioning()
         const std::array<int, 4>& viewport = camera.get_viewport();
 
         // screen coordinates
-        const Vec2d v1ss = DimensioningHelper::model_to_ss(v1, m_volume_matrix, projection_view_matrix, viewport);
-        const Vec2d v2ss = DimensioningHelper::model_to_ss(v2, m_volume_matrix, projection_view_matrix, viewport);
+        const Vec2d v1ss = TransformHelper::world_to_ss(v1, projection_view_matrix, viewport);
+        const Vec2d v2ss = TransformHelper::world_to_ss(v2, projection_view_matrix, viewport);
 
         if (v1ss.isApprox(v2ss))
             return;
@@ -835,7 +849,7 @@ void GLGizmoMeasure::render_dimensioning()
         const Vec3d v1ss_3 = { v1ss.x(), v1ss.y(), 0.0 };
         const Vec3d v2ss_3 = { v2ss.x(), v2ss.y(), 0.0 };
 
-        const Transform3d ss_to_ndc_matrix = DimensioningHelper::ndc_to_ss_matrix_inverse(viewport);
+        const Transform3d ss_to_ndc_matrix = TransformHelper::ndc_to_ss_matrix_inverse(viewport);
 
         // stem
         shader->set_uniform("view_model_matrix", overlap ?
@@ -951,8 +965,12 @@ void GLGizmoMeasure::render_dimensioning()
 
     auto point_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
         assert(f1.get_type() == Measure::SurfaceFeatureType::Point && f2.get_type() == Measure::SurfaceFeatureType::Edge);
-        const std::pair<Vec3d, Vec3d> e = f2.get_edge();
-        const Vec3d v_proj    = m_measurement_result.distance_infinite->to;
+        std::pair<Vec3d, Vec3d> e = f2.get_edge();
+        // Transform to world coordinates
+        e.first  = TransformHelper::model_to_world(e.first, m_volume_matrix);
+        e.second = TransformHelper::model_to_world(e.second, m_volume_matrix);
+
+        const Vec3d v_proj = m_measurement_result.distance_infinite->to;
 
         const Vec3d e1e2 = e.second - e.first;
         const Vec3d v_proje1 = v_proj - e.first;
@@ -962,11 +980,11 @@ void GLGizmoMeasure::render_dimensioning()
             const Camera& camera = wxGetApp().plater()->get_camera();
             const Matrix4d projection_view_matrix = camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix();
             const std::array<int, 4>& viewport = camera.get_viewport();
-            const Transform3d ss_to_ndc_matrix = DimensioningHelper::ndc_to_ss_matrix_inverse(viewport);
+            const Transform3d ss_to_ndc_matrix = TransformHelper::ndc_to_ss_matrix_inverse(viewport);
 
-            const Vec2d v_projss = DimensioningHelper::model_to_ss(v_proj, m_volume_matrix, projection_view_matrix, viewport);
+            const Vec2d v_projss = TransformHelper::world_to_ss(v_proj, projection_view_matrix, viewport);
             auto render_extension = [this, &v_projss, &projection_view_matrix, &viewport, &ss_to_ndc_matrix, shader](const Vec3d& p) {
-                const Vec2d pss = DimensioningHelper::model_to_ss(p, m_volume_matrix, projection_view_matrix, viewport);
+                const Vec2d pss = TransformHelper::world_to_ss(p, projection_view_matrix, viewport);
                 if (!pss.isApprox(v_projss)) {
                     const Vec2d pv_projss = v_projss - pss;
                     const double pv_projss_len = pv_projss.norm();
@@ -1029,7 +1047,7 @@ void GLGizmoMeasure::render_dimensioning()
         // arc
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center));
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center));
         m_dimensioning.arc.render();
 
         // arrows
@@ -1039,7 +1057,7 @@ void GLGizmoMeasure::render_dimensioning()
             const Vec3d direction_model = (endpoint_id == 1) ? -normal.cross(position_model - center).normalized() : normal.cross(position_model - center).normalized();
             const auto qz = Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal);
             const auto qx = Eigen::Quaternion<double>::FromTwoVectors(qz * Vec3d::UnitX(), direction_model);
-            const Transform3d view_model_matrix = camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(position_model) *
+            const Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::translation_transform(position_model) *
                 qx * qz * Geometry::scale_transform(camera.get_inv_zoom());
             shader->set_uniform("view_model_matrix", view_model_matrix);
             m_dimensioning.triangle.render();
@@ -1055,8 +1073,8 @@ void GLGizmoMeasure::render_dimensioning()
         const Vec3d e11center = center - e1.first;
         const double e11center_len = e11center.norm();
         if (e11center_len > EPSILON && e11center.dot(e11e12) < 0.0) {
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center) *
-                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e1.first, e1.second)) *
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center)*
+                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e1.first, e1.second))*
                 Geometry::scale_transform({ e11center_len, 1.0f, 1.0f }));
             m_dimensioning.line.render();
         }
@@ -1065,19 +1083,19 @@ void GLGizmoMeasure::render_dimensioning()
         const Vec3d e21center = center - e2.first;
         const double e21center_len = e21center.norm();
         if (e21center_len > EPSILON) {
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_volume_matrix * Geometry::translation_transform(center) *
-                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e2.first, e2.second)) *
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center)*
+                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e2.first, e2.second))*
                 Geometry::scale_transform({ (coplanar && radius > 0.0) ? e21center_len : draw_radius, 1.0f, 1.0f }));
             m_dimensioning.line.render();
         }
 
         // label
-        // label model coordinates
-        const Vec3d label_position_model = Geometry::translation_transform(center) * (draw_radius * (Eigen::Quaternion<double>(Eigen::AngleAxisd(step * 0.5 * double(resolution), normal)) * e1_unit));
+        // label world coordinates
+        const Vec3d label_position_world = Geometry::translation_transform(center) * (draw_radius * (Eigen::Quaternion<double>(Eigen::AngleAxisd(step * 0.5 * double(resolution), normal)) * e1_unit));
 
         // label screen coordinates
         const std::array<int, 4>& viewport = camera.get_viewport();
-        const Vec2d label_position_ss = DimensioningHelper::model_to_ss(label_position_model, m_volume_matrix,
+        const Vec2d label_position_ss = TransformHelper::world_to_ss(label_position_world,
             camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix(), viewport);
 
         m_imgui->set_next_window_pos(label_position_ss.x(), viewport[3] - label_position_ss.y(), ImGuiCond_Always, 0.0f, 1.0f);

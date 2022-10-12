@@ -120,6 +120,8 @@ struct DistAndPoints {
     double dist;
     Vec3d from;
     Vec3d to;
+
+    void transform(const Transform3d& trafo);
 };
 
 struct AngleAndEdges {
@@ -131,6 +133,8 @@ struct AngleAndEdges {
     std::pair<Vec3d, Vec3d> e2;
     double radius;
     bool coplanar;
+
+    void transform(const Transform3d& trafo);
 
     static const AngleAndEdges Dummy;
 };
