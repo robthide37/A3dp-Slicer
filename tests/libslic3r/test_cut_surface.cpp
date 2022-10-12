@@ -11,7 +11,7 @@ TEST_CASE("Cut character from surface", "[]")
     char         letter     = '%';
     float        flatness   = 2.;
     unsigned int font_index = 0;    // collection
-    float        z_depth    = 50.f; // projection size
+    double        z_depth    = 50.f; // projection size
 
     auto font = Emboss::create_font_file(font_path.c_str());
     REQUIRE(font != nullptr);
@@ -24,7 +24,7 @@ TEST_CASE("Cut character from surface", "[]")
     Transform3d tr = Transform3d::Identity();
     tr.translate(Vec3d(0., 0., -z_depth));
     tr.scale(Emboss::SHAPE_SCALE);
-    Emboss::OrthoProject cut_projection(tr, Vec3f(0.f, 0.f, z_depth));
+    Emboss::OrthoProject cut_projection(tr, Vec3d(0., 0., z_depth));
 
     auto object = its_make_cube(782 - 49 + 50, 724 + 10 + 50, 5);
     its_translate(object, Vec3f(49 - 25, -10 - 25, -40));
@@ -38,7 +38,7 @@ TEST_CASE("Cut character from surface", "[]")
     CHECK(!surfaces.empty());
 
     Emboss::OrthoProject projection(Transform3d::Identity(),
-                                    Vec3f(0.f, 0.f, 10.f));
+                                    Vec3d(0.f, 0.f, 10.f));
     its_translate(surfaces, Vec3f(0.f, 0.f, 10));
 
     indexed_triangle_set its = cut2model(surfaces, projection);
@@ -81,8 +81,8 @@ static Emboss::OrthoProject create_projection_for_cut(
 {
     // create sure that emboss object is bigger than source object
     const float safe_extension = 1.0f;
-    float       min_z          = z_range.first - safe_extension;
-    float       max_z          = z_range.second + safe_extension;
+    double      min_z          = z_range.first - safe_extension;
+    double      max_z          = z_range.second + safe_extension;
     assert(min_z < max_z);
     // range between min and max value
     double   projection_size           = max_z - min_z;
@@ -93,8 +93,7 @@ static Emboss::OrthoProject create_projection_for_cut(
     // Y .. from bottom to top
     // Z .. from text to eye
     Vec3d untransformed_direction(0., 0., projection_size);
-    Vec3f project_direction =
-        (transformation_for_vector * untransformed_direction).cast<float>();
+    Vec3d project_direction = transformation_for_vector * untransformed_direction;
 
     // Projection is in direction from far plane
     tr.translate(Vec3d(0., 0., min_z));

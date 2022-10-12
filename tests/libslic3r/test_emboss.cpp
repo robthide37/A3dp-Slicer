@@ -433,8 +433,8 @@ TEST_CASE("Cut surface", "[]")
     std::string  font_path  = get_font_filepath();
     char         letter     = '%';
     float        flatness   = 2.;
-    unsigned int font_index = 0;    // collection
-    float        z_depth    = 50.f; // projection size
+    unsigned int font_index = 0;   // collection
+    double       z_depth    = 50.; // projection size
 
     auto font = Emboss::create_font_file(font_path.c_str());
     REQUIRE(font != nullptr);
@@ -451,7 +451,7 @@ TEST_CASE("Cut surface", "[]")
     Transform3d tr = Transform3d::Identity();
     tr.translate(Vec3d(0., 0., -z_depth));
     tr.scale(Emboss::SHAPE_SCALE);
-    Emboss::OrthoProject cut_projection(tr, Vec3f(0.f, 0.f, z_depth));
+    Emboss::OrthoProject cut_projection(tr, Vec3d(0., 0., z_depth));
 
     auto object = its_make_cube(782 - 49 + 50, 724 + 10 + 50, 5);
     its_translate(object, Vec3f(49 - 25, -10 - 25, -40));
@@ -462,8 +462,8 @@ TEST_CASE("Cut surface", "[]")
     auto surfaces = cut_surface(shape, {object}, cut_projection, 0);
     CHECK(!surfaces.empty());
 
-    Emboss::OrthoProject projection(Transform3d::Identity(), Vec3f(0.f, 0.f, 10.f));
-    its_translate(surfaces, Vec3f(0.f, 0.f, 10));
+    Emboss::OrthoProject projection(Transform3d::Identity(), Vec3d(0., 0., 10.));
+    its_translate(surfaces, Vec3f(0., 0., 10.));
 
     indexed_triangle_set its = cut2model(surfaces, projection);
     CHECK(!its.empty());

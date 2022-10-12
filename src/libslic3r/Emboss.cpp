@@ -303,6 +303,7 @@ ExPolygons Emboss::heal_shape(const Polygons &shape) {
     return res;
 }
 
+#define HEAL_CLOSE_POINTS
 bool Emboss::heal_shape(ExPolygons &shape, unsigned max_iteration)
 {
     if (shape.empty()) return true;
@@ -313,11 +314,11 @@ bool Emboss::heal_shape(ExPolygons &shape, unsigned max_iteration)
 
         Pointfs intersections = intersection_points(shape);
         Points  duplicits     = collect_duplications(to_points(shape));
-        Points  close         = priv::collect_close_points(shape);
-        if (intersections.empty() && duplicits.empty() && close.empty()) break;
+        //Points  close         = priv::collect_close_points(shape, 1.);
+        if (intersections.empty() && duplicits.empty() /* && close.empty() */) break;
 
         holes.clear();
-        holes.reserve(intersections.size() + duplicits.size() + close.size());
+        holes.reserve(intersections.size() + duplicits.size() /* + close.size()*/);
 
         // Fix self intersection in result by subtracting hole 2x2
         for (const Vec2d &p : intersections) {
@@ -335,11 +336,11 @@ bool Emboss::heal_shape(ExPolygons &shape, unsigned max_iteration)
         }
 
         // fix close points in simmilar way as duplicits
-        for (const Point &p : close) {
-            Slic3r::Polygon hole(priv::pts_3x3);
-            hole.translate(p);
-            holes.push_back(hole);
-        }
+        //for (const Point &p : close) {
+        //    Slic3r::Polygon hole(priv::pts_3x3);
+        //    hole.translate(p);
+        //    holes.push_back(hole);
+        //}
 
         holes = Slic3r::union_(holes);
         shape = Slic3r::diff_ex(shape, holes, ApplySafetyOffset::Yes);
@@ -1063,8 +1064,8 @@ indexed_triangle_set polygons2model_unique(
 
     for (const Point &p : points) {
         auto p2 = projection.create_front_back(p);
-        front_points.push_back(p2.first);
-        back_points.push_back(p2.second);
+        front_points.push_back(p2.first.cast<float>());
+        back_points.push_back(p2.second.cast<float>());
     }    
     
     // insert back points, front are already in
@@ -1132,8 +1133,8 @@ indexed_triangle_set polygons2model_duplicit(
         max_index = index;
         const Point &p = points[i];
         auto p2 = projection.create_front_back(p);
-        front_points.push_back(p2.first);
-        back_points.push_back(p2.second);
+        front_points.push_back(p2.first.cast<float>());
+        back_points.push_back(p2.second.cast<float>());
     }
     assert(max_index+1 == count_point);    
     
@@ -1185,23 +1186,23 @@ indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
         priv::polygons2model_duplicit(shape2d, projection, points, duplicits);
 }
 
-std::pair<Vec3f, Vec3f> Emboss::ProjectZ::create_front_back(const Point &p) const
+std::pair<Vec3d, Vec3d> Emboss::ProjectZ::create_front_back(const Point &p) const
 {
-    Vec3f front(
-        static_cast<float>(p.x() * SHAPE_SCALE), 
-        static_cast<float>(p.y() * SHAPE_SCALE),
-        0.f);
+    Vec3d front(
+        p.x() * SHAPE_SCALE,
+        p.y() * SHAPE_SCALE,
+        0.);
     return std::make_pair(front, project(front));
 }
 
-Vec3f Emboss::ProjectZ::project(const Vec3f &point) const 
+Vec3d Emboss::ProjectZ::project(const Vec3d &point) const 
 {
-    Vec3f res = point; // copy
+    Vec3d res = point; // copy
     res.z() = m_depth;
     return res;
 }
 
-std::optional<Point> Emboss::ProjectZ::unproject(const Vec3f &p) const {
+std::optional<Point> Emboss::ProjectZ::unproject(const Vec3d &p) const {
     return Point(p.x() / SHAPE_SCALE, p.y() / SHAPE_SCALE);
 }
 
@@ -1267,18 +1268,18 @@ Transform3d Emboss::create_transformation_onto_surface(const Vec3f &position,
 
 // OrthoProject
 
-std::pair<Vec3f, Vec3f> Emboss::OrthoProject::create_front_back(const Point &p) const {
+std::pair<Vec3d, Vec3d> Emboss::OrthoProject::create_front_back(const Point &p) const {
     Vec3d front(p.x(), p.y(), 0.);
-    Vec3f front_tr = (m_matrix * front).cast<float>();
+    Vec3d front_tr = m_matrix * front;
     return std::make_pair(front_tr, project(front_tr));
 }
 
-Vec3f Emboss::OrthoProject::project(const Vec3f &point) const
+Vec3d Emboss::OrthoProject::project(const Vec3d &point) const
 {
     return point + m_direction;
 }
 
-std::optional<Point> Emboss::OrthoProject::unproject(const Vec3f &p) const {
-    Vec3d pp = m_matrix_inv * p.cast<double>();
+std::optional<Point> Emboss::OrthoProject::unproject(const Vec3d &p) const {
+    Vec3d pp = m_matrix_inv * p;
     return Point(pp.x(), pp.y());
 }

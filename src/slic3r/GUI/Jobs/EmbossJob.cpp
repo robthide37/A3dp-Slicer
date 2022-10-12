@@ -97,7 +97,7 @@ static Emboss::OrthoProject create_projection_for_cut(
 /// <param name="tr">Text voliume transformation inside object</param>
 /// <param name="cut">Cutted surface from model</param>
 /// <returns>Projection</returns>
-static Emboss::OrthoProject3f create_emboss_projection(
+static Emboss::OrthoProject3d create_emboss_projection(
     bool is_outside, float emboss, Transform3d tr, SurfaceCut &cut);
 
 static void create_message(const std::string &message); // only in finalize
@@ -428,7 +428,7 @@ void UseSurfaceJob::process(Ctl &ctl) {
     if (was_canceled()) return;
 
     // !! Projection needs to transform cut
-    Emboss::OrthoProject3f projection = priv::create_emboss_projection(
+    Emboss::OrthoProject3d projection = priv::create_emboss_projection(
         m_input.is_outside, fp.emboss, emboss_tr, cut);
     
     indexed_triangle_set new_its = cut2model(cut, projection);
@@ -664,8 +664,8 @@ Emboss::OrthoProject priv::create_projection_for_cut(
     double                         shape_scale,
     const std::pair<float, float> &z_range)
 {
-    float min_z = z_range.first - priv::safe_extension;
-    float max_z = z_range.second + priv::safe_extension;
+    double min_z = z_range.first - priv::safe_extension;
+    double max_z = z_range.second + priv::safe_extension;
     assert(min_z < max_z);
     // range between min and max value
     double projection_size = max_z - min_z; 
@@ -676,8 +676,7 @@ Emboss::OrthoProject priv::create_projection_for_cut(
     // Y .. from bottom to top
     // Z .. from text to eye
     Vec3d untransformed_direction(0., 0., projection_size);
-    Vec3f project_direction =
-        (transformation_for_vector * untransformed_direction).cast<float>();
+    Vec3d project_direction = transformation_for_vector * untransformed_direction;
 
     // Projection is in direction from far plane
     tr.translate(Vec3d(0., 0., min_z));
@@ -685,7 +684,7 @@ Emboss::OrthoProject priv::create_projection_for_cut(
     return Emboss::OrthoProject(tr, project_direction);
 }
 
-Emboss::OrthoProject3f priv::create_emboss_projection(
+Emboss::OrthoProject3d priv::create_emboss_projection(
     bool is_outside, float emboss, Transform3d tr, SurfaceCut &cut)
 {
     // Offset of clossed side to model
@@ -694,8 +693,8 @@ Emboss::OrthoProject3f priv::create_emboss_projection(
         front_move = (is_outside) ? emboss : surface_offset,
         back_move  = -((is_outside) ? surface_offset : emboss);    
     its_transform(cut, tr.pretranslate(Vec3d(0., 0., front_move)));    
-    Vec3f from_front_to_back(0.f, 0.f, back_move - front_move);
-    return Emboss::OrthoProject3f(from_front_to_back);
+    Vec3d from_front_to_back(0., 0., back_move - front_move);
+    return Emboss::OrthoProject3d(from_front_to_back);
 }
 
 bool priv::process(std::exception_ptr &eptr) { 

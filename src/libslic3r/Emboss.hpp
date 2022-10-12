@@ -215,10 +215,10 @@ public:
     /// <summary>
     /// Project spatial point
     /// </summary>
-    class IProject3f
+    class IProject3d
     {
     public:
-        virtual ~IProject3f() = default;
+        virtual ~IProject3d() = default;
         /// <summary>
         /// Move point with respect to projection direction
         /// e.g. Orthogonal projection will move with point by direction
@@ -226,14 +226,14 @@ public:
         /// </summary>
         /// <param name="point">Spatial point coordinate</param>
         /// <returns>Projected spatial point</returns>
-        virtual Vec3f project(const Vec3f &point) const = 0;
+        virtual Vec3d project(const Vec3d &point) const = 0;
     };
 
     /// <summary>
     /// Project 2d point into space
     /// Could be plane, sphere, cylindric, ...
     /// </summary>
-    class IProjection : public IProject3f
+    class IProjection : public IProject3d
     {
     public:
         virtual ~IProjection() = default;
@@ -246,9 +246,9 @@ public:
         /// first - front spatial point
         /// second - back spatial point
         /// </returns>
-        virtual std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const = 0;
+        virtual std::pair<Vec3d, Vec3d> create_front_back(const Point &p) const = 0;
 
-        virtual std::optional<Point> unproject(const Vec3f &p) const = 0;
+        virtual std::optional<Point> unproject(const Vec3d &p) const = 0;
     };
 
     /// <summary>
@@ -272,59 +272,59 @@ public:
     class ProjectZ : public IProjection
     {
     public:
-        ProjectZ(float depth) : m_depth(depth) {}
+        ProjectZ(double depth) : m_depth(depth) {}
         // Inherited via IProject
-        std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const override;
-        Vec3f project(const Vec3f &point) const override;
-        std::optional<Point> unproject(const Vec3f &p) const override;
-        float m_depth;
+        std::pair<Vec3d, Vec3d> create_front_back(const Point &p) const override;
+        Vec3d project(const Vec3d &point) const override;
+        std::optional<Point> unproject(const Vec3d &p) const override;
+        double m_depth;
     };
 
     class ProjectScale : public IProjection
     {
         std::unique_ptr<IProjection> core;
-        float m_scale;
+        double m_scale;
     public:
-        ProjectScale(std::unique_ptr<IProjection> core, float scale)
+        ProjectScale(std::unique_ptr<IProjection> core, double scale)
             : core(std::move(core)), m_scale(scale)
         {}
 
         // Inherited via IProject
-        std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const override
+        std::pair<Vec3d, Vec3d> create_front_back(const Point &p) const override
         {
             auto res = core->create_front_back(p);
             return std::make_pair(res.first * m_scale, res.second * m_scale);
         }
-        Vec3f project(const Vec3f &point) const override{
+        Vec3d project(const Vec3d &point) const override{
             return core->project(point);
         }
-        std::optional<Point> unproject(const Vec3f &p) const override {
+        std::optional<Point> unproject(const Vec3d &p) const override {
             return core->unproject(p / m_scale);
         }
     };
 
-    class OrthoProject3f : public Emboss::IProject3f
+    class OrthoProject3d : public Emboss::IProject3d
     {
         // size and direction of emboss for ortho projection
-        Vec3f m_direction;
+        Vec3d m_direction;
     public:
-        OrthoProject3f(Vec3f direction) : m_direction(direction) {}
-        Vec3f project(const Vec3f &point) const override{ return point + m_direction;}
+        OrthoProject3d(Vec3d direction) : m_direction(direction) {}
+        Vec3d project(const Vec3d &point) const override{ return point + m_direction;}
     };
 
     class OrthoProject: public Emboss::IProjection {
         Transform3d m_matrix;
         // size and direction of emboss for ortho projection
-        Vec3f       m_direction;
+        Vec3d       m_direction;
         Transform3d m_matrix_inv;
     public:
-        OrthoProject(Transform3d matrix, Vec3f direction)
+        OrthoProject(Transform3d matrix, Vec3d direction)
             : m_matrix(matrix), m_direction(direction), m_matrix_inv(matrix.inverse())
         {}
         // Inherited via IProject
-        std::pair<Vec3f, Vec3f> create_front_back(const Point &p) const override;
-        Vec3f project(const Vec3f &point) const override;
-        std::optional<Point> unproject(const Vec3f &p) const override;     
+        std::pair<Vec3d, Vec3d> create_front_back(const Point &p) const override;
+        Vec3d project(const Vec3d &point) const override;
+        std::optional<Point> unproject(const Vec3d &p) const override;     
     };
 };
 

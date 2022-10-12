@@ -20,9 +20,10 @@
 /// patches/patch{O}.off
 /// result.obj - Merged result its
 /// result_contours/{O}.obj - visualization of contours for result patches
-//#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
+#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
 
 using namespace Slic3r;
+#include "ExPolygonsIndex.hpp"
 
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
 #include <CGAL/Exact_integer.h>
@@ -33,11 +34,12 @@ using namespace Slic3r;
 // libslic3r
 #include "TriangleMesh.hpp" // its_merge
 #include "Utils.hpp" // next_highest_power_of_2
+#include "ClipperUtils.hpp" // union_ex + offset_ex
 
 namespace priv {
 
 using Project = Emboss::IProjection;
-using Project3f = Emboss::IProject3f;
+using Project3d = Emboss::IProject3d;
 
 /// <summary>
 /// Set true for indices out of area of interest
@@ -62,7 +64,7 @@ void set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
 /// projection direction [in DEG]</param>
 void set_skip_by_angle(std::vector<bool>          &skip_indicies,
                        const indexed_triangle_set &its,
-                       const Project3f            &projection,
+                       const Project3d            &projection,
                        double                      max_angle = 89.);
 
     
@@ -99,6 +101,9 @@ CutMesh to_cgal(const indexed_triangle_set &its,
 /// <param name="projection">Define transformation 2d point into 3d</param>
 /// <returns>CGAL model of extruded shape</returns>
 CutMesh to_cgal(const ExPolygons &shapes, const Project &projection);
+// function to check result of projection. 2d int32_t -> 3d double
+bool exist_duplicit_vertex(const CutMesh& mesh);
+
 
 /// <summary>
 /// IntersectingElement
@@ -187,19 +192,6 @@ const std::string face_shape_map_name = "f:IntersectingElement";
 const std::string vert_shape_map_name = "v:IntersectingElement";
 
 /// <summary>
-/// Identify contour (or hole) point from ExPolygons
-/// </summary>
-struct ShapePointId
-{
-    // index of ExPolygons
-    uint32_t expolygons_index;
-    // index of Polygon
-    uint32_t polygon_index;
-    // index of point in polygon
-    uint32_t point_index;
-};
-
-/// <summary>
 /// Flag for faces in CGAL mesh
 /// </summary>
 enum class FaceType {
@@ -253,24 +245,6 @@ using CutAOIs = std::vector<CutAOI>;
 using VCutAOIs = std::vector<CutAOIs>;
 
 /// <summary>
-/// Keep conversion from ShapePointId to Index and vice versa
-/// ShapePoint .. contour(or hole) poin from ExPolygons
-/// Index      .. continous number
-/// </summary>
-class ShapePoint2index
-{
-    std::vector<std::vector<uint32_t>> m_offsets;
-    // for check range of index
-    uint32_t m_count;
-
-public:
-    ShapePoint2index(const ExPolygons &shapes);
-    uint32_t     calc_index(const ShapePointId &id) const;
-    ShapePointId calc_id(uint32_t index) const;
-    uint32_t     get_count() const;
-};
-
-/// <summary>
 /// Create AOIs(area of interest) on model surface
 /// </summary>
 /// <param name="cgal_model">Input model converted to CGAL
@@ -286,7 +260,7 @@ CutAOIs cut_from_model(CutMesh                &cgal_model,
                        const ExPolygons       &shapes,
                        /*const*/ CutMesh      &cgal_shape,
                        float                   projection_ratio,
-                       const ShapePoint2index &s2i);
+                       const ExPolygonsIndices &s2i);
 
 using Loop  = std::vector<VI>;
 using Loops = std::vector<Loop>;
@@ -371,7 +345,7 @@ public:
 SurfacePatches diff_models(VCutAOIs             &cuts,
                            /*const*/ CutMeshes  &cut_models,
                            /*const*/ CutMeshes  &models,
-                           const Project3f      &projection);
+                           const Project3d      &projection);
 
 /// <summary>
 /// Checking whether patch is uninterrupted cover of whole expolygon it belongs.
@@ -394,8 +368,21 @@ bool is_over_whole_expoly(const SurfacePatch &patch,
                           const ExPolygons   &shapes,
                           const VCutAOIs     &cutAOIs,
                           const CutMeshes    &meshes);
+/// <summary>
+/// Unptoject points from outline loops of patch
+/// </summary>
+/// <param name="patch">Contain loops and vertices</param>
+/// <param name="projection">Know how to project from 3d to 2d</param>
+/// <returns>Unprojected points in loops</returns>
+Polygons unproject_loops(const SurfacePatch &patch, const Project &projection);
 
-ExPolygon to_expoly(const SurfacePatch &patch, const Project &unproject);
+/// <summary>
+/// Unproject points from loops and create expolygons
+/// </summary>
+/// <param name="patch"></param>
+/// <param name="projection">Convert 3d point to 2d</param>
+/// <returns></returns>
+ExPolygon to_expoly(const SurfacePatch &patch, const Project &projection);
 
 /// <summary>
 /// To select surface near projection distance
@@ -414,7 +401,7 @@ struct ProjectionDistance
     // signed distance to projection 
     float distance = std::numeric_limits<float>::max();    
 };
-// addresed by ShapePoint2index
+// addresed by ExPolygonsIndices
 using ProjectionDistances =  std::vector<ProjectionDistance>;
 
 // each point in shapes has its ProjectionDistances
@@ -438,42 +425,51 @@ VDistances calc_distances(const SurfacePatches &patches,
                           float                 projection_ratio);
 
 /// <summary>
-/// Fill area of expolygons by patches
-/// Not used patches are discarded(removed from vector)
-/// </summary>
-/// <param name="patches">In/Out parts of surface to be filtered</param>
-/// <param name="distances">Depth distances for outline points</param>
-/// <param name="shapes">Shapes to be filled by patches</param>
-/// <param name="center">Starting point for select correct depth</param>
-/// <param name="s2i">Help struct to address point inside of shapes by one index</param>
-void filter_patches(SurfacePatches         &patches,
-                    const VDistances       &distances,
-                    const ExPolygons       &shapes,
-                    const Point            &center,
-                    const ShapePoint2index &s2i);
-
-/// <summary>
 /// Select distances in similar depth between expolygons
 /// </summary>
 /// <param name="distances">All distances - Vector distances for each shape point</param>
 /// <param name="shapes">Vector of letters</param>
-/// <param name="center">Center of projection</param>
-/// <param name="shape_point_2_index">Convert index to addresss inside of shape</param>
-/// <returns>Best projection distances</returns>
+/// <param name="start">Pivot for start projection in 2d</param>
+/// <param name="s2i">Convert index to addresss inside of shape</param>
+/// <param name="patches">Cutted parts from surface</param>
+/// <returns>Closest distance projection indexed by points in shapes(see s2i)</returns>
 ProjectionDistances choose_best_distance(
     const VDistances       &distances,
     const ExPolygons       &shapes,
-    const Point            &center,
-    const ShapePoint2index &shape_point_2_index);
+    const Point            &start,
+    const ExPolygonsIndices &s2i,
+    const SurfacePatches   &patches);
 
 /// <summary>
 /// Create mask for patches
 /// </summary>
-/// <param name="best_distances"></param>
-/// <param name="patches"></param>
+/// <param name="best_distances">For each point selected closest distance</param>
+/// <param name="patches">All patches</param>
+/// <param name="shapes">All patches</param>
 /// <returns>Mask of used patch</returns>
 std::vector<bool> select_patches(const ProjectionDistances &best_distances,
-                                 const SurfacePatches      &patches);
+                                 const SurfacePatches      &patches,
+
+                                 const ExPolygons       &shapes,
+                                 const ExPolygonsIndices &s2i,
+                                 const VCutAOIs         &cutAOIs,
+                                 const CutMeshes        &meshes,
+                                 const Project &projection);
+
+/// <summary>
+/// Merge two surface cuts together
+/// Added surface cut will be consumed
+/// </summary>
+/// <param name="sc">Surface cut to extend</param>
+/// <param name="sc_add">Surface cut to consume</param>
+void append(SurfaceCut &sc, SurfaceCut &&sc_add);
+
+/// <summary>
+/// Convert patch to indexed_triangle_set
+/// </summary>
+/// <param name="patch">Part of surface</param>
+/// <returns>Converted patch</returns>
+SurfaceCut patch2cut(SurfacePatch &patch);
 
 /// <summary>
 /// Merge masked patches to one surface cut
@@ -495,11 +491,12 @@ void initialize_store(const std::string& dir_to_clear);
 /// <param name="face_type_map">Color source</param>
 /// <param name="file">File to store</param>
 void store(const CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string &dir, bool is_filled = false);
+void store(const ExPolygons &shapes, const std::string &svg_file);
 void store(const CutMesh &mesh, const ReductionMap &reduction_map, const std::string &dir);
 void store(const CutAOIs &aois, const CutMesh &mesh, const std::string &dir);
 void store(const SurfacePatches &patches, const std::string &dir);
 void store(const Vec3f &vertex, const Vec3f &normal, const std::string &file, float size = 2.f);
-void store(const ProjectionDistances &pds, const VCutAOIs &aois, const CutMeshes &meshes, const std::string &file, float width = 0.2f/* [in mm] */);
+//void store(const ProjectionDistances &pds, const VCutAOIs &aois, const CutMeshes &meshes, const std::string &file, float width = 0.2f/* [in mm] */);
 void store(const ExPolygons& shapes, const std::vector<bool>& mask_distances, const std::vector<std::pair<size_t, size_t>>& connections, const std::string& file_svg);
 void store(const SurfaceCut &cut, const std::string &file, const std::string &contour_dir);
 void store(const std::vector<indexed_triangle_set> &models, const std::string &obj_filename);
@@ -508,7 +505,10 @@ void store(const Emboss::IProjection &projection, const Point &point_to_project,
 #endif // DEBUG_OUTPUT_DIR
 } // namespace privat
 
+#ifdef DEBUG_OUTPUT_DIR
 #include "libslic3r/SVG.hpp"
+#include <boost/log/trivial.hpp>
+#endif // DEBUG_OUTPUT_DIR
 
 SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
                                const std::vector<indexed_triangle_set> &models,
@@ -522,6 +522,7 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
 #ifdef DEBUG_OUTPUT_DIR
     priv::initialize_store(DEBUG_OUTPUT_DIR);
     priv::store(models, DEBUG_OUTPUT_DIR + "models_input.obj");
+    priv::store(shapes, DEBUG_OUTPUT_DIR + "shapes.svg");
 #endif // DEBUG_OUTPUT_DIR
 
     // for filter out triangles out of bounding box
@@ -556,9 +557,9 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
 #ifdef DEBUG_OUTPUT_DIR
     CGAL::IO::write_OFF(DEBUG_OUTPUT_DIR + "shape.off", cgal_shape); // only debug
 #endif // DEBUG_OUTPUT_DIR
-    
+
     // create tool for convert index to shape Point adress and vice versa
-    priv::ShapePoint2index s2i(shapes);
+    ExPolygonsIndices s2i(shapes);
     priv::VCutAOIs model_cuts;
     // cut shape from each cgal model
     for (priv::CutMesh &cgal_model : cgal_models) { 
@@ -580,7 +581,7 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     // fix - convert shape_point_id to expolygon index 
     // save 1 param(s2i) from diff_models call
     for (priv::SurfacePatch &patch : patches)
-        patch.shape_id = s2i.calc_id(patch.shape_id).expolygons_index;
+        patch.shape_id = s2i.cvt(patch.shape_id).expolygons_index;
 
     //// Only for create function
     //std::vector<bool> is_filling;
@@ -605,15 +606,21 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     uint32_t shapes_points = s2i.get_count();
     // for each point collect all projection distances
     priv::VDistances distances = priv::calc_distances(patches, cgal_models, cgal_shape, shapes_points, projection_ratio);
+        
+    Point start = shapes_bb.center(); // only align center
+    
+    //SurfaceCut result;
+    //for (priv::SurfacePatch &patch : patches)
+    //    priv::append(result, priv::patch2cut(patch));    
 
-    //assert(shapes_bb.center().x() == 0 && shapes_bb.center().y() == 0);
-    //Point start = shapes_bb.center();
-    //priv::filter_patches(patches, distances, shapes, start, s2i);
-
+    // Use only outline points
     // for each point select best projection
-    priv::ProjectionDistances best_projection = priv::choose_best_distance(distances, shapes, shapes_bb.center(), s2i);
-    std::vector<bool> use_patch = priv::select_patches(best_projection, patches);
+    priv::ProjectionDistances best_projection = priv::choose_best_distance(distances, shapes, start, s2i, patches);
+    std::vector<bool> use_patch = priv::select_patches(best_projection, patches,
+        shapes, s2i,model_cuts, cgal_models, projection);
     SurfaceCut result = merge_patches(patches, use_patch);
+    //*/
+
 #ifdef DEBUG_OUTPUT_DIR
     priv::store(result, DEBUG_OUTPUT_DIR + "result.obj", DEBUG_OUTPUT_DIR + "result_contours/");
 #endif // DEBUG_OUTPUT_DIR
@@ -621,7 +628,7 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
 }
 
 indexed_triangle_set Slic3r::cut2model(const SurfaceCut         &cut,
-                                       const Emboss::IProject3f &projection)
+                                       const Emboss::IProject3d &projection)
 {
     assert(!cut.empty());
     size_t count_vertices = cut.vertices.size() * 2;
@@ -644,9 +651,10 @@ indexed_triangle_set Slic3r::cut2model(const SurfaceCut         &cut,
         cut.indices.begin(), cut.indices.end());
 
     // back
-    for (const auto &v : cut.vertices) {
-        Vec3f v2 = projection.project(v);
-        result.vertices.push_back(v2);
+    for (const Vec3f &v : cut.vertices) {
+        Vec3d vd = v.cast<double>();
+        Vec3d vd2 = projection.project(vd);
+        result.vertices.push_back(vd2.cast<float>());
     }
 
     size_t back_offset = cut.vertices.size();
@@ -744,7 +752,7 @@ void priv::set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
     //   |    |/
     // 0 *----* 3
     //////////////////
-    std::array<std::pair<Vec3f, Vec3f>, 4> bb;
+    std::array<std::pair<Vec3d, Vec3d>, 4> bb;
     int index = 0;
     for (Point v :
          {shapes_bb.min, Point{shapes_bb.min.x(), shapes_bb.max.y()},
@@ -760,20 +768,20 @@ void priv::set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
     // plane is defined by point and normal
     PointNormals point_normals;
     for (size_t i = 0; i < 4; i++) {
-        const Vec3f &p1 = bb[i].first;
-        const Vec3f &p2 = bb[i].second;
-        const Vec3f &p3 = bb[prev_i].first;
+        const Vec3d &p1 = bb[i].first;
+        const Vec3d &p2 = bb[i].second;
+        const Vec3d &p3 = bb[prev_i].first;
         prev_i = i;
 
-        Vec3d v1 = (p2 - p1).cast<double>();
+        Vec3d v1 = p2 - p1;
         v1.normalize();
-        Vec3d v2 = (p3 - p1).cast<double>();
+        Vec3d v2 = p3 - p1;
         v2.normalize();
 
         Vec3d normal = v2.cross(v1);
         normal.normalize(); 
 
-        point_normals[i] = {p1.cast<double>(), normal};
+        point_normals[i] = {p1, normal};
     }
     // same meaning as point normal
     IsOnSides is_on_sides(its.vertices.size(), {false,false,false,false});    
@@ -865,7 +873,7 @@ indexed_triangle_set Slic3r::its_cut_AoI(const indexed_triangle_set &its,
 
 void priv::set_skip_by_angle(std::vector<bool>          &skip_indicies,
                              const indexed_triangle_set &its,
-                             const Project3f            &projection,
+                             const Project3d            &projection,
                              double                      max_angle)
 {
     assert(max_angle < 90. && max_angle > 89.);
@@ -875,9 +883,11 @@ void priv::set_skip_by_angle(std::vector<bool>          &skip_indicies,
         size_t index = &face - &its.indices.front();
         if (skip_indicies[index]) continue;
         Vec3f n = its_face_normal(its, face);
-        const Vec3f v = its.vertices[face[0]];
+        const Vec3f& v = its.vertices[face[0]];
+        const Vec3d vd = v.cast<double>();
         // Improve: For Orthogonal Projection it is same for each vertex
-        Vec3f projected = projection.project(v);
+        Vec3d projectedd  = projection.project(vd);
+        Vec3f projected   = projectedd.cast<float>();
         Vec3f project_dir = projected - v;
         project_dir.normalize();
         float cos_alpha = project_dir.dot(n);
@@ -959,6 +969,26 @@ priv::CutMesh priv::to_cgal(const indexed_triangle_set &its,
     return result;
 }
 
+bool priv::exist_duplicit_vertex(const CutMesh &mesh) {
+    std::vector<Vec3d> points;
+    points.reserve(mesh.vertices().size());
+    // copy points
+    for (VI vi : mesh.vertices()) { 
+        const P3 &p = mesh.point(vi);
+        points.emplace_back(p.x(), p.y(), p.z());
+    }
+    std::sort(points.begin(), points.end(), [](const Vec3d &v1, const Vec3d &v2) {
+        return v1.x() < v2.x() || 
+              (v1.x() == v2.x() && 
+                  (v1.y() < v2.y() || 
+                  (v1.y() == v2.y()  && 
+                      v1.z() < v2.z())));
+    });
+    // find first duplicit
+    auto it = std::adjacent_find(points.begin(), points.end());
+    return it != points.end();
+}
+
 priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
                             const Project     &projection)
 {
@@ -1028,66 +1058,9 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
         for (const Polygon &hole : shape.holes)
             insert_contour(hole);
     }
+    assert(!exist_duplicit_point(result));
     return result;
 }
-
-priv::ShapePoint2index::ShapePoint2index(const ExPolygons &shapes)
-{
-    // prepare offsets
-    m_offsets.reserve(shapes.size());
-    uint32_t offset = 0;
-    for (const auto &shape : shapes) {
-        assert(!shape.contour.points.empty());
-        std::vector<uint32_t> shape_offsets(shape.holes.size() + 1);
-
-        shape_offsets[0] = offset;
-        offset += shape.contour.points.size();
-
-        for (uint32_t i = 0; i < shape.holes.size(); i++) {
-            shape_offsets[i + 1] = offset;
-            offset += shape.holes[i].points.size();
-        }
-        m_offsets.push_back(std::move(shape_offsets));
-    }
-    m_count = offset;
-}
-
-uint32_t priv::ShapePoint2index::calc_index(const ShapePointId &id) const
-{
-    assert(id.expolygons_index < m_offsets.size());
-    const std::vector<uint32_t> &shape_offset = m_offsets[id.expolygons_index];
-    assert(id.polygon_index < shape_offset.size());
-    uint32_t res = shape_offset[id.polygon_index] + id.point_index;
-    assert(res < m_count);
-    return res;
-}
-
-priv::ShapePointId priv::ShapePoint2index::calc_id(uint32_t index) const
-{
-    assert(index < m_count);
-    ShapePointId result{0,0,0};
-    // find shape index
-    for (size_t i = 1; i < m_offsets.size(); i++) {
-        if (m_offsets[i][0] > index) break;
-        result.expolygons_index = i;
-    }
-
-    // find contour index
-    const std::vector<uint32_t> &shape_offset =
-        m_offsets[result.expolygons_index];
-    for (size_t i = 1; i < shape_offset.size(); i++) {
-        if (shape_offset[i] > index) break;
-        result.polygon_index = i;
-    }
-
-    // calculate point index
-    uint32_t polygon_offset = shape_offset[result.polygon_index];
-    assert(index >= polygon_offset);
-    result.point_index = index - polygon_offset;
-    return result;
-}
-
-uint32_t priv::ShapePoint2index::get_count() const { return m_count; }
 
 priv::ModelCut2index::ModelCut2index(const VCutAOIs &cuts)
 {
@@ -1219,7 +1192,7 @@ bool is_face_inside(HI                      hi,
                     const CutMesh          &mesh,
                     const CutMesh          &shape_mesh,
                     const VertexShapeMap   &vertex_shape_map,
-                    const ShapePoint2index &shape2index);
+                    const ExPolygonsIndices &shape2index);
 
 /// <summary>
 /// Face with constrained edge are inside/outside by type of intersection
@@ -1236,7 +1209,7 @@ void set_face_type(FaceTypeMap            &face_type_map,
                    const VertexShapeMap   &vertex_shape_map,
                    const EdgeBoolMap          &ecm,
                    const CutMesh          &shape_mesh,
-                   const ShapePoint2index &shape2index);
+                   const ExPolygonsIndices &shape2index);
 
 /// <summary>
 /// Change FaceType from not_constrained to inside
@@ -1315,6 +1288,8 @@ void priv::Visitor::intersection_point_detected(std::size_t    i_id,
         assert(&tm_f == &shape && &tm_e == &object);
         assert(!is_target_coplanar);
         assert(!is_source_coplanar);
+        if (is_target_coplanar || is_source_coplanar) 
+            *is_valid = false;
         intersection_ptr = &edge_shape_map[shape.edge(h_f)];
         if (sdim == 0) vert_shape_map[object.target(h_e)] = intersection_ptr;
     }
@@ -1343,7 +1318,7 @@ bool priv::is_face_inside(HI                      hi,
                           const CutMesh          &mesh,
                           const CutMesh          &shape_mesh,
                           const VertexShapeMap   &vertex_shape_map,
-                          const ShapePoint2index &shape2index)
+                          const ExPolygonsIndices &shape2index)
 {
     VI vi_from = mesh.source(hi);
     VI vi_to   = mesh.target(hi);
@@ -1370,9 +1345,9 @@ bool priv::is_face_inside(HI                      hi,
         // j is next contour point in vertices
         uint32_t j = i + 2;
         if (shape_from.is_last()) {
-            ShapePointId point_id = shape2index.calc_id(i_from);
+            ExPolygonsIndex point_id = shape2index.cvt(i_from);
             point_id.point_index  = 0;
-            j = shape2index.calc_index(point_id)*2;
+            j = shape2index.cvt(point_id)*2;
         }
 
         // opposit point(in triangle face) to edge
@@ -1410,7 +1385,7 @@ void priv::set_face_type(FaceTypeMap            &face_type_map,
                          const VertexShapeMap   &vertex_shape_map,
                          const EdgeBoolMap      &ecm,
                          const CutMesh          &shape_mesh,
-                         const ShapePoint2index &shape2index)
+                         const ExPolygonsIndices &shape2index)
 {
     for (EI ei : mesh.edges()) {
         if (!ecm[ei]) continue;
@@ -1432,7 +1407,7 @@ priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
                                    const ExPolygons       &shapes,
                                    CutMesh                &cgal_shape,
                                    float                   projection_ratio,
-                                   const ShapePoint2index &s2i)
+                                   const ExPolygonsIndices &s2i)
 {
     // pointer to edge or face shape_map
     VertexShapeMap vert_shape_map = cgal_model.add_property_map<VI, const IntersectingElement*>(vert_shape_map_name, nullptr).first;
@@ -1787,24 +1762,25 @@ AABBTreeIndirect::Tree<2, double> tree;
 };
 
 SearchData create_search_data(const ExPolygons &shapes, const std::vector<bool>& mask);
-uint32_t get_closest_point_index(const SearchData &sd, size_t line_idx, const Vec2d &hit_point, const ExPolygons &shapes, const ShapePoint2index &s2i);
+uint32_t get_closest_point_index(const SearchData &sd, size_t line_idx, const Vec2d &hit_point, const ExPolygons &shapes, const ExPolygonsIndices &s2i);
 
 // use AABB Tree Lines to find closest point
-uint32_t find_closest_point_index(const Point &p, const ExPolygons &shapes, const ShapePoint2index &s2i, const std::vector<bool> &mask);
+uint32_t find_closest_point_index(const Point &p, const ExPolygons &shapes, const ExPolygonsIndices &s2i, const std::vector<bool> &mask);
 
-std::pair<uint32_t, uint32_t> find_closest_point_pair(const ExPolygons &shapes, const std::vector<bool> &done_shapes, const ShapePoint2index  &s2i, const std::vector<bool> &mask);
+std::pair<uint32_t, uint32_t> find_closest_point_pair(const ExPolygons &shapes, const std::vector<bool> &done_shapes, const ExPolygonsIndices  &s2i, const std::vector<bool> &mask);
 
 // Search for closest projection to wanted distance
 const ProjectionDistance *get_closest_projection(const ProjectionDistances &distance, float wanted_distance);
 
 // fill result around known index inside one polygon
-void fill_polygon_distances(const ProjectionDistance &pd, uint32_t index, const ShapePointId &id, ProjectionDistances & result, const ExPolygons &shapes, const VDistances &distances);
+void fill_polygon_distances(const ProjectionDistance &pd, uint32_t index, const ExPolygonsIndex &id, ProjectionDistances & result, const ExPolygon &shape, const VDistances &distances);
 
+// search for closest projection for expolygon
 // choose correct cut by source point
-void fill_shape_distances(uint32_t known_point, const ProjectionDistance &pd, ProjectionDistances &result, std::vector<bool>& finished_shapes, const ShapePoint2index &s2i, const ExPolygons &shapes, const VDistances &distances);
+void fill_shape_distances(uint32_t start_index, const ProjectionDistance *start_pd, ProjectionDistances &result, const ExPolygonsIndices &s2i, const ExPolygon &shape, const VDistances &distances);
 
 // find close points between finished and unfinished ExPolygons
-ClosePoint find_close_point(const Point &p, ProjectionDistances &result, std::vector<bool>& finished_shapes,const ShapePoint2index &s2i, const ExPolygons &shapes);
+ClosePoint find_close_point(const Point &p, ProjectionDistances &result, std::vector<bool>& finished_shapes,const ExPolygonsIndices &s2i, const ExPolygons &shapes);
 
 }
 
@@ -1853,7 +1829,7 @@ uint32_t priv::get_closest_point_index(const SearchData &sd,
                                        size_t            line_idx,
                                        const Vec2d      &hit_point,
                                        const ExPolygons       &shapes,
-                                       const ShapePoint2index &s2i)
+                                       const ExPolygonsIndices &s2i)
 {
     const Linef &line = sd.lines[line_idx];
     Vec2d dir = line.a - line.b;
@@ -1868,7 +1844,7 @@ uint32_t priv::get_closest_point_index(const SearchData &sd,
     // Lambda used only for check result
     [[maybe_unused]] auto is_same = [&s2i, &shapes]
     (const Vec2d &p, size_t i) -> bool {
-        auto id = s2i.calc_id(i);
+        auto id = s2i.cvt(i);
         const ExPolygon &shape = shapes[id.expolygons_index];
         const Polygon   &poly  = (id.polygon_index == 0) ?
                                            shape.contour :
@@ -1881,7 +1857,7 @@ uint32_t priv::get_closest_point_index(const SearchData &sd,
         assert(is_same(line.b, point_index));
         return point_index; 
     }
-    auto id = s2i.calc_id(point_index);
+    auto id = s2i.cvt(point_index);
     if (id.point_index != 0) {
         assert(is_same(line.a, point_index - 1));
         return point_index - 1;
@@ -1899,7 +1875,7 @@ uint32_t priv::get_closest_point_index(const SearchData &sd,
 // use AABB Tree Lines
 uint32_t priv::find_closest_point_index(const Point            &p,
                                         const ExPolygons       &shapes,
-                                        const ShapePoint2index &s2i,
+                                        const ExPolygonsIndices &s2i,
                                         const std::vector<bool> &mask)
 {    
     SearchData sd = create_search_data(shapes, mask);
@@ -1918,7 +1894,7 @@ uint32_t priv::find_closest_point_index(const Point            &p,
 std::pair<uint32_t, uint32_t> priv::find_closest_point_pair(
     const ExPolygons        &shapes,
     const std::vector<bool> &done_shapes,
-    const ShapePoint2index  &s2i,
+    const ExPolygonsIndices  &s2i,
     const std::vector<bool> &mask)
 {
     assert(mask.size() == s2i.get_count());
@@ -1962,8 +1938,9 @@ std::pair<uint32_t, uint32_t> priv::find_closest_point_pair(
                 Vec2d  hit_point;
                 double distance_sq = AABBTreeLines::squared_distance_to_indexed_lines(
                     sd.lines, sd.tree, p_d, line_idx, hit_point, cp.distance_sq);
-                if (distance_sq < 0) continue;
-                assert(distance_sq <= cp.distance_sq);
+                if (distance_sq < 0 || 
+                    distance_sq >= cp.distance_sq) continue;
+                assert(line_idx < sd.lines.size());
                 cp.distance_sq         = distance_sq;
                 cp.unfinished_line_idx = line_idx;
                 cp.hit_point           = hit_point;
@@ -2004,13 +1981,12 @@ const priv::ProjectionDistance *priv::get_closest_projection(
 
 void priv::fill_polygon_distances(const ProjectionDistance &pd,
                                   uint32_t                  index,
-                                  const ShapePointId       &id,
+                                  const ExPolygonsIndex       &id,
                                   ProjectionDistances      &result,
-                                  const ExPolygons         &shapes,
+                                  const ExPolygon          &shape,
                                   const VDistances         &distances)
 {
-    const ExPolygon &shape = shapes[id.expolygons_index];
-    const Points  & points = (id.polygon_index == 0) ?
+    const Points& points = (id.polygon_index == 0) ?
                                             shape.contour.points :
                                             shape.holes[id.polygon_index - 1].points;
     // border of indexes for Polygon
@@ -2069,21 +2045,18 @@ void priv::fill_polygon_distances(const ProjectionDistance &pd,
     } while (true);
 }
 
-void priv::fill_shape_distances(uint32_t                  known_point,
-                                const ProjectionDistance &pd,
+// IMPROVE: when select distance fill in all distances from Patch
+void priv::fill_shape_distances(uint32_t                  start_index,
+                                const ProjectionDistance *start_pd,
                                 ProjectionDistances      &result,
-                                std::vector<bool>        &finished_shapes,
-                                const ShapePoint2index   &s2i,
-                                const ExPolygons         &shapes,
+                                const ExPolygonsIndices   &s2i,
+                                const ExPolygon         &shape,
                                 const VDistances         &distances)
 {
-    const ProjectionDistance *start_pd = &pd;
-    uint32_t start_index = known_point;
-    uint32_t expolygons_index = s2i.calc_id(known_point).expolygons_index;
-    uint32_t first_shape_index = s2i.calc_index({expolygons_index, 0, 0});
-    const ExPolygon &shape = shapes[expolygons_index];
+    uint32_t expolygons_index = s2i.cvt(start_index).expolygons_index;
+    uint32_t first_shape_index = s2i.cvt({expolygons_index, 0, 0});
     do {
-        fill_polygon_distances(*start_pd, start_index, s2i.calc_id(start_index),result, shapes, distances);
+        fill_polygon_distances(*start_pd, start_index, s2i.cvt(start_index),result, shape, distances);
         // seaching only inside shape, return index of closed finished point
         auto find_close_finished_point = [&first_shape_index, &shape, &result]
         (const Point &p) -> ClosePoint {
@@ -2143,13 +2116,12 @@ void priv::fill_shape_distances(uint32_t                  known_point,
         for (const Polygon &h : shape.holes)
             check_unfinished_points(h.points);
     } while (start_index != std::numeric_limits<uint32_t>::max());
-    finished_shapes[expolygons_index] = true;
 }
 
 priv::ClosePoint priv::find_close_point(const Point         &p,
                                         ProjectionDistances &result,
                                         std::vector<bool>   &finished_shapes,
-                                        const ShapePoint2index &s2i,
+                                        const ExPolygonsIndices &s2i,
                                         const ExPolygons       &shapes)
 {
     // result
@@ -2158,7 +2130,7 @@ priv::ClosePoint priv::find_close_point(const Point         &p,
     for (uint32_t shape_index = 0; shape_index < shapes.size(); ++shape_index) {
         if (!finished_shapes[shape_index]) continue;
         const ExPolygon &shape = shapes[shape_index];
-        uint32_t index = s2i.calc_index({shape_index, 0, 0});
+        uint32_t index = s2i.cvt({shape_index, 0, 0});
         auto find_close_point_in_points = [&p, &cp, &index, &result]
         (const Points &pts){
             for (const Point &p_ : pts) {
@@ -2184,79 +2156,17 @@ priv::ClosePoint priv::find_close_point(const Point         &p,
     return cp;
 }
 
-void priv::filter_patches(SurfacePatches         &patches,
-                          const VDistances       &distances,
-                          const ExPolygons       &shapes,
-                          const Point            &center,
-                          const ShapePoint2index &s2i)
+// IMPROVE: when select distance fill in all distances from Patch
+priv::ProjectionDistances priv::choose_best_distance(
+    const VDistances &distances, const ExPolygons &shapes, const Point &start, const ExPolygonsIndices &s2i, const SurfacePatches &patches)
 {
     assert(distances.size() == count_points(shapes));
-    // collect closest projection for source shape point(outline point)
-    ProjectionDistances closest(distances.size());
 
-    // store info about finished shapes
-    std::vector<bool> finished_shapes(shapes.size(), {false});
-    
-    // wanted distance from ideal projection
-    // Distances are relative to projection distance
-    // so first wanted distance is the closest one (ZERO)
-    float wanted_distance = 0.f;
-    
-    // For each shape point flag wether exist some distance.
-    std::vector<bool> mask_distances(s2i.get_count(), {true});
-    for (const auto &d : distances)
-        if (d.empty()) mask_distances[&d - &distances.front()] = false;
+    // vector of patches for shape
+    std::vector<std::vector<uint32_t>> shapes_patches(shapes.size());
+    for (const SurfacePatch &patch : patches)
+        shapes_patches[patch.shape_id].push_back(&patch-&patches.front());
 
-    // Select point from shapes(text contour) which is closest to center (all in 2d)
-    uint32_t unfinished_index = find_closest_point_index(center, shapes, s2i, mask_distances);
-    
-#ifdef DEBUG_OUTPUT_DIR
-    std::vector<std::pair<size_t, size_t>> connections;
-    connections.reserve(shapes.size());
-    connections.emplace_back(unfinished_index, unfinished_index);
-#endif // DEBUG_OUTPUT_DIR
-
-    do {
-        const ProjectionDistance* pd = get_closest_projection(distances[unfinished_index], wanted_distance);
-        // selection of closest_id should proove that pd has value 
-        // (functions: get_closest_point_index and find_close_point_in_points)
-        assert(pd != nullptr);
-        fill_shape_distances(unfinished_index, *pd, closest, finished_shapes, s2i, shapes, distances);
-
-        // The most close points between finished and unfinished shapes
-        auto [finished, unfinished] = find_closest_point_pair(
-            shapes, finished_shapes, s2i, mask_distances);
-
-        // detection of end (best doesn't have value)
-        if (finished == std::numeric_limits<uint32_t>::max()) break;
-
-        assert(unfinished != std::numeric_limits<uint32_t>::max());
-        const ProjectionDistance &closest_pd = closest[finished];
-        // check that best_cp is finished and has result
-        assert(closest_pd.aoi_index != std::numeric_limits<uint32_t>::max());
-        wanted_distance = closest_pd.distance;
-        unfinished_index = unfinished;
-
-#ifdef DEBUG_OUTPUT_DIR
-        connections.emplace_back(finished, unfinished);
-#endif // DEBUG_OUTPUT_DIR
-    } while (true); //(unfinished_index != std::numeric_limits<uint32_t>::max());    
-#ifdef DEBUG_OUTPUT_DIR
-    store(shapes, mask_distances, connections, DEBUG_OUTPUT_DIR + "closest_points.svg");
-#endif // DEBUG_OUTPUT_DIR
-    
-    
-    
-    
-}
-
-// IMPROVE2: when select distance fill in all distances from Patch
-priv::ProjectionDistances priv::choose_best_distance(
-    const VDistances       &distances,
-    const ExPolygons       &shapes,
-    const Point            &center,
-    const ShapePoint2index &s2i)
-{
     // collect one closest projection for each outline point
     ProjectionDistances result(distances.size());
 
@@ -2273,7 +2183,7 @@ priv::ProjectionDistances priv::choose_best_distance(
         if (d.empty()) mask_distances[&d - &distances.front()] = false;
 
     // Select point from shapes(text contour) which is closest to center (all in 2d)
-    uint32_t unfinished_index = find_closest_point_index(center, shapes, s2i, mask_distances);
+    uint32_t unfinished_index = find_closest_point_index(start, shapes, s2i, mask_distances);
     
 #ifdef DEBUG_OUTPUT_DIR
     std::vector<std::pair<size_t, size_t>> connections;
@@ -2286,8 +2196,42 @@ priv::ProjectionDistances priv::choose_best_distance(
         // selection of closest_id should proove that pd has value 
         // (functions: get_closest_point_index and find_close_point_in_points)
         assert(pd != nullptr);
-        fill_shape_distances(unfinished_index, *pd, result, finished_shapes, s2i, shapes, distances);
+        uint32_t expolygons_index = s2i.cvt(unfinished_index).expolygons_index;        
+        const ExPolygon &shape = shapes[expolygons_index];
+        std::vector<uint32_t> &shape_patches = shapes_patches[expolygons_index];
+        if (shape_patches.size() == 1){
+            // Speed up, only one patch so copy distance from patch
+            uint32_t first_shape_index = s2i.cvt({expolygons_index, 0, 0});
+            uint32_t laset_shape_index = first_shape_index + count_points(shape);
+            for (uint32_t i = first_shape_index; i < laset_shape_index; ++i) { 
+                const ProjectionDistances &pds = distances[i];
+                if (pds.empty()) continue;
+                // check that index belongs to patch
+                assert(pds.front().patch_index == shape_patches.front());
+                result[i] = pds.front();
+                if (pds.size() == 1) continue;
 
+                float relative_distance = fabs(result[i].distance - pd->distance);
+                // patch could contain multiple value for one outline point
+                // so choose closest to start point
+                for (uint32_t pds_index = 1; pds_index < pds.size(); ++pds_index) {
+                    // check that index still belongs to same patch
+                    assert(pds[pds_index].patch_index == shape_patches.front());
+                    float relative_distance2 = fabs(pds[pds_index].distance - pd->distance);
+                    if (relative_distance > relative_distance2) { 
+                        relative_distance = relative_distance2;
+                        result[i]         = pds[pds_index];
+                    }
+                }
+            }
+        } else {
+            // multiple patches for expolygon
+            // check that exist patch to fill shape
+            assert(!shape_patches.empty());
+            fill_shape_distances(unfinished_index, pd, result, s2i, shape, distances);
+        }
+
+        finished_shapes[expolygons_index] = true;
         // The most close points between finished and unfinished shapes
         auto [finished, unfinished] = find_closest_point_pair(
             shapes, finished_shapes, s2i, mask_distances);
@@ -2786,7 +2730,7 @@ bool has_bb_intersection(const BoundingBoxf3  &bb,
 /// otherwise FALSE</returns>
 bool is_patch_inside_of_model(const SurfacePatch &patch,
                               const Tree         &tree,
-                              const Project3f    &projection);
+                              const Project3d    &projection);
 
 /// <summary>
 /// Return some shape point index which identify shape
@@ -2875,12 +2819,12 @@ bool priv::has_bb_intersection(const BoundingBoxf3  &bb,
 
 bool priv::is_patch_inside_of_model(const SurfacePatch &patch,
                                     const Tree         &tree,
-                                    const Project3f    &projection)
+                                    const Project3d    &projection)
 {
     // TODO: Solve model with hole in projection direction !!!
     const P3 &a = patch.mesh.point(VI(0));
-    Vec3f a_(a.x(), a.y(), a.z());
-    Vec3f b_ = projection.project(a_);
+    Vec3d a_(a.x(), a.y(), a.z());
+    Vec3d b_ = projection.project(a_);
     P3 b(b_.x(), b_.y(), b_.z());
 
     Ray ray_query(a, b);
@@ -3026,7 +2970,7 @@ void priv::collect_open_edges(SurfacePatches &patches) {
 priv::SurfacePatches priv::diff_models(VCutAOIs            &cuts,
                                        /*const*/ CutMeshes &cut_models,
                                        /*const*/ CutMeshes &models,
-                                       const Project3f     &projection)
+                                       const Project3d     &projection)
 {
     // IMPROVE: when models contain ONE mesh. It is only about convert cuts to patches
     // and reduce unneccessary triangles on contour
@@ -3215,16 +3159,99 @@ bool priv::is_over_whole_expoly(const CutAOI    &cutAOI,
     return true;
 }
 
-std::vector<bool> priv::select_patches(
-    const ProjectionDistances &best_distances,
-    const SurfacePatches      &patches)
+std::vector<bool> priv::select_patches(const ProjectionDistances &best_distances,
+                                       const SurfacePatches      &patches,
+
+                                       const ExPolygons       &shapes,
+                                       const ExPolygonsIndices &s2i,
+                                       const VCutAOIs         &cutAOIs,
+                                       const CutMeshes        &meshes,
+                                       const Project          &projection)
 {
+    // extension to cover numerical mistake made by back projection patch from 3d to 2d
+    const float extend_delta = 5.f / Emboss::SHAPE_SCALE; // [Font points scaled by Emboss::SHAPE_SCALE]
+
+    // vector of patches for shape
+    std::vector<std::vector<uint32_t>> used_shapes_patches(shapes.size());    
     std::vector<bool> in_distances(patches.size(), {false});
     for (const ProjectionDistance &d : best_distances) {
         // exist valid projection for shape point?
         if (d.patch_index == std::numeric_limits<uint32_t>::max()) continue;
+        if (in_distances[d.patch_index]) continue;
         in_distances[d.patch_index] = true;
+
+        ExPolygonsIndex id = s2i.cvt(&d - &best_distances.front());
+        used_shapes_patches[id.expolygons_index].push_back(d.patch_index);
     }
+
+    // vector of patches for shape
+    std::vector<std::vector<uint32_t>> shapes_patches(shapes.size());
+    for (const SurfacePatch &patch : patches) 
+        shapes_patches[patch.shape_id].push_back(&patch - &patches.front());
+
+    for (size_t shape_index = 0; shape_index < shapes.size(); shape_index++) 
+    {
+        const ExPolygon &shape = shapes[shape_index];
+        const std::vector<uint32_t> &used_shape_patches = used_shapes_patches[shape_index];
+        if (used_shape_patches.empty()) continue;
+        if (used_shape_patches.size() == 1) { 
+            uint32_t patch_index = used_shape_patches.front();
+            const SurfacePatch &patch = patches[patch_index];
+            if (is_over_whole_expoly(patch, shapes, cutAOIs, meshes)) continue;
+        }
+
+        // only shapes contain multiple patches
+        // or not full filled are hard processed
+
+        // convert patch to 2d
+        ExPolygons fill;
+        fill.reserve(used_shape_patches.size());
+        for (uint32_t patch_index : used_shape_patches) { 
+            ExPolygon patch_area = to_expoly(patches[patch_index], projection);
+            //*/
+            // add save offset extension to cover numerical mistake made by back projection to 2d
+            const float extend_delta = 5.f;
+            ExPolygons patch_areas = offset_ex(patch_area, extend_delta);
+            fill.insert(fill.end(), patch_areas.begin(), patch_areas.end());            
+            /*/
+            // without save extension
+            fill.push_back(patch_area);
+            //*/
+        }
+        ExPolygons rest = diff_ex(ExPolygons{shape}, fill, ApplySafetyOffset::Yes);
+        if (rest.empty()) continue;
+
+        // find patches overlaed rest area
+        fill = union_ex(fill);
+        struct PatchShape{
+            uint32_t patch_index;
+            ExPolygon shape;
+            ExPolygons intersection;
+        };
+        using PatchShapes = std::vector<PatchShape>;
+        PatchShapes patch_shapes;
+        for (uint32_t patch_index : shapes_patches[shape_index]) { 
+            // check is patch already used
+            auto it = std::lower_bound(used_shape_patches.begin(), used_shape_patches.end(), patch_index);
+            if (it != used_shape_patches.end() && *it == patch_index) continue;
+            ExPolygon patch_shape = to_expoly(patches[patch_index], projection);
+            ExPolygons patch_intersection = intersection_ex(ExPolygons{patch_shape}, rest);
+            if (patch_intersection.empty()) continue;
+
+            patch_shapes.push_back({patch_index, patch_shape, patch_intersection});
+        }
+
+        // how to select which patch to use
+        // 
+        // by depth:
+        // how to calc wanted depth - idealy by depth of hole outline points
+        // 
+        // how to calc patch depth - by average outline depth
+
+
+    }
+
+
     // For sure of the bounding boxes intersection
     const double bb_extension = 1e-10;
     const Vec3d bb_ext(bb_extension, bb_extension, bb_extension);
@@ -3275,16 +3302,6 @@ std::vector<bool> priv::select_patches(
     }
     return result;
 }
-
-// help function to 'merge_patches'
-namespace priv {
-/// <summary>
-/// Convert patch to indexed_triangle_set
-/// </summary>
-/// <param name="patch">Part of surface</param>
-/// <returns>Converted patch</returns>
-SurfaceCut patch2cut(SurfacePatch &patch);
-} // namespace priv
 
 priv::Loops priv::create_loops(const std::vector<HI> &outlines, const CutMesh& mesh)
 {
@@ -3349,8 +3366,7 @@ priv::Loops priv::create_loops(const std::vector<HI> &outlines, const CutMesh& m
     return loops;
 }
 
-#include "ClipperUtils.hpp"
-ExPolygon priv::to_expoly(const SurfacePatch &patch, const Project &project)
+Polygons priv::unproject_loops(const SurfacePatch &patch, const Project &projection)
 {
     assert(!patch.loops.empty());
     if (patch.loops.empty()) return {};
@@ -3364,11 +3380,11 @@ ExPolygon priv::to_expoly(const SurfacePatch &patch, const Project &project)
     for (const Loop &l : patch.loops) {
         pts.clear();
         pts.reserve(l.size());
-        for (VI vi : l) { 
+        for (VI vi : l) {
             const P3 &p3 = patch.mesh.point(vi);
-            Vec3f p(p3.x(), p3.y(), p3.z());
-            std::optional<Point> p2_opt = project.unproject(p);
-            
+            Vec3d p(p3.x(), p3.y(), p3.z());
+            std::optional<Point> p2_opt = projection.unproject(p);
+
             // Check when appear that skip is enough for poit which can't be unprojected
             // - it could break contour
             assert(p2_opt.has_value());
@@ -3384,13 +3400,17 @@ ExPolygon priv::to_expoly(const SurfacePatch &patch, const Project &project)
     }
 
     assert(!polys.empty());
-    if (polys.empty()) return {};
+    return polys;
+}
 
-    ExPolygons expolys = Slic3r::union_ex(polys, ClipperLib::PolyFillType::pftEvenOdd);
-
+ExPolygon priv::to_expoly(const SurfacePatch &patch, const Project &projection)
+{
+    Polygons polys = unproject_loops(patch, projection);
+    // should not be used when no opposit triangle are counted so should not create overlaps
+    ClipperLib::PolyFillType fill_type = ClipperLib::PolyFillType::pftEvenOdd;
+    ExPolygons expolys = Slic3r::union_ex(polys, fill_type);
     assert(expolys.size() == 1);
     if (expolys.empty()) return {};
-
     return expolys.front();
 }
 
@@ -3448,18 +3468,6 @@ SurfaceCut priv::patch2cut(SurfacePatch &patch)
     return sc;
 }
 
-namespace priv {
-
-/// <summary>
-/// Merge two surface cuts together
-/// Added surface cut will be consumed
-/// </summary>
-/// <param name="sc">Surface cut to extend</param>
-/// <param name="sc_add">Surface cut to consume</param>
-void append(SurfaceCut &sc, SurfaceCut &&sc_add);
-
-}// namespace priv
-
 void priv::append(SurfaceCut &sc, SurfaceCut &&sc_add)
 {
     if (sc.empty()) {
@@ -3491,7 +3499,7 @@ SurfaceCut priv::merge_patches(SurfacePatches &patches, const std::vector<bool>&
 }
 
 #ifdef DEBUG_OUTPUT_DIR
-
+#include "libslic3r/SVG.hpp"
 #include <filesystem>
 namespace priv{
 void prepare_dir(const std::string &dir){
@@ -3576,6 +3584,11 @@ void priv::store(const CutMesh &mesh, const FaceTypeMap &face_type_map, const st
     }
     CGAL::IO::write_OFF(off_file, mesh);
     mesh_.remove_property_map(face_colors);
+}
+
+void priv::store(const ExPolygons &shapes, const std::string &svg_file) { 
+    SVG svg(svg_file);
+    svg.draw(shapes);
 }
 
 void priv::store(const CutMesh &mesh, const ReductionMap &reduction_map, const std::string& dir)
@@ -3707,52 +3720,52 @@ void priv::store(const SurfacePatches &patches, const std::string &dir) {
         CGAL::IO::write_OFF(dir + "patch" + std::to_string(index) + ".off", patch.mesh);
     }
 }
-
-void priv::store(const ProjectionDistances &pds,
-                 const VCutAOIs            &aois,
-                 const CutMeshes           &meshes,
-                 const std::string         &file,
-                 float                      width)
-{
-    // create rectangle for each half edge from projection distances
-    indexed_triangle_set its;
-    its.vertices.reserve(4 * pds.size());
-    its.indices.reserve(2 * pds.size());
-    for (const ProjectionDistance &pd : pds) {
-        if (pd.aoi_index == std::numeric_limits<uint32_t>::max()) continue;
-        HI hi  = aois[pd.model_index][pd.aoi_index].second[pd.hi_index];
-        const CutMesh &mesh = meshes[pd.model_index];
-        VI vi1 = mesh.source(hi);
-        VI vi2 = mesh.target(hi);
-        VI vi3 = mesh.target(mesh.next(hi));
-        const P3 &p1  = mesh.point(vi1);
-        const P3 &p2  = mesh.point(vi2);
-        const P3 &p3  = mesh.point(vi3);
-        Vec3f v1(p1.x(), p1.y(), p1.z());
-        Vec3f v2(p2.x(), p2.y(), p2.z());
-        Vec3f v3(p3.x(), p3.y(), p3.z());
-
-        Vec3f v12 = v2 - v1;
-        v12.normalize();
-        Vec3f v13 = v3 - v1;
-        v13.normalize();
-        Vec3f n = v12.cross(v13);
-        n.normalize();
-        Vec3f side = n.cross(v12);
-        side.normalize();
-        side *= -width;
-        
-        uint32_t i = its.vertices.size();
-        its.vertices.push_back(v1);
-        its.vertices.push_back(v1+side);
-        its.vertices.push_back(v2);
-        its.vertices.push_back(v2+side);
-
-        its.indices.emplace_back(i, i + 1, i + 2);
-        its.indices.emplace_back(i + 2, i + 1, i + 3);
-    }
-    its_write_obj(its, file.c_str());
-}
+//
+//void priv::store(const ProjectionDistances &pds,
+//                 const VCutAOIs            &aois,
+//                 const CutMeshes           &meshes,
+//                 const std::string         &file,
+//                 float                      width)
+//{
+//    // create rectangle for each half edge from projection distances
+//    indexed_triangle_set its;
+//    its.vertices.reserve(4 * pds.size());
+//    its.indices.reserve(2 * pds.size());
+//    for (const ProjectionDistance &pd : pds) {
+//        if (pd.aoi_index == std::numeric_limits<uint32_t>::max()) continue;
+//        HI hi  = aois[pd.model_index][pd.aoi_index].second[pd.hi_index];
+//        const CutMesh &mesh = meshes[pd.model_index];
+//        VI vi1 = mesh.source(hi);
+//        VI vi2 = mesh.target(hi);
+//        VI vi3 = mesh.target(mesh.next(hi));
+//        const P3 &p1  = mesh.point(vi1);
+//        const P3 &p2  = mesh.point(vi2);
+//        const P3 &p3  = mesh.point(vi3);
+//        Vec3f v1(p1.x(), p1.y(), p1.z());
+//        Vec3f v2(p2.x(), p2.y(), p2.z());
+//        Vec3f v3(p3.x(), p3.y(), p3.z());
+//
+//        Vec3f v12 = v2 - v1;
+//        v12.normalize();
+//        Vec3f v13 = v3 - v1;
+//        v13.normalize();
+//        Vec3f n = v12.cross(v13);
+//        n.normalize();
+//        Vec3f side = n.cross(v12);
+//        side.normalize();
+//        side *= -width;
+//        
+//        uint32_t i = its.vertices.size();
+//        its.vertices.push_back(v1);
+//        its.vertices.push_back(v1+side);
+//        its.vertices.push_back(v2);
+//        its.vertices.push_back(v2+side);
+//
+//        its.indices.emplace_back(i, i + 1, i + 2);
+//        its.indices.emplace_back(i + 2, i + 1, i + 3);
+//    }
+//    its_write_obj(its, file.c_str());
+//}
 
 #include "SVG.hpp"
 void priv::store(const ExPolygons                   &shapes,
@@ -3766,9 +3779,9 @@ void priv::store(const ExPolygons                   &shapes,
     SVG svg(file_svg, bb);
     svg.draw(shapes);
     
-    ShapePoint2index s2i(shapes);
+    ExPolygonsIndices s2i(shapes);
     auto get_point = [&shapes, &s2i](size_t i)->Point {
-        auto id = s2i.calc_id(i);
+        auto id = s2i.cvt(i);
         const ExPolygon &s  = shapes[id.expolygons_index];
         const Polygon   &p  = (id.polygon_index == 0) ?
                                               s.contour :
@@ -3948,10 +3961,19 @@ void priv::store(const Emboss::IProjection &projection,
                  const std::string         &obj_filename)
 {
     auto [front, back] = projection.create_front_back(point_to_project);
-    Vec3f diff         = back - front;
-    Vec3f pos          = front + diff * projection_ratio;
-    priv::store(pos, diff.normalized(),
+    Vec3d diff         = back - front;
+    Vec3d pos          = front + diff * projection_ratio;
+    priv::store(pos.cast<float>(), diff.normalized().cast<float>(),
                 DEBUG_OUTPUT_DIR + "projection_center.obj"); // only debug
 }
 
 #endif // DEBUG_OUTPUT_DIR
+
+bool Slic3r::corefine_test(const std::string &model_path, const std::string &shape_path) {
+    priv::CutMesh model, shape;
+    if (!CGAL::IO::read_OFF(model_path, model)) return false;
+    if (!CGAL::IO::read_OFF(shape_path, shape)) return false;
+        
+    CGAL::Polygon_mesh_processing::corefine(model, shape);
+    return true;
+}

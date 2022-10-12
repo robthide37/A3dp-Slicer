@@ -46,7 +46,7 @@ SurfaceCut cut_surface(const ExPolygons                        &shapes,
 /// <param name="projection">Way of emboss</param>
 /// <returns>Mesh</returns>
 indexed_triangle_set cut2model(const SurfaceCut         &cut,
-                               const Emboss::IProject3f &projection);
+                               const Emboss::IProject3d &projection);
 
 /// <summary>
 /// Separate (A)rea (o)f (I)nterest .. AoI from model
@@ -67,6 +67,8 @@ indexed_triangle_set its_cut_AoI(const indexed_triangle_set &its,
 /// <param name="mask">Mask - same size as its::indices</param>
 /// <returns>Copy of indices by mask(with their vertices)</returns>
 indexed_triangle_set its_mask(const indexed_triangle_set &its, const std::vector<bool> &mask);
+
+bool corefine_test(const std::string &model_path, const std::string &shape_path);
 
 } // namespace Slic3r
 #endif // slic3r_CutSurface_hpp_
