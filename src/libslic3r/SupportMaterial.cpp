@@ -800,6 +800,7 @@ public:
     {
         switch (m_style) {
         case smsTree:
+        case smsOrganic:
             assert(false);
             [[fallthrough]];
         case smsGrid:

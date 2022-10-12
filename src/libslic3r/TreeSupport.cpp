@@ -211,7 +211,7 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
 #endif // NDEBUG
         // Support must be enabled and set to Tree style.
         assert(object_config.support_material);
-        assert(object_config.support_material_style == smsTree);
+        assert(object_config.support_material_style == smsTree || object_config.support_material_style == smsOrganic);
 
         bool found_existing_group = false;
         TreeSupportSettings next_settings{ TreeSupportMeshGroupSettings{ print_object } };
@@ -330,18 +330,39 @@ void tree_supports_show_error(std::string message, bool critical)
                 if (! (enforced_layer || blockers_layers.empty() || blockers_layers[layer_id].empty()))
                     overhangs = diff(overhangs, blockers_layers[layer_id], ApplySafetyOffset::Yes);
             }
-            if (! enforcers_layers.empty() && ! enforcers_layers[layer_id].empty())
+            //check_self_intersections(overhangs, "generate_overhangs1");
+            if (! enforcers_layers.empty() && ! enforcers_layers[layer_id].empty()) {
                 // Has some support enforcers at this layer, apply them to the overhangs, don't apply the support threshold angle.
-                if (Polygons enforced_overhangs = intersection(raw_overhangs_calculated ? raw_overhangs : diff(current_layer.lslices, lower_layer.lslices), enforcers_layers[layer_id]);
+                //enforcers_layers[layer_id] = union_(enforcers_layers[layer_id]);
+                //check_self_intersections(enforcers_layers[layer_id], "generate_overhangs - enforcers");
+                //check_self_intersections(to_polygons(lower_layer.lslices), "generate_overhangs - lowerlayers");
+                if (Polygons enforced_overhangs = intersection(raw_overhangs_calculated ? raw_overhangs : diff(current_layer.lslices, lower_layer.lslices), enforcers_layers[layer_id] /*, ApplySafetyOffset::Yes */);
                     ! enforced_overhangs.empty()) {
                     //FIXME this is a hack to make enforcers work on steep overhangs.
-                    enforced_overhangs = diff(offset(enforced_overhangs, 
+                    //check_self_intersections(enforced_overhangs, "generate_overhangs - enforced overhangs1");
+                    //Polygons enforced_overhangs_prev = enforced_overhangs;
+                    //check_self_intersections(to_polygons(union_ex(enforced_overhangs)), "generate_overhangs - enforced overhangs11");
+                    //check_self_intersections(offset(union_ex(enforced_overhangs),
+                        //FIXME this is a fudge constant!
+                    //    scaled<float>(0.4)), "generate_overhangs - enforced overhangs12");
+                    enforced_overhangs = diff(offset(union_ex(enforced_overhangs),
                         //FIXME this is a fudge constant!
                         scaled<float>(0.4)), 
                         lower_layer.lslices);
+#ifdef TREESUPPORT_DEBUG_SVG
+                    if (! intersecting_edges(enforced_overhangs).empty()) {
+                        static int irun = 0;
+                        SVG::export_expolygons(debug_out_path("treesupport-self-intersections-%d.svg", ++irun),
+                            { { { union_ex(enforced_overhangs_prev) },   { "prev", "yellow", 0.5f } },
+                              { { lower_layer.lslices },   { "lower_layer.lslices", "gray", 0.5f } },
+                              { { union_ex(enforced_overhangs) }, { "enforced_overhangs", "red",  "black", "", scaled<coord_t>(0.1f), 0.5f } } });
+                    }
+#endif // TREESUPPORT_DEBUG_SVG
+                    //check_self_intersections(enforced_overhangs, "generate_overhangs - enforced overhangs2");
                     overhangs = overhangs.empty() ? std::move(enforced_overhangs) : union_(overhangs, enforced_overhangs);
+                    //check_self_intersections(overhangs, "generate_overhangs - enforcers");
                 }
-            check_self_intersections(overhangs, "generate_overhangs");
+            }   
             out[layer_id] = std::move(overhangs);
         }
     });
@@ -1106,7 +1127,7 @@ static void generate_initial_areas(
                 overhang_regular = mesh_group_settings.support_offset == 0 ? 
                     overhang_raw :
                     safe_offset_inc(overhang_raw, mesh_group_settings.support_offset, relevant_forbidden, mesh_config.min_radius * 1.75 + mesh_config.xy_min_distance, 0, 1);
-                check_self_intersections(overhang_regular, "overhang_regular1");
+                //check_self_intersections(overhang_regular, "overhang_regular1");
 
                 // offset ensures that areas that could be supported by a part of a support line, are not considered unsupported overhang
                 Polygons remaining_overhang = intersection(
@@ -1134,7 +1155,7 @@ static void generate_initial_areas(
                     remaining_overhang = diff(remaining_overhang, safe_offset_inc(overhang_regular, 1.5 * extra_total_offset_acc, raw_collision, offset_step, 0, 1));
                     // Extending the overhangs by the inflated remaining overhangs.
                     overhang_regular   = union_(overhang_regular, diff(safe_offset_inc(remaining_overhang, extra_total_offset_acc, raw_collision, offset_step, 0, 1), relevant_forbidden));
-                    check_self_intersections(overhang_regular, "overhang_regular2");
+                    //check_self_intersections(overhang_regular, "overhang_regular2");
                 }
                 // If the xy distance overrides the z distance, some support needs to be inserted further down.
                 //=> Analyze which support points do not fit on this layer and check if they will fit a few layers down (while adding them an infinite amount of layers down would technically be closer the the setting description, it would not produce reasonable results. )
@@ -1186,7 +1207,7 @@ static void generate_initial_areas(
                 if (mesh_group_settings.minimum_support_area > 0)
                     remove_small(overhang_roofs, mesh_group_settings.minimum_roof_area);
                 overhang_regular = diff(overhang_regular, overhang_roofs, ApplySafetyOffset::Yes);
-                check_self_intersections(overhang_regular, "overhang_regular3");
+                //check_self_intersections(overhang_regular, "overhang_regular3");
                 for (ExPolygon &roof_part : union_ex(overhang_roofs))
                     overhang_processing.emplace_back(std::move(roof_part), true);
             }
@@ -2397,6 +2418,8 @@ static void set_points_on_areas(const SupportElement &elem, SupportElements *lay
                 next_elem.state.result_on_layer = move_inside_if_outside(next_elem.influence_area, elem.state.result_on_layer);
                 // do not call recursive because then amount of layers would be restricted by the stack size
             }
+            // Mark the parent element as accessed from a valid child element.
+            next_elem.state.marked = true;
         }
 }
 
@@ -2515,15 +2538,23 @@ static void create_nodes_from_area(
 {
     // Initialize points on layer 0, with a "random" point in the influence area. 
     // Point is chosen based on an inaccurate estimate where the branches will split into two, but every point inside the influence area would produce a valid result.
-    for (SupportElement &init : move_bounds.front()) {
-        init.state.result_on_layer = move_inside_if_outside(init.influence_area, init.state.next_position);
-        // Also set the parent nodes, as these will be required for the first iteration of the loop below.
-        set_points_on_areas(init, move_bounds.size() > 1 ? &move_bounds[1] : nullptr);
+    {
+        SupportElements *layer_above = move_bounds.size() > 1 ? &move_bounds[1] : nullptr;
+        for (SupportElement &elem : *layer_above)
+            elem.state.marked = false;
+        for (SupportElement &init : move_bounds.front()) {
+            init.state.result_on_layer = move_inside_if_outside(init.influence_area, init.state.next_position);
+            // Also set the parent nodes, as these will be required for the first iteration of the loop below and mark the parent nodes.
+            set_points_on_areas(init, layer_above);
+        }
     }
 
     for (LayerIndex layer_idx = 1; layer_idx < LayerIndex(move_bounds.size()); ++ layer_idx) {
         auto &layer       = move_bounds[layer_idx];
         auto *layer_above = layer_idx + 1 < move_bounds.size() ? &move_bounds[layer_idx + 1] : nullptr;
+        if (layer_above)
+            for (SupportElement &elem : *layer_above)
+                elem.state.marked = false;
         for (SupportElement &elem : layer) {
             assert(! elem.state.deleted);
             assert(elem.state.layer_idx == layer_idx);
@@ -2537,11 +2568,6 @@ static void create_nodes_from_area(
                     }
                     // we dont need to remove yet the parents as they will have a lower dtt and also no result_on_layer set
                     elem.state.deleted = true;
-                    for (int32_t parent_idx : elem.parents)
-                        // When the roof was not able to generate downwards enough, the top elements may have not moved, and have result_on_layer already set.
-                        // As this branch needs to be removed => all parents result_on_layer have to be invalidated.
-                        (*layer_above)[parent_idx].state.result_on_layer_reset();
-                    continue;
                 } else {
                     // set the point where the branch will be placed on the model
                     if (elem.state.to_model_gracious)
@@ -2550,13 +2576,67 @@ static void create_nodes_from_area(
                         set_to_model_contact_simple(elem);
                 }
             }
-            if (! elem.state.deleted)
-                // element is valid now setting points in the layer above
+            if (! elem.state.deleted && ! elem.state.marked && elem.state.target_height == layer_idx)
+                // Just a tip surface with no supporting element.
+                elem.state.deleted = true;
+            if (elem.state.deleted) {
+                for (int32_t parent_idx : elem.parents)
+                    // When the roof was not able to generate downwards enough, the top elements may have not moved, and have result_on_layer already set.
+                    // As this branch needs to be removed => all parents result_on_layer have to be invalidated.
+                    (*layer_above)[parent_idx].state.result_on_layer_reset();
+            }
+            if (! elem.state.deleted) {
+                // Element is valid now setting points in the layer above and mark the parent nodes.
                 set_points_on_areas(elem, layer_above);
+            }
         }
     }
 
+#ifndef NDEBUG
+    // Verify the tree connectivity including the branch slopes.
+    for (LayerIndex layer_idx = 0; layer_idx + 1 < LayerIndex(move_bounds.size()); ++ layer_idx) {
+        auto &layer = move_bounds[layer_idx];
+        auto &above = move_bounds[layer_idx + 1];
+        for (SupportElement &elem : layer)
+            if (! elem.state.deleted) {
+                for (int32_t iparent : elem.parents) {
+                    SupportElement &parent = above[iparent];
+                    assert(! parent.state.deleted);
+                    assert(elem.state.result_on_layer_is_set() == parent.state.result_on_layer_is_set());
+                    if (elem.state.result_on_layer_is_set()) {
+                        double radius_increase = config.getRadius(elem.state) - config.getRadius(parent.state);
+                        assert(radius_increase >= 0);
+                        double shift = (elem.state.result_on_layer - parent.state.result_on_layer).cast<double>().norm();
+                        assert(shift < radius_increase + 2. * config.maximum_move_distance_slow);
+                    }
+                }
+            }
+        }
+#endif // NDEBUG
+
     remove_deleted_elements(move_bounds);
+
+#ifndef NDEBUG
+    // Verify the tree connectivity including the branch slopes.
+    for (LayerIndex layer_idx = 0; layer_idx + 1 < LayerIndex(move_bounds.size()); ++ layer_idx) {
+        auto &layer = move_bounds[layer_idx];
+        auto &above = move_bounds[layer_idx + 1];
+        for (SupportElement &elem : layer) {
+            assert(! elem.state.deleted);
+            for (int32_t iparent : elem.parents) {
+                SupportElement &parent = above[iparent];
+                assert(! parent.state.deleted);
+                assert(elem.state.result_on_layer_is_set() == parent.state.result_on_layer_is_set());
+                if (elem.state.result_on_layer_is_set()) {
+                    double radius_increase = config.getRadius(elem.state) - config.getRadius(parent.state);
+                    assert(radius_increase >= 0);
+                    double shift = (elem.state.result_on_layer - parent.state.result_on_layer).cast<double>().norm();
+                    assert(shift < radius_increase + 2. * config.maximum_move_distance_slow);
+                }
+            }
+        }
+    }
+#endif // NDEBUG
 }
 
 // For producing circular / elliptical areas from SupportElements (one DrawArea per one SupportElement)
@@ -2677,7 +2757,8 @@ static void generate_branch_areas(const TreeModelVolumes &volumes, const TreeSup
                                 polygons_with_correct_center.emplace_back(std::move(part));
                         }
                         // Increase the area again, to ensure the nozzle path when calculated later is very similar to the one assumed above.
-                        polygons = diff_clipped(offset(polygons_with_correct_center, config.support_line_width / 2, jtMiter, 1.2), 
+                        assert(contains(polygons, draw_area.element->state.result_on_layer));
+                        polygons = diff_clipped(offset(polygons_with_correct_center, config.support_line_width / 2, jtMiter, 1.2),
                             //FIXME Vojtech: Clipping may split the region into multiple pieces again, reversing the fixing effort.
                             collision);
                     }
@@ -2723,10 +2804,12 @@ static void smooth_branch_areas(
             [&](const tbb::blocked_range<size_t> &range) {
             for (size_t processing_idx = range.begin(); processing_idx < range.end(); ++ processing_idx) {
                 DrawArea &draw_area               = linear_data[processing_base + processing_idx];
+                assert(draw_area.element->state.layer_idx == layer_idx);
                 double    max_outer_wall_distance = 0;
                 bool      do_something            = false;
                 for (int32_t parent_idx : draw_area.element->parents) {
                     const SupportElement &parent = layer_above[parent_idx];
+                    assert(parent.state.layer_idx == layer_idx + 1);
                     if (config.getRadius(parent.state) != config.getCollisionRadius(parent.state)) {
                         do_something = true;
                         max_outer_wall_distance = std::max(max_outer_wall_distance, (draw_area.element->state.result_on_layer - parent.state.result_on_layer).cast<double>().norm() - (config.getRadius(*draw_area.element) - config.getRadius(parent)));
@@ -2734,14 +2817,35 @@ static void smooth_branch_areas(
                 }
                 max_outer_wall_distance += max_radius_change_per_layer; // As this change is a bit larger than what usually appears, lost radius can be slowly reclaimed over the layers.
                 if (do_something) {
+                    assert(contains(draw_area.polygons, draw_area.element->state.result_on_layer));
                     Polygons max_allowed_area = offset(draw_area.polygons, float(max_outer_wall_distance), jtMiter, 1.2);
                     for (int32_t parent_idx : draw_area.element->parents) {
                         const SupportElement &parent = layer_above[parent_idx];
+#ifndef NDEBUG
+                        assert(parent.state.layer_idx == layer_idx + 1);
+                        assert(contains(linear_data[processing_base_above + parent_idx].polygons, parent.state.result_on_layer));
+                        double radius_increase = config.getRadius(draw_area.element->state) - config.getRadius(parent.state);
+                        assert(radius_increase >= 0);
+                        double shift = (draw_area.element->state.result_on_layer - parent.state.result_on_layer).cast<double>().norm();
+                        assert(shift < radius_increase + 2. * config.maximum_move_distance_slow);
+#endif // NDEBUG
                         if (config.getRadius(parent.state) != config.getCollisionRadius(parent.state)) {
                             // No other element on this layer than the current one may be connected to &parent,
                             // thus it is safe to update parent's DrawArea directly.
                             Polygons &dst = linear_data[processing_base_above + parent_idx].polygons;
-                            dst = intersection(dst, max_allowed_area);
+//                            Polygons orig = dst;
+                            if (! dst.empty()) {
+                                dst = intersection(dst, max_allowed_area);
+#if 0
+                                if (dst.empty()) {
+                                    static int irun = 0;
+                                    SVG::export_expolygons(debug_out_path("treesupport-extrude_areas-smooth-error-%d.svg", irun ++),
+                                        { { { union_ex(max_allowed_area) },   { "max_allowed_area", "yellow", 0.5f } },
+                                          { { union_ex(orig) }, { "orig", "red",  "black", "", scaled<coord_t>(0.1f), 0.5f } } });
+                                    ::MessageBoxA(nullptr, "TreeSupport smoothing bug", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
+                                }
+#endif
+                            }
                         }
                     }
                 }
@@ -3010,9 +3114,7 @@ static void draw_areas(
                         // Only one link points to a node above from below.
                         assert(! (++ it != map_downwards_old.end() && it->first == &elem));
                     }
-                    if ((! child && elem.state.target_height == layer_idx) || (child && !child->state.result_on_layer_is_set()))
-                        // We either come from nowhere at the final layer or we had invalid parents 2. should never happen but just to be sure
-                        continue;
+                    assert(child ? child->state.result_on_layer_is_set() : elem.state.target_height > layer_idx);
                 }
                 for (int32_t parent_idx : elem.parents) {
                     SupportElement &parent = (*layer_above)[parent_idx];
@@ -3026,12 +3128,66 @@ static void draw_areas(
         linear_data_layers.emplace_back(linear_data.size());
     }
 
+#ifndef NDEBUG
+    for (size_t i = 0; i < move_bounds.size(); ++ i) {
+        size_t begin = linear_data_layers[i];
+        size_t end   = linear_data_layers[i + 1];
+        for (size_t j = begin; j < end; ++ j)
+            assert(linear_data[j].element == &move_bounds[i][j - begin]);
+    }
+#endif // NDEBUG
+
     auto t_start = std::chrono::high_resolution_clock::now();
     // Generate the circles that will be the branches.
     generate_branch_areas(volumes, config, move_bounds, linear_data);
+
+#if 0
+    assert(linear_data_layers.size() == move_bounds.size() + 1);
+    for (const auto &draw_area : linear_data)
+        assert(contains(draw_area.polygons, draw_area.element->state.result_on_layer));
+    for (size_t i = 0; i < move_bounds.size(); ++ i) {
+        size_t begin = linear_data_layers[i];
+        size_t end   = linear_data_layers[i + 1];
+        for (size_t j = begin; j < end; ++ j) {
+            const auto &draw_area = linear_data[j];
+            assert(draw_area.element == &move_bounds[i][j - begin]);
+            assert(contains(draw_area.polygons, draw_area.element->state.result_on_layer));
+        }
+    }
+#endif
+
+#if 0
+    for (size_t area_layer_idx = 0; area_layer_idx + 1 < linear_data_layers.size(); ++ area_layer_idx) {
+        size_t begin = linear_data_layers[area_layer_idx];
+        size_t end   = linear_data_layers[area_layer_idx + 1];
+        Polygons polygons;
+        for (size_t area_idx = begin; area_idx < end; ++ area_idx) {
+            DrawArea &area = linear_data[area_idx];
+            append(polygons, area.polygons);
+        }
+        SVG::export_expolygons(debug_out_path("treesupport-extrude_areas-raw-%d.svg", area_layer_idx),
+            { { { union_ex(polygons) }, { "parent", "red",  "black", "", scaled<coord_t>(0.1f), 0.5f } } });
+    }
+#endif
+
     auto t_generate = std::chrono::high_resolution_clock::now();
     // In some edgecases a branch may go though a hole, where the regular radius does not fit. This can result in an apparent jump in branch radius. As such this cases need to be caught and smoothed out.
     smooth_branch_areas(config, move_bounds, linear_data, linear_data_layers);
+
+#if 0
+    for (size_t area_layer_idx = 0; area_layer_idx + 1 < linear_data_layers.size(); ++area_layer_idx) {
+        size_t begin = linear_data_layers[area_layer_idx];
+        size_t end = linear_data_layers[area_layer_idx + 1];
+        Polygons polygons;
+        for (size_t area_idx = begin; area_idx < end; ++area_idx) {
+            DrawArea& area = linear_data[area_idx];
+            append(polygons, area.polygons);
+        }
+        SVG::export_expolygons(debug_out_path("treesupport-extrude_areas-smooth-%d.svg", area_layer_idx),
+            { { { union_ex(polygons) }, { "parent", "red",  "black", "", scaled<coord_t>(0.1f), 0.5f } } });
+    }
+#endif
+
     auto t_smooth = std::chrono::high_resolution_clock::now();
     // drop down all trees that connect non gracefully with the model
     drop_non_gracious_areas(volumes, linear_data, support_layer_storage);
@@ -3256,7 +3412,7 @@ static void extrude_branch(
             float angle_step = 2. * acos(1. - eps / radius);
             auto  nsteps = int(ceil(M_PI / (2. * angle_step)));
             angle_step = M_PI / (2. * nsteps);
-            float angle = M_PI / 2.;
+            auto angle = float(M_PI / 2.);
             for (int i = 0; i < nsteps; ++ i, angle -= angle_step) {
                 std::pair<int, int> strip = discretize_circle((p2 + ncurrent * radius * cos(angle)).cast<float>(), ncurrent.cast<float>(), radius * sin(angle), eps, result.vertices);
                 triangulate_strip(result, prev_strip.first, prev_strip.second, strip.first, strip.second);
@@ -3335,9 +3491,7 @@ static void draw_branches(
                         assert(!(++it != map_downwards_old.end() && it->first == &elem));
                     }
                     const SupportElement *pchild = child == -1 ? nullptr : &move_bounds[layer_idx - 1][child];
-                    if ((! pchild && elem.state.target_height == layer_idx) || (pchild && ! pchild->state.result_on_layer_is_set()))
-                        // We either come from nowhere at the final layer or we had invalid parents 2. should never happen but just to be sure
-                        continue;
+                    assert(pchild ? pchild->state.result_on_layer_is_set() : elem.state.target_height > layer_idx);
                 }
                 for (int32_t parent_idx : elem.parents) {
                     SupportElement &parent = (*layer_above)[parent_idx];
@@ -3370,7 +3524,8 @@ static void draw_branches(
         const double max_nudge_collision_avoidance = 2. * scale;
         const double max_nudge_smoothing = 1. * scale;
 
-        for (size_t iter = 0; iter < 1000; ++ iter) {
+        static constexpr const size_t num_iter = 100; // 1000;
+        for (size_t iter = 0; iter < num_iter; ++ iter) {
             prev = pts;
             projections = pts;
             distances.assign(pts.size(), std::numeric_limits<float>::max());
@@ -3404,18 +3559,24 @@ static void draw_branches(
                     Vec2d avg{ 0, 0 };
                     const SupportElements &above = move_bounds[element.state.layer_idx + 1];
                     const size_t           offset_above = linear_data_layers[element.state.layer_idx + 1];
+                    double weight = 0.;
                     for (auto iparent : element.parents) {
-                        avg.x() += prev[offset_above + iparent].x();
-                        avg.y() += prev[offset_above + iparent].y();
+                        double w = config.getRadius(above[iparent].state);
+                        avg.x() += w * prev[offset_above + iparent].x();
+                        avg.y() += w * prev[offset_above + iparent].y();
+                        weight += w;
                     }
                     size_t cnt = element.parents.size();
                     if (below != -1) {
                         const size_t offset_below = linear_data_layers[element.state.layer_idx - 1];
-                        avg.x() += prev[offset_below + below].x();
-                        avg.y() += prev[offset_below + below].y();
+                        const double w = weight; //  config.getRadius(move_bounds[element.state.layer_idx - 1][below].state);
+                        avg.x() += w * prev[offset_below + below].x();
+                        avg.y() += w * prev[offset_below + below].y();
                         ++ cnt;
+                        weight += w;
                     }
-                    avg /= double(cnt);
+                    //avg /= double(cnt);
+                    avg /= weight;
                     static constexpr const double smoothing_factor = 0.5;
                     Vec2d old_pos{ pts[i].x(), pts[i].y() };
                     Vec2d new_pos = (1. - smoothing_factor) * old_pos + smoothing_factor * avg;
@@ -3654,13 +3815,15 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         auto t_place = std::chrono::high_resolution_clock::now();
 
         // ### draw these points as circles
-#if 0
-        draw_areas(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
-            bottom_contacts, top_contacts, intermediate_layers, layer_storage);
-#else
-        draw_branches(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
-            bottom_contacts, top_contacts, intermediate_layers, layer_storage);
-#endif
+        
+        if (print_object.config().support_material_style == smsTree)
+            draw_areas(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
+                bottom_contacts, top_contacts, intermediate_layers, layer_storage);
+        else {
+            assert(print_object.config().support_material_style == smsOrganic);
+            draw_branches(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
+                bottom_contacts, top_contacts, intermediate_layers, layer_storage);
+        }
 
         auto t_draw = std::chrono::high_resolution_clock::now();
         auto dur_pre_gen = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_precalc - t_start).count();
