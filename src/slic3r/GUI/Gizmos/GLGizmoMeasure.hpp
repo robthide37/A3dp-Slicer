@@ -152,7 +152,6 @@ protected:
     std::string on_get_name() const override;
     bool on_is_activable() const override;
     void on_render() override;
-    void on_render_for_picking() override;
     void on_set_state() override;
     CommonGizmosDataID on_get_requirements() const override;
 

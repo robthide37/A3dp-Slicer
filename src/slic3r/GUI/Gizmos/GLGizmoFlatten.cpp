@@ -10,7 +10,6 @@
 
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/Model.hpp"
-#include "libslic3r/SurfaceMesh.hpp"
 
 #include <numeric>
 
@@ -22,31 +21,9 @@ namespace GUI {
 static const Slic3r::ColorRGBA DEFAULT_PLANE_COLOR       = { 0.9f, 0.9f, 0.9f, 0.5f };
 static const Slic3r::ColorRGBA DEFAULT_HOVER_PLANE_COLOR = { 0.9f, 0.9f, 0.9f, 0.75f };
 
-
-
-
-// TESTING:
-static Halfedge_index hi;
-static bool hi_initialized = false;
-static std::unique_ptr<SurfaceMesh> sm_ptr;
-static Vertex_index src;
-static Vertex_index tgt;
-
-
-
-
-
-
 GLGizmoFlatten::GLGizmoFlatten(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-{
-    indexed_triangle_set a = its_make_cone(0.05, .2);
-    its_rotate_x(a, M_PI);
-    its_translate(a, stl_vertex(0., 0., .8));
-    indexed_triangle_set b = its_make_cylinder(.02, 0.8);
-    its_merge(a, b);
-    arrow.init_from(a);
-}
+{}
 
 bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
 {
@@ -60,7 +37,9 @@ bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
             m_mouse_left_down = true;
             Selection &selection = m_parent.get_selection();
             if (selection.is_single_full_instance()) {
-                hi = sm_ptr->halfedge(Face_index(m_hover_id));
+                // Rotate the object so the normal points downward:
+                selection.flattening_rotate(m_planes[m_hover_id].normal);
+                m_parent.do_rotate(L("Gizmo-Place on Face"));
             }
             return true;
         }
@@ -122,18 +101,6 @@ void GLGizmoFlatten::on_render()
     const Selection& selection = m_parent.get_selection();
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-
-    
-    
-    if (!hi_initialized) {
-        const indexed_triangle_set & its = m_c->selection_info()->model_object()->volumes.front()->mesh().its;
-        sm_ptr.reset(new SurfaceMesh(its));
-        hi = sm_ptr->halfedge(Face_index(0));
-        hi_initialized = true;
-    }
-    SurfaceMesh & sm = *sm_ptr;
-
-    
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader == nullptr)
         return;
@@ -169,13 +136,8 @@ void GLGizmoFlatten::on_render()
             m_planes[i].vbo.model.set_color(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
             m_planes[i].vbo.model.render();
 #else
-            int cur_face = hi.is_invalid() ? 1000000 : sm.face(hi);
-            for (int i = 0; i < m_planes.size(); ++i) {
-                m_planes[i].vbo.set_color(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
-                if (i == cur_face)
-                    m_planes[i].vbo.set_color(i == m_hover_id ? ColorRGBA(.5f, 0.f, 0.f, 1.f) : ColorRGBA(1.f, 0.f, 0.f, 1.f));
-                m_planes[i].vbo.render();
-            }
+            m_planes[i].vbo.set_color(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
+            m_planes[i].vbo.render();
 #endif // ENABLE_RAYCAST_PICKING
 #else
             glsafe(::glColor4fv(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR.data() : DEFAULT_PLANE_COLOR.data()));
@@ -187,90 +149,6 @@ void GLGizmoFlatten::on_render()
         glsafe(::glPopMatrix());
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
-
-    
-    
-    
-    
-        /////////////////
-        ////////////////
-        //////////////////
-    
-    auto draw_arrow = [&](const Vec3d& from, const Vec3d& to) -> void {
-        Vec3d desired_pos = from;
-        Vec3d desired_dir = to - from;
-        double desired_len = desired_dir.norm();
-        desired_dir.normalize();
-    
-        Transform3d m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
-        m.translate(desired_pos);
-        Eigen::Quaterniond q;
-        Transform3d rot = Transform3d::Identity();
-        rot.matrix().block(0, 0, 3, 3) = q.setFromTwoVectors(Vec3d::UnitZ(), desired_dir).toRotationMatrix();
-        Transform3d sc = Transform3d::Identity();
-        sc.scale(desired_len);
-        m = m * sc * rot;
-    
-        const Camera & camera = wxGetApp().plater()->get_camera();
-        Transform3d view_model_matrix = camera.get_view_matrix() *
-            Geometry::assemble_transform(selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z() * Vec3d::UnitZ()) * m;
-    
-        shader->set_uniform("view_model_matrix", view_model_matrix);
-        arrow.render();
-    };
-
-    m_imgui->begin(std::string("DEBUG"));
-    bool invalid = hi.is_invalid();
-    if (invalid) {
-    if (m_imgui->button(std::string("HALFEDGE INVALID (Click to reset)")))
-        hi = sm.halfedge(Face_index(0));
-    }
-    else {
-        m_imgui->text(sm.is_border(hi) ? "BORDER HALFEDGE !" : "Halfedge is not border");
-        m_imgui->text((std::string("Face: ") + std::to_string(int(hi.face()))).c_str());
-        m_imgui->text(std::string("Target degree:" + std::to_string(sm.degree(sm.target(hi)))));
-        m_imgui->text(std::string("Face degree:" + std::to_string(sm.degree(sm.face(hi)))));
-    }
-    m_imgui->disabled_begin(invalid);
-    if (m_imgui->button(std::string("next")))
-        hi = sm.next(hi);
-    if (m_imgui->button(std::string("prev")))
-        hi = sm.prev(hi);
-    if (m_imgui->button(std::string("opposite")))
-        hi = sm.opposite(hi);
-    if (m_imgui->button(std::string("next_around_target")))
-        hi = sm.next_around_target(hi);
-    if (m_imgui->button(std::string("prev_around_target")))
-        hi = sm.prev_around_target(hi);
-    if (m_imgui->button(std::string("next_around_source")))
-        hi = sm.next_around_source(hi);
-    if (m_imgui->button(std::string("prev_around_source")))
-        hi = sm.prev_around_source(hi);
-    if (m_imgui->button(std::string("remember one")))
-        src = sm.target(hi);
-    if (m_imgui->button(std::string("switch to halfedge"))) {
-        tgt = sm.target(hi);
-        hi = sm.halfedge(src, tgt);
-    }
-
-    if (invalid)
-        m_imgui->disabled_end();
-    m_imgui->end();
-
-    if (!hi.is_invalid()) {
-        Vec3d a = sm.point(sm.source(hi)).cast<double>();
-        Vec3d b = sm.point(sm.target(hi)).cast<double>();
-        draw_arrow(a, b);
-    }
-
-    
-        /////////////////
-        ////////////////
-        //////////////////
-    
-    
-    
-       
 
     glsafe(::glEnable(GL_CULL_FACE));
     glsafe(::glDisable(GL_BLEND));
@@ -375,11 +253,11 @@ void GLGizmoFlatten::update_planes()
     for (const ModelVolume* vol : mo->volumes) {
         if (vol->type() != ModelVolumeType::MODEL_PART)
             continue;
-        TriangleMesh vol_ch = vol->mesh(); //vol->get_convex_hull();
+        TriangleMesh vol_ch = vol->get_convex_hull();
         vol_ch.transform(vol->get_matrix());
         ch.merge(vol_ch);
     }
-    //ch = ch.convex_hull_3d();
+    ch = ch.convex_hull_3d();
     m_planes.clear();
 #if ENABLE_RAYCAST_PICKING
     on_unregister_raycasters_for_picking();
@@ -403,17 +281,47 @@ void GLGizmoFlatten::update_planes()
     std::vector<bool>        facet_visited(num_of_facets, false);
     int                      facet_queue_cnt = 0;
     const stl_normal*        normal_ptr      = nullptr;
+    int facet_idx = 0;
+    while (1) {
+        // Find next unvisited triangle:
+        for (; facet_idx < num_of_facets; ++ facet_idx)
+            if (!facet_visited[facet_idx]) {
+                facet_queue[facet_queue_cnt ++] = facet_idx;
+                facet_visited[facet_idx] = true;
+                normal_ptr = &face_normals[facet_idx];
+                m_planes.emplace_back();
+                break;
+            }
+        if (facet_idx == num_of_facets)
+            break; // Everything was visited already
 
-    for (size_t i = 0; i < ch.its.indices.size(); ++i) {
-        const Vec3i & face = ch.its.indices[i];
-        m_planes.emplace_back();
-        for (int j = 0; j < 3; ++j)
-            m_planes.back().vertices.emplace_back(ch.its.vertices[face[j]].cast<double>());
-        m_planes.back().normal = face_normals[i].cast<double>();
+        while (facet_queue_cnt > 0) {
+            int facet_idx = facet_queue[-- facet_queue_cnt];
+            const stl_normal& this_normal = face_normals[facet_idx];
+            if (std::abs(this_normal(0) - (*normal_ptr)(0)) < 0.001 && std::abs(this_normal(1) - (*normal_ptr)(1)) < 0.001 && std::abs(this_normal(2) - (*normal_ptr)(2)) < 0.001) {
+                const Vec3i face = ch.its.indices[facet_idx];
+                for (int j=0; j<3; ++j)
+                    m_planes.back().vertices.emplace_back(ch.its.vertices[face[j]].cast<double>());
+
+                facet_visited[facet_idx] = true;
+                for (int j = 0; j < 3; ++ j)
+                    if (int neighbor_idx = face_neighbors[facet_idx][j]; neighbor_idx >= 0 && ! facet_visited[neighbor_idx])
+                        facet_queue[facet_queue_cnt ++] = neighbor_idx;
+            }
+        }
+        m_planes.back().normal = normal_ptr->cast<double>();
+
         Pointf3s& verts = m_planes.back().vertices;
         // Now we'll transform all the points into world coordinates, so that the areas, angles and distances
         // make real sense.
         verts = transform(verts, inst_matrix);
+
+        // if this is a just a very small triangle, remove it to speed up further calculations (it would be rejected later anyway):
+        if (verts.size() == 3 &&
+            ((verts[0] - verts[1]).norm() < minimal_side
+            || (verts[0] - verts[2]).norm() < minimal_side
+            || (verts[1] - verts[2]).norm() < minimal_side))
+            m_planes.pop_back();
     }
 
     // Let's prepare transformation of the normal vector from mesh to instance coordinates.
@@ -445,11 +353,83 @@ void GLGizmoFlatten::update_planes()
         polygon = Slic3r::Geometry::convex_hull(polygon);
         polygon = transform(polygon, tr.inverse());
 
+        // Calculate area of the polygons and discard ones that are too small
+        float& area = m_planes[polygon_id].area;
+        area = 0.f;
+        for (unsigned int i = 0; i < polygon.size(); i++) // Shoelace formula
+            area += polygon[i](0)*polygon[i + 1 < polygon.size() ? i + 1 : 0](1) - polygon[i + 1 < polygon.size() ? i + 1 : 0](0)*polygon[i](1);
+        area = 0.5f * std::abs(area);
+
+        bool discard = false;
+        if (area < minimal_area)
+            discard = true;
+        else {
+            // We also check the inner angles and discard polygons with angles smaller than the following threshold
+            const double angle_threshold = ::cos(10.0 * (double)PI / 180.0);
+
+            for (unsigned int i = 0; i < polygon.size(); ++i) {
+                const Vec3d& prec = polygon[(i == 0) ? polygon.size() - 1 : i - 1];
+                const Vec3d& curr = polygon[i];
+                const Vec3d& next = polygon[(i == polygon.size() - 1) ? 0 : i + 1];
+
+                if ((prec - curr).normalized().dot((next - curr).normalized()) > angle_threshold) {
+                    discard = true;
+                    break;
+                }
+            }
+        }
+
+        if (discard) {
+            m_planes[polygon_id--] = std::move(m_planes.back());
+            m_planes.pop_back();
+            continue;
+        }
+
         // We will shrink the polygon a little bit so it does not touch the object edges:
         Vec3d centroid = std::accumulate(polygon.begin(), polygon.end(), Vec3d(0.0, 0.0, 0.0));
         centroid /= (double)polygon.size();
         for (auto& vertex : polygon)
             vertex = 0.9f*vertex + 0.1f*centroid;
+
+        // Polygon is now simple and convex, we'll round the corners to make them look nicer.
+        // The algorithm takes a vertex, calculates middles of respective sides and moves the vertex
+        // towards their average (controlled by 'aggressivity'). This is repeated k times.
+        // In next iterations, the neighbours are not always taken at the middle (to increase the
+        // rounding effect at the corners, where we need it most).
+        const unsigned int k = 10; // number of iterations
+        const float aggressivity = 0.2f;  // agressivity
+        const unsigned int N = polygon.size();
+        std::vector<std::pair<unsigned int, unsigned int>> neighbours;
+        if (k != 0) {
+            Pointf3s points_out(2*k*N); // vector long enough to store the future vertices
+            for (unsigned int j=0; j<N; ++j) {
+                points_out[j*2*k] = polygon[j];
+                neighbours.push_back(std::make_pair((int)(j*2*k-k) < 0 ? (N-1)*2*k+k : j*2*k-k, j*2*k+k));
+            }
+
+            for (unsigned int i=0; i<k; ++i) {
+                // Calculate middle of each edge so that neighbours points to something useful:
+                for (unsigned int j=0; j<N; ++j)
+                    if (i==0)
+                        points_out[j*2*k+k] = 0.5f * (points_out[j*2*k] + points_out[j==N-1 ? 0 : (j+1)*2*k]);
+                    else {
+                        float r = 0.2+0.3/(k-1)*i; // the neighbours are not always taken in the middle
+                        points_out[neighbours[j].first] = r*points_out[j*2*k] + (1-r) * points_out[neighbours[j].first-1];
+                        points_out[neighbours[j].second] = r*points_out[j*2*k] + (1-r) * points_out[neighbours[j].second+1];
+                    }
+                // Now we have a triangle and valid neighbours, we can do an iteration:
+                for (unsigned int j=0; j<N; ++j)
+                    points_out[2*k*j] = (1-aggressivity) * points_out[2*k*j] +
+                                        aggressivity*0.5f*(points_out[neighbours[j].first] + points_out[neighbours[j].second]);
+
+                for (auto& n : neighbours) {
+                    ++n.first;
+                    --n.second;
+                }
+            }
+            polygon = points_out; // replace the coarse polygon with the smooth one that we just created
+        }
+
 
         // Raise a bit above the object surface to avoid flickering:
         for (auto& b : polygon)
