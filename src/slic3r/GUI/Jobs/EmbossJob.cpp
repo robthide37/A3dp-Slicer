@@ -356,7 +356,7 @@ void UseSurfaceJob::process(Ctl &ctl) {
     const TextConfiguration &tc   = m_input.text_configuration;
     const char              *text = tc.text.c_str();
     const FontProp          &fp   = tc.style.prop;
-    ExPolygons shapes = Emboss::text2shapes(m_input.font_file, text, fp);
+    ExPolygons shapes = Emboss::text2shapes(m_input.font_file, text, fp, was_canceled);
     if (shapes.empty() || shapes.front().contour.empty())
         throw priv::EmbossJobException(
             _u8L("Font doesn't have any shape for given text.").c_str());

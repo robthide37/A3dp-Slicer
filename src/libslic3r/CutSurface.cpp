@@ -20,7 +20,7 @@
 /// patches/patch{O}.off
 /// result.obj - Merged result its
 /// result_contours/{O}.obj - visualization of contours for result patches
-#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
+//#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
 
 using namespace Slic3r;
 #include "ExPolygonsIndex.hpp"
@@ -1058,7 +1058,7 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
         for (const Polygon &hole : shape.holes)
             insert_contour(hole);
     }
-    assert(!exist_duplicit_point(result));
+    assert(!exist_duplicit_vertex(result));
     return result;
 }
 
@@ -3209,8 +3209,6 @@ std::vector<bool> priv::select_patches(const ProjectionDistances &best_distances
         for (uint32_t patch_index : used_shape_patches) { 
             ExPolygon patch_area = to_expoly(patches[patch_index], projection);
             //*/
-            // add save offset extension to cover numerical mistake made by back projection to 2d
-            const float extend_delta = 5.f;
             ExPolygons patch_areas = offset_ex(patch_area, extend_delta);
             fill.insert(fill.end(), patch_areas.begin(), patch_areas.end());            
             /*/

@@ -283,9 +283,9 @@ TEST_CASE("Heal of points close to line", "[Emboss]")
     Polygon polygon = polygons.front();
     polygon.points.pop_back();// NSVG put first point as last one when polygon is closed
     ExPolygons expoly({ExPolygon(polygon)});
-    Emboss::heal_shape(expoly);
+    CHECK(Emboss::divide_segments_for_close_point(expoly, .6));
     //{ SVG svg("C:/data/temp/healed.svg"); svg.draw(expoly);}
-    CHECK(expoly.size() == 3);
+    CHECK(to_points(expoly).size() >= (to_points(polygon).size() + 2));
 }
 
 TEST_CASE("Convert text with glyph cache to model", "[Emboss]")

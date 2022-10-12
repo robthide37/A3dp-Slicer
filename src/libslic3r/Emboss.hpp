@@ -178,6 +178,17 @@ public:
     static bool heal_shape(ExPolygons &shape, unsigned max_iteration = 10);
 
     /// <summary>
+    /// Divide line segments in place near to point
+    /// (which could lead to self intersection due to preccision)
+    /// Remove same neighbors
+    /// Note: Possible part of heal shape
+    /// </summary>
+    /// <param name="expolygons">Expolygon to edit</param>
+    /// <param name="distance">(epsilon)Euclidean distance from point to line which divide line</param>
+    /// <returns>True when some division was made otherwise false</returns>
+    static bool divide_segments_for_close_point(ExPolygons &expolygons, double distance);
+
+    /// <summary>
     /// Use data from font property to modify transformation
     /// </summary>
     /// <param name="font_prop">Z-move as surface distance(FontProp::distance)

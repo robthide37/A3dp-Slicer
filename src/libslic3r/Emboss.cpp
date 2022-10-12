@@ -43,7 +43,6 @@ Point to_point(const stbtt__point &point);
 bool remove_same_neighbor(Slic3r::Points &points);
 bool remove_same_neighbor(Slic3r::Polygons &polygons);
 bool remove_same_neighbor(ExPolygons &expolygons);
-bool divide_segments_for_close_point(ExPolygons &expolygons, double distance = .6);
 
 // NOTE: expolygons can't contain same_neighbor
 Points collect_close_points(const ExPolygons &expolygons, double distance = .6);
@@ -173,13 +172,13 @@ Points priv::collect_close_points(const ExPolygons &expolygons, double distance)
     return res;
 }
 
-bool priv::divide_segments_for_close_point(ExPolygons &expolygons, double distance)
+bool Emboss::divide_segments_for_close_point(ExPolygons &expolygons, double distance)
 {
     if (expolygons.empty()) return false;
     if (distance < 0.) return false;
 
     // ExPolygons can't contain same neigbours
-    remove_same_neighbor(expolygons);
+    priv::remove_same_neighbor(expolygons);
 
     // IMPROVE: use int(insted of double) lines and tree
     const ExPolygonsIndices ids(expolygons);
