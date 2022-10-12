@@ -39,7 +39,7 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
 
     // Support must be enabled and set to Tree style.
     assert(config.support_material);
-    assert(config.support_material_style == smsTree);
+    assert(config.support_material_style == smsTree || config.support_material_style == smsOrganic);
 
     // Calculate maximum external perimeter width over all printing regions, taking into account the default layer height.
     coordf_t external_perimeter_width = 0.;
