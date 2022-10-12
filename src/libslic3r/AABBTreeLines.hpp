@@ -100,10 +100,11 @@ inline typename VectorType::Scalar squared_distance_to_indexed_lines(
     Eigen::PlainObjectBase<VectorType> &hit_point_out,
     typename VectorType::Scalar         max_sqr_dist = std::numeric_limits<typename VectorType::Scalar>::infinity())
 {
-    if (tree.empty()) return VectorType::Scalar(-1);
+    using Scalar = typename VectorType::Scalar;
+    if (tree.empty()) return Scalar(-1);
     auto distancer = detail::IndexedLinesDistancer<LineType, TreeType, VectorType>{lines, tree, point};
     return AABBTreeIndirect::detail::squared_distance_to_indexed_primitives_recursive(
-        distancer, size_t(0), VectorType::Scalar(0), max_sqr_dist, hit_idx_out, hit_point_out);
+        distancer, size_t(0), Scalar(0), max_sqr_dist, hit_idx_out, hit_point_out);
 }
 
 // Returns all lines within the given radius limit
