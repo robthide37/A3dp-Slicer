@@ -678,10 +678,10 @@ void GLGizmoMeasure::update_if_needed()
         }
         m_old_model_object = object;
         m_old_model_volume = volume;
-
-        m_volume_matrix = m_parent.get_selection().get_first_volume()->world_matrix();
-        m_volume_matrix_scale_inverse = Geometry::Transformation(m_volume_matrix).get_scaling_factor_matrix().inverse();
     };
+
+    m_volume_matrix = m_parent.get_selection().get_first_volume()->world_matrix();
+    m_volume_matrix_scale_inverse = Geometry::Transformation(m_volume_matrix).get_scaling_factor_matrix().inverse();
 
     const ModelObject* mo = m_c->selection_info()->model_object();
     const ModelVolume* mv = m_c->selection_info()->model_volume();
