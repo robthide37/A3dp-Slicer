@@ -3238,6 +3238,20 @@ static inline void fill_expolygons_generate_paths(
     fill_expolygons_generate_paths(dst, std::move(expolygons), filler, fill_params, density, role, flow);
 }
 
+static Polylines draw_perimeters(const ExPolygon &expoly, double clip_length)
+{
+    // Draw the perimeters.
+    Polylines polylines;
+    polylines.reserve(expoly.holes.size() + 1);
+    for (size_t i = 0; i <= expoly.holes.size();  ++ i) {
+        Polyline pl(i == 0 ? expoly.contour.points : expoly.holes[i - 1].points);
+        pl.points.emplace_back(pl.points.front());
+        pl.clip_end(clip_length);
+        polylines.emplace_back(std::move(pl));
+    }
+    return polylines;
+}
+
 static inline void tree_supports_generate_paths(
     ExtrusionEntitiesPtr    &dst,
     const Polygons          &polygons,
@@ -3336,7 +3350,20 @@ static inline void tree_supports_generate_paths(
     const double clip_length = spacing * 0.15;
     const double anchor_length = spacing * 6.;
     ClipperLib_Z::Paths anchor_candidates;
-    for (ExPolygon &expoly : closing_ex(polygons, float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5*flow.scaled_width()))) {
+    for (ExPolygon& expoly : closing_ex(polygons, float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5 * flow.scaled_width()))) {
+        double area = expoly.area();
+        if (area > sqr(scaled<double>(5.))) {
+            // Make the tree branch stable by adding another perimeter.
+            ExPolygons level2 = offset2_ex({ expoly }, -1.5 * flow.scaled_width(), 0.5 * flow.scaled_width());
+            if (level2.size() == 1) {
+                Polylines polylines;
+                extrusion_entities_append_paths(dst, draw_perimeters(expoly, clip_length), erSupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(),
+                    // Disable reversal of the path, always start with the anchor, always print CCW.
+                    false);
+                expoly = level2.front();
+            }
+        }
+
         // Try to produce one more perimeter to place the seam anchor.
         // First genrate a 2nd perimeter loop as a source for anchor candidates.
         // The anchor candidate points are annotated with an index of the source contour or with -1 if on intersection.
@@ -3466,9 +3493,9 @@ static inline void fill_expolygons_with_sheath_generate_paths(
     fill_params.density     = density;
     fill_params.dont_adjust = true;
 
-    double spacing = flow.scaled_spacing();
+    const double spacing = flow.scaled_spacing();
     // Clip the sheath path to avoid the extruder to get exactly on the first point of the loop.
-    double clip_length = spacing * 0.15;
+    const double clip_length = spacing * 0.15;
 
     for (ExPolygon &expoly : closing_ex(polygons, float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5*flow.scaled_width()))) {
         // Don't reorder the skirt and its infills.
@@ -3478,16 +3505,7 @@ static inline void fill_expolygons_with_sheath_generate_paths(
             eec->no_sort = true;
         }
         ExtrusionEntitiesPtr &out = no_sort ? eec->entities : dst;
-        // Draw the perimeters.
-        Polylines polylines;
-        polylines.reserve(expoly.holes.size() + 1);
-        for (size_t i = 0; i <= expoly.holes.size();  ++ i) {
-            Polyline pl(i == 0 ? expoly.contour.points : expoly.holes[i - 1].points);
-            pl.points.emplace_back(pl.points.front());
-            pl.clip_end(clip_length);
-            polylines.emplace_back(std::move(pl));
-        }
-        extrusion_entities_append_paths(out, polylines, erSupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height());
+        extrusion_entities_append_paths(out, draw_perimeters(expoly, clip_length), erSupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height());
         // Fill in the rest.
         fill_expolygons_generate_paths(out, offset_ex(expoly, float(-0.4 * spacing)), filler, fill_params, density, role, flow);
         if (no_sort && ! eec->empty())
