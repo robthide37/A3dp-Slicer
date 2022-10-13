@@ -280,10 +280,12 @@ ExPolygons Emboss::heal_shape(const Polygons &shape) {
     // fix of self intersections
     // http://www.angusj.com/delphi/clipper/documentation/Docs/Units/ClipperLib/Functions/SimplifyPolygon.htm
     ClipperLib::Paths paths = ClipperLib::SimplifyPolygons(ClipperUtils::PolygonsProvider(shape), ClipperLib::pftNonZero);
-    ClipperLib::CleanPolygons(paths);
+    const double clean_distance = 1.415; // little grater than sqrt(2)
+    ClipperLib::CleanPolygons(paths, clean_distance);
     Polygons polygons = to_polygons(paths);
         
-    // do not remove all duplicits but do it better way
+    // Do not remove all duplicits but do it better way
+    // Overlap all duplicit points by rectangle 3x3
     Points duplicits = collect_duplications(to_points(polygons));
     if (!duplicits.empty()) {
         polygons.reserve(polygons.size() + duplicits.size());
@@ -302,7 +304,6 @@ ExPolygons Emboss::heal_shape(const Polygons &shape) {
     return res;
 }
 
-#define HEAL_CLOSE_POINTS
 bool Emboss::heal_shape(ExPolygons &shape, unsigned max_iteration)
 {
     if (shape.empty()) return true;
@@ -478,6 +479,10 @@ const Emboss::Glyph* priv::get_glyph(
     }
 
     float flatness = static_cast<float>(font.infos[font_index].ascent * RESOLUTION / font_prop.size_in_mm);
+
+    // Fix for very small flatness because it create huge amount of points from curve
+    if (flatness < RESOLUTION) flatness = RESOLUTION;
+
     std::optional<Emboss::Glyph> glyph_opt =
         priv::get_glyph(*font_info_opt, unicode, flatness);
 
