@@ -3534,7 +3534,8 @@ static void draw_branches(
             for (size_t i = 0; i < projections.size(); ++ i) {
                 const SupportElement &element = *elements_with_link_down[i].first;
                 const int            below    = elements_with_link_down[i].second;
-                if (pts[i] != projections[i]) {
+                const bool           locked   = below == -1 && element.state.layer_idx > 0;
+                if (! locked && pts[i] != projections[i]) {
                     // Nudge the circle center away from the collision.
                     Vec3d v{ projections[i].x() - pts[i].x(), projections[i].y() - pts[i].y(), projections[i].z() - pts[i].z() };
                     double depth = v.norm();
@@ -3555,7 +3556,7 @@ static void draw_branches(
                     }
                 }
                 // Laplacian smoothing
-                if (! element.parents.empty() && (below != -1 || element.state.layer_idx == 0)) {
+                if (! locked && ! element.parents.empty()) {
                     Vec2d avg{ 0, 0 };
                     const SupportElements &above = move_bounds[element.state.layer_idx + 1];
                     const size_t           offset_above = linear_data_layers[element.state.layer_idx + 1];
