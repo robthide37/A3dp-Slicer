@@ -458,6 +458,8 @@ private:
     bool                                m_brim_done;
     // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
     bool                                m_second_layer_things_done;
+    // G-code that is due to be written before the next extrusion
+    std::string                         m_pending_pre_extrusion_gcode;
     // Pointer to currently exporting PrintObject and instance index.
     GCode::PrintObjectInstance          m_current_instance;
 

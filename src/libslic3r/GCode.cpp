@@ -2249,7 +2249,13 @@ LayerResult GCodeGenerator::process_layer(
 
     if (single_object_instance_idx == size_t(-1)) {
         // Normal (non-sequential) print.
-        gcode += ProcessLayer::emit_custom_gcode_per_print_z(*this, layer_tools.custom_gcode, m_writer.extruder()->id(), first_extruder_id, print.config());
+        std::string custom_gcode = ProcessLayer::emit_custom_gcode_per_print_z(*this, layer_tools.custom_gcode, m_writer.extruder()->id(), first_extruder_id, print.config());
+        if (layer_tools.custom_gcode != nullptr && layer_tools.custom_gcode->type == CustomGCode::ColorChange) {
+            // We have a color change to do on this layer, but we want to do it immediately before the first extrusion instead of now, in order to fix GH #2672
+            m_pending_pre_extrusion_gcode = custom_gcode;
+        } else {
+            gcode += custom_gcode;
+        }
     }
     // Extrude skirt at the print_z of the raft layers and normal object layers
     // not at the print_z of the interlaced support material layers.
@@ -3009,6 +3015,12 @@ std::string GCodeGenerator::_extrude(
 
     // compensate retraction
     gcode += this->unretract();
+
+    if (!m_pending_pre_extrusion_gcode.empty()) {
+        // There is G-Code that is due to be inserted before an extrusion starts. Insert it.
+        gcode += m_pending_pre_extrusion_gcode;
+        m_pending_pre_extrusion_gcode.clear();
+    }
 
     // adjust acceleration
     if (m_config.default_acceleration.value > 0) {
