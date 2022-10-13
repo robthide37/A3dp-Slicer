@@ -9,6 +9,8 @@
 
 #include "wx/fontenum.h"
 
+#include <boost/log/trivial.hpp>
+
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
@@ -96,6 +98,11 @@ void CreateFontImageJob::process(Ctl &ctl)
     r->encode(encoder);
 }
 
+// ability to request new frame after finish rendering
+#include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/GLCanvas3D.hpp"
+
 void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
 {
     if (m_input.count_opened_font_files)
@@ -118,4 +125,12 @@ void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
     // bind default texture
     GLuint no_texture_id = 0;
     glsafe(::glBindTexture(target, no_texture_id));
+
+    // show rendered texture
+    //wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+
+    BOOST_LOG_TRIVIAL(info) 
+        << "Generate Preview font('" << m_input.font_name << "' id:" << m_input.index << ") "
+        << "with text: '" << m_input.text << "' "
+        << "texture_size " << m_input.size.x() << " x " << m_input.size.y();
 }

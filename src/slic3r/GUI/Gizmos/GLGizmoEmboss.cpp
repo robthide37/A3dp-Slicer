@@ -34,6 +34,7 @@
 #include <wx/fontenum.h>
 
 #include <GL/glew.h>
+#include <chrono> // measure enumeration of fonts
 
 // uncomment for easier debug
 //#define ALLOW_DEBUG_MODE
@@ -1294,7 +1295,18 @@ void GLGizmoEmboss::init_face_names() {
     wxFontEncoding   encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
     MyFontEnumerator fontEnumerator(encoding);
     bool             fixed_width_only = false;
-    fontEnumerator.EnumerateFacenames(encoding, fixed_width_only);
+
+    { using namespace std::chrono;
+    steady_clock::time_point enumerate_start = steady_clock::now();
+    ScopeGuard sg([&enumerate_start]() {
+        steady_clock::time_point enumerate_end = steady_clock::now();
+        long long enumerate_duration = duration_cast<milliseconds>(enumerate_end - enumerate_start).count();
+        BOOST_LOG_TRIVIAL(info) << "OS Fonts Enumeration " << enumerate_duration << "ms";
+    });
+
+    fontEnumerator.EnumerateFacenames(encoding, fixed_width_only);    
+    }// End Time measures
+    
     m_face_names.encoding = encoding;
     std::vector<wxString> &names = fontEnumerator.m_facenames;
     std::sort(names.begin(), names.end());

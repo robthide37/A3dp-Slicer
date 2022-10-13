@@ -77,7 +77,7 @@ class PlaterWorker: public Worker {
                 << std::fixed // do not use scientific notations
                 << "Job '" << typeid(*m_job).name() << "' "
                 << "spend " << m_process_duration + finalize_duration << "ms "
-                << "(process " << m_process_duration << "ms + finalize " << finalize_duration << "ms)" << std::endl;
+                << "(process " << m_process_duration << "ms + finalize " << finalize_duration << "ms)";
 
             if (eptr) try {
                 std::rethrow_exception(eptr);
