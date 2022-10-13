@@ -127,7 +127,7 @@ void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
     glsafe(::glBindTexture(target, no_texture_id));
 
     // show rendered texture
-    //wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+    wxGetApp().plater()->canvas3D()->schedule_extra_frame(0);
 
     BOOST_LOG_TRIVIAL(info) 
         << "Generate Preview font('" << m_input.font_name << "' id:" << m_input.index << ") "
