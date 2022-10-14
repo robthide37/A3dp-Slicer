@@ -463,7 +463,8 @@ const Emboss::Glyph* priv::get_glyph(
     Emboss::Glyphs &               cache,
     std::optional<stbtt_fontinfo> &font_info_opt)
 {
-    const double RESOLUTION = 0.0125; // TODO: read from printer configuration
+    // TODO: Use resolution by printer configuration, or add it into FontProp
+    const float RESOLUTION = 0.0125; // [in mm]
     auto glyph_item = cache.find(unicode);
     if (glyph_item != cache.end()) return &glyph_item->second;
 
@@ -478,7 +479,7 @@ const Emboss::Glyph* priv::get_glyph(
         if (!font_info_opt.has_value()) return nullptr;
     }
 
-    float flatness = static_cast<float>(font.infos[font_index].ascent * RESOLUTION / font_prop.size_in_mm);
+    float flatness = font.infos[font_index].ascent * RESOLUTION / font_prop.size_in_mm;
 
     // Fix for very small flatness because it create huge amount of points from curve
     if (flatness < RESOLUTION) flatness = RESOLUTION;
