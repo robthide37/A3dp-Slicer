@@ -87,7 +87,6 @@ class GLGizmoMeasure : public GLGizmoBase
     Dimensioning m_dimensioning;
 
     Transform3d m_volume_matrix{ Transform3d::Identity() };
-    Transform3d m_volume_matrix_scale_inverse{ Transform3d::Identity() };
     std::vector<GLModel> m_plane_models_cache;
     std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
     std::vector<std::shared_ptr<SceneRaycasterItem>> m_selection_raycasters;

@@ -562,8 +562,8 @@ void GLGizmoMeasure::on_render()
                 default: { assert(false); break; }
                 case Measure::SurfaceFeatureType::Point:
                 {
-                    const Vec3d& position = feature.get_point();
-                    const Transform3d feature_matrix = m_volume_matrix * Geometry::translation_transform(position) * m_volume_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
+                    const Vec3d position = TransformHelper::model_to_world(feature.get_point(), m_volume_matrix);
+                    const Transform3d feature_matrix = Geometry::translation_transform(position) * Geometry::scale_transform(inv_zoom);
                     set_matrix_uniforms(feature_matrix);
                     m_sphere.model.set_color(colors.front());
                     m_sphere.model.render();
@@ -578,7 +578,8 @@ void GLGizmoMeasure::on_render()
                 {
                     const auto& [center, radius, normal] = feature.get_circle();
                     // render center
-                    const Transform3d center_matrix = m_volume_matrix * Geometry::translation_transform(center) * m_volume_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
+                    const Vec3d center_world = TransformHelper::model_to_world(center, m_volume_matrix);
+                    const Transform3d center_matrix = Geometry::translation_transform(center_world) * Geometry::scale_transform(inv_zoom);
                     set_matrix_uniforms(center_matrix);
                     m_sphere.model.set_color(colors.front());
                     m_sphere.model.render();
@@ -608,11 +609,12 @@ void GLGizmoMeasure::on_render()
                 }
                 case Measure::SurfaceFeatureType::Edge:
                 {
-                    const auto& [start, end] = feature.get_edge();
+                    const auto& [from, to] = feature.get_edge();
                     // render extra point
                     const std::optional<Vec3d> extra = feature.get_extra_point();
                     if (extra.has_value()) {
-                        const Transform3d point_matrix = m_volume_matrix * Geometry::translation_transform(*extra) * m_volume_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
+                        const Vec3d extra_world = TransformHelper::model_to_world(*extra, m_volume_matrix);
+                        const Transform3d point_matrix = Geometry::translation_transform(extra_world) * Geometry::scale_transform(inv_zoom);
                         set_matrix_uniforms(point_matrix);
                         m_sphere.model.set_color(colors.front());
                         m_sphere.model.render();
@@ -623,9 +625,11 @@ void GLGizmoMeasure::on_render()
                         }
                     }
                     // render edge
-                    const Transform3d edge_matrix = m_volume_matrix * Geometry::translation_transform(start) *
-                        Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), end - start) *
-                        Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (end - start).norm() });
+                    const Vec3d from_world = TransformHelper::model_to_world(from, m_volume_matrix);
+                    const Vec3d to_world = TransformHelper::model_to_world(to, m_volume_matrix);
+                    const Transform3d edge_matrix = Geometry::translation_transform(from_world) *
+                        Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), to_world - from_world) *
+                        Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (to_world - from_world).norm() });
                     set_matrix_uniforms(edge_matrix);
                     m_cylinder.model.set_color(colors.back());
                     m_cylinder.model.render();
@@ -717,7 +721,8 @@ void GLGizmoMeasure::on_render()
 
         if (is_hovering_on_locked_feature && m_curr_point_on_feature_position.has_value()) {
             if (m_hover_id != POINT_ID) {
-                const Transform3d matrix = m_volume_matrix * Geometry::translation_transform(*m_curr_point_on_feature_position) * m_volume_matrix_scale_inverse * Geometry::scale_transform(inv_zoom);
+                const Vec3d position = TransformHelper::model_to_world(*m_curr_point_on_feature_position, m_volume_matrix);
+                const Transform3d matrix = Geometry::translation_transform(position) * Geometry::scale_transform(inv_zoom);
                 set_matrix_uniforms(matrix);
                 m_sphere.model.set_color(hover_selection_color());
                 m_sphere.model.render();
@@ -766,7 +771,6 @@ void GLGizmoMeasure::update_if_needed()
     };
 
     m_volume_matrix = m_parent.get_selection().get_first_volume()->world_matrix();
-    m_volume_matrix_scale_inverse = Geometry::Transformation(m_volume_matrix).get_scaling_factor_matrix().inverse();
 
     const ModelObject* mo = m_c->selection_info()->model_object();
     const ModelVolume* mv = m_c->selection_info()->model_volume();
