@@ -191,6 +191,7 @@ private:
         // maximal size of face name image
         Vec2i face_name_size = Vec2i(100, 0);
         float face_name_max_width = 100.f;
+        float face_name_texture_offset_x = 105.f;
 
         // maximal texture generate jobs running at once
         unsigned int max_count_opened_font_files = 10;
@@ -228,7 +229,7 @@ private:
     struct FaceName{
         wxString name;
         std::string name_truncated = "";
-
+        size_t texture_index = 0;
         // State for generation of texture
         // when start generate create share pointers
         std::shared_ptr<std::atomic<bool>> cancel = nullptr;
@@ -242,8 +243,7 @@ private:
         // flag if face names was enumerated from OS
         bool is_init = false;
 
-        wxFontEncoding encoding;
-        std::vector<FaceName> faces;
+        std::vector<FaceName> faces = {};
 
         // Identify if preview texture exists
         GLuint texture_id = 0;
@@ -251,6 +251,15 @@ private:
         // protection for open too much font files together
         // Gtk:ERROR:../../../../gtk/gtkiconhelper.c:494:ensure_surface_for_gicon: assertion failed (error == NULL): Failed to load /usr/share/icons/Yaru/48x48/status/image-missing.png: Error opening file /usr/share/icons/Yaru/48x48/status/image-missing.png: Too many open files (g-io-error-quark, 31)
         unsigned int count_opened_font_files = 0; 
+
+        // Configuration of font encoding
+        const wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
+
+        // Configuration for texture height
+        const int count_cached_textures = 32;
+
+        // index for new generated texture index(must be lower than count_cached_textures)
+        size_t texture_index = 0;
     } m_face_names;
 
     // Text to emboss

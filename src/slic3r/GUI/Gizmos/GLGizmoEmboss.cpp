@@ -1222,8 +1222,6 @@ void GLGizmoEmboss::draw_text_input()
     }
 }
 
-//#define DEBUG_NOT_LOADABLE_FONTS
-
 /// <summary>
 /// Keep list of loadable OS fonts
 /// Filtrate which can be loaded.
@@ -1232,14 +1230,20 @@ void GLGizmoEmboss::draw_text_input()
 class MyFontEnumerator : public wxFontEnumerator
 {
     wxFontEncoding m_encoding;
-public: 
+    bool m_fixed_width_only = false;
     std::vector<wxString> m_facenames;
+    std::vector<wxString> m_facenames_bad;
+public: 
     MyFontEnumerator(wxFontEncoding encoding) : m_encoding(encoding) {}
+    void enumerate() {
+        m_facenames.clear();
+        m_facenames_bad.clear();
+        EnumerateFacenames(m_encoding, m_fixed_width_only); 
+        std::sort(m_facenames.begin(), m_facenames.end());
+    }
 
-#ifdef DEBUG_NOT_LOADABLE_FONTS
-    std::vector<std::string> m_efacenames;
-#endif // DEBUG_NOT_LOADABLE_FONTS
-
+    const std::vector<wxString> &get_face_names() const { return m_facenames; }
+    const std::vector<wxString> &get_bad_face_names() const { return m_facenames_bad; }
 protected:
     /// <summary>
     /// Called by wxFontEnumerator::EnumerateFacenames() for each match.
@@ -1255,9 +1259,7 @@ protected:
         // Faster chech if wx_font is loadable but not 100%
         // names could contain not loadable font
         if (!WxFontUtils::can_load(wx_font)) {
-#ifdef DEBUG_NOT_LOADABLE_FONTS
-            m_efacenames.emplace_back(facename.c_str());
-#endif // DEBUG_NOT_LOADABLE_FONTS
+            m_facenames_bad.emplace_back(facename);
             return true; // can't load
         }
         /*/
@@ -1265,9 +1267,7 @@ protected:
         // After this all files are loadable
         auto font_file = WxFontUtils::create_font_file(wx_font);
         if (font_file == nullptr) {
-#ifdef DEBUG_NOT_LOADABLE_FONTS
-            m_efacenames.emplace_back(facename.c_str());
-#endif // DEBUG_NOT_LOADABLE_FONTS
+            m_facenames_bad.emplace_back(facename.c_str());
             return true; // can't create font file
         } // */
         m_facenames.push_back(facename);
@@ -1289,28 +1289,33 @@ bool GLGizmoEmboss::select_facename(const wxString &facename) {
     return true;
 }
 
+static std::string concat(std::vector<wxString> data) {
+    std::stringstream ss;
+    for (const auto &d : data) 
+        ss << d.c_str() << ", ";
+    return ss.str();
+}
+
 void GLGizmoEmboss::init_face_names() {
     if (m_face_names.is_init) return;
     m_face_names.is_init      = true;
-    wxFontEncoding   encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
-    MyFontEnumerator fontEnumerator(encoding);
-    bool             fixed_width_only = false;
+    MyFontEnumerator font_enumerator(m_face_names.encoding);
 
     { using namespace std::chrono;
     steady_clock::time_point enumerate_start = steady_clock::now();
-    ScopeGuard sg([&enumerate_start]() {
+    ScopeGuard sg([&enumerate_start, &font_enumerator]() {
         steady_clock::time_point enumerate_end = steady_clock::now();
         long long enumerate_duration = duration_cast<milliseconds>(enumerate_end - enumerate_start).count();
-        BOOST_LOG_TRIVIAL(info) << "OS Fonts Enumeration " << enumerate_duration << "ms";
+        BOOST_LOG_TRIVIAL(info) << "OS enumerate " << font_enumerator.get_face_names().size() << " fonts "
+                                << "(+ " << font_enumerator.get_bad_face_names().size() << " can't load "
+                                << "= " << font_enumerator.get_face_names().size() + font_enumerator.get_bad_face_names().size() << " fonts) "
+                                << "in " << enumerate_duration << " ms\n" << concat(font_enumerator.get_bad_face_names());
     });
 
-    fontEnumerator.EnumerateFacenames(encoding, fixed_width_only);    
+    font_enumerator.enumerate();   
     }// End Time measures
     
-    m_face_names.encoding = encoding;
-    std::vector<wxString> &names = fontEnumerator.m_facenames;
-    std::sort(names.begin(), names.end());
-
+    const std::vector<wxString> &names = font_enumerator.get_face_names();
     const float &width = m_gui_cfg->face_name_max_width;
     m_face_names.faces.reserve(names.size());
     for (const wxString &name : names) {
@@ -1333,7 +1338,7 @@ void GLGizmoEmboss::init_font_name_texture() {
     glsafe(::glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
     glsafe(::glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
     const Vec2i &size = m_gui_cfg->face_name_size;
-    GLint w = size.x(), h = m_face_names.faces.size() * size.y();
+    GLint w = size.x(), h = m_face_names.count_cached_textures * size.y();
     std::vector<unsigned char> data(4*w * h, {0});
     const GLenum format = GL_RGBA, type = GL_UNSIGNED_BYTE;
     const GLint level = 0, internal_format = GL_RGBA, border = 0;
@@ -1379,7 +1384,6 @@ void GLGizmoEmboss::draw_font_list()
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if (!m_face_names.is_init) init_face_names();
         if (m_face_names.texture_id == 0) init_font_name_texture();
-        ImTextureID tex_id = (void *) (intptr_t) m_face_names.texture_id;
         unsigned int &count_opened_fonts = m_face_names.count_opened_font_files; 
         for (FaceName &face : m_face_names.faces) {
             const wxString &face_name = face.name;
@@ -1398,17 +1402,18 @@ void GLGizmoEmboss::draw_font_list()
                 ImGui::SetTooltip("%s", face_name.ToUTF8().data());
             if (is_selected) ImGui::SetItemDefaultFocus();
 
+            ImVec2 size(m_gui_cfg->face_name_size.x(), m_gui_cfg->face_name_size.y());
+            // set to pixel 0,0 in texture
+            ImVec2 uv0(0.f, 0.f), uv1(1.f, 1.f / size.y / m_face_names.count_cached_textures);
+            ImTextureID tex_id = (void *) (intptr_t) m_face_names.texture_id;
             if (face.is_created != nullptr){
-                if (*face.is_created){
-                    ImGui::SameLine(m_gui_cfg->face_name_max_width);
-                    ImVec2 size(m_gui_cfg->face_name_size.x(),
-                                m_gui_cfg->face_name_size.y()),
-                        uv0(0.f, index / (float) m_face_names.faces.size()),
-                        uv1(1.f, (index + 1) / (float) m_face_names.faces.size());
-                    ImGui::Image(tex_id, size, uv0, uv1);
-                } else if (!ImGui::IsItemVisible()) { 
-                    face.cancel->store(true);
+                if (*face.is_created) {
+                    size_t texture_index = face.texture_index;
+                    uv0 = ImVec2(0.f, texture_index / (float) m_face_names.count_cached_textures),
+                    uv1 = ImVec2(1.f, (texture_index + 1) / (float) m_face_names.count_cached_textures);
+                } else if (!ImGui::IsItemVisible()) {
                     face.is_created = nullptr;
+                    face.cancel->store(true);
                 }
             } else if (ImGui::IsItemVisible() && 
                 count_opened_fonts < m_gui_cfg->max_count_opened_font_files) {
@@ -1422,12 +1427,25 @@ void GLGizmoEmboss::draw_font_list()
                 // format type and level must match to texture data
                 const GLenum format = GL_RGBA, type = GL_UNSIGNED_BYTE;
                 const GLint level = 0;
+                // select next texture index
+                size_t texture_index = (m_face_names.texture_index+1) % m_face_names.count_cached_textures;
+                // set previous cach as deleted
+                for (FaceName &f : m_face_names.faces)
+                    if (f.texture_index == texture_index) {
+                        if (f.cancel != nullptr)
+                            f.cancel->store(true);
+                        f.is_created = nullptr;
+                    }
+                
+                m_face_names.texture_index = texture_index;
+                face.texture_index = texture_index;
+                
                 // render text to texture
                 FontImageData data{text,
                                    face_name,
                                    m_face_names.encoding,
                                    m_face_names.texture_id,
-                                   index,
+                                   m_face_names.texture_index,
                                    m_gui_cfg->face_name_size,
                                    gray_level,
                                    format,
@@ -1441,7 +1459,9 @@ void GLGizmoEmboss::draw_font_list()
                 auto& worker = wxGetApp().plater()->get_ui_job_worker();
                 queue_job(worker, std::move(job));
             }
-            
+
+            ImGui::SameLine(m_gui_cfg->face_name_texture_offset_x);
+            ImGui::Image(tex_id, size, uv0, uv1);
             ImGui::PopID();
         }        
 #ifdef SHOW_FONT_COUNT
