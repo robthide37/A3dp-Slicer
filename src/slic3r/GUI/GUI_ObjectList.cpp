@@ -2458,19 +2458,37 @@ bool ObjectList::has_selected_cut_object() const
 
     return false;
 }
-
 void ObjectList::invalidate_cut_info_for_selection()
 {
-    wxDataViewItemArray sels;
-    GetSelections(sels);
-    if (sels.IsEmpty())
+    const wxDataViewItem item = GetSelection();
+    if (item) {
+        const int obj_idx = m_objects_model->GetObjectIdByItem(item);
+        if (obj_idx >= 0)
+            invalidate_cut_info_for_object(size_t(obj_idx));
+    }
+}
+
+void ObjectList::invalidate_cut_info_for_object(size_t obj_idx)
+{
+    ModelObject* init_obj = object(int(obj_idx));
+    if (!init_obj->is_cut())
         return;
 
-    for (wxDataViewItem item : sels) {
-        const int obj_idx = m_objects_model->GetObjectIdByItem(item);
-        if (obj_idx >= 0 && object(obj_idx)->is_cut())
-            object(obj_idx)->invalidate_cut();
-    }
+    take_snapshot(_L("Invalidate cut info"));
+
+    auto invalidate_cut = [this](size_t obj_idx) {
+        object(int(obj_idx))->invalidate_cut();
+        update_info_items(obj_idx);
+        add_volumes_to_object_in_list(obj_idx);
+    };
+
+    // invalidate cut for related objects (which have the same cut_id)
+    for (size_t idx = 0; idx < m_objects->size(); idx++)
+        if (ModelObject* obj = object(idx); obj != init_obj && obj->cut_id.is_equal(init_obj->cut_id))
+            invalidate_cut(idx);
+
+    // invalidate own cut information
+    invalidate_cut(size_t(obj_idx));
 
     update_lock_icons_for_model();
 }
@@ -2970,8 +2988,6 @@ void ObjectList::update_lock_icons_for_model()
 
 bool ObjectList::delete_from_model_and_list(const ItemType type, const int obj_idx, const int sub_obj_idx)
 {
-//    take_snapshot(_(L("Delete Selected Item"))); // #ysFIXME - delete this redundant snapshot after test
-
     if (type & (itObject | itVolume | itInstance)) {
         if (type & itObject) {
             bool was_cut = object(obj_idx)->is_cut();
@@ -2983,7 +2999,7 @@ bool ObjectList::delete_from_model_and_list(const ItemType type, const int obj_i
             }
             return false;
         }
-        else if (del_subobject_from_object(obj_idx, sub_obj_idx, type)) {
+        if (del_subobject_from_object(obj_idx, sub_obj_idx, type)) {
             type == itVolume ? delete_volume_from_list(obj_idx, sub_obj_idx) :
                                delete_instance_from_list(obj_idx, sub_obj_idx);
             return true;
@@ -3189,6 +3205,8 @@ void ObjectList::remove()
             if (m_objects_model->InvalidItem(item)) // item can be deleted for this moment (like last 2 Instances or Volumes)
                 continue;
             parent = delete_item(item);
+            if (parent == item && m_objects_model->GetItemType(item) & itObject) // Object wasn't deleted
+                break;
         }
     }
 

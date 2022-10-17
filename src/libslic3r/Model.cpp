@@ -1259,11 +1259,9 @@ void ModelObject::apply_cut_connectors(const std::string& new_name)
 
 void ModelObject::invalidate_cut()
 {
-    for (ModelObject* obj : m_model->objects)
-        if (obj != this && obj->cut_id.is_equal(this->cut_id))
-            obj->cut_id.invalidate();
-    // invalidate own cut_id
     this->cut_id.invalidate();
+    for (ModelVolume* volume : this->volumes)
+        volume->invalidate_cut_info();
 }
 
 void ModelObject::synchronize_model_after_cut()

@@ -156,7 +156,7 @@ public:
         this->m_check_sum = rhs.check_sum();
         this->m_connectors_cnt = rhs.connectors_cnt() ;
     }
-    CutObjectBase operator=(const CutObjectBase& other) { 
+    CutObjectBase& operator=(const CutObjectBase& other) { 
         this->copy(other); 
         return *this; 
     }
@@ -179,6 +179,13 @@ public:
 
     size_t connectors_cnt() const                           { return m_connectors_cnt; }
     void   increase_connectors_cnt(size_t connectors_cnt)   { m_connectors_cnt += connectors_cnt; }
+
+private:
+    friend class cereal::access;
+    template<class Archive> void serialize(Archive& ar) {
+        ar(cereal::base_class<ObjectBase>(this));
+        ar(m_check_sum, m_connectors_cnt);
+    }
 };
 
 // Unique object / instance ID for the wipe tower.

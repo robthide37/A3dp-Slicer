@@ -3020,8 +3020,6 @@ bool Plater::priv::delete_object_from_model(size_t obj_idx)
         dialog.SetButtonLabel(wxID_YES, _L("Delete object"));
         if (dialog.ShowModal() == wxID_CANCEL)
             return false;
-        // unmark all related CutParts of initial object
-        obj->invalidate_cut();
     }
 
     wxString snapshot_label = _L("Delete Object");
@@ -3029,6 +3027,10 @@ bool Plater::priv::delete_object_from_model(size_t obj_idx)
         snapshot_label += ": " + wxString::FromUTF8(obj->name.c_str());
     Plater::TakeSnapshot snapshot(q, snapshot_label);
     m_worker.cancel_all();
+
+    if (obj->is_cut())
+        sidebar->obj_list()->invalidate_cut_info_for_object(obj_idx);
+
     model.delete_object(obj_idx);
     update();
     object_list_changed();
@@ -5940,9 +5942,8 @@ void Plater::cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_mat
 
     wxCHECK_RET(instance_idx < object->instances.size(), "instance_idx out of bounds");
 
-    this->suppress_snapshots();
     wxBusyCursor wait;
-    
+
     const auto new_objects = object->cut(instance_idx, cut_matrix, attributes);
 
     model().delete_object(obj_idx);
@@ -5950,8 +5951,6 @@ void Plater::cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_mat
 
     // suppress to call selection update for Object List to avoid call of early Gizmos on/off update
     p->load_model_objects(new_objects, false, false);
-
-    this->allow_snapshots();
 
     // now process all updates of the 3d scene
     update();

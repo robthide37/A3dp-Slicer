@@ -1223,11 +1223,10 @@ bool GLGizmoCut3D::update_bb()
 
         on_unregister_raycasters_for_picking();
 
-        if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info()) {
-            clear_selection();
+        clear_selection();
+        if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info())
             m_selected.resize(selection->model_object()->cut_connectors.size(), false);
-            m_connectors_editing = !m_selected.empty();
-        }
+        m_connectors_editing = !m_selected.empty();
 
         return true;
     }
@@ -1811,6 +1810,9 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     if (!mo)
         return;
 
+    // deactivate CutGizmo and than perform a cut
+    m_parent.reset_all_gizmos();
+
     // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
     const double sla_shift_z    = selection.get_first_volume()->get_sla_shift_z();
     const double object_cut_z   = m_plane_center.z() - sla_shift_z;
@@ -1820,13 +1822,12 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     cut_center_offset[Z] -= sla_shift_z;
 
     if (0.0 < object_cut_z && can_perform_cut()) {
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by Plane"));
+
         bool create_dowels_as_separate_object = false;
         const bool has_connectors = !mo->cut_connectors.empty();
-        {
-            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by Plane"));
-            // update connectors pos as offset of its center before cut performing
-            apply_connectors_in_model(mo, create_dowels_as_separate_object);
-        }
+        // update connectors pos as offset of its center before cut performing
+        apply_connectors_in_model(mo, create_dowels_as_separate_object);
 
         plater->cut(object_idx, instance_idx, assemble_transform(cut_center_offset) * m_rotation_m,
                     only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
