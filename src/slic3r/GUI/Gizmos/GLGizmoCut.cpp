@@ -968,6 +968,11 @@ bool GLGizmoCut3D::on_is_activable() const
     return m_parent.get_selection().is_single_full_instance();
 }
 
+bool GLGizmoCut3D::on_is_selectable() const
+{
+    return wxGetApp().get_mode() != comSimple;
+}
+
 Vec3d GLGizmoCut3D::mouse_position_in_local_plane(Axis axis, const Linef3& mouse_ray) const
 {
     double half_pi = 0.5 * PI;
@@ -1194,7 +1199,7 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(bool revert_move /*= false*
 bool GLGizmoCut3D::update_bb()
 {
     const BoundingBoxf3 box = bounding_box();
-    if (m_max_pos != box.max && m_min_pos != box.min) {
+    if (m_max_pos != box.max || m_min_pos != box.min) {
         m_max_pos = box.max;
         m_min_pos = box.min;
         m_bb_center = box.center();
@@ -1501,8 +1506,12 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGui::SameLine(m_label_width);
         render_move_center_input(Z);
         ImGui::SameLine();
+
+        const bool is_cut_plane_init = m_rotation_m.isApprox(Transform3d::Identity()) && bounding_box().center() == m_plane_center;
+        m_imgui->disabled_begin(is_cut_plane_init);
         if (render_reset_button("cut_plane", _u8L("Reset cutting plane")))
             reset_cut_plane();
+        m_imgui->disabled_end();
 
         if (wxGetApp().plater()->printer_technology() == ptFFF) {
             m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);

@@ -171,6 +171,7 @@ protected:
     CommonGizmosDataID on_get_requirements() const override;
     void               on_set_hover_id() override;
     bool               on_is_activable() const override;
+    bool               on_is_selectable() const override;
     Vec3d              mouse_position_in_local_plane(Axis axis, const Linef3&mouse_ray) const;
     void               dragging_grabber_z(const GLGizmoBase::UpdateData &data);
     void               dragging_grabber_xy(const GLGizmoBase::UpdateData &data);
