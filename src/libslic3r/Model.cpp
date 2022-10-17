@@ -464,12 +464,25 @@ static constexpr const double volume_threshold_inches = 9.0; // 9 = 3*3*3;
 
 bool Model::looks_like_imperial_units() const
 {
-    if (this->objects.size() == 0)
+    if (this->objects.empty())
         return false;
 
     for (ModelObject* obj : this->objects)
-        if (obj->get_object_stl_stats().volume < volume_threshold_inches)
-            return true;
+        if (obj->get_object_stl_stats().volume < volume_threshold_inches) {
+            if (!obj->is_cut())
+                return true;
+            bool all_cut_parts_look_like_imperial_units = true;
+            for (ModelObject* obj_other : this->objects) {
+                if (obj_other == obj)
+                    continue;
+                if (obj_other->cut_id.is_equal(obj->cut_id) && obj_other->get_object_stl_stats().volume >= volume_threshold_inches) {
+                    all_cut_parts_look_like_imperial_units = false;
+                    break;
+                }
+            }
+            if (all_cut_parts_look_like_imperial_units)
+                return true;
+        }
 
     return false;
 }

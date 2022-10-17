@@ -1728,6 +1728,9 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
         // update printable state on canvas
         wxGetApp().plater()->canvas3D()->update_instance_printable_state_for_object((size_t)obj_idx);
 
+    if (model_object.is_cut())
+        update_info_items(obj_idx);
+
     selection_changed();
 }
 
@@ -1858,11 +1861,13 @@ bool ObjectList::del_subobject_item(wxDataViewItem& item)
 
     // If last volume item with warning was deleted, unmark object item
     if (type & itVolume) {
+        add_volumes_to_object_in_list(obj_idx);
         const std::string& icon_name = get_warning_icon_name(object(obj_idx)->get_object_stl_stats());
         m_objects_model->UpdateWarningIcon(parent, icon_name);
     }
+    else
+        m_objects_model->Delete(item);
 
-    m_objects_model->Delete(item);
     update_info_items(obj_idx);
 
     return true;
@@ -2677,7 +2682,8 @@ void ObjectList::part_selection_changed()
                     volume_id = m_objects_model->GetVolumeIdByItem(item);
                     m_config = &object->volumes[volume_id]->config;
                     update_and_show_manipulations = true;
-                    enable_manipulation = !(object->is_cut() && object->volumes[volume_id]->is_cut_connector());
+                    const ModelVolume* volume = object->volumes[volume_id];
+                    enable_manipulation = !(object->is_cut() && (volume->is_cut_connector() || volume->is_model_part()));
                 }
                 else if (type & itInstance) {
                     og_name = _L("Instance manipulation");
@@ -2874,8 +2880,11 @@ static bool can_add_volumes_to_object(const ModelObject* object)
     if (can && object->is_cut()) {
         int no_connectors_cnt = 0;
         for (const ModelVolume* v : object->volumes)
-            if (!v->is_cut_connector())
+            if (!v->is_cut_connector()) {
+                if (!v->is_model_part())
+                    return true;
                 no_connectors_cnt++;
+            }
         can = no_connectors_cnt > 1;
     }
 
@@ -3031,7 +3040,7 @@ bool ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& it
             if (!del_subobject_from_object(item->obj_idx, item->sub_obj_idx, item->type))
                 continue;
             if (item->type&itVolume) {
-                m_objects_model->Delete(m_objects_model->GetItemByVolumeId(item->obj_idx, item->sub_obj_idx));
+                add_volumes_to_object_in_list(item->obj_idx);
                 ModelObject* obj = object(item->obj_idx);
                 if (obj->volumes.size() == 1) {
                     wxDataViewItem parent = m_objects_model->GetItemById(item->obj_idx);

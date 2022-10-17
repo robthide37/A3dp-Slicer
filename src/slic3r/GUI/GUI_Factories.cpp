@@ -689,15 +689,12 @@ void MenuFactory::append_menu_item_invalidate_cut_info(wxMenu* menu)
 {
     const wxString menu_name = _L("Invalidate cut info");
 
-    bool is_cut = obj_list()->has_selected_cut_object();
-
     auto menu_item_id = menu->FindItem(menu_name);
-    if (menu_item_id != wxNOT_FOUND) {
+    if (menu_item_id != wxNOT_FOUND)
         // Delete old menu item if selected object isn't cut
-        if (!is_cut)
-            menu->Destroy(menu_item_id);
-    }
-    else if (is_cut)
+        menu->Destroy(menu_item_id);
+
+    if (obj_list()->has_selected_cut_object())
         append_menu_item(menu, wxID_ANY, menu_name, "",
             [](wxCommandEvent&) { obj_list()->invalidate_cut_info_for_selection(); }, "", menu,
             []() { return true; }, m_parent);
