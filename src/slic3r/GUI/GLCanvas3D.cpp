@@ -2011,14 +2011,14 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         size_t                      volume_idx;
     };
 
-    // SLA steps to pull the preview meshes for.
-	typedef std::array<SLAPrintObjectStep, 3> SLASteps;
-    SLASteps sla_steps = { slaposDrillHoles, slaposSupportTree, slaposPad };
-    struct SLASupportState {
-        std::array<PrintStateBase::StateWithTimeStamp, std::tuple_size<SLASteps>::value> step;
-    };
-    // State of the sla_steps for all SLAPrintObjects.
-    std::vector<SLASupportState>   sla_support_state;
+//    // SLA steps to pull the preview meshes for.
+//	typedef std::array<SLAPrintObjectStep, 3> SLASteps;
+//    SLASteps sla_steps = { slaposDrillHoles, slaposSupportTree, slaposPad };
+//    struct SLASupportState {
+//        std::array<PrintStateBase::StateWithTimeStamp, std::tuple_size<SLASteps>::value> step;
+//    };
+//    // State of the sla_steps for all SLAPrintObjects.
+//    std::vector<SLASupportState>   sla_support_state;
 
     std::vector<size_t> instance_ids_selected;
     std::vector<size_t> map_glvolume_old_to_new(m_volumes.volumes.size(), size_t(-1));
@@ -2044,33 +2044,33 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             }
         }
     }
-    if (printer_technology == ptSLA) {
-        const SLAPrint* sla_print = this->sla_print();
-#ifndef NDEBUG
-        // Verify that the SLAPrint object is synchronized with m_model.
-        check_model_ids_equal(*m_model, sla_print->model());
-#endif /* NDEBUG */
-        sla_support_state.reserve(sla_print->objects().size());
-        for (const SLAPrintObject* print_object : sla_print->objects()) {
-            SLASupportState state;
-            for (size_t istep = 0; istep < sla_steps.size(); ++istep) {
-                state.step[istep] = print_object->step_state_with_timestamp(sla_steps[istep]);
-                if (state.step[istep].state == PrintStateBase::DONE) {
-                    if (!print_object->has_mesh(sla_steps[istep]))
-                        // Consider the DONE step without a valid mesh as invalid for the purpose
-                        // of mesh visualization.
-                        state.step[istep].state = PrintStateBase::INVALID;
-                    else if (sla_steps[istep] != slaposDrillHoles)
-                        for (const ModelInstance* model_instance : print_object->model_object()->instances)
-                            // Only the instances, which are currently printable, will have the SLA support structures kept.
-                            // The instances outside the print bed will have the GLVolumes of their support structures released.
-                            if (model_instance->is_printable())
-                                aux_volume_state.emplace_back(state.step[istep].timestamp, model_instance->id());
-                }
-            }
-            sla_support_state.emplace_back(state);
-        }
-    }
+//    if (printer_technology == ptSLA) {
+//        const SLAPrint* sla_print = this->sla_print();
+//#ifndef NDEBUG
+//        // Verify that the SLAPrint object is synchronized with m_model.
+//        check_model_ids_equal(*m_model, sla_print->model());
+//#endif /* NDEBUG */
+//        sla_support_state.reserve(sla_print->objects().size());
+//        for (const SLAPrintObject* print_object : sla_print->objects()) {
+//            SLASupportState state;
+//            for (size_t istep = 0; istep < sla_steps.size(); ++istep) {
+//                state.step[istep] = print_object->step_state_with_timestamp(sla_steps[istep]);
+//                if (state.step[istep].state == PrintStateBase::DONE) {
+//                    if (!print_object->has_mesh(sla_steps[istep]))
+//                        // Consider the DONE step without a valid mesh as invalid for the purpose
+//                        // of mesh visualization.
+//                        state.step[istep].state = PrintStateBase::INVALID;
+//                    else if (sla_steps[istep] != slaposDrillHoles)
+//                        for (const ModelInstance* model_instance : print_object->model_object()->instances)
+//                            // Only the instances, which are currently printable, will have the SLA support structures kept.
+//                            // The instances outside the print bed will have the GLVolumes of their support structures released.
+//                            if (model_instance->is_printable())
+//                                aux_volume_state.emplace_back(state.step[istep].timestamp, model_instance->id());
+//                }
+//            }
+//            sla_support_state.emplace_back(state);
+//        }
+//    }
     std::sort(model_volume_state.begin(), model_volume_state.end(), model_volume_state_lower);
     std::sort(aux_volume_state.begin(), aux_volume_state.end(), model_volume_state_lower);
     // Release all ModelVolume based GLVolumes not found in the current Model. Find the GLVolume of a hollowed mesh.
@@ -7642,10 +7642,10 @@ void GLCanvas3D::_load_sla_shells()
                 // Set the extruder_id and volume_id to achieve the same color as in the 3D scene when
                 // through the update_volumes_colors_by_extruder() call.
                 m_volumes.volumes.back()->extruder_id = obj->model_object()->volumes.front()->extruder_id();
-                if (obj->is_step_done(slaposSupportTree) && obj->has_mesh(slaposSupportTree))
-                    add_volume(*obj, -int(slaposSupportTree), instance, obj->support_mesh(), GLVolume::SLA_SUPPORT_COLOR, true);
-                if (obj->is_step_done(slaposPad) && obj->has_mesh(slaposPad))
-                    add_volume(*obj, -int(slaposPad), instance, obj->pad_mesh(), GLVolume::SLA_PAD_COLOR, false);
+                if (auto &tree_mesh = obj->support_mesh(); !tree_mesh.empty())
+                    add_volume(*obj, -int(slaposSupportTree), instance, tree_mesh, GLVolume::SLA_SUPPORT_COLOR, true);
+                if (auto &pad_mesh = obj->pad_mesh(); !pad_mesh.empty())
+                    add_volume(*obj, -int(slaposPad), instance, pad_mesh, GLVolume::SLA_PAD_COLOR, false);
             }
             double shift_z = obj->get_current_elevation();
             for (unsigned int i = initial_volumes_count; i < m_volumes.volumes.size(); ++ i) {
