@@ -176,10 +176,6 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
     ctl.stopcondition = [this]() { return canceled(); };
     ctl.cancelfn = [this]() { throw_if_canceled(); };
 
-    sla::JobController ctl;
-    ctl.stopcondition = [this]() { return canceled(); };
-    ctl.cancelfn = [this]() { throw_if_canceled(); };
-
     sla::InteriorPtr interior =
         generate_interior(range(po.m_mesh_to_slice), hlwcfg, ctl);
 
