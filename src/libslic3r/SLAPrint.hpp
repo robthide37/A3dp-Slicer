@@ -3,16 +3,15 @@
 
 #include <cstdint>
 #include <mutex>
+#include <set>
+
 #include "PrintBase.hpp"
-#include "SLA/RasterBase.hpp"
 #include "SLA/SupportTree.hpp"
 #include "Point.hpp"
-#include "MTUtils.hpp"
-#include "Zipper.hpp"
 #include "Format/SLAArchiveWriter.hpp"
 #include "GCode/ThumbnailData.hpp"
-
-#include "libslic3r/Execution/ExecutionTBB.hpp"
+#include "libslic3r/CSGMesh/CSGMesh.hpp"
+#include "libslic3r/OpenVDBUtils.hpp"
 
 namespace Slic3r {
 
@@ -23,6 +22,7 @@ enum SLAPrintStep : unsigned int {
 };
 
 enum SLAPrintObjectStep : unsigned int {
+    slaposAssembly,
     slaposHollowing,
     slaposDrillHoles,
 	slaposObjectSlice,
@@ -44,6 +44,53 @@ using _SLAPrintObjectBase =
 // using coord_t = int64_t;
 
 enum SliceOrigin { soSupport, soModel };
+
+// Each sla object step can hold a collection of csg operations on the
+// sla model to be sliced. Currently, Assembly step adds negative and positive
+// volumes, hollowing adds the negative interior, drilling adds the hole cylinders.
+// They need to be processed in this specific order. If CSGPartForStep instances
+// are put into a multiset container the key being the sla step,
+// iterating over the container will maintain the correct order of csg operations.
+struct CSGPartForStep : public csg::CSGPart
+{
+    SLAPrintObjectStep key;
+    mutable struct { VoxelGridPtr gridptr; csg::VoxelizeParams params; } cache;
+
+    CSGPartForStep(SLAPrintObjectStep k, CSGPart &&p = {})
+        : key{k}, CSGPart{std::move(p)}
+    {}
+
+    CSGPartForStep &operator=(CSGPart &&part)
+    {
+        this->its_ptr = std::move(part.its_ptr);
+        this->operation = part.operation;
+        return *this;
+    }
+
+    bool operator<(const CSGPartForStep &other) const { return key < other.key; }
+};
+
+namespace csg {
+
+//inline VoxelGridPtr get_voxelgrid(const CSGPartForStep &part,
+//                                  const VoxelizeParams &p)
+//{
+//    if (!part.cache.gridptr || get_voxel_scale(*part.cache.gridptr) < p.voxel_scale()) {
+//        part.cache.gridptr = mesh_to_grid(*csg::get_mesh(part), p.voxel_scale(),
+//                                    p.exterior_bandwidth(),
+//                                    p.interior_bandwidth());
+
+//    } /*else {
+//        float vscale = p.voxel_scale();
+//        float oscale = get_voxel_scale(*part.cache.gridptr);
+
+//        rescale_grid(*part.cache.gridptr, oscale/vscale);
+//    }*/
+
+//    return clone(*part.cache.gridptr);
+//}
+
+} // namespace csg
 
 class SLAPrintObject : public _SLAPrintObjectBase
 {
@@ -88,11 +135,7 @@ public:
     // Get the mesh that is going to be printed with all the modifications
     // like hollowing and drilled holes.
     const TriangleMesh & get_mesh_to_print() const {
-        return (m_hollowing_data && is_step_done(slaposDrillHoles)) ? m_hollowing_data->hollow_mesh_with_holes_trimmed : transformed_mesh();
-    }
-
-    const TriangleMesh & get_mesh_to_slice() const {
-        return (m_hollowing_data && is_step_done(slaposDrillHoles)) ? m_hollowing_data->hollow_mesh_with_holes : transformed_mesh();
+        return !m_mesh_from_slices.empty() ? m_mesh_from_slices :  transformed_mesh();
     }
 
     // This will return the transformed mesh which is cached
@@ -275,7 +318,8 @@ protected:
         { m_config.apply_only(other, keys, ignore_nonexistent); }
 
     void                    set_trafo(const Transform3d& trafo, bool left_handed) {
-        m_transformed_rmesh.invalidate([this, &trafo, left_handed](){ m_trafo = trafo; m_left_handed = left_handed; });
+        m_trafo = trafo;
+        m_left_handed = left_handed;
     }
 
     template<class InstVec> inline void set_instances(InstVec&& instances) { m_instances = std::forward<InstVec>(instances); }
@@ -307,7 +351,7 @@ private:
     std::vector<float>                      m_model_height_levels;
 
     // Caching the transformed (m_trafo) raw mesh of the object
-    mutable CachedObject<TriangleMesh>      m_transformed_rmesh;
+    TriangleMesh                            m_transformed_rmesh;
     
     struct SupportData
     {
@@ -333,16 +377,16 @@ private:
             pad_mesh = TriangleMesh{sla::create_pad(input, tree_mesh.its, ctl)};
         }
     };
-    
-    std::unique_ptr<SupportData> m_supportdata;
-    
+
+    std::unique_ptr<SupportData>  m_supportdata;
+    TriangleMesh                  m_mesh_from_slices;
+    std::multiset<CSGPartForStep> m_mesh_to_slice;
+
     class HollowingData
     {
     public:
 
         sla::InteriorPtr interior;
-        mutable TriangleMesh hollow_mesh_with_holes; // caching the complete hollowed mesh
-        mutable TriangleMesh hollow_mesh_with_holes_trimmed;
     };
     
     std::unique_ptr<HollowingData> m_hollowing_data;

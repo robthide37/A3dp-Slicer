@@ -14,6 +14,12 @@
 
 #include <libslic3r/ElephantFootCompensation.hpp>
 #include <libslic3r/AABBTreeIndirect.hpp>
+#include <libslic3r/MeshSplitImpl.hpp>
+#include <libslic3r/SlicesToTriangleMesh.hpp>
+#include <libslic3r/CSGMesh/ModelToCSGMesh.hpp>
+#include <libslic3r/CSGMesh/SliceCSGMesh.hpp>
+#include <libslic3r/OpenVDBUtils.hpp>
+#include <libslic3r/QuadricEdgeCollapse.hpp>
 
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/QuadricEdgeCollapse.hpp>
@@ -33,7 +39,8 @@ namespace Slic3r {
 namespace {
 
 const std::array<unsigned, slaposCount> OBJ_STEP_LEVELS = {
-    10, // slaposHollowing,
+    5, // slaposAssembly
+    5, // slaposHollowing,
     10, // slaposDrillHoles
     10, // slaposObjectSlice,
     20, // slaposSupportPoints,
@@ -45,6 +52,7 @@ const std::array<unsigned, slaposCount> OBJ_STEP_LEVELS = {
 std::string OBJ_STEP_LABELS(size_t idx)
 {
     switch (idx) {
+    case slaposAssembly:             return L("Assembling model from parts");
     case slaposHollowing:            return L("Hollowing model");
     case slaposDrillHoles:           return L("Drilling holes into model.");
     case slaposObjectSlice:          return L("Slicing model");
@@ -120,9 +128,38 @@ void SLAPrint::Steps::apply_printer_corrections(SLAPrintObject &po, SliceOrigin 
     }
 }
 
+void clear_csg(std::multiset<CSGPartForStep> &s, SLAPrintObjectStep step)
+{
+    auto r = s.equal_range(step);
+    s.erase(r.first, r.second);
+}
+
+struct csg_inserter {
+    std::multiset<CSGPartForStep> &m;
+    SLAPrintObjectStep key;
+
+    csg_inserter &operator*() { return *this; }
+    void operator=(csg::CSGPart &&part) { m.emplace(key, std::move(part)); }
+    csg_inserter& operator++() { return *this; }
+};
+
+void SLAPrint::Steps::mesh_assembly(SLAPrintObject &po)
+{
+    po.m_mesh_to_slice.clear();
+
+    po.m_transformed_rmesh = po.m_model_object->raw_mesh();
+    po.m_transformed_rmesh.transform(po.trafo());
+
+    csg::model_to_csgmesh(*po.model_object(), po.trafo(),
+                          csg_inserter{po.m_mesh_to_slice, slaposAssembly},
+                          csg::mpartsPositive | csg::mpartsNegative);
+}
+
 void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
 {
     po.m_hollowing_data.reset();
+    clear_csg(po.m_mesh_to_slice, slaposDrillHoles);
+    clear_csg(po.m_mesh_to_slice, slaposHollowing);
 
     if (! po.m_config.hollowing_enable.getBool()) {
         BOOST_LOG_TRIVIAL(info) << "Skipping hollowing step!";
@@ -139,7 +176,12 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
     ctl.stopcondition = [this]() { return canceled(); };
     ctl.cancelfn = [this]() { throw_if_canceled(); };
 
-    sla::InteriorPtr interior = generate_interior(po.transformed_mesh().its, hlwcfg, ctl);
+    sla::JobController ctl;
+    ctl.stopcondition = [this]() { return canceled(); };
+    ctl.cancelfn = [this]() { throw_if_canceled(); };
+
+    sla::InteriorPtr interior =
+        generate_interior(range(po.m_mesh_to_slice), hlwcfg, ctl);
 
     if (!interior || sla::get_mesh(*interior).empty())
         BOOST_LOG_TRIVIAL(warning) << "Hollowed interior is empty!";
@@ -147,166 +189,74 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
         po.m_hollowing_data.reset(new SLAPrintObject::HollowingData());
         po.m_hollowing_data->interior = std::move(interior);
 
-        indexed_triangle_set &m = sla::get_mesh(*po.m_hollowing_data->interior);
-
-        if (!m.empty()) {
-            // simplify mesh lossless
-            float loss_less_max_error = 2*std::numeric_limits<float>::epsilon();
-            its_quadric_edge_collapse(m, 0U, &loss_less_max_error);
-
-            its_compactify_vertices(m);
-            its_merge_vertices(m);
-
-            // flip normals back...
-            sla::swap_normals(m);
-        }
+        // Put the interior into the target mesh as a negative
+        po.m_mesh_to_slice
+            .emplace(slaposHollowing,
+                     csg::CSGPart{&sla::get_mesh(*po.m_hollowing_data->interior),
+                                  csg::CSGType::Difference});
     }
-}
-
-static indexed_triangle_set
-remove_unconnected_vertices(const indexed_triangle_set &its)
-{
-    if (its.indices.empty()) {};
-
-    indexed_triangle_set M;
-    its_compactify_vertices(M);
-
-    return M;
 }
 
 // Drill holes into the hollowed/original mesh.
 void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
 {
-    bool needs_drilling = ! po.m_model_object->sla_drain_holes.empty();
-    bool is_hollowed =
-        (po.m_hollowing_data && po.m_hollowing_data->interior &&
-         !sla::get_mesh(*po.m_hollowing_data->interior).empty());
+    clear_csg(po.m_mesh_to_slice, slaposDrillHoles);
 
-    if (! is_hollowed && ! needs_drilling) {
-        // In this case we can dump any data that might have been
-        // generated on previous runs.
-        po.m_hollowing_data.reset();
-        return;
-    }
+    csg::model_to_csgmesh(*po.model_object(), po.trafo(),
+                          csg_inserter{po.m_mesh_to_slice, slaposDrillHoles},
+                          csg::mpartsDrillHoles);
 
-    if (! po.m_hollowing_data)
-        po.m_hollowing_data.reset(new SLAPrintObject::HollowingData());
+    // update preview mesh
+    double vscale = 1. / 0.05;
+    auto   voxparams = csg::VoxelizeParams{}
+                         .voxel_scale(vscale)
+                         .exterior_bandwidth(1.f)
+                         .interior_bandwidth(1.f);
+    auto grid = csg::voxelize_csgmesh(range(po.m_mesh_to_slice), voxparams);
+    indexed_triangle_set mesh_from_slices = grid_to_mesh(*grid);
+    po.m_mesh_from_slices = TriangleMesh{mesh_from_slices};
+}
 
-    // Hollowing and/or drilling is active, m_hollowing_data is valid.
-
-    // Regenerate hollowed mesh, even if it was there already. It may contain
-    // holes that are no longer on the frontend.
-    TriangleMesh &hollowed_mesh = po.m_hollowing_data->hollow_mesh_with_holes;
-    hollowed_mesh = po.transformed_mesh();
-    if (is_hollowed)
-        sla::hollow_mesh(hollowed_mesh, *po.m_hollowing_data->interior);
-
-    TriangleMesh &mesh_view = po.m_hollowing_data->hollow_mesh_with_holes_trimmed;
-
-    if (! needs_drilling) {
-        mesh_view = po.transformed_mesh();
-
-        if (is_hollowed)
-            sla::hollow_mesh(mesh_view, *po.m_hollowing_data->interior,
-                             sla::hfRemoveInsideTriangles);
-
-        BOOST_LOG_TRIVIAL(info) << "Drilling skipped (no holes).";
-        return;
-    }
-
-    BOOST_LOG_TRIVIAL(info) << "Drilling drainage holes.";
-    sla::DrainHoles drainholes = po.transformed_drainhole_points();
-
-    auto tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(
-        hollowed_mesh.its.vertices,
-        hollowed_mesh.its.indices
-    );
-
-    std::uniform_real_distribution<float> dist(0., float(EPSILON));
-    auto holes_mesh_cgal = MeshBoolean::cgal::triangle_mesh_to_cgal({}, {});
-    indexed_triangle_set part_to_drill = hollowed_mesh.its;
-
-    bool hole_fail = false;
-    for (size_t i = 0; i < drainholes.size(); ++i) {
-        sla::DrainHole holept = drainholes[i];
-
-        holept.normal += Vec3f{dist(m_rng), dist(m_rng), dist(m_rng)};
-        holept.normal.normalize();
-        holept.pos += Vec3f{dist(m_rng), dist(m_rng), dist(m_rng)};
-        indexed_triangle_set m = holept.to_mesh();
-
-        part_to_drill.indices.clear();
-        auto bb = bounding_box(m);
-        Eigen::AlignedBox<float, 3> ebb{bb.min.cast<float>(),
-                                        bb.max.cast<float>()};
-
-        AABBTreeIndirect::traverse(
-                    tree,
-                    AABBTreeIndirect::intersecting(ebb),
-                    [&part_to_drill, &hollowed_mesh](const auto& node)
-        {
-            part_to_drill.indices.emplace_back(hollowed_mesh.its.indices[node.idx]);
-        });
-
-        auto cgal_meshpart = MeshBoolean::cgal::triangle_mesh_to_cgal(
-            remove_unconnected_vertices(part_to_drill));
-
-        if (MeshBoolean::cgal::does_self_intersect(*cgal_meshpart)) {
-            BOOST_LOG_TRIVIAL(error) << "Failed to drill hole";
-
-            hole_fail = drainholes[i].failed =
-                    po.model_object()->sla_drain_holes[i].failed = true;
-
-            continue;
+template<class Pred>
+static std::vector<ExPolygons> slice_volumes(
+    const ModelVolumePtrs     &volumes,
+    const std::vector<float>  &slice_grid,
+    const Transform3d         &trafo,
+    const MeshSlicingParamsEx &slice_params,
+    Pred &&predicate)
+{
+    indexed_triangle_set mesh;
+    for (const ModelVolume *vol : volumes) {
+        if (predicate(vol)) {
+            indexed_triangle_set vol_mesh = vol->mesh().its;
+            its_transform(vol_mesh, trafo * vol->get_matrix());
+            its_merge(mesh, vol_mesh);
         }
-
-        auto cgal_hole = MeshBoolean::cgal::triangle_mesh_to_cgal(m);
-        MeshBoolean::cgal::plus(*holes_mesh_cgal, *cgal_hole);
     }
 
-    if (MeshBoolean::cgal::does_self_intersect(*holes_mesh_cgal))
-        throw Slic3r::SlicingError(L("Too many overlapping holes."));
+    std::vector<ExPolygons> out;
 
-    auto hollowed_mesh_cgal = MeshBoolean::cgal::triangle_mesh_to_cgal(hollowed_mesh);
-
-    if (!MeshBoolean::cgal::does_bound_a_volume(*hollowed_mesh_cgal)) {
-        po.active_step_add_warning(
-            PrintStateBase::WarningLevel::NON_CRITICAL,
-            L("Mesh to be hollowed is not suitable for hollowing (does not "
-              "bound a volume)."));
+    if (!mesh.empty()) {
+        out = slice_mesh_ex(mesh, slice_grid, slice_params);
     }
 
-    if (!MeshBoolean::cgal::empty(*holes_mesh_cgal)
-        && !MeshBoolean::cgal::does_bound_a_volume(*holes_mesh_cgal)) {
-        po.active_step_add_warning(
-            PrintStateBase::WarningLevel::NON_CRITICAL,
-            L("Unable to drill the current configuration of holes into the "
-              "model."));
+    return out;
+}
+
+template<class Cont> BoundingBoxf3 csgmesh_positive_bb(const Cont &csg)
+{
+    // Calculate the biggest possible bounding box of the mesh to be sliced
+    // from all the positive parts that it contains.
+    auto bb3d = csg.empty() ? BoundingBoxf3{} :
+                              bounding_box(*csg::get_mesh(*csg.begin()),
+                                           csg::get_transform(*csg.begin()));
+
+    for (const auto &m : csg) {
+        if (m.operation == csg::CSGType::Union)
+            bb3d.merge(bounding_box(*csg::get_mesh(m), csg::get_transform(m)));
     }
 
-    try {
-        if (!MeshBoolean::cgal::empty(*holes_mesh_cgal))
-            MeshBoolean::cgal::minus(*hollowed_mesh_cgal, *holes_mesh_cgal);
-
-        hollowed_mesh = MeshBoolean::cgal::cgal_to_triangle_mesh(*hollowed_mesh_cgal);
-        mesh_view = hollowed_mesh;
-
-        if (is_hollowed) {
-            auto &interior = *po.m_hollowing_data->interior;
-            std::vector<bool> exclude_mask =
-                    create_exclude_mask(mesh_view.its, interior, drainholes);
-
-            sla::remove_inside_triangles(mesh_view, interior, exclude_mask);
-        }
-    } catch (const Slic3r::RuntimeError &) {
-        throw Slic3r::SlicingError(L(
-            "Drilling holes into the mesh failed. "
-            "This is usually caused by broken model. Try to fix it first."));
-    }
-
-    if (hole_fail)
-        po.active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
-                                   L("Failed to drill some holes into the model"));
+    return bb3d;
 }
 
 // The slicing will be performed on an imaginary 1D grid which starts from
@@ -319,14 +269,17 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
 // same imaginary grid (the height vector argument to TriangleMeshSlicer).
 void SLAPrint::Steps::slice_model(SLAPrintObject &po)
 {
-    const TriangleMesh &mesh = po.get_mesh_to_slice();
+    // The first mesh in the csg sequence is assumed to be a positive part
+    assert(po.m_mesh_to_slice.empty() ||
+           csg::get_operation(*po.m_mesh_to_slice.begin()) == csg::CSGType::Union);
+
+    auto bb3d = csgmesh_positive_bb(po.m_mesh_to_slice);
 
     // We need to prepare the slice index...
 
     double  lhd  = m_print->m_objects.front()->m_config.layer_height.getFloat();
     float   lh   = float(lhd);
     coord_t lhs  = scaled(lhd);
-    auto && bb3d = mesh.bounding_box();
     double  minZ = bb3d.min(Z) - po.get_elevation();
     double  maxZ = bb3d.max(Z);
     auto    minZf = float(minZ);
@@ -368,27 +321,9 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
     }
     auto  thr        = [this]() { m_print->throw_if_canceled(); };
     auto &slice_grid = po.m_model_height_levels;
-    po.m_model_slices = slice_mesh_ex(mesh.its, slice_grid, params, thr);
 
-    sla::Interior *interior = po.m_hollowing_data ?
-                                  po.m_hollowing_data->interior.get() :
-                                  nullptr;
-
-    if (interior && ! sla::get_mesh(*interior).empty()) {
-        indexed_triangle_set interiormesh = sla::get_mesh(*interior);
-        sla::swap_normals(interiormesh);
-        params.mode = MeshSlicingParams::SlicingMode::Regular;
-
-        std::vector<ExPolygons> interior_slices = slice_mesh_ex(interiormesh, slice_grid, params, thr);
-
-        execution::for_each(
-            ex_tbb, size_t(0), interior_slices.size(),
-            [&po, &interior_slices](size_t i) {
-                const ExPolygons &slice = interior_slices[i];
-                po.m_model_slices[i] = diff_ex(po.m_model_slices[i], slice);
-            },
-            execution::max_concurrency(ex_tbb));
-    }
+    Range csgrange = {po.m_mesh_to_slice.begin(), po.m_mesh_to_slice.end()};
+    po.m_model_slices = slice_csgmesh_ex(csgrange, slice_grid, params, thr);
 
     auto mit = slindex_it;
     for (size_t id = 0;
@@ -400,10 +335,86 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
     // We apply the printer correction offset here.
     apply_printer_corrections(po, soModel);
 
-    if(po.m_config.supports_enable.getBool() || po.m_config.pad_enable.getBool())
-    {
-        po.m_supportdata.reset(new SLAPrintObject::SupportData(po.get_mesh_to_print()));
+//    auto simpl_slices = reserve_vector<ExPolygons>(po.m_model_slices.size());
+//    for (const ExPolygons &slice : po.m_model_slices) {
+//        simpl_slices.emplace_back(expolygons_simplify(slice, scaled(1e-2)));
+//    }
+
+//    po.m_mesh_from_slices = TriangleMesh{
+//        slices_to_mesh(simpl_slices, slice_grid.front(), lhd, ilhd)};
+
+    double vscale = 1. / lhd;
+    auto   voxparams = csg::VoxelizeParams{}
+                      .voxel_scale(vscale)
+                      .exterior_bandwidth(1.f)
+                      .interior_bandwidth(1.f);
+    auto grid = csg::voxelize_csgmesh(range(po.m_mesh_to_slice), voxparams);
+
+    assert(grid);
+
+//    size_t max_face_cnt = 0;
+//    for (const CSGMesh &part : po.m_mesh_to_slice)
+//        max_face_cnt += part.its_ptr->indices.size();
+
+    indexed_triangle_set mesh_from_slices = grid_to_mesh(*grid);
+
+//    its_quadric_edge_collapse(mesh_from_slices, vscale * max_face_cnt);
+
+//    its_compactify_vertices(mesh_from_slices);
+//    its_merge_vertices(mesh_from_slices);
+
+    po.m_mesh_from_slices = TriangleMesh{mesh_from_slices};
+
+//    po.m_mesh_from_slices = TriangleMesh{sla::get_mesh(*po.m_hollowing_data->interior)};
+
+}
+
+static void filter_support_points_by_modifiers(
+    sla::SupportPoints            &pts,
+    const std::vector<ExPolygons> &blockers,
+    const std::vector<ExPolygons> &enforcers,
+    const std::vector<float>      &slice_grid)
+{
+    assert((blockers.empty() || blockers.size() == slice_grid.size()) &&
+           (enforcers.empty() || enforcers.size() == slice_grid.size()));
+
+    auto new_pts = reserve_vector<sla::SupportPoint>(pts.size());
+
+    for (size_t i = 0; i < pts.size(); ++i) {
+        const sla::SupportPoint &sp = pts[i];
+        Point sp2d = scaled(to_2d(sp.pos));
+
+        auto it = std::lower_bound(slice_grid.begin(), slice_grid.end(), sp.pos.z());
+        if (it != slice_grid.end()) {
+            size_t idx = std::distance(slice_grid.begin(), it);
+            bool is_enforced = false;
+            if (idx < enforcers.size()) {
+                for (size_t enf_idx = 0;
+                     !is_enforced && enf_idx < enforcers[idx].size();
+                     ++enf_idx)
+                {
+                    if (enforcers[idx][enf_idx].contains_b(sp2d))
+                        is_enforced = true;
+                }
+            }
+
+            bool is_blocked = false;
+            if (!is_enforced && idx < blockers.size()) {
+                for (size_t blk_idx = 0;
+                     !is_blocked && blk_idx < blockers[idx].size();
+                     ++blk_idx)
+                {
+                    if (blockers[idx][blk_idx].contains_b(sp2d))
+                        is_blocked = true;
+                }
+            }
+
+            if (!is_blocked)
+                new_pts.emplace_back(sp);
+        }
     }
+
+    pts.swap(new_pts);
 }
 
 // In this step we check the slices, identify island and cover them with
@@ -414,9 +425,9 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
     if(!po.m_config.supports_enable.getBool()) return;
 
     if (!po.m_supportdata)
-        po.m_supportdata.reset(new SLAPrintObject::SupportData(po.get_mesh_to_print()));
+        po.m_supportdata.reset(new SLAPrintObject::SupportData(po.m_mesh_from_slices));
 
-    po.m_supportdata->input.zoffset = bounding_box(po.get_mesh_to_print())
+    po.m_supportdata->input.zoffset = csgmesh_positive_bb(po.m_mesh_to_slice)
                                           .min.z();
 
     const ModelObject& mo = *po.m_model_object;
@@ -431,11 +442,6 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
 
         // calculate heights of slices (slices are calculated already)
         const std::vector<float>& heights = po.m_model_height_levels;
-
-        // Tell the mesh where drain holes are. Although the points are
-        // calculated on slices, the algorithm then raycasts the points
-        // so they actually lie on the mesh.
-//        po.m_supportdata->emesh.load_holes(po.transformed_drainhole_points());
 
         throw_if_canceled();
         sla::SupportPointGenerator::Config config;
@@ -464,8 +470,27 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
             heights, config, [this]() { throw_if_canceled(); }, statuscb);
 
         // Now let's extract the result.
-        const std::vector<sla::SupportPoint>& points = auto_supports.output();
+        std::vector<sla::SupportPoint>& points = auto_supports.output();
         throw_if_canceled();
+
+        MeshSlicingParamsEx params;
+        params.closing_radius = float(po.config().slice_closing_radius.value);
+        std::vector<ExPolygons> blockers =
+            slice_volumes(po.model_object()->volumes,
+                          po.m_model_height_levels, po.trafo(), params,
+                          [](const ModelVolume *vol) {
+                              return vol->is_support_blocker();
+                          });
+
+        std::vector<ExPolygons> enforcers =
+            slice_volumes(po.model_object()->volumes,
+                          po.m_model_height_levels, po.trafo(), params,
+                          [](const ModelVolume *vol) {
+                              return vol->is_support_enforcer();
+                          });
+
+        filter_support_points_by_modifiers(points, blockers, enforcers, po.m_model_height_levels);
+
         po.m_supportdata->input.pts = points;
 
         BOOST_LOG_TRIVIAL(debug)
@@ -487,11 +512,6 @@ void SLAPrint::Steps::support_tree(SLAPrintObject &po)
 {
     if(!po.m_supportdata) return;
 
-//    sla::PadConfig pcfg = make_pad_cfg(po.m_config);
-
-//    if (pcfg.embed_object)
-//        po.m_supportdata->emesh.ground_level_offset(pcfg.wall_thickness_mm);
-
     // If the zero elevation mode is engaged, we have to filter out all the
     // points that are on the bottom of the object
     if (is_zero_elevation(po.config())) {
@@ -503,7 +523,6 @@ void SLAPrint::Steps::support_tree(SLAPrintObject &po)
 
     po.m_supportdata->input.cfg = make_support_cfg(po.m_config);
     po.m_supportdata->input.pad_cfg = make_pad_cfg(po.m_config);
-//    po.m_supportdata->emesh.load_holes(po.transformed_drainhole_points());
 
     // scaling for the sub operations
     double d = objectstep_scale * OBJ_STEP_LEVELS[slaposSupportTree] / 100.0;
@@ -553,16 +572,6 @@ void SLAPrint::Steps::generate_pad(SLAPrintObject &po) {
         // depending on the specific parameter that has changed).
         sla::PadConfig pcfg = make_pad_cfg(po.m_config);
         po.m_supportdata->input.pad_cfg = pcfg;
-
-//        if (!po.m_config.supports_enable.getBool() || pcfg.embed_object) {
-//            // No support (thus no elevation) or zero elevation mode
-//            // we sometimes call it "builtin pad" is enabled so we will
-//            // get a sample from the bottom of the mesh and use it for pad
-//            // creation.
-//            sla::pad_blueprint(trmesh.its, bp, float(pad_h),
-//                               float(po.m_config.layer_height.getFloat()),
-//                               [this](){ throw_if_canceled(); });
-//        }
 
         sla::JobController ctl;
         ctl.stopcondition = [this]() { return canceled(); };
@@ -996,6 +1005,7 @@ double SLAPrint::Steps::progressrange(SLAPrintStep step) const
 void SLAPrint::Steps::execute(SLAPrintObjectStep step, SLAPrintObject &obj)
 {
     switch(step) {
+    case slaposAssembly: mesh_assembly(obj); break;
     case slaposHollowing: hollow_model(obj); break;
     case slaposDrillHoles: drill_holes(obj); break;
     case slaposObjectSlice: slice_model(obj); break;
