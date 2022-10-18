@@ -3806,6 +3806,8 @@ void ObjectList::update_selections_on_canvas()
 
     if (sel_cnt == 1) {
         wxDataViewItem item = GetSelection();
+        if (m_objects_model->GetInfoItemType(item) == InfoItemType::CutConnectors)
+            selection.remove_all();
         if (m_objects_model->GetItemType(item) & (itSettings | itInstanceRoot | itLayerRoot | itLayer))
             add_to_selection(m_objects_model->GetParent(item), selection, instance_idx, mode);
         else

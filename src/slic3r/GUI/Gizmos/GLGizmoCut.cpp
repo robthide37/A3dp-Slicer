@@ -963,9 +963,30 @@ void GLGizmoCut3D::on_set_hover_id()
 
 bool GLGizmoCut3D::on_is_activable() const
 {
+    const Selection& selection = m_parent.get_selection();
+    const int object_idx = selection.get_object_idx();
+    if (object_idx < 0)
+        return false;
+
+    bool is_dowel_object = false;
+    if (const ModelObject* mo = wxGetApp().plater()->model().objects[object_idx]; mo->is_cut()) {
+        int solid_connector_cnt = 0;
+        int connectors_cnt = 0;
+        for (const ModelVolume* volume : mo->volumes) {
+            if (volume->is_cut_connector()) {
+                connectors_cnt++;
+                if (volume->is_model_part())
+                    solid_connector_cnt++;
+            }
+            if (connectors_cnt > 1)
+                break;
+        }
+        is_dowel_object = connectors_cnt == 1 && solid_connector_cnt == 1;
+    }
+
     // This is assumed in GLCanvas3D::do_rotate, do not change this
     // without updating that function too.
-    return m_parent.get_selection().is_single_full_instance();
+    return selection.is_single_full_instance() && !is_dowel_object;
 }
 
 bool GLGizmoCut3D::on_is_selectable() const
@@ -1200,6 +1221,9 @@ bool GLGizmoCut3D::update_bb()
 {
     const BoundingBoxf3 box = bounding_box();
     if (m_max_pos != box.max || m_min_pos != box.min) {
+
+        invalidate_cut_plane();
+
         m_max_pos = box.max;
         m_min_pos = box.min;
         m_bb_center = box.center();
@@ -1412,8 +1436,14 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     if (type_changed)
         apply_selected_connectors([this, &connectors] (size_t idx) { connectors[idx].attribs.type = CutConnectorType(m_connector_type); });
 
+    m_imgui->disabled_begin(m_connector_type == CutConnectorType::Dowel);
+    if (type_changed && m_connector_type == CutConnectorType::Dowel) {
+        m_connector_style = size_t(CutConnectorStyle::Prizm);
+        apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
+    }
     if (render_combo(_u8L("Style"), m_connector_styles, m_connector_style))
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
+    m_imgui->disabled_end();
 
     if (render_combo(_u8L("Shape"), m_connector_shapes, m_connector_shape_id))
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id); });
@@ -1850,8 +1880,6 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     else {
         // the object is SLA-elevated and the plane is under it.
     }
-
-    invalidate_cut_plane();
 }
 
 
@@ -2136,7 +2164,7 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
         return true;
     }
 
-    if (action == SLAGizmoEventType::LeftUp) {
+    if (action == SLAGizmoEventType::LeftUp && !m_selection_rectangle.is_dragging()) {
         if ((m_ldown_mouse_position - mouse_position).norm() < 5.)
             unselect_all_connectors();
         return is_selection_changed(alt_down, shift_down);

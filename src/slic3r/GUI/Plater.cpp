@@ -2976,9 +2976,6 @@ void Plater::priv::object_list_changed()
     const bool model_fits = view3D->get_canvas3d()->check_volumes_outside_state() == ModelInstancePVS_Inside;
 
     sidebar->enable_buttons(!model.objects.empty() && !export_in_progress && model_fits);
-
-    // invalidate CutGizmo after changes in ObjectList
-    static_cast<GLGizmoCut3D*>(q->canvas3D()->get_gizmos_manager().get_gizmo(GLGizmosManager::Cut))->invalidate_cut_plane();
 }
 
 void Plater::priv::select_all()
@@ -4930,8 +4927,12 @@ bool Plater::priv::can_fix_through_netfabb() const
 
 bool Plater::priv::can_simplify() const
 {
+    const int obj_idx = get_selected_object_idx();
     // is object for simplification selected
-    if (get_selected_object_idx() < 0) return false;
+    // cut object can't be simplify
+    if (obj_idx < 0 || model.objects[obj_idx]->is_cut()) 
+        return false;
+
     // is already opened?
     if (q->canvas3D()->get_gizmos_manager().get_current_type() ==
         GLGizmosManager::EType::Simplify)

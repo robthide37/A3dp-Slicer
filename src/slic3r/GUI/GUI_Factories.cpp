@@ -1080,6 +1080,9 @@ wxMenu* MenuFactory::multi_selection_menu()
     wxDataViewItemArray sels;
     obj_list()->GetSelections(sels);
 
+    if (sels.IsEmpty())
+        return nullptr;
+
     for (const wxDataViewItem& item : sels)
         if (!(list_model()->GetItemType(item) & (itVolume | itObject | itInstance)))
             // show this menu only for Objects(Instances mixed with Objects)/Volumes selection
