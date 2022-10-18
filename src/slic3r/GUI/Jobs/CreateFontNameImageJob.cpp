@@ -7,6 +7,11 @@
 #include "slic3r/Utils/WxFontUtils.hpp"
 #include "slic3r/GUI/3DScene.hpp" // ::glsafe
 
+// ability to request new frame after finish rendering
+#include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/GLCanvas3D.hpp"
+
 #include "wx/fontenum.h"
 
 #include <boost/log/trivial.hpp>
@@ -97,11 +102,6 @@ void CreateFontImageJob::process(Ctl &ctl)
     };
     r->encode(encoder);
 }
-
-// ability to request new frame after finish rendering
-#include "slic3r/GUI/GUI_App.hpp"
-#include "slic3r/GUI/Plater.hpp"
-#include "slic3r/GUI/GLCanvas3D.hpp"
 
 void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
 {

@@ -9,6 +9,11 @@
 
 #include "slic3r/GUI/3DScene.hpp" // ::glsafe
 
+// ability to request new frame after finish rendering
+#include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/GLCanvas3D.hpp"
+
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
@@ -126,6 +131,7 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
 
 void CreateFontStyleImagesJob::finalize(bool canceled, std::exception_ptr &)
 {
+    if (canceled) return;
     // upload texture on GPU
     GLuint tex_id;
     GLenum target = GL_TEXTURE_2D, format = GL_RGBA, type = GL_UNSIGNED_BYTE;
@@ -150,4 +156,7 @@ void CreateFontStyleImagesJob::finalize(bool canceled, std::exception_ptr &)
     // bind default texture
     GLuint no_texture_id = 0;
     glsafe(::glBindTexture(target, no_texture_id));
+        
+    // show rendered texture
+    wxGetApp().plater()->canvas3D()->schedule_extra_frame(0);
 }
