@@ -318,6 +318,10 @@ private:
         inline SupportData(const TriangleMesh &t)
             : input{t.its, {}, {}}
         {}
+
+        inline SupportData(const indexed_triangle_set &t)
+            : input{t, {}, {}}
+        {}
         
         void create_support_tree(const sla::JobController &ctl)
         {

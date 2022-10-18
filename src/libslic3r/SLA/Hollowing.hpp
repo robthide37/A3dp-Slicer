@@ -3,9 +3,13 @@
 
 #include <memory>
 #include <libslic3r/TriangleMesh.hpp>
+#include <libslic3r/OpenVDBUtils.hpp>
 #include <libslic3r/SLA/JobController.hpp>
+#include <libslic3r/CSGMesh/VoxelizeCSGMesh.hpp>
 
 namespace Slic3r {
+
+class ModelObject;
 
 namespace sla {
 
@@ -28,6 +32,9 @@ using  InteriorPtr = std::unique_ptr<Interior, InteriorDeleter>;
 indexed_triangle_set &      get_mesh(Interior &interior);
 const indexed_triangle_set &get_mesh(const Interior &interior);
 
+const VoxelGrid & get_grid(const Interior &interior);
+VoxelGrid &get_grid(Interior &interior);
+
 struct DrainHole
 {
     Vec3f pos;
@@ -46,18 +53,18 @@ struct DrainHole
 
     DrainHole(const DrainHole& rhs) :
         DrainHole(rhs.pos, rhs.normal, rhs.radius, rhs.height, rhs.failed) {}
-    
+
     bool operator==(const DrainHole &sp) const;
-    
+
     bool operator!=(const DrainHole &sp) const { return !(sp == (*this)); }
 
     bool is_inside(const Vec3f& pt) const;
 
     bool get_intersections(const Vec3f& s, const Vec3f& dir,
                            std::array<std::pair<float, Vec3d>, 2>& out) const;
-    
+
     indexed_triangle_set to_mesh() const;
-    
+
     template<class Archive> inline void serialize(Archive &ar)
     {
         ar(pos, normal, radius, height, failed);
@@ -70,9 +77,50 @@ using DrainHoles = std::vector<DrainHole>;
 
 constexpr float HoleStickOutLength = 1.f;
 
-InteriorPtr generate_interior(const TriangleMesh &mesh,
+double get_voxel_scale(double mesh_volume, const HollowingConfig &hc);
+
+InteriorPtr generate_interior(const VoxelGrid &mesh,
                               const HollowingConfig &  = {},
                               const JobController &ctl = {});
+
+inline InteriorPtr generate_interior(const indexed_triangle_set &mesh,
+                              const HollowingConfig      &hc  = {},
+                              const JobController        &ctl = {})
+{
+    auto voxel_scale = get_voxel_scale(its_volume(mesh), hc);
+    auto grid = mesh_to_grid(mesh, Transform3f::Identity(), voxel_scale, 1.f, 1.f);
+
+    if (its_is_splittable(mesh))
+        grid = redistance_grid(*grid, 0.0f, 6.f / voxel_scale, 6.f / voxel_scale);
+
+    return generate_interior(*grid, hc, ctl);
+}
+
+template<class It>
+InteriorPtr generate_interior(const Range<It>       &csgparts,
+                              const HollowingConfig &hc  = {},
+                              const JobController   &ctl = {})
+{
+    double mesh_vol = 0;
+    for (auto &part : csgparts)
+        mesh_vol = std::max(mesh_vol,
+                            double(its_volume(*(csg::get_mesh(part)))));
+
+    auto params = csg::VoxelizeParams{}
+                      .voxel_scale(get_voxel_scale(mesh_vol, hc))
+                      .exterior_bandwidth(1.f)
+                      .interior_bandwidth(1.f);
+
+    auto ptr = csg::voxelize_csgmesh(csgparts, params);
+
+    if (csgparts.size() > 1 || its_is_splittable(*csg::get_mesh(*csgparts.begin())))
+        ptr = redistance_grid(*ptr,
+                              0.0f,
+                              6.f / params.voxel_scale(),
+                              6.f / params.voxel_scale());
+
+    return generate_interior(*ptr, hc, ctl);
+}
 
 // Will do the hollowing
 void hollow_mesh(TriangleMesh &mesh, const HollowingConfig &cfg, int flags = 0);
@@ -83,13 +131,8 @@ void hollow_mesh(TriangleMesh &mesh, const Interior &interior, int flags = 0);
 void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
                              const std::vector<bool> &exclude_mask = {});
 
-double get_distance(const Vec3f &p, const Interior &interior);
-
-template<class T>
-FloatingOnly<T> get_distance(const Vec<3, T> &p, const Interior &interior)
-{
-    return get_distance(Vec3f(p.template cast<float>()), interior);
-}
+sla::DrainHoles transformed_drainhole_points(const ModelObject &mo,
+                                             const Transform3d &trafo);
 
 void cut_drainholes(std::vector<ExPolygons> & obj_slices,
                     const std::vector<float> &slicegrid,
@@ -102,6 +145,16 @@ inline void swap_normals(indexed_triangle_set &its)
     for (auto &face : its.indices)
         std::swap(face(0), face(2));
 }
+
+// Create exclude mask for triangle removal inside hollowed interiors.
+// This is necessary when the interior is already part of the mesh which was
+// drilled using CGAL mesh boolean operation. Excluded will be the triangles
+// originally part of the interior mesh and triangles that make up the drilled
+// hole walls.
+std::vector<bool> create_exclude_mask(
+    const indexed_triangle_set &its,
+    const sla::Interior &interior,
+    const std::vector<sla::DrainHole> &holes);
 
 } // namespace sla
 } // namespace Slic3r

@@ -28,7 +28,7 @@ class AABBMesh {
     class AABBImpl;
     
     const indexed_triangle_set* m_tm;
-    double m_ground_level = 0/*, m_gnd_offset = 0*/;
+//    double m_ground_level = 0/*, m_gnd_offset = 0*/;
     
     std::unique_ptr<AABBImpl> m_aabb;
     VertexFaceIndex m_vfidx;    // vertex-face index
@@ -57,7 +57,7 @@ public:
     
     ~AABBMesh();
     
-    inline double ground_level() const { return m_ground_level /*+ m_gnd_offset*/; }
+//    inline double ground_level() const { return m_ground_level /*+ m_gnd_offset*/; }
 //    inline void ground_level_offset(double o) { m_gnd_offset = o; }
 //    inline double ground_level_offset() const { return m_gnd_offset; }
     

@@ -11,7 +11,7 @@ endif ()
 
 set(OpenVDBUtils_SOURCES "")
 if (TARGET OpenVDB::openvdb)
-    set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp)
+    set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp OpenVDBUtilsLegacy.hpp)
 endif()
 
 set(SLIC3R_SOURCES
@@ -39,6 +39,11 @@ set(SLIC3R_SOURCES
     Color.hpp
     Config.cpp
     Config.hpp
+    CSGMesh/CSGMesh.hpp
+    CSGMesh/SliceCSGMesh.hpp
+    CSGMesh/ModelToCSGMesh.hpp
+    CSGMesh/PerformCSGMeshBooleans.hpp
+    CSGMesh/VoxelizeCSGMesh.hpp
     EdgeGrid.cpp
     EdgeGrid.hpp
     ElephantFootCompensation.cpp

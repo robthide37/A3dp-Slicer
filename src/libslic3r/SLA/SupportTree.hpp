@@ -108,6 +108,7 @@ struct SupportableMesh
     SupportPoints     pts;
     SupportTreeConfig cfg;
     PadConfig         pad_cfg;
+    double            zoffset = 0.;
 
     explicit SupportableMesh(const indexed_triangle_set &trmsh,
                              const SupportPoints        &sp,
@@ -124,7 +125,7 @@ struct SupportableMesh
 
 inline double ground_level(const SupportableMesh &sm)
 {
-    double lvl = sm.emesh.ground_level() -
+    double lvl = sm.zoffset -
                  !bool(sm.pad_cfg.embed_object) * sm.cfg.enabled * sm.cfg.object_elevation_mm +
                   bool(sm.pad_cfg.embed_object) * sm.pad_cfg.wall_thickness_mm;
 

@@ -10,10 +10,9 @@
 #include <libslic3r/QuadricEdgeCollapse.hpp>
 #include <libslic3r/SLA/SupportTreeMesher.hpp>
 #include <libslic3r/Execution/ExecutionSeq.hpp>
+#include <libslic3r/Model.hpp>
 
 #include <boost/log/trivial.hpp>
-
-#include <openvdb/tools/FastSweeping.h>
 
 #include <libslic3r/MTUtils.hpp>
 #include <libslic3r/I18N.hpp>
@@ -27,19 +26,17 @@ namespace sla {
 
 struct Interior {
     indexed_triangle_set mesh;
-    openvdb::FloatGrid::Ptr gridptr;
-    mutable std::optional<openvdb::FloatGrid::ConstAccessor> accessor;
+    VoxelGridPtr gridptr;
 
     double iso_surface = 0.;
     double thickness = 0.;
-    double voxel_scale = 1.;
     double full_narrowb = 2.;
 
     void reset_accessor() const  // This resets the accessor and its cache
     // Not a thread safe call!
     {
         if (gridptr)
-            accessor = gridptr->getConstAccessor();
+            Slic3r::reset_accessor(*gridptr);
     }
 };
 
@@ -58,29 +55,30 @@ const indexed_triangle_set &get_mesh(const Interior &interior)
     return interior.mesh;
 }
 
-static InteriorPtr generate_interior_verbose(const TriangleMesh & mesh,
-                                             const JobController &ctl,
-                                             double min_thickness,
-                                             double voxel_scale,
-                                             double closing_dist)
+const VoxelGrid &get_grid(const Interior &interior)
 {
-    double offset   = voxel_scale * min_thickness;
-    double D        = voxel_scale * closing_dist;
+    return *interior.gridptr;
+}
+
+VoxelGrid &get_grid(Interior &interior)
+{
+    return *interior.gridptr;
+}
+
+InteriorPtr generate_interior(const VoxelGrid       &vgrid,
+                              const HollowingConfig &hc,
+                              const JobController   &ctl)
+{
+    double offset   = hc.min_thickness;
+    double D        = hc.closing_distance;
     float  in_range = 1.1f * float(offset + D);
-    auto   narrowb  = 1.;
+    auto   narrowb  = 3.f / get_voxel_scale(vgrid);
     float  out_range = narrowb;
 
     if (ctl.stopcondition()) return {};
     else ctl.statuscb(0, L("Hollowing"));
 
-    auto gridptr = mesh_to_grid(mesh.its, {}, voxel_scale, out_range, in_range);
-
-    assert(gridptr);
-
-    if (!gridptr) {
-        BOOST_LOG_TRIVIAL(error) << "Returned OpenVDB grid is NULL";
-        return {};
-    }
+    auto gridptr = dilate_grid(vgrid, out_range, in_range);
 
     if (ctl.stopcondition()) return {};
     else ctl.statuscb(30, L("Hollowing"));
@@ -90,12 +88,7 @@ static InteriorPtr generate_interior_verbose(const TriangleMesh & mesh,
         in_range = narrowb;
         gridptr = redistance_grid(*gridptr, -(offset + D), narrowb, in_range);
 
-        constexpr int DilateIterations = 1;
-
-        gridptr = openvdb::tools::dilateSdf(
-            *gridptr, std::ceil(iso_surface),
-            openvdb::tools::NN_FACE_EDGE_VERTEX, DilateIterations,
-            openvdb::tools::FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE);
+        gridptr = dilate_grid(*gridptr, std::ceil(iso_surface), 0.f);
 
         out_range = iso_surface;
     } else {
@@ -109,68 +102,14 @@ static InteriorPtr generate_interior_verbose(const TriangleMesh & mesh,
     InteriorPtr interior = InteriorPtr{new Interior{}};
 
     interior->mesh = grid_to_mesh(*gridptr, iso_surface, adaptivity);
-    interior->gridptr = gridptr;
+    interior->gridptr = std::move(gridptr);
 
     if (ctl.stopcondition()) return {};
     else ctl.statuscb(100, L("Hollowing"));
 
     interior->iso_surface = iso_surface;
     interior->thickness   = offset;
-    interior->voxel_scale = voxel_scale;
-    interior->full_narrowb = out_range + in_range;
-
-    return interior;
-}
-
-InteriorPtr generate_interior(const TriangleMesh &   mesh,
-                              const HollowingConfig &hc,
-                              const JobController &  ctl)
-{
-    static constexpr double MIN_SAMPLES_IN_WALL = 3.5;
-    static constexpr double MAX_OVERSAMPL = 8.;
-    static constexpr double UNIT_VOLUME   = 500000; // empiric
-
-    // I can't figure out how to increase the grid resolution through openvdb
-    // API so the model will be scaled up before conversion and the result
-    // scaled down. Voxels have a unit size. If I set voxelSize smaller, it
-    // scales the whole geometry down, and doesn't increase the number of
-    // voxels.
-    //
-    // First an allowed range for voxel scale is determined from an initial
-    // range of <MIN_SAMPLES_IN_WALL, MAX_OVERSAMPL>. The final voxel scale is
-    // then chosen from this range using the 'quality:<0, 1>' parameter.
-    // The minimum can be lowered if the wall thickness is great enough and
-    // the maximum is lowered if the model volume very big.
-    double mesh_vol      = its_volume(mesh.its);
-    double sc_divider    = std::max(1.0, (mesh_vol / UNIT_VOLUME));
-    double min_oversampl = std::max(MIN_SAMPLES_IN_WALL / hc.min_thickness, 1.);
-    double max_oversampl_scaled = std::max(min_oversampl, MAX_OVERSAMPL / sc_divider);
-    auto   voxel_scale          = min_oversampl + (max_oversampl_scaled - min_oversampl) * hc.quality;
-
-    BOOST_LOG_TRIVIAL(debug) << "Hollowing: max oversampl will be: " << max_oversampl_scaled;
-    BOOST_LOG_TRIVIAL(debug) << "Hollowing: voxel scale will be: " << voxel_scale;
-    BOOST_LOG_TRIVIAL(debug) << "Hollowing: mesh volume is: " << mesh_vol;
-
-    InteriorPtr interior = generate_interior_verbose(mesh, ctl,
-                                                     hc.min_thickness,
-                                                     voxel_scale,
-                                                     hc.closing_distance);
-
-    if (interior && !interior->mesh.empty()) {
-
-        // flip normals back...
-        swap_normals(interior->mesh);
-
-        // simplify mesh lossless
-        float loss_less_max_error = 2*std::numeric_limits<float>::epsilon();
-        its_quadric_edge_collapse(interior->mesh, 0U, &loss_less_max_error);
-
-        its_compactify_vertices(interior->mesh);
-        its_merge_vertices(interior->mesh);
-
-        // flip normals back...
-        swap_normals(interior->mesh);
-    }
+    interior->full_narrowb = (out_range + in_range) / 2.;
 
     return interior;
 }
@@ -207,7 +146,6 @@ bool DrainHole::is_inside(const Vec3f& pt) const
 
     return false;
 }
-
 
 // Given a line s+dir*t, find parameter t of intersections with the hole
 // and the normal (points inside the hole). Outputs through out reference,
@@ -331,7 +269,7 @@ void cut_drainholes(std::vector<ExPolygons> & obj_slices,
 
 void hollow_mesh(TriangleMesh &mesh, const HollowingConfig &cfg, int flags)
 {
-    InteriorPtr interior = generate_interior(mesh, cfg, JobController{});
+    InteriorPtr interior = generate_interior(mesh.its, cfg, JobController{});
     if (!interior) return;
 
     hollow_mesh(mesh, *interior, flags);
@@ -354,13 +292,7 @@ static double get_distance_raw(const Vec3f &p, const Interior &interior)
 {
     assert(interior.gridptr);
 
-    if (!interior.accessor) interior.reset_accessor();
-
-    auto v       = (p * interior.voxel_scale).cast<double>();
-    auto grididx = interior.gridptr->transform().worldToIndexCellCentered(
-        {v.x(), v.y(), v.z()});
-
-    return interior.accessor->getValue(grididx) ;
+    return Slic3r::get_distance_raw(p, *interior.gridptr);
 }
 
 struct TriangleBubble { Vec3f center; double R; };
@@ -369,7 +301,7 @@ struct TriangleBubble { Vec3f center; double R; };
 // triangle is too big to be measured.
 static double get_distance(const TriangleBubble &b, const Interior &interior)
 {
-    double R = b.R * interior.voxel_scale;
+    double R = b.R;
     double D = 2. * R;
     double Dst = get_distance_raw(b.center, interior);
 
@@ -379,10 +311,16 @@ static double get_distance(const TriangleBubble &b, const Interior &interior)
                 Dst - interior.iso_surface;
 }
 
-double get_distance(const Vec3f &p, const Interior &interior)
+inline double get_distance(const Vec3f &p, const Interior &interior)
 {
     double d = get_distance_raw(p, interior) - interior.iso_surface;
-    return d / interior.voxel_scale;
+    return d;
+}
+
+template<class T>
+FloatingOnly<T> get_distance(const Vec<3, T> &p, const Interior &interior)
+{
+    return get_distance(Vec3f(p.template cast<float>()), interior);
 }
 
 // A face that can be divided. Stores the indices into the original mesh if its
@@ -500,7 +438,7 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
         TriangleBubble bubble{facebb.center().cast<float>(), facebb.radius()};
 
         double D = get_distance(bubble, interior);
-        double R = bubble.R * interior.voxel_scale;
+        double R = bubble.R;
 
         if (std::isnan(D)) // The distance cannot be measured, triangle too big
             return true;
@@ -583,6 +521,225 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
 
     mesh = TriangleMesh{mesh.its};
     //FIXME do we want to repair the mesh? Are there duplicate vertices or flipped triangles?
+}
+
+struct FaceHash {
+
+    // A 64 bit number's max hex digits
+    static constexpr size_t MAX_NUM_CHARS = 16;
+
+    // A hash is created for each triangle to be identifiable. The hash uses
+    // only the triangle's geometric traits, not the index in a particular mesh.
+    std::unordered_set<std::string> facehash;
+
+    // Returns the string in reverse, but that is ok for hashing
+    static std::array<char, MAX_NUM_CHARS + 1> to_chars(int64_t val)
+    {
+        std::array<char, MAX_NUM_CHARS + 1> ret;
+
+        static const constexpr char * Conv = "0123456789abcdef";
+
+        auto ptr = ret.begin();
+        auto uval = static_cast<uint64_t>(std::abs(val));
+        while (uval) {
+            *ptr = Conv[uval & 0xf];
+            ++ptr;
+            uval = uval >> 4;
+        }
+        if (val < 0) { *ptr = '-'; ++ptr; }
+        *ptr = '\0'; // C style string ending
+
+        return ret;
+    }
+
+    static std::string hash(const Vec<3, int64_t> &v)
+    {
+        std::string ret;
+        ret.reserve(3 * MAX_NUM_CHARS);
+
+        for (auto val : v)
+            ret += to_chars(val).data();
+
+        return ret;
+    }
+
+    static std::string facekey(const Vec3i &face, const std::vector<Vec3f> &vertices)
+    {
+        // Scale to integer to avoid floating points
+        std::array<Vec<3, int64_t>, 3> pts = {
+            scaled<int64_t>(vertices[face(0)]),
+            scaled<int64_t>(vertices[face(1)]),
+            scaled<int64_t>(vertices[face(2)])
+        };
+
+        // Get the first two sides of the triangle, do a cross product and move
+        // that vector to the center of the triangle. This encodes all
+        // information to identify an identical triangle at the same position.
+        Vec<3, int64_t> a = pts[0] - pts[2], b = pts[1] - pts[2];
+        Vec<3, int64_t> c = a.cross(b) + (pts[0] + pts[1] + pts[2]) / 3;
+
+        // Return a concatenated string representation of the coordinates
+        return hash(c);
+    }
+
+    FaceHash (const indexed_triangle_set &its): facehash(its.indices.size())
+    {
+        for (const Vec3i &face : its.indices)
+            facehash.insert(facekey(face, its.vertices));
+    }
+
+    bool find(const std::string &key)
+    {
+        auto it = facehash.find(key);
+        return it != facehash.end();
+    }
+};
+
+
+static void exclude_neighbors(const Vec3i                &face,
+                              std::vector<bool>          &mask,
+                              const indexed_triangle_set &its,
+                              const VertexFaceIndex      &index,
+                              size_t                      recursions)
+{
+    for (int i = 0; i < 3; ++i) {
+        const auto &neighbors_range = index[face(i)];
+        for (size_t fi_n : neighbors_range) {
+            mask[fi_n] = true;
+            if (recursions > 0)
+                exclude_neighbors(its.indices[fi_n], mask, its, index, recursions - 1);
+        }
+    }
+}
+
+std::vector<bool> create_exclude_mask(const indexed_triangle_set   &its,
+                                      const Interior               &interior,
+                                      const std::vector<DrainHole> &holes)
+{
+    FaceHash interior_hash{sla::get_mesh(interior)};
+
+    std::vector<bool> exclude_mask(its.indices.size(), false);
+
+    VertexFaceIndex neighbor_index{its};
+
+    for (size_t fi = 0; fi < its.indices.size(); ++fi) {
+        auto &face = its.indices[fi];
+
+        if (interior_hash.find(FaceHash::facekey(face, its.vertices))) {
+            exclude_mask[fi] = true;
+            continue;
+        }
+
+        if (exclude_mask[fi]) {
+            exclude_neighbors(face, exclude_mask, its, neighbor_index, 1);
+            continue;
+        }
+
+        // Lets deal with the holes. All the triangles of a hole and all the
+        // neighbors of these triangles need to be kept. The neigbors were
+        // created by CGAL mesh boolean operation that modified the original
+        // interior inside the input mesh to contain the holes.
+        Vec3d tr_center = (
+                              its.vertices[face(0)] +
+                              its.vertices[face(1)] +
+                              its.vertices[face(2)]
+                              ).cast<double>() / 3.;
+
+        // If the center is more than half a mm inside the interior,
+        // it cannot possibly be part of a hole wall.
+        if (sla::get_distance(tr_center, interior) < -0.5)
+            continue;
+
+        Vec3f U = its.vertices[face(1)] - its.vertices[face(0)];
+        Vec3f V = its.vertices[face(2)] - its.vertices[face(0)];
+        Vec3f C = U.cross(V);
+        Vec3f face_normal = C.normalized();
+
+        for (const sla::DrainHole &dh : holes) {
+            if (dh.failed) continue;
+
+            Vec3d dhpos = dh.pos.cast<double>();
+            Vec3d dhend = dhpos + dh.normal.cast<double>() * dh.height;
+
+            Linef3 holeaxis{dhpos, dhend};
+
+            double D_hole_center = line_alg::distance_to(holeaxis, tr_center);
+            double D_hole        = std::abs(D_hole_center - dh.radius);
+            float dot            = dh.normal.dot(face_normal);
+
+            // Empiric tolerances for center distance and normals angle.
+            // For triangles that are part of a hole wall the angle of
+            // triangle normal and the hole axis is around 90 degrees,
+            // so the dot product is around zero.
+            double D_tol = dh.radius / sla::DrainHole::steps;
+            float normal_angle_tol = 1.f / sla::DrainHole::steps;
+
+            if (D_hole < D_tol && std::abs(dot) < normal_angle_tol) {
+                exclude_mask[fi] = true;
+                exclude_neighbors(face, exclude_mask, its, neighbor_index, 1);
+            }
+        }
+    }
+
+    return exclude_mask;
+}
+
+DrainHoles transformed_drainhole_points(const ModelObject &mo,
+                                        const Transform3d &trafo)
+{
+    auto pts = mo.sla_drain_holes;
+    const Transform3d& vol_trafo = mo.volumes.front()->get_transformation().get_matrix();
+    const Geometry::Transformation trans(trafo * vol_trafo);
+    const Transform3f& tr = trans.get_matrix().cast<float>();
+    const Vec3f sc = trans.get_scaling_factor().cast<float>();
+    for (sla::DrainHole &hl : pts) {
+        hl.pos = tr * hl.pos;
+        hl.normal = tr * hl.normal - tr.translation();
+
+        // The normal scales as a covector (and we must also
+        // undo the damage already done).
+        hl.normal = Vec3f(hl.normal(0)/(sc(0)*sc(0)),
+                          hl.normal(1)/(sc(1)*sc(1)),
+                          hl.normal(2)/(sc(2)*sc(2)));
+
+        // Now shift the hole a bit above the object and make it deeper to
+        // compensate for it. This is to avoid problems when the hole is placed
+        // on (nearly) flat surface.
+        hl.pos -= hl.normal.normalized() * sla::HoleStickOutLength;
+        hl.height += sla::HoleStickOutLength;
+    }
+
+    return pts;
+}
+
+double get_voxel_scale(double mesh_volume, const HollowingConfig &hc)
+{
+    static constexpr double MIN_SAMPLES_IN_WALL = 3.5;
+    static constexpr double MAX_OVERSAMPL = 8.;
+    static constexpr double UNIT_VOLUME   = 500000; // empiric
+
+    // I can't figure out how to increase the grid resolution through openvdb
+    // API so the model will be scaled up before conversion and the result
+    // scaled down. Voxels have a unit size. If I set voxelSize smaller, it
+    // scales the whole geometry down, and doesn't increase the number of
+    // voxels.
+    //
+    // First an allowed range for voxel scale is determined from an initial
+    // range of <MIN_SAMPLES_IN_WALL, MAX_OVERSAMPL>. The final voxel scale is
+    // then chosen from this range using the 'quality:<0, 1>' parameter.
+    // The minimum can be lowered if the wall thickness is great enough and
+    // the maximum is lowered if the model volume very big.
+
+    double sc_divider    = std::max(1.0, (mesh_volume / UNIT_VOLUME));
+    double min_oversampl = std::max(MIN_SAMPLES_IN_WALL / hc.min_thickness, 1.);
+    double max_oversampl_scaled = std::max(min_oversampl, MAX_OVERSAMPL / sc_divider);
+    auto   voxel_scale          = min_oversampl + (max_oversampl_scaled - min_oversampl) * hc.quality;
+
+    BOOST_LOG_TRIVIAL(debug) << "Hollowing: max oversampl will be: " << max_oversampl_scaled;
+    BOOST_LOG_TRIVIAL(debug) << "Hollowing: voxel scale will be: " << voxel_scale;
+    BOOST_LOG_TRIVIAL(debug) << "Hollowing: mesh volume is: " << mesh_volume;
+
+    return voxel_scale;
 }
 
 }} // namespace Slic3r::sla

@@ -1081,30 +1081,7 @@ sla::SupportPoints SLAPrintObject::transformed_support_points() const
 
 sla::DrainHoles SLAPrintObject::transformed_drainhole_points() const
 {
-    assert(m_model_object != nullptr);
-    auto pts = m_model_object->sla_drain_holes;
-    const Transform3d& vol_trafo = m_model_object->volumes.front()->get_transformation().get_matrix();
-    const Geometry::Transformation trans(trafo() * vol_trafo);
-    const Transform3f& tr = trans.get_matrix().cast<float>();
-    const Vec3f sc = trans.get_scaling_factor().cast<float>();
-    for (sla::DrainHole &hl : pts) {
-        hl.pos = tr * hl.pos;
-        hl.normal = tr * hl.normal - tr.translation();
-
-        // The normal scales as a covector (and we must also
-        // undo the damage already done).
-        hl.normal = Vec3f(hl.normal(0)/(sc(0)*sc(0)),
-                          hl.normal(1)/(sc(1)*sc(1)),
-                          hl.normal(2)/(sc(2)*sc(2)));
-
-        // Now shift the hole a bit above the object and make it deeper to
-        // compensate for it. This is to avoid problems when the hole is placed
-        // on (nearly) flat surface.
-        hl.pos -= hl.normal.normalized() * sla::HoleStickOutLength;
-        hl.height += sla::HoleStickOutLength;
-    }
-
-    return pts;
+    return sla::transformed_drainhole_points(*this->model_object(), trafo());
 }
 
 DynamicConfig SLAPrintStatistics::config() const

@@ -101,7 +101,7 @@ void test_supports(const std::string          &obj_filename,
     REQUIRE_FALSE(mesh.empty());
 
     if (hollowingcfg.enabled) {
-        sla::InteriorPtr interior = sla::generate_interior(mesh, hollowingcfg);
+        sla::InteriorPtr interior = sla::generate_interior(mesh.its, hollowingcfg);
         REQUIRE(interior);
         mesh.merge(TriangleMesh{sla::get_mesh(*interior)});
     }

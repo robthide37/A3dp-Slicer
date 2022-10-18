@@ -157,12 +157,16 @@ class MeshRaycaster {
 public:
 #if ENABLE_RAYCAST_PICKING
     explicit MeshRaycaster(std::shared_ptr<const TriangleMesh> mesh)
-        : m_mesh(mesh)
-        , m_emesh(*mesh, true) // calculate epsilon for triangle-ray intersection from an average edge length
-        , m_normals(its_face_normals(mesh->its))
+        : m_mesh(std::move(mesh))
+        , m_emesh(*m_mesh, true) // calculate epsilon for triangle-ray intersection from an average edge length
+        , m_normals(its_face_normals(m_mesh->its))
     {
-        assert(m_mesh != nullptr);
+        assert(m_mesh);
     }
+
+    explicit MeshRaycaster(const TriangleMesh &mesh)
+        : MeshRaycaster(std::make_unique<TriangleMesh>(mesh))
+    {}
 
     static void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
         Vec3d& point, Vec3d& direction);

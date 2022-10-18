@@ -16,6 +16,7 @@
 #include <libslic3r/AABBTreeIndirect.hpp>
 
 #include <libslic3r/ClipperUtils.hpp>
+#include <libslic3r/QuadricEdgeCollapse.hpp>
 
 #include <boost/log/trivial.hpp>
 
@@ -134,181 +135,32 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
     double quality  = po.m_config.hollowing_quality.getFloat();
     double closing_d = po.m_config.hollowing_closing_distance.getFloat();
     sla::HollowingConfig hlwcfg{thickness, quality, closing_d};
+    sla::JobController ctl;
+    ctl.stopcondition = [this]() { return canceled(); };
+    ctl.cancelfn = [this]() { throw_if_canceled(); };
 
-    sla::InteriorPtr interior = generate_interior(po.transformed_mesh(), hlwcfg);
+    sla::InteriorPtr interior = generate_interior(po.transformed_mesh().its, hlwcfg, ctl);
 
     if (!interior || sla::get_mesh(*interior).empty())
         BOOST_LOG_TRIVIAL(warning) << "Hollowed interior is empty!";
     else {
         po.m_hollowing_data.reset(new SLAPrintObject::HollowingData());
         po.m_hollowing_data->interior = std::move(interior);
-    }
-}
 
-struct FaceHash {
+        indexed_triangle_set &m = sla::get_mesh(*po.m_hollowing_data->interior);
 
-    // A 64 bit number's max hex digits
-    static constexpr size_t MAX_NUM_CHARS = 16;
+        if (!m.empty()) {
+            // simplify mesh lossless
+            float loss_less_max_error = 2*std::numeric_limits<float>::epsilon();
+            its_quadric_edge_collapse(m, 0U, &loss_less_max_error);
 
-    // A hash is created for each triangle to be identifiable. The hash uses
-    // only the triangle's geometric traits, not the index in a particular mesh.
-    std::unordered_set<std::string> facehash;
+            its_compactify_vertices(m);
+            its_merge_vertices(m);
 
-    // Returns the string in reverse, but that is ok for hashing
-    static std::array<char, MAX_NUM_CHARS + 1> to_chars(int64_t val)
-    {
-        std::array<char, MAX_NUM_CHARS + 1> ret;
-
-        static const constexpr char * Conv = "0123456789abcdef";
-
-        auto ptr = ret.begin();
-        auto uval = static_cast<uint64_t>(std::abs(val));
-        while (uval) {
-            *ptr = Conv[uval & 0xf];
-            ++ptr;
-            uval = uval >> 4;
-        }
-        if (val < 0) { *ptr = '-'; ++ptr; }
-        *ptr = '\0'; // C style string ending
-
-        return ret;
-    }
-
-    static std::string hash(const Vec<3, int64_t> &v)
-    {
-        std::string ret;
-        ret.reserve(3 * MAX_NUM_CHARS);
-
-        for (auto val : v)
-            ret += to_chars(val).data();
-
-        return ret;
-    }
-
-    static std::string facekey(const Vec3i &face, const std::vector<Vec3f> &vertices)
-    {
-        // Scale to integer to avoid floating points
-        std::array<Vec<3, int64_t>, 3> pts = {
-            scaled<int64_t>(vertices[face(0)]),
-            scaled<int64_t>(vertices[face(1)]),
-            scaled<int64_t>(vertices[face(2)])
-        };
-
-        // Get the first two sides of the triangle, do a cross product and move
-        // that vector to the center of the triangle. This encodes all
-        // information to identify an identical triangle at the same position.
-        Vec<3, int64_t> a = pts[0] - pts[2], b = pts[1] - pts[2];
-        Vec<3, int64_t> c = a.cross(b) + (pts[0] + pts[1] + pts[2]) / 3;
-
-        // Return a concatenated string representation of the coordinates
-        return hash(c);
-    }
-
-    FaceHash (const indexed_triangle_set &its): facehash(its.indices.size())
-    {
-        for (const Vec3i &face : its.indices)
-            facehash.insert(facekey(face, its.vertices));
-    }
-
-    bool find(const std::string &key)
-    {
-        auto it = facehash.find(key);
-        return it != facehash.end();
-    }
-};
-
-static void exclude_neighbors(const Vec3i                &face,
-                              std::vector<bool>          &mask,
-                              const indexed_triangle_set &its,
-                              const VertexFaceIndex      &index,
-                              size_t                      recursions)
-{
-    for (int i = 0; i < 3; ++i) {
-        const auto &neighbors_range = index[face(i)];
-        for (size_t fi_n : neighbors_range) {
-            mask[fi_n] = true;
-            if (recursions > 0)
-                exclude_neighbors(its.indices[fi_n], mask, its, index, recursions - 1);
+            // flip normals back...
+            sla::swap_normals(m);
         }
     }
-}
-
-// Create exclude mask for triangle removal inside hollowed interiors.
-// This is necessary when the interior is already part of the mesh which was
-// drilled using CGAL mesh boolean operation. Excluded will be the triangles
-// originally part of the interior mesh and triangles that make up the drilled
-// hole walls.
-static std::vector<bool> create_exclude_mask(
-        const indexed_triangle_set &its,
-        const sla::Interior &interior,
-        const std::vector<sla::DrainHole> &holes)
-{
-    FaceHash interior_hash{sla::get_mesh(interior)};
-
-    std::vector<bool> exclude_mask(its.indices.size(), false);
-
-    VertexFaceIndex neighbor_index{its};
-
-    for (size_t fi = 0; fi < its.indices.size(); ++fi) {
-        auto &face = its.indices[fi];
-
-        if (interior_hash.find(FaceHash::facekey(face, its.vertices))) {
-            exclude_mask[fi] = true;
-            continue;
-        }
-
-        if (exclude_mask[fi]) {
-            exclude_neighbors(face, exclude_mask, its, neighbor_index, 1);
-            continue;
-        }
-
-        // Lets deal with the holes. All the triangles of a hole and all the
-        // neighbors of these triangles need to be kept. The neigbors were
-        // created by CGAL mesh boolean operation that modified the original
-        // interior inside the input mesh to contain the holes.
-        Vec3d tr_center = (
-            its.vertices[face(0)] +
-            its.vertices[face(1)] +
-            its.vertices[face(2)]
-        ).cast<double>() / 3.;
-
-        // If the center is more than half a mm inside the interior,
-        // it cannot possibly be part of a hole wall.
-        if (sla::get_distance(tr_center, interior) < -0.5)
-            continue;
-
-        Vec3f U = its.vertices[face(1)] - its.vertices[face(0)];
-        Vec3f V = its.vertices[face(2)] - its.vertices[face(0)];
-        Vec3f C = U.cross(V);
-        Vec3f face_normal = C.normalized();
-
-        for (const sla::DrainHole &dh : holes) {
-            if (dh.failed) continue;
-
-            Vec3d dhpos = dh.pos.cast<double>();
-            Vec3d dhend = dhpos + dh.normal.cast<double>() * dh.height;
-
-            Linef3 holeaxis{dhpos, dhend};
-
-            double D_hole_center = line_alg::distance_to(holeaxis, tr_center);
-            double D_hole        = std::abs(D_hole_center - dh.radius);
-            float dot            = dh.normal.dot(face_normal);
-
-            // Empiric tolerances for center distance and normals angle.
-            // For triangles that are part of a hole wall the angle of
-            // triangle normal and the hole axis is around 90 degrees,
-            // so the dot product is around zero.
-            double D_tol = dh.radius / sla::DrainHole::steps;
-            float normal_angle_tol = 1.f / sla::DrainHole::steps;
-
-            if (D_hole < D_tol && std::abs(dot) < normal_angle_tol) {
-                exclude_mask[fi] = true;
-                exclude_neighbors(face, exclude_mask, its, neighbor_index, 1);
-            }
-        }
-    }
-
-    return exclude_mask;
 }
 
 static indexed_triangle_set
@@ -317,26 +169,7 @@ remove_unconnected_vertices(const indexed_triangle_set &its)
     if (its.indices.empty()) {};
 
     indexed_triangle_set M;
-
-    std::vector<int> vtransl(its.vertices.size(), -1);
-    int vcnt = 0;
-    for (auto &f : its.indices) {
-
-        for (int i = 0; i < 3; ++i)
-            if (vtransl[size_t(f(i))] < 0) {
-
-                M.vertices.emplace_back(its.vertices[size_t(f(i))]);
-                vtransl[size_t(f(i))] = vcnt++;
-            }
-
-        std::array<int, 3> new_f = {
-            vtransl[size_t(f(0))],
-            vtransl[size_t(f(1))],
-            vtransl[size_t(f(2))]
-        };
-
-        M.indices.emplace_back(new_f[0], new_f[1], new_f[2]);
-    }
+    its_compactify_vertices(M);
 
     return M;
 }
@@ -583,6 +416,9 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
     if (!po.m_supportdata)
         po.m_supportdata.reset(new SLAPrintObject::SupportData(po.get_mesh_to_print()));
 
+    po.m_supportdata->input.zoffset = bounding_box(po.get_mesh_to_print())
+                                          .min.z();
+
     const ModelObject& mo = *po.m_model_object;
 
     BOOST_LOG_TRIVIAL(debug) << "Support point count "
@@ -661,7 +497,7 @@ void SLAPrint::Steps::support_tree(SLAPrintObject &po)
     if (is_zero_elevation(po.config())) {
         remove_bottom_points(po.m_supportdata->input.pts,
                              float(
-                                 po.m_supportdata->input.emesh.ground_level() +
+                                 po.m_supportdata->input.zoffset +
                                  EPSILON));
     }
 

@@ -8,6 +8,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <boost/variant.hpp>
 
 #include "libslic3r.h"
 
@@ -135,6 +136,88 @@ inline std::vector<ArithmeticOnly<T>> grid(const T &start,
      
     return vals;
 }
+
+// A general purpose pointer holder that can hold any type of smart pointer
+// or raw pointer which can own or not own any object they point to.
+// In case a raw pointer is stored, it is not destructed so ownership is
+// assumed to be foreign.
+//
+// The stored pointer is not checked for being null when dereferenced.
+//
+// This is a movable only object due to the fact that it can possibly hold
+// a unique_ptr which a non-copy.
+template<class T>
+class AnyPtr {
+    enum { RawPtr, UPtr, ShPtr, WkPtr };
+
+    boost::variant<T*, std::unique_ptr<T>, std::shared_ptr<T>, std::weak_ptr<T>> ptr;
+
+    template<class Self> static T *get_ptr(Self &&s)
+    {
+        switch (s.ptr.which()) {
+        case RawPtr: return boost::get<T *>(s.ptr);
+        case UPtr: return boost::get<std::unique_ptr<T>>(s.ptr).get();
+        case ShPtr: return boost::get<std::shared_ptr<T>>(s.ptr).get();
+        case WkPtr: {
+            auto shptr = boost::get<std::weak_ptr<T>>(s.ptr).lock();
+            return shptr.get();
+        }
+        }
+
+        return nullptr;
+    }
+
+public:
+    template<class TT = T, class = std::enable_if_t<std::is_convertible_v<TT, T>>>
+    AnyPtr(TT *p = nullptr) : ptr{p}
+    {}
+    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>>
+    AnyPtr(std::unique_ptr<TT> p) : ptr{std::unique_ptr<T>(std::move(p))}
+    {}
+    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>>
+    AnyPtr(std::shared_ptr<TT> p) : ptr{std::shared_ptr<T>(std::move(p))}
+    {}
+    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>>
+    AnyPtr(std::weak_ptr<TT> p) : ptr{std::weak_ptr<T>(std::move(p))}
+    {}
+
+    ~AnyPtr() = default;
+
+    AnyPtr(AnyPtr &&other) noexcept : ptr{std::move(other.ptr)} {}
+    AnyPtr(const AnyPtr &other) = delete;
+
+    AnyPtr &operator=(AnyPtr &&other) noexcept { ptr = std::move(other.ptr); return *this; }
+    AnyPtr &operator=(const AnyPtr &other) = delete;
+
+    AnyPtr &operator=(T *p) { ptr = p; return *this; }
+    AnyPtr &operator=(std::unique_ptr<T> p) { ptr = std::move(p); return *this; }
+    AnyPtr &operator=(std::shared_ptr<T> p) { ptr = p; return *this; }
+    AnyPtr &operator=(std::weak_ptr<T> p) { ptr = std::move(p); return *this; }
+
+    const T &operator*() const { return *get_ptr(*this); }
+    T &operator*() { return *get_ptr(*this); }
+
+    T *operator->() { return get_ptr(*this); }
+    const T *operator->() const { return get_ptr(*this); }
+
+    T *get() { return get_ptr(*this); }
+    const T *get() const { return get_ptr(*this); }
+
+    operator bool() const
+    {
+        switch (ptr.which()) {
+        case RawPtr: return bool(boost::get<T *>(ptr));
+        case UPtr: return bool(boost::get<std::unique_ptr<T>>(ptr));
+        case ShPtr: return bool(boost::get<std::shared_ptr<T>>(ptr));
+        case WkPtr: {
+            auto shptr = boost::get<std::weak_ptr<T>>(ptr).lock();
+            return bool(shptr);
+        }
+        }
+
+        return false;
+    }
+};
 
 } // namespace Slic3r
 
