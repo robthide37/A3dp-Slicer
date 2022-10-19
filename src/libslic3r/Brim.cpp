@@ -39,7 +39,7 @@ static void append_and_translate(Polygons &dst, const Polygons &src, const Print
         dst[dst_idx].translate(instance.shift.x(), instance.shift.y());
 }
 
-static float max_brim_width(const ConstPrintObjectPtrsAdaptor &objects)
+static float max_brim_width(const SpanOfConstPtrs<PrintObject> &objects)
 {
     assert(!objects.empty());
     return float(std::accumulate(objects.begin(), objects.end(), 0.,
