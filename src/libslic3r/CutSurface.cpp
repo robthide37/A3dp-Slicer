@@ -373,16 +373,18 @@ bool is_over_whole_expoly(const SurfacePatch &patch,
 /// </summary>
 /// <param name="patch">Contain loops and vertices</param>
 /// <param name="projection">Know how to project from 3d to 2d</param>
+/// <param name="depth_range">Range of unprojected points x .. min, y .. max value</param>
 /// <returns>Unprojected points in loops</returns>
-Polygons unproject_loops(const SurfacePatch &patch, const Project &projection);
+Polygons unproject_loops(const SurfacePatch &patch, const Project &projection, Vec2d &depth_range);
 
 /// <summary>
 /// Unproject points from loops and create expolygons
 /// </summary>
-/// <param name="patch"></param>
+/// <param name="patch">Patch to convert on expolygon</param>
 /// <param name="projection">Convert 3d point to 2d</param>
-/// <returns></returns>
-ExPolygon to_expoly(const SurfacePatch &patch, const Project &projection);
+/// <param name="depth_range">Range of unprojected points x .. min, y .. max value</param>
+/// <returns>Expolygon represent patch in 2d</returns>
+ExPolygon to_expoly(const SurfacePatch &patch, const Project &projection, Vec2d &depth_range);
 
 /// <summary>
 /// To select surface near projection distance
@@ -3170,7 +3172,7 @@ std::vector<bool> priv::select_patches(const ProjectionDistances &best_distances
 {
     // extension to cover numerical mistake made by back projection patch from 3d to 2d
     const float extend_delta = 5.f / Emboss::SHAPE_SCALE; // [Font points scaled by Emboss::SHAPE_SCALE]
-
+        
     // vector of patches for shape
     std::vector<std::vector<uint32_t>> used_shapes_patches(shapes.size());    
     std::vector<bool> in_distances(patches.size(), {false});
@@ -3189,115 +3191,134 @@ std::vector<bool> priv::select_patches(const ProjectionDistances &best_distances
     for (const SurfacePatch &patch : patches) 
         shapes_patches[patch.shape_id].push_back(&patch - &patches.front());
 
-    for (size_t shape_index = 0; shape_index < shapes.size(); shape_index++) 
-    {
+    for (size_t shape_index = 0; shape_index < shapes.size(); shape_index++) {
         const ExPolygon &shape = shapes[shape_index];
-        const std::vector<uint32_t> &used_shape_patches = used_shapes_patches[shape_index];
+        std::vector<uint32_t> &used_shape_patches = used_shapes_patches[shape_index];
         if (used_shape_patches.empty()) continue;
+        // is used all exist patches?
+        if (used_shapes_patches.size() == shapes_patches[shape_index].size()) continue;
         if (used_shape_patches.size() == 1) { 
             uint32_t patch_index = used_shape_patches.front();
             const SurfacePatch &patch = patches[patch_index];
             if (is_over_whole_expoly(patch, shapes, cutAOIs, meshes)) continue;
         }
 
-        // only shapes contain multiple patches
-        // or not full filled are hard processed
+        // only shapes containing multiple patches
+        // or not full filled are back projected (hard processed)
 
-        // convert patch to 2d
+        // intersection of converted patches to 2d
         ExPolygons fill;
         fill.reserve(used_shape_patches.size());
-        for (uint32_t patch_index : used_shape_patches) { 
-            ExPolygon patch_area = to_expoly(patches[patch_index], projection);
+
+        // Heuristics to predict which patch to be used need average patch depth
+        Vec2d used_patches_depth(std::numeric_limits<double>::max(), std::numeric_limits<double>::min());
+        for (uint32_t patch_index : used_shape_patches) {
+            ExPolygon patch_area = to_expoly(patches[patch_index], projection, used_patches_depth);
             //*/
             ExPolygons patch_areas = offset_ex(patch_area, extend_delta);
-            fill.insert(fill.end(), patch_areas.begin(), patch_areas.end());            
+            fill.insert(fill.end(), patch_areas.begin(), patch_areas.end());
             /*/
             // without save extension
             fill.push_back(patch_area);
             //*/
         }
+        fill = union_ex(fill);
+
+        // not cutted area of expolygon
         ExPolygons rest = diff_ex(ExPolygons{shape}, fill, ApplySafetyOffset::Yes);
+#ifdef DEBUG_OUTPUT_DIR
+        SVG svg(DEBUG_OUTPUT_DIR + "input_patches_" + std::to_string(shape_index) + ".svg");
+        svg.draw(fill, "darkgreen");
+        svg.draw(rest, "green");
+#endif // DEBUG_OUTPUT_DIR
+
+        // already filled by multiple patches
         if (rest.empty()) continue;
 
-        // find patches overlaed rest area
-        fill = union_ex(fill);
+        // find patches overlaped rest area
         struct PatchShape{
             uint32_t patch_index;
             ExPolygon shape;
             ExPolygons intersection;
+            double depth_range_center_distance; // always positive 
         };
         using PatchShapes = std::vector<PatchShape>;
         PatchShapes patch_shapes;
+
+        double used_patches_depth_center = (used_patches_depth[0] + used_patches_depth[1]) / 2;
+
+        // sort used_patches for faster search
+        std::sort(used_shape_patches.begin(), used_shape_patches.end());
         for (uint32_t patch_index : shapes_patches[shape_index]) { 
             // check is patch already used
             auto it = std::lower_bound(used_shape_patches.begin(), used_shape_patches.end(), patch_index);
             if (it != used_shape_patches.end() && *it == patch_index) continue;
-            ExPolygon patch_shape = to_expoly(patches[patch_index], projection);
+
+            // Heuristics to predict which patch to be used need average patch depth
+            Vec2d patche_depth_range(std::numeric_limits<double>::max(), std::numeric_limits<double>::min());
+            ExPolygon patch_shape = to_expoly(patches[patch_index], projection, patche_depth_range);
+            double depth_center = (patche_depth_range[0] + patche_depth_range[1]) / 2;
+            double depth_range_center_distance = std::fabs(used_patches_depth_center - depth_center);
+
             ExPolygons patch_intersection = intersection_ex(ExPolygons{patch_shape}, rest);
             if (patch_intersection.empty()) continue;
 
-            patch_shapes.push_back({patch_index, patch_shape, patch_intersection});
+            patch_shapes.push_back({patch_index, patch_shape, patch_intersection, depth_range_center_distance});
         }
 
-        // how to select which patch to use
-        // 
-        // by depth:
-        // how to calc wanted depth - idealy by depth of hole outline points
-        // 
-        // how to calc patch depth - by average outline depth
+        // nothing to add
+        if (patch_shapes.empty()) continue;
+        // only one solution to add
+        if (patch_shapes.size() == 1) {
+            used_shape_patches.push_back(patch_shapes.front().patch_index);        
+            continue;
+        }
 
+        // Idea: Get depth range of used patches and add patches in order by distance to used depth center
+        std::sort(patch_shapes.begin(), patch_shapes.end(), [](const PatchShape &a, const PatchShape &b) 
+            { return a.depth_range_center_distance < b.depth_range_center_distance; });
+
+#ifdef DEBUG_OUTPUT_DIR
+        for (const auto &p : patch_shapes) {
+            int gray_level = 30 + (&p - &patch_shapes.front()) * 200 / patch_shapes.size() ;
+            std::stringstream color;
+            color << "#" << std::hex << std::setfill('0') << std::setw(2) << gray_level << gray_level << gray_level;
+            svg.draw(p.shape, color.str());
+            svg.draw(p.intersection, color.str());
+        }
+#endif // DEBUG_OUTPUT_DIR
+
+        for (const PatchShape &patch : patch_shapes) { 
+            // Check when exist some place to fill
+            ExPolygons patch_intersection = intersection_ex(patch.intersection, rest);
+            if (patch_intersection.empty()) continue;
+
+            // Extend for sure
+            ExPolygons intersection = offset_ex(patch.intersection, extend_delta);
+            rest = diff_ex(rest, intersection, ApplySafetyOffset::Yes);
+
+            used_shape_patches.push_back(patch.patch_index);
+            if (rest.empty()) break;
+        }
+
+        // QUESTION: How to select which patch to use? How to sort them?
+        // Now is used back projection distance from used patches
+        // 
+        // Idealy by outline depth: (need ray cast into patches)
+        // how to calc wanted depth - idealy by depth of outline help to overlap
+        // how to calc patch depth - depth in place of outline position
+        // Which outline to use between 
 
     }
-
-
-    // For sure of the bounding boxes intersection
-    const double bb_extension = 1e-10;
-    const Vec3d bb_ext(bb_extension, bb_extension, bb_extension);
-    auto extend_bb = [&bb_ext](const BoundingBoxf3 &bb) {
-        return BoundingBoxf3(
-            bb.min - bb_ext,
-            bb.max + bb_ext);
-    };
-
-    // queue to flood fill by patches
-    std::vector<size_t> patch_indices;
 
     std::vector<bool> result(patches.size(), {false});
-    for (const ProjectionDistance &d : best_distances) {
-        // exist valid projection for shape point?
-        if (d.patch_index == std::numeric_limits<uint32_t>::max()) continue;
-        if (result[d.patch_index]) continue;
-        // Add all connected patches
-        // This is way to add patche(from other models) without source shape point
-        // 1. Patches inside of shape
-        // 2. Patches crossing outline between shape points
-
-        assert(patch_indices.empty());
-        patch_indices.push_back(d.patch_index);
-        do {
-            size_t patch_index = patch_indices.back();
-            patch_indices.pop_back();
-            if (result[patch_index]) continue;
+    for (const std::vector<uint32_t> &patches: used_shapes_patches)
+        for (uint32_t patch_index : patches) { 
+            assert(patch_index < result.size());
+            // check only onece insertation of patch
+            assert(!result[patch_index]);
             result[patch_index] = true;
-            const SurfacePatch &patch = patches[patch_index];
-            BoundingBoxf3 bb = extend_bb(patch.bb);
-            for (const SurfacePatch &patch2 : patches) {
-                // IMPROVE: check patches only from same shape (ExPolygon)
-                size_t patch_index2 = &patch2 - &patches.front();
-                // is already filled?
-                if (result[patch_index2]) continue;
-                // only patches made by same shape could be connected
-                if (patch.shape_id != patch2.shape_id) continue;
-                BoundingBoxf3 bb2 = extend_bb(patch2.bb);
-                if (!bb.intersects(bb2)) continue;
-                if (!in_distances[patch_index2]) {
-                    // TODO: check that really exist shared outline between patches
-                    
-                }
-                patch_indices.push_back(patch_index2);
-            }        
-        } while (!patch_indices.empty());
-    }
+        }
     return result;
 }
 
@@ -3364,7 +3385,7 @@ priv::Loops priv::create_loops(const std::vector<HI> &outlines, const CutMesh& m
     return loops;
 }
 
-Polygons priv::unproject_loops(const SurfacePatch &patch, const Project &projection)
+Polygons priv::unproject_loops(const SurfacePatch &patch, const Project &projection, Vec2d &depth_range)
 {
     assert(!patch.loops.empty());
     if (patch.loops.empty()) return {};
@@ -3374,6 +3395,11 @@ Polygons priv::unproject_loops(const SurfacePatch &patch, const Project &project
     polys.reserve(patch.loops.size());
     // project conture into 2d space to fillconvert outlines to
 
+    size_t count = 0;
+    for (const Loop &l : patch.loops) count += l.size();
+    std::vector<float> depths;
+    depths.reserve(count);
+
     Points pts;
     for (const Loop &l : patch.loops) {
         pts.clear();
@@ -3381,14 +3407,17 @@ Polygons priv::unproject_loops(const SurfacePatch &patch, const Project &project
         for (VI vi : l) {
             const P3 &p3 = patch.mesh.point(vi);
             Vec3d p(p3.x(), p3.y(), p3.z());
-            std::optional<Point> p2_opt = projection.unproject(p);
-
+            double depth;
+            std::optional<Vec2d> p2_opt = projection.unproject(p, &depth);
+            if (depth_range[0] > depth) depth_range[0] = depth; // min
+            if (depth_range[1] < depth) depth_range[1] = depth; // max
             // Check when appear that skip is enough for poit which can't be unprojected
             // - it could break contour
             assert(p2_opt.has_value());
             if (!p2_opt.has_value()) continue;
 
-            pts.push_back(*p2_opt);
+            pts.push_back(p2_opt->cast<Point::coord_type>());
+            depths.push_back(static_cast<float>(depth));
         }
         // minimal is triangle
         assert(pts.size() >= 3);
@@ -3401,9 +3430,9 @@ Polygons priv::unproject_loops(const SurfacePatch &patch, const Project &project
     return polys;
 }
 
-ExPolygon priv::to_expoly(const SurfacePatch &patch, const Project &projection)
+ExPolygon priv::to_expoly(const SurfacePatch &patch, const Project &projection, Vec2d &depth_range)
 {
-    Polygons polys = unproject_loops(patch, projection);
+    Polygons polys = unproject_loops(patch, projection, depth_range);
     // should not be used when no opposit triangle are counted so should not create overlaps
     ClipperLib::PolyFillType fill_type = ClipperLib::PolyFillType::pftEvenOdd;
     ExPolygons expolys = Slic3r::union_ex(polys, fill_type);

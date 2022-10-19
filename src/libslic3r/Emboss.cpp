@@ -1207,8 +1207,9 @@ Vec3d Emboss::ProjectZ::project(const Vec3d &point) const
     return res;
 }
 
-std::optional<Point> Emboss::ProjectZ::unproject(const Vec3d &p) const {
-    return Point(p.x() / SHAPE_SCALE, p.y() / SHAPE_SCALE);
+std::optional<Vec2d> Emboss::ProjectZ::unproject(const Vec3d &p, double *depth) const {
+    if (depth != nullptr) *depth /= SHAPE_SCALE;
+    return Vec2d(p.x() / SHAPE_SCALE, p.y() / SHAPE_SCALE);
 }
 
 Transform3d Emboss::create_transformation_onto_surface(const Vec3f &position,
@@ -1284,7 +1285,9 @@ Vec3d Emboss::OrthoProject::project(const Vec3d &point) const
     return point + m_direction;
 }
 
-std::optional<Point> Emboss::OrthoProject::unproject(const Vec3d &p) const {
+std::optional<Vec2d> Emboss::OrthoProject::unproject(const Vec3d &p, double *depth) const
+{
     Vec3d pp = m_matrix_inv * p;
-    return Point(pp.x(), pp.y());
+    if (depth != nullptr) *depth = pp.z();
+    return Vec2d(pp.x(), pp.y());
 }

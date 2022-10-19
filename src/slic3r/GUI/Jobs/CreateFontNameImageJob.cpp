@@ -71,6 +71,7 @@ void CreateFontImageJob::process(Ctl &ctl)
     m_tex_size   = Point(std::ceil(size_f.x()), std::ceil(size_f.y()));
     // crop image width
     if (m_tex_size.x() > m_input.size.x()) m_tex_size.x() = m_input.size.x();
+    if (m_tex_size.y() > m_input.size.y()) m_tex_size.y() = m_input.size.y();
 
     // Set up result
     m_result = std::vector<unsigned char>(m_tex_size.x() * m_tex_size.y() * 4, {255});

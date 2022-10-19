@@ -259,7 +259,13 @@ public:
         /// </returns>
         virtual std::pair<Vec3d, Vec3d> create_front_back(const Point &p) const = 0;
 
-        virtual std::optional<Point> unproject(const Vec3d &p) const = 0;
+        /// <summary>
+        /// Back projection
+        /// </summary>
+        /// <param name="p">Point to project</param>
+        /// <param name="depth">[optional] Depth of 2d projected point. Be careful number is in 2d scale</param>
+        /// <returns>Uprojected point when it is possible</returns>
+        virtual std::optional<Vec2d> unproject(const Vec3d &p, double * depth = nullptr) const = 0;
     };
 
     /// <summary>
@@ -287,7 +293,7 @@ public:
         // Inherited via IProject
         std::pair<Vec3d, Vec3d> create_front_back(const Point &p) const override;
         Vec3d project(const Vec3d &point) const override;
-        std::optional<Point> unproject(const Vec3d &p) const override;
+        std::optional<Vec2d> unproject(const Vec3d &p, double * depth = nullptr) const override;
         double m_depth;
     };
 
@@ -309,8 +315,10 @@ public:
         Vec3d project(const Vec3d &point) const override{
             return core->project(point);
         }
-        std::optional<Point> unproject(const Vec3d &p) const override {
-            return core->unproject(p / m_scale);
+        std::optional<Vec2d> unproject(const Vec3d &p, double *depth = nullptr) const override {
+            auto res = core->unproject(p / m_scale, depth);
+            if (depth != nullptr) *depth *= m_scale;
+            return res;
         }
     };
 
@@ -335,7 +343,7 @@ public:
         // Inherited via IProject
         std::pair<Vec3d, Vec3d> create_front_back(const Point &p) const override;
         Vec3d project(const Vec3d &point) const override;
-        std::optional<Point> unproject(const Vec3d &p) const override;     
+        std::optional<Vec2d> unproject(const Vec3d &p, double * depth = nullptr) const override;     
     };
 };
 
