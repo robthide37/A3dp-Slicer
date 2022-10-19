@@ -45,6 +45,24 @@ using _SLAPrintObjectBase =
 
 enum SliceOrigin { soSupport, soModel };
 
+} // namespace Slic3r
+
+namespace std {
+
+template<> struct hash<Slic3r::csg::VoxelizeParams> {
+    size_t operator() (const Slic3r::csg::VoxelizeParams &p) const {
+        std::string str = Slic3r::float_to_string_decimal_point(p.voxel_scale());
+        str += Slic3r::float_to_string_decimal_point(p.exterior_bandwidth());
+        str += Slic3r::float_to_string_decimal_point(p.interior_bandwidth());
+
+        return std::hash<std::string>{}(str);
+    }
+};
+
+} // namespace std
+
+namespace Slic3r {
+
 // Each sla object step can hold a collection of csg operations on the
 // sla model to be sliced. Currently, Assembly step adds negative and positive
 // volumes, hollowing adds the negative interior, drilling adds the hole cylinders.
@@ -54,7 +72,7 @@ enum SliceOrigin { soSupport, soModel };
 struct CSGPartForStep : public csg::CSGPart
 {
     SLAPrintObjectStep key;
-    mutable struct { VoxelGridPtr gridptr; csg::VoxelizeParams params; } cache;
+    mutable std::unordered_map<csg::VoxelizeParams, VoxelGridPtr> gridcache;
 
     CSGPartForStep(SLAPrintObjectStep k, CSGPart &&p = {})
         : key{k}, CSGPart{std::move(p)}
@@ -64,6 +82,7 @@ struct CSGPartForStep : public csg::CSGPart
     {
         this->its_ptr = std::move(part.its_ptr);
         this->operation = part.operation;
+
         return *this;
     }
 
@@ -72,23 +91,27 @@ struct CSGPartForStep : public csg::CSGPart
 
 namespace csg {
 
-//inline VoxelGridPtr get_voxelgrid(const CSGPartForStep &part,
-//                                  const VoxelizeParams &p)
-//{
-//    if (!part.cache.gridptr || get_voxel_scale(*part.cache.gridptr) < p.voxel_scale()) {
-//        part.cache.gridptr = mesh_to_grid(*csg::get_mesh(part), p.voxel_scale(),
-//                                    p.exterior_bandwidth(),
-//                                    p.interior_bandwidth());
+inline bool operator==(const VoxelizeParams &a, const VoxelizeParams &b)
+{
+    std::hash<Slic3r::csg::VoxelizeParams> h;
+    return h(a) == h(b);
+}
 
-//    } /*else {
-//        float vscale = p.voxel_scale();
-//        float oscale = get_voxel_scale(*part.cache.gridptr);
+inline VoxelGridPtr get_voxelgrid(const CSGPartForStep &part,
+                                  const VoxelizeParams &p)
+{
+    VoxelGridPtr &ret = part.gridcache[p];
 
-//        rescale_grid(*part.cache.gridptr, oscale/vscale);
-//    }*/
+    if (!ret) {
+        ret = mesh_to_grid(*csg::get_mesh(part),
+                           csg::get_transform(part),
+                           p.voxel_scale(),
+                           p.exterior_bandwidth(),
+                           p.interior_bandwidth());
+    }
 
-//    return clone(*part.cache.gridptr);
-//}
+    return clone(*ret);
+}
 
 } // namespace csg
 
@@ -134,9 +157,7 @@ public:
 
     // Get the mesh that is going to be printed with all the modifications
     // like hollowing and drilled holes.
-    const TriangleMesh & get_mesh_to_print() const {
-        return !m_mesh_from_slices.empty() ? m_mesh_from_slices : m_transformed_rmesh;
-    }
+    const TriangleMesh & get_mesh_to_print() const;
 
 //    // This will return the transformed mesh which is cached
 //    const TriangleMesh&     transformed_mesh() const;
@@ -379,8 +400,15 @@ private:
     };
 
     std::unique_ptr<SupportData>  m_supportdata;
-    TriangleMesh                  m_mesh_from_slices;
+
+    // Holds CSG operations for the printed object, prioritized by print steps.
     std::multiset<CSGPartForStep> m_mesh_to_slice;
+
+    // Holds the preview of the object to be printed (as it will look like with
+    // all its holes and cavities, negatives and positive volumes unified.
+    // Essentially this should be a m_mesh_to_slice after the CSG operations
+    // or an approximation of that.
+    std::array<TriangleMesh, SLAPrintObjectStep::slaposCount> m_preview_meshes;
 
     class HollowingData
     {

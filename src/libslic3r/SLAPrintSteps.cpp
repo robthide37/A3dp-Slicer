@@ -22,7 +22,7 @@
 #include <libslic3r/QuadricEdgeCollapse.hpp>
 
 #include <libslic3r/ClipperUtils.hpp>
-#include <libslic3r/QuadricEdgeCollapse.hpp>
+#include <libslic3r/ShortEdgeCollapse.hpp>
 
 #include <boost/log/trivial.hpp>
 
@@ -128,6 +128,54 @@ void SLAPrint::Steps::apply_printer_corrections(SLAPrintObject &po, SliceOrigin 
     }
 }
 
+
+void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
+{
+    Benchmark bench;
+
+    bench.start();
+    // update preview mesh
+    double vscale = 1. / (2. * po.m_config.layer_height.getFloat());
+    auto   voxparams = csg::VoxelizeParams{}
+                         .voxel_scale(vscale)
+                         .exterior_bandwidth(1.f)
+                         .interior_bandwidth(1.f);
+    auto grid = csg::voxelize_csgmesh(range(po.m_mesh_to_slice), voxparams);
+
+    indexed_triangle_set m = grid_to_mesh(*grid);
+
+//    if (!m.empty()) {
+//        // simplify mesh lossless
+
+//        std::cout << "simplify started" << std::endl;
+//        int expected_cnt = m.indices.size() * 0.8; //std::pow(po.m_transformed_rmesh.volume() / std::pow(1./vscale, 3), 2./3.);
+//        std::cout << "expected triangles " << expected_cnt << std::endl;
+//        float err = std::pow(vscale, 3);
+//        its_quadric_edge_collapse(m, 0U, &err);
+//        std::cout << "simplify ended " << m.indices.size() << " triangles" << std::endl;
+
+//        std::cout << "cleanup started" << std::endl;
+//        its_compactify_vertices(m);
+//        its_merge_vertices(m);
+//        std::cout << "cleanup ended" << std::endl;
+//    }
+
+    po.m_preview_meshes[step] = TriangleMesh{std::move(m)};
+
+    for (size_t i = size_t(step) + 1; i < slaposCount; ++i)
+    {
+        po.m_preview_meshes[i] = {};
+    }
+
+    bench.stop();
+
+    std::cout << "Preview gen took: " << bench.getElapsedSec() << std::endl;
+    using namespace std::string_literals;
+
+    report_status(-2, "Reload preview from step "s + std::to_string(int(step)), SlicingStatus::RELOAD_SLA_PREVIEW);
+}
+
+static inline
 void clear_csg(std::multiset<CSGPartForStep> &s, SLAPrintObjectStep step)
 {
     auto r = s.equal_range(step);
@@ -153,6 +201,8 @@ void SLAPrint::Steps::mesh_assembly(SLAPrintObject &po)
     csg::model_to_csgmesh(*po.model_object(), po.trafo(),
                           csg_inserter{po.m_mesh_to_slice, slaposAssembly},
                           csg::mpartsPositive | csg::mpartsNegative);
+
+    generate_preview(po, slaposAssembly);
 }
 
 void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
@@ -185,11 +235,24 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
         po.m_hollowing_data.reset(new SLAPrintObject::HollowingData());
         po.m_hollowing_data->interior = std::move(interior);
 
+        indexed_triangle_set &m = sla::get_mesh(*po.m_hollowing_data->interior);
+
+        if (!m.empty()) {
+            // simplify mesh lossless
+            float loss_less_max_error = 2*std::numeric_limits<float>::epsilon();
+            its_quadric_edge_collapse(m, 0U, &loss_less_max_error);
+
+            its_compactify_vertices(m);
+            its_merge_vertices(m);
+        }
+
         // Put the interior into the target mesh as a negative
         po.m_mesh_to_slice
             .emplace(slaposHollowing,
                      csg::CSGPart{&sla::get_mesh(*po.m_hollowing_data->interior),
                                   csg::CSGType::Difference});
+
+        generate_preview(po, slaposHollowing);
     }
 }
 
@@ -203,14 +266,7 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
                           csg::mpartsDrillHoles);
 
     // update preview mesh
-    double vscale = 1. / 0.05;
-    auto   voxparams = csg::VoxelizeParams{}
-                         .voxel_scale(vscale)
-                         .exterior_bandwidth(1.f)
-                         .interior_bandwidth(1.f);
-    auto grid = csg::voxelize_csgmesh(range(po.m_mesh_to_slice), voxparams);
-    indexed_triangle_set mesh_from_slices = grid_to_mesh(*grid);
-    po.m_mesh_from_slices = TriangleMesh{mesh_from_slices};
+    generate_preview(po, slaposDrillHoles);
 }
 
 template<class Pred>
@@ -331,38 +387,7 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
     // We apply the printer correction offset here.
     apply_printer_corrections(po, soModel);
 
-//    auto simpl_slices = reserve_vector<ExPolygons>(po.m_model_slices.size());
-//    for (const ExPolygons &slice : po.m_model_slices) {
-//        simpl_slices.emplace_back(expolygons_simplify(slice, scaled(1e-2)));
-//    }
-
-//    po.m_mesh_from_slices = TriangleMesh{
-//        slices_to_mesh(simpl_slices, slice_grid.front(), lhd, ilhd)};
-
-    double vscale = 1. / lhd;
-    auto   voxparams = csg::VoxelizeParams{}
-                      .voxel_scale(vscale)
-                      .exterior_bandwidth(1.f)
-                      .interior_bandwidth(1.f);
-    auto grid = csg::voxelize_csgmesh(range(po.m_mesh_to_slice), voxparams);
-
-    assert(grid);
-
-//    size_t max_face_cnt = 0;
-//    for (const CSGMesh &part : po.m_mesh_to_slice)
-//        max_face_cnt += part.its_ptr->indices.size();
-
-    indexed_triangle_set mesh_from_slices = grid_to_mesh(*grid);
-
-//    its_quadric_edge_collapse(mesh_from_slices, vscale * max_face_cnt);
-
-//    its_compactify_vertices(mesh_from_slices);
-//    its_merge_vertices(mesh_from_slices);
-
-    po.m_mesh_from_slices = TriangleMesh{mesh_from_slices};
-
-//    po.m_mesh_from_slices = TriangleMesh{sla::get_mesh(*po.m_hollowing_data->interior)};
-
+    generate_preview(po, slaposObjectSlice);
 }
 
 static void filter_support_points_by_modifiers(
@@ -421,7 +446,10 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
     if(!po.m_config.supports_enable.getBool()) return;
 
     if (!po.m_supportdata)
-        po.m_supportdata.reset(new SLAPrintObject::SupportData(po.m_mesh_from_slices));
+        po.m_supportdata =
+            std::make_unique<SLAPrintObject::SupportData>(
+                po.m_preview_meshes[slaposObjectSlice]
+            );
 
     po.m_supportdata->input.zoffset = csgmesh_positive_bb(po.m_mesh_to_slice)
                                           .min.z();

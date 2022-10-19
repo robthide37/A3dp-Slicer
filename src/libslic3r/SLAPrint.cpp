@@ -1056,6 +1056,23 @@ const TriangleMesh& SLAPrintObject::pad_mesh() const
     return EMPTY_MESH;
 }
 
+const TriangleMesh &SLAPrintObject::get_mesh_to_print() const {
+    const TriangleMesh *ret = nullptr;
+
+    int s = SLAPrintObjectStep::slaposCount;
+
+    while (s > 0 && !ret) {
+        --s;
+        if (is_step_done(SLAPrintObjectStep(s)) && !m_preview_meshes[s].empty())
+            ret = &m_preview_meshes[s];
+    }
+
+    if (!ret)
+        ret = &m_transformed_rmesh;
+
+    return *ret;
+}
+
 //const indexed_triangle_set &SLAPrintObject::hollowed_interior_mesh() const
 //{
 //    if (m_hollowing_data && m_hollowing_data->interior &&

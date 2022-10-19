@@ -659,14 +659,14 @@ public:
         int                instance_idx);
 
     // Load SLA auxiliary GLVolumes (for support trees or pad).
-    void load_object_auxiliary(
-        const SLAPrintObject* print_object,
-        int                             obj_idx,
-        // pairs of <instance_idx, print_instance_idx>
-        const std::vector<std::pair<size_t, size_t>>& instances,
-        SLAPrintObjectStep              milestone,
-        // Timestamp of the last change of the milestone
-        size_t                          timestamp);
+//    void load_object_auxiliary(
+//        const SLAPrintObject* print_object,
+//        int                             obj_idx,
+//        // pairs of <instance_idx, print_instance_idx>
+//        const std::vector<std::pair<size_t, size_t>>& instances,
+//        SLAPrintObjectStep              milestone,
+//        // Timestamp of the last change of the milestone
+//        size_t                          timestamp);
 
 #if ENABLE_OPENGL_ES
     int load_wipe_tower_preview(

@@ -6155,19 +6155,13 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
             const Transform3d mesh_trafo_inv = object->trafo().inverse();
             const bool is_left_handed = object->is_left_handed();
 
-            TriangleMesh pad_mesh;
-            const bool has_pad_mesh = extended && object->has_mesh(slaposPad);
-            if (has_pad_mesh) {
-                pad_mesh = object->get_mesh(slaposPad);
-                pad_mesh.transform(mesh_trafo_inv);
-            }
+            auto pad_mesh = extended? object->pad_mesh() : TriangleMesh{};
+            pad_mesh = object->pad_mesh();
+            pad_mesh.transform(mesh_trafo_inv);
 
-            TriangleMesh supports_mesh;
-            const bool has_supports_mesh = extended && object->has_mesh(slaposSupportTree);
-            if (has_supports_mesh) {
-                supports_mesh = object->get_mesh(slaposSupportTree);
-                supports_mesh.transform(mesh_trafo_inv);
-            }
+            auto supports_mesh = extended ? object->support_mesh() : TriangleMesh{};
+            supports_mesh.transform(mesh_trafo_inv);
+
             const std::vector<SLAPrintObject::Instance>& obj_instances = object->instances();
             for (const SLAPrintObject::Instance& obj_instance : obj_instances) {
                 auto it = std::find_if(model_object->instances.begin(), model_object->instances.end(),
@@ -6184,19 +6178,19 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
 
                     TriangleMesh inst_mesh;
 
-                    if (has_pad_mesh) {
+                    if (!pad_mesh.empty()) {
                         TriangleMesh inst_pad_mesh = pad_mesh;
                         inst_pad_mesh.transform(inst_transform, is_left_handed);
                         inst_mesh.merge(inst_pad_mesh);
                     }
 
-                    if (has_supports_mesh) {
+                    if (!supports_mesh.empty()) {
                         TriangleMesh inst_supports_mesh = supports_mesh;
                         inst_supports_mesh.transform(inst_transform, is_left_handed);
                         inst_mesh.merge(inst_supports_mesh);
                     }
 
-                    TriangleMesh inst_object_mesh = object->get_mesh_to_slice();
+                    TriangleMesh inst_object_mesh = object->get_mesh_to_print();
                     inst_object_mesh.transform(mesh_trafo_inv);
                     inst_object_mesh.transform(inst_transform, is_left_handed);
 

@@ -281,10 +281,10 @@ void HollowedMesh::on_update()
 
     // If there is a valid SLAPrintObject, check state of Hollowing step.
     if (print_object) {
-        if (print_object->is_step_done(slaposDrillHoles) && print_object->has_mesh(slaposDrillHoles)) {
+        if (print_object->is_step_done(slaposDrillHoles) && !print_object->get_mesh_to_print().empty()) {
             size_t timestamp = print_object->step_state_with_timestamp(slaposDrillHoles).timestamp;
             if (timestamp > m_old_hollowing_timestamp) {
-                const TriangleMesh& backend_mesh = print_object->get_mesh_to_slice();
+                const TriangleMesh& backend_mesh = print_object->get_mesh_to_print();
                 if (! backend_mesh.empty()) {
                     m_hollowed_mesh_transformed.reset(new TriangleMesh(backend_mesh));
                     Transform3d trafo_inv = (canvas->sla_print()->sla_trafo(*mo) * print_object->model_object()->volumes.front()->get_transformation().get_matrix()).inverse();
@@ -292,10 +292,10 @@ void HollowedMesh::on_update()
                     m_drainholes = print_object->model_object()->sla_drain_holes;
                     m_old_hollowing_timestamp = timestamp;
 
-                    indexed_triangle_set interior = print_object->hollowed_interior_mesh();
-                    its_flip_triangles(interior);
-                    m_hollowed_interior_transformed = std::make_unique<TriangleMesh>(std::move(interior));
-                    m_hollowed_interior_transformed->transform(trafo_inv);
+//                    indexed_triangle_set interior = print_object->hollowed_interior_mesh();
+//                    its_flip_triangles(interior);
+//                    m_hollowed_interior_transformed = std::make_unique<TriangleMesh>(std::move(interior));
+//                    m_hollowed_interior_transformed->transform(trafo_inv);
                 }
                 else {
                     m_hollowed_mesh_transformed.reset(nullptr);
