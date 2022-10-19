@@ -108,6 +108,54 @@ static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const 
     return init_data;
 }
 
+static GLModel::Geometry init_torus_data(unsigned int primary_resolution, unsigned int secondary_resolution, const Vec3f& center,
+    float radius, float thickness, const Vec3f& model_axis, const Transform3f& world_trafo)
+{
+    const unsigned int torus_sector_count = std::max<unsigned int>(4, primary_resolution);
+    const unsigned int section_sector_count = std::max<unsigned int>(4, secondary_resolution);
+    const float torus_sector_step = 2.0f * float(M_PI) / float(torus_sector_count);
+    const float section_sector_step = 2.0f * float(M_PI) / float(section_sector_count);
+
+    GLModel::Geometry data;
+    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+    data.reserve_vertices(torus_sector_count * section_sector_count);
+    data.reserve_indices(torus_sector_count * section_sector_count * 2 * 3);
+
+    // vertices
+    const Transform3f local_to_world_matrix = world_trafo * Geometry::translation_transform(center.cast<double>()).cast<float>() *
+        Eigen::Quaternion<float>::FromTwoVectors(Vec3f::UnitZ(), model_axis);
+    for (unsigned int i = 0; i < torus_sector_count; ++i) {
+        const float section_angle = torus_sector_step * i;
+        const Vec3f radius_dir(std::cos(section_angle), std::sin(section_angle), 0.0f);
+        const Vec3f local_section_center = radius * radius_dir;
+        const Vec3f world_section_center = local_to_world_matrix * local_section_center;
+        const Vec3f local_section_normal = local_section_center.normalized().cross(Vec3f::UnitZ()).normalized();
+        const Vec3f world_section_normal = (Vec3f)(local_to_world_matrix.matrix().block(0, 0, 3, 3) * local_section_normal).normalized();
+        const Vec3f base_v = thickness * radius_dir;
+        for (unsigned int j = 0; j < section_sector_count; ++j) {
+            const Vec3f v = Eigen::AngleAxisf(section_sector_step * j, world_section_normal) * base_v;
+            data.add_vertex(world_section_center + v, (Vec3f)v.normalized());
+        }
+    }
+
+    // triangles
+    for (unsigned int i = 0; i < torus_sector_count; ++i) {
+        const unsigned int ii = i * section_sector_count;
+        const unsigned int ii_next = ((i + 1) % torus_sector_count) * section_sector_count;
+        for (unsigned int j = 0; j < section_sector_count; ++j) {
+            const unsigned int j_next = (j + 1) % section_sector_count;
+            const unsigned int i0 = ii + j;
+            const unsigned int i1 = ii_next + j;
+            const unsigned int i2 = ii_next + j_next;
+            const unsigned int i3 = ii + j_next;
+            data.add_triangle(i0, i1, i2);
+            data.add_triangle(i0, i2, i3);
+        }
+    }
+
+    return data;
+}
+
 class TransformHelper
 {
     struct Cache
@@ -411,6 +459,20 @@ void GLGizmoMeasure::on_render()
         const bool mouse_on_object = m_c->raycaster()->raycasters().front()->unproject_on_mesh(m_mouse_pos, m_volume_matrix, camera, position_on_model, normal_on_model, nullptr, &model_facet_idx);
         const bool is_hovering_on_locked_feature = m_mode == EMode::ExtendedSelection && m_hover_id != -1;
 
+        auto update_circle = [this, inv_zoom]() {
+            if (m_last_inv_zoom != inv_zoom || m_last_circle != m_curr_feature) {
+                m_last_inv_zoom = inv_zoom;
+                m_last_circle = m_curr_feature;
+                m_circle.reset();
+                const auto [center, radius, normal] = m_curr_feature->get_circle();
+                GLModel::Geometry circle_geometry = init_torus_data(64, 16, center.cast<float>(), float(radius), 5.0f * inv_zoom, normal.cast<float>(), m_volume_matrix.cast<float>());
+                m_circle.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(circle_geometry.get_as_indexed_triangle_set()));
+                m_circle.model.init_from(std::move(circle_geometry));
+                return true;
+            }
+            return false;
+        };
+
         if (m_mode == EMode::BasicSelection) {
             std::optional<Measure::SurfaceFeature> curr_feature = mouse_on_object ? m_measuring->get_feature(model_facet_idx, position_on_model.cast<double>()) : std::nullopt;
             m_curr_point_on_feature_position.reset();
@@ -441,16 +503,7 @@ void GLGizmoMeasure::on_render()
                 }
                 case Measure::SurfaceFeatureType::Circle:
                 {
-                    const auto [center, radius, normal] = m_curr_feature->get_circle();
-                    if (m_last_inv_zoom != inv_zoom || m_last_circle != m_curr_feature) {
-                        m_last_inv_zoom = inv_zoom;
-                        m_last_circle   = m_curr_feature;
-                        m_circle.reset();
-                        GLModel::Geometry circle_geometry = smooth_torus(64, 16, float(radius), 5.0f * inv_zoom);
-                        m_circle.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(circle_geometry.get_as_indexed_triangle_set()));
-                        m_circle.model.init_from(std::move(circle_geometry));
-                    }
-
+                    update_circle();
                     m_raycasters.insert({ CIRCLE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_ID, *m_circle.mesh_raycaster) });
                     m_raycasters.insert({ POINT_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID, *m_sphere.mesh_raycaster) });
                     break;
@@ -519,16 +572,30 @@ void GLGizmoMeasure::on_render()
                 if (m_hover_id == POINT_ID)
                     m_curr_point_on_feature_position = center;
                 else {
-                    const float r = radius; // needed for the following lambda
-                    m_curr_point_on_feature_position = m_volume_matrix.inverse() * position_on_feature(CIRCLE_ID, camera, [r](const Vec3f& v) {
-                        float angle = std::atan2(v.y(), v.x());
-                        if (angle < 0.0f)
-                            angle += 2.0f * float(M_PI);
-                        return Vec3f(float(r) * std::cos(angle), float(r) * std::sin(angle), 0.0f);
-                        });
+                    const Vec3d world_pof = position_on_feature(CIRCLE_ID, camera, [](const Vec3f& v) { return v; });
+                    const Eigen::Hyperplane<double, 3> plane(m_volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose()* normal, m_volume_matrix * center);
+                    const Transform3d local_to_model_matrix = Geometry::translation_transform(center) * Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal);
+                    const Vec3d local_proj = local_to_model_matrix.inverse() * m_volume_matrix.inverse() * plane.projection(world_pof);
+                    double angle = std::atan2(local_proj.y(), local_proj.x());
+                    if (angle < 0.0)
+                        angle += 2.0 * double(M_PI);
+
+                    const Vec3d local_pos = radius * Vec3d(std::cos(angle), std::sin(angle), 0.0);
+                    m_curr_point_on_feature_position = local_to_model_matrix * local_pos;
                 }
                 break;
             }
+            }
+        }
+        else {
+            if (m_curr_feature.has_value() && m_curr_feature->get_type() == Measure::SurfaceFeatureType::Circle) {
+                if (update_circle()) {
+                    m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_ID);
+                    auto it = m_raycasters.find(CIRCLE_ID);
+                    if (it != m_raycasters.end())
+                        m_raycasters.erase(it);
+                    m_raycasters.insert({ CIRCLE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_ID, *m_circle.mesh_raycaster) });
+                }
             }
         }
 
@@ -589,7 +656,7 @@ void GLGizmoMeasure::on_render()
                             it->second->set_transform(center_matrix);
                     }
                     // render circle
-                    const Transform3d circle_matrix = m_volume_matrix * Geometry::translation_transform(center) * Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal);
+                    const Transform3d circle_matrix = Transform3d::Identity();
                     set_matrix_uniforms(circle_matrix);
                     if (update_raycasters_transform) {
                         m_circle.model.set_color(colors.back());
@@ -600,7 +667,7 @@ void GLGizmoMeasure::on_render()
                     }
                     else {
                         GLModel circle;
-                        GLModel::Geometry circle_geometry = smooth_torus(64, 16, float(radius), 5.0f * inv_zoom);
+                        GLModel::Geometry circle_geometry = init_torus_data(64, 16, center.cast<float>(), float(radius), 5.0f * inv_zoom, normal.cast<float>(), m_volume_matrix.cast<float>());
                         circle.init_from(std::move(circle_geometry));
                         circle.set_color(colors.back());
                         circle.render();
