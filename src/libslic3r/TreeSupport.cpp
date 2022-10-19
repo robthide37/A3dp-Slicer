@@ -3908,7 +3908,7 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
 void fff_tree_support_generate(PrintObject &print_object, std::function<void()> throw_on_cancel)
 {
     size_t idx = 0;
-    for (PrintObject* po : print_object.print()->objects()) {
+    for (const PrintObject *po : print_object.print()->objects()) {
         if (po == &print_object)
             break;
         ++idx;

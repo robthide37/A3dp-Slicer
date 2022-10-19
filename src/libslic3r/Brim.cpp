@@ -564,7 +564,7 @@ ExtrusionEntityCollection make_brim(const Print &print, PrintTryCancel try_cance
     }
 #endif // BRIM_DEBUG_TO_SVG
 
-    const bool could_brim_intersects_skirt = std::any_of(print.objects().begin(), print.objects().end(), [&print](PrintObject *object) {
+    const bool could_brim_intersects_skirt = std::any_of(print.objects().begin(), print.objects().end(), [&print](const PrintObject *object) {
         const BrimType &bt = object->config().brim_type;
         return (bt == btOuterOnly || bt == btOuterAndInner) && print.config().skirt_distance.value < object->config().brim_width;
     });
