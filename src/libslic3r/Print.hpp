@@ -129,7 +129,6 @@ public:
     bool                    empty() const { return m_data->empty(); }
     const T*                operator[](size_t i) const { return (*m_data)[i]; }
     const T*                at(size_t i) const { return m_data->at(i); }
-    std::vector<const T*>   vector() const { return std::vector<const T*>(this->begin(), this->end()); }
 protected:
     ConstVectorOfPtrsAdaptor(const std::vector<T*> *data) : m_data(data) {}
 private:
