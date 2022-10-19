@@ -425,12 +425,9 @@ bool GLGizmoMeasure::on_is_activable() const
     bool res = (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA) ?
         selection.is_single_full_instance() :
         selection.is_single_volume() || selection.is_single_volume_instance();
-    if (res) {
+    if (res)
         res &= !selection.get_first_volume()->is_sinking();
-#if DISABLE_MEASURE_GIZMO_FOR_SCALED_VOLUMES
-        res &= Geometry::Transformation(selection.get_first_volume()->world_matrix()).get_scaling_factor().isApprox(Vec3d::Ones());
-#endif // DISABLE_MEASURE_GIZMO_FOR_SCALED_VOLUMES
-    }
+
     return res;
 }
 
