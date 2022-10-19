@@ -2123,13 +2123,13 @@ void Control::show_cog_icon_context_menu()
     GUI::wxGetApp().plater()->PopupMenu(&menu);
 }
 
-bool check_color_change(PrintObject* object, size_t frst_layer_id, size_t layers_cnt, bool check_overhangs, std::function<bool(Layer*)> break_condition)
+bool check_color_change(const PrintObject* object, size_t frst_layer_id, size_t layers_cnt, bool check_overhangs, std::function<bool(const Layer*)> break_condition)
 {
     double prev_area = area(object->get_layer(frst_layer_id)->lslices);
 
     bool detected = false;
     for (size_t i = frst_layer_id+1; i < layers_cnt; i++) {
-        Layer* layer = object->get_layer(i);
+        const Layer* layer = object->get_layer(i);
         double cur_area = area(layer->lslices);
 
         // check for overhangs
@@ -2169,7 +2169,7 @@ void Control::auto_color_change()
         if (object->layer_count() < 2)
             continue;
 
-        check_color_change(object, 1, object->layers().size(), false, [this, extruders_cnt](Layer* layer)
+        check_color_change(object, 1, object->layers().size(), false, [this, extruders_cnt](const Layer* layer)
         {
             int tick = get_tick_from_value(layer->print_z);
             if (tick >= 0 && !m_ticks.has_tick(tick)) {

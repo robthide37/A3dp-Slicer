@@ -31,10 +31,10 @@ constexpr double epsilon() { return 0.0011; }
 bool equivalent_areas(const double& bottom_area, const double& top_area);
 
 // return true if color change was detected
-bool check_color_change(PrintObject* object, size_t frst_layer_id, size_t layers_cnt, bool check_overhangs,
+bool check_color_change(const PrintObject* object, size_t frst_layer_id, size_t layers_cnt, bool check_overhangs,
                         // what to do with detected color change
                         // and return true when detection have to be desturbed
-                        std::function<bool(Layer*)> break_condition);
+                        std::function<bool(const Layer*)> break_condition);
 
 // custom message the slider sends to its parent to notify a tick-change:
 wxDECLARE_EVENT(wxCUSTOMEVT_TICKSCHANGED, wxEvent);

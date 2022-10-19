@@ -27,7 +27,7 @@ SCENARIO("SupportMaterial: support_layers_z and contact_distance", "[SupportMate
 
 	auto check = [](Slic3r::Print &print, bool &first_support_layer_height_ok, bool &layer_height_minimum_ok, bool &layer_height_maximum_ok, bool &top_spacing_ok)
 	{
-        ConstSupportLayerPtrsAdaptor support_layers = print.objects().front()->support_layers();
+        SpanOfConstPtrs<SupportLayer> support_layers = print.objects().front()->support_layers();
 
 		first_support_layer_height_ok = support_layers.front()->print_z == print.config().first_layer_height.value;
 
