@@ -34,6 +34,14 @@ void ObjectDataViewModelNode::init_container()
 #endif  //__WXGTK__
 }
 
+void ObjectDataViewModelNode::invalidate_container()
+{
+#ifndef __WXGTK__
+    if (this->GetChildCount() == 0)
+        this->m_container = false;
+#endif //__WXGTK__
+}
+
 static constexpr char LayerRootIcon[]   = "edit_layers_all";
 static constexpr char LayerIcon[]       = "edit_layers_some";
 static constexpr char WarningIcon[]     = "exclamation";
@@ -724,10 +732,7 @@ wxDataViewItem ObjectDataViewModel::Delete(const wxDataViewItem &item)
             delete node_parent;
             ret_item = wxDataViewItem(obj_node);
 
-#ifndef __WXGTK__
-            if (obj_node->GetChildCount() == 0)
-                obj_node->m_container = false;
-#endif //__WXGTK__
+            obj_node->invalidate_container();
             ItemDeleted(ret_item, wxDataViewItem(node_parent));
             return ret_item;
         }
@@ -743,10 +748,7 @@ wxDataViewItem ObjectDataViewModel::Delete(const wxDataViewItem &item)
             delete node_parent;
             ret_item = wxDataViewItem(obj_node);
 
-#ifndef __WXGTK__
-            if (obj_node->GetChildCount() == 0)
-                obj_node->m_container = false;
-#endif //__WXGTK__
+            obj_node->invalidate_container();
             ItemDeleted(ret_item, wxDataViewItem(node_parent));
             return ret_item;
         }
@@ -768,10 +770,7 @@ wxDataViewItem ObjectDataViewModel::Delete(const wxDataViewItem &item)
             node_parent->m_volumes_cnt = 0;
             delete last_child_node;
 
-#ifndef __WXGTK__
-            if (node_parent->GetChildCount() == 0)
-                node_parent->m_container = false;
-#endif //__WXGTK__
+            node_parent->invalidate_container();
             ItemDeleted(parent, wxDataViewItem(last_child_node));
 
             wxCommandEvent event(wxCUSTOMEVT_LAST_VOLUME_IS_DELETED);
@@ -806,10 +805,7 @@ wxDataViewItem ObjectDataViewModel::Delete(const wxDataViewItem &item)
 
 	// set m_containet to FALSE if parent has no child
 	if (node_parent) {
-#ifndef __WXGTK__
-        if (node_parent->GetChildCount() == 0)
-            node_parent->m_container = false;
-#endif //__WXGTK__
+        node_parent->invalidate_container();
 		ret_item = parent;
 	}
 
@@ -851,10 +847,7 @@ wxDataViewItem ObjectDataViewModel::DeleteLastInstance(const wxDataViewItem &par
         parent_node->set_printable_icon(last_inst_printable);
         ItemDeleted(parent_item, inst_root_item);
         ItemChanged(parent_item);
-#ifndef __WXGTK__
-        if (parent_node->GetChildCount() == 0)
-            parent_node->m_container = false;
-#endif //__WXGTK__
+        parent_node->invalidate_container();
     }
 
     // update object_node printable property
@@ -899,10 +892,7 @@ void ObjectDataViewModel::DeleteChildren(wxDataViewItem& parent)
         ItemDeleted(parent, item);
     }
 
-    // set m_containet to FALSE if parent has no child
-#ifndef __WXGTK__
-        root->m_container = false;
-#endif //__WXGTK__
+    root->invalidate_container();
 }
 
 void ObjectDataViewModel::DeleteVolumeChildren(wxDataViewItem& parent)
@@ -932,11 +922,7 @@ void ObjectDataViewModel::DeleteVolumeChildren(wxDataViewItem& parent)
         ItemDeleted(parent, item);
     }
     root->m_volumes_cnt = 0;
-
-    // set m_containet to FALSE if parent has no child
-#ifndef __WXGTK__
-    root->m_container = false;
-#endif //__WXGTK__
+    root->invalidate_container();
 }
 
 void ObjectDataViewModel::DeleteSettings(const wxDataViewItem& parent)

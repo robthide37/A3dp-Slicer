@@ -4470,7 +4470,10 @@ void Plater::priv::on_action_split_volumes(SimpleEvent&)
 
 void Plater::priv::on_action_layersediting(SimpleEvent&)
 {
-    view3D->enable_layers_editing(!view3D->is_layers_editing_enabled());
+    const bool enable_layersediting = !view3D->is_layers_editing_enabled();
+    view3D->enable_layers_editing(enable_layersediting);
+    if (enable_layersediting)
+        view3D->get_canvas3d()->reset_all_gizmos();
     notification_manager->set_move_from_overlay(view3D->is_layers_editing_enabled());
 }
 
@@ -4513,7 +4516,7 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
                                                 selection.is_single_full_object() || 
                                                 selection.is_multiple_full_instance();
 #if ENABLE_WORLD_COORDINATE
-            const bool is_part = selection.is_single_volume_or_modifier();
+            const bool is_part = selection.is_single_volume_or_modifier() && ! selection.is_any_connector();
 #else
             const bool is_part = selection.is_single_volume() || selection.is_single_modifier();
 #endif // ENABLE_WORLD_COORDINATE

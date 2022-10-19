@@ -128,7 +128,9 @@ public:
     }
 
 	void init_container();
-	bool IsContainer() const
+    void invalidate_container();
+
+    bool IsContainer() const
 	{
 		return m_container;
 	}

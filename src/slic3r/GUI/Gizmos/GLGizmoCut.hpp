@@ -237,6 +237,7 @@ private:
     void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix);
     void render_cut_plane_grabbers();
     void render_cut_line();
+    void render_cut_plane_line();
     void perform_cut(const Selection&selection);
     void set_center_pos(const Vec3d&center_pos, bool force = false);
     bool update_bb();
@@ -248,7 +249,6 @@ private:
     void init_connector_shapes();
     void update_connector_shape();
     void validate_connector_settings();
-    void update_model_object();
     bool process_cut_line(SLAGizmoEventType action, const Vec2d& mouse_position);
 };
 
