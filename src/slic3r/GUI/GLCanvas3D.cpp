@@ -1356,6 +1356,9 @@ void GLCanvas3D::toggle_sla_auxiliaries_visibility(bool visible, const ModelObje
 
 void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject* mo, int instance_idx, const ModelVolume* mv)
 {
+#if ENABLE_RAYCAST_PICKING
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters_for_picking(SceneRaycaster::EType::Volume);
+#endif // ENABLE_RAYCAST_PICKING
     for (GLVolume* vol : m_volumes.volumes) {
         if (vol->is_wipe_tower)
             vol->is_active = (visible && mo == nullptr);
@@ -1382,6 +1385,11 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
                 }
             }
         }
+#if ENABLE_RAYCAST_PICKING
+        auto it = std::find_if(raycasters->begin(), raycasters->end(), [vol](std::shared_ptr<SceneRaycasterItem> item) { return item->get_raycaster() == vol->mesh_raycaster.get(); });
+        if (it != raycasters->end())
+            (*it)->set_active(vol->is_active);
+#endif // ENABLE_RAYCAST_PICKING
     }
 
     if (visible && !mo)
