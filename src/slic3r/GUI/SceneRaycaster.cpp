@@ -88,7 +88,7 @@ void SceneRaycaster::remove_raycaster(std::shared_ptr<SceneRaycasterItem> item)
     }
 }
 
-SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Camera& camera, const ClippingPlane* clipping_plane)
+SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Camera& camera, const ClippingPlane* clipping_plane) const
 {
     double closest_hit_squared_distance = std::numeric_limits<double>::max();
     auto is_closest = [&closest_hit_squared_distance](const Camera& camera, const Vec3f& hit) {
@@ -107,7 +107,7 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
 
     auto test_raycasters = [this, is_closest, clipping_plane](EType type, const Vec2d& mouse_pos, const Camera& camera, HitResult& ret) {
         const ClippingPlane* clip_plane = (clipping_plane != nullptr && type == EType::Volume) ? clipping_plane : nullptr;
-        std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters(type);
+        const std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters(type);
         const Vec3f camera_forward = camera.get_dir_forward().cast<float>();
         HitResult current_hit = { type };
         for (std::shared_ptr<SceneRaycasterItem> item : *raycasters) {
@@ -203,6 +203,20 @@ size_t SceneRaycaster::active_gizmos_count() const {
 std::vector<std::shared_ptr<SceneRaycasterItem>>* SceneRaycaster::get_raycasters(EType type)
 {
     std::vector<std::shared_ptr<SceneRaycasterItem>>* ret = nullptr;
+    switch (type)
+    {
+    case EType::Bed:    { ret = &m_bed; break; }
+    case EType::Volume: { ret = &m_volumes; break; }
+    case EType::Gizmo:  { ret = &m_gizmos; break; }
+    default:            { break; }
+    }
+    assert(ret != nullptr);
+    return ret;
+}
+
+const std::vector<std::shared_ptr<SceneRaycasterItem>>* SceneRaycaster::get_raycasters(EType type) const
+{
+    const std::vector<std::shared_ptr<SceneRaycasterItem>>* ret = nullptr;
     switch (type)
     {
     case EType::Bed:    { ret = &m_bed; break; }

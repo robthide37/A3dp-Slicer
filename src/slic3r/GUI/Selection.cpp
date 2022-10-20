@@ -62,18 +62,18 @@ Selection::VolumeCache::VolumeCache(const Geometry::Transformation& volume_trans
 
 bool Selection::Clipboard::is_sla_compliant() const
 {
-    if (m_mode == Selection::Volume)
-        return false;
+//    if (m_mode == Selection::Volume)
+//        return false;
 
-    for (const ModelObject* o : m_model->objects) {
-        if (o->is_multiparts())
-            return false;
+//    for (const ModelObject* o : m_model->objects) {
+//        if (o->is_multiparts())
+//            return false;
 
-        for (const ModelVolume* v : o->volumes) {
-            if (v->is_modifier())
-                return false;
-        }
-    }
+//        for (const ModelVolume* v : o->volumes) {
+//            if (v->is_modifier())
+//                return false;
+//        }
+//    }
 
     return true;
 }
@@ -571,13 +571,13 @@ bool Selection::is_from_single_object() const
 
 bool Selection::is_sla_compliant() const
 {
-    if (m_mode == Volume)
-        return false;
+//    if (m_mode == Volume)
+//        return false;
 
-    for (unsigned int i : m_list) {
-        if ((*m_volumes)[i]->is_modifier)
-            return false;
-    }
+//    for (unsigned int i : m_list) {
+//        if ((*m_volumes)[i]->is_modifier)
+//            return false;
+//    }
 
     return true;
 }

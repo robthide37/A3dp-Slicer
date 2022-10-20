@@ -3279,9 +3279,9 @@ void Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
 		const PresetWithVendorProfile new_printer_preset_with_vendor_profile = m_presets->get_preset_with_vendor_profile(new_printer_preset);
         PrinterTechnology    old_printer_technology = m_presets->get_edited_preset().printer_technology();
         PrinterTechnology    new_printer_technology = new_printer_preset.printer_technology();
-        if (new_printer_technology == ptSLA && old_printer_technology == ptFFF && !wxGetApp().may_switch_to_SLA_preset(_L("New printer preset selected")))
+        /*if (new_printer_technology == ptSLA && old_printer_technology == ptFFF && !wxGetApp().may_switch_to_SLA_preset(_L("New printer preset selected")))
             canceled = true;
-        else {
+        else */{
             struct PresetUpdate {
                 Preset::Type         tab_type;
                 PresetCollection 	*presets;

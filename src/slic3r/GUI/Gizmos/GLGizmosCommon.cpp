@@ -23,7 +23,7 @@ CommonGizmosDataPool::CommonGizmosDataPool(GLCanvas3D* canvas)
     using c = CommonGizmosDataID;
     m_data[c::SelectionInfo].reset(   new SelectionInfo(this));
     m_data[c::InstancesHider].reset(  new InstancesHider(this));
-    m_data[c::HollowedMesh].reset(    new HollowedMesh(this));
+//    m_data[c::HollowedMesh].reset(    new HollowedMesh(this));
     m_data[c::Raycaster].reset(       new Raycaster(this));
     m_data[c::ObjectClipper].reset(   new ObjectClipper(this));
     m_data[c::SupportsClipper].reset( new SupportsClipper(this));
@@ -59,12 +59,12 @@ InstancesHider* CommonGizmosDataPool::instances_hider() const
     return inst_hider->is_valid() ? inst_hider : nullptr;
 }
 
-HollowedMesh* CommonGizmosDataPool::hollowed_mesh() const
-{
-    HollowedMesh* hol_mesh = dynamic_cast<HollowedMesh*>(m_data.at(CommonGizmosDataID::HollowedMesh).get());
-    assert(hol_mesh);
-    return hol_mesh->is_valid() ? hol_mesh : nullptr;
-}
+//HollowedMesh* CommonGizmosDataPool::hollowed_mesh() const
+//{
+//    HollowedMesh* hol_mesh = dynamic_cast<HollowedMesh*>(m_data.at(CommonGizmosDataID::HollowedMesh).get());
+//    assert(hol_mesh);
+//    return hol_mesh->is_valid() ? hol_mesh : nullptr;
+//}
 
 Raycaster* CommonGizmosDataPool::raycaster() const
 {
@@ -117,15 +117,17 @@ bool CommonGizmosDataPool::check_dependencies(CommonGizmosDataID required) const
 void SelectionInfo::on_update()
 {
     const Selection& selection = get_pool()->get_canvas()->get_selection();
+
+    m_model_object = nullptr;
+    m_print_object = nullptr;
+
     if (selection.is_single_full_instance()) {
         m_model_object = selection.get_model()->objects[selection.get_object_idx()];
-        m_model_volume = nullptr;
+
+        if (m_model_object)
+            m_print_object = get_pool()->get_canvas()->sla_print()->get_object(m_model_object->id());
+
         m_z_shift = selection.get_first_volume()->get_sla_shift_z();
-    }
-    else {
-        m_model_object = nullptr;
-        if (selection.is_single_volume())
-            m_model_volume = selection.get_model()->objects[selection.get_object_idx()]->volumes[selection.get_first_volume()->volume_idx()];
     }
 }
 
@@ -253,78 +255,78 @@ void InstancesHider::render_cut() const
 
 
 
-void HollowedMesh::on_update()
-{
-    const ModelObject* mo = get_pool()->selection_info()->model_object();
-    bool is_sla = wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology() == ptSLA;
-    if (! mo || ! is_sla)
-        return;
+//void HollowedMesh::on_update()
+//{
+//    const ModelObject* mo = get_pool()->selection_info()->model_object();
+//    bool is_sla = wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology() == ptSLA;
+//    if (! mo || ! is_sla)
+//        return;
 
-    const GLCanvas3D* canvas = get_pool()->get_canvas();
-    const PrintObjects& print_objects = canvas->sla_print()->objects();
-    const SLAPrintObject* print_object = (m_print_object_idx >= 0 && m_print_object_idx < int(print_objects.size()))
-            ? print_objects[m_print_object_idx]
-            : nullptr;
+//    const GLCanvas3D* canvas = get_pool()->get_canvas();
+//    const PrintObjects& print_objects = canvas->sla_print()->objects();
+//    const SLAPrintObject* print_object = (m_print_object_idx >= 0 && m_print_object_idx < int(print_objects.size()))
+//            ? print_objects[m_print_object_idx]
+//            : nullptr;
 
-    // Find the respective SLAPrintObject.
-    if (m_print_object_idx < 0 || m_print_objects_count != int(print_objects.size())) {
-        m_print_objects_count = print_objects.size();
-        m_print_object_idx = -1;
-        for (const SLAPrintObject* po : print_objects) {
-            ++m_print_object_idx;
-            if (po->model_object()->id() == mo->id()) {
-                print_object = po;
-                break;
-            }
-        }
-    }
+//    // Find the respective SLAPrintObject.
+//    if (m_print_object_idx < 0 || m_print_objects_count != int(print_objects.size())) {
+//        m_print_objects_count = print_objects.size();
+//        m_print_object_idx = -1;
+//        for (const SLAPrintObject* po : print_objects) {
+//            ++m_print_object_idx;
+//            if (po->model_object()->id() == mo->id()) {
+//                print_object = po;
+//                break;
+//            }
+//        }
+//    }
 
-    // If there is a valid SLAPrintObject, check state of Hollowing step.
-    if (print_object) {
-        if (print_object->is_step_done(slaposDrillHoles) && !print_object->get_mesh_to_print().empty()) {
-            size_t timestamp = print_object->step_state_with_timestamp(slaposDrillHoles).timestamp;
-            if (timestamp > m_old_hollowing_timestamp) {
-                const TriangleMesh& backend_mesh = print_object->get_mesh_to_print();
-                if (! backend_mesh.empty()) {
-                    m_hollowed_mesh_transformed.reset(new TriangleMesh(backend_mesh));
-                    Transform3d trafo_inv = (canvas->sla_print()->sla_trafo(*mo) * print_object->model_object()->volumes.front()->get_transformation().get_matrix()).inverse();
-                    m_hollowed_mesh_transformed->transform(trafo_inv);
-                    m_drainholes = print_object->model_object()->sla_drain_holes;
-                    m_old_hollowing_timestamp = timestamp;
+//    // If there is a valid SLAPrintObject, check state of Hollowing step.
+//    if (print_object) {
+//        if (print_object->is_step_done(slaposDrillHoles) && !print_object->get_mesh_to_print().empty()) {
+//            size_t timestamp = print_object->step_state_with_timestamp(slaposDrillHoles).timestamp;
+//            if (timestamp > m_old_hollowing_timestamp) {
+//                const TriangleMesh& backend_mesh = print_object->get_mesh_to_print();
+//                if (! backend_mesh.empty()) {
+//                    m_hollowed_mesh_transformed.reset(new TriangleMesh(backend_mesh));
+//                    Transform3d trafo_inv = (canvas->sla_print()->sla_trafo(*mo) * print_object->model_object()->volumes.front()->get_transformation().get_matrix()).inverse();
+//                    m_hollowed_mesh_transformed->transform(trafo_inv);
+//                    m_drainholes = print_object->model_object()->sla_drain_holes;
+//                    m_old_hollowing_timestamp = timestamp;
 
-//                    indexed_triangle_set interior = print_object->hollowed_interior_mesh();
-//                    its_flip_triangles(interior);
-//                    m_hollowed_interior_transformed = std::make_unique<TriangleMesh>(std::move(interior));
-//                    m_hollowed_interior_transformed->transform(trafo_inv);
-                }
-                else {
-                    m_hollowed_mesh_transformed.reset(nullptr);
-                }
-            }
-        }
-        else
-            m_hollowed_mesh_transformed.reset(nullptr);
-    }
-}
-
-
-void HollowedMesh::on_release()
-{
-    m_hollowed_mesh_transformed.reset();
-    m_old_hollowing_timestamp = 0;
-    m_print_object_idx = -1;
-}
+////                    indexed_triangle_set interior = print_object->hollowed_interior_mesh();
+////                    its_flip_triangles(interior);
+////                    m_hollowed_interior_transformed = std::make_unique<TriangleMesh>(std::move(interior));
+////                    m_hollowed_interior_transformed->transform(trafo_inv);
+//                }
+//                else {
+//                    m_hollowed_mesh_transformed.reset(nullptr);
+//                }
+//            }
+//        }
+//        else
+//            m_hollowed_mesh_transformed.reset(nullptr);
+//    }
+//}
 
 
-const TriangleMesh* HollowedMesh::get_hollowed_mesh() const
-{
-    return m_hollowed_mesh_transformed.get();
-}
+//void HollowedMesh::on_release()
+//{
+//    m_hollowed_mesh_transformed.reset();
+//    m_old_hollowing_timestamp = 0;
+//    m_print_object_idx = -1;
+//}
 
-const TriangleMesh* HollowedMesh::get_hollowed_interior() const
-{
-    return m_hollowed_interior_transformed.get();
-}
+
+//const TriangleMesh* HollowedMesh::get_hollowed_mesh() const
+//{
+//    return m_hollowed_mesh_transformed.get();
+//}
+
+//const TriangleMesh* HollowedMesh::get_hollowed_interior() const
+//{
+//    return m_hollowed_interior_transformed.get();
+//}
 
 
 
@@ -345,12 +347,13 @@ void Raycaster::on_update()
         mvs = mo->volumes;
 
     std::vector<const TriangleMesh*> meshes;
-    if (mvs.size() == 1) {
-        assert(mvs.front()->is_model_part());
-        const HollowedMesh* hollowed_mesh_tracker = get_pool()->hollowed_mesh();
-        if (hollowed_mesh_tracker && hollowed_mesh_tracker->get_hollowed_mesh())
-            meshes.push_back(hollowed_mesh_tracker->get_hollowed_mesh());
-    }
+    const std::vector<ModelVolume*>& mvs = mo->volumes;
+//    if (mvs.size() == 1) {
+//        assert(mvs.front()->is_model_part());
+//        const HollowedMesh* hollowed_mesh_tracker = get_pool()->hollowed_mesh();
+//        if (hollowed_mesh_tracker && hollowed_mesh_tracker->get_hollowed_mesh())
+//            meshes.push_back(hollowed_mesh_tracker->get_hollowed_mesh());
+//    }
     if (meshes.empty()) {
         for (const ModelVolume* v : mvs) {
             if (v->is_model_part())
@@ -396,9 +399,9 @@ void ObjectClipper::on_update()
 
     // which mesh should be cut?
     std::vector<const TriangleMesh*> meshes;
-    bool has_hollowed = get_pool()->hollowed_mesh() && get_pool()->hollowed_mesh()->get_hollowed_mesh();
-    if (has_hollowed)
-        meshes.push_back(get_pool()->hollowed_mesh()->get_hollowed_mesh());
+//    bool has_hollowed = get_pool()->hollowed_mesh() && get_pool()->hollowed_mesh()->get_hollowed_mesh();
+//    if (has_hollowed)
+//        meshes.push_back(get_pool()->hollowed_mesh()->get_hollowed_mesh());
 
     if (meshes.empty())
         for (const ModelVolume* mv : mo->volumes)
@@ -412,8 +415,8 @@ void ObjectClipper::on_update()
         }
         m_old_meshes = meshes;
 
-        if (has_hollowed)
-            m_clippers.front()->set_negative_mesh(*get_pool()->hollowed_mesh()->get_hollowed_interior());
+//        if (has_hollowed)
+//            m_clippers.front()->set_negative_mesh(*get_pool()->hollowed_mesh()->get_hollowed_interior());
 
         m_active_inst_bb_radius =
             mo->instance_bounding_box(get_pool()->selection_info()->get_active_instance()).radius();

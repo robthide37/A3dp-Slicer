@@ -386,7 +386,7 @@ public:
         bool                force_neutral_color : 1;
         // Whether or not to force rendering of sinking contours
         bool                force_sinking_contours : 1;
-    };
+    }; // this gets instantiated automatically in the parent struct
 
     // Is mouse or rectangle selection over this object to select/deselect it ?
     EHoverState         	hover;

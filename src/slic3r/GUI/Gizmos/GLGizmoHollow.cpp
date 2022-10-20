@@ -53,8 +53,8 @@ void GLGizmoHollow::data_changed()
             reload_cache();
             m_old_mo_id = mo->id();
         }
-        if (m_c->hollowed_mesh() && m_c->hollowed_mesh()->get_hollowed_mesh())
-            m_holes_in_drilled_mesh = mo->sla_drain_holes;
+//        if (m_c->hollowed_mesh() && m_c->hollowed_mesh()->get_hollowed_mesh())
+//            m_holes_in_drilled_mesh = mo->sla_drain_holes;
 #if ENABLE_RAYCAST_PICKING
         if (m_raycasters.empty())
             on_register_raycasters_for_picking();
@@ -206,11 +206,11 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 #endif // !ENABLE_RAYCAST_PICKING
             if (size_t(m_hover_id) == i)
                 render_color = ColorRGBA::CYAN();
-            else if (m_c->hollowed_mesh() &&
-                       i < m_c->hollowed_mesh()->get_drainholes().size() &&
-                       m_c->hollowed_mesh()->get_drainholes()[i].failed) {
-                render_color = { 1.0f, 0.0f, 0.0f, 0.5f };
-            }
+//            else if (m_c->hollowed_mesh() &&
+//                       i < m_c->hollowed_mesh()->get_drainholes().size() &&
+//                       m_c->hollowed_mesh()->get_drainholes()[i].failed) {
+//                render_color = { 1.0f, 0.0f, 0.0f, 0.5f };
+//            }
             else 
                 render_color = point_selected ? ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
 #if !ENABLE_RAYCAST_PICKING
@@ -314,18 +314,18 @@ bool GLGizmoHollow::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, V
             normal,
             clp_dist != 0. ? clp : nullptr))
     {
-        if (m_c->hollowed_mesh() && m_c->hollowed_mesh()->get_hollowed_mesh()) {
-            // in this case the raycaster sees the hollowed and drilled mesh.
-            // if the point lies on the surface created by the hole, we want
-            // to ignore it.
-            for (const sla::DrainHole& hole : m_holes_in_drilled_mesh) {
-                sla::DrainHole outer(hole);
-                outer.radius *= 1.001f;
-                outer.height *= 1.001f;
-                if (outer.is_inside(hit))
-                    return false;
-            }
-        }
+//        if (m_c->hollowed_mesh() && m_c->hollowed_mesh()->get_hollowed_mesh()) {
+//            // in this case the raycaster sees the hollowed and drilled mesh.
+//            // if the point lies on the surface created by the hole, we want
+//            // to ignore it.
+//            for (const sla::DrainHole& hole : m_holes_in_drilled_mesh) {
+//                sla::DrainHole outer(hole);
+//                outer.radius *= 1.001f;
+//                outer.height *= 1.001f;
+//                if (outer.is_inside(hit))
+//                    return false;
+//            }
+//        }
 
         // Return both the point and the facet normal.
         pos_and_normal = std::make_pair(hit, normal);

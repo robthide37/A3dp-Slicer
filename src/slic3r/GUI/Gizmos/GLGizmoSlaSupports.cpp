@@ -86,6 +86,8 @@ void GLGizmoSlaSupports::data_changed()
             update_raycasters_for_picking_transform();
 #endif // ENABLE_RAYCAST_PICKING
     }
+
+//    m_parent.toggle_model_objects_visibility(false);
 }
 
 
@@ -179,8 +181,8 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
     const size_t cache_size = m_editing_mode ? m_editing_cache.size() : m_normal_cache.size();
 
     const bool has_points = (cache_size != 0);
-    const bool has_holes = (! m_c->hollowed_mesh()->get_hollowed_mesh()
-                   && ! m_c->selection_info()->model_object()->sla_drain_holes.empty());
+    const bool has_holes = (/*! m_c->hollowed_mesh()->get_hollowed_mesh()
+                   &&*/ ! m_c->selection_info()->model_object()->sla_drain_holes.empty());
 
     if (! has_points && ! has_holes)
         return;
@@ -304,7 +306,8 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         if (m_editing_mode) {
             // in case the normal is not yet cached, find and cache it
             if (m_editing_cache[i].normal == Vec3f::Zero())
-                m_c->raycaster()->raycaster()->get_closest_point(m_editing_cache[i].support_point.pos, &m_editing_cache[i].normal);
+                m_parent.raycaster().get_raycasters(SceneRaycaster::EType::Volume)->front()->get_raycaster()->get_closest_point(m_editing_cache[i].support_point.pos, &m_editing_cache[i].normal);
+                //m_c->raycaster()->raycaster()->get_closest_point(m_editing_cache[i].support_point.pos, &m_editing_cache[i].normal);
 
             Eigen::Quaterniond q;
             q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * m_editing_cache[i].normal.cast<double>());
@@ -453,7 +456,7 @@ bool GLGizmoSlaSupports::is_mesh_point_clipped(const Vec3d& point) const
 // Return false if no intersection was found, true otherwise.
 bool GLGizmoSlaSupports::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal)
 {
-    if (! m_c->raycaster()->raycaster())
+    if (m_parent.raycaster().get_raycasters(SceneRaycaster::EType::Volume)->empty())
         return false;
 
     const Camera& camera = wxGetApp().plater()->get_camera();
@@ -468,7 +471,7 @@ bool GLGizmoSlaSupports::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec
     // The raycaster query
     Vec3f hit;
     Vec3f normal;
-    if (m_c->raycaster()->raycaster()->unproject_on_mesh(
+    if (m_parent.raycaster().get_raycasters(SceneRaycaster::EType::Volume)->front()->get_raycaster()->unproject_on_mesh(
             mouse_pos,
             trafo.get_matrix(),
             camera,
@@ -477,24 +480,24 @@ bool GLGizmoSlaSupports::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec
             clp_dist != 0. ? clp : nullptr))
     {
         // Check whether the hit is in a hole
-        bool in_hole = false;
+//        bool in_hole = false;
         // In case the hollowed and drilled mesh is available, we can allow
         // placing points in holes, because they should never end up
         // on surface that's been drilled away.
-        if (! m_c->hollowed_mesh()->get_hollowed_mesh()) {
-            sla::DrainHoles drain_holes = m_c->selection_info()->model_object()->sla_drain_holes;
-            for (const sla::DrainHole& hole : drain_holes) {
-                if (hole.is_inside(hit)) {
-                    in_hole = true;
-                    break;
-                }
-            }
-        }
-        if (! in_hole) {
+//        if (! m_c->hollowed_mesh()->get_hollowed_mesh()) {
+//            sla::DrainHoles drain_holes = m_c->selection_info()->model_object()->sla_drain_holes;
+//            for (const sla::DrainHole& hole : drain_holes) {
+//                if (hole.is_inside(hit)) {
+//                    in_hole = true;
+//                    break;
+//                }
+//            }
+//        }
+//        if (! in_hole) {
             // Return both the point and the facet normal.
             pos_and_normal = std::make_pair(hit, normal);
             return true;
-        }
+//        }
     }
 
     return false;
@@ -589,7 +592,8 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
             for (size_t idx : points_idxs)
                 points_inside.emplace_back((trafo.get_matrix().cast<float>() * (m_editing_cache[idx].support_point.pos + m_editing_cache[idx].normal)).cast<float>());
 
-            for (size_t idx : m_c->raycaster()->raycaster()->get_unobscured_idxs(
+            assert(!m_parent.raycaster().get_raycasters(SceneRaycaster::EType::Volume).emtpy());
+            for (size_t idx : m_parent.raycaster().get_raycasters(SceneRaycaster::EType::Volume)->front()->get_raycaster()->get_unobscured_idxs(
                      trafo, wxGetApp().plater()->get_camera(), points_inside,
                      m_c->object_clipper()->get_clipping_plane()))
             {
@@ -1457,7 +1461,7 @@ void GLGizmoSlaSupports::update_raycasters_for_picking_transform()
             const Transform3d support_matrix = Geometry::translation_transform(m_editing_cache[i].support_point.pos.cast<double>()) * instance_scaling_matrix_inverse;
 
             if (m_editing_cache[i].normal == Vec3f::Zero())
-                m_c->raycaster()->raycaster()->get_closest_point(m_editing_cache[i].support_point.pos, &m_editing_cache[i].normal);
+                m_parent.raycaster().get_raycasters(SceneRaycaster::EType::Volume)->front()->get_raycaster()->get_closest_point(m_editing_cache[i].support_point.pos, &m_editing_cache[i].normal);
 
             Eigen::Quaterniond q;
             q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * m_editing_cache[i].normal.cast<double>());

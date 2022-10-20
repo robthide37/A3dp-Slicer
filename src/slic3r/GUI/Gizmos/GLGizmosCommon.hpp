@@ -5,11 +5,11 @@
 #include <map>
 
 #include "slic3r/GUI/MeshUtils.hpp"
-#include "libslic3r/SLA/Hollowing.hpp"
 
 namespace Slic3r {
 
 class ModelObject;
+class SLAPrintObject;
 class ModelVolume;
 
 namespace GUI {
@@ -85,7 +85,7 @@ public:
     // Getters for the data that need to be accessed from the gizmos directly.
     CommonGizmosDataObjects::SelectionInfo* selection_info() const;
     CommonGizmosDataObjects::InstancesHider* instances_hider() const;
-    CommonGizmosDataObjects::HollowedMesh* hollowed_mesh() const;
+//    CommonGizmosDataObjects::HollowedMesh* hollowed_mesh() const;
     CommonGizmosDataObjects::Raycaster* raycaster() const;
     CommonGizmosDataObjects::ObjectClipper* object_clipper() const;
     CommonGizmosDataObjects::SupportsClipper* supports_clipper() const;
@@ -158,6 +158,7 @@ public:
 
     // Returns a non-null pointer if the selection is a single full instance
     ModelObject* model_object() const { return m_model_object; }
+    const SLAPrintObject *print_object() const { return m_print_object; }
     // Returns a non-null pointer if the selection is a single volume
     ModelVolume* model_volume() const { return m_model_volume; }
     int get_active_instance() const;
@@ -169,6 +170,7 @@ protected:
 
 private:
     ModelObject* m_model_object = nullptr;
+    const SLAPrintObject *m_print_object = nullptr;
     ModelVolume* m_model_volume = nullptr;
     // int m_active_inst = -1;
     float m_z_shift = 0.f;
@@ -201,32 +203,32 @@ private:
 
 
 
-class HollowedMesh : public CommonGizmosDataBase
-{
-public:
-    explicit HollowedMesh(CommonGizmosDataPool* cgdp)
-        : CommonGizmosDataBase(cgdp) {}
-#ifndef NDEBUG
-    CommonGizmosDataID get_dependencies() const override { return CommonGizmosDataID::SelectionInfo; }
-#endif // NDEBUG
+//class HollowedMesh : public CommonGizmosDataBase
+//{
+//public:
+//    explicit HollowedMesh(CommonGizmosDataPool* cgdp)
+//        : CommonGizmosDataBase(cgdp) {}
+//#ifndef NDEBUG
+//    CommonGizmosDataID get_dependencies() const override { return CommonGizmosDataID::SelectionInfo; }
+//#endif // NDEBUG
 
-    const sla::DrainHoles &get_drainholes() const { return m_drainholes; }
+//    const sla::DrainHoles &get_drainholes() const { return m_drainholes; }
 
-    const TriangleMesh* get_hollowed_mesh() const;
-    const TriangleMesh* get_hollowed_interior() const;
+//    const TriangleMesh* get_hollowed_mesh() const;
+//    const TriangleMesh* get_hollowed_interior() const;
 
-protected:
-    void on_update() override;
-    void on_release() override;
+//protected:
+//    void on_update() override;
+//    void on_release() override;
 
-private:
-    std::unique_ptr<TriangleMesh> m_hollowed_mesh_transformed;
-    std::unique_ptr<TriangleMesh> m_hollowed_interior_transformed;
-    size_t m_old_hollowing_timestamp = 0;
-    int m_print_object_idx = -1;
-    int m_print_objects_count = 0;
-    sla::DrainHoles m_drainholes;
-};
+//private:
+//    std::unique_ptr<TriangleMesh> m_hollowed_mesh_transformed;
+//    std::unique_ptr<TriangleMesh> m_hollowed_interior_transformed;
+//    size_t m_old_hollowing_timestamp = 0;
+//    int m_print_object_idx = -1;
+//    int m_print_objects_count = 0;
+//    sla::DrainHoles m_drainholes;
+//};
 
 
 

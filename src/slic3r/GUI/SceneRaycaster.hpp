@@ -89,10 +89,11 @@ public:
     void remove_raycaster(std::shared_ptr<SceneRaycasterItem> item);
 
     std::vector<std::shared_ptr<SceneRaycasterItem>>* get_raycasters(EType type);
+    const std::vector<std::shared_ptr<SceneRaycasterItem>>* get_raycasters(EType type) const;
 
     void set_gizmos_on_top(bool value) { m_gizmos_on_top = value; }
 
-    HitResult hit(const Vec2d& mouse_pos, const Camera& camera, const ClippingPlane* clipping_plane = nullptr);
+    HitResult hit(const Vec2d& mouse_pos, const Camera& camera, const ClippingPlane* clipping_plane = nullptr) const;
 
 #if ENABLE_RAYCAST_PICKING_DEBUG
     void render_hit(const Camera& camera);

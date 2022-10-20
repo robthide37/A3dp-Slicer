@@ -44,7 +44,6 @@ static bool is_improper_category(const std::string& category, const int extruder
         (!is_object_settings && category == "Support material");
 }
 
-
 //-------------------------------------
 //            SettingsFactory
 //-------------------------------------
@@ -155,14 +154,14 @@ wxBitmapBundle* SettingsFactory::get_category_bitmap(const std::string& category
 //-------------------------------------
 
 // Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
-const std::vector<std::pair<std::string, std::string>> MenuFactory::ADD_VOLUME_MENU_ITEMS {
-//       menu_item Name              menu_item bitmap name
-        {L("Add part"),              "add_part" },           // ~ModelVolumeType::MODEL_PART
-        {L("Add negative volume"),   "add_negative" },       // ~ModelVolumeType::NEGATIVE_VOLUME
-        {L("Add modifier"),          "add_modifier"},        // ~ModelVolumeType::PARAMETER_MODIFIER
-        {L("Add support blocker"),   "support_blocker"},     // ~ModelVolumeType::SUPPORT_BLOCKER
-        {L("Add support enforcer"),  "support_enforcer"},    // ~ModelVolumeType::SUPPORT_ENFORCER
-};
+static const constexpr std::array<std::pair<const char *, const char *>, 5> ADD_VOLUME_MENU_ITEMS = {{
+    //       menu_item Name              menu_item bitmap name
+    {L("Add part"),              "add_part" },           // ~ModelVolumeType::MODEL_PART
+    {L("Add negative volume"),   "add_negative" },       // ~ModelVolumeType::NEGATIVE_VOLUME
+    {L("Add modifier"),          "add_modifier"},        // ~ModelVolumeType::PARAMETER_MODIFIER
+    {L("Add support blocker"),   "support_blocker"},     // ~ModelVolumeType::SUPPORT_BLOCKER
+    {L("Add support enforcer"),  "support_enforcer"},    // ~ModelVolumeType::SUPPORT_ENFORCER
+}};
 
 // Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
 const std::vector<std::pair<std::string, std::string>> MenuFactory::TEXT_VOLUME_ICONS {
@@ -583,6 +582,55 @@ void MenuFactory::append_menu_items_add_volume(wxMenu* menu)
     append_menu_item_layers_editing(menu);
 }
 
+void MenuFactory::append_menu_items_add_sla_volume(wxMenu *menu)
+{
+    // Update "add" items(delete old & create new)  settings popupmenu
+    for (auto& item : ADD_VOLUME_MENU_ITEMS) {
+        const auto settings_id = menu->FindItem(_(item.first));
+        if (settings_id != wxNOT_FOUND)
+            menu->Destroy(settings_id);
+    }
+
+    const ConfigOptionMode mode = wxGetApp().get_mode();
+
+    if (mode == comAdvanced) {
+        append_menu_item(menu, wxID_ANY, _(ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::MODEL_PART)].first), "",
+            [](wxCommandEvent&) { obj_list()->load_subobject(ModelVolumeType::MODEL_PART); },
+            ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::MODEL_PART)].second, nullptr,
+            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+    } else {
+        auto& item = ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::MODEL_PART)];
+
+        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType::MODEL_PART);
+        append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
+            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+    }
+
+    {
+        auto& item = ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::NEGATIVE_VOLUME)];
+
+        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType::NEGATIVE_VOLUME);
+        append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
+            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+    }
+
+    {
+        auto& item = ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::SUPPORT_ENFORCER)];
+
+        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType::SUPPORT_ENFORCER);
+        append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
+            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+    }
+
+    {
+        auto& item = ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::SUPPORT_BLOCKER)];
+
+        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType::SUPPORT_BLOCKER);
+        append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
+            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+    }
+}
+
 wxMenuItem* MenuFactory::append_menu_item_layers_editing(wxMenu* menu)
 {
     return append_menu_item(menu, wxID_ANY, _L("Height range Modifier"), "",
@@ -631,7 +679,7 @@ wxMenuItem* MenuFactory::append_menu_item_settings(wxMenu* menu_)
     // If there are selected more then one instance but not all of them
     // don't add settings menu items
     const Selection& selection = get_selection();
-    if ((selection.is_multiple_full_instance() && !selection.is_single_full_object()) ||
+    if ((selection.is_multiple_full_instance() && !selection.is_single_full_object()) || (printer_technology() == ptSLA && selection.is_single_volume()) ||
         selection.is_multiple_volume() || selection.is_mixed()) // more than one volume(part) is selected on the scene
         return nullptr;
 
@@ -1065,6 +1113,8 @@ void MenuFactory::create_sla_object_menu()
         [](wxCommandEvent&) { plater()->split_object(); }, "split_object_SMALL", nullptr,
         []() { return plater()->can_split(true); }, m_parent);
 
+    m_sla_object_menu.AppendSeparator();
+    append_menu_items_add_sla_volume(&m_sla_object_menu);
     m_sla_object_menu.AppendSeparator();
 }
 

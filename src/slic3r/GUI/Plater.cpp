@@ -2649,17 +2649,6 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 model_object->ensure_on_bed(is_project_file);
             }
 
-            // check multi-part object adding for the SLA-printing
-            if (printer_technology == ptSLA) {
-                for (auto obj : model.objects)
-                    if ( obj->volumes.size()>1 ) {
-                        Slic3r::GUI::show_error(nullptr,
-                            format_wxstr(_L("You can't to add the object(s) from %s because of one or some of them is(are) multi-part"),
-                                        from_path(filename)));
-                        return obj_idxs;
-                    }
-            }
-
             if (one_by_one) {
                 if ((type_3mf && !is_project_file) || (type_any_amf && !type_zip_amf))
                     model.center_instances_around_point(this->bed.build_volume().bed_center());

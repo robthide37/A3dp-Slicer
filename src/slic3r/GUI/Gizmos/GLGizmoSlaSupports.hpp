@@ -25,7 +25,7 @@ private:
 
     bool unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal);
 
-    const float RenderPointScale = 1.f;
+    static constexpr float RenderPointScale = 1.f;
 
     class CacheEntry {
     public:
