@@ -484,7 +484,8 @@ SurfaceCut merge_patches(/*const*/ SurfacePatches &patches,
                          const std::vector<bool>  &mask);
 
 #ifdef DEBUG_OUTPUT_DIR
-void initialize_store(const std::string& dir_to_clear);
+void prepare_dir(const std::string &dir);
+void initialize_store(const std::string &dir_to_clear);
 /// <summary>
 /// Debug purpose store of mesh with colored face by face type
 /// </summary>
@@ -499,7 +500,8 @@ void store(const CutAOIs &aois, const CutMesh &mesh, const std::string &dir);
 void store(const SurfacePatches &patches, const std::string &dir);
 void store(const Vec3f &vertex, const Vec3f &normal, const std::string &file, float size = 2.f);
 //void store(const ProjectionDistances &pds, const VCutAOIs &aois, const CutMeshes &meshes, const std::string &file, float width = 0.2f/* [in mm] */);
-void store(const ExPolygons& shapes, const std::vector<bool>& mask_distances, const std::vector<std::pair<size_t, size_t>>& connections, const std::string& file_svg);
+using Connection = std::pair<size_t, size_t>; using Connections = std::vector<Connection>;
+void store(const ExPolygons &shapes, const std::vector<bool> &mask_distances, const Connections &connections, const std::string &file_svg);
 void store(const SurfaceCut &cut, const std::string &file, const std::string &contour_dir);
 void store(const std::vector<indexed_triangle_set> &models, const std::string &obj_filename);
 void store(const std::vector<CutMesh>&models, const std::string &dir);
@@ -510,6 +512,7 @@ void store(const Emboss::IProjection &projection, const Point &point_to_project,
 #ifdef DEBUG_OUTPUT_DIR
 #include "libslic3r/SVG.hpp"
 #include <boost/log/trivial.hpp>
+#include <filesystem>
 #endif // DEBUG_OUTPUT_DIR
 
 SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
@@ -585,24 +588,6 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     for (priv::SurfacePatch &patch : patches)
         patch.shape_id = s2i.cvt(patch.shape_id).expolygons_index;
 
-    //// Only for create function
-    //std::vector<bool> is_filling;
-    //is_filling.reserve(patches.size());
-    //for (priv::SurfacePatch &patch : patches)
-    //    is_filling.push_back(priv::is_over_whole_expoly(patch, shapes, model_cuts, cgal_models));
-
-    //// convert patch to 2d
-    //ExPolygons fill;
-    //fill.reserve(patches.size());
-    //for (priv::SurfacePatch &patch : patches) 
-    //    fill.push_back(to_expoly(patch, projection));
-
-    //{
-    //    SVG svg("C:/data/temp/filled_text.svg");
-    //    svg.draw(shapes, "gray");
-    //    svg.draw(fill, "green");
-    //}
-
     // calc distance to projection for all outline points of cutAOI(shape)
     // it is used for distiguish the top one
     uint32_t shapes_points = s2i.get_count();
@@ -610,10 +595,6 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     priv::VDistances distances = priv::calc_distances(patches, cgal_models, cgal_shape, shapes_points, projection_ratio);
         
     Point start = shapes_bb.center(); // only align center
-    
-    //SurfaceCut result;
-    //for (priv::SurfacePatch &patch : patches)
-    //    priv::append(result, priv::patch2cut(patch));    
 
     // Use only outline points
     // for each point select best projection
@@ -2188,7 +2169,7 @@ priv::ProjectionDistances priv::choose_best_distance(
     uint32_t unfinished_index = find_closest_point_index(start, shapes, s2i, mask_distances);
     
 #ifdef DEBUG_OUTPUT_DIR
-    std::vector<std::pair<size_t, size_t>> connections;
+    Connections connections;
     connections.reserve(shapes.size());
     connections.emplace_back(unfinished_index, unfinished_index);
 #endif // DEBUG_OUTPUT_DIR
@@ -3191,6 +3172,11 @@ std::vector<bool> priv::select_patches(const ProjectionDistances &best_distances
     for (const SurfacePatch &patch : patches) 
         shapes_patches[patch.shape_id].push_back(&patch - &patches.front());
 
+#ifdef DEBUG_OUTPUT_DIR
+    std::string store_dir = DEBUG_OUTPUT_DIR + "select_patches/";
+    prepare_dir(store_dir);
+#endif // DEBUG_OUTPUT_DIR
+
     for (size_t shape_index = 0; shape_index < shapes.size(); shape_index++) {
         const ExPolygon &shape = shapes[shape_index];
         std::vector<uint32_t> &used_shape_patches = used_shapes_patches[shape_index];
@@ -3227,7 +3213,8 @@ std::vector<bool> priv::select_patches(const ProjectionDistances &best_distances
         // not cutted area of expolygon
         ExPolygons rest = diff_ex(ExPolygons{shape}, fill, ApplySafetyOffset::Yes);
 #ifdef DEBUG_OUTPUT_DIR
-        SVG svg(DEBUG_OUTPUT_DIR + "input_patches_" + std::to_string(shape_index) + ".svg");
+        BoundingBox shape_bb = get_extents(shape);
+        SVG svg(store_dir + "shape_" + std::to_string(shape_index) + ".svg", shape_bb);
         svg.draw(fill, "darkgreen");
         svg.draw(rest, "green");
 #endif // DEBUG_OUTPUT_DIR
@@ -3279,12 +3266,15 @@ std::vector<bool> priv::select_patches(const ProjectionDistances &best_distances
             { return a.depth_range_center_distance < b.depth_range_center_distance; });
 
 #ifdef DEBUG_OUTPUT_DIR
-        for (const auto &p : patch_shapes) {
-            int gray_level = 30 + (&p - &patch_shapes.front()) * 200 / patch_shapes.size() ;
+        for (size_t i = patch_shapes.size(); i > 0; --i) { 
+            const PatchShape &p = patch_shapes[i - 1];
+            int gray_level =  (i * 200) / patch_shapes.size();
             std::stringstream color;
             color << "#" << std::hex << std::setfill('0') << std::setw(2) << gray_level << gray_level << gray_level;
             svg.draw(p.shape, color.str());
-            svg.draw(p.intersection, color.str());
+            Point text_pos = get_extents(p.shape).center().cast<int>();
+            svg.draw_text(text_pos, std::to_string(i-1).c_str(), "orange", std::ceil(shape_bb.size().x() / 20 * 0.000001));
+            //svg.draw(p.intersection, color.str());
         }
 #endif // DEBUG_OUTPUT_DIR
 
@@ -3526,10 +3516,7 @@ SurfaceCut priv::merge_patches(SurfacePatches &patches, const std::vector<bool>&
 }
 
 #ifdef DEBUG_OUTPUT_DIR
-#include "libslic3r/SVG.hpp"
-#include <filesystem>
-namespace priv{
-void prepare_dir(const std::string &dir){
+void priv::prepare_dir(const std::string &dir){
     namespace fs = std::filesystem;
     if (fs::exists(dir)) {
         for (auto &path : fs::directory_iterator(dir)) fs::remove_all(path);
@@ -3538,6 +3525,7 @@ void prepare_dir(const std::string &dir){
     }
 }
 
+namespace priv{
 int reduction_order = 0;
 int filled_order    = 0;
 int constrained_order = 0;
@@ -3794,11 +3782,7 @@ void priv::store(const SurfacePatches &patches, const std::string &dir) {
 //    its_write_obj(its, file.c_str());
 //}
 
-#include "SVG.hpp"
-void priv::store(const ExPolygons                   &shapes,
-           const std::vector<bool>            &mask,
-           const std::vector<std::pair<size_t, size_t>> &connections,
-           const std::string                  &file_svg)
+void priv::store(const ExPolygons &shapes, const std::vector<bool> &mask, const Connections &connections, const std::string &file_svg)
 {
     auto bb = get_extents(shapes);
     int  width = get_extents(shapes.front()).size().x() / 70;
@@ -3817,7 +3801,7 @@ void priv::store(const ExPolygons                   &shapes,
     };
 
     bool is_first = true;
-    for (auto c : connections) { 
+    for (const Connection &c : connections) { 
         if (is_first) {
             is_first = false;
             Point p = get_point(c.first);
