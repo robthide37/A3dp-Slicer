@@ -578,13 +578,9 @@ void GLGizmoCut3D::render_cut_plane_line()
 
     const Camera& camera = wxGetApp().plater()->get_camera();
 
-    Vec3d unit_dir = m_rotation_m * Vec3d::UnitZ();
-    unit_dir.normalize();
+    const Vec3d unit_dir = m_rotation_m * Vec3d::UnitZ();
 
-    Vec3d camera_dir = camera.get_dir_forward();
-    camera_dir.normalize();
-
-    if (std::abs(unit_dir.dot(camera_dir)) <= 0.025) {
+    if (std::abs(unit_dir.dot(camera.get_dir_forward())) <= 0.025) {
         GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
         if (shader) {
             m_circle.reset();
@@ -665,7 +661,6 @@ void GLGizmoCut3D::render_line(GLModel& line_model, const ColorRGBA& color, Tran
     if (shader) {
         shader->start_using();
 
-        const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", wxGetApp().plater()->get_camera().get_projection_matrix());
         shader->set_uniform("width", width);
@@ -734,11 +729,11 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
 
     // render Z grabber
 
-    if ((!m_dragging && m_hover_id < 0))
+    if (!m_dragging && m_hover_id < 0)
         render_grabber_connection(color, view_matrix);
     render_model(m_sphere.model, color, view_matrix * scale_transform(size));
 
-    if (!m_dragging && m_hover_id < 0 || m_hover_id == Z)
+    if ((!m_dragging && m_hover_id < 0) || m_hover_id == Z)
     {
         const BoundingBoxf3 tbb = transformed_bounding_box();
         if (tbb.min.z() <= 0.0)
@@ -867,9 +862,9 @@ void GLGizmoCut3D::on_set_state()
 
         m_parent.request_extra_frame();
     }
-    else
+    else {
         m_c->object_clipper()->release();
-
+    }
 	force_update_clipper_on_render = m_state == On;
 }
 
@@ -1397,6 +1392,34 @@ void GLGizmoCut3D::render_debug_input_window()
     m_imgui->slider_float("contour_width", &contour_width, 0.f, 3.f);
     if (auto oc = m_c->object_clipper())
         oc->set_behavior(hide_clipped || m_connectors_editing, fill_cut || m_connectors_editing, double(contour_width));
+
+    ImGui::Separator();
+
+    // Camera editing
+
+    auto get_label = [](Vec3d dir) {
+        wxString str = "x=" + double_to_string(dir.x(), 2) +
+            ", y=" + double_to_string(dir.y(), 2) +
+            ", z=" + double_to_string(dir.z(), 2);
+        return str;
+    };
+
+    const Camera& camera = wxGetApp().plater()->get_camera();
+
+    Vec3d unit_dir = m_rotation_m * Vec3d::UnitZ();
+    m_imgui->text("Unit dir: ");
+    ImGui::SameLine(m_label_width);
+    m_imgui->text(get_label(unit_dir));
+
+    Vec3d camera_dir = camera.get_dir_forward();
+    m_imgui->text("Camera dir: ");
+    ImGui::SameLine(m_label_width);
+    m_imgui->text(get_label(camera_dir));
+
+    m_imgui->text("Unit2Camera: ");
+    double proj = unit_dir.dot(camera_dir);
+    ImGui::SameLine(m_label_width);
+    m_imgui->text_colored(std::abs(proj) <= 0.025 ? ImGuiWrapper::COL_ORANGE_LIGHT : ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()), double_to_string(proj, 2));
 
     m_imgui->end();
 }
@@ -2021,13 +2044,6 @@ void GLGizmoCut3D::discard_cut_line_processing()
 
 bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse_position)
 {
-    const float sla_shift = m_c->selection_info()->get_sla_shift();
-    const ModelObject* mo = m_c->selection_info()->model_object();
-    const ModelInstance* mi = mo->instances[m_c->selection_info()->get_active_instance()];
-    Transform3d inst_trafo = sla_shift > 0.f ?
-        assemble_transform(Vec3d(0.0, 0.0, sla_shift)) * mi->get_transformation().get_matrix() :
-        mi->get_transformation().get_matrix();
-
     const Camera& camera = wxGetApp().plater()->get_camera();
 
     Vec3d pt;

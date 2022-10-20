@@ -1232,6 +1232,8 @@ indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes conn
     case CutConnectorShape::Hexagon:
         sectorCount = 6;
         break;
+    default:
+        break;
     }
 
     if (connector_attributes.style == CutConnectorStyle::Prizm)
@@ -1395,11 +1397,11 @@ void ModelObject::process_connector_cut(ModelVolume* volume, ModelObjectCutAttri
 void ModelObject::process_modifier_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& inverse_cut_matrix,
                                        ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower)
 {
-    const auto volume_matrix = volume->get_matrix();
+    const auto volume_matrix = instance_matrix * volume->get_matrix();
 
     // Modifiers are not cut, but we still need to add the instance transformation
     // to the modifier volume transformation to preserve their shape properly.
-    volume->set_transformation(Geometry::Transformation(instance_matrix * volume_matrix));
+    volume->set_transformation(Geometry::Transformation(volume_matrix));
 
     // Some logic for the negative volumes/connectors. Add only needed modifiers
     auto bb = volume->mesh().transformed_bounding_box(inverse_cut_matrix * volume_matrix);

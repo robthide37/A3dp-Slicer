@@ -2990,9 +2990,9 @@ void ObjectList::delete_instance_from_list(const size_t obj_idx, const size_t in
 
 void ObjectList::update_lock_icons_for_model()
 {
-    for (int obj_idx = 0; obj_idx < (*m_objects).size(); ++obj_idx)
+    for (size_t obj_idx = 0; obj_idx < (*m_objects).size(); ++obj_idx)
         if (!(*m_objects)[obj_idx]->is_cut())
-            m_objects_model->UpdateLockIcon(m_objects_model->GetItemById(obj_idx), false);
+            m_objects_model->UpdateLockIcon(m_objects_model->GetItemById(int(obj_idx)), false);
 }
 
 bool ObjectList::delete_from_model_and_list(const ItemType type, const int obj_idx, const int sub_obj_idx)
@@ -4088,15 +4088,16 @@ bool ObjectList::fix_cut_selection(wxDataViewItemArray& sels)
 
                 bool is_instance_selection = m_objects_model->GetItemType(item) & itInstance;
 
-                int obj_idx = m_objects_model->GetObjectIdByItem(item);
+                int object_idx = m_objects_model->GetObjectIdByItem(item);
                 int inst_idx = is_instance_selection ? m_objects_model->GetInstanceIdByItem(item) : 0;
 
-                if (auto obj = object(obj_idx); obj->is_cut()) {
+                if (auto obj = object(object_idx); obj->is_cut()) {
                     sels.Clear();
 
                     auto cut_id = obj->cut_id;
 
-                    for (int obj_idx = 0; obj_idx < (*m_objects).size(); ++obj_idx) {
+                    int objects_cnt = int((*m_objects).size());
+                    for (int obj_idx = 0; obj_idx < objects_cnt; ++obj_idx) {
                         auto object = (*m_objects)[obj_idx];
                         if (object->is_cut() && object->cut_id.has_same_id(cut_id))
                             sels.Add(is_instance_selection ? m_objects_model->GetItemByInstanceId(obj_idx, inst_idx) : m_objects_model->GetItemById(obj_idx));
