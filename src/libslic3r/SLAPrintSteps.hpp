@@ -46,7 +46,8 @@ private:
     void apply_printer_corrections(SLAPrintObject &po, SliceOrigin o);
 
     void generate_preview(SLAPrintObject &po, SLAPrintObjectStep step);
-    
+    indexed_triangle_set generate_preview_vdb(SLAPrintObject &po, SLAPrintObjectStep step);
+
 public:
     explicit Steps(SLAPrint *print);
     

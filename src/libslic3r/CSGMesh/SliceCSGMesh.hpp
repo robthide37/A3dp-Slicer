@@ -52,6 +52,8 @@ std::vector<ExPolygons> slice_csgmesh_ex(
                 return p.area() < double(SCALED_EPSILON) * double(SCALED_EPSILON);
             });
 
+            // Hopefully, ExPolygons are moved, not copied to new positions
+            // and that is cheap for expolygons
             slice.erase(it, slice.end());
         }
     }

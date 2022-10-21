@@ -18,11 +18,13 @@
 #include <libslic3r/SlicesToTriangleMesh.hpp>
 #include <libslic3r/CSGMesh/ModelToCSGMesh.hpp>
 #include <libslic3r/CSGMesh/SliceCSGMesh.hpp>
+#include <libslic3r/CSGMesh/VoxelizeCSGMesh.hpp>>
+#include <libslic3r/CSGMesh/PerformCSGMeshBooleans.hpp>
 #include <libslic3r/OpenVDBUtils.hpp>
 #include <libslic3r/QuadricEdgeCollapse.hpp>
 
 #include <libslic3r/ClipperUtils.hpp>
-#include <libslic3r/ShortEdgeCollapse.hpp>
+//#include <libslic3r/ShortEdgeCollapse.hpp>
 
 #include <boost/log/trivial.hpp>
 
@@ -128,48 +130,50 @@ void SLAPrint::Steps::apply_printer_corrections(SLAPrintObject &po, SliceOrigin 
     }
 }
 
-
-void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
+indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
+    SLAPrintObject &po, SLAPrintObjectStep step)
 {
     Benchmark bench;
 
     bench.start();
+
     // update preview mesh
     double vscale = 1. / (2. * po.m_config.layer_height.getFloat());
     auto   voxparams = csg::VoxelizeParams{}
                          .voxel_scale(vscale)
                          .exterior_bandwidth(1.f)
                          .interior_bandwidth(1.f);
+
     auto grid = csg::voxelize_csgmesh(range(po.m_mesh_to_slice), voxparams);
 
     indexed_triangle_set m = grid_to_mesh(*grid);
 
-//    if (!m.empty()) {
-//        // simplify mesh lossless
+    bench.stop();
 
-//        std::cout << "simplify started" << std::endl;
-//        int expected_cnt = m.indices.size() * 0.8; //std::pow(po.m_transformed_rmesh.volume() / std::pow(1./vscale, 3), 2./3.);
-//        std::cout << "expected triangles " << expected_cnt << std::endl;
-//        float err = std::pow(vscale, 3);
-//        its_quadric_edge_collapse(m, 0U, &err);
-//        std::cout << "simplify ended " << m.indices.size() << " triangles" << std::endl;
+    std::cout << "Preview gen took: " << bench.getElapsedSec() << std::endl;
 
-//        std::cout << "cleanup started" << std::endl;
-//        its_compactify_vertices(m);
-//        its_merge_vertices(m);
-//        std::cout << "cleanup ended" << std::endl;
-//    }
+    return m;
+}
 
-    po.m_preview_meshes[step] = TriangleMesh{std::move(m)};
+
+void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
+{
+    MeshBoolean::cgal::CGALMeshPtr cgalptr;
+
+    try {
+        cgalptr = csg::perform_csgmesh_booleans(range(po.m_mesh_to_slice));
+    } catch(...) {}
+
+    if (cgalptr) {
+        po.m_preview_meshes[step] = MeshBoolean::cgal::cgal_to_triangle_mesh(*cgalptr);
+    } else
+        po.m_preview_meshes[step] = TriangleMesh{generate_preview_vdb(po, step)};
 
     for (size_t i = size_t(step) + 1; i < slaposCount; ++i)
     {
         po.m_preview_meshes[i] = {};
     }
 
-    bench.stop();
-
-    std::cout << "Preview gen took: " << bench.getElapsedSec() << std::endl;
     using namespace std::string_literals;
 
     report_status(-2, "Reload preview from step "s + std::to_string(int(step)), SlicingStatus::RELOAD_SLA_PREVIEW);
