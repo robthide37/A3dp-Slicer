@@ -243,6 +243,8 @@ void MeshClipper::recalculate_triangles()
     }
 
     tr.pretranslate(0.001 * m_plane.get_normal().normalized()); // to avoid z-fighting
+    Transform3d tr2 = tr;
+    tr2.pretranslate(0.002 * m_plane.get_normal().normalized());
 
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -318,9 +320,9 @@ void MeshClipper::recalculate_triangles()
 
             // vertices + indices
             for (auto it = triangles2d.cbegin(); it != triangles2d.cend(); it = it + 3) {
-                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr2 * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr2 * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr2 * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
                 const size_t idx = it - triangles2d.cbegin();
                 init_data.add_triangle((unsigned short)idx, (unsigned short)idx + 1, (unsigned short)idx + 2);
             }
