@@ -160,7 +160,7 @@ public:
     void invalidate_cut_plane();
 
     BoundingBoxf3   bounding_box() const;
-    BoundingBoxf3   transformed_bounding_box(bool revert_move = false) const;
+    BoundingBoxf3   transformed_bounding_box(const Vec3d& plane_center, bool revert_move = false) const;
 
 protected:
     bool               on_init() override;
@@ -237,6 +237,7 @@ private:
     void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix);
     void render_cut_plane_grabbers();
     void render_cut_line();
+    bool can_render_cut_plane_line(bool render_values = false);
     void render_cut_plane_line();
     void perform_cut(const Selection&selection);
     void set_center_pos(const Vec3d&center_pos, bool force = false);

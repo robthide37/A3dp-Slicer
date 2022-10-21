@@ -224,7 +224,7 @@ std::string GLGizmoCut3D::get_tooltip() const
     if (m_hover_id == Z) {
         double koef = m_imperial_units ? ObjectManipulation::mm_to_in : 1.0;
         std::string unit_str = " " + (m_imperial_units ? _u8L("inch") : _u8L("mm"));
-        const BoundingBoxf3 tbb = transformed_bounding_box();
+        const BoundingBoxf3 tbb = transformed_bounding_box(m_plane_center);
         if (tbb.max.z() >= 0.0) {
             double top = (tbb.min.z() <= 0.0 ? tbb.max.z() : tbb.size().z()) * koef;
             tooltip += format(top, 2) + " " + unit_str + " (" + _u8L("Top part") + ")";
@@ -568,6 +568,82 @@ bool GLGizmoCut3D::render_reset_button(const std::string& label_id, const std::s
     return revert;
 }
 
+static Vec2d ndc_to_ss(const Vec3d& ndc, const std::array<int, 4>& viewport) {
+    const double half_w = 0.5 * double(viewport[2]);
+    const double half_h = 0.5 * double(viewport[3]);
+    return { half_w * ndc.x() + double(viewport[0]) + half_w, half_h * ndc.y() + double(viewport[1]) + half_h };
+};
+static Vec3d clip_to_ndc(const Vec4d& clip) {
+    return Vec3d(clip.x(), clip.y(), clip.z()) / clip.w();
+}
+static Vec4d world_to_clip(const Vec3d& world, const Matrix4d& projection_view_matrix) {
+    return projection_view_matrix * Vec4d(world.x(), world.y(), world.z(), 1.0);
+}
+static Vec2d world_to_ss(const Vec3d& world, const Matrix4d& projection_view_matrix, const std::array<int, 4>& viewport) {
+    return ndc_to_ss(clip_to_ndc(world_to_clip(world, projection_view_matrix)), viewport);
+}
+
+static wxString get_label(Vec3d vec)
+{
+    wxString str =  "x=" + double_to_string(vec.x(), 2) +
+                    ", y=" + double_to_string(vec.y(), 2) +
+                    ", z=" + double_to_string(vec.z(), 2);
+    return str;
+}
+
+static wxString get_label(Vec2d vec)
+{
+    wxString str =  "x=" + double_to_string(vec.x(), 2) +
+                    ", y=" + double_to_string(vec.y(), 2);
+    return str;
+}
+
+bool  GLGizmoCut3D::can_render_cut_plane_line(bool render_values_in_debug/* = false*/)
+{
+    const Camera& camera = wxGetApp().plater()->get_camera();
+
+    Vec3d unit_dir = m_rotation_m * Vec3d::UnitZ();
+
+    const Matrix4d projection_view_matrix = camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix();
+
+    const Vec2d screen_coord = world_to_ss(m_plane_center, projection_view_matrix, camera.get_viewport());
+
+    const Vec3d mouse_dir = m_parent.mouse_ray(Point(screen_coord.x(), screen_coord.y())).unit_vector();
+
+    const Vec3d camera_dir = camera.get_dir_forward();
+//    double proj = unit_dir.dot(camera_dir);
+    const double proj = unit_dir.dot(mouse_dir);
+    const bool can_render = std::abs(proj) <= 0.01; // 0.25
+
+    if (render_values_in_debug) {
+        ImGui::Separator();
+
+        m_imgui->text("Unit dir: ");
+        ImGui::SameLine(m_label_width);
+        m_imgui->text(get_label(unit_dir));
+
+        m_imgui->text("Camera dir: ");
+        ImGui::SameLine(m_label_width);
+        m_imgui->text(get_label(camera_dir));
+
+        // m_imgui->text("screen_coord: ");
+        // ImGui::SameLine(m_label_width);
+        // m_imgui->text(get_label(screen_coord));
+
+        m_imgui->text("Mouse dir: ");
+        ImGui::SameLine(m_label_width);
+        m_imgui->text(get_label(mouse_dir));
+
+//        m_imgui->text("Unit2Camera: ");
+        m_imgui->text("Unit2Mouse: ");
+        double proj = unit_dir.dot(/*camera_dir*/mouse_dir);
+        ImGui::SameLine(m_label_width);
+        m_imgui->text_colored(can_render ? ImGuiWrapper::COL_ORANGE_LIGHT : ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()), double_to_string(proj, 2));
+    }
+
+    return can_render;
+}
+
 void GLGizmoCut3D::render_cut_plane_line()
 {
     if (cut_line_processing())
@@ -576,16 +652,13 @@ void GLGizmoCut3D::render_cut_plane_line()
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
-    const Camera& camera = wxGetApp().plater()->get_camera();
-
-    const Vec3d unit_dir = m_rotation_m * Vec3d::UnitZ();
-
-    if (std::abs(unit_dir.dot(camera.get_dir_forward())) <= 0.025) {
+    if (can_render_cut_plane_line()) {
         GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
         if (shader) {
-            m_circle.reset();
-            init_from_circle(m_circle, m_radius * 1.25);
+            GLModel circle;
+            init_from_circle(circle, m_radius * 1.25);
 
+            const Camera& camera = wxGetApp().plater()->get_camera();
             const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
 
             shader->start_using();
@@ -593,7 +666,7 @@ void GLGizmoCut3D::render_cut_plane_line()
             shader->set_uniform("view_model_matrix", view_model_matrix);
             shader->set_uniform("width", 0.1f);
 
-            m_circle.render();
+            circle.render();
 
             shader->stop_using();
         }
@@ -735,7 +808,7 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
 
     if ((!m_dragging && m_hover_id < 0) || m_hover_id == Z)
     {
-        const BoundingBoxf3 tbb = transformed_bounding_box();
+        const BoundingBoxf3 tbb = transformed_bounding_box(m_plane_center);
         if (tbb.min.z() <= 0.0)
             render_model(m_cone.model, color, view_matrix * assemble_transform(-offset, PI * Vec3d::UnitX(), cone_scale));
 
@@ -1184,7 +1257,9 @@ void GLGizmoCut3D::on_stop_dragging()
 
 void GLGizmoCut3D::set_center_pos(const Vec3d& center_pos, bool force/* = false*/)
 {
-    bool can_set_center_pos = force || transformed_bounding_box(true).contains(center_pos);
+    const BoundingBoxf3 tbb = transformed_bounding_box(center_pos);
+
+    bool can_set_center_pos = force || (tbb.max.z() > -1. && tbb.min.z() < 1.);
     if (!can_set_center_pos) {
         const double old_dist = (m_bb_center - m_plane_center).norm();
         const double new_dist = (m_bb_center - center_pos).norm();
@@ -1212,7 +1287,7 @@ BoundingBoxf3 GLGizmoCut3D::bounding_box() const
     return ret;
 }
 
-BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(bool revert_move /*= false*/) const
+BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(const Vec3d& plane_center, bool revert_move /*= false*/) const
 {
     // #ysFIXME !!!
     BoundingBoxf3 ret;
@@ -1229,11 +1304,11 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(bool revert_move /*= false*
     const ModelInstance* mi = mo->instances[instance_idx];
 
     const Vec3d& instance_offset = mi->get_offset();
-    Vec3d cut_center_offset = m_plane_center - instance_offset;
+    Vec3d cut_center_offset = plane_center - instance_offset;
     cut_center_offset[Z] -= sel_info->get_sla_shift();
 
     const auto move  = assemble_transform(-cut_center_offset);
-    const auto move2 = assemble_transform(m_plane_center);
+    const auto move2 = assemble_transform(plane_center);
 
     const auto cut_matrix = (revert_move ? move2 : Transform3d::Identity()) * m_rotation_m.inverse() * move;
 
@@ -1393,33 +1468,8 @@ void GLGizmoCut3D::render_debug_input_window()
     if (auto oc = m_c->object_clipper())
         oc->set_behavior(hide_clipped || m_connectors_editing, fill_cut || m_connectors_editing, double(contour_width));
 
-    ImGui::Separator();
-
     // Camera editing
-
-    auto get_label = [](Vec3d dir) {
-        wxString str = "x=" + double_to_string(dir.x(), 2) +
-            ", y=" + double_to_string(dir.y(), 2) +
-            ", z=" + double_to_string(dir.z(), 2);
-        return str;
-    };
-
-    const Camera& camera = wxGetApp().plater()->get_camera();
-
-    Vec3d unit_dir = m_rotation_m * Vec3d::UnitZ();
-    m_imgui->text("Unit dir: ");
-    ImGui::SameLine(m_label_width);
-    m_imgui->text(get_label(unit_dir));
-
-    Vec3d camera_dir = camera.get_dir_forward();
-    m_imgui->text("Camera dir: ");
-    ImGui::SameLine(m_label_width);
-    m_imgui->text(get_label(camera_dir));
-
-    m_imgui->text("Unit2Camera: ");
-    double proj = unit_dir.dot(camera_dir);
-    ImGui::SameLine(m_label_width);
-    m_imgui->text_colored(std::abs(proj) <= 0.025 ? ImGuiWrapper::COL_ORANGE_LIGHT : ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()), double_to_string(proj, 2));
+    can_render_cut_plane_line(true);
 
     m_imgui->end();
 }
@@ -1549,7 +1599,7 @@ void GLGizmoCut3D::render_build_size()
 {
     double              koef     = m_imperial_units ? ObjectManipulation::mm_to_in : 1.0;
     wxString            unit_str = " " + (m_imperial_units ? _L("in") : _L("mm"));
-    const BoundingBoxf3 tbb      = transformed_bounding_box();
+    const BoundingBoxf3 tbb      = transformed_bounding_box(m_plane_center);
             
     Vec3d    tbb_sz = tbb.size();
     wxString size   =   "X: " + double_to_string(tbb_sz.x() * koef, 2) + unit_str +
@@ -1880,7 +1930,7 @@ bool GLGizmoCut3D::can_perform_cut() const
     if (m_has_invalid_connector || (!m_keep_upper && !m_keep_lower) || m_connectors_editing)
         return false;
 
-    const BoundingBoxf3 tbb = transformed_bounding_box(true);
+    const BoundingBoxf3 tbb = transformed_bounding_box(m_plane_center, true);
     return tbb.contains(m_plane_center);
 }
 
