@@ -46,6 +46,14 @@ std::vector<ExPolygons> slice_csgmesh_ex(
                 break;
             }
         }
+
+        for (ExPolygons &slice : ret) {
+            auto it = std::remove_if(slice.begin(), slice.end(), [](const ExPolygon &p){
+                return p.area() < double(SCALED_EPSILON) * double(SCALED_EPSILON);
+            });
+
+            slice.erase(it, slice.end());
+        }
     }
 
     return ret;

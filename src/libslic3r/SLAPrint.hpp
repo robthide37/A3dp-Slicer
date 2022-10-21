@@ -91,27 +91,7 @@ struct CSGPartForStep : public csg::CSGPart
 
 namespace csg {
 
-inline bool operator==(const VoxelizeParams &a, const VoxelizeParams &b)
-{
-    std::hash<Slic3r::csg::VoxelizeParams> h;
-    return h(a) == h(b);
-}
-
-inline VoxelGridPtr get_voxelgrid(const CSGPartForStep &part,
-                                  const VoxelizeParams &p)
-{
-    VoxelGridPtr &ret = part.gridcache[p];
-
-    if (!ret) {
-        ret = mesh_to_grid(*csg::get_mesh(part),
-                           csg::get_transform(part),
-                           p.voxel_scale(),
-                           p.exterior_bandwidth(),
-                           p.interior_bandwidth());
-    }
-
-    return clone(*ret);
-}
+VoxelGridPtr get_voxelgrid(const CSGPartForStep &part, const VoxelizeParams &p);
 
 } // namespace csg
 
@@ -372,7 +352,7 @@ private:
     std::vector<float>                      m_model_height_levels;
 
     // Caching the transformed (m_trafo) raw mesh of the object
-    TriangleMesh                            m_transformed_rmesh;
+//    TriangleMesh                            m_transformed_rmesh;
     
     struct SupportData
     {

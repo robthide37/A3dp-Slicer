@@ -194,10 +194,6 @@ struct csg_inserter {
 void SLAPrint::Steps::mesh_assembly(SLAPrintObject &po)
 {
     po.m_mesh_to_slice.clear();
-
-    po.m_transformed_rmesh = po.m_model_object->raw_mesh();
-    po.m_transformed_rmesh.transform(po.trafo());
-
     csg::model_to_csgmesh(*po.model_object(), po.trafo(),
                           csg_inserter{po.m_mesh_to_slice, slaposAssembly},
                           csg::mpartsPositive | csg::mpartsNegative);
@@ -265,8 +261,11 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
                           csg_inserter{po.m_mesh_to_slice, slaposDrillHoles},
                           csg::mpartsDrillHoles);
 
+    auto r = po.m_mesh_to_slice.equal_range(slaposDrillHoles);
+
     // update preview mesh
-    generate_preview(po, slaposDrillHoles);
+    if (r.first != r.second)
+        generate_preview(po, slaposDrillHoles);
 }
 
 template<class Pred>
@@ -374,8 +373,7 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
     auto  thr        = [this]() { m_print->throw_if_canceled(); };
     auto &slice_grid = po.m_model_height_levels;
 
-    Range csgrange = {po.m_mesh_to_slice.begin(), po.m_mesh_to_slice.end()};
-    po.m_model_slices = slice_csgmesh_ex(csgrange, slice_grid, params, thr);
+    po.m_model_slices = slice_csgmesh_ex(range(po.m_mesh_to_slice), slice_grid, params, thr);
 
     auto mit = slindex_it;
     for (size_t id = 0;
@@ -387,7 +385,8 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
     // We apply the printer correction offset here.
     apply_printer_corrections(po, soModel);
 
-    generate_preview(po, slaposObjectSlice);
+//    po.m_preview_meshes[slaposObjectSlice] = po.get_mesh_to_print();
+//    report_status(-2, "", SlicingStatus::RELOAD_SLA_PREVIEW);
 }
 
 static void filter_support_points_by_modifiers(
@@ -448,7 +447,7 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
     if (!po.m_supportdata)
         po.m_supportdata =
             std::make_unique<SLAPrintObject::SupportData>(
-                po.m_preview_meshes[slaposObjectSlice]
+                po.get_mesh_to_print()
             );
 
     po.m_supportdata->input.zoffset = csgmesh_positive_bb(po.m_mesh_to_slice)

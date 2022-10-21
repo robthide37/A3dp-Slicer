@@ -792,13 +792,6 @@ bool SLAPrint::is_step_done(SLAPrintObjectStep step) const
 
 SLAPrintObject::SLAPrintObject(SLAPrint *print, ModelObject *model_object)
     : Inherited(print, model_object)
-//    , m_transformed_rmesh([this](TriangleMesh &obj) {
-////        obj = m_model_object->raw_mesh();
-////        if (!obj.empty()) {
-////            obj.transform(m_trafo);
-////        }
-//        obj = transformed_mesh_csg(*this);
-//    })
 {}
 
 SLAPrintObject::~SLAPrintObject() {}
@@ -1056,7 +1049,8 @@ const TriangleMesh& SLAPrintObject::pad_mesh() const
     return EMPTY_MESH;
 }
 
-const TriangleMesh &SLAPrintObject::get_mesh_to_print() const {
+const TriangleMesh &SLAPrintObject::get_mesh_to_print() const
+{
     const TriangleMesh *ret = nullptr;
 
     int s = SLAPrintObjectStep::slaposCount;
@@ -1068,7 +1062,7 @@ const TriangleMesh &SLAPrintObject::get_mesh_to_print() const {
     }
 
     if (!ret)
-        ret = &m_transformed_rmesh;
+        ret = &EMPTY_MESH;
 
     return *ret;
 }
@@ -1157,5 +1151,30 @@ void SLAPrint::StatusReporter::operator()(SLAPrint &         p,
 
     p.set_status(int(std::round(st)), msg, flags);
 }
+
+namespace csg {
+
+inline bool operator==(const VoxelizeParams &a, const VoxelizeParams &b)
+{
+    std::hash<Slic3r::csg::VoxelizeParams> h;
+    return h(a) == h(b);
+}
+
+VoxelGridPtr get_voxelgrid(const CSGPartForStep &part, const VoxelizeParams &p)
+{
+    VoxelGridPtr &ret = part.gridcache[p];
+
+    if (!ret) {
+        ret = mesh_to_grid(*csg::get_mesh(part),
+                           csg::get_transform(part),
+                           p.voxel_scale(),
+                           p.exterior_bandwidth(),
+                           p.interior_bandwidth());
+    }
+
+    return clone(*ret);
+}
+
+} // namespace csg
 
 } // namespace Slic3r
