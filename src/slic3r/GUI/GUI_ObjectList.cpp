@@ -1738,7 +1738,7 @@ void ObjectList::load_shape_object(const std::string& type_name)
     // Create mesh
     BoundingBoxf3 bb;
     TriangleMesh mesh = create_mesh(type_name, bb);
-    load_mesh_object(mesh, _L("Shape") + "-" + _(type_name));
+    load_mesh_object(mesh, _u8L("Shape") + "-" + type_name);
 #if ENABLE_RELOAD_FROM_DISK_REWORK
     if (!m_objects->empty())
         m_objects->back()->volumes.front()->source.is_from_builtin_objects = true;
@@ -1780,7 +1780,7 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
 
 void ObjectList::load_mesh_object(
     const TriangleMesh &     mesh,
-    const wxString &         name,
+    const std::string &      name,
     bool                     center,
     const TextConfiguration *text_config /* = nullptr*/,
     const Transform3d *      transformation /* = nullptr*/)
@@ -1794,12 +1794,12 @@ void ObjectList::load_mesh_object(
     
     std::vector<size_t> object_idxs;
     ModelObject* new_object = model.add_object();
-    new_object->name = into_u8(name);
+    new_object->name = name;
     new_object->add_instance(); // each object should have at list one instance
     
     ModelVolume* new_volume = new_object->add_volume(mesh);
     new_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
-    new_volume->name = into_u8(name);
+    new_volume->name = name;
     if (text_config)
         new_volume->text_configuration = *text_config;
     // set a default extruder value, since user can't add it manually
