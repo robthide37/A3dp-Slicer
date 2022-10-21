@@ -1263,6 +1263,11 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         m_placeholder_parser.set("first_layer_print_min",  new ConfigOptionFloats({ bbox.min.x(), bbox.min.y() }));
         m_placeholder_parser.set("first_layer_print_max",  new ConfigOptionFloats({ bbox.max.x(), bbox.max.y() }));
         m_placeholder_parser.set("first_layer_print_size", new ConfigOptionFloats({ bbox.size().x(), bbox.size().y() }));
+
+        std::vector<unsigned char> is_extruder_used(print.config().nozzle_diameter.size(), 0);
+        for (unsigned int extruder_id : print.extruders())
+            is_extruder_used[extruder_id] = true;
+        m_placeholder_parser.set("is_extruder_used", new ConfigOptionBools(is_extruder_used));
     }
     std::string start_gcode = this->placeholder_parser_process("start_gcode", print.config().start_gcode.value, initial_extruder_id);
     // Set bed temperature if the start G-code does not contain any bed temp control G-codes.
