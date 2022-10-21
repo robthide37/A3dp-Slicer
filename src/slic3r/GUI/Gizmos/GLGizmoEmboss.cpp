@@ -10,6 +10,7 @@
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
 #include "slic3r/GUI/Jobs/EmbossJob.hpp"
+#include "slic3r/GUI/Jobs/CreateFontNameImageJob.hpp"
 #include "slic3r/GUI/Jobs/NotificationProgressIndicator.hpp"
 #include "slic3r/Utils/WxFontUtils.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
@@ -17,6 +18,7 @@
 // TODO: remove include
 #include "libslic3r/SVG.hpp"      // debug store
 #include "libslic3r/Geometry.hpp" // covex hull 2d
+#include "libslic3r/Timer.hpp" // covex hull 2d
 
 #include "libslic3r/NSVGUtils.hpp"
 #include "libslic3r/Model.hpp"
@@ -1297,6 +1299,7 @@ static std::string concat(std::vector<wxString> data) {
 }
 
 void GLGizmoEmboss::init_face_names() {
+    Timer t("enumerate_fonts");
     if (m_face_names.is_init) return;
     m_face_names.is_init      = true;
     MyFontEnumerator font_enumerator(m_face_names.encoding);
@@ -1328,6 +1331,7 @@ void GLGizmoEmboss::init_face_names() {
 
 // create texture for visualization font face
 void GLGizmoEmboss::init_font_name_texture() {
+    Timer t("init_font_name_texture");
     // check if already exists
     GLuint &id = m_face_names.texture_id; 
     if (id != 0) return;
@@ -1355,7 +1359,70 @@ void GLGizmoEmboss::init_font_name_texture() {
     }
 }
 
-#include "slic3r/GUI/Jobs/CreateFontNameImageJob.hpp"
+void GLGizmoEmboss::draw_font_preview(FaceName& face)
+{
+    unsigned int &count_opened_fonts = m_face_names.count_opened_font_files; 
+    ImVec2 size(m_gui_cfg->face_name_size.x(), m_gui_cfg->face_name_size.y());
+    // set to pixel 0,0 in texture
+    ImVec2      uv0(0.f, 0.f), uv1(1.f / size.x, 1.f / size.y / m_face_names.count_cached_textures);
+    ImTextureID tex_id = (void *) (intptr_t) m_face_names.texture_id;
+    if (face.is_created != nullptr) {
+        if (*face.is_created) {
+            size_t texture_index = face.texture_index;
+            uv0                  = ImVec2(0.f, texture_index / (float) m_face_names.count_cached_textures),
+            uv1                  = ImVec2(1.f, (texture_index + 1) / (float) m_face_names.count_cached_textures);
+        } else if (!ImGui::IsItemVisible()) {
+            face.is_created = nullptr;
+            face.cancel->store(true);
+        }
+    } else if (ImGui::IsItemVisible() && count_opened_fonts < m_gui_cfg->max_count_opened_font_files) {
+        ++count_opened_fonts;
+        face.cancel     = std::make_shared<std::atomic_bool>(false);
+        face.is_created = std::make_shared<bool>(false);
+
+        std::string text = m_text.empty() ? "AaBbCc" : m_text;
+
+        const unsigned char gray_level = 5;
+        // format type and level must match to texture data
+        const GLenum format = GL_RGBA, type = GL_UNSIGNED_BYTE;
+        const GLint  level = 0;
+        // select next texture index
+        size_t texture_index = (m_face_names.texture_index + 1) % m_face_names.count_cached_textures;
+        // set previous cach as deleted
+        for (FaceName &f : m_face_names.faces)
+            if (f.texture_index == texture_index) {
+                if (f.cancel != nullptr) f.cancel->store(true);
+                f.is_created = nullptr;
+            }
+
+        m_face_names.texture_index = texture_index;
+        face.texture_index         = texture_index;
+
+        // render text to texture
+        FontImageData data{
+            text,
+            face.wx_name,
+            m_face_names.encoding,
+            m_face_names.texture_id,
+            m_face_names.texture_index,
+            m_gui_cfg->face_name_size,
+            gray_level,
+            format,
+            type,
+            level,
+            &count_opened_fonts,
+            face.cancel,    // copy
+            face.is_created // copy
+        };
+        auto  job    = std::make_unique<CreateFontImageJob>(std::move(data));
+        auto &worker = wxGetApp().plater()->get_ui_job_worker();
+        queue_job(worker, std::move(job));
+    }
+
+    ImGui::SameLine(m_gui_cfg->face_name_texture_offset_x);
+    ImGui::Image(tex_id, size, uv0, uv1);
+}
+
 void GLGizmoEmboss::draw_font_list()
 {
     // Set partial
@@ -1365,11 +1432,16 @@ void GLGizmoEmboss::draw_font_list()
         if (wx_font_opt.has_value())
             actual_face_name = wx_font_opt->GetFaceName();
     }
+    // name of actual selected font
     const char * selected = (!actual_face_name.empty()) ?
         actual_face_name.ToUTF8().data() : " --- ";
 
+    // Do not remove font face during enumeration
+    // When deletation of font appear this variable is set
     std::optional<size_t> del_index;
 
+    // When is unknown font is inside .3mf only font selection is allowed
+    // Stop Imgui disable + Guard again start disabling
     ScopeGuard unknown_font_sc;
     if (m_is_unknown_font) { 
         m_imgui->disabled_end(); 
@@ -1378,91 +1450,30 @@ void GLGizmoEmboss::draw_font_list()
         });
     }
 
-    // variable for detection just closed combo box
+    // variable for detect just closed combo box
     static bool allow_update_rendered_font = false;
 
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if (!m_face_names.is_init) init_face_names();
         if (m_face_names.texture_id == 0) init_font_name_texture();
-        unsigned int &count_opened_fonts = m_face_names.count_opened_font_files; 
         for (FaceName &face : m_face_names.faces) {
-            const wxString &face_name = face.name;
+            const wxString &wx_face_name = face.wx_name;
             size_t index = &face - &m_face_names.faces.front();
             ImGui::PushID(index);
-            bool is_selected = (actual_face_name == face_name);
+            ScopeGuard sg([]() { ImGui::PopID(); });
+            bool is_selected = (actual_face_name == wx_face_name);
             ImVec2 selectable_size(0, m_gui_cfg->face_name_size.y());
             ImGuiSelectableFlags flags = 0;
             if (ImGui::Selectable(face.name_truncated.c_str(), is_selected, flags, selectable_size)) {
-                if (!select_facename(face_name)) {
+                if (!select_facename(wx_face_name)) {
                     del_index = index;
-                    wxMessageBox(GUI::format(_L("Font face \"%1%\" can't be selected."), face_name));
+                    wxMessageBox(GUI::format(_L("Font face \"%1%\" can't be selected."), wx_face_name));
                 }
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", face_name.ToUTF8().data());
+                ImGui::SetTooltip("%s", wx_face_name.ToUTF8().data());
             if (is_selected) ImGui::SetItemDefaultFocus();
-
-            ImVec2 size(m_gui_cfg->face_name_size.x(), m_gui_cfg->face_name_size.y());
-            // set to pixel 0,0 in texture
-            ImVec2 uv0(0.f, 0.f), uv1(1.f, 1.f / size.y / m_face_names.count_cached_textures);
-            ImTextureID tex_id = (void *) (intptr_t) m_face_names.texture_id;
-            if (face.is_created != nullptr){
-                if (*face.is_created) {
-                    size_t texture_index = face.texture_index;
-                    uv0 = ImVec2(0.f, texture_index / (float) m_face_names.count_cached_textures),
-                    uv1 = ImVec2(1.f, (texture_index + 1) / (float) m_face_names.count_cached_textures);
-                } else if (!ImGui::IsItemVisible()) {
-                    face.is_created = nullptr;
-                    face.cancel->store(true);
-                }
-            } else if (ImGui::IsItemVisible() && 
-                count_opened_fonts < m_gui_cfg->max_count_opened_font_files) {
-                ++count_opened_fonts;
-                face.cancel = std::make_shared<std::atomic_bool>(false);
-                face.is_created = std::make_shared<bool>(false);
-                
-                std::string text = m_text.empty() ? "AaBbCc" : m_text;
-                                
-                const unsigned char gray_level = 5;
-                // format type and level must match to texture data
-                const GLenum format = GL_RGBA, type = GL_UNSIGNED_BYTE;
-                const GLint level = 0;
-                // select next texture index
-                size_t texture_index = (m_face_names.texture_index+1) % m_face_names.count_cached_textures;
-                // set previous cach as deleted
-                for (FaceName &f : m_face_names.faces)
-                    if (f.texture_index == texture_index) {
-                        if (f.cancel != nullptr)
-                            f.cancel->store(true);
-                        f.is_created = nullptr;
-                    }
-                
-                m_face_names.texture_index = texture_index;
-                face.texture_index = texture_index;
-                
-                // render text to texture
-                FontImageData data{text,
-                                   face_name,
-                                   m_face_names.encoding,
-                                   m_face_names.texture_id,
-                                   m_face_names.texture_index,
-                                   m_gui_cfg->face_name_size,
-                                   gray_level,
-                                   format,
-                                   type,
-                                   level,
-                                   &count_opened_fonts,
-                                   face.cancel, // copy
-                                   face.is_created // copy
-                };
-                auto job = std::make_unique<CreateFontImageJob>(std::move(data));
-                auto& worker = wxGetApp().plater()->get_ui_job_worker();
-                queue_job(worker, std::move(job));
-            }
-
-            ImGui::SameLine(m_gui_cfg->face_name_texture_offset_x);
-            ImGui::Image(tex_id, size, uv0, uv1);
-            ImGui::PopID();
+            draw_font_preview(face);
         }        
 #ifdef SHOW_FONT_COUNT
         ImGui::TextColored(ImGuiWrapper::COL_GREY_LIGHT, "Count %d",

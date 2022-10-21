@@ -115,6 +115,8 @@ private:
     void draw_style_save_as_popup();
     void draw_style_add_button();
     void init_font_name_texture();
+    struct FaceName;
+    void draw_font_preview(FaceName &face);
     void draw_font_list();
     void draw_style_edit();
     bool draw_italic_button();
@@ -227,7 +229,7 @@ private:
     EmbossStyleManager m_style_manager;
 
     struct FaceName{
-        wxString name;
+        wxString wx_name;
         std::string name_truncated = "";
         size_t texture_index = 0;
         // State for generation of texture
