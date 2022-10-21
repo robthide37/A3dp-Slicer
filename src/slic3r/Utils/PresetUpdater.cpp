@@ -264,9 +264,12 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors, const std::string
 		BOOST_LOG_TRIVIAL(error) << "Download of vedor profiles archive zip failed.";
 		return;
 	}
-	if (cancel) { return; }
+	if (cancel) { 
+		return; 
+	}
 
 	// Unzip archive to cache / vendor
+	std::vector<std::string> vendors_only_in_archive;
 	mz_zip_archive archive;
 	mz_zip_zero_struct(&archive);
 	if (!open_zip_reader(&archive, archive_path.string())) {
@@ -293,22 +296,64 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors, const std::string
 					file.write(buffer.c_str(), buffer.size());
 					file.close();
 					fs::rename(tmp_path, target_path);
+					
+					if (name.substr(name.size() - 3) == "ini")
+						vendors_only_in_archive.push_back(name);
 				}
 			}
 		}
 		close_zip_reader(&archive);
 	}
 
+	auto get_missing_resource = [&self = std::as_const(*this)](const std::string& vendor, const std::string& filename,
+		const std::string& url, const fs::path& vendor_path,
+		const fs::path& rsrc_path, const fs::path& cache_path)
+	{
+		if (filename.empty() || vendor.empty())
+			return;
+
+		if (!boost::starts_with(url, "http://files.prusa3d.com/wp-content/uploads/repository/") &&
+			!boost::starts_with(url, "https://files.prusa3d.com/wp-content/uploads/repository/"))
+		{
+			throw Slic3r::CriticalException(GUI::format("URL outside prusa3d.com network: %1%", url));
+		}
+
+		const fs::path file_in_vendor(vendor_path / (vendor + "/" + filename));
+		const fs::path file_in_rsrc(rsrc_path / (vendor + "/" + filename));
+		const fs::path file_in_cache(cache_path / (vendor + "/" + filename));
+
+		if (fs::exists(file_in_vendor)) { // Already in vendor. No need to do anything.
+			return;
+		}
+		if (fs::exists(file_in_rsrc)) { // In resources dir since installation. No need to do anything.
+			return;
+		}
+	
+		BOOST_LOG_TRIVIAL(info) << "Resources check could not find " << vendor << " / " << filename << " bed texture. Downloading.";
+
+		const auto resource_url = format("%1%%2%%3%", url, url.back() == '/' ? "" : "/", filename); // vendor should already be in url 
+
+		if (!fs::exists(file_in_cache.parent_path()))
+			fs::create_directory(file_in_cache.parent_path());
+
+		self.get_file(resource_url, file_in_cache);
+		return;
+	};
+
 	// Update vendor preset bundles if in Vendor
 	// Over all indices from the cache directory:
 	for (auto &index : index_db) {
-		if (cancel) { return; }
+		if (cancel) { 
+			return; 
+		}
 
 		const auto vendor_it = vendors.find(index.vendor());
 		if (vendor_it == vendors.end()) {
-			BOOST_LOG_TRIVIAL(info) << "No such vendor: " << index.vendor();
+			// Not installed vendor yet we need to check missing thumbnails (of new printers)
+			BOOST_LOG_TRIVIAL(debug) << "No such vendor: " << index.vendor();
 			continue;
 		}
+
 		const VendorProfile &vendor = vendor_it->second;
 		const std::string idx_path = (cache_path / (vendor.id + ".idx")).string();
 		const std::string idx_path_temp = (cache_vendor_path / (vendor.id + ".idx")).string();
@@ -367,30 +412,57 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors, const std::string
 		if (vp.config_version != recommended)
 			continue;
 		copy_file_fix(path_in_archive, path_in_cache);
+		// vendors that are checked here, doesnt need to be checked again later
+		const auto archive_it = std::find(vendors_only_in_archive.begin(), vendors_only_in_archive.end(), index.vendor() + ".ini");
+		if (archive_it != vendors_only_in_archive.end()) {
+			vendors_only_in_archive.erase(archive_it);
+		}
 
 		// check the fresh bundle for missing resources
 		// for that, the ini file must be parsed (done above)
-		auto check_and_get_resource = [&self = std::as_const(*this)](const std::string& vendor, const std::string& filename,
-																	 const std::string& url, const fs::path& vendor_path,
-																	 const fs::path& rsrc_path, const fs::path& cache_path)
-		{
-			if (!fs::exists((vendor_path / (vendor + "/" + filename)))
-				&& !fs::exists((rsrc_path / (vendor + "/" + filename)))) {
-				BOOST_LOG_TRIVIAL(info) << "Resources check could not find " << vendor << " / " << filename << " bed texture. Downloading.";
-				const auto resource_url = format("%1%/%2%/%3%", url, vendor, filename);
-				const auto resource_path = (cache_path / (vendor + "/" + filename));
-				if (!fs::exists(resource_path.parent_path()))
-					fs::create_directory(resource_path.parent_path());
-				self.get_file(resource_url, resource_path);
-			}
-		};
 		for (const auto& model : vp.models) {
-			for (const std::string& res : { model.bed_texture, model.bed_model, model.id +"_thumbnail.png"} ) {
-				if (! res.empty())
-					check_and_get_resource(vp.id, res, vendor.config_update_url, vendor_path, rsrc_path, cache_path);
+			for (const std::string& res : { model.bed_texture, model.bed_model, model.thumbnail/*id +"_thumbnail.png"*/} ) {
+				if (! res.empty()) {
+					try
+					{
+						// for debug (wont pass check inside function)
+						//std::string fake_url = "https://github.com/kocikdav/PrusaSlicer-settings/raw/master/resources/" + vp.id;
+						get_missing_resource(vp.id, res, vendor.config_update_url, vendor_path, rsrc_path, cache_path);
+					}
+					catch (const std::exception& e)
+					{
+						BOOST_LOG_TRIVIAL(error) << "Failed to get " << res << " for " << vp.id << " " << model.id << ": " << e.what();
+					}
+					
+				}
 				if (cancel)
 			    	return;
 			}
+		}
+	}
+	// Download missing thumbnails for not-installed vendors.
+	for (const std::string& vendor : vendors_only_in_archive)	
+	{
+		BOOST_LOG_TRIVIAL(error) << vendor;
+		const auto path_in_archive = cache_vendor_path / vendor;
+		assert(boost::filesystem::exists(path_in_archive));
+		auto vp = VendorProfile::from_ini(path_in_archive, true);
+		for (const auto& model : vp.models) {
+			if (!model.thumbnail.empty()) {
+				try
+				{
+					// for debug (wont pass check inside function)
+					//std::string fake_url = "https://github.com/kocikdav/PrusaSlicer-settings/raw/master/resources/" + vp.id;
+					get_missing_resource(vp.id, model.thumbnail, vp.config_update_url, vendor_path, rsrc_path, cache_path);
+				}
+				catch (const std::exception& e)
+				{
+					BOOST_LOG_TRIVIAL(error) << "Failed to get " << model.thumbnail << " for " << vp.id << " " << model.id << ": " << e.what();
+				}
+			}
+			if (cancel)
+				return;
+			
 		}
 	}
 }
@@ -643,6 +715,9 @@ bool PresetUpdater::priv::perform_updates(Updates &&updates, bool snapshot) cons
 
 		BOOST_LOG_TRIVIAL(info) << format("Performing %1% updates", updates.updates.size());
 
+		wxProgressDialog progress_dialog(_L("Installing profiles"), _L("Installing profiles"));
+		progress_dialog.Pulse();
+		
 		for (const auto &update : updates.updates) {
 			BOOST_LOG_TRIVIAL(info) << '\t' << update;
 
@@ -681,32 +756,71 @@ bool PresetUpdater::priv::perform_updates(Updates &&updates, bool snapshot) cons
 			for (const auto &name : bundle.obsolete_presets.sla_materials/*filaments*/) { obsolete_remover("sla_material", name); } 
 			for (const auto &name : bundle.obsolete_presets.printers)  { obsolete_remover("printer", name); }
 
-			auto copy_missing_resource = [](const std::string& vendor,   const std::string& filename,
+			auto get_and_copy_missing_resource = [&self = std::as_const(*this)](const std::string& vendor,   const std::string& filename,
 											const fs::path& vendor_path, const fs::path& rsrc_path,
-											const fs::path& cache_path)
+											const fs::path& cache_path, const std::string& url)
 			{
-				if (   !fs::exists((vendor_path / (vendor + "/" + filename)))
-					&& !fs::exists((rsrc_path   / (vendor + "/" + filename)))) {
+				if (filename.empty() || vendor.empty())
+					return;
 
-					if (!fs::exists((cache_path / (vendor + "/" + filename)))) {
-						BOOST_LOG_TRIVIAL(error) << "Resources missing in cache directory: " << vendor << " / " << filename;
-						return;
-					}
-					if (!fs::exists((vendor_path / vendor)))
-						fs::create_directory((vendor_path / vendor));
+				const fs::path file_in_vendor(vendor_path / (vendor + "/" + filename));
+				const fs::path file_in_rsrc(rsrc_path / (vendor + "/" + filename));
+				const fs::path file_in_cache(cache_path / (vendor + "/" + filename));
 
-					copy_file_fix((cache_path / (vendor + "/" + filename)), (vendor_path / (vendor + "/" + filename)));
+				if (fs::exists(file_in_vendor)) { // Already in vendor. No need to do anything.
+					return;
 				}
+				if (fs::exists(file_in_rsrc)) { // In resources dir since installation. No need to do anything.
+					return;
+				}
+				if (!fs::exists(file_in_cache)) { // No file to copy. Download it to straight to the vendor dir.
+					if (!boost::starts_with(url, "http://files.prusa3d.com/wp-content/uploads/repository/") &&
+						!boost::starts_with(url, "https://files.prusa3d.com/wp-content/uploads/repository/"))
+					{
+						throw Slic3r::CriticalException(GUI::format("URL outside prusa3d.com network: %1%", url));
+					}
+					BOOST_LOG_TRIVIAL(info) << "Downloading resources missing in cache directory: " << vendor << " / " << filename;
+
+					const auto resource_url = format("%1%%2%%3%", url, url.back() == '/' ? "" : "/", filename); // vendor should already be in url 
+
+					if (!fs::exists(file_in_vendor.parent_path()))
+						fs::create_directory(file_in_vendor.parent_path());
+				
+					self.get_file(resource_url, file_in_vendor);
+					return;
+				}
+
+				if (!fs::exists(file_in_vendor.parent_path())) // create vendor_name dir in vendor 
+					fs::create_directory(file_in_vendor.parent_path());
+				
+				BOOST_LOG_TRIVIAL(debug) << "Copiing: " << file_in_cache << " to " << file_in_vendor;
+				copy_file_fix(file_in_cache, file_in_vendor);
 			};
+
 			// check if any resorces of installed bundle are missing. If so, new ones should be already downloaded at cache/vendor_id/
 			auto vp = VendorProfile::from_ini(update.target, true);
+			progress_dialog.Update(1, GUI::format_wxstr(_L("Downloading resources for %1%."),vp.id));
+			progress_dialog.Pulse();
 			for (const auto& model : vp.models) {
-				copy_missing_resource(vp.id, model.bed_texture, vendor_path, rsrc_path, cache_path);
-				copy_missing_resource(vp.id, model.bed_model, vendor_path, rsrc_path, cache_path);
-				copy_missing_resource(vp.id, model.id + "_thumbnail.png", vendor_path, rsrc_path, cache_path);
+				for (const std::string& resource : { model.bed_texture, model.bed_model, model.thumbnail }) {
+					if (resource.empty())
+						continue;
+					try
+					{
+						// for debug (wont pass check inside function)
+						//std::string fake_url = "https://github.com/kocikdav/PrusaSlicer-settings/raw/master/resources/" + vp.id;
+						get_and_copy_missing_resource(vp.id, resource, vendor_path, rsrc_path, cache_path, vp.config_update_url);
+					}
+					catch (const std::exception& e)
+					{
+						BOOST_LOG_TRIVIAL(error) << "Failed to prepare " << resource << " for " << vp.id << " " << model.id << ": " << e.what();
+					}
+				}
 			}
 			
 		}
+
+		progress_dialog.Destroy();
 	}
 
 	return true;
@@ -750,6 +864,16 @@ void PresetUpdater::sync(const PresetBundle *preset_bundle)
 		this->p->prune_tmps();
 		this->p->sync_config(std::move(vendors), profile_archive_url);
     });
+}
+
+void PresetUpdater::cancel_sync()
+{
+	if (p && p->thread.joinable()) {
+		// This will stop transfers being done by the thread, if any.
+		// Cancelling takes some time, but should complete soon enough.
+		p->cancel = true;
+		p->thread.join();
+	}
 }
 
 void PresetUpdater::slic3r_update_notify()
@@ -932,10 +1056,10 @@ bool PresetUpdater::install_bundles_rsrc_or_cache_vendor(std::vector<std::string
 
 		// find if in cache vendor is newer version than in resources
 		if (is_in_cache_vendor) {
-			auto vp_cache = VendorProfile::from_ini(path_in_cache_vendor, false);
-			auto vp_rsrc = VendorProfile::from_ini(path_in_rsrc, false);
+			auto version_cache = VendorProfile::from_ini(path_in_cache_vendor, false).config_version;
+			auto version_rsrc = !is_in_rsrc ? Semver::zero() : VendorProfile::from_ini(path_in_rsrc, false).config_version;
 
-			if (! is_in_rsrc || vp_cache.config_version > vp_rsrc.config_version) {
+			if (!is_in_rsrc || version_cache > version_rsrc) {
 				// in case we are installing from cache / vendor. we should also copy index to cache
 				// This needs to be done now bcs the current one would be missing this version on next start 
 				auto path_idx_cache_vendor(path_in_cache_vendor);

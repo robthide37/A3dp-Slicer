@@ -239,15 +239,23 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
             }
             return false;
         };
-        if (!load_bitmap(GUI::from_u8(Slic3r::data_dir() + "/vendor/" + vendor.id + "/" + model.id + "_thumbnail.png"), bitmap, bitmap_width)) {
-            if (!load_bitmap(GUI::from_u8(Slic3r::resources_dir() + "/profiles/" + vendor.id + "/" + model.id + "_thumbnail.png"), bitmap, bitmap_width)) {
-                BOOST_LOG_TRIVIAL(warning) << boost::format("Can't find bitmap file `%1%` for vendor `%2%`, printer `%3%`, using placeholder icon instead")
-                    % (Slic3r::resources_dir() + "/profiles/" + vendor.id + "/" + model.id + "_thumbnail.png")
-                    % vendor.id
-                    % model.id;
-                load_bitmap(Slic3r::var(PRINTER_PLACEHOLDER), bitmap, bitmap_width);
+        
+        bool found = false;
+        for (const std::string& res : { Slic3r::data_dir() + "/vendor/" + vendor.id + "/", Slic3r::resources_dir() + "/profiles/" + vendor.id + "/", Slic3r::data_dir() + "/cache/" + vendor.id + "/" } ) {
+            if (load_bitmap(GUI::from_u8(res + "/" + model.thumbnail), bitmap, bitmap_width)) {
+                found = true;
+                break;
             }
         }
+        
+        if (!found) {
+            BOOST_LOG_TRIVIAL(warning) << boost::format("Can't find bitmap file `%1%` for vendor `%2%`, printer `%3%`, using placeholder icon instead")
+                % model.thumbnail
+                % vendor.id
+                % model.id;
+            load_bitmap(Slic3r::var(PRINTER_PLACEHOLDER), bitmap, bitmap_width);
+        }
+        
         auto *title = new wxStaticText(this, wxID_ANY, from_u8(model.name), wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
         title->SetFont(font_name);
         const int wrap_width = std::max((int)MODEL_MIN_WRAP, bitmap_width);
@@ -3053,7 +3061,9 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     if (install_bundles.size() > 0) {
         // Install bundles from resources or cache / vendor.
         // Don't create snapshot - we've already done that above if applicable.
-        if (! updater->install_bundles_rsrc_or_cache_vendor(std::move(install_bundles), false))
+        
+        bool install_result = updater->install_bundles_rsrc_or_cache_vendor(std::move(install_bundles), false);
+        if (!install_result)
             return false;
     } else {
         BOOST_LOG_TRIVIAL(info) << "No bundles need to be installed from resources or cache / vendor";

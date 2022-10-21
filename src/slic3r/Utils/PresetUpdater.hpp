@@ -27,6 +27,7 @@ public:
 
 	// If either version check or config updating is enabled, get the appropriate data in the background and cache it.
 	void sync(const PresetBundle *preset_bundle);
+	void cancel_sync();
 
 	// If version check is enabled, check if chaced online slic3r version is newer, notify if so.
 	void slic3r_update_notify();

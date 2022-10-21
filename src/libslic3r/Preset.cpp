@@ -205,6 +205,10 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
             }
             model.bed_model   = section.second.get<std::string>("bed_model", "");
             model.bed_texture = section.second.get<std::string>("bed_texture", "");
+            model.thumbnail   = section.second.get<std::string>("thumbnail", "");
+            if (model.thumbnail.empty())
+                model.thumbnail = model.id + "_thumbnail.png";
+
             if (! model.id.empty() && ! model.variants.empty())
                 res.models.push_back(std::move(model));
         }
@@ -2138,7 +2142,7 @@ namespace PresetUtils {
         std::string rsrc_folder   = Slic3r::resources_dir() + "/profiles/" + vp.id + "/";
         std::string cache_folder  = Slic3r::data_dir()      + "/cache/"    + vp.id + "/";
         for (const VendorProfile::PrinterModel& model : vp.models) {
-            for (const std::string& res : { model.bed_texture, model.bed_model, model.id + "_thumbnail.png" } ) {
+            for (const std::string& res : { model.bed_texture, model.bed_model, model.thumbnail } ) {
                 if (! res.empty()
                  && !fs::exists(fs::path(vendor_folder + res))
                  && !fs::exists(fs::path(rsrc_folder   + res))
