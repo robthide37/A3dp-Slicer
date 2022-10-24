@@ -835,7 +835,11 @@ void GLGizmoMeasure::update_if_needed()
         m_old_model_volume = volume;
     };
 
-    m_volume_matrix = m_parent.get_selection().get_first_volume()->world_matrix();
+    const Selection& selection = m_parent.get_selection();
+    if (selection.is_empty())
+        return;
+
+    m_volume_matrix = selection.get_first_volume()->world_matrix();
 
     const ModelObject* mo = m_c->selection_info()->model_object();
     const ModelVolume* mv = m_c->selection_info()->model_volume();
