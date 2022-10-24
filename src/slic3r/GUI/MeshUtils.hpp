@@ -115,6 +115,8 @@ public:
 
     void pass_mouse_click(const Vec3d& pt);
 
+    bool contains(Vec3d point);
+    bool has_valid_contour();
 
 private:
     void recalculate_triangles();

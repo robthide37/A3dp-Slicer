@@ -146,6 +146,42 @@ void MeshClipper::render_contour()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
+bool MeshClipper::contains(Vec3d point)
+{
+    if (!m_result)
+        recalculate_triangles();
+
+    for (CutIsland& isl : m_result->cut_islands) {
+        BoundingBoxf3 bb = isl.model_expanded.get_bounding_box();
+
+        // instead of using of standard bb.contains(point)
+        // because of precision (Note, that model_expanded is pretranslate(0.003 * normal.normalized()))
+        constexpr double pres = 0.01;
+        bool ret = (point.x() > bb.min.x() || is_approx(point.x(), bb.min.x(), pres)) && (point.x() < bb.max.x() || is_approx(point.x(), bb.max.x(), pres))
+                && (point.y() > bb.min.y() || is_approx(point.y(), bb.min.y(), pres)) && (point.y() < bb.max.y() || is_approx(point.y(), bb.max.y(), pres))
+                && (point.z() > bb.min.z() || is_approx(point.z(), bb.min.z(), pres)) && (point.z() < bb.max.z() || is_approx(point.z(), bb.max.z(), pres));
+        if (ret) {
+            // when we detected, that model_expanded's bb contains a point, then check if its polygon contains this point 
+            Vec3d point_inv = m_result->trafo.inverse() * point;
+            Point pt = Point(scale_(point_inv.x()), scale_(point_inv.y()));
+            if (isl.expoly.contains(pt))
+                return true;
+        }
+    }
+    return false;
+}
+
+bool MeshClipper::has_valid_contour()
+{
+    if (!m_result)
+        recalculate_triangles();
+
+    for (CutIsland& isl : m_result->cut_islands)
+        if (isl.model_expanded.get_bounding_box().defined)
+            return true;
+
+    return false;
+}
 
 
 void MeshClipper::pass_mouse_click(const Vec3d& point_in)

@@ -266,6 +266,8 @@ public:
     void pass_mouse_click(const Vec3d& pt);
     std::vector<Vec3d> get_disabled_contours() const;
 
+    bool containes(Vec3d point) const;
+    bool has_valid_contour() const;
 
 
 protected:

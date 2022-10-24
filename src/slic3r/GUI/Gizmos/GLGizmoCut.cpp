@@ -1845,6 +1845,32 @@ Transform3d GLGizmoCut3D::get_volume_transformation(const ModelVolume* volume) c
     return assemble_transform(offset, Vec3d::Zero(), Vec3d::Ones() - border_scale, Vec3d::Ones()) * vol_matrix;
 }
 
+bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
+{
+    // check if connector pos is out of clipping plane
+    if (m_c->object_clipper() && !m_c->object_clipper()->containes(cur_pos))
+        return true;
+
+    const CutConnector& cur_connector = connectors[idx];
+    const Transform3d matrix = translation_transform(cur_pos) * m_rotation_m *
+                               scale_transform(Vec3f(cur_connector.radius, cur_connector.radius, cur_connector.height).cast<double>());
+    const BoundingBoxf3 cur_tbb = m_shapes[cur_connector.attribs].model.get_bounding_box().transformed(matrix);
+
+    if (!bounding_box().contains(cur_tbb))
+        return true;
+
+    for (size_t i = 0; i < connectors.size(); ++i) {
+        if (i == idx)
+            continue;
+        const CutConnector& connector = connectors[i];
+
+        if ((connector.pos - cur_connector.pos).norm() < double(connector.radius + cur_connector.radius))
+            return true;
+    }
+
+    return false;
+}
+
 void GLGizmoCut3D::render_connectors()
 {
     ::glEnable(GL_DEPTH_TEST);
@@ -1872,8 +1898,6 @@ void GLGizmoCut3D::render_connectors()
     const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
     const Vec3d& normal = cp && cp->is_active() ? cp->get_normal() : m_clp_normal;
 
-    const Transform3d instance_trafo = assemble_transform(Vec3d(0.0, 0.0, sla_shift)) * mi->get_transformation().get_matrix();
-
     m_has_invalid_connector = false;
 
     for (size_t i = 0; i < connectors.size(); ++i) {
@@ -1881,16 +1905,14 @@ void GLGizmoCut3D::render_connectors()
 
         float height = connector.height;
         // recalculate connector position to world position
-        Vec3d pos = connector.pos + instance_offset;
-        if (connector.attribs.type  == CutConnectorType::Dowel &&
-            connector.attribs.style == CutConnectorStyle::Prizm) {
-            pos -= height * normal;
-            height *= 2;
-        }
-        pos += sla_shift * Vec3d::UnitZ();
+        Vec3d pos = connector.pos + instance_offset + sla_shift * Vec3d::UnitZ();
 
         // First decide about the color of the point.
-        if (!m_connectors_editing)
+        if (is_conflict_for_connector(i, connectors, pos)) {
+            m_has_invalid_connector = true;
+            render_color = CONNECTOR_ERR_COLOR;
+        }
+        else if (!m_connectors_editing)
             render_color = CONNECTOR_ERR_COLOR;
         else if (size_t(m_hover_id - m_connectors_group_id) == i)
             render_color = connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR : HOVERED_PLAG_COLOR;
@@ -1898,26 +1920,13 @@ void GLGizmoCut3D::render_connectors()
             render_color = connector.attribs.type == CutConnectorType::Dowel ? SELECTED_DOWEL_COLOR : SELECTED_PLAG_COLOR;
         else // neither hover nor picking
             render_color = connector.attribs.type == CutConnectorType::Dowel ? DOWEL_COLOR          : PLAG_COLOR;
-        // ! #ysFIXME rework get_volume_transformation
-        if (0) { // else { // neither hover nor picking
-            int mesh_id = -1;
-            for (const ModelVolume* mv : mo->volumes) {
-                ++mesh_id;
-                if (!mv->is_model_part())
-                    continue;
-
-                const Transform3d volume_trafo = get_volume_transformation(mv);
-
-                if (m_c->raycaster()->raycasters()[mesh_id]->is_valid_intersection(pos, -normal, instance_trafo * volume_trafo)) {
-                    render_color = m_connectors_editing ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f) : CONNECTOR_ERR_COLOR;
-                    break;
-                }
-                render_color = CONNECTOR_ERR_COLOR;
-                m_has_invalid_connector = true;
-            }
-        }
 
         const Camera& camera = wxGetApp().plater()->get_camera();
+        if (connector.attribs.type  == CutConnectorType::Dowel &&
+            connector.attribs.style == CutConnectorStyle::Prizm) {
+            pos -= height * normal;
+            height *= 2;
+        }
         const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(pos) * m_rotation_m * 
                                               scale_transform(Vec3f(connector.radius, connector.radius, height).cast<double>());
 
@@ -1930,8 +1939,8 @@ bool GLGizmoCut3D::can_perform_cut() const
     if (m_has_invalid_connector || (!m_keep_upper && !m_keep_lower) || m_connectors_editing)
         return false;
 
-    const BoundingBoxf3 tbb = transformed_bounding_box(m_plane_center, true);
-    return tbb.contains(m_plane_center);
+    const auto clipper = m_c->object_clipper();
+    return clipper && clipper->has_valid_contour();
 }
 
 void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, bool &create_dowels_as_separate_object)
@@ -1982,7 +1991,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     Vec3d cut_center_offset     = m_plane_center - instance_offset;
     cut_center_offset[Z] -= sla_shift_z;
 
-    if (0.0 < object_cut_z && can_perform_cut()) {
+    if (0.0 < object_cut_z) {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by Plane"));
 
         bool create_dowels_as_separate_object = false;
@@ -2014,7 +2023,7 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair
 
     const ModelObject* mo = m_c->selection_info()->model_object();
     const ModelInstance* mi = mo->instances[m_c->selection_info()->get_active_instance()];
-    const Transform3d    instance_trafo = sla_shift > 0.0 ? 
+    const Transform3d    instance_trafo = sla_shift > 0.f ? 
         assemble_transform(Vec3d(0.0, 0.0, sla_shift)) * mi->get_transformation().get_matrix() : mi->get_transformation().get_matrix();
     const Camera& camera = wxGetApp().plater()->get_camera();
 
@@ -2138,33 +2147,28 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
 
 bool GLGizmoCut3D::add_connector(CutConnectors& connectors, const Vec2d& mouse_position)
 {
+    if (!m_connectors_editing)
+        return false;
+
     std::pair<Vec3d, Vec3d> pos_and_normal;
     Vec3d pos_world;
     if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal, pos_world)) {
         const Vec3d& hit = pos_and_normal.first;
 
-        if (m_connectors_editing) {
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
+        unselect_all_connectors();
 
-            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
-            unselect_all_connectors();
-
-            connectors.emplace_back(hit, m_rotation_m,
-                                    m_connector_size * 0.5f, m_connector_depth_ratio,
-                                    m_connector_size_tolerance, m_connector_depth_ratio_tolerance,
-                                    CutConnectorAttributes( CutConnectorType(m_connector_type),
-                                                            CutConnectorStyle(m_connector_style),
-                                                            CutConnectorShape(m_connector_shape_id)));
-            m_selected.push_back(true);
-            m_selected_count = 1;
-            assert(m_selected.size() == connectors.size());
-            update_raycasters_for_picking();
-            m_parent.set_as_dirty();
-        }
-        else {
-            // Following would inform the clipper about the mouse click, so it can
-            // toggle the respective contour as disabled.
-            //m_c->object_clipper()->pass_mouse_click(pos_world);
-        }
+        connectors.emplace_back(hit, m_rotation_m,
+                                m_connector_size * 0.5f, m_connector_depth_ratio,
+                                m_connector_size_tolerance, m_connector_depth_ratio_tolerance,
+                                CutConnectorAttributes( CutConnectorType(m_connector_type),
+                                                        CutConnectorStyle(m_connector_style),
+                                                        CutConnectorShape(m_connector_shape_id)));
+        m_selected.push_back(true);
+        m_selected_count = 1;
+        assert(m_selected.size() == connectors.size());
+        update_raycasters_for_picking();
+        m_parent.set_as_dirty();
 
         return true;
     }
