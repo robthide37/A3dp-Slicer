@@ -632,13 +632,21 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
         } else if (f2.get_type() == SurfaceFeatureType::Circle) {
             // Find a plane containing normal, center and the point.
             const auto [c, radius, n] = f2.get_circle();
-            Eigen::Hyperplane<double, 3> circle_plane(n, c);
-            Vec3d proj = circle_plane.projection(f1.get_point());
-            double dist = std::sqrt(std::pow((proj - c).norm() - radius, 2.) +
-                (f1.get_point() - proj).squaredNorm());
+            const Eigen::Hyperplane<double, 3> circle_plane(n, c);
+            const Vec3d proj = circle_plane.projection(f1.get_point());
+            if (proj.isApprox(c)) {
+                const Vec3d p_on_circle = c + radius * get_orthogonal(n, true);
+                result.distance_strict = std::make_optional(DistAndPoints{ radius, c, p_on_circle });
+            }
+            else {
+                const Eigen::Hyperplane<double, 3> circle_plane(n, c);
+                const Vec3d proj = circle_plane.projection(f1.get_point());
+                const double dist = std::sqrt(std::pow((proj - c).norm() - radius, 2.) +
+                    (f1.get_point() - proj).squaredNorm());
 
-            const Vec3d p_on_circle = c + radius * (circle_plane.projection(f1.get_point()) - c).normalized();
-            result.distance_strict = std::make_optional(DistAndPoints{dist, f1.get_point(), p_on_circle}); // TODO
+                const Vec3d p_on_circle = c + radius * (proj - c).normalized();
+                result.distance_strict = std::make_optional(DistAndPoints{ dist, f1.get_point(), p_on_circle }); // TODO
+            }
     ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Plane) {
             const auto [idx, normal, pt] = f2.get_plane();
