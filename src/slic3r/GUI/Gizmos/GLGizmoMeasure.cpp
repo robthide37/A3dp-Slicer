@@ -9,6 +9,7 @@
 
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/MeasureUtils.hpp"
 
 #include <imgui/imgui_internal.h>
 
@@ -1486,8 +1487,11 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             case Measure::SurfaceFeatureType::Circle:
             {
                 auto [center, radius, normal] = m_curr_feature->get_circle();
+                // generic point on circle, used to recalculate radius after transformation
+                const Vec3d on_circle = m_volume_matrix * (center + radius * Measure::get_orthogonal(normal, true));
                 center = m_volume_matrix * center;
-                normal = m_volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
+                normal = (m_volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal).normalized();
+                radius = (on_circle - center).norm();
                 if (use_inches) {
                     center = ObjectManipulation::mm_to_in * center;
                     radius = ObjectManipulation::mm_to_in * radius;

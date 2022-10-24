@@ -93,7 +93,7 @@ protected:
     std::vector<double> m_coefficient;
 };
 
-Polynomial1 operator * (const Polynomial1& p0, const Polynomial1& p1)
+inline Polynomial1 operator * (const Polynomial1& p0, const Polynomial1& p1)
 {
     const uint32_t p0Degree = p0.GetDegree();
     const uint32_t p1Degree = p1.GetDegree();
@@ -107,7 +107,7 @@ Polynomial1 operator * (const Polynomial1& p0, const Polynomial1& p1)
     return result;
 }
 
-Polynomial1 operator + (const Polynomial1& p0, const Polynomial1& p1)
+inline Polynomial1 operator + (const Polynomial1& p0, const Polynomial1& p1)
 {
     const uint32_t p0Degree = p0.GetDegree();
     const uint32_t p1Degree = p1.GetDegree();
@@ -136,7 +136,7 @@ Polynomial1 operator + (const Polynomial1& p0, const Polynomial1& p1)
     }
 }
 
-Polynomial1 operator - (const Polynomial1& p0, const Polynomial1& p1)
+inline Polynomial1 operator - (const Polynomial1& p0, const Polynomial1& p1)
 {
     const uint32_t p0Degree = p0.GetDegree();
     const uint32_t p1Degree = p1.GetDegree();
@@ -165,7 +165,7 @@ Polynomial1 operator - (const Polynomial1& p0, const Polynomial1& p1)
     }
 }
 
-Polynomial1 operator * (double scalar, const Polynomial1& p)
+inline Polynomial1 operator * (double scalar, const Polynomial1& p)
 {
     const uint32_t degree = p.GetDegree();
     Polynomial1 result(degree);
@@ -354,7 +354,7 @@ public:
 // the maximum absolute component occurs at index i, then the orthogonal
 // vector U has u[i] = v[i+1], u[i+1] = -v[i], and all other components
 // zero.  The index addition i+1 is computed modulo N.
-Vec3d get_orthogonal(const Vec3d& v, bool unitLength)
+inline Vec3d get_orthogonal(const Vec3d& v, bool unitLength)
 {
     double cmax = std::fabs(v[0]);
     int32_t imax = 0;
