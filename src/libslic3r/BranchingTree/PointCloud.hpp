@@ -259,9 +259,9 @@ template<class PC, class Fn> void traverse(PC &&pc, size_t root, Fn &&fn)
 {
     if (auto nodeptr = pc.find(root); nodeptr != nullptr) {
         auto &nroot = *nodeptr;
-        fn(nroot);
-        if (nroot.left  >= 0) traverse(pc, nroot.left, fn);
-        if (nroot.right >= 0) traverse(pc, nroot.right, fn);
+        bool r = fn(nroot);
+        if (r && nroot.left  >= 0) traverse(pc, nroot.left, fn);
+        if (r && nroot.right >= 0) traverse(pc, nroot.right, fn);
     }
 }
 

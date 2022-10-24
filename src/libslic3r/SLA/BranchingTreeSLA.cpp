@@ -61,22 +61,41 @@ class BranchingTreeBuilder: public branchingtree::Builder {
                                          toR);
                 m_builder.add_junction(tod, toR);
             }
+
+            return true;
         });
     }
 
     void discard_subtree(size_t root)
     {
         // Discard all the support points connecting to this branch.
+        // As a last resort, try to route child nodes to ground and stop
+        // traversing if any child branch succeeds.
         traverse(m_cloud, root, [this](const branchingtree::Node &node) {
+            bool ret = true;
+
             int suppid_parent = m_cloud.get_leaf_id(node.id);
-            int suppid_left   = m_cloud.get_leaf_id(node.left);
-            int suppid_right  = m_cloud.get_leaf_id(node.right);
+            int suppid_left   = branchingtree::Node::ID_NONE;
+            int suppid_right  = branchingtree::Node::ID_NONE;
+
+            if (node.left >= 0 && add_ground_bridge(m_cloud.get(node.left), node))
+                ret = false;
+            else
+                suppid_left = m_cloud.get_leaf_id(node.left);
+
+            if (node.right >= 0 && add_ground_bridge(m_cloud.get(node.right), node))
+                ret = false;
+            else
+                suppid_right = m_cloud.get_leaf_id(node.right);
+
             if (suppid_parent >= 0)
                 m_unroutable_pinheads.emplace_back(suppid_parent);
             if (suppid_left >= 0)
                 m_unroutable_pinheads.emplace_back(suppid_left);
             if (suppid_right >= 0)
                 m_unroutable_pinheads.emplace_back(suppid_right);
+
+            return ret;
         });
     }
 
