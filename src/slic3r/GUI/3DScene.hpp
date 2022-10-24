@@ -668,7 +668,6 @@ public:
         // Timestamp of the last change of the milestone
         size_t                          timestamp);
 
-#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 #if ENABLE_OPENGL_ES
     int load_wipe_tower_preview(
         float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh = nullptr);
@@ -676,15 +675,6 @@ public:
     int load_wipe_tower_preview(
         float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width);
 #endif // ENABLE_OPENGL_ES
-#else
-#if ENABLE_OPENGL_ES
-    int load_wipe_tower_preview(
-        int obj_idx, float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh = nullptr);
-#else
-    int load_wipe_tower_preview(
-        int obj_idx, float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width);
-#endif // ENABLE_OPENGL_ES
-#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 #else
     std::vector<int> load_object(
         const ModelObject 		*model_object,
@@ -710,13 +700,8 @@ public:
         size_t                          timestamp,
         bool 			   				opengl_initialized);
 
-#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
     int load_wipe_tower_preview(
         float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized);
-#else
-    int load_wipe_tower_preview(
-        int obj_idx, float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized);
-#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL

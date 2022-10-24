@@ -1786,6 +1786,17 @@ public:
     // Initialized by ConfigOptionEnum<xxx>::get_enum_values()
     const t_config_enum_values         *enum_keys_map   = nullptr;
 
+    void set_enum_values(std::initializer_list<std::pair<std::string_view, std::string_view>> il) {
+        enum_values.clear();
+        enum_values.reserve(il.size());
+        enum_labels.clear();
+        enum_labels.reserve(il.size());
+        for (const std::pair<std::string_view, std::string_view> p : il) {
+            enum_values.emplace_back(p.first);
+            enum_labels.emplace_back(p.second);
+        }
+    }
+
     bool has_enum_value(const std::string &value) const {
         for (const std::string &v : enum_values)
             if (v == value)
