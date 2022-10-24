@@ -5,7 +5,6 @@
 #include <admesh/stl.h>
 
 #include "libslic3r/ExPolygon.hpp"
-#include "libslic3r/BoundingBox.hpp"
 
 namespace Slic3r { namespace branchingtree {
 

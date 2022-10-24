@@ -5,7 +5,7 @@
 #include <optional>
 #include <algorithm>
 
-#include "libslic3r/SLA/SupportTreeUtils.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 namespace Slic3r { namespace branchingtree {
 

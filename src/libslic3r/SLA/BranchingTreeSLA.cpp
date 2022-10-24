@@ -18,6 +18,8 @@ class BranchingTreeBuilder: public branchingtree::Builder {
     const SupportableMesh  &m_sm;
     const branchingtree::PointCloud &m_cloud;
 
+    std::set<int /*ground node_id that was already processed*/> m_ground_mem;
+
     // Scaling of the input value 'widening_factor:<0, 1>' to produce resonable
     // widening behaviour
     static constexpr double WIDENING_SCALE = 0.02;
@@ -156,10 +158,20 @@ bool BranchingTreeBuilder::add_merger(const branchingtree::Node &node,
 bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
                                              const branchingtree::Node &to)
 {
-    bool ret = search_ground_route(ex_tbb, m_builder, m_sm,
+    bool ret = false;
+
+    auto it = m_ground_mem.find(from.id);
+    if (it == m_ground_mem.end()) {
+        ret = search_ground_route(ex_tbb, m_builder, m_sm,
                                    sla::Junction{from.pos.cast<double>(),
                                                  get_radius(from)},
                                    get_radius(to)).first;
+
+        // Remember that this node was tested if can go to ground, don't
+        // test it with any other destination ground point because
+        // it is unlikely that search_ground_route would find a better solution
+        m_ground_mem.insert(from.id);
+    }
 
     if (ret) {
         build_subtree(from.id);
