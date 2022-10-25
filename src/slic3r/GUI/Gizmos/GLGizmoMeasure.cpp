@@ -933,7 +933,8 @@ void GLGizmoMeasure::render_dimensioning()
         shader->set_uniform("view_model_matrix", overlap ?
             ss_to_ndc_matrix * Geometry::translation_transform(v1ss_3) * q12ss * Geometry::translation_transform(-2.0 * TRIANGLE_HEIGHT * Vec3d::UnitX()) * Geometry::scale_transform({ v12ss_len + 4.0 * TRIANGLE_HEIGHT, 1.0f, 1.0f }) :
             ss_to_ndc_matrix * Geometry::translation_transform(v1ss_3) * q12ss * Geometry::scale_transform({ v12ss_len, 1.0f, 1.0f }));
-            m_dimensioning.line.render();
+        m_dimensioning.line.set_color(ColorRGBA::WHITE());
+        m_dimensioning.line.render();
 
         // arrow 1
         shader->set_uniform("view_model_matrix", overlap ?
@@ -1072,6 +1073,7 @@ void GLGizmoMeasure::render_dimensioning()
                     shader->set_uniform("projection_matrix", Transform3d::Identity());
                     shader->set_uniform("view_model_matrix", ss_to_ndc_matrix * Geometry::translation_transform({ pss.x(), pss.y(), 0.0 }) * q *
                         Geometry::scale_transform({ pv_projss_len, 1.0f, 1.0f }));
+                    m_dimensioning.line.set_color(ColorRGBA::LIGHT_GRAY());
                     m_dimensioning.line.render();
                 }
             };
@@ -1154,6 +1156,7 @@ void GLGizmoMeasure::render_dimensioning()
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center)*
                 Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e1.first, e1.second))*
                 Geometry::scale_transform({ e11center_len, 1.0f, 1.0f }));
+            m_dimensioning.line.set_color(ColorRGBA::LIGHT_GRAY());
             m_dimensioning.line.render();
         }
 
@@ -1164,6 +1167,7 @@ void GLGizmoMeasure::render_dimensioning()
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center)*
                 Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e2.first, e2.second))*
                 Geometry::scale_transform({ (coplanar && radius > 0.0) ? e21center_len : draw_radius, 1.0f, 1.0f }));
+            m_dimensioning.line.set_color(ColorRGBA::LIGHT_GRAY());
             m_dimensioning.line.render();
         }
 
