@@ -325,6 +325,9 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             m_mouse_left_down = false;
             return true;
         }
+        if (m_hover_id == -1 && !m_parent.is_mouse_dragging())
+            // avoid closing the gizmo if the user clicks outside of any volume
+            return true;
     }
     else if (mouse_event.RightDown() && mouse_event.CmdDown()) {
         m_selected_features.reset();
@@ -1153,8 +1156,8 @@ void GLGizmoMeasure::render_dimensioning()
         const Vec3d e11center = center - e1.first;
         const double e11center_len = e11center.norm();
         if (e11center_len > EPSILON && e11center.dot(e11e12) < 0.0) {
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center)*
-                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e1.first, e1.second))*
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center) *
+                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e1.first, e1.second)) *
                 Geometry::scale_transform({ e11center_len, 1.0f, 1.0f }));
             m_dimensioning.line.set_color(ColorRGBA::LIGHT_GRAY());
             m_dimensioning.line.render();
@@ -1164,8 +1167,8 @@ void GLGizmoMeasure::render_dimensioning()
         const Vec3d e21center = center - e2.first;
         const double e21center_len = e21center.norm();
         if (e21center_len > EPSILON) {
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center)*
-                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e2.first, e2.second))*
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center) *
+                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitX(), Measure::edge_direction(e2.first, e2.second)) *
                 Geometry::scale_transform({ (coplanar && radius > 0.0) ? e21center_len : draw_radius, 1.0f, 1.0f }));
             m_dimensioning.line.set_color(ColorRGBA::LIGHT_GRAY());
             m_dimensioning.line.render();
