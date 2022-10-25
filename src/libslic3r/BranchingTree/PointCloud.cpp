@@ -1,6 +1,5 @@
 #include "PointCloud.hpp"
 
-#include "libslic3r/Geometry.hpp"
 #include "libslic3r/Tesselate.hpp"
 
 #include <igl/random_points_on_mesh.h>
