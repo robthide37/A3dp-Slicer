@@ -290,6 +290,10 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
                             m_selection_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_2_ID, *m_sphere.mesh_raycaster));
                     }
                 }
+                else {
+                    if (!m_selected_features.second.feature.has_value())
+                        m_selected_features.first.reset();
+                }
             }
             else {
                 const SelectedFeatures::Item item = item_from_feature();
@@ -1398,7 +1402,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     if (m_editing_distance)
         return;
 
-    m_imgui->begin(_u8L("Measure tool"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    m_imgui->begin(get_name(), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
     // adjust window position to avoid overlap the view toolbar
     const float win_h = ImGui::GetWindowHeight();
@@ -1417,18 +1421,39 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
         unsigned int row_count = 1;
         add_row_to_table(
             [this]() {
-            m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Left mouse button"));
+                m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Left mouse button"));
             },
             [this]() {
-                m_imgui->text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text),
-                    m_selected_features.second.feature.has_value() ?
-                    ((m_mode == EMode::BasicSelection) ? _u8L("Select/Unselect feature") : _u8L("Select/Unselect point")) :
-                    ((m_mode == EMode::BasicSelection) ? _u8L("Select feature") : _u8L("Select point")));
+                std::string text;
+                ColorRGBA color;
+                if (m_selected_features.second.feature.has_value()) {
+                    if (m_selected_features.second.feature == m_curr_feature && m_mode == EMode::BasicSelection)
+                        text = _u8L("Unselect feature");
+                    else if (m_hover_id == SELECTION_2_ID)
+                        text = _u8L("Unselect point");
+                    else
+                        text = (m_mode == EMode::BasicSelection) ? _u8L("Select feature") : _u8L("Select point");
+                    color = SELECTED_2ND_COLOR;
+                }
+                else {
+                    if (m_selected_features.first.feature.has_value()) {
+                        if (m_selected_features.first.feature == m_curr_feature)
+                            text = _u8L("Unselect feature");
+                        else if (m_hover_id == SELECTION_1_ID)
+                            text = _u8L("Unselect point");
+                        color = SELECTED_1ST_COLOR;
+                    }
+                    if (text.empty()) {
+                        text = (m_mode == EMode::BasicSelection) ? _u8L("Select feature") : _u8L("Select point");
+                        color = m_selected_features.first.feature.has_value() ? SELECTED_2ND_COLOR : SELECTED_1ST_COLOR;
+                    }
+                }
+
+                m_imgui->text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), text);
                 ImGui::SameLine();
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
                 const float rect_size = ImGui::GetTextLineHeight();
-                ImGui::GetWindowDrawList()->AddRectFilled({ pos.x + 1.0f, pos.y + 1.0f }, { pos.x + rect_size, pos.y + rect_size },
-                    ImGuiWrapper::to_ImU32(m_selected_features.first.feature.has_value() ? SELECTED_2ND_COLOR : SELECTED_1ST_COLOR));
+                ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x + 1.0f, pos.y + 1.0f), ImVec2(pos.x + rect_size, pos.y + rect_size), ImGuiWrapper::to_ImU32(color));
                 ImGui::Dummy(ImVec2(rect_size, rect_size));
             }
             );
