@@ -928,6 +928,7 @@ void GLGizmoCut3D::on_set_state()
 {
     if (m_state == On) {
         update_bb();
+        m_connectors_editing = !m_selected.empty();
 
         // initiate archived values
         m_ar_plane_center   = m_plane_center;
@@ -937,6 +938,7 @@ void GLGizmoCut3D::on_set_state()
     }
     else {
         m_c->object_clipper()->release();
+        m_selected.clear();
     }
 	force_update_clipper_on_render = m_state == On;
 }
@@ -1257,16 +1259,20 @@ void GLGizmoCut3D::on_stop_dragging()
 
 void GLGizmoCut3D::set_center_pos(const Vec3d& center_pos, bool force/* = false*/)
 {
-    const BoundingBoxf3 tbb = transformed_bounding_box(center_pos);
-
-    bool can_set_center_pos = force || (tbb.max.z() > -1. && tbb.min.z() < 1.);
+    bool can_set_center_pos = force;
     if (!can_set_center_pos) {
-        const double old_dist = (m_bb_center - m_plane_center).norm();
-        const double new_dist = (m_bb_center - center_pos).norm();
-        // check if forcing is reasonable
-        if ( new_dist < old_dist)
+        const BoundingBoxf3 tbb = transformed_bounding_box(center_pos);
+        if (tbb.max.z() > -1. && tbb.min.z() < 1.)
             can_set_center_pos = true;
+        else {
+            const double old_dist = (m_bb_center - m_plane_center).norm();
+            const double new_dist = (m_bb_center - center_pos).norm();
+            // check if forcing is reasonable
+            if (new_dist < old_dist)
+                can_set_center_pos = true;
+        }
     }
+
     if (can_set_center_pos) {
         m_plane_center = center_pos;
         m_center_offset = m_plane_center - m_bb_center;
@@ -1299,7 +1305,7 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(const Vec3d& plane_center, 
     if (!mo)
         return ret;
     const int instance_idx = sel_info->get_active_instance();
-    if (instance_idx < 0)
+    if (instance_idx < 0 || mo->instances.empty())
         return ret;
     const ModelInstance* mi = mo->instances[instance_idx];
 
@@ -1372,7 +1378,6 @@ bool GLGizmoCut3D::update_bb()
         clear_selection();
         if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info())
             m_selected.resize(selection->model_object()->cut_connectors.size(), false);
-        m_connectors_editing = !m_selected.empty();
 
         return true;
     }
@@ -1791,8 +1796,18 @@ void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
 
 void GLGizmoCut3D::render_input_window_warning() const
 {
-    if (wxGetApp().plater()->printer_technology() == ptFFF && m_has_invalid_connector)
-        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Invalid connectors detected."));
+    if (wxGetApp().plater()->printer_technology() == ptFFF && m_has_invalid_connector) {
+        wxString out = wxString(ImGui::WarningMarkerSmall) + _L("Invalid connectors detected") + ":";
+        if (m_info_stats.outside_cut_contour > size_t(0))
+            out += "\n - " + format_wxstr(_L_PLURAL("%1$d connector is out of cut contour", "%1$d connectors are out of cut contour", m_info_stats.outside_cut_contour),
+                                          m_info_stats.outside_cut_contour);
+        if (m_info_stats.outside_bb > size_t(0))
+            out += "\n - " + format_wxstr(_L_PLURAL("%1$d connector is out of object", "%1$d connectors are out of object", m_info_stats.outside_bb),
+                                           m_info_stats.outside_bb);
+        if (m_info_stats.is_overlap)
+            out += "\n - " + _L("Some connectors are overlapped");
+        m_imgui->text(out);
+    }
     if (!m_keep_upper && !m_keep_lower)
         m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Invalid state. \nNo one part is selected for keep after cut"));
 }
@@ -1848,24 +1863,30 @@ Transform3d GLGizmoCut3D::get_volume_transformation(const ModelVolume* volume) c
 bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
 {
     // check if connector pos is out of clipping plane
-    if (m_c->object_clipper() && !m_c->object_clipper()->containes(cur_pos))
+    if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(cur_pos)) {
+        m_info_stats.outside_cut_contour++;
         return true;
+    }
 
     const CutConnector& cur_connector = connectors[idx];
     const Transform3d matrix = translation_transform(cur_pos) * m_rotation_m *
                                scale_transform(Vec3f(cur_connector.radius, cur_connector.radius, cur_connector.height).cast<double>());
     const BoundingBoxf3 cur_tbb = m_shapes[cur_connector.attribs].model.get_bounding_box().transformed(matrix);
 
-    if (!bounding_box().contains(cur_tbb))
+    if (!bounding_box().contains(cur_tbb)) {
+        m_info_stats.outside_bb++;
         return true;
+    }
 
     for (size_t i = 0; i < connectors.size(); ++i) {
         if (i == idx)
             continue;
         const CutConnector& connector = connectors[i];
 
-        if ((connector.pos - cur_connector.pos).norm() < double(connector.radius + cur_connector.radius))
+        if ((connector.pos - cur_connector.pos).norm() < double(connector.radius + cur_connector.radius)) {
+            m_info_stats.is_overlap = true;
             return true;
+        }
     }
 
     return false;
@@ -1899,6 +1920,7 @@ void GLGizmoCut3D::render_connectors()
     const Vec3d& normal = cp && cp->is_active() ? cp->get_normal() : m_clp_normal;
 
     m_has_invalid_connector = false;
+    m_info_stats.invalidate();
 
     for (size_t i = 0; i < connectors.size(); ++i) {
         const CutConnector& connector = connectors[i];
@@ -1970,6 +1992,8 @@ void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, bool &create_dowel
 
 void GLGizmoCut3D::perform_cut(const Selection& selection)
 {
+    if (!can_perform_cut())
+        return;
     const int instance_idx = selection.get_instance_idx();
     const int object_idx = selection.get_object_idx();
 
@@ -1985,13 +2009,13 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
     // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
     const double sla_shift_z    = selection.get_first_volume()->get_sla_shift_z();
-    const double object_cut_z   = m_plane_center.z() - sla_shift_z;
 
     const Vec3d instance_offset = mo->instances[instance_idx]->get_offset();
     Vec3d cut_center_offset     = m_plane_center - instance_offset;
     cut_center_offset[Z] -= sla_shift_z;
 
-    if (0.0 < object_cut_z) {
+    // perform cut
+    {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by Plane"));
 
         bool create_dowels_as_separate_object = false;
@@ -2007,9 +2031,6 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                     only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) | 
                     only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) | 
                     only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));
-    }
-    else {
-        // the object is SLA-elevated and the plane is under it.
     }
 }
 

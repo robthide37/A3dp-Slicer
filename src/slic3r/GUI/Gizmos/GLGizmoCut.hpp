@@ -74,6 +74,19 @@ class GLGizmoCut3D : public GLGizmoBase
 
     Vec3d   m_old_center;
 
+    struct InvalidConnectorsStatistics
+    {
+        unsigned int    outside_cut_contour;
+        unsigned int    outside_bb;
+        bool            is_overlap;
+
+        void invalidate() {
+            outside_cut_contour = 0;
+            outside_bb = 0;
+            is_overlap = false;
+        } 
+    } m_info_stats;
+
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };
     bool m_place_on_cut_upper{ true };

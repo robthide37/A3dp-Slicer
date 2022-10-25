@@ -456,62 +456,14 @@ void ObjectClipper::render_cut() const
     }
 }
 
-bool ObjectClipper::containes(Vec3d point) const
+bool ObjectClipper::is_projection_inside_cut(const Vec3d& point) const
 {
-    if (m_clp_ratio == 0.)
-        return false;
-    const SelectionInfo* sel_info = get_pool()->selection_info();
-    int sel_instance_idx = sel_info->get_active_instance();
-    if (sel_instance_idx < 0)
-        return false;
-    const ModelObject* mo = sel_info->model_object();
-    const Geometry::Transformation inst_trafo = mo->instances[sel_instance_idx]->get_transformation();
-
-    size_t clipper_id = 0;
-    for (const ModelVolume* mv : mo->volumes) {
-        const Geometry::Transformation vol_trafo  = mv->get_transformation();
-        Geometry::Transformation trafo = inst_trafo * vol_trafo;
-        trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
-
-        auto& clipper = m_clippers[clipper_id];
-        clipper->set_plane(*m_clp);
-        clipper->set_transformation(trafo);
-        clipper->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
-        if (clipper->contains(point))
-            return true;
-
-        ++clipper_id;
-    }
-    return false;
+    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [point](const std::unique_ptr<MeshClipper>& cl) { return cl->is_projection_inside_cut(point); });
 }
 
 bool ObjectClipper::has_valid_contour() const
 {
-    if (m_clp_ratio == 0.)
-        return false;
-    const SelectionInfo* sel_info = get_pool()->selection_info();
-    int sel_instance_idx = sel_info->get_active_instance();
-    if (sel_instance_idx < 0)
-        return false;
-    const ModelObject* mo = sel_info->model_object();
-    const Geometry::Transformation inst_trafo = mo->instances[sel_instance_idx]->get_transformation();
-
-    size_t clipper_id = 0;
-    for (const ModelVolume* mv : mo->volumes) {
-        const Geometry::Transformation vol_trafo  = mv->get_transformation();
-        Geometry::Transformation trafo = inst_trafo * vol_trafo;
-        trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
-
-        auto& clipper = m_clippers[clipper_id];
-        clipper->set_plane(*m_clp);
-        clipper->set_transformation(trafo);
-        clipper->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
-        if (clipper->has_valid_contour())
-            return true;
-
-        ++clipper_id;
-    }
-    return false;
+    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [](const std::unique_ptr<MeshClipper>& cl) { return cl->has_valid_contour(); });
 }
 
 void ObjectClipper::set_position_by_ratio(double pos, bool keep_normal)

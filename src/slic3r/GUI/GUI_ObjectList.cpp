@@ -4155,10 +4155,11 @@ void ObjectList::change_part_type()
     if (obj_idx < 0) return;
 
     const ModelVolumeType type = volume->type();
+    const ModelObject* obj = object(obj_idx);
     if (type == ModelVolumeType::MODEL_PART)
     {
         int model_part_cnt = 0;
-        for (auto vol : (*m_objects)[obj_idx]->volumes) {
+        for (auto vol : obj->volumes) {
             if (vol->type() == ModelVolumeType::MODEL_PART)
                 ++model_part_cnt;
         }
@@ -4169,9 +4170,18 @@ void ObjectList::change_part_type()
         }
     }
 
-    const wxString names[] = { _L("Part"), _L("Negative Volume"), _L("Modifier"), _L("Support Blocker"), _L("Support Enforcer") };
-    auto new_type = ModelVolumeType(wxGetApp().GetSingleChoiceIndex(_L("Type:"), _L("Select type of part"), wxArrayString(5, names), int(type)));
+    const bool is_cut_object = obj->is_cut();
 
+    wxArrayString names;
+    names.Alloc(is_cut_object ? 3 : 5);
+    if (!is_cut_object)
+        for (const wxString& type : { _L("Part"), _L("Negative Volume") })
+            names.Add(type);
+    for (const wxString& type : { _L("Modifier"), _L("Support Blocker"), _L("Support Enforcer") } )
+        names.Add(type);
+
+    const int type_shift = is_cut_object ? 2 : 0;
+    auto new_type = ModelVolumeType(type_shift + wxGetApp().GetSingleChoiceIndex(_L("Type:"), _L("Select type of part"), names, int(type) - type_shift));
 	if (new_type == type || new_type == ModelVolumeType::INVALID)
         return;
 

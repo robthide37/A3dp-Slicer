@@ -266,7 +266,7 @@ public:
     void pass_mouse_click(const Vec3d& pt);
     std::vector<Vec3d> get_disabled_contours() const;
 
-    bool containes(Vec3d point) const;
+    bool is_projection_inside_cut(const Vec3d& point_in) const;
     bool has_valid_contour() const;
 
 
