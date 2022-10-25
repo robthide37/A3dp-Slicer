@@ -268,7 +268,6 @@ set(SLIC3R_SOURCES
     TriangleMeshSlicer.hpp
     MeshSplitImpl.hpp
     TriangulateWall.hpp
-    TriangulateWall.cpp
     utils.cpp
     Utils.hpp
     Time.cpp

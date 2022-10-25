@@ -39,8 +39,6 @@
 //====================
 #define ENABLE_2_5_0_ALPHA1 1
 
-// Enable removal of wipe tower magic object_id equal to 1000
-#define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of legacy OpenGL calls
 #define ENABLE_LEGACY_OPENGL_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable OpenGL ES

@@ -2197,7 +2197,7 @@ void PrintObject::combine_infill()
 
 void PrintObject::_generate_support_material()
 {
-    if (m_config.support_material_style == smsTree) {
+    if (m_config.support_material_style == smsTree || m_config.support_material_style == smsOrganic) {
         fff_tree_support_generate(*this, std::function<void()>([this](){ this->throw_if_canceled(); }));
     } else {
         PrintObjectSupportMaterial support_material(this, m_slicing_params);
@@ -2205,7 +2205,7 @@ void PrintObject::_generate_support_material()
     }
 }
 
-static void project_triangles_to_slabs(ConstLayerPtrsAdaptor layers, const indexed_triangle_set &custom_facets, const Transform3f &tr, bool seam, std::vector<Polygons> &out)
+static void project_triangles_to_slabs(SpanOfConstPtrs<Layer> layers, const indexed_triangle_set &custom_facets, const Transform3f &tr, bool seam, std::vector<Polygons> &out)
 {
     if (custom_facets.indices.empty())
         return;

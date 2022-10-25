@@ -574,7 +574,7 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
             if (i < min_solid_height)
                 continue;
 
-            if (DoubleSlider::check_color_change(object, i, num_layers, true, [this, object](Layer*) {
+            if (DoubleSlider::check_color_change(object, i, num_layers, true, [this, object](const Layer*) {
                 NotificationManager* notif_mngr = wxGetApp().plater()->get_notification_manager();
                 notif_mngr->push_notification(
                     NotificationType::SignDetected, NotificationManager::NotificationLevel::PrintInfoNotificationLevel,

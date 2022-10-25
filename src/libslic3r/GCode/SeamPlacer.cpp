@@ -1,6 +1,7 @@
 #include "SeamPlacer.hpp"
 
 #include "Color.hpp"
+#include "Polygon.hpp"
 #include "PrintConfig.hpp"
 #include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
@@ -995,49 +996,6 @@ void pick_random_seam_point(const std::vector<SeamCandidate> &perimeter_points, 
     perimeter.finalized = true;
 }
 
-class PerimeterDistancer {
-    std::vector<Linef> lines;
-    AABBTreeIndirect::Tree<2, double> tree;
-
-public:
-    PerimeterDistancer(const Layer *layer) {
-        ExPolygons layer_outline = layer->lslices;
-        for (const ExPolygon &island : layer_outline) {
-            assert(island.contour.is_counter_clockwise());
-            for (const auto &line : island.contour.lines()) {
-                lines.emplace_back(unscale(line.a), unscale(line.b));
-            }
-            for (const Polygon &hole : island.holes) {
-                assert(hole.is_clockwise());
-                for (const auto &line : hole.lines()) {
-                    lines.emplace_back(unscale(line.a), unscale(line.b));
-                }
-            }
-        }
-        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
-    }
-
-    float distance_from_perimeter(const Vec2f &point) const {
-        Vec2d p = point.cast<double>();
-        size_t hit_idx_out { };
-        Vec2d hit_point_out = Vec2d::Zero();
-        auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, p, hit_idx_out, hit_point_out);
-        if (distance < 0) {
-            return std::numeric_limits<float>::max();
-        }
-
-        distance = sqrt(distance);
-        const Linef &line = lines[hit_idx_out];
-        Vec2d v1 = line.b - line.a;
-        Vec2d v2 = p - line.a;
-        if ((v1.x() * v2.y()) - (v1.y() * v2.x()) > 0.0) {
-            distance *= -1;
-        }
-        return distance;
-    }
-}
-;
-
 } // namespace SeamPlacerImpl
 
 // Parallel process and extract each perimeter polygon of the given print object.
@@ -1089,13 +1047,14 @@ void SeamPlacer::calculate_candidates_visibility(const PrintObject *po,
 
 void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) {
     using namespace SeamPlacerImpl;
+    using PerimeterDistancer = AABBTreeLines::LinesDistancer<Linef>;
 
     std::vector<PrintObjectSeamData::LayerSeams> &layers = m_seam_per_object[po].layers;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, layers.size()),
             [po, &layers](tbb::blocked_range<size_t> r) {
                 std::unique_ptr<PerimeterDistancer> prev_layer_distancer;
                 if (r.begin() > 0) { // previous layer exists
-                    prev_layer_distancer = std::make_unique<PerimeterDistancer>(po->layers()[r.begin() - 1]);
+                    prev_layer_distancer = std::make_unique<PerimeterDistancer>(to_unscaled_linesf(po->layers()[r.begin() - 1]->lslices));
                 }
 
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
@@ -1106,12 +1065,13 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                         }
                     };
                     bool should_compute_layer_embedding = regions_with_perimeter > 1;
-                    std::unique_ptr<PerimeterDistancer> current_layer_distancer = std::make_unique<PerimeterDistancer>(po->layers()[layer_idx]);
+                    std::unique_ptr<PerimeterDistancer> current_layer_distancer        = std::make_unique<PerimeterDistancer>(
+                        to_unscaled_linesf(po->layers()[layer_idx]->lslices));
 
                     for (SeamCandidate &perimeter_point : layers[layer_idx].points) {
                         Vec2f point = Vec2f { perimeter_point.position.head<2>() };
                         if (prev_layer_distancer.get() != nullptr) {
-                            perimeter_point.overhang = prev_layer_distancer->distance_from_perimeter(point)
+                            perimeter_point.overhang = prev_layer_distancer->signed_distance_from_lines(point.cast<double>())
                                     + 0.6f * perimeter_point.perimeter.flow_width
                                     - tan(SeamPlacer::overhang_angle_threshold)
                                             * po->layers()[layer_idx]->height;
@@ -1120,7 +1080,7 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                         }
 
                         if (should_compute_layer_embedding) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
-                            perimeter_point.embedded_distance = current_layer_distancer->distance_from_perimeter(point)
+                            perimeter_point.embedded_distance = current_layer_distancer->signed_distance_from_lines(point.cast<double>())
                                     + 0.6f * perimeter_point.perimeter.flow_width;
                         }
                     }

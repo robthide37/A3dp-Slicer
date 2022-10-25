@@ -566,11 +566,7 @@ bool Selection::is_single_full_instance() const
 bool Selection::is_from_single_object() const
 {
     const int idx = get_object_idx();
-#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
     return 0 <= idx && idx < int(m_model->objects.size());
-#else
-    return 0 <= idx && idx < 1000;
-#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 }
 
 bool Selection::is_sla_compliant() const
@@ -1426,16 +1422,10 @@ void Selection::translate(unsigned int object_idx, const Vec3d& displacement)
         if (done.size() == m_volumes->size())
             break;
 
-#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         if ((*m_volumes)[i]->is_wipe_tower)
             continue;
 
         int object_idx = (*m_volumes)[i]->object_idx();
-#else
-        int object_idx = (*m_volumes)[i]->object_idx();
-        if (object_idx >= 1000)
-            continue;
-#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 
         // Process unselected volumes of the object.
         for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
@@ -1480,16 +1470,10 @@ void Selection::translate(unsigned int object_idx, unsigned int instance_idx, co
         if (done.size() == m_volumes->size())
             break;
 
-#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         if ((*m_volumes)[i]->is_wipe_tower)
             continue;
 
-        int object_idx = (*m_volumes)[i]->object_idx();
-#else
-        int object_idx = (*m_volumes)[i]->object_idx();
-        if (object_idx >= 1000)
-            continue;
-#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+        const int object_idx = (*m_volumes)[i]->object_idx();
 
         // Process unselected volumes of the object.
         for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
@@ -2987,17 +2971,10 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
             break;
 
         const GLVolume* volume_i = (*m_volumes)[i];
-#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         if (volume_i->is_wipe_tower)
             continue;
 
         const int object_idx = volume_i->object_idx();
-#else
-        const int object_idx = volume_i->object_idx();
-        if (object_idx >= 1000)
-            continue;
-#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
-
         const int instance_idx = volume_i->instance_idx();
 #if ENABLE_WORLD_COORDINATE
         const Geometry::Transformation& curr_inst_trafo_i = volume_i->get_instance_transformation();
@@ -3095,17 +3072,10 @@ void Selection::synchronize_unselected_volumes()
 {
     for (unsigned int i : m_list) {
         const GLVolume* volume = (*m_volumes)[i];
-#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         if (volume->is_wipe_tower)
             continue;
 
         const int object_idx = volume->object_idx();
-#else
-        const int object_idx = volume->object_idx();
-        if (object_idx >= 1000)
-            continue;
-#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
-
         const int volume_idx = volume->volume_idx();
 #if ENABLE_WORLD_COORDINATE
         const Geometry::Transformation& trafo = volume->get_volume_transformation();

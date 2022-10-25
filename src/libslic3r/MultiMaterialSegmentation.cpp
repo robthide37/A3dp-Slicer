@@ -1305,7 +1305,7 @@ static inline std::vector<std::vector<ExPolygons>> mmu_segmentation_top_and_bott
 {
     const size_t num_extruders = print_object.print()->config().nozzle_diameter.size() + 1;
     const size_t num_layers    = input_expolygons.size();
-    const ConstLayerPtrsAdaptor layers = print_object.layers();
+    const SpanOfConstPtrs<Layer> layers = print_object.layers();
 
     // Maximum number of top / bottom layers accounts for maximum overlap of one thread group into a neighbor thread group.
     int max_top_layers = 0;
@@ -1685,7 +1685,7 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
     std::vector<std::vector<PaintedLine>> painted_lines(num_layers);
     std::array<std::mutex, 64>            painted_lines_mutex;
     std::vector<EdgeGrid::Grid>           edge_grids(num_layers);
-    const ConstLayerPtrsAdaptor           layers = print_object.layers();
+    const SpanOfConstPtrs<Layer>          layers = print_object.layers();
     std::vector<ExPolygons>               input_expolygons(num_layers);
 
     throw_on_cancel_callback();

@@ -2349,21 +2349,11 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
             const float brim_width = print.wipe_tower_data(extruders_count).brim_width;
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
             m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
                 !print.is_step_done(psWipeTower), brim_width);
 #else
-            m_shells.volumes.load_wipe_tower_preview(1000, config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
-                !print.is_step_done(psWipeTower), brim_width);
-#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
-#else
-#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
             m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
                 !print.is_step_done(psWipeTower), brim_width, initialized);
-#else
-            m_shells.volumes.load_wipe_tower_preview(1000, config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
-                !print.is_step_done(psWipeTower), brim_width, initialized);
-#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
     }

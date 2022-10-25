@@ -10,9 +10,9 @@
 #include <tchar.h>
 #include <winioctl.h>
 #include <shlwapi.h>
-
 #include <Dbt.h>
-
+#include <Setupapi.h>
+#include <cfgmgr32.h>
 #else
 // unix, linux & OSX includes
 #include <errno.h>
@@ -72,6 +72,192 @@ std::vector<DriveData> RemovableDriveManager::search_for_removable_drives() cons
 	return current_drives;
 }
 
+namespace {
+// returns the device instance handle of a storage volume or 0 on error
+// called from eject_inner, based on https://stackoverflow.com/a/58848961
+DEVINST get_dev_inst_by_device_number(long device_number, UINT drive_type, WCHAR* dos_device_name)
+{
+	bool is_floppy = (wcsstr(dos_device_name, L"\\Floppy") != NULL); // TODO: could be tested better?
+	GUID* guid;
+	switch (drive_type) {
+	case DRIVE_REMOVABLE:
+		if (is_floppy) {
+			// we are interested only in SD cards or USB sticks
+			BOOST_LOG_TRIVIAL(debug) << "get_dev_inst_by_device_number failed: Drive is floppy disk.";
+			return 0;
+			//guid = (GUID*)&GUID_DEVINTERFACE_FLOPPY;
+		} else {
+			guid = (GUID*)&GUID_DEVINTERFACE_DISK;
+		}
+		break;
+	case DRIVE_FIXED:
+		// we are interested only in SD cards or USB sticks
+		BOOST_LOG_TRIVIAL(debug) << "get_dev_inst_by_device_number failed: Drive is harddisk.";
+		return 0;
+		//guid = (GUID*)&GUID_DEVINTERFACE_DISK;
+		//break;
+	case DRIVE_CDROM:
+		BOOST_LOG_TRIVIAL(debug) << "get_dev_inst_by_device_number failed: Drive is cd-rom.";
+		// we are interested only in SD cards or USB sticks
+		return 0;
+		//guid = (GUID*)&GUID_DEVINTERFACE_CDROM;
+		//break;
+	default:
+		return 0;
+	}
+
+	// Get device interface info set handle for all devices attached to system
+	HDEVINFO h_dev_info = SetupDiGetClassDevs(guid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+
+	if (h_dev_info == INVALID_HANDLE_VALUE) {
+		BOOST_LOG_TRIVIAL(debug) << "get_dev_inst_by_device_number failed: Invalid dev info handle.";
+		return 0;
+	}
+
+	// Retrieve a context structure for a device interface of a device information set
+	BYTE							 buf[1024];
+	PSP_DEVICE_INTERFACE_DETAIL_DATA pspdidd = (PSP_DEVICE_INTERFACE_DETAIL_DATA)buf;
+	SP_DEVICE_INTERFACE_DATA         spdid;
+	SP_DEVINFO_DATA                  spdd;
+	DWORD                            size;
+
+	spdid.cbSize = sizeof(spdid);
+
+	// Loop through devices and compare device numbers
+	for (DWORD index = 0; SetupDiEnumDeviceInterfaces(h_dev_info, NULL, guid, index, &spdid); ++index) {
+		SetupDiGetDeviceInterfaceDetail(h_dev_info, &spdid, NULL, 0, &size, NULL);
+		// check the buffer size 
+		if (size == 0 || size > sizeof(buf)) {
+			continue;
+		}
+		// prepare structures
+		pspdidd->cbSize = sizeof(*pspdidd);
+		ZeroMemory(&spdd, sizeof(spdd));
+		spdd.cbSize = sizeof(spdd);
+		// fill structures
+		long res = SetupDiGetDeviceInterfaceDetail(h_dev_info, &spdid, pspdidd, size, &size, &spdd);
+		if (!res) {
+			continue;
+		}
+		// open the drive with pspdidd->DevicePath to compare device numbers
+		HANDLE drive_handle = CreateFile(pspdidd->DevicePath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+		if (drive_handle == INVALID_HANDLE_VALUE) {
+			continue;
+		}
+		// get its device number
+		STORAGE_DEVICE_NUMBER sdn;
+		DWORD			      bytes_returned = 0;
+		res = DeviceIoControl(drive_handle, IOCTL_STORAGE_GET_DEVICE_NUMBER, NULL, 0, &sdn, sizeof(sdn), &bytes_returned, NULL);
+		CloseHandle(drive_handle);
+		if (!res) {
+			continue;
+		}
+		//compare
+		if (device_number != (long)sdn.DeviceNumber) {
+			continue;
+		}
+		// this is the drive, return the device instance
+		SetupDiDestroyDeviceInfoList(h_dev_info);
+		return spdd.DevInst;
+	}
+
+	SetupDiDestroyDeviceInfoList(h_dev_info);
+	BOOST_LOG_TRIVIAL(debug) << "get_dev_inst_by_device_number failed: Enmurating couldn't find the drive.";
+	return 0;
+}
+
+// Perform eject using CM_Request_Device_EjectW.
+// Returns 0 if success.
+int eject_inner(const std::string& path)
+{
+	// Following implementation is based on https://stackoverflow.com/a/58848961
+	assert(path.size() > 0);
+	std::wstring wpath = std::wstring();
+	wpath += boost::nowide::widen(path)[0]; // drive letter wide
+	wpath[0] &= ~0x20; // make sure drive letter is uppercase
+	assert(wpath[0] >= 'A' && wpath[0] <= 'Z');
+	std::wstring root_path			= wpath + L":\\"; // for GetDriveType
+	std::wstring device_path		= wpath + L":"; //for QueryDosDevice
+	std::wstring volume_access_path = L"\\\\.\\" + wpath + L":"; // for CreateFile
+	long	     device_number		= -1;
+
+	// open the storage volume
+	HANDLE volume_handle = CreateFileW(volume_access_path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, NULL, NULL);
+	if (volume_handle == INVALID_HANDLE_VALUE) {
+		BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1% has failed: Invalid value of file handle.", path);
+		return 1;
+	}
+
+	// get the volume's device number
+	STORAGE_DEVICE_NUMBER sdn;
+	DWORD bytes_returned = 0;
+	long res = DeviceIoControl(volume_handle, IOCTL_STORAGE_GET_DEVICE_NUMBER, NULL, 0, &sdn, sizeof(sdn), &bytes_returned, NULL);
+	if (res) {
+		device_number = sdn.DeviceNumber;
+	}
+	CloseHandle(volume_handle);
+
+	if (device_number == -1) {
+		BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1% has failed: Invalid device number.", path);
+		return 1;
+	}
+
+	// get the drive type which is required to match the device numbers correctely
+	UINT drive_type = GetDriveTypeW(root_path.c_str());
+
+	// get the dos device name (like \device\floppy0) to decide if it's a floppy or not
+	WCHAR dos_device_name[MAX_PATH];
+	res = QueryDosDeviceW(device_path.c_str(), dos_device_name, MAX_PATH);
+	if (!res) {
+		BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1% has failed: Invalid dos device name.", path);
+		return 1;
+	}
+
+	// get the device instance handle of the storage volume by means of a SetupDi enum and matching the device number
+	DEVINST dev_inst = get_dev_inst_by_device_number(device_number, drive_type, dos_device_name);
+
+	if (dev_inst == 0) {
+		BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1% has failed: Invalid device instance handle.", path);
+		return 1;
+	}
+
+	PNP_VETO_TYPE veto_type = PNP_VetoTypeUnknown;
+	WCHAR		  veto_name[MAX_PATH];
+	veto_name[0] = 0;
+
+	// get drives's parent, e.g. the USB bridge, the SATA port, an IDE channel with two drives!
+	DEVINST dev_inst_parent = 0;
+	res = CM_Get_Parent(&dev_inst_parent, dev_inst, 0);
+	
+#if 0
+	// loop with several tries and sleep (this is running on main UI thread)
+	for (int i = 0; i < 3; ++i) { 
+		veto_name[0] = 0;
+		// CM_Query_And_Remove_SubTree doesn't work for restricted users
+		//res = CM_Query_And_Remove_SubTreeW(DevInstParent, &VetoType, VetoNameW, MAX_PATH, CM_REMOVE_NO_RESTART); // CM_Query_And_Remove_SubTreeA is not implemented under W2K!
+		//res = CM_Query_And_Remove_SubTreeW(DevInstParent, NULL, NULL, 0, CM_REMOVE_NO_RESTART);  // with messagebox (W2K, Vista) or balloon (XP)
+		res = CM_Request_Device_EjectW(dev_inst_parent, &veto_type, veto_name, MAX_PATH, 0);
+		//res = CM_Request_Device_EjectW(DevInstParent, NULL, NULL, 0, 0); // with messagebox (W2K, Vista) or balloon (XP)
+		if (res == CR_SUCCESS && veto_type == PNP_VetoTypeUnknown) {
+			return 0;
+		}
+		// Wait for next try. 
+		// This is main thread!
+		Sleep(500);
+	}
+#endif // 0
+
+	// perform eject 
+	res = CM_Request_Device_EjectW(dev_inst_parent, &veto_type, veto_name, MAX_PATH, 0);
+	if (res == CR_SUCCESS && veto_type == PNP_VetoTypeUnknown) {
+		return 0;
+	}
+
+	BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1% has failed: Request to eject device has failed.", path);
+	return 1;
+}
+
+}
 // Called from UI therefore it blocks the UI thread.
 // It also blocks updates at the worker thread.
 // Win32 implementation.
@@ -86,6 +272,28 @@ void RemovableDriveManager::eject_drive()
 	BOOST_LOG_TRIVIAL(info) << "Ejecting started"; 
 	std::scoped_lock<std::mutex> lock(m_drives_mutex);
 	auto it_drive_data = this->find_last_save_path_drive_data();
+	if (it_drive_data != m_current_drives.end()) {
+		if (!eject_inner(m_last_save_path)) {
+		// success
+		assert(m_callback_evt_handler);
+		if (m_callback_evt_handler)
+			wxPostEvent(m_callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair< DriveData, bool >(std::move(*it_drive_data), true)));
+		} else {
+			// failed to eject
+			// this should not happen, throwing exception might be the way here
+			assert(m_callback_evt_handler);
+			if (m_callback_evt_handler)
+				wxPostEvent(m_callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair<DriveData, bool>(*it_drive_data, false)));
+		}
+	} else {
+		// drive not found in m_current_drives
+		assert(m_callback_evt_handler);
+		if (m_callback_evt_handler)
+			wxPostEvent(m_callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair<DriveData, bool>({"",""}, false)));
+	}
+#if 0
+	// Implementation used until 2.5.x version
+	// Some usb drives does not eject properly (still visible in file explorer). Some even does not write all content and eject.
 	if (it_drive_data != m_current_drives.end()) {
 		// get handle to device
 		std::string mpath = "\\\\.\\" + m_last_save_path;
@@ -102,16 +310,16 @@ void RemovableDriveManager::eject_drive()
 		//these 3 commands should eject device safely but they dont, the device does disappear from file explorer but the "device was safely remove" notification doesnt trigger.
 		//sd cards does  trigger WM_DEVICECHANGE messege, usb drives dont
 		BOOL e1 = DeviceIoControl(handle, FSCTL_LOCK_VOLUME, nullptr, 0, nullptr, 0, &deviceControlRetVal, nullptr);
-		BOOST_LOG_TRIVIAL(debug) << "FSCTL_LOCK_VOLUME " << e1 << " ; " << deviceControlRetVal << " ; " << GetLastError();
+		BOOST_LOG_TRIVIAL(error) << "FSCTL_LOCK_VOLUME " << e1 << " ; " << deviceControlRetVal << " ; " << GetLastError();
 		BOOL e2 = DeviceIoControl(handle, FSCTL_DISMOUNT_VOLUME, nullptr, 0, nullptr, 0, &deviceControlRetVal, nullptr);
-		BOOST_LOG_TRIVIAL(debug) << "FSCTL_DISMOUNT_VOLUME " << e2 << " ; " << deviceControlRetVal << " ; " << GetLastError();
-		// some implemenatations also calls IOCTL_STORAGE_MEDIA_REMOVAL here but it returns error to me
+		BOOST_LOG_TRIVIAL(error) << "FSCTL_DISMOUNT_VOLUME " << e2 << " ; " << deviceControlRetVal << " ; " << GetLastError();
+		// some implemenatations also calls IOCTL_STORAGE_MEDIA_REMOVAL here with FALSE as third parameter, which should set PreventMediaRemoval 
 		BOOL error = DeviceIoControl(handle, IOCTL_STORAGE_EJECT_MEDIA, nullptr, 0, nullptr, 0, &deviceControlRetVal, nullptr);
 		if (error == 0) {
 			CloseHandle(handle);
 			BOOST_LOG_TRIVIAL(error) << "Ejecting " << mpath << " failed (IOCTL_STORAGE_EJECT_MEDIA)" << deviceControlRetVal << " " << GetLastError();
 			assert(m_callback_evt_handler);
-			if (m_callback_evt_handler)
+			if (m_callback_evt_handler) 
 				wxPostEvent(m_callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair<DriveData, bool>(*it_drive_data, false)));
 			return;
 		}
@@ -122,6 +330,7 @@ void RemovableDriveManager::eject_drive()
 			wxPostEvent(m_callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair< DriveData, bool >(std::move(*it_drive_data), true)));
 		m_current_drives.erase(it_drive_data);
 	}
+#endif // 0
 }
 
 std::string RemovableDriveManager::get_removable_drive_path(const std::string &path)

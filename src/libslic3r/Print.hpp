@@ -21,6 +21,7 @@
 
 #include <functional>
 #include <set>
+#include <tcbspan/span.hpp>
 
 namespace Slic3r {
 
@@ -117,38 +118,12 @@ private:
 inline bool operator==(const PrintRegion &lhs, const PrintRegion &rhs) { return lhs.config_hash() == rhs.config_hash() && lhs.config() == rhs.config(); }
 inline bool operator!=(const PrintRegion &lhs, const PrintRegion &rhs) { return ! (lhs == rhs); }
 
-template<typename T>
-class ConstVectorOfPtrsAdaptor {
-public:
-    // Returning a non-const pointer to const pointers to T.
-    T * const *             begin() const { return m_data->data(); }
-    T * const *             end()   const { return m_data->data() + m_data->size(); }
-    const T*                front() const { return m_data->front(); }
-    const T*                back()  const { return m_data->back(); }
-    size_t                  size()  const { return m_data->size(); }
-    bool                    empty() const { return m_data->empty(); }
-    const T*                operator[](size_t i) const { return (*m_data)[i]; }
-    const T*                at(size_t i) const { return m_data->at(i); }
-    std::vector<const T*>   vector() const { return std::vector<const T*>(this->begin(), this->end()); }
-protected:
-    ConstVectorOfPtrsAdaptor(const std::vector<T*> *data) : m_data(data) {}
-private:
-    const std::vector<T*> *m_data;
-};
+// For const correctness: Wrapping a vector of non-const pointers as a span of const pointers.
+template<class T>
+using SpanOfConstPtrs           = tcb::span<const T* const>;
 
-typedef std::vector<Layer*>       LayerPtrs;
-typedef std::vector<const Layer*> ConstLayerPtrs;
-class ConstLayerPtrsAdaptor : public ConstVectorOfPtrsAdaptor<Layer> {
-    friend PrintObject;
-    ConstLayerPtrsAdaptor(const LayerPtrs *data) : ConstVectorOfPtrsAdaptor<Layer>(data) {}
-};
-
-typedef std::vector<SupportLayer*>        SupportLayerPtrs;
-typedef std::vector<const SupportLayer*>  ConstSupportLayerPtrs;
-class ConstSupportLayerPtrsAdaptor : public ConstVectorOfPtrsAdaptor<SupportLayer> {
-    friend PrintObject;
-    ConstSupportLayerPtrsAdaptor(const SupportLayerPtrs *data) : ConstVectorOfPtrsAdaptor<SupportLayer>(data) {}
-};
+using LayerPtrs                 = std::vector<Layer*>;
+using SupportLayerPtrs          = std::vector<SupportLayer*>;
 
 class BoundingBoxf3;        // TODO: for temporary constructor parameter
 
@@ -256,8 +231,8 @@ public:
     // Size of an object: XYZ in scaled coordinates. The size might not be quite snug in XY plane.
     const Vec3crd&               size() const			{ return m_size; }
     const PrintObjectConfig&     config() const         { return m_config; }    
-    ConstLayerPtrsAdaptor        layers() const         { return ConstLayerPtrsAdaptor(&m_layers); }
-    ConstSupportLayerPtrsAdaptor support_layers() const { return ConstSupportLayerPtrsAdaptor(&m_support_layers); }
+    auto                         layers() const         { return SpanOfConstPtrs<Layer>(const_cast<const Layer* const* const>(m_layers.data()), m_layers.size()); }
+    auto                         support_layers() const { return SpanOfConstPtrs<SupportLayer>(const_cast<const SupportLayer* const* const>(m_support_layers.data()), m_support_layers.size()); }
     const Transform3d&           trafo() const          { return m_trafo; }
     // Trafo with the center_offset() applied after the transformation, to center the object in XY before slicing.
     Transform3d                  trafo_centered() const 
@@ -498,21 +473,10 @@ struct PrintStatistics
     }
 };
 
-typedef std::vector<PrintObject*>       PrintObjectPtrs;
-typedef std::vector<const PrintObject*> ConstPrintObjectPtrs;
-class ConstPrintObjectPtrsAdaptor : public ConstVectorOfPtrsAdaptor<PrintObject> {
-    friend Print;
-    ConstPrintObjectPtrsAdaptor(const PrintObjectPtrs *data) : ConstVectorOfPtrsAdaptor<PrintObject>(data) {}
-};
+using PrintObjectPtrs          = std::vector<PrintObject*>;
+using ConstPrintObjectPtrs     = std::vector<const PrintObject*>;
 
-typedef std::vector<PrintRegion*>       PrintRegionPtrs;
-/*
-typedef std::vector<const PrintRegion*> ConstPrintRegionPtrs;
-class ConstPrintRegionPtrsAdaptor : public ConstVectorOfPtrsAdaptor<PrintRegion> {
-    friend Print;
-    ConstPrintRegionPtrsAdaptor(const PrintRegionPtrs *data) : ConstVectorOfPtrsAdaptor<PrintRegion>(data) {}
-};
-*/
+using PrintRegionPtrs          = std::vector<PrintRegion*>;
 
 // The complete print tray with possibly multiple objects.
 class Print : public PrintBaseWithState<PrintStep, psCount>
@@ -575,7 +539,7 @@ public:
     const PrintConfig&          config() const { return m_config; }
     const PrintObjectConfig&    default_object_config() const { return m_default_object_config; }
     const PrintRegionConfig&    default_region_config() const { return m_default_region_config; }
-    ConstPrintObjectPtrsAdaptor objects() const { return ConstPrintObjectPtrsAdaptor(&m_objects); }
+    SpanOfConstPtrs<PrintObject> objects() const { return SpanOfConstPtrs<PrintObject>(const_cast<const PrintObject* const* const>(m_objects.data()), m_objects.size()); }
     PrintObject*                get_object(size_t idx) { return const_cast<PrintObject*>(m_objects[idx]); }
     const PrintObject*          get_object(size_t idx) const { return m_objects[idx]; }
     // PrintObject by its ObjectID, to be used to uniquely bind slicing warnings to their source PrintObjects
