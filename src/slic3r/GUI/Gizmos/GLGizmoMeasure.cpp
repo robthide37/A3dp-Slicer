@@ -438,9 +438,9 @@ void GLGizmoMeasure::on_render()
     render_debug_dialog();
 #endif // ENABLE_MEASURE_GIZMO_DEBUG
 
-    // do not render if the user is panning/rotating the 3d scene
-    if (m_parent.is_mouse_dragging())
-        return;
+//    // do not render if the user is panning/rotating the 3d scene
+//    if (m_parent.is_mouse_dragging())
+//        return;
 
     const Selection& selection = m_parent.get_selection();
 
@@ -610,6 +610,8 @@ void GLGizmoMeasure::on_render()
 
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
         glsafe(::glEnable(GL_DEPTH_TEST));
+        const bool old_cullface = ::glIsEnabled(GL_CULL_FACE);
+        glsafe(::glDisable(GL_CULL_FACE));
 
         const Transform3d& view_matrix = camera.get_view_matrix();
 
@@ -795,6 +797,9 @@ void GLGizmoMeasure::on_render()
         }
 
         shader->stop_using();
+
+        if (old_cullface)
+            glsafe(::glEnable(GL_CULL_FACE));
     }
 
     render_dimensioning();
