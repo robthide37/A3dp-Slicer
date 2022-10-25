@@ -558,8 +558,7 @@ bool optimize_pinhead_placement(Ex                     policy,
                 m.cfg.head_back_radius_mm;
 
        // check available distance
-    Hit t = pinhead_mesh_hit(policy, m.emesh, hp, nn, pin_r, back_r, w,
-                                   sd);
+    Hit t = pinhead_mesh_hit(policy, m.emesh, hp, nn, pin_r, back_r, w, sd);
 
     if (t.distance() < w) {
         // Let's try to optimize this angle, there might be a
@@ -663,11 +662,13 @@ std::pair<bool, long> connect_to_ground(Ex                     policy,
         return {false, SupportTreeNode::ID_UNSET};
 
     Vec3d endp = hjp + d * dir;
-    auto ret = create_ground_pillar(policy, builder, sm, endp, dir, r, end_r);
+    double bridge_ratio =  d / (d + (endp.z() - sm.emesh.ground_level()));
+    double pill_r  = r + bridge_ratio * (end_r - r);
+    auto ret = create_ground_pillar(policy, builder, sm, endp, dir, pill_r, end_r);
 
     if (ret.second >= 0) {
-        builder.add_bridge(hjp, endp, r);
-        builder.add_junction(endp, r);
+        builder.add_diffbridge(hjp, endp, r, pill_r);
+        builder.add_junction(endp, pill_r);
     }
 
     return ret;
@@ -687,9 +688,9 @@ std::pair<bool, long> search_ground_route(Ex                     policy,
     if (res.first)
         return res;
 
-       // Optimize bridge direction:
-       // Straight path failed so we will try to search for a suitable
-       // direction out of the cavity.
+    // Optimize bridge direction:
+    // Straight path failed so we will try to search for a suitable
+    // direction out of the cavity.
     auto [polar, azimuth] = dir_to_spheric(init_dir);
 
     Optimizer<AlgNLoptGenetic> solver(get_criteria(sm.cfg).stop_score(1e6));
