@@ -1208,6 +1208,9 @@ void GLGizmoMeasure::render_dimensioning()
 
     auto arc_plane_plane = [this, arc_edge_edge](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2) {
         assert(f1.get_type() == Measure::SurfaceFeatureType::Plane && f2.get_type() == Measure::SurfaceFeatureType::Plane);
+        if (!m_measurement_result.angle.has_value())
+            return;
+
         const std::pair<Vec3d, Vec3d> e1 = m_measurement_result.angle->e1;
         const std::pair<Vec3d, Vec3d> e2 = m_measurement_result.angle->e2;
         const double calc_radius = m_measurement_result.angle->radius;
