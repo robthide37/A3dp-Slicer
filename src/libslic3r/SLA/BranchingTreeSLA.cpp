@@ -78,12 +78,16 @@ class BranchingTreeBuilder: public branchingtree::Builder {
             int suppid_left   = branchingtree::Node::ID_NONE;
             int suppid_right  = branchingtree::Node::ID_NONE;
 
-            if (node.left >= 0 && add_ground_bridge(m_cloud.get(node.left), node))
+            branchingtree::Node dst = node;
+            dst.weight += node.pos.z();
+            dst.Rmin = std::max(node.Rmin, dst.Rmin);
+
+            if (node.left >= 0 && add_ground_bridge(m_cloud.get(node.left), dst))
                 ret = false;
             else
                 suppid_left = m_cloud.get_leaf_id(node.left);
 
-            if (node.right >= 0 && add_ground_bridge(m_cloud.get(node.right), node))
+            if (node.right >= 0 && add_ground_bridge(m_cloud.get(node.right), dst))
                 ret = false;
             else
                 suppid_right = m_cloud.get_leaf_id(node.right);
@@ -143,7 +147,7 @@ bool BranchingTreeBuilder::add_bridge(const branchingtree::Node &from,
     double fromR = get_radius(from), toR = get_radius(to);
     Beam beam{Ball{fromd, fromR}, Ball{tod, toR}};
     auto   hit = beam_mesh_hit(ex_tbb, m_sm.emesh, beam,
-                               m_sm.cfg.safety_distance_mm);
+                               0.9 * m_sm.cfg.safety_distance_mm);
 
     bool ret = hit.distance() > (tod - fromd).norm();
 
