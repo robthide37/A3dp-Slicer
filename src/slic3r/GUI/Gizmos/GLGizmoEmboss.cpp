@@ -323,6 +323,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         ModelObject *act_model_object = act_model_volume->get_object();
         m_raycast_manager.actualize(act_model_object, &condition);
         m_dragging_mouse_offset = calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
+        // Cancel job to prevent interuption of dragging (duplicit result)
+        if (m_update_job_cancel != nullptr) m_update_job_cancel->store(true);
         return false;
     }
 
