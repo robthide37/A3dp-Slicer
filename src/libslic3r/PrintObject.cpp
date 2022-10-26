@@ -962,7 +962,7 @@ void PrintObject::detect_surfaces_type()
         #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
                     
                     // save surfaces to layer
-                    Surfaces &surfaces_out = interface_shells ? surfaces_new[idx_layer] : layerm->slices().surfaces;
+                    Surfaces &surfaces_out = interface_shells ? surfaces_new[idx_layer] : layerm->m_slices.surfaces;
                     Surfaces  surfaces_backup;
                     if (! interface_shells) {
                         surfaces_backup = std::move(surfaces_out);
