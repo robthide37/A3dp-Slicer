@@ -272,6 +272,9 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
 bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
                                            const branchingtree::Node &to)
 {
+    if (from.weight > m_sm.cfg.max_weight_on_model_support)
+        return false;
+
     sla::Junction fromj = {from.pos.cast<double>(), get_radius(from)};
 
     auto anchor = m_sm.cfg.ground_facing_only ?

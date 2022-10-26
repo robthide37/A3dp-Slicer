@@ -861,6 +861,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     // Generate only ground facing supports
     ((ConfigOptionBool, support_buildplate_only))
 
+    ((ConfigOptionFloat, support_max_weight_on_model))
+
     // TODO: unimplemented at the moment. This coefficient will have an impact
     // when bridges and pillars are merged. The resulting pillar should be a bit
     // thicker than the ones merging into it. How much thicker? I don't know

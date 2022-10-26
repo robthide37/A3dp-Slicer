@@ -66,6 +66,7 @@ sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfig& c)
             scfg.safety_distance_mm : c.support_base_safety_distance.getFloat();
     
     scfg.max_bridges_on_pillar = unsigned(c.support_max_bridges_on_pillar.getInt());
+    scfg.max_weight_on_model_support = c.support_max_weight_on_model.getFloat();
     
     return scfg;
 }
@@ -843,6 +844,7 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             || opt_key == "support_pillar_diameter"
             || opt_key == "support_pillar_widening_factor"
             || opt_key == "support_small_pillar_diameter_percent"
+            || opt_key == "support_max_weight_on_model"
             || opt_key == "support_max_bridges_on_pillar"
             || opt_key == "support_pillar_connection_mode"
             || opt_key == "support_buildplate_only"

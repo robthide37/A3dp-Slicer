@@ -390,6 +390,7 @@ void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
     toggle_field("support_max_bridge_length", supports_en);
     toggle_field("support_max_pillar_link_distance", supports_en && is_default_tree);
     toggle_field("support_pillar_widening_factor", supports_en && is_branching_tree);
+    toggle_field("support_max_weight_on_model", supports_en && is_branching_tree);
     toggle_field("support_points_density_relative", supports_en);
     toggle_field("support_points_minimal_distance", supports_en);
 

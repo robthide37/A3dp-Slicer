@@ -76,7 +76,9 @@ struct SupportTreeConfig
     double pillar_base_safety_distance_mm = 0.5;
     
     unsigned max_bridges_on_pillar = 3;
-    
+
+    double max_weight_on_model_support = 10.f;
+
     double head_fullwidth() const {
         return 2 * head_front_radius_mm + head_width_mm +
                2 * head_back_radius_mm - head_penetration_mm;
