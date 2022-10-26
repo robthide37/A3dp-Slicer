@@ -2522,17 +2522,7 @@ bool ObjectList::can_merge_to_single_object() const
 
 wxPoint ObjectList::get_mouse_position_in_control() const
 {
-    wxPoint pt = wxGetMousePosition() - this->GetScreenPosition();
-
-#ifdef __APPLE__
-    // Workaround for OSX. From wxWidgets 3.1.6 Hittest doesn't respect to the header of wxDataViewCtrl
-    if (wxDataViewItem top_item = this->GetTopItem(); top_item.IsOk()) {
-        auto rect = this->GetItemRect(top_item, this->GetColumn(0));
-        pt.y -= rect.y;
-    }
-#endif // __APPLE__
-
-    return pt;
+    return wxGetMousePosition() - this->GetScreenPosition();
 }
 
 // NO_PARAMETERS function call means that changed object index will be determine from Selection() 
