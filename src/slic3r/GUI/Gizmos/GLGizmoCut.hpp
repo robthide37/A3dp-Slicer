@@ -96,6 +96,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
     bool m_hide_cut_plane{ false };
     bool m_connectors_editing{ false };
+    bool m_cut_plane_as_circle{ false };
 
     float m_connector_depth_ratio{ 3.f };
     float m_connector_size{ 2.5f };
@@ -251,8 +252,6 @@ private:
     void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix);
     void render_cut_plane_grabbers();
     void render_cut_line();
-    bool can_render_cut_plane_line(bool render_values = false);
-    void render_cut_plane_line();
     void perform_cut(const Selection&selection);
     void set_center_pos(const Vec3d&center_pos, bool force = false);
     bool update_bb();

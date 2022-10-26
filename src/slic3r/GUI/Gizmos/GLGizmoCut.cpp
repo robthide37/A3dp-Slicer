@@ -599,81 +599,6 @@ static wxString get_label(Vec2d vec)
     return str;
 }
 
-bool  GLGizmoCut3D::can_render_cut_plane_line(bool render_values_in_debug/* = false*/)
-{
-    const Camera& camera = wxGetApp().plater()->get_camera();
-
-    Vec3d unit_dir = m_rotation_m * Vec3d::UnitZ();
-
-    const Matrix4d projection_view_matrix = camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix();
-
-    const Vec2d screen_coord = world_to_ss(m_plane_center, projection_view_matrix, camera.get_viewport());
-
-    const Vec3d mouse_dir = m_parent.mouse_ray(Point(screen_coord.x(), screen_coord.y())).unit_vector();
-
-    const Vec3d camera_dir = camera.get_dir_forward();
-//    double proj = unit_dir.dot(camera_dir);
-    const double proj = unit_dir.dot(mouse_dir);
-    const bool can_render = std::abs(proj) <= 0.01; // 0.25
-
-    if (render_values_in_debug) {
-        ImGui::Separator();
-
-        m_imgui->text("Unit dir: ");
-        ImGui::SameLine(m_label_width);
-        m_imgui->text(get_label(unit_dir));
-
-        m_imgui->text("Camera dir: ");
-        ImGui::SameLine(m_label_width);
-        m_imgui->text(get_label(camera_dir));
-
-        // m_imgui->text("screen_coord: ");
-        // ImGui::SameLine(m_label_width);
-        // m_imgui->text(get_label(screen_coord));
-
-        m_imgui->text("Mouse dir: ");
-        ImGui::SameLine(m_label_width);
-        m_imgui->text(get_label(mouse_dir));
-
-//        m_imgui->text("Unit2Camera: ");
-        m_imgui->text("Unit2Mouse: ");
-        double proj = unit_dir.dot(/*camera_dir*/mouse_dir);
-        ImGui::SameLine(m_label_width);
-        m_imgui->text_colored(can_render ? ImGuiWrapper::COL_ORANGE_LIGHT : ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()), double_to_string(proj, 2));
-    }
-
-    return can_render;
-}
-
-void GLGizmoCut3D::render_cut_plane_line()
-{
-    if (cut_line_processing())
-        return;
-
-    glsafe(::glEnable(GL_DEPTH_TEST));
-    glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
-
-    if (can_render_cut_plane_line()) {
-        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
-        if (shader) {
-            GLModel circle;
-            init_from_circle(circle, m_radius * 1.25);
-
-            const Camera& camera = wxGetApp().plater()->get_camera();
-            const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
-
-            shader->start_using();
-            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-            shader->set_uniform("view_model_matrix", view_model_matrix);
-            shader->set_uniform("width", 0.1f);
-
-            circle.render();
-
-            shader->stop_using();
-        }
-    }
-}
-
 void GLGizmoCut3D::render_cut_plane()
 {
     if (cut_line_processing())
@@ -697,7 +622,8 @@ void GLGizmoCut3D::render_cut_plane()
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
     if (can_perform_cut())
-        m_plane.set_color({ 0.8f, 0.8f, 0.8f, 0.5f });
+//        m_plane.set_color({ 0.8f, 0.8f, 0.8f, 0.5f });
+        m_plane.set_color({ 0.9f, 0.9f, 0.9f, 0.5f });
     else
         m_plane.set_color({ 1.0f, 0.8f, 0.8f, 0.5f });
     m_plane.render();
@@ -947,7 +873,8 @@ void GLGizmoCut3D::on_set_state()
 void GLGizmoCut3D::on_register_raycasters_for_picking()
 {
     assert(m_raycasters.empty());
-    set_volumes_picking_state(false);
+    // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(true);
 
     init_picking_models();
 
@@ -977,7 +904,8 @@ void GLGizmoCut3D::on_unregister_raycasters_for_picking()
 {
     m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo);
     m_raycasters.clear();
-    set_volumes_picking_state(true);
+    // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(false);
 }
 
 void GLGizmoCut3D::update_raycasters_for_picking()
@@ -1418,8 +1346,12 @@ void GLGizmoCut3D::init_rendering_items()
     if (!m_angle_arc.is_initialized() || m_angle != 0.0)
         init_from_angle_arc(m_angle_arc, m_angle, m_grabber_connection_len);
 
-    if (!m_plane.is_initialized() && !m_hide_cut_plane && !m_connectors_editing)
-        m_plane.init_from(its_make_square_plane(float(m_radius)));
+    if (!m_plane.is_initialized() && !m_hide_cut_plane && !m_connectors_editing) {
+        if (m_cut_plane_as_circle)
+            m_plane.init_from(its_make_frustum_dowel(2. * m_radius, 0.3, 180));
+        else
+            m_plane.init_from(its_make_square_plane(float(m_radius)));
+    }
 }
 
 void GLGizmoCut3D::render_clipper_cut()
@@ -1453,8 +1385,6 @@ void GLGizmoCut3D::on_render()
 
     render_cut_line();
 
-    render_cut_plane_line();
-
     m_selection_rectangle.render(m_parent);
 }
 
@@ -1474,8 +1404,10 @@ void GLGizmoCut3D::render_debug_input_window()
     if (auto oc = m_c->object_clipper())
         oc->set_behavior(hide_clipped || m_connectors_editing, fill_cut || m_connectors_editing, double(contour_width));
 
-    // Camera editing
-    can_render_cut_plane_line(true);
+    ImGui::Separator();
+
+    if (m_imgui->checkbox(_L("Render cut plane as circle"), m_cut_plane_as_circle))
+        m_plane.reset();
 
     m_imgui->end();
 }
