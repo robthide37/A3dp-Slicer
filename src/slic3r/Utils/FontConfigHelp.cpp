@@ -14,21 +14,26 @@ using namespace Slic3r::GUI;
 // Will be finalized on application exit
 // It seams that it NOT work
 static std::optional<Slic3r::ScopeGuard> finalize_guard;
+// cache for Loading of the default configuration file and building information about the available fonts.
+static FcConfig *fc = nullptr;
 
-std::string Slic3r::GUI::get_font_path(const wxFont &font)
+std::string Slic3r::GUI::get_font_path(const wxFont &font, bool reload_fonts)
 {
     if (!finalize_guard.has_value()) {
         FcInit();
+        fc = FcInitLoadConfigAndFonts();
         finalize_guard.emplace([]() {
             // Some internal problem of Font config or other library use FC too(like wxWidget)
             // fccache.c:795: FcCacheFini: Assertion `fcCacheChains[i] == NULL' failed. 
             //FcFini(); 
+            FcConfigDestroy(fc);
         });
-    }    
+    } else if (reload_fonts) {
+        FcConfigDestroy(fc);
+        fc = FcInitLoadConfigAndFonts();
+    }
 
-    FcConfig *fc = FcInitLoadConfigAndFonts();
     if (fc == nullptr) return "";
-    ScopeGuard sg_fc([fc]() { FcConfigDestroy(fc); });
 
     wxString                 fontDesc = font.GetNativeFontInfoUserDesc();
     wxString                 faceName = font.GetFaceName();
