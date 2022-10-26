@@ -7165,7 +7165,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
             if (is_selected_separate_extruder) {
                 bool at_least_one_has_correct_extruder = false;
                 for (const LayerRegion* layerm : layer->regions()) {
-                    if (layerm->slices.surfaces.empty())
+                    if (layerm->slices().empty())
                         continue;
                     const PrintRegionConfig& cfg = layerm->region().config();
                     if (cfg.perimeter_extruder.value    == m_selected_extruder ||
@@ -7208,14 +7208,14 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                     }
                     if (ctxt.has_perimeters)
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-                        _3DScene::extrusionentity_to_verts(layerm->perimeters, float(layer->print_z), copy,
+                        _3DScene::extrusionentity_to_verts(layerm->perimeters(), float(layer->print_z), copy,
                             select_geometry(idx_layer, layerm->region().config().perimeter_extruder.value, 0));
 #else
                         _3DScene::extrusionentity_to_verts(layerm->perimeters, float(layer->print_z), copy,
                         	volume(idx_layer, layerm->region().config().perimeter_extruder.value, 0));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     if (ctxt.has_infill) {
-                        for (const ExtrusionEntity *ee : layerm->fills.entities) {
+                        for (const ExtrusionEntity *ee : layerm->fills()) {
                             // fill represents infill extrusions of a single island.
                             const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
                             if (! fill->entities.empty())

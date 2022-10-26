@@ -459,8 +459,8 @@ SCENARIO("Some weird coverage test", "[Perimeters]")
     object->slice();
     Layer       *layer = object->get_layer(1);
     LayerRegion *layerm = layer->get_region(0);
-    layerm->slices.clear();
-    layerm->slices.append({ expolygon }, stInternal);
+    layerm->m_slices.clear();
+    layerm->m_slices.append({ expolygon }, stInternal);
     
     // make perimeters
     layer->make_perimeters();
@@ -472,22 +472,22 @@ SCENARIO("Some weird coverage test", "[Perimeters]")
     Polygons covered_by_infill;
     {
         Polygons acc;
-        for (const ExtrusionEntity *ee : layerm->perimeters.entities)
+        for (const ExtrusionEntity *ee : layerm->perimeters())
             for (const ExtrusionEntity *ee : dynamic_cast<const ExtrusionEntityCollection*>(ee)->entities)
                 append(acc, offset(dynamic_cast<const ExtrusionLoop*>(ee)->polygon().split_at_first_point(), float(pflow.scaled_width() / 2.f + SCALED_EPSILON)));
         covered_by_perimeters = union_(acc);
     }
     {
         Polygons acc;
-        for (const Surface &surface : layerm->fill_surfaces.surfaces)
-            append(acc, to_polygons(surface.expolygon));
-        for (const ExtrusionEntity *ee : layerm->thin_fills.entities)
+        for (const ExPolygon &expolygon : layerm->fill_expolygons())
+            append(acc, to_polygons(expolygon));
+        for (const ExtrusionEntity *ee : layerm->thin_fills().entities)
             append(acc, offset(dynamic_cast<const ExtrusionPath*>(ee)->polyline, float(iflow.scaled_width() / 2.f + SCALED_EPSILON)));
         covered_by_infill = union_(acc);
     }
     
     // compute the non covered area
-    ExPolygons non_covered = diff_ex(to_polygons(layerm->slices.surfaces), union_(covered_by_perimeters, covered_by_infill));
+    ExPolygons non_covered = diff_ex(to_polygons(layerm->slices().surfaces), union_(covered_by_perimeters, covered_by_infill));
     
     /*
     if (0) {
@@ -506,7 +506,8 @@ SCENARIO("Some weird coverage test", "[Perimeters]")
     }
     */
     THEN("no gap between perimeters and infill") {
-        size_t num_non_convered = std::count_if(non_covered.begin(), non_covered.end(), [&iflow](const ExPolygon &ex){ return ex.area() > sqr(double(iflow.scaled_width())); });
+        size_t num_non_convered = std::count_if(non_covered.begin(), non_covered.end(), 
+            [&iflow](const ExPolygon &ex){ return ex.area() > sqr(double(iflow.scaled_width())); });
         REQUIRE(num_non_convered == 0);
     }
 }

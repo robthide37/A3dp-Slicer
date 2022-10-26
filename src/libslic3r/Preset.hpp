@@ -418,7 +418,7 @@ public:
     size_t          first_compatible_idx(PreferedCondition prefered_condition) const
     {
         size_t i = m_default_suppressed ? m_num_default_presets : 0;
-        size_t n = this->m_presets.size();
+        size_t n = m_presets.size();
         size_t i_compatible = n;
         int    match_quality = -1;
         for (; i < n; ++ i)

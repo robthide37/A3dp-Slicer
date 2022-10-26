@@ -371,7 +371,7 @@ std::pair<std::vector<Vec3i>, std::vector<Vec3i>> TriangleSelector::precompute_a
 {
     std::vector<Vec3i> neighbors(m_triangles.size(), Vec3i(-1, -1, -1));
     std::vector<Vec3i> neighbors_propagated(m_triangles.size(), Vec3i(-1, -1, -1));
-    for (int facet_idx = 0; facet_idx < this->m_orig_size_indices; ++facet_idx) {
+    for (int facet_idx = 0; facet_idx < m_orig_size_indices; ++facet_idx) {
         neighbors[facet_idx]            = m_neighbors[facet_idx];
         neighbors_propagated[facet_idx] = neighbors[facet_idx];
         assert(this->verify_triangle_neighbors(m_triangles[facet_idx], neighbors[facet_idx]));
@@ -1480,7 +1480,7 @@ void TriangleSelector::get_facets_split_by_tjoints(const Vec3i &vertices, const 
 
 std::vector<Vec2i> TriangleSelector::get_seed_fill_contour() const {
     std::vector<Vec2i> edges_out;
-    for (int facet_idx = 0; facet_idx < this->m_orig_size_indices; ++facet_idx) {
+    for (int facet_idx = 0; facet_idx < m_orig_size_indices; ++facet_idx) {
         const Vec3i neighbors = m_neighbors[facet_idx];
         assert(this->verify_triangle_neighbors(m_triangles[facet_idx], neighbors));
         this->get_seed_fill_contour_recursive(facet_idx, neighbors, neighbors, edges_out);

@@ -218,7 +218,7 @@ ColorRGBA ColorRGBA::operator * (float value) const
 	for (size_t i = 0; i < 3; ++i) {
 		ret.m_data[i] = std::clamp(value * m_data[i], 0.0f, 1.0f);
 	}
-	ret.m_data[3] = this->m_data[3];
+	ret.m_data[3] = m_data[3];
 	return ret;
 }
 

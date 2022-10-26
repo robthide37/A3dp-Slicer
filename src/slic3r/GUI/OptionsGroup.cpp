@@ -101,7 +101,7 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
 			this->back_to_initial_value(opt_id);
 	};
 	field->m_back_to_sys_value = [this](std::string opt_id) {
-		if (!this->m_disabled)
+		if (!m_disabled)
 			this->back_to_sys_value(opt_id);
 	};
 

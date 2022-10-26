@@ -2735,8 +2735,8 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 
     if (volume_extruded_filament != 0.)
         m_used_filaments.increase_caches(volume_extruded_filament,
-            this->m_extruder_id, area_filament_cross_section * this->m_parking_position,
-            area_filament_cross_section * this->m_extra_loading_move);
+            m_extruder_id, area_filament_cross_section * m_parking_position,
+            area_filament_cross_section * m_extra_loading_move);
 
     const EMoveType type = move_type(delta_pos);
     if (type == EMoveType::Extrude) {
@@ -4303,7 +4303,7 @@ void GCodeProcessor::process_filaments(CustomGCode::Type code)
         m_used_filaments.process_color_change_cache();
 
     if (code == CustomGCode::ToolChange)
-        m_used_filaments.process_extruder_cache(this->m_extruder_id);
+        m_used_filaments.process_extruder_cache(m_extruder_id);
 }
 
 void GCodeProcessor::simulate_st_synchronize(float additional_time)

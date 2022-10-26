@@ -103,7 +103,7 @@ std::string PrintBase::output_filepath(const std::string &path, const std::strin
 
 void PrintBase::status_update_warnings(int step, PrintStateBase::WarningLevel /* warning_level */, const std::string &message, const PrintObjectBase* print_object)
 {
-    if (this->m_status_callback) {
+    if (m_status_callback) {
         auto status = print_object ? SlicingStatus(*print_object, step) : SlicingStatus(*this, step);
         m_status_callback(status);
     }

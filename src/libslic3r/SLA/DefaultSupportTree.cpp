@@ -180,7 +180,7 @@ bool DefaultSupportTree::interconnect(const Pillar &pillar,
     Vec3d eupper = pillar.endpoint();
     Vec3d elower = nextpillar.endpoint();
 
-    double zmin = ground_level(this->m_sm) + m_sm.cfg.base_height_mm;
+    double zmin = ground_level(m_sm) + m_sm.cfg.base_height_mm;
     eupper.z() = std::max(eupper.z(), zmin);
     elower.z() = std::max(elower.z(), zmin);
 

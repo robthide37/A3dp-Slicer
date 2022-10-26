@@ -121,8 +121,8 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
     bool 												has_internal_voids = false;
 	for (size_t region_id = 0; region_id < layer.regions().size(); ++ region_id) {
 		const LayerRegion  &layerm = *layer.regions()[region_id];
-		region_to_surface_params[region_id].assign(layerm.fill_surfaces.size(), nullptr);
-	    for (const Surface &surface : layerm.fill_surfaces.surfaces)
+		region_to_surface_params[region_id].assign(layerm.fill_surfaces().size(), nullptr);
+	    for (const Surface &surface : layerm.fill_surfaces())
 	        if (surface.surface_type == stInternalVoid)
 	        	has_internal_voids = true;
 	        else {
@@ -180,7 +180,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		        auto it_params = set_surface_params.find(params);
 		        if (it_params == set_surface_params.end())
 		        	it_params = set_surface_params.insert(it_params, params);
-		        region_to_surface_params[region_id][&surface - &layerm.fill_surfaces.surfaces.front()] = &(*it_params);
+		        region_to_surface_params[region_id][&surface - &layerm.fill_surfaces().surfaces.front()] = &(*it_params);
 		    }
 	}
 
@@ -192,9 +192,9 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 
 	for (size_t region_id = 0; region_id < layer.regions().size(); ++ region_id) {
 		const LayerRegion &layerm = *layer.regions()[region_id];
-	    for (const Surface &surface : layerm.fill_surfaces.surfaces)
+	    for (const Surface &surface : layerm.fill_surfaces())
 	        if (surface.surface_type != stInternalVoid) {
-	        	const SurfaceFillParams *params = region_to_surface_params[region_id][&surface - &layerm.fill_surfaces.surfaces.front()];
+	        	const SurfaceFillParams *params = region_to_surface_params[region_id][&surface - &layerm.fill_surfaces().surfaces.front()];
 				if (params != nullptr) {
 	        		SurfaceFill &fill = surface_fills[params->idx];
                     if (fill.region_id == size_t(-1)) {
@@ -325,7 +325,7 @@ void export_group_fills_to_svg(const char *path, const std::vector<SurfaceFill> 
 void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree, FillLightning::Generator* lightning_generator)
 {
 	for (LayerRegion *layerm : m_regions)
-		layerm->fills.clear();
+		layerm->m_fills.clear();
 
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
@@ -420,7 +420,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 		        }
 		        // Save into layer.
 				ExtrusionEntityCollection* eec = nullptr;
-		        m_regions[surface_fill.region_id]->fills.entities.push_back(eec = new ExtrusionEntityCollection());
+		        m_regions[surface_fill.region_id]->m_fills.entities.push_back(eec = new ExtrusionEntityCollection());
 		        // Only concentric fills are not sorted.
 		        eec->no_sort = f->no_sort();
                 if (params.use_arachne) {
@@ -453,16 +453,16 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
     // The path type could be ExtrusionPath, ExtrusionLoop or ExtrusionEntityCollection.
     // Why the paths are unpacked?
 	for (LayerRegion *layerm : m_regions)
-	    for (const ExtrusionEntity *thin_fill : layerm->thin_fills.entities) {
+	    for (const ExtrusionEntity *thin_fill : layerm->thin_fills().entities) {
 	        ExtrusionEntityCollection &collection = *(new ExtrusionEntityCollection());
-	        layerm->fills.entities.push_back(&collection);
+	        layerm->m_fills.entities.push_back(&collection);
 	        collection.entities.push_back(thin_fill->clone());
 	    }
 
 #ifndef NDEBUG
 	for (LayerRegion *layerm : m_regions)
-	    for (size_t i = 0; i < layerm->fills.entities.size(); ++ i)
-    	    assert(dynamic_cast<ExtrusionEntityCollection*>(layerm->fills.entities[i]) != nullptr);
+	    for (const ExtrusionEntity *e : layerm->fills())
+    	    assert(dynamic_cast<const ExtrusionEntityCollection*>(e) != nullptr);
 #endif
 }
 
@@ -539,7 +539,7 @@ void Layer::make_ironing()
     double default_layer_height = this->object()->config().layer_height;
 
 	for (LayerRegion *layerm : m_regions)
-		if (! layerm->slices.empty()) {
+		if (! layerm->slices().empty()) {
 			IroningParams ironing_params;
 			const PrintRegionConfig &config = layerm->region().config();
 			if (config.ironing && 
@@ -602,7 +602,7 @@ void Layer::make_ironing()
 				if (iron_everything) {
 					// Check whether there is any non-solid hole in the regions.
 					bool internal_infill_solid = region_config.fill_density.value > 95.;
-					for (const Surface &surface : ironing_params.layerm->fill_surfaces.surfaces)
+					for (const Surface &surface : ironing_params.layerm->fill_surfaces())
 						if ((! internal_infill_solid && surface.surface_type == stInternal) || surface.surface_type == stInternalBridge || surface.surface_type == stInternalVoid) {
 							// Some fill region is not quite solid. Don't iron over the whole surface.
 							iron_completely = false;
@@ -611,10 +611,10 @@ void Layer::make_ironing()
 				}
 				if (iron_completely) {
 					// Iron everything. This is likely only good for solid transparent objects.
-					for (const Surface &surface : ironing_params.layerm->slices.surfaces)
+					for (const Surface &surface : ironing_params.layerm->slices())
 						polygons_append(polys, surface.expolygon);
 				} else {
-					for (const Surface &surface : ironing_params.layerm->slices.surfaces)
+					for (const Surface &surface : ironing_params.layerm->slices())
 						if (surface.surface_type == stTop || (iron_everything && surface.surface_type == stBottom))
 							// stBottomBridge is not being ironed on purpose, as it would likely destroy the bridges.
 							polygons_append(polys, surface.expolygon);
@@ -622,7 +622,7 @@ void Layer::make_ironing()
 				if (iron_everything && ! iron_completely) {
 					// Add solid fill surfaces. This may not be ideal, as one will not iron perimeters touching these
 					// solid fill surfaces, but it is likely better than nothing.
-					for (const Surface &surface : ironing_params.layerm->fill_surfaces.surfaces)
+					for (const Surface &surface : ironing_params.layerm->fill_surfaces())
 						if (surface.surface_type == stInternalSolid)
 							polygons_append(infills, surface.expolygon);
 				}
@@ -659,7 +659,7 @@ void Layer::make_ironing()
 	        if (! polylines.empty()) {
 		        // Save into layer.
 				ExtrusionEntityCollection *eec = nullptr;
-		        ironing_params.layerm->fills.entities.push_back(eec = new ExtrusionEntityCollection());
+		        ironing_params.layerm->m_fills.entities.push_back(eec = new ExtrusionEntityCollection());
 		        // Don't sort the ironing infill lines as they are monotonicly ordered.
 				eec->no_sort = true;
 		        extrusion_entities_append_paths(

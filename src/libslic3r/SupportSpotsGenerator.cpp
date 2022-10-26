@@ -1039,12 +1039,12 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
 // PREPARE BASE LAYER
     const Layer *layer = po->layers()[0];
     for (const LayerRegion *layer_region : layer->regions()) {
-        for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
+        for (const ExtrusionEntity *ex_entity : layer_region->perimeters()) {
             for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                 push_lines(perimeter, layer_lines);
             } // perimeter
         } // ex_entity
-        for (const ExtrusionEntity *ex_entity : layer_region->fills.entities) {
+        for (const ExtrusionEntity *ex_entity : layer_region->fills()) {
             for (const ExtrusionEntity *fill : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                 push_lines(fill, layer_lines);
             } // fill
@@ -1083,13 +1083,13 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
     for (size_t layer_idx = 1; layer_idx < po->layer_count(); ++layer_idx) {
         const Layer *layer = po->layers()[layer_idx];
         for (const LayerRegion *layer_region : layer->regions()) {
-            for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
+            for (const ExtrusionEntity *ex_entity : layer_region->perimeters()) {
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     check_extrusion_entity_stability(perimeter, layer_lines, layer->slice_z, layer_region,
                             external_lines, issues, params);
                 } // perimeter
             } // ex_entity
-            for (const ExtrusionEntity *ex_entity : layer_region->fills.entities) {
+            for (const ExtrusionEntity *ex_entity : layer_region->fills()) {
                 for (const ExtrusionEntity *fill : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     if (fill->role() == ExtrusionRole::erGapFill
                             || fill->role() == ExtrusionRole::erBridgeInfill) {

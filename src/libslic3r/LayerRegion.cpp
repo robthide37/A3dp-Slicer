@@ -43,30 +43,26 @@ Flow LayerRegion::bridging_flow(FlowRole role) const
     }
 }
 
-// Fill in layerm->fill_surfaces by trimming the layerm->slices by the cummulative layerm->fill_surfaces.
+// Fill in layerm->fill_surfaces by trimming the layerm->slices by layerm->fill_expolygons.
 void LayerRegion::slices_to_fill_surfaces_clipped()
 {
-    // Note: this method should be idempotent, but fill_surfaces gets modified 
-    // in place. However we're now only using its boundaries (which are invariant)
-    // so we're safe. This guarantees idempotence of prepare_infill() also in case
-    // that combine_infill() turns some fill_surface into VOID surfaces.
     // Collect polygons per surface type.
-    std::array<SurfacesPtr, size_t(stCount)> by_surface;
-    for (Surface &surface : this->slices.surfaces)
+    std::array<std::vector<const Surface*>, size_t(stCount)> by_surface;
+    for (const Surface &surface : this->slices())
         by_surface[size_t(surface.surface_type)].emplace_back(&surface);
     // Trim surfaces by the fill_boundaries.
-    this->fill_surfaces.surfaces.clear();
+    m_fill_surfaces.surfaces.clear();
     for (size_t surface_type = 0; surface_type < size_t(stCount); ++ surface_type) {
-        const SurfacesPtr &this_surfaces = by_surface[surface_type];
+        const std::vector<const Surface*> &this_surfaces = by_surface[surface_type];
         if (! this_surfaces.empty())
-            this->fill_surfaces.append(intersection_ex(this_surfaces, this->fill_expolygons), SurfaceType(surface_type));
+            m_fill_surfaces.append(intersection_ex(this_surfaces, this->fill_expolygons()), SurfaceType(surface_type));
     }
 }
 
 void LayerRegion::make_perimeters(const SurfaceCollection &slices, SurfaceCollection* fill_surfaces)
 {
-    this->perimeters.clear();
-    this->thin_fills.clear();
+    m_perimeters.clear();
+    m_thin_fills.clear();
 
     const PrintConfig       &print_config  = this->layer()->object()->print()->config();
     const PrintRegionConfig &region_config = this->region().config();
@@ -87,8 +83,8 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, SurfaceCollec
         spiral_vase,
         
         // output:
-        &this->perimeters,
-        &this->thin_fills,
+        &m_perimeters,
+        &m_thin_fills,
         fill_surfaces
     );
     
@@ -131,7 +127,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
     // Internal surfaces, not grown.
     Surfaces                    internal;
     // Areas, where an infill of various types (top, bottom, bottom bride, sparse, void) could be placed.
-    Polygons                    fill_boundaries = to_polygons(this->fill_expolygons);
+    Polygons                    fill_boundaries = to_polygons(this->fill_expolygons());
     Polygons  					lower_layer_covered_tmp;
 
     // Collect top surfaces and internal surfaces.
@@ -141,7 +137,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
     {
         // Voids are sparse infills if infill rate is zero.
         Polygons voids;
-        for (const Surface &surface : this->fill_surfaces.surfaces) {
+        for (const Surface &surface : this->fill_surfaces()) {
             if (surface.is_top()) {
                 // Collect the top surfaces, inflate them and trim them by the bottom surfaces.
                 // This gives the priority to bottom surfaces.
@@ -292,7 +288,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
                     bridges[idx_last].bridge_angle = bd.angle;
                     if (this->layer()->object()->has_support()) {
 //                        polygons_append(this->bridged, bd.coverage());
-                        append(this->unsupported_bridge_edges, bd.unsupported_edges());
+                        append(m_unsupported_bridge_edges, bd.unsupported_edges());
                     }
 				} else if (custom_angle > 0) {
 					// Bridge was not detected (likely it is only supported at one side). Still it is a surface filled in
@@ -365,7 +361,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
         surfaces_append(new_surfaces, std::move(new_expolys), s1);
     }
     
-    this->fill_surfaces.surfaces = std::move(new_surfaces);
+    m_fill_surfaces.surfaces = std::move(new_surfaces);
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
     export_region_fill_surfaces_to_svg_debug("3_process_external_surfaces-final");
@@ -389,12 +385,12 @@ void LayerRegion::prepare_fill_surfaces()
     // For Lightning infill, infill_only_where_needed is ignored because both
     // do a similar thing, and their combination doesn't make much sense.
     if (! spiral_vase && this->region().config().top_solid_layers == 0) {
-        for (Surface &surface : this->fill_surfaces.surfaces)
+        for (Surface &surface : m_fill_surfaces)
             if (surface.is_top())
                 surface.surface_type = this->layer()->object()->config().infill_only_where_needed && this->region().config().fill_pattern != ipLightning ? stInternalVoid : stInternal;
     }
     if (this->region().config().bottom_solid_layers == 0) {
-        for (Surface &surface : this->fill_surfaces.surfaces)
+        for (Surface &surface : m_fill_surfaces)
             if (surface.is_bottom()) // (surface.surface_type == stBottom)
                 surface.surface_type = stInternal;
     }
@@ -403,7 +399,7 @@ void LayerRegion::prepare_fill_surfaces()
     if (! spiral_vase && this->region().config().fill_density.value > 0) {
         // scaling an area requires two calls!
         double min_area = scale_(scale_(this->region().config().solid_infill_below_area.value));
-        for (Surface &surface : this->fill_surfaces.surfaces)
+        for (Surface &surface : m_fill_surfaces)
             if (surface.surface_type == stInternal && surface.area() <= min_area)
                 surface.surface_type = stInternalSolid;
     }
@@ -423,38 +419,38 @@ double LayerRegion::infill_area_threshold() const
 void LayerRegion::trim_surfaces(const Polygons &trimming_polygons)
 {
 #ifndef NDEBUG
-    for (const Surface &surface : this->slices.surfaces)
+    for (const Surface &surface : this->slices())
         assert(surface.surface_type == stInternal);
 #endif /* NDEBUG */
-	this->slices.set(intersection_ex(this->slices.surfaces, trimming_polygons), stInternal);
+	m_slices.set(intersection_ex(this->slices().surfaces, trimming_polygons), stInternal);
 }
 
 void LayerRegion::elephant_foot_compensation_step(const float elephant_foot_compensation_perimeter_step, const Polygons &trimming_polygons)
 {
 #ifndef NDEBUG
-    for (const Surface &surface : this->slices.surfaces)
+    for (const Surface &surface : this->slices())
         assert(surface.surface_type == stInternal);
 #endif /* NDEBUG */
-    Polygons tmp = intersection(this->slices.surfaces, trimming_polygons);
-    append(tmp, diff(this->slices.surfaces, opening(this->slices.surfaces, elephant_foot_compensation_perimeter_step)));
-    this->slices.set(union_ex(tmp), stInternal);
+    Polygons tmp = intersection(this->slices().surfaces, trimming_polygons);
+    append(tmp, diff(this->slices().surfaces, opening(this->slices().surfaces, elephant_foot_compensation_perimeter_step)));
+    m_slices.set(union_ex(tmp), stInternal);
 }
 
 void LayerRegion::export_region_slices_to_svg(const char *path) const
 {
     BoundingBox bbox;
-    for (Surfaces::const_iterator surface = this->slices.surfaces.begin(); surface != this->slices.surfaces.end(); ++surface)
-        bbox.merge(get_extents(surface->expolygon));
+    for (const Surface &surface : this->slices())
+        bbox.merge(get_extents(surface.expolygon));
     Point legend_size = export_surface_type_legend_to_svg_box_size();
     Point legend_pos(bbox.min(0), bbox.max(1));
     bbox.merge(Point(std::max(bbox.min(0) + legend_size(0), bbox.max(0)), bbox.max(1) + legend_size(1)));
 
     SVG svg(path, bbox);
     const float transparency = 0.5f;
-    for (Surfaces::const_iterator surface = this->slices.surfaces.begin(); surface != this->slices.surfaces.end(); ++surface)
-        svg.draw(surface->expolygon, surface_type_to_color_name(surface->surface_type), transparency);
-    for (Surfaces::const_iterator surface = this->fill_surfaces.surfaces.begin(); surface != this->fill_surfaces.surfaces.end(); ++surface)
-        svg.draw(surface->expolygon.lines(), surface_type_to_color_name(surface->surface_type));
+    for (const Surface &surface : this->slices())
+        svg.draw(surface.expolygon, surface_type_to_color_name(surface.surface_type), transparency);
+    for (const Surface &surface : this->fill_surfaces())
+        svg.draw(surface.expolygon.lines(), surface_type_to_color_name(surface.surface_type));
     export_surface_type_legend_to_svg(svg, legend_pos);
     svg.Close();
 }
@@ -470,15 +466,15 @@ void LayerRegion::export_region_slices_to_svg_debug(const char *name) const
 void LayerRegion::export_region_fill_surfaces_to_svg(const char *path) const
 {
     BoundingBox bbox;
-    for (Surfaces::const_iterator surface = this->fill_surfaces.surfaces.begin(); surface != this->fill_surfaces.surfaces.end(); ++surface)
-        bbox.merge(get_extents(surface->expolygon));
+    for (const Surface &surface : this->fill_surfaces())
+        bbox.merge(get_extents(surface.expolygon));
     Point legend_size = export_surface_type_legend_to_svg_box_size();
     Point legend_pos(bbox.min(0), bbox.max(1));
     bbox.merge(Point(std::max(bbox.min(0) + legend_size(0), bbox.max(0)), bbox.max(1) + legend_size(1)));
 
     SVG svg(path, bbox);
     const float transparency = 0.5f;
-    for (const Surface &surface : this->fill_surfaces.surfaces) {
+    for (const Surface &surface : this->fill_surfaces()) {
         svg.draw(surface.expolygon, surface_type_to_color_name(surface.surface_type), transparency);
         svg.draw_outline(surface.expolygon, "black", "blue", scale_(0.05)); 
     }

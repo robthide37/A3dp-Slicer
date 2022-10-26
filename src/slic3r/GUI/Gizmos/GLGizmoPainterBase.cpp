@@ -1158,18 +1158,18 @@ void TriangleSelectorGUI::update_render_data()
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
 void GLPaintContour::render() const
 {
-    assert(this->m_contour_VBO_id != 0);
-    assert(this->m_contour_EBO_id != 0);
+    assert(m_contour_VBO_id != 0);
+    assert(m_contour_EBO_id != 0);
 
     glsafe(::glLineWidth(4.0f));
 
-    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, this->m_contour_VBO_id));
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_contour_VBO_id));
     glsafe(::glVertexPointer(3, GL_FLOAT, 3 * sizeof(float), nullptr));
 
     glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
 
     if (this->contour_indices_size > 0) {
-        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->m_contour_EBO_id));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_contour_EBO_id));
         glsafe(::glDrawElements(GL_LINES, GLsizei(this->contour_indices_size), GL_UNSIGNED_INT, nullptr));
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
     }
@@ -1181,20 +1181,20 @@ void GLPaintContour::render() const
 
 void GLPaintContour::finalize_geometry()
 {
-    assert(this->m_contour_VBO_id == 0);
-    assert(this->m_contour_EBO_id == 0);
+    assert(m_contour_VBO_id == 0);
+    assert(m_contour_EBO_id == 0);
 
     if (!this->contour_vertices.empty()) {
-        glsafe(::glGenBuffers(1, &this->m_contour_VBO_id));
-        glsafe(::glBindBuffer(GL_ARRAY_BUFFER, this->m_contour_VBO_id));
+        glsafe(::glGenBuffers(1, &m_contour_VBO_id));
+        glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_contour_VBO_id));
         glsafe(::glBufferData(GL_ARRAY_BUFFER, this->contour_vertices.size() * sizeof(float), this->contour_vertices.data(), GL_STATIC_DRAW));
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
         this->contour_vertices.clear();
     }
 
     if (!this->contour_indices.empty()) {
-        glsafe(::glGenBuffers(1, &this->m_contour_EBO_id));
-        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->m_contour_EBO_id));
+        glsafe(::glGenBuffers(1, &m_contour_EBO_id));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_contour_EBO_id));
         glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->contour_indices.size() * sizeof(unsigned int), this->contour_indices.data(), GL_STATIC_DRAW));
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
         this->contour_indices.clear();
@@ -1203,13 +1203,13 @@ void GLPaintContour::finalize_geometry()
 
 void GLPaintContour::release_geometry()
 {
-    if (this->m_contour_VBO_id) {
-        glsafe(::glDeleteBuffers(1, &this->m_contour_VBO_id));
-        this->m_contour_VBO_id = 0;
+    if (m_contour_VBO_id) {
+        glsafe(::glDeleteBuffers(1, &m_contour_VBO_id));
+        m_contour_VBO_id = 0;
     }
-    if (this->m_contour_EBO_id) {
-        glsafe(::glDeleteBuffers(1, &this->m_contour_EBO_id));
-        this->m_contour_EBO_id = 0;
+    if (m_contour_EBO_id) {
+        glsafe(::glDeleteBuffers(1, &m_contour_EBO_id));
+        m_contour_EBO_id = 0;
     }
     this->clear();
 }

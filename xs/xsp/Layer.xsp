@@ -13,15 +13,15 @@
         %code%{ RETVAL = &THIS->region(); %};
 
     Ref<SurfaceCollection> slices()
-        %code%{ RETVAL = &THIS->slices; %};
+        %code%{ RETVAL = const_cast<SurfaceCollection*>(&THIS->slices()); %};
     Ref<ExtrusionEntityCollection> thin_fills()
-        %code%{ RETVAL = &THIS->thin_fills; %};
+        %code%{ RETVAL = const_cast<ExtrusionEntityCollection*>(&THIS->thin_fills()); %};
     Ref<SurfaceCollection> fill_surfaces()
-        %code%{ RETVAL = &THIS->fill_surfaces; %};
+        %code%{ RETVAL = const_cast<SurfaceCollection*>(&THIS->fill_surfaces()); %};
     Ref<ExtrusionEntityCollection> perimeters()
-        %code%{ RETVAL = &THIS->perimeters; %};
+        %code%{ RETVAL = const_cast<ExtrusionEntityCollection*>(&THIS->perimeters()); %};
     Ref<ExtrusionEntityCollection> fills()
-        %code%{ RETVAL = &THIS->fills; %};
+        %code%{ RETVAL = const_cast<ExtrusionEntityCollection*>(&THIS->fills()); %};
     
     void prepare_fill_surfaces();
     void make_perimeters(SurfaceCollection* slices, SurfaceCollection* fill_surfaces)

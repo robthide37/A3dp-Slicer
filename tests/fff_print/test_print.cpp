@@ -20,11 +20,11 @@ SCENARIO("PrintObject: Perimeter generation", "[PrintObject]") {
             }
             THEN("Every layer in region 0 has 1 island of perimeters") {
                 for (const Layer *layer : object.layers())
-                    REQUIRE(layer->regions().front()->perimeters.entities.size() == 1);
+                    REQUIRE(layer->regions().front()->perimeters().size() == 1);
             }
             THEN("Every layer in region 0 has 3 paths in its perimeters list.") {
                 for (const Layer *layer : object.layers())
-                    REQUIRE(layer->regions().front()->perimeters.items_count() == 3);
+                    REQUIRE(layer->regions().front()->perimeters().items_count() == 3);
             }
         }
     }
@@ -66,7 +66,7 @@ SCENARIO("Print: Changing number of solid surfaces does not cause all surfaces t
 		    // iterate over all of the regions in the layer
 		    for (const LayerRegion *region : layer.regions()) {
 		        // for each region, iterate over the fill surfaces
-		        for (const Surface &surface : region->fill_surfaces.surfaces)
+		        for (const Surface &surface : region->fill_surfaces())
 		            CHECK(surface.is_solid());
 		    }
 		};

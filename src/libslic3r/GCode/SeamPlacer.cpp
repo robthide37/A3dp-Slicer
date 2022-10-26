@@ -401,7 +401,7 @@ struct GlobalModelInfo {
 Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerRegion*> &corresponding_regions_out) {
     Polygons polygons;
     for (const LayerRegion *layer_region : layer->regions()) {
-        for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
+        for (const ExtrusionEntity *ex_entity : layer_region->perimeters()) {
             if (ex_entity->is_collection()) { //collection of inner, outer, and overhang perimeters
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     ExtrusionRole role = perimeter->role();
@@ -1060,7 +1060,7 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
                     size_t regions_with_perimeter = 0;
                     for (const LayerRegion *region : po->layers()[layer_idx]->regions()) {
-                        if (region->perimeters.entities.size() > 0) {
+                        if (region->perimeters().size() > 0) {
                             regions_with_perimeter++;
                         }
                     };

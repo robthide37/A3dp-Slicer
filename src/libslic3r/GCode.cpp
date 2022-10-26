@@ -849,7 +849,7 @@ namespace DoExport {
 	                    region.config().get_abs_value("small_perimeter_speed") == 0 ||
 	                    region.config().get_abs_value("external_perimeter_speed") == 0 ||
 	                    region.config().get_abs_value("bridge_speed") == 0)
-	                    mm3_per_mm.push_back(layerm->perimeters.min_mm3_per_mm());
+	                    mm3_per_mm.push_back(layerm->perimeters().min_mm3_per_mm());
 	                if (region.config().get_abs_value("infill_speed") == 0 ||
 	                    region.config().get_abs_value("solid_infill_speed") == 0 ||
 	                    region.config().get_abs_value("top_solid_infill_speed") == 0 ||
@@ -866,7 +866,7 @@ namespace DoExport {
                             return min;
                         };
 
-                        mm3_per_mm.push_back(min_mm3_per_mm_no_ironing(layerm->fills));
+                        mm3_per_mm.push_back(min_mm3_per_mm_no_ironing(layerm->fills()));
                     }
 	            }
 	        }
@@ -1502,7 +1502,7 @@ void GCode::process_layers(
             }
         });
     const auto spiral_vase = tbb::make_filter<LayerResult, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [&spiral_vase = *this->m_spiral_vase](LayerResult in) -> LayerResult {
+        [&spiral_vase = *m_spiral_vase](LayerResult in) -> LayerResult {
             if (in.nop_layer_result)
                 return in;
 
@@ -1510,18 +1510,18 @@ void GCode::process_layers(
             return { spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush};
         });
     const auto pressure_equalizer = tbb::make_filter<LayerResult, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [&pressure_equalizer = *this->m_pressure_equalizer](LayerResult in) -> LayerResult {
+        [&pressure_equalizer = *m_pressure_equalizer](LayerResult in) -> LayerResult {
             return pressure_equalizer.process_layer(std::move(in));
         });
     const auto cooling = tbb::make_filter<LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
-        [&cooling_buffer = *this->m_cooling_buffer](LayerResult in) -> std::string {
+        [&cooling_buffer = *m_cooling_buffer](LayerResult in) -> std::string {
              if (in.nop_layer_result)
                 return in.gcode;
 
              return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
     const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
-        [&self = *this->m_find_replace](std::string s) -> std::string {
+        [&self = *m_find_replace](std::string s) -> std::string {
             return self.process_layer(std::move(s));
         });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
@@ -1584,24 +1584,24 @@ void GCode::process_layers(
             }
         });
     const auto spiral_vase = tbb::make_filter<LayerResult, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [&spiral_vase = *this->m_spiral_vase](LayerResult in)->LayerResult {
+        [&spiral_vase = *m_spiral_vase](LayerResult in)->LayerResult {
             if (in.nop_layer_result)
                 return in;
             spiral_vase.enable(in.spiral_vase_enable);
             return { spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush };
         });
     const auto pressure_equalizer = tbb::make_filter<LayerResult, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [&pressure_equalizer = *this->m_pressure_equalizer](LayerResult in) -> LayerResult {
+        [&pressure_equalizer = *m_pressure_equalizer](LayerResult in) -> LayerResult {
              return pressure_equalizer.process_layer(std::move(in));
         });
     const auto cooling = tbb::make_filter<LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
-        [&cooling_buffer = *this->m_cooling_buffer](LayerResult in)->std::string {
+        [&cooling_buffer = *m_cooling_buffer](LayerResult in)->std::string {
             if (in.nop_layer_result)
                 return in.gcode;
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
     const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
-        [&self = *this->m_find_replace](std::string s) -> std::string {
+        [&self = *m_find_replace](std::string s) -> std::string {
             return self.process_layer(std::move(s));
         });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
@@ -2108,8 +2108,8 @@ LayerResult GCode::process_layer(
         if (enable) {
             for (const LayerRegion *layer_region : layer.regions())
                 if (size_t(layer_region->region().config().bottom_solid_layers.value) > layer.id() ||
-                    layer_region->perimeters.items_count() > 1u ||
-                    layer_region->fills.items_count() > 0) {
+                    layer_region->perimeters().items_count() > 1u ||
+                    layer_region->fills().items_count() > 0) {
                     enable = false;
                     break;
                 }
@@ -2252,20 +2252,11 @@ LayerResult GCode::process_layer(
             //   option
             // (Still, we have to keep track of regions because we need to apply their config)
             size_t n_slices = layer.lslices.size();
-            const std::vector<BoundingBox> &layer_surface_bboxes = layer.lslices_bboxes;
+            const LayerSlices &layer_surfaces = layer.lslices_ex;
             // Traverse the slices in an increasing order of bounding box size, so that the islands inside another islands are tested first,
             // so we can just test a point inside ExPolygon::contour and we may skip testing the holes.
-            std::vector<size_t> slices_test_order;
-            slices_test_order.reserve(n_slices);
-            for (size_t i = 0; i < n_slices; ++ i)
-                slices_test_order.emplace_back(i);
-            std::sort(slices_test_order.begin(), slices_test_order.end(), [&layer_surface_bboxes](size_t i, size_t j) {
-                const Vec2d s1 = layer_surface_bboxes[i].size().cast<double>();
-                const Vec2d s2 = layer_surface_bboxes[j].size().cast<double>();
-                return s1.x() * s1.y() < s2.x() * s2.y();
-            });
-            auto point_inside_surface = [&layer, &layer_surface_bboxes](const size_t i, const Point &point) {
-                const BoundingBox &bbox = layer_surface_bboxes[i];
+            auto point_inside_surface = [&layer, &layer_surfaces](const size_t i, const Point &point) {
+                const BoundingBox &bbox = layer_surfaces[i].bbox;
                 return point(0) >= bbox.min(0) && point(0) < bbox.max(0) &&
                        point(1) >= bbox.min(1) && point(1) < bbox.max(1) &&
                        layer.lslices[i].contour.contains(point);
@@ -2284,7 +2275,7 @@ LayerResult GCode::process_layer(
                 // The process is almost the same for perimeters and infills - we will do it in a cycle that repeats twice:
                 std::vector<unsigned int> printing_extruders;
                 for (const ObjectByExtruder::Island::Region::Type entity_type : { ObjectByExtruder::Island::Region::INFILL, ObjectByExtruder::Island::Region::PERIMETERS }) {
-                    for (const ExtrusionEntity *ee : (entity_type == ObjectByExtruder::Island::Region::INFILL) ? layerm->fills.entities : layerm->perimeters.entities) {
+                    for (const ExtrusionEntity *ee : (entity_type == ObjectByExtruder::Island::Region::INFILL) ? layerm->fills() : layerm->perimeters()) {
                         // extrusions represents infill or perimeter extrusions of a single island.
                         assert(dynamic_cast<const ExtrusionEntityCollection*>(ee) != nullptr);
                         const auto *extrusions = static_cast<const ExtrusionEntityCollection*>(ee);
@@ -2329,7 +2320,9 @@ LayerResult GCode::process_layer(
                                 layers.size(), n_slices+1);
                             for (size_t i = 0; i <= n_slices; ++ i) {
                                 bool   last = i == n_slices;
-                                size_t island_idx = last ? n_slices : slices_test_order[i];
+                                // Traverse lslices back to front: lslices are produced by traversing ClipperLib::PolyTree, emitting parent contour before its children.
+                                // Therefore traversing layer_surfaces back to front will traverse children contours before their parents.
+                                size_t island_idx = last ? n_slices : layer_surfaces.size() - i - 1;
                                 if (// extrusions->first_point does not fit inside any slice
                                     last ||
                                     // extrusions->first_point fits inside ith slice

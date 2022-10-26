@@ -690,7 +690,7 @@ inline bool is_just_line_with_extrude_set_speed_tag(const std::string &line)
 
 void PressureEqualizer::push_line_to_output(const size_t line_idx, const float new_feedrate, const char *comment)
 {
-    const GCodeLine &line = this->m_gcode_lines[line_idx];
+    const GCodeLine &line = m_gcode_lines[line_idx];
     if (line_idx > 0 && output_buffer_length > 0) {
         const std::string prev_line_str = std::string(output_buffer.begin() + int(this->output_buffer_prev_length),
                                                       output_buffer.begin() + int(this->output_buffer_length) + 1);

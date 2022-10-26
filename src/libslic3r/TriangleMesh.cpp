@@ -284,7 +284,7 @@ void TriangleMesh::rotate(float angle, const Axis &axis)
         case Z:  its_rotate_z(this->its, angle); break;
         default: assert(false);                  return;
         }
-        update_bounding_box(this->its, this->m_stats);
+        update_bounding_box(this->its, m_stats);
     }
 }
 
@@ -295,7 +295,7 @@ void TriangleMesh::rotate(float angle, const Vec3d& axis)
         Transform3d m = Transform3d::Identity();
         m.rotate(Eigen::AngleAxisd(angle, axis_norm));
         its_transform(its, m);
-        update_bounding_box(this->its, this->m_stats);
+        update_bounding_box(this->its, m_stats);
     }
 }
 
@@ -334,7 +334,7 @@ void TriangleMesh::transform(const Transform3d& t, bool fix_left_handed)
         det = -det;
     }
     m_stats.volume *= det;
-    update_bounding_box(this->its, this->m_stats);
+    update_bounding_box(this->its, m_stats);
 }
 
 void TriangleMesh::transform(const Matrix3d& m, bool fix_left_handed)
@@ -346,7 +346,7 @@ void TriangleMesh::transform(const Matrix3d& m, bool fix_left_handed)
         det = -det;
     }
     m_stats.volume *= det;
-    update_bounding_box(this->its, this->m_stats);
+    update_bounding_box(this->its, m_stats);
 }
 
 void TriangleMesh::flip_triangles()
@@ -512,7 +512,7 @@ std::vector<ExPolygons> TriangleMesh::slice(const std::vector<double> &z) const
 
 size_t TriangleMesh::memsize() const
 {
-    size_t memsize = 8 + this->its.memsize() + sizeof(this->m_stats);
+    size_t memsize = 8 + this->its.memsize() + sizeof(m_stats);
     return memsize;
 }
 
