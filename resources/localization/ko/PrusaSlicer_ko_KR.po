@@ -93,7 +93,7 @@ msgstr ""
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:84
 #, boost-format
 msgid "PrusaSlicer has encountered a fatal error: \"%1%\""
-msgstr "슬라이서에 치명적인 오류가 발생했습니다"
+msgstr "슬라이서에 치명적인 오류가 발생했습니다: \"%1%\""
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:85
 msgid ""
