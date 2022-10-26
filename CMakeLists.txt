@@ -106,6 +106,8 @@ if (MSVC)
     # C4244: 'conversion' conversion from 'type1' to 'type2', possible loss of data. An integer type is converted to a smaller integer type.
     # C4267: The compiler detected a conversion from size_t to a smaller type.
     add_compile_options(/wd4244 /wd4267)
+    # Enforce strict C++ conformance, so our code that compiles on MSVC also compiles on GCC and clang.
+    add_compile_options(/permissive-)
 endif ()
 
 if (MINGW)
