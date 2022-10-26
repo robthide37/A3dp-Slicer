@@ -1243,7 +1243,7 @@ public:
         m_facenames.clear();
         m_facenames_bad.clear();
         EnumerateFacenames(m_encoding, m_fixed_width_only); 
-        std::sort(m_facenames.begin(), m_facenames.end());
+        //std::sort(m_facenames.begin(), m_facenames.end());
     }
 
     const std::vector<wxString> &get_face_names() const { return m_facenames; }
@@ -1262,10 +1262,10 @@ protected:
         //*
         // Faster chech if wx_font is loadable but not 100%
         // names could contain not loadable font
-        if (!WxFontUtils::can_load(wx_font)) {
-            m_facenames_bad.emplace_back(facename);
-            return true; // can't load
-        }
+        //if (!WxFontUtils::can_load(wx_font)) {
+        //    m_facenames_bad.emplace_back(facename);
+        //    return true; // can't load
+        //}
         /*/
         // Slow copy of font files to try load font
         // After this all files are loadable
