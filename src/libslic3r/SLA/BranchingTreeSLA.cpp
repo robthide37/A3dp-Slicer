@@ -20,6 +20,14 @@ class BranchingTreeBuilder: public branchingtree::Builder {
 
     std::set<int /*ground node_id that was already processed*/> m_ground_mem;
 
+    // Establish an index of
+    using PointIndexEl = std::pair<Vec3f, unsigned>;
+    boost::geometry::index::
+        rtree<PointIndexEl, boost::geometry::index::rstar<16, 4> /* ? */>
+            m_pillar_index;
+
+    std::vector<branchingtree::Node> m_pillars;
+
     // Scaling of the input value 'widening_factor:<0, 1>' to produce resonable
     // widening behaviour
     static constexpr double WIDENING_SCALE = 0.02;
@@ -61,8 +69,6 @@ class BranchingTreeBuilder: public branchingtree::Builder {
                                          toR);
                 m_builder.add_junction(tod, toR);
             }
-
-            return true;
         });
     }
 
@@ -72,7 +78,7 @@ class BranchingTreeBuilder: public branchingtree::Builder {
         // As a last resort, try to route child nodes to ground and stop
         // traversing if any child branch succeeds.
         traverse(m_cloud, root, [this](const branchingtree::Node &node) {
-            bool ret = true;
+            branchingtree::TraverseReturnT ret{true, true};
 
             int suppid_parent = m_cloud.get_leaf_id(node.id);
             int suppid_left   = branchingtree::Node::ID_NONE;
@@ -83,12 +89,12 @@ class BranchingTreeBuilder: public branchingtree::Builder {
             dst.Rmin = std::max(node.Rmin, dst.Rmin);
 
             if (node.left >= 0 && add_ground_bridge(m_cloud.get(node.left), dst))
-                ret = false;
+                ret.to_left = false;
             else
                 suppid_left = m_cloud.get_leaf_id(node.left);
 
             if (node.right >= 0 && add_ground_bridge(m_cloud.get(node.right), dst))
-                ret = false;
+                ret.to_right = false;
             else
                 suppid_right = m_cloud.get_leaf_id(node.right);
 
@@ -141,7 +147,7 @@ public:
 };
 
 bool BranchingTreeBuilder::add_bridge(const branchingtree::Node &from,
-                                  const branchingtree::Node &to)
+                                      const branchingtree::Node &to)
 {
     Vec3d fromd = from.pos.cast<double>(), tod = to.pos.cast<double>();
     double fromR = get_radius(from), toR = get_radius(to);
@@ -183,12 +189,72 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
 {
     bool ret = false;
 
+    namespace bgi = boost::geometry::index;
+
+    struct Output {
+        std::optional<PointIndexEl> &res;
+
+        Output& operator *() { return *this; }
+        void operator=(const PointIndexEl &el) { res = el; }
+        Output& operator++() { return *this; }
+    };
+
     auto it = m_ground_mem.find(from.id);
     if (it == m_ground_mem.end()) {
-        ret = search_ground_route(ex_tbb, m_builder, m_sm,
-                                   sla::Junction{from.pos.cast<double>(),
-                                                 get_radius(from)},
-                                   get_radius(to)).first;
+        std::optional<PointIndexEl> result;
+        auto filter = bgi::satisfies(
+            [this, &from](const PointIndexEl &e) {
+                auto len = (from.pos - e.first).norm();
+                return !branchingtree::is_occupied(m_pillars[e.second])
+                       && len < m_sm.cfg.max_bridge_length_mm
+                       && !m_cloud.is_outside_support_cone(from.pos, e.first)
+                       && beam_mesh_hit(ex_tbb,
+                                        m_sm.emesh,
+                                        Beam{Ball{from.pos.cast<double>(),
+                                                  get_radius(from)},
+                                             Ball{e.first.cast<double>(),
+                                                  get_radius(
+                                                      m_pillars[e.second])}},
+                                        0.9 * m_sm.cfg.safety_distance_mm)
+                                  .distance()
+                              > len;
+            });
+        m_pillar_index.query(filter && bgi::nearest(from.pos, 1), Output{result});
+
+        sla::Junction j{from.pos.cast<double>(), get_radius(from)};
+        if (!result) {
+            auto [found_conn, cjunc] = optimize_ground_connection(
+                                           ex_tbb,
+                                           m_builder,
+                                           m_sm,
+                                           j,
+                                           get_radius(to));
+
+            if (found_conn) {
+                Vec3d endp = cjunc? cjunc->pos : j.pos;
+                double R   = cjunc? cjunc->r   : j.r;
+                Vec3d  dir = cjunc? Vec3d((j.pos - cjunc->pos).normalized()) : DOWN;
+                auto plr = create_ground_pillar(ex_tbb, m_builder, m_sm, endp, dir, R, get_radius(to));
+
+                if (plr.second >= 0) {
+                    m_builder.add_junction(endp, R);
+                    if (cjunc) {
+                        m_builder.add_diffbridge(j.pos, endp, j.r, R);
+                        branchingtree::Node n{cjunc->pos.cast<float>(), float(R)};
+                        n.left = from.id;
+                        m_pillars.emplace_back(n);
+                        m_pillar_index.insert({n.pos, m_pillars.size() - 1});
+                    }
+
+                    ret = true;
+                }
+            }
+        } else {
+            const auto &resnode = m_pillars[result->second];
+            m_builder.add_diffbridge(j.pos, resnode.pos.cast<double>(), j.r, get_radius(resnode));
+            m_pillars[result->second].right = from.id;
+            ret = true;
+        }
 
         // Remember that this node was tested if can go to ground, don't
         // test it with any other destination ground point because

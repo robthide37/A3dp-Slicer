@@ -76,6 +76,11 @@ struct Node
     {}
 };
 
+inline bool is_occupied(const Node &n)
+{
+    return n.left != Node::ID_NONE && n.right != Node::ID_NONE;
+}
+
 // An output interface for the branching tree generator function. Consider each
 // method as a callback and implement the actions that need to be done.
 class Builder

@@ -283,17 +283,17 @@ Hit pinhead_mesh_hit(Ex              ex,
 
 template<class Ex>
 Hit pinhead_mesh_hit(Ex              ex,
-                           const AABBMesh &mesh,
-                           const Head     &head,
-                           double          safety_d)
+                     const AABBMesh &mesh,
+                     const Head     &head,
+                     double          safety_d)
 {
     return pinhead_mesh_hit(ex, mesh, head.pos, head.dir, head.r_pin_mm,
-                                  head.r_back_mm, head.width_mm, safety_d);
+                            head.r_back_mm, head.width_mm, safety_d);
 }
 
 template<class Ex>
-std::optional<DiffBridge> search_widening_path(Ex policy,
-                                               const SupportableMesh     &sm,
+std::optional<DiffBridge> search_widening_path(Ex                     policy,
+                                               const SupportableMesh &sm,
                                                const Vec3d           &jp,
                                                const Vec3d           &dir,
                                                double                 radius,
@@ -635,56 +635,61 @@ std::optional<Head> calculate_pinhead_placement(Ex                     policy,
 }
 
 template<class Ex>
-std::pair<bool, long> connect_to_ground(Ex                     policy,
-                                        SupportTreeBuilder    &builder,
-                                        const SupportableMesh &sm,
-                                        const Junction        &j,
-                                        const Vec3d           &dir,
-                                        double                 end_r)
+std::pair<bool, std::optional<Junction>> find_ground_connection(
+    Ex                     policy,
+    SupportTreeBuilder    &builder,
+    const SupportableMesh &sm,
+    const Junction        &j,
+    const Vec3d           &dir,
+    double                 end_r)
 {
     auto   hjp = j.pos;
     double r   = j.r;
     auto   sd  = r * sm.cfg.safety_distance_mm / sm.cfg.head_back_radius_mm;
     double r2  = j.r + (end_r - j.r) / (j.pos.z() - ground_level(sm));
 
-    double t   = beam_mesh_hit(policy, sm.emesh, Beam{hjp, dir, r, r2}, sd).distance();
-    double d   = 0, tdown = 0;
-    t          = std::min(t, sm.cfg.max_bridge_length_mm * r / sm.cfg.head_back_radius_mm);
+    double t = beam_mesh_hit(policy, sm.emesh, Beam{hjp, dir, r, r2}, sd)
+                   .distance();
+    double d = 0, tdown = 0;
+    t = std::min(t,
+                 sm.cfg.max_bridge_length_mm * r / sm.cfg.head_back_radius_mm);
 
-    while (d < t &&
-           !std::isinf(tdown = beam_mesh_hit(policy, sm.emesh,
-                                             Beam{hjp + d * dir, DOWN, r, r2}, sd)
-                                   .distance())) {
+    while (
+        d < t &&
+        !std::isinf(tdown = beam_mesh_hit(policy, sm.emesh,
+                                          Beam{hjp + d * dir, DOWN, r, r2}, sd)
+                                .distance())) {
         d += r;
     }
 
-    if(!std::isinf(tdown))
-        return {false, SupportTreeNode::ID_UNSET};
+    std::pair<bool, std::optional<Junction>> ret;
 
-    Vec3d endp = hjp + d * dir;
-    double bridge_ratio =  d / (d + (endp.z() - sm.emesh.ground_level()));
-    double pill_r  = r + bridge_ratio * (end_r - r);
-    auto ret = create_ground_pillar(policy, builder, sm, endp, dir, pill_r, end_r);
+    if (std::isinf(tdown)) {
+        ret.first = true;
+        if (d > 0) {
+            Vec3d  endp         = hjp + d * dir;
+            double bridge_ratio = d / (d + (endp.z() - sm.emesh.ground_level()));
+            double pill_r = r + bridge_ratio * (end_r - r);
 
-    if (ret.second >= 0) {
-        builder.add_diffbridge(hjp, endp, r, pill_r);
-        builder.add_junction(endp, pill_r);
+            ret.second = Junction{endp, pill_r};
+        }
     }
 
     return ret;
 }
 
 template<class Ex>
-std::pair<bool, long> search_ground_route(Ex                     policy,
-                                          SupportTreeBuilder    &builder,
-                                          const SupportableMesh &sm,
-                                          const Junction        &j,
-                                          double                 end_radius,
-                                          const Vec3d &init_dir = DOWN)
+std::pair<bool, std::optional<Junction>> optimize_ground_connection(
+    Ex                     policy,
+    SupportTreeBuilder    &builder,
+    const SupportableMesh &sm,
+    const Junction        &j,
+    double                 end_radius,
+    const Vec3d           &init_dir = DOWN)
 {
     double downdst = j.pos.z() - ground_level(sm);
 
-    auto res = connect_to_ground(policy, builder, sm, j, init_dir, end_radius);
+    auto res = find_ground_connection(policy, builder, sm, j, init_dir, end_radius);
     if (res.first)
         return res;
 
@@ -710,7 +715,59 @@ std::pair<bool, long> search_ground_route(Ex                     policy,
 
     Vec3d bridgedir = spheric_to_dir(oresult.optimum).normalized();
 
-    return connect_to_ground(policy, builder, sm, j, bridgedir, end_radius);
+    return find_ground_connection(policy, builder, sm, j, bridgedir, end_radius);
+}
+
+template<class Ex>
+std::pair<bool, long> connect_to_ground(Ex                     policy,
+                                        SupportTreeBuilder    &builder,
+                                        const SupportableMesh &sm,
+                                        const Junction        &j,
+                                        const Vec3d           &dir,
+                                        double                 end_r)
+{
+    std::pair<bool, long> ret = {false, SupportTreeNode::ID_UNSET};
+
+    auto [found_c, cjunc] = find_ground_connection(policy, builder, sm, j, dir, end_r);
+
+    if (found_c) {
+        Vec3d endp = cjunc? cjunc->pos : j.pos;
+        double R   = cjunc? cjunc->r   : j.r;
+        ret = create_ground_pillar(policy, builder, sm, endp, dir, R, end_r);
+
+        if (ret.second >= 0) {
+            builder.add_diffbridge(j.pos, endp, j.r, R);
+            builder.add_junction(endp, R);
+        }
+    }
+
+    return ret;
+}
+
+template<class Ex>
+std::pair<bool, long> search_ground_route(Ex                     policy,
+                                          SupportTreeBuilder    &builder,
+                                          const SupportableMesh &sm,
+                                          const Junction        &j,
+                                          double                 end_r,
+                                          const Vec3d &init_dir = DOWN)
+{
+    std::pair<bool, long> ret = {false, SupportTreeNode::ID_UNSET};
+
+    auto [found_c, cjunc] = optimize_ground_connection(policy, builder, sm, j, end_r, init_dir);
+    if (found_c) {
+        Vec3d endp = cjunc? cjunc->pos : j.pos;
+        double R   = cjunc? cjunc->r   : j.r;
+        Vec3d  dir = cjunc? Vec3d((j.pos - cjunc->pos).normalized()) : DOWN;
+        ret = create_ground_pillar(policy, builder, sm, endp, dir, R, end_r);
+
+        if (ret.second >= 0) {
+            builder.add_diffbridge(j.pos, endp, j.r, R);
+            builder.add_junction(endp, R);
+        }
+    }
+
+    return ret;
 }
 
 template<class Ex>

@@ -189,6 +189,10 @@ struct DiffBridge: public Bridge {
     DiffBridge(const Vec3d &p_s, const Vec3d &p_e, double r_s, double r_e)
         : Bridge{p_s, p_e, r_s}, end_r{r_e}
     {}
+
+    DiffBridge(const Junction &j_s, const Junction &j_e)
+        : Bridge{j_s.pos, j_e.pos, j_s.r}, end_r{j_e.r}
+    {}
 };
 
 // This class will hold the support tree parts (not meshes, but logical parts)
