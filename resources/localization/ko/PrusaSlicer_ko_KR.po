@@ -73,7 +73,7 @@ msgid ""
 msgstr ""
 "Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, "
 "Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik and "
-"numerous others. 한국어 번역 울산에테르, 밤송이직박구리"
+"numerous others. 한국어 번역 울산에테르, 밤송이직박구리,brightstone song"
 
 #: src/slic3r/GUI/AboutDialog.cpp:308
 msgid "Copy Version Info"
@@ -93,13 +93,13 @@ msgstr ""
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:84
 #, boost-format
 msgid "PrusaSlicer has encountered a fatal error: \"%1%\""
-msgstr ""
+msgstr "슬라이서에 치명적인 오류가 발생했습니다"
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:85
 msgid ""
 "Please save your project and restart PrusaSlicer. We would be glad if you "
 "reported the issue."
-msgstr ""
+msgstr "작업물을 저장하시고 슬라이서를 재시작하시기 바랍니다. 이 이슈를 보고해주시면 감사하겠습니다."
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:162
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:204
@@ -109,27 +109,27 @@ msgstr "슬라이스 완료"
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:199
 #, boost-format
 msgid "Masked SLA file exported to %1%"
-msgstr "마스크 된 SLA 파일을 %1%로 내보냅니"
+msgstr "마스크 된 SLA 파일을 %1%로 내보냅니다."
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:286
 msgid "Access violation"
-msgstr ""
+msgstr "접근 위반"
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:288
 msgid "Illegal instruction"
-msgstr ""
+msgstr "잘못된 명령"
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:290
 msgid "Divide by zero"
-msgstr ""
+msgstr "0"
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:292
 msgid "Overflow"
-msgstr ""
+msgstr "오버플로우"
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:294
 msgid "Underflow"
-msgstr ""
+msgstr "언더플로우"
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:297
 msgid "Floating reserved operand"
@@ -137,7 +137,7 @@ msgstr ""
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:300
 msgid "Stack overflow"
-msgstr ""
+msgstr "스택 오버플로우"
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:659
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:726
@@ -147,7 +147,7 @@ msgstr "포스트 프로세싱 스크립트"
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:690
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:710
 msgid "Unknown error occured during exporting G-code."
-msgstr ""
+msgstr "G고드 제작중 알 수 없는 오류가 발생"
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:695
 #, boost-format
@@ -189,7 +189,7 @@ msgstr ""
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:715
 #, boost-format
 msgid "G-code file exported to %1%"
-msgstr "%1%로 내보낸 G 코드 파일"
+msgstr "%1%로 G코드 파일이 저장되었습니다."
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:729
 msgid "Copying of the temporary G-code to the output G-code failed"
@@ -218,13 +218,13 @@ msgstr "노즐 직경"
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:49
 msgid "Size in X and Y of the rectangular plate."
-msgstr "사각 플레이트 X 및 Y 크기."
+msgstr "사각형 베드의 X와 Y크기."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:58
 msgid ""
 "Distance of the 0,0 G-code coordinate from the front left corner of the "
 "rectangle."
-msgstr "사각 전면 왼쪽 모서리에서 원저(0, 0) G-code 좌표 거리입니다."
+msgstr "전면부 왼쪽 모서리부터 원점까지의(0, 0) G-code 좌표 거리입니다."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:64 src/slic3r/GUI/ConfigWizard.cpp:262
 #: src/slic3r/GUI/ConfigWizard.cpp:1476 src/slic3r/GUI/ConfigWizard.cpp:1490
@@ -281,7 +281,7 @@ msgstr "mm"
 msgid ""
 "Diameter of the print bed. It is assumed that origin (0,0) is located in the "
 "center."
-msgstr "인쇄 배드의 직경. 원점 (0,0) 은 중재봉선에 있다고 가정합니다."
+msgstr "인쇄 배드의 직경. 원점 (0,0) 은 중앙에 있다고 가정됩니다."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:79
 msgid "Rectangular"
@@ -303,7 +303,7 @@ msgstr "모양"
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:203
 msgid "Load shape from STL..."
-msgstr "STL파일 로드."
+msgstr "STL파일 로드하기."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:249 src/slic3r/GUI/GCodeViewer.cpp:3710
 #: src/slic3r/GUI/MainFrame.cpp:2140
@@ -325,7 +325,7 @@ msgstr "제거"
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:317 src/slic3r/GUI/BedShapeDialog.cpp:388
 msgid "Not found:"
-msgstr ""
+msgstr "찾지 못함"
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:344
 msgid "Model"
@@ -346,25 +346,25 @@ msgstr "오류! 잘못된 모델"
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:533
 msgid "The selected file contains no geometry."
-msgstr "선택한 파일에 없는 형상이 있습니다."
+msgstr "선택한 파일에는 형상이 존재하지 않습니다."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:537
 msgid ""
 "The selected file contains several disjoint areas. This is not supported."
 msgstr ""
-"선택한 파일은 여러개의 분리 된 영역을 포함 되어 있어 지원 되지 않습니다."
+"이 파일은 몇몇 끊어진 부분이 있습니다. 지원이 불가능합니다."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:552
 msgid "Choose a file to import bed texture from (PNG/SVG):"
-msgstr "(PNG /SVG)에서 배드 텍스처를 가져올 파일을 선택합니다."
+msgstr "베드 텍스처를 가져올 (PNG /SVG)파일을 선택하십시오."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:574
 msgid "Choose an STL file to import bed model from:"
-msgstr "다음에서 베드 모델을 가져올 STL 파일을 선택합니다:"
+msgstr "베드 모델을 가져올 STL 파일을 선택하십시오:"
 
 #: src/slic3r/GUI/BedShapeDialog.hpp:95 src/slic3r/GUI/ConfigWizard.cpp:1396
 msgid "Bed Shape"
-msgstr "배드 모양"
+msgstr "베드 모양"
 
 #: src/slic3r/GUI/BonjourDialog.cpp:55
 msgid "Network lookup"
@@ -376,7 +376,7 @@ msgstr "주소"
 
 #: src/slic3r/GUI/BonjourDialog.cpp:73
 msgid "Hostname"
-msgstr "호스트이름"
+msgstr "호스트 이름"
 
 #: src/slic3r/GUI/BonjourDialog.cpp:74
 msgid "Service name"
@@ -388,7 +388,7 @@ msgstr "옥토프린트 버전"
 
 #: src/slic3r/GUI/BonjourDialog.cpp:224
 msgid "Searching for devices"
-msgstr "디바이스 검색"
+msgstr "디바이스 검색중"
 
 #: src/slic3r/GUI/BonjourDialog.cpp:231
 msgid "Finished"
@@ -406,7 +406,7 @@ msgstr "이 값은 시스템 값과 같습니다"
 msgid ""
 "Value was changed and is not equal to the system value or the last saved "
 "preset"
-msgstr "값이 변경 되었고, 시스템 값 또는 마지막으로 저장된 설정값과 다릅니다."
+msgstr "수치가 변경 되었고, 시스템 값 또는 마지막으로 저장된 설정값과 다릅니다."
 
 #: src/slic3r/GUI/ButtonsDescription.cpp:62
 msgid "Buttons And Text Colors Description"
@@ -418,6 +418,9 @@ msgid ""
 "\n"
 "The layer height will be reset to 0.01."
 msgstr ""
+"레이어 높이가 유호하지 않습니다.\n"
+"\n"
+"높이가 0.01로 재설정됩니다."
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:50
 #: src/slic3r/GUI/GUI_ObjectLayers.cpp:29 src/slic3r/GUI/Tab.cpp:1453
@@ -431,6 +434,9 @@ msgid ""
 "\n"
 "The first layer height will be reset to 0.01."
 msgstr ""
+"첫 레이어 높이가 유호하지 않습니다.\n"
+"\n"
+"첫 레이어 높이가 0.01로 재설정됩니다."
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:62 src/libslic3r/PrintConfig.cpp:1208
 msgid "First layer height"
@@ -446,14 +452,21 @@ msgid ""
 "- Ensure vertical shell thickness enabled\n"
 "- Detect thin walls disabled"
 msgstr ""
+"꽃병 모드는 다음과 같은 설정이 필요합니다:\n"
+"- 외벽 1\n"
+"- 상부 레이어 없음\n"
+"- 내부 밀도 0%\n"
+"- 서포트 없음\n"
+"- 외벽 두께 보장 활성화\n"
+"- 얇은 외벽 감지 비활성화"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:90
 msgid "Shall I adjust those settings in order to enable Spiral Vase?"
-msgstr "나선형 꽃병을 활성화하기 위해 이러한 설정을 조정해야 합니까?"
+msgstr "꽃병 모드를 활성화하기 위해 이 설정들을 변경하시겠습니까?"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:91
 msgid "Spiral Vase"
-msgstr "스파이럴 바이스"
+msgstr "꾳병 모드"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:121
 msgid ""
@@ -463,14 +476,14 @@ msgid ""
 "(both support_material_extruder and support_material_interface_extruder need "
 "to be set to 0)."
 msgstr ""
-"와이프 타워(프라임 타워)는 현재 비수용성 지원만 지원합니다.\n"
-"공구 교환을 트리거하지 않고 현재 압출기로 인쇄된 경우\n"
-"(support_material_extruder support_material_interface_extruder 모두 0으로 설"
+"와이프 타워(프라임 타워)는 현재 비수용성 서포트만 지원합니다.\n"
+"툴체인지를 사용하지 않고 현재 노즐로 출력시\n"
+"(support_material_extruder support_material_interface_extruder를 모두 0으로 설"
 "정해야 합니다)."
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:125
 msgid "Shall I adjust those settings in order to enable the Wipe Tower?"
-msgstr "와이프 타워를 활성화하기 위해 이러한 설정을 조정해야 합니까?"
+msgstr "와이프 타워를 활성화하기 위해 이 설정들을 변경하시겠습니까?"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:126
 #: src/slic3r/GUI/ConfigManipulation.cpp:146
@@ -482,37 +495,37 @@ msgid ""
 "For the Wipe Tower to work with the soluble supports, the support layers\n"
 "need to be synchronized with the object layers."
 msgstr ""
-"와이프 타워(프라임 타워)가 가용성 지지체와 함께 작동 하려면 서포트 레이어를 "
+"와이프 타워(프라임 타워)를 수용성 서포트와 함께 사용하기 위해서는 서포트 레이어를 "
 "객체(object) 레이어와 동기화 해야 합니다."
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:145
 msgid "Shall I synchronize support layers in order to enable the Wipe Tower?"
-msgstr "와이프 타워를 활성화하기 위해 지원 레이어를 동기화해야 합니까?"
+msgstr "와이프 타워를 사용하기 위해 서포트 레이어 설정을 변경하시겠습니까?"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:164
 msgid ""
 "Supports work better, if the following feature is enabled:\n"
 "- Detect bridging perimeters"
 msgstr ""
-"다음 기능이 활성화된 경우 더 나은 작업을 지원합니다.\n"
-"- 브리징 경계를 감지"
+"서포트는 다음 기능이 활성화되어 있으면 더 효율적으로 생성됩니다.\n"
+"- 브릿징 동작 감지"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:167
 msgid "Shall I adjust those settings for supports?"
-msgstr "지원에 대한 설정을 조정해야 합니까?"
+msgstr "서포트 세팅을 변경하시겠습니까?"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:168
 msgid "Support Generator"
-msgstr "서포트 생성"
+msgstr "서포트 생성기"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:195
 #, boost-format
 msgid "The %1% infill pattern is not supposed to work at 100%% density."
-msgstr "%1% 채우기 패턴은 100%% 밀도로 작동하도록 되어 있지 않습니다."
+msgstr "%1% 패턴은 100%% 밀도로 작동하도록 되어 있지 않습니다."
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:198
 msgid "Shall I switch to rectilinear fill pattern?"
-msgstr "직선 채우기 패턴으로 전환해야 합니까?"
+msgstr "직선 패턴으로 전환하시겠습니까?"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:199
 #: src/slic3r/GUI/GUI_Factories.cpp:55 src/slic3r/GUI/GUI_Factories.cpp:128
@@ -525,19 +538,19 @@ msgstr "직선 채우기 패턴으로 전환해야 합니까?"
 #: src/libslic3r/PrintConfig.cpp:1474 src/libslic3r/PrintConfig.cpp:1493
 #: src/libslic3r/PrintConfig.cpp:2314 src/libslic3r/PrintConfig.cpp:2331
 msgid "Infill"
-msgstr "인필(채움)"
+msgstr "인필"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:327
 msgid "Head penetration should not be greater than the head width."
-msgstr "헤드 관통은 헤드 폭 보다 크지 않아야 합니다."
+msgstr "헤드 접촉길이는 헤드의 지름보다 클 수 없습니다."
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:329
 msgid "Invalid Head penetration"
-msgstr "잘못된 헤드 관통"
+msgstr "헤드 관통 불가"
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:340
 msgid "Pinhead diameter should be smaller than the pillar diameter."
-msgstr "핀헤드 지름은 기둥 지름 보다 작아야 합니다."
+msgstr "핀헤드 지름은 기둥 지름보다 클 수 ."
 
 #: src/slic3r/GUI/ConfigManipulation.cpp:342
 msgid "Invalid pinhead diameter"
@@ -596,7 +609,7 @@ msgstr "프린터"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:75 src/slic3r/GUI/Tab.cpp:1370
 msgid "vendor"
-msgstr "제조 회사"
+msgstr "제조사"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:75
 msgid "version"
@@ -641,7 +654,7 @@ msgstr "대체 노즐:"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:330
 msgid "All standard"
-msgstr "모두 표준설정"
+msgstr "전부 표준설정으로"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:330
 msgid "Standard"
@@ -680,12 +693,12 @@ msgid ""
 "Hello, welcome to %s! This %s helps you with the initial configuration; just "
 "a few settings and you will be ready to print."
 msgstr ""
-"안녕하세요 ,%s에 오신 것을 환영 합니다! 이 %s는 초기 구성에 도움이 됩니다. "
-"몇 가지 설정만으로 인쇄 준비가 될 것입니다."
+"안녕하세요 ,%s에 오신 것을 환영 합니다! 이 %s는 초기 설정에 도움이 됩니다. "
+"몇 가지 설정 후 프린팅할 준비가 될 것입니다."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:495
 msgid "Remove user profiles (a snapshot will be taken beforehand)"
-msgstr ""
+msgstr "유저 프로필 제거(제거 전 스냅샷이 생성될 것입니다.)"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:498
 msgid ""
@@ -696,7 +709,7 @@ msgstr ""
 #: src/slic3r/GUI/ConfigWizard.cpp:550
 #, c-format, boost-format
 msgid "%s Family"
-msgstr "%s의 가족들"
+msgstr "%s사 제품들"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:640
 msgid "Printer:"
@@ -729,7 +742,7 @@ msgstr "필라멘트"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:752
 msgid "SLA materials"
-msgstr ""
+msgstr "SLA 레진"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:755
 #, boost-format
@@ -754,19 +767,19 @@ msgstr ""
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1175
 msgid "Custom Printer Setup"
-msgstr "사용자 지정 프린터 설정"
+msgstr "커스텀 프린터 설정"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1175
 msgid "Custom Printer"
-msgstr "사용자 정의 프린터"
+msgstr "커스텀 프린터"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1177
 msgid "Define a custom printer profile"
-msgstr "사용자 정의 프린터 프로필"
+msgstr "커스텀 프린터 세팅 입력"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1179
 msgid "Custom profile name:"
-msgstr "사용자 정의 프로필 명칭:"
+msgstr "커스텀 프로필 명칭:"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1206
 msgid "Automatic updates"
@@ -788,9 +801,9 @@ msgid ""
 "application startup (never during program usage). This is only a "
 "notification mechanisms, no automatic installation is done."
 msgstr ""
-"활성화 된 경우 %s은 온라인의 새 버전을 확인합니다. 새 버전을 사용할 수 있게 "
-"되면, 다음 응용 프로그램 시작시 알림이 표시됩니다 (프로그램 사용 중에는 절대"
-"로 사용하지 마십시오).이것은 단순한 알림 일뿐 자동으로 설치가 되지 않습니다."
+"활성화시 %s는 최신버전을 온라인에서 확인합니다. 새 버전이 있을시 "
+"프로그램이 켜질 때 알림이 표시됩니다 (켜져있을 때는 알림이"
+"표시되지 않습니다).자동으로 설치는 되지 않습니다."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1224 src/slic3r/GUI/Preferences.cpp:175
 msgid "Update built-in Presets automatically"
@@ -877,7 +890,7 @@ msgstr ""
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1279
 msgid "Simple mode"
-msgstr "단순 모드"
+msgstr "초보자 모드"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1280
 msgid "Advanced mode"
@@ -889,20 +902,20 @@ msgstr "전문가 모드"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1287
 msgid "The size of the object can be specified in inches"
-msgstr ""
+msgstr "물체의 크기를 인치로 표시 가능합니다"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1288
 msgid "Use inches"
-msgstr ""
+msgstr "인치 사용"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1322
 msgid "Other Vendors"
-msgstr "다른 공급 업체"
+msgstr "다른 벤더"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1326
 #, c-format, boost-format
 msgid "Pick another vendor supported by %s"
-msgstr "%s가 지원하는 다른 공급 업체를 선택하십시오:"
+msgstr "%s가 지원하는 다른 벤더를 선택하십시오:"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1357
 msgid "Firmware Type"
@@ -914,7 +927,7 @@ msgstr "펌웨어"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1361
 msgid "Choose the type of firmware used by your printer."
-msgstr "프린터에 업로드 할 펌웨어를 선택하세요."
+msgstr "프린터가 사용하는 펌웨어를 선택하세요."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1396
 msgid "Bed Shape and Size"
@@ -922,13 +935,13 @@ msgstr "배드 모양과 크기"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1399
 msgid "Set the shape of your printer's bed."
-msgstr "프린터 배드모양을 설정하세요."
+msgstr "프린터의 배드 모양을 설정하세요."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1433 src/slic3r/GUI/Field.cpp:255
 #: src/slic3r/GUI/Field.cpp:324 src/slic3r/GUI/Field.cpp:1562
 #: src/slic3r/GUI/GUI_ObjectLayers.cpp:429
 msgid "Invalid numeric input."
-msgstr "숫자 입력이 잘못 되었습니다."
+msgstr "잘못된 수치."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1457
 msgid "Filament and Nozzle Diameters"
@@ -936,11 +949,11 @@ msgstr "필라멘트와 노즐 크기"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1457
 msgid "Print Diameters"
-msgstr "인쇄 직경"
+msgstr "노즐,필라멘트 직경"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1472
 msgid "Enter the diameter of your printer's hot end nozzle."
-msgstr "핫 엔드 노즐 직경을 입력하십시오."
+msgstr "노즐 직경을 입력하십시오."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1475
 msgid "Nozzle Diameter:"
@@ -948,15 +961,15 @@ msgstr "노즐 직경:"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1485
 msgid "Enter the diameter of your filament."
-msgstr "필라멘트의 직경을 입력하십시오."
+msgstr "필라멘트 직경을 입력하십시오."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1486
 msgid ""
 "Good precision is required, so use a caliper and do multiple measurements "
 "along the filament, then compute the average."
 msgstr ""
-"정밀도가 필요하므로 캘리퍼를 사용하여 필라멘트를 따라 여러 번 측정 한 다음 평"
-"균을 계산하십시오."
+"정확한 수치가 필요하므로 버니어 캘리퍼로 여러번 측정하여"
+"평균값을 입력하십시오."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1489
 msgid "Filament Diameter:"
@@ -964,7 +977,7 @@ msgstr "필라멘트 직경:"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1547
 msgid "Nozzle and Bed Temperatures"
-msgstr ""
+msgstr "노즐, 베드 온도"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1547
 msgid "Temperatures"
@@ -992,14 +1005,14 @@ msgstr "°C"
 msgid ""
 "Enter the bed temperature needed for getting your filament to stick to your "
 "heated bed."
-msgstr "필라멘트가 핫배드에 접착하는데 필요한 온도를 입력하십시오."
+msgstr "필라멘트가 온열배드에 안착하는데 필요한 온도를 입력하십시오."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1578
 msgid ""
 "A rule of thumb is 60 °C for PLA and 110 °C for ABS. Leave zero if you have "
 "no heated bed."
 msgstr ""
-"보통은 PLA의 경우 60 ° C이고 ABS의 경우 110 ° C입니다. 핫배드가 없는 경우에"
+"보통 PLA는 60 ° C이고 ABS는 110 ° C입니다. 온열배드가 없는 경우에"
 "는 0으로 두십시오."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1581
@@ -1008,7 +1021,7 @@ msgstr "배드 온도 :"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:2043 src/slic3r/GUI/ConfigWizard.cpp:2915
 msgid "SLA Materials"
-msgstr "SLA 재료"
+msgstr "SLA 레진"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:2097
 msgid "FFF Technology Printers"
@@ -1024,6 +1037,8 @@ msgid ""
 "Following printer profiles has no default filament: %1%Please select one "
 "manually."
 msgstr ""
+"프린터 프로필에 기본 필라멘트가 없습니다: %1%하나를 "
+"선택하십시오."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:2339
 #, boost-format
@@ -1031,6 +1046,8 @@ msgid ""
 "Following printer profiles has no default material: %1%Please select one "
 "manually."
 msgstr ""
+"프린터 프로필에 기본 레진이 없습니다: %1%하나를 "
+"선택하십시오."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:2340 src/slic3r/GUI/ConfigWizard.cpp:2438
 #: src/slic3r/GUI/DoubleSlider.cpp:2521 src/slic3r/GUI/DoubleSlider.cpp:2542
