@@ -14,7 +14,7 @@
 #include "Arrange.hpp"
 #include "CustomGCode.hpp"
 #include "enum_bitmask.hpp"
-#include "ModelVolumeType.hpp"
+//#include "ModelVolumeType.hpp"
 #include "TextConfiguration.hpp"
 
 #include <map>

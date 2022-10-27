@@ -349,7 +349,7 @@ void ObjectDataViewModel::UpdateBitmapForNode(ObjectDataViewModelNode* node)
     bool is_volume_node = vol_type >= 0;
 
     if (!node->has_warning_icon() && !node->has_lock()) {
-        node->SetBitmap(is_volume_node ? *m_volume_bmps.at(vol_type) : m_empty_bmp);
+        node->SetBitmap(is_volume_node ? (node->is_text_volume() ? *m_text_volume_bmps.at(vol_type) : *m_volume_bmps.at(vol_type)) : m_empty_bmp);
         return;
     }
 
@@ -370,7 +370,7 @@ void ObjectDataViewModel::UpdateBitmapForNode(ObjectDataViewModelNode* node)
         if (node->has_lock())
             bmps.emplace_back(&m_lock_bmp);
         if (is_volume_node)
-            bmps.emplace_back(m_volume_bmps[vol_type]);
+            bmps.emplace_back(node->is_text_volume() ? m_text_volume_bmps[vol_type] : m_volume_bmps[vol_type]);
         bmp = m_bitmap_cache->insert_bndl(scaled_bitmap_name, bmps);
     }
 
@@ -406,8 +406,8 @@ wxDataViewItem ObjectDataViewModel::AddVolumeChild( const wxDataViewItem &parent
                                                     const wxString &name,
                                                     const int volume_idx,
                                                     const Slic3r::ModelVolumeType volume_type,
+                                                    const bool is_text_volume,
                                                     const std::string& warning_icon_name,
-                                                    const bool is_text_volume = false,
                                                     const wxString& extruder)
 {
 	ObjectDataViewModelNode *root = static_cast<ObjectDataViewModelNode*>(parent_item.GetID());
@@ -418,7 +418,7 @@ wxDataViewItem ObjectDataViewModel::AddVolumeChild( const wxDataViewItem &parent
     if (insert_position < 0)
         insert_position = get_root_idx(root, itInstanceRoot);
 
-    const auto node = new ObjectDataViewModelNode(root, name, volume_type, extruder, volume_idx);
+    const auto node = new ObjectDataViewModelNode(root, name, volume_type, is_text_volume, extruder, volume_idx);
     UpdateBitmapForNode(node, warning_icon_name, root->has_lock() && volume_type < ModelVolumeType::PARAMETER_MODIFIER);
     insert_position < 0 ? root->Append(node) : root->Insert(node, insert_position);
 
@@ -1618,11 +1618,6 @@ void ObjectDataViewModel::UpdateSettingsDigest(const wxDataViewItem &item,
     ItemChanged(item);
 }
 
-void ObjectDataViewModel::SetVolumeBitmap(ObjectDataViewModelNode* node) 
-{
-    node->SetBitmap(GetVolumeIcon(*node, node->m_warning_icon_name));
-}
-
 ModelVolumeType ObjectDataViewModel::GetVolumeType(const wxDataViewItem& item)
 {
     if (!item.IsOk() || GetItemType(item) != itVolume) 
@@ -1714,30 +1709,6 @@ void ObjectDataViewModel::UpdateBitmaps()
 
         ItemChanged(item);
     }
-}
-
-wxBitmapBundle ObjectDataViewModel::GetVolumeIcon(
-    const ObjectDataViewModelNode &node,
-    const std::string &warning_icon_name /* = std::string()*/)
-{
-    const std::vector<wxBitmapBundle*>& bitmaps = node.is_text_volume() ? m_text_volume_bmps : m_volume_bmps;
-    if (warning_icon_name.empty())
-        return *bitmaps[static_cast<int>(node.GetVolumeType())];
-
-    std::string scaled_bitmap_name = warning_icon_name +
-                                     std::to_string(node.GetType()) +
-                                     (node.is_text_volume() ?"text": "");
-    scaled_bitmap_name += "-em" + std::to_string(wxGetApp().em_unit()) + (wxGetApp().dark_mode() ? "-dm" : "-lm");
-
-    // TODO: use scale cache
-    wxBitmapBundle *bmp = m_bitmap_cache->find_bndl(scaled_bitmap_name);
-    if (bmp == nullptr) {
-        std::vector<wxBitmapBundle*> bmps;
-        bmps.emplace_back(&GetWarningBitmap(warning_icon_name));
-        bmps.emplace_back(bitmaps[static_cast<int>(node.GetVolumeType())]);
-        bmp = m_bitmap_cache->insert_bndl(scaled_bitmap_name, bmps);
-    }
-    return *bmp;
 }
 
 void ObjectDataViewModel::AddWarningIcon(const wxDataViewItem& item, const std::string& warning_icon_name)

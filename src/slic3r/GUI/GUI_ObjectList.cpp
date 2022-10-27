@@ -4182,13 +4182,12 @@ void ObjectList::change_part_type()
         }
     }
 
-
+    const bool is_cut_object = obj->is_cut();
     wxArrayString names;
-//    names.Alloc(is_cut_object ? 3 : 5);
     if (!is_cut_object)
         for (const wxString& type : { _L("Part"), _L("Negative Volume") })
             names.Add(type);
-    names.Add(_L("Modifier"))
+    names.Add(_L("Modifier"));
     if (!volume->text_configuration.has_value())
         for (const wxString& name : { _L("Support Blocker"), _L("Support Enforcer") })
             names.Add(name);
