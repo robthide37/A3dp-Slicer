@@ -8,6 +8,7 @@
 #include "../Print.hpp"
 #include "../PrintConfig.hpp"
 #include "../Surface.hpp"
+// for Arachne based infills
 #include "../PerimeterGenerator.hpp"
 
 #include "FillBase.hpp"
@@ -427,7 +428,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                     for (const ThickPolyline &thick_polyline : thick_polylines) {
                         Flow new_flow = surface_fill.params.flow.with_spacing(float(f->spacing));
 
-                        ExtrusionMultiPath multi_path = thick_polyline_to_multi_path(thick_polyline, surface_fill.params.extrusion_role, new_flow, scaled<float>(0.05), float(SCALED_EPSILON));
+                        ExtrusionMultiPath multi_path = PerimeterGenerator::thick_polyline_to_multi_path(thick_polyline, surface_fill.params.extrusion_role, new_flow, scaled<float>(0.05), float(SCALED_EPSILON));
                         // Append paths to collection.
                         if (!multi_path.empty()) {
                             if (multi_path.paths.front().first_point() == multi_path.paths.back().last_point())

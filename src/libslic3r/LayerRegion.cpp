@@ -72,35 +72,46 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, SurfaceCollec
         (this->layer()->id() >= size_t(region_config.bottom_solid_layers.value) &&
          this->layer()->print_z >= region_config.bottom_solid_min_thickness - EPSILON);
 
-    PerimeterGenerator g(
-        // input:
-        &slices,
+    PerimeterGenerator::Parameters params(
         this->layer()->height,
+        int(this->layer()->id()),
         this->flow(frPerimeter),
-        &region_config,
-        &this->layer()->object()->config(),
-        &print_config,
-        spiral_vase,
-        
-        // output:
-        &m_perimeters,
-        &m_thin_fills,
-        fill_surfaces
+        this->flow(frExternalPerimeter),
+        this->bridging_flow(frPerimeter),
+        this->flow(frSolidInfill),
+        region_config,
+        this->layer()->object()->config(),
+        print_config,
+        spiral_vase
     );
-    
-    if (this->layer()->lower_layer != nullptr)
-        // Cummulative sum of polygons over all the regions.
-        g.lower_slices = &this->layer()->lower_layer->lslices;
-    
-    g.layer_id              = (int)this->layer()->id();
-    g.ext_perimeter_flow    = this->flow(frExternalPerimeter);
-    g.overhang_flow         = this->bridging_flow(frPerimeter);
-    g.solid_infill_flow     = this->flow(frSolidInfill);
+
+    // Cummulative sum of polygons over all the regions.
+    const ExPolygons *lower_slices = this->layer()->lower_layer ? &this->layer()->lower_layer->lslices : nullptr;
+    // Cache for offsetted lower_slices
+    Polygons          lower_layer_polygons_cache;
 
     if (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne && !spiral_vase)
-        g.process_arachne();
+        PerimeterGenerator::process_arachne(
+            // input:
+            params,
+            &slices,
+            lower_slices,
+            lower_layer_polygons_cache,
+            // output:
+            m_perimeters,
+            m_thin_fills,
+            *fill_surfaces);
     else
-        g.process_classic();
+        PerimeterGenerator::process_classic(
+            // input:
+            params,
+            &slices,
+            lower_slices,
+            lower_layer_polygons_cache,
+            // output:
+            m_perimeters,
+            m_thin_fills,
+            *fill_surfaces);
 }
 
 //#define EXTERNAL_SURFACES_OFFSET_PARAMETERS ClipperLib::jtMiter, 3.

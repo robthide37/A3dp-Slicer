@@ -45,21 +45,29 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
         ExtrusionEntityCollection loops;
         ExtrusionEntityCollection gap_fill;
         SurfaceCollection         fill_surfaces;
-        PerimeterGenerator        perimeter_generator(
-            &slices, 
+        Flow                      flow(1., 1., 1.);
+        PerimeterGenerator::Parameters perimeter_generator_params(
             1., // layer height
-            Flow(1., 1., 1.),
-            static_cast<const PrintRegionConfig*>(&config),
-            static_cast<const PrintObjectConfig*>(&config),
-            static_cast<const PrintConfig*>(&config),
-            false, // spiral_vase
-            // output:
-            &loops, &gap_fill, &fill_surfaces);
+            -1, // layer ID
+            flow, flow, flow, flow,
+            static_cast<const PrintRegionConfig&>(config),
+            static_cast<const PrintObjectConfig&>(config),
+            static_cast<const PrintConfig&>(config),
+            false); // spiral_vase
+        Polygons lower_layer_polygons_cache;
         // FIXME Lukas H.: Disable this test for Arachne because it is failing and needs more investigation.
 //        if (config.perimeter_generator == PerimeterGeneratorType::Arachne)
-//            perimeter_generator.process_arachne();
+//            PerimeterGenerator::process_arachne();
 //        else
-            perimeter_generator.process_classic();
+            PerimeterGenerator::process_classic(
+                // input:
+                perimeter_generator_params,
+                &slices,
+                nullptr,
+                // cache:
+                lower_layer_polygons_cache,
+                // output:
+                loops, gap_fill, fill_surfaces);
 
         THEN("expected number of collections") {
             REQUIRE(loops.entities.size() == data.expolygons.size());
