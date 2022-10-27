@@ -256,6 +256,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/WinRegistry.hpp
 )
 
+find_package(NanoSVG REQUIRED)
+
 if (APPLE)
     list(APPEND SLIC3R_GUI_SOURCES
             Utils/RetinaHelperImpl.mm

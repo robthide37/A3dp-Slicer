@@ -56,6 +56,11 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::PreferencesHoverButton, "notification_preferences_hover"},
     {ImGui::SliderFloatEditBtnIcon, "edit_button"                   },
     {ImGui::SliderFloatEditBtnPressedIcon, "edit_button_pressed"    },
+    {ImGui::ExpandBtn             , "expand_btn"                    },
+    {ImGui::CollapseBtn           , "collapse_btn"                  },
+    {ImGui::RevertButton          , "undo"                          },
+    {ImGui::WarningMarkerSmall    , "notification_warning"          },
+    {ImGui::InfoMarkerSmall       , "notification_info"             },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {
