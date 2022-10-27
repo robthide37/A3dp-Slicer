@@ -4180,13 +4180,6 @@ void Plater::priv::on_select_preset(wxCommandEvent &evt)
         combo->update();
     }
     else if (select_preset) {
-        if (preset_type == Preset::TYPE_PRINTER) {
-            PhysicalPrinterCollection& physical_printers = wxGetApp().preset_bundle->physical_printers;
-            if(combo->is_selected_physical_printer())
-                preset_name = physical_printers.get_selected_printer_preset_name();
-            else
-                physical_printers.unselect_printer();
-        }
         wxWindowUpdateLocker noUpdates(sidebar->presets_panel());
         wxGetApp().get_tab(preset_type)->select_preset(preset_name);
     }
