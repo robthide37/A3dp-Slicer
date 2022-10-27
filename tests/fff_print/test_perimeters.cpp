@@ -44,7 +44,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
         
         ExtrusionEntityCollection loops;
         ExtrusionEntityCollection gap_fill;
-        SurfaceCollection         fill_surfaces;
+        ExPolygons                fill_expolygons;
         Flow                      flow(1., 1., 1.);
         PerimeterGenerator::Parameters perimeter_generator_params(
             1., // layer height
@@ -67,7 +67,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
                 // cache:
                 lower_layer_polygons_cache,
                 // output:
-                loops, gap_fill, fill_surfaces);
+                loops, gap_fill, fill_expolygons);
 
         THEN("expected number of collections") {
             REQUIRE(loops.entities.size() == data.expolygons.size());

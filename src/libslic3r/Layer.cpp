@@ -426,12 +426,12 @@ void Layer::make_perimeters()
 		            }
 		        }
 	        
-            SurfaceCollection fill_surfaces;
+            ExPolygons fill_expolygons;
 	        if (layerms.size() == 1) {  // optimization
                 (*layerm)->m_fill_expolygons.clear();
 	            (*layerm)->m_fill_surfaces.clear();
-	            (*layerm)->make_perimeters((*layerm)->slices(), &fill_surfaces);
-	            (*layerm)->m_fill_expolygons = to_expolygons(fill_surfaces.surfaces);
+	            (*layerm)->make_perimeters((*layerm)->slices(), fill_expolygons);
+	            (*layerm)->m_fill_expolygons = std::move(fill_expolygons);
 	        } else {
 	            SurfaceCollection new_slices;
 	            // Use the region with highest infill rate, as the make_perimeters() function below decides on the gap fill based on the infill existence.
@@ -452,12 +452,12 @@ void Layer::make_perimeters()
 	                    new_slices.append(offset_ex(surfaces_with_extra_perimeters.second, ClipperSafetyOffset), surfaces_with_extra_perimeters.second.front());
 	            }
 	            // make perimeters
-	            layerm_config->make_perimeters(new_slices, &fill_surfaces);
+	            layerm_config->make_perimeters(new_slices, fill_expolygons);
 	            // assign fill_surfaces to each layer
-                if (! fill_surfaces.empty()) {
+                if (! fill_expolygons.empty()) {
                     // Separate the fill surfaces.
                     for (LayerRegion *l : layerms)
-                       l->m_fill_expolygons = intersection_ex(fill_surfaces.surfaces, l->slices().surfaces);
+                       l->m_fill_expolygons = intersection_ex(l->slices().surfaces, fill_expolygons);
                 }
 	        }
 	    }

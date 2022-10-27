@@ -59,7 +59,7 @@ void LayerRegion::slices_to_fill_surfaces_clipped()
     }
 }
 
-void LayerRegion::make_perimeters(const SurfaceCollection &slices, SurfaceCollection* fill_surfaces)
+void LayerRegion::make_perimeters(const SurfaceCollection &slices, ExPolygons &fill_expolygons)
 {
     m_perimeters.clear();
     m_thin_fills.clear();
@@ -100,7 +100,7 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, SurfaceCollec
             // output:
             m_perimeters,
             m_thin_fills,
-            *fill_surfaces);
+            fill_expolygons);
     else
         PerimeterGenerator::process_classic(
             // input:
@@ -111,7 +111,7 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, SurfaceCollec
             // output:
             m_perimeters,
             m_thin_fills,
-            *fill_surfaces);
+            fill_expolygons);
 }
 
 //#define EXTERNAL_SURFACES_OFFSET_PARAMETERS ClipperLib::jtMiter, 3.

@@ -77,7 +77,7 @@ void process_classic(
     // Gaps without the thin walls
     ExtrusionEntityCollection  &out_gap_fill,
     // Infills without the gap fills
-    SurfaceCollection          &out_fill_surfaces);
+    ExPolygons                 &out_fill_expolygons);
 
 void process_arachne(
     // Inputs:
@@ -92,7 +92,7 @@ void process_arachne(
     // Gaps without the thin walls
     ExtrusionEntityCollection  &out_gap_fill,
     // Infills without the gap fills
-    SurfaceCollection          &out_fill_surfaces);
+    ExPolygons                 &out_fill_expolygons);
 
 ExtrusionMultiPath thick_polyline_to_multi_path(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, float tolerance, float merge_tolerance);
 

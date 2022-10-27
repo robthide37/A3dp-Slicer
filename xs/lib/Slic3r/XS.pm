@@ -159,8 +159,6 @@ for my $class (qw(
         Slic3r::ExtrusionPath
         Slic3r::ExtrusionPath::Collection
         Slic3r::Geometry::BoundingBox
-        Slic3r::Layer
-        Slic3r::Layer::Region
         Slic3r::Line
         Slic3r::Model
         Slic3r::Model::Instance

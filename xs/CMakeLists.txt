@@ -46,11 +46,7 @@ set(XS_XSP_FILES
     ${XSP_DIR}/BoundingBox.xsp
     ${XSP_DIR}/Config.xsp
     ${XSP_DIR}/ExPolygon.xsp
-    ${XSP_DIR}/ExtrusionEntityCollection.xsp
-    ${XSP_DIR}/ExtrusionLoop.xsp
-    ${XSP_DIR}/ExtrusionPath.xsp
     ${XSP_DIR}/Geometry.xsp
-    ${XSP_DIR}/Layer.xsp
     ${XSP_DIR}/Line.xsp
     ${XSP_DIR}/Model.xsp
     ${XSP_DIR}/Point.xsp

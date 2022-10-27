@@ -53,15 +53,6 @@
 %typemap{Polygon*};
 %typemap{Ref<Polygon>}{simple};
 %typemap{Clone<Polygon>}{simple};
-%typemap{ExtrusionEntityCollection*};
-%typemap{Ref<ExtrusionEntityCollection>}{simple};
-%typemap{Clone<ExtrusionEntityCollection>}{simple};
-%typemap{ExtrusionPath*};
-%typemap{Ref<ExtrusionPath>}{simple};
-%typemap{Clone<ExtrusionPath>}{simple};
-%typemap{ExtrusionLoop*};
-%typemap{Ref<ExtrusionLoop>}{simple};
-%typemap{Clone<ExtrusionLoop>}{simple};
 %typemap{TriangleMesh*};
 %typemap{Ref<TriangleMesh>}{simple};
 %typemap{Clone<TriangleMesh>}{simple};
@@ -86,19 +77,12 @@
 %typemap{Ref<Print>}{simple};
 %typemap{Clone<Print>}{simple};
 
-%typemap{LayerRegion*};
-%typemap{Ref<LayerRegion>}{simple};
-
-%typemap{Layer*};
-%typemap{Ref<Layer>}{simple};
-
 %typemap{Points};
 %typemap{Pointfs};
 %typemap{Lines};
 %typemap{Polygons};
 %typemap{Polylines};
 %typemap{ExPolygons};
-%typemap{ExtrusionPaths};
 %typemap{Surfaces};
 %typemap{Polygons*};
 %typemap{TriangleMesh*};

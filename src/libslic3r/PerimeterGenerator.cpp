@@ -611,7 +611,7 @@ void PerimeterGenerator::process_arachne(
     // Gaps without the thin walls
     ExtrusionEntityCollection  &out_gap_fill,
     // Infills without the gap fills
-    SurfaceCollection          &out_fill_surfaces)
+    ExPolygons                 &out_fill_expolygons)
 {
     // other perimeters
     coord_t perimeter_spacing     = params.perimeter_flow.scaled_spacing();
@@ -817,12 +817,11 @@ void PerimeterGenerator::process_arachne(
         // collapse too narrow infill areas
         const auto    min_perimeter_infill_spacing = coord_t(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE));
         // append infill areas to fill_surfaces
-        out_fill_surfaces.append(
+        append(out_fill_expolygons,
             offset2_ex(
                 union_ex(pp),
                 float(- min_perimeter_infill_spacing / 2.),
-                float(inset + min_perimeter_infill_spacing / 2.)),
-            stInternal);
+                float(inset + min_perimeter_infill_spacing / 2.)));
     }
 }
 
@@ -839,7 +838,7 @@ void PerimeterGenerator::process_classic(
     // Gaps without the thin walls
     ExtrusionEntityCollection  &out_gap_fill,
     // Infills without the gap fills
-    SurfaceCollection          &out_fill_surfaces)
+    ExPolygons                 &out_fill_expolygons)
 {
     // other perimeters
     coord_t perimeter_width         = params.perimeter_flow.scaled_width();
@@ -1094,12 +1093,11 @@ void PerimeterGenerator::process_classic(
         // collapse too narrow infill areas
         coord_t min_perimeter_infill_spacing = coord_t(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE));
         // append infill areas to fill_surfaces
-        out_fill_surfaces.append(
+        append(out_fill_expolygons,
             offset2_ex(
                 union_ex(pp),
                 float(- inset - min_perimeter_infill_spacing / 2.),
-                float(min_perimeter_infill_spacing / 2.)),
-            stInternal);
+                float(min_perimeter_infill_spacing / 2.)));
     } // for each island
 }
 
