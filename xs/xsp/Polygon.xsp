@@ -2,9 +2,7 @@
 
 %{
 #include <xsinit.h>
-#include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/Polygon.hpp"
-#include "libslic3r/BoundingBox.hpp"
 %}
 
 %name{Slic3r::Polygon} class Polygon {
@@ -35,7 +33,6 @@
         %code{% RETVAL = THIS->contains(*point); %};
     Polygons simplify(double tolerance);
     Clone<Point> centroid();
-    Clone<BoundingBox> bounding_box();
     Clone<Point> first_intersection(Line* line)
         %code{%
             Point p;

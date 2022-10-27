@@ -32,18 +32,12 @@ use Moo 1.003001;
 
 use Slic3r::XS;   # import all symbols (constants etc.) before they get parsed
 use Slic3r::Config;
-use Slic3r::ExPolygon;
-use Slic3r::ExtrusionLoop;
-use Slic3r::ExtrusionPath;
 use Slic3r::GCode::Reader;
-use Slic3r::Layer;
 use Slic3r::Line;
 use Slic3r::Model;
 use Slic3r::Point;
 use Slic3r::Polygon;
 use Slic3r::Polyline;
-use Slic3r::Print::Object;
-use Slic3r::Surface;
 our $build = eval "use Slic3r::Build; 1";
 
 # Scaling between the float and integer coordinates.

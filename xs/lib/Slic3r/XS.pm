@@ -100,7 +100,6 @@ for my $class (qw(
         Slic3r::Config::Print
         Slic3r::Config::Static
         Slic3r::ExPolygon
-        Slic3r::Geometry::BoundingBox
         Slic3r::Line
         Slic3r::Model
         Slic3r::Model::Instance
@@ -115,10 +114,6 @@ for my $class (qw(
         Slic3r::Polyline
         Slic3r::Polyline::Collection
         Slic3r::Print
-        Slic3r::Print::Object
-        Slic3r::Print::Region
-        Slic3r::Surface
-        Slic3r::Surface::Collection
         Slic3r::TriangleMesh
     ))
 {
