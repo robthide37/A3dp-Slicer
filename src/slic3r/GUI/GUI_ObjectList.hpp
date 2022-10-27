@@ -248,7 +248,7 @@ public:
     void                add_category_to_settings_from_frequent(const std::vector<std::string>& category_options, wxDataViewItem item);
     void                show_settings(const wxDataViewItem settings_item);
     bool                is_instance_or_object_selected();
-
+    bool                is_selected_object_cut();
     void                load_subobject(ModelVolumeType type, bool from_galery = false);
     // ! ysFIXME - delete commented code after testing and rename "load_modifier" to something common
     //void                load_part(ModelObject& model_object, std::vector<ModelVolume*>& added_volumes, ModelVolumeType type, bool from_galery = false);
@@ -259,8 +259,8 @@ public:
     void                load_shape_object_from_gallery(const wxArrayString& input_files);
     void                load_mesh_object(const TriangleMesh &mesh, const std::string &name, bool center = true, 
                                          const TextConfiguration* text_config = nullptr, const Transform3d* transformation = nullptr);
-    void                del_object(const int obj_idx);
-    void                del_subobject_item(wxDataViewItem& item);
+    bool                del_object(const int obj_idx);
+    bool                del_subobject_item(wxDataViewItem& item);
     void                del_settings_from_config(const wxDataViewItem& parent_item);
     void                del_instances_from_object(const int obj_idx);
     void                del_layer_from_object(const int obj_idx, const t_layer_height_range& layer_range);
@@ -279,6 +279,9 @@ public:
     bool                is_splittable(bool to_objects);
     bool                selected_instances_of_same_object();
     bool                can_split_instances();
+    bool                has_selected_cut_object() const;
+    void                invalidate_cut_info_for_selection();
+    void                invalidate_cut_info_for_object(size_t obj_idx);
     bool                can_merge_to_multipart_object() const;
     bool                can_merge_to_single_object() const;
 
@@ -290,6 +293,9 @@ public:
     void                changed_object(const int obj_idx = -1) const;
     void                part_selection_changed();
 
+    // Add object's volumes to the list
+    // Return selected items, if add_to_selection is defined 
+    wxDataViewItemArray add_volumes_to_object_in_list(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
     // Add object to the list
     void add_object_to_list(size_t obj_idx, bool call_selection_changed = true);
     // Delete object from the list
@@ -297,8 +303,9 @@ public:
     void delete_object_from_list(const size_t obj_idx);
     void delete_volume_from_list(const size_t obj_idx, const size_t vol_idx);
     void delete_instance_from_list(const size_t obj_idx, const size_t inst_idx);
-    void delete_from_model_and_list(const ItemType type, const int obj_idx, const int sub_obj_idx);
-    void delete_from_model_and_list(const std::vector<ItemForDelete>& items_for_delete);
+    void update_lock_icons_for_model();
+    bool delete_from_model_and_list(const ItemType type, const int obj_idx, const int sub_obj_idx);
+    bool delete_from_model_and_list(const std::vector<ItemForDelete>& items_for_delete);
     // Delete all objects from the list
     void delete_all_objects_from_list();
     // Increase instances count
@@ -341,6 +348,8 @@ public:
     void init_objects();
     bool multiple_selection() const ;
     bool is_selected(const ItemType type) const;
+    bool is_connectors_item_selected() const;
+    bool is_connectors_item_selected(const wxDataViewItemArray& sels) const;
     int  get_selected_layers_range_idx() const;
     void set_selected_layers_range_idx(const int range_idx) { m_selected_layers_range_idx = range_idx; }
     void set_selection_mode(SELECTION_MODE mode) { m_selection_mode = mode; }
@@ -355,6 +364,9 @@ public:
     bool check_last_selection(wxString& msg_str);
     // correct current selections to avoid of the possible conflicts
     void fix_multiselection_conflicts();
+    // correct selection in respect to the cut_id if any exists
+    void fix_cut_selection();
+    bool fix_cut_selection(wxDataViewItemArray& sels);
 
     ModelVolume* get_selected_model_volume();
     void change_part_type();
@@ -390,7 +402,7 @@ public:
     void toggle_printable_state();
 
     void set_extruder_for_selected_items(const int extruder) const ;
-    wxDataViewItemArray reorder_volumes_and_get_selection(int obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
+    wxDataViewItemArray reorder_volumes_and_get_selection(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
     void apply_volumes_order();
     bool has_paint_on_segmentation();
 

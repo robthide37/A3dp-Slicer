@@ -97,6 +97,7 @@
 #include "MsgDialog.hpp"
 #include "ProjectDirtyStateManager.hpp"
 #include "Gizmos/GLGizmoSimplify.hpp" // create suggestion notification
+#include "Gizmos/GLGizmoCut.hpp"
 
 #ifdef __APPLE__
 #include "Gizmos/GLGizmosManager.hpp"
@@ -1792,7 +1793,7 @@ struct Plater::priv
     std::string get_config(const std::string &key) const;
 
     std::vector<size_t> load_files(const std::vector<fs::path>& input_files, bool load_model, bool load_config, bool used_inches = false);
-    std::vector<size_t> load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z = false);
+    std::vector<size_t> load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z = false, bool call_selection_changed = true);
 
     fs::path get_export_file_path(GUI::FileType file_type);
     wxString get_export_file(GUI::FileType file_type);
@@ -1807,7 +1808,7 @@ struct Plater::priv
     void select_all();
     void deselect_all();
     void remove(size_t obj_idx);
-    void delete_object_from_model(size_t obj_idx);
+    bool delete_object_from_model(size_t obj_idx);
     void delete_all_objects_from_model();
     void reset();
     void mirror(Axis axis);
@@ -2718,7 +2719,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
 // #define AUTOPLACEMENT_ON_LOAD
 
-std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z)
+std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z, bool call_selection_changed /*= true*/)
 {
     const Vec3d bed_size = Slic3r::to_3d(this->bed.build_volume().bounding_volume2d().size(), 1.0) - 2.0 * Vec3d::Ones();
 
@@ -2801,17 +2802,18 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
 
     notification_manager->close_notification_of_type(NotificationType::UpdatedItemsInfo);
     for (const size_t idx : obj_idxs) {
-        wxGetApp().obj_list()->add_object_to_list(idx);
+        wxGetApp().obj_list()->add_object_to_list(idx, call_selection_changed);
     }
 
-    update();
-    // Update InfoItems in ObjectList after update() to use of a correct value of the GLCanvas3D::is_sinking(),
-    // which is updated after a view3D->reload_scene(false, flags & (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH) call
-    for (const size_t idx : obj_idxs)
-        wxGetApp().obj_list()->update_info_items(idx);
+    if (call_selection_changed) {
+        update();
+        // Update InfoItems in ObjectList after update() to use of a correct value of the GLCanvas3D::is_sinking(),
+        // which is updated after a view3D->reload_scene(false, flags & (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH) call
+        for (const size_t idx : obj_idxs)
+            wxGetApp().obj_list()->update_info_items(idx);
 
-    object_list_changed();
-
+        object_list_changed();
+    }
     this->schedule_background_process();
 
     return obj_idxs;
@@ -2990,16 +2992,35 @@ void Plater::priv::remove(size_t obj_idx)
 }
 
 
-void Plater::priv::delete_object_from_model(size_t obj_idx)
+bool Plater::priv::delete_object_from_model(size_t obj_idx)
 {
+    // check if object isn't cut
+    // show warning message that "cut consistancy" will not be supported any more
+    ModelObject* obj = model.objects[obj_idx];
+    if (obj->is_cut()) {
+        InfoDialog dialog(q, _L("Delete object which is a part of cut object"), 
+                             _L("You try to delete an object which is a part of a cut object.\n"
+                                "This action will break a cut correspondence.\n"
+                                "After that PrusaSlicer can't garantie model consistency"), 
+                                false, wxYES | wxCANCEL | wxCANCEL_DEFAULT | wxICON_WARNING);
+        dialog.SetButtonLabel(wxID_YES, _L("Delete object"));
+        if (dialog.ShowModal() == wxID_CANCEL)
+            return false;
+    }
+
     wxString snapshot_label = _L("Delete Object");
-    if (! model.objects[obj_idx]->name.empty())
-        snapshot_label += ": " + wxString::FromUTF8(model.objects[obj_idx]->name.c_str());
+    if (!obj->name.empty())
+        snapshot_label += ": " + wxString::FromUTF8(obj->name.c_str());
     Plater::TakeSnapshot snapshot(q, snapshot_label);
     m_worker.cancel_all();
+
+    if (obj->is_cut())
+        sidebar->obj_list()->invalidate_cut_info_for_object(obj_idx);
+
     model.delete_object(obj_idx);
     update();
     object_list_changed();
+    return true;
 }
 
 void Plater::priv::delete_all_objects_from_model()
@@ -4438,7 +4459,10 @@ void Plater::priv::on_action_split_volumes(SimpleEvent&)
 
 void Plater::priv::on_action_layersediting(SimpleEvent&)
 {
-    view3D->enable_layers_editing(!view3D->is_layers_editing_enabled());
+    const bool enable_layersediting = !view3D->is_layers_editing_enabled();
+    view3D->enable_layers_editing(enable_layersediting);
+    if (enable_layersediting)
+        view3D->get_canvas3d()->reset_all_gizmos();
     notification_manager->set_move_from_overlay(view3D->is_layers_editing_enabled());
 }
 
@@ -4481,7 +4505,7 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
                                                 selection.is_single_full_object() || 
                                                 selection.is_multiple_full_instance();
 #if ENABLE_WORLD_COORDINATE
-            const bool is_part = selection.is_single_volume_or_modifier();
+            const bool is_part = selection.is_single_volume_or_modifier() && ! selection.is_any_connector();
 #else
             const bool is_part = selection.is_single_volume() || selection.is_single_modifier();
 #endif // ENABLE_WORLD_COORDINATE
@@ -4763,7 +4787,8 @@ bool Plater::priv::can_split(bool to_objects) const
 bool Plater::priv::can_scale_to_print_volume() const
 {
     const BuildVolume::Type type = this->bed.build_volume().type();
-    return !view3D->get_canvas3d()->get_selection().is_empty() && (type == BuildVolume::Type::Rectangle || type == BuildVolume::Type::Circle);
+    return  !sidebar->obj_list()->has_selected_cut_object() &&
+            !view3D->get_canvas3d()->get_selection().is_empty() && (type == BuildVolume::Type::Rectangle || type == BuildVolume::Type::Circle);
 }
 
 bool Plater::priv::layers_height_allowed() const
@@ -4778,16 +4803,19 @@ bool Plater::priv::layers_height_allowed() const
 
 bool Plater::priv::can_mirror() const
 {
-    return get_selection().is_from_single_instance();
+    return !sidebar->obj_list()->has_selected_cut_object() && get_selection().is_from_single_instance();
 }
 
 bool Plater::priv::can_replace_with_stl() const
 {
-    return get_selection().get_volume_idxs().size() == 1;
+    return !sidebar->obj_list()->has_selected_cut_object() && get_selection().get_volume_idxs().size() == 1;
 }
 
 bool Plater::priv::can_reload_from_disk() const
 {
+    if (sidebar->obj_list()->has_selected_cut_object())
+        return false;
+
 #if ENABLE_RELOAD_FROM_DISK_REWORK
     // collect selected reloadable ModelVolumes
     std::vector<std::pair<int, int>> selected_volumes = reloadable_volumes(model, get_selection());
@@ -4901,8 +4929,12 @@ bool Plater::priv::can_fix_through_netfabb() const
 
 bool Plater::priv::can_simplify() const
 {
+    const int obj_idx = get_selected_object_idx();
     // is object for simplification selected
-    if (get_selected_object_idx() < 0) return false;
+    // cut object can't be simplify
+    if (obj_idx < 0 || model.objects[obj_idx]->is_cut()) 
+        return false;
+
     // is already opened?
     if (q->canvas3D()->get_gizmos_manager().get_current_type() ==
         GLGizmosManager::EType::Simplify)
@@ -4918,8 +4950,7 @@ bool Plater::priv::can_increase_instances() const
 
     if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
 
-    int obj_idx = get_selected_object_idx();
-    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size());
+    return !sidebar->obj_list()->has_selected_cut_object();
 }
 
 bool Plater::priv::can_decrease_instances() const
@@ -4928,8 +4959,7 @@ bool Plater::priv::can_decrease_instances() const
      || q->canvas3D()->get_gizmos_manager().is_in_editing_mode())
             return false;
 
-    int obj_idx = get_selected_object_idx();
-    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) && (model.objects[obj_idx]->instances.size() > 1);
+    return !sidebar->obj_list()->has_selected_cut_object();
 }
 
 bool Plater::priv::can_split_to_objects() const
@@ -5735,7 +5765,7 @@ void Plater::reset_with_confirm()
         reset();
 }
 
-void Plater::delete_object_from_model(size_t obj_idx) { p->delete_object_from_model(obj_idx); }
+bool Plater::delete_object_from_model(size_t obj_idx) { return p->delete_object_from_model(obj_idx); }
 
 void Plater::remove_selected()
 {
@@ -5912,23 +5942,29 @@ void Plater::toggle_layers_editing(bool enable)
         canvas3D()->force_main_toolbar_left_action(canvas3D()->get_main_toolbar_item_id("layersediting"));
 }
 
-void Plater::cut(size_t obj_idx, size_t instance_idx, coordf_t z, ModelObjectCutAttributes attributes)
+void Plater::cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_matrix, ModelObjectCutAttributes attributes)
 {
     wxCHECK_RET(obj_idx < p->model.objects.size(), "obj_idx out of bounds");
-    auto *object = p->model.objects[obj_idx];
+    auto* object = p->model.objects[obj_idx];
 
     wxCHECK_RET(instance_idx < object->instances.size(), "instance_idx out of bounds");
 
-    if (! attributes.has(ModelObjectCutAttribute::KeepUpper) && ! attributes.has(ModelObjectCutAttribute::KeepLower))
-        return;
-
-    Plater::TakeSnapshot snapshot(this, _L("Cut by Plane"));
-
     wxBusyCursor wait;
-    const auto new_objects = object->cut(instance_idx, z, attributes);
 
-    remove(obj_idx);
-    p->load_model_objects(new_objects);
+    const auto new_objects = object->cut(instance_idx, cut_matrix, attributes);
+
+    model().delete_object(obj_idx);
+    sidebar().obj_list()->delete_object_from_list(obj_idx);
+
+    // suppress to call selection update for Object List to avoid call of early Gizmos on/off update
+    p->load_model_objects(new_objects, false, false);
+
+    // now process all updates of the 3d scene
+    update();
+    // Update InfoItems in ObjectList after update() to use of a correct value of the GLCanvas3D::is_sinking(),
+    // which is updated after a view3D->reload_scene(false, flags & (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH) call
+    for (size_t idx = 0; idx < p->model.objects.size(); idx++)
+        wxGetApp().obj_list()->update_info_items(idx);
 
     Selection& selection = p->get_selection();
     size_t last_id = p->model.objects.size() - 1;

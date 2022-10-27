@@ -276,6 +276,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/WxFontUtils.hpp
 )
 
+find_package(NanoSVG REQUIRED)
+
 if (APPLE)
     list(APPEND SLIC3R_GUI_SOURCES
             Utils/RetinaHelperImpl.mm

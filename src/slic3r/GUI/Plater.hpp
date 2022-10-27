@@ -242,7 +242,7 @@ public:
     void remove(size_t obj_idx);
     void reset();
     void reset_with_confirm();
-    void delete_object_from_model(size_t obj_idx);
+    bool delete_object_from_model(size_t obj_idx);
     void remove_selected();
     void increase_instances(size_t num = 1);
     void decrease_instances(size_t num = 1);
@@ -253,7 +253,7 @@ public:
     void convert_unit(ConversionType conv_type);
     void toggle_layers_editing(bool enable);
 
-    void cut(size_t obj_idx, size_t instance_idx, coordf_t z, ModelObjectCutAttributes attributes);
+    void cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_matrix, ModelObjectCutAttributes attributes);
 
     void export_gcode(bool prefer_removable);
     void export_stl_obj(bool extended = false, bool selection_only = false);

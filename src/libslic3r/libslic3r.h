@@ -270,9 +270,9 @@ constexpr inline T lerp(const T& a, const T& b, Number t)
 }
 
 template <typename Number>
-constexpr inline bool is_approx(Number value, Number test_value)
+constexpr inline bool is_approx(Number value, Number test_value, Number precision = EPSILON)
 {
-    return std::fabs(double(value) - double(test_value)) < double(EPSILON);
+    return std::fabs(double(value) - double(test_value)) < double(precision);
 }
 
 template<typename Number>
