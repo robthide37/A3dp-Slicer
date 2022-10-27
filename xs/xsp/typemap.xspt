@@ -56,13 +56,6 @@
 %typemap{TriangleMesh*};
 %typemap{Ref<TriangleMesh>}{simple};
 %typemap{Clone<TriangleMesh>}{simple};
-%typemap{SurfaceCollection*};
-%typemap{Ref<SurfaceCollection>}{simple};
-%typemap{Clone<SurfaceCollection>}{simple};
-
-%typemap{Surface*};
-%typemap{Ref<Surface>}{simple};
-%typemap{Clone<Surface>}{simple};
 
 %typemap{PrintState*};
 %typemap{Ref<PrintState>}{simple};
@@ -83,7 +76,6 @@
 %typemap{Polygons};
 %typemap{Polylines};
 %typemap{ExPolygons};
-%typemap{Surfaces};
 %typemap{Polygons*};
 %typemap{TriangleMesh*};
 %typemap{Model*};

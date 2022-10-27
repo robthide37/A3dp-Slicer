@@ -53,8 +53,6 @@ set(XS_XSP_FILES
     ${XSP_DIR}/Polygon.xsp
     ${XSP_DIR}/Polyline.xsp
     ${XSP_DIR}/Print.xsp
-    ${XSP_DIR}/Surface.xsp
-    ${XSP_DIR}/SurfaceCollection.xsp
     ${XSP_DIR}/TriangleMesh.xsp
     ${XSP_DIR}/XS.xsp
 )

@@ -70,13 +70,6 @@ ExPolygon*                 O_OBJECT_SLIC3R
 Ref<ExPolygon>             O_OBJECT_SLIC3R_T
 Clone<ExPolygon>           O_OBJECT_SLIC3R_T
 
-Surface*                   O_OBJECT_SLIC3R
-Ref<Surface>               O_OBJECT_SLIC3R_T
-Clone<Surface>             O_OBJECT_SLIC3R_T
-
-SurfaceCollection*         O_OBJECT_SLIC3R
-Ref<SurfaceCollection>     O_OBJECT_SLIC3R_T
-
 Model*                     O_OBJECT_SLIC3R
 Ref<Model>                 O_OBJECT_SLIC3R_T
 Clone<Model>               O_OBJECT_SLIC3R_T
@@ -119,7 +112,6 @@ Lines           T_ARRAYREF
 Polygons        T_ARRAYREF
 Polylines       T_ARRAYREF
 ExPolygons      T_ARRAYREF
-Surfaces        T_ARRAYREF
 
 # we return these types whenever we want the items to be returned
 # by reference and marked ::Ref because they're contained in another
