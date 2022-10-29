@@ -783,12 +783,14 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
             return str;
         if (label_type == ltHeightWithLayer) {
             size_t layer_number = m_is_wipe_tower ? get_layer_number(value, label_type) + 1 : (m_values.empty() ? value : value + 1);
+            wxString layer_time_wstr = value < m_layers_times.size() ? short_and_splitted_time(get_time_dhms(m_layers_times[value] - (value > 0 ? m_layers_times[value - 1] : 0))) : "";
             if (layer_number >= m_values.size()) {
+                assert(layer_number == m_values.size());
                 double layer_height = m_values.empty() ? m_label_koef : m_values[m_values.size() - 1] - (m_values.size() > 1 ? m_values[m_values.size() - 2] : 0);
-                return format_wxstr("\n%1%\n(%2%,\n%3%)", str, wxString::Format("%.*f", 2, layer_height), layer_number);
+                return format_wxstr("\n%1%\n(%2%,\n%3%,\n%4%)", str, wxString::Format("%.*f", 2, layer_height), layer_time_wstr, layer_number);
             } else {
                 double layer_height = m_values.empty() ? m_label_koef : m_values[layer_number - 1] - (layer_number > 1 ? m_values[layer_number - 2] : 0);
-                return format_wxstr("%1%\n(%2%,\n%3%)", str, wxString::Format("%.*f", 2, layer_height), layer_number);
+                return format_wxstr("%1%\n(%2%,\n%3%,\n%4%)", str, wxString::Format("%.*f", 2, layer_height), layer_time_wstr, layer_number);
             }
         }
     }
