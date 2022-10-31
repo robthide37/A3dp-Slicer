@@ -537,7 +537,7 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
             pos = action == SLAGizmoEventType::MouseWheelDown
                       ? std::max(0., pos - 0.01)
                       : std::min(1., pos + 0.01);
-            m_c->object_clipper()->set_position(pos, true);
+            m_c->object_clipper()->set_position_by_ratio(pos, true);
             return true;
         }
         else if (alt_down) {
@@ -573,7 +573,7 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
     }
 
     if (action == SLAGizmoEventType::ResetClippingPlane) {
-        m_c->object_clipper()->set_position(-1., false);
+        m_c->object_clipper()->set_position_by_ratio(-1., false);
         return true;
     }
 

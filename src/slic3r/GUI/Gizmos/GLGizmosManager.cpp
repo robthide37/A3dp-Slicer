@@ -102,7 +102,7 @@ bool GLGizmosManager::init()
     m_gizmos.emplace_back(new GLGizmoScale3D(m_parent, "scale.svg", 1));
     m_gizmos.emplace_back(new GLGizmoRotate3D(m_parent, "rotate.svg", 2));
     m_gizmos.emplace_back(new GLGizmoFlatten(m_parent, "place.svg", 3));
-    m_gizmos.emplace_back(new GLGizmoCut(m_parent, "cut.svg", 4));
+    m_gizmos.emplace_back(new GLGizmoCut3D(m_parent, "cut.svg", 4));
     m_gizmos.emplace_back(new GLGizmoHollow(m_parent, "hollow.svg", 5));
     m_gizmos.emplace_back(new GLGizmoSlaSupports(m_parent, "sla_supports.svg", 6));
     m_gizmos.emplace_back(new GLGizmoFdmSupports(m_parent, "fdm_supports.svg", 7));
@@ -298,6 +298,8 @@ bool GLGizmosManager::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_p
     else if (m_current == Measure)
         return dynamic_cast<GLGizmoMeasure*>(m_gizmos[Measure].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
 #endif // ENABLE_MEASURE_GIZMO
+    else if (m_current == Cut)
+        return dynamic_cast<GLGizmoCut3D*>(m_gizmos[Cut].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
     else
         return false;
 }
@@ -514,7 +516,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
 #endif /* __APPLE__ */
         {
             // Sla gizmo selects all support points
-            if ((m_current == SlaSupports || m_current == Hollow) && gizmo_event(SLAGizmoEventType::SelectAll))
+            if ((m_current == SlaSupports || m_current == Hollow || m_current == Cut) && gizmo_event(SLAGizmoEventType::SelectAll))
                 processed = true;
 
             break;
@@ -556,7 +558,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         case WXK_BACK:
         case WXK_DELETE:
         {
-            if ((m_current == SlaSupports || m_current == Hollow) && gizmo_event(SLAGizmoEventType::Delete))
+            if ((m_current == SlaSupports || m_current == Hollow || m_current == Cut) && gizmo_event(SLAGizmoEventType::Delete))
                 processed = true;
 
             break;
@@ -610,20 +612,13 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
     const int keyCode = evt.GetKeyCode();
     bool processed = false;
 
-    if (evt.GetEventType() == wxEVT_KEY_UP) {
-        if (m_current == SlaSupports || m_current == Hollow) {
-            bool is_editing = true;
-            bool is_rectangle_dragging = false;
-
-            if (m_current == SlaSupports) {
-                GLGizmoSlaSupports* gizmo = dynamic_cast<GLGizmoSlaSupports*>(get_current());
-                is_editing = gizmo->is_in_editing_mode();
-                is_rectangle_dragging = gizmo->is_selection_rectangle_dragging();
-            }
-            else {
-                GLGizmoHollow* gizmo = dynamic_cast<GLGizmoHollow*>(get_current());
-                is_rectangle_dragging = gizmo->is_selection_rectangle_dragging();
-            }
+    if (evt.GetEventType() == wxEVT_KEY_UP)
+    {
+        if (m_current == SlaSupports || m_current == Hollow || m_current == Cut)
+        {
+            GLGizmoBase* gizmo = get_current();
+            const bool is_editing             = m_current == Hollow ? true : gizmo->is_in_editing_mode();
+            const bool is_rectangle_dragging  = gizmo->is_selection_rectangle_dragging();
 
             if (keyCode == WXK_SHIFT) {
                 // shift has been just released - SLA gizmo might want to close rectangular selection.
@@ -645,16 +640,18 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
 //        if (processed)
 //            m_parent.set_cursor(GLCanvas3D::Standard);
     }
-    else if (evt.GetEventType() == wxEVT_KEY_DOWN) {
-        if (m_current == SlaSupports && (keyCode == WXK_SHIFT || keyCode == WXK_ALT)
-          && dynamic_cast<GLGizmoSlaSupports*>(get_current())->is_in_editing_mode()) {
+    else if (evt.GetEventType() == wxEVT_KEY_DOWN)
+    {
+        if ((m_current == SlaSupports) && ((keyCode == WXK_SHIFT) || (keyCode == WXK_ALT))
+          && get_current()->is_in_editing_mode())
+        {
 //            m_parent.set_cursor(GLCanvas3D::Cross);
             processed = true;
         }
         else if (m_current == Cut) {
             auto do_move = [this, &processed](double delta_z) {
-                GLGizmoCut* cut = dynamic_cast<GLGizmoCut*>(get_current());
-                cut->set_cut_z(delta_z + cut->get_cut_z());
+                GLGizmoCut3D* cut = dynamic_cast<GLGizmoCut3D*>(get_current());
+                cut->shift_cut_z(delta_z);
                 processed = true;
             };
 
@@ -662,6 +659,9 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
             {
             case WXK_NUMPAD_UP:   case WXK_UP:   { do_move(1.0); break; }
             case WXK_NUMPAD_DOWN: case WXK_DOWN: { do_move(-1.0); break; }
+            case WXK_SHIFT :      case WXK_ALT: {
+                processed = get_current()->is_in_editing_mode();
+            }
             default: { break; }
             }
         }
@@ -1048,6 +1048,11 @@ float GLGizmosManager::get_scaled_total_width() const
 GLGizmoBase* GLGizmosManager::get_current() const
 {
     return ((m_current == Undefined) || m_gizmos.empty()) ? nullptr : m_gizmos[m_current].get();
+}
+
+GLGizmoBase* GLGizmosManager::get_gizmo(GLGizmosManager::EType type) const
+{
+    return ((type == Undefined) || m_gizmos.empty()) ? nullptr : m_gizmos[type].get();
 }
 
 GLGizmosManager::EType GLGizmosManager::get_gizmo_from_name(const std::string& gizmo_name) const

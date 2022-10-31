@@ -59,6 +59,11 @@ static const std::map<const wchar_t, std::string> font_icons = {
 #if ENABLE_MEASURE_GIZMO
     {ImGui::ClipboardBtnIcon      , "copy_menu"                     },
 #endif // ENABLE_MEASURE_GIZMO
+    {ImGui::ExpandBtn             , "expand_btn"                    },
+    {ImGui::CollapseBtn           , "collapse_btn"                  },
+    {ImGui::RevertButton          , "undo"                          },
+    {ImGui::WarningMarkerSmall    , "notification_warning"          },
+    {ImGui::InfoMarkerSmall       , "notification_info"             },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {

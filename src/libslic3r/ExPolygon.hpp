@@ -37,6 +37,7 @@ public:
 
     void clear() { contour.points.clear(); holes.clear(); }
     void scale(double factor);
+    void scale(double factor_x, double factor_y);
     void translate(double x, double y) { this->translate(Point(coord_t(x), coord_t(y))); }
     void translate(const Point &vector);
     void rotate(double angle);

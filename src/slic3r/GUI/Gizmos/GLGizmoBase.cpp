@@ -310,8 +310,8 @@ void GLGizmoBase::set_hover_id(int id)
     assert(!m_dragging);
 
     // allow empty grabbers when not using grabbers but use hover_id - flatten, rotate
-    if (!m_grabbers.empty() && id >= (int) m_grabbers.size())
-        return;
+//    if (!m_grabbers.empty() && id >= (int) m_grabbers.size())
+//        return;
     
     m_hover_id = id;
     on_set_hover_id();    
@@ -403,15 +403,15 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
     } 
 
     if (mouse_event.LeftDown()) {
-        Selection &selection = m_parent.get_selection();        
-        if (!selection.is_empty() && m_hover_id != -1 && 
-            (m_grabbers.empty() || m_hover_id < static_cast<int>(m_grabbers.size()))) {
+        Selection &selection = m_parent.get_selection();
+        if (!selection.is_empty() && m_hover_id != -1 /* &&
+            (m_grabbers.empty() || m_hover_id < static_cast<int>(m_grabbers.size()))*/) {
             selection.setup_cache();
 
             m_dragging = true;
             for (auto &grabber : m_grabbers) grabber.dragging = false;
-            if (!m_grabbers.empty() && m_hover_id < int(m_grabbers.size()))
-                m_grabbers[m_hover_id].dragging = true;            
+//            if (!m_grabbers.empty() && m_hover_id < int(m_grabbers.size()))
+//                m_grabbers[m_hover_id].dragging = true;
             
             on_start_dragging();
 

@@ -515,12 +515,24 @@ bool PresetComboBox::is_selected_physical_printer()
 
 bool PresetComboBox::selection_is_changed_according_to_physical_printers()
 {
-    if (m_type != Preset::TYPE_PRINTER || !is_selected_physical_printer())
+    if (m_type != Preset::TYPE_PRINTER)
         return false;
 
-    PhysicalPrinterCollection& physical_printers = m_preset_bundle->physical_printers;
+    const std::string           selected_string     = into_u8(this->GetString(this->GetSelection()));
+    PhysicalPrinterCollection&  physical_printers   = m_preset_bundle->physical_printers;
+    Tab*                        tab                 = wxGetApp().get_tab(Preset::TYPE_PRINTER);
 
-    std::string selected_string = this->GetString(this->GetSelection()).ToUTF8().data();
+    if (!is_selected_physical_printer()) {
+        if (!physical_printers.has_selection())
+            return false;
+
+        const bool is_changed = selected_string == physical_printers.get_selected_printer_preset_name();
+        if (is_changed)
+            tab->select_preset(selected_string);
+        physical_printers.unselect_printer();
+
+        return is_changed;
+    }
 
     std::string old_printer_full_name, old_printer_preset;
     if (physical_printers.has_selection()) {
@@ -548,7 +560,6 @@ bool PresetComboBox::selection_is_changed_according_to_physical_printers()
         return true;
     }
 
-    Tab* tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
     if (tab)
         tab->select_preset(preset_name, false, old_printer_full_name);
     return true;

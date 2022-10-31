@@ -1367,6 +1367,8 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
             && (instance_idx == -1 || vol->composite_id.instance_id == instance_idx)
             && (mv == nullptr || m_model->objects[vol->composite_id.object_id]->volumes[vol->composite_id.volume_id] == mv)) {
                 vol->is_active = visible;
+                if (!vol->is_modifier)
+                    vol->color.a(1.f);
 
                 if (instance_idx == -1) {
                     vol->force_native_color = false;
@@ -1375,9 +1377,13 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
                     const GLGizmosManager& gm = get_gizmos_manager();
                     auto gizmo_type = gm.get_current_type();
                     if (    (gizmo_type == GLGizmosManager::FdmSupports
-                          || gizmo_type == GLGizmosManager::Seam)
-                        && ! vol->is_modifier)
+                        || gizmo_type == GLGizmosManager::Seam
+                        || gizmo_type == GLGizmosManager::Cut)
+                        && !vol->is_modifier) {
                         vol->force_neutral_color = true;
+                        if (gizmo_type == GLGizmosManager::Cut)
+                            vol->color.a(0.95f);
+                    }
                     else if (gizmo_type == GLGizmosManager::MmuSegmentation)
                         vol->is_active = false;
                     else
@@ -2248,7 +2254,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 #if ENABLE_LEGACY_OPENGL_REMOVAL
                                 volume.model.init_from(mesh);
 #if ENABLE_RAYCAST_PICKING
-                                volume.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<TriangleMesh>(mesh));
+                                volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(mesh));
 #endif // ENABLE_RAYCAST_PICKING
 #else
                                 volume.indexed_vertex_array.load_mesh(mesh);
@@ -2268,7 +2274,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 #if ENABLE_RAYCAST_PICKING
                                 const TriangleMesh& new_mesh = m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh();
                                 volume.model.init_from(new_mesh);
-                                volume.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<TriangleMesh>(new_mesh));
+                                volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(new_mesh));
 #else
                                 volume.model.init_from(m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh());
 #endif // ENABLE_RAYCAST_PICKING
@@ -3371,6 +3377,11 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     show_sinking_contours();
             }
         }
+        else if (evt.LeftUp() &&
+            m_gizmos.get_current_type() == GLGizmosManager::EType::Scale &&
+            m_gizmos.get_current()->get_state() == GLGizmoBase::EState::On) {
+            wxGetApp().obj_list()->selection_changed();
+        }
 
         return;
     }
@@ -3446,6 +3457,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 if (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports &&
                     m_gizmos.get_current_type() != GLGizmosManager::FdmSupports &&
                     m_gizmos.get_current_type() != GLGizmosManager::Seam &&
+                    m_gizmos.get_current_type() != GLGizmosManager::Cut &&
                     m_gizmos.get_current_type() != GLGizmosManager::MmuSegmentation) {
                     m_rectangle_selection.start_dragging(m_mouse.position, evt.ShiftDown() ? GLSelectionRectangle::EState::Select : GLSelectionRectangle::EState::Deselect);
                     m_dirty = true;
@@ -3495,7 +3507,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     const int volume_idx = get_first_hover_volume_idx();
                     BoundingBoxf3 volume_bbox = m_volumes.volumes[volume_idx]->transformed_bounding_box();
                     volume_bbox.offset(1.0);
-                    if ((!any_gizmo_active || !evt.CmdDown()) && volume_bbox.contains(m_mouse.scene_position)) {
+                    const bool is_cut_connector_selected = m_selection.is_any_connector();
+                    if ((!any_gizmo_active || !evt.CmdDown()) && volume_bbox.contains(m_mouse.scene_position) && !is_cut_connector_selected) {
                         m_volumes.volumes[volume_idx]->hover = GLVolume::HS_None;
                         // The dragging operation is initiated.
                         m_mouse.drag.move_volume_idx = volume_idx;
@@ -5502,19 +5515,15 @@ void GLCanvas3D::_picking_pass()
         imgui.text_colored(col_2_color, col_2.c_str());
     };
 
+    char buf[1024];
     if (hit.type != SceneRaycaster::EType::None) {
         if (ImGui::BeginTable("Hit", 2)) {
-            char buf[1024];
-            add_strings_row_to_table("Object ID:", ImGuiWrapper::COL_ORANGE_LIGHT,
-                std::to_string(hit.raycaster_id), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
-            add_strings_row_to_table("Type:", ImGuiWrapper::COL_ORANGE_LIGHT,
-                object_type, ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+            add_strings_row_to_table("Object ID", ImGuiWrapper::COL_ORANGE_LIGHT, std::to_string(hit.raycaster_id), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table("Type", ImGuiWrapper::COL_ORANGE_LIGHT, object_type, ImGui::GetStyleColorVec4(ImGuiCol_Text));
             sprintf(buf, "%.3f, %.3f, %.3f", hit.position.x(), hit.position.y(), hit.position.z());
-            add_strings_row_to_table("Position:", ImGuiWrapper::COL_ORANGE_LIGHT,
-                std::string(buf), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+            add_strings_row_to_table("Position", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             sprintf(buf, "%.3f, %.3f, %.3f", hit.normal.x(), hit.normal.y(), hit.normal.z());
-            add_strings_row_to_table("Normal:", ImGuiWrapper::COL_ORANGE_LIGHT,
-                std::string(buf), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+            add_strings_row_to_table("Normal", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ImGui::EndTable();
         }
     }
@@ -5523,17 +5532,13 @@ void GLCanvas3D::_picking_pass()
 
     ImGui::Separator();
     imgui.text("Registered for picking:");
-    if (ImGui::BeginTable("Counters", 2)) {
-        char buf[1024];
+    if (ImGui::BeginTable("Raycasters", 2)) {
         sprintf(buf, "%d (%d)", (int)m_scene_raycaster.beds_count(), (int)m_scene_raycaster.active_beds_count());
-        add_strings_row_to_table("Beds:", ImGuiWrapper::COL_ORANGE_LIGHT,
-            std::string(buf), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+        add_strings_row_to_table("Beds", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
         sprintf(buf, "%d (%d)", (int)m_scene_raycaster.volumes_count(), (int)m_scene_raycaster.active_volumes_count());
-        add_strings_row_to_table("Volumes:", ImGuiWrapper::COL_ORANGE_LIGHT,
-            std::string(buf), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+        add_strings_row_to_table("Volumes", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
         sprintf(buf, "%d (%d)", (int)m_scene_raycaster.gizmos_count(), (int)m_scene_raycaster.active_gizmos_count());
-        add_strings_row_to_table("Gizmo elements:", ImGuiWrapper::COL_ORANGE_LIGHT,
-            std::string(buf), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
+        add_strings_row_to_table("Gizmo elements", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
         ImGui::EndTable();
     }
     imgui.end();

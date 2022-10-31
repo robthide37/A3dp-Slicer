@@ -414,7 +414,7 @@ public:
     std::string get_left_preset_name(Preset::Type type);
     std::string get_right_preset_name(Preset::Type type);
 
-    std::vector<std::string> get_selected_options(Preset::Type type) const { return std::move(m_tree->options(type, true)); }
+    std::vector<std::string> get_selected_options(Preset::Type type) const { return m_tree->options(type, true); }
 
 protected:
     void on_dpi_changed(const wxRect& suggested_rect) override;
