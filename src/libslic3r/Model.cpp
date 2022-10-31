@@ -1661,6 +1661,12 @@ void ModelObject::split(ModelObjectPtrs* new_objects)
                 new_object->add_instance(*model_instance);
             ModelVolume* new_vol = new_object->add_volume(*volume, std::move(mesh));
 
+            // Invalidate extruder value in volume's config,
+            // otherwise there will no way to change extruder for object after splitting,
+            // because volume's extruder value overrides object's extruder value.
+            if (new_vol->config.has("extruder"))
+                new_vol->config.set_key_value("extruder", new ConfigOptionInt(0));
+
             for (ModelInstance* model_instance : new_object->instances) {
 #if ENABLE_WORLD_COORDINATE
                 Vec3d shift = model_instance->get_transformation().get_matrix_no_offset() * new_vol->get_offset();
