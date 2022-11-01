@@ -173,6 +173,7 @@ protected:
 	ScalableButton*		m_btn_edit_ph_printer {nullptr};
 	ScalableButton*		m_btn_hide_incompatible_presets;
 	wxBoxSizer*			m_hsizer;
+	wxBoxSizer*			m_h_buttons_sizer;
 	wxBoxSizer*			m_left_sizer;
 	wxTreeCtrl*			m_treectrl;
 
