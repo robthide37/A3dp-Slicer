@@ -209,14 +209,14 @@ public:
         // draw text to the box at the left of the splashscreen.
         // this box will be 2/5 of the weight of the bitmap, and be at the left.
         int width = lround(m_main_bitmap.GetWidth() * 0.4);
+        wxCoord margin = int(m_scale * 20);
 
         // load bitmap for logo
         BitmapCache bmp_cache;
         int logo_size = lround(width * 0.25);
-        wxBitmap* logo_bmp = bmp_cache.load_svg(wxGetApp().logo_name(), logo_size, logo_size);
+        //wxBitmap* logo_bmp = bmp_cache.load_svg(wxGetApp().logo_name(), logo_size, logo_size);
+        wxBitmap* logo_bmp = bmp_cache.load_png("A3dp-Slicer_blue_logo", width - margin * 2, 0);
         if (logo_bmp == nullptr) return;
-
-        wxCoord margin = int(m_scale * 20);
 
         wxRect banner_rect(wxPoint(0, logo_size), wxPoint(width, m_main_bitmap.GetHeight()));
         banner_rect.Deflate(margin, 2 * margin);
@@ -231,7 +231,7 @@ public:
         memDc.SetTextForeground(wxColour(180, 180, 180));
 
         memDc.SetFont(m_constant_text.title_font);
-        memDc.DrawLabel(m_constant_text.title,   banner_rect, wxALIGN_TOP | wxALIGN_LEFT);
+        //memDc.DrawLabel(m_constant_text.title,   banner_rect, wxALIGN_TOP | wxALIGN_LEFT);
 
         int title_height = memDc.GetTextExtent(m_constant_text.title).GetY();
         banner_rect.SetTop(banner_rect.GetTop() + title_height);
