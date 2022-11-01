@@ -2438,8 +2438,10 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     // refresh volume raycasters for picking
     m_scene_raycaster.remove_raycasters(SceneRaycaster::EType::Volume);
     for (size_t i = 0; i < m_volumes.volumes.size(); ++i) {
-        assert(m_volumes.volumes[i]->mesh_raycaster != nullptr);
-        add_raycaster_for_picking(SceneRaycaster::EType::Volume, i, *m_volumes.volumes[i]->mesh_raycaster, m_volumes.volumes[i]->world_matrix());
+        const GLVolume* v = m_volumes.volumes[i];
+        assert(v->mesh_raycaster != nullptr);
+        std::shared_ptr<SceneRaycasterItem> raycaster = add_raycaster_for_picking(SceneRaycaster::EType::Volume, i, *v->mesh_raycaster, v->world_matrix());
+        raycaster->set_active(v->is_active);
     }
 
     // refresh gizmo elements raycasters for picking
