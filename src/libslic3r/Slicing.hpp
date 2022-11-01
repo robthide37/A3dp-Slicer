@@ -151,9 +151,12 @@ struct HeightProfileSmoothingParams
 {
     unsigned int radius;
     bool keep_min;
+    float min_height;
+    float max_height;
+    float adaptive_quality;
 
-    HeightProfileSmoothingParams() : radius(5), keep_min(false) {}
-    HeightProfileSmoothingParams(unsigned int radius, bool keep_min) : radius(radius), keep_min(keep_min) {}
+    HeightProfileSmoothingParams() : radius(5), keep_min(false), min_height(0.0f), max_height(9999.f), adaptive_quality(0.5f) {}
+    HeightProfileSmoothingParams(unsigned int radius, bool keep_min, float min_height, float max_height) : radius(radius), keep_min(keep_min), min_height(min_height), max_height(max_height) {}
 };
 
 extern std::vector<double> smooth_height_profile(

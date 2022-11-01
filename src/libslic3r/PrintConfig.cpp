@@ -3588,8 +3588,8 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Min layer height");
     def->category = OptionCategory::extruders;
     def->tooltip = L("This is the lowest printable layer height for this extruder and limits "
-                    "the resolution for variable layer height. Typical values are between 0.05 mm and 0.1 mm."
-                    "\nCan be a % of the nozzle diameter.");
+        "the resolution for variable layer height. Typical values are between 0.05 mm and 0.1 mm."
+        "\nCan be a % of the nozzle diameter.");
     def->sidetext = L("mm or %");
     def->ratio_over = "nozzle_diameter";
     def->min = 0;

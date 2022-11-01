@@ -173,6 +173,12 @@ void GLCanvas3D::LayersEditing::set_config(const DynamicPrintConfig* config)
     m_config = config;
     m_slicing_parameters.reset();
     m_layers_texture.valid = false;
+    if (m_min_layer_height_variable == 0) {
+        m_smooth_params.min_height = 0.f;
+    }
+    if (m_max_layer_height_variable == 0) {
+        m_smooth_params.max_height = 9999.f;
+    }
 }
 
 void GLCanvas3D::LayersEditing::select_object(const Model &model, int object_id)
@@ -243,10 +249,10 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas) const
     imgui.text_colored(ImGuiWrapper::get_COL_LIGHT(), _L("Mouse wheel:"));
     ImGui::SameLine();
     imgui.text(_L("Increase/decrease edit area"));
-    
+
     ImGui::Separator();
     if (imgui.button(_L("Adaptive")))
-        wxPostEvent((wxEvtHandler*)canvas.get_wxglcanvas(), Event<float>(EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE, m_adaptive_quality));
+        wxPostEvent((wxEvtHandler*)canvas.get_wxglcanvas(), HeightProfileSmoothEvent(EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE, m_smooth_params));
 
     ImGui::SameLine();
     float text_align = ImGui::GetCursorPosX();
@@ -261,8 +267,8 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas) const
     ImGui::SameLine();
     float widget_align = ImGui::GetCursorPosX();
     ImGui::PushItemWidth(imgui.get_style_scaling() * 120.0f);
-    m_adaptive_quality = std::clamp(m_adaptive_quality, 0.0f, 1.f);
-    imgui.slider_float("", &m_adaptive_quality, 0.0f, 1.f, "%.2f");
+    m_smooth_params.adaptive_quality = std::clamp(m_smooth_params.adaptive_quality, 0.0f, 1.f);
+    imgui.slider_float("", &m_smooth_params.adaptive_quality, 0.0f, 1.f, "%.2f");
 
     ImGui::Separator();
     if (imgui.button(_L("Smooth")))
@@ -290,6 +296,69 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas) const
 
     ImGui::PushItemWidth(imgui.get_style_scaling() * 120.0f);
     imgui.checkbox("##2", m_smooth_params.keep_min);
+
+    // min/ max layer height
+    const ConfigOptionFloats* nd_opt = this->m_config->option<ConfigOptionFloats>("nozzle_diameter");
+    const ConfigOptionFloatsOrPercents* min_lh_opt = this->m_config->option<ConfigOptionFloatsOrPercents>("min_layer_height");
+    const ConfigOptionFloatsOrPercents* max_lh_opt = this->m_config->option<ConfigOptionFloatsOrPercents>("max_layer_height");
+    const ConfigOptionFloat* lh_opt = this->m_config->option<ConfigOptionFloat>("layer_height");
+    const ConfigOptionFloat* z_step_opt = this->m_config->option<ConfigOptionFloat>("z_step");
+    const ConfigOptionFloatOrPercent* flh_opt = this->m_config->option<ConfigOptionFloatOrPercent>("first_layer_height");
+    float min_lh = min_lh_opt->get_abs_value(0, nd_opt->values[0]);
+    float max_lh = max_lh_opt->get_abs_value(0, nd_opt->values[0]);
+    float min_nd = nd_opt->values[0];
+    float max_nd = nd_opt->values[0];
+    for (int idx = 1; idx < nd_opt->values.size(); idx++) {
+        float nd = nd_opt->values[idx];
+        float min = min_lh_opt->get_abs_value(idx, nd);
+        float max = max_lh_opt->get_abs_value(idx, nd);
+        if (min > min_lh) { min_lh = min; }
+        if (max < max_lh) { max_lh = max; }
+        if (min_nd > nd) { min_nd = nd; }
+        if (max_nd < nd) { max_nd = nd; }
+    }
+    float med_min_lh = std::min(lh_opt->value, flh_opt->get_abs_value(min_nd));
+    float med_max_lh = std::max(lh_opt->value, flh_opt->get_abs_value(max_nd));
+    med_min_lh = std::max(med_min_lh, min_lh);
+    med_max_lh = std::min(med_max_lh, max_lh);
+
+    ImGui::Separator();
+
+    ImGui::SetCursorPosX(text_align);
+    ImGui::AlignTextToFramePadding();
+    imgui.text(_L("Min height"));
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(_L("If you want to set a higher minimum height than what your nozzle can handle.").ToUTF8());
+        ImGui::EndTooltip();
+    }
+    ImGui::SameLine();
+    if (ImGui::GetCursorPosX() < widget_align)  // because of line lenght after localization
+        ImGui::SetCursorPosX(widget_align);
+    ImGui::PushItemWidth(imgui.get_style_scaling() * 120.0f);
+    m_smooth_params.min_height = std::clamp((float)Slic3r::check_z_step(m_smooth_params.min_height, z_step_opt->value), min_lh, std::min(med_min_lh, m_smooth_params.max_height));
+    imgui.slider_float("##3", &m_smooth_params.min_height, min_lh, med_min_lh, "%.3f");
+
+    if (imgui.button(_L("Set")))
+        wxPostEvent((wxEvtHandler*)canvas.get_wxglcanvas(), HeightProfileSmoothEvent(EVT_GLCANVAS_SET_MIN_MAX_LAYER_HEIGHT, m_smooth_params));
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(text_align);
+    ImGui::AlignTextToFramePadding();
+    imgui.text(_L("Max height"));
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(_L("If you want to set a lower maximum height than what your nozzle can handle.").ToUTF8());
+        ImGui::EndTooltip();
+    }
+    ImGui::SameLine();
+    if (ImGui::GetCursorPosX() < widget_align)  // because of line lenght after localization
+        ImGui::SetCursorPosX(widget_align);
+    ImGui::PushItemWidth(imgui.get_style_scaling() * 120.0f);
+
+    m_smooth_params.max_height = std::clamp((float)Slic3r::check_z_step(m_smooth_params.max_height, z_step_opt->value), std::max(m_smooth_params.min_height, med_max_lh), max_lh);
+    imgui.slider_float("##4", &m_smooth_params.max_height, med_max_lh, max_lh, "%.3f");
+    
+    
 
     ImGui::Separator();
     if (imgui.button(_L("Reset")))
@@ -507,10 +576,21 @@ void GLCanvas3D::LayersEditing::reset_layer_height_profile(GLCanvas3D& canvas)
     wxGetApp().obj_list()->update_info_items(last_object_id);
 }
 
-void GLCanvas3D::LayersEditing::adaptive_layer_height_profile(GLCanvas3D& canvas, float quality_factor)
+void GLCanvas3D::LayersEditing::set_min_max_layer_height(GLCanvas3D& canvas, const HeightProfileSmoothingParams& smoothing_params)
+{
+    m_min_layer_height_variable = smoothing_params.min_height;
+    m_max_layer_height_variable = smoothing_params.max_height;
+    const_cast<ModelObject*>(m_model_object)->layer_height_profile.clear();
+    m_layer_height_profile.clear();
+    m_layers_texture.valid = false;
+    canvas.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
+    wxGetApp().obj_list()->update_info_items(last_object_id);
+}
+
+void GLCanvas3D::LayersEditing::adaptive_layer_height_profile(GLCanvas3D& canvas, const HeightProfileSmoothingParams& smoothing_params)
 {
     this->update_slicing_parameters();
-    m_layer_height_profile = layer_height_profile_adaptive(*m_slicing_parameters, *m_model_object, quality_factor);
+    m_layer_height_profile = layer_height_profile_adaptive(*m_slicing_parameters, *m_model_object, smoothing_params.adaptive_quality);
     const_cast<ModelObject*>(m_model_object)->layer_height_profile.set(m_layer_height_profile);
     m_layers_texture.valid = false;
     canvas.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
@@ -574,6 +654,12 @@ void GLCanvas3D::LayersEditing::update_slicing_parameters()
 {
 	if (!m_slicing_parameters) {
         m_slicing_parameters = PrintObject::slicing_parameters(*m_config, *m_model_object, m_object_max_z);
+    }
+    if (m_min_layer_height_variable > 0) {
+        m_slicing_parameters->min_layer_height = m_min_layer_height_variable;
+    }
+    if (m_max_layer_height_variable > 0) {
+        m_slicing_parameters->max_layer_height = m_max_layer_height_variable;
     }
 }
 
@@ -904,7 +990,8 @@ wxDEFINE_EVENT(EVT_GLCANVAS_UNDO, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_REDO, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_COLLAPSE_SIDEBAR, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_RESET_LAYER_HEIGHT_PROFILE, SimpleEvent);
-wxDEFINE_EVENT(EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE, Event<float>);
+wxDEFINE_EVENT(EVT_GLCANVAS_SET_MIN_MAX_LAYER_HEIGHT, HeightProfileSmoothEvent);
+wxDEFINE_EVENT(EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE, HeightProfileSmoothEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_SMOOTH_LAYER_HEIGHT_PROFILE, HeightProfileSmoothEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_RELOAD_FROM_DISK, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_RENDER_TIMER, wxTimerEvent/*RenderTimerEvent*/);
@@ -1335,10 +1422,18 @@ void GLCanvas3D::reset_layer_height_profile()
     }
 }
 
-void GLCanvas3D::adaptive_layer_height_profile(float quality_factor)
+void GLCanvas3D::set_min_max_layer_height(const HeightProfileSmoothingParams& smoothing_params)
+{
+    wxGetApp().plater()->take_snapshot(_L("Variable layer height - set min max"));
+    m_layers_editing.set_min_max_layer_height(*this, smoothing_params);
+    m_layers_editing.state = LayersEditing::Completed;
+    m_dirty = true;
+}
+
+void GLCanvas3D::adaptive_layer_height_profile(const HeightProfileSmoothingParams& smoothing_params)
 {
     wxGetApp().plater()->take_snapshot(_L("Variable layer height - Adaptive"));
-    m_layers_editing.adaptive_layer_height_profile(*this, quality_factor);
+    m_layers_editing.adaptive_layer_height_profile(*this, smoothing_params);
     m_layers_editing.state = LayersEditing::Completed;
     m_dirty = true;
 }
