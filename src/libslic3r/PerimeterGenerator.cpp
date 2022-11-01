@@ -2371,7 +2371,7 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
 }
 
 ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
-    const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls) const
+    const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls, int count_since_overhang /*= 0*/) const
 {
     // loops is an arrayref of ::Loop objects
     // turn each one into an ExtrusionLoop object
@@ -2403,11 +2403,11 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
         // detect overhanging/bridging perimeters
         ExtrusionPaths paths;
 
-        bool is_overhang = this->config->overhangs_width_speed.value > 0
+        bool can_overhang = this->config->overhangs_width_speed.value > 0
             && this->layer->id() > object_config->raft_layers;
         if(this->object_config->support_material && this->object_config->support_material_contact_distance_type.value == zdNone)
-            is_overhang = false;
-        if (is_overhang) {
+            can_overhang = false;
+        if (can_overhang) {
             paths = this->create_overhangs(loop.polygon.split_at_first_point(), role, is_external);
         } else {
             ExtrusionPath path(role);
@@ -2479,10 +2479,28 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
             }
         } else {
             const PerimeterGeneratorLoop &loop = loops[idx.first];
+            ExtrusionLoop* eloop = static_cast<ExtrusionLoop*>(coll[idx.first]);
+            bool has_overhang = false;
+            if (this->config->overhangs_speed_enforce.value > 0) {
+                for (const ExtrusionPath& path : eloop->paths) {
+                    if (path.role() == erOverhangPerimeter) {
+                        has_overhang = true;
+                        break;
+                    }
+                }
+                if (has_overhang || this->config->overhangs_speed_enforce.value > count_since_overhang) {
+                    //enforce
+                    for (ExtrusionPath& path : eloop->paths) {
+                        if (path.role() == erPerimeter || path.role() == erExternalPerimeter) {
+                            path.set_role(erOverhangPerimeter);
+                        }
+                    }
+                }
+
+            }
             assert(thin_walls.empty());
-            ExtrusionEntityCollection children = this->_traverse_loops(loop.children, thin_walls);
+            ExtrusionEntityCollection children = this->_traverse_loops(loop.children, thin_walls, has_overhang ? 1 : (count_since_overhang+1));
             coll_out.set_entities().reserve(coll_out.entities().size() + children.entities().size() + 1);
-            ExtrusionLoop *eloop = static_cast<ExtrusionLoop*>(coll[idx.first]);
             coll[idx.first] = nullptr;
             if (loop.is_contour) {
                 //note: this->layer->id() % 2 == 1 already taken into account in the is_steep_overhang compute (to save time).

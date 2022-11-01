@@ -980,6 +980,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "gap_fill_speed"
                 || opt_key == "infill_speed"
                 || opt_key == "overhangs_speed"
+                || opt_key == "overhangs_speed_enforce"
                 || opt_key == "perimeter_speed"
                 || opt_key == "seam_position"
                 || opt_key == "seam_preferred_direction"

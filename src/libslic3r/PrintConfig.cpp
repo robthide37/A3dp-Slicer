@@ -3804,6 +3804,20 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
 
+    def = this->add("overhangs_speed_enforce", coInt);
+    def->label = L("Enforce overhangs speed");
+    def->full_label = L("Enforce overhangs speed");
+    def->category = OptionCategory::speed;
+    def->tooltip = L("Set the speed of the full perimeters to the overhang speed, and also the next one(s) if any."
+                "\nSet to 0 to disable."
+                "\nSet to 1 to set the overhang speed to the full periemter if there is any overhang detected in the periemter."
+                "\nSet to more than 1 to also set the overhang speed to the next perimeter(s)."
+                );
+    def->sidetext = L("perimeters");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionInt(0));
+
     def = this->add("overhangs_width_speed", coFloatOrPercent);
     def->label = L("'As bridge' speed threshold");
     def->full_label = L("Overhang bridge speed threshold");
@@ -7524,6 +7538,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "overhangs_reverse_threshold",
 "overhangs_reverse",
 "overhangs_speed",
+"overhangs_speed_enforce",
 "overhangs_width_speed",
 "perimeter_bonding",
 "perimeter_extrusion_spacing",
