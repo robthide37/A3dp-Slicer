@@ -67,6 +67,14 @@ struct SupportTreeNode
     long id = ID_UNSET; // For identification withing a tree.
 };
 
+// A junction connecting bridges and pillars
+struct Junction: public SupportTreeNode {
+    double r = 1;
+    Vec3d pos;
+
+    Junction(const Vec3d &tr, double r_mm) : r(r_mm), pos(tr) {}
+};
+
 // A pinhead originating from a support point
 struct Head: public SupportTreeNode {
     Vec3d dir = DOWN;
@@ -77,7 +85,6 @@ struct Head: public SupportTreeNode {
     double width_mm = 2;
     double penetration_mm = 0.5;
 
-    
     // If there is a pillar connecting to this head, then the id will be set.
     long pillar_id = ID_UNSET;
     
@@ -103,19 +110,19 @@ struct Head: public SupportTreeNode {
     {
         return real_width() - penetration_mm;
     }
-    
+
+    inline Junction junction() const
+    {
+        Junction j{pos + (fullwidth() - r_back_mm) * dir, r_back_mm};
+        j.id = -this->id; // Remember that this junction is from a head
+
+        return j;
+    }
+
     inline Vec3d junction_point() const
     {
-        return pos + (fullwidth() - r_back_mm) * dir;
+        return junction().pos;
     }
-};
-
-// A junction connecting bridges and pillars
-struct Junction: public SupportTreeNode {
-    double r = 1;
-    Vec3d pos;
-
-    Junction(const Vec3d &tr, double r_mm) : r(r_mm), pos(tr) {}
 };
 
 // A straight pillar. Only has an endpoint and a height. No explicit starting

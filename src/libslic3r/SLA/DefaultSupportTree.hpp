@@ -176,9 +176,8 @@ class DefaultSupportTree {
     // jp is the starting junction point which needs to be routed down.
     // sourcedir is the allowed direction of an optional bridge between the
     // jp junction and the final pillar.
-    bool create_ground_pillar(const Vec3d &jp,
+    bool create_ground_pillar(const Junction &jp,
                               const Vec3d &sourcedir,
-                              double       radius,
                               long         head_id = SupportTreeNode::ID_UNSET);
 
     void add_pillar_base(long pid)

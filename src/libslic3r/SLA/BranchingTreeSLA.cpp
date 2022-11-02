@@ -32,7 +32,7 @@ class BranchingTreeBuilder: public branchingtree::Builder {
     // widening behaviour
     static constexpr double WIDENING_SCALE = 0.02;
 
-    double get_radius(const branchingtree::Node &j)
+    double get_radius(const branchingtree::Node &j) const
     {
         double w = WIDENING_SCALE * m_sm.cfg.pillar_widening_factor * j.weight;
 
@@ -109,6 +109,44 @@ class BranchingTreeBuilder: public branchingtree::Builder {
         });
     }
 
+    std::optional<PointIndexEl>
+    search_for_existing_pillar(const branchingtree::Node &from) const
+    {
+        namespace bgi = boost::geometry::index;
+
+        struct Output
+        {
+            std::optional<PointIndexEl> &res;
+
+            Output &operator*() { return *this; }
+            void operator=(const PointIndexEl &el) { res = el; }
+            Output &operator++() { return *this; }
+        };
+
+        std::optional<PointIndexEl> result;
+
+        auto filter = bgi::satisfies([this, &from](const PointIndexEl &e) {
+            assert(e.second < m_pillars.size());
+
+            auto len = (from.pos - e.first).norm();
+            const branchingtree::Node &to = m_pillars[e.second];
+            double sd = m_sm.cfg.safety_distance_mm;
+
+            Beam beam{Ball{from.pos.cast<double>(), get_radius(from)},
+                      Ball{e.first.cast<double>(), get_radius(to)}};
+
+            return !branchingtree::is_occupied(to) &&
+                   len < m_sm.cfg.max_bridge_length_mm &&
+                   !m_cloud.is_outside_support_cone(from.pos, e.first) &&
+                   beam_mesh_hit(ex_tbb, m_sm.emesh, beam, sd).distance() > len;
+        });
+
+        m_pillar_index.query(filter && bgi::nearest(from.pos, 1),
+                             Output{result});
+
+        return result;
+    }
+
 public:
     BranchingTreeBuilder(SupportTreeBuilder          &builder,
                      const SupportableMesh       &sm,
@@ -153,7 +191,7 @@ bool BranchingTreeBuilder::add_bridge(const branchingtree::Node &from,
     double fromR = get_radius(from), toR = get_radius(to);
     Beam beam{Ball{fromd, fromR}, Ball{tod, toR}};
     auto   hit = beam_mesh_hit(ex_tbb, m_sm.emesh, beam,
-                               0.9 * m_sm.cfg.safety_distance_mm);
+                               m_sm.cfg.safety_distance_mm);
 
     bool ret = hit.distance() > (tod - fromd).norm();
 
@@ -201,53 +239,43 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
 
     auto it = m_ground_mem.find(from.id);
     if (it == m_ground_mem.end()) {
-        std::optional<PointIndexEl> result;
-        auto filter = bgi::satisfies(
-            [this, &from](const PointIndexEl &e) {
-                auto len = (from.pos - e.first).norm();
-                return !branchingtree::is_occupied(m_pillars[e.second])
-                       && len < m_sm.cfg.max_bridge_length_mm
-                       && !m_cloud.is_outside_support_cone(from.pos, e.first)
-                       && beam_mesh_hit(ex_tbb,
-                                        m_sm.emesh,
-                                        Beam{Ball{from.pos.cast<double>(),
-                                                  get_radius(from)},
-                                             Ball{e.first.cast<double>(),
-                                                  get_radius(
-                                                      m_pillars[e.second])}},
-                                        0.9 * m_sm.cfg.safety_distance_mm)
-                                  .distance()
-                              > len;
-            });
-        m_pillar_index.query(filter && bgi::nearest(from.pos, 1), Output{result});
+        std::optional<PointIndexEl> result = search_for_existing_pillar(from);
 
         sla::Junction j{from.pos.cast<double>(), get_radius(from)};
         if (!result) {
-            auto [found_conn, cjunc] = optimize_ground_connection(
+            auto conn = optimize_ground_connection(
                                            ex_tbb,
                                            m_builder,
                                            m_sm,
                                            j,
                                            get_radius(to));
 
-            if (found_conn) {
-                Vec3d endp = cjunc? cjunc->pos : j.pos;
-                double R   = cjunc? cjunc->r   : j.r;
-                Vec3d  dir = cjunc? Vec3d((j.pos - cjunc->pos).normalized()) : DOWN;
-                auto plr = create_ground_pillar(ex_tbb, m_builder, m_sm, endp, dir, R, get_radius(to));
+            if (conn) {
+                build_ground_connection(m_builder, m_sm, conn);
+                Junction connlast = conn.path.back();
+                branchingtree::Node n{connlast.pos.cast<float>(), float(connlast.r)};
+                n.left = from.id;
+                m_pillars.emplace_back(n);
+                m_pillar_index.insert({n.pos, m_pillars.size() - 1});
+                ret = true;
 
-                if (plr.second >= 0) {
-                    m_builder.add_junction(endp, R);
-                    if (cjunc) {
-                        m_builder.add_diffbridge(j.pos, endp, j.r, R);
-                        branchingtree::Node n{cjunc->pos.cast<float>(), float(R)};
-                        n.left = from.id;
-                        m_pillars.emplace_back(n);
-                        m_pillar_index.insert({n.pos, m_pillars.size() - 1});
-                    }
+//                Vec3d endp = cjunc? cjunc->pos : j.pos;
+//                double R   = cjunc? cjunc->r   : j.r;
+//                Vec3d  dir = cjunc? Vec3d((j.pos - cjunc->pos).normalized()) : DOWN;
+//                auto plr = create_ground_pillar(ex_tbb, m_builder, m_sm, endp, dir, R, get_radius(to));
 
-                    ret = true;
-                }
+//                if (plr.second >= 0) {
+//                    m_builder.add_junction(endp, R);
+//                    if (cjunc) {
+//                        m_builder.add_diffbridge(j.pos, endp, j.r, R);
+//                        branchingtree::Node n{cjunc->pos.cast<float>(), float(R)};
+//                        n.left = from.id;
+//                        m_pillars.emplace_back(n);
+//                        m_pillar_index.insert({n.pos, m_pillars.size() - 1});
+//                    }
+
+//                    ret = true;
+//                }
             }
         } else {
             const auto &resnode = m_pillars[result->second];

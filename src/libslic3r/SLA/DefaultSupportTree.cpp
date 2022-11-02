@@ -340,15 +340,13 @@ bool DefaultSupportTree::connect_to_nearpillar(const Head &head,
     return true;
 }
 
-bool DefaultSupportTree::create_ground_pillar(const Vec3d &hjp,
+bool DefaultSupportTree::create_ground_pillar(const Junction &hjp,
                                              const Vec3d &sourcedir,
-                                             double       radius,
                                              long         head_id)
 {
     auto [ret, pillar_id] = sla::create_ground_pillar(suptree_ex_policy,
                                                       m_builder, m_sm, hjp,
-                                                      sourcedir, radius, radius,
-                                                      head_id);
+                                                      sourcedir, hjp.r, head_id);
 
     if (pillar_id >= 0) // Save the pillar endpoint in the spatial index
         m_pillar_index.guarded_insert(m_builder.pillar(pillar_id).endpt,
@@ -587,7 +585,7 @@ void DefaultSupportTree::routing_to_ground()
 
         Head &h = m_builder.head(hid);
 
-        if (!create_ground_pillar(h.junction_point(), h.dir, h.r_back_mm, h.id)) {
+        if (!create_ground_pillar(h.junction(), h.dir, h.id)) {
             BOOST_LOG_TRIVIAL(warning)
                 << "Pillar cannot be created for support point id: " << hid;
             m_iheads_onmodel.emplace_back(h.id);
@@ -615,10 +613,9 @@ void DefaultSupportTree::routing_to_ground()
 
                 if (!connect_to_nearpillar(sidehead, centerpillarID) &&
                     !search_pillar_and_connect(sidehead)) {
-                    Vec3d pstart = sidehead.junction_point();
                     // Vec3d pend = Vec3d{pstart.x(), pstart.y(), gndlvl};
                     // Could not find a pillar, create one
-                    create_ground_pillar(pstart, sidehead.dir, sidehead.r_back_mm, sidehead.id);
+                    create_ground_pillar(sidehead.junction(), sidehead.dir, sidehead.id);
                 }
             }
         }
