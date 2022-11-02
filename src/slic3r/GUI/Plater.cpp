@@ -3034,6 +3034,7 @@ void Plater::priv::delete_all_objects_from_model()
     gcode_result.reset();
 
     view3D->get_canvas3d()->reset_sequential_print_clearance();
+    view3D->get_canvas3d()->reset_all_gizmos();
 
     m_worker.cancel_all();
 

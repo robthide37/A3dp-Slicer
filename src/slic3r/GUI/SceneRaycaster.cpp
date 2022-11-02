@@ -37,10 +37,10 @@ std::shared_ptr<SceneRaycasterItem> SceneRaycaster::add_raycaster(EType type, in
     const Transform3d& trafo, bool use_back_faces)
 {
     switch (type) {
-    case EType::Bed: { return m_bed.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo, use_back_faces)); }
+    case EType::Bed:    { return m_bed.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo, use_back_faces)); }
     case EType::Volume: { return m_volumes.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo, use_back_faces)); }
-    case EType::Gizmo: { return m_gizmos.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo, use_back_faces)); }
-    default: { assert(false);  return nullptr; }
+    case EType::Gizmo:  { return m_gizmos.emplace_back(std::make_shared<SceneRaycasterItem>(encode_id(type, id), raycaster, trafo, use_back_faces)); }
+    default:            { assert(false);  return nullptr; }
     };
 }
 
@@ -172,6 +172,31 @@ void SceneRaycaster::render_hit(const Camera& camera)
     m_line.render();
 
     shader->stop_using();
+}
+
+size_t SceneRaycaster::active_beds_count() const {
+    size_t count = 0;
+    for (const auto& b : m_bed) {
+        if (b->is_active())
+            ++count;
+    }
+    return count;
+}
+size_t SceneRaycaster::active_volumes_count() const {
+    size_t count = 0;
+    for (const auto& v : m_volumes) {
+        if (v->is_active())
+            ++count;
+    }
+    return count;
+}
+size_t SceneRaycaster::active_gizmos_count() const {
+    size_t count = 0;
+    for (const auto& g : m_gizmos) {
+        if (g->is_active())
+            ++count;
+    }
+    return count;
 }
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 

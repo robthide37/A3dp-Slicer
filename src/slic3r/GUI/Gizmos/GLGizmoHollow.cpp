@@ -114,7 +114,7 @@ void GLGizmoHollow::on_register_raycasters_for_picking()
     if (info != nullptr && !info->model_object()->sla_drain_holes.empty()) {
         const sla::DrainHoles& drain_holes = info->model_object()->sla_drain_holes;
         for (int i = 0; i < (int)drain_holes.size(); ++i) {
-            m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_cylinder.mesh_raycaster, Transform3d::Identity()));
+            m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_cylinder.mesh_raycaster));
         }
         update_raycasters_for_picking_transform();
     }

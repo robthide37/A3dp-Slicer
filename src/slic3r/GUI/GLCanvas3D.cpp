@@ -1377,9 +1377,9 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
                     const GLGizmosManager& gm = get_gizmos_manager();
                     auto gizmo_type = gm.get_current_type();
                     if (    (gizmo_type == GLGizmosManager::FdmSupports
-                          || gizmo_type == GLGizmosManager::Seam
-                          || gizmo_type == GLGizmosManager::Cut)
-                        && ! vol->is_modifier) {
+                        || gizmo_type == GLGizmosManager::Seam
+                        || gizmo_type == GLGizmosManager::Cut)
+                        && !vol->is_modifier) {
                         vol->force_neutral_color = true;
                         if (gizmo_type == GLGizmosManager::Cut)
                             vol->color.a(0.95f);
@@ -3379,9 +3379,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     show_sinking_contours();
             }
         }
-        else if (evt.LeftUp() && 
-                 m_gizmos.get_current_type() == GLGizmosManager::EType::Scale && 
-                 m_gizmos.get_current()->get_state() == GLGizmoBase::EState::On) {
+        else if (evt.LeftUp() &&
+            m_gizmos.get_current_type() == GLGizmosManager::EType::Scale &&
+            m_gizmos.get_current()->get_state() == GLGizmoBase::EState::On) {
             wxGetApp().obj_list()->selection_changed();
         }
 
@@ -5443,10 +5443,9 @@ void GLCanvas3D::_picking_pass()
                 const GLVolume* volume = m_volumes.volumes[hit.raycaster_id];
                 if (volume->is_active && !volume->disabled && (volume->composite_id.volume_id >= 0 || m_render_sla_auxiliaries)) {
                     // do not add the volume id if any gizmo is active and CTRL is pressed
-                    if (m_gizmos.get_current_type() == GLGizmosManager::EType::Undefined || !wxGetKeyState(WXK_CONTROL)) {
+                    if (m_gizmos.get_current_type() == GLGizmosManager::EType::Undefined || !wxGetKeyState(WXK_CONTROL))
                         m_hover_volume_idxs.emplace_back(hit.raycaster_id);
-                        m_gizmos.set_hover_id(-1);
-                    }
+                    m_gizmos.set_hover_id(-1);
                 }
             }
             else
@@ -5457,8 +5456,8 @@ void GLCanvas3D::_picking_pass()
         case SceneRaycaster::EType::Gizmo:
         {
             const Size& cnv_size = get_canvas_size();
-            bool inside = 0 <= m_mouse.position.x() && m_mouse.position.x() < cnv_size.get_width() &&
-                          0 <= m_mouse.position.y() && m_mouse.position.y() < cnv_size.get_height();
+            const bool inside = 0 <= m_mouse.position.x() && m_mouse.position.x() < cnv_size.get_width() &&
+                0 <= m_mouse.position.y() && m_mouse.position.y() < cnv_size.get_height();
             m_gizmos.set_hover_id(inside ? hit.raycaster_id : -1);
             break;
         }
