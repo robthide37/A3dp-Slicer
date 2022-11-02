@@ -516,6 +516,26 @@ void remove_collinear(Polygons &polys)
 		remove_collinear(poly);
 }
 
+// Do polygons match? If they match, they must have the same topology,
+// however their contours may be rotated.
+bool polygons_match(const Polygon &l, const Polygon &r)
+{
+    if (l.size() != r.size())
+        return false;
+    auto it_l = std::find(l.points.begin(), l.points.end(), r.points.front());
+    if (it_l == l.points.end())
+        return false;
+    auto it_r = r.points.begin();
+    for (; it_l != l.points.end(); ++ it_l, ++ it_r)
+        if (*it_l != *it_r)
+            return false;
+    it_l = l.points.begin();
+    for (; it_r != r.points.end(); ++ it_l, ++ it_r)
+        if (*it_l != *it_r)
+            return false;
+    return true;
+}
+
 bool contains(const Polygons &polygons, const Point &p, bool border_result)
 {
     int poly_count_inside = 0;

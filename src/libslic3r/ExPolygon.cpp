@@ -306,6 +306,18 @@ Lines ExPolygon::lines() const
     return lines;
 }
 
+// Do expolygons match? If they match, they must have the same topology,
+// however their contours may be rotated.
+bool expolygons_match(const ExPolygon &l, const ExPolygon &r)
+{
+    if (l.holes.size() != r.holes.size() || ! polygons_match(l.contour, r.contour))
+        return false;
+    for (size_t hole_idx = 0; hole_idx < l.holes.size(); ++ hole_idx)
+        if (! polygons_match(l.holes[hole_idx], r.holes[hole_idx]))
+            return false;
+    return true;
+}
+
 BoundingBox get_extents(const ExPolygon &expolygon)
 {
     return get_extents(expolygon.contour);

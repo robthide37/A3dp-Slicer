@@ -59,10 +59,25 @@ void LayerRegion::slices_to_fill_surfaces_clipped()
     }
 }
 
-void LayerRegion::make_perimeters(const SurfaceCollection &slices, ExPolygons &fill_expolygons)
+// Produce perimeter extrusions, gap fill extrusions and fill polygons for input slices.
+void LayerRegion::make_perimeters(
+    // Input slices for which the perimeters, gap fills and fill expolygons are to be generated.
+    const SurfaceCollection                                &slices,
+    // Ranges of perimeter extrusions and gap fill extrusions per suface, referencing
+    // newly created extrusions stored at this LayerRegion.
+    std::vector<std::pair<ExtrusionRange, ExtrusionRange>> &perimeter_and_gapfill_ranges,
+    // All fill areas produced for all input slices above.
+    ExPolygons                                             &fill_expolygons,
+    // Ranges of fill areas above per input slice.
+    std::vector<ExPolygonRange>                            &fill_expolygons_ranges)
 {
     m_perimeters.clear();
     m_thin_fills.clear();
+
+    perimeter_and_gapfill_ranges.reserve(perimeter_and_gapfill_ranges.size() + slices.size());
+    // There may be more expolygons produced per slice, thus this reserve is conservative.
+    fill_expolygons.reserve(fill_expolygons.size() + slices.size());
+    fill_expolygons_ranges.reserve(fill_expolygons_ranges.size() + slices.size());
 
     const PrintConfig       &print_config  = this->layer()->object()->print()->config();
     const PrintRegionConfig &region_config = this->region().config();
@@ -90,28 +105,37 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, ExPolygons &f
     // Cache for offsetted lower_slices
     Polygons          lower_layer_polygons_cache;
 
-    if (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne && !spiral_vase)
-        PerimeterGenerator::process_arachne(
-            // input:
-            params,
-            &slices,
-            lower_slices,
-            lower_layer_polygons_cache,
-            // output:
-            m_perimeters,
-            m_thin_fills,
-            fill_expolygons);
-    else
-        PerimeterGenerator::process_classic(
-            // input:
-            params,
-            &slices,
-            lower_slices,
-            lower_layer_polygons_cache,
-            // output:
-            m_perimeters,
-            m_thin_fills,
-            fill_expolygons);
+    for (const Surface &surface : slices) {
+        auto perimeters_begin      = uint32_t(m_perimeters.size());
+        auto gap_fills_begin       = uint32_t(m_thin_fills.size());
+        auto fill_expolygons_begin = uint32_t(fill_expolygons.size());
+        if (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne && !spiral_vase)
+            PerimeterGenerator::process_arachne(
+                // input:
+                params,
+                surface,
+                lower_slices,
+                lower_layer_polygons_cache,
+                // output:
+                m_perimeters,
+                m_thin_fills,
+                fill_expolygons);
+        else
+            PerimeterGenerator::process_classic(
+                // input:
+                params,
+                surface,
+                lower_slices,
+                lower_layer_polygons_cache,
+                // output:
+                m_perimeters,
+                m_thin_fills,
+                fill_expolygons);
+        perimeter_and_gapfill_ranges.emplace_back(
+            ExtrusionRange{ perimeters_begin, uint32_t(m_perimeters.size()) }, 
+            ExtrusionRange{ gap_fills_begin,  uint32_t(m_thin_fills.size()) });
+        fill_expolygons_ranges.emplace_back(ExtrusionRange{ fill_expolygons_begin, uint32_t(fill_expolygons.size()) });
+    }
 }
 
 //#define EXTERNAL_SURFACES_OFFSET_PARAMETERS ClipperLib::jtMiter, 3.

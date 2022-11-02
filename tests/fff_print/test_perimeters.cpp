@@ -55,6 +55,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
             static_cast<const PrintConfig&>(config),
             false); // spiral_vase
         Polygons lower_layer_polygons_cache;
+        for (const Surface &surface : slices)
         // FIXME Lukas H.: Disable this test for Arachne because it is failing and needs more investigation.
 //        if (config.perimeter_generator == PerimeterGeneratorType::Arachne)
 //            PerimeterGenerator::process_arachne();
@@ -62,7 +63,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
             PerimeterGenerator::process_classic(
                 // input:
                 perimeter_generator_params,
-                &slices,
+                surface,
                 nullptr,
                 // cache:
                 lower_layer_polygons_cache,

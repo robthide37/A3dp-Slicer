@@ -391,6 +391,10 @@ inline ExPolygons expolygons_simplify(const ExPolygons &expolys, double toleranc
 	return out;
 }
 
+// Do expolygons match? If they match, they must have the same topology,
+// however their contours may be rotated.
+bool expolygons_match(const ExPolygon &l, const ExPolygon &r);
+
 BoundingBox get_extents(const ExPolygon &expolygon);
 BoundingBox get_extents(const ExPolygons &expolygons);
 BoundingBox get_extents_rotated(const ExPolygon &poly, double angle);

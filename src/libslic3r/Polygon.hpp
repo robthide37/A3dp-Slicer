@@ -250,6 +250,10 @@ inline Polygons to_polygons(std::vector<Points> &&paths)
     return out;
 }
 
+// Do polygons match? If they match, they must have the same topology,
+// however their contours may be rotated.
+bool polygons_match(const Polygon &l, const Polygon &r);
+
 // Returns true if inside. Returns border_result if on boundary.
 bool contains(const Polygons& polygons, const Point& p, bool border_result = true);
 
