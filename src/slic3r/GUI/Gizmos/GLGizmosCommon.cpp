@@ -119,21 +119,25 @@ void SelectionInfo::on_update()
     const Selection& selection = get_pool()->get_canvas()->get_selection();
     if (selection.is_single_full_instance()) {
         m_model_object = selection.get_model()->objects[selection.get_object_idx()];
+        m_model_volume = nullptr;
         m_z_shift = selection.get_first_volume()->get_sla_shift_z();
     }
-    else
+    else {
         m_model_object = nullptr;
+        if (selection.is_single_volume())
+            m_model_volume = selection.get_model()->objects[selection.get_object_idx()]->volumes[selection.get_first_volume()->volume_idx()];
+    }
 }
 
 void SelectionInfo::on_release()
 {
     m_model_object = nullptr;
+    m_model_volume = nullptr;
 }
 
 int SelectionInfo::get_active_instance() const
 {
-    const Selection& selection = get_pool()->get_canvas()->get_selection();
-    return selection.get_instance_idx();
+    return get_pool()->get_canvas()->get_selection().get_instance_idx();
 }
 
 
@@ -329,12 +333,18 @@ void Raycaster::on_update()
 {
     wxBusyCursor wait;
     const ModelObject* mo = get_pool()->selection_info()->model_object();
+    const ModelVolume* mv = get_pool()->selection_info()->model_volume();
 
-    if (! mo)
+    if (mo == nullptr && mv == nullptr)
         return;
 
+    std::vector<ModelVolume*> mvs;
+    if (mv != nullptr)
+        mvs.push_back(const_cast<ModelVolume*>(mv));
+    else
+        mvs = mo->volumes;
+
     std::vector<const TriangleMesh*> meshes;
-    const std::vector<ModelVolume*>& mvs = mo->volumes;
     if (mvs.size() == 1) {
         assert(mvs.front()->is_model_part());
         const HollowedMesh* hollowed_mesh_tracker = get_pool()->hollowed_mesh();
@@ -342,9 +352,9 @@ void Raycaster::on_update()
             meshes.push_back(hollowed_mesh_tracker->get_hollowed_mesh());
     }
     if (meshes.empty()) {
-        for (const ModelVolume* mv : mvs) {
-            if (mv->is_model_part())
-                meshes.push_back(&mv->mesh());
+        for (const ModelVolume* v : mvs) {
+            if (v->is_model_part())
+                meshes.push_back(&v->mesh());
         }
     }
 
@@ -425,8 +435,11 @@ void ObjectClipper::render_cut() const
     if (m_clp_ratio == 0.)
         return;
     const SelectionInfo* sel_info = get_pool()->selection_info();
+    int sel_instance_idx = sel_info->get_active_instance();
+    if (sel_instance_idx < 0)
+        return;
     const ModelObject* mo = sel_info->model_object();
-    const Geometry::Transformation inst_trafo = mo->instances[sel_info->get_active_instance()]->get_transformation();
+    const Geometry::Transformation inst_trafo = mo->instances[sel_instance_idx]->get_transformation();
 
     size_t clipper_id = 0;
     for (const ModelVolume* mv : mo->volumes) {
@@ -440,19 +453,30 @@ void ObjectClipper::render_cut() const
         clipper->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         clipper->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f });
+        clipper->render_contour({ 1.f, 1.f, 1.f, 1.f});
 #else
         glsafe(::glPushMatrix());
         glsafe(::glColor3f(1.0f, 0.37f, 0.0f));
         clipper->render_cut();
-        glsafe(::glPopMatrix());
+        glsafe(::glColor3f(1.f, 1.f, 1.f));
+        clipper->render_contour();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         ++clipper_id;
     }
 }
 
+bool ObjectClipper::is_projection_inside_cut(const Vec3d& point) const
+{
+    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [point](const std::unique_ptr<MeshClipper>& cl) { return cl->is_projection_inside_cut(point); });
+}
 
-void ObjectClipper::set_position(double pos, bool keep_normal)
+bool ObjectClipper::has_valid_contour() const
+{
+    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [](const std::unique_ptr<MeshClipper>& cl) { return cl->has_valid_contour(); });
+}
+
+void ObjectClipper::set_position_by_ratio(double pos, bool keep_normal)
 {
     const ModelObject* mo = get_pool()->selection_info()->model_object();
     int active_inst = get_pool()->selection_info()->get_active_instance();
@@ -470,7 +494,36 @@ void ObjectClipper::set_position(double pos, bool keep_normal)
     get_pool()->get_canvas()->set_as_dirty();
 }
 
+void ObjectClipper::set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset, double pos)
+{
+    m_clp.reset(new ClippingPlane(cpl_normal, cpl_offset));
+    m_clp_ratio = pos;
+    get_pool()->get_canvas()->set_as_dirty();
+}
 
+const ClippingPlane* ObjectClipper::get_clipping_plane(bool ignore_hide_clipped) const
+{
+    static const ClippingPlane no_clip = ClippingPlane::ClipsNothing();
+    return (ignore_hide_clipped || m_hide_clipped) ? m_clp.get() : &no_clip;
+}
+
+void ObjectClipper::set_behavior(bool hide_clipped, bool fill_cut, double contour_width)
+{
+    m_hide_clipped = hide_clipped;
+    for (auto& clipper : m_clippers)
+        clipper->set_behaviour(fill_cut, contour_width);
+}
+
+void ObjectClipper::pass_mouse_click(const Vec3d& pt)
+{
+    for (auto& clipper : m_clippers)
+        clipper->pass_mouse_click(pt);
+}
+
+std::vector<Vec3d> ObjectClipper::get_disabled_contours() const
+{
+    return std::vector<Vec3d>();
+}
 
 void SupportsClipper::on_update()
 {
@@ -557,11 +610,13 @@ void SupportsClipper::render_cut() const
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     m_clipper->render_cut({ 1.0f, 0.f, 0.37f, 1.0f });
+    m_clipper->render_contour({ 1.f, 1.f, 1.f, 1.f });
 #else
     glsafe(::glPushMatrix());
     glsafe(::glColor3f(1.0f, 0.f, 0.37f));
     m_clipper->render_cut();
-    glsafe(::glPopMatrix());
+    glsafe(::glColor3f(1.0f, 1.f, 1.f));
+    m_clipper->render_contour();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 

@@ -19,6 +19,13 @@ void ExPolygon::scale(double factor)
         hole.scale(factor);
 }
 
+void ExPolygon::scale(double factor_x, double factor_y)
+{
+    contour.scale(factor_x, factor_y);
+    for (Polygon &hole : holes)
+        hole.scale(factor_x, factor_y);
+}
+
 void ExPolygon::translate(const Point &p)
 {
     contour.translate(p);

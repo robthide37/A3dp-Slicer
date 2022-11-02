@@ -13,8 +13,8 @@ if (UNIX AND NOT APPLE) # wxWidgets will not use char as the underlying type for
 endif()
 
 prusaslicer_add_cmake_project(wxWidgets
-    URL https://github.com/prusa3d/wxWidgets/archive/2a0b365df947138c513a888d707d46248d78a341.zip
-    URL_HASH SHA256=9ab05cd5179196fad4ae702c78eaae9418e73a402cfd390f7438e469b13eb735
+    URL https://github.com/prusa3d/wxWidgets/archive/34b524f8d5134a40a90d93a16360d533af2676ae.zip
+    URL_HASH SHA256=e76ca0dd998905c4dbb86f41f264e6e0468504dc2398f7e7e3bba8dc37de2f45
     DEPENDS ${PNG_PKG} ${ZLIB_PKG} ${EXPAT_PKG} dep_TIFF dep_JPEG dep_NanoSVG
     CMAKE_ARGS
         -DwxBUILD_PRECOMP=ON
@@ -38,6 +38,7 @@ prusaslicer_add_cmake_project(wxWidgets
         -DwxUSE_LIBSDL=OFF
         -DwxUSE_XTEST=OFF
         -DwxUSE_GLCANVAS_EGL=OFF
+        -DwxUSE_WEBREQUEST=OFF
 )
 
 if (MSVC)

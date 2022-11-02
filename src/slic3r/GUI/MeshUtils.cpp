@@ -16,15 +16,27 @@
 
 #include <igl/unproject.h>
 
+#include <cstdint>
+
 
 namespace Slic3r {
 namespace GUI {
+
+void MeshClipper::set_behaviour(bool fill_cut, double contour_width)
+{
+    if (fill_cut != m_fill_cut || contour_width != m_contour_width)
+        m_result.reset();
+    m_fill_cut = fill_cut;
+    m_contour_width = contour_width;
+}
+
+
 
 void MeshClipper::set_plane(const ClippingPlane& plane)
 {
     if (m_plane != plane) {
         m_plane = plane;
-        m_triangles_valid = false;
+        m_result.reset();
     }
 }
 
@@ -33,7 +45,7 @@ void MeshClipper::set_limiting_plane(const ClippingPlane& plane)
 {
     if (m_limiting_plane != plane) {
         m_limiting_plane = plane;
-        m_triangles_valid = false;
+        m_result.reset();
     }
 }
 
@@ -43,8 +55,7 @@ void MeshClipper::set_mesh(const TriangleMesh& mesh)
 {
     if (m_mesh != &mesh) {
         m_mesh = &mesh;
-        m_triangles_valid = false;
-        m_triangles2d.resize(0);
+        m_result.reset();
     }
 }
 
@@ -52,8 +63,7 @@ void MeshClipper::set_negative_mesh(const TriangleMesh& mesh)
 {
     if (m_negative_mesh != &mesh) {
         m_negative_mesh = &mesh;
-        m_triangles_valid = false;
-        m_triangles2d.resize(0);
+        m_result.reset();
     }
 }
 
@@ -63,8 +73,7 @@ void MeshClipper::set_transformation(const Geometry::Transformation& trafo)
 {
     if (! m_trafo.get_matrix().isApprox(trafo.get_matrix())) {
         m_trafo = trafo;
-        m_triangles_valid = false;
-        m_triangles2d.resize(0);
+        m_result.reset();
     }
 }
 
@@ -74,13 +83,9 @@ void MeshClipper::render_cut(const ColorRGBA& color)
 void MeshClipper::render_cut()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
-    if (! m_triangles_valid)
+    if (! m_result)
         recalculate_triangles();
-
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    if (m_model.vertices_count() == 0 || m_model.indices_count() == 0)
-        return;
-
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
@@ -91,8 +96,10 @@ void MeshClipper::render_cut()
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        m_model.set_color(color);
-        m_model.render();
+        for (CutIsland& isl : m_result->cut_islands) {
+            isl.model.set_color(isl.disabled ? ColorRGBA(1.f, 0.f, 0.f, 1.f) : color);
+            isl.model.render();
+        }
         shader->stop_using();
     }
 
@@ -105,19 +112,80 @@ void MeshClipper::render_cut()
 }
 
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+void MeshClipper::render_contour(const ColorRGBA& color)
+#else
+void MeshClipper::render_contour()
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+{
+    if (! m_result)
+        recalculate_triangles();
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
+    if (curr_shader != nullptr)
+        curr_shader->stop_using();
+
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    if (shader != nullptr) {
+        shader->start_using();
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        for (CutIsland& isl : m_result->cut_islands) {
+            isl.model_expanded.set_color(color);
+            isl.model_expanded.render();
+        }
+        shader->stop_using();
+    }
+
+    if (curr_shader != nullptr)
+        curr_shader->start_using();
+#else
+    if (m_vertex_array_expanded.has_VBOs())
+        m_vertex_array_expanded.render();
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+}
+
+bool MeshClipper::is_projection_inside_cut(const Vec3d& point_in) const
+{
+    if (!m_result || m_result->cut_islands.empty())
+        return false;
+    Vec3d point = m_result->trafo.inverse() * point_in;
+    Point pt_2d = Point::new_scale(Vec2d(point.x(), point.y()));
+
+    for (const CutIsland& isl : m_result->cut_islands) {
+        if (isl.expoly_bb.contains(pt_2d) && isl.expoly.contains(pt_2d))
+            return true;
+    }
+    return false;
+}
+
+bool MeshClipper::has_valid_contour() const
+{
+    return m_result && std::any_of(m_result->cut_islands.begin(), m_result->cut_islands.end(), [](const CutIsland& isl) { return !isl.expoly.empty(); });
+}
+
+
+void MeshClipper::pass_mouse_click(const Vec3d& point_in)
+{
+    if (! m_result || m_result->cut_islands.empty())
+        return;
+    Vec3d point = m_result->trafo.inverse() * point_in;
+    Point pt_2d = Point::new_scale(Vec2d(point.x(), point.y()));
+
+    for (CutIsland& isl : m_result->cut_islands) {
+        if (isl.expoly_bb.contains(pt_2d) && isl.expoly.contains(pt_2d))
+            isl.disabled = ! isl.disabled;
+    }
+}
 
 void MeshClipper::recalculate_triangles()
 {
-#if ENABLE_WORLD_COORDINATE
-    const Transform3f instance_matrix_no_translation_no_scaling = m_trafo.get_rotation_matrix().cast<float>();
-#else
-    const Transform3f& instance_matrix_no_translation_no_scaling = m_trafo.get_matrix(true,false,true).cast<float>();
-#endif // ENABLE_WORLD_COORDINATE
-    // Calculate clipping plane normal in mesh coordinates.
-    const Vec3f up_noscale = instance_matrix_no_translation_no_scaling.inverse() * m_plane.get_normal().cast<float>();
-    const Vec3d up = up_noscale.cast<double>().cwiseProduct(m_trafo.get_scaling_factor());
-    // Calculate distance from mesh origin to the clipping plane (in mesh coordinates).
-    const float height_mesh = m_plane.distance(m_trafo.get_offset()) * (up_noscale.norm()/up.norm());
+    m_result = ClipResult();
+
+    auto plane_mesh = Eigen::Hyperplane<double, 3>(m_plane.get_normal(), -m_plane.distance(Vec3d::Zero())).transform(m_trafo.get_matrix().inverse());
+    const Vec3d up = plane_mesh.normal();
+    const float height_mesh = -plane_mesh.offset();
 
     // Now do the cutting
     MeshSlicingParams slicing_params;
@@ -136,6 +204,8 @@ void MeshClipper::recalculate_triangles()
     Transform3d tr = Transform3d::Identity();
     tr.rotate(q);
     tr = m_trafo.get_matrix() * tr;
+
+    m_result->trafo = tr;
 
     if (m_limiting_plane != ClippingPlane::ClipsNothing())
     {
@@ -190,42 +260,108 @@ void MeshClipper::recalculate_triangles()
         }
     }
 
-    m_triangles2d = triangulate_expolygons_2f(expolys, m_trafo.get_matrix().matrix().determinant() < 0.);
-
     tr.pretranslate(0.001 * m_plane.get_normal().normalized()); // to avoid z-fighting
+    Transform3d tr2 = tr;
+    tr2.pretranslate(0.002 * m_plane.get_normal().normalized());
+
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    m_model.reset();
+    std::vector<Vec2f> triangles2d;
 
-    GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
-    init_data.reserve_vertices(m_triangles2d.size());
-    init_data.reserve_indices(m_triangles2d.size());
+    for (const ExPolygon& exp : expolys) {
+        triangles2d.clear();
 
-    // vertices + indices
-    for (auto it = m_triangles2d.cbegin(); it != m_triangles2d.cend(); it = it + 3) {
-        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-        const size_t idx = it - m_triangles2d.cbegin();
-        init_data.add_triangle((unsigned int)idx, (unsigned int)idx + 1, (unsigned int)idx + 2);
+        m_result->cut_islands.push_back(CutIsland());
+        CutIsland& isl = m_result->cut_islands.back();
+
+        if (m_fill_cut) {
+            triangles2d = triangulate_expolygon_2f(exp, m_trafo.get_matrix().matrix().determinant() < 0.);
+            GLModel::Geometry init_data;
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+            init_data.reserve_vertices(triangles2d.size());
+            init_data.reserve_indices(triangles2d.size());
+
+            // vertices + indices
+            for (auto it = triangles2d.cbegin(); it != triangles2d.cend(); it = it + 3) {
+                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                const size_t idx = it - triangles2d.cbegin();
+                init_data.add_triangle((unsigned int)idx, (unsigned int)idx + 1, (unsigned int)idx + 2);
+            }
+
+            if (!init_data.is_empty())
+                isl.model.init_from(std::move(init_data));
+        }
+
+        if (m_contour_width != 0. && ! exp.contour.empty()) {
+            triangles2d.clear();
+
+            // The contours must not scale with the object. Check the scale factor
+            // in the respective directions, create a scaled copy of the ExPolygon
+            // offset it and then unscale the result again.
+
+            Transform3d t = tr;
+            t.translation() = Vec3d::Zero();
+            double scale_x = (t * Vec3d::UnitX()).norm();
+            double scale_y = (t * Vec3d::UnitY()).norm();
+
+            // To prevent overflow after scaling, downscale the input if needed:
+            double extra_scale = 1.;
+            int32_t limit = int32_t(std::min(std::numeric_limits<coord_t>::max() / (2. * scale_x), std::numeric_limits<coord_t>::max() / (2. * scale_y)));
+            int32_t max_coord = 0;
+            for (const Point& pt : exp.contour)
+                max_coord = std::max(max_coord, std::max(std::abs(pt.x()), std::abs(pt.y())));
+            if (max_coord + m_contour_width >= limit)
+                extra_scale = 0.9 * double(limit) / max_coord;            
+
+            ExPolygon exp_copy = exp;
+            if (extra_scale != 1.)
+                exp_copy.scale(extra_scale);
+            exp_copy.scale(scale_x, scale_y);
+
+            ExPolygons expolys_exp = offset_ex(exp_copy, scale_(m_contour_width));
+            expolys_exp = diff_ex(expolys_exp, ExPolygons({exp_copy}));
+
+            for (ExPolygon& e : expolys_exp) {
+                e.scale(1./scale_x, 1./scale_y);
+                if (extra_scale != 1.)
+                    e.scale(1./extra_scale);
+            }
+
+
+            triangles2d = triangulate_expolygons_2f(expolys_exp, m_trafo.get_matrix().matrix().determinant() < 0.);
+            GLModel::Geometry init_data = GLModel::Geometry();
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+            init_data.reserve_vertices(triangles2d.size());
+            init_data.reserve_indices(triangles2d.size());
+
+            // vertices + indices
+            for (auto it = triangles2d.cbegin(); it != triangles2d.cend(); it = it + 3) {
+                init_data.add_vertex((Vec3f)(tr2 * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr2 * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                init_data.add_vertex((Vec3f)(tr2 * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+                const size_t idx = it - triangles2d.cbegin();
+                init_data.add_triangle((unsigned short)idx, (unsigned short)idx + 1, (unsigned short)idx + 2);
+            }
+
+            if (!init_data.is_empty())
+                isl.model_expanded.init_from(std::move(init_data));
+        }
+
+        isl.expoly = std::move(exp);
+        isl.expoly_bb = get_extents(exp);
     }
-
-    if (!init_data.is_empty())
-        m_model.init_from(std::move(init_data));
 #else
-    m_vertex_array.release_geometry();
-    for (auto it=m_triangles2d.cbegin(); it != m_triangles2d.cend(); it=it+3) {
-        m_vertex_array.push_geometry(tr * Vec3d((*(it+0))(0), (*(it+0))(1), height_mesh), up);
-        m_vertex_array.push_geometry(tr * Vec3d((*(it+1))(0), (*(it+1))(1), height_mesh), up);
-        m_vertex_array.push_geometry(tr * Vec3d((*(it+2))(0), (*(it+2))(1), height_mesh), up);
-        const size_t idx = it - m_triangles2d.cbegin();
-        m_vertex_array.push_triangle(idx, idx+1, idx+2);
-    }
-    m_vertex_array.finalize_geometry(true);
+    #error NOT IMPLEMENTED
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-    m_triangles_valid = true;
+
+
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#else
+    #error NOT IMPLEMENTED
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 
@@ -239,7 +375,7 @@ void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3
                                         Vec3d& point, Vec3d& direction)
 #else
 void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                                        Vec3d& point, Vec3d& direction) const
+                                        Vec3d& point, Vec3d& direction)
 #endif // ENABLE_RAYCAST_PICKING
 {
     Matrix4d modelview = camera.get_view_matrix().matrix();
@@ -264,8 +400,11 @@ void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3
 
 bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                       Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane,
-                                      size_t* facet_idx) const
+                                      size_t* facet_idx, bool* was_clipping_plane_hit) const
 {
+    if (was_clipping_plane_hit)
+        *was_clipping_plane_hit = false;
+
     Vec3d point;
     Vec3d direction;
     line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
@@ -286,9 +425,26 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
             break;
     }
 
-    if (i==hits.size() || (hits.size()-i) % 2 != 0) {
-        // All hits are either clipped, or there is an odd number of unclipped
-        // hits - meaning the nearest must be from inside the mesh.
+    if (i==hits.size()) {
+        // All hits are clipped.
+        return false;
+    }
+    if  ((hits.size()-i) % 2 != 0) {
+        // There is an odd number of unclipped hits - meaning the nearest must be from inside the mesh.
+        // In that case, calculate intersection with the clipping place.
+        if (clipping_plane && was_clipping_plane_hit) {
+            direction = direction + point;
+            point = trafo * point; // transform to world coords
+            direction = trafo * direction - point;
+
+            Vec3d normal = -clipping_plane->get_normal().cast<double>();
+            double den = normal.dot(direction);
+            if (den != 0.) {
+                double t = (-clipping_plane->get_offset() - normal.dot(point))/den;
+                position = (point + t * direction).cast<float>();
+                *was_clipping_plane_hit = true;
+            }
+        }
         return false;
     }
 
@@ -300,6 +456,35 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
         *facet_idx = hits[i].face();
 
     return true;
+}
+
+bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
+                                      Vec3d& position, Vec3d& normal) const
+{
+    Vec3d point;
+    Vec3d direction;
+    line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
+
+    std::vector<AABBMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction);
+
+    if (hits.empty())
+        return false; // no intersection found
+
+    // Now stuff the points in the provided vector and calculate normals if asked about them:
+    position = hits[0].position();
+    normal = hits[0].normal();
+
+    return true;
+}
+
+bool MeshRaycaster::is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const 
+{
+    point = trafo.inverse() * point;
+
+    std::vector<AABBMesh::hit_result> hits      = m_emesh.query_ray_hits(point, direction);
+    std::vector<AABBMesh::hit_result> neg_hits  = m_emesh.query_ray_hits(point, -direction);
+
+    return !hits.empty() && !neg_hits.empty();
 }
 
 

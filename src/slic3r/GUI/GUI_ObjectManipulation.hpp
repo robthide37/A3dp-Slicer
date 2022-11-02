@@ -64,6 +64,8 @@ public:
     const std::string&  get_full_opt_name() const { return m_full_opt_name; }
 #endif // ENABLE_WORLD_COORDINATE
 
+    bool                has_opt_key(const std::string& key) { return m_opt_key == key; }
+
 private:
     double              get_value();
 };
@@ -197,6 +199,10 @@ public:
     void        Show(const bool show) override;
     bool        IsShown() override;
     void        UpdateAndShow(const bool show) override;
+    void        Enable(const bool enadle = true);
+    void        Disable() { Enable(false); }
+    void        DisableScale();
+    void        DisableUnuniformScale();
     void        update_ui_from_settings();
     bool        use_colors() { return m_use_colors; }
 

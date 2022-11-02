@@ -515,12 +515,23 @@ bool PresetComboBox::is_selected_physical_printer()
 
 bool PresetComboBox::selection_is_changed_according_to_physical_printers()
 {
-    if (m_type != Preset::TYPE_PRINTER || !is_selected_physical_printer())
+    if (m_type != Preset::TYPE_PRINTER)
         return false;
 
-    PhysicalPrinterCollection& physical_printers = m_preset_bundle->physical_printers;
+    const std::string           selected_string     = into_u8(this->GetString(this->GetSelection()));
+    PhysicalPrinterCollection&  physical_printers   = m_preset_bundle->physical_printers;
+    Tab*                        tab                 = wxGetApp().get_tab(Preset::TYPE_PRINTER);
 
-    std::string selected_string = this->GetString(this->GetSelection()).ToUTF8().data();
+    if (!is_selected_physical_printer()) {
+        if (!physical_printers.has_selection())
+            return false;
+
+        const bool is_changed = selected_string == physical_printers.get_selected_printer_preset_name();
+        physical_printers.unselect_printer();
+        if (is_changed)
+            tab->select_preset(selected_string);
+        return is_changed;
+    }
 
     std::string old_printer_full_name, old_printer_preset;
     if (physical_printers.has_selection()) {
@@ -535,20 +546,21 @@ bool PresetComboBox::selection_is_changed_according_to_physical_printers()
 
     // if new preset wasn't selected, there is no need to call update preset selection
     if (old_printer_preset == preset_name) {
+        tab->update_preset_choice();
+        wxGetApp().plater()->show_action_buttons(false);
+
         // we need just to update according Plater<->Tab PresetComboBox 
         if (dynamic_cast<PlaterPresetComboBox*>(this)!=nullptr) {
-            wxGetApp().get_tab(m_type)->update_preset_choice();
             // Synchronize config.ini with the current selections.
             m_preset_bundle->export_selections(*wxGetApp().app_config);
+            this->update();
         }
         else if (dynamic_cast<TabPresetComboBox*>(this)!=nullptr)
             wxGetApp().sidebar().update_presets(m_type);
 
-        this->update();
         return true;
     }
 
-    Tab* tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
     if (tab)
         tab->select_preset(preset_name, false, old_printer_full_name);
     return true;

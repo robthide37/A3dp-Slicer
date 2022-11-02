@@ -2890,6 +2890,13 @@ bool GUI_App::may_switch_to_SLA_preset(const wxString& caption)
             caption);
         return false;
     }
+    if (model_has_connectors(model())) {
+        show_info(nullptr,
+            _L("SLA technology doesn't support cut with connectors") + "\n\n" +
+            _L("Please check your object list before preset changing."),
+            caption);
+        return false;
+    }
     return true;
 }
 
@@ -3244,7 +3251,7 @@ void GUI_App::app_updater(bool from_user)
     app_data.target_path =dwnld_dlg.get_download_path();
 
     // start download
-    this->plater_->get_notification_manager()->push_download_progress_notification(_utf8("Download"), std::bind(&AppUpdater::cancel_callback, m_app_updater.get()));
+    this->plater_->get_notification_manager()->push_download_progress_notification(_utf8("Download"), std::bind(&AppUpdater::cancel_callback, this->m_app_updater.get()));
     app_data.start_after = dwnld_dlg.run_after_download();
     m_app_updater->set_app_data(std::move(app_data));
     m_app_updater->sync_download();

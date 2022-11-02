@@ -10,7 +10,7 @@
 namespace Slic3r {
 
 class ModelObject;
-
+class ModelVolume;
 
 namespace GUI {
 
@@ -24,6 +24,8 @@ enum class SLAGizmoEventType : unsigned char {
     Dragging,
     Delete,
     SelectAll,
+    CtrlDown,
+    CtrlUp,
     ShiftUp,
     AltUp,
     ApplyChanges,
@@ -153,7 +155,10 @@ public:
     explicit SelectionInfo(CommonGizmosDataPool* cgdp)
         : CommonGizmosDataBase(cgdp) {}
 
+    // Returns a non-null pointer if the selection is a single full instance
     ModelObject* model_object() const { return m_model_object; }
+    // Returns a non-null pointer if the selection is a single volume
+    ModelVolume* model_volume() const { return m_model_volume; }
     int get_active_instance() const;
     float get_sla_shift() const { return m_z_shift; }
 
@@ -163,6 +168,7 @@ protected:
 
 private:
     ModelObject* m_model_object = nullptr;
+    ModelVolume* m_model_volume = nullptr;
     // int m_active_inst = -1;
     float m_z_shift = 0.f;
 };
@@ -255,10 +261,19 @@ public:
     CommonGizmosDataID get_dependencies() const override { return CommonGizmosDataID::SelectionInfo; }
 #endif // NDEBUG
 
-    void set_position(double pos, bool keep_normal);
+    void set_normal(const Vec3d& dir);
     double get_position() const { return m_clp_ratio; }
-    ClippingPlane* get_clipping_plane() const { return m_clp.get(); }
+    const ClippingPlane* get_clipping_plane(bool ignore_hide_clipped = false) const;
     void render_cut() const;
+    void set_position_by_ratio(double pos, bool keep_normal);
+    void set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset, double pos);
+    void set_behavior(bool hide_clipped, bool fill_cut, double contour_width);
+    
+    void pass_mouse_click(const Vec3d& pt);
+    std::vector<Vec3d> get_disabled_contours() const;
+
+    bool is_projection_inside_cut(const Vec3d& point_in) const;
+    bool has_valid_contour() const;
 
 
 protected:
@@ -271,6 +286,7 @@ private:
     std::unique_ptr<ClippingPlane> m_clp;
     double m_clp_ratio = 0.;
     double m_active_inst_bb_radius = 0.;
+    bool m_hide_clipped = true;
 };
 
 

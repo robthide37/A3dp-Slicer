@@ -320,6 +320,8 @@ public:
     bool is_single_volume() const { return m_type == SingleVolume; }
     bool is_multiple_volume() const { return m_type == MultipleVolume; }
     bool is_any_volume() const { return is_single_volume() || is_multiple_volume(); }
+    bool is_any_connector() const;
+    bool is_any_cut_volume() const;
     bool is_mixed() const { return m_type == Mixed; }
     bool is_from_single_instance() const { return get_instance_idx() != -1; }
     bool is_from_single_object() const;
@@ -328,6 +330,7 @@ public:
 #if ENABLE_WORLD_COORDINATE
     bool is_single_volume_or_modifier() const { return is_single_volume() || is_single_modifier(); }
 #endif // ENABLE_WORLD_COORDINATE
+    bool is_single_volume_instance() const { return is_single_full_instance() && m_list.size() == 1; }
 
     bool contains_volume(unsigned int volume_idx) const { return m_list.find(volume_idx) != m_list.end(); }
     // returns true if the selection contains all the given indices
