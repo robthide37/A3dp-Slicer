@@ -5,8 +5,6 @@
 #include "libslic3r/Geometry/Circle.hpp"
 #include "libslic3r/SurfaceMesh.hpp"
 
-#if ENABLE_MEASURE_GIZMO
-
 namespace Slic3r {
 namespace Measure {
 
@@ -1082,5 +1080,3 @@ void AngleAndEdges::transform(const Transform3d& trafo) {
 } // namespace Measure
 } // namespace Slic3r
 
-
-#endif // ENABLE_MEASURE_GIZMO

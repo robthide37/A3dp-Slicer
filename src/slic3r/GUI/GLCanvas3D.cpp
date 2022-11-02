@@ -5441,15 +5441,9 @@ void GLCanvas3D::_picking_pass()
                 const GLVolume* volume = m_volumes.volumes[hit.raycaster_id];
                 if (volume->is_active && !volume->disabled && (volume->composite_id.volume_id >= 0 || m_render_sla_auxiliaries)) {
                     // do not add the volume id if any gizmo is active and CTRL is pressed
-                    if (m_gizmos.get_current_type() == GLGizmosManager::EType::Undefined || !wxGetKeyState(WXK_CONTROL)) {
+                    if (m_gizmos.get_current_type() == GLGizmosManager::EType::Undefined || !wxGetKeyState(WXK_CONTROL))
                         m_hover_volume_idxs.emplace_back(hit.raycaster_id);
-#if !ENABLE_MEASURE_GIZMO
-                        m_gizmos.set_hover_id(-1);
-#endif // !ENABLE_MEASURE_GIZMO
-                    }
-#if ENABLE_MEASURE_GIZMO
                     m_gizmos.set_hover_id(-1);
-#endif // ENABLE_MEASURE_GIZMO
                 }
             }
             else

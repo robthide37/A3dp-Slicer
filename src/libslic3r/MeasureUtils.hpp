@@ -1,8 +1,6 @@
 #ifndef Slic3r_MeasureUtils_hpp_
 #define Slic3r_MeasureUtils_hpp_
 
-#if ENABLE_MEASURE_GIZMO
-
 #include <initializer_list>
 
 namespace Slic3r {
@@ -386,5 +384,3 @@ inline Vec3d get_orthogonal(const Vec3d& v, bool unitLength)
 } // namespace Measure
 
 #endif // Slic3r_MeasureUtils_hpp_
-
-#endif // ENABLE_MEASURE_GIZMO

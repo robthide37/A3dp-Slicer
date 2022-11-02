@@ -21,9 +21,7 @@
 #include "slic3r/GUI/Gizmos/GLGizmoSeam.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoSimplify.hpp"
-#if ENABLE_MEASURE_GIZMO
 #include "slic3r/GUI/Gizmos/GLGizmoMeasure.hpp"
-#endif // ENABLE_MEASURE_GIZMO
 
 #include "libslic3r/format.hpp"
 #include "libslic3r/Model.hpp"
@@ -109,9 +107,7 @@ bool GLGizmosManager::init()
     m_gizmos.emplace_back(new GLGizmoSeam(m_parent, "seam.svg", 8));
     m_gizmos.emplace_back(new GLGizmoMmuSegmentation(m_parent, "mmu_segmentation.svg", 9));
     m_gizmos.emplace_back(new GLGizmoSimplify(m_parent, "cut.svg", 10));
-#if ENABLE_MEASURE_GIZMO
     m_gizmos.emplace_back(new GLGizmoMeasure(m_parent, "measure.svg", 11));
-#endif // ENABLE_MEASURE_GIZMO
 
     m_common_gizmos_data.reset(new CommonGizmosDataPool(&m_parent));
 
@@ -294,10 +290,8 @@ bool GLGizmosManager::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_p
         return dynamic_cast<GLGizmoSeam*>(m_gizmos[Seam].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
     else if (m_current == MmuSegmentation)
         return dynamic_cast<GLGizmoMmuSegmentation*>(m_gizmos[MmuSegmentation].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
-#if ENABLE_MEASURE_GIZMO
     else if (m_current == Measure)
         return dynamic_cast<GLGizmoMeasure*>(m_gizmos[Measure].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
-#endif // ENABLE_MEASURE_GIZMO
     else if (m_current == Cut)
         return dynamic_cast<GLGizmoCut3D*>(m_gizmos[Cut].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
     else
@@ -631,11 +625,9 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
                     processed = true;
             }
         }
-#if ENABLE_MEASURE_GIZMO
         else if (m_current == Measure && keyCode == WXK_CONTROL) {
             gizmo_event(SLAGizmoEventType::CtrlUp, Vec2d::Zero(), false);
         }
-#endif // ENABLE_MEASURE_GIZMO
 
 //        if (processed)
 //            m_parent.set_cursor(GLCanvas3D::Standard);
@@ -670,11 +662,9 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
             if (simplify != nullptr) 
                 processed = simplify->on_esc_key_down();
         }
-#if ENABLE_MEASURE_GIZMO
         else if (m_current == Measure && keyCode == WXK_CONTROL) {
             gizmo_event(SLAGizmoEventType::CtrlDown, Vec2d::Zero(), true);
         }
-#endif // ENABLE_MEASURE_GIZMO
     }
 
     if (processed)

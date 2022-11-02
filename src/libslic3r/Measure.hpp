@@ -1,8 +1,6 @@
 #ifndef Slic3r_Measure_hpp_
 #define Slic3r_Measure_hpp_
 
-#if ENABLE_MEASURE_GIZMO
-
 #include <optional>
 #include <memory>
 
@@ -197,5 +195,3 @@ inline bool are_perpendicular(const SurfaceFeature& f1, const SurfaceFeature& f2
 } // namespace Slic3r
 
 #endif // Slic3r_Measure_hpp_
-
-#endif // ENABLE_MEASURE_GIZMO

@@ -157,8 +157,8 @@ namespace ImGui
     const wchar_t InfoMarker               = 0x2603;
     const wchar_t SliderFloatEditBtnIcon   = 0x2604;
     const wchar_t SliderFloatEditBtnPressedIcon = 0x2605;
-#if ENABLE_MEASURE_GIZMO
     const wchar_t ClipboardBtnIcon         = 0x2606;
+
     const wchar_t LegendTravel             = 0x2701;
     const wchar_t LegendWipe               = 0x2702;
     const wchar_t LegendRetract            = 0x2703;
@@ -175,25 +175,7 @@ namespace ImGui
     const wchar_t ExpandBtn                = 0x2714;
     const wchar_t CollapseBtn              = 0x2715;
     const wchar_t InfoMarkerSmall          = 0x2716;
-#else
-    const wchar_t LegendTravel             = 0x2606;
-    const wchar_t LegendWipe               = 0x2607;
-    const wchar_t LegendRetract            = 0x2608;
-    const wchar_t LegendDeretract          = 0x2609;
-    const wchar_t LegendSeams              = 0x2610;
-    const wchar_t LegendToolChanges        = 0x2611;
-    const wchar_t LegendColorChanges       = 0x2612;
-    const wchar_t LegendPausePrints        = 0x2613;
-    const wchar_t LegendCustomGCodes       = 0x2614;
-    const wchar_t LegendCOG                = 0x2615;
-    const wchar_t LegendShells             = 0x2616;
-    const wchar_t LegendToolMarker         = 0x2617;
-    const wchar_t WarningMarkerSmall       = 0x2618;
-    const wchar_t ExpandBtn                = 0x2619;
-    const wchar_t CollapseBtn              = 0x2620;
-    const wchar_t InfoMarkerSmall          = 0x2621;
-#endif // ENABLE_MEASURE_GIZMO
 
-//    void MyFunction(const char* name, const MyMatrix44& v);
+    //    void MyFunction(const char* name, const MyMatrix44& v);
 }
 

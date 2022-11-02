@@ -416,7 +416,6 @@ public:
     ~TaskTimer();
 };
 
-#if ENABLE_MEASURE_GIZMO
 class KeyAutoRepeatFilter
 {
     size_t m_count{ 0 };
@@ -426,7 +425,6 @@ public:
     void reset_count() { m_count = 0; }
     bool is_first() const { return m_count == 0; }
 };
-#endif // ENABLE_MEASURE_GIZMO
 
 }}
 

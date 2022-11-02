@@ -19,8 +19,6 @@
 
 #include <wx/clipbrd.h>
 
-#if ENABLE_MEASURE_GIZMO
-
 namespace Slic3r {
 namespace GUI {
 
@@ -1691,5 +1689,3 @@ void GLGizmoMeasure::on_unregister_raycasters_for_picking()
 
 } // namespace GUI
 } // namespace Slic3r
-
-#endif // ENABLE_MEASURE_GIZMO

@@ -56,9 +56,7 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::PreferencesHoverButton, "notification_preferences_hover"},
     {ImGui::SliderFloatEditBtnIcon, "edit_button"                   },
     {ImGui::SliderFloatEditBtnPressedIcon, "edit_button_pressed"    },
-#if ENABLE_MEASURE_GIZMO
     {ImGui::ClipboardBtnIcon      , "copy_menu"                     },
-#endif // ENABLE_MEASURE_GIZMO
     {ImGui::ExpandBtn             , "expand_btn"                    },
     {ImGui::CollapseBtn           , "collapse_btn"                  },
     {ImGui::RevertButton          , "undo"                          },
@@ -1129,12 +1127,10 @@ ImFontAtlasCustomRect* ImGuiWrapper::GetTextureCustomRect(const wchar_t& tex_id)
     return (item != m_custom_glyph_rects_ids.end()) ? ImGui::GetIO().Fonts->GetCustomRectByIndex(m_custom_glyph_rects_ids[tex_id]) : nullptr;
 }
 
-#if ENABLE_MEASURE_GIZMO
 void ImGuiWrapper::disable_background_fadeout_animation()
 {
     GImGui->DimBgRatio = 1.0f;
 }
-#endif // ENABLE_MEASURE_GIZMO
 
 ImU32 ImGuiWrapper::to_ImU32(const ColorRGBA& color)
 {
