@@ -19,6 +19,14 @@ wxDEFINE_EVENT(wxCUSTOMEVT_LAST_VOLUME_IS_DELETED, wxCommandEvent);
 
 BitmapCache* m_bitmap_cache = nullptr;
 
+wxBitmapBundle* find_bndl(const std::string& bmp_name)
+{
+    if (!m_bitmap_cache)
+        m_bitmap_cache = new BitmapCache;
+
+    return m_bitmap_cache->find_bndl(bmp_name);
+}
+
 // *****************************************************************************
 // ----------------------------------------------------------------------------
 // ObjectDataViewModelNode
@@ -186,7 +194,7 @@ void ObjectDataViewModelNode::update_settings_digest_bitmaps()
     std::string scaled_bitmap_name = m_name.ToUTF8().data();
     scaled_bitmap_name += (wxGetApp().dark_mode() ? "-dm" : "");
 
-    wxBitmapBundle *bmp = m_bitmap_cache->find_bndl(scaled_bitmap_name);
+    wxBitmapBundle *bmp = find_bndl(scaled_bitmap_name);
     if (bmp == nullptr) {
         std::vector<wxBitmapBundle*> bmps;
         for (auto& category : m_opt_categories)
@@ -321,8 +329,6 @@ static int get_root_idx(ObjectDataViewModelNode *parent_node, const ItemType roo
 
 ObjectDataViewModel::ObjectDataViewModel()
 {
-    m_bitmap_cache = new Slic3r::GUI::BitmapCache;
-
     m_volume_bmps = MenuFactory::get_volume_bitmaps();
     m_warning_bmp = *get_bmp_bundle(WarningIcon);
     m_warning_manifold_bmp = *get_bmp_bundle(WarningManifoldIcon);
@@ -359,7 +365,7 @@ void ObjectDataViewModel::UpdateBitmapForNode(ObjectDataViewModelNode* node)
         scaled_bitmap_name += std::to_string(vol_type);
     scaled_bitmap_name += (wxGetApp().dark_mode() ? "-dm" : "-lm");
 
-    wxBitmapBundle* bmp = m_bitmap_cache->find_bndl(scaled_bitmap_name);
+    wxBitmapBundle* bmp = find_bndl(scaled_bitmap_name);
     if (!bmp) {
         std::vector<wxBitmapBundle*> bmps;
         if (node->has_warning_icon())
