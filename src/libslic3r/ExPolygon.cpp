@@ -117,6 +117,26 @@ ExPolygon::has_boundary_point(const Point &point) const
     return false;
 }
 
+// Projection of a point onto the polygon.
+Point ExPolygon::point_projection(const Point &point) const
+{
+    if (this->holes.empty()) {
+        return this->contour.point_projection(point);
+    } else {
+        double dist_min2 = std::numeric_limits<double>::max();
+        Point  closest_pt_min;
+        for (size_t i = 0; i < this->num_contours(); ++ i) {
+            Point closest_pt = this->contour_or_hole(i).point_projection(point);
+            double d2 = (closest_pt - point).cast<double>().squaredNorm();
+            if (d2 < dist_min2) {
+                dist_min2      = d2;
+                closest_pt_min = closest_pt;
+            }
+        }
+        return closest_pt_min;
+    }
+}
+
 bool ExPolygon::overlaps(const ExPolygon &other) const
 {
     #if 0

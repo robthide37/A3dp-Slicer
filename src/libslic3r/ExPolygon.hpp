@@ -53,6 +53,8 @@ public:
     bool contains(const Point &point) const;
     bool contains_b(const Point &point) const;
     bool has_boundary_point(const Point &point) const;
+    // Projection of a point onto the polygon.
+    Point point_projection(const Point &point) const;
 
     // Does this expolygon overlap another expolygon?
     // Either the ExPolygons intersect, or one is fully inside the other,

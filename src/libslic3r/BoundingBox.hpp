@@ -244,6 +244,39 @@ auto cast(const BoundingBox3Base<Tin> &b)
                                           b.max.template cast<Tout>()};
 }
 
+// Distance of a point to a bounding box. Zero inside and on the boundary, positive outside.
+inline double bbox_point_distance(const BoundingBox &bbox, const Point &pt)
+{
+    if (pt.x() < bbox.min.x())
+        return pt.y() < bbox.min.y() ? (bbox.min - pt).cast<double>().norm() :
+               pt.y() > bbox.max.y() ? (Point(bbox.min.x(), bbox.max.y()) - pt).cast<double>().norm() :
+               double(bbox.min.x() - pt.x());
+    else if (pt.x() > bbox.max.x())
+        return pt.y() < bbox.min.y() ? (Point(bbox.max.x(), bbox.min.y()) - pt).cast<double>().norm() :
+               pt.y() > bbox.max.y() ? (bbox.max - pt).cast<double>().norm() :
+               double(pt.x() - bbox.max.x());
+    else
+        return pt.y() < bbox.min.y() ? bbox.min.y() - pt.y() :
+               pt.y() > bbox.max.y() ? pt.y() - bbox.max.y() :
+               coord_t(0);
+}
+
+inline double bbox_point_distance_squared(const BoundingBox &bbox, const Point &pt)
+{
+    if (pt.x() < bbox.min.x())
+        return pt.y() < bbox.min.y() ? (bbox.min - pt).cast<double>().squaredNorm() :
+               pt.y() > bbox.max.y() ? (Point(bbox.min.x(), bbox.max.y()) - pt).cast<double>().squaredNorm() :
+               Slic3r::sqr(double(bbox.min.x() - pt.x()));
+    else if (pt.x() > bbox.max.x())
+        return pt.y() < bbox.min.y() ? (Point(bbox.max.x(), bbox.min.y()) - pt).cast<double>().squaredNorm() :
+               pt.y() > bbox.max.y() ? (bbox.max - pt).cast<double>().squaredNorm() :
+               Slic3r::sqr<double>(pt.x() - bbox.max.x());
+    else
+        return Slic3r::sqr<double>(pt.y() < bbox.min.y() ? bbox.min.y() - pt.y() :
+                                   pt.y() > bbox.max.y() ? pt.y() - bbox.max.y() :
+                                   coord_t(0));
+}
+
 } // namespace Slic3r
 
 // Serialization through the Cereal library

@@ -322,6 +322,92 @@ void export_group_fills_to_svg(const char *path, const std::vector<SurfaceFill> 
 }
 #endif
 
+static void insert_fills_into_islands(Layer &layer, uint32_t fill_region_id, uint32_t fill_begin, uint32_t fill_end)
+{
+	if (fill_begin < fill_end) {
+    	// Sort the extrusion range into its LayerIsland.
+	    // Traverse the slices in an increasing order of bounding box size, so that the islands inside another islands are tested first,
+	    // so we can just test a point inside ExPolygon::contour and we may skip testing the holes.
+	    auto point_inside_surface = [&layer](const size_t lslice_idx, const Point &point) {
+	        const BoundingBox &bbox = layer.lslices_ex[lslice_idx].bbox;
+	        return point.x() >= bbox.min.x() && point.x() < bbox.max.x() &&
+	               point.y() >= bbox.min.y() && point.y() < bbox.max.y() &&
+	               layer.lslices[lslice_idx].contour.contains(point);
+	    };
+	    Point point = layer.get_region(fill_region_id)->fills().entities[fill_begin]->first_point();
+	    int lslice_idx = int(layer.lslices_ex.size()) - 1;
+	    for (; lslice_idx >= 0; -- lslice_idx)
+	        if (point_inside_surface(lslice_idx, point))
+	        	break;
+	    assert(lslice_idx >= 0);
+	    if (lslice_idx >= 0) {
+	    	LayerSlice &lslice = layer.lslices_ex[lslice_idx];
+	    	// Find an island.
+	    	LayerIsland *island = nullptr;
+	    	if (lslice.islands.size() == 1) {
+	    		// Cool, just save the extrusions in there.
+	    		island = &lslice.islands.front();
+	    	} else {
+	    		// The infill was created for one of the infills.
+	    		// In case of ironing, the infill may not fall into any of the infill expolygons either.
+	    		// In case of some numerical error, the infill may not fall into any of the infill expolygons either.
+	    		// 1) Try an exact test, it should be cheaper than a closest region test.
+	    		for (LayerIsland &li : lslice.islands) {
+	    			const BoundingBoxes &bboxes     = li.fill_expolygons_composite() ?
+	    				layer.get_region(li.perimeters.region())->fill_expolygons_composite_bboxes() :
+	    				layer.get_region(li.fill_region_id)->fill_expolygons_bboxes();
+	    			const ExPolygons 	&expolygons = li.fill_expolygons_composite() ? 
+	    				layer.get_region(li.perimeters.region())->fill_expolygons_composite() :
+	    				layer.get_region(li.fill_region_id)->fill_expolygons();
+	    			for (uint32_t fill_expolygon_id : li.fill_expolygons)
+	    				if (bboxes[fill_expolygon_id].contains(point) && expolygons[fill_expolygon_id].contains(point)) {
+	    					island = &li;
+	    					goto found;
+	    				}
+	    		}
+	    		// 2) Find closest fill_expolygon, branch and bound by distance to bounding box.
+				{
+					struct Island {
+						uint32_t island_idx;
+						uint32_t expolygon_idx;
+						double   distance2;
+					};
+	    			std::vector<Island> islands_sorted;
+	    			for (uint32_t island_idx = 0; island_idx < uint32_t(lslice.islands.size()); ++ island_idx) {
+	    				const LayerIsland   &li     = lslice.islands[island_idx];
+	    				const BoundingBoxes &bboxes = li.fill_expolygons_composite() ?
+	    					layer.get_region(li.perimeters.region())->fill_expolygons_composite_bboxes() :
+	    					layer.get_region(li.fill_region_id)->fill_expolygons_bboxes();
+	    				for (uint32_t fill_expolygon_id : li.fill_expolygons)
+							islands_sorted.push_back({ island_idx, fill_expolygon_id, bbox_point_distance_squared(bboxes[fill_expolygon_id], point) });
+	    			}
+	    			std::sort(islands_sorted.begin(), islands_sorted.end(), [](auto &l, auto &r){ return l.distance2 < r.distance2; });
+	    			auto dist_min2 = std::numeric_limits<double>::max();
+	    			for (uint32_t sorted_bbox_idx = 0; sorted_bbox_idx < uint32_t(islands_sorted.size()); ++ sorted_bbox_idx) {
+	    				const Island &isl = islands_sorted[sorted_bbox_idx];
+	    				if (isl.distance2 > dist_min2)
+							// Branch & bound condition.
+	    					break;
+	    				LayerIsland		  &li         = lslice.islands[isl.island_idx];
+	    				const ExPolygons  &expolygons = li.fill_expolygons_composite() ?
+	    					layer.get_region(li.perimeters.region())->fill_expolygons_composite() :
+	    					layer.get_region(li.fill_region_id)->fill_expolygons();
+	    				double d2 = (expolygons[isl.expolygon_idx].point_projection(point) - point).cast<double>().squaredNorm();
+	    				if (d2 < dist_min2) {
+	    					dist_min2 = d2;
+	    					island = &li;
+	    				}
+	    			}
+				}
+	    	found:;
+	    	}
+	    	assert(island);
+	    	if (island)
+				island->fills.push_back(LayerExtrusionRange{ fill_region_id, { fill_begin, fill_end }});
+	    }
+    }
+}
+
 // friend to Layer
 void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree, FillLightning::Generator* lightning_generator)
 {
@@ -382,6 +468,8 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         // Used by the concentric infill pattern to clip the loops to create extrusion paths.
         f->loop_clipping = coord_t(scale_(surface_fill.params.flow.nozzle_diameter()) * LOOP_CLIPPING_LENGTH_OVER_NOZZLE_DIAMETER);
 
+        LayerRegion &layerm = *m_regions[surface_fill.region_id];
+
         // apply half spacing using this flow's own spacing and generate infill
         FillParams params;
         params.density           = float(0.01 * surface_fill.params.density);
@@ -390,7 +478,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         params.anchor_length_max = surface_fill.params.anchor_length_max;
         params.resolution        = resolution;
         params.use_arachne       = perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric;
-        params.layer_height      = m_regions[surface_fill.region_id]->layer()->height;
+        params.layer_height      = layerm.layer()->height;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
 			// Spacing is modified by the filler to indicate adjustments. Reset it for each expolygon.
@@ -421,7 +509,8 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 		        }
 		        // Save into layer.
 				ExtrusionEntityCollection* eec = nullptr;
-		        m_regions[surface_fill.region_id]->m_fills.entities.push_back(eec = new ExtrusionEntityCollection());
+				auto fill_begin = uint32_t(layerm.fills().size());
+		        layerm.m_fills.entities.push_back(eec = new ExtrusionEntityCollection());
 		        // Only concentric fills are not sorted.
 		        eec->no_sort = f->no_sort();
                 if (params.use_arachne) {
@@ -445,10 +534,14 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                         surface_fill.params.extrusion_role,
                         flow_mm3_per_mm, float(flow_width), surface_fill.params.flow.height());
                 }
+                insert_fills_into_islands(*this, uint32_t(surface_fill.region_id), fill_begin, uint32_t(layerm.fills().size()));
 		    }
 		}
     }
 
+    //FIXME Don't copy thin fill extrusions into fills, just use these thin fill extrusions
+    // from the G-code export directly.
+#if 0
     // add thin fill regions
     // Unpacks the collection, creates multiple collections per path.
     // The path type could be ExtrusionPath, ExtrusionLoop or ExtrusionEntityCollection.
@@ -459,6 +552,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 	        layerm->m_fills.entities.push_back(&collection);
 	        collection.entities.push_back(thin_fill->clone());
 	    }
+#endif
 
 #ifndef NDEBUG
 	for (LayerRegion *layerm : m_regions)
@@ -519,7 +613,8 @@ void Layer::make_ironing()
 				   this->angle == rhs.angle;
 		}
 
-		LayerRegion *layerm		= nullptr;
+		LayerRegion *layerm;
+		uint32_t     region_id;
 
 		// IdeaMaker: ironing
 		// ironing flowrate (5% percent)
@@ -539,8 +634,8 @@ void Layer::make_ironing()
 	std::vector<IroningParams> by_extruder;
     double default_layer_height = this->object()->config().layer_height;
 
-	for (LayerRegion *layerm : m_regions)
-		if (! layerm->slices().empty()) {
+	for (uint32_t region_id = 0; region_id < uint32_t(this->regions().size()); ++region_id)
+		if (LayerRegion *layerm = this->get_region(region_id); ! layerm->slices().empty()) {
 			IroningParams ironing_params;
 			const PrintRegionConfig &config = layerm->region().config();
 			if (config.ironing && 
@@ -564,6 +659,7 @@ void Layer::make_ironing()
 				ironing_params.speed 		= config.ironing_speed;
 				ironing_params.angle 		= config.fill_angle * M_PI / 180.;
 				ironing_params.layerm 		= layerm;
+				ironing_params.region_id    = region_id;
 				by_extruder.emplace_back(ironing_params);
 			}
 		}
@@ -659,6 +755,7 @@ void Layer::make_ironing()
 			}
 	        if (! polylines.empty()) {
 		        // Save into layer.
+				auto fill_begin = uint32_t(ironing_params.layerm->fills().size());
 				ExtrusionEntityCollection *eec = nullptr;
 		        ironing_params.layerm->m_fills.entities.push_back(eec = new ExtrusionEntityCollection());
 		        // Don't sort the ironing infill lines as they are monotonicly ordered.
@@ -667,6 +764,7 @@ void Layer::make_ironing()
 		            eec->entities, std::move(polylines),
 		            erIroning,
 		            flow_mm3_per_mm, extrusion_width, float(extrusion_height));
+				insert_fills_into_islands(*this, ironing_params.region_id, fill_begin, uint32_t(ironing_params.layerm->fills().size()));
 		    }
 		}
 

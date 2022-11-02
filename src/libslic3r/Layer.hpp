@@ -32,35 +32,33 @@ namespace FillLightning {
 template<typename T>
 class IndexRange
 {
-private:
-    // Just a bare minimum functionality iterator required by range-for loop.
-    template<typename T>
-    class IteratorType {
-    public:
-        T    operator*() const { return m_idx; }
-        bool operator!=(const IteratorType &rhs) const { return m_idx != rhs.m_idx; }
-        void operator++() { ++ m_idx; }
-    private:
-        friend class IndexRange<T>;
-        IteratorType(T idx) : m_idx(idx) {}
-        T m_idx;
-    };
-    // Index of the first extrusion in LayerRegion.
-    T    m_begin   { 0 };
-    // Index of the last extrusion in LayerRegion.
-    T    m_end     { 0 };
-
 public:
     IndexRange(T ibegin, T iend) : m_begin(ibegin), m_end(iend) {}
     IndexRange() = default;
 
-    using Iterator = IteratorType<T>;
+    // Just a bare minimum functionality iterator required by range-for loop.
+    class Iterator {
+    public:
+        T    operator*() const { return m_idx; }
+        bool operator!=(const Iterator &rhs) const { return m_idx != rhs.m_idx; }
+        void operator++() { ++ m_idx; }
+    private:
+        friend class IndexRange<T>;
+        Iterator(T idx) : m_idx(idx) {}
+        T m_idx;
+    };
 
     Iterator begin()  const { assert(m_begin <= m_end); return Iterator(m_begin); };
     Iterator end()    const { assert(m_begin <= m_end); return Iterator(m_end); };
 
     bool     empty()  const { assert(m_begin <= m_end); return m_begin >= m_end; }
     T        size()   const { assert(m_begin <= m_end); return m_end - m_begin; }
+
+private:
+    // Index of the first extrusion in LayerRegion.
+    T    m_begin   { 0 };
+    // Index of the last extrusion in LayerRegion.
+    T    m_end     { 0 };
 };
 
 using ExtrusionRange = IndexRange<uint32_t>;
@@ -70,7 +68,6 @@ using ExPolygonRange = IndexRange<uint32_t>;
 class LayerExtrusionRange : public ExtrusionRange
 {
 public:
-    LayerExtrusionRange(uint32_t iregion, uint32_t ibegin, uint32_t iend) : m_region(iregion), ExtrusionRange(ibegin, iend) {}
     LayerExtrusionRange(uint32_t iregion, ExtrusionRange extrusion_range) : m_region(iregion), ExtrusionRange(extrusion_range) {}
     LayerExtrusionRange() = default;
 
