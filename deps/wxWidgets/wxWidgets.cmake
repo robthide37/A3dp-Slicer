@@ -38,6 +38,7 @@ prusaslicer_add_cmake_project(wxWidgets
         -DwxUSE_LIBSDL=OFF
         -DwxUSE_XTEST=OFF
         -DwxUSE_GLCANVAS_EGL=OFF
+        -DwxUSE_WEBREQUEST=OFF
 )
 
 if (MSVC)
