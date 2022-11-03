@@ -452,7 +452,8 @@ std::optional<Emboss::Glyph> priv::get_glyph(const stbtt_fontinfo &font_info, in
         std::reverse(pts.begin(), pts.end());
         glyph_polygons.emplace_back(pts);
     }
-    glyph.shape = Emboss::heal_shape(glyph_polygons);
+    if (!glyph_polygons.empty())
+        glyph.shape = Emboss::heal_shape(glyph_polygons);
     return glyph;
 }
 
