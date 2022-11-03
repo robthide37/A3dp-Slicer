@@ -206,7 +206,6 @@ void MeasuringImpl::update_planes()
         PLANE_FAILURE:
             m_planes[plane_id].borders.clear();
     }
-    
 }
 
 
@@ -261,6 +260,7 @@ void MeasuringImpl::extract_features()
             bool circle = false;
             std::vector<SurfaceFeature> circles;
             std::vector<std::pair<size_t, size_t>> circles_idxs;
+            //std::vector<double, int> angle_and_vert_num_per_circle;
             for (int i=1; i<(int)angles.size(); ++i) {
                 if (Slic3r::is_approx(lengths[i], lengths[i-1])
                     && Slic3r::is_approx(angles[i], angles[i-1])
@@ -288,12 +288,24 @@ void MeasuringImpl::extract_features()
                                 // Add the circle and remember indices into borders.                            
                                 circles_idxs.emplace_back(start_idx, i);
                                 circles.emplace_back(SurfaceFeature(SurfaceFeatureType::Circle, center, plane.normal, std::nullopt, radius));
+                                //angle_and_vert_num_per_circle.emplace_back(..., ...);
                             }
                         }
                         circle = false;
                     }
                 }
             }
+/*
+            // At this point we must merge the first and last circles. The dicrimination of too small
+            // circles will follow, so we need a complete picture before that.
+            assert(circles.size() == angle_and_vert_num_per_circle.size());
+            for (size_t i=0; i<circles.size(); ++i) {
+                // TODO
+            }*/
+
+            // Now throw away all circles that consist of too little points or subtend less than 90 deg.
+            // TODO
+
 
             // Some of the "circles" may actually be polygons. We want them detected as
             // edges, but also to remember the center and save it into those edges.
@@ -317,11 +329,6 @@ void MeasuringImpl::extract_features()
                 }
             }
 
-
-
-
-
-
             // We have the circles. Now go around again and pick edges.
             int cidx = 0; // index of next circle in the way
             for (int i=1; i<int(border.size()); ++i) {
@@ -331,10 +338,25 @@ void MeasuringImpl::extract_features()
                     plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge, border[i - 1], border[i]));
             }
 
+            // Merge adjacent edges where needed.
+            assert(std::all_of(plane.surface_features.begin(), plane.surface_features.end(),
+                            [](const SurfaceFeature& f) { return f.get_type() == SurfaceFeatureType::Edge; }));
+            for (int i=plane.surface_features.size()-1; i>=0; --i) {
+                const auto& [first_start, first_end] = plane.surface_features[i==0 ? plane.surface_features.size()-1 : i-1].get_edge();
+                const auto& [second_start, second_end] =   plane.surface_features[i].get_edge();
+
+                if (Slic3r::is_approx(first_end, second_start)
+                    && Slic3r::is_approx((first_end-first_start).normalized().dot((second_end-second_start).normalized()), 1.)) {
+                    // The edges have the same direction and share a point. Merge them.
+                    plane.surface_features[i==0 ? plane.surface_features.size()-1 : i-1] = SurfaceFeature(SurfaceFeatureType::Edge, first_start, second_end);
+                    plane.surface_features.erase(plane.surface_features.begin() + i);
+                }
+            }
+
+            
+
             // FIXME Throw away / do not create edges which are parts of circles or
             // which lead to circle points (unless they belong to the same plane.)
-
-            // FIXME Check and merge first and last circle if needed.
 
             // Now move the circles into the feature list.
             assert(std::all_of(circles.begin(), circles.end(), [](const SurfaceFeature& f) {
