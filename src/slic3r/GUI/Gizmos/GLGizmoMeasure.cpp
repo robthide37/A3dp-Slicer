@@ -1271,13 +1271,6 @@ void GLGizmoMeasure::render_dimensioning()
 
     if (m_selected_features.second.feature.has_value()) {
         const bool has_distance = m_measurement_result.has_distance_data();
-        if (has_distance) {
-            // Render the arrow between the points that the backend passed:
-            const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
-                ? *m_measurement_result.distance_infinite
-                : *m_measurement_result.distance_strict;
-            point_point(dap.from, dap.to, dap.dist);
-        }
 
         const Measure::SurfaceFeature* f1 = &(*m_selected_features.first.feature);
         const Measure::SurfaceFeature* f2 = &(*m_selected_features.second.feature);
@@ -1290,17 +1283,25 @@ void GLGizmoMeasure::render_dimensioning()
             std::swap(f1, f2);
         }
 
-        // Where needed, draw also the extension of the edge to where the dist is measured:
-        if (has_distance && ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
-            point_edge(*f1, *f2);
-
-        // Now if there is an angle to show, draw the arc:
+        // If there is an angle to show, draw the arc:
         if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Edge)
             arc_edge_edge(*f1, *f2);
         else if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Plane)
             arc_edge_plane(*f1, *f2);
         else if (ft1 == Measure::SurfaceFeatureType::Plane && ft2 == Measure::SurfaceFeatureType::Plane)
             arc_plane_plane(*f1, *f2);
+
+        if (has_distance){
+            // Where needed, draw the extension of the edge to where the dist is measured:
+            if (ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
+                point_edge(*f1, *f2);
+
+            // Render the arrow between the points that the backend passed:
+            const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
+                ? *m_measurement_result.distance_infinite
+                : *m_measurement_result.distance_strict;
+            point_point(dap.from, dap.to, dap.dist);
+        }
     }
     
     glsafe(::glEnable(GL_DEPTH_TEST));
