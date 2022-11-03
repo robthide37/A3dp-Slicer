@@ -652,7 +652,6 @@ struct GroundConnection {
 
 template<class Ex>
 GroundConnection find_pillar_route(Ex policy,
-//                                   SupportTreeBuilder &builder,
                                    const SupportableMesh &sm,
                                    const Junction &source,
                                    const Vec3d &sourcedir,
@@ -661,7 +660,6 @@ GroundConnection find_pillar_route(Ex policy,
     GroundConnection ret;
 
     Vec3d  jp           = source.pos, endp = jp, dir = sourcedir;
-//    long   pillar_id    = SupportTreeNode::ID_UNSET;
     bool   can_add_base = false/*, non_head = false*/;
 
     double gndlvl = 0.; // The Z level where pedestals should be
@@ -694,18 +692,13 @@ GroundConnection find_pillar_route(Ex policy,
                                  sm.cfg.head_back_radius_mm);
 
         if (diffbr && diffbr->endp.z() > jp_gnd) {
-//            auto &br = builder.add_diffbridge(*diffbr);
-//            if (head_id >= 0)
-//                builder.head(head_id).bridge_id = br.id;
             ret.path.emplace_back(source);
             endp = diffbr->endp;
             radius = diffbr->end_r;
-//            builder.add_junction(endp, radius);
             ret.path.emplace_back(endp, radius);
-//            non_head = true;
             dir = diffbr->get_dir();
             eval_limits();
-        } else return ret;//return {false, pillar_id};
+        } else return ret;
     }
 
     if (sm.cfg.object_elevation_mm < EPSILON)
@@ -760,28 +753,18 @@ GroundConnection find_pillar_route(Ex policy,
         }
 
         if (t > 0.) { // Need to make additional bridge
-//            const Bridge& br = builder.add_bridge(endp, nexp, radius);
-//            if (head_id >= 0)
-//                builder.head(head_id).bridge_id = br.id;
-
-//            builder.add_junction(nexp, radius);
             ret.path.emplace_back(nexp, radius);
             endp = nexp;
-//            non_head = true;
         }
     }
 
     Vec3d gp = to_floor(endp);
-    double h = endp.z() - gp.z();
 
-//    pillar_id = head_id >= 0 && !non_head ? builder.add_pillar(head_id, h) :
-//                                            builder.add_pillar(gp, h, radius, end_radius);
     ret.end_radius = end_radius;
 
     if (can_add_base) {
-        ret.pillar_base = Pedestal{gp, h, sm.cfg.base_height_mm, sm.cfg.base_radius_mm};
-//        builder.add_pillar_base(pillar_id, sm.cfg.base_height_mm,
-//                                sm.cfg.base_radius_mm);
+        ret.pillar_base =
+            Pedestal{gp, sm.cfg.base_height_mm, sm.cfg.base_radius_mm, end_radius};
     }
 
     return ret; //{true, pillar_id};
@@ -806,7 +789,15 @@ inline long build_ground_connection(SupportTreeBuilder &builder,
     auto gp = conn.path.back().pos;
     gp.z() = ground_level(sm);
     double h = conn.path.back().pos.z() - gp.z();
-    ret = builder.add_pillar(gp, h, conn.path.back().r, conn.end_radius);
+
+// TODO: does not work yet
+//    if (conn.path.back().id < 0) {
+//        // this is a head
+//        long head_id = std::abs(conn.path.back().id);
+//        ret = builder.add_pillar(head_id, h);
+//    } else
+        ret = builder.add_pillar(gp, h, conn.path.back().r, conn.end_radius);
+
     if (conn.pillar_base)
         builder.add_pillar_base(ret, conn.pillar_base->height, conn.pillar_base->r_bottom);
 
@@ -846,19 +837,16 @@ GroundConnection find_ground_connection(
 
     if (std::isinf(tdown)) {
         ret.path.emplace_back(j);
-        if (d > 0) {
-            Vec3d  endp         = hjp + d * dir;
-            double bridge_ratio = d / (d + (endp.z() - sm.emesh.ground_level()));
-            double pill_r = r + bridge_ratio * (end_r - r);
+        Vec3d  endp         = hjp + d * dir;
+        double bridge_ratio = d / (d + (endp.z() - sm.emesh.ground_level()));
+        double pill_r = r + bridge_ratio * (end_r - r);
 
-//            ret.path.emplace_back(endp, pill_r);
-            auto route = find_pillar_route(policy, sm, {endp, pill_r}, dir, end_r);
-            for (auto &j : route.path)
-                ret.path.emplace_back(j);
+        auto route = find_pillar_route(policy, sm, {endp, pill_r}, dir, end_r);
+        for (auto &j : route.path)
+            ret.path.emplace_back(j);
 
-            ret.pillar_base = route.pillar_base;
-            ret.end_radius  = end_r;
-        }
+        ret.pillar_base = route.pillar_base;
+        ret.end_radius  = end_r;
     }
 
     return ret;

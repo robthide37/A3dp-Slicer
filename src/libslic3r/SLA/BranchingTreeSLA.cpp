@@ -26,7 +26,10 @@ class BranchingTreeBuilder: public branchingtree::Builder {
         rtree<PointIndexEl, boost::geometry::index::rstar<16, 4> /* ? */>
             m_pillar_index;
 
-    std::vector<branchingtree::Node> m_pillars;
+    std::vector<branchingtree::Node> m_pillars; // to put an index over them
+
+    // cache succesfull ground connections
+    std::map<size_t, GroundConnection>    m_gnd_connections;
 
     // Scaling of the input value 'widening_factor:<0, 1>' to produce resonable
     // widening behaviour
@@ -182,6 +185,13 @@ public:
     }
 
     bool is_valid() const override { return !m_builder.ctl().stopcondition(); }
+
+
+    void group_pillars()
+    {
+
+    }
+
 };
 
 bool BranchingTreeBuilder::add_bridge(const branchingtree::Node &from,
@@ -251,31 +261,15 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
                                            get_radius(to));
 
             if (conn) {
-                build_ground_connection(m_builder, m_sm, conn);
+//                build_ground_connection(m_builder, m_sm, conn);
                 Junction connlast = conn.path.back();
                 branchingtree::Node n{connlast.pos.cast<float>(), float(connlast.r)};
                 n.left = from.id;
                 m_pillars.emplace_back(n);
                 m_pillar_index.insert({n.pos, m_pillars.size() - 1});
+                m_gnd_connections[m_pillars.size() - 1] = conn;
+
                 ret = true;
-
-//                Vec3d endp = cjunc? cjunc->pos : j.pos;
-//                double R   = cjunc? cjunc->r   : j.r;
-//                Vec3d  dir = cjunc? Vec3d((j.pos - cjunc->pos).normalized()) : DOWN;
-//                auto plr = create_ground_pillar(ex_tbb, m_builder, m_sm, endp, dir, R, get_radius(to));
-
-//                if (plr.second >= 0) {
-//                    m_builder.add_junction(endp, R);
-//                    if (cjunc) {
-//                        m_builder.add_diffbridge(j.pos, endp, j.r, R);
-//                        branchingtree::Node n{cjunc->pos.cast<float>(), float(R)};
-//                        n.left = from.id;
-//                        m_pillars.emplace_back(n);
-//                        m_pillar_index.insert({n.pos, m_pillars.size() - 1});
-//                    }
-
-//                    ret = true;
-//                }
             }
         } else {
             const auto &resnode = m_pillars[result->second];
@@ -380,6 +374,8 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
 
     BranchingTreeBuilder vbuilder{builder, sm, nodes};
     branchingtree::build_tree(nodes, vbuilder);
+
+    vbuilder.group_pillars();
 
     for (size_t id : vbuilder.unroutable_pinheads())
         builder.head(id).invalidate();

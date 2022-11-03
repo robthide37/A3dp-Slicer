@@ -344,15 +344,21 @@ bool DefaultSupportTree::create_ground_pillar(const Junction &hjp,
                                              const Vec3d &sourcedir,
                                              long         head_id)
 {
-    auto [ret, pillar_id] = sla::create_ground_pillar(suptree_ex_policy,
-                                                      m_builder, m_sm, hjp,
-                                                      sourcedir, hjp.r, head_id);
+    long pillar_id = SupportTreeNode::ID_UNSET;
+
+    auto conn = sla::find_pillar_route(suptree_ex_policy, m_sm, hjp, sourcedir, hjp.r);
+    if (conn)
+        pillar_id = build_ground_connection(m_builder, m_sm, conn);
+
+//    auto [ret, pillar_id] = sla::create_ground_pillar(suptree_ex_policy,
+//                                                      m_builder, m_sm, hjp,
+//                                                      sourcedir, hjp.r, head_id);
 
     if (pillar_id >= 0) // Save the pillar endpoint in the spatial index
         m_pillar_index.guarded_insert(m_builder.pillar(pillar_id).endpt,
                                       unsigned(pillar_id));
 
-    return ret;
+    return bool(conn);
 }
 
 void DefaultSupportTree::add_pinheads()
