@@ -87,6 +87,10 @@ void MeasuringImpl::update_planes()
         return (std::abs(a(0) - b(0)) < 0.001 && std::abs(a(1) - b(1)) < 0.001 && std::abs(a(2) - b(2)) < 0.001);
     };
 
+    // First go through all the triangles and fill in m_planes vector. For each "plane"
+    // detected on the model, it will contain list of facets that are part of it.
+    // We will also fill in m_face_to_plane, which contains index into m_planes
+    // for each of the source facets.
     while (1) {
         // Find next unvisited triangle:
         for (; seed_facet_idx < num_of_facets; ++ seed_facet_idx)
@@ -117,20 +121,29 @@ void MeasuringImpl::update_planes()
         m_planes.back().normal = normal_ptr->cast<double>();
         std::sort(m_planes.back().facets.begin(), m_planes.back().facets.end());
     }
-
+    
+    // Check that each facet is part of one of the planes.
     assert(std::none_of(m_face_to_plane.begin(), m_face_to_plane.end(), [](size_t val) { return val == size_t(-1); }));
 
+    // Now we will walk around each of the planes and save vertices which form the border.
     SurfaceMesh sm(m_its);
     for (int plane_id=0; plane_id < int(m_planes.size()); ++plane_id) {
-    //int plane_id = 5; {
         const auto& facets = m_planes[plane_id].facets;
         m_planes[plane_id].borders.clear();
         std::vector<std::array<bool, 3>> visited(facets.size(), {false, false, false});
         
+        
+
         for (int face_id=0; face_id<int(facets.size()); ++face_id) {
             assert(m_face_to_plane[facets[face_id]] == plane_id);
+
             for (int edge_id=0; edge_id<3; ++edge_id) {
-                if (visited[face_id][edge_id] || (int)m_face_to_plane[face_neighbors[facets[face_id]][edge_id]] == plane_id) {
+                // Every facet's edge which has a neighbor from a different plane is
+                // part of an edge that we want to walk around. Skip the others.
+                int neighbor_idx = face_neighbors[facets[face_id]][edge_id];
+                if (neighbor_idx == -1)
+                    goto PLANE_FAILURE;
+                if (visited[face_id][edge_id] || (int)m_face_to_plane[neighbor_idx] == plane_id) {
                     visited[face_id][edge_id] = true;
                     continue;
                 }
@@ -156,14 +169,22 @@ void MeasuringImpl::update_planes()
                 do {
                     const Halfedge_index he_orig = he;
                     he = sm.next_around_target(he);
-                    while ( (int)m_face_to_plane[sm.face(he)] == plane_id && he != he_orig)
+                    if (he.is_invalid())
+                        goto PLANE_FAILURE;
+                    while ( (int)m_face_to_plane[sm.face(he)] == plane_id && he != he_orig) {
                         he = sm.next_around_target(he);
+                        if (he.is_invalid())
+                        goto PLANE_FAILURE;
+                    }
                     he = sm.opposite(he);
+                    if (he.is_invalid())
+                        goto PLANE_FAILURE;
                     
                     Face_index fi = he.face();
                     auto face_it = std::lower_bound(facets.begin(), facets.end(), int(fi));
-                    assert(face_it != facets.end());
-                    assert(*face_it == int(fi));
+                    if (face_it == facets.end() || *face_it != int(fi)) // This indicates a broken mesh.
+                        goto PLANE_FAILURE;
+
                     if (visited[face_it - facets.begin()][he.side()] && he != he_start) {
                         last_border.resize(1);
                         break;
@@ -177,11 +198,12 @@ void MeasuringImpl::update_planes()
                     m_planes[plane_id].borders.pop_back();
             }
         }
-    }
 
-    m_planes.erase(std::remove_if(m_planes.begin(), m_planes.end(),
-                       [](const PlaneData& p) { return p.borders.empty(); }),
-                       m_planes.end());
+        continue; // There was no failure.
+
+        PLANE_FAILURE:
+            m_planes[plane_id].borders.clear();
+    }
 }
 
 
@@ -209,7 +231,8 @@ void MeasuringImpl::extract_features()
         trafo.rotate(q);    
         
         for (const std::vector<Vec3d>& border : plane.borders) {
-            assert(border.size() > 1);
+            if (border.size() <= 1)
+                continue;
             int start_idx = -1;
 
             // First calculate angles at all the vertices.
