@@ -905,7 +905,7 @@ void GLGizmoMeasure::render_dimensioning()
         return;
 
     auto point_point = [this, shader](const Vec3d& v1, const Vec3d& v2, float distance) {
-        if (v1.isApprox(v2))
+        if ((v2 - v2).squaredNorm() < 0.000001)
             return;
 
         const Camera& camera = wxGetApp().plater()->get_camera();

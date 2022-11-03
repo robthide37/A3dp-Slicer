@@ -1060,14 +1060,6 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
         else
             result.angle = angle_plane_plane(f1.get_plane(), f2.get_plane());
     }
-
-    // validation
-    if (result.distance_infinite.has_value() && result.distance_infinite->dist < EPSILON)
-        result.distance_infinite.reset();
-    if (result.distance_strict.has_value() && result.distance_strict->dist < EPSILON)
-        result.distance_strict.reset();
-    if (result.angle.has_value() && std::abs(result.angle->angle) < EPSILON)
-        result.angle.reset();
     
     return result;
 }
