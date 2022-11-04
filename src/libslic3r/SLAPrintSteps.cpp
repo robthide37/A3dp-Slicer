@@ -158,16 +158,22 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
 
 void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
 {
-    MeshBoolean::cgal::CGALMeshPtr cgalptr;
+    // TODO: enable when this works reliably. Currently, perform_csgmesh_booleans
+    // can generate incorrect result despite not throwing any exception.
+//    MeshBoolean::cgal::CGALMeshPtr cgalptr;
 
-    try {
-        cgalptr = csg::perform_csgmesh_booleans(range(po.m_mesh_to_slice));
-    } catch(...) {}
+//    try {
+//        cgalptr = csg::perform_csgmesh_booleans(range(po.m_mesh_to_slice));
+//    } catch(...) {
+//        cgalptr = nullptr;
+//    }
 
-    if (cgalptr) {
-        po.m_preview_meshes[step] = MeshBoolean::cgal::cgal_to_triangle_mesh(*cgalptr);
-    } else
-        po.m_preview_meshes[step] = TriangleMesh{generate_preview_vdb(po, step)};
+//    if (cgalptr) {
+//        po.m_preview_meshes[step] = MeshBoolean::cgal::cgal_to_triangle_mesh(*cgalptr);
+//    } else
+//        po.m_preview_meshes[step] = TriangleMesh{generate_preview_vdb(po, step)};
+
+    po.m_preview_meshes[step] = TriangleMesh{generate_preview_vdb(po, step)};
 
     for (size_t i = size_t(step) + 1; i < slaposCount; ++i)
     {
