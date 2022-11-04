@@ -100,7 +100,7 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
     };
 
 #if ENABLE_RAYCAST_PICKING_DEBUG
-    m_last_hit.reset();
+    const_cast<std::optional<HitResult>*>(&m_last_hit)->reset();
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 
     HitResult ret;
@@ -142,7 +142,7 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
         ret.raycaster_id = decode_id(ret.type, ret.raycaster_id);
 
 #if ENABLE_RAYCAST_PICKING_DEBUG
-    m_last_hit = ret;
+    *const_cast<std::optional<HitResult>*>(&m_last_hit) = ret;
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
     return ret;
 }

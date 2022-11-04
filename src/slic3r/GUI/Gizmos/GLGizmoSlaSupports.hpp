@@ -3,6 +3,7 @@
 
 #include "GLGizmoBase.hpp"
 #include "slic3r/GUI/GLSelectionRectangle.hpp"
+#include "slic3r/GUI/3DScene.hpp"
 
 #include "libslic3r/SLA/SupportPoint.hpp"
 #include "libslic3r/ObjectID.hpp"
@@ -22,7 +23,6 @@ enum class SLAGizmoEventType : unsigned char;
 class GLGizmoSlaSupports : public GLGizmoBase
 {
 private:
-
     bool unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal);
 
     static constexpr float RenderPointScale = 1.f;
@@ -93,11 +93,17 @@ private:
 #else
     void render_points(const Selection& selection, bool picking = false);
 #endif // ENABLE_RAYCAST_PICKING
+    void render_volumes();
     bool unsaved_changes() const;
 #if ENABLE_RAYCAST_PICKING
-    void set_sla_auxiliary_volumes_picking_state(bool state);
-    void update_raycasters_for_picking_transform();
+    void register_point_raycasters_for_picking();
+    void unregister_point_raycasters_for_picking();
+    void register_volume_raycasters_for_picking();
+    void unregister_volume_raycasters_for_picking();
+    void update_point_raycasters_for_picking_transform();
 #endif // ENABLE_RAYCAST_PICKING
+    void update_volumes();
+    void process_mesh(SLAPrintObjectStep step, bool postpone_error_messages = false);
 
     bool m_lock_unique_islands = false;
     bool m_editing_mode = false;            // Is editing mode active?
@@ -113,12 +119,14 @@ private:
 #if ENABLE_RAYCAST_PICKING
     PickingModel m_sphere;
     PickingModel m_cone;
-    std::vector<std::pair<std::shared_ptr<SceneRaycasterItem>, std::shared_ptr<SceneRaycasterItem>>> m_raycasters;
+    std::vector<std::pair<std::shared_ptr<SceneRaycasterItem>, std::shared_ptr<SceneRaycasterItem>>> m_point_raycasters;
+    std::vector<std::shared_ptr<SceneRaycasterItem>> m_volume_raycasters;
 #else
     GLModel m_cone;
     GLModel m_sphere;
 #endif // ENABLE_RAYCAST_PICKING
-    GLModel m_cylinder;
+
+    GLVolumeCollection m_volumes;
 
     // This map holds all translated description texts, so they can be easily referenced during layout calculations
     // etc. When language changes, GUI is recreated and this class constructed again, so the change takes effect.

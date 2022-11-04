@@ -688,8 +688,6 @@ public:
     void set_raycaster_gizmos_on_top(bool value) {
         m_scene_raycaster.set_gizmos_on_top(value);
     }
-
-    const SceneRaycaster & raycaster() const { return m_scene_raycaster; }
 #endif // ENABLE_RAYCAST_PICKING
 
     void set_as_dirty();

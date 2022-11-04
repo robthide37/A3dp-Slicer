@@ -72,6 +72,8 @@ std::pair<bool, std::string> GLShadersManager::init()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview
     valid &= append_shader("gouraud_light", { prefix + "gouraud_light.vs", prefix + "gouraud_light.fs" });
+    // extend "gouraud_light" by adding clipping, used in sla gizmos
+    valid &= append_shader("gouraud_light_clip", { prefix + "gouraud_light_clip.vs", prefix + "gouraud_light_clip.fs" });
     // used to render printbed
     valid &= append_shader("printbed", { prefix + "printbed.vs", prefix + "printbed.fs" });
 #else

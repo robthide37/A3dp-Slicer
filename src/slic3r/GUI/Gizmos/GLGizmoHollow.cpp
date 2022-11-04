@@ -10,6 +10,7 @@
 #include "slic3r/GUI/GUI_ObjectList.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/SLAPrint.hpp"
 
 #include "libslic3r/Model.hpp"
 
@@ -53,14 +54,21 @@ void GLGizmoHollow::data_changed()
             reload_cache();
             m_old_mo_id = mo->id();
         }
-//        if (m_c->hollowed_mesh() && m_c->hollowed_mesh()->get_hollowed_mesh())
-//            m_holes_in_drilled_mesh = mo->sla_drain_holes;
+
+        const SLAPrintObject* po = m_c->selection_info()->print_object();
+        if (po != nullptr && po->get_mesh_to_print().empty())
+            process_mesh(slaposAssembly);
+
+        update_volumes();
+
 #if ENABLE_RAYCAST_PICKING
-        if (m_raycasters.empty())
-            on_register_raycasters_for_picking();
+        if (m_hole_raycasters.empty())
+            register_hole_raycasters_for_picking();
         else
-            update_raycasters_for_picking_transform();
+            update_hole_raycasters_for_picking_transform();
 #endif // ENABLE_RAYCAST_PICKING
+
+        m_c->instances_hider()->set_hide_full_scene(true);
     }
 }
 
@@ -87,16 +95,15 @@ void GLGizmoHollow::on_render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-    if (selection.is_from_single_instance())
 #if ENABLE_RAYCAST_PICKING
-        render_points(selection);
+    render_volumes();
+    render_points(selection);
 #else
-        render_points(selection, false);
+    render_points(selection, false);
 #endif // ENABLE_RAYCAST_PICKING
 
     m_selection_rectangle.render(m_parent);
     m_c->object_clipper()->render_cut();
-    m_c->supports_clipper()->render_cut();
 
     glsafe(::glDisable(GL_BLEND));
 }
@@ -104,27 +111,14 @@ void GLGizmoHollow::on_render()
 #if ENABLE_RAYCAST_PICKING
 void GLGizmoHollow::on_register_raycasters_for_picking()
 {
-    assert(m_raycasters.empty());
-
-    init_cylinder_model();
-
-    set_sla_auxiliary_volumes_picking_state(false);
-
-    const CommonGizmosDataObjects::SelectionInfo* info = m_c->selection_info();
-    if (info != nullptr && !info->model_object()->sla_drain_holes.empty()) {
-        const sla::DrainHoles& drain_holes = info->model_object()->sla_drain_holes;
-        for (int i = 0; i < (int)drain_holes.size(); ++i) {
-            m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_cylinder.mesh_raycaster));
-        }
-        update_raycasters_for_picking_transform();
-    }
+    register_hole_raycasters_for_picking();
+    register_volume_raycasters_for_picking();
 }
 
 void GLGizmoHollow::on_unregister_raycasters_for_picking()
 {
-    m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo);
-    m_raycasters.clear();
-    set_sla_auxiliary_volumes_picking_state(true);
+    unregister_hole_raycasters_for_picking();
+    unregister_volume_raycasters_for_picking();
 }
 #else
 void GLGizmoHollow::on_render_for_picking()
@@ -190,7 +184,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 
 #if ENABLE_RAYCAST_PICKING
         const bool clipped = is_mesh_point_clipped(drain_hole.pos.cast<double>());
-        m_raycasters[i]->set_active(!clipped);
+        m_hole_raycasters[i]->set_active(!clipped);
         if (clipped)
             continue;
 #else
@@ -270,6 +264,25 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
+void GLGizmoHollow::render_volumes()
+{
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_clip");
+    if (shader == nullptr)
+        return;
+
+    shader->start_using();
+    shader->set_uniform("emission_factor", 0.0f);
+    const Camera& camera = wxGetApp().plater()->get_camera();
+
+    ClippingPlane clipping_plane = (m_c->object_clipper()->get_position() == 0.0)  ? ClippingPlane::ClipsNothing() : *m_c->object_clipper()->get_clipping_plane();
+    clipping_plane.set_normal(-clipping_plane.get_normal());
+    m_volumes.set_clipping_plane(clipping_plane.get_data());
+
+    m_volumes.render(GLVolumeCollection::ERenderType::Opaque, false, camera.get_view_matrix(), camera.get_projection_matrix());
+    shader->stop_using();
+
+}
+
 bool GLGizmoHollow::is_mesh_point_clipped(const Vec3d& point) const
 {
     if (m_c->object_clipper()->get_position() == 0.)
@@ -291,48 +304,26 @@ bool GLGizmoHollow::is_mesh_point_clipped(const Vec3d& point) const
 // Return false if no intersection was found, true otherwise.
 bool GLGizmoHollow::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal)
 {
+    if (m_c->raycaster()->raycasters().size() != 1)
+        return false;
     if (! m_c->raycaster()->raycaster())
         return false;
-
-    const Camera& camera = wxGetApp().plater()->get_camera();
-    const Selection& selection = m_parent.get_selection();
-    const GLVolume* volume = selection.get_first_volume();
-    Geometry::Transformation trafo = volume->get_instance_transformation() * volume->get_volume_transformation();
-    trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., m_c->selection_info()->get_sla_shift()));
-
-    double clp_dist = m_c->object_clipper()->get_position();
-    const ClippingPlane* clp = m_c->object_clipper()->get_clipping_plane();
 
     // The raycaster query
     Vec3f hit;
     Vec3f normal;
     if (m_c->raycaster()->raycaster()->unproject_on_mesh(
             mouse_pos,
-            trafo.get_matrix(),
-            camera,
+            m_volumes.volumes.front()->world_matrix(),
+            wxGetApp().plater()->get_camera(),
             hit,
             normal,
-            clp_dist != 0. ? clp : nullptr))
-    {
-//        if (m_c->hollowed_mesh() && m_c->hollowed_mesh()->get_hollowed_mesh()) {
-//            // in this case the raycaster sees the hollowed and drilled mesh.
-//            // if the point lies on the surface created by the hole, we want
-//            // to ignore it.
-//            for (const sla::DrainHole& hole : m_holes_in_drilled_mesh) {
-//                sla::DrainHole outer(hole);
-//                outer.radius *= 1.001f;
-//                outer.height *= 1.001f;
-//                if (outer.is_inside(hit))
-//                    return false;
-//            }
-//        }
-
+            m_c->object_clipper()->get_position() != 0.0 ? m_c->object_clipper()->get_clipping_plane() : nullptr)) {
         // Return both the point and the facet normal.
         pos_and_normal = std::make_pair(hit, normal);
         return true;
     }
-    else
-        return false;
+    return false;
 }
 
 // Following function is called from GLCanvas3D to inform the gizmo about a mouse/keyboard event.
@@ -348,9 +339,8 @@ bool GLGizmoHollow::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_pos
     // left down with shift - show the selection rectangle:
     if (action == SLAGizmoEventType::LeftDown && (shift_down || alt_down || control_down)) {
         if (m_hover_id == -1) {
-            if (shift_down || alt_down) {
+            if (shift_down || alt_down)
                 m_selection_rectangle.start_dragging(mouse_position, shift_down ? GLSelectionRectangle::EState::Select : GLSelectionRectangle::EState::Deselect);
-            }
         }
         else {
             if (m_selected[m_hover_id])
@@ -383,8 +373,8 @@ bool GLGizmoHollow::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_pos
                 m_parent.set_as_dirty();
                 m_wait_for_up_event = true;
 #if ENABLE_RAYCAST_PICKING
-                on_unregister_raycasters_for_picking();
-                on_register_raycasters_for_picking();
+                unregister_hole_raycasters_for_picking();
+                register_hole_raycasters_for_picking();
 #endif // ENABLE_RAYCAST_PICKING
             }
             else
@@ -510,8 +500,8 @@ void GLGizmoHollow::delete_selected_points()
     }
 
 #if ENABLE_RAYCAST_PICKING
-    on_unregister_raycasters_for_picking();
-    on_register_raycasters_for_picking();
+    unregister_hole_raycasters_for_picking();
+    register_hole_raycasters_for_picking();
 #endif // ENABLE_RAYCAST_PICKING
     select_point(NoPoints);
 }
@@ -580,39 +570,61 @@ bool GLGizmoHollow::on_mouse(const wxMouseEvent &mouse_event)
     return false;
 }
 
-void GLGizmoHollow::hollow_mesh(bool postpone_error_messages)
+void GLGizmoHollow::process_mesh(SLAPrintObjectStep step, bool postpone_error_messages)
 {
-    wxGetApp().CallAfter([this, postpone_error_messages]() {
-        wxGetApp().plater()->reslice_SLA_hollowing(
-            *m_c->selection_info()->model_object(), postpone_error_messages);
-    });
+    wxGetApp().CallAfter([this, step, postpone_error_messages]() {
+        wxGetApp().plater()->reslice_SLA_until_step(step, *m_c->selection_info()->model_object(), postpone_error_messages);
+        });
 }
 
 #if ENABLE_RAYCAST_PICKING
-void GLGizmoHollow::set_sla_auxiliary_volumes_picking_state(bool state)
+void GLGizmoHollow::register_hole_raycasters_for_picking()
 {
-    std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = m_parent.get_raycasters_for_picking(SceneRaycaster::EType::Volume);
-    if (raycasters != nullptr) {
-        const Selection& selection = m_parent.get_selection();
-        const Selection::IndicesList ids = selection.get_volume_idxs();
-        for (unsigned int id : ids) {
-            const GLVolume* v = selection.get_volume(id);
-            if (v->is_sla_pad() || v->is_sla_support()) {
-                auto it = std::find_if(raycasters->begin(), raycasters->end(), [v](std::shared_ptr<SceneRaycasterItem> item) { return item->get_raycaster() == v->mesh_raycaster.get(); });
-                if (it != raycasters->end())
-                    (*it)->set_active(state);
-            }
+    assert(m_hole_raycasters.empty());
+
+    init_cylinder_model();
+
+    const CommonGizmosDataObjects::SelectionInfo* info = m_c->selection_info();
+    if (info != nullptr && !info->model_object()->sla_drain_holes.empty()) {
+        const sla::DrainHoles& drain_holes = info->model_object()->sla_drain_holes;
+        for (int i = 0; i < (int)drain_holes.size(); ++i) {
+            m_hole_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_cylinder.mesh_raycaster, Transform3d::Identity()));
         }
+        update_hole_raycasters_for_picking_transform();
     }
 }
 
-void GLGizmoHollow::update_raycasters_for_picking_transform()
+void GLGizmoHollow::unregister_hole_raycasters_for_picking()
+{
+    for (size_t i = 0; i < m_hole_raycasters.size(); ++i) {
+        m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, i);
+    }
+    m_hole_raycasters.clear();
+}
+
+void GLGizmoHollow::register_volume_raycasters_for_picking()
+{
+    for (size_t i = 0; i < m_volumes.volumes.size(); ++i) {
+        const GLVolume* v = m_volumes.volumes[i];
+        m_volume_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, (int)SceneRaycaster::EIdBase::Gizmo + (int)i, *v->mesh_raycaster, v->world_matrix()));
+    }
+}
+
+void GLGizmoHollow::unregister_volume_raycasters_for_picking()
+{
+    for (size_t i = 0; i < m_volume_raycasters.size(); ++i) {
+        m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, (int)SceneRaycaster::EIdBase::Gizmo + (int)i);
+    }
+    m_volume_raycasters.clear();
+}
+
+void GLGizmoHollow::update_hole_raycasters_for_picking_transform()
 {
     const CommonGizmosDataObjects::SelectionInfo* info = m_c->selection_info();
     if (info != nullptr) {
         const sla::DrainHoles& drain_holes = info->model_object()->sla_drain_holes;
         if (!drain_holes.empty()) {
-            assert(!m_raycasters.empty());
+            assert(!m_hole_raycasters.empty());
 
             const GLVolume* vol = m_parent.get_selection().get_first_volume();
             const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_scaling_factor_matrix().inverse();
@@ -625,12 +637,61 @@ void GLGizmoHollow::update_raycasters_for_picking_transform()
                 const Eigen::AngleAxisd aa(q);
                 const Transform3d matrix = vol->world_matrix() * hole_matrix * Transform3d(aa.toRotationMatrix()) *
                     Geometry::translation_transform(-drain_hole.height * Vec3d::UnitZ()) * Geometry::scale_transform(Vec3d(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
-                m_raycasters[i]->set_transform(matrix);
+                m_hole_raycasters[i]->set_transform(matrix);
             }
         }
     }
 }
 #endif // ENABLE_RAYCAST_PICKING
+
+void GLGizmoHollow::update_volumes()
+{
+    m_volumes.clear();
+    unregister_volume_raycasters_for_picking();
+
+    const ModelObject* mo = m_c->selection_info()->model_object();
+    if (mo == nullptr)
+        return;
+
+    const SLAPrintObject* po = m_c->selection_info()->print_object();
+    if (po == nullptr)
+        return;
+
+    TriangleMesh backend_mesh = po->get_mesh_to_print();
+    if (!backend_mesh.empty()) {
+        // The backend has generated a valid mesh. Use it
+        backend_mesh.transform(po->trafo().inverse());
+        m_volumes.volumes.emplace_back(new GLVolume());
+        GLVolume* new_volume = m_volumes.volumes.back();
+        new_volume->model.init_from(backend_mesh);
+        new_volume->set_instance_transformation(po->model_object()->instances[m_parent.get_selection().get_instance_idx()]->get_transformation());
+        new_volume->set_sla_shift_z(po->get_current_elevation());
+        new_volume->selected = true; // to set the proper color
+        new_volume->mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(backend_mesh);
+    }
+
+    if (m_volumes.volumes.empty()) {
+        // No valid mesh found in the backend. Use the selection to duplicate the volumes
+        const Selection& selection = m_parent.get_selection();
+        const Selection::IndicesList& idxs = selection.get_volume_idxs();
+        for (unsigned int idx : idxs) {
+            const GLVolume* v = selection.get_volume(idx);
+            if (!v->is_modifier) {
+                m_volumes.volumes.emplace_back(new GLVolume());
+                GLVolume* new_volume = m_volumes.volumes.back();
+                const TriangleMesh& mesh = mo->volumes[v->volume_idx()]->mesh();
+                new_volume->model.init_from(mesh);
+                new_volume->set_instance_transformation(v->get_instance_transformation());
+                new_volume->set_volume_transformation(v->get_volume_transformation());
+                new_volume->set_sla_shift_z(v->get_sla_shift_z());
+                new_volume->selected = true; // to set the proper color
+                new_volume->mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
+            }
+        }
+    }
+
+    register_volume_raycasters_for_picking();
+}
 
 std::vector<std::pair<const ConfigOption*, const ConfigOptionDef*>>
 GLGizmoHollow::get_config_options(const std::vector<std::string>& keys) const
@@ -724,8 +785,8 @@ RENDER_AGAIN:
     window_width = std::max(window_width, button_preview_width);
 
     if (m_imgui->button(m_desc["preview"]))
-        hollow_mesh();
-    
+        process_mesh(slaposDrillHoles);
+
     bool config_changed = false;
 
     ImGui::Separator();
@@ -896,13 +957,6 @@ RENDER_AGAIN:
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f"))
         m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
 
-    // make sure supports are shown/hidden as appropriate
-    bool show_sups = m_c->instances_hider()->are_supports_shown();
-    if (m_imgui->checkbox(m_desc["show_supports"], show_sups)) {
-        m_c->instances_hider()->show_supports(show_sups);
-        force_refresh = true;
-    }
-
     m_imgui->end();
 
 
@@ -935,7 +989,7 @@ bool GLGizmoHollow::on_is_activable() const
     const Selection& selection = m_parent.get_selection();
 
     if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA
-        || !selection.is_from_single_instance())
+        || !selection.is_single_full_instance())
         return false;
 
     // Check that none of the selected volumes is outside. Only SLA auxiliaries (supports) are allowed outside.
@@ -964,9 +1018,7 @@ CommonGizmosDataID GLGizmoHollow::on_get_requirements() const
                 int(CommonGizmosDataID::SelectionInfo)
               | int(CommonGizmosDataID::InstancesHider)
               | int(CommonGizmosDataID::Raycaster)
-              | int(CommonGizmosDataID::HollowedMesh)
-              | int(CommonGizmosDataID::ObjectClipper)
-              | int(CommonGizmosDataID::SupportsClipper));
+              | int(CommonGizmosDataID::ObjectClipper));
 }
 
 
@@ -975,8 +1027,12 @@ void GLGizmoHollow::on_set_state()
     if (m_state == m_old_state)
         return;
 
-    if (m_state == Off && m_old_state != Off) // the gizmo was just turned Off
+    if (m_state == Off && m_old_state != Off) {
+        // the gizmo was just turned Off
         m_parent.post_event(SimpleEvent(EVT_GLCANVAS_FORCE_UPDATE));
+        m_c->instances_hider()->set_hide_full_scene(false);
+    }
+
     m_old_state = m_state;
 }
 
@@ -1091,6 +1147,9 @@ void GLGizmoHollow::reload_cache()
 
 void GLGizmoHollow::on_set_hover_id()
 {
+    if (m_c->selection_info()->model_object() == nullptr)
+        return;
+
     if (int(m_c->selection_info()->model_object()->sla_drain_holes.size()) <= m_hover_id)
         m_hover_id = -1;
 }

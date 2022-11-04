@@ -63,7 +63,6 @@ enum class CommonGizmosDataID {
     None                 = 0,
     SelectionInfo        = 1 << 0,
     InstancesHider       = 1 << 1,
-    HollowedMesh         = 1 << 2,
     Raycaster            = 1 << 3,
     ObjectClipper        = 1 << 4,
     SupportsClipper      = 1 << 5,
@@ -187,8 +186,7 @@ public:
     CommonGizmosDataID get_dependencies() const override { return CommonGizmosDataID::SelectionInfo; }
 #endif // NDEBUG
 
-    void show_supports(bool show);
-    bool are_supports_shown() const { return m_show_supports; }
+    void set_hide_full_scene(bool hide);
     void render_cut() const;
 
 protected:
@@ -196,39 +194,10 @@ protected:
     void on_release() override;
 
 private:
-    bool m_show_supports = false;
+    bool m_hide_full_scene{ false };
     std::vector<const TriangleMesh*> m_old_meshes;
     std::vector<std::unique_ptr<MeshClipper>> m_clippers;
 };
-
-
-
-//class HollowedMesh : public CommonGizmosDataBase
-//{
-//public:
-//    explicit HollowedMesh(CommonGizmosDataPool* cgdp)
-//        : CommonGizmosDataBase(cgdp) {}
-//#ifndef NDEBUG
-//    CommonGizmosDataID get_dependencies() const override { return CommonGizmosDataID::SelectionInfo; }
-//#endif // NDEBUG
-
-//    const sla::DrainHoles &get_drainholes() const { return m_drainholes; }
-
-//    const TriangleMesh* get_hollowed_mesh() const;
-//    const TriangleMesh* get_hollowed_interior() const;
-
-//protected:
-//    void on_update() override;
-//    void on_release() override;
-
-//private:
-//    std::unique_ptr<TriangleMesh> m_hollowed_mesh_transformed;
-//    std::unique_ptr<TriangleMesh> m_hollowed_interior_transformed;
-//    size_t m_old_hollowing_timestamp = 0;
-//    int m_print_object_idx = -1;
-//    int m_print_objects_count = 0;
-//    sla::DrainHoles m_drainholes;
-//};
 
 
 
@@ -251,6 +220,8 @@ protected:
 private:
     std::vector<std::unique_ptr<MeshRaycaster>> m_raycasters;
     std::vector<const TriangleMesh*> m_old_meshes;
+    // Used to store the sla mesh coming from the backend
+    TriangleMesh m_sla_mesh_cache;
 };
 
 
@@ -285,7 +256,9 @@ protected:
 
 private:
     std::vector<const TriangleMesh*> m_old_meshes;
-    std::vector<std::unique_ptr<MeshClipper>> m_clippers;
+    // Used to store the sla mesh coming from the backend
+    TriangleMesh m_sla_mesh_cache;
+    std::vector<std::pair<std::unique_ptr<MeshClipper>, Geometry::Transformation>> m_clippers;
     std::unique_ptr<ClippingPlane> m_clp;
     double m_clp_ratio = 0.;
     double m_active_inst_bb_radius = 0.;
