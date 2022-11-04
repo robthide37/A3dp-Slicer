@@ -1,8 +1,6 @@
+#include "libslic3r/libslic3r.h"
 // Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoSlaSupports.hpp"
-#include "slic3r/GUI/GLCanvas3D.hpp"
-#include "slic3r/GUI/Camera.hpp"
-#include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 
@@ -12,11 +10,9 @@
 #include <wx/settings.h>
 #include <wx/stattext.h>
 
-#include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/GUI_ObjectSettings.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
-#include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -30,10 +26,8 @@ static const double CONE_HEIGHT = 0.75;
 namespace Slic3r {
 namespace GUI {
 
-static const ColorRGBA DISABLED_COLOR = ColorRGBA::DARK_GRAY();
-
 GLGizmoSlaSupports::GLGizmoSlaSupports(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
-    : GLGizmoBase(parent, icon_filename, sprite_id)
+    : GLGizmoSlaBase(parent, icon_filename, sprite_id, slaposDrillHoles)
 {}
 
 bool GLGizmoSlaSupports::on_init()
@@ -62,16 +56,6 @@ bool GLGizmoSlaSupports::on_init()
     return true;
 }
 
-static int last_completed_step(const SLAPrint& sla)
-{
-    int step = -1;
-    for (int i = 0; i < (int)SLAPrintObjectStep::slaposCount; ++i) {
-        if (sla.is_step_done((SLAPrintObjectStep)i))
-            ++step;
-    }
-    return step;
-}
-
 void GLGizmoSlaSupports::data_changed()
 {
     if (! m_c->selection_info())
@@ -89,8 +73,9 @@ void GLGizmoSlaSupports::data_changed()
     if (mo) {
         m_c->instances_hider()->set_hide_full_scene(true);
         const SLAPrintObject* po = m_c->selection_info()->print_object();
-        if (po != nullptr && last_completed_step(*po->print()) < (int)slaposDrillHoles)
-            process_mesh(slaposDrillHoles, false);
+        const int required_step = get_min_sla_print_object_step();
+        if (po != nullptr && last_completed_step(*po->print()) < required_step)
+            reslice_until_step((SLAPrintObjectStep)required_step, false);
 
         update_volumes();
 
@@ -380,24 +365,6 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-void GLGizmoSlaSupports::render_volumes()
-{
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_clip");
-    if (shader == nullptr)
-        return;
-
-    shader->start_using();
-    shader->set_uniform("emission_factor", 0.0f);
-    const Camera& camera = wxGetApp().plater()->get_camera();
-
-    ClippingPlane clipping_plane = (m_c->object_clipper()->get_position() == 0.0) ? ClippingPlane::ClipsNothing() : *m_c->object_clipper()->get_clipping_plane();
-    clipping_plane.set_normal(-clipping_plane.get_normal());
-    m_volumes.set_clipping_plane(clipping_plane.get_data());
-
-    m_volumes.render(GLVolumeCollection::ERenderType::Opaque, false, camera.get_view_matrix(), camera.get_projection_matrix());
-    shader->stop_using();
-}
-
 bool GLGizmoSlaSupports::is_mesh_point_clipped(const Vec3d& point) const
 {
     if (m_c->object_clipper()->get_position() == 0.)
@@ -411,33 +378,6 @@ bool GLGizmoSlaSupports::is_mesh_point_clipped(const Vec3d& point) const
     Vec3d transformed_point =  trafo * point;
     transformed_point(2) += sel_info->get_sla_shift();
     return m_c->object_clipper()->get_clipping_plane()->is_point_clipped(transformed_point);
-}
-
-
-
-// Unprojects the mouse position on the mesh and saves hit point and normal of the facet into pos_and_normal
-// Return false if no intersection was found, true otherwise.
-bool GLGizmoSlaSupports::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal)
-{
-    if (!m_c->raycaster()->raycaster())
-        return false;
-
-    // The raycaster query
-    Vec3f hit;
-    Vec3f normal;
-    if (m_c->raycaster()->raycaster()->unproject_on_mesh(
-            mouse_pos,
-            m_volumes.volumes.front()->world_matrix(),
-            wxGetApp().plater()->get_camera(),
-            hit,
-            normal,
-            m_c->object_clipper()->get_position() != 0.0 ? m_c->object_clipper()->get_clipping_plane() : nullptr)) { 
-        // Return both the point and the facet normal.
-        pos_and_normal = std::make_pair(hit, normal);
-        return true;
-    }
-
-    return false;
 }
 
 // Following function is called from GLCanvas3D to inform the gizmo about a mouse/keyboard event.
@@ -842,7 +782,7 @@ RENDER_AGAIN:
         }
     }
     else { // not in editing mode:
-        m_imgui->disabled_begin(!m_input_enabled);
+        m_imgui->disabled_begin(!is_input_enabled());
 
         ImGui::AlignTextToFramePadding();
         m_imgui->text(m_desc.at("minimal_distance"));
@@ -895,7 +835,7 @@ RENDER_AGAIN:
 
         m_imgui->disabled_end();
 
-        m_imgui->disabled_begin(!m_input_enabled || m_normal_cache.empty());
+        m_imgui->disabled_begin(!is_input_enabled() || m_normal_cache.empty());
         remove_all = m_imgui->button(m_desc.at("remove_all"));
         m_imgui->disabled_end();
 
@@ -908,7 +848,7 @@ RENDER_AGAIN:
 
 
     // Following is rendered in both editing and non-editing mode:
-    m_imgui->disabled_begin(!m_input_enabled);
+    m_imgui->disabled_begin(!is_input_enabled());
     ImGui::Separator();
     if (m_c->object_clipper()->get_position() == 0.f) {
         ImGui::AlignTextToFramePadding();
@@ -990,17 +930,6 @@ std::string GLGizmoSlaSupports::on_get_name() const
 {
     return _u8L("SLA Support Points");
 }
-
-CommonGizmosDataID GLGizmoSlaSupports::on_get_requirements() const
-{
-    return CommonGizmosDataID(
-                int(CommonGizmosDataID::SelectionInfo)
-              | int(CommonGizmosDataID::InstancesHider)
-              | int(CommonGizmosDataID::Raycaster)
-              | int(CommonGizmosDataID::ObjectClipper));
-}
-
-
 
 void GLGizmoSlaSupports::ask_about_changes_call_after(std::function<void()> on_yes, std::function<void()> on_no)
 {
@@ -1189,7 +1118,7 @@ void GLGizmoSlaSupports::editing_mode_apply_changes()
         mo->sla_support_points.clear();
         mo->sla_support_points = m_normal_cache;
 
-        reslice_SLA_supports();
+        reslice_until_step(slaposPad);
     }
 }
 
@@ -1221,17 +1150,9 @@ bool GLGizmoSlaSupports::has_backend_supports() const
     return false;
 }
 
-void GLGizmoSlaSupports::reslice_SLA_supports(bool postpone_error_messages) const
-{
-    wxGetApp().CallAfter([this, postpone_error_messages]() {
-        wxGetApp().plater()->reslice_SLA_supports(
-            *m_c->selection_info()->model_object(), postpone_error_messages);
-    });
-}
-
 bool GLGizmoSlaSupports::on_mouse(const wxMouseEvent &mouse_event)
 {
-    if (!m_input_enabled) return true;
+    if (!is_input_enabled()) return true;
     if (mouse_event.Moving()) return false;
     if (!mouse_event.ShiftDown() && !mouse_event.AltDown() 
         && use_grabbers(mouse_event)) return true;
@@ -1324,7 +1245,7 @@ void GLGizmoSlaSupports::auto_generate()
 
     if (mo->sla_points_status != sla::PointsStatus::UserModified || m_normal_cache.empty() || dlg.ShowModal() == wxID_YES) {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Autogenerate support points"));
-        wxGetApp().CallAfter([this]() { reslice_SLA_supports(); });
+        wxGetApp().CallAfter([this]() { reslice_until_step(slaposPad); });
         mo->sla_points_status = sla::PointsStatus::Generating;
     }
 }
@@ -1395,22 +1316,6 @@ void GLGizmoSlaSupports::unregister_point_raycasters_for_picking()
     m_point_raycasters.clear();
 }
 
-void GLGizmoSlaSupports::register_volume_raycasters_for_picking()
-{
-    for (size_t i = 0; i < m_volumes.volumes.size(); ++i) {
-        const GLVolume* v = m_volumes.volumes[i];
-        m_volume_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, (int)SceneRaycaster::EIdBase::Gizmo + (int)i, *v->mesh_raycaster, v->world_matrix()));
-    }
-}
-
-void GLGizmoSlaSupports::unregister_volume_raycasters_for_picking()
-{
-    for (size_t i = 0; i < m_volume_raycasters.size(); ++i) {
-        m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, (int)SceneRaycaster::EIdBase::Gizmo + (int)i);
-    }
-    m_volume_raycasters.clear();
-}
-
 void GLGizmoSlaSupports::update_point_raycasters_for_picking_transform()
 {
     if (m_editing_cache.empty())
@@ -1441,68 +1346,6 @@ void GLGizmoSlaSupports::update_point_raycasters_for_picking_transform()
     }
 }
 #endif // ENABLE_RAYCAST_PICKING
-
-void GLGizmoSlaSupports::update_volumes()
-{
-    m_volumes.clear();
-    unregister_volume_raycasters_for_picking();
-
-    const ModelObject* mo = m_c->selection_info()->model_object();
-    if (mo == nullptr)
-        return;
-
-    const SLAPrintObject* po = m_c->selection_info()->print_object();
-    if (po == nullptr)
-        return;
-
-    m_input_enabled = false;
-
-    TriangleMesh backend_mesh = po->get_mesh_to_print();
-    if (!backend_mesh.empty()) {
-        // The backend has generated a valid mesh. Use it
-        backend_mesh.transform(po->trafo().inverse());
-        m_volumes.volumes.emplace_back(new GLVolume());
-        GLVolume* new_volume = m_volumes.volumes.back();
-        new_volume->model.init_from(backend_mesh);
-        new_volume->set_instance_transformation(po->model_object()->instances[m_parent.get_selection().get_instance_idx()]->get_transformation());
-        new_volume->set_sla_shift_z(po->get_current_elevation());
-        new_volume->mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(backend_mesh);
-        m_input_enabled = last_completed_step(*m_c->selection_info()->print_object()->print()) >= slaposDrillHoles;
-        if (m_input_enabled)
-            new_volume->selected = true; // to set the proper color
-        else
-            new_volume->set_color(DISABLED_COLOR);
-    }
-
-    if (m_volumes.volumes.empty()) {
-        // No valid mesh found in the backend. Use the selection to duplicate the volumes
-        const Selection& selection = m_parent.get_selection();
-        const Selection::IndicesList& idxs = selection.get_volume_idxs();
-        for (unsigned int idx : idxs) {
-            const GLVolume* v = selection.get_volume(idx);
-            if (!v->is_modifier) {
-                m_volumes.volumes.emplace_back(new GLVolume());
-                GLVolume* new_volume = m_volumes.volumes.back();
-                const TriangleMesh& mesh = mo->volumes[v->volume_idx()]->mesh();
-                new_volume->model.init_from(mesh);
-                new_volume->set_instance_transformation(v->get_instance_transformation());
-                new_volume->set_volume_transformation(v->get_volume_transformation());
-                new_volume->set_sla_shift_z(v->get_sla_shift_z());
-                new_volume->set_color(DISABLED_COLOR);
-                new_volume->mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
-            }
-        }
-    }
-
-    register_volume_raycasters_for_picking();
-}
-
-void GLGizmoSlaSupports::process_mesh(SLAPrintObjectStep step, bool postpone_error_messages)
-{
-    wxGetApp().CallAfter([this, step, postpone_error_messages]() {
-        wxGetApp().plater()->reslice_SLA_until_step(step, *m_c->selection_info()->model_object(), postpone_error_messages);
-        });
-}
 
 SlaGizmoHelpDialog::SlaGizmoHelpDialog()
 : wxDialog(nullptr, wxID_ANY, _L("SLA gizmo keyboard shortcuts"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER)

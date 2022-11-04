@@ -1,9 +1,8 @@
 #ifndef slic3r_GLGizmoSlaSupports_hpp_
 #define slic3r_GLGizmoSlaSupports_hpp_
 
-#include "GLGizmoBase.hpp"
+#include "GLGizmoSlaBase.hpp"
 #include "slic3r/GUI/GLSelectionRectangle.hpp"
-#include "slic3r/GUI/3DScene.hpp"
 
 #include "libslic3r/SLA/SupportPoint.hpp"
 #include "libslic3r/ObjectID.hpp"
@@ -20,11 +19,9 @@ namespace GUI {
 class Selection;
 enum class SLAGizmoEventType : unsigned char;
 
-class GLGizmoSlaSupports : public GLGizmoBase
+class GLGizmoSlaSupports : public GLGizmoSlaBase
 {
 private:
-    bool unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal);
-
     static constexpr float RenderPointScale = 1.f;
 
     class CacheEntry {
@@ -65,7 +62,6 @@ public:
     bool is_in_editing_mode() const override { return m_editing_mode; }
     bool is_selection_rectangle_dragging() const  override { return m_selection_rectangle.is_dragging(); }
     bool has_backend_supports() const;
-    void reslice_SLA_supports(bool postpone_error_messages = false) const;
 
     bool wants_enter_leave_snapshots() const override { return true; }
     std::string get_gizmo_entering_text() const override { return _u8L("Entering SLA support points"); }
@@ -93,17 +89,12 @@ private:
 #else
     void render_points(const Selection& selection, bool picking = false);
 #endif // ENABLE_RAYCAST_PICKING
-    void render_volumes();
     bool unsaved_changes() const;
 #if ENABLE_RAYCAST_PICKING
     void register_point_raycasters_for_picking();
     void unregister_point_raycasters_for_picking();
-    void register_volume_raycasters_for_picking();
-    void unregister_volume_raycasters_for_picking();
     void update_point_raycasters_for_picking_transform();
 #endif // ENABLE_RAYCAST_PICKING
-    void update_volumes();
-    void process_mesh(SLAPrintObjectStep step, bool postpone_error_messages = false);
 
     bool m_lock_unique_islands = false;
     bool m_editing_mode = false;            // Is editing mode active?
@@ -120,14 +111,10 @@ private:
     PickingModel m_sphere;
     PickingModel m_cone;
     std::vector<std::pair<std::shared_ptr<SceneRaycasterItem>, std::shared_ptr<SceneRaycasterItem>>> m_point_raycasters;
-    std::vector<std::shared_ptr<SceneRaycasterItem>> m_volume_raycasters;
 #else
     GLModel m_cone;
     GLModel m_sphere;
 #endif // ENABLE_RAYCAST_PICKING
-
-    GLVolumeCollection m_volumes;
-    bool m_input_enabled{ false };
 
     // This map holds all translated description texts, so they can be easily referenced during layout calculations
     // etc. When language changes, GUI is recreated and this class constructed again, so the change takes effect.
@@ -174,7 +161,6 @@ protected:
     std::string on_get_name() const override;
     bool on_is_activable() const override;
     bool on_is_selectable() const override;
-    virtual CommonGizmosDataID on_get_requirements() const override;
     void on_load(cereal::BinaryInputArchive& ar) override;
     void on_save(cereal::BinaryOutputArchive& ar) const override;
 };

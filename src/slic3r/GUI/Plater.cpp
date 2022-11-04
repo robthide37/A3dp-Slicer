@@ -6370,16 +6370,6 @@ void Plater::reslice()
     p->preview->reload_print(!clean_gcode_toolpaths);
 }
 
-void Plater::reslice_SLA_supports(const ModelObject &object, bool postpone_error_messages)
-{
-    reslice_SLA_until_step(slaposPad, object, postpone_error_messages);
-}
-
-void Plater::reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages)
-{
-    reslice_SLA_until_step(slaposDrillHoles, object, postpone_error_messages);
-}
-
 void Plater::reslice_until_step_inner(int step, const ModelObject &object, bool postpone_error_messages)
 {
     //FIXME Don't reslice if export of G-code or sending to OctoPrint is running.

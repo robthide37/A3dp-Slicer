@@ -683,7 +683,7 @@ void GLGizmosManager::update_after_undo_redo(const UndoRedo::Snapshot& snapshot)
     m_serializing = false;
     if (m_current == SlaSupports
      && snapshot.snapshot_data.flags & UndoRedo::SnapshotData::RECALCULATE_SLA_SUPPORTS)
-        dynamic_cast<GLGizmoSlaSupports*>(m_gizmos[SlaSupports].get())->reslice_SLA_supports(true);
+        dynamic_cast<GLGizmoSlaSupports*>(m_gizmos[SlaSupports].get())->reslice_until_step(slaposPad, true);
 }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
