@@ -282,7 +282,11 @@ void hollow_mesh(TriangleMesh &mesh, const Interior &interior, int flags)
     if (flags & hfRemoveInsideTriangles && interior.gridptr)
         remove_inside_triangles(mesh, interior);
 
-    mesh.merge(TriangleMesh{interior.mesh});
+    indexed_triangle_set interi = interior.mesh;
+    sla::swap_normals(interi);
+    TriangleMesh inter{std::move(interi)};
+
+    mesh.merge(inter);
 }
 
 // Get the distance of p to the interior's zero iso_surface. Interior should
