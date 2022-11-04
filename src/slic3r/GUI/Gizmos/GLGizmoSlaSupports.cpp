@@ -30,6 +30,8 @@ static const double CONE_HEIGHT = 0.75;
 namespace Slic3r {
 namespace GUI {
 
+static const ColorRGBA DISABLED_COLOR = ColorRGBA::DARK_GRAY();
+
 GLGizmoSlaSupports::GLGizmoSlaSupports(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {}
@@ -748,8 +750,7 @@ RENDER_AGAIN:
     float win_h = ImGui::GetWindowHeight();
     y = std::min(y, bottom_limit - win_h);
     ImGui::SetWindowPos(ImVec2(x, y), ImGuiCond_Always);
-    if ((last_h != win_h) || (last_y != y))
-    {
+    if (last_h != win_h || last_y != y) {
         // ask canvas for another frame to render the window in the correct position
         m_imgui->set_requires_extra_frame();
         if (last_h != win_h)
@@ -780,6 +781,7 @@ RENDER_AGAIN:
         if (m_new_point_head_diameter > diameter_upper_cap)
             m_new_point_head_diameter = diameter_upper_cap;
         ImGui::AlignTextToFramePadding();
+
         m_imgui->text(m_desc.at("head_diameter"));
         ImGui::SameLine(diameter_slider_left);
         ImGui::PushItemWidth(window_width - diameter_slider_left);
@@ -840,6 +842,8 @@ RENDER_AGAIN:
         }
     }
     else { // not in editing mode:
+        m_imgui->disabled_begin(!m_input_enabled);
+
         ImGui::AlignTextToFramePadding();
         m_imgui->text(m_desc.at("minimal_distance"));
         ImGui::SameLine(settings_sliders_left);
@@ -889,7 +893,9 @@ RENDER_AGAIN:
         if (m_imgui->button(m_desc.at("manual_editing")))
             switch_to_editing_mode();
 
-        m_imgui->disabled_begin(m_normal_cache.empty());
+        m_imgui->disabled_end();
+
+        m_imgui->disabled_begin(!m_input_enabled || m_normal_cache.empty());
         remove_all = m_imgui->button(m_desc.at("remove_all"));
         m_imgui->disabled_end();
 
@@ -902,6 +908,7 @@ RENDER_AGAIN:
 
 
     // Following is rendered in both editing and non-editing mode:
+    m_imgui->disabled_begin(!m_input_enabled);
     ImGui::Separator();
     if (m_c->object_clipper()->get_position() == 0.f) {
         ImGui::AlignTextToFramePadding();
@@ -921,13 +928,14 @@ RENDER_AGAIN:
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f"))
         m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
 
-
     if (m_imgui->button("?")) {
         wxGetApp().CallAfter([]() {
             SlaGizmoHelpDialog help_dlg;
             help_dlg.ShowModal();
         });
     }
+
+    m_imgui->disabled_end();
 
     m_imgui->end();
 
@@ -1221,7 +1229,9 @@ void GLGizmoSlaSupports::reslice_SLA_supports(bool postpone_error_messages) cons
     });
 }
 
-bool GLGizmoSlaSupports::on_mouse(const wxMouseEvent &mouse_event){
+bool GLGizmoSlaSupports::on_mouse(const wxMouseEvent &mouse_event)
+{
+    if (!m_input_enabled) return true;
     if (mouse_event.Moving()) return false;
     if (!mouse_event.ShiftDown() && !mouse_event.AltDown() 
         && use_grabbers(mouse_event)) return true;
@@ -1445,6 +1455,8 @@ void GLGizmoSlaSupports::update_volumes()
     if (po == nullptr)
         return;
 
+    m_input_enabled = false;
+
     TriangleMesh backend_mesh = po->get_mesh_to_print();
     if (!backend_mesh.empty()) {
         // The backend has generated a valid mesh. Use it
@@ -1454,8 +1466,12 @@ void GLGizmoSlaSupports::update_volumes()
         new_volume->model.init_from(backend_mesh);
         new_volume->set_instance_transformation(po->model_object()->instances[m_parent.get_selection().get_instance_idx()]->get_transformation());
         new_volume->set_sla_shift_z(po->get_current_elevation());
-        new_volume->selected = true; // to set the proper color
         new_volume->mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(backend_mesh);
+        m_input_enabled = last_completed_step(*m_c->selection_info()->print_object()->print()) >= slaposDrillHoles;
+        if (m_input_enabled)
+            new_volume->selected = true; // to set the proper color
+        else
+            new_volume->set_color(DISABLED_COLOR);
     }
 
     if (m_volumes.volumes.empty()) {
@@ -1472,7 +1488,7 @@ void GLGizmoSlaSupports::update_volumes()
                 new_volume->set_instance_transformation(v->get_instance_transformation());
                 new_volume->set_volume_transformation(v->get_volume_transformation());
                 new_volume->set_sla_shift_z(v->get_sla_shift_z());
-                new_volume->selected = true; // to set the proper color
+                new_volume->set_color(DISABLED_COLOR);
                 new_volume->mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
             }
         }

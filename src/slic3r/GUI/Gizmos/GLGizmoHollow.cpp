@@ -14,9 +14,10 @@
 
 #include "libslic3r/Model.hpp"
 
-
 namespace Slic3r {
 namespace GUI {
+
+static const ColorRGBA DISABLED_COLOR = ColorRGBA::DARK_GRAY();
 
 GLGizmoHollow::GLGizmoHollow(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
@@ -508,6 +509,7 @@ void GLGizmoHollow::delete_selected_points()
 
 bool GLGizmoHollow::on_mouse(const wxMouseEvent &mouse_event)
 {
+    if (!m_input_enabled) return true;
     if (mouse_event.Moving()) return false;
     if (use_grabbers(mouse_event)) return true;
 
@@ -644,6 +646,16 @@ void GLGizmoHollow::update_hole_raycasters_for_picking_transform()
 }
 #endif // ENABLE_RAYCAST_PICKING
 
+static int last_completed_step(const SLAPrint& sla)
+{
+    int step = -1;
+    for (int i = 0; i < (int)SLAPrintObjectStep::slaposCount; ++i) {
+        if (sla.is_step_done((SLAPrintObjectStep)i))
+            ++step;
+    }
+    return step;
+}
+
 void GLGizmoHollow::update_volumes()
 {
     m_volumes.clear();
@@ -657,6 +669,8 @@ void GLGizmoHollow::update_volumes()
     if (po == nullptr)
         return;
 
+    m_input_enabled = false;
+
     TriangleMesh backend_mesh = po->get_mesh_to_print();
     if (!backend_mesh.empty()) {
         // The backend has generated a valid mesh. Use it
@@ -666,8 +680,12 @@ void GLGizmoHollow::update_volumes()
         new_volume->model.init_from(backend_mesh);
         new_volume->set_instance_transformation(po->model_object()->instances[m_parent.get_selection().get_instance_idx()]->get_transformation());
         new_volume->set_sla_shift_z(po->get_current_elevation());
-        new_volume->selected = true; // to set the proper color
         new_volume->mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(backend_mesh);
+        m_input_enabled = last_completed_step(*m_c->selection_info()->print_object()->print()) >= slaposAssembly;
+        if (m_input_enabled)
+            new_volume->selected = true; // to set the proper color
+        else
+            new_volume->set_color(DISABLED_COLOR);
     }
 
     if (m_volumes.volumes.empty()) {
@@ -684,7 +702,7 @@ void GLGizmoHollow::update_volumes()
                 new_volume->set_instance_transformation(v->get_instance_transformation());
                 new_volume->set_volume_transformation(v->get_volume_transformation());
                 new_volume->set_sla_shift_z(v->get_sla_shift_z());
-                new_volume->selected = true; // to set the proper color
+                new_volume->set_color(DISABLED_COLOR);
                 new_volume->mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
             }
         }
@@ -784,6 +802,8 @@ RENDER_AGAIN:
     float window_width = minimal_slider_width + std::max({settings_sliders_left, clipping_slider_left, diameter_slider_left});
     window_width = std::max(window_width, button_preview_width);
 
+    m_imgui->disabled_begin(!m_input_enabled);
+
     if (m_imgui->button(m_desc["preview"]))
         process_mesh(slaposDrillHoles);
 
@@ -801,7 +821,10 @@ RENDER_AGAIN:
         }
     }
 
-    m_imgui->disabled_begin(! m_enable_hollowing);
+    m_imgui->disabled_end();
+
+    m_imgui->disabled_begin(!m_input_enabled || !m_enable_hollowing);
+
     ImGui::AlignTextToFramePadding();
     m_imgui->text(m_desc.at("offset"));
     ImGui::SameLine(settings_sliders_left, m_imgui->get_item_spacing().x);
@@ -844,7 +867,7 @@ RENDER_AGAIN:
             mo->config.set("hollowing_min_thickness", m_offset_stash);
             mo->config.set("hollowing_quality", m_quality_stash);
             mo->config.set("hollowing_closing_distance", m_closing_d_stash);
-            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _(L("Hollowing parameter change")));
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Hollowing parameter change"));
         }
         mo->config.set("hollowing_min_thickness", offset);
         mo->config.set("hollowing_quality", quality);
@@ -867,12 +890,15 @@ RENDER_AGAIN:
     if (m_new_hole_radius * 2.f > diameter_upper_cap)
         m_new_hole_radius = diameter_upper_cap / 2.f;
     ImGui::AlignTextToFramePadding();
+
+    m_imgui->disabled_begin(!m_input_enabled);
+
     m_imgui->text(m_desc.at("hole_diameter"));
     ImGui::SameLine(diameter_slider_left, m_imgui->get_item_spacing().x);
     ImGui::PushItemWidth(window_width - diameter_slider_left);
-
     float diam = 2.f * m_new_hole_radius;
     m_imgui->slider_float("##hole_diameter", &diam, 1.f, 25.f, "%.1f mm", 1.f, false);
+
     // Let's clamp the value (which could have been entered by keyboard) to a larger range
     // than the slider. This allows entering off-scale values and still protects against
     //complete non-sense.
@@ -883,9 +909,13 @@ RENDER_AGAIN:
     bool deactivated = m_imgui->get_last_slider_status().deactivated_after_edit;
 
     ImGui::AlignTextToFramePadding();
+
     m_imgui->text(m_desc["hole_depth"]);
     ImGui::SameLine(diameter_slider_left, m_imgui->get_item_spacing().x);
     m_imgui->slider_float("##hole_depth", &m_new_hole_height, 0.f, 10.f, "%.1f mm", 1.f, false);
+
+    m_imgui->disabled_end();
+
     // Same as above:
     m_new_hole_height = std::clamp(m_new_hole_height, 0.f, 100.f);
 
@@ -921,24 +951,24 @@ RENDER_AGAIN:
                     break;
                 }
             }
-            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _(L("Change drainage hole diameter")));
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Change drainage hole diameter"));
             m_new_hole_radius = backup_rad;
             m_new_hole_height = backup_hei;
             mo->sla_drain_holes = new_holes;
         }
     }
 
-    m_imgui->disabled_begin(m_selection_empty);
+    m_imgui->disabled_begin(!m_input_enabled || m_selection_empty);
     remove_selected = m_imgui->button(m_desc.at("remove_selected"));
     m_imgui->disabled_end();
 
-    m_imgui->disabled_begin(mo->sla_drain_holes.empty());
+    m_imgui->disabled_begin(!m_input_enabled || mo->sla_drain_holes.empty());
     remove_all = m_imgui->button(m_desc.at("remove_all"));
     m_imgui->disabled_end();
 
     // Following is rendered in both editing and non-editing mode:
-   // m_imgui->text("");
     ImGui::Separator();
+    m_imgui->disabled_begin(!m_input_enabled);
     if (m_c->object_clipper()->get_position() == 0.f) {
         ImGui::AlignTextToFramePadding();
         m_imgui->text(m_desc.at("clipping_of_view"));
@@ -956,6 +986,8 @@ RENDER_AGAIN:
     float clp_dist = m_c->object_clipper()->get_position();
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f"))
         m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
+
+    m_imgui->disabled_end();
 
     m_imgui->end();
 

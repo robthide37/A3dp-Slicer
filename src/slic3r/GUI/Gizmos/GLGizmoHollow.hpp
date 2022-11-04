@@ -81,6 +81,7 @@ private:
 #endif // ENABLE_RAYCAST_PICKING
 
     GLVolumeCollection m_volumes;
+    bool m_input_enabled{ false };
 
     float m_new_hole_radius = 2.f;        // Size of a new hole.
     float m_new_hole_height = 6.f;

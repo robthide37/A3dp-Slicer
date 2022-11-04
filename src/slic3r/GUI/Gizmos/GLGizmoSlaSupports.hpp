@@ -127,6 +127,7 @@ private:
 #endif // ENABLE_RAYCAST_PICKING
 
     GLVolumeCollection m_volumes;
+    bool m_input_enabled{ false };
 
     // This map holds all translated description texts, so they can be easily referenced during layout calculations
     // etc. When language changes, GUI is recreated and this class constructed again, so the change takes effect.
@@ -161,8 +162,7 @@ private:
 
 protected:
     void on_set_state() override;
-    void on_set_hover_id() override
-    {
+    void on_set_hover_id() override {
         if (! m_editing_mode || (int)m_editing_cache.size() <= m_hover_id)
             m_hover_id = -1;
     }
