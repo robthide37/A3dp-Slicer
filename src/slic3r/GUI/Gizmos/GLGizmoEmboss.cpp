@@ -1226,58 +1226,13 @@ void GLGizmoEmboss::draw_text_input()
     }
 }
 
-/// <summary>
-/// Keep list of loadable OS fonts
-/// Filtrate which can be loaded.
-/// Sort alphanumerical.
-/// </summary>
-class MyFontEnumerator : public wxFontEnumerator
+#include <boost/functional/hash.hpp>
+#include "wx/hashmap.h"
+std::size_t hash_value(wxString const &s)
 {
-    wxFontEncoding m_encoding;
-    bool m_fixed_width_only = false;
-    std::vector<wxString> m_facenames;
-    std::vector<wxString> m_facenames_bad;
-public: 
-    MyFontEnumerator(wxFontEncoding encoding) : m_encoding(encoding) {}
-    void enumerate() {
-        m_facenames.clear();
-        m_facenames_bad.clear();
-        EnumerateFacenames(m_encoding, m_fixed_width_only); 
-        std::sort(m_facenames.begin(), m_facenames.end());
-    }
-
-    const std::vector<wxString> &get_face_names() const { return m_facenames; }
-    const std::vector<wxString> &get_bad_face_names() const { return m_facenames_bad; }
-protected:
-    /// <summary>
-    /// Called by wxFontEnumerator::EnumerateFacenames() for each match.
-    /// </summary>
-    /// <param name="facename">name identificator to load face by wxFont</param>
-    /// <returns> True to continue enumeration or false to stop it.</returns>
-    virtual bool OnFacename(const wxString& facename) wxOVERRIDE {
-        // vertical font start with @, we will filter it out
-        if (facename.empty() || facename[0] == '@') return true;
-        wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(m_encoding));
-
-        //*
-        // Faster chech if wx_font is loadable but not 100%
-        // names could contain not loadable font
-        if (!WxFontUtils::can_load(wx_font)) {
-            m_facenames_bad.emplace_back(facename);
-            return true; // can't load
-        }
-        /*/
-        // Slow copy of font files to try load font
-        // After this all files are loadable
-        auto font_file = WxFontUtils::create_font_file(wx_font);
-        if (font_file == nullptr) {
-            m_facenames_bad.emplace_back(facename.c_str());
-            return true; // can't create font file
-        } // */
-        m_facenames.push_back(facename);
-        return true;
-    }
-};
+    boost::hash<std::string> hasher;
+    return hasher(s.ToStdString());
+}
 
 bool GLGizmoEmboss::select_facename(const wxString &facename) {
     if (!wxFontEnumerator::IsValidFacename(facename)) return false;
@@ -1303,27 +1258,57 @@ static std::string concat(std::vector<wxString> data) {
 void GLGizmoEmboss::init_face_names() {
     Timer t("enumerate_fonts");
     if (m_face_names.is_init) return;
-    m_face_names.is_init      = true;
-    MyFontEnumerator font_enumerator(m_face_names.encoding);
+    m_face_names.is_init = true;
 
-    { using namespace std::chrono;
+    using namespace std::chrono;
     steady_clock::time_point enumerate_start = steady_clock::now();
-    ScopeGuard sg([&enumerate_start, &font_enumerator]() {
+    ScopeGuard sg([&enumerate_start, &face_names = m_face_names]() {
         steady_clock::time_point enumerate_end = steady_clock::now();
         long long enumerate_duration = duration_cast<milliseconds>(enumerate_end - enumerate_start).count();
-        BOOST_LOG_TRIVIAL(info) << "OS enumerate " << font_enumerator.get_face_names().size() << " fonts "
-                                << "(+ " << font_enumerator.get_bad_face_names().size() << " can't load "
-                                << "= " << font_enumerator.get_face_names().size() + font_enumerator.get_bad_face_names().size() << " fonts) "
-                                << "in " << enumerate_duration << " ms\n" << concat(font_enumerator.get_bad_face_names());
+        BOOST_LOG_TRIVIAL(info) << "OS enumerate " << face_names.faces.size() << " fonts "
+                                << "(+ " << face_names.bad.size() << " can't load "
+                                << "= " << face_names.faces.size() + face_names.bad.size() << " fonts) "
+                                << "in " << enumerate_duration << " ms\n" << concat(face_names.bad);
     });
-
-    font_enumerator.enumerate();   
-    }// End Time measures
+    wxArrayString facenames = wxFontEnumerator::GetFacenames(m_face_names.encoding);
+    size_t hash = boost::hash_range(facenames.begin(), facenames.end());
+    // check if it is same as last time
+    if (m_face_names.hash == hash) return; // no new installed font
+    m_face_names.hash = hash;
     
-    const std::vector<wxString> &names = font_enumerator.get_face_names();
+    // validation lambda
+    auto is_valid_font = [encoding = m_face_names.encoding](const wxString &name) {
+        if (name.empty()) return false;
+
+        // vertical font start with @, we will filter it out
+        // Not sure if it is only in Windows so filtering is on all platforms
+        if (name[0] == '@') return false;
+        
+        wxFont wx_font(wxFontInfo().FaceName(name).Encoding(encoding));
+
+        //*
+        // Faster chech if wx_font is loadable but not 100%
+        // names could contain not loadable font
+        if (!WxFontUtils::can_load(wx_font)) return false;
+
+        /*/
+        // Slow copy of font files to try load font
+        // After this all files are loadable
+        auto font_file = WxFontUtils::create_font_file(wx_font);
+        if (font_file == nullptr) 
+            return false; // can't create font file
+        // */
+        return true;
+    };
+
     const float &width = m_gui_cfg->face_name_max_width;
-    m_face_names.faces.reserve(names.size());
-    for (const wxString &name : names) {
+    m_face_names.faces.reserve(facenames.size());
+    for (const wxString &name : facenames) {
+        if (!is_valid_font(name)) {
+            m_face_names.bad.push_back(name);
+            continue;
+        }
+
         FaceName face_name = {name};
         std::string name_str(name.ToUTF8().data());
         face_name.name_truncated = ImGuiWrapper::trunc(name_str, width);
@@ -1482,10 +1467,11 @@ void GLGizmoEmboss::draw_font_list()
                            static_cast<int>(m_face_names.names.size()));
 #endif // SHOW_FONT_COUNT
         ImGui::EndCombo();
-        allow_update_rendered_font = true;
-    } else if (allow_update_rendered_font) { 
+    } else if (m_face_names.is_init) {
+        // Just one after close combo box        
         // free texture and set id to zero
-        allow_update_rendered_font = false;
+
+        m_face_names.is_init = false;
         // cancel all process for generation of texture
         for (FaceName &face : m_face_names.faces)
             if (face.cancel != nullptr) face.cancel->store(true);

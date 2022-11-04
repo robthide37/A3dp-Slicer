@@ -244,8 +244,13 @@ private:
     {
         // flag if face names was enumerated from OS
         bool is_init = false;
-
+        // data of can_load() faces
         std::vector<FaceName> faces = {};
+        // Not valid face names
+        std::vector<wxString> bad   = {};
+
+        // Configuration of font encoding
+        const wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
 
         // Identify if preview texture exists
         GLuint texture_id = 0;
@@ -254,14 +259,15 @@ private:
         // Gtk:ERROR:../../../../gtk/gtkiconhelper.c:494:ensure_surface_for_gicon: assertion failed (error == NULL): Failed to load /usr/share/icons/Yaru/48x48/status/image-missing.png: Error opening file /usr/share/icons/Yaru/48x48/status/image-missing.png: Too many open files (g-io-error-quark, 31)
         unsigned int count_opened_font_files = 0; 
 
-        // Configuration of font encoding
-        const wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
-
         // Configuration for texture height
         const int count_cached_textures = 32;
 
         // index for new generated texture index(must be lower than count_cached_textures)
         size_t texture_index = 0;
+
+        // hash created from enumerated font from OS
+        // check when new font was installed
+        size_t hash = 0;
     } m_face_names;
 
     // Text to emboss

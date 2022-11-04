@@ -73,6 +73,8 @@ bool WxFontUtils::can_load(const wxFont &font)
 #elif defined(__APPLE__)
     return is_valid_ttf(get_file_path(font));
 #elif defined(__linux__)
+    return true;
+    // font config check file path take about 4000ms for chech them all
     std::string font_path = Slic3r::GUI::get_font_path(font);
     return !font_path.empty();
 #endif
