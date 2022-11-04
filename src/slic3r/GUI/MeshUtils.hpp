@@ -14,6 +14,7 @@
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <cfloat>
+#include <optional>
 #if ENABLE_RAYCAST_PICKING
 #include <memory>
 #endif // ENABLE_RAYCAST_PICKING
@@ -80,6 +81,10 @@ public:
 class MeshClipper
 {
 public:
+    // Set whether the cut should be triangulated and whether a cut
+    // contour should be calculated and shown.
+    void set_behaviour(bool fill_cut, double contour_width);
+    
     // Inform MeshClipper about which plane we want to use to cut the mesh
     // This is supposed to be in world coordinates.
     void set_plane(const ClippingPlane& plane);
@@ -103,9 +108,15 @@ public:
     // be set in world coords.
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_cut(const ColorRGBA& color);
+    void render_contour(const ColorRGBA& color);
 #else
     void render_cut();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
+
+    void pass_mouse_click(const Vec3d& pt);
+
+    bool is_projection_inside_cut(const Vec3d& point) const;
+    bool has_valid_contour() const;
 
 private:
     void recalculate_triangles();
@@ -115,13 +126,27 @@ private:
     const TriangleMesh* m_negative_mesh = nullptr;
     ClippingPlane m_plane;
     ClippingPlane m_limiting_plane = ClippingPlane::ClipsNothing();
-    std::vector<Vec2f> m_triangles2d;
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    GLModel m_model;
+
+    struct CutIsland {
+        GLModel model;
+        GLModel model_expanded;
+        ExPolygon expoly;
+        BoundingBox expoly_bb;
+        bool disabled = false;
+    };
+    struct ClipResult {
+        std::vector<CutIsland> cut_islands;
+        Transform3d trafo; // this rotates the cut into world coords
+    };
+    std::optional<ClipResult> m_result;
+    
 #else
+    #error NOT IMLEMENTED
     GLIndexedVertexArray m_vertex_array;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-    bool m_triangles_valid = false;
+    bool m_fill_cut = true;
+    double m_contour_width = 0.;
 };
 
 
@@ -150,8 +175,10 @@ public:
     {
     }
 
-    void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-        Vec3d& point, Vec3d& direction) const;
+    static void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
+                             Vec3d& point, Vec3d& direction);
+//    void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
+//        Vec3d& point, Vec3d& direction) const;
 #endif // ENABLE_RAYCAST_PICKING
 
     // Given a mouse position, this returns true in case it is on the mesh.
@@ -159,11 +186,17 @@ public:
         const Vec2d& mouse_pos,
         const Transform3d& trafo, // how to get the mesh into world coords
         const Camera& camera, // current camera position
-        Vec3f& position, // where to save the positibon of the hit (mesh coords)
+        Vec3f& position, // where to save the positibon of the hit (mesh coords if mesh, world coords if clipping plane)
         Vec3f& normal, // normal of the triangle that was hit
         const ClippingPlane* clipping_plane = nullptr, // clipping plane (if active)
-        size_t* facet_idx = nullptr // index of the facet hit
+        size_t* facet_idx = nullptr, // index of the facet hit
+        bool* was_clipping_plane_hit = nullptr // is the hit on the clipping place cross section?
     ) const;
+
+    // Given a mouse position, this returns true in case it is on the mesh.
+    bool unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera, Vec3d& position, Vec3d& normal) const;
+
+    bool is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const;
 
     // Given a vector of points in woorld coordinates, this returns vector
     // of indices of points that are visible (i.e. not cut by clipping plane

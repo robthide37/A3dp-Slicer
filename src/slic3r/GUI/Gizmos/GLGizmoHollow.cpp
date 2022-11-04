@@ -478,19 +478,19 @@ bool GLGizmoHollow::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_pos
     if (action == SLAGizmoEventType::MouseWheelUp && control_down) {
         double pos = m_c->object_clipper()->get_position();
         pos = std::min(1., pos + 0.01);
-        m_c->object_clipper()->set_position(pos, true);
+        m_c->object_clipper()->set_position_by_ratio(pos, true);
         return true;
     }
 
     if (action == SLAGizmoEventType::MouseWheelDown && control_down) {
         double pos = m_c->object_clipper()->get_position();
         pos = std::max(0., pos - 0.01);
-        m_c->object_clipper()->set_position(pos, true);
+        m_c->object_clipper()->set_position_by_ratio(pos, true);
         return true;
     }
 
     if (action == SLAGizmoEventType::ResetClippingPlane) {
-        m_c->object_clipper()->set_position(-1., false);
+        m_c->object_clipper()->set_position_by_ratio(-1., false);
         return true;
     }
 
@@ -885,7 +885,7 @@ RENDER_AGAIN:
     else {
         if (m_imgui->button(m_desc.at("reset_direction"))) {
             wxGetApp().CallAfter([this](){
-                    m_c->object_clipper()->set_position(-1., false);
+                    m_c->object_clipper()->set_position_by_ratio(-1., false);
                 });
         }
     }
@@ -894,7 +894,7 @@ RENDER_AGAIN:
     ImGui::PushItemWidth(window_width - settings_sliders_left);
     float clp_dist = m_c->object_clipper()->get_position();
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f"))
-        m_c->object_clipper()->set_position(clp_dist, true);
+        m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
 
     // make sure supports are shown/hidden as appropriate
     bool show_sups = m_c->instances_hider()->are_supports_shown();

@@ -140,6 +140,7 @@ namespace ImGui
     const wchar_t CancelButton             = 0x14;
     const wchar_t CancelHoverButton        = 0x15;
 //    const wchar_t VarLayerHeightMarker     = 0x16;
+    const wchar_t RevertButton             = 0x16;
 
     const wchar_t RightArrowButton         = 0x18;
     const wchar_t RightArrowHoverButton    = 0x19;
@@ -168,6 +169,10 @@ namespace ImGui
     const wchar_t LegendCOG                = 0x2615;
     const wchar_t LegendShells             = 0x2616;
     const wchar_t LegendToolMarker         = 0x2617;
+    const wchar_t WarningMarkerSmall       = 0x2618;
+    const wchar_t ExpandBtn                = 0x2619;
+    const wchar_t CollapseBtn              = 0x2620;
+    const wchar_t InfoMarkerSmall          = 0x2621;
 
 //    void MyFunction(const char* name, const MyMatrix44& v);
 }

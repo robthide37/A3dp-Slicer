@@ -181,7 +181,7 @@ set(SLIC3R_SOURCES
     Model.hpp
     ModelArrange.hpp
     ModelArrange.cpp
-    ModelVolumeType.hpp
+    #ModelVolumeType.hpp
     MultiMaterialSegmentation.cpp
     MultiMaterialSegmentation.hpp
     MeshNormals.hpp

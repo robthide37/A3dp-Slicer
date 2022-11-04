@@ -510,6 +510,28 @@ void Selection::volumes_changed(const std::vector<size_t> &map_volume_old_to_new
     this->set_bounding_boxes_dirty();
 }
 
+bool Selection::is_any_connector() const
+{
+    const int obj_idx = get_object_idx();
+
+    if ((is_any_volume() || is_any_modifier() || is_mixed()) && // some solid_part AND/OR modifier is selected 
+        obj_idx >= 0 && m_model->objects[obj_idx]->is_cut()) {
+        const ModelVolumePtrs& obj_volumes = m_model->objects[obj_idx]->volumes;
+        for (size_t vol_idx = 0; vol_idx < obj_volumes.size(); vol_idx++)
+            if (obj_volumes[vol_idx]->is_cut_connector())
+                for (const GLVolume* v  : *m_volumes)
+                    if (v->object_idx() == obj_idx && v->volume_idx() == (int)vol_idx && v->selected)
+                        return true;
+    }
+    return false;
+}
+
+bool Selection::is_any_cut_volume() const
+{
+    const int obj_idx = get_object_idx();
+    return is_any_volume() && obj_idx >= 0 && m_model->objects[obj_idx]->is_cut();
+}
+
 bool Selection::is_single_full_instance() const
 {
     if (m_type == SingleFullInstance)
@@ -1524,7 +1546,7 @@ int Selection::bake_transform_if_needed() const
 
         if (needs_baking) {
             MessageDialog dlg((wxWindow*)wxGetApp().mainframe,
-                _L("The currently manipulated object is tilted or contains tilted parts (rotation angles are not multiples of 90�). "
+                _L("The currently manipulated object is tilted or contains tilted parts (rotation angles are not multiples of 90°). "
                     "Non-uniform scaling of tilted objects is only possible in non-local coordinate systems, "
                     "once the rotation is embedded into the object coordinates.") + "\n" +
                 _L("This operation is irreversible.") + "\n" +

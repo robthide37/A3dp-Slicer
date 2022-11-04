@@ -4,10 +4,13 @@
 #include <cmath> // std::isinf() is here
 #include <unordered_map>
 
-#include "libslic3r/Point.hpp"
 #include "libslic3r/MutablePriorityQueue.hpp"
 
 namespace Slic3r { namespace astar {
+
+// Borrowed from C++20
+template<class T>
+using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
 // Input interface for the Astar algorithm. Specialize this struct for a
 // particular type and implement all the 4 methods and specify the Node type

@@ -12,6 +12,7 @@
 #include "slic3r/GUI/Jobs/RotoptimizeJob.hpp"
 
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/Model.hpp"
 
 #include <GL/glew.h>
 
@@ -868,7 +869,8 @@ std::string GLGizmoRotate3D::on_get_name() const
 
 bool GLGizmoRotate3D::on_is_activable() const
 {
-    return !m_parent.get_selection().is_empty();
+    const Selection& selection = m_parent.get_selection();
+    return !selection.is_any_cut_volume() && !selection.is_any_connector() && !selection.is_empty();
 }
 
 void GLGizmoRotate3D::on_start_dragging()

@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 #include <libslic3r/Emboss.hpp>
-#include <libslic3r/ModelVolumeType.hpp>
+//#include <libslic3r/ModelVolumeType.hpp>
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "Job.hpp"

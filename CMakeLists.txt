@@ -43,6 +43,14 @@ set(SLIC3R_GTK "2" CACHE STRING "GTK version to use with wxWidgets on Linux")
 
 set(IS_CROSS_COMPILE FALSE)
 
+if (SLIC3R_STATIC)
+    # Prefer config scripts over find modules. This is helpful when building with
+    # the static dependencies. Many libraries have their own export scripts
+    # while having a Find<PkgName> module in standard cmake installation.
+    # (e.g. CURL)
+    set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
+endif ()
+
 if (APPLE)
     set(CMAKE_FIND_FRAMEWORK LAST)
     set(CMAKE_FIND_APPBUNDLE LAST)
@@ -106,6 +114,8 @@ if (MSVC)
     # C4244: 'conversion' conversion from 'type1' to 'type2', possible loss of data. An integer type is converted to a smaller integer type.
     # C4267: The compiler detected a conversion from size_t to a smaller type.
     add_compile_options(/wd4244 /wd4267)
+    # Enforce strict C++ conformance, so our code that compiles on MSVC also compiles on GCC and clang.
+    add_compile_options(/permissive-)
 endif ()
 
 if (MINGW)
@@ -434,6 +444,14 @@ include_directories(BEFORE SYSTEM ${EIGEN3_INCLUDE_DIR})
 # Find expat. We have our overriden FindEXPAT which exports libexpat target
 # no matter what.
 find_package(EXPAT REQUIRED)
+
+add_library(libexpat INTERFACE)
+
+if (TARGET EXPAT::EXPAT )
+    target_link_libraries(libexpat INTERFACE EXPAT::EXPAT)
+elseif(TARGET expat::expat)
+    target_link_libraries(libexpat INTERFACE expat::expat)
+endif ()
 
 find_package(PNG REQUIRED)
 

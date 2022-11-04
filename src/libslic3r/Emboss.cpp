@@ -465,7 +465,7 @@ const Emboss::Glyph* priv::get_glyph(
     std::optional<stbtt_fontinfo> &font_info_opt)
 {
     // TODO: Use resolution by printer configuration, or add it into FontProp
-    const float RESOLUTION = 0.0125; // [in mm]
+    const float RESOLUTION = 0.0125f; // [in mm]
     auto glyph_item = cache.find(unicode);
     if (glyph_item != cache.end()) return &glyph_item->second;
 
@@ -545,7 +545,8 @@ Point priv::to_point(const stbtt__point &point) {
 // Get system font file path
 std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_name)
 {
-    static const LPWSTR fontRegistryPath = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
+//    static const LPWSTR fontRegistryPath = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
+    static const LPCWSTR fontRegistryPath = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
     HKEY hKey;
     LONG result;
 
@@ -613,7 +614,8 @@ EmbossStyles Emboss::get_font_list()
 }
 
 EmbossStyles Emboss::get_font_list_by_register() {
-    static const LPWSTR fontRegistryPath = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
+//    static const LPWSTR fontRegistryPath = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
+    static const LPCWSTR fontRegistryPath = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
     HKEY hKey;
     LONG result;
 

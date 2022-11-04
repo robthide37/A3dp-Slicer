@@ -28,6 +28,8 @@ class wxFont;
 namespace Slic3r{
     class AppConfig;
     class GLVolume;
+
+    enum class ModelVolumeType : int;
 }
 
 namespace Slic3r::GUI {

@@ -85,6 +85,7 @@ public:
     bool on_mouse(const wxMouseEvent &mouse_event) override;
 
     void data_changed() override;
+    void enable_ununiversal_scale(bool enable);
 protected:
     virtual bool on_init() override;
     virtual std::string on_get_name() const override;
