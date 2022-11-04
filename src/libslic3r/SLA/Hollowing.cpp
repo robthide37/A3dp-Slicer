@@ -118,9 +118,9 @@ indexed_triangle_set DrainHole::to_mesh() const
 {
     auto r = double(radius);
     auto h = double(height);
-    indexed_triangle_set hole = sla::cylinder(r, h, steps);
+    indexed_triangle_set hole = its_make_cylinder(r, h); //sla::cylinder(r, h, steps);
     Eigen::Quaternionf q;
-    q.setFromTwoVectors(Vec3f{0.f, 0.f, 1.f}, normal);
+    q.setFromTwoVectors(Vec3f::UnitZ(), normal);
     for(auto& p : hole.vertices) p = q * p + pos;
     
     return hole;
@@ -692,24 +692,23 @@ DrainHoles transformed_drainhole_points(const ModelObject &mo,
                                         const Transform3d &trafo)
 {
     auto pts = mo.sla_drain_holes;
-    const Transform3d& vol_trafo = mo.volumes.front()->get_transformation().get_matrix();
-    const Geometry::Transformation trans(trafo * vol_trafo);
-    const Transform3f& tr = trans.get_matrix().cast<float>();
-    const Vec3f sc = trans.get_scaling_factor().cast<float>();
+//    const Transform3d& vol_trafo = mo.volumes.front()->get_transformation().get_matrix();
+    const Geometry::Transformation trans(trafo /** vol_trafo*/);
+    const Transform3d& tr = trans.get_matrix();
     for (sla::DrainHole &hl : pts) {
-        hl.pos = tr * hl.pos;
-        hl.normal = tr * hl.normal - tr.translation();
+        Vec3d pos = hl.pos.cast<double>();
+        Vec3d nrm = hl.normal.cast<double>();
 
-        // The normal scales as a covector (and we must also
-        // undo the damage already done).
-        hl.normal = Vec3f(hl.normal(0)/(sc(0)*sc(0)),
-                          hl.normal(1)/(sc(1)*sc(1)),
-                          hl.normal(2)/(sc(2)*sc(2)));
+        pos = tr * pos;
+        nrm = tr * nrm - tr.translation();
 
         // Now shift the hole a bit above the object and make it deeper to
         // compensate for it. This is to avoid problems when the hole is placed
         // on (nearly) flat surface.
-        hl.pos -= hl.normal.normalized() * sla::HoleStickOutLength;
+        pos -= nrm.normalized() * sla::HoleStickOutLength;
+
+        hl.pos = pos.cast<float>();
+        hl.normal = nrm.cast<float>();
         hl.height += sla::HoleStickOutLength;
     }
 
