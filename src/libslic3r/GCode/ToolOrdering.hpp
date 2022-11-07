@@ -6,6 +6,7 @@
 #include "../libslic3r.h"
 
 #include <utility>
+#include <cstddef>
 
 #include <boost/container/small_vector.hpp>
 
@@ -14,6 +15,7 @@ namespace Slic3r {
 class Print;
 class PrintObject;
 class LayerTools;
+class ToolOrdering;
 namespace CustomGCode { struct Item; }
 class PrintRegion;
 
@@ -45,13 +47,7 @@ public:
     void ensure_perimeters_infills_order(const Print& print);
 
     bool is_overriddable(const ExtrusionEntityCollection& ee, const PrintConfig& print_config, const PrintObject& object, const PrintRegion& region) const;
-    bool is_overriddable_and_mark(const ExtrusionEntityCollection& ee, const PrintConfig& print_config, const PrintObject& object, const PrintRegion& region) {
-    	bool out = this->is_overriddable(ee, print_config, object, region);
-    	m_something_overridable |= out;
-    	return out;
-    }
-
-    void set_layer_tools_ptr(const LayerTools* lt) { m_layer_tools = lt; }
+    void set_something_overridable() { m_something_overridable = true; }
 
 private:
     int first_nonsoluble_extruder_on_layer(const PrintConfig& print_config) const;
@@ -69,14 +65,11 @@ private:
     std::map<const ExtrusionEntity*, ExtruderPerCopy> m_entity_map;  // to keep track of who prints what
     bool m_something_overridable = false;
     bool m_something_overridden = false;
-    const LayerTools* m_layer_tools = nullptr;    // so we know which LayerTools object this belongs to
 };
 
 class LayerTools
 {
 public:
-    LayerTools(const coordf_t z) : print_z(z) {}
-
     // Changing these operators to epsilon version can make a problem in cases where support and object layers get close to each other.
     // In case someone tries to do it, make sure you know what you're doing and test it properly (slice multiple objects at once with supports).
     bool operator< (const LayerTools &rhs) const { return print_z < rhs.print_z; }
@@ -114,12 +107,17 @@ public:
     // Custom G-code (color change, extruder switch, pause) to be performed before this layer starts to print.
     const CustomGCode::Item    *custom_gcode = nullptr;
 
-    WipingExtrusions& wiping_extrusions() {
-        m_wiping_extrusions.set_layer_tools_ptr(this);
-        return m_wiping_extrusions;
-    }
+    WipingExtrusions&       wiping_extrusions_nonconst() { return m_wiping_extrusions; }
+    const WipingExtrusions& wiping_extrusions() const    { return m_wiping_extrusions; }
 
 private:
+    // to access LayerTools private constructor
+    friend class ToolOrdering;
+    LayerTools(const coordf_t z) : print_z(z) {}
+
+    // for calculating offset of m_wiping_extrusions in LayerTools. 
+    friend const LayerTools& layer_tools(const WipingExtrusions *self);
+
     // This object holds list of extrusion that will be used for extruder wiping
     WipingExtrusions m_wiping_extrusions;
 };

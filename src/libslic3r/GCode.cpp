@@ -2208,8 +2208,7 @@ LayerResult GCode::process_layer(
         std::vector<InstanceToPrint> instances_to_print = sort_print_object_instances(layers, ordering, single_object_instance_idx);
 
         // We are almost ready to print. However, we must go through all the objects twice to print the the overridden extrusions first (infill/perimeter wiping feature):
-        //FIXME const_cast
-        bool is_anything_overridden = const_cast<LayerTools&>(layer_tools).wiping_extrusions().is_anything_overridden();
+        bool is_anything_overridden = layer_tools.wiping_extrusions().is_anything_overridden();
         if (is_anything_overridden) {
             // Extrude wipes.
             size_t gcode_size_old = gcode.size();
@@ -2349,8 +2348,7 @@ void GCode::process_layer_single_object(
             // by last extruder on this layer (could happen e.g. when a wiping object is taller than others - dontcare extruders are eradicated from layer_tools)
             correct_extruder_id = layer_tools.extruders.back();
         }
-        //FIXME const_cast!
-        int extruder_override_id = is_anything_overridden ? const_cast<LayerTools&>(layer_tools).wiping_extrusions().get_extruder_override(eec, instance_id) : -1;
+        int extruder_override_id = is_anything_overridden ? layer_tools.wiping_extrusions().get_extruder_override(eec, instance_id) : -1;
         return print_wipe_extrusions ?
             extruder_override_id == int(extruder_id) :
             extruder_override_id < 0 && extruder_id == correct_extruder_id;
