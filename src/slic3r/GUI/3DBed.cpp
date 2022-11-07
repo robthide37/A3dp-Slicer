@@ -223,7 +223,10 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     m_contour = ExPolygon(Polygon::new_scale(bed_shape));
-    m_polygon = offset(m_contour.contour, (float)m_contour.contour.bounding_box().radius() * 1.7f, jtRound, scale_(0.5)).front();
+    const BoundingBox bbox = m_contour.contour.bounding_box();
+    if (!bbox.defined)
+        throw RuntimeError(std::string("Invalid bed shape"));
+    m_polygon = offset(m_contour.contour, (float)bbox.radius() * 1.7f, jtRound, scale_(0.5)).front();
 
     m_triangles.reset();
     m_gridlines.reset();
