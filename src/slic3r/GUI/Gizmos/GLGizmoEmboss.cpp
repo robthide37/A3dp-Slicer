@@ -1234,20 +1234,6 @@ std::size_t hash_value(wxString const &s)
     return hasher(s.ToStdString());
 }
 
-bool GLGizmoEmboss::select_facename(const wxString &facename) {
-    if (!wxFontEnumerator::IsValidFacename(facename)) return false;
-    // Select font
-    const wxFontEncoding &encoding = m_face_names.encoding;
-    wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(encoding));
-    if (!wx_font.IsOk()) return false;
-    // wx font could change source file by size of font
-    int point_size = static_cast<int>(m_style_manager.get_font_prop().size_in_mm);
-    wx_font.SetPointSize(point_size);
-    if (!m_style_manager.set_wx_font(wx_font)) return false;
-    process();
-    return true;
-}
-
 static std::string concat(std::vector<wxString> data) {
     std::stringstream ss;
     for (const auto &d : data) 
@@ -1255,10 +1241,112 @@ static std::string concat(std::vector<wxString> data) {
     return ss.str();
 }
 
+static boost::filesystem::path get_fontlist_cache_path()
+{
+    return boost::filesystem::path(data_dir()) / "cache" / "fonts.cereal";
+}
+
+// cache font list by cereal
+#include <cereal/cereal.hpp>
+#include <cereal/types/vector.hpp>
+#include <cereal/types/string.hpp>
+#include <cereal/archives/binary.hpp>
+
+// increase number when change struct FacenamesSerializer
+#define FACENAMES_VERSION 1
+struct FacenamesSerializer
+{
+    // hash number for unsorted vector of installed font into system
+    size_t hash = 0;
+    // assumption that is loadable
+    std::vector<wxString> good;
+    // Can't load for some reason
+    std::vector<wxString> bad;
+};
+
+template<class Archive> void save(Archive &archive, wxString const &d)
+{ std::string s(d.ToUTF8().data()); archive(s);}
+template<class Archive> void load(Archive &archive, wxString &d)
+{ std::string s; archive(s); d = s;} 
+
+template<class Archive> void serialize(Archive &ar, FacenamesSerializer &t, const std::uint32_t version)
+{
+    // When performing a load, the version associated with the class
+    // is whatever it was when that data was originally serialized
+    // When we save, we'll use the version that is defined in the macro
+    if (version != FACENAMES_VERSION) return;
+    ar(t.hash, t.good, t.bad);
+}
+CEREAL_CLASS_VERSION(FacenamesSerializer, FACENAMES_VERSION); // register class version
+
+bool GLGizmoEmboss::store(const Facenames &facenames) {
+    std::string cache_path = get_fontlist_cache_path().string();
+    boost::nowide::ofstream file(cache_path, std::ios::binary);
+    cereal::BinaryOutputArchive archive(file);
+    std::vector<wxString> good;
+    good.reserve(facenames.faces.size());
+    for (const FaceName &face : facenames.faces) good.push_back(face.wx_name);
+    FacenamesSerializer data = {facenames.hash, good, facenames.bad};
+
+    assert(std::is_sorted(data.bad.begin(), data.bad.end()));
+    assert(std::is_sorted(data.good.begin(), data.good.end()));
+
+    try {
+        archive(data);
+    } catch (const std::exception &ex) {
+        BOOST_LOG_TRIVIAL(error) << "Failed to write fontlist cache - " << cache_path << ex.what();
+        return false;
+    }
+    return true;
+}
+
+bool GLGizmoEmboss::load(Facenames &facenames) {
+    boost::filesystem::path path = get_fontlist_cache_path();
+    std::string             path_str = path.string();
+    if (!boost::filesystem::exists(path)) {
+        BOOST_LOG_TRIVIAL(warning) << "Fontlist cache - '" << path_str << "' does not exists.";
+        return false;
+    }
+    boost::nowide::ifstream file(path_str, std::ios::binary);
+    cereal::BinaryInputArchive archive(file);
+    
+    FacenamesSerializer data;
+    try {
+        archive(data);
+    } catch (const std::exception &ex) {
+        BOOST_LOG_TRIVIAL(error) << "Failed to load fontlist cache - '" << path_str << "'. Exception: " << ex.what();
+        return false;
+    }
+
+    assert(std::is_sorted(data.bad.begin(), data.bad.end()));
+    assert(std::is_sorted(data.good.begin(), data.good.end()));
+
+    facenames.hash = data.hash;
+    facenames.faces.reserve(data.good.size());
+    for (const wxString &face : data.good)
+        facenames.faces.push_back({face});
+    facenames.bad = data.bad;
+    return true;
+}
+
 void GLGizmoEmboss::init_face_names() {
     Timer t("enumerate_fonts");
     if (m_face_names.is_init) return;
     m_face_names.is_init = true;
+
+    auto create_truncated_names = [&facenames = m_face_names, &width = m_gui_cfg->face_name_max_width]() {
+        for (FaceName &face : facenames.faces) {
+            std::string name_str(face.wx_name.ToUTF8().data());
+            face.name_truncated = ImGuiWrapper::trunc(name_str, width);
+        }
+    };
+
+    // try load cache
+    // Only not OS enumerated face has hash value 0
+    if (m_face_names.hash == 0) { 
+        load(m_face_names); 
+        create_truncated_names();
+    }
 
     using namespace std::chrono;
     steady_clock::time_point enumerate_start = steady_clock::now();
@@ -1272,20 +1360,25 @@ void GLGizmoEmboss::init_face_names() {
     });
     wxArrayString facenames = wxFontEnumerator::GetFacenames(m_face_names.encoding);
     size_t hash = boost::hash_range(facenames.begin(), facenames.end());
+    // Zero value is used as uninitialized hash
+    if (hash == 0) hash = 1;
     // check if it is same as last time
     if (m_face_names.hash == hash) return; // no new installed font
     m_face_names.hash = hash;
     
     // validation lambda
-    auto is_valid_font = [encoding = m_face_names.encoding](const wxString &name) {
+    auto is_valid_font = [encoding = m_face_names.encoding, bad = m_face_names.bad /*copy*/](const wxString &name) {
         if (name.empty()) return false;
 
         // vertical font start with @, we will filter it out
         // Not sure if it is only in Windows so filtering is on all platforms
-        if (name[0] == '@') return false;
-        
-        wxFont wx_font(wxFontInfo().FaceName(name).Encoding(encoding));
+        if (name[0] == '@') return false;        
 
+        // previously detected bad font
+        auto it = std::lower_bound(bad.begin(), bad.end(), name);
+        if (it != bad.end() && *it == name) return false;
+
+        wxFont wx_font(wxFontInfo().FaceName(name).Encoding(encoding));
         //*
         // Faster chech if wx_font is loadable but not 100%
         // names could contain not loadable font
@@ -1301,19 +1394,20 @@ void GLGizmoEmboss::init_face_names() {
         return true;
     };
 
-    const float &width = m_gui_cfg->face_name_max_width;
+    m_face_names.faces.clear();
+    m_face_names.bad.clear();
     m_face_names.faces.reserve(facenames.size());
+    std::sort(facenames.begin(), facenames.end());
     for (const wxString &name : facenames) {
-        if (!is_valid_font(name)) {
+        if (is_valid_font(name)) {
+            m_face_names.faces.push_back({name});
+        }else{
             m_face_names.bad.push_back(name);
-            continue;
         }
-
-        FaceName face_name = {name};
-        std::string name_str(name.ToUTF8().data());
-        face_name.name_truncated = ImGuiWrapper::trunc(name_str, width);
-        m_face_names.faces.push_back(std::move(face_name));
     }
+    assert(std::is_sorted(m_face_names.bad.begin(), m_face_names.bad.end()));
+    create_truncated_names();
+    store(m_face_names);
 }
 
 // create texture for visualization font face
@@ -1410,6 +1504,21 @@ void GLGizmoEmboss::draw_font_preview(FaceName& face)
     ImGui::Image(tex_id, size, uv0, uv1);
 }
 
+bool GLGizmoEmboss::select_facename(const wxString &facename)
+{
+    if (!wxFontEnumerator::IsValidFacename(facename)) return false;
+    // Select font
+    const wxFontEncoding &encoding = m_face_names.encoding;
+    wxFont                wx_font(wxFontInfo().FaceName(facename).Encoding(encoding));
+    if (!wx_font.IsOk()) return false;
+    // wx font could change source file by size of font
+    int point_size = static_cast<int>(m_style_manager.get_font_prop().size_in_mm);
+    wx_font.SetPointSize(point_size);
+    if (!m_style_manager.set_wx_font(wx_font)) return false;
+    process();
+    return true;
+}
+
 void GLGizmoEmboss::draw_font_list()
 {
     // Set partial
@@ -1479,10 +1588,16 @@ void GLGizmoEmboss::draw_font_list()
         m_face_names.texture_id = 0;
     }
 
-    // delete unloadable face name when appear
+    // delete unloadable face name when try to use
     if (del_index.has_value()) {
-        // IMPROVE: store list of deleted facename into app.ini
-        m_face_names.faces.erase(m_face_names.faces.begin() + (*del_index));
+        auto face = m_face_names.faces.begin() + (*del_index);
+        std::vector<wxString>& bad = m_face_names.bad;
+        // sorted insert into bad fonts
+        auto it = std::upper_bound(bad.begin(), bad.end(), face->wx_name);
+        bad.insert(it, face->wx_name);
+        m_face_names.faces.erase(face);
+        // update cached file
+        store(m_face_names);
     }
 
 #ifdef ALLOW_ADD_FONT_BY_FILE

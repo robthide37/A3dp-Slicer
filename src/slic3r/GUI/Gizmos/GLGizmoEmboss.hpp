@@ -244,11 +244,14 @@ private:
     // Keep sorted list of loadable face names
     struct Facenames
     {
-        // flag if face names was enumerated from OS
+        // flag to keep need of enumeration fonts from OS
+        // false .. wants new enumeration check by Hash
+        // true  .. already enumerated(During opened combo box)
         bool is_init = false;
+
         // data of can_load() faces
         std::vector<FaceName> faces = {};
-        // Not valid face names
+        // Sorter set of Non valid face names in OS
         std::vector<wxString> bad   = {};
 
         // Configuration of font encoding
@@ -271,6 +274,9 @@ private:
         // check when new font was installed
         size_t hash = 0;
     } m_face_names;
+    static bool store(const Facenames &facenames);
+    static bool load(Facenames &facenames);
+
 
     // Text to emboss
     std::string m_text;
