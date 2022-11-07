@@ -233,9 +233,9 @@ static void connect_layer_slices(
         }
     }
     for (int32_t islice = 0; islice < above.lslices_ex.size(); ++ islice) {
-        LayerSlice::Links &links1 = above.lslices_ex[islice].overlaps_above;
+        LayerSlice::Links &links1 = above.lslices_ex[islice].overlaps_below;
         for (LayerSlice::Link &link1 : links1) {
-            LayerSlice::Links &links2 = below.lslices_ex[link1.slice_idx].overlaps_below;
+            LayerSlice::Links &links2 = below.lslices_ex[link1.slice_idx].overlaps_above;
             assert(! std::binary_search(links2.begin(), links2.end(), link1, [](auto &l, auto &r){ return l.slice_idx < r.slice_idx; }));
         }
     }
@@ -688,24 +688,17 @@ void Layer::sort_perimeters_into_islands(
             std::numeric_limits<double>::max() :
             (lslices[lslice_idx].point_projection(point) - point).cast<double>().squaredNorm();
     };
-    for (int lslice_idx = int(lslices_ex.size()) - 1; lslice_idx >= 0 && ! perimeter_slices_queue.empty(); -- lslice_idx) {
+    for (auto it_source_slice  = perimeter_slices_queue.begin(); it_source_slice != perimeter_slices_queue.end(); ++ it_source_slice) {
         double d2min = std::numeric_limits<double>::max();
-        auto it_source_slice = perimeter_slices_queue.end();
-        for (auto it = perimeter_slices_queue.begin(); it != perimeter_slices_queue.end(); ++ it)
-            if (double d2 = point_inside_surface_dist2(lslice_idx, it->second); d2 < d2min) {
+        int    lslice_idx_min = -1;
+        for (int lslice_idx = int(lslices_ex.size()) - 1; lslice_idx >= 0 && ! perimeter_slices_queue.empty(); -- lslice_idx)
+            if (double d2 = point_inside_surface_dist2(lslice_idx, it_source_slice->second); d2 < d2min) {
                 d2min = d2;
-                it_source_slice = it;
+                lslice_idx_min = lslice_idx;
             }
-        assert(it_source_slice != perimeter_slices_queue.end());
-        if (it_source_slice != perimeter_slices_queue.end()) {
-            insert_into_island(lslice_idx, it_source_slice->first);
-            if (std::next(it_source_slice) != perimeter_slices_queue.end())
-                // Remove the current slice & point pair from the queue.
-                *it_source_slice = perimeter_slices_queue.back();
-            perimeter_slices_queue.pop_back();
-        }
+        assert(lslice_idx_min != -1);
+        insert_into_island(lslice_idx_min, it_source_slice->first);
     }
-    assert(perimeter_slices_queue.empty());
 }
 
 void Layer::export_region_slices_to_svg(const char *path) const

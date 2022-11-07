@@ -30,7 +30,12 @@ public:
     }
 
     // When allocating extruder overrides of an object's ExtrusionEntity, overrides for maximum 3 copies are allocated in place.
-    typedef boost::container::small_vector<int32_t, 3> ExtruderPerCopy;
+    using ExtruderPerCopy =
+#ifdef NDEBUG
+        boost::container::small_vector<int32_t, 3>;
+#else // NDEBUG
+        std::vector<int32_t>;
+#endif // NDEBUG
 
     // This is called from GCode::process_layer_single_object()
     // Returns positive number if the extruder is overridden.
