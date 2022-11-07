@@ -1713,11 +1713,16 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
     new_volume->set_transformation(Geometry::Transformation::volume_to_bed_transformation(v->get_instance_transformation(), mesh_bb));
 #endif // ENABLE_WORLD_COORDINATE
     // Set the modifier position.
-    auto offset = (type_name == "Slab") ?
-        // Slab: Lift to print bed
-		Vec3d(0., 0., 0.5 * mesh_bb.size().z() + instance_bb.min.z() - v->get_instance_offset().z()) :
+    Vec3d offset;
+    if (type_name == "Slab") {
+        Vec3d inst_center = instance_bb.center() - v->get_instance_offset();
+        // Slab: Lift to print bed and and push to the center of instance
+        offset = Vec3d(inst_center.x(), inst_center.y(), 0.5 * mesh_bb.size().z() + instance_bb.min.z() - v->get_instance_offset().z());
+    }
+    else {
         // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
-        Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - v->get_instance_offset();
+        offset = Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - v->get_instance_offset();
+    }
 #if ENABLE_WORLD_COORDINATE
     new_volume->set_offset(v->get_instance_transformation().get_matrix_no_offset().inverse() * offset);
 #else
@@ -2904,6 +2909,9 @@ static bool can_add_volumes_to_object(const ModelObject* object)
 
 wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection/* = nullptr*/)
 {
+    const bool is_prevent_list_events = m_prevent_list_events;
+    m_prevent_list_events = true;
+
     wxDataViewItem object_item = m_objects_model->GetItemById(int(obj_idx));
     m_objects_model->DeleteVolumeChildren(object_item);
 
@@ -2932,6 +2940,7 @@ wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, st
         Expand(object_item);
     }
 
+    m_prevent_list_events = is_prevent_list_events;
     return items;
 }
 

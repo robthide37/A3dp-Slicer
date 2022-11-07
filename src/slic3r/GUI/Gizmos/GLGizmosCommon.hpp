@@ -10,7 +10,7 @@
 namespace Slic3r {
 
 class ModelObject;
-
+class ModelVolume;
 
 namespace GUI {
 
@@ -24,6 +24,8 @@ enum class SLAGizmoEventType : unsigned char {
     Dragging,
     Delete,
     SelectAll,
+    CtrlDown,
+    CtrlUp,
     ShiftUp,
     AltUp,
     ApplyChanges,
@@ -153,7 +155,10 @@ public:
     explicit SelectionInfo(CommonGizmosDataPool* cgdp)
         : CommonGizmosDataBase(cgdp) {}
 
+    // Returns a non-null pointer if the selection is a single full instance
     ModelObject* model_object() const { return m_model_object; }
+    // Returns a non-null pointer if the selection is a single volume
+    ModelVolume* model_volume() const { return m_model_volume; }
     int get_active_instance() const;
     float get_sla_shift() const { return m_z_shift; }
 
@@ -163,6 +168,7 @@ protected:
 
 private:
     ModelObject* m_model_object = nullptr;
+    ModelVolume* m_model_volume = nullptr;
     // int m_active_inst = -1;
     float m_z_shift = 0.f;
 };

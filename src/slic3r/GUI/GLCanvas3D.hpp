@@ -19,6 +19,7 @@
 #if ENABLE_RAYCAST_PICKING
 #include "SceneRaycaster.hpp"
 #endif // ENABLE_RAYCAST_PICKING
+#include "GUI_Utils.hpp"
 
 #include "libslic3r/Slicing.hpp"
 
@@ -133,16 +134,6 @@ public:
     virtual wxEventCategory GetEventCategory() const { return wxEVT_CATEGORY_TIMER; }
 private:
     wxTimer* m_timer;
-};
-
-class KeyAutoRepeatFilter
-{
-    size_t m_count{ 0 };
-
-public:
-    void increase_count() { ++m_count; }
-    void reset_count() { m_count = 0; }
-    bool is_first() const { return m_count == 0; }
 };
 
 wxDECLARE_EVENT(EVT_GLCANVAS_OBJECT_SELECT, SimpleEvent);
@@ -680,7 +671,7 @@ public:
 
 #if ENABLE_RAYCAST_PICKING
     std::shared_ptr<SceneRaycasterItem> add_raycaster_for_picking(SceneRaycaster::EType type, int id, const MeshRaycaster& raycaster,
-        const Transform3d& trafo, bool use_back_faces = false) {
+        const Transform3d& trafo = Transform3d::Identity(), bool use_back_faces = false) {
         return m_scene_raycaster.add_raycaster(type, id, raycaster, trafo, use_back_faces);
     }
     void remove_raycasters_for_picking(SceneRaycaster::EType type, int id) {

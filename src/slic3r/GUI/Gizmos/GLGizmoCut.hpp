@@ -96,7 +96,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
     bool m_hide_cut_plane{ false };
     bool m_connectors_editing{ false };
-    bool m_cut_plane_as_circle{ false };
+    bool m_cut_plane_as_circle{ true };
 
     float m_connector_depth_ratio{ 3.f };
     float m_connector_size{ 2.5f };
@@ -108,6 +108,9 @@ class GLGizmoCut3D : public GLGizmoBase
     float m_control_width{ 200.0 };
     bool  m_imperial_units{ false };
     bool  force_update_clipper_on_render{false};
+
+    float m_contour_width{ 0.4f };
+    bool  m_is_contour_changed{ false };
 
     mutable std::vector<bool> m_selected; // which pins are currently selected
     int  m_selected_count{ 0 };
@@ -170,7 +173,6 @@ public:
     void put_connectors_on_cut_plane(const Vec3d& cp_normal, double cp_offset);
     void update_clipper();
     void update_clipper_on_render();
-    void set_connectors_editing() { m_connectors_editing = true; }
     void invalidate_cut_plane();
 
     BoundingBoxf3   bounding_box() const;

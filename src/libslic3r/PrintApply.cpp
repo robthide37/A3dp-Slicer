@@ -988,6 +988,11 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
     DynamicPrintConfig   filament_overrides;
     t_config_option_keys print_diff       = print_config_diffs(m_config, new_full_config, filament_overrides);
     t_config_option_keys full_config_diff = full_print_config_diffs(m_full_print_config, new_full_config);
+    // If just a physical printer was changed, but printer preset is the same, then there is no need to apply whole print
+    // see https://github.com/prusa3d/PrusaSlicer/issues/8800
+    if (full_config_diff.size() == 1 && full_config_diff[0] == "physical_printer_settings_id")
+        full_config_diff.clear();
+
     // Collect changes to object and region configs.
     t_config_option_keys object_diff      = m_default_object_config.diff(new_full_config);
     t_config_option_keys region_diff      = m_default_region_config.diff(new_full_config);

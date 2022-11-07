@@ -140,6 +140,8 @@ namespace GUI {
             size_t vertices_size_bytes() const  { return vertices_size_floats() * sizeof(float); }
             size_t indices_size_bytes() const { return indices.size() * index_stride_bytes(*this); }
 
+            indexed_triangle_set get_as_indexed_triangle_set() const;
+
             static size_t vertex_stride_floats(const Format& format);
             static size_t vertex_stride_bytes(const Format& format) { return vertex_stride_floats(format) * sizeof(float); }
 
@@ -374,9 +376,17 @@ namespace GUI {
     GLModel::Geometry diamond(unsigned int resolution);
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    // create a sphere with the given resolution and smooth normals
+    // create a sphere with smooth normals
     // the origin of the sphere is in its center
     GLModel::Geometry smooth_sphere(unsigned int resolution, float radius);
+    // create a cylinder with smooth normals
+    // the axis of the cylinder is the Z axis
+    // the origin of the cylinder is the center of its bottom cap face
+    GLModel::Geometry smooth_cylinder(unsigned int resolution, float radius, float height);
+    // create a torus with smooth normals
+    // the axis of the torus is the Z axis
+    // the origin of the torus is in its center
+    GLModel::Geometry smooth_torus(unsigned int primary_resolution, unsigned int secondary_resolution, float radius, float thickness);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace GUI

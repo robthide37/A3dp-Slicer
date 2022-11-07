@@ -3034,6 +3034,7 @@ void Plater::priv::delete_all_objects_from_model()
     gcode_result.reset();
 
     view3D->get_canvas3d()->reset_sequential_print_clearance();
+    view3D->get_canvas3d()->reset_all_gizmos();
 
     m_worker.cancel_all();
 
@@ -4180,19 +4181,14 @@ void Plater::priv::on_select_preset(wxCommandEvent &evt)
         combo->update();
     }
     else if (select_preset) {
-        if (preset_type == Preset::TYPE_PRINTER) {
-            PhysicalPrinterCollection& physical_printers = wxGetApp().preset_bundle->physical_printers;
-            if(combo->is_selected_physical_printer())
-                preset_name = physical_printers.get_selected_printer_preset_name();
-            else
-                physical_printers.unselect_printer();
-        }
         wxWindowUpdateLocker noUpdates(sidebar->presets_panel());
         wxGetApp().get_tab(preset_type)->select_preset(preset_name);
     }
 
-    // update plater with new config
-    q->on_config_change(wxGetApp().preset_bundle->full_config());
+    if (preset_type != Preset::TYPE_PRINTER || select_preset) {
+        // update plater with new config
+        q->on_config_change(wxGetApp().preset_bundle->full_config());
+    }
     if (preset_type == Preset::TYPE_PRINTER) {
     /* Settings list can be changed after printer preset changing, so
      * update all settings items for all item had it.
@@ -4948,9 +4944,13 @@ bool Plater::priv::can_increase_instances() const
      || q->canvas3D()->get_gizmos_manager().is_in_editing_mode())
             return false;
 
+    // Disallow arrange and add instance when emboss gizmo is opend 
+    // Prevent strobo effect during editing emboss parameters.
     if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
 
-    return !sidebar->obj_list()->has_selected_cut_object();
+    const int obj_idx = get_selected_object_idx();
+    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) &&
+            !sidebar->obj_list()->has_selected_cut_object();
 }
 
 bool Plater::priv::can_decrease_instances() const
@@ -4959,7 +4959,10 @@ bool Plater::priv::can_decrease_instances() const
      || q->canvas3D()->get_gizmos_manager().is_in_editing_mode())
             return false;
 
-    return !sidebar->obj_list()->has_selected_cut_object();
+    const int obj_idx = get_selected_object_idx();
+    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) && 
+            (model.objects[obj_idx]->instances.size() > 1) &&
+            !sidebar->obj_list()->has_selected_cut_object();
 }
 
 bool Plater::priv::can_split_to_objects() const
@@ -5490,10 +5493,27 @@ void Plater::load_gcode(const wxString& filename)
     p->gcode_result = std::move(processor.extract_result());
 
     // show results
-    p->preview->reload_print(false);
+    try
+    {
+        p->preview->reload_print(false);
+    }
+    catch (const std::exception&)
+    {
+        wxEndBusyCursor();
+        p->gcode_result.reset();
+        reset_gcode_toolpaths();
+        set_default_bed_shape();
+        p->preview->reload_print(false);
+        p->get_current_canvas3D()->render();
+        MessageDialog(this, _L("The selected file") + ":\n" + filename + "\n" + _L("does not contain valid gcode."),
+            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("Error while loading .gcode file"), wxOK | wxICON_WARNING | wxCENTRE).ShowModal();
+        set_project_filename(wxEmptyString);
+        return;
+    }
     p->preview->get_canvas3d()->zoom_to_gcode();
 
     if (p->preview->get_canvas3d()->get_gcode_layers_zs().empty()) {
+        wxEndBusyCursor();
         //wxMessageDialog(this, _L("The selected file") + ":\n" + filename + "\n" + _L("does not contain valid gcode."),
         MessageDialog(this, _L("The selected file") + ":\n" + filename + "\n" + _L("does not contain valid gcode."),
             wxString(GCODEVIEWER_APP_NAME) + " - " + _L("Error while loading .gcode file"), wxOK | wxICON_WARNING | wxCENTRE).ShowModal();
@@ -6657,6 +6677,11 @@ void Plater::set_bed_shape() const
 void Plater::set_bed_shape(const Pointfs& shape, const double max_print_height, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom) const
 {
     p->set_bed_shape(shape, max_print_height, custom_texture, custom_model, force_as_custom);
+}
+
+void Plater::set_default_bed_shape() const
+{
+    set_bed_shape({ { 0.0, 0.0 }, { 200.0, 0.0 }, { 200.0, 200.0 }, { 0.0, 200.0 } }, 0.0, {}, {}, true);
 }
 
 void Plater::force_filament_colors_update()

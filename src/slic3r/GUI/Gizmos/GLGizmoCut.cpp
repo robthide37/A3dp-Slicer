@@ -864,7 +864,10 @@ void GLGizmoCut3D::on_set_state()
         m_parent.request_extra_frame();
     }
     else {
-        m_c->object_clipper()->release();
+        if (auto oc = m_c->object_clipper()) {
+            oc->set_behavior(true, true, 0.);
+            oc->release();
+        }
         m_selected.clear();
     }
 	force_update_clipper_on_render = m_state == On;
@@ -1000,7 +1003,7 @@ bool GLGizmoCut3D::on_is_activable() const
 {
     const Selection& selection = m_parent.get_selection();
     const int object_idx = selection.get_object_idx();
-    if (object_idx < 0)
+    if (object_idx < 0 || selection.is_wipe_tower())
         return false;
 
     bool is_dowel_object = false;
@@ -1391,7 +1394,7 @@ void GLGizmoCut3D::on_render()
 void GLGizmoCut3D::render_debug_input_window()
 {
     m_imgui->begin(wxString("DEBUG"));
-
+/*
     static bool  hide_clipped  = false;
     static bool  fill_cut      = false;
     static float contour_width = 0.4f;
@@ -1405,7 +1408,7 @@ void GLGizmoCut3D::render_debug_input_window()
         oc->set_behavior(hide_clipped || m_connectors_editing, fill_cut || m_connectors_editing, double(contour_width));
 
     ImGui::Separator();
-
+*/
     if (m_imgui->checkbox(_L("Render cut plane as circle"), m_cut_plane_as_circle))
         m_plane.reset();
 
@@ -1527,8 +1530,16 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     ImGui::Separator();
 
     if (m_imgui->button(_L("Confirm connectors"))) {
-        m_clp_normal         = m_c->object_clipper()->get_clipping_plane()->get_normal();
+        m_clp_normal = m_c->object_clipper()->get_clipping_plane()->get_normal();
         unselect_all_connectors();
+        set_connectors_editing(false);
+    }
+
+    ImGui::SameLine(2.75f * m_label_width);
+
+    if (m_imgui->button(_L("Cancel"))) {
+        m_clp_normal = m_c->object_clipper()->get_clipping_plane()->get_normal();
+        reset_connectors();
         set_connectors_editing(false);
     }
 }
@@ -1573,6 +1584,8 @@ void GLGizmoCut3D::set_connectors_editing(bool connectors_editing)
     m_connectors_editing = connectors_editing;
     update_raycasters_for_picking();
 
+    m_c->object_clipper()->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
+
     m_parent.request_extra_frame();
 }
 
@@ -1602,6 +1615,13 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         if (render_reset_button("cut_plane", _u8L("Reset cutting plane")))
             reset_cut_plane();
         m_imgui->disabled_end();
+
+        ImGui::SameLine(2.25f * m_label_width);
+        ImGui::PushItemWidth(0.75f * m_label_width);
+        m_is_contour_changed = m_imgui->slider_float("contour width", &m_contour_width, 0.f, 3.f);
+
+        if (auto oc = m_c->object_clipper(); oc && m_is_contour_changed)
+            oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
 
         if (wxGetApp().plater()->printer_technology() == ptFFF) {
             m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
@@ -1641,7 +1661,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
     ImGui::Separator();
 
-    m_imgui->disabled_begin(!can_perform_cut());
+    m_imgui->disabled_begin(!m_is_contour_changed && !can_perform_cut());
         if(m_imgui->button(_L("Perform cut")))
             perform_cut(m_parent.get_selection());
     m_imgui->disabled_end();
@@ -1729,6 +1749,8 @@ void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
 
 void GLGizmoCut3D::render_input_window_warning() const
 {
+    if (m_is_contour_changed)
+        return;
     if (wxGetApp().plater()->printer_technology() == ptFFF && m_has_invalid_connector) {
         wxString out = wxString(ImGui::WarningMarkerSmall) + _L("Invalid connectors detected") + ":";
         if (m_info_stats.outside_cut_contour > size_t(0))
@@ -1829,7 +1851,8 @@ void GLGizmoCut3D::render_connectors()
 {
     ::glEnable(GL_DEPTH_TEST);
 
-    if (cut_line_processing() || m_connector_mode == CutConnectorMode::Auto || !m_c->selection_info())
+    if (m_is_contour_changed || cut_line_processing() || 
+        m_connector_mode == CutConnectorMode::Auto || !m_c->selection_info())
         return;
 
     const ModelObject* mo = m_c->selection_info()->model_object();
