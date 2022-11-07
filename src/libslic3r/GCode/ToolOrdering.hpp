@@ -24,14 +24,19 @@ class WipingExtrusions
 {
 public:
     bool is_anything_overridden() const {   // if there are no overrides, all the agenda can be skipped - this function can tell us if that's the case
-        return something_overridden;
+        return m_something_overridden;
     }
 
     // When allocating extruder overrides of an object's ExtrusionEntity, overrides for maximum 3 copies are allocated in place.
     typedef boost::container::small_vector<int32_t, 3> ExtruderPerCopy;
 
-    // This is called from GCode::process_layer - see implementation for further comments:
-    const ExtruderPerCopy* get_extruder_overrides(const ExtrusionEntity* entity, int correct_extruder_id, size_t num_of_copies);
+    // This is called from GCode::process_layer_single_object()
+    // Returns positive number if the extruder is overridden.
+    // Returns -1 if not.
+    int get_extruder_override(const ExtrusionEntity* entity, uint32_t instance_id) const {
+        auto entity_map_it = m_entity_map.find(entity);
+        return entity_map_it == m_entity_map.end() ? -1 : entity_map_it->second[instance_id];
+    }
 
     // This function goes through all infill entities, decides which ones will be used for wiping and
     // marks them by the extruder id. Returns volume that remains to be wiped on the wipe tower:
@@ -42,7 +47,7 @@ public:
     bool is_overriddable(const ExtrusionEntityCollection& ee, const PrintConfig& print_config, const PrintObject& object, const PrintRegion& region) const;
     bool is_overriddable_and_mark(const ExtrusionEntityCollection& ee, const PrintConfig& print_config, const PrintObject& object, const PrintRegion& region) {
     	bool out = this->is_overriddable(ee, print_config, object, region);
-    	this->something_overridable |= out;
+    	m_something_overridable |= out;
     	return out;
     }
 
@@ -57,13 +62,13 @@ private:
 
     // Returns true in case that entity is not printed with its usual extruder for a given copy:
     bool is_entity_overridden(const ExtrusionEntity* entity, size_t copy_id) const {
-        auto it = entity_map.find(entity);
-        return it == entity_map.end() ? false : it->second[copy_id] != -1;
+        auto it = m_entity_map.find(entity);
+        return it == m_entity_map.end() ? false : it->second[copy_id] != -1;
     }
 
-    std::map<const ExtrusionEntity*, ExtruderPerCopy> entity_map;  // to keep track of who prints what
-    bool something_overridable = false;
-    bool something_overridden = false;
+    std::map<const ExtrusionEntity*, ExtruderPerCopy> m_entity_map;  // to keep track of who prints what
+    bool m_something_overridable = false;
+    bool m_something_overridden = false;
     const LayerTools* m_layer_tools = nullptr;    // so we know which LayerTools object this belongs to
 };
 

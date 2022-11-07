@@ -507,16 +507,43 @@ void Layer::sort_perimeters_into_islands(
     for (const ExPolygon &expolygon : fill_expolygons)
         fill_expolygons_bboxes.emplace_back(get_extents(expolygon));
 
+
+    // Take one sample point for each source slice, to be used to sort source slices into layer slices.
+    // source slice index + its sample.
+    std::vector<std::pair<uint32_t, Point>> perimeter_slices_queue;
+    perimeter_slices_queue.reserve(slices.size());
+    for (uint32_t islice = 0; islice < uint32_t(slices.size()); ++ islice) {
+        const std::pair<ExtrusionRange, ExtrusionRange> &extrusions = perimeter_and_gapfill_ranges[islice];
+        Point sample;
+        bool  sample_set = false;
+        if (! extrusions.first.empty()) {
+            sample     = this_layer_region.perimeters().entities[*extrusions.first.begin()]->first_point();
+            sample_set = true;
+        } else if (! extrusions.second.empty()) {
+            sample     = this_layer_region.thin_fills().entities[*extrusions.second.begin()]->first_point();
+            sample_set = true;
+        } else {
+            for (uint32_t iexpoly : fill_expolygons_ranges[islice])
+                if (const ExPolygon &expoly = fill_expolygons[iexpoly]; ! expoly.empty()) {
+                    sample     = expoly.contour.points.front();
+                    sample_set = true;
+                    break;
+                }
+        }
+        // There may be a valid empty island.
+        // assert(sample_set);
+        if (sample_set)
+            perimeter_slices_queue.emplace_back(islice, sample);
+    }
+
     // Map of source fill_expolygon into region and fill_expolygon of that region.
     // -1: not set
     std::vector<std::pair<int, int>> map_expolygon_to_region_and_fill;
-
+    const bool                       has_multiple_regions = layer_region_ids.size() > 1;
+    assert(has_multiple_regions || layer_region_ids.size() == 1);
     // assign fill_surfaces to each layer
     if (! fill_expolygons.empty()) {
-        if (layer_region_ids.size() == 1) {
-            this_layer_region.m_fill_expolygons = std::move(fill_expolygons);
-            this_layer_region.m_fill_expolygons_bboxes = std::move(fill_expolygons_bboxes);
-        } else {
+        if (has_multiple_regions) {
             // Sort the bounding boxes lexicographically.
             std::vector<uint32_t> fill_expolygons_bboxes_sorted(fill_expolygons_bboxes.size());
             std::iota(fill_expolygons_bboxes_sorted.begin(), fill_expolygons_bboxes_sorted.end(), 0);
@@ -550,106 +577,133 @@ void Layer::sort_perimeters_into_islands(
                         }
                 }
             }
+        } else {
+            this_layer_region.m_fill_expolygons        = std::move(fill_expolygons);
+            this_layer_region.m_fill_expolygons_bboxes = std::move(fill_expolygons_bboxes);
         }
-    }
-
-    // Traverse the slices in an increasing order of bounding box size, so that the islands inside another islands are tested first,
-    // so we can just test a point inside ExPolygon::contour and we may skip testing the holes.
-    auto point_inside_surface = [this](const size_t lslice_idx, const Point &point) {
-        const BoundingBox &bbox = this->lslices_ex[lslice_idx].bbox;
-        return point.x() >= bbox.min.x() && point.x() < bbox.max.x() &&
-               point.y() >= bbox.min.y() && point.y() < bbox.max.y() &&
-               this->lslices[lslice_idx].contour.contains(point);
-    };
-
-    // Take one sample point for each source slice, to be used to sort source slices into layer slices.
-    // source slice index + its sample.
-    std::vector<std::pair<uint32_t, Point>> perimeter_slices_queue;
-    perimeter_slices_queue.reserve(slices.size());
-    for (uint32_t islice = 0; islice < uint32_t(slices.size()); ++ islice) {
-        const std::pair<ExtrusionRange, ExtrusionRange> &extrusions = perimeter_and_gapfill_ranges[islice];
-        Point sample;
-        bool  sample_set = false;
-        if (! extrusions.first.empty()) {
-            sample     = this_layer_region.perimeters().entities[*extrusions.first.begin()]->first_point();
-            sample_set = true;
-        } else if (! extrusions.second.empty()) {
-            sample     = this_layer_region.thin_fills().entities[*extrusions.second.begin()]->first_point();
-            sample_set = true;
-        } else if (const ExPolygonRange &fill_expolygon_range = fill_expolygons_ranges[islice]; ! fill_expolygons.empty()) {
-            for (uint32_t iexpoly : fill_expolygon_range)
-                if (const ExPolygon &expoly = fill_expolygons[iexpoly]; ! expoly.empty()) {
-                    sample     = expoly.contour.points.front();
-                    sample_set = true;
-                    break;
-                }
-        }
-        if (sample_set)
-            perimeter_slices_queue.emplace_back(islice, sample);
     }
 
     // Sort perimeter extrusions, thin fill extrusions and fill expolygons into islands.
     std::vector<uint32_t> region_fill_sorted_last;
-    for (int lslice_idx = int(this->lslices_ex.size()) - 1; lslice_idx >= 0 && ! perimeter_slices_queue.empty(); -- lslice_idx) {
+    auto insert_into_island = [
+        // Region where the perimeters, gap fills and fill expolygons are stored.
+        region_id, 
+        // Whether there are infills with different regions generated for this LayerSlice.
+        has_multiple_regions,
+        // Perimeters and gap fills to be sorted into islands.
+        &perimeter_and_gapfill_ranges,
+        // Infill regions to be sorted into islands.
+        &fill_expolygons, &fill_expolygons_bboxes, &fill_expolygons_ranges,
+        // Mapping of fill_expolygon to region and its infill.
+        &map_expolygon_to_region_and_fill,
+        // Output
+        &regions = m_regions, &lslices_ex = this->lslices_ex,
+        // fill_expolygons and fill_expolygons_bboxes need to be sorted into contiguous sequence by island,
+        // thus region_fill_sorted_last contains last fill_expolygon processed (meaning sorted).
+        &region_fill_sorted_last]
+        (int lslice_idx, int source_slice_idx) {
+        lslices_ex[lslice_idx].islands.push_back({});
+        LayerIsland &island = lslices_ex[lslice_idx].islands.back();
+        island.perimeters = LayerExtrusionRange(region_id, perimeter_and_gapfill_ranges[source_slice_idx].first);
+        island.thin_fills = perimeter_and_gapfill_ranges[source_slice_idx].second;
+        if (ExPolygonRange fill_range = fill_expolygons_ranges[source_slice_idx]; ! fill_range.empty()) {
+            if (has_multiple_regions) {
+                // Check whether the fill expolygons of this island were split into multiple regions.
+                island.fill_region_id = LayerIsland::fill_region_composite_id;
+                for (uint32_t fill_idx : fill_range) {
+                    const std::pair<int, int> &kvp = map_expolygon_to_region_and_fill[fill_idx];
+                    if (kvp.first == -1 || (island.fill_region_id != -1 && island.fill_region_id != kvp.second)) {
+                        island.fill_region_id = LayerIsland::fill_region_composite_id;
+                        break;
+                    } else
+                        island.fill_region_id = kvp.second;
+                }
+                if (island.fill_expolygons_composite()) {
+                    // They were split, thus store the unsplit "composite" expolygons into the region of perimeters.
+                    LayerRegion &this_layer_region = *regions[region_id];
+                    auto begin = uint32_t(this_layer_region.fill_expolygons_composite().size());
+                    this_layer_region.m_fill_expolygons_composite.reserve(this_layer_region.fill_expolygons_composite().size() + fill_range.size());
+                    std::move(fill_expolygons.begin() + *fill_range.begin(), fill_expolygons.begin() + *fill_range.end(), std::back_inserter(this_layer_region.m_fill_expolygons_composite));
+                    this_layer_region.m_fill_expolygons_composite_bboxes.insert(this_layer_region.m_fill_expolygons_composite_bboxes.end(), 
+                        fill_expolygons_bboxes.begin() + *fill_range.begin(), fill_expolygons_bboxes.begin() + *fill_range.end());
+                    island.fill_expolygons = ExPolygonRange(begin, uint32_t(this_layer_region.fill_expolygons_composite().size()));
+                } else {
+                    if (region_fill_sorted_last.empty())
+                        region_fill_sorted_last.assign(regions.size(), 0);
+                    uint32_t &last = region_fill_sorted_last[island.fill_region_id];
+                    // They were not split and they belong to the same region.
+                    // Sort the region m_fill_expolygons to a continuous span.
+                    uint32_t begin = last;
+                    LayerRegion &layerm = *regions[island.fill_region_id];
+                    for (uint32_t fill_id : fill_range) {
+                        uint32_t region_fill_id = map_expolygon_to_region_and_fill[fill_id].second;
+                        assert(region_fill_id >= last);
+                        if (region_fill_id > last) {
+                            std::swap(layerm.m_fill_expolygons[region_fill_id], layerm.m_fill_expolygons[last]);
+                            std::swap(layerm.m_fill_expolygons_bboxes[region_fill_id], layerm.m_fill_expolygons_bboxes[last]);
+                        }
+                        ++ last;
+                    }
+                    island.fill_expolygons = ExPolygonRange(begin, last);
+                }
+            } else {
+                // Layer island is made of one fill region only.
+                island.fill_expolygons = fill_range;
+                island.fill_region_id  = region_id;
+            }
+        }
+    };
+
+    // First sort into islands using exact fit.
+    // Traverse the slices in an increasing order of bounding box size, so that the islands inside another islands are tested first,
+    // so we can just test a point inside ExPolygon::contour and we may skip testing the holes.
+    auto point_inside_surface = [&lslices = this->lslices, &lslices_ex = this->lslices_ex](size_t lslice_idx, const Point &point) {
+        const BoundingBox &bbox = lslices_ex[lslice_idx].bbox;
+        return point.x() >= bbox.min.x() && point.x() < bbox.max.x() &&
+               point.y() >= bbox.min.y() && point.y() < bbox.max.y() &&
+               // Exact match: Don't just test whether a point is inside the outer contour of an island,
+               // test also whether the point is not inside some hole of the same expolygon.
+               // This is unfortunatelly necessary because the point may be inside an expolygon of one of this expolygon's hole
+               // and missed due to numerical issues.
+               lslices[lslice_idx].contains(point);
+    };
+    for (int lslice_idx = int(lslices_ex.size()) - 1; lslice_idx >= 0 && ! perimeter_slices_queue.empty(); -- lslice_idx)
         for (auto it_source_slice = perimeter_slices_queue.begin(); it_source_slice != perimeter_slices_queue.end(); ++ it_source_slice)
             if (point_inside_surface(lslice_idx, it_source_slice->second)) {
-                this->lslices_ex[lslice_idx].islands.push_back({});
-                LayerIsland &island = this->lslices_ex[lslice_idx].islands.back();
-                const uint32_t source_slice_idx = it_source_slice->first;
-                island.perimeters = LayerExtrusionRange(region_id, perimeter_and_gapfill_ranges[source_slice_idx].first);
-                island.thin_fills = perimeter_and_gapfill_ranges[source_slice_idx].second;
-                if (ExPolygonRange fill_range = fill_expolygons_ranges[source_slice_idx]; ! fill_range.empty()) {
-                    if (layer_region_ids.size() == 1) {
-                        // Layer island is made of one fill region only.
-                        island.fill_expolygons = fill_range;
-                        island.fill_region_id  = region_id;
-                    } else {
-                        // Check whether the fill expolygons of this island were split into multiple regions.
-                        island.fill_region_id = LayerIsland::fill_region_composite_id;
-                        for (uint32_t fill_idx : fill_range) {
-                            const std::pair<int, int> &kvp = map_expolygon_to_region_and_fill[fill_idx];
-                            if (kvp.first == -1 || (island.fill_region_id != -1 && island.fill_region_id != kvp.second)) {
-                                island.fill_region_id = LayerIsland::fill_region_composite_id;
-                                break;
-                            } else
-                                island.fill_region_id = kvp.second;
-                        }
-                        if (island.fill_expolygons_composite()) {
-                            // They were split, thus store the unsplit "composite" expolygons into the region of perimeters.
-                            auto begin = uint32_t(this_layer_region.fill_expolygons_composite().size());
-                            this_layer_region.m_fill_expolygons_composite.reserve(this_layer_region.fill_expolygons_composite().size() + fill_range.size());
-                            std::move(fill_expolygons.begin() + *fill_range.begin(), fill_expolygons.begin() + *fill_range.end(), std::back_inserter(this_layer_region.m_fill_expolygons_composite));
-                            this_layer_region.m_fill_expolygons_composite_bboxes.insert(this_layer_region.m_fill_expolygons_composite_bboxes.end(), 
-                                fill_expolygons_bboxes.begin() + *fill_range.begin(), fill_expolygons_bboxes.begin() + *fill_range.end());
-                            island.fill_expolygons = ExPolygonRange(begin, uint32_t(this_layer_region.fill_expolygons_composite().size()));
-                        } else {
-                            if (region_fill_sorted_last.empty())
-                                region_fill_sorted_last.assign(m_regions.size(), 0);
-                            uint32_t &last = region_fill_sorted_last[island.fill_region_id];
-                            // They were not split and they belong to the same region.
-                            // Sort the region m_fill_expolygons to a continuous span.
-                            uint32_t begin = last;
-                            LayerRegion &layerm = *m_regions[island.fill_region_id];
-                            for (uint32_t fill_id : fill_range) {
-                                uint32_t region_fill_id = map_expolygon_to_region_and_fill[fill_id].second;
-                                assert(region_fill_id >= last);
-                                if (region_fill_id > last) {
-                                    std::swap(layerm.m_fill_expolygons[region_fill_id], layerm.m_fill_expolygons[last]);
-                                    std::swap(layerm.m_fill_expolygons_bboxes[region_fill_id], layerm.m_fill_expolygons_bboxes[last]);
-                                }
-                                ++ last;
-                            }
-                            island.fill_expolygons = ExPolygonRange(begin, last);
-                        }
-                    }
-                }
-                if (std::next(it_source_slice) != perimeter_slices_queue.end()) {
+                insert_into_island(lslice_idx, it_source_slice->first);
+                if (std::next(it_source_slice) != perimeter_slices_queue.end())
                     // Remove the current slice & point pair from the queue.
                     *it_source_slice = perimeter_slices_queue.back();
-                    perimeter_slices_queue.pop_back();
-                }
+                perimeter_slices_queue.pop_back();
                 break;
             }
+    // If anything fails to be sorted in using exact fit, try to find a closest island.
+    auto point_inside_surface_dist2 =
+        [&lslices = this->lslices, &lslices_ex = this->lslices_ex, bbox_eps = scaled<coord_t>(this->object()->print()->config().gcode_resolution.value) + SCALED_EPSILON]
+        (const size_t lslice_idx, const Point &point) {
+        const BoundingBox &bbox = lslices_ex[lslice_idx].bbox;
+        return 
+            point.x() < bbox.min.x() - bbox_eps || point.x() > bbox.max.x() + bbox_eps ||
+            point.y() < bbox.min.y() - bbox_eps || point.y() > bbox.max.y() + bbox_eps ?
+            std::numeric_limits<double>::max() :
+            (lslices[lslice_idx].point_projection(point) - point).cast<double>().squaredNorm();
+    };
+    for (int lslice_idx = int(lslices_ex.size()) - 1; lslice_idx >= 0 && ! perimeter_slices_queue.empty(); -- lslice_idx) {
+        double d2min = std::numeric_limits<double>::max();
+        auto it_source_slice = perimeter_slices_queue.end();
+        for (auto it = perimeter_slices_queue.begin(); it != perimeter_slices_queue.end(); ++ it)
+            if (double d2 = point_inside_surface_dist2(lslice_idx, it->second); d2 < d2min) {
+                d2min = d2;
+                it_source_slice = it;
+            }
+        assert(it_source_slice != perimeter_slices_queue.end());
+        if (it_source_slice != perimeter_slices_queue.end()) {
+            insert_into_island(lslice_idx, it_source_slice->first);
+            if (std::next(it_source_slice) != perimeter_slices_queue.end())
+                // Remove the current slice & point pair from the queue.
+                *it_source_slice = perimeter_slices_queue.back();
+            perimeter_slices_queue.pop_back();
+        }
     }
 }
 

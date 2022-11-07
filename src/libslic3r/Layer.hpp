@@ -79,8 +79,8 @@ private:
     uint32_t    m_region  { 0 };
 };
 
-// Most likely one LayerIsland will be filled with maximum one fill type.
-static constexpr const size_t LayerExtrusionRangesStaticSize = 1;
+// One LayerIsland may be filled with solid fill, sparse fill, top / bottom fill.
+static constexpr const size_t LayerExtrusionRangesStaticSize = 3;
 using LayerExtrusionRanges =
 #ifdef NDEBUG
     // To reduce memory allocation in release mode.

@@ -103,7 +103,7 @@ ToolOrdering::ToolOrdering(const PrintObject &object, unsigned int first_extrude
     }
     double max_layer_height = calc_max_layer_height(object.print()->config(), object.config().layer_height);
 
-    // Collect extruders reuqired to print the layers.
+    // Collect extruders required to print the layers.
     this->collect_extruders(object, std::vector<std::pair<double, unsigned int>>());
 
     // Reorder the extruders to minimize tool switches.
@@ -598,14 +598,15 @@ const LayerTools& ToolOrdering::tools_for_layer(coordf_t print_z) const
 // This function is called from Print::mark_wiping_extrusions and sets extruder this entity should be printed with (-1 .. as usual)
 void WipingExtrusions::set_extruder_override(const ExtrusionEntity* entity, size_t copy_id, int extruder, size_t num_of_copies)
 {
-    something_overridden = true;
+    m_something_overridden = true;
 
-    auto entity_map_it = (entity_map.emplace(entity, ExtruderPerCopy())).first; // (add and) return iterator
+    auto entity_map_it = (m_entity_map.emplace(entity, ExtruderPerCopy())).first; // (add and) return iterator
     ExtruderPerCopy& copies_vector = entity_map_it->second;
     copies_vector.resize(num_of_copies, -1);
 
+    assert(copies_vector[copy_id] == -1);
     if (copies_vector[copy_id] != -1)
-        std::cout << "ERROR: Entity extruder overriden multiple times!!!\n";    // A debugging message - this must never happen.
+        BOOST_LOG_TRIVIAL(error) << "ERROR: Entity extruder overriden multiple times!!!";
 
     copies_vector[copy_id] = extruder;
 }
@@ -649,13 +650,19 @@ bool WipingExtrusions::is_overriddable(const ExtrusionEntityCollection& eec, con
 
 // Following function iterates through all extrusions on the layer, remembers those that could be used for wiping after toolchange
 // and returns volume that is left to be wiped on the wipe tower.
+// Switching from old_extruder to new_extruder, trying to wipe volume_to_wipe into not yet extruded extrusions, that may change material (overridable).
 float WipingExtrusions::mark_wiping_extrusions(const Print& print, unsigned int old_extruder, unsigned int new_extruder, float volume_to_wipe)
 {
     const LayerTools& lt = *m_layer_tools;
     const float min_infill_volume = 0.f; // ignore infill with smaller volume than this
 
-    if (! this->something_overridable || volume_to_wipe <= 0. || print.config().filament_soluble.get_at(old_extruder) || print.config().filament_soluble.get_at(new_extruder))
-        return std::max(0.f, volume_to_wipe); // Soluble filament cannot be wiped in a random infill, neither the filament after it
+    if (! m_something_overridable || volume_to_wipe <= 0. || 
+        // Don't wipe a soluble filament into another object.
+        print.config().filament_soluble.get_at(old_extruder) || 
+        // Don't prime a soluble filament into another object.
+        print.config().filament_soluble.get_at(new_extruder))
+        // Soluble filament cannot be wiped in a random infill, neither the filament after it
+        return std::max(0.f, volume_to_wipe);
 
     // we will sort objects so that dedicated for wiping are at the beginning:
     ConstPrintObjectPtrs object_list(print.objects().begin(), print.objects().end());
@@ -742,7 +749,7 @@ float WipingExtrusions::mark_wiping_extrusions(const Print& print, unsigned int 
 // them again and make sure we override it.
 void WipingExtrusions::ensure_perimeters_infills_order(const Print& print)
 {
-	if (! this->something_overridable)
+	if (! m_something_overridable)
 		return;
 
     const LayerTools& lt = *m_layer_tools;
@@ -775,8 +782,8 @@ void WipingExtrusions::ensure_perimeters_infills_order(const Print& print)
                     // Either way, we will now force-override it with something suitable:
                     if (print.config().infill_first
                     || object->config().wipe_into_objects  // in this case the perimeter is overridden, so we can override by the last one safely
-                    || lt.is_extruder_order(lt.perimeter_extruder(region), last_nonsoluble_extruder    // !infill_first, but perimeter is already printed when last extruder prints
-                    || ! lt.has_extruder(lt.infill_extruder(region)))) // we have to force override - this could violate infill_first (FIXME)
+                    || lt.is_extruder_order(lt.perimeter_extruder(region), last_nonsoluble_extruder)    // !infill_first, but perimeter is already printed when last extruder prints
+                    || ! lt.has_extruder(lt.infill_extruder(region))) // we have to force override - this could violate infill_first (FIXME)
                         set_extruder_override(fill, copy, (print.config().infill_first ? first_nonsoluble_extruder : last_nonsoluble_extruder), num_of_copies);
                     else {
                         // In this case we can (and should) leave it to be printed normally.
@@ -794,25 +801,5 @@ void WipingExtrusions::ensure_perimeters_infills_order(const Print& print)
         }
     }
 }
-
-// Following function is called from GCode::process_layer and returns pointer to vector with information about which extruders should be used for given copy of this entity.
-// If this extrusion does not have any override, nullptr is returned.
-// Otherwise it modifies the vector in place and changes all -1 to correct_extruder_id (at the time the overrides were created, correct extruders were not known,
-// so -1 was used as "print as usual").
-// The resulting vector therefore keeps track of which extrusions are the ones that were overridden and which were not. If the extruder used is overridden,
-// its number is saved as is (zero-based index). Regular extrusions are saved as -number-1 (unfortunately there is no negative zero).
-const WipingExtrusions::ExtruderPerCopy* WipingExtrusions::get_extruder_overrides(const ExtrusionEntity* entity, int correct_extruder_id, size_t num_of_copies)
-{
-	ExtruderPerCopy *overrides = nullptr;
-    auto entity_map_it = entity_map.find(entity);
-    if (entity_map_it != entity_map.end()) {
-        overrides = &entity_map_it->second;
-    	overrides->resize(num_of_copies, -1);
-	    // Each -1 now means "print as usual" - we will replace it with actual extruder id (shifted it so we don't lose that information):
-	    std::replace(overrides->begin(), overrides->end(), -1, -correct_extruder_id-1);
-	}
-    return overrides;
-}
-
 
 } // namespace Slic3r

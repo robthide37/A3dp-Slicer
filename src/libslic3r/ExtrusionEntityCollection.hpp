@@ -127,12 +127,12 @@ public:
     };
 
     void collect_polylines(Polylines &dst) const override {
-        for (ExtrusionEntity* extrusion_entity : this->entities)
+        for (const ExtrusionEntity *extrusion_entity : this->entities)
             extrusion_entity->collect_polylines(dst);
     }
 
     void   collect_points(Points &dst) const override {
-        for (ExtrusionEntity* extrusion_entity : this->entities)
+        for (const ExtrusionEntity *extrusion_entity : this->entities)
             extrusion_entity->collect_points(dst);
     }
 
