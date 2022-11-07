@@ -188,7 +188,7 @@ void ToolOrdering::initialize_layers(std::vector<coordf_t> &zs)
 }
 
 // Decides whether this entity could be overridden
-static [[nodiscard]] bool is_overriddable(const ExtrusionEntityCollection& eec, const LayerTools& lt, const PrintConfig& print_config, const PrintObject& object, const PrintRegion& region)
+[[nodiscard]] static bool is_overriddable(const ExtrusionEntityCollection& eec, const LayerTools& lt, const PrintConfig& print_config, const PrintObject& object, const PrintRegion& region)
 {
     if (print_config.filament_soluble.get_at(lt.extruder(eec, region)))
         return false;
@@ -631,7 +631,7 @@ void WipingExtrusions::set_extruder_override(const ExtrusionEntity* entity, size
 }
 
 // Finds first non-soluble extruder on the layer
-static [[nodiscard]] int first_nonsoluble_extruder_on_layer(const PrintConfig& print_config, const LayerTools& layer_tools)
+[[nodiscard]] static int first_nonsoluble_extruder_on_layer(const PrintConfig& print_config, const LayerTools& layer_tools)
 {
     for (auto extruders_it = layer_tools.extruders.begin(); extruders_it != layer_tools.extruders.end(); ++extruders_it)
         if (!print_config.filament_soluble.get_at(*extruders_it))
@@ -641,7 +641,7 @@ static [[nodiscard]] int first_nonsoluble_extruder_on_layer(const PrintConfig& p
 }
 
 // Finds last non-soluble extruder on the layer
-static [[nodiscard]] int last_nonsoluble_extruder_on_layer(const PrintConfig& print_config, const LayerTools& layer_tools)
+[[nodiscard]] static int last_nonsoluble_extruder_on_layer(const PrintConfig& print_config, const LayerTools& layer_tools)
 {
     for (auto extruders_it = layer_tools.extruders.rbegin(); extruders_it != layer_tools.extruders.rend(); ++extruders_it)
         if (!print_config.filament_soluble.get_at(*extruders_it))

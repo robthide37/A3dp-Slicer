@@ -2399,7 +2399,8 @@ void GCode::process_layer_single_object(
                     for (uint32_t perimeter_id : island.perimeters)
                         if (const auto *eec = static_cast<const ExtrusionEntityCollection*>(layerm.perimeters().entities[perimeter_id]);
                             shall_print_this_extrusion_collection(eec, region)) {
-                            assert(! eec->can_reverse());
+                            // This may not apply to Arachne, but maybe the Arachne gap fill should disable reverse as well?
+                            // assert(! eec->can_reverse());
                             if (first) {
                                 first = false;
                                 init_layer_delayed();

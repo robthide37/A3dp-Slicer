@@ -398,6 +398,9 @@ void Layer::make_perimeters()
         layerm.m_fill_expolygons_composite_bboxes.clear();
     };
 
+    for (LayerSlice &lslice : this->lslices_ex)
+        lslice.islands.clear();
+
     for (LayerRegionPtrs::iterator layerm = m_regions.begin(); layerm != m_regions.end(); ++ layerm)
         if (size_t region_id = layerm - m_regions.begin(); ! done[region_id]) {
             layer_region_reset_perimeters(**layerm);
@@ -496,9 +499,6 @@ void Layer::sort_perimeters_into_islands(
     // If the current layer consists of multiple regions, then the fill_expolygons above are split by the source LayerRegion surfaces.
     const std::vector<uint32_t>                                     &layer_region_ids)
 {
-    for (LayerSlice &lslice : this->lslices_ex)
-        lslice.islands.clear();
-
     LayerRegion &this_layer_region = *m_regions[region_id];
 
     // Bounding boxes of fill_expolygons.
@@ -705,6 +705,7 @@ void Layer::sort_perimeters_into_islands(
             perimeter_slices_queue.pop_back();
         }
     }
+    assert(perimeter_slices_queue.empty());
 }
 
 void Layer::export_region_slices_to_svg(const char *path) const
