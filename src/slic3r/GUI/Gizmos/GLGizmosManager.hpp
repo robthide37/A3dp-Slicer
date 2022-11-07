@@ -79,9 +79,9 @@ public:
         FdmSupports,
         Seam,
         MmuSegmentation,
+        Measure,
         Emboss,
         Simplify,
-        Measure,
         Undefined
     };
 
