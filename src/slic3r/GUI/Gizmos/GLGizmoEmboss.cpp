@@ -1546,9 +1546,6 @@ void GLGizmoEmboss::draw_font_list()
         });
     }
 
-    // variable for detect just closed combo box
-    static bool allow_update_rendered_font = false;
-
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if (!m_face_names.is_init) init_face_names();
         if (m_face_names.texture_id == 0) init_font_name_texture();
