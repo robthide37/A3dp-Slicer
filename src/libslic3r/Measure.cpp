@@ -723,8 +723,8 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
         if (f2.get_type() == SurfaceFeatureType::Point) {
             Vec3d diff = (f2.get_point() - f1.get_point());
             result.distance_strict = std::make_optional(DistAndPoints{diff.norm(), f1.get_point(), f2.get_point()});
-            result.distance_xyz = diff;
-            
+            result.distance_xyz = diff.cwiseAbs();
+
     ///////////////////////////////////////////////////////////////////////////
         } else if (f2.get_type() == SurfaceFeatureType::Edge) {
             const auto [s,e] = f2.get_edge();

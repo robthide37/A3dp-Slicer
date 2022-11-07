@@ -156,10 +156,10 @@ struct MeasurementResult {
             angle->transform(trafo);
         if (distance_infinite.has_value())
             distance_infinite->transform(trafo);
-        if (distance_strict.has_value())
+        if (distance_strict.has_value()) {
             distance_strict->transform(trafo);
-        if (distance_xyz.has_value())
-            distance_xyz = trafo * *distance_xyz;
+            distance_xyz = (distance_strict->to - distance_strict->from).cwiseAbs();
+        }
     }
 };
 
