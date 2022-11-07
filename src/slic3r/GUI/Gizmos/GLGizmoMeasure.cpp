@@ -306,6 +306,8 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
                 m_measurement_result.transform(m_volume_matrix);
             }
 
+            m_imgui->set_requires_extra_frame();
+
             return true;
         }
 
@@ -327,7 +329,7 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
     else if (mouse_event.RightDown() && mouse_event.CmdDown()) {
         m_selected_features.reset();
         m_selection_raycasters.clear();
-        m_imgui->set_requires_extra_frame();
+        m_parent.request_extra_frame();
     }
     else if (mouse_event.Leaving())
         m_mouse_left_down = false;
