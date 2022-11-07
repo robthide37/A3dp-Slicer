@@ -209,7 +209,7 @@ std::optional<wxFont> WxFontUtils::create_wxFont(const EmbossStyle &style)
     double  point_size = static_cast<double>(fp.size_in_mm);
     wxFontInfo info(point_size);
     if (fp.family.has_value()) {
-        auto it = type_to_family.right.find(*fp.style);
+        auto it = type_to_family.right.find(*fp.family);
         if (it != type_to_family.right.end()) info.Family(it->second);
     }
     if (fp.face_name.has_value()) {
