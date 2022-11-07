@@ -116,6 +116,7 @@ class GLGizmoMeasure : public GLGizmoBase
     KeyAutoRepeatFilter m_ctrl_kar_filter;
 
     SelectedFeatures m_selected_features;
+    bool m_pending_scale{ false };
     bool m_editing_distance{ false };
     bool m_is_editing_distance_first_frame{ true };
 

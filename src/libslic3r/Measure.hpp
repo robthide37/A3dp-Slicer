@@ -150,6 +150,17 @@ struct MeasurementResult {
     bool has_any_data() const {
         return angle.has_value() || distance_infinite.has_value() || distance_strict.has_value() || distance_xyz.has_value();
     }
+
+    void transform(const Transform3d& trafo) {
+        if (angle.has_value())
+            angle->transform(trafo);
+        if (distance_infinite.has_value())
+            distance_infinite->transform(trafo);
+        if (distance_strict.has_value())
+            distance_strict->transform(trafo);
+        if (distance_xyz.has_value())
+            distance_xyz = trafo * *distance_xyz;
+    }
 };
 
 // Returns distance/angle between two SurfaceFeatures.

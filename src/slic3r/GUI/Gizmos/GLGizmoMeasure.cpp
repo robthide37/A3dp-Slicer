@@ -303,14 +303,7 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             if (m_selected_features != selected_features_old && m_selected_features.second.feature.has_value()) {
                 m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
                 // transform to world coordinates
-                if (m_measurement_result.angle.has_value())
-                    m_measurement_result.angle->transform(m_volume_matrix);
-                if (m_measurement_result.distance_infinite.has_value())
-                    m_measurement_result.distance_infinite->transform(m_volume_matrix);
-                if (m_measurement_result.distance_strict.has_value())
-                    m_measurement_result.distance_strict->transform(m_volume_matrix);
-                if (m_measurement_result.distance_xyz.has_value())
-                    m_measurement_result.distance_xyz = TransformHelper::model_to_world(*m_measurement_result.distance_xyz, m_volume_matrix);
+                m_measurement_result.transform(m_volume_matrix);
             }
 
             return true;
@@ -357,7 +350,14 @@ void GLGizmoMeasure::data_changed()
 
     m_last_inv_zoom = 0.0f;
     m_last_plane_idx = -1;
-    m_selected_features.reset();
+    if (m_pending_scale) {
+        m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
+        // transform to world coordinates
+        m_measurement_result.transform(m_volume_matrix);
+        m_pending_scale = false;
+    }
+    else
+        m_selected_features.reset();
     m_selection_raycasters.clear();
     m_editing_distance = false;
     m_is_editing_distance_first_frame = true;
@@ -1007,6 +1007,9 @@ void GLGizmoMeasure::render_dimensioning()
                 selection.scale(ratio * Vec3d::Ones(), type);
                 wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
                 wxGetApp().obj_manipul()->set_dirty();
+
+                // update measure on next call to data_changed()
+                m_pending_scale = true;
             };
             auto action_exit = [this]() {
                 m_editing_distance = false;
