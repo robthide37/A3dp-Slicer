@@ -42,17 +42,13 @@ public:
 
     // This function goes through all infill entities, decides which ones will be used for wiping and
     // marks them by the extruder id. Returns volume that remains to be wiped on the wipe tower:
-    float mark_wiping_extrusions(const Print& print, unsigned int old_extruder, unsigned int new_extruder, float volume_to_wipe);
+    float mark_wiping_extrusions(const Print& print, const LayerTools& lt, unsigned int old_extruder, unsigned int new_extruder, float volume_to_wipe);
 
-    void ensure_perimeters_infills_order(const Print& print);
+    void ensure_perimeters_infills_order(const Print& print, const LayerTools& lt);
 
-    bool is_overriddable(const ExtrusionEntityCollection& ee, const PrintConfig& print_config, const PrintObject& object, const PrintRegion& region) const;
     void set_something_overridable() { m_something_overridable = true; }
 
 private:
-    int first_nonsoluble_extruder_on_layer(const PrintConfig& print_config) const;
-    int last_nonsoluble_extruder_on_layer(const PrintConfig& print_config) const;
-
     // This function is called from mark_wiping_extrusions and sets extruder that it should be printed with (-1 .. as usual)
     void set_extruder_override(const ExtrusionEntity* entity, size_t copy_id, int extruder, size_t num_of_copies);
 
@@ -114,9 +110,6 @@ private:
     // to access LayerTools private constructor
     friend class ToolOrdering;
     LayerTools(const coordf_t z) : print_z(z) {}
-
-    // for calculating offset of m_wiping_extrusions in LayerTools. 
-    friend const LayerTools& layer_tools(const WipingExtrusions *self);
 
     // This object holds list of extrusion that will be used for extruder wiping
     WipingExtrusions m_wiping_extrusions;

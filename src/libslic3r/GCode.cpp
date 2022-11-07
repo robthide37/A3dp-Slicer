@@ -2204,7 +2204,6 @@ LayerResult GCode::process_layer(
             m_avoid_crossing_perimeters.disable_once();
         }
 
-
         std::vector<InstanceToPrint> instances_to_print = sort_print_object_instances(layers, ordering, single_object_instance_idx);
 
         // We are almost ready to print. However, we must go through all the objects twice to print the the overridden extrusions first (infill/perimeter wiping feature):
