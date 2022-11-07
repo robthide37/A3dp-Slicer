@@ -3460,6 +3460,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     m_gizmos.get_current_type() != GLGizmosManager::FdmSupports &&
                     m_gizmos.get_current_type() != GLGizmosManager::Seam &&
                     m_gizmos.get_current_type() != GLGizmosManager::Cut &&
+                    m_gizmos.get_current_type() != GLGizmosManager::Measure &&
                     m_gizmos.get_current_type() != GLGizmosManager::MmuSegmentation) {
                     m_rectangle_selection.start_dragging(m_mouse.position, evt.ShiftDown() ? GLSelectionRectangle::EState::Select : GLSelectionRectangle::EState::Deselect);
                     m_dirty = true;
@@ -3695,7 +3696,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 // if right clicking on volume, propagate event through callback (shows context menu)
                 int volume_idx = get_first_hover_volume_idx();
                 if (!m_volumes.volumes[volume_idx]->is_wipe_tower // no context menu for the wipe tower
-                    && m_gizmos.get_current_type() != GLGizmosManager::SlaSupports)  // disable context menu when the gizmo is open
+                    && (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports && m_gizmos.get_current_type() != GLGizmosManager::Measure))  // disable context menu when the gizmo is open
                 {
                     // forces the selection of the volume
                     /* m_selection.add(volume_idx); // #et_FIXME_if_needed
@@ -3719,7 +3720,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             if (!m_mouse.dragging) {
                 // do not post the event if the user is panning the scene
                 // or if right click was done over the wipe tower
-                const bool post_right_click_event = m_hover_volume_idxs.empty() || !m_volumes.volumes[get_first_hover_volume_idx()]->is_wipe_tower;
+                const bool post_right_click_event = (m_hover_volume_idxs.empty() || !m_volumes.volumes[get_first_hover_volume_idx()]->is_wipe_tower) &&
+                    m_gizmos.get_current_type() != GLGizmosManager::Measure;
                 if (post_right_click_event)
                     post_event(RBtnEvent(EVT_GLCANVAS_RIGHT_CLICK, { logical_pos, m_hover_volume_idxs.empty() }));
             }

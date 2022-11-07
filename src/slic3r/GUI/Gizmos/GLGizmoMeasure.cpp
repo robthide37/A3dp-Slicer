@@ -303,15 +303,10 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             if (m_selected_features != selected_features_old && m_selected_features.second.feature.has_value()) {
                 m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
                 // transform to world coordinates
-                if (m_measurement_result.angle.has_value())
-                    m_measurement_result.angle->transform(m_volume_matrix);
-                if (m_measurement_result.distance_infinite.has_value())
-                    m_measurement_result.distance_infinite->transform(m_volume_matrix);
-                if (m_measurement_result.distance_strict.has_value())
-                    m_measurement_result.distance_strict->transform(m_volume_matrix);
-                if (m_measurement_result.distance_xyz.has_value())
-                    m_measurement_result.distance_xyz = TransformHelper::model_to_world(*m_measurement_result.distance_xyz, m_volume_matrix);
+                m_measurement_result.transform(m_volume_matrix);
             }
+
+            m_imgui->set_requires_extra_frame();
 
             return true;
         }
@@ -334,7 +329,7 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
     else if (mouse_event.RightDown() && mouse_event.CmdDown()) {
         m_selected_features.reset();
         m_selection_raycasters.clear();
-        m_imgui->set_requires_extra_frame();
+        m_parent.request_extra_frame();
     }
     else if (mouse_event.Leaving())
         m_mouse_left_down = false;
@@ -357,7 +352,14 @@ void GLGizmoMeasure::data_changed()
 
     m_last_inv_zoom = 0.0f;
     m_last_plane_idx = -1;
-    m_selected_features.reset();
+    if (m_pending_scale) {
+        m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
+        // transform to world coordinates
+        m_measurement_result.transform(m_volume_matrix);
+        m_pending_scale = false;
+    }
+    else
+        m_selected_features.reset();
     m_selection_raycasters.clear();
     m_editing_distance = false;
     m_is_editing_distance_first_frame = true;
@@ -905,7 +907,7 @@ void GLGizmoMeasure::render_dimensioning()
         return;
 
     auto point_point = [this, shader](const Vec3d& v1, const Vec3d& v2, float distance) {
-        if (v1.isApprox(v2))
+        if ((v2 - v1).squaredNorm() < 0.000001 || distance < 0.001f)
             return;
 
         const Camera& camera = wxGetApp().plater()->get_camera();
@@ -1007,6 +1009,9 @@ void GLGizmoMeasure::render_dimensioning()
                 selection.scale(ratio * Vec3d::Ones(), type);
                 wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
                 wxGetApp().obj_manipul()->set_dirty();
+
+                // update measure on next call to data_changed()
+                m_pending_scale = true;
             };
             auto action_exit = [this]() {
                 m_editing_distance = false;
@@ -1271,13 +1276,6 @@ void GLGizmoMeasure::render_dimensioning()
 
     if (m_selected_features.second.feature.has_value()) {
         const bool has_distance = m_measurement_result.has_distance_data();
-        if (has_distance) {
-            // Render the arrow between the points that the backend passed:
-            const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
-                ? *m_measurement_result.distance_infinite
-                : *m_measurement_result.distance_strict;
-            point_point(dap.from, dap.to, dap.dist);
-        }
 
         const Measure::SurfaceFeature* f1 = &(*m_selected_features.first.feature);
         const Measure::SurfaceFeature* f2 = &(*m_selected_features.second.feature);
@@ -1290,17 +1288,25 @@ void GLGizmoMeasure::render_dimensioning()
             std::swap(f1, f2);
         }
 
-        // Where needed, draw also the extension of the edge to where the dist is measured:
-        if (has_distance && ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
-            point_edge(*f1, *f2);
-
-        // Now if there is an angle to show, draw the arc:
+        // If there is an angle to show, draw the arc:
         if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Edge)
             arc_edge_edge(*f1, *f2);
         else if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Plane)
             arc_edge_plane(*f1, *f2);
         else if (ft1 == Measure::SurfaceFeatureType::Plane && ft2 == Measure::SurfaceFeatureType::Plane)
             arc_plane_plane(*f1, *f2);
+
+        if (has_distance){
+            // Where needed, draw the extension of the edge to where the dist is measured:
+            if (ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
+                point_edge(*f1, *f2);
+
+            // Render the arrow between the points that the backend passed:
+            const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
+                ? *m_measurement_result.distance_infinite
+                : *m_measurement_result.distance_strict;
+            point_point(dap.from, dap.to, dap.dist);
+        }
     }
     
     glsafe(::glEnable(GL_DEPTH_TEST));

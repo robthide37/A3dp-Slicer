@@ -2882,6 +2882,9 @@ static bool can_add_volumes_to_object(const ModelObject* object)
 
 wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection/* = nullptr*/)
 {
+    const bool is_prevent_list_events = m_prevent_list_events;
+    m_prevent_list_events = true;
+
     wxDataViewItem object_item = m_objects_model->GetItemById(int(obj_idx));
     m_objects_model->DeleteVolumeChildren(object_item);
 
@@ -2909,6 +2912,7 @@ wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, st
         Expand(object_item);
     }
 
+    m_prevent_list_events = is_prevent_list_events;
     return items;
 }
 

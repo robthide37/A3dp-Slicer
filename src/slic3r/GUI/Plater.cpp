@@ -5477,10 +5477,27 @@ void Plater::load_gcode(const wxString& filename)
     p->gcode_result = std::move(processor.extract_result());
 
     // show results
-    p->preview->reload_print(false);
+    try
+    {
+        p->preview->reload_print(false);
+    }
+    catch (const std::exception&)
+    {
+        wxEndBusyCursor();
+        p->gcode_result.reset();
+        reset_gcode_toolpaths();
+        set_default_bed_shape();
+        p->preview->reload_print(false);
+        p->get_current_canvas3D()->render();
+        MessageDialog(this, _L("The selected file") + ":\n" + filename + "\n" + _L("does not contain valid gcode."),
+            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("Error while loading .gcode file"), wxOK | wxICON_WARNING | wxCENTRE).ShowModal();
+        set_project_filename(wxEmptyString);
+        return;
+    }
     p->preview->get_canvas3d()->zoom_to_gcode();
 
     if (p->preview->get_canvas3d()->get_gcode_layers_zs().empty()) {
+        wxEndBusyCursor();
         //wxMessageDialog(this, _L("The selected file") + ":\n" + filename + "\n" + _L("does not contain valid gcode."),
         MessageDialog(this, _L("The selected file") + ":\n" + filename + "\n" + _L("does not contain valid gcode."),
             wxString(GCODEVIEWER_APP_NAME) + " - " + _L("Error while loading .gcode file"), wxOK | wxICON_WARNING | wxCENTRE).ShowModal();
@@ -6644,6 +6661,11 @@ void Plater::set_bed_shape() const
 void Plater::set_bed_shape(const Pointfs& shape, const double max_print_height, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom) const
 {
     p->set_bed_shape(shape, max_print_height, custom_texture, custom_model, force_as_custom);
+}
+
+void Plater::set_default_bed_shape() const
+{
+    set_bed_shape({ { 0.0, 0.0 }, { 200.0, 0.0 }, { 200.0, 200.0 }, { 0.0, 200.0 } }, 0.0, {}, {}, true);
 }
 
 void Plater::force_filament_colors_update()
