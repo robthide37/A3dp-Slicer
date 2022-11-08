@@ -112,6 +112,8 @@ public:
     const std::optional<wxFont> &get_wx_font()        const { return m_style_cache.wx_font; }
     const std::optional<wxFont> &get_stored_wx_font() const { return m_style_cache.stored_wx_font; }
     Emboss::FontFileWithCache &get_font_file_with_cache()   { return m_style_cache.font_file; }
+    bool has_collections() const { return m_style_cache.font_file.font_file != nullptr && 
+                                          m_style_cache.font_file.font_file->infos.size() > 1; }
 
     // True when activ style has same name as some of stored style
     bool exist_stored_style() const { return m_style_cache.style_index != std::numeric_limits<size_t>::max(); }

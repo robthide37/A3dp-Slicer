@@ -735,6 +735,10 @@ void GLGizmoEmboss::initialize()
         ImVec2(cfg.minimal_window_size.x,
                cfg.minimal_window_size.y + advance_height);
 
+    cfg.minimal_window_size_with_collections = 
+        ImVec2(cfg.minimal_window_size_with_advance.x,
+            cfg.minimal_window_size_with_advance.y + input_height);
+
     int max_style_image_width = cfg.max_style_name_width /2 -
                                 2 * style.FramePadding.x;
     int max_style_image_height = 1.5 * input_height;
@@ -2811,9 +2815,9 @@ void GLGizmoEmboss::set_minimal_window_size(bool is_advance_edit_style)
 
 const ImVec2 &GLGizmoEmboss::get_minimal_window_size() const
 {
-    return m_is_advanced_edit_style ?
-               m_gui_cfg->minimal_window_size_with_advance :
-               m_gui_cfg->minimal_window_size;
+    return (!m_is_advanced_edit_style) ? m_gui_cfg->minimal_window_size :
+        ((!m_style_manager.has_collections())? m_gui_cfg->minimal_window_size_with_advance :
+            m_gui_cfg->minimal_window_size_with_collections);
 }
 
 #ifdef ALLOW_ADD_FONT_BY_OS_SELECTOR
