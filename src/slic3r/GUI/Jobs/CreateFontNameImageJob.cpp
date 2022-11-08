@@ -112,6 +112,10 @@ void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
     
     *m_input.is_created = true;
 
+    // Exist result bitmap with preview?
+    // (not valid input. e.g. not loadable font)
+    if (m_result.empty()) return;
+
     // upload texture on GPU
     const GLenum target = GL_TEXTURE_2D;
     glsafe(::glBindTexture(target, m_input.texture_id));
