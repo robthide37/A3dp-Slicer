@@ -10,7 +10,6 @@ namespace Measure {
 
 
 constexpr double feature_hover_limit = 0.5; // how close to a feature the mouse must be to highlight it
-constexpr double edge_endpoint_limit = 0.5; // how close to an edge endpoint the mouse ...
 
 static std::pair<Vec3d, double> get_center_and_radius(const std::vector<Vec3d>& border, int start_idx, int end_idx, const Transform3d& trafo)
 {
@@ -467,6 +466,8 @@ std::optional<SurfaceFeature> MeasuringImpl::get_feature(size_t face_idx, const 
     MeasurementResult res;
     SurfaceFeature point_sf(point);
 
+    assert(plane.surface_features.empty() || plane.surface_features.back().get_type() == SurfaceFeatureType::Plane);
+
     for (size_t i=0; i<plane.surface_features.size() - 1; ++i) {
         // The -1 is there to prevent measuring distance to the plane itself,
         // which is needless and relatively expensive.
@@ -484,9 +485,12 @@ std::optional<SurfaceFeature> MeasuringImpl::get_feature(size_t face_idx, const 
         const SurfaceFeature& f = plane.surface_features[closest_feature_idx];
         if (f.get_type() == SurfaceFeatureType::Edge) {
             // If this is an edge, check if we are not close to the endpoint. If so,
-            // we will include the endpoint as well.
-            constexpr double limit_sq = edge_endpoint_limit * edge_endpoint_limit;
+            // we will include the endpoint as well. Close = 10% of the lenghth of
+            // the edge, clamped between 0.025 and 0.5 mm.
             const auto& [sp, ep] = f.get_edge();
+            double len_sq = (ep-sp).squaredNorm();
+            double limit_sq = std::max(0.025*0.025, std::min(0.5*0.5, 0.1 * 0.1 * len_sq));
+
             if ((point-sp).squaredNorm() < limit_sq)
                 return std::make_optional(SurfaceFeature(sp));
             if ((point-ep).squaredNorm() < limit_sq)
