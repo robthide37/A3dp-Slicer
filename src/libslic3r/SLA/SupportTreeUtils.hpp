@@ -709,7 +709,7 @@ GroundConnection find_pillar_route(Ex policy,
         auto [polar, azimuth] = dir_to_spheric(dir);
         polar = PI - sm.cfg.bridge_slope;
         Vec3d d = spheric_to_dir(polar, azimuth).normalized();
-        auto sd = radius * sm.cfg.safety_distance_mm / sm.cfg.head_back_radius_mm;
+        auto sd = sm.cfg.safety_distance_mm; //radius * sm.cfg.safety_distance_mm / sm.cfg.head_back_radius_mm;
         double t = beam_mesh_hit(policy, sm.emesh, Beam{endp, d, radius, r2}, sd).distance();
         double tmax = std::min(sm.cfg.max_bridge_length_mm, t);
         t = 0.;
@@ -817,7 +817,7 @@ GroundConnection find_ground_connection(
 {
     auto   hjp = j.pos;
     double r   = j.r;
-    auto   sd  = r * sm.cfg.safety_distance_mm / sm.cfg.head_back_radius_mm;
+    auto   sd  = sm.cfg.safety_distance_mm; //r * sm.cfg.safety_distance_mm / sm.cfg.head_back_radius_mm;
     double r2  = j.r + (end_r - j.r) / (j.pos.z() - ground_level(sm));
 
     double t = beam_mesh_hit(policy, sm.emesh, Beam{hjp, dir, r, r2}, sd)
