@@ -1343,8 +1343,8 @@ void GLGizmoEmboss::init_face_names() {
 
     // try load cache
     // Only not OS enumerated face has hash value 0
-    if (m_face_names.hash == 0) { 
-        load(m_face_names); 
+    if (m_face_names.hash == 0) {
+        load(m_face_names);
         create_truncated_names();
     }
 
@@ -1363,7 +1363,16 @@ void GLGizmoEmboss::init_face_names() {
     // Zero value is used as uninitialized hash
     if (hash == 0) hash = 1;
     // check if it is same as last time
-    if (m_face_names.hash == hash) return; // no new installed font
+    if (m_face_names.hash == hash) { 
+        // no new installed font
+        BOOST_LOG_TRIVIAL(info) << "Same FontNames hash, cache is used. " 
+            << "For clear cache delete file: " << get_fontlist_cache_path().string();
+        return;
+    }
+
+    BOOST_LOG_TRIVIAL(info) << (m_face_names.hash == 0) ?
+        "FontName list is generate from scratch." :
+        "Hash are different. Only previous bad fonts are used and set again as bad";
     m_face_names.hash = hash;
     
     // validation lambda
