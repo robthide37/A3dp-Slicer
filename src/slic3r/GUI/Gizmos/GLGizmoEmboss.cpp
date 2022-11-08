@@ -556,7 +556,7 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     if (!m_gui_cfg.has_value()) initialize();
-    check_selection(); 
+    check_selection();
 
     // TODO: fix width - showing scroll in first draw of advanced.
     const ImVec2 &min_window_size = get_minimal_window_size();
@@ -1046,6 +1046,11 @@ void GLGizmoEmboss::draw_window()
     ImGui::TreePush();
     draw_style_edit();
     ImGui::TreePop();
+
+    // close advanced style property when unknown font is selected
+    if (m_is_unknown_font && m_is_advanced_edit_style) 
+        ImGui::SetNextTreeNodeOpen(false);
+
     if (ImGui::TreeNode(_u8L("advanced").c_str())) {
         if (!m_is_advanced_edit_style) {
             set_minimal_window_size(true);
@@ -3065,7 +3070,7 @@ void GLGizmoEmboss::create_notification_not_valid_font(
     std::string text =
         GUI::format(_L("Can't load exactly same font(\"%1%\"), "
                        "Aplication select similar one(\"%2%\"). "
-                       "When you edit text, similar font will be applied."),
+                       "You have to specify font for enable edit text."),
                     origin_font_name, actual_font_name);
     auto notification_manager = wxGetApp().plater()->get_notification_manager();
     notification_manager->push_notification(type, level, text);
