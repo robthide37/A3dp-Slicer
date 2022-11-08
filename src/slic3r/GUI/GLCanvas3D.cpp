@@ -6705,6 +6705,10 @@ void GLCanvas3D::_render_selection_sidebar_hints()
 
 void GLCanvas3D::_update_volumes_hover_state()
 {
+    // skip update if the Gizmo Measure is active
+    if (m_gizmos.get_current_type() == GLGizmosManager::Measure)
+        return;
+
     for (GLVolume* v : m_volumes.volumes) {
         v->hover = GLVolume::HS_None;
     }
@@ -6712,9 +6716,9 @@ void GLCanvas3D::_update_volumes_hover_state()
     if (m_hover_volume_idxs.empty())
         return;
 
-    bool ctrl_pressed = wxGetKeyState(WXK_CONTROL); // additive select/deselect
-    bool shift_pressed = wxGetKeyState(WXK_SHIFT);  // select by rectangle
-    bool alt_pressed = wxGetKeyState(WXK_ALT);      // deselect by rectangle
+    const bool ctrl_pressed  = wxGetKeyState(WXK_CONTROL);
+    const bool shift_pressed = wxGetKeyState(WXK_SHIFT);
+    const bool alt_pressed   = wxGetKeyState(WXK_ALT);
 
     if (alt_pressed && (shift_pressed || ctrl_pressed)) {
         // illegal combinations of keys
@@ -6749,22 +6753,22 @@ void GLCanvas3D::_update_volumes_hover_state()
         if (volume.hover != GLVolume::HS_None)
             continue;
 
-        bool deselect = volume.selected && ((shift_pressed && m_rectangle_selection.is_empty()) || (alt_pressed && !m_rectangle_selection.is_empty()));
-        bool select   = !volume.selected && (m_rectangle_selection.is_empty() || (shift_pressed && !m_rectangle_selection.is_empty()));
+        const bool deselect = volume.selected && ((shift_pressed && m_rectangle_selection.is_empty()) || (alt_pressed && !m_rectangle_selection.is_empty()));
+        const bool select   = !volume.selected && (m_rectangle_selection.is_empty() || (shift_pressed && !m_rectangle_selection.is_empty()));
 
         if (select || deselect) {
-            bool as_volume =
+            const bool as_volume =
                 volume.is_modifier && hover_from_single_instance && !ctrl_pressed &&
                 (
-                (!deselect) ||
-                (deselect && !m_selection.is_single_full_instance() && (volume.object_idx() == m_selection.get_object_idx()) && (volume.instance_idx() == m_selection.get_instance_idx()))
+                !deselect ||
+                (deselect && !m_selection.is_single_full_instance() && volume.object_idx() == m_selection.get_object_idx() && volume.instance_idx() == m_selection.get_instance_idx())
                 );
 
             if (as_volume)
                 volume.hover = deselect ? GLVolume::HS_Deselect : GLVolume::HS_Select;
             else {
-                int object_idx = volume.object_idx();
-                int instance_idx = volume.instance_idx();
+                const int object_idx = volume.object_idx();
+                const int instance_idx = volume.instance_idx();
 
                 for (GLVolume* v : m_volumes.volumes) {
                     if (v->object_idx() == object_idx && v->instance_idx() == instance_idx)

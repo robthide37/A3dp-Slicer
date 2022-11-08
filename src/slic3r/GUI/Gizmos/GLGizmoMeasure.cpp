@@ -406,8 +406,6 @@ void GLGizmoMeasure::on_set_state()
         m_editing_distance = false;
         m_is_editing_distance_first_frame = true;
         m_measuring.reset();
-
-        int a = 0;
     }
     else {
         m_mode = EMode::BasicSelection;
