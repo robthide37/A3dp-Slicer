@@ -86,7 +86,7 @@ void read_used_binary(std::vector<std::string>& ids)
 		BOOST_LOG_TRIVIAL(warning) << "Failed to load to hints.cereal. File does not exists. " << path.string();
 		return;
 	}
-	boost::nowide::ifstream file(path.string());
+	boost::nowide::ifstream file(path.string(), std::ios::binary);
 	cereal::BinaryInputArchive archive(file);
 	HintsCerealData cd;
 	try
