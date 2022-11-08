@@ -1284,7 +1284,8 @@ void GLGizmoSlaSupports::reslice_SLA_supports(bool postpone_error_messages) cons
 
 bool GLGizmoSlaSupports::on_mouse(const wxMouseEvent &mouse_event){
     if (mouse_event.Moving()) return false;
-    if (use_grabbers(mouse_event)) return true;
+    if (!mouse_event.ShiftDown() && !mouse_event.AltDown() 
+        && use_grabbers(mouse_event)) return true;
 
     // wxCoord == int --> wx/types.h
     Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
