@@ -875,7 +875,7 @@ GroundConnection optimize_ground_connection(
     Optimizer<AlgNLoptGenetic> solver(get_criteria(sm.cfg).stop_score(1e6));
     solver.seed(0); // we want deterministic behavior
 
-    auto   sd  = j.r * sm.cfg.safety_distance_mm / sm.cfg.head_back_radius_mm;
+    auto   sd  = /*j.r **/ sm.cfg.safety_distance_mm /*/ sm.cfg.head_back_radius_mm*/;
     auto oresult = solver.to_max().optimize(
         [&j, sd, &policy, &sm, &downdst, &end_radius](const opt::Input<2> &input) {
             auto &[plr, azm] = input;

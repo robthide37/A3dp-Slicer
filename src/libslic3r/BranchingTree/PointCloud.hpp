@@ -286,6 +286,11 @@ template<class PC, class Fn> void traverse(PC &&pc, size_t root, Fn &&fn)
 
 void build_tree(PointCloud &pcloud, Builder &builder);
 
+inline void build_tree(PointCloud &&pc, Builder &builder)
+{
+    build_tree(pc, builder);
+}
+
 }} // namespace Slic3r::branchingtree
 
 #endif // POINTCLOUD_HPP
