@@ -310,6 +310,10 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
 
             return true;
         }
+        else
+            // if the mouse pointer is on any volume, filter out the event to prevent the user to move it
+            // equivalent tp: return (m_parent.get_first_hover_volume_idx() != -1);
+            return m_curr_feature.has_value();
 
         // fix: prevent restart gizmo when reselect object
         // take responsibility for left up
@@ -401,6 +405,7 @@ void GLGizmoMeasure::on_set_state()
         restore_scene_raycasters_state();
         m_editing_distance = false;
         m_is_editing_distance_first_frame = true;
+        m_measuring.reset();
     }
     else {
         m_mode = EMode::BasicSelection;
