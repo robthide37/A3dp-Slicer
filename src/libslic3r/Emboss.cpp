@@ -778,20 +778,20 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(const char *file_path
     FILE *file = fopen(file_path, "rb");
     if (file == nullptr) {
         assert(false);
-        // BOOST_LOG_TRIVIAL(error) << "Couldn't open " << file_path << " for reading." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Couldn't open " << file_path << " for reading.";
         return nullptr;
     }
 
     // find size of file
     if (fseek(file, 0L, SEEK_END) != 0) {
         assert(false);
-        // BOOST_LOG_TRIVIAL(error) << "Couldn't fseek file " << file_path << " for size measure." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Couldn't fseek file " << file_path << " for size measure.";
         return nullptr;
     }
     size_t size = ftell(file);
     if (size == 0) {
         assert(false);
-        // BOOST_LOG_TRIVIAL(error) << "Size of font file is zero. Can't read." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Size of font file is zero. Can't read.";
         return nullptr;    
     }
     rewind(file);
@@ -799,7 +799,7 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(const char *file_path
     size_t count_loaded_bytes = fread((void *) &buffer->front(), 1, size, file);
     if (count_loaded_bytes != size) {
         assert(false);
-        // BOOST_LOG_TRIVIAL(error) << "Different loaded(from file) data size." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Different loaded(from file) data size.";
         return nullptr;
     }
     return create_font_file(std::move(buffer));
