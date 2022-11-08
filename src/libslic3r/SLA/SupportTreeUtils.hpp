@@ -784,6 +784,8 @@ inline long build_ground_connection(SupportTreeBuilder &builder,
 
     while (itnx != conn.path.end()) {
         builder.add_diffbridge(*it, *itnx);
+        builder.add_junction(*itnx);
+        ++it; ++itnx;
     }
 
     auto gp = conn.path.back().pos;
