@@ -848,7 +848,7 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(HFONT hfont)
     HDC hdc = ::CreateCompatibleDC(NULL);
     if (hdc == NULL) {
         assert(false);
-        // BOOST_LOG_TRIVIAL(error) << "Can't create HDC by CreateCompatibleDC(NULL)." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Can't create HDC by CreateCompatibleDC(NULL).";
         return nullptr;
     }
 
@@ -863,7 +863,7 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(HFONT hfont)
     ::DeleteDC(hdc);
     if (size != loaded_size) {
         assert(false);
-        // BOOST_LOG_TRIVIAL(error) << "Different loaded(from HFONT) data size." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Different loaded(from HFONT) data size.";
         return nullptr;    
     }
     return create_font_file(std::move(buffer));

@@ -1338,6 +1338,9 @@ void GLGizmoEmboss::init_face_names() {
     if (m_face_names.is_init) return;
     m_face_names.is_init = true;
 
+    // to reload fonts from system, when install new one
+    wxFontEnumerator::InvalidateCache();
+
     auto create_truncated_names = [&facenames = m_face_names, &width = m_gui_cfg->face_name_max_width]() {
         for (FaceName &face : facenames.faces) {
             std::string name_str(face.wx_name.ToUTF8().data());
@@ -1374,9 +1377,9 @@ void GLGizmoEmboss::init_face_names() {
         return;
     }
 
-    BOOST_LOG_TRIVIAL(info) << (m_face_names.hash == 0) ?
+    BOOST_LOG_TRIVIAL(info) << ((m_face_names.hash == 0) ?
         "FontName list is generate from scratch." :
-        "Hash are different. Only previous bad fonts are used and set again as bad";
+        "Hash are different. Only previous bad fonts are used and set again as bad");
     m_face_names.hash = hash;
     
     // validation lambda
