@@ -68,7 +68,7 @@ template<class Method> class NLoptOpt {};
 template<nlopt_algorithm alg> class NLoptOpt<NLoptAlg<alg>> {
 protected:
     StopCriteria m_stopcr;
-    OptDir m_dir;
+    OptDir m_dir = OptDir::MIN;
 
     template<class Fn> using TOptData =
         std::tuple<std::remove_reference_t<Fn>*, NLoptOpt*, nlopt_opt>;
