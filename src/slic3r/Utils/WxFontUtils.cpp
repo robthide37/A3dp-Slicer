@@ -71,12 +71,13 @@ bool WxFontUtils::can_load(const wxFont &font)
 #ifdef _WIN32
     return Emboss::can_load(font.GetHFONT()) != nullptr;
 #elif defined(__APPLE__)
-    return is_valid_ttf(get_file_path(font));
+    return true;
+    //return is_valid_ttf(get_file_path(font));
 #elif defined(__linux__)
     return true;
     // font config check file path take about 4000ms for chech them all
-    std::string font_path = Slic3r::GUI::get_font_path(font);
-    return !font_path.empty();
+    //std::string font_path = Slic3r::GUI::get_font_path(font);
+    //return !font_path.empty();
 #endif
     return false;
 }
@@ -87,11 +88,19 @@ std::unique_ptr<Emboss::FontFile> WxFontUtils::create_font_file(const wxFont &fo
     return Emboss::create_font_file(font.GetHFONT());
 #elif defined(__APPLE__)
     std::string file_path = get_file_path(font);
-    if (file_path.empty()) return nullptr;
+    if (!is_valid_ttf(file_path)) {        
+        BOOST_LOG_TRIVIAL(error) << "Can not process font('" << get_human_readable_name(font) << "'), "
+                                 << "file in path('" << file_path << "') is not valid TTF.";
+        return nullptr; 
+    }
     return Emboss::create_font_file(file_path.c_str());
 #elif defined(__linux__)
     std::string font_path = Slic3r::GUI::get_font_path(font);
-    if (font_path.empty()) return nullptr;
+    if (font_path.empty()){
+        BOOST_LOG_TRIVIAL(error) << "Can not read font('" << get_human_readable_name(font) << "'), "
+                                 << "file path is empty.";
+        return nullptr;
+    }
     return Emboss::create_font_file(font_path.c_str());
 #else
     // HERE is place to add implementation for another platform
