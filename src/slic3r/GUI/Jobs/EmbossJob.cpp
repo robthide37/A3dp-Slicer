@@ -190,6 +190,11 @@ void EmbossCreateVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
 
     obj_list->selection_changed();
 
+    // Now is valid text volume selected open emboss gizmo
+    GLGizmosManager &manager = canvas->get_gizmos_manager();
+    if (manager.get_current_type() != GLGizmosManager::Emboss) 
+        manager.open_gizmo(GLGizmosManager::Emboss);
+
     // redraw scene
     canvas->reload_scene(true);
 }

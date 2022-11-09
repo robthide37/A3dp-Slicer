@@ -241,7 +241,37 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
     return used;
 }
 
-static Vec2d calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolume& mv) {
+namespace priv {
+
+/// <summary>
+/// Access to model from gl_volume
+/// TODO: it is more general function --> move to utils
+/// </summary>
+/// <param name="gl_volume">Volume to model belongs to</param>
+/// <param name="objects">All objects</param>
+/// <returns>Model for volume</returns>
+static ModelVolume *get_model_volume(const GLVolume *gl_volume, const ModelObjectPtrs &objects);
+
+/// <summary>
+/// Access to model by selection
+/// TODO: it is more general function --> move to select utils
+/// </summary>
+/// <param name="selection">Actual selection</param>
+/// <param name="objects">All objects</param>
+/// <returns>Model from selection</returns>
+static ModelVolume *get_selected_volume(const Selection &selection, const ModelObjectPtrs &objects);
+
+/// <summary>
+/// Calculate offset from mouse position to center of text
+/// </summary>
+/// <param name="mouse">Screan mouse position</param>
+/// <param name="mv">Selected volume(text)</param>
+/// <returns>Offset in screan coordinate</returns>
+static Vec2d calc_mouse_to_center_text_offset(const Vec2d &mouse, const ModelVolume &mv);
+
+} // namespace priv
+
+Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolume& mv) {
     const Transform3d &volume_tr   = mv.get_matrix();
     const Camera      &camera      = wxGetApp().plater()->get_camera();
     assert(mv.text_configuration.has_value());
@@ -295,7 +325,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
     GLVolume *gl_volume = m_parent.get_volumes().volumes[hovered_id];
     const ModelObjectPtrs &objects = wxGetApp().plater()->model().objects;
-    ModelVolume *act_model_volume = get_model_volume(gl_volume, objects);
+    ModelVolume *act_model_volume = priv::get_model_volume(gl_volume, objects);
 
     // hovered object must be actual text volume
     if (m_volume != act_model_volume) return false;
@@ -322,7 +352,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // IMPROVE: move to job, for big scene it slows down 
         ModelObject *act_model_object = act_model_volume->get_object();
         m_raycast_manager.actualize(act_model_object, &condition);
-        m_dragging_mouse_offset = calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
+        m_dragging_mouse_offset = priv::calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
         // Cancel job to prevent interuption of dragging (duplicit result)
         if (m_update_job_cancel != nullptr) m_update_job_cancel->store(true);
         return false;
@@ -440,7 +470,7 @@ void GLGizmoEmboss::on_render() {
         const Transform3d matrix = camera.get_view_matrix() * (*m_temp_transformation);
         shader->set_uniform("view_model_matrix", matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        shader->set_uniform("view_normal_matrix", (Matrix3d) (*m_temp_transformation).matrix().block(0, 0, 3, 3).inverse().transpose());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // dragging object must be selected so draw it with correct color
@@ -557,6 +587,13 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     if (!m_gui_cfg.has_value()) initialize();
     check_selection();
+
+    // Do not render window for not selected text volume
+    if (m_volume == nullptr ||
+        !m_volume->text_configuration.has_value()) {
+        close();
+        return;
+    } 
 
     // TODO: fix width - showing scroll in first draw of advanced.
     const ImVec2 &min_window_size = get_minimal_window_size();
@@ -859,30 +896,18 @@ void GLGizmoEmboss::check_selection()
     set_default_text();
 }
 
-ModelVolume *GLGizmoEmboss::get_selected_volume()
-{
-    return get_selected_volume(m_parent.get_selection(),
-                               wxGetApp().plater()->model().objects);
-}
-
-ModelVolume *GLGizmoEmboss::get_model_volume(const GLVolume *      gl_volume,
-                                             const ModelObjectPtrs& objects)
+ModelVolume *priv::get_model_volume(const GLVolume *gl_volume, const ModelObjectPtrs &objects)
 {
     const GLVolume::CompositeID &id = gl_volume->composite_id;
 
-    if (id.object_id < 0 ||
-        static_cast<size_t>(id.object_id) >= objects.size())
-        return nullptr;
+    if (id.object_id < 0 || static_cast<size_t>(id.object_id) >= objects.size()) return nullptr;
     ModelObject *object = objects[id.object_id];
 
-    if (id.volume_id < 0 ||
-        static_cast<size_t>(id.volume_id) >= object->volumes.size())
-        return nullptr;
+    if (id.volume_id < 0 || static_cast<size_t>(id.volume_id) >= object->volumes.size()) return nullptr;
     return object->volumes[id.volume_id];
 }
 
-ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
-                                                const ModelObjectPtrs& objects)
+ModelVolume *priv::get_selected_volume(const Selection &selection, const ModelObjectPtrs &objects)
 {
     int object_idx = selection.get_object_idx();
     // is more object selected?
@@ -891,9 +916,15 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
     auto volume_idxs = selection.get_volume_idxs();
     // is more volumes selected?
     if (volume_idxs.size() != 1) return nullptr;
-    unsigned int                 vol_id_gl = *volume_idxs.begin();
-    const GLVolume *             vol_gl    = selection.get_volume(vol_id_gl);
+    unsigned int    vol_id_gl = *volume_idxs.begin();
+    const GLVolume *vol_gl    = selection.get_volume(vol_id_gl);
     return get_model_volume(vol_gl, objects);
+}
+
+ModelVolume *GLGizmoEmboss::get_selected_volume()
+{
+    return priv::get_selected_volume(m_parent.get_selection(),
+        wxGetApp().plater()->model().objects);
 }
 
 // Run Job on main thread (blocking) - ONLY DEBUG
@@ -2944,13 +2975,14 @@ bool GLGizmoEmboss::choose_svg_file()
 
 EmbossDataBase GLGizmoEmboss::create_emboss_data_base() {
     auto create_volume_name = [&]() {
-        const size_t &max_len = m_gui_cfg->max_count_char_in_volume_name;
-        // m_text is UTF8 and can't be cutted in the middle of letter
-        std::wstring w_text = boost::nowide::widen(m_text);
-        return _u8L("Text") + " - " +
-               ((w_text.size() > max_len) ?
-                    (boost::nowide::narrow(w_text.substr(0, max_len - 3)) + " ..") :
-                    m_text);
+        bool contain_enter = m_text.find('\n') != std::string::npos;
+        std::string text_fixed;
+        if (contain_enter) {
+            // change enters to space
+            text_fixed = m_text; // copy
+            std::replace(text_fixed.begin(), text_fixed.end(), '\n', ' ');        
+        }
+        return _u8L("Text") + " - " + ((contain_enter) ? text_fixed : m_text);
     };
     
     auto create_configuration = [&]() -> TextConfiguration {

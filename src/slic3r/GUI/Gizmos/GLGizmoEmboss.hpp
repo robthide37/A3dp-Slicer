@@ -96,10 +96,7 @@ private:
     bool start_volume_creation(ModelVolumeType volume_type, const Vec2d &screen_coor);
 
     void check_selection();
-    // more general function --> move to select
     ModelVolume *get_selected_volume();
-    static ModelVolume *get_model_volume(const GLVolume *gl_volume, const ModelObjectPtrs& objects);
-    static ModelVolume *get_selected_volume(const Selection &selection, const ModelObjectPtrs& objects);
     // create volume from text - main functionality
     bool process();
     void close();
@@ -174,7 +171,6 @@ private:
     // so the change takes effect. (info by GLGizmoFdmSupports.hpp)
     struct GuiCfg
     {
-        size_t max_count_char_in_volume_name = 20;
         // Zero means it is calculated in init function
         ImVec2 minimal_window_size              = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);

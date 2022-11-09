@@ -114,7 +114,10 @@ void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
 
     // Exist result bitmap with preview?
     // (not valid input. e.g. not loadable font)
-    if (m_result.empty()) return;
+    if (m_result.empty()) {
+        // TODO: write text cannot load into texture
+        m_result = std::vector<unsigned char>(m_tex_size.x() * m_tex_size.y() * 4, {255});
+    }
 
     // upload texture on GPU
     const GLenum target = GL_TEXTURE_2D;
