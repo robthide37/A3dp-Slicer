@@ -1177,6 +1177,50 @@ void GLGizmoEmboss::draw_text_input()
     // when their glyph range is out of language character range
     if (exist_font) ImGui::PushFont(imgui_font);
 
+    // show warning about incorrectness view of font
+    std::string warning;
+    std::string tool_tip;
+    if (!exist_font) {
+        warning  = _u8L("Can't write text by selected font.");
+        tool_tip = _u8L("Try to choose another font.");
+    } else {
+        std::string who;
+        auto        append_warning = [&who, &tool_tip](std::string w, std::string t) {
+            if (!w.empty()) {
+                if (!who.empty()) who += " & ";
+                who += w;
+            }
+            if (!t.empty()) {
+                if (!tool_tip.empty()) tool_tip += "\n";
+                tool_tip += t;
+            }
+        };
+        if (is_text_empty(m_text)) append_warning(_u8L("Empty"), _u8L("Embossed text can NOT contain only white spaces."));
+        if (m_text_contain_unknown_glyph)
+            append_warning(_u8L("Bad symbol"), _u8L("Text contain character glyph (represented by '?') unknown by font."));
+
+        const FontProp &prop = m_style_manager.get_font_prop();
+        if (prop.skew.has_value()) append_warning(_u8L("Skew"), _u8L("Unsupported visualization of font skew for text input."));
+        if (prop.boldness.has_value()) append_warning(_u8L("Boldness"), _u8L("Unsupported visualization of font boldness for text input."));
+        if (prop.line_gap.has_value())
+            append_warning(_u8L("Line gap"), _u8L("Unsupported visualization of gap between lines inside text input."));
+        auto &ff         = m_style_manager.get_font_file_with_cache();
+        float imgui_size = EmbossStyleManager::get_imgui_font_size(prop, *ff.font_file);
+        if (imgui_size > EmbossStyleManager::max_imgui_font_size)
+            append_warning(_u8L("To tall"), _u8L("Diminished font height inside text input."));
+        if (imgui_size < EmbossStyleManager::min_imgui_font_size)
+            append_warning(_u8L("To small"), _u8L("Enlarged font height inside text input."));
+        if (!who.empty()) warning = GUI::format(_L("%1% is NOT shown."), who);
+    }
+
+    // add border around input when warning appears
+    ScopeGuard input_border_sg;
+    if (!warning.empty()) { 
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_Border, ImGuiWrapper::COL_ORANGE_LIGHT);
+        input_border_sg = ScopeGuard([]() { ImGui::PopStyleColor(); ImGui::PopStyleVar(); });
+    }
+
     // flag for extend font ranges if neccessary
     // ranges can't be extend during font is activ(pushed)
     std::string range_text;
@@ -1192,53 +1236,6 @@ void GLGizmoEmboss::draw_text_input()
     }
 
     if (exist_font) ImGui::PopFont();
-
-    // show warning about incorrectness view of font
-    std::string warning;
-    std::string tool_tip;
-    if (!exist_font) {
-        warning = _u8L("Can't write text by selected font.");
-        tool_tip = _u8L("Try to choose another font.");
-    } else {
-        std::string who;
-        auto append_warning = [&who, &tool_tip](std::string w, std::string t) {
-            if (!w.empty()) {
-                if (!who.empty()) who += " & ";
-                who += w;
-            }
-            if (!t.empty()) {
-                if (!tool_tip.empty()) tool_tip += "\n";
-                tool_tip += t;            
-            }
-        };
-        if (is_text_empty(m_text))
-            append_warning(_u8L("Empty"), 
-                _u8L("Embossed text can NOT contain only white spaces."));
-        if (m_text_contain_unknown_glyph)
-            append_warning(_u8L("Bad symbol"), 
-                _u8L("Text contain character glyph (represented by '?') unknown by font."));
-
-        const FontProp &prop = m_style_manager.get_font_prop();
-        if (prop.skew.has_value())
-            append_warning(_u8L("Skew"), 
-                _u8L("Unsupported visualization of font skew for text input."));
-        if (prop.boldness.has_value())
-            append_warning(_u8L("Boldness"),
-                _u8L("Unsupported visualization of font boldness for text input."));
-        if (prop.line_gap.has_value())
-            append_warning(_u8L("Line gap"),
-                _u8L("Unsupported visualization of gap between lines inside text input."));
-        auto &ff = m_style_manager.get_font_file_with_cache();
-        float imgui_size = EmbossStyleManager::get_imgui_font_size(prop, *ff.font_file);
-        if (imgui_size > EmbossStyleManager::max_imgui_font_size)           
-            append_warning(_u8L("To tall"),
-                _u8L("Diminished font height inside text input."));
-        if (imgui_size < EmbossStyleManager::min_imgui_font_size)       
-            append_warning(_u8L("To small"),
-                _u8L("Enlarged font height inside text input."));
-        if (!who.empty())
-            warning = GUI::format(_L("%1% is NOT shown."), who);
-    }
 
     if (!warning.empty()) {
         if (ImGui::IsItemHovered() && !tool_tip.empty())
