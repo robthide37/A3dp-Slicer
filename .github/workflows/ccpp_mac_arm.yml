@@ -1,13 +1,8 @@
-name: C/C++ Nightly arm macos
+name: C/C++ Patch-01 arm macos
 
 on:
   push:
     branches:
-      - Nigthly
-      - nightly_dev
-      - nightly_master
-      - debug_macos
-      - dev
       - patch-1
 
 jobs:
@@ -30,10 +25,10 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
-        name: nightly_macos_arm.app
+        name: ${{ github.event.repository.name }}_macos_arm.app
         path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
-        name: nightly_macos_arm.dmg
+        name: ${{ github.event.repository.name }}_macos_arm.dmg
         path: ${{ github.event.repository.name }}.dmg
