@@ -4,6 +4,7 @@
 
 #include "libslic3r/Geometry/Circle.hpp"
 #include "libslic3r/SurfaceMesh.hpp"
+#include <numeric>
 
 namespace Slic3r {
 namespace Measure {

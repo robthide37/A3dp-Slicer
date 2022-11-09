@@ -423,7 +423,8 @@ void PrintObject::generate_support_spots()
                 [](const ModelVolume* mv){return mv->supported_facets.empty();})
         ) {
             SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values};
-            SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this, params);
+            auto [issues, malformations] = SupportSpotsGenerator::full_search(this, params);
+
             auto obj_transform = this->trafo_centered();
             for (ModelVolume *model_volume : this->model_object()->volumes) {
                 if (model_volume->is_model_part()) {
@@ -474,6 +475,26 @@ void PrintObject::generate_support_material()
 #endif
         }
         this->set_done(posSupportMaterial);
+    }
+}
+
+void PrintObject::estimate_curled_extrusions()
+{
+    if (this->set_started(posEstimateCurledExtrusions)) {
+        if (this->print()->config().avoid_curled_filament_during_travels) {
+            BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - start";
+            m_print->set_status(88, L("Estimating curled extrusions"));
+
+            // Estimate curling of support material and add it to the malformaition lines of each layer
+            float                         support_flow_width = support_material_flow(this, this->config().layer_height).width();
+            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values};
+            SupportSpotsGenerator::estimate_supports_malformations(this->support_layers(), support_flow_width, params);
+            SupportSpotsGenerator::estimate_malformations(this->layers(), params);
+
+            m_print->throw_if_canceled();
+            BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - end";
+        }
+        this->set_done(posEstimateCurledExtrusions);
     }
 }
 
@@ -785,7 +806,7 @@ bool PrintObject::invalidate_step(PrintObjectStep step)
     
     // propagate to dependent steps
     if (step == posPerimeters) {
-		invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning });
+		invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning, posEstimateCurledExtrusions });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posPrepareInfill) {
         invalidated |= this->invalidate_steps({ posInfill, posIroning });
@@ -793,11 +814,12 @@ bool PrintObject::invalidate_step(PrintObjectStep step)
         invalidated |= this->invalidate_steps({ posIroning });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posSlice) {
-		invalidated |= this->invalidate_steps({ posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportMaterial });
+		invalidated |= this->invalidate_steps({ posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportMaterial, posEstimateCurledExtrusions });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
         m_slicing_params.valid = false;
     } else if (step == posSupportMaterial) {
-        invalidated |= m_print->invalidate_steps({ psSkirtBrim });
+        invalidated |= m_print->invalidate_steps({ psSkirtBrim,  });
+        invalidated |= this->invalidate_steps({ posEstimateCurledExtrusions });
         m_slicing_params.valid = false;
     }
 

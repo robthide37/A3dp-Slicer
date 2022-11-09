@@ -2,14 +2,20 @@
 
 #include "ExPolygon.hpp"
 #include "ExtrusionEntity.hpp"
+#include "ExtrusionEntityCollection.hpp"
 #include "Line.hpp"
+#include "Point.hpp"
 #include "Polygon.hpp"
+#include "libslic3r.h"
 #include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
 #include "tbb/blocked_range2d.h"
 #include "tbb/parallel_reduce.h"
 #include <boost/log/trivial.hpp>
 #include <cmath>
+#include <cstdio>
+#include <functional>
+#include <unordered_map>
 #include <unordered_set>
 #include <stack>
 
@@ -20,7 +26,7 @@
 #include "Geometry/ConvexHull.hpp"
 
 // #define DETAILED_DEBUG_LOGS
-// #define DEBUG_FILES
+//#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -333,7 +339,7 @@ std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length
     std::vector<ExtrusionLine> lines;
     lines.reserve(pl.points.size() * 1.5f);
     lines.emplace_back(unscaled(pl.points[0]).cast<float>(), unscaled(pl.points[0]).cast<float>(), e);
-    for (int point_idx = 0; point_idx < int(pl.points.size() - 1); ++point_idx) {
+    for (int point_idx = 0; point_idx < int(pl.points.size()) - 1; ++point_idx) {
         Vec2f start        = unscaled(pl.points[point_idx]).cast<float>();
         Vec2f next         = unscaled(pl.points[point_idx + 1]).cast<float>();
         Vec2f v            = next - start; // vector from next to current
@@ -367,12 +373,6 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         const auto to_vec3f = [layer_z](const Vec2f &point) {
             return Vec3f(point.x(), point.y(), layer_z);
         };
-        float overhang_dist = tan(params.overhang_angle_deg * PI / 180.0f) * layer_region->layer()->height;
-        float min_malformation_dist = tan(params.malformation_angle_span_deg.first * PI / 180.0f)
-                * layer_region->layer()->height;
-        float max_malformation_dist = tan(params.malformation_angle_span_deg.second * PI / 180.0f)
-                * layer_region->layer()->height;
-
         std::vector<ExtrusionLine> lines = to_short_lines(entity, params.bridge_distance);
         if (lines.empty()) return;
 
@@ -380,6 +380,9 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
         ExtrusionPropertiesAccumulator malformation_acc { };
         bridging_acc.add_distance(params.bridge_distance + 1.0f);
         const float flow_width = get_flow_width(layer_region, entity->role());
+        float min_malformation_dist = flow_width - params.malformation_overlap_factor.first * flow_width;
+        float max_malformation_dist = flow_width - params.malformation_overlap_factor.second * flow_width;
+
 
         for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
             ExtrusionLine &current_line = lines[line_idx];
@@ -395,9 +398,12 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             bridging_acc.add_angle(curr_angle);
             // malformation in concave angles does not happen
             malformation_acc.add_angle(std::max(0.0f, curr_angle));
+            if (curr_angle < -20.0 * PI / 180.0) {
+                malformation_acc.reset();
+            }
 
             auto [dist_from_prev_layer, nearest_line_idx, nearest_point] = prev_layer_lines.signed_distance_from_lines_extra(current_line.b);
-            if (fabs(dist_from_prev_layer) < overhang_dist) {
+            if (fabs(dist_from_prev_layer) < flow_width) {
                 bridging_acc.reset();
             } else {
                 bridging_acc.add_distance(current_line.len);
@@ -416,15 +422,16 @@ void check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
 
             //malformation
-            if (fabs(dist_from_prev_layer) < 3.0f * flow_width) {
+            if (fabs(dist_from_prev_layer) < 2.0f * flow_width) {
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
-                current_line.malformation += 0.9 * nearest_line.malformation;
+                current_line.malformation += 0.85 * nearest_line.malformation;
             }
             if (dist_from_prev_layer > min_malformation_dist && dist_from_prev_layer < max_malformation_dist) {
+                float factor = std::abs(dist_from_prev_layer - (max_malformation_dist + min_malformation_dist) * 0.5) /
+                               (max_malformation_dist - min_malformation_dist);
                 malformation_acc.add_distance(current_line.len);
-                current_line.malformation += layer_region->layer()->height *
-                                             (0.5f + 1.5f * (malformation_acc.max_curvature / PI) *
-                                                         gauss(malformation_acc.distance, 5.0f, 1.0f, 0.2f));
+                current_line.malformation += layer_region->layer()->height * factor * (2.0f + 3.0f * (malformation_acc.max_curvature / PI));
+                current_line.malformation = std::min(current_line.malformation, float(layer_region->layer()->height * params.max_malformation_factor));
             } else {
                 malformation_acc.reset();
             }
@@ -1023,7 +1030,7 @@ Issues check_global_stability(SupportGridFilter supports_presence_grid,
     return issues;
 }
 
-std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(const PrintObject *po,
+std::tuple<Issues, Malformations, std::vector<LayerIslands>> check_extrusions_and_build_graph(const PrintObject *po,
         const Params &params) {
 #ifdef DEBUG_FILES
     FILE *segmentation_f = boost::nowide::fopen(debug_out_path("segmentation.obj").c_str(), "w");
@@ -1031,6 +1038,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
 #endif
 
     Issues issues { };
+    Malformations malformations{};
     std::vector<LayerIslands> islands_graph;
     std::vector<ExtrusionLine> layer_lines;
     float flow_width = get_flow_width(po->layers()[po->layer_count() - 1]->regions()[0], erExternalPerimeter);
@@ -1038,6 +1046,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
 
 // PREPARE BASE LAYER
     const Layer *layer = po->layers()[0];
+    malformations.layers.push_back({}); // no malformations to be expected at first layer
     for (const LayerRegion *layer_region : layer->regions()) {
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
             for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
@@ -1106,6 +1115,12 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
                 layer_lines, params);
         islands_graph.push_back(std::move(layer_islands));
 
+        Lines malformed_lines{};
+        for (const auto &line : layer_lines) {
+            if (line.malformation > 0.3f) { malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)}); }
+        }
+        malformations.layers.push_back(malformed_lines);
+
 #ifdef DEBUG_FILES
         for (size_t x = 0; x < size_t(layer_grid.get_pixel_count().x()); ++x) {
             for (size_t y = 0; y < size_t(layer_grid.get_pixel_count().y()); ++y) {
@@ -1122,7 +1137,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
         }
         for (const auto &line : layer_lines) {
             if (line.malformation > 0.0f) {
-                Vec3f color = value_to_rgbf(0, 1.0f, line.malformation);
+                Vec3f color = value_to_rgbf(-EPSILON, layer->height*params.max_malformation_factor, line.malformation);
                 fprintf(malform_f, "v %f %f %f  %f %f %f\n", line.b[0],
                         line.b[1], layer->slice_z, color[0], color[1], color[2]);
             }
@@ -1138,7 +1153,7 @@ std::tuple<Issues, std::vector<LayerIslands>> check_extrusions_and_build_graph(c
     fclose(malform_f);
 #endif
 
-    return {issues, islands_graph};
+    return {issues, malformations, islands_graph};
 }
 
 #ifdef DEBUG_FILES
@@ -1167,8 +1182,8 @@ void debug_export(Issues issues, std::string file_name) {
 //     return {};
 // }
 
-Issues full_search(const PrintObject *po, const Params &params) {
-    auto [local_issues, graph] = check_extrusions_and_build_graph(po, params);
+std::tuple<Issues, Malformations> full_search(const PrintObject *po, const Params &params) {
+    auto [local_issues, malformations, graph] = check_extrusions_and_build_graph(po, params);
     Issues global_issues = check_global_stability( { po, params.min_distance_between_support_points }, graph, params);
 #ifdef DEBUG_FILES
     debug_export(local_issues, "local_issues");
@@ -1178,7 +1193,146 @@ Issues full_search(const PrintObject *po, const Params &params) {
     global_issues.support_points.insert(global_issues.support_points.end(),
             local_issues.support_points.begin(), local_issues.support_points.end());
 
-    return global_issues;
+    return {global_issues, malformations};
+}
+
+struct LayerCurlingEstimator
+{
+    LD                                          prev_layer_lines = LD({});
+    Params                                      params;
+    std::function<float(const ExtrusionLine &)> flow_width_getter;
+
+    LayerCurlingEstimator(std::function<float(const ExtrusionLine &)> flow_width_getter, const Params &params)
+        : flow_width_getter(flow_width_getter), params(params)
+    {}
+
+    void estimate_curling(std::vector<ExtrusionLine> &extrusion_lines, Layer *l)
+    {
+        ExtrusionPropertiesAccumulator malformation_acc{};
+        for (size_t line_idx = 0; line_idx < extrusion_lines.size(); ++line_idx) {
+            ExtrusionLine &current_line = extrusion_lines[line_idx];
+
+            float flow_width = flow_width_getter(current_line);
+
+            float min_malformation_dist = flow_width - params.malformation_overlap_factor.first * flow_width;
+            float max_malformation_dist = flow_width - params.malformation_overlap_factor.second * flow_width;
+
+            float curr_angle = 0;
+            if (line_idx + 1 < extrusion_lines.size()) {
+                const Vec2f v1 = current_line.b - current_line.a;
+                const Vec2f v2 = extrusion_lines[line_idx + 1].b - extrusion_lines[line_idx + 1].a;
+                curr_angle     = angle(v1, v2);
+            }
+            // malformation in concave angles does not happen
+            malformation_acc.add_angle(std::max(0.0f, curr_angle));
+            if (curr_angle < -20.0 * PI / 180.0) { malformation_acc.reset(); }
+
+            auto [dist_from_prev_layer, nearest_line_idx, nearest_point] = prev_layer_lines.signed_distance_from_lines_extra(current_line.b);
+
+            if (fabs(dist_from_prev_layer) < 2.0f * flow_width) {
+                const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
+                current_line.malformation += 0.85 * nearest_line.malformation;
+            }
+            if (dist_from_prev_layer > min_malformation_dist && dist_from_prev_layer < max_malformation_dist) {
+                float factor = std::abs(dist_from_prev_layer - (max_malformation_dist + min_malformation_dist) * 0.5) /
+                               (max_malformation_dist - min_malformation_dist);
+                malformation_acc.add_distance(current_line.len);
+                current_line.malformation += l->height * factor * (2.0f + 3.0f * (malformation_acc.max_curvature / PI));
+                current_line.malformation = std::min(current_line.malformation, float(l->height * params.max_malformation_factor));
+            } else {
+                malformation_acc.reset();
+            }
+        }
+
+        for (const ExtrusionLine &line : extrusion_lines) {
+            if (line.malformation > 0.3f) { l->malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)}); }
+        }
+        prev_layer_lines = LD(extrusion_lines);
+    }
+};
+
+
+void estimate_supports_malformations(SupportLayerPtrs &layers, float supports_flow_width, const Params &params)
+{
+#ifdef DEBUG_FILES
+    FILE *debug_file = boost::nowide::fopen(debug_out_path("supports_malformations.obj").c_str(), "w");
+#endif
+    auto flow_width_getter = [=](const ExtrusionLine& l) {
+        return supports_flow_width;
+    };
+
+    LayerCurlingEstimator lce{flow_width_getter, params};
+
+    for (SupportLayer *l : layers) {
+        std::vector<ExtrusionLine> extrusion_lines;
+        for (const ExtrusionEntity *extrusion : l->support_fills.flatten().entities) {
+            Polyline pl = extrusion->as_polyline();
+            Polygon pol(pl.points);
+            pol.make_counter_clockwise();
+            pl = pol.split_at_first_point();
+            for (int point_idx = 0; point_idx < int(pl.points.size() - 1); ++point_idx) {
+                Vec2f         start = unscaled(pl.points[point_idx]).cast<float>();
+                Vec2f         next  = unscaled(pl.points[point_idx + 1]).cast<float>();
+                ExtrusionLine line{start, next, extrusion};
+                extrusion_lines.push_back(line);
+            }
+        }
+
+        lce.estimate_curling(extrusion_lines, l);
+
+#ifdef DEBUG_FILES
+        for (const ExtrusionLine &line : extrusion_lines) {
+            if (line.malformation > 0.3f) {
+                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_malformation_factor, line.malformation);
+                fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
+            }
+        }
+#endif
+    }
+
+#ifdef DEBUG_FILES
+    fclose(debug_file);
+#endif
+}
+
+void estimate_malformations(LayerPtrs &layers, const Params &params)
+{
+#ifdef DEBUG_FILES
+    FILE *debug_file = boost::nowide::fopen(debug_out_path("object_malformations.obj").c_str(), "w");
+#endif
+    auto flow_width_getter = [](const ExtrusionLine &l) { return 0.0; };
+    LayerCurlingEstimator lce{flow_width_getter, params};
+
+    for (Layer *l : layers) {
+        if (l->regions().empty()) {
+            continue;
+        }
+        std::unordered_map<const ExtrusionEntity*, float> extrusions_widths;
+        std::vector<ExtrusionLine> extrusion_lines;
+        for (const LayerRegion *region : l->regions()) {
+            for (const ExtrusionEntity *extrusion : region->perimeters.flatten().entities) {
+                auto lines = to_short_lines(extrusion, params.bridge_distance);
+                extrusion_lines.insert(extrusion_lines.end(), lines.begin(), lines.end());
+                extrusions_widths.emplace(extrusion, get_flow_width(region, extrusion->role())); 
+            }
+        }
+        lce.flow_width_getter = [&](const ExtrusionLine &l) { return extrusions_widths[l.origin_entity]; };
+
+        lce.estimate_curling(extrusion_lines, l);
+
+#ifdef DEBUG_FILES
+        for (const ExtrusionLine &line : extrusion_lines) {
+            if (line.malformation > 0.3f) {
+                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_malformation_factor, line.malformation);
+                fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
+            }
+        }
+#endif
+    }
+
+#ifdef DEBUG_FILES
+    fclose(debug_file);
+#endif
 }
 
 } //SupportableIssues End

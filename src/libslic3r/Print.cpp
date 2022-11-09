@@ -58,6 +58,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
     // Cache the plenty of parameters, which influence the G-code generator only,
     // or they are only notes not influencing the generated G-code.
     static std::unordered_set<std::string> steps_gcode = {
+        "avoid_curled_filament_during_travels",
         "avoid_crossing_perimeters",
         "avoid_crossing_perimeters_max_detour",
         "bed_shape",
@@ -829,6 +830,8 @@ void Print::process()
         obj->generate_support_spots();
     for (PrintObject *obj : m_objects)
         obj->generate_support_material();
+    for (PrintObject *obj : m_objects)
+        obj->estimate_curled_extrusions();
     if (this->set_started(psWipeTower)) {
         m_wipe_tower_data.clear();
         m_tool_ordering.clear();

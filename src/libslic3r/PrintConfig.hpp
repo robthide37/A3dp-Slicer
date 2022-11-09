@@ -729,6 +729,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     PrintConfig, 
     (MachineEnvelopeConfig, GCodeConfig),
 
+    ((ConfigOptionBool,               avoid_curled_filament_during_travels))
     ((ConfigOptionBool,               avoid_crossing_perimeters))
     ((ConfigOptionFloatOrPercent,     avoid_crossing_perimeters_max_detour))
     ((ConfigOptionPoints,             bed_shape))
