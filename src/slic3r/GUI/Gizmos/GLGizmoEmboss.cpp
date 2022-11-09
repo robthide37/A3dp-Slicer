@@ -56,8 +56,6 @@
 #define ALLOW_REVERT_ALL_STYLES
 #endif // ALLOW_DEBUG_MODE
 
-#define SHOW_CONTAIN_3MF_FIX
-
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
@@ -206,11 +204,6 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
     bool used = use_grabbers(mouse_event);
     if (!m_dragging) return used;
 
-    assert(m_volume != nullptr);
-    assert(m_volume->text_configuration.has_value());
-    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) 
-        return false;
-
     if (mouse_event.Dragging()) {
         auto &angle_opt = m_volume->text_configuration->style.prop.angle;
         if (!m_rotate_start_angle.has_value())
@@ -316,9 +309,6 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         !mouse_event.LeftDown())
         return false;
 
-    // text volume must be selected
-    if (m_volume == nullptr) return false;
-
     // must exist hover object
     int hovered_id = m_parent.get_first_hover_volume_idx();
     if (hovered_id < 0) return false;
@@ -420,11 +410,14 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
 bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
 {
-    // not selected volume
-    if (m_volume == nullptr) return false;
-
     // do not process moving event
     if (mouse_event.Moving()) return false;
+
+    // not selected volume
+    assert(m_volume != nullptr);
+    assert(m_volume->text_configuration.has_value());
+    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) return false;
+
     if (on_mouse_for_rotation(mouse_event)) return true;
     if (on_mouse_for_translate(mouse_event)) return true;
 
@@ -587,8 +580,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     check_selection();
 
     // Do not render window for not selected text volume
-    if (m_volume == nullptr ||
-        !m_volume->text_configuration.has_value()) {
+    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) {
         close();
         return;
     } 
@@ -947,6 +939,7 @@ static inline void execute_job(std::shared_ptr<Job> j)
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
+    assert(m_volume != nullptr);
     if (m_volume == nullptr) return false;
 
     // without text there is nothing to emboss
@@ -1670,13 +1663,6 @@ void GLGizmoEmboss::draw_model_type()
     }
     ImGui::SameLine(m_gui_cfg->style_offset);
 
-    if (m_volume == nullptr) {
-        ImGui::Text("[ %s ]", _u8L("No text").c_str());
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("First select text to change type.").c_str());
-        return;
-    }
-
     std::optional<ModelVolumeType> new_type;
     ModelVolumeType modifier = ModelVolumeType::PARAMETER_MODIFIER;
     ModelVolumeType negative = ModelVolumeType::NEGATIVE_VOLUME;
@@ -1884,8 +1870,6 @@ void GLGizmoEmboss::draw_style_add_button()
     bool only_add_style = !m_style_manager.exist_stored_style();
     bool can_add        = true;
     if (only_add_style &&
-        m_volume && 
-        m_volume->text_configuration.has_value() &&
         m_volume->text_configuration->style.type != WxFontUtils::get_actual_type())
         can_add = false;
 
@@ -2414,10 +2398,7 @@ void GLGizmoEmboss::draw_style_edit() {
         Limits::apply(font_prop.size_in_mm, limits.size_in_mm);
 
         // only different value need process
-        if (m_volume != nullptr &&
-            m_volume->text_configuration.has_value() &&
-            !is_approx(font_prop.size_in_mm, m_volume->text_configuration->style.prop.size_in_mm)) {
-
+        if (!is_approx(font_prop.size_in_mm, m_volume->text_configuration->style.prop.size_in_mm)) {
             // store font size into path
             if (style.type == WxFontUtils::get_actual_type()) {
                 if (wx_font_opt.has_value()) {
@@ -2645,8 +2626,6 @@ void GLGizmoEmboss::draw_advanced()
         min_char_gap, max_char_gap, units_fmt, _L("Distance between letters"))){
         // Condition prevent recalculation when insertint out of limits value by imgui input
         if (!Limits::apply(font_prop.char_gap, limits.char_gap) ||
-            m_volume == nullptr ||
-            !m_volume->text_configuration.has_value() ||
             !m_volume->text_configuration->style.prop.char_gap.has_value() ||
             m_volume->text_configuration->style.prop.char_gap != font_prop.char_gap) {        
             // char gap is stored inside of imgui font atlas
@@ -2663,8 +2642,6 @@ void GLGizmoEmboss::draw_advanced()
         min_line_gap, max_line_gap, units_fmt, _L("Distance between lines"))){
         // Condition prevent recalculation when insertint out of limits value by imgui input
         if (!Limits::apply(font_prop.line_gap, limits.line_gap) ||
-            m_volume == nullptr ||
-            !m_volume->text_configuration.has_value() ||
             !m_volume->text_configuration->style.prop.line_gap.has_value() ||
             m_volume->text_configuration->style.prop.line_gap != font_prop.line_gap) {        
             // line gap is planed to be stored inside of imgui font atlas
@@ -2679,8 +2656,6 @@ void GLGizmoEmboss::draw_advanced()
     if (rev_slider(tr.boldness, font_prop.boldness, def_boldness, _u8L("Undo boldness"), 
         limits.boldness.gui.min, limits.boldness.gui.max, units_fmt, _L("Tiny / Wide glyphs"))){
         if (!Limits::apply(font_prop.boldness, limits.boldness.values) ||
-            m_volume == nullptr ||
-            !m_volume->text_configuration.has_value() ||
             !m_volume->text_configuration->style.prop.boldness.has_value() ||
             m_volume->text_configuration->style.prop.boldness != font_prop.boldness)
             exist_change = true;
@@ -2692,8 +2667,6 @@ void GLGizmoEmboss::draw_advanced()
     if (rev_slider(tr.italic, font_prop.skew, def_skew, _u8L("Undo letter's skew"),
         limits.skew.gui.min, limits.skew.gui.max, "%.2f", _L("Italic strength ratio"))){
         if (!Limits::apply(font_prop.skew, limits.skew.values) ||
-            m_volume == nullptr ||
-            !m_volume->text_configuration.has_value() ||
             !m_volume->text_configuration->style.prop.skew.has_value() ||
             m_volume->text_configuration->style.prop.skew != font_prop.skew)
             exist_change = true;
@@ -2701,8 +2674,6 @@ void GLGizmoEmboss::draw_advanced()
     
     // input surface distance
     bool allowe_surface_distance = 
-        m_volume != nullptr &&
-        m_volume->text_configuration.has_value() &&
         !m_volume->text_configuration->style.prop.use_surface &&
         !is_text_object(m_volume);    
     std::optional<float> &distance = font_prop.distance;
@@ -2740,7 +2711,7 @@ void GLGizmoEmboss::draw_advanced()
         min_distance, max_distance, "%.2f mm", move_tooltip)) is_moved = true;
     }
 
-    if (is_moved && m_volume != nullptr && m_volume->text_configuration.has_value()){
+    if (is_moved){
         m_volume->text_configuration->style.prop.distance = font_prop.distance;        
         float act_distance = font_prop.distance.has_value() ? *font_prop.distance : .0f;
         do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
@@ -2769,13 +2740,11 @@ void GLGizmoEmboss::draw_advanced()
         if (is_approx(*angle, 0.f))
             angle.reset();
         
-        if (m_volume != nullptr && m_volume->text_configuration.has_value()) {
-            m_volume->text_configuration->style.prop.angle = angle;
-            float act_angle = angle.has_value() ? *angle : .0f;
-            do_rotate(act_angle - prev_angle);
-            // recalculate for surface cut
-            if (font_prop.use_surface) process();
-        }
+        m_volume->text_configuration->style.prop.angle = angle;
+        float act_angle = angle.has_value() ? *angle : .0f;
+        do_rotate(act_angle - prev_angle);
+        // recalculate for surface cut
+        if (font_prop.use_surface) process();
     }
 
     // when more collection add selector
