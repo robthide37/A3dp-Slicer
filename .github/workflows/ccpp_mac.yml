@@ -25,10 +25,10 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
-        name: ${{ github.event.repository.name }}.app
+        name: ${{ github.event.repository.name }}_patch_01.app
         path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
-        name: ${{ github.event.repository.name }}.dmg
+        name: ${{ github.event.repository.name }}_patch_01.dmg
         path: ${{ github.event.repository.name }}.dmg
