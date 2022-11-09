@@ -461,7 +461,8 @@ void GLGizmoEmboss::on_render() {
         const Transform3d matrix = camera.get_view_matrix() * (*m_temp_transformation);
         shader->set_uniform("view_model_matrix", matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("view_normal_matrix", (Matrix3d) (*m_temp_transformation).matrix().block(0, 0, 3, 3).inverse().transpose());
+        shader->set_uniform("view_normal_matrix", (Matrix3d) (matrix).matrix().block(0, 0, 3, 3).inverse().transpose());
+        shader->set_uniform("emission_factor", 0.0f);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // dragging object must be selected so draw it with correct color
