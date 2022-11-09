@@ -1112,15 +1112,6 @@ void GLGizmoEmboss::draw_window()
         }
     }
 
-    // Option to create text volume when reselecting volumes
-    m_imgui->disabled_begin(!is_activ_font);
-    if (m_volume == nullptr) {
-        ImGui::SameLine();
-        if (ImGui::Button(_u8L("Generate object").c_str()))
-            create_volume(ModelVolumeType::MODEL_PART);
-    }
-    m_imgui->disabled_end(); // !is_activ_font
-
 #ifdef SHOW_CONTAIN_3MF_FIX
     if (m_volume!=nullptr &&
         m_volume->text_configuration.has_value() &&
