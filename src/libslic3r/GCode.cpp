@@ -7,6 +7,9 @@
 #include "GCode/PrintExtents.hpp"
 #include "GCode/Thumbnails.hpp"
 #include "GCode/WipeTower.hpp"
+#include "Point.hpp"
+#include "Polygon.hpp"
+#include "PrintConfig.hpp"
 #include "ShortestPath.hpp"
 #include "Print.hpp"
 #include "Thread.hpp"
@@ -2347,6 +2350,14 @@ LayerResult GCode::process_layer(
         }
     } // for objects
 
+    if (this->config().avoid_curled_filament_during_travels) {
+        m_avoid_curled_filaments.clear();
+        for (const LayerToPrint &layer_to_print : layers) {
+            m_avoid_curled_filaments.add_obstacles(layer_to_print.object_layer, Point(scaled(this->origin())));
+            m_avoid_curled_filaments.add_obstacles(layer_to_print.support_layer, Point(scaled(this->origin())));
+        }
+    }
+
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
     for (unsigned int extruder_id : layer_tools.extruders)
     {
@@ -2405,7 +2416,7 @@ LayerResult GCode::process_layer(
         for (int print_wipe_extrusions = is_anything_overridden; print_wipe_extrusions>=0; --print_wipe_extrusions) {
             if (is_anything_overridden && print_wipe_extrusions == 0)
                 gcode+="; PURGING FINISHED\n";
-
+                
             for (InstanceToPrint &instance_to_print : instances_to_print) {
                 const LayerToPrint &layer_to_print = layers[instance_to_print.layer_id];
                 // To control print speed of the 1st object layer printed over raft interface.
@@ -3070,6 +3081,12 @@ std::string GCode::travel_to(const Point &point, ExtrusionRole role, std::string
         This is expressed in print coordinates, so it will need to be translated by
         this->origin in order to get G-code coordinates.  */
     Polyline travel { this->last_pos(), point };
+
+    if (this->config().avoid_curled_filament_during_travels) {
+        Point scaled_origin = Point(scaled(this->origin()));
+        travel              = m_avoid_curled_filaments.find_path(this->last_pos() + scaled_origin, point + scaled_origin);
+        travel.translate(-scaled_origin);
+    }
 
     // check whether a straight travel move would need retraction
     bool needs_retraction             = this->needs_retraction(travel, role);

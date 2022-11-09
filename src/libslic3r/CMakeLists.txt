@@ -165,6 +165,8 @@ set(SLIC3R_SOURCES
     Geometry/VoronoiOffset.hpp
     Geometry/VoronoiVisualUtils.hpp
     Int128.hpp
+    JumpPointSearch.cpp
+    JumpPointSearch.hpp
     KDTreeIndirect.hpp
     Layer.cpp
     Layer.hpp
