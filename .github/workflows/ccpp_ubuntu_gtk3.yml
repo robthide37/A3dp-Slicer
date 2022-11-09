@@ -1,13 +1,8 @@
-name: C/C++ Nightly ubuntu-GTK3
+name: C/C++ Patch-01 ubuntu-GTK3
 
 on:
   push:
     branches:
-      - Nigthly
-      - nightly_dev
-      - nightly_master
-      - debug_ubuntu
-      - dev
       - patch-1
 
 jobs:
