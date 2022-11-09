@@ -584,6 +584,7 @@ bool PrintObject::invalidate_state_by_config_options(
         } else if (
                opt_key == "perimeters"
             || opt_key == "extra_perimeters"
+            || opt_key == "extra_perimeters_on_overhangs"
             || opt_key == "first_layer_extrusion_width"
             || opt_key == "perimeter_extrusion_width"
             || opt_key == "infill_overlap"

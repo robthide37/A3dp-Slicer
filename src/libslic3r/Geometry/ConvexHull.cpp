@@ -116,6 +116,18 @@ Polygon convex_hull(const ExPolygons &expolygons)
     return convex_hull(pp);
 }
 
+Polygon convex_hulll(const Polylines &polylines)
+{
+    Points pp;
+    size_t sz = 0;
+    for (const auto &polyline : polylines)
+        sz += polyline.points.size();
+    pp.reserve(sz);
+    for (const auto &polyline : polylines)
+        pp.insert(pp.end(), polyline.points.begin(), polyline.points.end());
+    return convex_hull(pp);
+}
+
 namespace rotcalip {
 
 using int256_t = boost::multiprecision::int256_t;
