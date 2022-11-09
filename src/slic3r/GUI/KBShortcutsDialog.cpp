@@ -154,7 +154,6 @@ void KBShortcutsDialog::fill_shortcuts()
             { "L", L("Gizmo FDM paint-on supports") },
             { "P", L("Gizmo FDM paint-on seam") },
             { "N", L("Gizmo Multi Material painting") },
-            { "T", L("Gizmo Emboss Text / edit text")},
             { "Esc", L("Unselect gizmo or clear selection") },
             { "K", L("Change camera type (perspective, orthographic)") },
             { "B", L("Zoom to Bed") },
