@@ -155,7 +155,7 @@ void EmbossCreateVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
     if (objects.size() <= object_idx) 
         return;
 
-    Plater::TakeSnapshot snapshot(plater, _L("Add Emboss text Volume"));
+    plater->take_snapshot(_L("Add Emboss text Volume"));
 
     ModelObject    *obj    = objects[object_idx];
     ModelVolumeType type   = m_input.volume_type;
@@ -258,7 +258,7 @@ void EmbossCreateObjectJob::finalize(bool canceled, std::exception_ptr &eptr)
     ObjectList *obj_list = app.obj_list();
     GLCanvas3D *canvas   = plater->canvas3D();
 
-    Plater::TakeSnapshot snapshot(plater, _L("Add Emboss text object"));
+    plater->take_snapshot(_L("Add Emboss text object"));
 
     // Create new object and change selection
     bool center = false;
