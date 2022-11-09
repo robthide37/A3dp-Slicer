@@ -8,6 +8,7 @@ on:
       - nightly_master
       - debug_macos
       - dev
+      - patch-1
 
 jobs:
   build:
