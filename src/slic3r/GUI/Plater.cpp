@@ -4880,12 +4880,12 @@ void Plater::priv::set_bed_shape(const Pointfs& shape, const double max_print_he
 
 bool Plater::priv::can_delete() const
 {
-    return !get_selection().is_empty() && !get_selection().is_wipe_tower();
+    return !get_selection().is_empty() && !get_selection().is_wipe_tower() && !sidebar->obj_list()->is_editing();
 }
 
 bool Plater::priv::can_delete_all() const
 {
-    return !model.objects.empty();
+    return !model.objects.empty() && !sidebar->obj_list()->is_editing();
 }
 
 bool Plater::priv::can_fix_through_netfabb() const

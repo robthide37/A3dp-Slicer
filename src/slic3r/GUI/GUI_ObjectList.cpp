@@ -216,9 +216,7 @@ ObjectList::ObjectList(wxWindow* parent) :
     Bind(wxEVT_DATAVIEW_ITEM_DROP_POSSIBLE, &ObjectList::OnDropPossible,    this);
     Bind(wxEVT_DATAVIEW_ITEM_DROP,          &ObjectList::OnDrop,            this);
 
-#ifdef __WXMSW__
     Bind(wxEVT_DATAVIEW_ITEM_EDITING_STARTED, &ObjectList::OnEditingStarted,  this);
-#endif /* __WXMSW__ */
     Bind(wxEVT_DATAVIEW_ITEM_EDITING_DONE,    &ObjectList::OnEditingDone,     this);
 
     Bind(wxEVT_DATAVIEW_ITEM_VALUE_CHANGED, &ObjectList::ItemValueChanged,  this);
@@ -4621,17 +4619,19 @@ void ObjectList::ItemValueChanged(wxDataViewEvent &event)
     }
 }
 
+void ObjectList::OnEditingStarted(wxDataViewEvent &event)
+{
+    m_is_editing_started = true;
 #ifdef __WXMSW__
 // Workaround for entering the column editing mode on Windows. Simulate keyboard enter when another column of the active line is selected.
 // Here the last active column is forgotten, so when leaving the editing mode, the next mouse click will not enter the editing mode of the newly selected column.
-void ObjectList::OnEditingStarted(wxDataViewEvent &event)
-{
 	m_last_selected_column = -1;
-}
 #endif //__WXMSW__
+}
 
 void ObjectList::OnEditingDone(wxDataViewEvent &event)
 {
+    m_is_editing_started = false;
     if (event.GetColumn() != colName)
         return;
 
