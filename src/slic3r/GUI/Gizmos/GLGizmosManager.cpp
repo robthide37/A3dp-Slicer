@@ -606,10 +606,8 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
     const int keyCode = evt.GetKeyCode();
     bool processed = false;
 
-    if (evt.GetEventType() == wxEVT_KEY_UP)
-    {
-        if (m_current == SlaSupports || m_current == Hollow || m_current == Cut)
-        {
+    if (evt.GetEventType() == wxEVT_KEY_UP) {
+        if (m_current == SlaSupports || m_current == Hollow || m_current == Cut) {
             GLGizmoBase* gizmo = get_current();
             const bool is_editing             = m_current == Hollow ? true : gizmo->is_in_editing_mode();
             const bool is_rectangle_dragging  = gizmo->is_selection_rectangle_dragging();
@@ -625,18 +623,19 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
                     processed = true;
             }
         }
-        else if (m_current == Measure && keyCode == WXK_CONTROL) {
-            gizmo_event(SLAGizmoEventType::CtrlUp, Vec2d::Zero(), false);
+        else if (m_current == Measure) { 
+            if (keyCode == WXK_CONTROL)
+                gizmo_event(SLAGizmoEventType::CtrlUp, Vec2d::Zero(), evt.ShiftDown(), evt.AltDown(), evt.CmdDown());
+            else if (keyCode == WXK_SHIFT)
+                gizmo_event(SLAGizmoEventType::ShiftUp, Vec2d::Zero(), evt.ShiftDown(), evt.AltDown(), evt.CmdDown());
         }
 
 //        if (processed)
 //            m_parent.set_cursor(GLCanvas3D::Standard);
     }
-    else if (evt.GetEventType() == wxEVT_KEY_DOWN)
-    {
-        if ((m_current == SlaSupports) && ((keyCode == WXK_SHIFT) || (keyCode == WXK_ALT))
-          && get_current()->is_in_editing_mode())
-        {
+    else if (evt.GetEventType() == wxEVT_KEY_DOWN) {
+        if (m_current == SlaSupports && (keyCode == WXK_SHIFT || keyCode == WXK_ALT)
+          && get_current()->is_in_editing_mode()) {
 //            m_parent.set_cursor(GLCanvas3D::Cross);
             processed = true;
         }
@@ -662,8 +661,11 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
             if (simplify != nullptr) 
                 processed = simplify->on_esc_key_down();
         }
-        else if (m_current == Measure && keyCode == WXK_CONTROL) {
-            gizmo_event(SLAGizmoEventType::CtrlDown, Vec2d::Zero(), true);
+        else if (m_current == Measure) {
+            if (keyCode == WXK_CONTROL)
+                gizmo_event(SLAGizmoEventType::CtrlDown, Vec2d::Zero(), evt.ShiftDown(), evt.AltDown(), evt.CmdDown());
+            else if (keyCode == WXK_SHIFT)
+                gizmo_event(SLAGizmoEventType::ShiftDown, Vec2d::Zero(), evt.ShiftDown(), evt.AltDown(), evt.CmdDown());
         }
     }
 
