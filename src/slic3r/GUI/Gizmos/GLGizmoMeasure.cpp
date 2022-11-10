@@ -865,9 +865,9 @@ void GLGizmoMeasure::on_render()
         if (m_curr_feature.has_value()) {
             std::vector<ColorRGBA> colors;
             if (m_selected_features.first.feature.has_value() && *m_curr_feature == *m_selected_features.first.feature)
-                colors.emplace_back(SELECTED_1ST_COLOR);
+                colors.emplace_back(hovering_color());
             else if (m_selected_features.second.feature.has_value() && *m_curr_feature == *m_selected_features.second.feature)
-                colors.emplace_back(SELECTED_2ND_COLOR);
+                colors.emplace_back(hovering_color());
             else {
                 switch (m_curr_feature->get_type())
                 {
