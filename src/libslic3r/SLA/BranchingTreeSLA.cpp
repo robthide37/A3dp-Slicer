@@ -253,13 +253,11 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
 //        if (!result) {
             auto conn = optimize_ground_connection(
                                            ex_tbb,
-                                           m_builder,
                                            m_sm,
                                            j,
                                            get_radius(to));
 
             if (conn) {
-//                build_ground_connection(m_builder, m_sm, conn);
 //                Junction connlast = conn.path.back();
 //                branchingtree::Node n{connlast.pos.cast<float>(), float(connlast.r)};
 //                n.left = from.id;
@@ -321,6 +319,17 @@ bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
     return bool(anchor);
 }
 
+inline void build_pillars(SupportTreeBuilder &builder,
+                          BranchingTreeBuilder &vbuilder,
+                          const SupportableMesh &sm)
+{
+    for (size_t pill_id = 0; pill_id < vbuilder.pillars().size(); ++pill_id) {
+        auto * conn = vbuilder.ground_conn(pill_id);
+        if (conn)
+            build_ground_connection(builder, sm, *conn);
+    }
+}
+
 void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &sm)
 {
     auto coordfn = [&sm](size_t id, size_t dim) { return sm.pts[id].pos(dim); };
@@ -373,34 +382,22 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
     BranchingTreeBuilder vbuilder{builder, sm, nodes};
     branchingtree::build_tree(nodes, vbuilder);
 
-    std::vector<branchingtree::Node> bedleafs;
-    for (auto n : vbuilder.pillars()) {
-        n.left =  branchingtree::Node::ID_NONE;
-        n.right = branchingtree::Node::ID_NONE;
-        bedleafs.emplace_back(n);
-    }
+    if constexpr (props.group_pillars()) {
 
-    props.max_branch_length(50.f);
-    auto gndsm = sm;
-    branchingtree::PointCloud gndnodes{{}, nodes.get_bedpoints(), bedleafs, props};
-    BranchingTreeBuilder gndbuilder{builder, sm, gndnodes};
-    branchingtree::build_tree(gndnodes, gndbuilder);
+        std::vector<branchingtree::Node> bedleafs;
+        for (auto n : vbuilder.pillars()) {
+            n.left =  branchingtree::Node::ID_NONE;
+            n.right = branchingtree::Node::ID_NONE;
+            bedleafs.emplace_back(n);
+        }
 
-    // All leafs of gndbuilder are nodes that already proved to be routable
-    // to the ground. gndbuilder should not encounter any unroutable nodes
-//    assert(gndbuilder.unroutable_pinheads().empty());
+        branchingtree::PointCloud gndnodes{{}, nodes.get_bedpoints(), bedleafs, props};
+        BranchingTreeBuilder gndbuilder{builder, sm, gndnodes};
+        branchingtree::build_tree(gndnodes, gndbuilder);
 
-
-//    for (size_t pill_id = 0; pill_id < vbuilder.pillars().size(); ++pill_id) {
-//        auto * conn = vbuilder.ground_conn(pill_id);
-//        if (conn)
-//            build_ground_connection(builder, sm, *conn);
-//    }
-
-    for (size_t pill_id = 0; pill_id < gndbuilder.pillars().size(); ++pill_id) {
-        auto * conn = gndbuilder.ground_conn(pill_id);
-        if (conn)
-            build_ground_connection(builder, sm, *conn);
+        build_pillars(builder, gndbuilder, sm);
+    } else {
+        build_pillars(builder, vbuilder, sm);
     }
 
     for (size_t id : vbuilder.unroutable_pinheads())

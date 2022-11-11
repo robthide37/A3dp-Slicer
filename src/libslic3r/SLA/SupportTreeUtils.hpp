@@ -6,6 +6,7 @@
 
 #include <libslic3r/Execution/Execution.hpp>
 #include <libslic3r/Optimize/NLoptOptimizer.hpp>
+#include <libslic3r/Optimize/BruteforceOptimizer.hpp>
 #include <libslic3r/MeshNormals.hpp>
 #include <libslic3r/Geometry.hpp>
 #include <libslic3r/SLA/SupportTreeBuilder.hpp>
@@ -178,7 +179,7 @@ Hit beam_mesh_hit(Ex ex, const AABBMesh &mesh, const Beam &beam, double sd)
         [&mesh, r_src, r_dst, src, dst, &ring, dir, sd, &hits](size_t i) {
             Hit &hit = hits[i];
 
-               // Point on the circle on the pin sphere
+            // Point on the circle on the pin sphere
             Vec3d p_src = ring.get(i, src, r_src + sd);
             Vec3d p_dst = ring.get(i, dst, r_dst + sd);
             Vec3d raydir = (p_dst - p_src).normalized();
@@ -644,10 +645,9 @@ struct GroundConnection {
     static constexpr size_t MaxExpectedJunctions = 3;
 
     boost::container::small_vector<Junction, MaxExpectedJunctions> path;
-    double end_radius;
     std::optional<Pedestal> pillar_base;
 
-    operator bool() const { return !path.empty(); }
+    operator bool() const { return pillar_base.has_value() && !path.empty(); }
 };
 
 template<class Ex>
@@ -659,6 +659,8 @@ GroundConnection find_pillar_route(Ex policy,
 {
     GroundConnection ret;
 
+    ret.path.emplace_back(source);
+
     Vec3d  jp           = source.pos, endp = jp, dir = sourcedir;
     bool   can_add_base = false/*, non_head = false*/;
 
@@ -666,6 +668,7 @@ GroundConnection find_pillar_route(Ex policy,
     double jp_gnd = 0.; // The lowest Z where a junction center can be
     double gap_dist = 0.; // The gap distance between the model and the pad
     double radius = source.r;
+    double sd = sm.cfg.safety_distance_mm;
 
     double r2 = radius + (end_radius - radius) / (jp.z() - ground_level(sm));
 
@@ -692,7 +695,6 @@ GroundConnection find_pillar_route(Ex policy,
                                  sm.cfg.head_back_radius_mm);
 
         if (diffbr && diffbr->endp.z() > jp_gnd) {
-            ret.path.emplace_back(source);
             endp = diffbr->endp;
             radius = diffbr->end_r;
             ret.path.emplace_back(endp, radius);
@@ -709,7 +711,6 @@ GroundConnection find_pillar_route(Ex policy,
         auto [polar, azimuth] = dir_to_spheric(dir);
         polar = PI - sm.cfg.bridge_slope;
         Vec3d d = spheric_to_dir(polar, azimuth).normalized();
-        auto sd = sm.cfg.safety_distance_mm; //radius * sm.cfg.safety_distance_mm / sm.cfg.head_back_radius_mm;
         double t = beam_mesh_hit(policy, sm.emesh, Beam{endp, d, radius, r2}, sd).distance();
         double tmax = std::min(sm.cfg.max_bridge_length_mm, t);
         t = 0.;
@@ -759,15 +760,19 @@ GroundConnection find_pillar_route(Ex policy,
     }
 
     Vec3d gp = to_floor(endp);
+    auto hit = beam_mesh_hit(policy, sm.emesh,
+                             Beam{{endp, radius}, {gp, end_radius}}, sd);
 
-    ret.end_radius = end_radius;
+    if (std::isinf(hit.distance())) {
+        double base_radius = can_add_base ?
+                    std::max(sm.cfg.base_radius_mm, end_radius) : end_radius;
 
-    if (can_add_base) {
+        Vec3d gp = to_floor(endp);
         ret.pillar_base =
-            Pedestal{gp, sm.cfg.base_height_mm, sm.cfg.base_radius_mm, end_radius};
+            Pedestal{gp, sm.cfg.base_height_mm, base_radius, end_radius};
     }
 
-    return ret; //{true, pillar_id};
+    return ret;
 }
 
 inline long build_ground_connection(SupportTreeBuilder &builder,
@@ -798,10 +803,9 @@ inline long build_ground_connection(SupportTreeBuilder &builder,
 //        long head_id = std::abs(conn.path.back().id);
 //        ret = builder.add_pillar(head_id, h);
 //    } else
-        ret = builder.add_pillar(gp, h, conn.path.back().r, conn.end_radius);
+        ret = builder.add_pillar(gp, h, conn.path.back().r, conn.pillar_base->r_top);
 
-    if (conn.pillar_base)
-        builder.add_pillar_base(ret, conn.pillar_base->height, conn.pillar_base->r_bottom);
+    builder.add_pillar_base(ret, conn.pillar_base->height, conn.pillar_base->r_bottom);
 
     return ret;
 }
@@ -809,7 +813,6 @@ inline long build_ground_connection(SupportTreeBuilder &builder,
 template<class Ex>
 GroundConnection find_ground_connection(
     Ex                     policy,
-    SupportTreeBuilder    &builder,
     const SupportableMesh &sm,
     const Junction        &j,
     const Vec3d           &dir,
@@ -817,39 +820,36 @@ GroundConnection find_ground_connection(
 {
     auto   hjp = j.pos;
     double r   = j.r;
-    auto   sd  = sm.cfg.safety_distance_mm; //r * sm.cfg.safety_distance_mm / sm.cfg.head_back_radius_mm;
+    auto   sd  = sm.cfg.safety_distance_mm;
     double r2  = j.r + (end_r - j.r) / (j.pos.z() - ground_level(sm));
 
-    double t = beam_mesh_hit(policy, sm.emesh, Beam{hjp, dir, r, r2}, sd)
-                   .distance();
-    double d = 0, tdown = 0;
-    t = std::min(t,
-                 sm.cfg.max_bridge_length_mm * r / sm.cfg.head_back_radius_mm);
+    double t = beam_mesh_hit(policy, sm.emesh, Beam{hjp, dir, r, r2}, sd).distance();
+    t = std::min(t, sm.cfg.max_bridge_length_mm);
+    double d = 0.;
 
-    while (
-        d < t &&
-        !std::isinf(tdown = beam_mesh_hit(policy, sm.emesh,
-                                          Beam{hjp + d * dir, DOWN, r, r2}, sd)
-                                .distance())) {
+    GroundConnection gnd_route;
+
+    while (!gnd_route && d < t) {
+        Vec3d  endp = hjp + d * dir;
+        double bridge_ratio = d / (d + (endp.z() - sm.emesh.ground_level()));
+        double pill_r = r + bridge_ratio * (end_r - r);
+        gnd_route = find_pillar_route(policy, sm, {endp, pill_r}, dir, end_r);
+
         d += r;
     }
 
     GroundConnection ret;
-    ret.end_radius = end_r;
 
-    if (std::isinf(tdown)) {
+    if (d > 0.)
         ret.path.emplace_back(j);
-        Vec3d  endp         = hjp + d * dir;
-        double bridge_ratio = d / (d + (endp.z() - sm.emesh.ground_level()));
-        double pill_r = r + bridge_ratio * (end_r - r);
 
-        auto route = find_pillar_route(policy, sm, {endp, pill_r}, dir, end_r);
-        for (auto &j : route.path)
-            ret.path.emplace_back(j);
+    for (auto &p : gnd_route.path)
+        ret.path.emplace_back(p);
 
-        ret.pillar_base = route.pillar_base;
-        ret.end_radius  = end_r;
-    }
+    // This will ultimately determine if the route is valid or not
+    // but the path junctions will be provided anyways, so invalid paths
+    // can be debugged
+    ret.pillar_base = gnd_route.pillar_base;
 
     return ret;
 }
@@ -857,7 +857,6 @@ GroundConnection find_ground_connection(
 template<class Ex>
 GroundConnection optimize_ground_connection(
     Ex                     policy,
-    SupportTreeBuilder    &builder,
     const SupportableMesh &sm,
     const Junction        &j,
     double                 end_radius,
@@ -865,8 +864,8 @@ GroundConnection optimize_ground_connection(
 {
     double downdst = j.pos.z() - ground_level(sm);
 
-    auto res = find_ground_connection(policy, builder, sm, j, init_dir, end_radius);
-    if (!res)
+    auto res = find_ground_connection(policy, sm, j, init_dir, end_radius);
+    if (res)
         return res;
 
     // Optimize bridge direction:
@@ -874,7 +873,7 @@ GroundConnection optimize_ground_connection(
     // direction out of the cavity.
     auto [polar, azimuth] = dir_to_spheric(init_dir);
 
-    Optimizer<AlgNLoptGenetic> solver(get_criteria(sm.cfg).stop_score(1e6));
+    Optimizer<opt::AlgNLoptMLSL> solver(get_criteria(sm.cfg).stop_score(1e6));
     solver.seed(0); // we want deterministic behavior
 
     auto   sd  = /*j.r **/ sm.cfg.safety_distance_mm /*/ sm.cfg.head_back_radius_mm*/;
@@ -891,7 +890,7 @@ GroundConnection optimize_ground_connection(
 
     Vec3d bridgedir = spheric_to_dir(oresult.optimum).normalized();
 
-    return find_ground_connection(policy, builder, sm, j, bridgedir, end_radius);
+    return find_ground_connection(policy, sm, j, bridgedir, end_radius);
 }
 
 template<class Ex>
@@ -904,7 +903,7 @@ std::pair<bool, long> connect_to_ground(Ex                     policy,
 {
     std::pair<bool, long> ret = {false, SupportTreeNode::ID_UNSET};
 
-    auto conn = find_ground_connection(policy, builder, sm, j, dir, end_r);
+    auto conn = find_ground_connection(policy, sm, j, dir, end_r);
     ret.first = bool(conn);
     ret.second = build_ground_connection(builder, sm, conn);
 
@@ -921,8 +920,7 @@ std::pair<bool, long> search_ground_route(Ex                     policy,
 {
     std::pair<bool, long> ret = {false, SupportTreeNode::ID_UNSET};
 
-    auto conn = optimize_ground_connection(policy, builder, sm, j,
-                                                       end_r, init_dir);
+    auto conn = optimize_ground_connection(policy, sm, j, end_r, init_dir);
 
     ret.first = bool(conn);
     ret.second = build_ground_connection(builder, sm, conn);

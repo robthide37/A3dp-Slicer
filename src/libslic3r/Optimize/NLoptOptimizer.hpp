@@ -158,7 +158,7 @@ public:
         return optimize(nl, std::forward<Func>(func), initvals);
     }
 
-    explicit NLoptOpt(StopCriteria stopcr = {}) : m_stopcr(stopcr) {}
+    explicit NLoptOpt(const StopCriteria &stopcr = {}) : m_stopcr(stopcr) {}
 
     void set_criteria(const StopCriteria &cr) { m_stopcr = cr; }
     const StopCriteria &get_criteria() const noexcept { return m_stopcr; }
@@ -226,7 +226,7 @@ using AlgNLoptGenetic = detail::NLoptAlgComb<NLOPT_GN_ESCH>;
 using AlgNLoptSubplex = detail::NLoptAlg<NLOPT_LN_SBPLX>;
 using AlgNLoptSimplex = detail::NLoptAlg<NLOPT_LN_NELDERMEAD>;
 using AlgNLoptDIRECT  = detail::NLoptAlg<NLOPT_GN_DIRECT>;
-using AlgNLoptMLSL    = detail::NLoptAlg<NLOPT_GN_MLSL>;
+using AlgNLoptMLSL    = detail::NLoptAlgComb<NLOPT_GN_MLSL, NLOPT_LN_SBPLX>;
 
 }} // namespace Slic3r::opt
 
