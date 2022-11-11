@@ -262,7 +262,21 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
         m_mouse_left_down = false;
         return false;
     }
+    else if (mouse_event.Dragging()) {
+        // Enable/Disable panning/rotating the 3D scene 
+        // Ctrl is pressed or the mouse is not hovering a selected volume
+        bool unlock_dragging = mouse_event.CmdDown() || (m_hover_id == -1 && !m_parent.get_selection().contains_volume(m_parent.get_first_hover_volume_idx()));
+        // mode is not center selection or mouse is not hovering a center
+        unlock_dragging &= !mouse_event.ShiftDown() || (m_hover_id != SELECTION_1_ID && m_hover_id != SELECTION_2_ID && m_hover_id != POINT_ID);
+        return !unlock_dragging;
+    }
     else if (mouse_event.LeftDown()) {
+        // let the event pass through to allow panning/rotating the 3D scene
+        if ((m_mode != EMode::CenterSelection && mouse_event.CmdDown()) ||
+            (m_mode == EMode::CenterSelection && m_hover_id != SELECTION_1_ID && m_hover_id != SELECTION_2_ID && m_hover_id != POINT_ID)) {
+            return false;
+        }
+
         if (m_hover_id != -1) {
             SelectedFeatures selected_features_old = m_selected_features;
             m_mouse_left_down = true;
@@ -329,10 +343,10 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
                         if (m_mode == EMode::PointSelection || m_mode == EMode::CenterSelection)
                             m_selection_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_2_ID, *m_sphere.mesh_raycaster));
                         if (m_mode == EMode::CenterSelection) {
-                            // Fake shift up event to exit the center selection mode
-                            gizmo_event(SLAGizmoEventType::ShiftUp, Vec2d::Zero(), false, false, true);
-                            // increase counter to avoid that keeping the SHIFT key pressed triggers a shift down event
-                            m_shift_kar_filter.increase_count();
+                            // Fake ctrl up event to exit the center selection mode
+                            gizmo_event(SLAGizmoEventType::CtrlUp, Vec2d::Zero(), true, false, false);
+                            // increase counter to avoid that keeping the ctrl key pressed triggers a ctrl down event
+                            m_ctrl_kar_filter.increase_count();
                         }
                     }
                 }
@@ -347,10 +361,10 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
                 if (m_mode == EMode::PointSelection || m_mode == EMode::CenterSelection)
                     m_selection_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_1_ID, *m_sphere.mesh_raycaster));
                 if (m_mode == EMode::CenterSelection) {
-                    // Fake shift up event to exit the center selection mode
-                    gizmo_event(SLAGizmoEventType::ShiftUp, Vec2d::Zero(), false, false, true);
-                    // increase counter to avoid that keeping the SHIFT key pressed triggers a shift down event
-                    m_shift_kar_filter.increase_count();
+                    // Fake ctrl up event to exit the center selection mode
+                    gizmo_event(SLAGizmoEventType::CtrlUp, Vec2d::Zero(), true, false, false);
+                    // increase counter to avoid that keeping the ctrl key pressed triggers a ctrl down event
+                    m_ctrl_kar_filter.increase_count();
                 }
             }
 
@@ -384,10 +398,18 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             // avoid closing the gizmo if the user clicks outside of any volume
             return true;
     }
-    else if (mouse_event.RightDown() && mouse_event.CmdDown()) {
-        m_selected_features.reset();
-        m_selection_raycasters.clear();
-        m_parent.request_extra_frame();
+    else if (mouse_event.RightDown()) {
+        // let the event pass through to allow panning/rotating the 3D scene
+        if ((m_mode != EMode::CenterSelection && mouse_event.CmdDown()) || (m_mode == EMode::CenterSelection && m_hover_id != SELECTION_1_ID && m_hover_id != SELECTION_2_ID)) {
+            std::cout << "RightDown -> false\n";
+            return false;
+        }
+
+        if (mouse_event.ShiftDown()) {
+            m_selected_features.reset();
+            m_selection_raycasters.clear();
+            m_parent.request_extra_frame();
+        }
     }
     else if (mouse_event.Leaving())
         m_mouse_left_down = false;
@@ -443,29 +465,29 @@ bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_po
         return ret;
     };
 
-    if (action == SLAGizmoEventType::CtrlDown) {
-        if (m_ctrl_kar_filter.is_first()) {
-            m_mode = activate_center_selection(SLAGizmoEventType::CtrlDown) ? EMode::CenterSelection : EMode::PointSelection;
-            disable_scene_raycasters();
-        }
-        m_ctrl_kar_filter.increase_count();
-    }
-    else if (action == SLAGizmoEventType::CtrlUp) {
-        m_ctrl_kar_filter.reset_count();
-        m_mode = EMode::FeatureSelection;
-        restore_scene_raycasters_state();
-    }
-    else if (action == SLAGizmoEventType::ShiftDown) {
+    if (action == SLAGizmoEventType::ShiftDown) {
         if (m_shift_kar_filter.is_first()) {
-            if (activate_center_selection(SLAGizmoEventType::ShiftDown)) {
-                m_mode = EMode::CenterSelection;
-                disable_scene_raycasters();
-            }
+            m_mode = activate_center_selection(SLAGizmoEventType::ShiftDown) ? EMode::CenterSelection : EMode::PointSelection;
+            disable_scene_raycasters();
         }
         m_shift_kar_filter.increase_count();
     }
     else if (action == SLAGizmoEventType::ShiftUp) {
         m_shift_kar_filter.reset_count();
+        m_mode = EMode::FeatureSelection;
+        restore_scene_raycasters_state();
+    }
+    else if (action == SLAGizmoEventType::CtrlDown) {
+        if (m_ctrl_kar_filter.is_first()) {
+            if (activate_center_selection(SLAGizmoEventType::CtrlDown)) {
+                m_mode = EMode::CenterSelection;
+                disable_scene_raycasters();
+            }
+        }
+        m_ctrl_kar_filter.increase_count();
+    }
+    else if (action == SLAGizmoEventType::CtrlUp) {
+        m_ctrl_kar_filter.reset_count();
         m_mode = control_down ? EMode::PointSelection : EMode::FeatureSelection;
         restore_scene_raycasters_state();
     }
@@ -1621,17 +1643,17 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             );
 
         if (m_mode == EMode::FeatureSelection && m_hover_id != -1) {
-            add_strings_row_to_table(*m_imgui, CTRL_STR, ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Enable point selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, _u8L("Shift"), ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Enable point selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ++row_count;
         }
 
         if (m_mode != EMode::CenterSelection && feature_has_center(m_curr_feature)) {
-            add_strings_row_to_table(*m_imgui, CTRL_STR + "+" + _u8L("Shift"), ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Enable center selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, _u8L("Shift") + "+" + CTRL_STR, ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Enable center selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ++row_count;
         }
 
         if (m_selected_features.first.feature.has_value()) {
-            add_strings_row_to_table(*m_imgui, CTRL_STR + "+" + _u8L("Right mouse button"), ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Restart selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, _u8L("Shift") + "+" + _u8L("Right mouse button"), ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Restart selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ++row_count;
         }
 
