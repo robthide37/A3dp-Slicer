@@ -1864,12 +1864,10 @@ bool ObjectList::del_subobject_item(wxDataViewItem& item)
 
     // If last volume item with warning was deleted, unmark object item
     if (type & itVolume) {
-        add_volumes_to_object_in_list(obj_idx);
         const std::string& icon_name = get_warning_icon_name(object(obj_idx)->get_object_stl_stats());
         m_objects_model->UpdateWarningIcon(parent, icon_name);
     }
-    else
-        m_objects_model->Delete(item);
+    m_objects_model->Delete(item);
 
     update_info_items(obj_idx);
 
@@ -3031,7 +3029,7 @@ bool ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& it
             if (!del_subobject_from_object(item->obj_idx, item->sub_obj_idx, item->type))
                 continue;
             if (item->type&itVolume) {
-                add_volumes_to_object_in_list(item->obj_idx);
+                m_objects_model->Delete(m_objects_model->GetItemByVolumeId(item->obj_idx, item->sub_obj_idx));
                 ModelObject* obj = object(item->obj_idx);
                 if (obj->volumes.size() == 1) {
                     wxDataViewItem parent = m_objects_model->GetItemById(item->obj_idx);
