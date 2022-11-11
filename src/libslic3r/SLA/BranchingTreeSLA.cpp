@@ -382,20 +382,20 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
     BranchingTreeBuilder vbuilder{builder, sm, nodes};
     branchingtree::build_tree(nodes, vbuilder);
 
+    std::cout << "Original pillar count: " << vbuilder.pillars().size() << std::endl;
+
     if constexpr (props.group_pillars()) {
 
         std::vector<branchingtree::Node> bedleafs;
-        for (auto n : vbuilder.pillars()) {
-            n.left =  branchingtree::Node::ID_NONE;
-            n.right = branchingtree::Node::ID_NONE;
-            bedleafs.emplace_back(n);
-        }
+        std::copy(vbuilder.pillars().begin(), vbuilder.pillars().end(), std::back_inserter(bedleafs));
 
         branchingtree::PointCloud gndnodes{{}, nodes.get_bedpoints(), bedleafs, props};
         BranchingTreeBuilder gndbuilder{builder, sm, gndnodes};
         branchingtree::build_tree(gndnodes, gndbuilder);
 
+        std::cout << "Grouped pillar count: " << gndbuilder.pillars().size() << std::endl;
         build_pillars(builder, gndbuilder, sm);
+
     } else {
         build_pillars(builder, vbuilder, sm);
     }

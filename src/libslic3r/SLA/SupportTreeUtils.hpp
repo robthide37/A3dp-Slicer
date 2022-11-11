@@ -629,7 +629,7 @@ std::optional<Head> calculate_pinhead_placement(Ex                     policy,
     };
 
     if (optimize_pinhead_placement(policy, sm, head)) {
-        head.id = suppt_idx;
+        head.id = long(suppt_idx);
 
         return head;
     }

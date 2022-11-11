@@ -197,7 +197,10 @@ PointCloud::PointCloud(std::vector<Node> meshpts,
     
     for (size_t i = 0; i < m_leafs.size(); ++i) {
         Node &n = m_leafs[i];
-        n.id = int(LEAFS_BEGIN + i);
+        n.id    = int(LEAFS_BEGIN + i);
+        n.left  = Node::ID_NONE;
+        n.right = Node::ID_NONE;
+
         m_ktree.insert({n.pos, n.id});
     }
 }
