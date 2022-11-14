@@ -351,136 +351,6 @@ std::optional<DiffBridge> search_widening_path(Ex                     policy,
     return {};
 }
 
-// This is a proxy function for pillar creation which will mind the gap
-// between the pad and the model bottom in zero elevation mode.
-// 'pinhead_junctionpt' is the starting junction point which needs to be
-// routed down. sourcedir is the allowed direction of an optional bridge
-// between the jp junction and the final pillar.
-template<class Ex>
-std::pair<bool, long> create_ground_pillar(
-    Ex                     policy,
-    SupportTreeBuilder    &builder,
-    const SupportableMesh &sm,
-    const Junction        &pinhead_junctionpt,
-    const Vec3d           &sourcedir,
-    double                 end_radius,
-    long                   head_id = SupportTreeNode::ID_UNSET)
-{
-    Vec3d  jp           = pinhead_junctionpt.pos, endp = jp, dir = sourcedir;
-    long   pillar_id    = SupportTreeNode::ID_UNSET;
-    bool   can_add_base = false, non_head = false;
-
-    double gndlvl = 0.; // The Z level where pedestals should be
-    double jp_gnd = 0.; // The lowest Z where a junction center can be
-    double gap_dist = 0.; // The gap distance between the model and the pad
-    double radius = pinhead_junctionpt.r;
-
-    double r2 = radius + (end_radius - radius) / (jp.z() - ground_level(sm));
-
-    auto to_floor = [&gndlvl](const Vec3d &p) { return Vec3d{p.x(), p.y(), gndlvl}; };
-
-    auto eval_limits = [&sm, &radius, &can_add_base, &gndlvl, &gap_dist, &jp_gnd]
-        (bool base_en = true)
-    {
-        can_add_base  = base_en && radius >= sm.cfg.head_back_radius_mm;
-        double base_r = can_add_base ? sm.cfg.base_radius_mm : 0.;
-        gndlvl        = ground_level(sm);
-        if (!can_add_base) gndlvl -= sm.pad_cfg.wall_thickness_mm;
-        jp_gnd   = gndlvl + (can_add_base ? 0. : sm.cfg.head_back_radius_mm);
-        gap_dist = sm.cfg.pillar_base_safety_distance_mm + base_r + EPSILON;
-    };
-
-    eval_limits();
-
-    // We are dealing with a mini pillar that's potentially too long
-    if (radius < sm.cfg.head_back_radius_mm && jp.z() - gndlvl > 20 * radius)
-    {
-        std::optional<DiffBridge> diffbr =
-            search_widening_path(policy, sm, jp, dir, radius,
-                                 sm.cfg.head_back_radius_mm);
-
-        if (diffbr && diffbr->endp.z() > jp_gnd) {
-            auto &br = builder.add_diffbridge(*diffbr);
-            if (head_id >= 0) builder.head(head_id).bridge_id = br.id;
-            endp = diffbr->endp;
-            radius = diffbr->end_r;
-            builder.add_junction(endp, radius);
-            non_head = true;
-            dir = diffbr->get_dir();
-            eval_limits();
-        } else return {false, pillar_id};
-    }
-
-    if (sm.cfg.object_elevation_mm < EPSILON)
-    {
-        // get a suitable direction for the corrector bridge. It is the
-        // original sourcedir's azimuth but the polar angle is saturated to the
-        // configured bridge slope.
-        auto [polar, azimuth] = dir_to_spheric(dir);
-        polar = PI - sm.cfg.bridge_slope;
-        Vec3d d = spheric_to_dir(polar, azimuth).normalized();
-        auto sd = radius * sm.cfg.safety_distance_mm / sm.cfg.head_back_radius_mm;
-        double t = beam_mesh_hit(policy, sm.emesh, Beam{endp, d, radius, r2}, sd).distance();
-        double tmax = std::min(sm.cfg.max_bridge_length_mm, t);
-        t = 0.;
-
-        double zd = endp.z() - jp_gnd;
-        double tmax2 = zd / std::sqrt(1 - sm.cfg.bridge_slope * sm.cfg.bridge_slope);
-        tmax = std::min(tmax, tmax2);
-
-        Vec3d nexp = endp;
-        double dlast = 0.;
-        while (((dlast = std::sqrt(sm.emesh.squared_distance(to_floor(nexp)))) < gap_dist ||
-                !std::isinf(beam_mesh_hit(policy, sm.emesh, Beam{nexp, DOWN, radius, r2}, sd).distance())) &&
-               t < tmax)
-        {
-            t += radius;
-            nexp = endp + t * d;
-        }
-
-        if (dlast < gap_dist && can_add_base) {
-            nexp         = endp;
-            t            = 0.;
-            can_add_base = false;
-            eval_limits(can_add_base);
-
-            zd = endp.z() - jp_gnd;
-            tmax2 = zd / std::sqrt(1 - sm.cfg.bridge_slope * sm.cfg.bridge_slope);
-            tmax = std::min(tmax, tmax2);
-
-            while (((dlast = std::sqrt(sm.emesh.squared_distance(to_floor(nexp)))) < gap_dist ||
-                    !std::isinf(beam_mesh_hit(policy, sm.emesh, Beam{nexp, DOWN, radius}, sd).distance())) && t < tmax) {
-                t += radius;
-                nexp = endp + t * d;
-            }
-        }
-
-        // Could not find a path to avoid the pad gap
-        if (dlast < gap_dist) return {false, pillar_id};
-
-        if (t > 0.) { // Need to make additional bridge
-            const Bridge& br = builder.add_bridge(endp, nexp, radius);
-            if (head_id >= 0) builder.head(head_id).bridge_id = br.id;
-
-            builder.add_junction(nexp, radius);
-            endp = nexp;
-            non_head = true;
-        }
-    }
-
-    Vec3d gp = to_floor(endp);
-    double h = endp.z() - gp.z();
-
-    pillar_id = head_id >= 0 && !non_head ? builder.add_pillar(head_id, h) :
-                                            builder.add_pillar(gp, h, radius, end_radius);
-
-    if (can_add_base)
-        builder.add_pillar_base(pillar_id, sm.cfg.base_height_mm,
-                                sm.cfg.base_radius_mm);
-
-    return {true, pillar_id};
-}
-
 inline double distance(const SupportPoint &a, const SupportPoint &b)
 {
     return (a.pos - b.pos).norm();
@@ -533,13 +403,13 @@ bool optimize_pinhead_placement(Ex                     policy,
 
     double back_r = head.r_back_mm;
 
-       // skip if the tilt is not sane
+    // skip if the tilt is not sane
     if (polar < PI - m.cfg.normal_cutoff_angle) return false;
 
-       // We saturate the polar angle to 3pi/4
+    // We saturate the polar angle to 3pi/4
     polar = std::max(polar, PI - m.cfg.bridge_slope);
 
-       // save the head (pinpoint) position
+    // save the head (pinpoint) position
     Vec3d hp = head.pos;
 
     double lmin = m.cfg.head_width_mm, lmax = lmin;
@@ -548,19 +418,18 @@ bool optimize_pinhead_placement(Ex                     policy,
         lmin = 0., lmax = m.cfg.head_penetration_mm;
     }
 
-       // The distance needed for a pinhead to not collide with model.
+    // The distance needed for a pinhead to not collide with model.
     double w = lmin + 2 * back_r + 2 * m.cfg.head_front_radius_mm -
                m.cfg.head_penetration_mm;
 
     double pin_r = head.r_pin_mm;
 
-       // Reassemble the now corrected normal
+    // Reassemble the now corrected normal
     auto nn = spheric_to_dir(polar, azimuth).normalized();
 
-    double sd = back_r * m.cfg.safety_distance_mm /
-                m.cfg.head_back_radius_mm;
+    double sd = m.cfg.safety_distance_mm;
 
-       // check available distance
+    // check available distance
     Hit t = pinhead_mesh_hit(policy, m.emesh, hp, nn, pin_r, back_r, w, sd);
 
     if (t.distance() < w) {
@@ -568,7 +437,7 @@ bool optimize_pinhead_placement(Ex                     policy,
         // viable normal that doesn't collide with the model
         // geometry and its very close to the default.
 
-        Optimizer<AlgNLoptGenetic> solver(get_criteria(m.cfg).stop_score(w).max_iterations(100));
+        Optimizer<opt::AlgNLoptMLSL> solver(get_criteria(m.cfg).stop_score(w).max_iterations(100));
         solver.seed(0); // we want deterministic behavior
 
         auto oresult = solver.to_max().optimize(
@@ -602,10 +471,10 @@ bool optimize_pinhead_placement(Ex                     policy,
         head.r_back_mm = back_r;
 
         ret = true;
-    } else if (back_r > m.cfg.head_fallback_radius_mm) {
+    } /*else if (back_r > m.cfg.head_fallback_radius_mm) {
         head.r_back_mm = m.cfg.head_fallback_radius_mm;
         ret = optimize_pinhead_placement(policy, m, head);
-    }
+    }*/
 
     return ret;
 }
@@ -848,7 +717,7 @@ GroundConnection find_ground_connection(
 
     // This will ultimately determine if the route is valid or not
     // but the path junctions will be provided anyways, so invalid paths
-    // can be debugged
+    // can be inspected
     ret.pillar_base = gnd_route.pillar_base;
 
     return ret;
@@ -876,7 +745,7 @@ GroundConnection optimize_ground_connection(
     Optimizer<opt::AlgNLoptMLSL> solver(get_criteria(sm.cfg).stop_score(1e6));
     solver.seed(0); // we want deterministic behavior
 
-    auto   sd  = /*j.r **/ sm.cfg.safety_distance_mm /*/ sm.cfg.head_back_radius_mm*/;
+    auto sd      = sm.cfg.safety_distance_mm;
     auto oresult = solver.to_max().optimize(
         [&j, sd, &policy, &sm, &downdst, &end_radius](const opt::Input<2> &input) {
             auto &[plr, azm] = input;
@@ -891,41 +760,6 @@ GroundConnection optimize_ground_connection(
     Vec3d bridgedir = spheric_to_dir(oresult.optimum).normalized();
 
     return find_ground_connection(policy, sm, j, bridgedir, end_radius);
-}
-
-template<class Ex>
-std::pair<bool, long> connect_to_ground(Ex                     policy,
-                                        SupportTreeBuilder    &builder,
-                                        const SupportableMesh &sm,
-                                        const Junction        &j,
-                                        const Vec3d           &dir,
-                                        double                 end_r)
-{
-    std::pair<bool, long> ret = {false, SupportTreeNode::ID_UNSET};
-
-    auto conn = find_ground_connection(policy, sm, j, dir, end_r);
-    ret.first = bool(conn);
-    ret.second = build_ground_connection(builder, sm, conn);
-
-    return ret;
-}
-
-template<class Ex>
-std::pair<bool, long> search_ground_route(Ex                     policy,
-                                          SupportTreeBuilder    &builder,
-                                          const SupportableMesh &sm,
-                                          const Junction        &j,
-                                          double                 end_r,
-                                          const Vec3d &init_dir = DOWN)
-{
-    std::pair<bool, long> ret = {false, SupportTreeNode::ID_UNSET};
-
-    auto conn = optimize_ground_connection(policy, sm, j, end_r, init_dir);
-
-    ret.first = bool(conn);
-    ret.second = build_ground_connection(builder, sm, conn);
-
-    return ret;
 }
 
 template<class Ex>

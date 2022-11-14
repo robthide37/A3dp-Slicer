@@ -345,8 +345,13 @@ bool DefaultSupportTree::create_ground_pillar(const Junction &hjp,
                                              long         head_id)
 {
     auto [ret, pillar_id] = sla::create_ground_pillar(suptree_ex_policy,
-                                                      m_builder, m_sm, hjp,
-                                                      sourcedir, hjp.r, head_id);
+                                                      m_builder,
+                                                      m_sm,
+                                                      hjp.pos,
+                                                      sourcedir,
+                                                      hjp.r,
+                                                      hjp.r,
+                                                      head_id);
 
     if (pillar_id >= 0) // Save the pillar endpoint in the spatial index
         m_pillar_index.guarded_insert(m_builder.pillar(pillar_id).endpt,

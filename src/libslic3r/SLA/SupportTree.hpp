@@ -50,7 +50,7 @@ struct SupportTreeConfig
     // when bridges and pillars are merged. The resulting pillar should be a bit
     // thicker than the ones merging into it. How much thicker? I don't know
     // but it will be derived from this value.
-    double pillar_widening_factor = .05;
+    double pillar_widening_factor = .5;
 
     // Radius in mm of the pillar base.
     double base_radius_mm = 2.0;

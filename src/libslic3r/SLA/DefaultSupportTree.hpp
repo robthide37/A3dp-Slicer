@@ -1,7 +1,7 @@
 #ifndef LEGACYSUPPORTTREE_HPP
 #define LEGACYSUPPORTTREE_HPP
 
-#include "SupportTreeUtils.hpp"
+#include "SupportTreeUtilsLegacy.hpp"
 
 #include <libslic3r/SLA/SpatIndex.hpp>
 #include <libslic3r/Execution/ExecutionTBB.hpp>

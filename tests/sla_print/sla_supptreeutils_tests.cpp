@@ -49,7 +49,11 @@ TEST_CASE("Avoid disk below junction", "[suptreeutils]")
     // The route should include the source and one avoidance junction.
     REQUIRE(conn.path.size() == 2);
 
-    // The end radius end the pillar base's upper radius should match
+    // Check if the radius increases with each node
+    REQUIRE(conn.path.front().r < conn.path.back().r);
+    REQUIRE(conn.path.back().r < conn.pillar_base->r_top);
+
+    // The end radius and the pillar base's upper radius should match
     REQUIRE(conn.pillar_base->r_top == Approx(EndRadius));
 
     // Check if the avoidance junction is indeed outside of the disk barrier's
@@ -107,6 +111,10 @@ TEST_CASE("Avoid disk below junction with barrier on the side", "[suptreeutils]"
 
     // The route should include the source and one avoidance junction.
     REQUIRE(conn.path.size() == 2);
+
+    // Check if the radius increases with each node
+    REQUIRE(conn.path.front().r < conn.path.back().r);
+    REQUIRE(conn.path.back().r < conn.pillar_base->r_top);
 
     // The end radius end the pillar base's upper radius should match
     REQUIRE(conn.pillar_base->r_top == Approx(EndRadius));
