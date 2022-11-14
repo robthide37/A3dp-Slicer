@@ -691,7 +691,7 @@ void Layer::sort_perimeters_into_islands(
     for (auto it_source_slice  = perimeter_slices_queue.begin(); it_source_slice != perimeter_slices_queue.end(); ++ it_source_slice) {
         double d2min = std::numeric_limits<double>::max();
         int    lslice_idx_min = -1;
-        for (int lslice_idx = int(lslices_ex.size()) - 1; lslice_idx >= 0 && ! perimeter_slices_queue.empty(); -- lslice_idx)
+        for (int lslice_idx = int(lslices_ex.size()) - 1; lslice_idx >= 0; -- lslice_idx)
             if (double d2 = point_inside_surface_dist2(lslice_idx, it_source_slice->second); d2 < d2min) {
                 d2min = d2;
                 lslice_idx_min = lslice_idx;

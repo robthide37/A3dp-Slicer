@@ -470,6 +470,8 @@ SCENARIO("Some weird coverage test", "[Perimeters]")
     LayerRegion *layerm = layer->get_region(0);
     layerm->m_slices.clear();
     layerm->m_slices.append({ expolygon }, stInternal);
+    layer->lslices = { expolygon };
+    layer->lslices_ex = { { get_extents(expolygon) } };
     
     // make perimeters
     layer->make_perimeters();

@@ -89,26 +89,9 @@ void Polygon::douglas_peucker(double tolerance)
 }
 
 // Does an unoriented polygon contain a point?
-// Tested by counting intersections along a horizontal line.
 bool Polygon::contains(const Point &p) const
 {
-    // http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html
-    bool result = false;
-    Points::const_iterator i = this->points.begin();
-    Points::const_iterator j = this->points.end() - 1;
-    for (; i != this->points.end(); j = i ++)
-        if (i->y() > p.y() != j->y() > p.y())
-#if 1
-            if (Vec2d v = (*j - *i).cast<double>();
-                // p.x() is below the line
-                p.x() - i->x() < double(p.y() - i->y()) * v.x() / v.y())
-#else
-            // Orientation predicated relative to i-th point.
-            if (double orient = (double)(p.x() - i->x()) * (double)(j->y() - i->y()) - (double)(p.y() - i->y()) * (double)(j->x() - i->x());
-                (i->y() > j->y()) ? (orient > 0.) : (orient < 0.))
-#endif
-                result = !result;
-    return result;
+    return Slic3r::contains(*this, p, true);
 }
 
 // this only works on CCW polygons as CW will be ripped out by Clipper's simplify_polygons()
@@ -534,6 +517,15 @@ bool polygons_match(const Polygon &l, const Polygon &r)
         if (*it_l != *it_r)
             return false;
     return true;
+}
+
+bool contains(const Polygon &polygon, const Point &p, bool border_result)
+{
+    if (const int poly_count_inside = ClipperLib::PointInPolygon(p, polygon.points); 
+        poly_count_inside == -1)
+        return border_result;
+    else
+        return (poly_count_inside % 2) == 1;
 }
 
 bool contains(const Polygons &polygons, const Point &p, bool border_result)

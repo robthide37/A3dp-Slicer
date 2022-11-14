@@ -255,6 +255,7 @@ inline Polygons to_polygons(std::vector<Points> &&paths)
 bool polygons_match(const Polygon &l, const Polygon &r);
 
 // Returns true if inside. Returns border_result if on boundary.
+bool contains(const Polygon& polygon, const Point& p, bool border_result = true);
 bool contains(const Polygons& polygons, const Point& p, bool border_result = true);
 
 Polygon make_circle(double radius, double error);

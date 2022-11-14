@@ -373,14 +373,14 @@ inline void expolygons_append(ExPolygons &dst, ExPolygons &&src)
 
 inline void expolygons_rotate(ExPolygons &expolys, double angle)
 {
-    for (ExPolygons::iterator p = expolys.begin(); p != expolys.end(); ++p)
-        p->rotate(angle);
+    for (ExPolygon &expoly : expolys)
+        expoly.rotate(angle);
 }
 
 inline bool expolygons_contain(ExPolygons &expolys, const Point &pt)
 {
-    for (ExPolygons::iterator p = expolys.begin(); p != expolys.end(); ++p)
-        if (p->contains(pt))
+    for (const ExPolygon &expoly : expolys)
+        if (expoly.contains(pt))
             return true;
     return false;
 }

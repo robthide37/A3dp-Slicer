@@ -100,10 +100,12 @@ bool ExPolygon::contains(const Polylines &polylines) const
 
 bool ExPolygon::contains(const Point &point) const
 {
-    if (! this->contour.contains(point))
+    if (! Slic3r::contains(contour, point, true))
+        // Outside the outer contour, not on the contour boundary.
         return false;
     for (const Polygon &hole : this->holes)
-        if (hole.contains(point))
+        if (Slic3r::contains(hole, point, false))
+            // Inside a hole, not on the hole boundary.
             return false;
     return true;
 }
@@ -114,13 +116,13 @@ bool ExPolygon::contains_b(const Point &point) const
     return this->contains(point) || this->has_boundary_point(point);
 }
 
-bool
-ExPolygon::has_boundary_point(const Point &point) const
+bool ExPolygon::has_boundary_point(const Point &point) const
 {
-    if (this->contour.has_boundary_point(point)) return true;
-    for (Polygons::const_iterator h = this->holes.begin(); h != this->holes.end(); ++h) {
-        if (h->has_boundary_point(point)) return true;
-    }
+    if (this->contour.has_boundary_point(point))
+        return true;
+    for (const Polygon &hole : this->holes)
+        if (hole.has_boundary_point(point))
+            return true;
     return false;
 }
 
