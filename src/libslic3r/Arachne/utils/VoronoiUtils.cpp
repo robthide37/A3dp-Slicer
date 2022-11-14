@@ -165,7 +165,7 @@ std::vector<Point> VoronoiUtils::discretizeParabola(const Point& p, const Segmen
     Line(a, b).distance_to_infinite_squared(p, &pxx);
     const Point ppxx = pxx - p;
     const coord_t d = ppxx.cast<int64_t>().norm();
-    const PointMatrix rot = PointMatrix(ppxx.rotate_90_degree_ccw());
+    const PointMatrix rot = PointMatrix(perp(ppxx));
 
     if (d == 0)
     {

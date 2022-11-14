@@ -45,16 +45,6 @@ void MultiPoint::rotate(double angle, const Point &center)
     }
 }
 
-double MultiPoint::length() const
-{
-    const Lines& lines = this->lines();
-    double len = 0;
-    for (auto it = lines.cbegin(); it != lines.cend(); ++it) {
-        len += it->length();
-    }
-    return len;
-}
-
 int MultiPoint::find_point(const Point &point) const
 {
     for (const Point &pt : this->points)
@@ -79,12 +69,6 @@ int MultiPoint::find_point(const Point &point, double scaled_epsilon) const
         }
     }
     return dist2_min < eps2 ? idx_min : -1;
-}
-
-bool MultiPoint::has_boundary_point(const Point &point) const
-{
-    double dist = (point.projection_onto(*this) - point).cast<double>().norm();
-    return dist < SCALED_EPSILON;
 }
 
 BoundingBox MultiPoint::bounding_box() const
@@ -117,49 +101,6 @@ bool MultiPoint::remove_duplicate_points()
         return true;
     }
     return false;
-}
-
-bool MultiPoint::intersection(const Line& line, Point* intersection) const
-{
-    Lines lines = this->lines();
-    for (Lines::const_iterator it = lines.begin(); it != lines.end(); ++it) {
-        if (it->intersection(line, intersection)) return true;
-    }
-    return false;
-}
-
-bool MultiPoint::first_intersection(const Line& line, Point* intersection) const
-{
-    bool   found = false;
-    double dmin  = 0.;
-    for (const Line &l : this->lines()) {
-        Point ip;
-        if (l.intersection(line, &ip)) {
-            if (! found) {
-                found = true;
-                dmin = (line.a - ip).cast<double>().norm();
-                *intersection = ip;
-            } else {
-                double d = (line.a - ip).cast<double>().norm();
-                if (d < dmin) {
-                    dmin = d;
-                    *intersection = ip;
-                }
-            }
-        }
-    }
-    return found;
-}
-
-bool MultiPoint::intersections(const Line &line, Points *intersections) const
-{
-    size_t intersections_size = intersections->size();
-    for (const Line &polygon_line : this->lines()) {
-        Point intersection;
-        if (polygon_line.intersection(line, &intersection))
-            intersections->emplace_back(std::move(intersection));
-    }
-    return intersections->size() > intersections_size;
 }
 
 std::vector<Point> MultiPoint::_douglas_peucker(const std::vector<Point>& pts, const double tolerance)
@@ -361,14 +302,6 @@ void MultiPoint3::translate(double x, double y)
 void MultiPoint3::translate(const Point& vector)
 {
     this->translate(vector(0), vector(1));
-}
-
-double MultiPoint3::length() const
-{
-    double len = 0.0;
-    for (const Line3& line : this->lines())
-        len += line.length();
-    return len;
 }
 
 BoundingBox3 MultiPoint3::bounding_box() const

@@ -116,8 +116,7 @@ namespace Slic3r {
             Point pos = Point::new_scale(writer_pos(0), writer_pos(1));
 
             // find standby point
-            Point standby_point;
-            pos.nearest_point(this->standby_points, &standby_point);
+            Point standby_point = nearest_point(this->standby_points, pos).first;
 
             /*  We don't call gcodegen.travel_to() because we don't need retraction (it was already
                 triggered by the caller) nor avoid_crossing_perimeters and also because the coordinates

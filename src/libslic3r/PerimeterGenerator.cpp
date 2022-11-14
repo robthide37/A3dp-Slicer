@@ -405,8 +405,8 @@ static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Path &subject, con
                 Point       prev(subject.front().x(), subject.front().y());
                 for (auto it = std::next(subject.begin()); it != subject.end(); ++it) {
                     Point curr(it->x(), it->y());
-                    Point projected_pt = pt.projection_onto(Line(prev, curr));
-                    if (double dist_sqr = (projected_pt - pt).cast<double>().squaredNorm(); dist_sqr < dist_sqr_min) {
+                    Point projected_pt;
+                    if (double dist_sqr = line_alg::distance_to_squared(Line(prev, curr), pt, &projected_pt); dist_sqr < dist_sqr_min) {
                         dist_sqr_min     = dist_sqr;
                         projected_pt_min = projected_pt;
                         it_min           = std::prev(it);

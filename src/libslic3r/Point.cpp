@@ -57,98 +57,6 @@ void Point::rotate(double angle, const Point &center)
     (*this)(1) = (coord_t)round( (double)center(1) + c * dy + s * dx );
 }
 
-int Point::nearest_point_index(const Points &points) const
-{
-    PointConstPtrs p;
-    p.reserve(points.size());
-    for (Points::const_iterator it = points.begin(); it != points.end(); ++it)
-        p.push_back(&*it);
-    return this->nearest_point_index(p);
-}
-
-int Point::nearest_point_index(const PointConstPtrs &points) const
-{
-    int idx = -1;
-    double distance = -1;  // double because long is limited to 2147483647 on some platforms and it's not enough
-    
-    for (PointConstPtrs::const_iterator it = points.begin(); it != points.end(); ++it) {
-        /* If the X distance of the candidate is > than the total distance of the
-           best previous candidate, we know we don't want it */
-        double d = sqr<double>((*this)(0) - (*it)->x());
-        if (distance != -1 && d > distance) continue;
-        
-        /* If the Y distance of the candidate is > than the total distance of the
-           best previous candidate, we know we don't want it */
-        d += sqr<double>((*this)(1) - (*it)->y());
-        if (distance != -1 && d > distance) continue;
-        
-        idx = it - points.begin();
-        distance = d;
-        
-        if (distance < EPSILON) break;
-    }
-    
-    return idx;
-}
-
-int Point::nearest_point_index(const PointPtrs &points) const
-{
-    PointConstPtrs p;
-    p.reserve(points.size());
-    for (PointPtrs::const_iterator it = points.begin(); it != points.end(); ++it)
-        p.push_back(*it);
-    return this->nearest_point_index(p);
-}
-
-bool Point::nearest_point(const Points &points, Point* point) const
-{
-    int idx = this->nearest_point_index(points);
-    if (idx == -1) return false;
-    *point = points.at(idx);
-    return true;
-}
-
-Point Point::projection_onto(const MultiPoint &poly) const
-{
-    Point running_projection = poly.first_point();
-    double running_min = (running_projection - *this).cast<double>().norm();
-    
-    Lines lines = poly.lines();
-    for (Lines::const_iterator line = lines.begin(); line != lines.end(); ++line) {
-        Point point_temp = this->projection_onto(*line);
-        if ((point_temp - *this).cast<double>().norm() < running_min) {
-	        running_projection = point_temp;
-	        running_min = (running_projection - *this).cast<double>().norm();
-        }
-    }
-    return running_projection;
-}
-
-Point Point::projection_onto(const Line &line) const
-{
-    if (line.a == line.b) return line.a;
-    
-    /*
-        (Ported from VisiLibity by Karl J. Obermeyer)
-        The projection of point_temp onto the line determined by
-        line_segment_temp can be represented as an affine combination
-        expressed in the form projection of
-        Point = theta*line_segment_temp.first + (1.0-theta)*line_segment_temp.second.
-        If theta is outside the interval [0,1], then one of the Line_Segment's endpoints
-        must be closest to calling Point.
-    */
-    double lx = (double)(line.b(0) - line.a(0));
-    double ly = (double)(line.b(1) - line.a(1));
-    double theta = ( (double)(line.b(0) - (*this)(0))*lx + (double)(line.b(1)- (*this)(1))*ly ) 
-          / ( sqr<double>(lx) + sqr<double>(ly) );
-    
-    if (0.0 <= theta && theta <= 1.0)
-        return (theta * line.a.cast<coordf_t>() + (1.0-theta) * line.b.cast<coordf_t>()).cast<coord_t>();
-    
-    // Else pick closest endpoint.
-    return ((line.a - *this).cast<double>().squaredNorm() < (line.b - *this).cast<double>().squaredNorm()) ? line.a : line.b;
-}
-
 bool has_duplicate_points(std::vector<Point> &&pts)
 {
     std::sort(pts.begin(), pts.end());
@@ -177,6 +85,29 @@ BoundingBoxf get_extents(const std::vector<Vec2d> &pts)
     for (const Vec2d &p : pts)
         bbox.merge(p);
     return bbox;
+}
+
+int nearest_point_index(const Points &points, const Point &pt)
+{
+    int64_t distance = std::numeric_limits<int64_t>::max();
+    int     idx      = -1;
+
+    for (const Point &pt2 : points) {
+        // If the X distance of the candidate is > than the total distance of the
+        // best previous candidate, we know we don't want it.
+        int64_t d = sqr<int64_t>(pt2.x() - pt.x());
+        if (d < distance) {
+            // If the Y distance of the candidate is > than the total distance of the
+            // best previous candidate, we know we don't want it.
+            d += sqr<int64_t>(pt2.y() - pt.y());
+            if (d < distance) {
+                idx      = &pt2 - points.data();
+                distance = d;
+            }
+        }
+    }
+
+    return idx;
 }
 
 std::ostream& operator<<(std::ostream &stm, const Vec2d &pointf)

@@ -19,6 +19,14 @@ const Point& Polyline::leftmost_point() const
     return *p;
 }
 
+double Polyline::length() const
+{
+    double l = 0;
+    for (size_t i = 1; i < this->points.size(); ++ i)
+        l += (this->points[i] - this->points[i - 1]).cast<double>().norm();
+    return l;
+}
+
 Lines Polyline::lines() const
 {
     Lines lines;
@@ -146,9 +154,8 @@ void Polyline::split_at(const Point &point, Polyline* p1, Polyline* p2) const
     auto  min_point_it = this->points.cbegin();
     Point prev         = this->points.front();
     for (auto it = this->points.cbegin() + 1; it != this->points.cend(); ++ it) {
-        Point proj = point.projection_onto(Line(prev, *it));
-        auto  d2 = (proj - point).cast<double>().squaredNorm();
-        if (d2 < min_dist2) {
+        Point proj;
+        if (double d2 = line_alg::distance_to_squared(Line(prev, *it), point, &proj); d2 < min_dist2) {
 	        min_dist2    = d2;
 	        min_point_it = it;
         }
@@ -235,9 +242,8 @@ std::pair<int, Point> foot_pt(const Points &polyline, const Point &pt)
     auto  it = polyline.begin();
     auto  it_proj = polyline.begin();
     for (++ it; it != polyline.end(); ++ it) {
-        Point  foot_pt = pt.projection_onto(Line(prev, *it));
-        double d2 = (foot_pt - pt).cast<double>().squaredNorm();
-        if (d2 < d2_min) {
+        Point foot_pt;
+        if (double d2 = line_alg::distance_to_squared(Line(prev, *it), pt, &foot_pt); d2 < d2_min) {
             d2_min      = d2;
             foot_pt_min = foot_pt;
             it_proj     = it;
@@ -284,6 +290,14 @@ void ThickPolyline::clip_end(double distance)
         distance -= std::sqrt(vec_length_sqr);
     }
     assert(this->width.size() == (this->points.size() - 1) * 2);
+}
+
+double Polyline3::length() const
+{
+    double l = 0;
+    for (size_t i = 1; i < this->points.size(); ++ i)
+        l += (this->points[i] - this->points[i - 1]).cast<double>().norm();
+    return l;
 }
 
 Lines3 Polyline3::lines() const

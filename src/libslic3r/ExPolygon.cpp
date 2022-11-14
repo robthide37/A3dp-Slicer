@@ -98,30 +98,24 @@ bool ExPolygon::contains(const Polylines &polylines) const
     return pl_out.empty();
 }
 
-bool ExPolygon::contains(const Point &point) const
+bool ExPolygon::contains(const Point &point, bool border_result /* = true */) const
 {
-    if (! Slic3r::contains(contour, point, true))
+    if (! Slic3r::contains(contour, point, border_result))
         // Outside the outer contour, not on the contour boundary.
         return false;
     for (const Polygon &hole : this->holes)
-        if (Slic3r::contains(hole, point, false))
+        if (Slic3r::contains(hole, point, ! border_result))
             // Inside a hole, not on the hole boundary.
             return false;
     return true;
 }
 
-// inclusive version of contains() that also checks whether point is on boundaries
-bool ExPolygon::contains_b(const Point &point) const
+bool ExPolygon::on_boundary(const Point &point, double eps) const
 {
-    return this->contains(point) || this->has_boundary_point(point);
-}
-
-bool ExPolygon::has_boundary_point(const Point &point) const
-{
-    if (this->contour.has_boundary_point(point))
+    if (this->contour.on_boundary(point, eps))
         return true;
     for (const Polygon &hole : this->holes)
-        if (hole.has_boundary_point(point))
+        if (hole.on_boundary(point, eps))
             return true;
     return false;
 }
@@ -148,6 +142,9 @@ Point ExPolygon::point_projection(const Point &point) const
 
 bool ExPolygon::overlaps(const ExPolygon &other) const
 {
+    if (this->empty() || other.empty())
+        return false;
+
     #if 0
     BoundingBox bbox = get_extents(other);
     bbox.merge(get_extents(*this));
@@ -164,7 +161,7 @@ bool ExPolygon::overlaps(const ExPolygon &other) const
     if (! pl_out.empty())
         return true; 
     //FIXME ExPolygon::overlaps() shall be commutative, it is not!
-    return ! other.contour.points.empty() && this->contains_b(other.contour.points.front());
+    return this->contains(other.contour.points.front());
 }
 
 void ExPolygon::simplify_p(double tolerance, Polygons* polygons) const
@@ -241,7 +238,7 @@ ExPolygon::medial_axis(double max_width, double min_width, ThickPolylines* polyl
            call, so we keep the inner point until we perform the second intersection() as well */
         Point new_front = polyline.points.front();
         Point new_back  = polyline.points.back();
-        if (polyline.endpoints.first && !this->has_boundary_point(new_front)) {
+        if (polyline.endpoints.first && !this->on_boundary(new_front, SCALED_EPSILON)) {
             Vec2d p1 = polyline.points.front().cast<double>();
             Vec2d p2 = polyline.points[1].cast<double>();
             // prevent the line from touching on the other side, otherwise intersection() might return that solution
@@ -251,7 +248,7 @@ ExPolygon::medial_axis(double max_width, double min_width, ThickPolylines* polyl
             p1 -= (p2 - p1).normalized() * max_width;
             this->contour.intersection(Line(p1.cast<coord_t>(), p2.cast<coord_t>()), &new_front);
         }
-        if (polyline.endpoints.second && !this->has_boundary_point(new_back)) {
+        if (polyline.endpoints.second && !this->on_boundary(new_back, SCALED_EPSILON)) {
             Vec2d p1 = (polyline.points.end() - 2)->cast<double>();
             Vec2d p2 = polyline.points.back().cast<double>();
             // prevent the line from touching on the other side, otherwise intersection() might return that solution

@@ -51,9 +51,9 @@ public:
     bool contains(const Line &line) const;
     bool contains(const Polyline &polyline) const;
     bool contains(const Polylines &polylines) const;
-    bool contains(const Point &point) const;
-    bool contains_b(const Point &point) const;
-    bool has_boundary_point(const Point &point) const;
+    bool contains(const Point &point, bool border_result = true) const;
+    // Approximate on boundary test.
+    bool on_boundary(const Point &point, double eps) const;
     // Projection of a point onto the polygon.
     Point point_projection(const Point &point) const;
 
@@ -377,10 +377,10 @@ inline void expolygons_rotate(ExPolygons &expolys, double angle)
         expoly.rotate(angle);
 }
 
-inline bool expolygons_contain(ExPolygons &expolys, const Point &pt)
+inline bool expolygons_contain(ExPolygons &expolys, const Point &pt, bool border_result = true)
 {
     for (const ExPolygon &expoly : expolys)
-        if (expoly.contains(pt))
+        if (expoly.contains(pt, border_result))
             return true;
     return false;
 }

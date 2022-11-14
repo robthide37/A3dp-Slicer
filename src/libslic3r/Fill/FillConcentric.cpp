@@ -40,7 +40,7 @@ void FillConcentric::_fill_surface_single(
     size_t iPathFirst = polylines_out.size();
     Point last_pos(0, 0);
     for (const Polygon &loop : loops) {
-        polylines_out.emplace_back(loop.split_at_index(last_pos.nearest_point_index(loop.points)));
+        polylines_out.emplace_back(loop.split_at_index(nearest_point_index(loop.points, last_pos)));
         last_pos = polylines_out.back().last_point();
     }
 
@@ -100,7 +100,7 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
             if (extrusion->is_closed && thick_polyline.points.front() == thick_polyline.points.back() && thick_polyline.width.front() == thick_polyline.width.back()) {
                 thick_polyline.points.pop_back();
                 assert(thick_polyline.points.size() * 2 == thick_polyline.width.size());
-                int nearest_idx = last_pos.nearest_point_index(thick_polyline.points);
+                int nearest_idx = nearest_point_index(thick_polyline.points, last_pos);
                 std::rotate(thick_polyline.points.begin(), thick_polyline.points.begin() + nearest_idx, thick_polyline.points.end());
                 std::rotate(thick_polyline.width.begin(), thick_polyline.width.begin() + 2 * nearest_idx, thick_polyline.width.end());
                 thick_polyline.points.emplace_back(thick_polyline.points.front());

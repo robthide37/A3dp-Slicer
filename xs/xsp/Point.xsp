@@ -29,9 +29,8 @@
         %code{% (*THIS)(0) = val; %};
     void set_y(int val)
         %code{% (*THIS)(1) = val; %};
-    int nearest_point_index(Points points);
     Clone<Point> nearest_point(Points points)
-        %code{% Point p; THIS->nearest_point(points, &p); RETVAL = p; %};
+        %code{% RETVAL = nearest_point(points, *THIS).first; %};
     double distance_to(Point* point)
         %code{% RETVAL = (*point - *THIS).cast<double>().norm(); %};
     double distance_to_line(Line* line)
@@ -40,8 +39,6 @@
         %code{% RETVAL = line->perp_distance_to(*THIS); %};
     double ccw(Point* p1, Point* p2)
         %code{% RETVAL = cross2((*p1 - *THIS).cast<double>(), (*p2 - *p1).cast<double>()); %};
-    Point* projection_onto_line(Line* line)
-        %code{% RETVAL = new Point(THIS->projection_onto(*line)); %};
     Point* negative()
         %code{% RETVAL = new Point(- *THIS); %};
     std::string serialize() %code{% char buf[2048]; sprintf(buf, "%ld,%ld", (*THIS)(0), (*THIS)(1)); RETVAL = buf; %};

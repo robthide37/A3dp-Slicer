@@ -274,7 +274,7 @@ std::vector<Point> SkeletalTrapezoidation::discretize(const vd_t::edge_type& vd_
         Point right_point = VoronoiUtils::getSourcePoint(*right_cell, segments);
         coord_t d = (right_point - left_point).cast<int64_t>().norm();
         Point middle = (left_point + right_point) / 2;
-        Point x_axis_dir = Point(right_point - left_point).rotate_90_degree_ccw();
+        Point x_axis_dir = perp(Point(right_point - left_point));
         coord_t x_axis_length = x_axis_dir.cast<int64_t>().norm();
 
         const auto projected_x = [x_axis_dir, x_axis_length, middle](Point from) //Project a point on the edge.

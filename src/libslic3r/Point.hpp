@@ -17,8 +17,6 @@ namespace Slic3r {
 
 class BoundingBox;
 class BoundingBoxf;
-class Line;
-class MultiPoint;
 class Point;
 using Vector = Point;
 
@@ -183,13 +181,6 @@ public:
     Point  rotated(double angle) const { Point res(*this); res.rotate(angle); return res; }
     Point  rotated(double cos_a, double sin_a) const { Point res(*this); res.rotate(cos_a, sin_a); return res; }
     Point  rotated(double angle, const Point &center) const { Point res(*this); res.rotate(angle, center); return res; }
-    Point  rotate_90_degree_ccw() const { return Point(-this->y(), this->x()); }
-    int    nearest_point_index(const Points &points) const;
-    int    nearest_point_index(const PointConstPtrs &points) const;
-    int    nearest_point_index(const PointPtrs &points) const;
-    bool   nearest_point(const Points &points, Point* point) const;
-    Point  projection_onto(const MultiPoint &poly) const;
-    Point  projection_onto(const Line &line) const;
 };
 
 inline bool operator<(const Point &l, const Point &r) 
@@ -241,6 +232,14 @@ inline Point lerp(const Point &a, const Point &b, double t)
 BoundingBox get_extents(const Points &pts);
 BoundingBox get_extents(const std::vector<Points> &pts);
 BoundingBoxf get_extents(const std::vector<Vec2d> &pts);
+
+int nearest_point_index(const Points &points, const Point &pt);
+
+inline std::pair<Point, bool> nearest_point(const Points &points, const Point &pt)
+{
+    int idx = nearest_point_index(points, pt);
+    return idx == -1 ? std::make_pair(Point(), false) : std::make_pair(points[idx], true);
+}
 
 // Test for duplicate points in a vector of points.
 // The points are copied, sorted and checked for duplicates globally.

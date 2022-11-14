@@ -6,6 +6,17 @@
 
 namespace Slic3r {
 
+double Polygon::length() const
+{
+    double l = 0;
+    if (this->points.size() > 1) {
+        l = (this->points.back() - this->points.front()).cast<double>().norm();
+        for (size_t i = 1; i < this->points.size(); ++ i)
+            l += (this->points[i] - this->points[i - 1]).cast<double>().norm();
+    }
+    return l;
+}
+
 Lines Polygon::lines() const
 {
     return to_lines(*this);
@@ -88,12 +99,6 @@ void Polygon::douglas_peucker(double tolerance)
     this->points = std::move(p);
 }
 
-// Does an unoriented polygon contain a point?
-bool Polygon::contains(const Point &p) const
-{
-    return Slic3r::contains(*this, p, true);
-}
-
 // this only works on CCW polygons as CW will be ripped out by Clipper's simplify_polygons()
 Polygons Polygon::simplify(double tolerance) const
 {
@@ -148,6 +153,64 @@ Point Polygon::centroid() const
         }
     }
     return Point(Vec2d(c / (3. * area_sum)));
+}
+
+bool Polygon::intersection(const Line &line, Point *intersection) const
+{
+    if (this->points.size() < 2)
+        return false;
+    if (Line(this->points.front(), this->points.back()).intersection(line, intersection))
+        return true;
+    for (size_t i = 1; i < this->points.size(); ++ i)
+        if (Line(this->points[i - 1], this->points[i]).intersection(line, intersection))
+            return true;
+    return false;
+}
+
+bool Polygon::first_intersection(const Line& line, Point* intersection) const
+{
+    if (this->points.size() < 2)
+        return false;
+
+    bool   found = false;
+    double dmin  = 0.;
+    Line l(this->points.back(), this->points.front());
+    for (size_t i = 0; i < this->points.size(); ++ i) {
+        l.b = this->points[i];
+        Point ip;
+        if (l.intersection(line, &ip)) {
+            if (! found) {
+                found = true;
+                dmin = (line.a - ip).cast<double>().squaredNorm();
+                *intersection = ip;
+            } else {
+                double d = (line.a - ip).cast<double>().squaredNorm();
+                if (d < dmin) {
+                    dmin = d;
+                    *intersection = ip;
+                }
+            }
+        }
+        l.a = l.b;
+    }
+    return found;
+}
+
+bool Polygon::intersections(const Line &line, Points *intersections) const
+{
+    if (this->points.size() < 2)
+        return false;
+
+    size_t intersections_size = intersections->size();
+    Line l(this->points.back(), this->points.front());
+    for (size_t i = 0; i < this->points.size(); ++ i) {
+        l.b = this->points[i];
+        Point intersection;
+        if (l.intersection(line, &intersection))
+            intersections->emplace_back(std::move(intersection));
+        l.a = l.b;
+    }
+    return intersections->size() > intersections_size;
 }
 
 // Filter points from poly to the output with the help of FilterFn.
