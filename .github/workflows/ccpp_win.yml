@@ -1,13 +1,9 @@
-name: C/C++ Nightly windows x64
+name: C/C++ Patch-01 windows x64
 
 on:
   push:
     branches:
-      - Nigthly
-      - nightly_dev
-      - nightly_master
-      - debug_win
-      - dev
+      - patch-1
 
 jobs:
   build_dep:
@@ -109,5 +105,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
-        name: nightly_win64
+        name: ${{ github.event.repository.name }}_win64
         path: build/package/
