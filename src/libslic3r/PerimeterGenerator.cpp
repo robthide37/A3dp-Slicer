@@ -282,10 +282,13 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator::Parame
         if (params.config.overhangs && params.layer_id > params.object_config.raft_layers
             && ! ((params.object_config.support_material || params.object_config.support_material_enforce_layers > 0) && 
                   params.object_config.support_material_contact_distance.value == 0)) {
+            BoundingBox bbox(polygon.points);
+            bbox.offset(SCALED_EPSILON);
+            Polygons lower_slices_polygons_clipped = ClipperUtils::clip_clipper_polygons_with_subject_bbox(lower_slices_polygons_cache, bbox);
             // get non-overhang paths by intersecting this loop with the grown lower slices
             extrusion_paths_append(
                 paths,
-                intersection_pl({ polygon }, lower_slices_polygons_cache),
+                intersection_pl({ polygon }, lower_slices_polygons_clipped),
                 role,
                 is_external ? params.ext_mm3_per_mm           : params.mm3_per_mm,
                 is_external ? params.ext_perimeter_flow.width() : params.perimeter_flow.width(),
@@ -296,7 +299,7 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator::Parame
             // the loop centerline and original lower slices is >= half nozzle diameter
             extrusion_paths_append(
                 paths,
-                diff_pl({ polygon }, lower_slices_polygons_cache),
+                diff_pl({ polygon }, lower_slices_polygons_clipped),
                 erOverhangPerimeter,
                 params.mm3_per_mm_overhang,
                 params.overhang_flow.width(),
@@ -466,17 +469,28 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
 
             ClipperLib_Z::Path extrusion_path;
             extrusion_path.reserve(extrusion->size());
-            for (const Arachne::ExtrusionJunction &ej : extrusion->junctions)
+            BoundingBox extrusion_path_bbox;
+            for (const Arachne::ExtrusionJunction &ej : extrusion->junctions) {
                 extrusion_path.emplace_back(ej.p.x(), ej.p.y(), ej.w);
+                extrusion_path_bbox.merge(Point{ej.p.x(), ej.p.y()});
+            }
 
             ClipperLib_Z::Paths lower_slices_paths;
             lower_slices_paths.reserve(lower_slices_polygons_cache.size());
-            for (const Polygon &poly : lower_slices_polygons_cache) {
-                lower_slices_paths.emplace_back();
-                ClipperLib_Z::Path &out = lower_slices_paths.back();
-                out.reserve(poly.points.size());
-                for (const Point &pt : poly.points)
-                    out.emplace_back(pt.x(), pt.y(), 0);
+            {
+                Points clipped;
+                extrusion_path_bbox.offset(SCALED_EPSILON);
+                for (const Polygon &poly : lower_slices_polygons_cache) {
+                    clipped.clear();
+                    ClipperUtils::clip_clipper_polygon_with_subject_bbox(poly.points, extrusion_path_bbox, clipped);
+                    if (! clipped.empty()) {
+                        lower_slices_paths.emplace_back();
+                        ClipperLib_Z::Path &out = lower_slices_paths.back();
+                        out.reserve(clipped.size());
+                        for (const Point &pt : clipped)
+                            out.emplace_back(pt.x(), pt.y(), 0);
+                    }
+                }
             }
 
             // get non-overhang paths by intersecting this loop with the grown lower slices
@@ -623,7 +637,7 @@ void PerimeterGenerator::process_arachne(
     coord_t solid_infill_spacing  = params.solid_infill_flow.scaled_spacing();
 
     // prepare grown lower layer slices for overhang detection
-    if (lower_slices != nullptr && params.config.overhangs) {
+    if (params.config.overhangs && lower_slices != nullptr && lower_slices_polygons_cache.empty()) {
         // We consider overhang any part where the entire nozzle diameter is not supported by the
         // lower layer, so we take lower slices and offset them by half the nozzle diameter used
         // in the current layer
@@ -741,7 +755,7 @@ void PerimeterGenerator::process_arachne(
         for (size_t unlocked_idx : blocking[best_candidate])
             blocked[unlocked_idx]--;
 
-        if(!best_path->junctions.empty()) { //If all paths were empty, the best path is still empty. We don't upate the current position then.
+        if (!best_path->junctions.empty()) { //If all paths were empty, the best path is still empty. We don't upate the current position then.
             if(best_path->is_closed)
                 current_position = best_path->junctions[0].p; //We end where we started.
             else
@@ -863,7 +877,7 @@ void PerimeterGenerator::process_classic(
     bool    has_gap_fill 		= params.config.gap_fill_enabled.value && params.config.gap_fill_speed.value > 0;
 
     // prepare grown lower layer slices for overhang detection
-    if (lower_slices != nullptr && params.config.overhangs) {
+    if (params.config.overhangs && lower_slices != nullptr && lower_slices_polygons_cache.empty()) {
         // We consider overhang any part where the entire nozzle diameter is not supported by the
         // lower layer, so we take lower slices and offset them by half the nozzle diameter used 
         // in the current layer
