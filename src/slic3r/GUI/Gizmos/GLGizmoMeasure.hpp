@@ -4,9 +4,9 @@
 #include "GLGizmoBase.hpp"
 #include "slic3r/GUI/GLModel.hpp"
 #include "slic3r/GUI/GUI_Utils.hpp"
+#include "slic3r/GUI/MeshUtils.hpp"
 #include "libslic3r/Measure.hpp"
 #if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
-#include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
 #include "libslic3r/Model.hpp"
 #endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
@@ -111,7 +111,7 @@ class GLGizmoMeasure : public GLGizmoBase
 #if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     // Uses a standalone raycaster and not the shared one because of the
     // difference in how the mesh is updated
-    CommonGizmosDataObjects::Raycaster m_raycaster;
+    std::unique_ptr<MeshRaycaster> m_raycaster;
 #else
     Transform3d m_volume_matrix{ Transform3d::Identity() };
 #endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES

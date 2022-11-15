@@ -245,9 +245,6 @@ TransformHelper::Cache TransformHelper::s_cache = { { 0, 0, 0, 0 }, Matrix4d::Id
 
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
 : GLGizmoBase(parent, icon_filename, sprite_id)
-#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
-, m_raycaster(nullptr)
-#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 {
     GLModel::Geometry sphere_geometry = smooth_sphere(16, 7.5f);
     m_sphere.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(sphere_geometry.get_as_indexed_triangle_set()));
@@ -526,7 +523,7 @@ void GLGizmoMeasure::on_set_state()
         m_is_editing_distance_first_frame = true;
         m_measuring.reset();
 #if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
-        m_raycaster.release();
+        m_raycaster.reset();
 #endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     }
     else {
@@ -599,7 +596,7 @@ void GLGizmoMeasure::on_render()
         Vec3f normal_on_model;
         size_t model_facet_idx;
 #if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
-        const bool mouse_on_object = m_raycaster.raycaster()->unproject_on_mesh(m_mouse_pos, Transform3d::Identity(), camera, position_on_model, normal_on_model, nullptr, &model_facet_idx);
+        const bool mouse_on_object = m_raycaster->unproject_on_mesh(m_mouse_pos, Transform3d::Identity(), camera, position_on_model, normal_on_model, nullptr, &model_facet_idx);
 #else
         const bool mouse_on_object = m_c->raycaster()->raycasters().front()->unproject_on_mesh(m_mouse_pos, m_volume_matrix, camera, position_on_model, normal_on_model, nullptr, &model_facet_idx);
 #endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
@@ -1083,7 +1080,7 @@ void GLGizmoMeasure::update_if_needed()
 
         m_measuring.reset(new Measure::Measuring(composite_mesh.its));
         update_plane_models_cache(m_measuring->get_mesh().its);
-        m_raycaster.update_from(m_measuring->get_mesh());
+        m_raycaster.reset(new MeshRaycaster(std::make_shared<const TriangleMesh>(m_measuring->get_mesh())));
         m_volumes_cache = volumes_cache;
     };
 #else
