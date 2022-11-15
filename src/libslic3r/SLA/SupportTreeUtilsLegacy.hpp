@@ -8,6 +8,86 @@
 
 namespace Slic3r { namespace sla {
 
+// Helper function for pillar interconnection where pairs of already connected
+// pillars should be checked for not to be processed again. This can be done
+// in constant time with a set of hash values uniquely representing a pair of
+// integers. The order of numbers within the pair should not matter, it has
+// the same unique hash. The hash value has to have twice as many bits as the
+// arguments need. If the same integral type is used for args and return val,
+// make sure the arguments use only the half of the type's bit depth.
+template<class I, class DoubleI = IntegerOnly<I>>
+IntegerOnly<DoubleI> pairhash(I a, I b)
+{
+    using std::ceil; using std::log2; using std::max; using std::min;
+    static const auto constexpr Ibits = int(sizeof(I) * CHAR_BIT);
+    static const auto constexpr DoubleIbits = int(sizeof(DoubleI) * CHAR_BIT);
+    static const auto constexpr shift = DoubleIbits / 2 < Ibits ? Ibits / 2 : Ibits;
+
+    I g = min(a, b), l = max(a, b);
+
+       // Assume the hash will fit into the output variable
+    assert((g ? (ceil(log2(g))) : 0) <= shift);
+    assert((l ? (ceil(log2(l))) : 0) <= shift);
+
+    return (DoubleI(g) << shift) + l;
+}
+
+template<class Ex>
+std::optional<DiffBridge> search_widening_path(Ex                     policy,
+                                               const SupportableMesh &sm,
+                                               const Vec3d           &jp,
+                                               const Vec3d           &dir,
+                                               double                 radius,
+                                               double new_radius)
+{
+    double w = radius + 2 * sm.cfg.head_back_radius_mm;
+    double stopval = w + jp.z() - ground_level(sm);
+    Optimizer<AlgNLoptSubplex> solver(get_criteria(sm.cfg).stop_score(stopval));
+
+    auto [polar, azimuth] = dir_to_spheric(dir);
+
+    double fallback_ratio = radius / sm.cfg.head_back_radius_mm;
+
+    auto oresult = solver.to_max().optimize(
+        [&policy, &sm, jp, radius, new_radius](const opt::Input<3> &input) {
+            auto &[plr, azm, t] = input;
+
+            auto d = spheric_to_dir(plr, azm).normalized();
+
+            auto sd = sm.cfg.safety_distance(new_radius);
+
+            double ret = pinhead_mesh_hit(policy, sm.emesh, jp, d, radius,
+                                          new_radius, t, sd)
+                             .distance();
+
+            Beam beam{jp + t * d, d, new_radius};
+            double down = beam_mesh_hit(policy, sm.emesh, beam, sd).distance();
+
+            if (ret > t && std::isinf(down))
+                ret += jp.z() - ground_level(sm);
+
+            return ret;
+        },
+        initvals({polar, azimuth, w}), // start with what we have
+        bounds({
+            {PI - sm.cfg.bridge_slope, PI}, // Must not exceed the slope limit
+            {-PI, PI}, // azimuth can be a full search
+            {radius + sm.cfg.head_back_radius_mm,
+             fallback_ratio * sm.cfg.max_bridge_length_mm}
+        }));
+
+    if (oresult.score >= stopval) {
+        polar       = std::get<0>(oresult.optimum);
+        azimuth     = std::get<1>(oresult.optimum);
+        double t    = std::get<2>(oresult.optimum);
+        Vec3d  endp = jp + t * spheric_to_dir(polar, azimuth);
+
+        return DiffBridge(jp, endp, radius, sm.cfg.head_back_radius_mm);
+    }
+
+    return {};
+}
+
 // This is a proxy function for pillar creation which will mind the gap
 // between the pad and the model bottom in zero elevation mode.
 // 'pinhead_junctionpt' is the starting junction point which needs to be

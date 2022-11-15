@@ -1,4 +1,3 @@
-#include <unordered_set>
 #include <unordered_map>
 #include <random>
 #include <numeric>
@@ -31,13 +30,6 @@ const char *const SUPPORT_TEST_MODELS[] = {
 };
 
 } // namespace
-
-TEST_CASE("Pillar pairhash should be unique", "[SLASupportGeneration]") {
-    test_pairhash<int, int>();
-    test_pairhash<int, long>();
-    test_pairhash<unsigned, unsigned>();
-    test_pairhash<unsigned, unsigned long>();
-}
 
 TEST_CASE("Support point generator should be deterministic if seeded", 
           "[SLASupportGeneration], [SLAPointGen]") {

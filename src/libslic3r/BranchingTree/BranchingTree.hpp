@@ -21,7 +21,7 @@ class Properties
 
 public:
 
-    constexpr bool group_pillars() const noexcept { return true; }
+    constexpr bool group_pillars() const noexcept { return false; }
 
     // Maximum slope for bridges of the tree
     Properties &max_slope(double val) noexcept
