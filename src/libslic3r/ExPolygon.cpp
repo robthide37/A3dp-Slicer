@@ -154,14 +154,18 @@ bool ExPolygon::overlaps(const ExPolygon &other) const
     svg.draw_outline(*this);
     svg.draw_outline(other, "blue");
     #endif
+
     Polylines pl_out = intersection_pl(to_polylines(other), *this);
+
     #if 0
     svg.draw(pl_out, "red");
     #endif
-    if (! pl_out.empty())
-        return true; 
-    //FIXME ExPolygon::overlaps() shall be commutative, it is not!
-    return this->contains(other.contour.points.front());
+
+    // See unit test SCENARIO("Clipper diff with polyline", "[Clipper]")
+    // for in which case the intersection_pl produces any intersection.
+    return ! pl_out.empty() ||
+           // If *this is completely inside other, then pl_out is empty, but the expolygons overlap. Test for that situation.
+           other.contains(this->contour.points.front());
 }
 
 void ExPolygon::simplify_p(double tolerance, Polygons* polygons) const

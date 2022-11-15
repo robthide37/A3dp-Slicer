@@ -60,6 +60,10 @@ public:
     // Does this expolygon overlap another expolygon?
     // Either the ExPolygons intersect, or one is fully inside the other,
     // and it is not inside a hole of the other expolygon.
+    // The test may not be commutative if the two expolygons touch by a boundary only,
+    // see unit test SCENARIO("Clipper diff with polyline", "[Clipper]").
+    // Namely expolygons touching at a vertical boundary are considered overlapping, while expolygons touching
+    // at a horizontal boundary are NOT considered overlapping.
     bool overlaps(const ExPolygon &other) const;
 
     void simplify_p(double tolerance, Polygons* polygons) const;
