@@ -316,8 +316,7 @@ std::optional<DiffBridge> search_widening_path(Ex                     policy,
 
             auto d = spheric_to_dir(plr, azm).normalized();
 
-            auto sd = new_radius * sm.cfg.safety_distance_mm /
-                      sm.cfg.head_back_radius_mm;
+            auto sd = sm.cfg.safety_distance(new_radius);
 
             double ret = pinhead_mesh_hit(policy, sm.emesh, jp, d, radius,
                                           new_radius, t, sd)
@@ -427,7 +426,7 @@ bool optimize_pinhead_placement(Ex                     policy,
     // Reassemble the now corrected normal
     auto nn = spheric_to_dir(polar, azimuth).normalized();
 
-    double sd = m.cfg.safety_distance_mm;
+    double sd = m.cfg.safety_distance(back_r);
 
     // check available distance
     Hit t = pinhead_mesh_hit(policy, m.emesh, hp, nn, pin_r, back_r, w, sd);
@@ -471,10 +470,10 @@ bool optimize_pinhead_placement(Ex                     policy,
         head.r_back_mm = back_r;
 
         ret = true;
-    } /*else if (back_r > m.cfg.head_fallback_radius_mm) {
+    } else if (back_r > m.cfg.head_fallback_radius_mm) {
         head.r_back_mm = m.cfg.head_fallback_radius_mm;
         ret = optimize_pinhead_placement(policy, m, head);
-    }*/
+    }
 
     return ret;
 }
@@ -527,122 +526,158 @@ GroundConnection find_pillar_route(Ex policy,
                                    double end_radius)
 {
     GroundConnection ret;
-
     ret.path.emplace_back(source);
 
-    Vec3d  jp           = source.pos, endp = jp, dir = sourcedir;
-    bool   can_add_base = false/*, non_head = false*/;
+    double sd = sm.cfg.safety_distance(source.r);
+    auto   gp = Vec3d{source.pos.x(), source.pos.y(), ground_level(sm)};
 
-    double gndlvl = 0.; // The Z level where pedestals should be
-    double jp_gnd = 0.; // The lowest Z where a junction center can be
-    double gap_dist = 0.; // The gap distance between the model and the pad
-    double radius = source.r;
-    double sd = sm.cfg.safety_distance_mm;
-
-    double r2 = radius + (end_radius - radius) / (jp.z() - ground_level(sm));
-
-    auto to_floor = [&gndlvl](const Vec3d &p) { return Vec3d{p.x(), p.y(), gndlvl}; };
-
-    auto eval_limits = [&sm, &radius, &can_add_base, &gndlvl, &gap_dist, &jp_gnd]
-        (bool base_en = true)
-    {
-        can_add_base  = base_en && radius >= sm.cfg.head_back_radius_mm;
-        double base_r = can_add_base ? sm.cfg.base_radius_mm : 0.;
-        gndlvl        = ground_level(sm);
-        if (!can_add_base) gndlvl -= sm.pad_cfg.wall_thickness_mm;
-        jp_gnd   = gndlvl + (can_add_base ? 0. : sm.cfg.head_back_radius_mm);
-        gap_dist = sm.cfg.pillar_base_safety_distance_mm + base_r + EPSILON;
-    };
-
-    eval_limits();
-
-    // We are dealing with a mini pillar that's potentially too long
-    if (radius < sm.cfg.head_back_radius_mm && jp.z() - gndlvl > 20 * radius)
-    {
-        std::optional<DiffBridge> diffbr =
-            search_widening_path(policy, sm, jp, dir, radius,
-                                 sm.cfg.head_back_radius_mm);
-
-        if (diffbr && diffbr->endp.z() > jp_gnd) {
-            endp = diffbr->endp;
-            radius = diffbr->end_r;
-            ret.path.emplace_back(endp, radius);
-            dir = diffbr->get_dir();
-            eval_limits();
-        } else return ret;
-    }
-
-    if (sm.cfg.object_elevation_mm < EPSILON)
-    {
-        // get a suitable direction for the corrector bridge. It is the
-        // original sourcedir's azimuth but the polar angle is saturated to the
-        // configured bridge slope.
-        auto [polar, azimuth] = dir_to_spheric(dir);
-        polar = PI - sm.cfg.bridge_slope;
-        Vec3d d = spheric_to_dir(polar, azimuth).normalized();
-        double t = beam_mesh_hit(policy, sm.emesh, Beam{endp, d, radius, r2}, sd).distance();
-        double tmax = std::min(sm.cfg.max_bridge_length_mm, t);
-        t = 0.;
-
-        double zd = endp.z() - jp_gnd;
-        double tmax2 = zd / std::sqrt(1 - sm.cfg.bridge_slope * sm.cfg.bridge_slope);
-        tmax = std::min(tmax, tmax2);
-
-        Vec3d nexp = endp;
-        double dlast = 0.;
-        while (((dlast = std::sqrt(sm.emesh.squared_distance(to_floor(nexp)))) < gap_dist ||
-                !std::isinf(beam_mesh_hit(policy, sm.emesh, Beam{nexp, DOWN, radius, r2}, sd).distance())) &&
-               t < tmax)
-        {
-            t += radius;
-            nexp = endp + t * d;
-        }
-
-        if (dlast < gap_dist && can_add_base) {
-            nexp         = endp;
-            t            = 0.;
-            can_add_base = false;
-            eval_limits(can_add_base);
-
-            zd = endp.z() - jp_gnd;
-            tmax2 = zd / std::sqrt(1 - sm.cfg.bridge_slope * sm.cfg.bridge_slope);
-            tmax = std::min(tmax, tmax2);
-
-            while (((dlast = std::sqrt(sm.emesh.squared_distance(to_floor(nexp)))) < gap_dist ||
-                    !std::isinf(beam_mesh_hit(policy, sm.emesh, Beam{nexp, DOWN, radius}, sd).distance())) && t < tmax) {
-                t += radius;
-                nexp = endp + t * d;
-            }
-        }
-
-        // Could not find a path to avoid the pad gap
-        if (dlast < gap_dist) {
-            ret.path.clear();
-            return ret;
-            //return {false, pillar_id};
-        }
-
-        if (t > 0.) { // Need to make additional bridge
-            ret.path.emplace_back(nexp, radius);
-            endp = nexp;
-        }
-    }
-
-    Vec3d gp = to_floor(endp);
-    auto hit = beam_mesh_hit(policy, sm.emesh,
-                             Beam{{endp, radius}, {gp, end_radius}}, sd);
+    auto hit = beam_mesh_hit(policy,
+                             sm.emesh,
+                             Beam{{source.pos, source.r}, {gp, end_radius}},
+                             sd);
 
     if (std::isinf(hit.distance())) {
-        double base_radius = can_add_base ?
-                    std::max(sm.cfg.base_radius_mm, end_radius) : end_radius;
+        double base_radius = std::max(sm.cfg.base_radius_mm, end_radius);
 
-        Vec3d gp = to_floor(endp);
         ret.pillar_base =
             Pedestal{gp, sm.cfg.base_height_mm, base_radius, end_radius};
     }
 
     return ret;
 }
+
+//template<class Ex>
+//GroundConnection find_pillar_route(Ex policy,
+//                                   const SupportableMesh &sm,
+//                                   const Junction &source,
+//                                   const Vec3d &sourcedir,
+//                                   double end_radius)
+//{
+//    GroundConnection ret;
+
+//    ret.path.emplace_back(source);
+
+//    Vec3d  jp           = source.pos, endp = jp, dir = sourcedir;
+//    bool   can_add_base = false/*, non_head = false*/;
+
+//    double gndlvl = 0.; // The Z level where pedestals should be
+//    double jp_gnd = 0.; // The lowest Z where a junction center can be
+//    double gap_dist = 0.; // The gap distance between the model and the pad
+//    double radius = source.r;
+//    double sd = sm.cfg.safety_distance(radius);
+
+//    double r2 = radius + (end_radius - radius) / (jp.z() - ground_level(sm));
+
+//    auto to_floor = [&gndlvl](const Vec3d &p) { return Vec3d{p.x(), p.y(), gndlvl}; };
+
+//    auto eval_limits = [&sm, &radius, &can_add_base, &gndlvl, &gap_dist, &jp_gnd, end_radius]
+//        (bool base_en = true)
+//    {
+//        can_add_base  = base_en && radius >= sm.cfg.head_back_radius_mm;
+//        double base_r = can_add_base ? std::max(sm.cfg.base_radius_mm, end_radius) : end_radius;
+//        gndlvl        = ground_level(sm);
+//        if (!can_add_base) gndlvl -= sm.pad_cfg.wall_thickness_mm;
+//        jp_gnd   = gndlvl + (can_add_base ? 0. : sm.cfg.head_back_radius_mm);
+//        gap_dist = sm.cfg.pillar_base_safety_distance_mm + base_r + EPSILON;
+//    };
+
+//    eval_limits();
+
+//    // We are dealing with a mini pillar that's potentially too long
+//    if (radius < sm.cfg.head_back_radius_mm && jp.z() - gndlvl > 20 * radius)
+//    {
+//        std::optional<DiffBridge> diffbr =
+//            search_widening_path(policy, sm, jp, dir, radius,
+//                                 sm.cfg.head_back_radius_mm);
+
+//        if (diffbr && diffbr->endp.z() > jp_gnd) {
+//            endp = diffbr->endp;
+//            radius = diffbr->end_r;
+//            ret.path.emplace_back(endp, radius);
+//            dir = diffbr->get_dir();
+//            eval_limits();
+//        } else return ret;
+//    }
+
+//    if (sm.cfg.object_elevation_mm < EPSILON)
+//    {
+//        // get a suitable direction for the corrector bridge. It is the
+//        // original sourcedir's azimuth but the polar angle is saturated to the
+//        // configured bridge slope.
+//        auto [polar, azimuth] = dir_to_spheric(dir);
+//        polar = PI - sm.cfg.bridge_slope;
+//        Vec3d d = spheric_to_dir(polar, azimuth).normalized();
+//        double t = beam_mesh_hit(policy, sm.emesh, Beam{endp, d, radius, r2}, sd).distance();
+//        double tmax = std::min(sm.cfg.max_bridge_length_mm, t);
+//        t = 0.;
+
+//        double zd = endp.z() - jp_gnd;
+//        double tmax2 = zd / std::sqrt(1 - sm.cfg.bridge_slope * sm.cfg.bridge_slope);
+//        tmax = std::min(tmax, tmax2);
+
+//        Vec3d nexp = endp;
+//        double dlast = 0.;
+//        double rnext = radius;
+//        while (((dlast = std::sqrt(sm.emesh.squared_distance(to_floor(nexp)))) < gap_dist ||
+//                !std::isinf(beam_mesh_hit(policy, sm.emesh, Beam{nexp, DOWN, rnext, end_radius}, sd).distance())) &&
+//               t < tmax)
+//        {
+//            t += radius;
+//            nexp = endp + t * d;
+//            double bridge_ratio = dlast / (dlast + (nexp.z() - ground_level(sm)));
+//            rnext = rnext + bridge_ratio * (end_radius - rnext);
+//        }
+
+//        // If could not find avoidance bridge for the pad gap, try again
+//        // without the pillar base
+//        if (dlast < gap_dist && can_add_base) {
+//            nexp         = endp;
+//            t            = 0.;
+//            rnext = radius;
+//            can_add_base = false;
+//            eval_limits(can_add_base);
+
+//            zd = endp.z() - jp_gnd;
+//            tmax2 = zd / std::sqrt(1 - sm.cfg.bridge_slope * sm.cfg.bridge_slope);
+//            tmax = std::min(tmax, tmax2);
+
+//            while (((dlast = std::sqrt(sm.emesh.squared_distance(to_floor(nexp)))) < gap_dist ||
+//                    !std::isinf(beam_mesh_hit(policy, sm.emesh, Beam{nexp, DOWN, rnext, end_radius}, sd).distance())) && t < tmax) {
+//                t += radius;
+//                nexp = endp + t * d;
+
+//                double bridge_ratio = dlast / (dlast + (nexp.z() - ground_level(sm)));
+//                rnext = rnext + bridge_ratio * (end_radius - rnext);
+//            }
+//        }
+
+//        // Could not find a path to avoid the pad gap
+//        if (dlast < gap_dist) {
+//            ret.path.clear();
+//            return ret;
+//        }
+
+//        if (t > 0.) { // Need to make additional bridge
+//            ret.path.emplace_back(nexp, rnext);
+//            endp = nexp;
+//        }
+//    }
+
+//    Vec3d gp = to_floor(endp);
+//    auto hit = beam_mesh_hit(policy, sm.emesh,
+//                             Beam{{endp, radius}, {gp, end_radius}}, sd);
+
+//    if (std::isinf(hit.distance())) {
+//        double base_radius = can_add_base ?
+//                    std::max(sm.cfg.base_radius_mm, end_radius) : end_radius;
+
+//        Vec3d gp = to_floor(endp);
+//        ret.pillar_base =
+//            Pedestal{gp, sm.cfg.base_height_mm, base_radius, end_radius};
+//    }
+
+//    return ret;
+//}
 
 inline long build_ground_connection(SupportTreeBuilder &builder,
                                     const SupportableMesh &sm,
@@ -689,7 +724,7 @@ GroundConnection find_ground_connection(
 {
     auto   hjp = j.pos;
     double r   = j.r;
-    auto   sd  = sm.cfg.safety_distance_mm;
+    auto   sd  = sm.cfg.safety_distance(r);
     double r2  = j.r + (end_r - j.r) / (j.pos.z() - ground_level(sm));
 
     double t = beam_mesh_hit(policy, sm.emesh, Beam{hjp, dir, r, r2}, sd).distance();
@@ -700,7 +735,7 @@ GroundConnection find_ground_connection(
 
     while (!gnd_route && d < t) {
         Vec3d  endp = hjp + d * dir;
-        double bridge_ratio = d / (d + (endp.z() - sm.emesh.ground_level()));
+        double bridge_ratio = d / (d + (endp.z() - ground_level(sm)));
         double pill_r = r + bridge_ratio * (end_r - r);
         gnd_route = find_pillar_route(policy, sm, {endp, pill_r}, dir, end_r);
 
@@ -745,7 +780,7 @@ GroundConnection optimize_ground_connection(
     Optimizer<opt::AlgNLoptMLSL> solver(get_criteria(sm.cfg).stop_score(1e6));
     solver.seed(0); // we want deterministic behavior
 
-    auto sd      = sm.cfg.safety_distance_mm;
+    auto sd      = sm.cfg.safety_distance(j.r);
     auto oresult = solver.to_max().optimize(
         [&j, sd, &policy, &sm, &downdst, &end_radius](const opt::Input<2> &input) {
             auto &[plr, azm] = input;
@@ -760,6 +795,120 @@ GroundConnection optimize_ground_connection(
     Vec3d bridgedir = spheric_to_dir(oresult.optimum).normalized();
 
     return find_ground_connection(policy, sm, j, bridgedir, end_radius);
+}
+
+template<class Ex>
+GroundConnection deepsearch_ground_connection(
+    Ex                     policy,
+    const SupportableMesh &sm,
+    const Junction        &j,
+    double                 end_radius,
+    const Vec3d           &init_dir = DOWN)
+{
+    // Score is the total lenght of the route. Feasible routes will have
+    // infinite length (rays not colliding with model), thus the stop score
+    // should be a reasonably big number.
+    constexpr double StopScore = 1e6;
+
+    const auto sd          = sm.cfg.safety_distance(j.r);
+    const auto gndlvl      = ground_level(sm);
+    const double widening  = end_radius - j.r;
+    const double base_r    = std::max(sm.cfg.base_radius_mm, end_radius);
+    const double zelev_gap = sm.cfg.pillar_base_safety_distance_mm + base_r;
+
+    auto criteria = get_criteria(sm.cfg).stop_score(StopScore);
+
+    Optimizer<opt::AlgNLoptMLSL> solver(criteria);
+    solver.seed(0); // enforce deterministic behavior
+
+    auto optfn = [&](const opt::Input<3> &input) {
+        double ret = NaNd;
+
+        // solver suggests polar, azimuth and bridge length values:
+        auto &[plr, azm, bridge_len] = input;
+
+        Vec3d n = spheric_to_dir(plr, azm);
+        Vec3d bridge_end = j.pos + bridge_len * n;
+
+        double full_len   = bridge_len + bridge_end.z() - gndlvl;
+        double bridge_r   = j.r + widening * bridge_len / full_len;
+        double brhit_dist = 0.;
+
+        if (bridge_len > EPSILON) {
+            // beam_mesh_hit with a zero lenght bridge is invalid
+
+            Beam bridgebeam{Ball{j.pos, j.r}, Ball{bridge_end, bridge_r}};
+            auto brhit = beam_mesh_hit(policy, sm.emesh, bridgebeam, sd);
+            brhit_dist = brhit.distance();
+        }
+
+        if (brhit_dist < bridge_len) {
+            ret = brhit_dist;
+        } else {
+            // check if pillar can be placed below
+            auto gp = Vec3d{bridge_end.x(), bridge_end.y(), gndlvl};
+
+            Beam gndbeam {{bridge_end, bridge_r}, {gp, end_radius}};
+            auto gndhit = beam_mesh_hit(policy, sm.emesh, gndbeam, sd);
+
+            if (std::isinf(gndhit.distance())) {
+                // Ground route is free with this bridge
+
+                if (sm.cfg.object_elevation_mm < EPSILON) {
+                    // Dealing with zero elevation mode, to not route pillars
+                    // into the gap between the optional pad and the model
+                    double gap = std::sqrt(sm.emesh.squared_distance(gp));
+                    if (gap < zelev_gap)
+                        ret = full_len - zelev_gap + gap;
+                    else // success
+                        ret = StopScore;
+                } else {
+                    // No zero elevation, return success
+                    ret = StopScore;
+                }
+            } else {
+                // Ground route is not free
+                ret = bridge_len + gndhit.distance();
+            }
+        }
+
+        return ret;
+    };
+
+    auto [plr_init, azm_init] = dir_to_spheric(init_dir);
+
+    // Saturate the polar angle to max tilt defined in config
+    plr_init = std::max(plr_init, PI - sm.cfg.bridge_slope);
+
+    auto oresult = solver.to_max().optimize(
+        optfn,
+        initvals({plr_init, azm_init, 0.}),      // start with a zero bridge
+        bounds({ {PI - sm.cfg.bridge_slope, PI}, // bounds for polar angle
+                 {-PI, PI},                      // bounds for azimuth
+                 {0., sm.cfg.max_bridge_length_mm} }) // bounds bridge length
+        );
+
+    GroundConnection conn;
+
+    if (oresult.score >= StopScore) {
+        // search was successful, extract and apply the result
+        auto &[plr, azm, bridge_len] = oresult.optimum;
+
+        Vec3d n = spheric_to_dir(plr, azm);
+        Vec3d bridge_end = j.pos + bridge_len * n;
+
+        double full_len = bridge_len + bridge_end.z() - gndlvl;
+        double bridge_r = j.r + widening * bridge_len / full_len;
+        Vec3d  gp{bridge_end.x(), bridge_end.y(), gndlvl};
+
+        conn.path.emplace_back(j);
+        conn.path.emplace_back(Junction{bridge_end, bridge_r});
+
+        conn.pillar_base =
+                Pedestal{gp, sm.cfg.base_height_mm, base_r, end_radius};
+    }
+
+    return conn;
 }
 
 template<class Ex>
@@ -779,8 +928,7 @@ bool optimize_anchor_placement(Ex                     policy,
     double lmax = std::min(sm.cfg.head_width_mm,
                            distance(from.pos, anchor.pos) - 2 * from.r);
 
-    double sd = anchor.r_back_mm * sm.cfg.safety_distance_mm /
-                sm.cfg.head_back_radius_mm;
+    double sd = sm.cfg.safety_distance(anchor.r_back_mm);
 
     Optimizer<AlgNLoptGenetic> solver(get_criteria(sm.cfg)
                                           .stop_score(anchor.fullwidth())

@@ -79,7 +79,7 @@ struct Junction: public SupportTreeNode {
 struct Head: public SupportTreeNode {
     Vec3d dir = DOWN;
     Vec3d pos = {0, 0, 0};
-    
+
     double r_back_mm = 1;
     double r_pin_mm = 0.5;
     double width_mm = 2;
@@ -87,12 +87,12 @@ struct Head: public SupportTreeNode {
 
     // If there is a pillar connecting to this head, then the id will be set.
     long pillar_id = ID_UNSET;
-    
+
     long bridge_id = ID_UNSET;
-    
+
     inline void invalidate() { id = ID_UNSET; }
     inline bool is_valid() const { return id >= 0; }
-    
+
     Head(double r_big_mm,
          double r_small_mm,
          double length_mm,

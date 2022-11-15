@@ -39,7 +39,7 @@ class BranchingTreeBuilder: public branchingtree::Builder {
     {
         double w = WIDENING_SCALE * m_sm.cfg.pillar_widening_factor * j.weight;
 
-        return std::min(m_sm.cfg.base_radius_mm, double(j.Rmin) + w);
+        return double(j.Rmin) + w;
     }
 
     std::vector<size_t>  m_unroutable_pinheads;
@@ -247,32 +247,18 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
 
     auto it = m_ground_mem.find(from.id);
     if (it == m_ground_mem.end()) {
-//        std::optional<PointIndexEl> result = search_for_existing_pillar(from);
-
         sla::Junction j{from.pos.cast<double>(), get_radius(from)};
-//        if (!result) {
-            auto conn = optimize_ground_connection(
-                                           ex_tbb,
-                                           m_sm,
-                                           j,
-                                           get_radius(to));
+        Vec3d init_dir = (to.pos - from.pos).cast<double>().normalized();
 
-            if (conn) {
-//                Junction connlast = conn.path.back();
-//                branchingtree::Node n{connlast.pos.cast<float>(), float(connlast.r)};
-//                n.left = from.id;
-                m_pillars.emplace_back(from);
-//                m_pillar_index.insert({n.pos, m_pillars.size() - 1});
-                m_gnd_connections[m_pillars.size() - 1] = conn;
+        auto conn = deepsearch_ground_connection(ex_tbb, m_sm, j,
+                                                 get_radius(to), init_dir);
 
-                ret = true;
-            }
-//        } else {
-//            const auto &resnode = m_pillars[result->second];
-//            m_builder.add_diffbridge(j.pos, resnode.pos.cast<double>(), j.r, get_radius(resnode));
-//            m_pillars[result->second].right = from.id;
-//            ret = true;
-//        }
+        if (conn) {
+            m_pillars.emplace_back(from);
+            m_gnd_connections[m_pillars.size() - 1] = conn;
+
+            ret = true;
+        }
 
         // Remember that this node was tested if can go to ground, don't
         // test it with any other destination ground point because

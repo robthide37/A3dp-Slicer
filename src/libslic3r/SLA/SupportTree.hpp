@@ -84,6 +84,12 @@ struct SupportTreeConfig
                2 * head_back_radius_mm - head_penetration_mm;
     }
 
+    double safety_distance() const { return safety_distance_mm; }
+    double safety_distance(double r) const
+    {
+        return std::min(safety_distance_mm, r * safety_distance_mm / head_back_radius_mm);
+    }
+
     // /////////////////////////////////////////////////////////////////////////
     // Compile time configuration values (candidates for runtime)
     // /////////////////////////////////////////////////////////////////////////
@@ -91,7 +97,9 @@ struct SupportTreeConfig
     // The max Z angle for a normal at which it will get completely ignored.
     static const double constexpr normal_cutoff_angle = 150.0 * M_PI / 180.0;
 
-    // The shortest distance of any support structure from the model surface
+    // The safety gap between a support structure and model body. For support
+    // struts smaller than head_back_radius, the safety distance is scaled
+    // down accordingly. see method safety_distance()
     static const double constexpr safety_distance_mm = 0.5;
 
     static const double constexpr max_solo_pillar_height_mm = 15.0;
@@ -117,11 +125,11 @@ struct SupportableMesh
         : emesh{trmsh}, pts{sp}, cfg{c}
     {}
 
-    explicit SupportableMesh(const AABBMesh          &em,
-                             const SupportPoints     &sp,
-                             const SupportTreeConfig &c)
-        : emesh{em}, pts{sp}, cfg{c}
-    {}
+//    explicit SupportableMesh(const AABBMesh          &em,
+//                             const SupportPoints     &sp,
+//                             const SupportTreeConfig &c)
+//        : emesh{em}, pts{sp}, cfg{c}
+//    {}
 };
 
 inline double ground_level(const SupportableMesh &sm)
