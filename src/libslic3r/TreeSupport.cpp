@@ -115,76 +115,6 @@ static inline void check_self_intersections(const ExPolygon &expoly, const std::
 #endif // _WIN32
 }
 
-static inline void clip_for_diff(const Polygon &src, const BoundingBox &bbox, Polygon &out)
-{
-    out.clear();
-    const size_t cnt = src.points.size();
-    if (cnt < 3)
-        return;
-
-    enum class Side {
-        Left   = 1,
-        Right  = 2,
-        Top    = 4,
-        Bottom = 8
-    };
-
-    auto sides = [bbox](const Point &p) {
-        return  int(p.x() < bbox.min.x()) * int(Side::Left) +
-                int(p.x() > bbox.max.x()) * int(Side::Right) +
-                int(p.y() < bbox.min.y()) * int(Side::Bottom) +
-                int(p.y() > bbox.max.y()) * int(Side::Top);
-    };
-
-    int sides_prev = sides(src.points.back());
-    int sides_this = sides(src.points.front());
-    const size_t last = cnt - 1;
-    for (size_t i = 0; i < last; ++ i) {
-        int sides_next = sides(src.points[i + 1]);
-        if (// This point is inside. Take it.
-            sides_this == 0 ||
-            // Either this point is outside and previous or next is inside, or
-            // the edge possibly cuts corner of the bounding box.
-            (sides_prev & sides_this & sides_next) == 0) {
-            out.points.emplace_back(src.points[i]);
-            sides_prev = sides_this;
-        } else {
-            // All the three points (this, prev, next) are outside at the same side.
-            // Ignore this point.
-        }
-        sides_this = sides_next;
-    }
-    // For the last point, if src is completely outside bbox, then out.points will be empty. Just use the first point instead.
-    int sides_next = sides(out.points.empty() ? src.points.front() : out.points.front());
-    if (// The last point is inside. Take it.
-        sides_this == 0 ||
-        // Either this point is outside and previous or next is inside, or
-        // the edge possibly cuts corner of the bounding box.
-        (sides_prev & sides_this & sides_next) == 0)
-        out.points.emplace_back(src.points.back());
-}
-
-[[nodiscard]] static inline Polygon clip_for_diff(const Polygon &src, const BoundingBox &bbox)
-{
-    Polygon out;
-    clip_for_diff(src, bbox, out);
-    return out;
-}
-
-[[nodiscard]] static inline Polygons clip_for_diff(const Polygons &src, const BoundingBox &bbox)
-{
-    Polygons out;
-    out.reserve(src.size());
-    for (const Polygon &p : src)
-        out.emplace_back(clip_for_diff(p, bbox));
-    return out;
-}
-
-[[nodiscard]] static inline Polygons diff_clipped(const Polygons &src, const Polygons &clipping)
-{
-    return diff(src, clip_for_diff(clipping, get_extents(src).inflated(SCALED_EPSILON)));
-}
-
 static constexpr const auto tiny_area_threshold = sqr(scaled<double>(0.001));
 
 static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_meshes(const Print &print, const std::vector<size_t> &print_object_ids)
@@ -821,7 +751,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
     Polygons collision_trimmed_buffer;
     auto collision_trimmed = [&collision_trimmed_buffer, &collision, &ret, distance]() -> const Polygons& {
         if (collision_trimmed_buffer.empty() && ! collision.empty())
-            collision_trimmed_buffer = clip_for_diff(collision, get_extents(ret).inflated(std::max(0, distance) + SCALED_EPSILON));
+            collision_trimmed_buffer = ClipperUtils::clip_clipper_polygons_with_subject_bbox(collision, get_extents(ret).inflated(std::max(0, distance) + SCALED_EPSILON));
         return collision_trimmed_buffer;
     };
 
