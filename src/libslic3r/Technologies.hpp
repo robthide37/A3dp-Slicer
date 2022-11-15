@@ -64,6 +64,8 @@
 // Enable picking using raytracing
 #define ENABLE_RAYCAST_PICKING (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
 #define ENABLE_RAYCAST_PICKING_DEBUG (0 && ENABLE_RAYCAST_PICKING)
+// Enable gizmo measure combining volumes meshes and passing them to the backend in world coordinates
+#define ENABLE_GIZMO_MEASURE_WORLD_COORDINATES (1 && ENABLE_2_5_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_

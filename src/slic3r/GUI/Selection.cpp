@@ -613,6 +613,19 @@ bool Selection::contains_any_volume(const std::vector<unsigned int>& volume_idxs
     return false;
 }
 
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+bool Selection::contains_sinking_volumes(bool ignore_modifiers) const
+{
+    for (const GLVolume* v : *m_volumes) {
+        if (!ignore_modifiers || !v->is_modifier) {
+            if (v->is_sinking())
+                return true;
+        }
+    }
+    return false;
+}
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+
 bool Selection::matches(const std::vector<unsigned int>& volume_idxs) const
 {
     unsigned int count = 0;

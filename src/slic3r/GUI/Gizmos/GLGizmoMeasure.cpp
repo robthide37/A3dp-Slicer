@@ -5,9 +5,11 @@
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 
-#include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
 
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+#include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
 #include "libslic3r/Model.hpp"
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/MeasureUtils.hpp"
 
@@ -242,7 +244,10 @@ private:
 TransformHelper::Cache TransformHelper::s_cache = { { 0, 0, 0, 0 }, Matrix4d::Identity(), Transform3d::Identity() };
 
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
-    : GLGizmoBase(parent, icon_filename, sprite_id)
+: GLGizmoBase(parent, icon_filename, sprite_id)
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+, m_raycaster(nullptr)
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 {
     GLModel::Geometry sphere_geometry = smooth_sphere(16, 7.5f);
     m_sphere.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(sphere_geometry.get_as_indexed_triangle_set()));
@@ -370,8 +375,10 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
 
             if (m_selected_features != selected_features_old && m_selected_features.second.feature.has_value()) {
                 m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                 // transform to world coordinates
                 m_measurement_result.transform(m_volume_matrix);
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
             }
 
             m_imgui->set_requires_extra_frame();
@@ -419,6 +426,9 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
 
 void GLGizmoMeasure::data_changed()
 {
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+    update_if_needed();
+#else
     const Selection&  selection     = m_parent.get_selection();
     const ModelObject* model_object = nullptr;
     const ModelVolume* model_volume = nullptr;
@@ -429,13 +439,16 @@ void GLGizmoMeasure::data_changed()
     }
     if (model_object != m_old_model_object || model_volume != m_old_model_volume)
         update_if_needed();
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
     m_last_inv_zoom = 0.0f;
     m_last_plane_idx = -1;
     if (m_pending_scale) {
         m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
         // transform to world coordinates
         m_measurement_result.transform(m_volume_matrix);
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
         m_pending_scale = false;
     }
     else
@@ -512,6 +525,9 @@ void GLGizmoMeasure::on_set_state()
         m_editing_distance = false;
         m_is_editing_distance_first_frame = true;
         m_measuring.reset();
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+        m_raycaster.release();
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     }
     else {
         m_mode = EMode::FeatureSelection;
@@ -528,10 +544,12 @@ void GLGizmoMeasure::on_set_state()
     }
 }
 
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 CommonGizmosDataID GLGizmoMeasure::on_get_requirements() const
 {
     return CommonGizmosDataID(int(CommonGizmosDataID::SelectionInfo) | int(CommonGizmosDataID::Raycaster));
 }
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
 std::string GLGizmoMeasure::on_get_name() const
 {
@@ -543,9 +561,15 @@ bool GLGizmoMeasure::on_is_activable() const
     const Selection& selection = m_parent.get_selection();
     bool res = (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA) ?
         selection.is_single_full_instance() :
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+        selection.is_single_full_instance() || selection.is_single_volume() || selection.is_single_modifier();
+    if (res)
+        res &= !selection.contains_sinking_volumes();
+#else
         selection.is_single_volume() || selection.is_single_volume_instance();
     if (res)
         res &= !selection.get_first_volume()->is_sinking();
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
     return res;
 }
@@ -562,8 +586,10 @@ void GLGizmoMeasure::on_render()
 
     const Selection& selection = m_parent.get_selection();
 
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     if ((wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA && selection.is_single_full_instance()) ||
         (selection.is_single_volume() || selection.is_single_volume_instance())) {
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
         update_if_needed();
 
         const Camera& camera = wxGetApp().plater()->get_camera();
@@ -572,7 +598,11 @@ void GLGizmoMeasure::on_render()
         Vec3f position_on_model;
         Vec3f normal_on_model;
         size_t model_facet_idx;
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+        const bool mouse_on_object = m_raycaster.raycaster()->unproject_on_mesh(m_mouse_pos, Transform3d::Identity(), camera, position_on_model, normal_on_model, nullptr, &model_facet_idx);
+#else
         const bool mouse_on_object = m_c->raycaster()->raycasters().front()->unproject_on_mesh(m_mouse_pos, m_volume_matrix, camera, position_on_model, normal_on_model, nullptr, &model_facet_idx);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
         const bool is_hovering_on_feature = (m_mode == EMode::PointSelection || m_mode == EMode::CenterSelection) && m_hover_id != -1;
 
         auto update_circle = [this, inv_zoom]() {
@@ -581,7 +611,11 @@ void GLGizmoMeasure::on_render()
                 m_last_circle = m_curr_feature;
                 m_circle.reset();
                 const auto [center, radius, normal] = m_curr_feature->get_circle();
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                GLModel::Geometry circle_geometry = init_torus_data(64, 16, center.cast<float>(), float(radius), 5.0f * inv_zoom, normal.cast<float>(), Transform3f::Identity());
+#else
                 GLModel::Geometry circle_geometry = init_torus_data(64, 16, center.cast<float>(), float(radius), 5.0f * inv_zoom, normal.cast<float>(), m_volume_matrix.cast<float>());
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                 m_circle.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(circle_geometry.get_as_indexed_triangle_set()));
                 m_circle.model.init_from(std::move(circle_geometry));
                 return true;
@@ -639,7 +673,11 @@ void GLGizmoMeasure::on_render()
                         const auto [idx, normal, point] = m_curr_feature->get_plane();
                         if (m_last_plane_idx != idx) {
                             m_last_plane_idx = idx;
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                            const indexed_triangle_set& its = m_measuring->get_mesh().its;
+#else
                             const indexed_triangle_set its = (m_old_model_volume != nullptr) ? m_old_model_volume->mesh().its : m_old_model_object->volumes.front()->mesh().its;
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                             const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
                             GLModel::Geometry init_data = init_plane_data(its, planes_triangles, idx);
                             m_plane.reset();
@@ -689,12 +727,20 @@ void GLGizmoMeasure::on_render()
                     if (extra.has_value() && m_hover_id == POINT_ID)
                         m_curr_point_on_feature_position = *extra;
                     else
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                        m_curr_point_on_feature_position = position_on_feature(EDGE_ID, camera, [](const Vec3f& v) { return Vec3f(0.0f, 0.0f, v.z()); });
+#else
                         m_curr_point_on_feature_position = m_volume_matrix.inverse() * position_on_feature(EDGE_ID, camera, [](const Vec3f& v) { return Vec3f(0.0f, 0.0f, v.z()); });
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                     break;
                 }
                 case Measure::SurfaceFeatureType::Plane:
                 {
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                    m_curr_point_on_feature_position = position_on_feature(PLANE_ID, camera);
+#else
                     m_curr_point_on_feature_position = m_volume_matrix.inverse() * position_on_feature(PLANE_ID, camera);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                     break;
                 }
                 case Measure::SurfaceFeatureType::Circle:
@@ -704,9 +750,17 @@ void GLGizmoMeasure::on_render()
                         m_curr_point_on_feature_position = center;
                     else {
                         const Vec3d world_pof = position_on_feature(CIRCLE_ID, camera, [](const Vec3f& v) { return v; });
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                        const Eigen::Hyperplane<double, 3> plane(normal, center);
+#else
                         const Eigen::Hyperplane<double, 3> plane(m_volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal, m_volume_matrix * center);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                         const Transform3d local_to_model_matrix = Geometry::translation_transform(center) * Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), normal);
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                        const Vec3d local_proj = local_to_model_matrix.inverse() * plane.projection(world_pof);
+#else
                         const Vec3d local_proj = local_to_model_matrix.inverse() * m_volume_matrix.inverse() * plane.projection(world_pof);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                         double angle = std::atan2(local_proj.y(), local_proj.x());
                         if (angle < 0.0)
                             angle += 2.0 * double(M_PI);
@@ -767,8 +821,12 @@ void GLGizmoMeasure::on_render()
                 default: { assert(false); break; }
                 case Measure::SurfaceFeatureType::Point:
                 {
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                    const Transform3d feature_matrix = Geometry::translation_transform(feature.get_point()) * Geometry::scale_transform(inv_zoom);
+#else
                     const Vec3d position = TransformHelper::model_to_world(feature.get_point(), m_volume_matrix);
                     const Transform3d feature_matrix = Geometry::translation_transform(position) * Geometry::scale_transform(inv_zoom);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                     set_matrix_uniforms(feature_matrix);
                     set_emission_uniform(colors.front(), hover);
                     m_sphere.model.set_color(colors.front());
@@ -785,8 +843,12 @@ void GLGizmoMeasure::on_render()
                     const auto& [center, radius, normal] = feature.get_circle();
                     // render center
                     if (update_raycasters_transform) {
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                        const Transform3d center_matrix = Geometry::translation_transform(center) * Geometry::scale_transform(inv_zoom);
+#else
                         const Vec3d center_world = TransformHelper::model_to_world(center, m_volume_matrix);
                         const Transform3d center_matrix = Geometry::translation_transform(center_world) * Geometry::scale_transform(inv_zoom);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                         set_matrix_uniforms(center_matrix);
                         set_emission_uniform(colors.front(), hover);
                         m_sphere.model.set_color(colors.front());
@@ -809,7 +871,11 @@ void GLGizmoMeasure::on_render()
                         }
                         else {
                             GLModel circle;
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                            GLModel::Geometry circle_geometry = init_torus_data(64, 16, center.cast<float>(), float(radius), 5.0f * inv_zoom, normal.cast<float>(), Transform3f::Identity());
+#else
                             GLModel::Geometry circle_geometry = init_torus_data(64, 16, center.cast<float>(), float(radius), 5.0f * inv_zoom, normal.cast<float>(), m_volume_matrix.cast<float>());
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                             circle.init_from(std::move(circle_geometry));
                             set_emission_uniform(colors.back(), hover);
                             circle.set_color(colors.back());
@@ -825,8 +891,12 @@ void GLGizmoMeasure::on_render()
                     if (update_raycasters_transform) {
                         const std::optional<Vec3d> extra = feature.get_extra_point();
                         if (extra.has_value()) {
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                            const Transform3d point_matrix = Geometry::translation_transform(*extra) * Geometry::scale_transform(inv_zoom);
+#else
                             const Vec3d extra_world = TransformHelper::model_to_world(*extra, m_volume_matrix);
                             const Transform3d point_matrix = Geometry::translation_transform(extra_world) * Geometry::scale_transform(inv_zoom);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                             set_matrix_uniforms(point_matrix);
                             set_emission_uniform(colors.front(), hover);
                             m_sphere.model.set_color(colors.front());
@@ -838,11 +908,17 @@ void GLGizmoMeasure::on_render()
                     }
                     // render edge
                     if (m_mode != EMode::CenterSelection) {
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                        const Transform3d edge_matrix = Geometry::translation_transform(from) *
+                        Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), to - from) *
+                        Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (to - from).norm() });
+#else
                         const Vec3d from_world = TransformHelper::model_to_world(from, m_volume_matrix);
                         const Vec3d to_world = TransformHelper::model_to_world(to, m_volume_matrix);
                         const Transform3d edge_matrix = Geometry::translation_transform(from_world) *
                             Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), to_world - from_world) *
                             Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (to_world - from_world).norm() });
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                         set_matrix_uniforms(edge_matrix);
                         set_emission_uniform(colors.back(), hover);
                         m_cylinder.model.set_color(colors.back());
@@ -857,16 +933,27 @@ void GLGizmoMeasure::on_render()
                 }
                 case Measure::SurfaceFeatureType::Plane:
                 {
-                    const auto& [idx, normal, pt] = feature.get_plane();
-                    assert(idx < m_plane_models_cache.size());
-                    set_matrix_uniforms(m_volume_matrix);
-                    set_emission_uniform(colors.front(), hover);
-                    m_plane_models_cache[idx].set_color(colors.front());
-                    m_plane_models_cache[idx].render();
+                    // no need to render the plane in case it is rendered with the same color as the volume in the 3D scene
+                    if (colors.front() != m_parent.get_selection().get_first_volume()->render_color) {
+                        const auto& [idx, normal, pt] = feature.get_plane();
+                        assert(idx < m_plane_models_cache.size());
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                        set_matrix_uniforms(Transform3d::Identity());
+#else
+                        set_matrix_uniforms(m_volume_matrix);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                        set_emission_uniform(colors.front(), hover);
+                        m_plane_models_cache[idx].set_color(colors.front());
+                        m_plane_models_cache[idx].render();
+                    }
                     if (update_raycasters_transform) {
                         auto it = m_raycasters.find(PLANE_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                            it->second->set_transform(Transform3d::Identity());
+#else
                             it->second->set_transform(m_volume_matrix);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                     }
                     break;
                 }
@@ -921,7 +1008,11 @@ void GLGizmoMeasure::on_render()
                 auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
                     [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SELECTION_1_ID; });
                 if (it != m_selection_raycasters.end())
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                    (*it)->set_transform(Geometry::translation_transform(m_selected_features.first.feature->get_point()) * Geometry::scale_transform(inv_zoom));
+#else
                     (*it)->set_transform(m_volume_matrix * Geometry::translation_transform(m_selected_features.first.feature->get_point()) * Geometry::scale_transform(inv_zoom));
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
             }
         }
         if (m_selected_features.second.feature.has_value() && (!m_curr_feature.has_value() || *m_curr_feature != *m_selected_features.second.feature)) {
@@ -931,14 +1022,22 @@ void GLGizmoMeasure::on_render()
                 auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
                     [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SELECTION_2_ID; });
                 if (it != m_selection_raycasters.end())
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                    (*it)->set_transform(Geometry::translation_transform(m_selected_features.second.feature->get_point()) * Geometry::scale_transform(inv_zoom));
+#else
                     (*it)->set_transform(m_volume_matrix * Geometry::translation_transform(m_selected_features.second.feature->get_point()) * Geometry::scale_transform(inv_zoom));
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
             }
         }
 
         if (is_hovering_on_feature && m_curr_point_on_feature_position.has_value()) {
             if (m_hover_id != POINT_ID) {
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                const Transform3d matrix = Geometry::translation_transform(*m_curr_point_on_feature_position) * Geometry::scale_transform(inv_zoom);
+#else
                 const Vec3d position = TransformHelper::model_to_world(*m_curr_point_on_feature_position, m_volume_matrix);
                 const Transform3d matrix = Geometry::translation_transform(position) * Geometry::scale_transform(inv_zoom);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
                 set_matrix_uniforms(matrix);
                 const ColorRGBA color = hover_selection_color();
                 set_emission_uniform(color, true);
@@ -951,7 +1050,9 @@ void GLGizmoMeasure::on_render()
 
         if (old_cullface)
             glsafe(::glEnable(GL_CULL_FACE));
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     }
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
     render_dimensioning();
 }
@@ -968,6 +1069,24 @@ void GLGizmoMeasure::update_if_needed()
         }
     };
 
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+    auto do_update = [this, update_plane_models_cache](const std::vector<VolumeCacheItem>& volumes_cache, const Selection& selection) {
+        TriangleMesh composite_mesh;
+        for (const auto& vol : volumes_cache) {
+//          if (selection.is_single_full_instance() && vol.volume->is_modifier())
+//              continue;
+
+            TriangleMesh volume_mesh = vol.volume->mesh();
+            volume_mesh.transform(vol.instance->get_transformation().get_matrix() * vol.volume->get_transformation().get_matrix());
+            composite_mesh.merge(volume_mesh);
+        }
+
+        m_measuring.reset(new Measure::Measuring(composite_mesh.its));
+        update_plane_models_cache(m_measuring->get_mesh().its);
+        m_raycaster.update_from(m_measuring->get_mesh());
+        m_volumes_cache = volumes_cache;
+    };
+#else
     auto do_update = [this, update_plane_models_cache](const ModelObject* object, const ModelVolume* volume) {
         const indexed_triangle_set& its = (volume != nullptr) ? volume->mesh().its : object->volumes.front()->mesh().its;
         m_measuring.reset(new Measure::Measuring(its));
@@ -977,24 +1096,44 @@ void GLGizmoMeasure::update_if_needed()
         // Let's save what we calculated it from:
         m_volumes_matrices.clear();
         m_volumes_types.clear();
-        m_first_instance_scale  = Vec3d::Ones();
+        m_first_instance_scale = Vec3d::Ones();
         m_first_instance_mirror = Vec3d::Ones();
         if (object != nullptr) {
             for (const ModelVolume* vol : object->volumes) {
                 m_volumes_matrices.push_back(vol->get_matrix());
                 m_volumes_types.push_back(vol->type());
             }
-            m_first_instance_scale  = object->instances.front()->get_scaling_factor();
+            m_first_instance_scale = object->instances.front()->get_scaling_factor();
             m_first_instance_mirror = object->instances.front()->get_mirror();
         }
         m_old_model_object = object;
         m_old_model_volume = volume;
     };
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
     const Selection& selection = m_parent.get_selection();
     if (selection.is_empty())
         return;
 
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+    const Selection::IndicesList& idxs = selection.get_volume_idxs();
+    std::vector<VolumeCacheItem> volumes_cache;
+    volumes_cache.reserve(idxs.size());
+    for (unsigned int idx : idxs) {
+        const GLVolume* v = selection.get_volume(idx);
+        const ModelObject* obj = selection.get_model()->objects[v->object_idx()];
+        const ModelInstance* inst = obj->instances[v->instance_idx()];
+        const ModelVolume* vol = obj->volumes[v->volume_idx()];
+        const VolumeCacheItem item = { obj, inst, vol, inst->get_matrix() * vol->get_matrix() };
+        volumes_cache.emplace_back(item);
+    }
+
+    if (m_state != On || volumes_cache.empty())
+        return;
+
+    if (m_measuring == nullptr || m_volumes_cache != volumes_cache)
+        do_update(volumes_cache, selection);
+#else
     m_volume_matrix = selection.get_first_volume()->world_matrix();
 
     const ModelObject* mo = m_c->selection_info()->model_object();
@@ -1023,6 +1162,7 @@ void GLGizmoMeasure::update_if_needed()
             break;
         }
     }
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 }
 
 void GLGizmoMeasure::disable_scene_raycasters()
@@ -1142,6 +1282,62 @@ void GLGizmoMeasure::render_dimensioning()
                 const double ratio = new_value / old_value;
                 wxGetApp().plater()->take_snapshot(_L("Scale"));
 
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+                struct TrafoData
+                {
+                    double ratio;
+                    Vec3d old_pivot;
+                    Vec3d new_pivot;
+                    Transform3d scale_matrix;
+
+                    TrafoData(double ratio, const Vec3d& pivot) {
+                        this->ratio = ratio;
+                        this->scale_matrix = Geometry::scale_transform(ratio);
+                        this->old_pivot = pivot;
+                        this->new_pivot = { pivot.x(), pivot.y(), (this->scale_matrix * pivot).z() };
+                    }
+
+                    Vec3d transform(const Vec3d& point) const {
+                        return this->scale_matrix * (point - this->old_pivot) + this->new_pivot;
+                    }
+                };
+
+                auto scale_feature = [this](Measure::SurfaceFeature& feature, const TrafoData& trafo_data) {
+                    switch (feature.get_type())
+                    {
+                    case Measure::SurfaceFeatureType::Point:
+                    {
+                        feature = Measure::SurfaceFeature(trafo_data.transform(feature.get_point()));
+                        break;
+                    }
+                    case Measure::SurfaceFeatureType::Edge:
+                    {
+                        const auto [from, to] = feature.get_edge();
+                        const std::optional<Vec3d> extra = feature.get_extra_point();
+                        const std::optional<Vec3d> new_extra = extra.has_value() ? trafo_data.transform(*extra) : extra;
+                        feature = Measure::SurfaceFeature(Measure::SurfaceFeatureType::Edge, trafo_data.transform(from), trafo_data.transform(to), new_extra);
+                        break;
+                    }
+                    case Measure::SurfaceFeatureType::Circle:
+                    {
+                        const auto [center, radius, normal] = feature.get_circle();
+                        feature = Measure::SurfaceFeature(Measure::SurfaceFeatureType::Circle, trafo_data.transform(center), normal, std::nullopt, trafo_data.ratio * radius);
+                        break;
+                    }
+                    case Measure::SurfaceFeatureType::Plane:
+                    {
+                        const auto [idx, normal, origin] = feature.get_plane();
+                        feature = Measure::SurfaceFeature(Measure::SurfaceFeatureType::Plane, normal, trafo_data.transform(origin), std::nullopt, idx);
+                        break;
+                    }
+                    }
+                  };
+
+                const TrafoData trafo_data(ratio, m_parent.get_selection().get_bounding_box().center());
+                scale_feature(*m_selected_features.first.feature, trafo_data);
+                scale_feature(*m_selected_features.second.feature, trafo_data);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+
                 TransformationType type;
                 type.set_world();
                 type.set_relative();
@@ -1200,8 +1396,10 @@ void GLGizmoMeasure::render_dimensioning()
         assert(f1.get_type() == Measure::SurfaceFeatureType::Point && f2.get_type() == Measure::SurfaceFeatureType::Edge);
         std::pair<Vec3d, Vec3d> e = f2.get_edge();
         // Transform to world coordinates
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
         e.first  = TransformHelper::model_to_world(e.first, m_volume_matrix);
         e.second = TransformHelper::model_to_world(e.second, m_volume_matrix);
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
         const Vec3d v_proj = m_measurement_result.distance_infinite->to;
 
@@ -1482,15 +1680,21 @@ void GLGizmoMeasure::render_debug_dialog()
         {
         case Measure::SurfaceFeatureType::Point:
         {
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+            add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(item.feature->get_point()), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+#else
             const Vec3d position = m_volume_matrix * item.feature->get_point();
             add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(position), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
             break;
         }
         case Measure::SurfaceFeatureType::Edge:
         {
             auto [from, to] = item.feature->get_edge();
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
             from = m_volume_matrix * from;
             to = m_volume_matrix * to;
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
             add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(from), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             add_strings_row_to_table(*m_imgui, "m_pt2", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(to), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             break;
@@ -1498,8 +1702,10 @@ void GLGizmoMeasure::render_debug_dialog()
         case Measure::SurfaceFeatureType::Plane:
         {
             auto [idx, normal, origin] = item.feature->get_plane();
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
             origin = m_volume_matrix * origin;
             normal = m_volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
             add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(normal), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             add_strings_row_to_table(*m_imgui, "m_pt2", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(origin), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             add_strings_row_to_table(*m_imgui, "m_value", ImGuiWrapper::COL_ORANGE_LIGHT, format_double(idx), ImGui::GetStyleColorVec4(ImGuiCol_Text));
@@ -1508,9 +1714,13 @@ void GLGizmoMeasure::render_debug_dialog()
         case Measure::SurfaceFeatureType::Circle:
         {
             auto [center, radius, normal] = item.feature->get_circle();
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+            const Vec3d on_circle = center + radius * Measure::get_orthogonal(normal, true);
+#else
             const Vec3d on_circle = m_volume_matrix * (center + radius * Measure::get_orthogonal(normal, true));
             center = m_volume_matrix * center;
             normal = (m_volume_matrix.matrix().block(0, 0, 3, 3).inverse().transpose() * normal).normalized();
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
             radius = (on_circle - center).norm();
             add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(center), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             add_strings_row_to_table(*m_imgui, "m_pt2", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(normal), ImGui::GetStyleColorVec4(ImGuiCol_Text));

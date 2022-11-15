@@ -137,6 +137,9 @@ protected:
     virtual void on_update() = 0;
     CommonGizmosDataPool* get_pool() const { return m_common; }
 
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+    void validate() { m_is_valid = true; }
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
 private:
     bool m_is_valid = false;
@@ -241,6 +244,10 @@ public:
 
     const MeshRaycaster* raycaster() const { assert(m_raycasters.size() == 1); return m_raycasters.front().get(); }
     std::vector<const MeshRaycaster*> raycasters() const;
+
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+    void update_from(const TriangleMesh& mesh);
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
 protected:
     void on_update() override;

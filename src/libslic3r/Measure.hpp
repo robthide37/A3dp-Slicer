@@ -87,9 +87,11 @@ class MeasuringImpl;
 
 class Measuring {
 public:
-    // Construct the measurement object on a given its. The its must remain
-    // valid and unchanged during the whole lifetime of the object.
-    explicit Measuring(const indexed_triangle_set& its);
+    // Construct the measurement object on a given its.
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+    // The its must remain valid and unchanged during the whole lifetime of the object.
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+  explicit Measuring(const indexed_triangle_set& its);
     ~Measuring();
     
     // Return a reference to a list of all features identified on the its.
@@ -108,6 +110,11 @@ public:
     // Returns the surface features of the plane with the given index
     const std::vector<SurfaceFeature>& get_plane_features(unsigned int plane_id) const;
 
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+    // Returns the mesh used for measuring
+    const TriangleMesh& get_mesh() const;
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+
 private: 
     std::unique_ptr<MeasuringImpl> priv;
 };
@@ -119,7 +126,9 @@ struct DistAndPoints {
     Vec3d from;
     Vec3d to;
 
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     void transform(const Transform3d& trafo);
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 };
 
 struct AngleAndEdges {
@@ -132,7 +141,9 @@ struct AngleAndEdges {
     double radius;
     bool coplanar;
 
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     void transform(const Transform3d& trafo);
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
     static const AngleAndEdges Dummy;
 };
@@ -151,6 +162,7 @@ struct MeasurementResult {
         return angle.has_value() || distance_infinite.has_value() || distance_strict.has_value() || distance_xyz.has_value();
     }
 
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     void transform(const Transform3d& trafo) {
         if (angle.has_value())
             angle->transform(trafo);
@@ -161,6 +173,7 @@ struct MeasurementResult {
             distance_xyz = (distance_strict->to - distance_strict->from).cwiseAbs();
         }
     }
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 };
 
 // Returns distance/angle between two SurfaceFeatures.

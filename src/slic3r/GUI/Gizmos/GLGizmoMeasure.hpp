@@ -5,10 +5,16 @@
 #include "slic3r/GUI/GLModel.hpp"
 #include "slic3r/GUI/GUI_Utils.hpp"
 #include "libslic3r/Measure.hpp"
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+#include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
+#include "libslic3r/Model.hpp"
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
 namespace Slic3r {
 
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 class ModelVolume;
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
 enum class ModelVolumeType : int;
 
@@ -68,6 +74,23 @@ class GLGizmoMeasure : public GLGizmoBase
         }
     };
 
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+    struct VolumeCacheItem
+    {
+        const ModelObject* object{ nullptr };
+        const ModelInstance* instance{ nullptr };
+        const ModelVolume* volume{ nullptr };
+        Transform3d world_trafo;
+
+        bool operator == (const VolumeCacheItem& other) const {
+            return this->object == other.object && this->instance == other.instance && this->volume == other.volume &&
+                this->world_trafo.isApprox(other.world_trafo);
+        }
+    };
+
+    std::vector<VolumeCacheItem> m_volumes_cache;
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+
     EMode m_mode{ EMode::FeatureSelection };
     Measure::MeasurementResult m_measurement_result;
 
@@ -85,7 +108,13 @@ class GLGizmoMeasure : public GLGizmoBase
     };
     Dimensioning m_dimensioning;
 
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+    // Uses a standalone raycaster and not the shared one because of the
+    // difference in how the mesh is updated
+    CommonGizmosDataObjects::Raycaster m_raycaster;
+#else
     Transform3d m_volume_matrix{ Transform3d::Identity() };
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     std::vector<GLModel> m_plane_models_cache;
     std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
     std::vector<std::shared_ptr<SceneRaycasterItem>> m_selection_raycasters;
@@ -100,17 +129,21 @@ class GLGizmoMeasure : public GLGizmoBase
     std::vector<SceneRaycasterState> m_scene_raycasters;
 
     // These hold information to decide whether recalculation is necessary:
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     std::vector<Transform3d> m_volumes_matrices;
     std::vector<ModelVolumeType> m_volumes_types;
     Vec3d m_first_instance_scale{ Vec3d::Ones() };
     Vec3d m_first_instance_mirror{ Vec3d::Ones() };
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     float m_last_inv_zoom{ 0.0f };
     std::optional<Measure::SurfaceFeature> m_last_circle;
     int m_last_plane_idx{ -1 };
 
     bool m_mouse_left_down{ false }; // for detection left_up of this gizmo
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     const ModelObject* m_old_model_object{ nullptr };
     const ModelVolume* m_old_model_volume{ nullptr };
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
     Vec2d m_mouse_pos{ Vec2d::Zero() };
 
@@ -153,7 +186,9 @@ protected:
     bool on_is_activable() const override;
     void on_render() override;
     void on_set_state() override;
+#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     CommonGizmosDataID on_get_requirements() const override;
+#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
     virtual void on_render_input_window(float x, float y, float bottom_limit) override;
     virtual void on_register_raycasters_for_picking() override;
