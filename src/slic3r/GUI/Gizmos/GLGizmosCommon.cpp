@@ -327,6 +327,19 @@ const TriangleMesh* HollowedMesh::get_hollowed_interior() const
 }
 
 
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+void Raycaster::update_from(const TriangleMesh& mesh)
+{
+    std::vector<const TriangleMesh*> meshes = { &mesh };
+    if (meshes != m_old_meshes) {
+        wxBusyCursor wait;
+        m_raycasters.clear();
+        m_raycasters.emplace_back(new MeshRaycaster(std::make_shared<const TriangleMesh>(mesh)));
+        m_old_meshes = meshes;
+    }
+    validate();
+}
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
 
 void Raycaster::on_update()
