@@ -12,6 +12,11 @@ struct indexed_triangle_set;
 
 
 namespace Slic3r {
+
+#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+class TriangleMesh;
+#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
+
 namespace Measure {
 
 
