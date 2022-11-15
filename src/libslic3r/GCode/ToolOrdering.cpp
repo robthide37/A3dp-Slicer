@@ -14,8 +14,9 @@
 #include <cassert>
 #include <limits>
 
-#include <libslic3r.h>
+#include <boost/log/trivial.hpp>
 
+#include <libslic3r.h>
 
 namespace Slic3r {
 

@@ -1,4 +1,5 @@
 #include "Layer.hpp"
+#include <clipper/clipper_z.hpp>
 #include "ClipperUtils.hpp"
 #include "Print.hpp"
 #include "Fill/Fill.hpp"
@@ -97,14 +98,25 @@ static void connect_layer_slices(
     const ClipperLib_Z::PolyTree                    &polytree,
     const std::vector<std::pair<coord_t, coord_t>>  &intersections,
     const coord_t                                    offset_below,
-    const coord_t                                    offset_above,
-    const coord_t                                    offset_end)
+    const coord_t                                    offset_above
+#ifndef NDEBUG
+    , const coord_t                                    offset_end
+#endif // NDEBUG
+    )
 {
     class Visitor {
     public:
         Visitor(const std::vector<std::pair<coord_t, coord_t>> &intersections, 
-            Layer &below, Layer &above, const coord_t offset_below, const coord_t offset_above, const coord_t offset_end) :
-            m_intersections(intersections), m_below(below), m_above(above), m_offset_below(offset_below), m_offset_above(offset_above), m_offset_end(offset_end) {}
+            Layer &below, Layer &above, const coord_t offset_below, const coord_t offset_above
+#ifndef NDEBUG
+            , const coord_t offset_end
+#endif // NDEBUG
+            ) :
+            m_intersections(intersections), m_below(below), m_above(above), m_offset_below(offset_below), m_offset_above(offset_above)
+#ifndef NDEBUG
+            , m_offset_end(offset_end) 
+#endif // NDEBUG
+            {}
 
         void visit(const ClipperLib_Z::PolyNode &polynode)
         {
@@ -217,8 +229,14 @@ static void connect_layer_slices(
         Layer                                          &m_above;
         const coord_t                                   m_offset_below;
         const coord_t                                   m_offset_above;
+#ifndef NDEBUG
         const coord_t                                   m_offset_end;
-    } visitor(intersections, below, above, offset_below, offset_above, offset_end);
+#endif // NDEBUG
+    } visitor(intersections, below, above, offset_below, offset_above
+#ifndef NDEBUG
+        , offset_end
+#endif // NDEBUG
+    );
 
     for (int i = 0; i < polytree.ChildCount(); ++ i)
         visitor.visit(*polytree.Childs[i]);
@@ -261,7 +279,9 @@ void Layer::build_up_down_graph(Layer& below, Layer& above)
     ClipperLib_Z::Paths paths_below = expolygons_to_zpaths(below.lslices, paths_below_offset);
     coord_t             paths_above_offset = paths_below_offset + coord_t(below.lslices.size());
     ClipperLib_Z::Paths paths_above = expolygons_to_zpaths(above.lslices, paths_above_offset);
+#ifndef NDEBUG
     coord_t             paths_end = paths_above_offset + coord_t(above.lslices.size());
+#endif // NDEBUG
 
     class ZFill {
     public:
@@ -301,7 +321,11 @@ void Layer::build_up_down_graph(Layer& below, Layer& above)
     clipper.AddPaths(paths_above, ClipperLib_Z::ptClip, true);
     clipper.Execute(ClipperLib_Z::ctIntersection, result, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
 
-    connect_layer_slices(below, above, result, zfill.intersections(), paths_below_offset, paths_above_offset, paths_end);
+    connect_layer_slices(below, above, result, zfill.intersections(), paths_below_offset, paths_above_offset
+#ifndef NDEBUG
+        , paths_end
+#endif // NDEBUG
+        );
 }
 
 static inline bool layer_needs_raw_backup(const Layer *layer)
