@@ -289,14 +289,14 @@ void MeasuringImpl::extract_features()
             // point happened to be inside the segment. The discrimination of too small segments
             // will follow, so we need a complete picture before that.
             if (circles_idxs.size() > 1
-             && circles_idxs.back().second == angles.size()-1
+             && circles_idxs.back().second == (int)angles.size()-1
              && circles_idxs.front().first == 0) {
                 // Possibly the same circle. Check that the angle and length criterion holds along the combined segment.
                 bool same = true;
                 double last_len = -1.;
                 double last_angle = 0.;
                 for (int i=circles_idxs.back().first + 1; i != circles_idxs.front().second; ++i) {
-                    if (i == angles.size())
+                    if (i == (int)angles.size())
                         i = 1;
                     if (last_len == -1.) {
                         last_len = lengths[i];
@@ -345,12 +345,12 @@ void MeasuringImpl::extract_features()
             for (int i=int(circles_idxs.size())-1; i>=0; --i) {
                 const auto& [start, end] = circles_idxs[i];
                 int N = start >= 0
-                        ? end - start + (start == 0 && end == border.size()-1 ? 0 : 1) // last point is the same as first
+                        ? end - start + (start == 0 && end == (int)border.size()-1 ? 0 : 1) // last point is the same as first
                         : end + (border.size() + start);
                 if (N < 5) {
                     circles.erase(circles.begin() + i);
                     circles_idxs.erase(circles_idxs.begin() + i);
-                } else if (N <= 8 && start == 0 && end == border.size()-1) {
+                } else if (N <= 8 && start == 0 && end == (int)border.size()-1) {
                     // This is a regular 5-8 polygon. Add the edges as edges with a special
                     // point and remove the circle. Leave the indices in circles_idxs, so
                     // the edges are not picked up again later.
