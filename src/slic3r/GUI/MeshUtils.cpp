@@ -409,12 +409,6 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
     Vec3d direction;
     line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
 
-    if (rand()%100 == 0) {
-        int a=5;
-        int b=6;
-        int c=7;
-    }
-
     std::vector<AABBMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction);
 
     if (hits.empty())
