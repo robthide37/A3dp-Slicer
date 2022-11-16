@@ -120,27 +120,44 @@ static void connect_layer_slices(
 
         void visit(const ClipperLib_Z::PolyNode &polynode)
         {
+#ifndef NDEBUG
+            auto assert_intersection_valid = [this](int i, int j) {
+                assert(i != j);
+                if (i > j)
+                    std::swap(i, j);
+                assert(i >= m_offset_below);
+                assert(i < m_offset_above);
+                assert(j >= m_offset_above);
+                assert(j < m_offset_end);
+                return true;
+            };
+#endif // NDEBUG
             if (polynode.Contour.size() >= 3) {
+                // If there is an intersection point, it should indicate which contours (one from layer below, the other from layer above) intersect.
+                // Otherwise the contour is fully inside another contour.
                 int32_t i = 0, j = 0;
-                double  area = 0;
                 for (int icontour = 0; icontour <= polynode.ChildCount(); ++ icontour) {
-                    const ClipperLib_Z::Path &contour = icontour == 0 ? polynode.Contour : polynode.Childs[icontour - 1]->Contour;
+                    const bool                first   = icontour == 0;
+                    const ClipperLib_Z::Path &contour = first ? polynode.Contour : polynode.Childs[icontour - 1]->Contour;
                     if (contour.size() >= 3) {
-                        area = ClipperLib_Z::Area(contour);
-                        int32_t i = contour.front().z();
-                        int32_t j = i;
-                        if (i < 0) {
-                            std::tie(i, j) = m_intersections[-i - 1];
-                        } else {
-                            for (const ClipperLib_Z::IntPoint& pt : contour) {
-                                j = pt.z();
-                                if (j < 0) {
-                                    std::tie(i, j) = m_intersections[-j - 1];
-                                    goto end;
-                                }
-                                else if (i != j)
-                                    goto end;
+                        if (first) {
+                            i = contour.front().z();
+                            j = i;
+                            if (i < 0) {
+                                std::tie(i, j) = m_intersections[-i - 1];
+                                assert(assert_intersection_valid(i, j));
+                                goto end;
                             }
+                        }
+                        for (const ClipperLib_Z::IntPoint& pt : contour) {
+                            j = pt.z();
+                            if (j < 0) {
+                                std::tie(i, j) = m_intersections[-j - 1];
+                                assert(assert_intersection_valid(i, j));
+                                goto end;
+                            }
+                            else if (i != j)
+                                goto end;
                         }
                     }
                 }
@@ -175,23 +192,21 @@ static void connect_layer_slices(
                         }
                     }
                 } else {
+                    assert(assert_intersection_valid(i, j));
                     if (i > j)
                         std::swap(i, j);
-                    assert(i >= m_offset_below);
-                    assert(i < m_offset_above);
                     i -= m_offset_below;
-                    assert(j >= m_offset_above);
-                    assert(j < m_offset_end);
                     j -= m_offset_above;
                     found = true;
                 }
                 if (found) {
                     // Subtract area of holes from the area of outer contour.
+                    double area = ClipperLib_Z::Area(polynode.Contour);
                     for (int icontour = 0; icontour < polynode.ChildCount(); ++ icontour)
                         area -= ClipperLib_Z::Area(polynode.Childs[icontour]->Contour);
                     // Store the links and area into the contours.
                     LayerSlice::Links &links_below = m_below.lslices_ex[i].overlaps_above;
-                    LayerSlice::Links &links_above = m_above.lslices_ex[i].overlaps_below;
+                    LayerSlice::Links &links_above = m_above.lslices_ex[j].overlaps_below;
                     LayerSlice::Link key{ j };
                     auto it_below = std::lower_bound(links_below.begin(), links_below.end(), key, [](auto &l, auto &r){ return l.slice_idx < r.slice_idx; });
                     if (it_below != links_below.end() && it_below->slice_idx == j) {
