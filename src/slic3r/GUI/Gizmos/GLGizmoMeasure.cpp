@@ -396,7 +396,6 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
     else if (mouse_event.RightDown()) {
         // let the event pass through to allow panning/rotating the 3D scene
         if ((m_mode != EMode::CenterSelection && mouse_event.CmdDown()) || (m_mode == EMode::CenterSelection && m_hover_id != SELECTION_1_ID && m_hover_id != SELECTION_2_ID)) {
-            std::cout << "RightDown -> false\n";
             return false;
         }
 
