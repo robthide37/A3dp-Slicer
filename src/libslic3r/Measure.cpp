@@ -47,9 +47,7 @@ public:
     std::optional<SurfaceFeature> get_feature(size_t face_idx, const Vec3d& point) const;
     std::vector<std::vector<int>> get_planes_triangle_indices() const;
     const std::vector<SurfaceFeature>& get_plane_features(unsigned int plane_id) const;
-#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     const TriangleMesh& get_mesh() const;
-#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
 private:
     void update_planes();
@@ -57,11 +55,7 @@ private:
     
     std::vector<PlaneData> m_planes;
     std::vector<size_t>    m_face_to_plane;
-#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     TriangleMesh m_mesh;
-#else
-    const indexed_triangle_set& m_its;
-#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 };
 
 
@@ -70,11 +64,7 @@ private:
 
 
 MeasuringImpl::MeasuringImpl(const indexed_triangle_set& its)
-#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 : m_mesh(its)
-#else
-: m_its{its}
-#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 {
     update_planes();
     extract_features();
@@ -87,17 +77,10 @@ void MeasuringImpl::update_planes()
 
     // Now we'll go through all the facets and append Points of facets sharing the same normal.
     // This part is still performed in mesh coordinate system.
-#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     const size_t             num_of_facets = m_mesh.its.indices.size();
     m_face_to_plane.resize(num_of_facets, size_t(-1));
     const std::vector<Vec3f> face_normals = its_face_normals(m_mesh.its);
     const std::vector<Vec3i> face_neighbors = its_face_neighbors(m_mesh.its);
-#else
-    const size_t             num_of_facets  = m_its.indices.size();
-    m_face_to_plane.resize(num_of_facets, size_t(-1));
-    const std::vector<Vec3f> face_normals   = its_face_normals(m_its);
-    const std::vector<Vec3i> face_neighbors = its_face_neighbors(m_its);
-#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     std::vector<int>         facet_queue(num_of_facets, 0);
     int                      facet_queue_cnt = 0;
     const stl_normal*        normal_ptr      = nullptr;
@@ -146,11 +129,7 @@ void MeasuringImpl::update_planes()
     assert(std::none_of(m_face_to_plane.begin(), m_face_to_plane.end(), [](size_t val) { return val == size_t(-1); }));
 
     // Now we will walk around each of the planes and save vertices which form the border.
-#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     SurfaceMesh sm(m_mesh.its);
-#else
-    SurfaceMesh sm(m_its);
-#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
     for (int plane_id=0; plane_id < int(m_planes.size()); ++plane_id) {
         const auto& facets = m_planes[plane_id].facets;
         m_planes[plane_id].borders.clear();
@@ -532,12 +511,10 @@ const std::vector<SurfaceFeature>& MeasuringImpl::get_plane_features(unsigned in
     return m_planes[plane_id].surface_features;
 }
 
-#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 const TriangleMesh& MeasuringImpl::get_mesh() const
 {
     return this->m_mesh;
 }
-#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
 
 
@@ -579,12 +556,10 @@ const std::vector<SurfaceFeature>& Measuring::get_plane_features(unsigned int pl
     return priv->get_plane_features(plane_id);
 }
 
-#if ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 const TriangleMesh& Measuring::get_mesh() const
 {
     return priv->get_mesh();
 }
-#endif // ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
 const AngleAndEdges AngleAndEdges::Dummy = { 0.0, Vec3d::Zero(), { Vec3d::Zero(), Vec3d::Zero() }, { Vec3d::Zero(), Vec3d::Zero() }, 0.0, true };
 
@@ -1183,29 +1158,6 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
     
     return result;
 }
-
-#if !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
-void DistAndPoints::transform(const Transform3d& trafo) {
-    from = trafo * from;
-    to = trafo * to;
-    dist = (to - from).norm();
-}
-
-void AngleAndEdges::transform(const Transform3d& trafo) {
-    const Vec3d old_e1 = e1.second - e1.first;
-    const Vec3d old_e2 = e2.second - e2.first;
-    center = trafo * center;
-    e1.first = trafo * e1.first;
-    e1.second = trafo * e1.second;
-    e2.first = trafo * e2.first;
-    e2.second = trafo * e2.second;
-    angle = std::acos(std::clamp(Measure::edge_direction(e1).dot(Measure::edge_direction(e2)), -1.0, 1.0));
-    const Vec3d new_e1 = e1.second - e1.first;
-    const Vec3d new_e2 = e2.second - e2.first;
-    const double average_scale = 0.5 * (new_e1.norm() / old_e1.norm() + new_e2.norm() / old_e2.norm());
-    radius = average_scale * radius;
-}
-#endif // !ENABLE_GIZMO_MEASURE_WORLD_COORDINATES
 
 
 
