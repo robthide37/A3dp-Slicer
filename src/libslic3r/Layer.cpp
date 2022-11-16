@@ -175,18 +175,22 @@ static void connect_layer_slices(
                             if (lslice.bbox.contains(pt) && m_above.lslices[l].contains(pt)) {
                                 found = true;
                                 j = l;
+                                assert(i >= 0 && i < m_below.lslices_ex.size());
+                                assert(j >= 0 && j < m_above.lslices_ex.size());
                                 break;
                             }
                         }
                     } else {
                         // Index of an island above. Look-it up in the island below.
                         assert(j < m_offset_end);
-                        j -= m_offset_below;
+                        j -= m_offset_above;
                         for (int l = int(m_below.lslices_ex.size()) - 1; l >= 0; -- l) {
                             LayerSlice &lslice = m_below.lslices_ex[l];
                             if (lslice.bbox.contains(pt) && m_below.lslices[l].contains(pt)) {
                                 found = true;
                                 i = l;
+                                assert(i >= 0 && i < m_below.lslices_ex.size());
+                                assert(j >= 0 && j < m_above.lslices_ex.size());
                                 break;
                             }
                         }
@@ -197,6 +201,8 @@ static void connect_layer_slices(
                         std::swap(i, j);
                     i -= m_offset_below;
                     j -= m_offset_above;
+                    assert(i >= 0 && i < m_below.lslices_ex.size());
+                    assert(j >= 0 && j < m_above.lslices_ex.size());
                     found = true;
                 }
                 if (found) {
