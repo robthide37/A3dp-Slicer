@@ -27,6 +27,21 @@ static std::pair<Vec3d, double> get_center_and_radius(const std::vector<Vec3d>& 
     return std::make_pair(trafo.inverse() * Vec3d(circle.center.x(), circle.center.y(), z), circle.radius);
 }
 
+static std::array<Vec3d, 3> orthonormal_basis(const Vec3d& v)
+{
+    std::array<Vec3d, 3> ret;
+    ret[2] = v.normalized();
+    int index;
+    ret[2].maxCoeff(&index);
+    switch (index)
+    {
+    case 0: { ret[0] = Vec3d(ret[2].y(), -ret[2].x(), 0.0).normalized(); break; }
+    case 1: { ret[0] = Vec3d(0.0, ret[2].z(), -ret[2].y()).normalized(); break; }
+    case 2: { ret[0] = Vec3d(-ret[2].z(), 0.0, ret[2].x()).normalized(); break; }
+    }
+    ret[1] = ret[2].cross(ret[0]).normalized();
+    return ret;
+}
 
 
 
@@ -628,8 +643,8 @@ static AngleAndEdges angle_edge_edge(const std::pair<Vec3d, Vec3d>& e1, const st
 static AngleAndEdges angle_edge_plane(const std::pair<Vec3d, Vec3d>& e, const std::tuple<int, Vec3d, Vec3d>& p)
 {
     const auto& [idx, normal, origin] = p;
-    const Vec3d e1e2_unit = edge_direction(e);
-    if (are_parallel(e1e2_unit, normal) || are_perpendicular(e1e2_unit, normal))
+    Vec3d e1e2_unit = edge_direction(e);
+    if (are_perpendicular(e1e2_unit, normal))
         return AngleAndEdges::Dummy;
 
     // ensure the edge is pointing away from the intersection
@@ -641,8 +656,22 @@ static AngleAndEdges angle_edge_plane(const std::pair<Vec3d, Vec3d>& e, const st
     // then verify edge direction and revert it, if needed
     Vec3d e1 = e.first;
     Vec3d e2 = e.second;
-    if ((e1 - inters).squaredNorm() > (e2 - inters).squaredNorm())
+    if ((e1 - inters).squaredNorm() > (e2 - inters).squaredNorm()) {
         std::swap(e1, e2);
+        e1e2_unit = -e1e2_unit;
+    }
+
+    if (are_parallel(e1e2_unit, normal)) {
+        const std::array<Vec3d, 3> basis = orthonormal_basis(e1e2_unit);
+        const double radius = (0.5 * (e1 + e2) - inters).norm();
+        const Vec3d edge_on_plane_dir = (basis[1].dot(origin - inters) >= 0.0) ? basis[1] : -basis[1];
+        std::pair<Vec3d, Vec3d> edge_on_plane = std::make_pair(inters, inters + radius * edge_on_plane_dir);
+        if (!inters.isApprox(e1)) {
+            edge_on_plane.first  += radius * edge_on_plane_dir;
+            edge_on_plane.second += radius * edge_on_plane_dir;
+        }
+        return AngleAndEdges(0.5 * double(PI), inters, std::make_pair(e1, e2), edge_on_plane, radius, inters.isApprox(e1));
+    }
 
     const Vec3d e1e2 = e2 - e1;
     const double e1e2_len = e1e2.norm();
@@ -771,7 +800,8 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
     ///////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////
-    } else if (f1.get_type() == SurfaceFeatureType::Edge) {
+    }
+    else if (f1.get_type() == SurfaceFeatureType::Edge) {
         if (f2.get_type() == SurfaceFeatureType::Edge) {
             std::vector<DistAndPoints> distances;
 
@@ -898,21 +928,6 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
             const Vec3d D = c1 - c0;
 
             if (!are_parallel(n0, n1)) {
-                auto orthonormal_basis = [](const Vec3d& v) {
-                    std::array<Vec3d, 3> ret;
-                    ret[2] = v.normalized();
-                    int index;
-                    ret[2].maxCoeff(&index);
-                    switch (index)
-                    {
-                    case 0: { ret[0] = Vec3d(ret[2].y(), -ret[2].x(), 0.0).normalized(); break; }
-                    case 1: { ret[0] = Vec3d(0.0, ret[2].z(), -ret[2].y()).normalized(); break; }
-                    case 2: { ret[0] = Vec3d(-ret[2].z(), 0.0, ret[2].x()).normalized(); break; }
-                    }
-                    ret[1] = ret[2].cross(ret[0]).normalized();
-                    return ret;
-                };
-
                 // Get parameters for constructing the degree-8 polynomial phi.
                 const double one = 1.0;
                 const double two = 2.0;
