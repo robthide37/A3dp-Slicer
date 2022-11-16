@@ -16,7 +16,7 @@ SCENARIO("Medial Axis", "[ThinWalls]") {
         auto hole_in_square = Polygon::new_scale({ {140, 140}, {140, 160}, {160, 160}, {160, 140} });
         ExPolygon expolygon{ square, hole_in_square };
         WHEN("Medial axis is extracted") {
-            Polylines res = expolygon.medial_axis(scaled<double>(40.), scaled<double>(0.5));
+            Polylines res = expolygon.medial_axis(scaled<double>(0.5), scaled<double>(40.));
             THEN("medial axis of a square shape is a single path") {
                 REQUIRE(res.size() == 1);
             }
@@ -32,7 +32,7 @@ SCENARIO("Medial Axis", "[ThinWalls]") {
     GIVEN("narrow rectangle") {
         ExPolygon expolygon{ Polygon::new_scale({ {100, 100}, {120, 100}, {120, 200}, {100, 200} }) };
         WHEN("Medial axis is extracted") {
-            Polylines res = expolygon.medial_axis(scaled<double>(20.), scaled<double>(0.5));
+            Polylines res = expolygon.medial_axis(scaled<double>(0.5), scaled<double>(20.));
             THEN("medial axis of a narrow rectangle is a single line") {
                 REQUIRE(res.size() == 1);
             }
@@ -50,7 +50,7 @@ SCENARIO("Medial Axis", "[ThinWalls]") {
             {100, 200} 
         })};
         WHEN("Medial axis is extracted") {
-            Polylines res = expolygon.medial_axis(scaled<double>(1.), scaled<double>(0.5));
+            Polylines res = expolygon.medial_axis(scaled<double>(0.5), scaled<double>(1.));
             THEN("medial axis of a narrow rectangle with an extra vertex is still a single line") {
                 REQUIRE(res.size() == 1);
             }
@@ -81,7 +81,7 @@ SCENARIO("Medial Axis", "[ThinWalls]") {
             {1687689,4235755},{1218962,3499999},{827499,2748020},{482284,1920196},{219954,1088186},{31126,236479},{0,0},{1005754,0}
         }};
         WHEN("Medial axis is extracted") {
-            Polylines res = expolygon.medial_axis(scaled<double>(1.324888), scaled<double>(0.25));
+            Polylines res = expolygon.medial_axis(scaled<double>(0.25), scaled<double>(1.324888));
             THEN("medial axis of a semicircumference is a single line") {
                 REQUIRE(res.size() == 1);
             }
@@ -103,7 +103,7 @@ SCENARIO("Medial Axis", "[ThinWalls]") {
     GIVEN("narrow trapezoid") {
         ExPolygon expolygon{ Polygon::new_scale({ {100, 100}, {120, 100}, {112, 200}, {108, 200} }) };
         WHEN("Medial axis is extracted") {
-            Polylines res = expolygon.medial_axis(scaled<double>(20.), scaled<double>(0.5));
+            Polylines res = expolygon.medial_axis(scaled<double>(0.5), scaled<double>(20.));
             THEN("medial axis of a narrow trapezoid is a single line") {
                 REQUIRE(res.size() == 1);
             }
@@ -115,7 +115,7 @@ SCENARIO("Medial Axis", "[ThinWalls]") {
     GIVEN("L shape") {
         ExPolygon expolygon{ Polygon::new_scale({ {100, 100}, {120, 100}, {120, 180}, {200, 180}, {200, 200}, {100, 200}, }) };
         WHEN("Medial axis is extracted") {
-            Polylines res = expolygon.medial_axis(scaled<double>(20.), scaled<double>(0.5));
+            Polylines res = expolygon.medial_axis(scaled<double>(0.5), scaled<double>(20.));
             THEN("medial axis of an L shape is a single line") {
                 REQUIRE(res.size() == 1);
             }
@@ -134,7 +134,7 @@ SCENARIO("Medial Axis", "[ThinWalls]") {
             {-220815482,-37738966},{-221117540,-37738966},{-221117540,-51762024},{-203064906,-51762024},
         }};
         WHEN("Medial axis is extracted") {
-            Polylines res = expolygon.medial_axis(819998., 102499.75);
+            Polylines res = expolygon.medial_axis(102499.75, 819998.);
             THEN("medial axis is a single line") {
                 REQUIRE(res.size() == 1);
             }
@@ -147,7 +147,7 @@ SCENARIO("Medial Axis", "[ThinWalls]") {
     GIVEN("narrow triangle") {
         ExPolygon expolygon{ Polygon::new_scale({ {50, 100}, {1000, 102}, {50, 104} }) };
         WHEN("Medial axis is extracted") {
-            Polylines res = expolygon.medial_axis(scaled<double>(4.), scaled<double>(0.5));
+            Polylines res = expolygon.medial_axis(scaled<double>(0.5), scaled<double>(4.));
             THEN("medial axis of a narrow triangle is a single line") {
                 REQUIRE(res.size() == 1);
             }
@@ -159,7 +159,7 @@ SCENARIO("Medial Axis", "[ThinWalls]") {
     GIVEN("GH #2474") {
         ExPolygon expolygon{{ {91294454,31032190},{11294481,31032190},{11294481,29967810},{44969182,29967810},{89909960,29967808},{91294454,29967808} }};
         WHEN("Medial axis is extracted") {
-            Polylines res = expolygon.medial_axis(1871238, 500000);
+            Polylines res = expolygon.medial_axis(500000, 1871238);
             THEN("medial axis is a single line") {
                 REQUIRE(res.size() == 1);
             }

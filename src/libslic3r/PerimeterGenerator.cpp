@@ -920,7 +920,7 @@ void PerimeterGenerator::process_classic(
                         float(min_width / 2.));
                     // the maximum thickness of our thin wall area is equal to the minimum thickness of a single loop
                     for (ExPolygon &ex : expp)
-                        ex.medial_axis(ext_perimeter_width + ext_perimeter_spacing2, min_width, &thin_walls);
+                        ex.medial_axis(min_width, ext_perimeter_width + ext_perimeter_spacing2, &thin_walls);
                 }
                 if (params.spiral_vase && offsets.size() > 1) {
                 	// Remove all but the largest area polygon.
@@ -1066,7 +1066,7 @@ void PerimeterGenerator::process_classic(
             offset2_ex(gaps, - float(max / 2.), float(max / 2. + ClipperSafetyOffset)));
         ThickPolylines polylines;
         for (const ExPolygon &ex : gaps_ex)
-            ex.medial_axis(max, min, &polylines);
+            ex.medial_axis(min, max, &polylines);
         if (! polylines.empty()) {
 			ExtrusionEntityCollection gap_fill;
 			variable_width(polylines, erGapFill, params.solid_infill_flow, gap_fill.entities);

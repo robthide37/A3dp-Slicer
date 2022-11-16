@@ -206,12 +206,10 @@ void ExPolygon::simplify(double tolerance, ExPolygons* expolygons) const
     append(*expolygons, this->simplify(tolerance));
 }
 
-void
-ExPolygon::medial_axis(double max_width, double min_width, ThickPolylines* polylines) const
+void ExPolygon::medial_axis(double min_width, double max_width, ThickPolylines* polylines) const
 {
     // init helper object
-    Slic3r::Geometry::MedialAxis ma(max_width, min_width, this);
-    ma.lines = this->lines();
+    Slic3r::Geometry::MedialAxis ma(min_width, max_width, *this);
     
     // compute the Voronoi diagram and extract medial axis polylines
     ThickPolylines pp;
@@ -318,11 +316,10 @@ ExPolygon::medial_axis(double max_width, double min_width, ThickPolylines* polyl
     polylines->insert(polylines->end(), pp.begin(), pp.end());
 }
 
-void
-ExPolygon::medial_axis(double max_width, double min_width, Polylines* polylines) const
+void ExPolygon::medial_axis(double min_width, double max_width, Polylines* polylines) const
 {
     ThickPolylines tp;
-    this->medial_axis(max_width, min_width, &tp);
+    this->medial_axis(min_width, max_width, &tp);
     polylines->insert(polylines->end(), tp.begin(), tp.end());
 }
 

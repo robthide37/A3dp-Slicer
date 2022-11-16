@@ -1,4 +1,4 @@
-// Polygon offsetting using Voronoi diagram prodiced by boost::polygon.
+// Polygon offsetting using Voronoi diagram produced by boost::polygon.
 
 #ifndef slic3r_VoronoiOffset_hpp_
 #define slic3r_VoronoiOffset_hpp_

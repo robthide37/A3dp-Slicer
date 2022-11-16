@@ -70,10 +70,10 @@ public:
     Polygons simplify_p(double tolerance) const;
     ExPolygons simplify(double tolerance) const;
     void simplify(double tolerance, ExPolygons* expolygons) const;
-    void medial_axis(double max_width, double min_width, ThickPolylines* polylines) const;
-    void medial_axis(double max_width, double min_width, Polylines* polylines) const;
-    Polylines medial_axis(double max_width, double min_width) const 
-        { Polylines out; this->medial_axis(max_width, min_width, &out); return out; }
+    void medial_axis(double min_width, double max_width, ThickPolylines* polylines) const;
+    void medial_axis(double min_width, double max_width, Polylines* polylines) const;
+    Polylines medial_axis(double min_width, double max_width) const 
+        { Polylines out; this->medial_axis(min_width, max_width, &out); return out; }
     Lines lines() const;
 
     // Number of contours (outer contour with holes).

@@ -1918,7 +1918,6 @@ TEST_CASE("Voronoi skeleton", "[VoronoiSkeleton]")
     Lines lines = to_lines(poly);
     construct_voronoi(lines.begin(), lines.end(), &vd);
     Slic3r::Voronoi::annotate_inside_outside(vd, lines);
-    Slic3r::Voronoi::annotate_inside_outside(vd, lines);
     static constexpr double threshold_alpha = M_PI / 12.; // 30 degrees
     std::vector<Vec2d> skeleton_edges = Slic3r::Voronoi::skeleton_edges_rough(vd, lines, threshold_alpha);
 
