@@ -1115,7 +1115,7 @@ void GLGizmoMeasure::render_dimensioning()
                     }
                 };
 
-                auto scale_feature = [this](Measure::SurfaceFeature& feature, const TrafoData& trafo_data) {
+                auto scale_feature = [](Measure::SurfaceFeature& feature, const TrafoData& trafo_data) {
                     switch (feature.get_type())
                     {
                     case Measure::SurfaceFeatureType::Point:
@@ -1143,6 +1143,7 @@ void GLGizmoMeasure::render_dimensioning()
                         feature = Measure::SurfaceFeature(Measure::SurfaceFeatureType::Plane, normal, trafo_data.transform(origin), std::nullopt, idx);
                         break;
                     }
+                    default: { break; }
                     }
                   };
 
