@@ -772,6 +772,7 @@ void WipingExtrusions::ensure_perimeters_infills_order(const Print& print, const
 
                 for (const ExtrusionEntity* ee : layerm->fills()) { // iterate through all infill Collections
                     auto* fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
+                    assert(fill);
 
                     if (!is_overriddable(*fill, lt, print.config(), *object, region)
                      || is_entity_overridden(fill, copy) )
@@ -795,6 +796,7 @@ void WipingExtrusions::ensure_perimeters_infills_order(const Print& print, const
                 // Now the same for perimeters - see comments above for explanation:
                 for (const ExtrusionEntity* ee : layerm->perimeters()) { // iterate through all perimeter Collections
                     auto* fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
+                    assert(fill);
                     if (is_overriddable(*fill, lt, print.config(), *object, region) && ! is_entity_overridden(fill, copy))
                         set_extruder_override(fill, copy, (print.config().infill_first ? last_nonsoluble_extruder : first_nonsoluble_extruder), num_of_copies);
                 }

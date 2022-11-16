@@ -539,20 +539,36 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 		}
     }
 
-    //FIXME Don't copy thin fill extrusions into fills, just use these thin fill extrusions
-    // from the G-code export directly.
-#if 0
-    // add thin fill regions
-    // Unpacks the collection, creates multiple collections per path.
-    // The path type could be ExtrusionPath, ExtrusionLoop or ExtrusionEntityCollection.
-    // Why the paths are unpacked?
-	for (LayerRegion *layerm : m_regions)
-	    for (const ExtrusionEntity *thin_fill : layerm->thin_fills().entities) {
-	        ExtrusionEntityCollection &collection = *(new ExtrusionEntityCollection());
-	        layerm->m_fills.entities.push_back(&collection);
-	        collection.entities.push_back(thin_fill->clone());
-	    }
-#endif
+	for (LayerSlice &lslice : this->lslices_ex)
+		for (LayerIsland &island : lslice.islands) {
+			if (! island.thin_fills.empty()) {
+				// Copy thin fills into fills packed as a collection.
+				// Fills are always stored as collections, the rest of the pipeline (wipe into infill, G-code generator) relies on it.
+				LayerRegion				  &layerm	  = *this->get_region(island.perimeters.region());
+				ExtrusionEntityCollection &collection = *(new ExtrusionEntityCollection());
+				layerm.m_fills.entities.push_back(&collection);
+				collection.entities.reserve(island.thin_fills.size());
+				for (uint32_t fill_id : island.thin_fills)
+					collection.entities.push_back(layerm.thin_fills().entities[fill_id]->clone());
+				island.fills.push_back({ island.perimeters.region(), { uint32_t(layerm.m_fills.entities.size() - 1), uint32_t(layerm.m_fills.entities.size()) } });
+			}
+			// Sort the fills by region ID.
+			std::sort(island.fills.begin(), island.fills.end(), [](auto &l, auto &r){ return l.region() < r.region() || (l.region() == r.region() && *l.begin() < *r.begin()); });
+			// Compress continuous fill ranges of the same region.
+			{
+				size_t k = 0;
+				for (size_t i = 0; i < island.fills.size(); ++ i) {
+					uint32_t region_id = island.fills[i].region();
+					uint32_t begin     = *island.fills[i].begin();
+					uint32_t end       = *island.fills[i].end();
+					size_t   j         = i + 1;
+					for (; j < island.fills.size() && island.fills[j].region() == region_id && *island.fills[j].begin() == end; ++ j)
+						end = *island.fills[j].end();
+					island.fills[k ++] = { region_id, { begin, end } };
+				}
+				island.fills.erase(island.fills.begin() + k, island.fills.end());
+			}
+		}
 
 #ifndef NDEBUG
 	for (LayerRegion *layerm : m_regions)

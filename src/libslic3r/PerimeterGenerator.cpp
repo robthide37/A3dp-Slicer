@@ -114,7 +114,7 @@ ExtrusionMultiPath PerimeterGenerator::thick_polyline_to_multi_path(const ThickP
     return multi_path;
 }
 
-static void variable_width(const ThickPolylines &polylines, ExtrusionRole role, const Flow &flow, std::vector<ExtrusionEntity *> &out)
+static void variable_width_classic(const ThickPolylines &polylines, ExtrusionRole role, const Flow &flow, std::vector<ExtrusionEntity *> &out)
 {
     // This value determines granularity of adaptive width, as G-code does not allow
     // variable extrusion within a single move; this value shall only affect the amount
@@ -251,7 +251,7 @@ static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy
 
 using PerimeterGeneratorLoops = std::vector<PerimeterGeneratorLoop>;
 
-static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator::Parameters &params, const Polygons &lower_slices_polygons_cache, const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls)
+static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator::Parameters &params, const Polygons &lower_slices_polygons_cache, const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls)
 {
     // loops is an arrayref of ::Loop objects
     // turn each one into an ExtrusionLoop object
@@ -322,7 +322,7 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator::Parame
     
     // Append thin walls to the nearest-neighbor search (only for first iteration)
     if (! thin_walls.empty()) {
-        variable_width(thin_walls, erExternalPerimeter, params.ext_perimeter_flow, coll.entities);
+        variable_width_classic(thin_walls, erExternalPerimeter, params.ext_perimeter_flow, coll.entities);
         thin_walls.clear();
     }
     
@@ -342,7 +342,7 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator::Parame
         } else {
             const PerimeterGeneratorLoop &loop = loops[idx.first];
             assert(thin_walls.empty());
-            ExtrusionEntityCollection children = traverse_loops(params, lower_slices_polygons_cache, loop.children, thin_walls);
+            ExtrusionEntityCollection children = traverse_loops_classic(params, lower_slices_polygons_cache, loop.children, thin_walls);
             out.entities.reserve(out.entities.size() + children.entities.size() + 1);
             ExtrusionLoop *eloop = static_cast<ExtrusionLoop*>(coll.entities[idx.first]);
             coll.entities[idx.first] = nullptr;
@@ -623,7 +623,7 @@ void PerimeterGenerator::process_arachne(
     // Loops with the external thin walls
     ExtrusionEntityCollection  &out_loops,
     // Gaps without the thin walls
-    ExtrusionEntityCollection  &out_gap_fill,
+    ExtrusionEntityCollection  & /* out_gap_fill */,
     // Infills without the gap fills
     ExPolygons                 &out_fill_expolygons)
 {
@@ -1043,7 +1043,7 @@ void PerimeterGenerator::process_classic(
             }
         }
         // at this point, all loops should be in contours[0]
-        ExtrusionEntityCollection entities = traverse_loops(params, lower_slices_polygons_cache, contours.front(), thin_walls);
+        ExtrusionEntityCollection entities = traverse_loops_classic(params, lower_slices_polygons_cache, contours.front(), thin_walls);
         // if brim will be printed, reverse the order of perimeters so that
         // we continue inwards after having finished the brim
         // TODO: add test for perimeter order
@@ -1069,7 +1069,7 @@ void PerimeterGenerator::process_classic(
             ex.medial_axis(min, max, &polylines);
         if (! polylines.empty()) {
 			ExtrusionEntityCollection gap_fill;
-			variable_width(polylines, erGapFill, params.solid_infill_flow, gap_fill.entities);
+			variable_width_classic(polylines, erGapFill, params.solid_infill_flow, gap_fill.entities);
             /*  Make sure we don't infill narrow parts that are already gap-filled
                 (we only consider this surface's gaps to reduce the diff() complexity).
                 Growing actual extrusions ensures that gaps not filled by medial axis

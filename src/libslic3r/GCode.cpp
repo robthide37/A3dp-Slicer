@@ -2355,21 +2355,28 @@ void GCode::process_layer_single_object(
     ExtrusionEntitiesPtr temp_fill_extrusions;
     if (const Layer *layer = layer_to_print.object_layer; layer)
         for (const LayerSlice &lslice : layer->lslices_ex) {
-            auto extrude_infill_range = [&](const LayerRegion &layerm, const ExtrusionEntityCollection &fills, const ExtrusionRange fill_range, bool ironing) {
+            auto extrude_infill_range = [&](
+                const LayerRegion &layerm, const ExtrusionEntityCollection &fills,
+                LayerExtrusionRanges::const_iterator it_fill_ranges_begin, LayerExtrusionRanges::const_iterator it_fill_ranges_end, bool ironing) {
                 // PrintObjects own the PrintRegions, thus the pointer to PrintRegion would be unique to a PrintObject, they would not
                 // identify the content of PrintRegion accross the whole print uniquely. Translate to a Print specific PrintRegion.
                 const PrintRegion &region = print.get_print_region(layerm.region().print_region_id());
                 temp_fill_extrusions.clear();
-                for (uint32_t fill_id : fill_range)
-                    if (auto *eec = static_cast<ExtrusionEntityCollection*>(layerm.fills().entities[fill_id]);
-                        (eec->role() == erIroning) == ironing && shall_print_this_extrusion_collection(eec, region)) {
-                        if (eec->can_reverse())
-                            // Flatten the infill collection for better path planning.
-                            for (auto *ee : eec->entities)
-                                temp_fill_extrusions.emplace_back(ee);
-                        else
-                            temp_fill_extrusions.emplace_back(eec);
+                for (auto it_fill_range = it_fill_ranges_begin; it_fill_range != it_fill_ranges_end; ++ it_fill_range) {
+                    assert(it_fill_range->region() == it_fill_ranges_begin->region());
+                    for (uint32_t fill_id : *it_fill_range) {
+                        assert(dynamic_cast<ExtrusionEntityCollection*>(fills.entities[fill_id]));
+                        if (auto *eec = static_cast<ExtrusionEntityCollection*>(fills.entities[fill_id]);
+                            (eec->role() == erIroning) == ironing && shall_print_this_extrusion_collection(eec, region)) {
+                            if (eec->can_reverse())
+                                // Flatten the infill collection for better path planning.
+                                for (auto *ee : eec->entities)
+                                    temp_fill_extrusions.emplace_back(ee);
+                            else
+                                temp_fill_extrusions.emplace_back(eec);
+                        }
                     }
+                }
                 if (! temp_fill_extrusions.empty()) {
                     init_layer_delayed();
                     m_config.apply(region.config());
@@ -2395,7 +2402,8 @@ void GCode::process_layer_single_object(
                     // identify the content of PrintRegion accross the whole print uniquely. Translate to a Print specific PrintRegion.
                     const PrintRegion &region = print.get_print_region(layerm.region().print_region_id());
                     bool first = true;
-                    for (uint32_t perimeter_id : island.perimeters)
+                    for (uint32_t perimeter_id : island.perimeters) {
+                        assert(dynamic_cast<const ExtrusionEntityCollection*>(layerm.perimeters().entities[perimeter_id]));
                         if (const auto *eec = static_cast<const ExtrusionEntityCollection*>(layerm.perimeters().entities[perimeter_id]);
                             shall_print_this_extrusion_collection(eec, region)) {
                             // This may not apply to Arachne, but maybe the Arachne gap fill should disable reverse as well?
@@ -2408,15 +2416,15 @@ void GCode::process_layer_single_object(
                             for (const ExtrusionEntity *ee : *eec)
                                 gcode += this->extrude_entity(*ee, comment_perimeter, -1.);
                         }
+                    }
                 };
                 auto process_infill = [&]() {
-                    for (LayerExtrusionRange fill_range : island.fills) {
-                        const LayerRegion &layerm = *layer->get_region(fill_range.region());
-                        extrude_infill_range(layerm, layerm.fills(), fill_range, false /* normal extrusions, not ironing */);
-                    }
-                    {
-                        const LayerRegion &layerm = *layer->get_region(island.perimeters.region());
-                        extrude_infill_range(layerm, layerm.thin_fills(), island.thin_fills, false);
+                    for (auto it = island.fills.begin(); it != island.fills.end(); ++ it) {
+                        // Gather range of fill ranges with the same region.
+                        auto it_end = it;
+                        for (++ it_end; it_end != island.fills.end() && it->region() == it_end->region(); ++ it_end) ;
+                        const LayerRegion &layerm = *layer->get_region(it->region());
+                        extrude_infill_range(layerm, layerm.fills(), it, it_end, false /* normal extrusions, not ironing */);
                     }
                 };
                 if (print.config().infill_first) {
@@ -2432,9 +2440,12 @@ void GCode::process_layer_single_object(
             // First Ironing changes extrusion rate quickly, second single ironing may be done over multiple perimeter regions.
             // Ironing in a second phase is safer, but it may be less efficient.
             for (const LayerIsland &island : lslice.islands) {
-                for (LayerExtrusionRange fill_range : island.fills) {
-                    const LayerRegion &layerm = *layer->get_region(fill_range.region());
-                    extrude_infill_range(layerm, layerm.fills(), fill_range, true /* ironing, not normal extrusions */);
+                for (auto it = island.fills.begin(); it != island.fills.end(); ++ it) {
+                    // Gather range of fill ranges with the same region.
+                    auto it_end = it;
+                    for (++ it_end; it_end != island.fills.end() && it->region() == it_end->region(); ++ it_end) ;
+                    const LayerRegion &layerm = *layer->get_region(it->region());
+                    extrude_infill_range(layerm, layerm.fills(), it, it_end, true /* ironing, not normal extrusions */);
                 }
             }
         }
