@@ -821,7 +821,7 @@ void GLGizmoMeasure::on_render()
                     m_cylinder.model.set_color(colors.back());
                     m_cylinder.model.render();
                     if (update_raycasters_transform) {
-                        auto it = m_raycasters.find(EDGE_ID);
+                      auto it = m_raycasters.find(EDGE_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
                             it->second->set_transform(edge_matrix);
                     }
@@ -830,15 +830,12 @@ void GLGizmoMeasure::on_render()
             }
             case Measure::SurfaceFeatureType::Plane:
             {
-                // no need to render the plane in case it is rendered with the same color as the volume in the 3D scene
-                if (colors.front() != m_parent.get_selection().get_first_volume()->render_color) {
-                    const auto& [idx, normal, pt] = feature.get_plane();
-                    assert(idx < m_plane_models_cache.size());
-                    set_matrix_uniforms(Transform3d::Identity());
-                    set_emission_uniform(colors.front(), hover);
-                    m_plane_models_cache[idx].set_color(colors.front());
-                    m_plane_models_cache[idx].render();
-                }
+                const auto& [idx, normal, pt] = feature.get_plane();
+                assert(idx < m_plane_models_cache.size());
+                set_matrix_uniforms(Transform3d::Identity());
+                set_emission_uniform(colors.front(), hover);
+                m_plane_models_cache[idx].set_color(colors.front());
+                m_plane_models_cache[idx].render();
                 if (update_raycasters_transform) {
                     auto it = m_raycasters.find(PLANE_ID);
                     if (it != m_raycasters.end() && it->second != nullptr)

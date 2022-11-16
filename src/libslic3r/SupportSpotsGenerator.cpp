@@ -1231,13 +1231,13 @@ struct LayerCurlingEstimator
 
             if (fabs(dist_from_prev_layer) < 2.0f * flow_width) {
                 const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
-                current_line.malformation += 0.85 * nearest_line.malformation;
+                current_line.malformation += 0.9 * nearest_line.malformation;
             }
             if (dist_from_prev_layer > min_malformation_dist && dist_from_prev_layer < max_malformation_dist) {
-                float factor = std::abs(dist_from_prev_layer - (max_malformation_dist + min_malformation_dist) * 0.5) /
-                               (max_malformation_dist - min_malformation_dist);
+                float factor = 0.5f + 0.5f * std::abs(dist_from_prev_layer - (max_malformation_dist + min_malformation_dist) * 0.5) /
+                                          (max_malformation_dist - min_malformation_dist);
                 malformation_acc.add_distance(current_line.len);
-                current_line.malformation += l->height * factor * (2.0f + 3.0f * (malformation_acc.max_curvature / PI));
+                current_line.malformation += l->height * factor * (1.5f + 3.0f * (malformation_acc.max_curvature / PI));
                 current_line.malformation = std::min(current_line.malformation, float(l->height * params.max_malformation_factor));
             } else {
                 malformation_acc.reset();
