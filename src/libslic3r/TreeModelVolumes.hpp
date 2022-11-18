@@ -366,6 +366,9 @@ private:
             return max_layer;
         }
 
+        // For debugging purposes, sorted by layer index, then by radius.
+        [[nodiscard]] std::vector<std::pair<RadiusLayerPair, std::reference_wrapper<const Polygons>>> sorted() const;
+
     private:
         RadiusLayerPolygonCacheData data;
         mutable std::mutex          mutex;

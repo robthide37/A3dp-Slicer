@@ -291,6 +291,42 @@ void TreeModelVolumes::precalculate(const coord_t max_layer)
 
 //    m_precalculated = true;
     BOOST_LOG_TRIVIAL(info) << "Precalculating collision took" << dur_col << " ms. Precalculating avoidance took " << dur_avo << " ms.";
+
+#if 0
+    // Paint caches into SVGs:
+    auto paint_cache_into_SVGs = [this](const RadiusLayerPolygonCache &cache, std::string_view name) {
+        const std::vector<std::pair<RadiusLayerPair, std::reference_wrapper<const Polygons>>> sorted = cache.sorted();
+        static constexpr const std::string_view colors[] = {
+            "red", "green", "blue", "magenta", "orange"
+        };
+        static constexpr const size_t num_colors = sizeof(colors) / sizeof(colors[0]);
+        for (size_t i = 0; i < sorted.size();) {
+            // Find range of cache items with the same layer index.
+            size_t j = i;
+            for (++ j; j < sorted.size() && sorted[i].first.second == sorted[j].first.second; ++ j) ;
+            // Collect expolygons in reverse order (largest to smallest).
+            std::vector<std::pair<Slic3r::ExPolygons, SVG::ExPolygonAttributes>> expolygons_with_attributes;
+            for (int k = int(j - 1); k >= int(i); -- k) {
+                std::string legend = format("radius-%1%", unscaled<float>(sorted[k].first.first));
+                expolygons_with_attributes.push_back({ union_ex(sorted[k].second), SVG::ExPolygonAttributes(legend, std::string(colors[(k - int(i)) % num_colors]), 1.) });
+            }
+            // Render the range of per radius collision polygons into a common SVG.
+            SVG::export_expolygons(debug_out_path("treesupport_cache-%s-%d.svg", name.data(), sorted[i].first.second), expolygons_with_attributes);
+            i = j;
+        }
+    };
+    paint_cache_into_SVGs(m_collision_cache,                    "collision_cache");
+    paint_cache_into_SVGs(m_collision_cache_holefree,           "collision_cache_holefree");
+    paint_cache_into_SVGs(m_avoidance_cache,                    "avoidance_cache");
+    paint_cache_into_SVGs(m_avoidance_cache_slow,               "avoidance_cache_slow");
+    paint_cache_into_SVGs(m_avoidance_cache_to_model,           "avoidance_cache_to_model");
+    paint_cache_into_SVGs(m_avoidance_cache_to_model_slow,      "avoidance_cache_to_model_slow");
+    paint_cache_into_SVGs(m_placeable_areas_cache,              "placable_areas_cache");
+    paint_cache_into_SVGs(m_avoidance_cache_holefree,           "avoidance_cache_holefree");
+    paint_cache_into_SVGs(m_avoidance_cache_holefree_to_model,  "avoidance_cache_holefree_to_model");
+    paint_cache_into_SVGs(m_wall_restrictions_cache,            "wall_restrictions_cache");
+    paint_cache_into_SVGs(m_wall_restrictions_cache_min,        "wall_restrictions_cache_min");
+#endif
 }
 
 const Polygons& TreeModelVolumes::getCollision(const coord_t orig_radius, LayerIndex layer_idx, bool min_xy_dist) const
@@ -780,6 +816,16 @@ coord_t TreeModelVolumes::ceilRadius(const coord_t radius) const
             out = out * SUPPORT_TREE_EXPONENTIAL_FACTOR;
         }
     }
+    return out;
+}
+
+// For debugging purposes, sorted by layer index, then by radius.
+std::vector<std::pair<TreeModelVolumes::RadiusLayerPair, std::reference_wrapper<const Polygons>>> TreeModelVolumes::RadiusLayerPolygonCache::sorted() const
+{
+    std::vector<std::pair<RadiusLayerPair, std::reference_wrapper<const Polygons>>> out;
+    for (auto it = this->data.begin(); it != this->data.end(); ++ it)
+        out.emplace_back(it->first, it->second);
+    std::sort(out.begin(), out.end(), [](auto &l, auto &r){ return l.first.second < r.first.second || (l.first.second == r.first.second) && l.first.first < r.first.first; });
     return out;
 }
 

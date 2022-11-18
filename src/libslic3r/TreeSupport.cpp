@@ -3728,10 +3728,10 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         for (size_t layer_idx = 0; layer_idx < move_bounds.size(); ++layer_idx) {
             Polygons polys;
             for (auto& area : move_bounds[layer_idx])
-                append(polys, area->influence_area);
+                append(polys, area.influence_area);
             if (auto begin = move_bounds[layer_idx].begin(); begin != move_bounds[layer_idx].end())
                 SVG::export_expolygons(debug_out_path("treesupport-initial_areas-%d.svg", layer_idx),
-                    { { { union_ex(volumes.getWallRestriction(config.getCollisionRadius((*begin)->state), layer_idx, (*begin)->state.use_min_xy_dist)) },
+                    { { { union_ex(volumes.getWallRestriction(config.getCollisionRadius(begin->state), layer_idx, begin->state.use_min_xy_dist)) },
                         { "wall_restricrictions", "gray", 0.5f } },
                       { { union_ex(polys) }, { "parent", "red",  "black", "", scaled<coord_t>(0.1f), 0.5f } } });
         }
