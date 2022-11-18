@@ -99,9 +99,11 @@ void Polygon::douglas_peucker(double tolerance)
     this->points = std::move(p);
 }
 
-// this only works on CCW polygons as CW will be ripped out by Clipper's simplify_polygons()
 Polygons Polygon::simplify(double tolerance) const
 {
+    // Works on CCW polygons only, CW contour will be reoriented to CCW by Clipper's simplify_polygons()!
+    assert(this->is_counter_clockwise());
+
     // repeat first point at the end in order to apply Douglas-Peucker
     // on the whole polygon
     Points points = this->points;
@@ -112,13 +114,6 @@ Polygons Polygon::simplify(double tolerance) const
     Polygons pp;
     pp.push_back(p);
     return simplify_polygons(pp);
-}
-
-void Polygon::simplify(double tolerance, Polygons &polygons) const
-{
-    Polygons pp = this->simplify(tolerance);
-    polygons.reserve(polygons.size() + pp.size());
-    polygons.insert(polygons.end(), pp.begin(), pp.end());
 }
 
 // Only call this on convex polygons or it will return invalid results
@@ -560,6 +555,27 @@ void remove_collinear(Polygons &polys)
 {
 	for (Polygon &poly : polys)
 		remove_collinear(poly);
+}
+
+Polygons polygons_simplify(const Polygons &source_polygons, double tolerance)
+{
+    Polygons out;
+    out.reserve(source_polygons.size());
+    for (const Polygon &source_polygon : source_polygons) {
+        // Run Douglas / Peucker simplification algorithm on an open polyline (by repeating the first point at the end of the polyline),
+        Points simplified = MultiPoint::_douglas_peucker(to_polyline(source_polygon).points, tolerance);
+        // then remove the last (repeated) point.
+        simplified.pop_back();
+        // Simplify the decimated contour by ClipperLib.
+        bool ccw = ClipperLib::Area(simplified) > 0.;
+        for (Points &path : ClipperLib::SimplifyPolygons(ClipperUtils::SinglePathProvider(simplified), ClipperLib::pftNonZero)) {
+            if (! ccw)
+                // ClipperLib likely reoriented negative area contours to become positive. Reverse holes back to CW.
+                std::reverse(path.begin(), path.end());
+            out.emplace_back(std::move(path));
+        }
+    }
+    return out;
 }
 
 // Do polygons match? If they match, they must have the same topology,

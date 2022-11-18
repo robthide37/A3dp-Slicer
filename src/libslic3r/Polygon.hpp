@@ -67,8 +67,8 @@ public:
     bool on_boundary(const Point &point, double eps) const
         { return (this->point_projection(point) - point).cast<double>().squaredNorm() < eps * eps; }
 
+    // Works on CCW polygons only, CW contour will be reoriented to CCW by Clipper's simplify_polygons()!
     Polygons simplify(double tolerance) const;
-    void simplify(double tolerance, Polygons &polygons) const;
     void densify(float min_length, std::vector<float>* lengths = nullptr);
     void triangulate_convex(Polygons* polygons) const;
     Point centroid() const;
@@ -148,14 +148,7 @@ inline void polygons_append(Polygons &dst, Polygons &&src)
     }
 }
 
-inline Polygons polygons_simplify(const Polygons &polys, double tolerance)
-{
-	Polygons out;
-	out.reserve(polys.size());
-	for (const Polygon &p : polys)
-		polygons_append(out, p.simplify(tolerance));
-	return out;
-}
+Polygons polygons_simplify(const Polygons &polys, double tolerance);
 
 inline void polygons_rotate(Polygons &polys, double angle)
 {
@@ -216,18 +209,22 @@ inline Lines to_lines(const Polygons &polys)
     return lines;
 }
 
-inline Polylines to_polylines(const Polygons &polys)
+inline Polyline to_polyline(const Polygon &polygon)
 {
-    Polylines polylines;
-    polylines.assign(polys.size(), Polyline());
-    size_t idx = 0;
-    for (Polygons::const_iterator it = polys.begin(); it != polys.end(); ++ it) {
-        Polyline &pl = polylines[idx ++];
-        pl.points = it->points;
-        pl.points.push_back(it->points.front());
-    }
-    assert(idx == polylines.size());
-    return polylines;
+    Polyline out;
+    out.points.reserve(polygon.size() + 1);
+    out.points.assign(polygon.points.begin(), polygon.points.end());
+    out.points.push_back(polygon.points.front());
+    return out;
+}
+
+inline Polylines to_polylines(const Polygons &polygons)
+{
+    Polylines out;
+    out.reserve(polygons.size());
+    for (const Polygon &polygon : polygons)
+        out.emplace_back(to_polyline(polygon));
+    return out;
 }
 
 inline Polylines to_polylines(Polygons &&polys)
