@@ -399,6 +399,13 @@ void PrintConfigDef::init_fff_params()
 
     // Maximum extruder temperature, bumped to 1500 to support printing of glass.
     const int max_temp = 1500;
+    def = this->add("avoid_curled_filament_during_travels", coBool);
+    def->label = L("Avoid curled filament during travels");
+    def->tooltip = L("Plan travel moves such that the extruder avoids areas where filament may be curled up. "
+                   "This is mostly happening on steeper rounded overhangs and may cause crash or borken print. "
+                   "This feature slows down both the print and the G-code generation.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("avoid_crossing_perimeters", coBool);
     def->label = L("Avoid crossing perimeters");
@@ -795,6 +802,13 @@ void PrintConfigDef::init_fff_params()
                    "is supported.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("extra_perimeters_on_overhangs", coBool);
+    def->label = L("Extra perimeters on overhangs");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Create additional perimeter paths over steep overhangs and areas where bridges cannot be anchored. ");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("extruder", coInt);
     def->gui_type = ConfigOptionDef::GUIType::i_enum_open;

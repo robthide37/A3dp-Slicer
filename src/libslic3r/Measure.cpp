@@ -4,6 +4,7 @@
 
 #include "libslic3r/Geometry/Circle.hpp"
 #include "libslic3r/SurfaceMesh.hpp"
+#include <numeric>
 
 #include <numeric>
 
@@ -12,7 +13,6 @@ namespace Measure {
 
 
 constexpr double feature_hover_limit = 0.5; // how close to a feature the mouse must be to highlight it
-constexpr double edge_endpoint_limit = 0.5; // how close to an edge endpoint the mouse ...
 
 static std::pair<Vec3d, double> get_center_and_radius(const std::vector<Vec3d>& border, int start_idx, int end_idx, const Transform3d& trafo)
 {
@@ -341,32 +341,9 @@ void MeasuringImpl::extract_features()
             }
             circles_lengths.clear(); // no longer needed, make it obvious
 
-            // Some of the "circles" may actually be polygons (5-8 vertices). We want them
-            // detected as edges, but also to remember the center and save it into those edges.
-            // We will add all such edges manually and delete the detected circles, leaving it
-            // in circles_idxs so they are not picked again.
-            assert(circles.size() == circles_idxs.size());
-            for (int i=circles.size()-1; i>=0; --i) {
-                if (circles_idxs[i].first == 0 && circles_idxs[i].second == border.size()-1) {
-                    int N = circles_idxs[i].second - circles_idxs[i].first;
-                    if (N <= 8) {
-                        if (N >= 5) { // polygon = 5,6,7,8 vertices
-                            const Vec3d center = std::get<0>(circles[i].get_circle());
-                            for (int j=(int)circles_idxs[i].first + 1; j<=(int)circles_idxs[i].second; ++j)
-                                edges.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
-                                    border[j - 1], border[j], std::make_optional(center)));
-                        } else {
-                            // This will be handled just like a regular edge (squares, triangles).
-                            circles_idxs.erase(circles_idxs.begin() + i);  
-                        }
-                        circles.erase(circles.begin() + i);
-                    }
-                }
-            }
-
             // Anything under 5 vertices shall not be considered a circle.
             assert(circles_idxs.size() == circles.size());
-            for (int i=0; i<int(circles_idxs.size()); ++i) {
+            for (int i=int(circles_idxs.size())-1; i>=0; --i) {
                 const auto& [start, end] = circles_idxs[i];
                 int N = start >= 0
                         ? end - start + (start == 0 && end == border.size()-1 ? 0 : 1) // last point is the same as first
@@ -374,7 +351,15 @@ void MeasuringImpl::extract_features()
                 if (N < 5) {
                     circles.erase(circles.begin() + i);
                     circles_idxs.erase(circles_idxs.begin() + i);
-                    --i;
+                } else if (N <= 8 && start == 0 && end == border.size()-1) {
+                    // This is a regular 5-8 polygon. Add the edges as edges with a special
+                    // point and remove the circle. Leave the indices in circles_idxs, so
+                    // the edges are not picked up again later.
+                    const Vec3d center = std::get<0>(circles[i].get_circle());
+                    for (int j=1; j<=end; ++j)
+                        edges.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
+                            border[j - 1], border[j], std::make_optional(center)));
+                    circles.erase(circles.begin() + i);
                 }
             }
 
@@ -469,6 +454,8 @@ std::optional<SurfaceFeature> MeasuringImpl::get_feature(size_t face_idx, const 
     MeasurementResult res;
     SurfaceFeature point_sf(point);
 
+    assert(plane.surface_features.empty() || plane.surface_features.back().get_type() == SurfaceFeatureType::Plane);
+
     for (size_t i=0; i<plane.surface_features.size() - 1; ++i) {
         // The -1 is there to prevent measuring distance to the plane itself,
         // which is needless and relatively expensive.
@@ -486,9 +473,12 @@ std::optional<SurfaceFeature> MeasuringImpl::get_feature(size_t face_idx, const 
         const SurfaceFeature& f = plane.surface_features[closest_feature_idx];
         if (f.get_type() == SurfaceFeatureType::Edge) {
             // If this is an edge, check if we are not close to the endpoint. If so,
-            // we will include the endpoint as well.
-            constexpr double limit_sq = edge_endpoint_limit * edge_endpoint_limit;
+            // we will include the endpoint as well. Close = 10% of the lenghth of
+            // the edge, clamped between 0.025 and 0.5 mm.
             const auto& [sp, ep] = f.get_edge();
+            double len_sq = (ep-sp).squaredNorm();
+            double limit_sq = std::max(0.025*0.025, std::min(0.5*0.5, 0.1 * 0.1 * len_sq));
+
             if ((point-sp).squaredNorm() < limit_sq)
                 return std::make_optional(SurfaceFeature(sp));
             if ((point-ep).squaredNorm() < limit_sq)

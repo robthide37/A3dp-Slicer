@@ -31,6 +31,7 @@ add_executable(${_TEST_NAME}_tests
     test_timeutils.cpp
     test_indexed_triangle_set.cpp
     test_astar.cpp
+	test_jump_point_search.cpp
     ../libnest2d/printer_parts.cpp
 	)
 

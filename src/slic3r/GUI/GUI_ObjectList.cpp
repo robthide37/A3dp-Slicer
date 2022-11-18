@@ -216,9 +216,7 @@ ObjectList::ObjectList(wxWindow* parent) :
     Bind(wxEVT_DATAVIEW_ITEM_DROP_POSSIBLE, &ObjectList::OnDropPossible,    this);
     Bind(wxEVT_DATAVIEW_ITEM_DROP,          &ObjectList::OnDrop,            this);
 
-#ifdef __WXMSW__
     Bind(wxEVT_DATAVIEW_ITEM_EDITING_STARTED, &ObjectList::OnEditingStarted,  this);
-#endif /* __WXMSW__ */
     Bind(wxEVT_DATAVIEW_ITEM_EDITING_DONE,    &ObjectList::OnEditingDone,     this);
 
     Bind(wxEVT_DATAVIEW_ITEM_VALUE_CHANGED, &ObjectList::ItemValueChanged,  this);
@@ -1866,12 +1864,10 @@ bool ObjectList::del_subobject_item(wxDataViewItem& item)
 
     // If last volume item with warning was deleted, unmark object item
     if (type & itVolume) {
-        add_volumes_to_object_in_list(obj_idx);
         const std::string& icon_name = get_warning_icon_name(object(obj_idx)->get_object_stl_stats());
         m_objects_model->UpdateWarningIcon(parent, icon_name);
     }
-    else
-        m_objects_model->Delete(item);
+    m_objects_model->Delete(item);
 
     update_info_items(obj_idx);
 
@@ -3033,7 +3029,7 @@ bool ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& it
             if (!del_subobject_from_object(item->obj_idx, item->sub_obj_idx, item->type))
                 continue;
             if (item->type&itVolume) {
-                add_volumes_to_object_in_list(item->obj_idx);
+                m_objects_model->Delete(m_objects_model->GetItemByVolumeId(item->obj_idx, item->sub_obj_idx));
                 ModelObject* obj = object(item->obj_idx);
                 if (obj->volumes.size() == 1) {
                     wxDataViewItem parent = m_objects_model->GetItemById(item->obj_idx);
@@ -4621,17 +4617,19 @@ void ObjectList::ItemValueChanged(wxDataViewEvent &event)
     }
 }
 
+void ObjectList::OnEditingStarted(wxDataViewEvent &event)
+{
+    m_is_editing_started = true;
 #ifdef __WXMSW__
 // Workaround for entering the column editing mode on Windows. Simulate keyboard enter when another column of the active line is selected.
 // Here the last active column is forgotten, so when leaving the editing mode, the next mouse click will not enter the editing mode of the newly selected column.
-void ObjectList::OnEditingStarted(wxDataViewEvent &event)
-{
 	m_last_selected_column = -1;
-}
 #endif //__WXMSW__
+}
 
 void ObjectList::OnEditingDone(wxDataViewEvent &event)
 {
+    m_is_editing_started = false;
     if (event.GetColumn() != colName)
         return;
 

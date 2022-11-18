@@ -7,6 +7,9 @@
 #include "GCode/PrintExtents.hpp"
 #include "GCode/Thumbnails.hpp"
 #include "GCode/WipeTower.hpp"
+#include "Point.hpp"
+#include "Polygon.hpp"
+#include "PrintConfig.hpp"
 #include "ShortestPath.hpp"
 #include "Print.hpp"
 #include "Thread.hpp"
@@ -2157,6 +2160,14 @@ LayerResult GCode::process_layer(
         Skirt::make_skirt_loops_per_extruder_1st_layer(print, layer_tools, m_skirt_done) :
         Skirt::make_skirt_loops_per_extruder_other_layers(print, layer_tools, m_skirt_done);
 
+    if (this->config().avoid_curled_filament_during_travels) {
+        m_avoid_curled_filaments.clear();
+        for (const ObjectLayerToPrint &layer_to_print : layers) {
+            m_avoid_curled_filaments.add_obstacles(layer_to_print.object_layer, Point(scaled(this->origin())));
+            m_avoid_curled_filaments.add_obstacles(layer_to_print.support_layer, Point(scaled(this->origin())));
+        }
+    }
+
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
     for (unsigned int extruder_id : layer_tools.extruders)
     {
@@ -2987,6 +2998,12 @@ std::string GCode::travel_to(const Point &point, ExtrusionRole role, std::string
         This is expressed in print coordinates, so it will need to be translated by
         this->origin in order to get G-code coordinates.  */
     Polyline travel { this->last_pos(), point };
+
+    if (this->config().avoid_curled_filament_during_travels) {
+        Point scaled_origin = Point(scaled(this->origin()));
+        travel              = m_avoid_curled_filaments.find_path(this->last_pos() + scaled_origin, point + scaled_origin);
+        travel.translate(-scaled_origin);
+    }
 
     // check whether a straight travel move would need retraction
     bool needs_retraction             = this->needs_retraction(travel, role);

@@ -26,8 +26,8 @@ struct Params {
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
     const float bridge_distance = 12.0f; //mm
     const float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / (1 + this factor * (curvature / PI) )
-    const float overhang_angle_deg = 80.0f;
-    const std::pair<float,float> malformation_angle_span_deg = std::pair<float, float> { 45.0f, 80.0f };
+    const std::pair<float,float> malformation_overlap_factor = std::pair<float, float> { 0.50, -0.1 };
+    const float max_malformation_factor = 10.0f;
 
     const float min_distance_between_support_points = 3.0f; //mm
     const float support_points_interface_radius = 1.5f; // mm
@@ -72,11 +72,17 @@ struct Issues {
     std::vector<SupportPoint> support_points;
 };
 
+struct Malformations {
+    std::vector<Lines> layers; //for each layer
+};
+
 // std::vector<size_t> quick_search(const PrintObject *po, const Params &params);
-Issues full_search(const PrintObject *po, const Params &params);
+std::tuple<Issues, Malformations> full_search(const PrintObject *po, const Params &params);
 
-}
+void estimate_supports_malformations(SupportLayerPtrs &layers, float supports_flow_width, const Params &params);
+void estimate_malformations(LayerPtrs &layers, const Params &params);
 
+} // namespace SupportSpotsGenerator
 }
 
 #endif /* SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_ */
