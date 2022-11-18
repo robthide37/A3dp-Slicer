@@ -1786,10 +1786,23 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     ImGui::Separator();
     const ImGuiTableFlags flags = ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersH;
     if (ImGui::BeginTable("Selection", 2, flags)) {
-        add_strings_row_to_table(*m_imgui, _u8L("Selection") + " 1:", ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR), m_selected_features.first.feature.has_value() ?
-            m_selected_features.first.source : _u8L("None"), ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR));
-        add_strings_row_to_table(*m_imgui, _u8L("Selection") + " 2:", ImGuiWrapper::to_ImVec4(SELECTED_2ND_COLOR), m_selected_features.second.feature.has_value() ?
-            m_selected_features.second.source : _u8L("None"), ImGuiWrapper::to_ImVec4(SELECTED_2ND_COLOR));
+        auto format_item_text = [use_inches, &units](const SelectedFeatures::Item& item) {
+          std::string txt = item.feature.has_value() ? item.source : _u8L("None");
+          if (item.feature.has_value() && item.feature->get_type() == Measure::SurfaceFeatureType::Circle) {
+              auto [center, radius, normal] = item.feature->get_circle();
+              const Vec3d on_circle = center + radius * Measure::get_orthogonal(normal, true);
+              radius = (on_circle - center).norm();
+              if (use_inches)
+                  radius = ObjectManipulation::mm_to_in * radius;
+              txt += " (" + _u8L("Diameter:") + " " + format_double(2.0 * radius) + units + ")";
+          }
+          return txt;
+        };
+
+        add_strings_row_to_table(*m_imgui, _u8L("Selection") + " 1:", ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR), format_item_text(m_selected_features.first),
+          ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR));
+        add_strings_row_to_table(*m_imgui, _u8L("Selection") + " 2:", ImGuiWrapper::to_ImVec4(SELECTED_2ND_COLOR), format_item_text(m_selected_features.second),
+          ImGuiWrapper::to_ImVec4(SELECTED_2ND_COLOR));
         ImGui::EndTable();
     }
 
