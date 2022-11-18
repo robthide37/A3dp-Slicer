@@ -1003,7 +1003,7 @@ void GLGizmoMeasure::render_dimensioning()
     if (shader == nullptr)
         return;
 
-    auto point_point = [this, shader](const Vec3d& v1, const Vec3d& v2, float distance) {
+    auto point_point = [this, &shader](const Vec3d& v1, const Vec3d& v2, float distance) {
         if ((v2 - v1).squaredNorm() < 0.000001 || distance < 0.001f)
             return;
 
@@ -1033,12 +1033,45 @@ void GLGizmoMeasure::render_dimensioning()
 
         const Transform3d ss_to_ndc_matrix = TransformHelper::ndc_to_ss_matrix_inverse(viewport);
 
+#if ENABLE_GL_CORE_PROFILE
+        if (OpenGLManager::get_gl_info().is_core_profile()) {
+            shader->stop_using();
+
+            shader = wxGetApp().get_shader("dashed_thick_lines");
+            if (shader == nullptr)
+                return;
+
+            shader->start_using();
+            shader->set_uniform("projection_matrix", Transform3d::Identity());
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 1.0f);
+            shader->set_uniform("gap_size", 0.0f);
+        }
+        else
+#endif // ENABLE_GL_CORE_PROFILE
+            glsafe(::glLineWidth(2.0f));
+
         // stem
         shader->set_uniform("view_model_matrix", overlap ?
             ss_to_ndc_matrix * Geometry::translation_transform(v1ss_3) * q12ss * Geometry::translation_transform(-2.0 * TRIANGLE_HEIGHT * Vec3d::UnitX()) * Geometry::scale_transform({ v12ss_len + 4.0 * TRIANGLE_HEIGHT, 1.0f, 1.0f }) :
             ss_to_ndc_matrix * Geometry::translation_transform(v1ss_3) * q12ss * Geometry::scale_transform({ v12ss_len, 1.0f, 1.0f }));
         m_dimensioning.line.set_color(ColorRGBA::WHITE());
         m_dimensioning.line.render();
+
+#if ENABLE_GL_CORE_PROFILE
+        if (OpenGLManager::get_gl_info().is_core_profile()) {
+            shader->stop_using();
+
+            shader = wxGetApp().get_shader("flat");
+            if (shader == nullptr)
+                return;
+
+            shader->start_using();
+        }
+        else
+#endif // ENABLE_GL_CORE_PROFILE
+            glsafe(::glLineWidth(1.0f));
 
         // arrow 1
         shader->set_uniform("view_model_matrix", overlap ?
@@ -1248,7 +1281,7 @@ void GLGizmoMeasure::render_dimensioning()
         }
     };
 
-    auto arc_edge_edge = [this, shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2, double radius = 0.0) {
+    auto arc_edge_edge = [this, &shader](const Measure::SurfaceFeature& f1, const Measure::SurfaceFeature& f2, double radius = 0.0) {
         assert(f1.get_type() == Measure::SurfaceFeatureType::Edge && f2.get_type() == Measure::SurfaceFeatureType::Edge);
         if (!m_measurement_result.angle.has_value())
             return;
@@ -1290,11 +1323,44 @@ void GLGizmoMeasure::render_dimensioning()
             m_dimensioning.arc.init_from(std::move(init_data));
         }
 
-        // arc
         const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_GL_CORE_PROFILE
+        if (OpenGLManager::get_gl_info().is_core_profile()) {
+            shader->stop_using();
+
+            shader = wxGetApp().get_shader("dashed_thick_lines");
+            if (shader == nullptr)
+                return;
+
+            shader->start_using();
+            shader->set_uniform("projection_matrix", Transform3d::Identity());
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 1.0f);
+            shader->set_uniform("gap_size", 0.0f);
+        }
+        else
+#endif // ENABLE_GL_CORE_PROFILE
+          glsafe(::glLineWidth(2.0f));
+
+        // arc
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center));
         m_dimensioning.arc.render();
+
+#if ENABLE_GL_CORE_PROFILE
+        if (OpenGLManager::get_gl_info().is_core_profile()) {
+            shader->stop_using();
+
+            shader = wxGetApp().get_shader("flat");
+            if (shader == nullptr)
+                return;
+
+            shader->start_using();
+        }
+        else
+#endif // ENABLE_GL_CORE_PROFILE
+          glsafe(::glLineWidth(1.0f));
 
         // arrows
         auto render_arrow = [this, shader, &camera, &normal, &center, &e1_unit, draw_radius, step, resolution](unsigned int endpoint_id) {
