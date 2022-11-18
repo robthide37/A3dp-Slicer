@@ -1068,8 +1068,17 @@ void GLGizmoMeasure::render_dimensioning()
             ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 1.0f, 1.0f });
             m_imgui->begin(std::string("distance"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
+            ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
             ImGui::AlignTextToFramePadding();
-            m_imgui->text(curr_value_str + " " + units);
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            const ImVec2 pos = ImGui::GetCursorScreenPos();
+            const std::string txt = curr_value_str + " " + units;
+            ImVec2 txt_size = ImGui::CalcTextSize(txt.c_str());
+            const ImGuiStyle& style = ImGui::GetStyle();
+            draw_list->AddRectFilled({ pos.x - style.FramePadding.x, pos.y + style.FramePadding.y }, { pos.x + txt_size.x + 2.0f * style.FramePadding.x , pos.y + txt_size.y + 2.0f * style.FramePadding.y },
+              ImGuiWrapper::to_ImU32(ColorRGBA(0.5f, 0.5f, 0.5f, 0.5f)));
+            ImGui::SetCursorScreenPos({ pos.x + style.FramePadding.x, pos.y });
+            m_imgui->text(txt);
             ImGui::SameLine();
             if (m_imgui->image_button(ImGui::SliderFloatEditBtnIcon, _L("Edit to scale"))) {
                 m_editing_distance = true;
@@ -1342,7 +1351,16 @@ void GLGizmoMeasure::render_dimensioning()
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
         m_imgui->begin(_L("##angle"), ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
-        m_imgui->text(format_double(Geometry::rad2deg(angle)) + "°");
+        ImGui::AlignTextToFramePadding();
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        const ImVec2 pos = ImGui::GetCursorScreenPos();
+        const std::string txt = format_double(Geometry::rad2deg(angle)) + "°";
+        ImVec2 txt_size = ImGui::CalcTextSize(txt.c_str());
+        const ImGuiStyle& style = ImGui::GetStyle();
+        draw_list->AddRectFilled({ pos.x - style.FramePadding.x, pos.y + style.FramePadding.y }, { pos.x + txt_size.x + 2.0f * style.FramePadding.x , pos.y + txt_size.y + 2.0f * style.FramePadding.y },
+          ImGuiWrapper::to_ImU32(ColorRGBA(0.5f, 0.5f, 0.5f, 0.5f)));
+        ImGui::SetCursorScreenPos({ pos.x + style.FramePadding.x, pos.y });
+        m_imgui->text(txt);
         m_imgui->end();
         ImGui::PopStyleVar();
     };
