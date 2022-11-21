@@ -5174,6 +5174,8 @@ bool GLCanvas3D::_init_main_toolbar()
     item.left.toggable = true;
     item.left.render_callback = [this](float left, float right, float, float) {
         if (m_canvas != nullptr) {
+            if (!m_canvas->HasFocus())
+                m_canvas->SetFocus();
             if (_render_search_list(0.5f * (left + right)))
                 _deactivate_search_toolbar_item();
         }

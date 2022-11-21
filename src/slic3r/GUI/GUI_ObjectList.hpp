@@ -176,6 +176,7 @@ private:
     // Workaround for entering the column editing mode on Windows. Simulate keyboard enter when another column of the active line is selected.
     int 	    m_last_selected_column = -1;
 #endif /* __MSW__ */
+    bool        m_is_editing_started{ false };
 
 #if 0
     SettingsFactory::Bundle m_freq_settings_fff;
@@ -406,6 +407,8 @@ public:
     void apply_volumes_order();
     bool has_paint_on_segmentation();
 
+    bool is_editing() const { return m_is_editing_started; }
+
 private:
 #ifdef __WXOSX__
 //    void OnChar(wxKeyEvent& event);
@@ -419,10 +422,8 @@ private:
     bool can_drop(const wxDataViewItem& item) const ;
 
     void ItemValueChanged(wxDataViewEvent &event);
-#ifdef __WXMSW__
     // Workaround for entering the column editing mode on Windows. Simulate keyboard enter when another column of the active line is selected.
 	void OnEditingStarted(wxDataViewEvent &event);
-#endif /* __WXMSW__ */
     void OnEditingDone(wxDataViewEvent &event);
 };
 

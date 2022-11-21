@@ -23,8 +23,9 @@ class GLGizmoMeasure : public GLGizmoBase
 {
     enum class EMode : unsigned char
     {
-        BasicSelection,
-        ExtendedSelection
+        FeatureSelection,
+        PointSelection,
+        CenterSelection
     };
 
     struct SelectedFeatures
@@ -67,7 +68,7 @@ class GLGizmoMeasure : public GLGizmoBase
         }
     };
 
-    EMode m_mode{ EMode::BasicSelection };
+    EMode m_mode{ EMode::FeatureSelection };
     Measure::MeasurementResult m_measurement_result;
 
     std::unique_ptr<Measure::Measuring> m_measuring; // PIMPL
@@ -114,6 +115,7 @@ class GLGizmoMeasure : public GLGizmoBase
     Vec2d m_mouse_pos{ Vec2d::Zero() };
 
     KeyAutoRepeatFilter m_ctrl_kar_filter;
+    KeyAutoRepeatFilter m_shift_kar_filter;
 
     SelectedFeatures m_selected_features;
     bool m_pending_scale{ false };

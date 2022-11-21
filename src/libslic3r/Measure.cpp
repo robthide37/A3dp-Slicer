@@ -339,32 +339,9 @@ void MeasuringImpl::extract_features()
             }
             circles_lengths.clear(); // no longer needed, make it obvious
 
-            // Some of the "circles" may actually be polygons (5-8 vertices). We want them
-            // detected as edges, but also to remember the center and save it into those edges.
-            // We will add all such edges manually and delete the detected circles, leaving it
-            // in circles_idxs so they are not picked again.
-            assert(circles.size() == circles_idxs.size());
-            for (int i=circles.size()-1; i>=0; --i) {
-                if (circles_idxs[i].first == 0 && circles_idxs[i].second == border.size()-1) {
-                    int N = circles_idxs[i].second - circles_idxs[i].first;
-                    if (N <= 8) {
-                        if (N >= 5) { // polygon = 5,6,7,8 vertices
-                            const Vec3d center = std::get<0>(circles[i].get_circle());
-                            for (int j=(int)circles_idxs[i].first + 1; j<=(int)circles_idxs[i].second; ++j)
-                                edges.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
-                                    border[j - 1], border[j], std::make_optional(center)));
-                        } else {
-                            // This will be handled just like a regular edge (squares, triangles).
-                            circles_idxs.erase(circles_idxs.begin() + i);  
-                        }
-                        circles.erase(circles.begin() + i);
-                    }
-                }
-            }
-
             // Anything under 5 vertices shall not be considered a circle.
             assert(circles_idxs.size() == circles.size());
-            for (int i=0; i<int(circles_idxs.size()); ++i) {
+            for (int i=int(circles_idxs.size())-1; i>=0; --i) {
                 const auto& [start, end] = circles_idxs[i];
                 int N = start >= 0
                         ? end - start + (start == 0 && end == border.size()-1 ? 0 : 1) // last point is the same as first
@@ -372,7 +349,15 @@ void MeasuringImpl::extract_features()
                 if (N < 5) {
                     circles.erase(circles.begin() + i);
                     circles_idxs.erase(circles_idxs.begin() + i);
-                    --i;
+                } else if (N <= 8 && start == 0 && end == border.size()-1) {
+                    // This is a regular 5-8 polygon. Add the edges as edges with a special
+                    // point and remove the circle. Leave the indices in circles_idxs, so
+                    // the edges are not picked up again later.
+                    const Vec3d center = std::get<0>(circles[i].get_circle());
+                    for (int j=1; j<=end; ++j)
+                        edges.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
+                            border[j - 1], border[j], std::make_optional(center)));
+                    circles.erase(circles.begin() + i);
                 }
             }
 

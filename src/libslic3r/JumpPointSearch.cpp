@@ -25,6 +25,7 @@
 
 namespace Slic3r {
 
+// execute fn for each pixel on the line. If fn returns false, terminate the iteration
 template<typename PointFn> void dda(coord_t x0, coord_t y0, coord_t x1, coord_t y1, const PointFn &fn)
 {
     coord_t dx    = abs(x1 - x0);
@@ -39,7 +40,7 @@ template<typename PointFn> void dda(coord_t x0, coord_t y0, coord_t x1, coord_t 
     dy *= 2;
 
     for (; n > 0; --n) {
-        fn(x, y);
+        if (!fn(x, y)) return;
 
         if (error > 0) {
             x += x_inc;
@@ -55,11 +56,11 @@ template<typename PointFn> void dda(coord_t x0, coord_t y0, coord_t x1, coord_t 
 // may call the fn on the same coordiantes multiple times!
 template<typename PointFn> void double_dda_with_offset(coord_t x0, coord_t y0, coord_t x1, coord_t y1, const PointFn &fn)
 {
-    Vec2d normal = Point{y1 - y0, x1 - x0}.cast<double>().normalized();
-    normal.x() = ceil(normal.x());
-    normal.y() = ceil(normal.y());
-    Point start_offset = Point(x0,y0) + (normal).cast<coord_t>();
-    Point end_offset = Point(x1,y1) + (normal).cast<coord_t>();
+    Vec2d normal       = Point{y1 - y0, x1 - x0}.cast<double>().normalized();
+    normal.x()         = ceil(normal.x());
+    normal.y()         = ceil(normal.y());
+    Point start_offset = Point(x0, y0) + (normal).cast<coord_t>();
+    Point end_offset   = Point(x1, y1) + (normal).cast<coord_t>();
 
     dda(x0, y0, x1, y1, fn);
     dda(start_offset.x(), start_offset.y(), end_offset.x(), end_offset.y(), fn);
@@ -95,7 +96,7 @@ private:
 
     bool is_jump_point(CellPositionType pos, CellPositionType forward_dir) const
     {
-        if (abs(forward_dir.x()) + abs(forward_dir.y()) == 2) { 
+        if (abs(forward_dir.x()) + abs(forward_dir.y()) == 2) {
             // diagonal
             CellPositionType horizontal_check_dir = CellPositionType{forward_dir.x(), 0};
             CellPositionType vertical_check_dir   = CellPositionType{0, forward_dir.y()};
@@ -169,8 +170,11 @@ public:
 
     float goal_heuristic(Node n) const { return n.position == target ? -1.f : (target - n.position).template cast<double>().norm(); }
 
-    size_t unique_id(Node n) const { return (static_cast<size_t>(uint16_t(n.position.x())) << 16) + static_cast<size_t>(uint16_t(n.position.y())); }
-    
+    size_t unique_id(Node n) const
+    {
+        return (static_cast<size_t>(uint16_t(n.position.x())) << 16) + static_cast<size_t>(uint16_t(n.position.y()));
+    }
+
     const std::vector<CellPositionType> all_directions{{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}};
 };
 
@@ -189,6 +193,7 @@ void JPSPathFinder::add_obstacles(const Lines &obstacles)
         obstacle_min.x() = std::min(obstacle_min.x(), x);
         obstacle_min.y() = std::min(obstacle_min.y(), y);
         inpassable.insert(Pixel{x, y});
+        return true;
     };
 
     for (const Line &l : obstacles) {
@@ -200,36 +205,13 @@ void JPSPathFinder::add_obstacles(const Lines &obstacles)
 
 void JPSPathFinder::add_obstacles(const Layer *layer, const Point &global_origin)
 {
-    if (layer != nullptr) { this->print_z = layer->print_z; }
+    if (layer == nullptr) return;
 
-    auto  store_obstacle = [&](coord_t x, coord_t y) { 
-        obstacle_max.x() = std::max(obstacle_max.x(), x);
-        obstacle_max.y() = std::max(obstacle_max.y(), y);
-        obstacle_min.x() = std::min(obstacle_min.x(), x);
-        obstacle_min.y() = std::min(obstacle_min.y(), y);
-        inpassable.insert(Pixel{x, y}); 
-        };
+    this->print_z = layer->print_z;
     Lines obstacles;
-    for (size_t step = 0; step < 3; step++) {
-        if (layer != nullptr) {
-            obstacles.insert(obstacles.end(), layer->malformed_lines.begin(), layer->malformed_lines.end());
-            layer = layer->lower_layer;
-        } else {
-            break;
-        }
-    }
-
-    for (const Line &l : obstacles) {
-        Pixel start = pixelize(l.a + global_origin);
-        Pixel end   = pixelize(l.b + global_origin);
-        double_dda_with_offset(start.x(), start.y(), end.x(), end.y(), store_obstacle);
-    }
-#ifdef DEBUG_FILES
-    ::Slic3r::SVG svg(debug_out_path(("obstacles_jps" + std::to_string(print_z) + "_" + std::to_string(rand() % 1000)).c_str()).c_str(),
-                      get_extents(obstacles));
-    svg.draw(obstacles);
-    svg.Close();
-#endif
+    obstacles.reserve(layer->malformed_lines.size());
+    for (const Line &l : layer->malformed_lines) { obstacles.push_back(Line{l.a + global_origin, l.b + global_origin}); }
+    add_obstacles(obstacles);
 }
 
 Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
@@ -238,21 +220,40 @@ Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
     Pixel end   = pixelize(p1);
     if (inpassable.empty() || (start - end).cast<float>().norm() < 3.0) { return Polyline{p0, p1}; }
 
-    BoundingBox search_box({start,end,obstacle_max,obstacle_min});
-    search_box.max += Pixel(1,1);
-    search_box.min -= Pixel(1,1);
+    if (inpassable.find(start) != inpassable.end()) {
+        dda(start.x(), start.y(), end.x(), end.y(), [&](coord_t x, coord_t y) {
+            if (inpassable.find(Pixel(x, y)) == inpassable.end() || start == end) { // new start not found yet, and xy passable
+                start = Pixel(x, y);
+                return false;
+            }
+            return true;
+        });
+    }
 
+    if (inpassable.find(end) != inpassable.end()) {
+        dda(end.x(), end.y(), start.x(), start.y(), [&](coord_t x, coord_t y) {
+            if (inpassable.find(Pixel(x, y)) == inpassable.end() || start == end) { // new start not found yet, and xy passable
+                end = Pixel(x, y);
+                return false;
+            }
+            return true;
+        });
+    }
 
-    BoundingBox bounding_square(Points{start,end});
-    bounding_square.max += Pixel(5,5);
-    bounding_square.min -= Pixel(5,5);
-    coord_t bounding_square_size = 2*std::max(bounding_square.size().x(),bounding_square.size().y());
+    BoundingBox search_box({start, end, obstacle_max, obstacle_min});
+    search_box.max += Pixel(1, 1);
+    search_box.min -= Pixel(1, 1);
+
+    BoundingBox bounding_square(Points{start, end});
+    bounding_square.max += Pixel(5, 5);
+    bounding_square.min -= Pixel(5, 5);
+    coord_t bounding_square_size = 2 * std::max(bounding_square.size().x(), bounding_square.size().y());
     bounding_square.max.x() += (bounding_square_size - bounding_square.size().x()) / 2;
     bounding_square.min.x() -= (bounding_square_size - bounding_square.size().x()) / 2;
     bounding_square.max.y() += (bounding_square_size - bounding_square.size().y()) / 2;
     bounding_square.min.y() -= (bounding_square_size - bounding_square.size().y()) / 2;
 
-    // Intersection - limit the search box to a square area around the start and end, to fasten the path searching 
+    // Intersection - limit the search box to a square area around the start and end, to fasten the path searching
     search_box.max = search_box.max.cwiseMin(bounding_square.max);
     search_box.min = search_box.min.cwiseMax(bounding_square.min);
 
@@ -283,9 +284,7 @@ Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
             closest_qnode = astar_cache[closest_qnode].parent;
         }
     } else {
-        for (const auto& node : out_nodes) {
-            out_path.push_back(node.position);
-        }
+        for (const auto &node : out_nodes) { out_path.push_back(node.position); }
         out_path.push_back(start);
     }
 
@@ -335,7 +334,11 @@ Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
             if (i - index_of_last_stored_point < 2) continue;
             bool passable       = true;
             auto store_obstacle = [&](coord_t x, coord_t y) {
-                if (Pixel(x, y) != start && Pixel(x, y) != end && inpassable.find(Pixel(x, y)) != inpassable.end()) { passable = false; };
+                if (Pixel(x, y) != start && Pixel(x, y) != end && inpassable.find(Pixel(x, y)) != inpassable.end()) {
+                    passable = false;
+                    return false;
+                }
+                return true;
             };
             dda(tmp_path.back().x(), tmp_path.back().y(), out_path[i].x(), out_path[i].y(), store_obstacle);
             if (!passable) {
