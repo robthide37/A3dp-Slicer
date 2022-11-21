@@ -864,7 +864,9 @@ void GLGizmoMeasure::on_render()
     };
 
     auto hover_selection_color = [this]() {
-        return (!m_selected_features.first.feature.has_value() || *m_curr_feature == *m_selected_features.first.feature) ? SELECTED_1ST_COLOR : SELECTED_2ND_COLOR;
+      return ((m_mode == EMode::PointSelection && !m_selected_features.first.feature.has_value()) ||
+              (m_mode != EMode::PointSelection && (!m_selected_features.first.feature.has_value() || *m_curr_feature == *m_selected_features.first.feature))) ?
+          SELECTED_1ST_COLOR : SELECTED_2ND_COLOR;
     };
 
     auto hovering_color = [this, hover_selection_color, &selection]() {
@@ -1728,11 +1730,14 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 }
                 else {
                     if (m_selected_features.first.feature.has_value()) {
-                        if (m_selected_features.first.feature == m_curr_feature)
+                        if (m_selected_features.first.feature == m_curr_feature && m_mode == EMode::FeatureSelection) {
                             text = _u8L("Unselect feature");
-                        else if (m_hover_id == SELECTION_1_ID)
+                            color = SELECTED_1ST_COLOR;
+                        }
+                        else if (m_hover_id == SELECTION_1_ID) {
                             text = (m_mode == EMode::CenterSelection) ? _u8L("Unselect center") : _u8L("Unselect point");
-                        color = SELECTED_1ST_COLOR;
+                            color = SELECTED_1ST_COLOR;
+                        }
                     }
                     if (text.empty()) {
                         text = (m_mode == EMode::PointSelection) ? _u8L("Select point") :
