@@ -3016,43 +3016,46 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
         return es.name == style.name;
     };
 
-    std::optional<wxFont> wx_font_opt;
-    if (style.type == WxFontUtils::get_actual_type())
-        wx_font_opt = WxFontUtils::load_wxFont(style.path);
+    int    wx_font_opt;
+    wxFont wx_font;
     bool is_path_changed = false;
-    if (!wx_font_opt.has_value()) {
+    if (style.type == WxFontUtils::get_actual_type())
+        wx_font = WxFontUtils::load_wxFont(style.path);
+    if (!wx_font.IsOk()) {
         create_notification_not_valid_font(tc);
         // Try create similar wx font
-        wx_font_opt = WxFontUtils::create_wxFont(style);
-        is_path_changed = wx_font_opt.has_value();
+        wx_font = WxFontUtils::create_wxFont(style);
+        is_path_changed = wx_font.IsOk();
     }
 
     const auto& styles = m_style_manager.get_styles();
     auto it = std::find_if(styles.begin(), styles.end(), has_same_name);
     if (it == styles.end()) {
         // style was not found
-        if (wx_font_opt.has_value())
-            m_style_manager.load_style(style, *wx_font_opt);
+        if (wx_font.IsOk())
+            m_style_manager.load_style(style, wx_font);
     } else {
         size_t style_index = it - styles.begin();
         if (!m_style_manager.load_style(style_index)) {
             // can`t load stored style
             m_style_manager.erase(style_index);
-            if (wx_font_opt.has_value())
-                m_style_manager.load_style(style, *wx_font_opt);
+            if (wx_font.IsOk())
+                m_style_manager.load_style(style, wx_font);
 
         } else {
             // stored style is loaded, now set modification of style
             m_style_manager.get_style() = style;
-            m_style_manager.set_wx_font(*wx_font_opt);
+            m_style_manager.set_wx_font(wx_font);
         }
     }
 
-    if (is_path_changed)
-        m_style_manager.get_style().path = WxFontUtils::store_wxFont(*wx_font_opt);
+    if (is_path_changed) {
+        std::string path = WxFontUtils::store_wxFont(wx_font);
+        m_style_manager.get_style().path = path;
+    }
 
-    m_text      = tc.text;
-    m_volume    = volume;
+    m_text   = tc.text;
+    m_volume = volume;
 
     // store volume state before edit
     m_unmodified_volume = {*volume->get_mesh_shared_ptr(), // copy

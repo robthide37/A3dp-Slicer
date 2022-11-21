@@ -32,11 +32,11 @@ public:
     static std::string get_human_readable_name(const wxFont &font);
 
     // serialize / deserialize font
-    static std::string           store_wxFont(const wxFont &font);
-    static std::optional<wxFont> load_wxFont(const std::string &font_descriptor);
+    static std::string store_wxFont(const wxFont &font);
+    static wxFont load_wxFont(const std::string &font_descriptor);
 
     // Try to create similar font, loaded from 3mf from different Computer
-    static std::optional<wxFont> create_wxFont(const EmbossStyle &style);
+    static wxFont create_wxFont(const EmbossStyle &style);
     // update font property by wxFont - without emboss depth and font size
     static void update_property(FontProp &font_prop, const wxFont &font);
 

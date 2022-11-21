@@ -171,13 +171,11 @@ std::string WxFontUtils::store_wxFont(const wxFont &font)
     return std::string(font_descriptor.c_str());
 }
 
-std::optional<wxFont> WxFontUtils::load_wxFont(
-    const std::string &font_descriptor)
+wxFont WxFontUtils::load_wxFont(const std::string &font_descriptor)
 {
     wxString font_descriptor_wx(font_descriptor);
-    std::optional<wxFont> res = std::make_optional<wxFont>(font_descriptor_wx);
-    if (!res->IsOk()) return {};
-    return res;
+    wxFont wx_font(font_descriptor_wx);
+    return wx_font;
 }
 
 using TypeToFamily = boost::bimap<wxFontFamily, std::string_view>;
@@ -212,7 +210,7 @@ const TypeToWeight WxFontUtils::type_to_weight =
         (wxFONTWEIGHT_HEAVY,      "heavy")
         (wxFONTWEIGHT_EXTRAHEAVY, "extraHeavy");
 
-std::optional<wxFont> WxFontUtils::create_wxFont(const EmbossStyle &style)
+wxFont WxFontUtils::create_wxFont(const EmbossStyle &style)
 {
     const FontProp &fp = style.prop;
     double  point_size = static_cast<double>(fp.size_in_mm);
@@ -244,9 +242,12 @@ std::optional<wxFont> WxFontUtils::create_wxFont(const EmbossStyle &style)
     // default:
     //}
 
-    std::optional<wxFont> res = std::make_optional<wxFont>(info);
-    if (!res->IsOk()) return {};
-    return res;
+    wxFont wx_font(info);
+    // Check if exist font file
+    std::unique_ptr<Emboss::FontFile> ff = create_font_file(wx_font);
+    if (ff == nullptr) return {};
+
+    return wx_font;
 }
 
 void WxFontUtils::update_property(FontProp &font_prop, const wxFont &font)
