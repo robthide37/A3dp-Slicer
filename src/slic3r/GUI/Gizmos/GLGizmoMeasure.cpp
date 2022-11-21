@@ -1775,13 +1775,13 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
         ImGui::EndTable();
     }
 
-    //if (m_selected_features.first.feature.has_value()) {
-    //    if (m_imgui->button(_u8L("Restart"))) {
-    //        m_selected_features.reset();
-    //        m_selection_raycasters.clear();
-    //        m_imgui->set_requires_extra_frame();
-    //    }
-    //}
+    m_imgui->disabled_begin(!m_selected_features.first.feature.has_value());
+        if (m_imgui->button(_u8L("Restart selection"))) {
+            m_selected_features.reset();
+            m_selection_raycasters.clear();
+            m_imgui->set_requires_extra_frame();
+        }
+    m_imgui->disabled_end();
 
     auto add_measure_row_to_table = [this](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
         ImGui::TableNextRow();
