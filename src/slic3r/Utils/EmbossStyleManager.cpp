@@ -12,9 +12,10 @@
 #include "slic3r/Utils/EmbossStylesSerializable.hpp"
 
 using namespace Slic3r;
-using namespace Slic3r::GUI;
+using namespace Slic3r::Emboss;
+using namespace Slic3r::GUI::Emboss;
 
-EmbossStyleManager::EmbossStyleManager(const ImWchar *language_glyph_range)
+StyleManager::StyleManager(const ImWchar *language_glyph_range)
     : m_imgui_init_glyph_range(language_glyph_range)
     , m_exist_style_images(false)
     , m_temp_style_images(nullptr)
@@ -22,12 +23,12 @@ EmbossStyleManager::EmbossStyleManager(const ImWchar *language_glyph_range)
     , m_last_style_index(std::numeric_limits<size_t>::max())
 {}
 
-EmbossStyleManager::~EmbossStyleManager() { 
+StyleManager::~StyleManager() { 
     clear_imgui_font();
     free_style_images();
 }
 
-void EmbossStyleManager::init(AppConfig *app_config, const EmbossStyles &default_styles)
+void StyleManager::init(AppConfig *app_config, const EmbossStyles &default_styles)
 {
     m_app_config = app_config;
     EmbossStyles styles = (app_config != nullptr) ?
@@ -67,7 +68,7 @@ void EmbossStyleManager::init(AppConfig *app_config, const EmbossStyles &default
     }
 }
 
-bool EmbossStyleManager::store_styles_to_app_config(bool use_modification,
+bool StyleManager::store_styles_to_app_config(bool use_modification,
                                                     bool store_activ_index)
 {
     assert(m_app_config != nullptr);
@@ -102,7 +103,7 @@ bool EmbossStyleManager::store_styles_to_app_config(bool use_modification,
     return true;
 }
 
-void EmbossStyleManager::add_style(const std::string &name) {
+void StyleManager::add_style(const std::string &name) {
     EmbossStyle& style = m_style_cache.style;
     style.name = name;
     make_unique_name(style.name);
@@ -112,7 +113,7 @@ void EmbossStyleManager::add_style(const std::string &name) {
     m_style_items.push_back({style});
 }
 
-void EmbossStyleManager::swap(size_t i1, size_t i2) {
+void StyleManager::swap(size_t i1, size_t i2) {
     if (i1 >= m_style_items.size() || 
         i2 >= m_style_items.size()) return;
     std::swap(m_style_items[i1], m_style_items[i2]);
@@ -125,7 +126,7 @@ void EmbossStyleManager::swap(size_t i1, size_t i2) {
     }
 }
 
-void EmbossStyleManager::discard_style_changes() {
+void StyleManager::discard_style_changes() {
     if (exist_stored_style()) {
         if (load_style(m_style_cache.style_index))
             return; // correct reload style
@@ -138,7 +139,7 @@ void EmbossStyleManager::discard_style_changes() {
     load_first_valid_font();
 }
 
-void EmbossStyleManager::erase(size_t index) {
+void StyleManager::erase(size_t index) {
     if (index >= m_style_items.size()) return;
 
     // fix selected index
@@ -151,7 +152,7 @@ void EmbossStyleManager::erase(size_t index) {
     m_style_items.erase(m_style_items.begin() + index);
 }
 
-void EmbossStyleManager::rename(const std::string& name) {
+void StyleManager::rename(const std::string& name) {
     m_style_cache.style.name = name;
     m_style_cache.truncated_name.clear();
     if (exist_stored_style()) { 
@@ -161,7 +162,7 @@ void EmbossStyleManager::rename(const std::string& name) {
     }
 }
 
-bool EmbossStyleManager::load_style(size_t style_index)
+bool StyleManager::load_style(size_t style_index)
 {
     if (style_index >= m_style_items.size()) return false;
     if (!load_style(m_style_items[style_index].style)) return false;
@@ -171,14 +172,14 @@ bool EmbossStyleManager::load_style(size_t style_index)
     return true;
 }
 
-bool EmbossStyleManager::load_style(const EmbossStyle &style) {
+bool StyleManager::load_style(const EmbossStyle &style) {
     if (style.type == EmbossStyle::Type::file_path) {
-        std::unique_ptr<Emboss::FontFile> font_ptr =
-            Emboss::create_font_file(style.path.c_str());
+        std::unique_ptr<FontFile> font_ptr =
+            create_font_file(style.path.c_str());
         if (font_ptr == nullptr) return false;
         m_style_cache.wx_font = {};
         m_style_cache.font_file = 
-            Emboss::FontFileWithCache(std::move(font_ptr));
+            FontFileWithCache(std::move(font_ptr));
         m_style_cache.style          = style; // copy
         m_style_cache.style_index    = std::numeric_limits<size_t>::max();
         m_style_cache.stored_wx_font = {};
@@ -190,7 +191,7 @@ bool EmbossStyleManager::load_style(const EmbossStyle &style) {
     return load_style(style, *wx_font_opt);
 }
 
-bool EmbossStyleManager::load_style(const EmbossStyle &style, const wxFont &font)
+bool StyleManager::load_style(const EmbossStyle &style, const wxFont &font)
 {
     if (!set_wx_font(font)) return false;
     m_style_cache.style      = style; // copy
@@ -200,9 +201,9 @@ bool EmbossStyleManager::load_style(const EmbossStyle &style, const wxFont &font
     return true;
 }
 
-bool EmbossStyleManager::is_activ_font() { return m_style_cache.font_file.has_value(); }
+bool StyleManager::is_activ_font() { return m_style_cache.font_file.has_value(); }
 
-bool EmbossStyleManager::load_first_valid_font() {
+bool StyleManager::load_first_valid_font() {
     while (!m_style_items.empty()) {
         if (load_style(0)) return true;
         // can't load so erase it from list
@@ -211,22 +212,22 @@ bool EmbossStyleManager::load_first_valid_font() {
     return false;
 }
 
-const EmbossStyle* EmbossStyleManager::get_stored_style() const
+const EmbossStyle* StyleManager::get_stored_style() const
 {
     if (m_style_cache.style_index >= m_style_items.size()) return nullptr;
     return &m_style_items[m_style_cache.style_index].style;
 }
 
-void EmbossStyleManager::clear_glyphs_cache()
+void StyleManager::clear_glyphs_cache()
 {
-    Emboss::FontFileWithCache &ff = m_style_cache.font_file;
+    FontFileWithCache &ff = m_style_cache.font_file;
     if (!ff.has_value()) return;
-    ff.cache = std::make_shared<Emboss::Glyphs>();
+    ff.cache = std::make_shared<Glyphs>();
 }
 
-void EmbossStyleManager::clear_imgui_font() { m_style_cache.atlas.Clear(); }
+void StyleManager::clear_imgui_font() { m_style_cache.atlas.Clear(); }
 
-ImFont *EmbossStyleManager::get_imgui_font()
+ImFont *StyleManager::get_imgui_font()
 {
     if (!is_activ_font()) return nullptr;
     
@@ -242,16 +243,16 @@ ImFont *EmbossStyleManager::get_imgui_font()
     return font;
 }
 
-const std::vector<EmbossStyleManager::Item> &EmbossStyleManager::get_styles() const{ return m_style_items; }
+const std::vector<StyleManager::Item> &StyleManager::get_styles() const{ return m_style_items; }
 
-ImFont* EmbossStyleManager::extend_imgui_font_range(size_t index, const std::string& text)
+ImFont* StyleManager::extend_imgui_font_range(size_t index, const std::string& text)
 {
     // TODO: start using merge mode
     // ImFontConfig::MergeMode = true;
     return create_imgui_font(text);
 }
 
-void EmbossStyleManager::make_unique_name(std::string &name)
+void StyleManager::make_unique_name(std::string &name)
 {
     auto is_unique = [&](const std::string &name) -> bool {
         for (const Item &it : m_style_items)
@@ -283,7 +284,7 @@ void EmbossStyleManager::make_unique_name(std::string &name)
     name = new_name;
 }
 
-void EmbossStyleManager::init_trunc_names(float max_width) { 
+void StyleManager::init_trunc_names(float max_width) { 
     for (auto &s : m_style_items)
         if (s.truncated_name.empty()) {
             std::string name = s.style.name;
@@ -298,7 +299,7 @@ void EmbossStyleManager::init_trunc_names(float max_width) {
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp" 
 
-void EmbossStyleManager::init_style_images(const Vec2i &max_size,
+void StyleManager::init_style_images(const Vec2i &max_size,
                                     const std::string &text)
 {
     // check already initialized
@@ -311,7 +312,7 @@ void EmbossStyleManager::init_style_images(const Vec2i &max_size,
             assert(m_temp_style_images->images.size() ==
                    m_temp_style_images->styles.size());
             // copy images into styles
-            for (EmbossStyleManager::StyleImage &image : m_temp_style_images->images){
+            for (StyleManager::StyleImage &image : m_temp_style_images->images){
                 size_t index = &image - &m_temp_style_images->images.front();
                 StyleImagesData::Item &style = m_temp_style_images->styles[index];
 
@@ -340,11 +341,11 @@ void EmbossStyleManager::init_style_images(const Vec2i &max_size,
         const EmbossStyle &style = item.style;
         std::optional<wxFont> wx_font_opt = WxFontUtils::load_wxFont(style.path);
         if (!wx_font_opt.has_value()) continue;
-        std::unique_ptr<Emboss::FontFile> font_file =
+        std::unique_ptr<FontFile> font_file =
             WxFontUtils::create_font_file(*wx_font_opt);
         if (font_file == nullptr) continue;
         styles.push_back({
-            Emboss::FontFileWithCache(std::move(font_file)), 
+            FontFileWithCache(std::move(font_file)), 
             style.name,
             style.prop
         });
@@ -354,7 +355,7 @@ void EmbossStyleManager::init_style_images(const Vec2i &max_size,
     queue_job(worker, std::make_unique<CreateFontStyleImagesJob>(std::move(data)));
 }
 
-void EmbossStyleManager::free_style_images() {
+void StyleManager::free_style_images() {
     if (!m_exist_style_images) return;
     GLuint tex_id = 0;
     for (Item &it : m_style_items) {
@@ -367,10 +368,10 @@ void EmbossStyleManager::free_style_images() {
     m_exist_style_images = false;
 }
 
-float EmbossStyleManager::min_imgui_font_size = 18.f;
-float EmbossStyleManager::max_imgui_font_size = 60.f;
-float EmbossStyleManager::get_imgui_font_size(const FontProp         &prop,
-                                              const Emboss::FontFile &file)
+float StyleManager::min_imgui_font_size = 18.f;
+float StyleManager::max_imgui_font_size = 60.f;
+float StyleManager::get_imgui_font_size(const FontProp         &prop,
+                                              const FontFile &file)
 {
     const auto  &cn = prop.collection_number;
     unsigned int font_index = (cn.has_value()) ? *cn : 0;
@@ -384,12 +385,12 @@ float EmbossStyleManager::get_imgui_font_size(const FontProp         &prop,
     return c1 * std::abs(prop.size_in_mm) / 0.3528f;
 }
 
-ImFont *EmbossStyleManager::create_imgui_font(const std::string &text)
+ImFont *StyleManager::create_imgui_font(const std::string &text)
 {
     // inspiration inside of ImGuiWrapper::init_font
     auto& ff = m_style_cache.font_file;
     if (!ff.has_value()) return nullptr;
-    const Emboss::FontFile &font_file = *ff.font_file;
+    const FontFile &font_file = *ff.font_file;
 
     ImFontGlyphRangesBuilder builder;
     builder.AddRanges(m_imgui_init_glyph_range);
@@ -464,18 +465,18 @@ ImFont *EmbossStyleManager::create_imgui_font(const std::string &text)
     return font;
 }
 
-bool EmbossStyleManager::set_wx_font(const wxFont &wx_font) {
-    std::unique_ptr<Emboss::FontFile> font_file = 
+bool StyleManager::set_wx_font(const wxFont &wx_font) {
+    std::unique_ptr<FontFile> font_file = 
         WxFontUtils::create_font_file(wx_font);
     return set_wx_font(wx_font, std::move(font_file));
 }
 
-bool EmbossStyleManager::set_wx_font(const wxFont &wx_font, std::unique_ptr<Emboss::FontFile> font_file)
+bool StyleManager::set_wx_font(const wxFont &wx_font, std::unique_ptr<FontFile> font_file)
 {
     if (font_file == nullptr) return false;
     m_style_cache.wx_font   = wx_font; // copy
     m_style_cache.font_file = 
-        Emboss::FontFileWithCache(std::move(font_file));
+        FontFileWithCache(std::move(font_file));
 
     EmbossStyle &style = m_style_cache.style;
     style.type = WxFontUtils::get_actual_type();

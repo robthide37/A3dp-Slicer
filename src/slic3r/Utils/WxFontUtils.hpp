@@ -51,7 +51,7 @@ public:
     /// <param name="font">wx descriptor of font</param>
     /// <param name="font_file">file described in wx font</param> 
     /// <returns>New created font fileon success otherwise nullptr</returns>
-    static std::unique_ptr<Emboss::FontFile> set_italic(wxFont &font, const Emboss::FontFile& prev_font_file);
+    static std::unique_ptr<Slic3r::Emboss::FontFile> set_italic(wxFont &font, const Slic3r::Emboss::FontFile &prev_font_file);
 
     /// <summary>
     /// Set boldness into wx font
@@ -61,7 +61,7 @@ public:
     /// <param name="font">wx descriptor of font</param>
     /// <param name="font_file">file described in wx font</param> 
     /// <returns>New created font fileon success otherwise nullptr</returns>
-    static std::unique_ptr<Emboss::FontFile> set_bold(wxFont &font, const Emboss::FontFile& font_file);
+    static std::unique_ptr<Slic3r::Emboss::FontFile> set_bold(wxFont &font, const Slic3r::Emboss::FontFile &font_file);
 
     // convert wxFont types to string and vice versa
     static const boost::bimap<wxFontFamily, std::string_view> type_to_family;

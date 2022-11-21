@@ -936,23 +936,8 @@ private:
     //      1   ->   is splittable
     mutable int               		m_is_splittable{ -1 };
 
-	ModelVolume(ModelObject *object, const TriangleMesh &mesh, ModelVolumeType type = ModelVolumeType::MODEL_PART) : m_mesh(new TriangleMesh(mesh)), m_type(type), object(object)
-    {
-		assert(this->id().valid()); 
-        assert(this->config.id().valid()); 
-        assert(this->supported_facets.id().valid()); 
-        assert(this->seam_facets.id().valid());
-        assert(this->mmu_segmentation_facets.id().valid());
-        assert(this->id() != this->config.id());
-        assert(this->id() != this->supported_facets.id());
-        assert(this->id() != this->seam_facets.id());
-        assert(this->id() != this->mmu_segmentation_facets.id());
-        if (mesh.facets_count() > 1)
-            calculate_convex_hull();
-    }
-    ModelVolume(ModelObject *object, TriangleMesh &&mesh, TriangleMesh &&convex_hull, ModelVolumeType type = ModelVolumeType::MODEL_PART) :
-		m_mesh(new TriangleMesh(std::move(mesh))), m_convex_hull(new TriangleMesh(std::move(convex_hull))), m_type(type), object(object) {
-		assert(this->id().valid()); 
+    inline bool check() {
+        assert(this->id().valid());
         assert(this->config.id().valid());
         assert(this->supported_facets.id().valid());
         assert(this->seam_facets.id().valid());
@@ -961,6 +946,24 @@ private:
         assert(this->id() != this->supported_facets.id());
         assert(this->id() != this->seam_facets.id());
         assert(this->id() != this->mmu_segmentation_facets.id());
+        return true;
+    }
+
+	ModelVolume(ModelObject *object, const TriangleMesh &mesh, ModelVolumeType type = ModelVolumeType::MODEL_PART) :
+        m_mesh(new TriangleMesh(mesh)), m_type(type), object(object)
+    {
+        assert(check());
+        if (m_mesh->facets_count() > 1) calculate_convex_hull();
+    }
+    ModelVolume(ModelObject *object, TriangleMesh &&mesh, ModelVolumeType type = ModelVolumeType::MODEL_PART)
+        : m_mesh(new TriangleMesh(std::move(mesh))), m_type(type), object(object)
+    {
+        assert(check());
+        if (m_mesh->facets_count() > 1) calculate_convex_hull();
+    }
+    ModelVolume(ModelObject *object, TriangleMesh &&mesh, TriangleMesh &&convex_hull, ModelVolumeType type = ModelVolumeType::MODEL_PART) :
+		m_mesh(new TriangleMesh(std::move(mesh))), m_convex_hull(new TriangleMesh(std::move(convex_hull))), m_type(type), object(object) {
+        assert(check());
 	}
 
     // Copying an existing volume, therefore this volume will get a copy of the ID assigned.

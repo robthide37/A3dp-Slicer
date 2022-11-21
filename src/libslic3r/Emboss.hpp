@@ -16,23 +16,21 @@ namespace Slic3r {
 /// class with only static function add ability to engraved OR raised
 /// text OR polygons onto model surface
 /// </summary>
-class Emboss
-{
-public:
-    Emboss() = delete;
-    
+namespace Emboss
+{    
     // every glyph's shape point is divided by SHAPE_SCALE - increase precission of fixed point value
-    static double SHAPE_SCALE;    
+    // stored in fonts (to be able represents curve by sequence of lines)
+    static constexpr double SHAPE_SCALE = 0.001; // SCALING_FACTOR promile is fine enough
 
     /// <summary>
     /// Collect fonts registred inside OS
     /// </summary>
     /// <returns>OS registred TTF font files(full path) with names</returns>
-    static EmbossStyles get_font_list();
+    EmbossStyles get_font_list();
 #ifdef _WIN32
-    static EmbossStyles get_font_list_by_register();
-    static EmbossStyles get_font_list_by_enumeration();
-    static EmbossStyles get_font_list_by_folder();
+    EmbossStyles get_font_list_by_register();
+    EmbossStyles get_font_list_by_enumeration();
+    EmbossStyles get_font_list_by_folder();
 #endif
 
     /// <summary>
@@ -40,7 +38,7 @@ public:
     /// </summary>
     /// <param name="font_face_name">Unique identificator for font</param>
     /// <returns>File path to font when found</returns>
-    static std::optional<std::wstring> get_font_path(const std::wstring &font_face_name);
+    std::optional<std::wstring> get_font_path(const std::wstring &font_face_name);
 
     // description of one letter
     struct Glyph
@@ -126,14 +124,14 @@ public:
     /// </summary>
     /// <param name="file_path">Location of .ttf or .ttc font file</param>
     /// <returns>Font object when loaded.</returns>
-    static std::unique_ptr<FontFile> create_font_file(const char *file_path);
+    std::unique_ptr<FontFile> create_font_file(const char *file_path);
     // data = raw file data
-    static std::unique_ptr<FontFile> create_font_file(std::unique_ptr<std::vector<unsigned char>> data);
+    std::unique_ptr<FontFile> create_font_file(std::unique_ptr<std::vector<unsigned char>> data);
 #ifdef _WIN32
     // fix for unknown pointer HFONT
     using HFONT = void*;
-    static void * can_load(HFONT hfont);
-    static std::unique_ptr<FontFile> create_font_file(HFONT hfont);
+    void * can_load(HFONT hfont);
+    std::unique_ptr<FontFile> create_font_file(HFONT hfont);
 #endif // _WIN32
 
     /// <summary>
@@ -144,7 +142,7 @@ public:
     /// <param name="letter">One character defined by unicode codepoint</param>
     /// <param name="flatness">Precision of lettter outline curve in conversion to lines</param>
     /// <returns>inner polygon cw(outer ccw)</returns>
-    static std::optional<Glyph> letter2glyph(const FontFile &font, unsigned int font_index, int letter, float flatness);
+    std::optional<Glyph> letter2glyph(const FontFile &font, unsigned int font_index, int letter, float flatness);
 
     /// <summary>
     /// Convert text into polygons
@@ -154,14 +152,14 @@ public:
     /// <param name="font_prop">User defined property of the font</param>
     /// <param name="was_canceled">Way to interupt processing</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    static ExPolygons text2shapes(FontFileWithCache &font, const char *text, const FontProp &font_prop, std::function<bool()> was_canceled = nullptr);
+    ExPolygons text2shapes(FontFileWithCache &font, const char *text, const FontProp &font_prop, std::function<bool()> was_canceled = nullptr);
 
     /// <summary>
     /// Fix intersections and self intersections in polygons glyph shape 
     /// </summary>
     /// <param name="shape">Input shape to heal</param>
     /// <returns>Healed shapes</returns>
-    static ExPolygons heal_shape(const Polygons &shape);
+    ExPolygons heal_shape(const Polygons &shape);
 
     /// <summary>
     /// NOTE: call Slic3r::union_ex before this call
@@ -175,7 +173,7 @@ public:
     /// <param name="max_iteration">Heal could create another issue,
     /// After healing it is checked again until shape is good or maximal count of iteration</param>
     /// <returns>True when shapes is good otherwise False</returns>
-    static bool heal_shape(ExPolygons &shape, unsigned max_iteration = 10);
+    bool heal_shape(ExPolygons &shape, unsigned max_iteration = 10);
 
     /// <summary>
     /// Divide line segments in place near to point
@@ -186,7 +184,7 @@ public:
     /// <param name="expolygons">Expolygon to edit</param>
     /// <param name="distance">(epsilon)Euclidean distance from point to line which divide line</param>
     /// <returns>True when some division was made otherwise false</returns>
-    static bool divide_segments_for_close_point(ExPolygons &expolygons, double distance);
+    bool divide_segments_for_close_point(ExPolygons &expolygons, double distance);
 
     /// <summary>
     /// Use data from font property to modify transformation
@@ -194,7 +192,7 @@ public:
     /// <param name="font_prop">Z-move as surface distance(FontProp::distance)
     /// Z-rotation as angle to Y axis(FontProp::angle)</param>
     /// <param name="transformation">In / Out transformation to modify by property</param>
-    static void apply_transformation(const FontProp &font_prop, Transform3d &transformation);
+    void apply_transformation(const FontProp &font_prop, Transform3d &transformation);
 
     /// <summary>
     /// Read information from naming table of font file
@@ -203,7 +201,7 @@ public:
     /// <param name="font">Selector of font</param>
     /// <param name="font_index">Index of font in collection</param>
     /// <returns>True when the font description contains italic/obligue otherwise False</returns>
-    static bool is_italic(const FontFile &font, unsigned int font_index);
+    bool is_italic(const FontFile &font, unsigned int font_index);
 
     /// <summary>
     /// Create unique character set from string with filtered from text with only character from font
@@ -213,7 +211,7 @@ public:
     /// <param name="font_index">Define font in collection</param>
     /// <param name="exist_unknown">True when text contain glyph unknown in font</param>
     /// <returns>Unique set of character from text contained in font</returns>
-    static std::string create_range_text(const std::string &text, const FontFile &font, unsigned int font_index, bool* exist_unknown = nullptr);    
+    std::string create_range_text(const std::string &text, const FontFile &font, unsigned int font_index, bool* exist_unknown = nullptr);    
 
     /// <summary>
     /// Calculate scale for glyph shape convert from shape points to mm
@@ -221,7 +219,7 @@ public:
     /// <param name="fp">Property of font</param>
     /// <param name="ff">Font data</param>
     /// <returns>Conversion to mm</returns>
-    static double get_shape_scale(const FontProp &fp, const FontFile &ff);
+    double get_shape_scale(const FontProp &fp, const FontFile &ff);
 
     /// <summary>
     /// Project spatial point
@@ -274,7 +272,7 @@ public:
     /// <param name="shape2d">text or image</param>
     /// <param name="projection">Define transformation from 2d to 3d(orientation, position, scale, ...)</param>
     /// <returns>Projected shape into space</returns>
-    static indexed_triangle_set polygons2model(const ExPolygons &shape2d, const IProjection& projection);
+    indexed_triangle_set polygons2model(const ExPolygons &shape2d, const IProjection& projection);
         
     /// <summary>
     /// Create transformation for emboss text object to lay on surface point
@@ -283,7 +281,7 @@ public:
     /// <param name="normal">Normal of surface point</param>
     /// <param name="up_limit">Is compared with normal.z to suggest up direction</param>
     /// <returns>Transformation onto surface point</returns>
-    static Transform3d create_transformation_onto_surface(
+    Transform3d create_transformation_onto_surface(
         const Vec3f &position, const Vec3f &normal, float up_limit = 0.9f);
 
     class ProjectZ : public IProjection
@@ -345,7 +343,7 @@ public:
         Vec3d project(const Vec3d &point) const override;
         std::optional<Vec2d> unproject(const Vec3d &p, double * depth = nullptr) const override;     
     };
-};
+} // namespace Emboss
 
 } // namespace Slic3r
 #endif // slic3r_Emboss_hpp_

@@ -57,7 +57,9 @@
 #endif // ALLOW_DEBUG_MODE
 
 using namespace Slic3r;
+using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
+using namespace Slic3r::GUI::Emboss;
 
 // anonymous namespace for unique names
 namespace {
@@ -165,6 +167,18 @@ void GLGizmoEmboss::set_fine_position()
     ImGuiWrapper::draw(rect);
 }
 
+namespace priv {
+
+/// <summary>
+/// Prepare data for emboss
+/// </summary>
+/// <param name="text">Text to emboss</param>
+/// <param name="style_manager">Keep actual selected style</param>
+/// <returns>Base data for emboss text</returns>
+static DataBase create_emboss_data_base(const std::string &text, StyleManager &style_manager);
+
+} // namespace priv
+
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
 {
     assert(volume_type == ModelVolumeType::MODEL_PART ||
@@ -188,11 +202,17 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     Plater* plater = wxGetApp().plater();
     const Camera &camera = plater->get_camera();
     const Pointfs &bed_shape = plater->build_volume().bed_shape();
-    EmbossDataCreateObject data{create_emboss_data_base(),
-                                screen_coor,
-                                camera,
-                                bed_shape};
-    auto job = std::make_unique<EmbossCreateObjectJob>(std::move(data));
+    // TODO: Fix double creation of base data (first is inside function start_volume_creation)
+    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager);
+    FontProp& prop = emboss_data.text_configuration.style.prop;
+    
+    // can't create new object with using surface
+    if (prop.use_surface) prop.use_surface = false;
+    // can't create new object with distance from surface
+    if (prop.distance.has_value()) prop.distance.reset();
+
+    DataCreateObject data{std::move(emboss_data), screen_coor, camera, bed_shape};
+    auto job = std::make_unique<CreateObjectJob>(std::move(data));
     Worker &worker = plater->get_ui_job_worker();
     queue_job(worker, std::move(job));
 }
@@ -369,9 +389,9 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
         // Calculate temporary position
         Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
-        Transform3d trmat = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
+        Transform3d trmat = create_transformation_onto_surface(hit->position, hit->normal);
         const FontProp& font_prop = tc.style.prop;
-        Emboss::apply_transformation(font_prop, trmat);
+        apply_transformation(font_prop, trmat);
 
         // fix baked transformation from .3mf store process
         if (tc.fix_3mf_tr.has_value())
@@ -807,8 +827,7 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
 
 void GLGizmoEmboss::set_default_text(){ m_text = _u8L("Embossed text"); }
 
-bool GLGizmoEmboss::start_volume_creation(ModelVolumeType volume_type,
-                                          const Vec2d    &screen_coor)
+bool GLGizmoEmboss::start_volume_creation(ModelVolumeType volume_type, const Vec2d &screen_coor)
 {
     Plater* plater = wxGetApp().plater();
     
@@ -848,18 +867,33 @@ bool GLGizmoEmboss::start_volume_creation(ModelVolumeType volume_type,
     GLVolume *gl_volume = volumes[hovered_id];
     Transform3d hit_instance_trmat = gl_volume->get_instance_transformation().get_matrix();
 
-    // create volume
-    EmbossDataCreateVolume data{create_emboss_data_base(),
-                                volume_type,
-                                screen_coor,
-                                object_idx_signed,
-                                camera,
-                                *hit,
-                                hit_object_trmat,
-                                hit_instance_trmat};
+    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager);
 
+    // Create result volume transformation
+    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal);
+    const FontProp& font_prop = emboss_data.text_configuration.style.prop;
+    apply_transformation(font_prop, surface_trmat);
+    Transform3d volume_trmat = hit_instance_trmat.inverse() * hit_object_trmat * surface_trmat;
+
+    std::unique_ptr<GUI::Job> job;
+    if (!emboss_data.text_configuration.style.prop.use_surface) {
+        // create volume
+        DataCreateVolume data{std::move(emboss_data), volume_type, object_idx_signed, volume_trmat};
+        job = std::make_unique<CreateVolumeJob>(std::move(data));        
+    } else { 
+        // Model to cut surface from.
+        SurfaceVolumeData::ModelSources sources = create_sources(obj->volumes);
+        if (sources.empty()) return false;
+
+        bool is_outside = volume_type == ModelVolumeType::MODEL_PART;
+        // check that there is not unexpected volume type
+        assert(is_outside || 
+            volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
+            volume_type == ModelVolumeType::PARAMETER_MODIFIER);
+        CreateSurfaceVolumeData surface_data{std::move(emboss_data), volume_trmat, is_outside, std::move(sources), volume_type, object_idx_signed};
+        job = std::make_unique<CreateSurfaceVolumeJob>(std::move(surface_data));
+    }
     Worker &worker = plater->get_ui_job_worker();
-    auto job = std::make_unique<EmbossCreateVolumeJob>(std::move(data));
     queue_job(worker, std::move(job));
     return true;
 }
@@ -957,7 +991,7 @@ bool GLGizmoEmboss::process()
         m_update_job_cancel->store(true);
     // create new shared ptr to cancel new job
     m_update_job_cancel = std::make_shared<std::atomic<bool> >(false);
-    EmbossDataUpdate data{create_emboss_data_base(), m_volume->id(), m_update_job_cancel};
+    DataUpdate data{priv::create_emboss_data_base(m_text, m_style_manager), m_volume->id(), m_update_job_cancel};
 
     std::unique_ptr<Job> job = nullptr;
 
@@ -965,7 +999,7 @@ bool GLGizmoEmboss::process()
     const TextConfiguration &tc = data.text_configuration;
     if (tc.style.prop.use_surface) {
         // Model to cut surface from.
-        UseSurfaceData::ModelSources sources = UseSurfaceData::create_sources(m_volume);
+        SurfaceVolumeData::ModelSources sources = create_volume_sources(m_volume);
         if (sources.empty()) return false;
 
         Transform3d text_tr = m_volume->get_matrix();
@@ -977,11 +1011,10 @@ bool GLGizmoEmboss::process()
         // check that there is not unexpected volume type
         assert(is_outside || m_volume->is_negative_volume() ||
                m_volume->is_modifier());
-        UseSurfaceData surface_data{std::move(data), text_tr, is_outside,
-                                    std::move(sources)};
-        job = std::make_unique<UseSurfaceJob>(std::move(surface_data));                  
+        UpdateSurfaceVolumeData surface_data{std::move(data), text_tr, is_outside, std::move(sources)};
+        job = std::make_unique<UpdateSurfaceVolumeJob>(std::move(surface_data));                  
     } else {
-        job = std::make_unique<EmbossUpdateJob>(std::move(data));
+        job = std::make_unique<UpdateJob>(std::move(data));
     }
 
     //*    
@@ -1024,7 +1057,7 @@ void GLGizmoEmboss::close()
 void GLGizmoEmboss::discard_and_close() { 
     if (!m_unmodified_volume.has_value()) return;    
     m_volume->set_transformation(m_unmodified_volume->tr);
-    EmbossUpdateJob::update_volume(m_volume, std::move(m_unmodified_volume->tm), m_unmodified_volume->tc, m_unmodified_volume->name);
+    UpdateJob::update_volume(m_volume, std::move(m_unmodified_volume->tm), m_unmodified_volume->tc, m_unmodified_volume->name);
     close();    
 
     //auto plater = wxGetApp().plater();
@@ -1139,18 +1172,18 @@ void GLGizmoEmboss::draw_window()
 
 void GLGizmoEmboss::draw_text_input()
 {
-    auto create_range_text = [&mng = m_style_manager, &text = m_text, &exist_unknown = m_text_contain_unknown_glyph]() {
+    auto create_range_text_prep = [&mng = m_style_manager, &text = m_text, &exist_unknown = m_text_contain_unknown_glyph]() {
         auto& ff = mng.get_font_file_with_cache();
         assert(ff.has_value());
         const auto &cn = mng.get_font_prop().collection_number;
         unsigned int font_index = (cn.has_value()) ? *cn : 0;
-        return Emboss::create_range_text(text, *ff.font_file, font_index, &exist_unknown);
+        return create_range_text(text, *ff.font_file, font_index, &exist_unknown);
     };
     
     ImFont *imgui_font = m_style_manager.get_imgui_font();
     if (imgui_font == nullptr) {
         // try create new imgui font
-        m_style_manager.create_imgui_font(create_range_text());
+        m_style_manager.create_imgui_font(create_range_text_prep());
         imgui_font = m_style_manager.get_imgui_font();
     }
     bool exist_font = 
@@ -1190,10 +1223,10 @@ void GLGizmoEmboss::draw_text_input()
         if (prop.line_gap.has_value())
             append_warning(_u8L("Line gap"), _u8L("Unsupported visualization of gap between lines inside text input."));
         auto &ff         = m_style_manager.get_font_file_with_cache();
-        float imgui_size = EmbossStyleManager::get_imgui_font_size(prop, *ff.font_file);
-        if (imgui_size > EmbossStyleManager::max_imgui_font_size)
+        float imgui_size = StyleManager::get_imgui_font_size(prop, *ff.font_file);
+        if (imgui_size > StyleManager::max_imgui_font_size)
             append_warning(_u8L("To tall"), _u8L("Diminished font height inside text input."));
-        if (imgui_size < EmbossStyleManager::min_imgui_font_size)
+        if (imgui_size < StyleManager::min_imgui_font_size)
             append_warning(_u8L("To small"), _u8L("Enlarged font height inside text input."));
         if (!who.empty()) warning = GUI::format(_L("%1% is NOT shown."), who);
     }
@@ -1217,7 +1250,7 @@ void GLGizmoEmboss::draw_text_input()
     const ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_AutoSelectAll;
     if (ImGui::InputTextMultiline("##Text", &m_text, text_size, flags)) {
         process();
-        range_text = create_range_text();
+        range_text = create_range_text_prep();
     }
 
     if (exist_font) ImGui::PopFont();
@@ -1571,7 +1604,7 @@ void GLGizmoEmboss::draw_font_list()
     // When is unknown font is inside .3mf only font selection is allowed
     // Stop Imgui disable + Guard again start disabling
     ScopeGuard unknown_font_sc;
-    if (m_is_unknown_font) { 
+    if (m_is_unknown_font) {
         m_imgui->disabled_end(); 
         unknown_font_sc = ScopeGuard([&]() { 
             m_imgui->disabled_begin(true); 
@@ -1963,7 +1996,7 @@ void GLGizmoEmboss::draw_delete_style_button() {
 
 void GLGizmoEmboss::draw_revert_all_styles_button() {
     if (draw_button(IconType::revert_all)) {
-        m_style_manager = EmbossStyleManager(m_imgui->get_glyph_ranges());
+        m_style_manager = StyleManager(m_imgui->get_glyph_ranges());
         m_style_manager.init(nullptr, create_default_styles());
         assert(m_style_manager.get_font_file_with_cache().has_value());
         process();
@@ -2029,7 +2062,7 @@ void GLGizmoEmboss::draw_style_list() {
         m_style_manager.init_style_images(m_gui_cfg->max_style_image_size, m_text);
         m_style_manager.init_trunc_names(max_style_name_width);
         std::optional<std::pair<size_t,size_t>> swap_indexes;
-        const std::vector<EmbossStyleManager::Item> &styles = m_style_manager.get_styles();
+        const std::vector<StyleManager::Item> &styles = m_style_manager.get_styles();
         for (const auto &item : styles) {
             size_t index = &item - &styles.front();
             const EmbossStyle &style = item.style;
@@ -2038,7 +2071,7 @@ void GLGizmoEmboss::draw_style_list() {
             bool is_selected = (index == m_style_manager.get_style_index());
 
             ImVec2 select_size(0,m_gui_cfg->max_style_image_size.y()); // 0,0 --> calculate in draw
-            const std::optional<EmbossStyleManager::StyleImage> &img = item.image;            
+            const std::optional<StyleManager::StyleImage> &img = item.image;            
             // allow click delete button
             ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; 
             if (ImGui::Selectable(item.truncated_name.c_str(), is_selected, flags, select_size)) {
@@ -2918,9 +2951,9 @@ bool GLGizmoEmboss::choose_svg_file()
     for (const auto &p : polys) bb.merge(p.contour.points);
     const FontProp &fp = m_style_manager.get_style().prop;
     float scale   = fp.size_in_mm / std::max(bb.max.x(), bb.max.y());
-    auto  project = std::make_unique<Emboss::ProjectScale>(
-        std::make_unique<Emboss::ProjectZ>(fp.emboss / scale), scale);
-    indexed_triangle_set its = Emboss::polygons2model(polys, *project);
+    auto  project = std::make_unique<ProjectScale>(
+        std::make_unique<ProjectZ>(fp.emboss / scale), scale);
+    indexed_triangle_set its = polygons2model(polys, *project);
     return false;
     // test store:
     // for (auto &poly : polys) poly.scale(1e5);
@@ -2929,41 +2962,38 @@ bool GLGizmoEmboss::choose_svg_file()
     //return add_volume(name, its);
 }
 
-EmbossDataBase GLGizmoEmboss::create_emboss_data_base() {
+DataBase priv::create_emboss_data_base(const std::string &text, StyleManager& style_manager)
+{
     auto create_volume_name = [&]() {
-        bool contain_enter = m_text.find('\n') != std::string::npos;
+        bool        contain_enter = text.find('\n') != std::string::npos;
         std::string text_fixed;
         if (contain_enter) {
             // change enters to space
-            text_fixed = m_text; // copy
-            std::replace(text_fixed.begin(), text_fixed.end(), '\n', ' ');        
+            text_fixed = text; // copy
+            std::replace(text_fixed.begin(), text_fixed.end(), '\n', ' ');
         }
-        return _u8L("Text") + " - " + ((contain_enter) ? text_fixed : m_text);
+        return _u8L("Text") + " - " + ((contain_enter) ? text_fixed : text);
     };
-    
+
     auto create_configuration = [&]() -> TextConfiguration {
-        if (!m_style_manager.is_activ_font()) {
-            std::string default_text_for_emboss = _u8L("Embossed text");
-            EmbossStyle es = m_style_manager.get_style();
+        if (!style_manager.is_activ_font()) {
+            std::string       default_text_for_emboss = _u8L("Embossed text");
+            EmbossStyle       es                      = style_manager.get_style();
             TextConfiguration tc{es, default_text_for_emboss};
             // TODO: investigate how to initialize
             return tc;
         }
 
-        EmbossStyle &es = m_style_manager.get_style();
+        EmbossStyle &es = style_manager.get_style();
         // actualize font path - during changes in gui it could be corrupted
         // volume must store valid path
-        assert(m_style_manager.get_wx_font().has_value());
-        assert(es.path.compare(WxFontUtils::store_wxFont(*m_style_manager.get_wx_font())) == 0);
-        //style.path = WxFontUtils::store_wxFont(*m_style_manager.get_wx_font());
-        return TextConfiguration{es, m_text};
+        assert(style_manager.get_wx_font().has_value());
+        assert(es.path.compare(WxFontUtils::store_wxFont(*style_manager.get_wx_font())) == 0);
+        // style.path = WxFontUtils::store_wxFont(*m_style_manager.get_wx_font());
+        return TextConfiguration{es, text};
     };
-    
-    return EmbossDataBase{
-        m_style_manager.get_font_file_with_cache(),
-        create_configuration(),
-        create_volume_name()
-    };
+
+    return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), create_configuration(), create_volume_name()};
 }
 
 bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
@@ -2974,7 +3004,7 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
     const TextConfiguration &tc    = *tc_opt;
     const EmbossStyle       &style = tc.style;
 
-    auto has_same_name = [&style](const EmbossStyleManager::Item &style_item) -> bool {
+    auto has_same_name = [&style](const StyleManager::Item &style_item) -> bool {
         const EmbossStyle &es = style_item.style;
         return es.name == style.name;
     };

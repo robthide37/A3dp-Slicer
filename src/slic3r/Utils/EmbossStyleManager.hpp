@@ -11,24 +11,24 @@
 
 class wxFont; 
 
-namespace Slic3r::GUI {
+namespace Slic3r::GUI::Emboss {
 /// <summary>
 /// Manage Emboss text styles
 /// Cache actual state of style
 ///     + imgui font
 ///     + wx font
 /// </summary>
-class EmbossStyleManager
+class StyleManager
 {
     friend class CreateFontStyleImagesJob; // access to StyleImagesData
 
 public:
-    EmbossStyleManager(const ImWchar *language_glyph_range);
+    StyleManager(const ImWchar *language_glyph_range);
         
     /// <summary>
     /// Release imgui font and style images from GPU
     /// </summary>
-    ~EmbossStyleManager();
+    ~StyleManager();
 
     /// <summary>
     /// Load font style list from config
@@ -111,7 +111,7 @@ public:
           FontProp    &get_font_prop()       { return get_style().prop; }
     const std::optional<wxFont> &get_wx_font()        const { return m_style_cache.wx_font; }
     const std::optional<wxFont> &get_stored_wx_font() const { return m_style_cache.stored_wx_font; }
-    Emboss::FontFileWithCache &get_font_file_with_cache()   { return m_style_cache.font_file; }
+    Slic3r::Emboss::FontFileWithCache &get_font_file_with_cache()   { return m_style_cache.font_file; }
     bool has_collections() const { return m_style_cache.font_file.font_file != nullptr && 
                                           m_style_cache.font_file.font_file->infos.size() > 1; }
 
@@ -132,7 +132,7 @@ public:
     /// <param name="wx_font">Must be source of font file</param>
     /// <param name="font_file">font file created by WxFontUtils::create_font_file(wx_font)</param>
     /// <returns>True on success otherwise false</returns>
-    bool set_wx_font(const wxFont &wx_font, std::unique_ptr<Emboss::FontFile> font_file );
+    bool set_wx_font(const wxFont &wx_font, std::unique_ptr<Slic3r::Emboss::FontFile> font_file);
 
     // Getter on acitve font pointer for imgui
     // Initialize imgui font(generate texture) when doesn't exist yet.
@@ -191,7 +191,7 @@ public:
     // Value out of limits is crop
     static float min_imgui_font_size;
     static float max_imgui_font_size;
-    static float get_imgui_font_size(const FontProp& prop, const Emboss::FontFile& file);
+    static float get_imgui_font_size(const FontProp &prop, const Slic3r::Emboss::FontFile &file);
 
 private:
     // erase font when not possible to load
@@ -207,7 +207,7 @@ private:
     struct StyleCache
     {
         // share font file data with emboss job thread
-        Emboss::FontFileWithCache font_file = {};
+        Slic3r::Emboss::FontFileWithCache font_file = {};
 
         // must live same as imgui_font inside of atlas
         ImVector<ImWchar> ranges = {};
@@ -251,7 +251,7 @@ private:
     {
         struct Item
         {
-            Emboss::FontFileWithCache font;
+            Slic3r::Emboss::FontFileWithCache font;
             std::string               text;
             FontProp                  prop;
         };

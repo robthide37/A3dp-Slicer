@@ -7,7 +7,7 @@
 #include "slic3r/Utils/EmbossStyleManager.hpp"
 #include "Job.hpp"
 
-namespace Slic3r::GUI {
+namespace Slic3r::GUI::Emboss {
 
 /// <summary>
 /// Create texture with name of styles written by its style
@@ -15,7 +15,7 @@ namespace Slic3r::GUI {
 /// </summary>
 class CreateFontStyleImagesJob : public Job
 {
-    EmbossStyleManager::StyleImagesData m_input;
+    StyleManager::StyleImagesData m_input;
 
     // Output data
     // texture size
@@ -23,10 +23,10 @@ class CreateFontStyleImagesJob : public Job
     // texture data
     std::vector<unsigned char> pixels; 
     // descriptors of sub textures
-    std::vector<EmbossStyleManager::StyleImage> images;
+    std::vector<StyleManager::StyleImage> images;
 
 public:
-    CreateFontStyleImagesJob(EmbossStyleManager::StyleImagesData &&input);
+    CreateFontStyleImagesJob(StyleManager::StyleImagesData &&input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &) override;
 };

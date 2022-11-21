@@ -34,8 +34,6 @@ namespace Slic3r{
 
 namespace Slic3r::GUI {
 class MeshRaycaster;
-struct EmbossDataBase;
-
 class GLGizmoEmboss : public GLGizmoBase
 {
 public:
@@ -157,8 +155,6 @@ private:
     bool choose_true_type_file();
     bool choose_svg_file();
 
-    // prepare base data for emboss text
-    EmbossDataBase create_emboss_data_base();
     bool load_configuration(ModelVolume *volume);
 
     // When open text loaded from .3mf it could be written with unknown font
@@ -225,7 +221,7 @@ private:
     std::optional<ImVec2> m_set_window_offset;
     bool m_is_advanced_edit_style = false;
 
-    EmbossStyleManager m_style_manager;
+    Emboss::StyleManager m_style_manager;
 
     struct FaceName{
         wxString wx_name;

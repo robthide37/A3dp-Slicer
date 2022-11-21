@@ -20,9 +20,6 @@
 #include "libslic3r/Line.hpp"
 
 using namespace Slic3r;
-
-double Emboss::SHAPE_SCALE = 0.001;//SCALING_FACTOR;
-
 // do not expose out of this file stbtt_ data types
 namespace priv{
 
