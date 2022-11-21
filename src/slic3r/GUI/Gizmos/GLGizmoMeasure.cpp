@@ -480,6 +480,16 @@ bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_po
         m_selection_raycasters.clear();
         m_parent.request_extra_frame();
     }
+    else if (action == SLAGizmoEventType::Escape) {
+        if (!m_selected_features.first.feature.has_value())
+            return false;
+        else {
+          if (m_selected_features.second.feature.has_value())
+              m_selected_features.second.feature.reset();
+          else
+              m_selected_features.first.feature.reset();
+        }
+    }
 
     return true;
 }
@@ -1758,8 +1768,27 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             ++row_count;
         }
 
+        if (m_selected_features.first.feature.has_value() || m_selected_features.second.feature.has_value()) {
+          add_row_to_table(
+            [this]() {
+                m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Esc"));
+            },
+            [this]() {
+                m_imgui->text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), _u8L("Unselect"));
+                ImGui::SameLine();
+                const ImVec2 pos = ImGui::GetCursorScreenPos();
+                const float rect_size = ImGui::GetTextLineHeight();
+                const ColorRGBA color = m_selected_features.second.feature.has_value() ? SELECTED_2ND_COLOR : SELECTED_1ST_COLOR;
+                ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x + 1.0f, pos.y + 1.0f), ImVec2(pos.x + rect_size, pos.y + rect_size), ImGuiWrapper::to_ImU32(color));
+                ImGui::Dummy(ImVec2(rect_size, rect_size));
+            }
+            );
+          
+          ++row_count;
+        }
+
         // add dummy rows to keep dialog size fixed
-        for (unsigned int i = row_count; i < 4; ++i) {
+        for (unsigned int i = row_count; i < 5; ++i) {
             add_strings_row_to_table(*m_imgui, " ", ImGuiWrapper::COL_ORANGE_LIGHT, " ", ImGui::GetStyleColorVec4(ImGuiCol_Text));
         }
 
