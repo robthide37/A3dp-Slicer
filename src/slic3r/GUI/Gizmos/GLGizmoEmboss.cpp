@@ -2402,9 +2402,9 @@ void GLGizmoEmboss::draw_style_edit() {
             style.prop.boldness = stored_style->prop.boldness;
             style.prop.skew = stored_style->prop.skew;
 
-            std::optional<wxFont> new_wx_font = WxFontUtils::load_wxFont(style.path);
-            if (new_wx_font.has_value() && 
-                m_style_manager.set_wx_font(*new_wx_font))
+            wxFont new_wx_font = WxFontUtils::load_wxFont(style.path);
+            if (new_wx_font.IsOk() && 
+                m_style_manager.set_wx_font(new_wx_font))
                 exist_change = true;
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("Revert font changes.").c_str());
@@ -3016,7 +3016,6 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
         return es.name == style.name;
     };
 
-    int    wx_font_opt;
     wxFont wx_font;
     bool is_path_changed = false;
     if (style.type == WxFontUtils::get_actual_type())
