@@ -20,6 +20,7 @@
 
 #include <boost/assign.hpp>
 #include <boost/bimap.hpp>
+#include <boost/filesystem.hpp>
 
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/replace.hpp>
