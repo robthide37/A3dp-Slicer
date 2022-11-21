@@ -29,6 +29,7 @@ enum class SLAGizmoEventType : unsigned char {
     ShiftDown,
     ShiftUp,
     AltUp,
+    Escape,
     ApplyChanges,
     DiscardChanges,
     AutomaticGeneration,
