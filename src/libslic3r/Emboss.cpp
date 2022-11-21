@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <boost/nowide/convert.hpp>
-#include <ClipperUtils.hpp> // union_ex
+#include <boost/log/trivial.hpp>
+#include <ClipperUtils.hpp> // union_ex + for boldness(polygon extend(offset))
 #include "IntersectionPoints.hpp"
 
 #define STB_TRUETYPE_IMPLEMENTATION // force following include to generate implementation
@@ -12,12 +13,11 @@
 #include <Triangulation.hpp> // CGAL project
 #include "libslic3r.h"
 
-#include "ClipperUtils.hpp" // for boldness - polygon extend(offset)
-
 // to heal shape
 #include "ExPolygonsIndex.hpp"
 #include "libslic3r/AABBTreeLines.hpp" // search structure for found close points
 #include "libslic3r/Line.hpp"
+#include "libslic3r/BoundingBox.hpp"
 
 using namespace Slic3r;
 // do not expose out of this file stbtt_ data types
