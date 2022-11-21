@@ -35,6 +35,8 @@
 #include <wx/fontdlg.h>
 #include <wx/fontenum.h>
 
+#include <boost/log/trivial.hpp>
+
 #include <GL/glew.h>
 #include <chrono> // measure enumeration of fonts
 
@@ -53,7 +55,6 @@
 #define SHOW_FINE_POSITION
 #define SHOW_WX_WEIGHT_INPUT
 #define DRAW_PLACE_TO_ADD_TEXT
-#define ALLOW_REVERT_ALL_STYLES
 #endif // ALLOW_DEBUG_MODE
 
 using namespace Slic3r;
@@ -1313,6 +1314,7 @@ static std::string concat(std::vector<wxString> data) {
     return ss.str();
 }
 
+#include <boost/filesystem.hpp>
 static boost::filesystem::path get_fontlist_cache_path()
 {
     return boost::filesystem::path(data_dir()) / "cache" / "fonts.cereal";
@@ -1351,6 +1353,7 @@ template<class Archive> void serialize(Archive &ar, FacenamesSerializer &t, cons
 }
 CEREAL_CLASS_VERSION(FacenamesSerializer, FACENAMES_VERSION); // register class version
 
+#include <boost/nowide/fstream.hpp>
 bool GLGizmoEmboss::store(const Facenames &facenames) {
     std::string cache_path = get_fontlist_cache_path().string();
     boost::nowide::ofstream file(cache_path, std::ios::binary);
@@ -2013,16 +2016,6 @@ void GLGizmoEmboss::draw_delete_style_button() {
     }
 }
 
-void GLGizmoEmboss::draw_revert_all_styles_button() {
-    if (draw_button(IconType::revert_all)) {
-        m_style_manager = StyleManager(m_imgui->get_glyph_ranges());
-        m_style_manager.init(nullptr, create_default_styles());
-        assert(m_style_manager.get_font_file_with_cache().has_value());
-        process();
-    } else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Revert all styles").c_str());
-}
-
 void GLGizmoEmboss::fix_transformation(const FontProp &from,
                                        const FontProp &to)
 {
@@ -2166,11 +2159,6 @@ void GLGizmoEmboss::draw_style_list() {
 
     ImGui::SameLine();
     draw_style_add_button();
-        
-#ifdef ALLOW_REVERT_ALL_STYLES
-    ImGui::SameLine();
-    draw_revert_all_styles_button();
-#endif // ALLOW_REVERT_ALL_STYLES
 
     // delete button
     ImGui::SameLine();
@@ -3137,7 +3125,6 @@ void GLGizmoEmboss::init_icons()
         "make_unbold.svg",   
         "search.svg",
         "open.svg",
-        "revert_all_.svg",
         "add_text_part.svg",
         "add_text_negative.svg",
         "add_text_modifier.svg"

@@ -105,7 +105,6 @@ private:
     void fix_transformation(const FontProp &from, const FontProp &to);
     void draw_style_list();
     void draw_delete_style_button();
-    void draw_revert_all_styles_button();
     void draw_style_rename_popup();
     void draw_style_rename_button();
     void draw_style_save_button(bool is_modified);
@@ -323,7 +322,6 @@ private:
         unbold,
         system_selector,
         open_file,
-        revert_all,
         // VolumeType icons
         part,
         negative,
