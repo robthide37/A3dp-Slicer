@@ -13,7 +13,7 @@
 
 #include <utility>
 
-#include <libslic3r/Optimize/Optimizer.hpp>
+#include "Optimizer.hpp"
 
 namespace Slic3r { namespace opt {
 
@@ -64,11 +64,35 @@ struct NLopt { // Helper RAII class for nlopt_opt
 
 template<class Method> class NLoptOpt {};
 
+// Map a generic function to each argument following the mapping function
+template<class Fn, class...Args>
+Fn for_each_argument(Fn &&fn, Args&&...args)
+{
+    // see https://www.fluentcpp.com/2019/03/05/for_each_arg-applying-a-function-to-each-argument-of-a-function-in-cpp/
+    (fn(std::forward<Args>(args)),...);
+
+    return fn;
+}
+
+template<class Fn, class...Args>
+Fn for_each_in_tuple(Fn fn, const std::tuple<Args...> &tup)
+{
+    auto arg = std::tuple_cat(std::make_tuple(fn), tup);
+    auto mpfn = [](auto fn, auto...pack) {
+        return for_each_argument(fn, pack...);
+    };
+    std::apply(mpfn, arg);
+
+    return fn;
+}
+
 // Optimizers based on NLopt.
 template<nlopt_algorithm alg> class NLoptOpt<NLoptAlg<alg>> {
 protected:
     StopCriteria m_stopcr;
     OptDir m_dir = OptDir::MIN;
+
+    static constexpr double ConstraintEps = 1e-6;
 
     template<class Fn> using TOptData =
         std::tuple<std::remove_reference_t<Fn>*, NLoptOpt*, nlopt_opt>;
@@ -78,7 +102,7 @@ protected:
                           double *gradient,
                           void *data)
     {
-        assert(n >= N);
+        assert(n == N);
 
         auto tdata = static_cast<TOptData<Fn>*>(data);
 
@@ -99,6 +123,21 @@ protected:
         }
 
         return scoreval;
+    }
+
+    template<class Fn, size_t N>
+    static double constrain_func(unsigned n, const double *params,
+                                  double *gradient,
+                                  void *data)
+    {
+        assert(n == N);
+
+        auto tdata = static_cast<TOptData<Fn>*>(data);
+
+        auto &fnptr  = std::get<0>(*tdata);
+        auto funval = to_arr<N>(params);
+
+       return (*fnptr)(funval);
     }
 
     template<size_t N>
@@ -125,12 +164,29 @@ protected:
             nlopt_set_maxeval(nl.ptr, m_stopcr.max_iterations());
     }
 
-    template<class Fn, size_t N>
-    Result<N> optimize(NLopt &nl, Fn &&fn, const Input<N> &initvals)
+    template<class Fn, size_t N, class...EqFns, class...IneqFns>
+    Result<N> optimize(NLopt &nl, Fn &&fn, const Input<N> &initvals,
+                       const std::tuple<EqFns...> &equalities,
+                       const std::tuple<IneqFns...> &inequalities)
     {
         Result<N> r;
 
         TOptData<Fn> data = std::make_tuple(&fn, this, nl.ptr);
+
+        auto do_for_each_eq = [this, &nl](auto &&arg) {
+            auto data = std::make_tuple(&arg, this, nl.ptr);
+            using F = std::remove_cv_t<decltype(arg)>;
+            nlopt_add_equality_constraint (nl.ptr, constrain_func<F, N>, &data, ConstraintEps);
+        };
+
+        auto do_for_each_ineq = [this, &nl](auto &&arg) {
+            auto data = std::make_tuple(&arg, this, nl.ptr);
+            using F = std::remove_cv_t<decltype(arg)>;
+            nlopt_add_inequality_constraint (nl.ptr, constrain_func<F, N>, &data, ConstraintEps);
+        };
+
+        for_each_in_tuple(do_for_each_eq, equalities);
+        for_each_in_tuple(do_for_each_ineq, inequalities);
 
         switch(m_dir) {
         case OptDir::MIN:
@@ -147,15 +203,18 @@ protected:
 
 public:
 
-    template<class Func, size_t N>
+    template<class Func, size_t N, class...EqFns, class...IneqFns>
     Result<N> optimize(Func&& func,
                        const Input<N> &initvals,
-                       const Bounds<N>& bounds)
+                       const Bounds<N>& bounds,
+                       const std::tuple<EqFns...> &equalities,
+                       const std::tuple<IneqFns...> &inequalities)
     {
         NLopt nl{alg, N};
         set_up(nl, bounds);
 
-        return optimize(nl, std::forward<Func>(func), initvals);
+        return optimize(nl, std::forward<Func>(func), initvals,
+                        equalities, inequalities);
     }
 
     explicit NLoptOpt(const StopCriteria &stopcr = {}) : m_stopcr(stopcr) {}
@@ -173,10 +232,12 @@ class NLoptOpt<NLoptAlgComb<glob, loc>>: public NLoptOpt<NLoptAlg<glob>>
     using Base = NLoptOpt<NLoptAlg<glob>>;
 public:
 
-    template<class Fn, size_t N>
+    template<class Fn, size_t N, class...EqFns, class...IneqFns>
     Result<N> optimize(Fn&& f,
                        const Input<N> &initvals,
-                       const Bounds<N>& bounds)
+                       const Bounds<N>& bounds,
+                       const std::tuple<EqFns...> &equalities,
+                       const std::tuple<IneqFns...> &inequalities)
     {
         NLopt nl_glob{glob, N}, nl_loc{loc, N};
 
@@ -184,7 +245,8 @@ public:
         Base::set_up(nl_loc, bounds);
         nlopt_set_local_optimizer(nl_glob.ptr, nl_loc.ptr);
 
-        return Base::optimize(nl_glob, std::forward<Fn>(f), initvals);
+        return Base::optimize(nl_glob, std::forward<Fn>(f), initvals,
+                              equalities, inequalities);
     }
 
     explicit NLoptOpt(StopCriteria stopcr = {}) : Base{stopcr} {}
@@ -201,12 +263,16 @@ public:
     Optimizer& to_max() { m_opt.set_dir(detail::OptDir::MAX); return *this; }
     Optimizer& to_min() { m_opt.set_dir(detail::OptDir::MIN); return *this; }
 
-    template<class Func, size_t N>
+    template<class Func, size_t N, class...EqFns, class...IneqFns>
     Result<N> optimize(Func&& func,
                        const Input<N> &initvals,
-                       const Bounds<N>& bounds)
+                       const Bounds<N>& bounds,
+                       const std::tuple<EqFns...> &eq_constraints = {},
+                       const std::tuple<IneqFns...> &ineq_constraint = {})
     {
-        return m_opt.optimize(std::forward<Func>(func), initvals, bounds);
+        return m_opt.optimize(std::forward<Func>(func), initvals, bounds,
+                              eq_constraints,
+                              ineq_constraint);
     }
 
     explicit Optimizer(StopCriteria stopcr = {}) : m_opt(stopcr) {}
@@ -225,7 +291,9 @@ public:
 using AlgNLoptGenetic = detail::NLoptAlgComb<NLOPT_GN_ESCH>;
 using AlgNLoptSubplex = detail::NLoptAlg<NLOPT_LN_SBPLX>;
 using AlgNLoptSimplex = detail::NLoptAlg<NLOPT_LN_NELDERMEAD>;
+using AlgNLoptCobyla  = detail::NLoptAlg<NLOPT_LN_COBYLA>;
 using AlgNLoptDIRECT  = detail::NLoptAlg<NLOPT_GN_DIRECT>;
+using AlgNLoptISRES   = detail::NLoptAlg<NLOPT_GN_ISRES>;
 using AlgNLoptMLSL    = detail::NLoptAlgComb<NLOPT_GN_MLSL, NLOPT_LN_SBPLX>;
 
 }} // namespace Slic3r::opt
