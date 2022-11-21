@@ -175,9 +175,9 @@ std::optional<wxFont> WxFontUtils::load_wxFont(
     const std::string &font_descriptor)
 {
     wxString font_descriptor_wx(font_descriptor);
-    wxFont   wx_font(font_descriptor_wx);
-    if (!wx_font.IsOk()) return {};
-    return wx_font;
+    std::optional<wxFont> res = std::make_optional<wxFont>(font_descriptor_wx);
+    if (!res->IsOk()) return {};
+    return res;
 }
 
 using TypeToFamily = boost::bimap<wxFontFamily, std::string_view>;
@@ -244,9 +244,9 @@ std::optional<wxFont> WxFontUtils::create_wxFont(const EmbossStyle &style)
     // default:
     //}
 
-    wxFont font(info);
-    if (!font.IsOk()) return {};
-    return font;
+    std::optional<wxFont> res = std::make_optional<wxFont>(info);
+    if (!res->IsOk()) return {};
+    return res;
 }
 
 void WxFontUtils::update_property(FontProp &font_prop, const wxFont &font)
