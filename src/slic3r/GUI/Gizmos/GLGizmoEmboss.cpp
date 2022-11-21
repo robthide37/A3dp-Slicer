@@ -177,6 +177,10 @@ namespace priv {
 /// <returns>Base data for emboss text</returns>
 static DataBase create_emboss_data_base(const std::string &text, StyleManager &style_manager);
 
+static void message_disable_cut_surface(){
+    wxMessageBox(_L("Can NOT cut surface from nothing. Function 'use surface' was disabled for this text."),
+                 _L("Disable 'use surface' from style"), wxOK | wxICON_WARNING);}
+
 } // namespace priv
 
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
@@ -207,7 +211,11 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     FontProp& prop = emboss_data.text_configuration.style.prop;
     
     // can't create new object with using surface
-    if (prop.use_surface) prop.use_surface = false;
+    if (prop.use_surface) { 
+        priv::message_disable_cut_surface();
+        prop.use_surface = false; 
+    }
+
     // can't create new object with distance from surface
     if (prop.distance.has_value()) prop.distance.reset();
 
@@ -875,23 +883,27 @@ bool GLGizmoEmboss::start_volume_creation(ModelVolumeType volume_type, const Vec
     apply_transformation(font_prop, surface_trmat);
     Transform3d volume_trmat = hit_instance_trmat.inverse() * hit_object_trmat * surface_trmat;
 
+    bool &use_surface = emboss_data.text_configuration.style.prop.use_surface;
     std::unique_ptr<GUI::Job> job;
-    if (!emboss_data.text_configuration.style.prop.use_surface) {
-        // create volume
-        DataCreateVolume data{std::move(emboss_data), volume_type, object_idx_signed, volume_trmat};
-        job = std::make_unique<CreateVolumeJob>(std::move(data));        
-    } else { 
+    if (use_surface) { 
         // Model to cut surface from.
         SurfaceVolumeData::ModelSources sources = create_sources(obj->volumes);
-        if (sources.empty()) return false;
-
-        bool is_outside = volume_type == ModelVolumeType::MODEL_PART;
-        // check that there is not unexpected volume type
-        assert(is_outside || 
-            volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
-            volume_type == ModelVolumeType::PARAMETER_MODIFIER);
-        CreateSurfaceVolumeData surface_data{std::move(emboss_data), volume_trmat, is_outside, std::move(sources), volume_type, object_idx_signed};
-        job = std::make_unique<CreateSurfaceVolumeJob>(std::move(surface_data));
+        if (sources.empty()) { 
+            priv::message_disable_cut_surface();
+            use_surface = false;
+        } else {
+            bool is_outside = volume_type == ModelVolumeType::MODEL_PART;
+            // check that there is not unexpected volume type
+            assert(is_outside || volume_type == ModelVolumeType::NEGATIVE_VOLUME || volume_type == ModelVolumeType::PARAMETER_MODIFIER);
+            CreateSurfaceVolumeData surface_data{std::move(emboss_data), volume_trmat, is_outside,
+                                                 std::move(sources),     volume_type,  object_idx_signed};
+            job = std::make_unique<CreateSurfaceVolumeJob>(std::move(surface_data));
+        }
+    }
+    if (!use_surface) {
+        // create volume
+        DataCreateVolume data{std::move(emboss_data), volume_type, object_idx_signed, volume_trmat};
+        job = std::make_unique<CreateVolumeJob>(std::move(data));
     }
     Worker &worker = plater->get_ui_job_worker();
     queue_job(worker, std::move(job));
@@ -996,8 +1008,15 @@ bool GLGizmoEmboss::process()
     std::unique_ptr<Job> job = nullptr;
 
     // check cutting from source mesh
-    const TextConfiguration &tc = data.text_configuration;
-    if (tc.style.prop.use_surface) {
+    bool &use_surface = data.text_configuration.style.prop.use_surface;
+    bool  is_object   = m_volume->get_object()->volumes.size() == 1;
+    if (use_surface && is_object) {
+        priv::message_disable_cut_surface();
+        use_surface = false;
+    }
+
+
+    if (use_surface) {
         // Model to cut surface from.
         SurfaceVolumeData::ModelSources sources = create_volume_sources(m_volume);
         if (sources.empty()) return false;
