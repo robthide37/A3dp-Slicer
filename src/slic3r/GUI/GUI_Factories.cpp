@@ -963,24 +963,35 @@ void MenuFactory::append_menu_items_mirror(wxMenu* menu)
         []() { return plater()->can_mirror(); }, m_parent);
 }
 
-void MenuFactory::append_menu_item_edit_text(wxMenu *menu) {
+void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
+{
     wxString name        = _L("Edit text");
+
+    auto can_edit_text = []() {
+        const auto& sel = plater()->get_selection();
+        if (sel.volumes_count() != 1) return false;
+        auto cid = sel.get_volume(*sel.get_volume_idxs().begin());
+        const ModelVolume* vol = plater()->canvas3D()->get_model()
+            ->objects[cid->object_idx()]->volumes[cid->volume_idx()];
+        return vol->text_configuration.has_value();
+    };
+
+    if (menu == &m_object_menu) {
+        auto menu_item_id = menu->FindItem(name);
+        if (menu_item_id != wxNOT_FOUND)
+            menu->Destroy(menu_item_id);
+        if (!can_edit_text())
+            return;
+    }
+
     wxString description = _L("Ability to change text, font, size, ...");
     std::string icon = "";
     append_menu_item(
         menu, wxID_ANY, name, description,
-        [](wxCommandEvent &) {
+        [can_edit_text](wxCommandEvent &) {
             plater()->canvas3D()->get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
         },
-        icon, nullptr,
-        []() { 
-            const auto& sel = plater()->get_selection();
-            if (sel.volumes_count() != 1) return false;
-            auto cid = sel.get_volume(*sel.get_volume_idxs().begin());
-            const ModelVolume *vol = plater()->canvas3D()->get_model()
-                ->objects[cid->object_idx()]->volumes[cid->volume_idx()];
-            return vol->text_configuration.has_value();
-        }, m_parent);
+        icon, nullptr, can_edit_text, m_parent);
 }
 
 MenuFactory::MenuFactory()
@@ -1139,6 +1150,7 @@ wxMenu* MenuFactory::object_menu()
     append_menu_item_change_extruder(&m_object_menu);
     update_menu_items_instance_manipulation(mtObjectFFF);
     append_menu_item_invalidate_cut_info(&m_object_menu);
+    append_menu_item_edit_text(&m_object_menu);
 
     return &m_object_menu;
 }
@@ -1149,6 +1161,7 @@ wxMenu* MenuFactory::sla_object_menu()
     append_menu_item_settings(&m_sla_object_menu);
     update_menu_items_instance_manipulation(mtObjectSLA);
     append_menu_item_invalidate_cut_info(&m_sla_object_menu);
+    append_menu_item_edit_text(&m_sla_object_menu);
 
     return &m_sla_object_menu;
 }

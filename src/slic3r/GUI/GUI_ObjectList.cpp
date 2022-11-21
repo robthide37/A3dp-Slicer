@@ -683,6 +683,10 @@ void ObjectList::update_name_in_list(int obj_idx, int vol_idx) const
         return;
 
     m_objects_model->SetName(new_name, item);
+
+    // if object has just one volume, rename object too
+    if (ModelObject* obj = object(obj_idx); obj->volumes.size() == 1)
+        obj->name = obj->volumes.front()->name;
 }
 
 void ObjectList::selection_changed()
