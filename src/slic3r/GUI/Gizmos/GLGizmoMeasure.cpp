@@ -354,6 +354,10 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
                 else {
                     if (!m_selected_features.second.feature.has_value())
                         m_selected_features.first.reset();
+                    else {
+                        m_selected_features.first = m_selected_features.second;
+                        m_selected_features.second.reset();
+                    }
                 }
             }
             else {
@@ -850,7 +854,7 @@ void GLGizmoMeasure::on_render()
     };
 
     auto hover_selection_color = [this]() {
-        return !m_selected_features.first.feature.has_value() ? SELECTED_1ST_COLOR : SELECTED_2ND_COLOR;
+        return (!m_selected_features.first.feature.has_value() || *m_curr_feature == *m_selected_features.first.feature) ? SELECTED_1ST_COLOR : SELECTED_2ND_COLOR;
     };
 
     auto hovering_color = [this, hover_selection_color, &selection]() {
@@ -1690,14 +1694,27 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 std::string text;
                 ColorRGBA color;
                 if (m_selected_features.second.feature.has_value()) {
-                    if (m_selected_features.second.feature == m_curr_feature && m_mode == EMode::FeatureSelection)
+                    if (m_selected_features.first.feature == m_curr_feature && m_mode == EMode::FeatureSelection) {
                         text = _u8L("Unselect feature");
-                    else if (m_hover_id == SELECTION_2_ID)
+                        color = SELECTED_1ST_COLOR;
+                    }
+                    else if (m_selected_features.second.feature == m_curr_feature && m_mode == EMode::FeatureSelection) {
+                        text = _u8L("Unselect feature");
+                        color = SELECTED_2ND_COLOR;
+                    }
+                    else if (m_hover_id == SELECTION_1_ID) {
                         text = (m_mode == EMode::CenterSelection) ? _u8L("Unselect center") : _u8L("Unselect point");
-                    else
+                        color = SELECTED_1ST_COLOR;
+                    }
+                    else if (m_hover_id == SELECTION_2_ID) {
+                        text = (m_mode == EMode::CenterSelection) ? _u8L("Unselect center") : _u8L("Unselect point");
+                        color = SELECTED_2ND_COLOR;
+                    }
+                    else {
                         text = (m_mode == EMode::PointSelection) ? _u8L("Select point") :
                             (m_mode == EMode::CenterSelection) ? _u8L("Select center") : _u8L("Select feature");
-                    color = SELECTED_2ND_COLOR;
+                        color = SELECTED_2ND_COLOR;
+                    }
                 }
                 else {
                     if (m_selected_features.first.feature.has_value()) {
