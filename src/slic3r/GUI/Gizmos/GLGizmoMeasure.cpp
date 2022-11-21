@@ -401,12 +401,6 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
         if ((m_mode != EMode::CenterSelection && mouse_event.CmdDown()) || (m_mode == EMode::CenterSelection && m_hover_id != SELECTION_1_ID && m_hover_id != SELECTION_2_ID)) {
             return false;
         }
-
-        if (mouse_event.ShiftDown()) {
-            m_selected_features.reset();
-            m_selection_raycasters.clear();
-            m_parent.request_extra_frame();
-        }
     }
     else if (mouse_event.Leaving())
         m_mouse_left_down = false;
@@ -476,6 +470,11 @@ bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_po
         m_ctrl_kar_filter.reset_count();
         m_mode = control_down ? EMode::PointSelection : EMode::FeatureSelection;
         restore_scene_raycasters_state();
+    }
+    else if (action == SLAGizmoEventType::Delete) {
+        m_selected_features.reset();
+        m_selection_raycasters.clear();
+        m_parent.request_extra_frame();
     }
 
     return true;
@@ -1735,7 +1734,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
         }
 
         if (m_selected_features.first.feature.has_value()) {
-            add_strings_row_to_table(*m_imgui, _u8L("Shift") + "+" + _u8L("Right mouse button"), ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Restart selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, _u8L("Delete"), ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Restart selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ++row_count;
         }
 
