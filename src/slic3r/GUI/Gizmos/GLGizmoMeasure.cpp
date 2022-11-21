@@ -968,7 +968,7 @@ void GLGizmoMeasure::update_if_needed()
 //              continue;
 
             TriangleMesh volume_mesh = vol.volume->mesh();
-            volume_mesh.transform(vol.instance->get_transformation().get_matrix() * vol.volume->get_transformation().get_matrix());
+            volume_mesh.transform(vol.world_trafo);
             composite_mesh.merge(volume_mesh);
         }
 
@@ -987,10 +987,17 @@ void GLGizmoMeasure::update_if_needed()
     volumes_cache.reserve(idxs.size());
     for (unsigned int idx : idxs) {
         const GLVolume* v = selection.get_volume(idx);
+        const int volume_idx = v->volume_idx();
+        if (volume_idx < 0)
+            continue;
+
         const ModelObject* obj = selection.get_model()->objects[v->object_idx()];
         const ModelInstance* inst = obj->instances[v->instance_idx()];
-        const ModelVolume* vol = obj->volumes[v->volume_idx()];
-        const VolumeCacheItem item = { obj, inst, vol, inst->get_matrix() * vol->get_matrix() };
+        const ModelVolume* vol = obj->volumes[volume_idx];
+        const VolumeCacheItem item = {
+            obj, inst, vol,
+            Geometry::translation_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * inst->get_matrix() * vol->get_matrix()
+        };
         volumes_cache.emplace_back(item);
     }
 
