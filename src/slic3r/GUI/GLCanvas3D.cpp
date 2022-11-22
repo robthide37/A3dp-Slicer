@@ -5682,6 +5682,7 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
 #if ENABLE_RAYCAST_PICKING
         const Camera& main_camera = wxGetApp().plater()->get_camera();
         Camera framebuffer_camera;
+        framebuffer_camera.set_type(main_camera.get_type());
         const Camera* camera = &main_camera;
         if (use_framebuffer) {
             // setup a camera which covers only the selection rectangle
