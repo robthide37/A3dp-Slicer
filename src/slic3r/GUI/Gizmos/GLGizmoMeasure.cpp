@@ -254,7 +254,6 @@ GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filen
 bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
 {
     m_mouse_pos = { double(mouse_event.GetX()), double(mouse_event.GetY()) };
-    m_dragging = false;
 
     if (mouse_event.Moving()) {
         // only for sure 
@@ -262,8 +261,6 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
         return false;
     }
     else if (mouse_event.Dragging()) {
-        m_dragging = true;
-
         // Enable/Disable panning/rotating the 3D scene 
         // Ctrl is pressed or the mouse is not hovering a selected volume
         bool unlock_dragging = mouse_event.CmdDown() || (m_hover_id == -1 && !m_parent.get_selection().contains_volume(m_parent.get_first_hover_volume_idx()));
@@ -594,7 +591,7 @@ void GLGizmoMeasure::on_render()
             m_curr_point_on_feature_position.reset();
         }
         else {
-            std::optional<Measure::SurfaceFeature> curr_feature = m_dragging ? m_curr_feature :
+            std::optional<Measure::SurfaceFeature> curr_feature = wxGetMouseState().LeftIsDown() ? m_curr_feature :
                 mouse_on_object ? m_measuring->get_feature(model_facet_idx, position_on_model.cast<double>()) : std::nullopt;
 
             if (m_curr_feature != curr_feature ||
