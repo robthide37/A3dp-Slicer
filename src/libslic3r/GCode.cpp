@@ -1,4 +1,7 @@
 #include "libslic3r.h"
+#include "ExPolygon.hpp"
+#include "Flow.hpp"
+#include "GCode/OverhangProcessor.hpp"
 #include "I18N.hpp"
 #include "GCode.hpp"
 #include "Exception.hpp"
@@ -38,6 +41,7 @@
 #include "SVG.hpp"
 
 #include <tbb/parallel_for.h>
+#include <utility>
 
 // Intel redesigned some TBB interface considerably when merging TBB with their oneAPI set of libraries, see GH #7332.
 // We are using quite an old TBB 2017 U7. Before we update our build servers, let's use the old API, which is deprecated in up to date TBB.
@@ -2168,6 +2172,13 @@ LayerResult GCode::process_layer(
         }
     }
 
+    std::vector<Linef> layer_lines;
+    for (const LayerToPrint &layer_to_print : layers) {
+        std::vector<Linef> object_lines = to_unscaled_linesf(layer_to_print.object_layer->lslices);
+        layer_lines.insert(layer_lines.end() ,object_lines.begin(), object_lines.end());
+    }
+    m_prev_layer_boundary = AABBTreeLines::LinesDistancer<Linef>{std::move(layer_lines)};
+
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
     for (unsigned int extruder_id : layer_tools.extruders)
     {
@@ -2845,12 +2856,12 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             acceleration = m_config.first_layer_acceleration.value;
         } else if (this->object_layer_over_raft() && m_config.first_layer_acceleration_over_raft.value > 0) {
             acceleration = m_config.first_layer_acceleration_over_raft.value;
-        } else if (m_config.perimeter_acceleration.value > 0 && is_perimeter(path.role())) {
-            acceleration = m_config.perimeter_acceleration.value;
         } else if (m_config.bridge_acceleration.value > 0 && is_bridge(path.role())) {
             acceleration = m_config.bridge_acceleration.value;
         } else if (m_config.infill_acceleration.value > 0 && is_infill(path.role())) {
             acceleration = m_config.infill_acceleration.value;
+        } else if (m_config.perimeter_acceleration.value > 0 && is_perimeter(path.role())) {
+            acceleration = m_config.perimeter_acceleration.value;
         } else {
             acceleration = m_config.default_acceleration.value;
         }
@@ -2869,7 +2880,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             speed = m_config.get_abs_value("perimeter_speed");
         } else if (path.role() == erExternalPerimeter) {
             speed = m_config.get_abs_value("external_perimeter_speed");
-        } else if (path.role() == erOverhangPerimeter || path.role() == erBridgeInfill) {
+        } else if (path.role() == erOverhangPerimeter) {
+            float quality = estimate_overhang_quality(path, path.width, this->m_prev_layer_boundary);
+            speed = std::max(10.0, quality * m_config.get_abs_value("bridge_speed"));
+        } else if (path.role() == erBridgeInfill) {
             speed = m_config.get_abs_value("bridge_speed");
         } else if (path.role() == erInternalInfill) {
             speed = m_config.get_abs_value("infill_speed");

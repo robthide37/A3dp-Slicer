@@ -881,7 +881,7 @@ SupportPoints full_search(const PrintObject *po, const Params &params)
 
 struct LayerCurlingEstimator
 {
-    LD                                          prev_layer_lines = LD({});
+    LD                                          prev_layer_lines;
     Params                                      params;
     std::function<float(const ExtrusionLine &)> flow_width_getter;
 

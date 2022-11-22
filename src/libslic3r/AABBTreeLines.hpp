@@ -137,6 +137,13 @@ public:
         tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(this->lines);
     }
 
+    explicit LinesDistancer(std::vector<LineType> &&lines) : lines(lines)
+    {
+        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(this->lines);
+    }
+
+    LinesDistancer() = default;
+
     // negative sign means inside
     std::tuple<Floating, size_t, Vec<2, Floating>> signed_distance_from_lines_extra(const Vec<2, Scalar> &point) const
     {
