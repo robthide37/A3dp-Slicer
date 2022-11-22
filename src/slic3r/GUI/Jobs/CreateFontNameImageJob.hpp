@@ -7,6 +7,7 @@
 #include <wx/string.h>
 #include <wx/fontenc.h>
 #include "Job.hpp"
+#include "libslic3r/Point.hpp" // Vec2i
 
 namespace Slic3r::GUI {
 
