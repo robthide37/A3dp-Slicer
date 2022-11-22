@@ -1174,16 +1174,14 @@ void GLGizmoMeasure::render_dimensioning()
                     Vec3d new_pivot;
                     Transform3d scale_matrix;
 
-                    TrafoData(double ratio, const Vec3d& pivot) {
+                    TrafoData(double ratio, const Vec3d& old_pivot, const Vec3d& new_pivot) {
                         this->ratio = ratio;
                         this->scale_matrix = Geometry::scale_transform(ratio);
-                        this->old_pivot = pivot;
-                        this->new_pivot = { pivot.x(), pivot.y(), (this->scale_matrix * pivot).z() };
+                        this->old_pivot = old_pivot;
+                        this->new_pivot = new_pivot;
                     }
 
-                    Vec3d transform(const Vec3d& point) const {
-                        return this->scale_matrix * (point - this->old_pivot) + this->new_pivot;
-                    }
+                    Vec3d transform(const Vec3d& point) const { return this->scale_matrix * (point - this->old_pivot) + this->new_pivot; }
                 };
 
                 auto scale_feature = [](Measure::SurfaceFeature& feature, const TrafoData& trafo_data) {
@@ -1218,21 +1216,25 @@ void GLGizmoMeasure::render_dimensioning()
                     }
                   };
 
-                const TrafoData trafo_data(ratio, m_parent.get_selection().get_bounding_box().center());
-                scale_feature(*m_selected_features.first.feature, trafo_data);
-                scale_feature(*m_selected_features.second.feature, trafo_data);
-
+                // apply scale
                 TransformationType type;
                 type.set_world();
                 type.set_relative();
                 type.set_joint();
 
-                // apply scale
+                // scale selection
                 Selection& selection = m_parent.get_selection();
+                const Vec3d old_center = selection.get_bounding_box().center();
                 selection.setup_cache();
                 selection.scale(ratio * Vec3d::Ones(), type);
                 wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
                 wxGetApp().obj_manipul()->set_dirty();
+
+                // scale dimensioning
+                const Vec3d new_center = selection.get_bounding_box().center();
+                const TrafoData trafo_data(ratio, old_center, new_center);
+                scale_feature(*m_selected_features.first.feature, trafo_data);
+                scale_feature(*m_selected_features.second.feature, trafo_data);
 
                 // update measure on next call to data_changed()
                 m_pending_scale = true;
