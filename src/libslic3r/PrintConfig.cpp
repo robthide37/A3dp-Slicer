@@ -1065,6 +1065,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("parallel_objects_step", coFloat);
+    def->label = L("Parallel printing step");
+    def->category = OptionCategory::output;
+    def->tooltip = L("When multiple objects are present, instead of jumping form one to another at each layer"
+        " the printer will continue to print the curernt object layers up to this height before moving to the next object."
+        " (first layers will be still printed one by one)."
+        "\nThis feature also use the same extruder clearance radius field as 'complete individual objects' (complete_objects)"
+        ", but you can modify them to instead reflect the clerance of the nozzle, if this field reflect the z-clearance of it."
+        "\nThis field is exclusive with 'complete individual objects' (complete_objects). Set to 0 to deactivate.");
+    def->sidetext = L("mm");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("complete_objects_one_skirt", coBool);
     def->label = L("Allow only one skirt loop");
     def->category = OptionCategory::output;
@@ -7966,7 +7979,7 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
     double base_dist = 0;
     //std::cout << "START min_object_distance =>" << base_dist << "\n";
     const ConfigOptionBool* co_opt = config->option<ConfigOptionBool>("complete_objects");
-    if (co_opt && co_opt->value) {
+    if (config->option("parallel_objects_step")->getFloat() > 0 || co_opt && co_opt->value) {
         double skirt_dist = 0;
         try {
             std::vector<double> vals = dynamic_cast<const ConfigOptionFloats*>(config->option("nozzle_diameter"))->values;

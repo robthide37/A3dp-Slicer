@@ -2031,6 +2031,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "bed_shape", "bed_custom_texture", "bed_custom_model", 
         "brim_width", "brim_width_interior","brim_separation",
         "complete_objects",
+        "parallel_objects_step",
         "complete_objects_sort",
         "complete_objects_one_skirt",
         "brim_per_object",
@@ -3338,7 +3339,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             if (printer_technology == ptFFF) {
                 const Print* print = background_process.fff_print();
                 Polygons polygons;
-                if (print->config().complete_objects)
+                if (print->config().complete_objects || print->config().parallel_objects_step > 0)
                     Print::sequential_print_horizontal_clearance_valid(*print, &polygons);
                 view3D->get_canvas3d()->set_sequential_print_clearance_visible(true);
                 view3D->get_canvas3d()->set_sequential_print_clearance_render_fill(true);
