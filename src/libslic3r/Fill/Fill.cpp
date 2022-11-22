@@ -403,7 +403,7 @@ static void insert_fills_into_islands(Layer &layer, uint32_t fill_region_id, uin
 	    	}
 	    	assert(island);
 	    	if (island)
-				island->fills.push_back(LayerExtrusionRange{ fill_region_id, { fill_begin, fill_end }});
+	    		island->add_fill_range(LayerExtrusionRange{ fill_region_id, { fill_begin, fill_end }});
 	    }
     }
 }
@@ -550,14 +550,14 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 				collection.entities.reserve(island.thin_fills.size());
 				for (uint32_t fill_id : island.thin_fills)
 					collection.entities.push_back(layerm.thin_fills().entities[fill_id]->clone());
-				island.fills.push_back({ island.perimeters.region(), { uint32_t(layerm.m_fills.entities.size() - 1), uint32_t(layerm.m_fills.entities.size()) } });
+	    		island.add_fill_range({ island.perimeters.region(), { uint32_t(layerm.m_fills.entities.size() - 1), uint32_t(layerm.m_fills.entities.size()) } });
 			}
 			// Sort the fills by region ID.
 			std::sort(island.fills.begin(), island.fills.end(), [](auto &l, auto &r){ return l.region() < r.region() || (l.region() == r.region() && *l.begin() < *r.begin()); });
 			// Compress continuous fill ranges of the same region.
 			{
 				size_t k = 0;
-				for (size_t i = 0; i < island.fills.size(); ++ i) {
+				for (size_t i = 0; i < island.fills.size();) {
 					uint32_t region_id = island.fills[i].region();
 					uint32_t begin     = *island.fills[i].begin();
 					uint32_t end       = *island.fills[i].end();
@@ -565,6 +565,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 					for (; j < island.fills.size() && island.fills[j].region() == region_id && *island.fills[j].begin() == end; ++ j)
 						end = *island.fills[j].end();
 					island.fills[k ++] = { region_id, { begin, end } };
+					i = j;
 				}
 				island.fills.erase(island.fills.begin() + k, island.fills.end());
 			}

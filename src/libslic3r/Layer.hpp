@@ -256,6 +256,14 @@ public:
 //    Point                 centroid;
 
     bool                  has_extrusions() const { return ! this->perimeters.empty() || ! this->fills.empty(); }
+
+    void                  add_fill_range(const LayerExtrusionRange &new_fill_range) {
+        // Compress ranges.
+        if (! this->fills.empty() && this->fills.back().region() == new_fill_range.region() && *this->fills.back().end() == *new_fill_range.begin())
+            this->fills.back() = { new_fill_range.region(), { *this->fills.back().begin(), *new_fill_range.end() } };
+        else
+            this->fills.push_back(new_fill_range);
+    }
 };
 
 static constexpr const size_t LayerIslandsStaticSize = 1;

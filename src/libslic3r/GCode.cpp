@@ -2430,12 +2430,13 @@ void GCode::process_layer_single_object(
                     }
                 };
                 auto process_infill = [&]() {
-                    for (auto it = island.fills.begin(); it != island.fills.end(); ++ it) {
+                    for (auto it = island.fills.begin(); it != island.fills.end();) {
                         // Gather range of fill ranges with the same region.
                         auto it_end = it;
                         for (++ it_end; it_end != island.fills.end() && it->region() == it_end->region(); ++ it_end) ;
                         const LayerRegion &layerm = *layer->get_region(it->region());
                         extrude_infill_range(layerm, layerm.fills(), it, it_end, false /* normal extrusions, not ironing */);
+                        it = it_end;
                     }
                 };
                 if (print.config().infill_first) {
@@ -2451,12 +2452,13 @@ void GCode::process_layer_single_object(
             // First Ironing changes extrusion rate quickly, second single ironing may be done over multiple perimeter regions.
             // Ironing in a second phase is safer, but it may be less efficient.
             for (const LayerIsland &island : lslice.islands) {
-                for (auto it = island.fills.begin(); it != island.fills.end(); ++ it) {
+                for (auto it = island.fills.begin(); it != island.fills.end();) {
                     // Gather range of fill ranges with the same region.
                     auto it_end = it;
                     for (++ it_end; it_end != island.fills.end() && it->region() == it_end->region(); ++ it_end) ;
                     const LayerRegion &layerm = *layer->get_region(it->region());
                     extrude_infill_range(layerm, layerm.fills(), it, it_end, true /* ironing, not normal extrusions */);
+                    it = it_end;
                 }
             }
         }
