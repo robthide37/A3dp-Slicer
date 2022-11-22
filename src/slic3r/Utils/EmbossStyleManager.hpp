@@ -7,6 +7,7 @@
 #include <imgui/imgui.h>
 #include <wx/font.h>
 #include <GL/glew.h>
+#include <libslic3r/BoundingBox.hpp>
 #include <libslic3r/Emboss.hpp>
 #include <libslic3r/AppConfig.hpp>
 
