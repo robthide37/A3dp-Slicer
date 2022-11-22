@@ -666,7 +666,7 @@ void GLGizmoMeasure::on_render()
                     return trafo * p.cast<double>();
                 }
             }
-            return Vec3d::Zero();
+            return Vec3d(DBL_MAX, DBL_MAX, DBL_MAX);
         };
 
         if (m_curr_feature.has_value()) {
@@ -683,8 +683,11 @@ void GLGizmoMeasure::on_render()
                 const std::optional<Vec3d> extra = m_curr_feature->get_extra_point();
                 if (extra.has_value() && m_hover_id == POINT_ID)
                     m_curr_point_on_feature_position = *extra;
-                else
-                    m_curr_point_on_feature_position = position_on_feature(EDGE_ID, camera, [](const Vec3f& v) { return Vec3f(0.0f, 0.0f, v.z()); });
+                else {
+                    const Vec3d pos = position_on_feature(EDGE_ID, camera, [](const Vec3f& v) { return Vec3f(0.0f, 0.0f, v.z()); });
+                    if (!pos.isApprox(Vec3d(DBL_MAX, DBL_MAX, DBL_MAX)))
+                        m_curr_point_on_feature_position = pos;
+                }
                 break;
             }
             case Measure::SurfaceFeatureType::Plane:
@@ -715,6 +718,7 @@ void GLGizmoMeasure::on_render()
         }
     }
     else {
+        m_curr_point_on_feature_position.reset();
         if (m_curr_feature.has_value() && m_curr_feature->get_type() == Measure::SurfaceFeatureType::Circle) {
             if (update_circle()) {
                 m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_ID);
