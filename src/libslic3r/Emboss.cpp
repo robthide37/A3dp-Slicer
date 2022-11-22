@@ -772,12 +772,13 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(
 
 std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(const char *file_path)
 {
-    FILE *file = fopen(file_path, "rb");
+    FILE *file = std::fopen(file_path, "rb");
     if (file == nullptr) {
         assert(false);
         BOOST_LOG_TRIVIAL(error) << "Couldn't open " << file_path << " for reading.";
         return nullptr;
     }
+    ScopeGuard sg([&file]() { std::fclose(file); });
 
     // find size of file
     if (fseek(file, 0L, SEEK_END) != 0) {
