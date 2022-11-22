@@ -28,7 +28,6 @@ public:
     static EmbossStyle create_emboss_style(const wxFont &font, const std::string& name = "");
 
     // load font used by Operating system as default GUI
-    static EmbossStyle    get_os_font();
     static std::string get_human_readable_name(const wxFont &font);
 
     // serialize / deserialize font

@@ -1,5 +1,6 @@
 #include "WxFontUtils.hpp"
 #include <boost/assign.hpp>
+#include <boost/log/trivial.hpp>
 
 #if defined(__APPLE__)
 #include <CoreText/CTFont.h>
@@ -141,14 +142,16 @@ EmbossStyle WxFontUtils::create_emboss_style(const wxFont &font, const std::stri
     return { name_item, fontDesc, type, font_prop };
 }
 
-EmbossStyle WxFontUtils::get_os_font()
-{
-    wxSystemFont system_font = wxSYS_DEFAULT_GUI_FONT;
-    wxFont       font        = wxSystemSettings::GetFont(system_font);
-    EmbossStyle  es          = create_emboss_style(font);
-    es.name += std::string(" (OS default)");
-    return es;
-}
+// NOT working on linux GTK2
+// load font used by Operating system as default GUI
+//EmbossStyle WxFontUtils::get_os_font()
+//{
+//    wxSystemFont system_font = wxSYS_DEFAULT_GUI_FONT;
+//    wxFont       font        = wxSystemSettings::GetFont(system_font);
+//    EmbossStyle  es          = create_emboss_style(font);
+//    es.name += std::string(" (OS default)");
+//    return es;
+//}
 
 std::string WxFontUtils::get_human_readable_name(const wxFont &font)
 {

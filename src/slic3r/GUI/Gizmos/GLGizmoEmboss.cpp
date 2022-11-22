@@ -824,7 +824,6 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
         WxFontUtils::create_emboss_style(*wxITALIC_FONT, _u8L("ITALIC")), // A font using the wxFONTFAMILY_ROMAN family and wxFONTSTYLE_ITALIC style and of the same size of wxNORMAL_FONT.
         WxFontUtils::create_emboss_style(*wxSWISS_FONT, _u8L("SWISS")),  // A font identic to wxNORMAL_FONT except for the family used which is wxFONTFAMILY_SWISS.
         WxFontUtils::create_emboss_style(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN"))
-        //, WxFontUtils::get_os_font() == wxNORMAL_FONT
     };
 }
 
@@ -1098,11 +1097,6 @@ void GLGizmoEmboss::draw_window()
 #ifdef ALLOW_DEBUG_MODE
     if (ImGui::Button("re-process")) process();
     if (ImGui::Button("add svg")) choose_svg_file();
-    if (ImGui::Button("use system font")) {
-        size_t font_index = m_style_items.size();
-        m_style_items.emplace_back(WxFontUtils::get_os_font());
-        bool loaded = load_style(font_index);
-    }
 #endif //  ALLOW_DEBUG_MODE
 
     bool is_activ_font = m_style_manager.is_activ_font();
