@@ -32,7 +32,7 @@ static std::array<Vec3d, 3> orthonormal_basis(const Vec3d& v)
     std::array<Vec3d, 3> ret;
     ret[2] = v.normalized();
     int index;
-    ret[2].maxCoeff(&index);
+    ret[2].cwiseAbs().maxCoeff(&index);
     switch (index)
     {
     case 0: { ret[0] = Vec3d(ret[2].y(), -ret[2].x(), 0.0).normalized(); break; }
