@@ -14,6 +14,8 @@
 
 #include <assert.h>
 
+#include <fast_float/fast_float.h>
+
 namespace Slic3r {
 
 CoolingBuffer::CoolingBuffer(GCode &gcodegen) : m_config(gcodegen.config()), m_toolchange_prefix(gcodegen.writer().toolchange_prefix()), m_current_extruder(0)
@@ -339,12 +341,13 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
     // for a sequence of extrusion moves.
     size_t            active_speed_modifier = size_t(-1);
 
+    std::vector<float> new_pos;
     for (; *line_start != 0; line_start = line_end) 
     {
         while (*line_end != '\n' && *line_end != 0)
             ++ line_end;
         // sline will not contain the trailing '\n'.
-        std::string sline(line_start, line_end);
+        std::string_view sline(line_start, line_end - line_start);
         // CoolingLine will contain the trailing '\n'.
         if (*line_end == '\n')
             ++ line_end;
@@ -358,20 +361,18 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         if (line.type) {
             // G0, G1 or G92
             // Parse the G-code line.
-            std::vector<float> new_pos(current_pos);
-            const char *c = sline.data() + 3;
-            for (;;) {
+            new_pos = current_pos;
+            for (auto c = sline.begin() + 3;;) {
                 // Skip whitespaces.
-                for (; *c == ' ' || *c == '\t'; ++ c);
-                if (*c == 0 || *c == ';')
+                for (; c != sline.end() && (*c == ' ' || *c == '\t'); ++ c);
+                if (c == sline.end() || *c == ';')
                     break;
 
-                assert(is_decimal_separator_point()); // for atof
                 // Parse the axis.
                 size_t axis = (*c >= 'X' && *c <= 'Z') ? (*c - 'X') :
                               (*c == extrusion_axis) ? 3 : (*c == 'F') ? 4 : size_t(-1);
                 if (axis != size_t(-1)) {
-                    new_pos[axis] = float(atof(++c));
+                    auto [pend, ec] = fast_float::from_chars(&*(++ c), sline.data() + sline.size(), new_pos[axis]);
                     if (axis == 4) {
                         // Convert mm/min to mm/sec.
                         new_pos[4] /= 60.f;
@@ -381,7 +382,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                     }
                 }
                 // Skip this word.
-                for (; *c != ' ' && *c != '\t' && *c != 0; ++ c);
+                for (; c != sline.end() && *c != ' ' && *c != '\t'; ++ c);
             }
             bool external_perimeter = boost::contains(sline, ";_EXTERNAL_PERIMETER");
             bool wipe               = boost::contains(sline, ";_WIPE");
@@ -460,7 +461,8 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             }
             active_speed_modifier = size_t(-1);
         } else if (boost::starts_with(sline, m_toolchange_prefix)) {
-            unsigned int new_extruder = (unsigned int)atoi(sline.c_str() + m_toolchange_prefix.size());
+            unsigned int new_extruder;
+            auto res = std::from_chars(sline.data() + m_toolchange_prefix.size(), sline.data() + sline.size(), new_extruder);
             // Only change extruder in case the number is meaningful. User could provide an out-of-range index through custom gcodes - those shall be ignored.
             if (new_extruder < map_extruder_to_per_extruder_adjustment.size()) {
                 if (new_extruder != current_extruder) {
@@ -485,10 +487,15 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             line.type = CoolingLine::TYPE_G4;
             size_t pos_S = sline.find('S', 3);
             size_t pos_P = sline.find('P', 3);
-            assert(is_decimal_separator_point()); // for atof
-            line.time = line.time_max = float(
-                (pos_S > 0) ? atof(sline.c_str() + pos_S + 1) :
-                (pos_P > 0) ? atof(sline.c_str() + pos_P + 1) * 0.001 : 0.);
+            bool   has_S = pos_S > 0;
+            bool   has_P = pos_P > 0;
+            if (has_S || has_P) {
+                auto [pend, ec] = fast_float::from_chars(sline.data() + (has_S ? pos_S : pos_P) + 1, sline.data() + sline.size(), line.time);
+                if (has_P)
+                    line.time *= 0.001f;
+            } else
+                line.time = 0;
+            line.time_max = line.time;
         }
         if (line.type != 0)
             adjustment->lines.emplace_back(std::move(line));
@@ -778,7 +785,8 @@ std::string CoolingBuffer::apply_layer_cooldown(
         if (line_start > pos)
             new_gcode.append(pos, line_start - pos);
         if (line->type & CoolingLine::TYPE_SET_TOOL) {
-            unsigned int new_extruder = (unsigned int)atoi(line_start + m_toolchange_prefix.size());
+            unsigned int new_extruder;
+            auto res = std::from_chars(line_start + m_toolchange_prefix.size(), line_end, new_extruder);
             if (new_extruder != m_current_extruder) {
                 m_current_extruder = new_extruder;
                 change_extruder_set_fan();
@@ -804,7 +812,10 @@ std::string CoolingBuffer::apply_layer_cooldown(
             // Remove the F word from the current G-code line.
             bool        remove          = false;
             assert(fpos != nullptr);
-            new_feedrate = line->slowdown ? int(floor(60. * line->feedrate + 0.5)) : atoi(fpos);
+            if (line->slowdown)
+                new_feedrate = int(floor(60. * line->feedrate + 0.5));
+            else
+                auto res = std::from_chars(fpos, line_end, new_feedrate);
             if (new_feedrate == current_feedrate) {
                 // No need to change the F value.
                 if ((line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE)) || line->length == 0.)
