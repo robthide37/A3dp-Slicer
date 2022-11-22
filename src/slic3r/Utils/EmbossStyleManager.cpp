@@ -1,5 +1,4 @@
 #include "EmbossStyleManager.hpp"
-#include <wx/font.h>
 #include <GL/glew.h> // Imgui texture
 #include <imgui/imgui_internal.h> // ImTextCharFromUtf8
 #include "WxFontUtils.hpp"

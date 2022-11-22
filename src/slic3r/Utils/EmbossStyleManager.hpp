@@ -5,11 +5,10 @@
 #include <optional>
 #include <string>
 #include <imgui/imgui.h>
+#include <wx/font.h>
 #include <GL/glew.h>
 #include <libslic3r/Emboss.hpp>
 #include <libslic3r/AppConfig.hpp>
-
-class wxFont; 
 
 namespace Slic3r::GUI::Emboss {
 /// <summary>
