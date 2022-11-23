@@ -756,12 +756,8 @@ void PreferencesDialog::msw_rescale()
 {
 	for (ConfigOptionsGroup* og : this->optgroups())
 		og->msw_rescale();
-#ifdef _WIN32
-	m_optgroup_dark_mode->msw_rescale();
-#endif //_WIN32
-#if ENABLE_ENVIRONMENT_MAP
-	m_optgroup_render->msw_rescale();
-#endif // ENABLE_ENVIRONMENT_MAP
+
+	update_ctrls_alignment();
 
     msw_buttons_rescale(this, em_unit(), { wxID_OK, wxID_CANCEL });
 

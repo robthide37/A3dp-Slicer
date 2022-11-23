@@ -2156,6 +2156,16 @@ void TabFilament::clear_pages()
 	m_cooling_description_line = nullptr;
 }
 
+void TabFilament::msw_rescale()
+{
+    for (const auto& over_opt : m_overrides_options) {
+        wxWindow* win = over_opt.second;
+        win->SetInitialSize(win->GetBestSize());
+    }
+
+    Tab::msw_rescale();
+}
+
 wxSizer* Tab::description_line_widget(wxWindow* parent, ogStaticText* *StaticText, wxString text /*= wxEmptyString*/)
 {
     *StaticText = new ogStaticText(parent, text);

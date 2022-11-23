@@ -386,6 +386,8 @@ void OG_CustomCtrl::correct_widgets_position(wxSizer* widget, const Line& line, 
 
 void OG_CustomCtrl::init_max_win_width()
 {
+    m_max_win_width = 0;
+
     if (opt_group->ctrl_horiz_alignment == wxALIGN_RIGHT && m_max_win_width == 0)
         for (CtrlLine& line : ctrl_lines) {
             if (int max_win_width = line.get_max_win_width();
@@ -419,7 +421,7 @@ void OG_CustomCtrl::msw_rescale()
     m_bmp_mode_sz       = get_bitmap_size(get_bmp_bundle("mode_simple", wxOSX ? 10 : 12), this);
     m_bmp_blinking_sz   = get_bitmap_size(get_bmp_bundle("search_blink"), this);
 
-    m_max_win_width = 0;
+    init_max_win_width();
 
     wxCoord    v_pos = 0;
     for (CtrlLine& line : ctrl_lines) {
