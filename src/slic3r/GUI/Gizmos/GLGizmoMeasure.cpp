@@ -751,7 +751,7 @@ void GLGizmoMeasure::on_render()
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
     };
 
-    auto set_emission_uniform = [this, shader](const ColorRGBA& color, bool hover) {
+    auto set_emission_uniform = [shader](const ColorRGBA& color, bool hover) {
         shader->set_uniform("emission_factor", (color == GLVolume::SELECTED_COLOR) ? 0.0f :
             hover ? 0.5f : 0.25f);
     };
@@ -873,7 +873,7 @@ void GLGizmoMeasure::on_render()
           SELECTED_1ST_COLOR : SELECTED_2ND_COLOR;
     };
 
-    auto hovering_color = [this, hover_selection_color, &selection]() {
+    auto hovering_color = [this, hover_selection_color]() {
         return (m_mode == EMode::PointSelection) ? GLVolume::SELECTED_COLOR : hover_selection_color();
     };
 
