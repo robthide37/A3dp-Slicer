@@ -743,9 +743,7 @@ boost::any& CheckBox::get_value()
 void CheckBox::msw_rescale()
 {
     Field::msw_rescale();
-
-    wxCheckBox* field = dynamic_cast<wxCheckBox*>(window);
-    field->SetMinSize(wxSize(-1, int(1.5f*field->GetFont().GetPixelSize().y +0.5f)));
+    window->SetInitialSize(window->GetBestSize());
 }
 
 

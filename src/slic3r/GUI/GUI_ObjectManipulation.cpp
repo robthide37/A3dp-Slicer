@@ -1409,7 +1409,7 @@ void ObjectManipulation::msw_rescale()
         editor->msw_rescale();
 
     // rescale "inches" checkbox
-    m_check_inch->SetMinSize(wxSize(-1, int(1.5f * m_check_inch->GetFont().GetPixelSize().y + 0.5f)));
+    m_check_inch->SetInitialSize(m_check_inch->GetBestSize());
 
     get_og()->msw_rescale();
 }
