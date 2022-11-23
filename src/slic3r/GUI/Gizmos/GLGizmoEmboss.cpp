@@ -1406,18 +1406,10 @@ void GLGizmoEmboss::init_face_names() {
     // to reload fonts from system, when install new one
     wxFontEnumerator::InvalidateCache();
 
-    auto create_truncated_names = [&facenames = m_face_names, &width = m_gui_cfg->face_name_max_width]() {
-        for (FaceName &face : facenames.faces) {
-            std::string name_str(face.wx_name.ToUTF8().data());
-            face.name_truncated = ImGuiWrapper::trunc(name_str, width);
-        }
-    };
-
     // try load cache
     // Only not OS enumerated face has hash value 0
     if (m_face_names.hash == 0) {
         load(m_face_names);
-        create_truncated_names();
     }
 
     using namespace std::chrono;
@@ -1459,11 +1451,11 @@ void GLGizmoEmboss::init_face_names() {
         auto it = std::lower_bound(bad.begin(), bad.end(), name);
         if (it != bad.end() && *it == name) return false;
 
-        //wxFont wx_font(wxFontInfo().FaceName(name).Encoding(encoding));
+        wxFont wx_font(wxFontInfo().FaceName(name).Encoding(encoding));
         //*
         // Faster chech if wx_font is loadable but not 100%
         // names could contain not loadable font
-        //if (!WxFontUtils::can_load(wx_font)) return false;
+        if (!WxFontUtils::can_load(wx_font)) return false;
 
         /*/
         // Slow copy of font files to try load font
@@ -1487,7 +1479,6 @@ void GLGizmoEmboss::init_face_names() {
         }
     }
     assert(std::is_sorted(m_face_names.bad.begin(), m_face_names.bad.end()));
-    create_truncated_names();
     store(m_face_names);
 }
 
@@ -1521,7 +1512,7 @@ void GLGizmoEmboss::init_font_name_texture() {
     }
 }
 
-void GLGizmoEmboss::draw_font_preview(FaceName& face)
+void GLGizmoEmboss::draw_font_preview(FaceName& face, bool is_visible)
 {
     unsigned int &count_opened_fonts = m_face_names.count_opened_font_files; 
     ImVec2 size(m_gui_cfg->face_name_size.x(), m_gui_cfg->face_name_size.y());
@@ -1533,11 +1524,11 @@ void GLGizmoEmboss::draw_font_preview(FaceName& face)
             size_t texture_index = face.texture_index;
             uv0                  = ImVec2(0.f, texture_index / (float) m_face_names.count_cached_textures),
             uv1                  = ImVec2(1.f, (texture_index + 1) / (float) m_face_names.count_cached_textures);
-        } else if (!ImGui::IsItemVisible()) {
+        } else if (!is_visible) {
             face.is_created = nullptr;
             face.cancel->store(true);
         }
-    } else if (ImGui::IsItemVisible() && count_opened_fonts < m_gui_cfg->max_count_opened_font_files) {
+    } else if (is_visible && count_opened_fonts < m_gui_cfg->max_count_opened_font_files) {
         ++count_opened_fonts;
         face.cancel     = std::make_shared<std::atomic_bool>(false);
         face.is_created = std::make_shared<bool>(false);
@@ -1647,7 +1638,13 @@ void GLGizmoEmboss::draw_font_list()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", wx_face_name.ToUTF8().data());
             if (is_selected) ImGui::SetItemDefaultFocus();
-            draw_font_preview(face);
+            bool is_visible = ImGui::IsItemVisible();
+            if (is_visible && face.name_truncated.empty()) {
+                float width = m_gui_cfg->face_name_max_width;
+                std::string name_str(face.wx_name.ToUTF8().data());
+                face.name_truncated = ImGuiWrapper::trunc(name_str, width);
+            }
+            draw_font_preview(face, is_visible);
         }        
 #ifdef SHOW_FONT_COUNT
         ImGui::TextColored(ImGuiWrapper::COL_GREY_LIGHT, "Count %d",

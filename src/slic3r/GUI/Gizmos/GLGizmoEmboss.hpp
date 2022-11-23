@@ -112,7 +112,7 @@ private:
     void draw_style_add_button();
     void init_font_name_texture();
     struct FaceName;
-    void draw_font_preview(FaceName &face);
+    void draw_font_preview(FaceName &face, bool is_visible);
     void draw_font_list();
     void draw_style_edit();
     bool draw_italic_button();
