@@ -1406,10 +1406,18 @@ void GLGizmoEmboss::init_face_names() {
     // to reload fonts from system, when install new one
     wxFontEnumerator::InvalidateCache();
 
+    auto create_truncated_names = [&facenames = m_face_names, &width = m_gui_cfg->face_name_max_width]() {
+        for (FaceName &face : facenames.faces) {
+            std::string name_str(face.wx_name.ToUTF8().data());
+            face.name_truncated = ImGuiWrapper::trunc(name_str, width);
+        }
+    };
+
     // try load cache
     // Only not OS enumerated face has hash value 0
     if (m_face_names.hash == 0) {
         load(m_face_names);
+        create_truncated_names();
     }
 
     using namespace std::chrono;
@@ -1479,6 +1487,7 @@ void GLGizmoEmboss::init_face_names() {
         }
     }
     assert(std::is_sorted(m_face_names.bad.begin(), m_face_names.bad.end()));
+    create_truncated_names();
     store(m_face_names);
 }
 
@@ -1638,13 +1647,7 @@ void GLGizmoEmboss::draw_font_list()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", wx_face_name.ToUTF8().data());
             if (is_selected) ImGui::SetItemDefaultFocus();
-            bool is_visible = ImGui::IsItemVisible();
-            if (is_visible && face.name_truncated.empty()) {
-                float width = m_gui_cfg->face_name_max_width;
-                std::string name_str(face.wx_name.ToUTF8().data());
-                face.name_truncated = ImGuiWrapper::trunc(name_str, width);
-            }
-            draw_font_preview(face, is_visible);
+            draw_font_preview(face, ImGui::IsItemVisible());
         }        
 #ifdef SHOW_FONT_COUNT
         ImGui::TextColored(ImGuiWrapper::COL_GREY_LIGHT, "Count %d",

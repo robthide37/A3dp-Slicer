@@ -1326,24 +1326,20 @@ std::string ImGuiWrapper::trunc(const std::string &text,
     text_width = calc_text_size(result_text).x;
     if (text_width < allowed_width) {
         // increase letter count
-        while (true) {
+        while (count_letter < text.length()) {
             ++count_letter;
             std::string_view act_text = text_.substr(0, count_letter);
             text_width = calc_text_size(act_text).x;
-            if (text_width < allowed_width) { 
-                result_text = std::move(act_text);
-                break; 
-            }            
+            if (text_width > allowed_width) break;
+            result_text = act_text;
         }
     } else {
         // decrease letter count
-        while (true) {
+        while (count_letter > 1) {
             --count_letter;
             result_text = text_.substr(0, count_letter);
             text_width  = calc_text_size(result_text).x;
-            if (text_width > allowed_width) break;
-            if (count_letter == 1) return "Error: No letters left. Can't return only tail.";
-            
+            if (text_width < allowed_width) break;            
         } 
     }
     return std::string(result_text) + tail;
