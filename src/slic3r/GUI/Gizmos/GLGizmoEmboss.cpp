@@ -1459,11 +1459,11 @@ void GLGizmoEmboss::init_face_names() {
         auto it = std::lower_bound(bad.begin(), bad.end(), name);
         if (it != bad.end() && *it == name) return false;
 
-        wxFont wx_font(wxFontInfo().FaceName(name).Encoding(encoding));
+        //wxFont wx_font(wxFontInfo().FaceName(name).Encoding(encoding));
         //*
         // Faster chech if wx_font is loadable but not 100%
         // names could contain not loadable font
-        if (!WxFontUtils::can_load(wx_font)) return false;
+        //if (!WxFontUtils::can_load(wx_font)) return false;
 
         /*/
         // Slow copy of font files to try load font
