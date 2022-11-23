@@ -81,6 +81,11 @@ Slic3r::Polygon CameraUtils::create_hull2d(const Camera &  camera,
 
 #include <igl/unproject.h>
 Vec3d CameraUtils::create_ray(const Camera &camera, const Vec2d &coor) {
+    if (camera.get_type() == Camera::EType::Ortho) 
+        return camera.get_dir_forward();
+    // check that it is known camera no other tha ORTHO or Persepective
+    assert(camera.get_type() == Camera::EType::Perspective);
+
     Matrix4d modelview  = camera.get_view_matrix().matrix();
     Matrix4d projection = camera.get_projection_matrix().matrix();
     Vec4i    viewport(camera.get_viewport().data());
