@@ -1,7 +1,5 @@
 #include "libslic3r.h"
-#include "ExPolygon.hpp"
-#include "Flow.hpp"
-#include "GCode/OverhangProcessor.hpp"
+#include "GCode/ExtrusionProcessor.hpp"
 #include "I18N.hpp"
 #include "GCode.hpp"
 #include "Exception.hpp"
@@ -41,7 +39,6 @@
 #include "SVG.hpp"
 
 #include <tbb/parallel_for.h>
-#include <utility>
 
 // Intel redesigned some TBB interface considerably when merging TBB with their oneAPI set of libraries, see GH #7332.
 // We are using quite an old TBB 2017 U7. Before we update our build servers, let's use the old API, which is deprecated in up to date TBB.
@@ -2172,12 +2169,12 @@ LayerResult GCode::process_layer(
         }
     }
 
-    std::vector<Linef> layer_lines;
+    std::vector<const Layer*> layers_ptrs;
+    layers_ptrs.reserve(layers.size());
     for (const LayerToPrint &layer_to_print : layers) {
-        std::vector<Linef> object_lines = to_unscaled_linesf(layer_to_print.object_layer->lslices);
-        layer_lines.insert(layer_lines.end() ,object_lines.begin(), object_lines.end());
+        layers_ptrs.push_back(layer_to_print.object_layer);
     }
-    m_prev_layer_boundary = AABBTreeLines::LinesDistancer<Linef>{std::move(layer_lines)};
+    m_extrusion_quality_estimator.prepare_for_new_layer(layers_ptrs);
 
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
     for (unsigned int extruder_id : layer_tools.extruders)
@@ -2708,6 +2705,7 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, const std::s
 
 std::string GCode::extrude_entity(const ExtrusionEntity &entity, const std::string_view description, double speed)
 {
+    m_extrusion_quality_estimator.reset_for_next_extrusion();
     if (const ExtrusionPath* path = dynamic_cast<const ExtrusionPath*>(&entity))
         return this->extrude_path(*path, description, speed);
     else if (const ExtrusionMultiPath* multipath = dynamic_cast<const ExtrusionMultiPath*>(&entity))
@@ -2880,10 +2878,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             speed = m_config.get_abs_value("perimeter_speed");
         } else if (path.role() == erExternalPerimeter) {
             speed = m_config.get_abs_value("external_perimeter_speed");
-        } else if (path.role() == erOverhangPerimeter) {
-            float quality = estimate_overhang_quality(path, path.width, this->m_prev_layer_boundary);
-            speed = std::max(10.0, quality * m_config.get_abs_value("bridge_speed"));
-        } else if (path.role() == erBridgeInfill) {
+        } else if (path.role() == erOverhangPerimeter || path.role() == erBridgeInfill) {
             speed = m_config.get_abs_value("bridge_speed");
         } else if (path.role() == erInternalInfill) {
             speed = m_config.get_abs_value("infill_speed");
@@ -2919,6 +2914,15 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm
         );
     }
+
+    bool               variable_speed = false;
+    double             last_set_speed = 0.0;
+    std::vector<float> points_quality{};
+    if (!this->on_first_layer() && is_perimeter(path.role())) {
+        points_quality = m_extrusion_quality_estimator.estimate_extrusion_quality(path);
+        variable_speed = std::any_of(points_quality.begin(), points_quality.end(), [](float q) { return q != 1.0; });
+    }
+
     double F = speed * 60;  // convert mm/sec to mm/min
 
     // extrude arc or line
@@ -2981,8 +2985,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
     }
 
     // F is mm per minute.
-    gcode += m_writer.set_speed(F, "", comment);
-    double path_length = 0.;
+    if (!variable_speed){
+        gcode += m_writer.set_speed(F, "", comment);
+    }
+
     {
         std::string comment;
         if (m_config.gcode_comments) {
@@ -2992,12 +2998,21 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         Vec2d prev = this->point_to_gcode_quantized(path.polyline.points.front());
         auto  it   = path.polyline.points.begin();
         auto  end  = path.polyline.points.end();
+        int i = 0;
         for (++ it; it != end; ++ it) {
+            if (variable_speed) {
+                double new_speed = std::max(5.0, points_quality[i] * speed);
+                if (last_set_speed != new_speed) {
+                    last_set_speed = new_speed;
+                    gcode += m_writer.set_speed(new_speed * 60.0, "", comment);
+                }
+            }
+
             Vec2d p = this->point_to_gcode_quantized(*it);
             const double line_length = (p - prev).norm();
-            path_length += line_length;
             gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
             prev = p;
+            i++;
         }
     }
     if (m_enable_cooling_markers)
