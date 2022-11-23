@@ -411,6 +411,8 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
 
 void GLGizmoMeasure::data_changed()
 {
+    m_parent.toggle_sla_auxiliaries_visibility(false, nullptr, -1);
+
     update_if_needed();
 
     m_last_inv_zoom = 0.0f;
@@ -500,6 +502,7 @@ bool GLGizmoMeasure::on_init()
 void GLGizmoMeasure::on_set_state()
 {
     if (m_state == Off) {
+        m_parent.toggle_sla_auxiliaries_visibility(true, nullptr, -1);
         m_ctrl_kar_filter.reset_count();
         m_shift_kar_filter.reset_count();
         m_curr_feature.reset();
