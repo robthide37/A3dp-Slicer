@@ -1,5 +1,7 @@
 #include <functional>
 #include <optional>
+#include <numeric>
+#include <unordered_set>
 
 #include <libslic3r/OpenVDBUtils.hpp>
 #include <libslic3r/TriangleMesh.hpp>

@@ -9,6 +9,8 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
+#include <boost/log/trivial.hpp>
+
 namespace Slic3r {
 
 // Same as walls() but with identical higher and lower polygons.
