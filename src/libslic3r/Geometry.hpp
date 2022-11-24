@@ -436,6 +436,8 @@ public:
 
     const Vec3d& get_rotation() const { return m_rotation; }
     double get_rotation(Axis axis) const { return m_rotation(axis); }
+
+    Transform3d get_rotation_matrix() const { return rotation_transform(get_rotation()); }
 #endif // ENABLE_WORLD_COORDINATE
 
     void set_rotation(const Vec3d& rotation);
@@ -454,6 +456,8 @@ public:
 #else
     const Vec3d& get_scaling_factor() const { return m_scaling_factor; }
     double get_scaling_factor(Axis axis) const { return m_scaling_factor(axis); }
+
+    Transform3d get_scaling_factor_matrix() const { return scale_transform(get_scaling_factor()); }
 #endif // ENABLE_WORLD_COORDINATE
 
     void set_scaling_factor(const Vec3d& scaling_factor);

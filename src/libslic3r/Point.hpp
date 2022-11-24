@@ -550,23 +550,21 @@ namespace boost { namespace polygon {
 
 // Serialization through the Cereal library
 namespace cereal {
-//	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2crd &v) { archive(v.x(), v.y()); }
-//	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3crd &v) { archive(v.x(), v.y(), v.z()); }
-	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2i   &v) { archive(v.x(), v.y()); }
-	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3i   &v) { archive(v.x(), v.y(), v.z()); }
-//	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2i64 &v) { archive(v.x(), v.y()); }
-//	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3i64 &v) { archive(v.x(), v.y(), v.z()); }
-	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2f   &v) { archive(v.x(), v.y()); }
-	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3f   &v) { archive(v.x(), v.y(), v.z()); }
-	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2d   &v) { archive(v.x(), v.y()); }
-	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3d   &v) { archive(v.x(), v.y(), v.z()); }
+//    template<class Archive> void serialize(Archive& archive, Slic3r::Vec2crd &v) { archive(v.x(), v.y()); }
+//    template<class Archive> void serialize(Archive& archive, Slic3r::Vec3crd &v) { archive(v.x(), v.y(), v.z()); }
+    template<class Archive> void serialize(Archive& archive, Slic3r::Vec2i   &v) { archive(v.x(), v.y()); }
+    template<class Archive> void serialize(Archive& archive, Slic3r::Vec3i   &v) { archive(v.x(), v.y(), v.z()); }
+//    template<class Archive> void serialize(Archive& archive, Slic3r::Vec2i64 &v) { archive(v.x(), v.y()); }
+//    template<class Archive> void serialize(Archive& archive, Slic3r::Vec3i64 &v) { archive(v.x(), v.y(), v.z()); }
+    template<class Archive> void serialize(Archive& archive, Slic3r::Vec2f   &v) { archive(v.x(), v.y()); }
+    template<class Archive> void serialize(Archive& archive, Slic3r::Vec3f   &v) { archive(v.x(), v.y(), v.z()); }
+    template<class Archive> void serialize(Archive& archive, Slic3r::Vec2d   &v) { archive(v.x(), v.y()); }
+    template<class Archive> void serialize(Archive& archive, Slic3r::Vec3d   &v) { archive(v.x(), v.y(), v.z()); }
 
-	template<class Archive> void load(Archive& archive, Slic3r::Matrix2f &m) { archive.loadBinary((char*)m.data(), sizeof(float) * 4); }
-	template<class Archive> void save(Archive& archive, Slic3r::Matrix2f &m) { archive.saveBinary((char*)m.data(), sizeof(float) * 4); }
-#if ENABLE_WORLD_COORDINATE
+    template<class Archive> void load(Archive& archive, Slic3r::Matrix2f &m) { archive.loadBinary((char*)m.data(), sizeof(float) * 4); }
+    template<class Archive> void save(Archive& archive, Slic3r::Matrix2f &m) { archive.saveBinary((char*)m.data(), sizeof(float) * 4); }
     template<class Archive> void load(Archive& archive, Slic3r::Transform3d& m)       { archive.loadBinary((char*)m.data(), sizeof(double) * 16); }
     template<class Archive> void save(Archive& archive, const Slic3r::Transform3d& m) { archive.saveBinary((char*)m.data(), sizeof(double) * 16); }
-#endif // ENABLE_WORLD_COORDINATE
 }
 
 // To be able to use Vec<> and Mat<> in range based for loops:
