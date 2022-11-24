@@ -104,6 +104,18 @@ Vec2d CameraUtils::get_z0_position(const Camera &camera, const Vec2d & coor)
 {
     Vec3d dir = CameraUtils::create_ray(camera, coor);
     Vec3d p0  = camera.get_position();
+    if (camera.get_type() == Camera::EType::Ortho) { 
+        Matrix4d modelview  = camera.get_view_matrix().matrix();
+        Matrix4d projection = camera.get_projection_matrix().matrix();
+        Vec4i    viewport(camera.get_viewport().data());
+        igl::unproject(Vec3d(coor.x(), viewport[3] - coor.y(), 0.), modelview, projection, viewport, p0);
+    }
+
+    // is approx zero
+    if ((fabs(dir.z()) - 1e-4) < 0)
+        return Vec2d(std::numeric_limits<double>::max(), 
+                     std::numeric_limits<double>::max());
+
     // find position of ray cross plane(z = 0)
     double t  = p0.z() / dir.z();
     Vec3d p = p0 - t * dir;
