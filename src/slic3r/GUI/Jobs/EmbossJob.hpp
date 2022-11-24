@@ -41,7 +41,7 @@ struct DataCreateVolume : public DataBase
     ModelVolumeType volume_type;
 
     // parent ModelObject index where to create volume
-    int object_idx;
+    ObjectID object_id;
 
     // new created volume transformation
     Transform3d trmat;
@@ -178,7 +178,7 @@ struct CreateSurfaceVolumeData : public DataBase, public SurfaceVolumeData{
     ModelVolumeType volume_type;
 
     // parent ModelObject index where to create volume
-    int object_idx;
+    ObjectID object_id;
 };
 
 /// <summary>

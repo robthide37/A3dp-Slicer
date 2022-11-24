@@ -44,13 +44,13 @@ public:
     /// </summary>
     /// <param name="volume_type">Object part / Negative volume / Modifier</param>
     /// <param name="mouse_pos">Define position of new volume</param>
-    void create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos = Vec2d(-1,-1));
+    void create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos);
 
     /// <summary>
-    /// Move window for edit emboss text near to embossed object
-    /// NOTE: embossed object must be selected
+    /// Create new text without given position
     /// </summary>
-    void set_fine_position();
+    /// <param name="volume_type">Object part / Negative volume / Modifier</param>
+    void create_volume(ModelVolumeType volume_type);
 
 protected:
     bool on_init() override;
@@ -91,8 +91,6 @@ private:
     // localized default text
     void set_default_text();
 
-    bool start_volume_creation(ModelVolumeType volume_type, const Vec2d &screen_coor);
-
     void check_selection();
     ModelVolume *get_selected_volume();
     // create volume from text - main functionality
@@ -124,6 +122,12 @@ private:
 
     void do_translate(const Vec3d& relative_move);
     void do_rotate(float relative_z_angle);
+
+    /// <summary>
+    /// Move window for edit emboss text near to embossed object
+    /// NOTE: embossed object must be selected
+    /// </summary>
+    void set_fine_position();
 
     /// <summary>
     /// Reversible input float with option to restor default value

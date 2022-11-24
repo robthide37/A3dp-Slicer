@@ -69,11 +69,11 @@ static void update_volume(TriangleMesh &&mesh, const DataUpdate &data);
 /// Add new volume to object
 /// </summary>
 /// <param name="mesh">triangles of new volume</param>
-/// <param name="object_idx">Object where to add volume</param>
+/// <param name="object_id">Object where to add volume</param>
 /// <param name="type">Type of new volume</param>
 /// <param name="trmat">Transformation of volume inside of object</param>
 /// <param name="data">Text configuration and New VolumeName</param>
-static void create_volume(TriangleMesh &&mesh, const size_t object_idx, 
+static void create_volume(TriangleMesh &&mesh, const ObjectID& object_id, 
     const ModelVolumeType type, const Transform3d trmat, const DataBase &data);
 
 /// <summary>
@@ -147,7 +147,7 @@ void CreateVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
     if (m_result.its.empty()) 
         return priv::create_message(_u8L("Can't create empty volume."));
 
-    priv::create_volume(std::move(m_result), m_input.object_idx, m_input.volume_type, m_input.trmat, m_input);
+    priv::create_volume(std::move(m_result), m_input.object_id, m_input.volume_type, m_input.trmat, m_input);
 }
 
 
@@ -320,7 +320,7 @@ void CreateSurfaceVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
     // TODO: Find better way to Not center volume data when add !!!
     TriangleMesh mesh = m_result; // Part1: copy
 
-    priv::create_volume(std::move(m_result), m_input.object_idx,
+    priv::create_volume(std::move(m_result), m_input.object_id,
         m_input.volume_type, m_input.text_tr, m_input);
 
     // Part2: update volume data
@@ -385,10 +385,8 @@ bool priv::check(const DataCreateVolume &input, bool is_main_thread) {
     bool res = check((DataBase) input, check_fontfile);
     assert(input.volume_type != ModelVolumeType::INVALID);
     res &= input.volume_type != ModelVolumeType::INVALID;
-    assert(input.object_idx >= 0);
-    res &= input.object_idx >= 0;
-    if (is_main_thread)
-        assert((size_t)input.object_idx < wxGetApp().model().objects.size());    
+    assert(input.object_id.id >= 0);
+    res &= input.object_id.id >= 0;
     return res; 
 }
 bool priv::check(const DataCreateObject &input) {
@@ -571,7 +569,7 @@ void priv::update_volume(TriangleMesh &&mesh, const DataUpdate &data)
 }
 
 void priv::create_volume(
-    TriangleMesh &&mesh, const size_t object_idx, 
+    TriangleMesh &&mesh, const ObjectID& object_id, 
     const ModelVolumeType type, const Transform3d trmat, const DataBase &data)
 {
     GUI_App         &app      = wxGetApp();
@@ -580,17 +578,25 @@ void priv::create_volume(
     GLCanvas3D      *canvas   = plater->canvas3D();
     ModelObjectPtrs &objects  = plater->model().objects;
 
+    ModelObject *obj = nullptr;
+    size_t object_idx = 0;
+    for (; object_idx < objects.size(); ++object_idx) {
+        ModelObject *o = objects[object_idx];
+        if (o->id() == object_id) { 
+            obj = o;
+            break;
+        }   
+    }
+
     // Parent object for text volume was propably removed.
     // Assumption: User know what he does, so text volume is no more needed.
-    if (objects.size() <= object_idx) 
-        return priv::create_message(_u8L("Bad object index to create volume."));
+    if (obj == nullptr) 
+        return priv::create_message(_u8L("Bad object to create volume."));
 
     if (mesh.its.empty()) 
         return priv::create_message(_u8L("Can't create empty volume."));
 
     plater->take_snapshot(_L("Add Emboss text Volume"));
-
-    ModelObject    *obj = objects[object_idx];
 
     // NOTE: be carefull add volume also center mesh !!!
     // So first add simple shape(convex hull is also calculated)
@@ -618,7 +624,7 @@ void priv::create_volume(
     // select only actual volume
     // when new volume is created change selection to this volume
     auto                add_to_selection = [volume](const ModelVolume *vol) { return vol == volume; };
-    wxDataViewItemArray sel              = obj_list->reorder_volumes_and_get_selection(object_idx, add_to_selection);
+    wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection(object_idx, add_to_selection);
     if (!sel.IsEmpty()) obj_list->select_item(sel.front());
 
     // update printable state on canvas

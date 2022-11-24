@@ -508,15 +508,17 @@ void MenuFactory::append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, 
         assert(emboss != nullptr);
         if (emboss == nullptr) return;
         
-        auto screen_position = canvas->get_popup_menu_position();
-        assert(screen_position.has_value());
-        if (!screen_position.has_value()) return;
-
         ModelVolumeType volume_type = type;
         // no selected object means create new object
         if (volume_type == ModelVolumeType::INVALID)
             volume_type = ModelVolumeType::MODEL_PART;
-        emboss->create_volume(volume_type, *screen_position);        
+
+        auto screen_position = canvas->get_popup_menu_position();
+        if (screen_position.has_value()) {
+            emboss->create_volume(volume_type, *screen_position);
+        } else {
+            emboss->create_volume(volume_type);
+        }
     };
 
     if (   type == ModelVolumeType::MODEL_PART
