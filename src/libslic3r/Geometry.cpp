@@ -398,7 +398,7 @@ Vec3d extract_rotation(const Transform3d& transform)
 #if ENABLE_WORLD_COORDINATE
 Transform3d Transformation::get_offset_matrix() const
 {
-    return assemble_transform(get_offset());
+    return translation_transform(get_offset());
 }
 
 static Transform3d extract_rotation_matrix(const Transform3d& trafo)

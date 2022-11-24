@@ -316,11 +316,11 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 #if ENABLE_LEGACY_OPENGL_REMOVAL
             const Transform3d model_matrix = vol->world_matrix() * support_matrix * Transform3d(aa.toRotationMatrix()) *
 #if ENABLE_RAYCAST_PICKING
-                Geometry::assemble_transform((CONE_HEIGHT + support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ(),
-                    Vec3d(PI, 0.0, 0.0), Vec3d(CONE_RADIUS, CONE_RADIUS, CONE_HEIGHT));
+                Geometry::translation_transform((CONE_HEIGHT + support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ()) *
+                Geometry::rotation_transform({ double(PI), 0.0, 0.0 }) * Geometry::scale_transform({ CONE_RADIUS, CONE_RADIUS, CONE_HEIGHT });
 #else
-                Geometry::assemble_transform((cone_height + support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ(),
-                    Vec3d(PI, 0.0, 0.0), Vec3d(cone_radius, cone_radius, cone_height));
+                Geometry::translation_transform((cone_height + support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ()) *
+                Geometry::rotation_transform({ double(PI), 0.0, 0.0 }), * Geometry::scale_transform({ cone_radius, cone_radius, cone_height });
 #endif // ENABLE_RAYCAST_PICKING
 
             shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
@@ -1463,9 +1463,9 @@ void GLGizmoSlaSupports::update_raycasters_for_picking_transform()
             q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * m_editing_cache[i].normal.cast<double>());
             const Eigen::AngleAxisd aa(q);
             const Transform3d cone_matrix = vol->world_matrix() * support_matrix * Transform3d(aa.toRotationMatrix()) *
-                Geometry::assemble_transform((CONE_HEIGHT + m_editing_cache[i].support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ(),
-                    Vec3d(PI, 0.0, 0.0), Vec3d(CONE_RADIUS, CONE_RADIUS, CONE_HEIGHT));
-                m_raycasters[i].second->set_transform(cone_matrix);
+              Geometry::translation_transform((CONE_HEIGHT + m_editing_cache[i].support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ()) *
+              Geometry::rotation_transform({ double(PI), 0.0, 0.0 }) * Geometry::scale_transform({ CONE_RADIUS, CONE_RADIUS, CONE_HEIGHT });
+            m_raycasters[i].second->set_transform(cone_matrix);
 
             const double radius = (double)m_editing_cache[i].support_point.head_front_radius * RenderPointScale;
             const Transform3d sphere_matrix = vol->world_matrix() * support_matrix * Geometry::scale_transform(radius);

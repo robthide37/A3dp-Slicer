@@ -307,7 +307,7 @@ void GLVolume::SinkingContours::render()
         return;
 
     const GUI::Camera& camera = GUI::wxGetApp().plater()->get_camera();
-    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::assemble_transform(m_shift));
+    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(m_shift));
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
     glsafe(::glPushMatrix());

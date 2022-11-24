@@ -427,7 +427,7 @@ int CLI::run(int argc, char **argv)
                     }
 #else
 //                    model.objects.front()->cut(0, m_config.opt_float("cut"), ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepUpper | ModelObjectCutAttribute::FlipLower);
-                    model.objects.front()->cut(0, Geometry::assemble_transform(m_config.opt_float("cut")* Vec3d::UnitZ()),
+                    model.objects.front()->cut(0, Geometry::translation_transform(m_config.opt_float("cut") * Vec3d::UnitZ()),
                                                ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepUpper | ModelObjectCutAttribute::PlaceOnCutUpper);
 #endif
                     model.delete_object(size_t(0));

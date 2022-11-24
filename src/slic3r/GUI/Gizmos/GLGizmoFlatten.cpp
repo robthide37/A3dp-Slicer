@@ -117,7 +117,7 @@ void GLGizmoFlatten::on_render()
         const Transform3d& inst_matrix = selection.get_first_volume()->get_instance_transformation().get_matrix();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d model_matrix = Geometry::assemble_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * inst_matrix;
+        const Transform3d model_matrix = Geometry::translation_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * inst_matrix;
         const Transform3d view_model_matrix = camera.get_view_matrix() * model_matrix;
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
@@ -168,7 +168,7 @@ void GLGizmoFlatten::on_register_raycasters_for_picking()
 
     if (!m_planes.empty()) {
         const Selection& selection = m_parent.get_selection();
-        const Transform3d matrix = Geometry::assemble_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) *
+        const Transform3d matrix = Geometry::translation_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) *
             selection.get_first_volume()->get_instance_transformation().get_matrix();
 
         for (int i = 0; i < (int)m_planes.size(); ++i) {
@@ -204,7 +204,7 @@ void GLGizmoFlatten::on_render_for_picking()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d view_model_matrix = camera.get_view_matrix() *
-            Geometry::assemble_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * m;
+          Geometry::translation_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * m;
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -348,7 +348,7 @@ void GLGizmoFlatten::update_planes()
         // And yes, it is a nasty thing to do. Whoever has time is free to refactor.
         Vec3d bb_size = BoundingBoxf3(polygon).size();
         float sf = std::min(1./bb_size(0), 1./bb_size(1));
-        Transform3d tr = Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), Vec3d(sf, sf, 1.f));
+        Transform3d tr = Geometry::scale_transform({ sf, sf, 1.f });
         polygon = transform(polygon, tr);
         polygon = Slic3r::Geometry::convex_hull(polygon);
         polygon = transform(polygon, tr.inverse());

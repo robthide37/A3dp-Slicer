@@ -364,8 +364,8 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 
     const Camera& camera = wxGetApp().plater()->get_camera();
     Transform3d view_model_matrix = camera.get_view_matrix() * trafo *
-        Geometry::assemble_transform(m_rr.hit.cast<double>()) * complete_scaling_matrix_inverse *
-        Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), m_cursor_radius * Vec3d::Ones());
+        Geometry::translation_transform(m_rr.hit.cast<double>()) * complete_scaling_matrix_inverse *
+        Geometry::scale_transform(m_cursor_radius * Vec3d::Ones());
 
     shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());

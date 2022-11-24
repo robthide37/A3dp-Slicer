@@ -195,10 +195,10 @@ void GCodeViewer::COG::render()
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
-    Transform3d model_matrix = Geometry::assemble_transform(cog());
+    Transform3d model_matrix = Geometry::translation_transform(cog());
     if (m_fixed_size) {
         const double inv_zoom = camera.get_inv_zoom();
-        model_matrix = model_matrix * Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), inv_zoom * Vec3d::Ones());
+        model_matrix = model_matrix * Geometry::scale_transform(inv_zoom);
     }
     const Transform3d& view_matrix = camera.get_view_matrix();
     shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
@@ -315,7 +315,8 @@ void GCodeViewer::SequentialView::Marker::init()
 void GCodeViewer::SequentialView::Marker::set_world_position(const Vec3f& position)
 {    
     m_world_position = position;
-    m_world_transform = (Geometry::assemble_transform((position + m_z_offset * Vec3f::UnitZ()).cast<double>()) * Geometry::assemble_transform(m_model.get_bounding_box().size().z() * Vec3d::UnitZ(), { M_PI, 0.0, 0.0 })).cast<float>();
+    m_world_transform = (Geometry::translation_transform((position + m_z_offset * Vec3f::UnitZ()).cast<double>()) *
+      Geometry::translation_transform(m_model.get_bounding_box().size().z() * Vec3d::UnitZ()) * Geometry::rotation_transform({ M_PI, 0.0, 0.0 })).cast<float>();
 }
 
 void GCodeViewer::SequentialView::Marker::render()
@@ -1550,7 +1551,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         const double width = static_cast<double>(1.5f * curr.width);
         const double height = static_cast<double>(1.5f * curr.height);
 
-        const Transform3d trafo = Geometry::assemble_transform((curr.position - 0.5f * curr.height * Vec3f::UnitZ()).cast<double>(), Vec3d::Zero(), { width, width, height });
+        const Transform3d trafo = Geometry::translation_transform((curr.position - 0.5f * curr.height * Vec3f::UnitZ()).cast<double>()) * 
+          Geometry::scale_transform({ width, width, height });
         const Eigen::Matrix<double, 3, 3, Eigen::DontAlign> normal_matrix = trafo.matrix().template block<3, 3>(0, 0).inverse().transpose();
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL

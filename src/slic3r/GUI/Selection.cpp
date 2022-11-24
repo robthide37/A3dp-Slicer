@@ -1767,7 +1767,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     glsafe(::glEnable(GL_DEPTH_TEST));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    const Transform3d base_matrix = Geometry::assemble_transform(get_bounding_box().center());
+    const Transform3d base_matrix = Geometry::translation_transform(get_bounding_box().center());
     Transform3d orient_matrix = Transform3d::Identity();
 #else
     glsafe(::glPushMatrix());
@@ -1902,7 +1902,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #if ENABLE_WORLD_COORDINATE
     if (!boost::starts_with(sidebar_field, "layer")) {
         if (!wxGetApp().obj_manipul()->is_world_coordinates())
-            m_axes.render(Geometry::assemble_transform(axes_center) * orient_matrix, 0.25f);
+            m_axes.render(Geometry::translation_transform(axes_center) * orient_matrix, 0.25f);
     }
 #endif // ENABLE_WORLD_COORDINATE
 #else
@@ -2613,7 +2613,7 @@ void Selection::render_sidebar_position_hints(const std::string& sidebar_field)
     shader.set_uniform("projection_matrix", camera.get_projection_matrix());
 
     if (boost::ends_with(sidebar_field, "x")) {
-        const Transform3d model_matrix = matrix * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitZ());
+        const Transform3d model_matrix = matrix * Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitZ());
         shader.set_uniform("view_model_matrix", view_matrix * model_matrix);
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader.set_uniform("view_normal_matrix", view_normal_matrix);
@@ -2627,7 +2627,7 @@ void Selection::render_sidebar_position_hints(const std::string& sidebar_field)
         m_arrow.render();
     }
     else if (boost::ends_with(sidebar_field, "z")) {
-        const Transform3d model_matrix = matrix * Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitX());
+        const Transform3d model_matrix = matrix * Geometry::rotation_transform(0.5 * PI * Vec3d::UnitX());
         shader.set_uniform("view_model_matrix", view_matrix * model_matrix);
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader.set_uniform("view_normal_matrix", view_normal_matrix);
@@ -2664,7 +2664,7 @@ void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field)
         Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader.set_uniform("view_normal_matrix", view_normal_matrix);
         m_curved_arrow.render();
-        const Transform3d matrix = model_matrix * Geometry::assemble_transform(Vec3d::Zero(), PI * Vec3d::UnitZ());
+        const Transform3d matrix = model_matrix * Geometry::rotation_transform(PI * Vec3d::UnitZ());
         shader.set_uniform("view_model_matrix", view_matrix * matrix);
         view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader.set_uniform("view_normal_matrix", view_normal_matrix);
@@ -2677,11 +2677,11 @@ void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field)
 
     if (boost::ends_with(sidebar_field, "x")) {
         m_curved_arrow.set_color(get_color(X));
-        render_sidebar_rotation_hint(shader, view_matrix, matrix * Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitY()));
+        render_sidebar_rotation_hint(shader, view_matrix, matrix * Geometry::rotation_transform(0.5 * PI * Vec3d::UnitY()));
     }
     else if (boost::ends_with(sidebar_field, "y")) {
         m_curved_arrow.set_color(get_color(Y));
-        render_sidebar_rotation_hint(shader, view_matrix, matrix * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitX()));
+        render_sidebar_rotation_hint(shader, view_matrix, matrix * Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitX()));
     }
     else if (boost::ends_with(sidebar_field, "z")) {
         m_curved_arrow.set_color(get_color(Z));
@@ -2726,7 +2726,7 @@ void Selection::render_sidebar_scale_hints(const std::string& sidebar_field)
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     auto render_sidebar_scale_hint = [this, uniform_scale](Axis axis, GLShaderProgram& shader, const Transform3d& view_matrix, const Transform3d& model_matrix) {
         m_arrow.set_color(uniform_scale ? UNIFORM_SCALE_COLOR : get_color(axis));
-        Transform3d matrix = model_matrix * Geometry::assemble_transform(5.0 * Vec3d::UnitY());
+        Transform3d matrix = model_matrix * Geometry::translation_transform(5.0 * Vec3d::UnitY());
         shader.set_uniform("view_model_matrix", view_matrix * matrix);
         Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader.set_uniform("view_normal_matrix", view_normal_matrix);
@@ -2742,7 +2742,7 @@ void Selection::render_sidebar_scale_hints(const std::string& sidebar_field)
         m_arrow.render();
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        matrix = model_matrix * Geometry::assemble_transform(-5.0 * Vec3d::UnitY(), PI * Vec3d::UnitZ());
+        matrix = model_matrix * Geometry::translation_transform(-5.0 * Vec3d::UnitY()) * Geometry::rotation_transform(PI * Vec3d::UnitZ());
         shader.set_uniform("view_model_matrix", view_matrix * matrix);
         view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader.set_uniform("view_normal_matrix", view_normal_matrix);
@@ -2761,7 +2761,7 @@ void Selection::render_sidebar_scale_hints(const std::string& sidebar_field)
 
     if (boost::ends_with(sidebar_field, "x") || uniform_scale) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        render_sidebar_scale_hint(X, shader, view_matrix, matrix * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitZ()));
+      render_sidebar_scale_hint(X, shader, view_matrix, matrix * Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitZ()));
 #else
         glsafe(::glPushMatrix());
         glsafe(::glRotated(-90.0, 0.0, 0.0, 1.0));
@@ -2782,7 +2782,7 @@ void Selection::render_sidebar_scale_hints(const std::string& sidebar_field)
 
     if (boost::ends_with(sidebar_field, "z") || uniform_scale) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        render_sidebar_scale_hint(Z, shader, view_matrix, matrix * Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitX()));
+      render_sidebar_scale_hint(Z, shader, view_matrix, matrix * Geometry::rotation_transform(0.5 * PI * Vec3d::UnitX()));
 #else
         glsafe(::glPushMatrix());
         glsafe(::glRotated(90.0, 1.0, 0.0, 0.0));
