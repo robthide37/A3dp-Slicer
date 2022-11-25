@@ -187,10 +187,16 @@ void MeasuringImpl::update_planes()
                     he = sm.next_around_target(he);
                     if (he.is_invalid())
                         goto PLANE_FAILURE;
+
+                    // For broken meshes, the iteration might never get back to he_orig.
+                    // Remember all halfedges we saw to break out of such infinite loops.
+                    boost::container::small_vector<Halfedge_index, 10> he_seen;
+
                     while ( (int)m_face_to_plane[sm.face(he)] == plane_id && he != he_orig) {
+                        he_seen.emplace_back(he);
                         he = sm.next_around_target(he);
-                        if (he.is_invalid())
-                        goto PLANE_FAILURE;
+                        if (he.is_invalid() || std::find(he_seen.begin(), he_seen.end(), he) != he_seen.end())
+                            goto PLANE_FAILURE;
                     }
                     he = sm.opposite(he);
                     if (he.is_invalid())
@@ -208,6 +214,12 @@ void MeasuringImpl::update_planes()
                     visited[face_it - facets.begin()][he.side()] = true;
 
                     last_border.emplace_back(sm.point(sm.source(he)).cast<double>());
+
+                    // In case of broken meshes, this loop might be infinite. Break
+                    // out in case it is clearly going bad.
+                    if (last_border.size() > 3*facets.size())
+                        goto PLANE_FAILURE;
+
                 } while (he != he_start);
 
                 if (last_border.size() == 1)
