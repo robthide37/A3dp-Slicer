@@ -1260,7 +1260,7 @@ void ModelObject::apply_cut_connectors(const std::string& new_name)
         ModelVolume* new_volume = add_volume(std::move(mesh), ModelVolumeType::NEGATIVE_VOLUME);
 
         // Transform the new modifier to be aligned inside the instance
-        new_volume->set_transformation(assemble_transform(connector.pos) * connector.rotation_m * 
+        new_volume->set_transformation(translation_transform(connector.pos) * connector.rotation_m *
                                        scale_transform(Vec3f(connector.radius, connector.radius, connector.height).cast<double>()));
 
         new_volume->cut_info = { connector.attribs.type, connector.radius_tolerance, connector.height_tolerance };
@@ -1437,7 +1437,7 @@ void ModelObject::process_solid_part_cut(ModelVolume* volume, const Transform3d&
     using namespace Geometry;
 
     const Transformation cut_transformation = Transformation(cut_matrix);
-    const Transform3d invert_cut_matrix = cut_transformation.get_rotation_matrix().inverse() * assemble_transform(-1 * cut_transformation.get_offset());
+    const Transform3d invert_cut_matrix = cut_transformation.get_rotation_matrix().inverse() * translation_transform(-1 * cut_transformation.get_offset());
 
     // Transform the mesh by the combined transformation matrix.
     // Flip the triangles in case the composite transformation is left handed.
@@ -1505,7 +1505,7 @@ static void reset_instance_transformation(ModelObject* object, size_t src_instan
         obj_instance->set_transformation(Transformation());
 
         const Vec3d displace = local_displace.isApprox(Vec3d::Zero()) ? Vec3d::Zero() :
-                               assemble_transform(Vec3d::Zero(), obj_instance->get_rotation()) * local_displace;
+                               rotation_transform(obj_instance->get_rotation()) * local_displace;
         obj_instance->set_offset(offset + displace);
 
         Vec3d rotation = Vec3d::Zero();
@@ -1560,15 +1560,19 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
     // in the transformation matrix and not applied to the mesh transform.
 
     // const auto instance_matrix = instances[instance]->get_matrix(true);
+#if ENABLE_WORLD_COORDINATE
+    const auto instance_matrix = instances[instance]->get_transformation().get_matrix_no_offset();
+#else
     const auto instance_matrix = assemble_transform(
         Vec3d::Zero(),  // don't apply offset
         instances[instance]->get_rotation(),
         instances[instance]->get_scaling_factor(),
         instances[instance]->get_mirror()
     );
+#endif // ENABLE_WORLD_COORDINATE
 
     const Transformation cut_transformation = Transformation(cut_matrix);
-    const Transform3d inverse_cut_matrix    = cut_transformation.get_rotation_matrix().inverse() * assemble_transform(-1. * cut_transformation.get_offset());
+    const Transform3d inverse_cut_matrix    = cut_transformation.get_rotation_matrix().inverse() * translation_transform(-1. * cut_transformation.get_offset());
 
     // Displacement (in instance coordinates) to be applied to place the upper parts
     Vec3d local_displace = Vec3d::Zero();
@@ -2338,8 +2342,7 @@ arrangement::ArrangePolygon ModelInstance::get_arrange_polygon() const
     
     Vec3d rotation = get_rotation();
     rotation.z()   = 0.;
-    Transform3d trafo_instance =
-        Geometry::assemble_transform(get_offset().z() * Vec3d::UnitZ(), rotation, get_scaling_factor(), get_mirror());
+    Transform3d trafo_instance = Geometry::assemble_transform(get_offset().z() * Vec3d::UnitZ(), rotation, get_scaling_factor(), get_mirror());
 
     Polygon p = get_object()->convex_hull_2d(trafo_instance);
 

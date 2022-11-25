@@ -61,28 +61,28 @@ void CoordAxes::render(float emission_factor)
     // x axis
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::X());
-    render_axis(*shader, trafo * Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }));
+    render_axis(*shader, trafo * Geometry::translation_transform(m_origin) * Geometry::rotation_transform({ 0.0, 0.5 * M_PI, 0.0 }));
 #else
     m_arrow.set_color(-1, ColorRGBA::X());
-    render_axis(Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }).cast<float>());
+    render_axis(Geometry::translation_transform(m_origin) * Geometry::rotation_transform({ 0.0, 0.5 * M_PI, 0.0 }).cast<float>());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // y axis
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::Y());
-    render_axis(*shader, trafo * Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }));
+    render_axis(*shader, trafo * Geometry::translation_transform(m_origin) * Geometry::rotation_transform({ -0.5 * M_PI, 0.0, 0.0 }));
 #else
     m_arrow.set_color(-1, ColorRGBA::Y());
-    render_axis(Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }).cast<float>());
+    render_axis(Geometry::translation_transform(m_origin) * Geometry::rotation_transform({ -0.5 * M_PI, 0.0, 0.0 }).cast<float>());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // z axis
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::Z());
-    render_axis(*shader, trafo * Geometry::assemble_transform(m_origin));
+    render_axis(*shader, trafo * Geometry::translation_transform(m_origin));
 #else
     m_arrow.set_color(-1, ColorRGBA::Z());
-    render_axis(Geometry::assemble_transform(m_origin).cast<float>());
+    render_axis(Geometry::translation_transform(m_origin).cast<float>());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     shader->stop_using();

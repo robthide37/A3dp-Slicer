@@ -285,7 +285,7 @@ void GLGizmoScale3D::on_render()
     }
     else {
         m_bounding_box = selection.get_bounding_box();
-        m_grabbers_transform = Geometry::assemble_transform(m_bounding_box.center());
+        m_grabbers_transform = Geometry::translation_transform(m_bounding_box.center());
         m_center = m_bounding_box.center();
         m_instance_center = selection.is_single_full_instance() ? selection.get_first_volume()->get_instance_offset() : m_center;
     }
@@ -911,7 +911,7 @@ double GLGizmoScale3D::calc_ratio(const UpdateData& data) const
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 Transform3d GLGizmoScale3D::local_transform(const Selection& selection) const
 {
-    Transform3d ret = Geometry::assemble_transform(m_center);
+    Transform3d ret = Geometry::translation_transform(m_center);
     if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
         const GLVolume& v = *selection.get_first_volume();
         Transform3d orient_matrix = v.get_instance_transformation().get_rotation_matrix();

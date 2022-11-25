@@ -337,7 +337,7 @@ void GLGizmoCut3D::shift_cut_z(double delta)
 
 void GLGizmoCut3D::rotate_vec3d_around_plane_center(Vec3d&vec)
 {
-    vec = Transformation( assemble_transform(m_plane_center) * m_rotation_m * assemble_transform(-m_plane_center)).get_matrix() * vec;
+    vec = Transformation(translation_transform(m_plane_center) * m_rotation_m * translation_transform(-m_plane_center)).get_matrix() * vec;
 }
 
 void GLGizmoCut3D::put_connectors_on_cut_plane(const Vec3d& cp_normal, double cp_offset)
@@ -737,10 +737,10 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
     {
         const BoundingBoxf3 tbb = transformed_bounding_box(m_plane_center);
         if (tbb.min.z() <= 0.0)
-            render_model(m_cone.model, color, view_matrix * assemble_transform(-offset, PI * Vec3d::UnitX(), cone_scale));
+            render_model(m_cone.model, color, view_matrix * translation_transform(-offset) * rotation_transform(PI * Vec3d::UnitX()) * scale_transform(cone_scale));
 
         if (tbb.max.z() >= 0.0)
-            render_model(m_cone.model, color, view_matrix * assemble_transform(offset, Vec3d::Zero(), cone_scale));
+            render_model(m_cone.model, color, view_matrix * translation_transform(offset) * scale_transform(cone_scale));
     }
 
     // render top sphere for X/Y grabbers
@@ -750,7 +750,7 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
         size = m_dragging ? double(grabber.get_dragging_half_size(mean_size)) : double(grabber.get_half_size(mean_size));
         color = m_hover_id == Y ? complementary(ColorRGBA::GREEN()) :
                 m_hover_id == X ? complementary(ColorRGBA::RED())   : ColorRGBA::GRAY();
-        render_model(m_sphere.model, color, view_matrix * assemble_transform(m_grabber_connection_len * Vec3d::UnitZ(), Vec3d::Zero(), size * Vec3d::Ones()));
+        render_model(m_sphere.model, color, view_matrix * translation_transform(m_grabber_connection_len * Vec3d::UnitZ()) * scale_transform(size));
     }
 
     // render X grabber
@@ -767,9 +767,9 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
         }
 
         offset = Vec3d(0.0, 1.25 * size, m_grabber_connection_len);
-        render_model(m_cone.model, color, view_matrix * assemble_transform(offset, -0.5 * PI * Vec3d::UnitX(), cone_scale));
+        render_model(m_cone.model, color, view_matrix * translation_transform(offset) * rotation_transform(-0.5 * PI * Vec3d::UnitX()) * scale_transform(cone_scale));
         offset = Vec3d(0.0, -1.25 * size, m_grabber_connection_len);
-        render_model(m_cone.model, color, view_matrix * assemble_transform(offset, 0.5 * PI * Vec3d::UnitX(), cone_scale));
+        render_model(m_cone.model, color, view_matrix * translation_transform(offset) * rotation_transform(0.5 * PI * Vec3d::UnitX()) * scale_transform(cone_scale));
     }
 
     // render Y grabber
@@ -786,9 +786,9 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
         }
 
         offset = Vec3d(1.25 * size, 0.0, m_grabber_connection_len);
-        render_model(m_cone.model, color, view_matrix * assemble_transform(offset, 0.5 * PI * Vec3d::UnitY(), cone_scale));
+        render_model(m_cone.model, color, view_matrix * translation_transform(offset) * rotation_transform(0.5 * PI * Vec3d::UnitY()) * scale_transform(cone_scale));
         offset = Vec3d(-1.25 * size, 0.0, m_grabber_connection_len);
-        render_model(m_cone.model, color, view_matrix * assemble_transform(offset, -0.5 * PI * Vec3d::UnitY(), cone_scale));
+        render_model(m_cone.model, color, view_matrix * translation_transform(offset)* rotation_transform(-0.5 * PI * Vec3d::UnitY()) * scale_transform(cone_scale));
     }
 }
 
@@ -979,19 +979,19 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
         Vec3d scale = Vec3d(0.75 * size, 0.75 * size, 1.8 * size);
 
         Vec3d offset = Vec3d(0.0, 1.25 * size, m_grabber_connection_len);
-        m_raycasters[0]->set_transform(trafo * assemble_transform(offset, -0.5 * PI * Vec3d::UnitX(), scale));
+        m_raycasters[0]->set_transform(trafo * translation_transform(offset) * rotation_transform(-0.5 * PI * Vec3d::UnitX()) * scale_transform(scale));
         offset = Vec3d(0.0, -1.25 * size, m_grabber_connection_len);
-        m_raycasters[1]->set_transform(trafo * assemble_transform(offset, 0.5 * PI * Vec3d::UnitX(), scale));
+        m_raycasters[1]->set_transform(trafo * translation_transform(offset) * rotation_transform(0.5 * PI * Vec3d::UnitX()) * scale_transform(scale));
 
         offset = Vec3d(1.25 * size, 0.0, m_grabber_connection_len);
-        m_raycasters[2]->set_transform(trafo * assemble_transform(offset, 0.5 * PI * Vec3d::UnitY(), scale));
+        m_raycasters[2]->set_transform(trafo * translation_transform(offset) * rotation_transform(0.5 * PI * Vec3d::UnitY()) * scale_transform(scale));
         offset = Vec3d(-1.25 * size, 0.0, m_grabber_connection_len);
-        m_raycasters[3]->set_transform(trafo * assemble_transform(offset, -0.5 * PI * Vec3d::UnitY(), scale));
+        m_raycasters[3]->set_transform(trafo * translation_transform(offset) * rotation_transform(-0.5 * PI * Vec3d::UnitY()) * scale_transform(scale));
 
         offset = 1.25 * size * Vec3d::UnitZ();
         m_raycasters[4]->set_transform(trafo * scale_transform(size));
-        m_raycasters[5]->set_transform(trafo * assemble_transform(-offset, PI * Vec3d::UnitX(), scale));
-        m_raycasters[6]->set_transform(trafo * assemble_transform(offset, Vec3d::Zero(), scale));
+        m_raycasters[5]->set_transform(trafo * translation_transform(-offset) * rotation_transform(PI * Vec3d::UnitX()) * scale_transform(scale));
+        m_raycasters[6]->set_transform(trafo * translation_transform(offset) * scale_transform(scale));
     }
 }
 
@@ -1245,8 +1245,8 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(const Vec3d& plane_center, 
     Vec3d cut_center_offset = plane_center - instance_offset;
     cut_center_offset[Z] -= sel_info->get_sla_shift();
 
-    const auto move  = assemble_transform(-cut_center_offset);
-    const auto move2 = assemble_transform(plane_center);
+    const auto move  = translation_transform(-cut_center_offset);
+    const auto move2 = translation_transform(plane_center);
 
     const auto cut_matrix = (revert_move ? move2 : Transform3d::Identity()) * m_rotation_m.inverse() * move;
 
@@ -1257,12 +1257,16 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(const Vec3d& plane_center, 
         // respect just to the solid parts for FFF and ignore pad and supports for SLA
         if (!volume->is_modifier && !volume->is_sla_pad() && !volume->is_sla_support()) {
 
+#if ENABLE_WORLD_COORDINATE
+            const auto instance_matrix = volume->get_instance_transformation().get_matrix_no_offset();
+#else
             const auto instance_matrix = assemble_transform(
                 Vec3d::Zero(),  // don't apply offset
                 volume->get_instance_rotation().cwiseProduct(Vec3d(1.0, 1.0, 1.0)),
                 volume->get_instance_scaling_factor(),
                 volume->get_instance_mirror()
             );
+#endif // ENABLE_WORLD_COORDINATE
 
             auto volume_trafo = instance_matrix * volume->get_volume_transformation().get_matrix();
 
@@ -1794,11 +1798,18 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 Transform3d GLGizmoCut3D::get_volume_transformation(const ModelVolume* volume) const
 {
     bool is_prizm_dowel = m_connector_type == CutConnectorType::Dowel && m_connector_style == size_t(CutConnectorStyle::Prizm);
+#if ENABLE_WORLD_COORDINATE
+    const Transform3d connector_trafo = is_prizm_dowel ?
+      Geometry::translation_transform(-m_connector_depth_ratio * Vec3d::UnitZ()) * m_rotation_m * Geometry::scale_transform({ 0.5 * m_connector_size, 0.5 * m_connector_size, 2 * m_connector_depth_ratio }) :
+      m_rotation_m * Geometry::scale_transform({ 0.5 * m_connector_size, 0.5 * m_connector_size, m_connector_depth_ratio });
+
+#else
     const Transform3d connector_trafo = assemble_transform(
         is_prizm_dowel ? Vec3d(0.0, 0.0, -m_connector_depth_ratio) : Vec3d::Zero(),
         Transformation(m_rotation_m).get_rotation(),
         Vec3d(0.5*m_connector_size, 0.5*m_connector_size, is_prizm_dowel ? 2 * m_connector_depth_ratio : m_connector_depth_ratio),
         Vec3d::Ones());
+#endif // ENABLE_WORLD_COORDINATE
     const Vec3d connector_bb = m_connector_mesh.transformed_bounding_box(connector_trafo).size();
 
     const Vec3d bb = volume->mesh().bounding_box().size();
@@ -1812,7 +1823,7 @@ Transform3d GLGizmoCut3D::get_volume_transformation(const ModelVolume* volume) c
     const Vec3d offset(vol_trans.x() * border_scale.x(), vol_trans.y() * border_scale.y(), vol_trans.z() * border_scale.z());
 
     // scale and translate volume to suppress to put connectors too close to the border
-    return assemble_transform(offset, Vec3d::Zero(), Vec3d::Ones() - border_scale, Vec3d::Ones()) * vol_matrix;
+    return translation_transform(offset) * scale_transform(Vec3d::Ones() - border_scale) * vol_matrix;
 }
 
 bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
@@ -1979,13 +1990,13 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         // update connectors pos as offset of its center before cut performing
         apply_connectors_in_model(mo, create_dowels_as_separate_object);
 
-        plater->cut(object_idx, instance_idx, assemble_transform(cut_center_offset) * m_rotation_m,
+        plater->cut(object_idx, instance_idx, translation_transform(cut_center_offset) * m_rotation_m,
                     only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
                     only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
-                    only_if(m_place_on_cut_upper, ModelObjectCutAttribute::PlaceOnCutUpper) | 
-                    only_if(m_place_on_cut_lower, ModelObjectCutAttribute::PlaceOnCutLower) | 
-                    only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) | 
-                    only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) | 
+                    only_if(m_place_on_cut_upper, ModelObjectCutAttribute::PlaceOnCutUpper) |
+                    only_if(m_place_on_cut_lower, ModelObjectCutAttribute::PlaceOnCutLower) |
+                    only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) |
+                    only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) |
                     only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));
     }
 }
@@ -2001,7 +2012,7 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair
     const ModelObject* mo = m_c->selection_info()->model_object();
     const ModelInstance* mi = mo->instances[m_c->selection_info()->get_active_instance()];
     const Transform3d    instance_trafo = sla_shift > 0.f ? 
-        assemble_transform(Vec3d(0.0, 0.0, sla_shift)) * mi->get_transformation().get_matrix() : mi->get_transformation().get_matrix();
+        translation_transform(sla_shift * Vec3d::UnitZ()) * mi->get_transformation().get_matrix() : mi->get_transformation().get_matrix();
     const Camera& camera = wxGetApp().plater()->get_camera();
 
     int mesh_id = -1;

@@ -430,7 +430,7 @@ double GLGizmoMove3D::calc_projection(const UpdateData& data) const
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 Transform3d GLGizmoMove3D::local_transform(const Selection& selection) const
 {
-    Transform3d ret = Geometry::assemble_transform(m_center);
+    Transform3d ret = Geometry::translation_transform(m_center);
     if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
         const GLVolume& v = *selection.get_first_volume();
         Transform3d orient_matrix = v.get_instance_transformation().get_rotation_matrix();
