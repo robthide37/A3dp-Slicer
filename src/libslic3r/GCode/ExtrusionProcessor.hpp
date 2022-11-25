@@ -7,6 +7,10 @@
 #include "../ExtrusionEntity.hpp"
 #include "../Layer.hpp"
 #include "../Point.hpp"
+#include "../SVG.hpp"
+#include "../BoundingBox.hpp"
+#include "../Polygon.hpp"
+#include "../ClipperUtils.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -62,7 +66,7 @@ public:
 class CurvatureEstimator
 {
     static const size_t               sliders_count          = 3;
-    SlidingWindowCurvatureAccumulator sliders[sliders_count] = {{2.0},{4.0}, {8.0}};
+    SlidingWindowCurvatureAccumulator sliders[sliders_count] = {{2.0}, {4.0}, {8.0}};
 
 public:
     void add_point(float distance, float angle)
@@ -101,6 +105,34 @@ public:
         }
         prev_layer_boundary = next_layer_boundary;
         next_layer_boundary = AABBTreeLines::LinesDistancer<Linef>{std::move(layer_lines)};
+
+#if 0 // EXPORT DEBUG FILES
+        Lines scaled_lines;
+        for (const Linef &lf : layer_lines) { scaled_lines.push_back({Point::new_scale(lf.a), Point::new_scale(lf.b)}); }
+        BoundingBox bb = get_extents(scaled_lines);
+
+        Points inside;
+        for (const Layer *layer : layers) {
+            if (layer == nullptr) continue;
+            auto in = to_points(to_polygons(offset_ex(layer->lslices, -scale_(0.4))));
+            inside.insert(inside.end(), in.begin(), in.end());
+        }
+
+        ::Slic3r::SVG svg(debug_out_path(("path_jps" + std::to_string(rand() % 1000)).c_str()).c_str(), bb);
+        svg.draw(scaled_lines, "black", scale_(0.10));
+        for (Point p : inside) {
+            auto [distance, line_idx, nearest_point] = next_layer_boundary.signed_distance_from_lines_extra(unscaled(p));
+            if (distance > 0) {
+                svg.draw(p, "red", scale_(0.2));
+                svg.draw(Point::new_scale(nearest_point.x(), nearest_point.y()), "blue", scale_(0.2));
+                auto li = next_layer_boundary.get_line(line_idx);
+                Line ls{Point::new_scale(li.a), Point::new_scale(li.b)};
+                svg.draw(ls, "yellow", scale_(0.2));
+
+
+            }
+        }
+#endif
     }
 
     std::vector<float> estimate_extrusion_quality(const ExtrusionPath &path)
@@ -121,7 +153,7 @@ public:
 
             double dist_from_prev_layer = prev_layer_boundary.signed_distance_from_lines(p.cast<double>()) + flow_width * 0.5f;
 
-            float default_dist_quality = 0.5f;
+            float default_dist_quality = 0.3f;
             float distance_quality     = 1.0f;
             if (dist_from_prev_layer < min_malformation_dist) {
                 distance_quality = 1.0f;
