@@ -210,8 +210,9 @@ bool its_write_obj(const indexed_triangle_set &its, const char *file)
 bool its_write_obj(const indexed_triangle_set& its, const std::vector<obj_color> &color, const char* file)
 {
     Slic3r::CNumericLocalesSetter locales_setter;
-    FILE* fp = fopen(file, "w");
+    FILE* fp = boost::nowide::fopen(file, "w");
     if (fp == nullptr) {
+        BOOST_LOG_TRIVIAL(error) << "stl_write_obj: Couldn't open " << file << " for writing";
         return false;
     }
 
