@@ -262,3 +262,98 @@ TEST_CASE("Avoid disk below junction with barrier on the side", "[suptreeutils]"
         REQUIRE(pR + FromRadius > CylRadius);
     }
 }
+
+TEST_CASE("BranchingSupports::MergePointFinder", "[suptreeutils]") {
+    using namespace Slic3r;
+
+    SECTION("Identical points have the same merge point") {
+        Vec3f a{0.f, 0.f, 0.f}, b = a;
+        auto slope = float(PI / 4.);
+
+        auto mergept = sla::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        REQUIRE((*mergept - b).norm() < EPSILON);
+        REQUIRE((*mergept - a).norm() < EPSILON);
+    }
+
+    // ^ Z
+    // | a *
+    // |
+    // | b * <= mergept
+    SECTION("Points at different heights have the lower point as mergepoint") {
+        Vec3f a{0.f, 0.f, 0.f}, b = {0.f, 0.f, -1.f};
+        auto slope = float(PI / 4.);
+
+        auto mergept = sla::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        REQUIRE((*mergept - b).squaredNorm() < 2 * EPSILON);
+    }
+
+    // -|---------> X
+    //  a       b
+    //  *       *
+    //      * <= mergept
+    SECTION("Points at different X have mergept in the middle at lower Z") {
+        Vec3f a{0.f, 0.f, 0.f}, b = {1.f, 0.f, 0.f};
+        auto slope = float(PI / 4.);
+
+        auto mergept = sla::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+
+        // Distance of mergept should be equal from both input points
+        float D = std::abs((*mergept - b).squaredNorm() - (*mergept - a).squaredNorm());
+
+        REQUIRE(D < EPSILON);
+        REQUIRE(!sla::is_outside_support_cone(a, *mergept, slope));
+        REQUIRE(!sla::is_outside_support_cone(b, *mergept, slope));
+    }
+
+    // -|---------> Y
+    //  a       b
+    //  *       *
+    //      * <= mergept
+    SECTION("Points at different Y have mergept in the middle at lower Z") {
+        Vec3f a{0.f, 0.f, 0.f}, b = {0.f, 1.f, 0.f};
+        auto slope = float(PI / 4.);
+
+        auto mergept = sla::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+
+        // Distance of mergept should be equal from both input points
+        float D = std::abs((*mergept - b).squaredNorm() - (*mergept - a).squaredNorm());
+
+        REQUIRE(D < EPSILON);
+        REQUIRE(!sla::is_outside_support_cone(a, *mergept, slope));
+        REQUIRE(!sla::is_outside_support_cone(b, *mergept, slope));
+    }
+
+    SECTION("Points separated by less than critical angle have the lower point as mergept") {
+        Vec3f a{-1.f, -1.f, -1.f}, b = {-1.5f, -1.5f, -2.f};
+        auto slope = float(PI / 4.);
+
+        auto mergept = sla::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        REQUIRE((*mergept - b).norm() < 2 * EPSILON);
+    }
+
+    // -|----------------------------> Y
+    //  a                          b
+    //  *            * <= mergept  *
+    //
+    SECTION("Points at same height have mergepoint in the middle if critical angle is zero ") {
+        Vec3f a{-1.f, -1.f, -1.f}, b = {-1.5f, -1.5f, -1.f};
+        auto slope = EPSILON;
+
+        auto mergept = sla::find_merge_pt(a, b, slope);
+
+        REQUIRE(bool(mergept));
+        Vec3f middle = (b + a) / 2.;
+        REQUIRE((*mergept - middle).norm() < 4 * EPSILON);
+    }
+}
+
