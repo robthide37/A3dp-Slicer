@@ -485,7 +485,7 @@ template<class Ex, class WideningFn,
 GroundConnection deepsearch_ground_connection(
     Ex                     policy,
     const SupportableMesh &sm,
-    const Junction        &j,
+    const Junction        &source,
     WideningFn            &&wideningfn,
     const Vec3d           &init_dir = DOWN)
 {
@@ -494,7 +494,7 @@ GroundConnection deepsearch_ground_connection(
     // should be a reasonably big number.
     constexpr double StopScore = 1e6;
 
-    const auto sd          = sm.cfg.safety_distance(j.r);
+    const auto sd          = sm.cfg.safety_distance(source.r);
     const auto gndlvl      = ground_level(sm);
 
     auto criteria = get_criteria(sm.cfg).stop_score(StopScore);
@@ -509,16 +509,16 @@ GroundConnection deepsearch_ground_connection(
         auto &[plr, azm, bridge_len] = input;
 
         Vec3d n = spheric_to_dir(plr, azm);
-        Vec3d bridge_end = j.pos + bridge_len * n;
+        Vec3d bridge_end = source.pos + bridge_len * n;
 
         double full_len   = bridge_len + bridge_end.z() - gndlvl;
-        double bridge_r   = wideningfn(Ball{j.pos, j.r}, n, bridge_len);
+        double bridge_r   = wideningfn(Ball{source.pos, source.r}, n, bridge_len);
         double brhit_dist = 0.;
 
         if (bridge_len > EPSILON) {
             // beam_mesh_hit with a zero lenght bridge is invalid
 
-            Beam bridgebeam{Ball{j.pos, j.r}, Ball{bridge_end, bridge_r}};
+            Beam bridgebeam{Ball{source.pos, source.r}, Ball{bridge_end, bridge_r}};
             auto brhit = beam_mesh_hit(policy, sm.emesh, bridgebeam, sd);
             brhit_dist = brhit.distance();
         }
@@ -579,15 +579,15 @@ GroundConnection deepsearch_ground_connection(
         auto &[plr, azm, bridge_len] = oresult.optimum;
 
         Vec3d n = spheric_to_dir(plr, azm);
-        Vec3d bridge_end = j.pos + bridge_len * n;
+        Vec3d bridge_end = source.pos + bridge_len * n;
         Vec3d gp{bridge_end.x(), bridge_end.y(), gndlvl};
 
-        double bridge_r = wideningfn(Ball{j.pos, j.r}, n, bridge_len);
+        double bridge_r = wideningfn(Ball{source.pos, source.r}, n, bridge_len);
         double down_l = bridge_end.z() - gndlvl;
         double end_radius = wideningfn(Ball{bridge_end, bridge_r}, DOWN, down_l);
         double base_r = std::max(sm.cfg.base_radius_mm, end_radius);
 
-        conn.path.emplace_back(j);
+        conn.path.emplace_back(source);
         if (bridge_len > EPSILON)
             conn.path.emplace_back(Junction{bridge_end, bridge_r});
 
@@ -601,12 +601,12 @@ GroundConnection deepsearch_ground_connection(
 template<class Ex>
 GroundConnection deepsearch_ground_connection(Ex policy,
                                               const SupportableMesh &sm,
-                                              const Junction &j,
+                                              const Junction &source,
                                               double end_radius,
                                               const Vec3d &init_dir = DOWN)
 {
     double gndlvl = ground_level(sm);
-    auto wfn = [end_radius, gndlvl](Ball src, Vec3d dir, double len) {
+    auto wfn = [end_radius, gndlvl](const Ball &src, const Vec3d &dir, double len) {
         Vec3d  dst = src.p + len * dir;
         double widening = end_radius - src.R;
         double zlen = dst.z() - gndlvl;
@@ -618,113 +618,30 @@ GroundConnection deepsearch_ground_connection(Ex policy,
 
     static_assert(IsWideningFn<decltype(wfn)>, "Not a widening function");
 
-    return deepsearch_ground_connection(policy, sm, j, wfn, init_dir);
+    return deepsearch_ground_connection(policy, sm, source, wfn, init_dir);
+}
 
-//    // Score is the total lenght of the route. Feasible routes will have
-//    // infinite length (rays not colliding with model), thus the stop score
-//    // should be a reasonably big number.
-//    constexpr double StopScore = 1e6;
+struct DefaultWideningModel {
+    static constexpr double WIDENING_SCALE = 0.02;
+    const SupportableMesh &sm;
 
-//    const auto sd          = sm.cfg.safety_distance(j.r);
-//    const auto gndlvl      = ground_level(sm);
-//    const double widening  = end_radius - j.r;
-//    const double base_r    = std::max(sm.cfg.base_radius_mm, end_radius);
-//    const double zelev_gap = sm.cfg.pillar_base_safety_distance_mm + base_r;
+    double operator()(const Ball &src, const Vec3d & /*dir*/, double len) {
+        static_assert(IsWideningFn<DefaultWideningModel>,
+                "DefaultWideningModel is not a widening function");
 
-//    auto criteria = get_criteria(sm.cfg).stop_score(StopScore);
+        double w = WIDENING_SCALE * sm.cfg.pillar_widening_factor * len;
+        return src.R + w;
+    };
+};
 
-//    Optimizer<opt::AlgNLoptMLSL> solver(criteria);
-//    solver.seed(0); // enforce deterministic behavior
-
-//    auto optfn = [&](const opt::Input<3> &input) {
-//        double ret = NaNd;
-
-//        // solver suggests polar, azimuth and bridge length values:
-//        auto &[plr, azm, bridge_len] = input;
-
-//        Vec3d n = spheric_to_dir(plr, azm);
-//        Vec3d bridge_end = j.pos + bridge_len * n;
-
-//        double full_len   = bridge_len + bridge_end.z() - gndlvl;
-//        double bridge_r   = j.r + widening * bridge_len / full_len;
-//        double brhit_dist = 0.;
-
-//        if (bridge_len > EPSILON) {
-//            // beam_mesh_hit with a zero lenght bridge is invalid
-
-//            Beam bridgebeam{Ball{j.pos, j.r}, Ball{bridge_end, bridge_r}};
-//            auto brhit = beam_mesh_hit(policy, sm.emesh, bridgebeam, sd);
-//            brhit_dist = brhit.distance();
-//        }
-
-//        if (brhit_dist < bridge_len) {
-//            ret = brhit_dist;
-//        } else {
-//            // check if pillar can be placed below
-//            auto gp = Vec3d{bridge_end.x(), bridge_end.y(), gndlvl};
-
-//            Beam gndbeam {{bridge_end, bridge_r}, {gp, end_radius}};
-//            auto gndhit = beam_mesh_hit(policy, sm.emesh, gndbeam, sd);
-
-//            if (std::isinf(gndhit.distance())) {
-//                // Ground route is free with this bridge
-
-//                if (sm.cfg.object_elevation_mm < EPSILON) {
-//                    // Dealing with zero elevation mode, to not route pillars
-//                    // into the gap between the optional pad and the model
-//                    double gap = std::sqrt(sm.emesh.squared_distance(gp));
-//                    if (gap < zelev_gap)
-//                        ret = full_len - zelev_gap + gap;
-//                    else // success
-//                        ret = StopScore + EPSILON;
-//                } else {
-//                    // No zero elevation, return success
-//                    ret = StopScore + EPSILON;
-//                }
-//            } else {
-//                // Ground route is not free
-//                ret = bridge_len + gndhit.distance();
-//            }
-//        }
-
-//        return ret;
-//    };
-
-//    auto [plr_init, azm_init] = dir_to_spheric(init_dir);
-
-//    // Saturate the polar angle to max tilt defined in config
-//    plr_init = std::max(plr_init, PI - sm.cfg.bridge_slope);
-
-//    auto oresult = solver.to_max().optimize(
-//        optfn,
-//        initvals({plr_init, azm_init, 0.}),      // start with a zero bridge
-//        bounds({ {PI - sm.cfg.bridge_slope, PI}, // bounds for polar angle
-//                {-PI, PI},                      // bounds for azimuth
-//                {0., sm.cfg.max_bridge_length_mm} }) // bounds bridge length
-//        );
-
-//    GroundConnection conn;
-
-//    if (oresult.score >= StopScore) {
-//        // search was successful, extract and apply the result
-//        auto &[plr, azm, bridge_len] = oresult.optimum;
-
-//        Vec3d n = spheric_to_dir(plr, azm);
-//        Vec3d bridge_end = j.pos + bridge_len * n;
-
-//        double full_len = bridge_len + bridge_end.z() - gndlvl;
-//        double bridge_r = j.r + widening * bridge_len / full_len;
-//        Vec3d  gp{bridge_end.x(), bridge_end.y(), gndlvl};
-
-//        conn.path.emplace_back(j);
-//        if (bridge_len > EPSILON)
-//            conn.path.emplace_back(Junction{bridge_end, bridge_r});
-
-//        conn.pillar_base =
-//            Pedestal{gp, sm.cfg.base_height_mm, base_r, end_radius};
-//    }
-
-//    return conn;
+template<class Ex>
+GroundConnection deepsearch_ground_connection(Ex policy,
+                                              const SupportableMesh &sm,
+                                              const Junction &source,
+                                              const Vec3d &init_dir = DOWN)
+{
+    return deepsearch_ground_connection(policy, sm, source,
+                                        DefaultWideningModel{sm}, init_dir);
 }
 
 template<class Ex>
