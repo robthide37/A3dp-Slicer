@@ -425,7 +425,7 @@ void PrintObject::generate_support_spots()
                 [](const ModelVolume* mv){return mv->supported_facets.empty();})
         ) {
             SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values};
-            auto [issues, malformations] = SupportSpotsGenerator::full_search(this, params);
+            SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this, params);
 
             auto obj_transform = this->trafo_centered();
             for (ModelVolume *model_volume : this->model_object()->volumes) {
