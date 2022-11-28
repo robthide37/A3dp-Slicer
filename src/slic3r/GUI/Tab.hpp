@@ -449,6 +449,7 @@ public:
 	void		toggle_options() override;
 	void		update() override;
 	void		clear_pages() override;
+	void        msw_rescale() override;
 	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
 };
 

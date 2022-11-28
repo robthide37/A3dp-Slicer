@@ -818,7 +818,7 @@ void Bed3D::render_model()
 
 #if ENABLE_RAYCAST_PICKING
         // register for picking
-        register_raycasters_for_picking(m_model.model.get_geometry(), Geometry::assemble_transform(m_model_offset));
+        register_raycasters_for_picking(m_model.model.get_geometry(), Geometry::translation_transform(m_model_offset));
 #endif // ENABLE_RAYCAST_PICKING
 
         // update extended bounding box
@@ -835,7 +835,7 @@ void Bed3D::render_model()
             shader->start_using();
             shader->set_uniform("emission_factor", 0.0f);
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-            const Transform3d model_matrix = Geometry::assemble_transform(m_model_offset);
+            const Transform3d model_matrix = Geometry::translation_transform(m_model_offset);
             shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
             shader->set_uniform("projection_matrix", projection_matrix);
             const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();

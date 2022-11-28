@@ -129,11 +129,11 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     const Transform3d& view_matrix = camera.get_view_matrix();
     const Matrix3d view_matrix_no_offset = view_matrix.matrix().block(0, 0, 3, 3);
     std::vector<Transform3d> elements_matrices(GRABBER_ELEMENTS_MAX_COUNT, Transform3d::Identity());
-    elements_matrices[0] = matrix * Geometry::assemble_transform(center, angles, 2.0 * half_size * Vec3d::Ones());
+    elements_matrices[0] = matrix * Geometry::translation_transform(center) * Geometry::rotation_transform(angles) * Geometry::scale_transform(2.0 * half_size);
     Transform3d view_model_matrix = view_matrix * elements_matrices[0];
 #else
     const Transform3d& view_matrix = camera.get_view_matrix();
-    const Transform3d model_matrix = matrix * Geometry::assemble_transform(center, angles, 2.0 * half_size * Vec3d::Ones());
+    const Transform3d model_matrix = matrix * Geometry::translation_transform(center) * Geometry::rotation_transform(angles) * Geometry::scale_transform(2.0 * half_size);
     const Transform3d view_model_matrix = view_matrix * model_matrix;
 #endif // ENABLE_RAYCAST_PICKING
 
@@ -171,55 +171,55 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosX)) != 0) {
 #if ENABLE_RAYCAST_PICKING
-        elements_matrices[1] = elements_matrices[0] * Geometry::assemble_transform(Vec3d::UnitX(), Vec3d(0.0, 0.5 * double(PI), 0.0));
+        elements_matrices[1] = elements_matrices[0] * Geometry::translation_transform(Vec3d::UnitX()) * Geometry::rotation_transform({ 0.0, 0.5 * double(PI), 0.0 });
         render_extension(elements_matrices[1]);
 #else
-        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(Vec3d::UnitX(), Vec3d(0.0, 0.5 * double(PI), 0.0)));
+        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::translation_transform(Vec3d::UnitX()) * Geometry::rotation_transform({ 0.0, 0.5 * double(PI), 0.0 }));
         s_cone.render();
 #endif // ENABLE_RAYCAST_PICKING
     }
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegX)) != 0) {
 #if ENABLE_RAYCAST_PICKING
-        elements_matrices[2] = elements_matrices[0] * Geometry::assemble_transform(-Vec3d::UnitX(), Vec3d(0.0, -0.5 * double(PI), 0.0));
+        elements_matrices[2] = elements_matrices[0] * Geometry::translation_transform(-Vec3d::UnitX()) * Geometry::rotation_transform({ 0.0, -0.5 * double(PI), 0.0 });
         render_extension(elements_matrices[2]);
 #else
-        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(-Vec3d::UnitX(), Vec3d(0.0, -0.5 * double(PI), 0.0)));
+        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::translation_transform(-Vec3d::UnitX()) * Geometry::rotation_transform({ 0.0, -0.5 * double(PI), 0.0 }));
         s_cone.render();
 #endif // ENABLE_RAYCAST_PICKING
     }
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosY)) != 0) {
 #if ENABLE_RAYCAST_PICKING
-        elements_matrices[3] = elements_matrices[0] * Geometry::assemble_transform(Vec3d::UnitY(), Vec3d(-0.5 * double(PI), 0.0, 0.0));
+        elements_matrices[3] = elements_matrices[0] * Geometry::translation_transform(Vec3d::UnitY()) * Geometry::rotation_transform({ -0.5 * double(PI), 0.0, 0.0 });
         render_extension(elements_matrices[3]);
 #else
-        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(Vec3d::UnitY(), Vec3d(-0.5 * double(PI), 0.0, 0.0)));
+        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::translation_transform(Vec3d::UnitY()) * Geometry::rotation_transform({ -0.5 * double(PI), 0.0, 0.0 }));
         s_cone.render();
 #endif // ENABLE_RAYCAST_PICKING
     }
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegY)) != 0) {
 #if ENABLE_RAYCAST_PICKING
-        elements_matrices[4] = elements_matrices[0] * Geometry::assemble_transform(-Vec3d::UnitY(), Vec3d(0.5 * double(PI), 0.0, 0.0));
+        elements_matrices[4] = elements_matrices[0] * Geometry::translation_transform(-Vec3d::UnitY()) * Geometry::rotation_transform({ 0.5 * double(PI), 0.0, 0.0 });
         render_extension(elements_matrices[4]);
 #else
-        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(-Vec3d::UnitY(), Vec3d(0.5 * double(PI), 0.0, 0.0)));
+        shader->set_uniform("view_model_matrix", view_model_matrix* Geometry::translation_transform(-Vec3d::UnitY())* Geometry::rotation_transform({ 0.5 * double(PI), 0.0, 0.0 }));
         s_cone.render();
 #endif // ENABLE_RAYCAST_PICKING
     }
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosZ)) != 0) {
 #if ENABLE_RAYCAST_PICKING
-        elements_matrices[5] = elements_matrices[0] * Geometry::assemble_transform(Vec3d::UnitZ());
+        elements_matrices[5] = elements_matrices[0] * Geometry::translation_transform(Vec3d::UnitZ());
         render_extension(elements_matrices[5]);
 #else
-        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(Vec3d::UnitZ()));
+        shader->set_uniform("view_model_matrix", view_model_matrix* Geometry::translation_transform(Vec3d::UnitZ()));
         s_cone.render();
 #endif // ENABLE_RAYCAST_PICKING
     }
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegZ)) != 0) {
 #if ENABLE_RAYCAST_PICKING
-        elements_matrices[6] = elements_matrices[0] * Geometry::assemble_transform(-Vec3d::UnitZ(), Vec3d(double(PI), 0.0, 0.0));
-        render_extension(elements_matrices[6]);
+        elements_matrices[6] = elements_matrices[0] * Geometry::translation_transform(-Vec3d::UnitZ()) * Geometry::rotation_transform({ double(PI), 0.0, 0.0 });
+      render_extension(elements_matrices[6]);
 #else
-        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(-Vec3d::UnitZ(), Vec3d(double(PI), 0.0, 0.0)));
+        shader->set_uniform("view_model_matrix", view_model_matrix* Geometry::translation_transform(-Vec3d::UnitZ())* Geometry::rotation_transform({ double(PI), 0.0, 0.0 }));
         s_cone.render();
 #endif // ENABLE_RAYCAST_PICKING
     }

@@ -4318,12 +4318,22 @@ void GLCanvas3D::update_sequential_clearance()
         for (size_t i = 0; i < m_model->objects.size(); ++i) {
             ModelObject* model_object = m_model->objects[i];
             ModelInstance* model_instance0 = model_object->instances.front();
+#if ENABLE_WORLD_COORDINATE
+            Geometry::Transformation trafo = model_instance0->get_transformation();
+            trafo.set_offset({ 0.0, 0.0, model_instance0->get_offset().z() });
+            Polygon hull_2d = offset(model_object->convex_hull_2d(trafo.get_matrix()),
+                // Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
+                // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
+                shrink_factor,
+                jtRound, mitter_limit).front();
+#else
             Polygon hull_2d = offset(model_object->convex_hull_2d(Geometry::assemble_transform({ 0.0, 0.0, model_instance0->get_offset().z() }, model_instance0->get_rotation(),
                 model_instance0->get_scaling_factor(), model_instance0->get_mirror())),
                 // Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
                 // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
                 shrink_factor,
                 jtRound, mitter_limit).front();
+#endif // ENABLE_WORLD_COORDINATE
 
             Pointf3s& cache_hull_2d = m_sequential_print_clearance.m_hull_2d_cache.emplace_back(Pointf3s());
             cache_hull_2d.reserve(hull_2d.points.size());
@@ -5682,6 +5692,7 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
 #if ENABLE_RAYCAST_PICKING
         const Camera& main_camera = wxGetApp().plater()->get_camera();
         Camera framebuffer_camera;
+        framebuffer_camera.set_type(main_camera.get_type());
         const Camera* camera = &main_camera;
         if (use_framebuffer) {
             // setup a camera which covers only the selection rectangle
@@ -6460,7 +6471,7 @@ void GLCanvas3D::_render_camera_target()
         shader->start_using();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::assemble_transform(m_camera_target.target));
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(m_camera_target.target));
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
         const std::array<int, 4>& viewport = camera.get_viewport();
@@ -6648,10 +6659,18 @@ void GLCanvas3D::_render_sla_slices()
 
             for (const SLAPrintObject::Instance& inst : obj->instances()) {
                 const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_WORLD_COORDINATE
+                Transform3d view_model_matrix = camera.get_view_matrix() *
+                    Geometry::translation_transform({ unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0 }) *
+                    Geometry::rotation_transform(inst.rotation * Vec3d::UnitZ());
+                if (obj->is_left_handed())
+                    view_model_matrix = view_model_matrix * Geometry::scale_transform({ -1.0f, 1.0f, 1.0f });
+#else
                 const Transform3d view_model_matrix = camera.get_view_matrix() *
-                    Geometry::assemble_transform(Vec3d(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0),
+                        Geometry::assemble_transform(Vec3d(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0),
                         inst.rotation * Vec3d::UnitZ(), Vec3d::Ones(),
                         obj->is_left_handed() ? /* The polygons are mirrored by X */ Vec3d(-1.0f, 1.0f, 1.0f) : Vec3d::Ones());
+#endif // ENABLE_WORLD_COORDINATE
 
                 shader->set_uniform("view_model_matrix", view_model_matrix);
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());

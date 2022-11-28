@@ -58,7 +58,6 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
     // Cache the plenty of parameters, which influence the G-code generator only,
     // or they are only notes not influencing the generated G-code.
     static std::unordered_set<std::string> steps_gcode = {
-        "avoid_curled_filament_during_travels",
         "avoid_crossing_perimeters",
         "avoid_crossing_perimeters_max_detour",
         "bed_shape",
@@ -223,6 +222,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             osteps.emplace_back(posInfill);
             osteps.emplace_back(posSupportMaterial);
             steps.emplace_back(psSkirtBrim);
+        } else if (opt_key == "avoid_curled_filament_during_travels") {
+            osteps.emplace_back(posEstimateCurledExtrusions);
         } else {
             // for legacy, if we can't handle this option let's invalidate all steps
             //FIXME invalidate all steps of all objects as well?
@@ -382,6 +383,16 @@ bool Print::sequential_print_horizontal_clearance_valid(const Print& print, Poly
 	        // FIXME: Arrangement has different parameters for offsetting (jtMiter, limit 2)
 	        // which causes that the warning will be showed after arrangement with the
 	        // appropriate object distance. Even if I set this to jtMiter the warning still shows up.
+#if ENABLE_WORLD_COORDINATE
+        Geometry::Transformation trafo = model_instance0->get_transformation();
+        trafo.set_offset({ 0.0, 0.0, model_instance0->get_offset().z() });
+          it_convex_hull = map_model_object_to_convex_hull.emplace_hint(it_convex_hull, model_object_id,
+              offset(print_object->model_object()->convex_hull_2d(trafo.get_matrix()),
+                  // Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
+                  // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
+                  float(scale_(0.5 * print.config().extruder_clearance_radius.value - BuildVolume::BedEpsilon)),
+                  jtRound, scale_(0.1)).front());
+#else
             it_convex_hull = map_model_object_to_convex_hull.emplace_hint(it_convex_hull, model_object_id,
                 offset(print_object->model_object()->convex_hull_2d(
                     Geometry::assemble_transform({ 0.0, 0.0, model_instance0->get_offset().z() }, model_instance0->get_rotation(), model_instance0->get_scaling_factor(), model_instance0->get_mirror())),
@@ -389,7 +400,8 @@ bool Print::sequential_print_horizontal_clearance_valid(const Print& print, Poly
                     // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
                     float(scale_(0.5 * print.config().extruder_clearance_radius.value - BuildVolume::BedEpsilon)),
                     jtRound, scale_(0.1)).front());
-        }
+#endif // ENABLE_WORLD_COORDINATE
+      }
 	    // Make a copy, so it may be rotated for instances.
 	    Polygon convex_hull0 = it_convex_hull->second;
 		const double z_diff = Geometry::rotation_diff_z(model_instance0->get_rotation(), print_object->instances().front().model_instance->get_rotation());
