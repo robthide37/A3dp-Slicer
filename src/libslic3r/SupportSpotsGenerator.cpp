@@ -670,7 +670,7 @@ SupportPoints check_stability(const PrintObject *po, const Params &params)
     SupportPoints            supp_points{};
     SupportGridFilter supports_presence_grid(po, params.min_distance_between_support_points);
     ActiveObjectParts active_object_parts{};
-    LD                prev_layer_ext_perim_lines({});
+    LD                prev_layer_ext_perim_lines;
 
     std::unordered_map<size_t, size_t>          prev_slice_idx_to_object_part_mapping;
     std::unordered_map<size_t, size_t>          next_slice_idx_to_object_part_mapping;

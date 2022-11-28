@@ -2171,7 +2171,7 @@ LayerResult GCode::process_layer(
 
     std::vector<const Layer*> layers_ptrs;
     layers_ptrs.reserve(layers.size());
-    for (const LayerToPrint &layer_to_print : layers) {
+    for (const ObjectLayerToPrint &layer_to_print : layers) {
         layers_ptrs.push_back(layer_to_print.object_layer);
     }
     m_extrusion_quality_estimator.prepare_for_new_layer(layers_ptrs);
