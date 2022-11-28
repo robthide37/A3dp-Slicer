@@ -4505,19 +4505,29 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
 #else
             const bool is_part = selection.is_single_volume() || selection.is_single_modifier();
 #endif // ENABLE_WORLD_COORDINATE
-            menu = is_some_full_instances   ? menus.object_menu() :
-                   is_part                  ? menus.part_menu()   : menus.multi_selection_menu();
+            if (is_some_full_instances)
+                menu = menus.object_menu();
+            else if (is_part)
+                menu = selection.is_single_text() ? menus.text_part_menu() : menus.part_menu();
+            else
+                menu = menus.multi_selection_menu();
         }
     }
 
     if (q != nullptr && menu) {
+        Vec2d mouse_position = evt.data.first;
+        wxPoint position(static_cast<int>(mouse_position.x()),
+                         static_cast<int>(mouse_position.y()));
 #ifdef __linux__
-        // For some reason on Linux the menu isn't displayed if position is specified
-        // (even though the position is sane).
-        q->PopupMenu(menu);
-#else
-        q->PopupMenu(menu, (int)evt.data.first.x(), (int)evt.data.first.y());
+        // For some reason on Linux the menu isn't displayed if position is
+        // specified (even though the position is sane).
+        position = wxDefaultPosition;
 #endif
+        GLCanvas3D &canvas = *q->canvas3D();
+        canvas.apply_retina_scale(mouse_position);
+        canvas.set_popup_menu_position(mouse_position);
+        q->PopupMenu(menu, position);
+        canvas.clear_popup_menu_position();
     }
 }
 
@@ -4934,6 +4944,10 @@ bool Plater::priv::can_increase_instances() const
      || q->canvas3D()->get_gizmos_manager().is_in_editing_mode())
             return false;
 
+    // Disallow arrange and add instance when emboss gizmo is opend 
+    // Prevent strobo effect during editing emboss parameters.
+    if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
+
     const int obj_idx = get_selected_object_idx();
     return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) &&
             !sidebar->obj_list()->has_selected_cut_object();
@@ -4963,7 +4977,9 @@ bool Plater::priv::can_split_to_volumes() const
 
 bool Plater::priv::can_arrange() const
 {
-    return !model.objects.empty() && m_worker.is_idle();
+    if (model.objects.empty() && m_worker.is_idle()) return false;
+    if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
+    return true;
 }
 
 bool Plater::priv::can_layers_editing() const
@@ -7244,7 +7260,7 @@ bool Plater::PopupMenu(wxMenu *menu, const wxPoint& pos)
 	SuppressBackgroundProcessingUpdate sbpu;
 	// When tracking a pop-up menu, postpone error messages from the slicing result.
 	m_tracking_popup_menu = true;
-	bool out = this->wxPanel::PopupMenu(menu, pos);
+    bool out = this->wxPanel::PopupMenu(menu, pos);
 	m_tracking_popup_menu = false;
 	if (! m_tracking_popup_menu_error_message.empty()) {
         // Don't know whether the CallAfter is necessary, but it should not hurt.
@@ -7262,6 +7278,7 @@ void Plater::bring_instance_forward()
 
 wxMenu* Plater::object_menu()           { return p->menus.object_menu();            }
 wxMenu* Plater::part_menu()             { return p->menus.part_menu();              }
+wxMenu* Plater::text_part_menu()        { return p->menus.text_part_menu();         }
 wxMenu* Plater::sla_object_menu()       { return p->menus.sla_object_menu();        }
 wxMenu* Plater::default_menu()          { return p->menus.default_menu();           }
 wxMenu* Plater::instance_menu()         { return p->menus.instance_menu();          }

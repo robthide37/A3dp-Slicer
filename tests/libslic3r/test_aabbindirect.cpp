@@ -107,6 +107,50 @@ TEST_CASE("Creating a several 2d lines, testing all lines in radius query", "[AA
     REQUIRE(indices.size() == 3);
 }
 
+TEST_CASE("Find the closest point from ExPolys", "[ClosestPoint]") {
+    //////////////////////////////
+    //  0 - 3
+    //  |Ex0|   0 - 3
+    //  |   |p  |Ex1|
+    //  1 - 2   |   |
+    //          1 - 2
+    //[0,0]
+    ///////////////////
+    ExPolygons ex_polys{
+        /*Ex0*/ {{0, 4}, {0, 1}, {2, 1}, {2, 4}}, 
+        /*Ex1*/ {{4, 3}, {4, 0}, {6, 0}, {6, 3}}
+    };
+    Vec2d p{2.5, 3.5};
+
+    std::vector<Linef> lines;
+    auto add_lines = [&lines](const Polygon& poly) {
+        for (const auto &line : poly.lines())
+            lines.emplace_back(
+                line.a.cast<double>(), 
+                line.b.cast<double>());
+    };
+    for (const ExPolygon &ex_poly : ex_polys) {
+        add_lines(ex_poly.contour);
+        for (const Polygon &hole : ex_poly.holes) 
+            add_lines(hole);
+    }
+    AABBTreeIndirect::Tree<2, double> tree = 
+        AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
+
+    size_t hit_idx_out = std::numeric_limits<size_t>::max();
+    Vec2d  hit_point_out; 
+    [[maybe_unused]] double distance_sq =
+        AABBTreeLines::squared_distance_to_indexed_lines(
+        lines, tree, p, hit_idx_out, hit_point_out, 0.24/* < (0.5*0.5) */);
+    CHECK(hit_idx_out == std::numeric_limits<size_t>::max());
+    distance_sq = AABBTreeLines::squared_distance_to_indexed_lines(
+        lines, tree, p, hit_idx_out, hit_point_out, 0.26);
+    CHECK(hit_idx_out != std::numeric_limits<size_t>::max());
+
+    //double distance = sqrt(distance_sq);
+    //const Linef &line = lines[hit_idx_out];
+}
+
 #if 0
 #include "libslic3r/EdgeGrid.hpp"
 #include <iostream>

@@ -3727,6 +3727,24 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
     else
         evt.Skip();
 
+    // Detection of doubleclick on text to open emboss edit window
+    if (evt.LeftDClick() && m_gizmos.get_current() == nullptr && !m_hover_volume_idxs.empty()) { 
+        for (int hover_volume_id : m_hover_volume_idxs) { 
+            const GLVolume &hover_gl_volume = *m_volumes.volumes[hover_volume_id];
+            const ModelObject* hover_object = m_model->objects[hover_gl_volume.object_idx()];
+            int hover_volume_idx = hover_gl_volume.volume_idx();
+            const ModelVolume* hover_volume = hover_object->volumes[hover_volume_idx];
+            if (hover_volume->text_configuration.has_value()) {
+                //m_selection.set_mode(Selection::EMode::Volume);
+                //m_selection.add(hover_volume_id); // add whole instance
+                m_selection.add_volumes(Selection::EMode::Volume, {(unsigned) hover_volume_id});
+                m_gizmos.open_gizmo(GLGizmosManager::EType::Emboss);
+                wxGetApp().obj_list()->update_selections();
+                return;
+            }
+        }
+    }
+
     if (m_moving)
         show_sinking_contours();
 
@@ -4380,6 +4398,14 @@ bool GLCanvas3D::is_object_sinking(int object_idx) const
             return true;
     }
     return false;
+}
+
+void GLCanvas3D::apply_retina_scale(Vec2d &screen_coordinate) const 
+{
+#if ENABLE_RETINA_GL
+    double scale = static_cast<double>(m_retina_helper->get_scale_factor());
+    screen_coordinate *= scale;
+#endif // ENABLE_RETINA_GL
 }
 
 bool GLCanvas3D::_is_shown_on_screen() const
@@ -7246,7 +7272,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                         _3DScene::extrusionentity_to_verts(layerm->perimeters(), float(layer->print_z), copy,
                             select_geometry(idx_layer, layerm->region().config().perimeter_extruder.value, 0));
 #else
-                        _3DScene::extrusionentity_to_verts(layerm->perimeters, float(layer->print_z), copy,
+                        _3DScene::extrusionentity_to_verts(layerm->perimeters(), float(layer->print_z), copy,
                         	volume(idx_layer, layerm->region().config().perimeter_extruder.value, 0));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     if (ctxt.has_infill) {

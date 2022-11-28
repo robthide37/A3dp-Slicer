@@ -267,6 +267,9 @@ inline bool has_duplicate_successive_points_closed(const std::vector<Point> &pts
     return has_duplicate_successive_points(pts) || (pts.size() >= 2 && pts.front() == pts.back());
 }
 
+// Collect adjecent(duplicit points)
+Points collect_duplications(Points pts /* Copy */);
+
 inline bool shorter_then(const Point& p0, const coord_t len)
 {
     if (p0.x() > len || p0.x() < -len)
@@ -547,6 +550,7 @@ namespace boost { namespace polygon {
 } }
 // end Boost
 
+#include <cereal/cereal.hpp>
 // Serialization through the Cereal library
 namespace cereal {
 //    template<class Archive> void serialize(Archive& archive, Slic3r::Vec2crd &v) { archive(v.x(), v.y()); }
@@ -560,10 +564,11 @@ namespace cereal {
     template<class Archive> void serialize(Archive& archive, Slic3r::Vec2d   &v) { archive(v.x(), v.y()); }
     template<class Archive> void serialize(Archive& archive, Slic3r::Vec3d   &v) { archive(v.x(), v.y(), v.z()); }
 
-    template<class Archive> void load(Archive& archive, Slic3r::Matrix2f &m) { archive.loadBinary((char*)m.data(), sizeof(float) * 4); }
-    template<class Archive> void save(Archive& archive, Slic3r::Matrix2f &m) { archive.saveBinary((char*)m.data(), sizeof(float) * 4); }
-    template<class Archive> void load(Archive& archive, Slic3r::Transform3d& m)       { archive.loadBinary((char*)m.data(), sizeof(double) * 16); }
-    template<class Archive> void save(Archive& archive, const Slic3r::Transform3d& m) { archive.saveBinary((char*)m.data(), sizeof(double) * 16); }
+    template<class Archive> void serialize(Archive& archive, Slic3r::Matrix4d &m){ archive(binary_data(m.data(), 4*4*sizeof(double))); }
+    template<class Archive> void serialize(Archive& archive, Slic3r::Matrix2f &m){ archive(binary_data(m.data(), 2*2*sizeof(float))); }
+        
+    // Eigen Transformation serialization
+    template<class Archive, class T, int N> inline void serialize(Archive& archive, Eigen::Transform<T, N, Eigen::Affine, Eigen::DontAlign>& t){ archive(t.matrix()); }
 }
 
 // To be able to use Vec<> and Mat<> in range based for loops:

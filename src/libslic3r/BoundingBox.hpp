@@ -53,7 +53,7 @@ public:
     PointClass size() const;
     double radius() const;
     void translate(coordf_t x, coordf_t y) { assert(this->defined); PointClass v(x, y); this->min += v; this->max += v; }
-    void translate(const Vec2d &v) { this->min += v; this->max += v; }
+    void translate(const PointClass &v) { this->min += v; this->max += v; }
     void offset(coordf_t delta);
     BoundingBoxBase<PointClass> inflated(coordf_t delta) const throw() { BoundingBoxBase<PointClass> out(*this); out.offset(delta); return out; }
     PointClass center() const;
@@ -174,6 +174,7 @@ public:
     BoundingBox rotated(double angle, const Point &center) const;
     void rotate(double angle) { (*this) = this->rotated(angle); }
     void rotate(double angle, const Point &center) { (*this) = this->rotated(angle, center); }
+    bool intersects(const BoundingBox &other) const { return this->min(0) <= other.max(0) && this->max(0) >= other.min(0) && this->min(1) <= other.max(1) && this->max(1) >= other.min(1); }
     // Align the min corner to a grid of cell_size x cell_size cells,
     // to encompass the original bounding box.
     void align_to_grid(const coord_t cell_size);

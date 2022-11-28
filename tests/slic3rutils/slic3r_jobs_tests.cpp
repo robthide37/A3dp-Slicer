@@ -118,12 +118,15 @@ TEMPLATE_LIST_TEST_CASE("cancel_all should remove all pending jobs", "[Jobs]", T
     });
     queue_job(worker, [&jobres](Job::Ctl &) {
         jobres[1] = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     });
     queue_job(worker, [&jobres](Job::Ctl &) {
         jobres[2] = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     });
     queue_job(worker, [&jobres](Job::Ctl &) {
         jobres[3] = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     });
 
     // wait until the first job's half time to be sure, the cancel is made

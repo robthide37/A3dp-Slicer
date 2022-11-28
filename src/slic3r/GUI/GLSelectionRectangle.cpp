@@ -1,5 +1,6 @@
 #include "GLSelectionRectangle.hpp"
 #include "Camera.hpp"
+#include "CameraUtils.hpp"
 #include "3DScene.hpp"
 #include "GLCanvas3D.hpp"
 #include "GUI_App.hpp"
@@ -44,30 +45,15 @@ namespace GUI {
         m_state = EState::Off;
 #endif // !ENABLE_RAYCAST_PICKING
 
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        const Matrix4d modelview = camera.get_view_matrix().matrix();
-        const Matrix4d projection= camera.get_projection_matrix().matrix();
-        const Vec4i viewport(camera.get_viewport().data());
-
-        // Convert our std::vector to Eigen dynamic matrix.
-        Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::DontAlign> pts(points.size(), 3);
-        for (size_t i=0; i<points.size(); ++i)
-            pts.block<1, 3>(i, 0) = points[i];
-
-        // Get the projections.
-        Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::DontAlign> projections;
-        igl::project(pts, modelview, projection, viewport, projections);
-
         // bounding box created from the rectangle corners - will take care of order of the corners
         const BoundingBox rectangle(Points{ Point(m_start_corner.cast<coord_t>()), Point(m_end_corner.cast<coord_t>()) });
 
         // Iterate over all points and determine whether they're in the rectangle.
-        for (int i = 0; i<projections.rows(); ++i)
-#if ENABLE_RAYCAST_PICKING
-            if (rectangle.contains(Point(projections(i, 0), viewport[3] - projections(i, 1))))
-#else
-            if (rectangle.contains(Point(projections(i, 0), canvas.get_canvas_size().get_height() - projections(i, 1))))
-#endif // ENABLE_RAYCAST_PICKING
+        const Camera &camera = wxGetApp().plater()->get_camera();
+        Points points_2d = CameraUtils::project(camera, points);
+        unsigned int size = static_cast<unsigned int>(points.size());
+        for (unsigned int i = 0; i< size; ++i)
+            if (rectangle.contains(points_2d[i]))
                 out.push_back(i);
 
         return out;

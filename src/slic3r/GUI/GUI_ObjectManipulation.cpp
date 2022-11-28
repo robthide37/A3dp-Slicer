@@ -23,7 +23,7 @@ namespace GUI
 {
 
 const double ObjectManipulation::in_to_mm = 25.4;
-const double ObjectManipulation::mm_to_in = 0.0393700787;
+const double ObjectManipulation::mm_to_in = 1 / ObjectManipulation::in_to_mm;
 
 // Helper function to be used by drop to bed button. Returns lowest point of this
 // volume in world coordinate system.

@@ -211,8 +211,8 @@ int its_remove_degenerate_faces(indexed_triangle_set &its, bool shrink_to_fit = 
 int its_compactify_vertices(indexed_triangle_set &its, bool shrink_to_fit = true);
 
 // store part of index triangle set
-bool its_store_triangle(const indexed_triangle_set &its, const char *obj_filename, size_t triangle_index);
-bool its_store_triangles(const indexed_triangle_set &its, const char *obj_filename, const std::vector<size_t>& triangles);
+bool its_store_triangle_to_obj(const indexed_triangle_set &its, const char *obj_filename, size_t triangle_index);
+bool its_store_triangles_to_obj(const indexed_triangle_set &its, const char *obj_filename, const std::vector<size_t>& triangles);
 
 std::vector<indexed_triangle_set> its_split(const indexed_triangle_set &its);
 std::vector<indexed_triangle_set> its_split(const indexed_triangle_set &its, std::vector<Vec3i> &face_neighbors);
@@ -284,6 +284,14 @@ inline stl_normal its_unnormalized_normal(const indexed_triangle_set &its,
 
 float its_volume(const indexed_triangle_set &its);
 float its_average_edge_length(const indexed_triangle_set &its);
+
+/// <summary>
+/// Merge one triangle mesh to another
+/// Added triangle set will be consumed
+/// </summary>
+/// <param name="its">IN/OUT triangle mesh</param>
+/// <param name="its_add">Triangle mesh (will be consumed)</param>
+void its_merge(indexed_triangle_set &its, indexed_triangle_set &&its_add);
 
 void its_merge(indexed_triangle_set &A, const indexed_triangle_set &B);
 void its_merge(indexed_triangle_set &A, const std::vector<Vec3f> &triangles);

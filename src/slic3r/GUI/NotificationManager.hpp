@@ -111,6 +111,8 @@ enum class NotificationType
 	// Give user advice to simplify object with big amount of triangles
 	// Contains ObjectID for closing when object is deleted
 	SimplifySuggestion,
+	// Change of text will change font to similar one on.
+	UnknownFont,
 	// information about netfabb is finished repairing model (blocking proccess)
 	NetfabbFinished,
 	// Short meesage to fill space between start and finish of export

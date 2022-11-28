@@ -76,7 +76,11 @@ public:
         if (entities.empty())
             entities = std::move(src);
         else {
-            std::move(std::begin(src), std::end(src), std::back_inserter(entities));
+            entities.insert(entities.end(),
+                std::make_move_iterator(src.begin()),
+                std::make_move_iterator(src.end()));
+            // Removing pointers to polymorphic extrusions from the donor object
+            // so that they will not be deleted twice.
             src.clear();
         }
     }

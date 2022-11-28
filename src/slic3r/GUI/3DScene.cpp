@@ -324,64 +324,73 @@ void GLVolume::SinkingContours::update()
     const int object_idx = m_parent.object_idx();
     const Model& model = GUI::wxGetApp().plater()->model();
 
-    if (0 <= object_idx && object_idx < int(model.objects.size()) && m_parent.is_sinking() && !m_parent.is_below_printbed()) {
-        const BoundingBoxf3& box = m_parent.transformed_convex_hull_bounding_box();
-        if (!m_old_box.size().isApprox(box.size()) || m_old_box.min.z() != box.min.z()) {
-            m_old_box = box;
-            m_shift = Vec3d::Zero();
-
-            const TriangleMesh& mesh = model.objects[object_idx]->volumes[m_parent.volume_idx()]->mesh();
-
-            m_model.reset();
-            GUI::GLModel::Geometry init_data;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-            init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3 };
-            init_data.color = ColorRGBA::WHITE();
-            unsigned int vertices_counter = 0;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-            MeshSlicingParams slicing_params;
-            slicing_params.trafo = m_parent.world_matrix();
-            const Polygons polygons = union_(slice_mesh(mesh.its, 0.0f, slicing_params));
-            for (const ExPolygon& expoly : diff_ex(expand(polygons, float(scale_(HalfWidth))), shrink(polygons, float(scale_(HalfWidth))))) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-                const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
-                init_data.reserve_vertices(init_data.vertices_count() + triangulation.size());
-                init_data.reserve_indices(init_data.indices_count() + triangulation.size());
-                for (const Vec3d& v : triangulation) {
-                    init_data.add_vertex((Vec3f)(v.cast<float>() + 0.015f * Vec3f::UnitZ())); // add a small positive z to avoid z-fighting
-                    ++vertices_counter;
-                    if (vertices_counter % 3 == 0)
-                        init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
-                }
-            }
-            m_model.init_from(std::move(init_data));
-#else
-                GUI::GLModel::Geometry::Entity entity;
-                entity.type = GUI::GLModel::EPrimitiveType::Triangles;
-                const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
-                entity.positions.reserve(entity.positions.size() + triangulation.size());
-                entity.normals.reserve(entity.normals.size() + triangulation.size());
-                entity.indices.reserve(entity.indices.size() + triangulation.size() / 3);
-                for (const Vec3d& v : triangulation) {
-                    entity.positions.emplace_back(v.cast<float>() + 0.015f * Vec3f::UnitZ()); // add a small positive z to avoid z-fighting
-                    entity.normals.emplace_back(Vec3f::UnitZ());
-                    const size_t positions_count = entity.positions.size();
-                    if (positions_count % 3 == 0) {
-                        entity.indices.emplace_back(positions_count - 3);
-                        entity.indices.emplace_back(positions_count - 2);
-                        entity.indices.emplace_back(positions_count - 1);
-                    }
-                }
-                init_data.entities.emplace_back(entity);
-            }
-            m_model.init_from(init_data);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-        }
-        else
-            m_shift = box.center() - m_old_box.center();
-    }
-    else
+    if (object_idx < 0 ||
+        object_idx >= int(model.objects.size()) ||
+        !m_parent.is_sinking() ||
+        m_parent.is_below_printbed()){
         m_model.reset();
+        return;    
+    }
+
+    const BoundingBoxf3& box = m_parent.transformed_convex_hull_bounding_box();
+    if (m_old_box.size().isApprox(box.size()) &&
+        m_old_box.min.z() == box.min.z()){
+        // Fix it !!! It is not working all the time
+        m_shift = box.center() - m_old_box.center();
+        return;
+    }    
+    
+    m_old_box = box;
+    m_shift = Vec3d::Zero();
+
+    const TriangleMesh& mesh = model.objects[object_idx]->volumes[m_parent.volume_idx()]->mesh();
+
+    m_model.reset();
+    GUI::GLModel::Geometry init_data;
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3 };
+    init_data.color = ColorRGBA::WHITE();
+    unsigned int vertices_counter = 0;
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+    MeshSlicingParams slicing_params;
+    slicing_params.trafo = m_parent.world_matrix();
+    const Polygons polygons = union_(slice_mesh(mesh.its, 0.0f, slicing_params));
+    if (polygons.empty()) return;
+
+    for (const ExPolygon& expoly : diff_ex(expand(polygons, float(scale_(HalfWidth))), shrink(polygons, float(scale_(HalfWidth))))) {
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+        const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
+        init_data.reserve_vertices(init_data.vertices_count() + triangulation.size());
+        init_data.reserve_indices(init_data.indices_count() + triangulation.size());
+        for (const Vec3d& v : triangulation) {
+            init_data.add_vertex((Vec3f)(v.cast<float>() + 0.015f * Vec3f::UnitZ())); // add a small positive z to avoid z-fighting
+            ++vertices_counter;
+            if (vertices_counter % 3 == 0)
+                init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
+        }
+    }
+    m_model.init_from(std::move(init_data));
+#else
+        GUI::GLModel::Geometry::Entity entity;
+        entity.type = GUI::GLModel::EPrimitiveType::Triangles;
+        const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
+        entity.positions.reserve(entity.positions.size() + triangulation.size());
+        entity.normals.reserve(entity.normals.size() + triangulation.size());
+        entity.indices.reserve(entity.indices.size() + triangulation.size() / 3);
+        for (const Vec3d& v : triangulation) {
+            entity.positions.emplace_back(v.cast<float>() + 0.015f * Vec3f::UnitZ()); // add a small positive z to avoid z-fighting
+            entity.normals.emplace_back(Vec3f::UnitZ());
+            const size_t positions_count = entity.positions.size();
+            if (positions_count % 3 == 0) {
+                entity.indices.emplace_back(positions_count - 3);
+                entity.indices.emplace_back(positions_count - 2);
+                entity.indices.emplace_back(positions_count - 1);
+            }
+        }
+        init_data.entities.emplace_back(entity);
+    }
+    m_model.init_from(init_data);
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLVolume::NonManifoldEdges::render()
@@ -1291,9 +1300,15 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+    ScopeGuard transparent_sg;
     if (type == ERenderType::Transparent) {
         glsafe(::glEnable(GL_BLEND));
         glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+        glsafe(::glDepthMask(false));
+        transparent_sg = ScopeGuard([]() {
+            glsafe(::glDisable(GL_BLEND));
+            glsafe(::glDepthMask(true));
+        });
     }
 
     glsafe(::glCullFace(GL_BACK));
@@ -1421,9 +1436,6 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
     if (disable_cullface)
         glsafe(::glEnable(GL_CULL_FACE));
-
-    if (type == ERenderType::Transparent)
-        glsafe(::glDisable(GL_BLEND));
 }
 
 bool GLVolumeCollection::check_outside_state(const BuildVolume &build_volume, ModelInstanceEPrintVolumeState *out_state) const

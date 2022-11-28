@@ -287,7 +287,8 @@ void GLGizmoRotate::on_render_for_picking()
 void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 {
     ECoordinatesType coordinates_type;
-    if (selection.is_wipe_tower())
+    if (m_using_local_coordinate ||
+        selection.is_wipe_tower())
         coordinates_type = ECoordinatesType::Local;
     else
         coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();

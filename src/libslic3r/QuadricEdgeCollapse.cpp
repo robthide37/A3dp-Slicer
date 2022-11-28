@@ -184,7 +184,7 @@ void Slic3r::its_quadric_edge_collapse(
     throw_on_cancel();
     status_fn(status_init_size);
 
-    //its_store_triangle(its, "triangle.obj", 1182);
+    //its_store_triangle_to_obj(its, "triangle.obj", 1182);
     //store_surround("triangle_surround1.obj", 1182, 1, its, v_infos, e_infos);
 
     // convert from triangle index to mutable priority queue index
@@ -904,7 +904,7 @@ void QuadricEdgeCollapse::store_surround(const char *obj_filename,
     std::vector<size_t> trs;
     trs.reserve(triangles.size());
     for (size_t ti : triangles) trs.push_back(ti);
-    its_store_triangles(its, obj_filename, trs);
+    its_store_triangles_to_obj(its, obj_filename, trs);
     // its_write_obj(its,"original.obj");
 }
 

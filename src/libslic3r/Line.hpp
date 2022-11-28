@@ -210,6 +210,7 @@ public:
     static const constexpr int Dim = 2;
     using Scalar = Vec2d::Scalar;
 };
+using Linesf = std::vector<Linef>;
 
 class Linef3
 {

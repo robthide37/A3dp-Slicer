@@ -14,12 +14,15 @@
 #include "Arrange.hpp"
 #include "CustomGCode.hpp"
 #include "enum_bitmask.hpp"
+//#include "ModelVolumeType.hpp"
+#include "TextConfiguration.hpp"
 
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+#include <optional>
 
 namespace cereal {
 	class BinaryInputArchive;
@@ -765,6 +768,7 @@ public:
     void                set_mesh(std::shared_ptr<const TriangleMesh> &mesh) { m_mesh = mesh; }
     void                set_mesh(std::unique_ptr<const TriangleMesh> &&mesh) { m_mesh = std::move(mesh); }
 	void				reset_mesh() { m_mesh = std::make_shared<const TriangleMesh>(); }
+    const std::shared_ptr<const TriangleMesh>& get_mesh_shared_ptr() const { return m_mesh; }
     // Configuration parameters specific to an object model geometry or a modifier volume, 
     // overriding the global Slic3r settings and the ModelObject settings.
     ModelConfigObject	config;
@@ -777,6 +781,10 @@ public:
 
     // List of mesh facets painted for MMU segmentation.
     FacetsAnnotation    mmu_segmentation_facets;
+
+    // Is set only when volume is Embossed Text type
+    // Contain information how to re-create volume
+    std::optional<TextConfiguration> text_configuration;
 
     // A parent object owning this modifier volume.
     ModelObject*        get_object() const { return this->object; }
@@ -928,23 +936,8 @@ private:
     //      1   ->   is splittable
     mutable int               		m_is_splittable{ -1 };
 
-	ModelVolume(ModelObject *object, const TriangleMesh &mesh, ModelVolumeType type = ModelVolumeType::MODEL_PART) : m_mesh(new TriangleMesh(mesh)), m_type(type), object(object)
-    {
-		assert(this->id().valid()); 
-        assert(this->config.id().valid()); 
-        assert(this->supported_facets.id().valid()); 
-        assert(this->seam_facets.id().valid());
-        assert(this->mmu_segmentation_facets.id().valid());
-        assert(this->id() != this->config.id());
-        assert(this->id() != this->supported_facets.id());
-        assert(this->id() != this->seam_facets.id());
-        assert(this->id() != this->mmu_segmentation_facets.id());
-        if (mesh.facets_count() > 1)
-            calculate_convex_hull();
-    }
-    ModelVolume(ModelObject *object, TriangleMesh &&mesh, TriangleMesh &&convex_hull, ModelVolumeType type = ModelVolumeType::MODEL_PART) :
-		m_mesh(new TriangleMesh(std::move(mesh))), m_convex_hull(new TriangleMesh(std::move(convex_hull))), m_type(type), object(object) {
-		assert(this->id().valid()); 
+    inline bool check() {
+        assert(this->id().valid());
         assert(this->config.id().valid());
         assert(this->supported_facets.id().valid());
         assert(this->seam_facets.id().valid());
@@ -953,6 +946,24 @@ private:
         assert(this->id() != this->supported_facets.id());
         assert(this->id() != this->seam_facets.id());
         assert(this->id() != this->mmu_segmentation_facets.id());
+        return true;
+    }
+
+	ModelVolume(ModelObject *object, const TriangleMesh &mesh, ModelVolumeType type = ModelVolumeType::MODEL_PART) :
+        m_mesh(new TriangleMesh(mesh)), m_type(type), object(object)
+    {
+        assert(check());
+        if (m_mesh->facets_count() > 1) calculate_convex_hull();
+    }
+    ModelVolume(ModelObject *object, TriangleMesh &&mesh, ModelVolumeType type = ModelVolumeType::MODEL_PART)
+        : m_mesh(new TriangleMesh(std::move(mesh))), m_type(type), object(object)
+    {
+        assert(check());
+        if (m_mesh->facets_count() > 1) calculate_convex_hull();
+    }
+    ModelVolume(ModelObject *object, TriangleMesh &&mesh, TriangleMesh &&convex_hull, ModelVolumeType type = ModelVolumeType::MODEL_PART) :
+		m_mesh(new TriangleMesh(std::move(mesh))), m_convex_hull(new TriangleMesh(std::move(convex_hull))), m_type(type), object(object) {
+        assert(check());
 	}
 
     // Copying an existing volume, therefore this volume will get a copy of the ID assigned.
@@ -961,7 +972,8 @@ private:
         name(other.name), source(other.source), m_mesh(other.m_mesh), m_convex_hull(other.m_convex_hull),
         config(other.config), m_type(other.m_type), object(object), m_transformation(other.m_transformation),
         supported_facets(other.supported_facets), seam_facets(other.seam_facets), mmu_segmentation_facets(other.mmu_segmentation_facets),
-        cut_info(other.cut_info)
+        cut_info(other.cut_info),
+        text_configuration(other.text_configuration)
     {
 		assert(this->id().valid()); 
         assert(this->config.id().valid()); 
@@ -982,7 +994,8 @@ private:
     // Providing a new mesh, therefore this volume will get a new unique ID assigned.
     ModelVolume(ModelObject *object, const ModelVolume &other, TriangleMesh &&mesh) :
         name(other.name), source(other.source), config(other.config), object(object), m_mesh(new TriangleMesh(std::move(mesh))), m_type(other.m_type), m_transformation(other.m_transformation),
-        cut_info(other.cut_info)
+        cut_info(other.cut_info),
+        text_configuration(other.text_configuration)
     {
 		assert(this->id().valid()); 
         assert(this->config.id().valid()); 
@@ -1029,6 +1042,7 @@ private:
         cereal::load_by_value(ar, seam_facets);
         cereal::load_by_value(ar, mmu_segmentation_facets);
         cereal::load_by_value(ar, config);
+        cereal::load(ar, text_configuration);
 		assert(m_mesh);
 		if (has_convex_hull) {
 			cereal::load_optional(ar, m_convex_hull);
@@ -1045,6 +1059,7 @@ private:
         cereal::save_by_value(ar, seam_facets);
         cereal::save_by_value(ar, mmu_segmentation_facets);
         cereal::save_by_value(ar, config);
+        cereal::save(ar, text_configuration);
 		if (has_convex_hull)
 			cereal::save_optional(ar, m_convex_hull);
 	}

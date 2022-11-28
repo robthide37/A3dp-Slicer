@@ -15,24 +15,27 @@
 
 #include <limits>
 #include <stdexcept>
+#include <optional>
+#include <string_view>
 
-#include <boost/algorithm/string/classification.hpp>
+#include <boost/assign.hpp>
+#include <boost/bimap.hpp>
+#include <boost/filesystem.hpp>
+
 #include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/filesystem/operations.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/qi_int.hpp>
 #include <boost/log/trivial.hpp>
 
-#include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
-#include <boost/foreach.hpp>
 namespace pt = boost::property_tree;
 
 #include <expat.h>
 #include <Eigen/Dense>
 #include "miniz_extension.hpp"
+
+#include "TextConfiguration.hpp"
 
 #include <fast_float/fast_float.h>
 
@@ -144,6 +147,30 @@ static constexpr const char* MESH_STAT_FACETS_REMOVED       = "facets_removed";
 static constexpr const char* MESH_STAT_FACETS_RESERVED      = "facets_reversed";
 static constexpr const char* MESH_STAT_BACKWARDS_EDGES      = "backwards_edges";
 
+// Store / load of TextConfiguration
+static constexpr const char *TEXT_TAG = "emboss";
+static constexpr const char *TEXT_DATA_ATTR = "text";
+// TextConfiguration::EmbossStyle
+static constexpr const char *STYLE_NAME_ATTR      = "style_name";
+static constexpr const char *FONT_DESCRIPTOR_ATTR = "font_descriptor";
+static constexpr const char *FONT_DESCRIPTOR_TYPE_ATTR = "font_descriptor_type";
+
+// TextConfiguration::FontProperty
+static constexpr const char *CHAR_GAP_ATTR    = "char_gap";
+static constexpr const char *LINE_GAP_ATTR    = "line_gap";
+static constexpr const char *LINE_HEIGHT_ATTR = "line_height";
+static constexpr const char *DEPTH_ATTR       = "depth";
+static constexpr const char *USE_SURFACE_ATTR = "use_surface";
+static constexpr const char *BOLDNESS_ATTR    = "boldness";
+static constexpr const char *SKEW_ATTR        = "skew";
+static constexpr const char *DISTANCE_ATTR    = "distance";
+static constexpr const char *ANGLE_ATTR       = "angle";
+static constexpr const char *COLLECTION_NUMBER_ATTR = "collection";
+
+static constexpr const char *FONT_FAMILY_ATTR    = "family";
+static constexpr const char *FONT_FACE_NAME_ATTR = "face_name";
+static constexpr const char *FONT_STYLE_ATTR     = "style";
+static constexpr const char *FONT_WEIGHT_ATTR    = "weight";
 
 const unsigned int VALID_OBJECT_TYPES_COUNT = 1;
 const char* VALID_OBJECT_TYPES[] =
@@ -395,7 +422,7 @@ namespace Slic3r {
                 unsigned int last_triangle_id;
                 MetadataList metadata;
                 RepairedMeshErrors mesh_stats;
-
+                std::optional<TextConfiguration> text_configuration;
                 VolumeMetadata(unsigned int first_triangle_id, unsigned int last_triangle_id)
                     : first_triangle_id(first_triangle_id)
                     , last_triangle_id(last_triangle_id)
@@ -548,6 +575,8 @@ namespace Slic3r {
 
         bool _handle_start_metadata(const char** attributes, unsigned int num_attributes);
         bool _handle_end_metadata();
+
+        bool _handle_start_text_configuration(const char** attributes, unsigned int num_attributes);
 
         bool _create_object_instance(int object_id, const Transform3d& transform, const bool printable, unsigned int recur_counter);
 
@@ -1545,6 +1574,8 @@ namespace Slic3r {
             res = _handle_start_config_volume_mesh(attributes, num_attributes);
         else if (::strcmp(METADATA_TAG, name) == 0)
             res = _handle_start_config_metadata(attributes, num_attributes);
+        else if (::strcmp(TEXT_TAG, name) == 0)
+            res = _handle_start_text_configuration(attributes, num_attributes);
 
         if (!res)
             _stop_xml_parser();
@@ -1891,6 +1922,50 @@ namespace Slic3r {
         return true;
     }
 
+    struct TextConfigurationSerialization
+    {
+    public:
+        TextConfigurationSerialization() = delete;
+
+        static const boost::bimap<EmbossStyle::Type, std::string_view> type_to_name;
+        
+        static EmbossStyle::Type get_type(std::string_view type) {
+            const auto& to_type = TextConfigurationSerialization::type_to_name.right;
+            auto type_item = to_type.find(type);
+            assert(type_item != to_type.end());
+            if (type_item == to_type.end()) return EmbossStyle::Type::undefined;
+            return type_item->second;        
+        }
+
+        static std::string_view get_name(EmbossStyle::Type type) {
+            const auto& to_name = TextConfigurationSerialization::type_to_name.left;
+            auto type_name = to_name.find(type);
+            assert(type_name != to_name.end());
+            if (type_name == to_name.end()) return "unknown type";
+            return type_name->second;
+        }
+
+        static void to_xml(std::stringstream &stream, const TextConfiguration &tc);
+        static void create_fix_and_store(std::stringstream &stream, TextConfiguration tc, const ModelVolume& volume);
+        static std::optional<TextConfiguration> read(const char **attributes, unsigned int num_attributes);
+    };
+
+    bool _3MF_Importer::_handle_start_text_configuration(const char **attributes, unsigned int num_attributes)
+    {
+        IdToMetadataMap::iterator object = m_objects_metadata.find(m_curr_config.object_id);
+        if (object == m_objects_metadata.end()) {
+            add_error("Cannot assign volume mesh to a valid object");
+            return false;
+        }
+        if (object->second.volumes.empty()) {
+            add_error("Cannot assign mesh to a valid volume");
+            return false;
+        }
+        ObjectMetadata::VolumeMetadata& volume = object->second.volumes.back();
+        volume.text_configuration = TextConfigurationSerialization::read(attributes, num_attributes);
+        return volume.text_configuration.has_value();
+    }
+
     bool _3MF_Importer::_create_object_instance(int object_id, const Transform3d& transform, const bool printable, unsigned int recur_counter)
     {
         static const unsigned int MAX_RECURSIONS = 10;
@@ -2007,7 +2082,7 @@ namespace Slic3r {
             return false;
         }
         if (object->second.volumes.empty()) {
-            add_error("Cannot assign mesh to a valid olume");
+            add_error("Cannot assign mesh to a valid volume");
             return false;
         }
 
@@ -2171,7 +2246,23 @@ namespace Slic3r {
             volume->supported_facets.shrink_to_fit();
             volume->seam_facets.shrink_to_fit();
             volume->mmu_segmentation_facets.shrink_to_fit();
+            auto &tc = volume_data.text_configuration;
+            if (tc.has_value()) {
+                volume->text_configuration = std::move(tc);
 
+                //// Transformation before store to 3mf
+                //const Transform3d &pre_trmat = *tc->fix_3mf_tr;
+                //// Cannot use source tranformation
+                //// When store transformed againg to 3mf it is not modified !!!
+                //// const Transform3d &pre_trmat = volume->source.transform.get_matrix();
+
+                //// create fix transformation
+                //assert(tc->fix_3mf_tr.has_value());
+                //volume->text_configuration->fix_3mf_tr =
+                //    pre_trmat.inverse() *
+                //    volume->get_transformation().get_matrix();
+            }
+            
             // apply the remaining volume's metadata
             for (const Metadata& metadata : volume_data.metadata) {
                 if (metadata.key == NAME_KEY)
@@ -2302,7 +2393,7 @@ namespace Slic3r {
 
     public:
         bool save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64);
-
+        static void add_transformation(std::stringstream &stream, const Transform3d &tr);
     private:
         bool _save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, const ThumbnailData* thumbnail_data);
         bool _add_content_types_file_to_archive(mz_zip_archive& archive);
@@ -2310,7 +2401,7 @@ namespace Slic3r {
         bool _add_relationships_file_to_archive(mz_zip_archive& archive);
         bool _add_model_file_to_archive(const std::string& filename, mz_zip_archive& archive, const Model& model, IdToObjectDataMap& objects_data);
         bool _add_object_to_model_stream(mz_zip_writer_staged_context &context, unsigned int& object_id, ModelObject& object, BuildItemsList& build_items, VolumeToOffsetsMap& volumes_offsets);
-        bool _add_mesh_to_object_stream(mz_zip_writer_staged_context &context, ModelObject& object, VolumeToOffsetsMap& volumes_offsets);
+        bool _add_mesh_to_object_stream(mz_zip_writer_staged_context &context, ModelObject& object, VolumeToOffsetsMap& volumes_offsets);        
         bool _add_build_to_model_stream(std::stringstream& stream, const BuildItemsList& build_items);
         bool _add_cut_information_file_to_archive(mz_zip_archive& archive, Model& model);
         bool _add_layer_height_profile_file_to_archive(mz_zip_archive& archive, Model& model);
@@ -2758,9 +2849,8 @@ namespace Slic3r {
             vertices_count += (int)its.vertices.size();
 
             const Transform3d& matrix = volume->get_matrix();
-
-            for (size_t i = 0; i < its.vertices.size(); ++i) {
-                Vec3f v = (matrix * its.vertices[i].cast<double>()).cast<float>();
+            for (const auto& vertex: its.vertices) {
+                Vec3f v = (matrix * vertex.cast<double>()).cast<float>();
                 char *ptr = buf;
                 boost::spirit::karma::generate(ptr, boost::spirit::lit("     <") << VERTEX_TAG << " x=\"");
                 ptr = format_coordinate(v.x(), ptr);
@@ -2857,6 +2947,16 @@ namespace Slic3r {
         return flush(true);
     }
 
+    void _3MF_Exporter::add_transformation(std::stringstream &stream, const Transform3d &tr)
+    {
+        for (unsigned c = 0; c < 4; ++c) {
+            for (unsigned r = 0; r < 3; ++r) {
+                stream << tr(r, c);
+                if (r != 2 || c != 3) stream << " ";
+            }
+        }
+    }
+
     bool _3MF_Exporter::_add_build_to_model_stream(std::stringstream& stream, const BuildItemsList& build_items)
     {
         // This happens for empty projects
@@ -2869,13 +2969,7 @@ namespace Slic3r {
 
         for (const BuildItem& item : build_items) {
             stream << "  <" << ITEM_TAG << " " << OBJECTID_ATTR << "=\"" << item.id << "\" " << TRANSFORM_ATTR << "=\"";
-            for (unsigned c = 0; c < 4; ++c) {
-                for (unsigned r = 0; r < 3; ++r) {
-                    stream << item.transform(r, c);
-                    if (r != 2 || c != 3)
-                        stream << " ";
-                }
-            }
+            add_transformation(stream, item.transform);
             stream << "\" " << PRINTABLE_ATTR << "=\"" << item.printable << "\"/>\n";
         }
 
@@ -3146,6 +3240,24 @@ namespace Slic3r {
 
     bool _3MF_Exporter::_add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, const IdToObjectDataMap &objects_data)
     {
+        enum class MetadataType{
+            object,
+            volume
+        };
+
+        auto add_metadata = [](std::stringstream &stream, unsigned indent, MetadataType type,
+            const std::string &key, const std::string &value) {
+            const char *type_value;
+            switch (type) {
+            case MetadataType::object: type_value = OBJECT_TYPE; break;
+            case MetadataType::volume: type_value = VOLUME_TYPE; break;
+            };
+            stream << std::string(indent, ' ') << '<' << METADATA_TAG << " " 
+                << TYPE_ATTR << "=\"" << type_value << "\" " 
+                << KEY_ATTR  << "=\"" << key << "\" " 
+                << VALUE_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(value) << "\"/>\n";
+        };
+
         std::stringstream stream;
         // Store mesh transformation in full precision, as the volumes are stored transformed and they need to be transformed back
         // when loaded as accurately as possible.
@@ -3155,96 +3267,96 @@ namespace Slic3r {
 
         for (const IdToObjectDataMap::value_type& obj_metadata : objects_data) {
             const ModelObject* obj = obj_metadata.second.object;
-            if (obj != nullptr) {
-                // Output of instances count added because of github #3435, currently not used by PrusaSlicer
-                stream << " <" << OBJECT_TAG << " " << ID_ATTR << "=\"" << obj_metadata.first << "\" " << INSTANCESCOUNT_ATTR << "=\"" << obj->instances.size() << "\">\n";
+            if (obj == nullptr) continue;
+            // Output of instances count added because of github #3435, currently not used by PrusaSlicer
+            stream << " <" << OBJECT_TAG << " " << ID_ATTR << "=\"" << obj_metadata.first << "\" " << INSTANCESCOUNT_ATTR << "=\"" << obj->instances.size() << "\">\n";
 
-                // stores object's name
-                if (!obj->name.empty())
-                    stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"name\" " << VALUE_ATTR << "=\"" << xml_escape(obj->name) << "\"/>\n";
+            // stores object's name
+            if (!obj->name.empty())                    
+                add_metadata(stream, 2, MetadataType::object, "name", obj->name);
+            // stores object's config data
+            const ModelConfigObject &config = obj->config;
+            for (const std::string& key : config.keys())
+                add_metadata(stream, 2, MetadataType::object, key, config.opt_serialize(key));
 
-                // stores object's config data
-                for (const std::string& key : obj->config.keys()) {
-                    stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << obj->config.opt_serialize(key) << "\"/>\n";
-                }
+            for (const ModelVolume* volume : obj_metadata.second.object->volumes) {
+                if (volume == nullptr) continue;
+                const VolumeToOffsetsMap& offsets = obj_metadata.second.volumes_offsets;
+                VolumeToOffsetsMap::const_iterator it = offsets.find(volume);
+                if (it != offsets.end()) {
+                    // stores volume's offsets
+                    stream << "  <" << VOLUME_TAG << " ";
+                    stream << FIRST_TRIANGLE_ID_ATTR << "=\"" << it->second.first_triangle_id << "\" ";
+                    stream << LAST_TRIANGLE_ID_ATTR << "=\"" << it->second.last_triangle_id << "\">\n";
 
-                for (const ModelVolume* volume : obj_metadata.second.object->volumes) {
-                    if (volume != nullptr) {
-                        const VolumeToOffsetsMap& offsets = obj_metadata.second.volumes_offsets;
-                        VolumeToOffsetsMap::const_iterator it = offsets.find(volume);
-                        if (it != offsets.end()) {
-                            // stores volume's offsets
-                            stream << "  <" << VOLUME_TAG << " ";
-                            stream << FIRST_TRIANGLE_ID_ATTR << "=\"" << it->second.first_triangle_id << "\" ";
-                            stream << LAST_TRIANGLE_ID_ATTR << "=\"" << it->second.last_triangle_id << "\">\n";
+                    // stores volume's name
+                    if (!volume->name.empty())
+                        add_metadata(stream, 3, MetadataType::volume, NAME_KEY, volume->name);
 
-                            // stores volume's name
-                            if (!volume->name.empty())
-                                stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << NAME_KEY << "\" " << VALUE_ATTR << "=\"" << xml_escape(volume->name) << "\"/>\n";
+                    // stores volume's modifier field (legacy, to support old slicers)
+                    if (volume->is_modifier())
+                        add_metadata(stream, 3, MetadataType::volume, MODIFIER_KEY, "1");
+                    // stores volume's type (overrides the modifier field above)
+                    add_metadata(stream, 3, MetadataType::volume, VOLUME_TYPE_KEY, ModelVolume::type_to_string(volume->type()));
 
-                            // stores volume's modifier field (legacy, to support old slicers)
-                            if (volume->is_modifier())
-                                stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MODIFIER_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
-                            // stores volume's type (overrides the modifier field above)
-                            stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << VOLUME_TYPE_KEY << "\" " << 
-                                VALUE_ATTR << "=\"" << ModelVolume::type_to_string(volume->type()) << "\"/>\n";
-
-                            // stores volume's local matrix
-                            stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MATRIX_KEY << "\" " << VALUE_ATTR << "=\"";
-                            const Transform3d matrix = volume->get_matrix() * volume->source.transform.get_matrix();
-                            for (int r = 0; r < 4; ++r) {
-                                for (int c = 0; c < 4; ++c) {
-                                    stream << matrix(r, c);
-                                    if (r != 3 || c != 3)
-                                        stream << " ";
-                                }
-                            }
-                            stream << "\"/>\n";
-
-                            // stores volume's source data
-                            {
-                                std::string input_file = xml_escape(m_fullpath_sources ? volume->source.input_file : boost::filesystem::path(volume->source.input_file).filename().string());
-                                std::string prefix = std::string("   <") + METADATA_TAG + " " + TYPE_ATTR + "=\"" + VOLUME_TYPE + "\" " + KEY_ATTR + "=\"";
-                                if (! volume->source.input_file.empty()) {
-                                    stream << prefix << SOURCE_FILE_KEY      << "\" " << VALUE_ATTR << "=\"" << input_file << "\"/>\n";
-                                    stream << prefix << SOURCE_OBJECT_ID_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.object_idx << "\"/>\n";
-                                    stream << prefix << SOURCE_VOLUME_ID_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.volume_idx << "\"/>\n";
-                                    stream << prefix << SOURCE_OFFSET_X_KEY  << "\" " << VALUE_ATTR << "=\"" << volume->source.mesh_offset(0) << "\"/>\n";
-                                    stream << prefix << SOURCE_OFFSET_Y_KEY  << "\" " << VALUE_ATTR << "=\"" << volume->source.mesh_offset(1) << "\"/>\n";
-                                    stream << prefix << SOURCE_OFFSET_Z_KEY  << "\" " << VALUE_ATTR << "=\"" << volume->source.mesh_offset(2) << "\"/>\n";
-                                }
-                                assert(! volume->source.is_converted_from_inches || ! volume->source.is_converted_from_meters);
-                                if (volume->source.is_converted_from_inches)
-                                    stream << prefix << SOURCE_IN_INCHES_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
-                                else if (volume->source.is_converted_from_meters)
-                                    stream << prefix << SOURCE_IN_METERS_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
-#if ENABLE_RELOAD_FROM_DISK_REWORK
-                                if (volume->source.is_from_builtin_objects)
-                                    stream << prefix << SOURCE_IS_BUILTIN_VOLUME_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
-                            }
-
-                            // stores volume's config data
-                            for (const std::string& key : volume->config.keys()) {
-                                stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << volume->config.opt_serialize(key) << "\"/>\n";
-                            }
-                            
-                            // stores mesh's statistics
-                            const RepairedMeshErrors& stats = volume->mesh().stats().repaired_errors;
-                            stream << "   <" << MESH_TAG << " ";
-                            stream << MESH_STAT_EDGES_FIXED        << "=\"" << stats.edges_fixed        << "\" ";
-                            stream << MESH_STAT_DEGENERATED_FACETS << "=\"" << stats.degenerate_facets  << "\" ";
-                            stream << MESH_STAT_FACETS_REMOVED     << "=\"" << stats.facets_removed     << "\" ";
-                            stream << MESH_STAT_FACETS_RESERVED    << "=\"" << stats.facets_reversed    << "\" ";
-                            stream << MESH_STAT_BACKWARDS_EDGES    << "=\"" << stats.backwards_edges    << "\"/>\n";
-
-                            stream << "  </" << VOLUME_TAG << ">\n";
+                    // stores volume's local matrix
+                    stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MATRIX_KEY << "\" " << VALUE_ATTR << "=\"";
+                    const Transform3d matrix = volume->get_matrix() * volume->source.transform.get_matrix();
+                    for (int r = 0; r < 4; ++r) {
+                        for (int c = 0; c < 4; ++c) {
+                            stream << matrix(r, c);
+                            if (r != 3 || c != 3)
+                                stream << " ";
                         }
                     }
-                }
+                    stream << "\"/>\n";
 
-                stream << " </" << OBJECT_TAG << ">\n";
+                    // stores volume's source data
+                    {
+                        std::string input_file = xml_escape(m_fullpath_sources ? volume->source.input_file : boost::filesystem::path(volume->source.input_file).filename().string());
+                        std::string prefix = std::string("   <") + METADATA_TAG + " " + TYPE_ATTR + "=\"" + VOLUME_TYPE + "\" " + KEY_ATTR + "=\"";
+                        if (! volume->source.input_file.empty()) {
+                            stream << prefix << SOURCE_FILE_KEY      << "\" " << VALUE_ATTR << "=\"" << input_file << "\"/>\n";
+                            stream << prefix << SOURCE_OBJECT_ID_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.object_idx << "\"/>\n";
+                            stream << prefix << SOURCE_VOLUME_ID_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.volume_idx << "\"/>\n";
+                            stream << prefix << SOURCE_OFFSET_X_KEY  << "\" " << VALUE_ATTR << "=\"" << volume->source.mesh_offset(0) << "\"/>\n";
+                            stream << prefix << SOURCE_OFFSET_Y_KEY  << "\" " << VALUE_ATTR << "=\"" << volume->source.mesh_offset(1) << "\"/>\n";
+                            stream << prefix << SOURCE_OFFSET_Z_KEY  << "\" " << VALUE_ATTR << "=\"" << volume->source.mesh_offset(2) << "\"/>\n";
+                        }
+                        assert(! volume->source.is_converted_from_inches || ! volume->source.is_converted_from_meters);
+                        if (volume->source.is_converted_from_inches)
+                            stream << prefix << SOURCE_IN_INCHES_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+                        else if (volume->source.is_converted_from_meters)
+                            stream << prefix << SOURCE_IN_METERS_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+                        if (volume->source.is_from_builtin_objects)
+                            stream << prefix << SOURCE_IS_BUILTIN_VOLUME_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
+                    }
+
+                    // stores volume's config data
+                    for (const std::string& key : volume->config.keys()) {
+                        stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << volume->config.opt_serialize(key) << "\"/>\n";
+                    }
+                                                        
+                    // stores volume's text data
+                    const auto &tc = volume->text_configuration;
+                    if (tc.has_value())
+                        TextConfigurationSerialization::create_fix_and_store(stream, *tc, *volume);                    
+
+                    // stores mesh's statistics
+                    const RepairedMeshErrors& stats = volume->mesh().stats().repaired_errors;
+                    stream << "   <" << MESH_TAG << " ";
+                    stream << MESH_STAT_EDGES_FIXED        << "=\"" << stats.edges_fixed        << "\" ";
+                    stream << MESH_STAT_DEGENERATED_FACETS << "=\"" << stats.degenerate_facets  << "\" ";
+                    stream << MESH_STAT_FACETS_REMOVED     << "=\"" << stats.facets_removed     << "\" ";
+                    stream << MESH_STAT_FACETS_RESERVED    << "=\"" << stats.facets_reversed    << "\" ";
+                    stream << MESH_STAT_BACKWARDS_EDGES    << "=\"" << stats.backwards_edges    << "\"/>\n";
+
+                    stream << "  </" << VOLUME_TAG << ">\n";
+                }
             }
+            stream << " </" << OBJECT_TAG << ">\n";
         }
 
         stream << "</" << CONFIG_TAG << ">\n";
@@ -3400,4 +3512,158 @@ bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config,
 
     return res;
 }
+
+/// <summary>
+/// TextConfiguration serialization
+/// </summary>
+using TypeToName = boost::bimap<EmbossStyle::Type, std::string_view>;
+const TypeToName TextConfigurationSerialization::type_to_name =
+            boost::assign::list_of<TypeToName::relation>
+    (EmbossStyle::Type::file_path, "file_name")
+    (EmbossStyle::Type::wx_win_font_descr, "wxFontDescriptor_Windows")
+    (EmbossStyle::Type::wx_lin_font_descr, "wxFontDescriptor_Linux")
+    (EmbossStyle::Type::wx_mac_font_descr, "wxFontDescriptor_MacOsX");
+
+void TextConfigurationSerialization::to_xml(std::stringstream &stream, const TextConfiguration &tc)
+{
+    stream << "   <" << TEXT_TAG << " ";
+
+    stream << TEXT_DATA_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(tc.text) << "\" ";
+    // font item
+    const EmbossStyle &fi = tc.style;
+    stream << STYLE_NAME_ATTR <<  "=\"" << xml_escape_double_quotes_attribute_value(fi.name) << "\" ";
+    stream << FONT_DESCRIPTOR_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(fi.path) << "\" ";
+    stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::get_name(fi.type) << "\" ";
+
+    // font property
+    const FontProp &fp = tc.style.prop;
+    if (fp.char_gap.has_value())
+        stream << CHAR_GAP_ATTR << "=\"" << *fp.char_gap << "\" ";
+    if (fp.line_gap.has_value())
+        stream << LINE_GAP_ATTR << "=\"" << *fp.line_gap << "\" ";
+
+    stream << LINE_HEIGHT_ATTR << "=\"" << fp.size_in_mm << "\" ";
+    stream << DEPTH_ATTR << "=\"" << fp.emboss << "\" ";
+    if (fp.use_surface)
+        stream << USE_SURFACE_ATTR << "=\"" << 1 << "\" ";
+    if (fp.boldness.has_value())
+        stream << BOLDNESS_ATTR << "=\"" << *fp.boldness << "\" ";
+    if (fp.skew.has_value())
+        stream << SKEW_ATTR << "=\"" << *fp.skew << "\" ";
+    if (fp.distance.has_value())
+        stream << DISTANCE_ATTR << "=\"" << *fp.distance << "\" ";
+    if (fp.angle.has_value())
+        stream << ANGLE_ATTR << "=\"" << *fp.angle << "\" ";
+    if (fp.collection_number.has_value())
+        stream << COLLECTION_NUMBER_ATTR << "=\"" << *fp.collection_number << "\" ";
+    // font descriptor
+    if (fp.family.has_value())
+        stream << FONT_FAMILY_ATTR << "=\"" << *fp.family << "\" ";
+    if (fp.face_name.has_value())
+        stream << FONT_FACE_NAME_ATTR << "=\"" << *fp.face_name << "\" ";
+    if (fp.style.has_value())
+        stream << FONT_STYLE_ATTR << "=\"" << *fp.style << "\" ";
+    if (fp.weight.has_value())
+        stream << FONT_WEIGHT_ATTR << "=\"" << *fp.weight << "\" ";
+
+    // FIX of baked transformation
+    assert(tc.fix_3mf_tr.has_value());
+    stream << TRANSFORM_ATTR << "=\"";
+    _3MF_Exporter::add_transformation(stream, *tc.fix_3mf_tr);
+    stream << "\" ";
+
+    stream << "/>\n"; // end TEXT_TAG
+}
+
+void TextConfigurationSerialization::create_fix_and_store(
+    std::stringstream &stream, TextConfiguration tc, const ModelVolume &volume)
+{
+    const auto& vertices = volume.mesh().its.vertices;
+    assert(!vertices.empty());
+    if (vertices.empty()) { 
+        to_xml(stream, tc);
+        return; 
+    }
+
+    // IMPROVE: check if volume was modified (translated, rotated OR scaled)
+    // when no change do not calculate transformation only store original fix matrix
+
+    // Create transformation used after load actual stored volume
+    const Transform3d &actual_trmat = volume.get_transformation().get_matrix();
+    Vec3d min = actual_trmat * vertices.front().cast<double>();
+    Vec3d max = min;
+    for (const Vec3f &v : vertices) {
+        Vec3d vd = actual_trmat * v.cast<double>();
+        for (size_t i = 0; i < 3; ++i) {
+            if (min[i] > vd[i]) min[i] = vd[i];
+            if (max[i] < vd[i]) max[i] = vd[i];
+        }
+    }
+    Vec3d center = (max + min) / 2;
+    Transform3d post_trmat = Transform3d::Identity();
+    post_trmat.translate(center);
+
+    Transform3d fix_trmat = actual_trmat.inverse() * post_trmat;    
+    if (!tc.fix_3mf_tr.has_value()) {
+        tc.fix_3mf_tr = fix_trmat;
+    } else if (!fix_trmat.isApprox(Transform3d::Identity(), 1e-5)) {
+        tc.fix_3mf_tr = *tc.fix_3mf_tr * fix_trmat;
+    }
+    to_xml(stream, tc);
+}
+
+std::optional<TextConfiguration> TextConfigurationSerialization::read(const char **attributes, unsigned int num_attributes)
+{
+    FontProp fp;
+    int char_gap = get_attribute_value_int(attributes, num_attributes, CHAR_GAP_ATTR);
+    if (char_gap != 0) fp.char_gap = char_gap;
+    int line_gap = get_attribute_value_int(attributes, num_attributes, LINE_GAP_ATTR); 
+    if (line_gap != 0) fp.line_gap = line_gap;
+    float boldness = get_attribute_value_float(attributes, num_attributes, BOLDNESS_ATTR);
+    if (std::fabs(boldness) > std::numeric_limits<float>::epsilon())
+        fp.boldness = boldness;
+    float skew = get_attribute_value_float(attributes, num_attributes, SKEW_ATTR);
+    if (std::fabs(skew) > std::numeric_limits<float>::epsilon())
+        fp.skew = skew;
+    float distance = get_attribute_value_float(attributes, num_attributes, DISTANCE_ATTR);
+    if (std::fabs(distance) > std::numeric_limits<float>::epsilon())
+        fp.distance = distance;
+    std::string use_surface = get_attribute_value_string(attributes, num_attributes, USE_SURFACE_ATTR);
+    if (!use_surface.empty()) fp.use_surface = true;
+    float angle = get_attribute_value_float(attributes, num_attributes, ANGLE_ATTR);
+    if (std::fabs(angle) > std::numeric_limits<float>::epsilon())
+        fp.angle = angle;
+    int collection_number = get_attribute_value_int(attributes, num_attributes, COLLECTION_NUMBER_ATTR);
+    if (collection_number > 0) fp.collection_number = static_cast<unsigned int>(collection_number);
+
+    fp.size_in_mm = get_attribute_value_float(attributes, num_attributes, LINE_HEIGHT_ATTR);
+    fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
+
+    std::string family = get_attribute_value_string(attributes, num_attributes, FONT_FAMILY_ATTR);
+    if (!family.empty()) fp.family = family;
+    std::string face_name = get_attribute_value_string(attributes, num_attributes, FONT_FACE_NAME_ATTR);
+    if (!face_name.empty()) fp.face_name = face_name;
+    std::string style = get_attribute_value_string(attributes, num_attributes, FONT_STYLE_ATTR);
+    if (!style.empty()) fp.style = style;
+    std::string weight = get_attribute_value_string(attributes, num_attributes, FONT_WEIGHT_ATTR);
+    if (!weight.empty()) fp.weight = weight;
+
+    std::string style_name = get_attribute_value_string(attributes, num_attributes, STYLE_NAME_ATTR);
+    std::string font_descriptor = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_ATTR);
+    std::string type_str = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_TYPE_ATTR);
+    EmbossStyle::Type type = TextConfigurationSerialization::get_type(type_str);
+    EmbossStyle fi{ style_name, std::move(font_descriptor), type, std::move(fp) };
+
+    std::string text = get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
+
+    std::optional<Transform3d> fix_tr_mat;
+    std::string fix_tr_mat_str = get_attribute_value_string(attributes, num_attributes, TRANSFORM_ATTR);
+    if (!fix_tr_mat_str.empty()) { 
+        fix_tr_mat = get_transform_from_3mf_specs_string(fix_tr_mat_str);
+    }
+
+    return TextConfiguration{std::move(fi), std::move(text), std::move(fix_tr_mat)};
+}
+
+
 } // namespace Slic3r

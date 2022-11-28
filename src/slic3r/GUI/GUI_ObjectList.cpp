@@ -1,5 +1,6 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/TextConfiguration.hpp"
 #include "GUI_ObjectList.hpp"
 #include "GUI_Factories.hpp"
 #include "GUI_ObjectManipulation.hpp"
@@ -649,14 +650,22 @@ void ObjectList::update_name_in_model(const wxDataViewItem& item) const
 
     ModelObject* obj = object(obj_idx);
     if (m_objects_model->GetItemType(item) & itObject) {
-        obj->name = m_objects_model->GetName(item).ToUTF8().data();
+        obj->name = into_u8(m_objects_model->GetName(item));
         // if object has just one volume, rename this volume too
-        if (obj->volumes.size() == 1)
+        if (obj->volumes.size() == 1 && !obj->volumes[0]->text_configuration.has_value())
             obj->volumes[0]->name = obj->name;
         return;
     }
 
-    if (volume_id < 0) return;
+    if (volume_id < 0)
+        return;
+
+    // Renaming of the text volume is suppressed
+    // So, revert the name in object list
+    if (obj->volumes[volume_id]->text_configuration.has_value()) {
+        m_objects_model->SetName(from_u8(obj->volumes[volume_id]->name), item);
+        return;
+    }
     obj->volumes[volume_id]->name = m_objects_model->GetName(item).ToUTF8().data();
 }
 
@@ -672,6 +681,10 @@ void ObjectList::update_name_in_list(int obj_idx, int vol_idx) const
         return;
 
     m_objects_model->SetName(new_name, item);
+
+    // if object has just one volume, rename object too
+    if (ModelObject* obj = object(obj_idx); obj->volumes.size() == 1)
+        obj->name = obj->volumes.front()->name;
 }
 
 void ObjectList::selection_changed()
@@ -968,11 +981,17 @@ void ObjectList::show_context_menu(const bool evt_context_menu)
             const ItemType type = m_objects_model->GetItemType(item);
             if (!(type & (itObject | itVolume | itLayer | itInstance)))
                 return;
-
-            menu =  type & itInstance                                           ? plater->instance_menu() :
-                    type & itLayer                                              ? plater->layer_menu() :
-                    m_objects_model->GetParent(item) != wxDataViewItem(nullptr) ? plater->part_menu() :
-                    printer_technology() == ptFFF                               ? plater->object_menu() : plater->sla_object_menu();
+            if (type & itVolume) {
+                int obj_idx, vol_idx;
+                get_selected_item_indexes(obj_idx, vol_idx, item);
+                if (obj_idx < 0 || vol_idx < 0)
+                    return;
+                menu = object(obj_idx)->volumes[vol_idx]->text_configuration.has_value() ? plater->text_part_menu() : plater->part_menu();
+            }
+            else
+                menu = type & itInstance             ? plater->instance_menu() :
+                       type & itLayer                ? plater->layer_menu() :
+                       printer_technology() == ptFFF ? plater->object_menu() : plater->sla_object_menu();
         }
         else if (evt_context_menu)
             menu = plater->default_menu();
@@ -1749,7 +1768,7 @@ void ObjectList::load_shape_object(const std::string& type_name)
     // Create mesh
     BoundingBoxf3 bb;
     TriangleMesh mesh = create_mesh(type_name, bb);
-    load_mesh_object(mesh, _L("Shape") + "-" + _(type_name));
+    load_mesh_object(mesh, _u8L("Shape") + "-" + type_name);
 #if ENABLE_RELOAD_FROM_DISK_REWORK
     if (!m_objects->empty())
         m_objects->back()->volumes.front()->source.is_from_builtin_objects = true;
@@ -1789,7 +1808,12 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
         wxGetApp().mainframe->update_title();
 }
 
-void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center)
+void ObjectList::load_mesh_object(
+    const TriangleMesh &     mesh,
+    const std::string &      name,
+    bool                     center,
+    const TextConfiguration *text_config /* = nullptr*/,
+    const Transform3d *      transformation /* = nullptr*/)
 {   
     // Add mesh to model as a new object
     Model& model = wxGetApp().plater()->model();
@@ -1799,22 +1823,29 @@ void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name
 #endif /* _DEBUG */
     
     std::vector<size_t> object_idxs;
-    auto bb = mesh.bounding_box();
     ModelObject* new_object = model.add_object();
-    new_object->name = into_u8(name);
+    new_object->name = name;
     new_object->add_instance(); // each object should have at list one instance
     
     ModelVolume* new_volume = new_object->add_volume(mesh);
     new_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
-    new_volume->name = into_u8(name);
+    new_volume->name = name;
+    if (text_config)
+        new_volume->text_configuration = *text_config;
     // set a default extruder value, since user can't add it manually
     new_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
     new_object->invalidate_bounding_box();
-    new_object->translate(-bb.center());
-
-    new_object->instances[0]->set_offset(center ? 
-        to_3d(wxGetApp().plater()->build_volume().bounding_volume2d().center(), -new_object->origin_translation.z()) :
+    if (transformation) {
+        assert(!center);
+        Slic3r::Geometry::Transformation tr(*transformation);
+        new_object->instances[0]->set_transformation(tr);
+    } else {
+        auto bb = mesh.bounding_box();
+        new_object->translate(-bb.center());
+        new_object->instances[0]->set_offset(
+            center ? to_3d(wxGetApp().plater()->build_volume().bounding_volume2d().center(), -new_object->origin_translation.z()) :
         bb.center());
+    }
 
     new_object->ensure_on_bed();
 
@@ -2898,6 +2929,7 @@ wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, st
                 from_u8(volume->name),
                 volume_idx,
                 volume->type(),
+                volume->text_configuration.has_value(),
                 get_warning_icon_name(volume->mesh().stats()),
                 extruder2str(volume->config.has("extruder") ? volume->config.extruder() : 0));
             add_settings_item(vol_item, &volume->config.get());
@@ -4160,14 +4192,14 @@ void ObjectList::change_part_type()
     }
 
     const bool is_cut_object = obj->is_cut();
-
     wxArrayString names;
-    names.Alloc(is_cut_object ? 3 : 5);
     if (!is_cut_object)
         for (const wxString& type : { _L("Part"), _L("Negative Volume") })
             names.Add(type);
-    for (const wxString& type : { _L("Modifier"), _L("Support Blocker"), _L("Support Enforcer") } )
-        names.Add(type);
+    names.Add(_L("Modifier"));
+    if (!volume->text_configuration.has_value())
+        for (const wxString& name : { _L("Support Blocker"), _L("Support Enforcer") })
+            names.Add(name);
 
     const int type_shift = is_cut_object ? 2 : 0;
     auto new_type = ModelVolumeType(type_shift + wxGetApp().GetSingleChoiceIndex(_L("Type:"), _L("Select type of part"), names, int(type) - type_shift));

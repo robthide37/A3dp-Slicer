@@ -54,6 +54,9 @@ public:
         NegZ = 1 << 5,
     };
 
+    // Represents NO key(button on keyboard) value
+    static const int NO_SHORTCUT_KEY_VALUE = 0;
+
 protected:
     struct Grabber
     {
@@ -131,9 +134,9 @@ public:
 protected:
     GLCanvas3D& m_parent;
 
-    int m_group_id{ -1 }; // TODO: remove only for rotate
-    EState m_state{ Off };
-    int m_shortcut_key{ 0 };
+    int m_group_id; // TODO: remove only for rotate
+    EState m_state;
+    int m_shortcut_key;
     std::string m_icon_filename;
     unsigned int m_sprite_id;
     int m_hover_id{ -1 };

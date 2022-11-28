@@ -19,6 +19,7 @@ set(SLIC3R_SOURCES
     pchheader.hpp
     AStar.hpp
     AABBTreeIndirect.hpp
+    AABBTreeLines.hpp
     AABBMesh.hpp
     AABBMesh.cpp
     BoundingBox.cpp
@@ -42,9 +43,13 @@ set(SLIC3R_SOURCES
     EdgeGrid.hpp
     ElephantFootCompensation.cpp
     ElephantFootCompensation.hpp
+    Emboss.cpp
+    Emboss.hpp
     enum_bitmask.hpp
     ExPolygon.cpp
     ExPolygon.hpp
+    ExPolygonsIndex.cpp
+    ExPolygonsIndex.hpp
     Extruder.cpp
     Extruder.hpp
     ExtrusionEntity.cpp
@@ -178,6 +183,7 @@ set(SLIC3R_SOURCES
     Model.hpp
     ModelArrange.hpp
     ModelArrange.cpp
+    #ModelVolumeType.hpp
     MultiMaterialSegmentation.cpp
     MultiMaterialSegmentation.hpp
     MeshNormals.hpp
@@ -194,6 +200,8 @@ set(SLIC3R_SOURCES
     MutablePriorityQueue.hpp
     NormalUtils.cpp
     NormalUtils.hpp
+    NSVGUtils.cpp
+    NSVGUtils.hpp
     ObjectID.cpp
     ObjectID.hpp
     PerimeterGenerator.cpp
@@ -266,6 +274,7 @@ set(SLIC3R_SOURCES
     Technologies.hpp
     Tesselate.cpp
     Tesselate.hpp
+    TextConfiguration.hpp
     TreeSupport.cpp
     TreeSupport.hpp
     TreeModelVolumes.cpp
@@ -280,6 +289,8 @@ set(SLIC3R_SOURCES
     Utils.hpp
     Time.cpp
     Time.hpp
+    Timer.cpp
+    Timer.hpp
     Thread.cpp
     Thread.hpp
     TriangleSelector.cpp
@@ -403,8 +414,14 @@ cmake_policy(SET CMP0011 NEW)
 find_package(CGAL REQUIRED)
 cmake_policy(POP)
 
-add_library(libslic3r_cgal STATIC MeshBoolean.cpp MeshBoolean.hpp  TryCatchSignal.hpp
-    TryCatchSignal.cpp Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp)
+add_library(libslic3r_cgal STATIC 
+    CutSurface.hpp CutSurface.cpp
+    Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp
+    IntersectionPoints.hpp IntersectionPoints.cpp
+    MeshBoolean.hpp MeshBoolean.cpp
+    TryCatchSignal.hpp TryCatchSignal.cpp
+    Triangulation.hpp Triangulation.cpp
+)
 target_include_directories(libslic3r_cgal PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 # Reset compile options of libslic3r_cgal. Despite it being linked privately, CGAL options
@@ -476,6 +493,7 @@ if (APPLE)
     # This flag prevents the need for minimum SDK version 10.14
     # currently, PS targets v10.12
     target_compile_options(libslic3r PUBLIC "-fno-aligned-allocation")
+    target_compile_options(libslic3r_cgal PUBLIC "-fno-aligned-allocation")
 endif ()
 
 if (SLIC3R_PCH AND NOT SLIC3R_SYNTAXONLY)

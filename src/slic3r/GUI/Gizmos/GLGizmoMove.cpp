@@ -220,8 +220,8 @@ void GLGizmoMove3D::on_render()
                 GLModel::Geometry init_data;
                 init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
                 init_data.color = AXES_COLOR[id];
-                init_data.reserve_vertices(2);
-                init_data.reserve_indices(2);
+                init_data.vertices.reserve(2);
+                init_data.indices.reserve(2);
 
                 // vertices
 #if ENABLE_WORLD_COORDINATE

@@ -331,6 +331,7 @@ public:
     bool is_single_volume_or_modifier() const { return is_single_volume() || is_single_modifier(); }
 #endif // ENABLE_WORLD_COORDINATE
     bool is_single_volume_instance() const { return is_single_full_instance() && m_list.size() == 1; }
+    bool is_single_text() const;
 
     bool contains_volume(unsigned int volume_idx) const { return m_list.find(volume_idx) != m_list.end(); }
     // returns true if the selection contains all the given indices
@@ -364,6 +365,7 @@ public:
     const IndicesList& get_volume_idxs() const { return m_list; }
     const GLVolume* get_volume(unsigned int volume_idx) const;
     const GLVolume* get_first_volume() const { return get_volume(*m_list.begin()); }
+    GLVolume* get_volume(unsigned int volume_idx);
 
     const ObjectIdxsToInstanceIdxsMap& get_content() const { return m_cache.content; }
 

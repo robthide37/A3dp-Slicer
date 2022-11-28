@@ -11,6 +11,7 @@ add_executable(${_TEST_NAME}_tests
 	test_color.cpp
 	test_config.cpp
 	test_curve_fitting.cpp
+	test_cut_surface.cpp
 	test_elephant_foot_compensation.cpp
 	test_expolygon.cpp
 	test_geometry.cpp
@@ -29,6 +30,9 @@ add_executable(${_TEST_NAME}_tests
     test_png_io.cpp
     test_surface_mesh.cpp
     test_timeutils.cpp
+	test_quadric_edge_collapse.cpp
+    test_triangulation.cpp
+    test_emboss.cpp
     test_indexed_triangle_set.cpp
     test_astar.cpp
 	test_jump_point_search.cpp

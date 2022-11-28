@@ -21,6 +21,7 @@
 #include <cassert>
 #include <cmath>
 #include <type_traits>
+#include <optional>
 
 #ifdef _WIN32
 // On MSVC, std::deque degenerates to a list of pointers, which defeats its purpose of reducing allocator load and memory fragmentation.
@@ -109,9 +110,10 @@ template <typename T>
 inline void append(std::vector<T>& dest, const std::vector<T>& src)
 {
     if (dest.empty())
-        dest = src;
+        dest = src; // copy
     else
         dest.insert(dest.end(), src.begin(), src.end());
+    // NOTE: insert reserve space when needed
 }
 
 template <typename T>
@@ -120,11 +122,14 @@ inline void append(std::vector<T>& dest, std::vector<T>&& src)
     if (dest.empty())
         dest = std::move(src);
     else {
-        dest.reserve(dest.size() + src.size());
-        std::move(std::begin(src), std::end(src), std::back_inserter(dest));
+        dest.insert(dest.end(),
+            std::make_move_iterator(src.begin()),
+            std::make_move_iterator(src.end()));
+
+        // Vojta wants back compatibility
+        src.clear();
+        src.shrink_to_fit();
     }
-    src.clear();
-    src.shrink_to_fit();
 }
 
 template<class T, class... Args> // Arbitrary allocator can be used
@@ -140,8 +145,8 @@ void clear_and_shrink(std::vector<T, Args...>& vec)
 template <typename T>
 inline void append_reversed(std::vector<T>& dest, const std::vector<T>& src)
 {
-    if (dest.empty())
-        dest = src;
+    if (dest.empty()) 
+        dest = {src.rbegin(), src.rend()};
     else
         dest.insert(dest.end(), src.rbegin(), src.rend());
 }
@@ -151,11 +156,14 @@ template <typename T>
 inline void append_reversed(std::vector<T>& dest, std::vector<T>&& src)
 {
     if (dest.empty())
-        dest = std::move(src);
-    else {
-        dest.reserve(dest.size() + src.size());
-        std::move(std::rbegin(src), std::rend(src), std::back_inserter(dest));
-    }
+        dest = {std::make_move_iterator(src.rbegin),
+                std::make_move_iterator(src.rend)};
+    else
+        dest.insert(dest.end(), 
+            std::make_move_iterator(src.rbegin()),
+            std::make_move_iterator(src.rend()));
+
+    // Vojta wants back compatibility
     src.clear();
     src.shrink_to_fit();
 }
@@ -266,6 +274,14 @@ template <typename Number>
 constexpr inline bool is_approx(Number value, Number test_value, Number precision = EPSILON)
 {
     return std::fabs(double(value) - double(test_value)) < double(precision);
+}
+
+template<typename Number>
+constexpr inline bool is_approx(const std::optional<Number> &value,
+                                const std::optional<Number> &test_value)
+{
+    return (!value.has_value() && !test_value.has_value()) ||
+        (value.has_value() && test_value.has_value() && is_approx<Number>(*value, *test_value));
 }
 
 // A meta-predicate which is true for integers wider than or equal to coord_t

@@ -783,9 +783,9 @@ int its_compactify_vertices(indexed_triangle_set &its, bool shrink_to_fit)
     return removed;
 }
 
-bool its_store_triangle(const indexed_triangle_set &its,
-                        const char *                obj_filename,
-                        size_t                      triangle_index)
+bool its_store_triangle_to_obj(const indexed_triangle_set &its,
+                               const char                 *obj_filename,
+                               size_t                      triangle_index)
 {
     if (its.indices.size() <= triangle_index) return false;
     Vec3i                t = its.indices[triangle_index];
@@ -796,9 +796,9 @@ bool its_store_triangle(const indexed_triangle_set &its,
     return its_write_obj(its2, obj_filename);
 }
 
-bool its_store_triangles(const indexed_triangle_set &its,
-                         const char *                obj_filename,
-                         const std::vector<size_t> & triangles)
+bool its_store_triangles_to_obj(const indexed_triangle_set &its,
+                                const char                 *obj_filename,
+                                const std::vector<size_t>  &triangles)
 {
     indexed_triangle_set its2;
     its2.vertices.reserve(triangles.size() * 3);
@@ -1204,6 +1204,23 @@ void its_reverse_all_facets(indexed_triangle_set &its)
 {
     for (stl_triangle_vertex_indices &face : its.indices)
         std::swap(face[0], face[1]);
+}
+
+void its_merge(indexed_triangle_set &its, indexed_triangle_set &&its_add)
+{
+    if (its.empty()) {
+        its = std::move(its_add);
+        return;
+    }
+    auto  &verts      = its.vertices;
+    size_t verts_size = verts.size();
+    Slic3r::append(verts, std::move(its_add.vertices));
+
+    // increase face indices
+    int offset = static_cast<int>(verts_size);
+    for (auto &face : its_add.indices)
+        for (int i = 0; i < 3; ++i) face[i] += offset;
+    Slic3r::append(its.indices, std::move(its_add.indices));
 }
 
 void its_merge(indexed_triangle_set &A, const indexed_triangle_set &B)

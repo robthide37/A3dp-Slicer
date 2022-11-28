@@ -95,10 +95,8 @@ static std::string create_volumes_name(const std::set<ObjectID>& ids, const Sele
     return name;
 }
 
-GLGizmoSimplify::GLGizmoSimplify(GLCanvas3D &       parent,
-                                 const std::string &icon_filename,
-                                 unsigned int       sprite_id)
-    : GLGizmoBase(parent, icon_filename, -1)
+GLGizmoSimplify::GLGizmoSimplify(GLCanvas3D &parent)
+    : GLGizmoBase(parent, M_ICON_FILENAME, -1)
     , m_show_wireframe(false)
     , m_move_to_center(false)
     , m_original_triangle_count(0)
@@ -588,7 +586,7 @@ void GLGizmoSimplify::on_set_state()
 
 void GLGizmoSimplify::create_gui_cfg() { 
     if (m_gui_cfg.has_value()) return;
-    int space_size = m_imgui->calc_text_size(":MM").x;
+    int    space_size = m_imgui->calc_text_size(std::string_view{":MM"}).x;
     GuiCfg cfg;
     cfg.top_left_width = std::max(m_imgui->calc_text_size(tr_mesh_name).x,
                                   m_imgui->calc_text_size(tr_triangles).x) 
@@ -843,5 +841,8 @@ void GLGizmoSimplify::Configuration::fix_count_by_ratio(size_t triangle_count)
         wanted_count = static_cast<uint32_t>(std::round(
             triangle_count * (100.f - decimate_ratio) / 100.f));
 }
+
+// any existing icon filename to not influence GUI
+const std::string GLGizmoSimplify::M_ICON_FILENAME = "cut.svg";
 
 } // namespace Slic3r::GUI

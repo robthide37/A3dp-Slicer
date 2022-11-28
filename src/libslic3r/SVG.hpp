@@ -167,9 +167,9 @@ public:
         { export_expolygons(path.c_str(), expolygons_with_attributes); }
 
 private:
-    static float    to_svg_coord(float x) throw() { return unscale<float>(x) * 10.f; }
-    static float    to_svg_x(float x) throw() { return to_svg_coord(x); }
-    float           to_svg_y(float x) const throw() { return flipY ? this->height - to_svg_coord(x) : to_svg_coord(x); }
+    static float to_svg_coord(float x) throw();
+    static float to_svg_x(float x) throw() { return to_svg_coord(x); }
+           float to_svg_y(float x) const throw() { return flipY ? this->height - to_svg_coord(x) : to_svg_coord(x); }
 };
 
 }

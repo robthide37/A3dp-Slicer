@@ -74,12 +74,14 @@ const std::map<InfoItemType, InfoItemAtributes> INFO_ITEMS{
 ObjectDataViewModelNode::ObjectDataViewModelNode(ObjectDataViewModelNode*   parent,
                                                  const wxString&            sub_obj_name,
                                                  Slic3r::ModelVolumeType    type,
+                                                 const bool                 is_text_volume,
                                                  const wxString&            extruder,
                                                  const int                  idx/* = -1*/) :
     m_parent(parent),
     m_name(sub_obj_name),
     m_type(itVolume),
     m_volume_type(type),
+    m_is_text_volume(is_text_volume),
     m_idx(idx),
     m_extruder(type == Slic3r::ModelVolumeType::MODEL_PART || type == Slic3r::ModelVolumeType::PARAMETER_MODIFIER ? extruder : "")
 {
@@ -330,6 +332,7 @@ static int get_root_idx(ObjectDataViewModelNode *parent_node, const ItemType roo
 ObjectDataViewModel::ObjectDataViewModel()
 {
     m_volume_bmps = MenuFactory::get_volume_bitmaps();
+    m_text_volume_bmps = MenuFactory::get_text_volume_bitmaps();
     m_warning_bmp = *get_bmp_bundle(WarningIcon);
     m_warning_manifold_bmp = *get_bmp_bundle(WarningManifoldIcon);
     m_lock_bmp    = *get_bmp_bundle(LockIcon);
@@ -352,7 +355,7 @@ void ObjectDataViewModel::UpdateBitmapForNode(ObjectDataViewModelNode* node)
     bool is_volume_node = vol_type >= 0;
 
     if (!node->has_warning_icon() && !node->has_lock()) {
-        node->SetBitmap(is_volume_node ? *m_volume_bmps.at(vol_type) : m_empty_bmp);
+        node->SetBitmap(is_volume_node ? (node->is_text_volume() ? *m_text_volume_bmps.at(vol_type) : *m_volume_bmps.at(vol_type)) : m_empty_bmp);
         return;
     }
 
@@ -373,7 +376,7 @@ void ObjectDataViewModel::UpdateBitmapForNode(ObjectDataViewModelNode* node)
         if (node->has_lock())
             bmps.emplace_back(&m_lock_bmp);
         if (is_volume_node)
-            bmps.emplace_back(m_volume_bmps[vol_type]);
+            bmps.emplace_back(node->is_text_volume() ? m_text_volume_bmps[vol_type] : m_volume_bmps[vol_type]);
         bmp = m_bitmap_cache->insert_bndl(scaled_bitmap_name, bmps);
     }
 
@@ -409,6 +412,7 @@ wxDataViewItem ObjectDataViewModel::AddVolumeChild( const wxDataViewItem &parent
                                                     const wxString &name,
                                                     const int volume_idx,
                                                     const Slic3r::ModelVolumeType volume_type,
+                                                    const bool is_text_volume,
                                                     const std::string& warning_icon_name,
                                                     const wxString& extruder)
 {
@@ -420,7 +424,7 @@ wxDataViewItem ObjectDataViewModel::AddVolumeChild( const wxDataViewItem &parent
     if (insert_position < 0)
         insert_position = get_root_idx(root, itInstanceRoot);
 
-    const auto node = new ObjectDataViewModelNode(root, name, volume_type, extruder, volume_idx);
+    const auto node = new ObjectDataViewModelNode(root, name, volume_type, is_text_volume, extruder, volume_idx);
     UpdateBitmapForNode(node, warning_icon_name, root->has_lock() && volume_type < ModelVolumeType::PARAMETER_MODIFIER);
     insert_position < 0 ? root->Append(node) : root->Insert(node, insert_position);
 
@@ -769,8 +773,12 @@ wxDataViewItem ObjectDataViewModel::Delete(const wxDataViewItem &item)
             // get index of the last VolumeItem in CildrenList
             size_t vol_idx = GetItemIndexForFirstVolume(node_parent);
 
-            // delete this last volume
             ObjectDataViewModelNode *last_child_node = node_parent->GetNthChild(vol_idx);
+            // if last volume is text then don't delete it
+            if (last_child_node->is_text_volume())
+                return parent;
+
+            // delete this last volume
             DeleteSettings(wxDataViewItem(last_child_node));
             node_parent->GetChildren().Remove(last_child_node);
             node_parent->m_volumes_cnt = 0;
@@ -1616,22 +1624,6 @@ void ObjectDataViewModel::UpdateSettingsDigest(const wxDataViewItem &item,
     ItemChanged(item);
 }
 
-void ObjectDataViewModel::SetVolumeType(const wxDataViewItem &item, const Slic3r::ModelVolumeType volume_type)
-{
-    if (!item.IsOk() || GetItemType(item) != itVolume) 
-        return;
-
-    ObjectDataViewModelNode *node = static_cast<ObjectDataViewModelNode*>(item.GetID());
-    node->SetVolumeType(volume_type);
-    node->SetBitmap(*m_volume_bmps[int(volume_type)]);
-    if (volume_type != Slic3r::ModelVolumeType::MODEL_PART && volume_type != Slic3r::ModelVolumeType::PARAMETER_MODIFIER)
-        node->SetExtruder("");          // hide extruder
-    else if (node->GetExtruder().IsEmpty())
-        node->SetExtruder("default");   // show extruder ans set it to default
-    node->UpdateExtruderAndColorIcon();
-    ItemChanged(item);
-}
-
 ModelVolumeType ObjectDataViewModel::GetVolumeType(const wxDataViewItem& item)
 {
     if (!item.IsOk() || GetItemType(item) != itVolume) 
@@ -1684,6 +1676,7 @@ wxDataViewItem ObjectDataViewModel::SetObjectPrintableState(
 void ObjectDataViewModel::UpdateBitmaps()
 {
     m_volume_bmps = MenuFactory::get_volume_bitmaps();
+    m_text_volume_bmps = MenuFactory::get_text_volume_bitmaps();
     m_warning_bmp = *get_bmp_bundle(WarningIcon);
     m_warning_manifold_bmp = *get_bmp_bundle(WarningManifoldIcon);
     m_lock_bmp    = *get_bmp_bundle(LockIcon);

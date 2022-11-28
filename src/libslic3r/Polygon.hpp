@@ -169,13 +169,16 @@ inline Points to_points(const Polygon &poly)
     return poly.points;
 }
 
+inline size_t count_points(const Polygons &polys) {
+    size_t n_points = 0;
+    for (const auto &poly: polys) n_points += poly.points.size();
+    return n_points;
+}
+
 inline Points to_points(const Polygons &polys) 
 {
-    size_t n_points = 0;
-    for (size_t i = 0; i < polys.size(); ++ i)
-        n_points += polys[i].points.size();
     Points points;
-    points.reserve(n_points);
+    points.reserve(count_points(polys));
     for (const Polygon &poly : polys)
         append(points, poly.points);
     return points;
@@ -195,11 +198,8 @@ inline Lines to_lines(const Polygon &poly)
 
 inline Lines to_lines(const Polygons &polys) 
 {
-    size_t n_lines = 0;
-    for (size_t i = 0; i < polys.size(); ++ i)
-        n_lines += polys[i].points.size();
     Lines lines;
-    lines.reserve(n_lines);
+    lines.reserve(count_points(polys));
     for (size_t i = 0; i < polys.size(); ++ i) {
         const Polygon &poly = polys[i];
         for (Points::const_iterator it = poly.points.begin(); it != poly.points.end()-1; ++it)

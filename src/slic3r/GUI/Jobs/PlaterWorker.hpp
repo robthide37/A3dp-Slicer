@@ -2,6 +2,7 @@
 #define PLATERWORKER_HPP
 
 #include <map>
+#include <chrono>
 
 #include "Worker.hpp"
 #include "BusyCursorJob.hpp"
@@ -24,6 +25,7 @@ class PlaterWorker: public Worker {
     class PlaterJob : public Job {
         std::unique_ptr<Job> m_job;
         Plater *m_plater;
+        long long m_process_duration; // [ms]
 
     public:
         void process(Ctl &c) override
@@ -55,12 +57,27 @@ class PlaterWorker: public Worker {
             } wctl{c};
 
             CursorSetterRAII busycursor{wctl};
+            
+            using namespace std::chrono;
+            steady_clock::time_point process_start = steady_clock::now();
             m_job->process(wctl);
+            steady_clock::time_point process_end = steady_clock::now();
+            m_process_duration = duration_cast<milliseconds>(process_end - process_start).count();
         }
 
         void finalize(bool canceled, std::exception_ptr &eptr) override
         {
+            using namespace std::chrono;
+            steady_clock::time_point finalize_start = steady_clock::now();
             m_job->finalize(canceled, eptr);
+            steady_clock::time_point finalize_end = steady_clock::now();
+            long long finalize_duration = duration_cast<milliseconds>(finalize_end - finalize_start).count();
+
+            BOOST_LOG_TRIVIAL(info)
+                << std::fixed // do not use scientific notations
+                << "Job '" << typeid(*m_job).name() << "' "
+                << "spend " << m_process_duration + finalize_duration << "ms "
+                << "(process " << m_process_duration << "ms + finalize " << finalize_duration << "ms)";
 
             if (eptr) try {
                 std::rethrow_exception(eptr);
