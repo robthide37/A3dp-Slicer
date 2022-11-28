@@ -86,6 +86,11 @@ public:
     }
 };
 
+struct ProcessedPoint{
+    Point p;
+    float speed_factor;
+};
+
 class ExtrusionQualityEstimator
 {
     AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary;
@@ -135,22 +140,38 @@ public:
 #endif
     }
 
-    std::vector<float> estimate_extrusion_quality(const ExtrusionPath &path)
+    std::vector<ProcessedPoint> estimate_extrusion_quality(const ExtrusionPath &path)
     {
+        struct ExtendedPoint{
+            Vec2f position;
+            float distance;
+
+        };
+
         float flow_width              = path.width;
         float min_malformation_dist   = 0.0 * flow_width;
         float max_malformation_dist   = 1.1 * flow_width;
         float worst_malformation_dist = 0.7 * flow_width;
 
-        std::vector<Vec2f> points;
-        Polyline           pl = path.as_polyline();
-        points.reserve(pl.size());
-        for (const Point &p : pl) { points.push_back(unscaled(p).cast<float>()); }
+        const Points& original_points = path.polyline.points;
+        std::vector<ExtendedPoint> points;
 
-        std::vector<float> point_qualities(points.size(), 1.0);
+        float distance = prev_layer_boundary.signed_distance_from_lines(unscaled(original_points[0]));
+        points.push_back({unscaled(original_points[0]).cast<float>(),distance});
+        for (size_t i = 1; i < original_points.size(); i++) {
+            Vec2f next_point_pos = unscaled(original_points[i]).cast<float>();
+            float distance_of_next = prev_layer_boundary.signed_distance_from_lines(next_point_pos);
+            if ((points[i-1].distance > min_malformation_dist ) != (distance_of_next > min_malformation_dist)) { //not same sign, so one is grounded, one not
+                auto intersections = prev_layer_boundary.intersections_with_line<true>({points[i-1].position, next_point_pos});
+                for (const auto& intersection : intersections) {
+                    points.push_back({intersection.cast<float>(), 0.0f});
+                }
+            }
+            points.push_back({next_point_pos, distance_of_next});
+        }
+
         for (int point_idx = 0; point_idx < int(points.size()); ++point_idx) {
-            const Vec2f &p = points[point_idx];
-
+            const ExtendedPoint p = points[point_idx];
             double dist_from_prev_layer = prev_layer_boundary.signed_distance_from_lines(p.cast<double>()) + flow_width * 0.5f;
 
             float default_dist_quality = 0.3f;
