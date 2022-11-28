@@ -131,6 +131,7 @@ void PrintObject::make_perimeters()
     // Revert the typed slices into untyped slices.
     if (m_typed_slices) {
         for (Layer *layer : m_layers) {
+            layer->clear_fills();
             layer->restore_untyped_slices();
             m_print->throw_if_canceled();
         }

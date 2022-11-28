@@ -390,6 +390,8 @@ protected:
         slice_z(slice_z), print_z(print_z), height(height),
         m_id(id), m_object(object) {}
     virtual ~Layer();
+    // Clear fill extrusions, remove them from layer islands.
+    void clear_fills();
 
 private:
     void sort_perimeters_into_islands(

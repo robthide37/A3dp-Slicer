@@ -408,12 +408,18 @@ static void insert_fills_into_islands(Layer &layer, uint32_t fill_region_id, uin
     }
 }
 
-// friend to Layer
+void Layer::clear_fills()
+{
+    for (LayerRegion *layerm : m_regions)
+        layerm->m_fills.clear();
+    for (LayerSlice &lslice : lslices_ex)
+		for (LayerIsland &island : lslice.islands)
+			island.fills.clear();
+}
+
 void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree, FillLightning::Generator* lightning_generator)
 {
-	for (LayerRegion *layerm : m_regions)
-		layerm->m_fills.clear();
-
+	this->clear_fills();
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
 //	this->export_region_fill_surfaces_to_svg_debug("10_fill-initial");

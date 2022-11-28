@@ -443,6 +443,7 @@ void Layer::make_perimeters()
         layerm.m_fill_expolygons_composite_bboxes.clear();
     };
 
+    // Remove layer islands, remove references to perimeters and fills from these layer islands to LayerRegion ExtrusionEntities.
     for (LayerSlice &lslice : this->lslices_ex)
         lslice.islands.clear();
 
