@@ -39,6 +39,9 @@ indexed_triangle_set create_support_tree(const SupportableMesh &sm,
             create_branching_tree(*builder, sm);
             break;
         }
+        case SupportTreeType::Organic: {
+            // TODO
+        }
         default:;
         }
 

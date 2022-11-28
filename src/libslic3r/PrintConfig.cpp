@@ -181,7 +181,8 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLAMaterialSpeed);
 
 static inline const t_config_enum_values s_keys_map_SLASupportTreeType = {
     {"default", int(sla::SupportTreeType::Default)},
-    {"branching",   int(sla::SupportTreeType::Branching)}
+    {"branching",   int(sla::SupportTreeType::Branching)},
+    //TODO: {"organic", int(sla::SupportTreeType::Organic)}
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLASupportTreeType);
 
@@ -3614,6 +3615,7 @@ void PrintConfigDef::init_sla_params()
     def->enum_labels = ConfigOptionEnum<sla::SupportTreeType>::get_enum_names();
     def->enum_labels[0] = L("Default");
     def->enum_labels[1] = L("Branching");
+    // TODO: def->enum_labels[2] = L("Organic");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum(sla::SupportTreeType::Default));
 
