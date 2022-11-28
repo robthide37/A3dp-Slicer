@@ -275,7 +275,7 @@ public:
 
     explicit LinesDistancer(std::vector<LineType> &&lines) : lines(lines)
     {
-        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(std::move(this->lines));
+        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(this->lines);
     }
 
     LinesDistancer() = default;
