@@ -492,17 +492,24 @@ GroundConnection deepsearch_ground_connection(
     // Score is the total lenght of the route. Feasible routes will have
     // infinite length (rays not colliding with model), thus the stop score
     // should be a reasonably big number.
-    constexpr double StopScore = 1e6;
+    constexpr double Penality = 1e5;
+    constexpr double PenOffs  = 1e2;
 
     const auto sd          = sm.cfg.safety_distance(source.r);
     const auto gndlvl      = ground_level(sm);
 
-    auto criteria = get_criteria(sm.cfg).stop_score(StopScore);
+    auto criteria = get_criteria(sm.cfg);
+    criteria.abs_score_diff(1.);
+    criteria.rel_score_diff(0.1);
+    criteria.max_iterations(5000);
 
     Optimizer<opt::AlgNLoptMLSL> solver(criteria);
+    solver.set_loc_criteria(criteria.max_iterations(100).abs_score_diff(1.));
     solver.seed(0); // enforce deterministic behavior
 
+    size_t icnt = 0;
     auto optfn = [&](const opt::Input<3> &input) {
+        ++icnt;
         double ret = NaNd;
 
         // solver suggests polar, azimuth and bridge length values:
@@ -511,7 +518,7 @@ GroundConnection deepsearch_ground_connection(
         Vec3d n = spheric_to_dir(plr, azm);
         Vec3d bridge_end = source.pos + bridge_len * n;
 
-        double full_len   = bridge_len + bridge_end.z() - gndlvl;
+        double down_l     = bridge_end.z() - gndlvl;
         double bridge_r   = wideningfn(Ball{source.pos, source.r}, n, bridge_len);
         double brhit_dist = 0.;
 
@@ -524,7 +531,7 @@ GroundConnection deepsearch_ground_connection(
         }
 
         if (brhit_dist < bridge_len) {
-            ret = brhit_dist;
+            ret = brhit_dist + Penality;
         } else {
             // check if pillar can be placed below
             auto   gp         = Vec3d{bridge_end.x(), bridge_end.y(), gndlvl};
@@ -532,28 +539,27 @@ GroundConnection deepsearch_ground_connection(
 
             Beam gndbeam {{bridge_end, bridge_r}, {gp, end_radius}};
             auto gndhit = beam_mesh_hit(policy, sm.emesh, gndbeam, sd);
+            double gnd_hit_d = std::min(gndhit.distance(), down_l);
+            double penality   = 0.;
 
-            if (std::isinf(gndhit.distance())) {
-                // Ground route is free with this bridge
-
-                if (sm.cfg.object_elevation_mm < EPSILON) {
-                    // Dealing with zero elevation mode, to not route pillars
-                    // into the gap between the optional pad and the model
-                    double gap     = std::sqrt(sm.emesh.squared_distance(gp));
-                    double base_r  = std::max(sm.cfg.base_radius_mm, end_radius);
-                    double max_gap = sm.cfg.pillar_base_safety_distance_mm + base_r;
-                    if (gap < max_gap)
-                        ret = full_len - max_gap + gap;
-                    else // success
-                        ret = StopScore + EPSILON;
-                } else {
-                    // No zero elevation, return success
-                    ret = StopScore + EPSILON;
+            if (!std::isinf(gndhit.distance()))
+                penality = Penality;
+            else if (sm.cfg.object_elevation_mm < EPSILON) {
+                // Dealing with zero elevation mode, to not route pillars
+                // into the gap between the optional pad and the model
+                double gap     = std::sqrt(sm.emesh.squared_distance(gp));
+                double base_r  = std::max(sm.cfg.base_radius_mm, end_radius);
+                double min_gap = sm.cfg.pillar_base_safety_distance_mm + base_r;
+                if (gap < min_gap) {
+                    penality = Penality + PenOffs * (min_gap - gap);
                 }
-            } else {
-                // Ground route is not free
-                ret = bridge_len + gndhit.distance();
+//                gnd_hit_d += std::max(0., min_gap - gap); //penality = Penality + 100000. * (min_gap - gap);
+//                if (gap < min_gap) {
+//                    penality = Penality;
+//                }
             }
+
+            ret = bridge_len + gnd_hit_d + penality;
         }
 
         return ret;
@@ -564,7 +570,7 @@ GroundConnection deepsearch_ground_connection(
     // Saturate the polar angle to max tilt defined in config
     plr_init = std::max(plr_init, PI - sm.cfg.bridge_slope);
 
-    auto oresult = solver.to_max().optimize(
+    auto oresult = solver.to_min().optimize(
         optfn,
         initvals({plr_init, azm_init, 0.}),      // start with a zero bridge
         bounds({ {PI - sm.cfg.bridge_slope, PI}, // bounds for polar angle
@@ -572,10 +578,12 @@ GroundConnection deepsearch_ground_connection(
                 {0., sm.cfg.max_bridge_length_mm} }) // bounds bridge length
         );
 
+    std::cout << "iters: " << icnt << std::endl;
+
     GroundConnection conn;
 
-    if (oresult.score >= StopScore) {
-        // search was successful, extract and apply the result
+    if (oresult.score < Penality) {
+        // Extract and apply the result
         auto &[plr, azm, bridge_len] = oresult.optimum;
 
         Vec3d n = spheric_to_dir(plr, azm);

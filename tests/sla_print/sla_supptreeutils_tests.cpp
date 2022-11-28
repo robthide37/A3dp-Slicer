@@ -177,7 +177,7 @@ TEST_CASE("Avoid disk below junction", "[suptreeutils]")
 
     sla::SupportableMesh sm{disk, sla::SupportPoints{}, cfg};
 
-    SECTION("without elevation") {
+    SECTION("with elevation") {
 
         sla::GroundConnection conn =
                 sla::deepsearch_ground_connection(ex_seq, sm, j, EndRadius, sla::DOWN);
@@ -191,7 +191,7 @@ TEST_CASE("Avoid disk below junction", "[suptreeutils]")
         REQUIRE(pR + FromRadius > CylRadius);
     }
 
-    SECTION("with elevation") {
+    SECTION("without elevation") {
         sm.cfg.object_elevation_mm = 0.;
 
         sla::GroundConnection conn =
@@ -234,7 +234,7 @@ TEST_CASE("Avoid disk below junction with barrier on the side", "[suptreeutils]"
 
     sla::SupportableMesh sm{disk, sla::SupportPoints{}, cfg};
 
-    SECTION("without elevation") {
+    SECTION("with elevation") {
         sla::GroundConnection conn =
                 sla::deepsearch_ground_connection(ex_seq, sm, j, EndRadius, sla::DOWN);
 

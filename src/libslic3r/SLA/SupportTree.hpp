@@ -105,7 +105,7 @@ struct SupportTreeConfig
     static const double constexpr max_solo_pillar_height_mm = 15.0;
     static const double constexpr max_dual_pillar_height_mm = 35.0;
     static const double constexpr optimizer_rel_score_diff = 1e-10;
-    static const unsigned constexpr optimizer_max_iterations = 2000;
+    static const unsigned constexpr optimizer_max_iterations = 30000;
     static const unsigned constexpr pillar_cascade_neighbors = 3;
     
 };

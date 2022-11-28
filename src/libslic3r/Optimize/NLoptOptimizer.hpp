@@ -141,7 +141,9 @@ protected:
     }
 
     template<size_t N>
-    void set_up(NLopt &nl, const Bounds<N>& bounds)
+    static void set_up(NLopt &nl,
+                       const Bounds<N> &bounds,
+                       const StopCriteria &stopcr)
     {
         std::array<double, N> lb, ub;
 
@@ -153,15 +155,15 @@ protected:
         nlopt_set_lower_bounds(nl.ptr, lb.data());
         nlopt_set_upper_bounds(nl.ptr, ub.data());
 
-        double abs_diff = m_stopcr.abs_score_diff();
-        double rel_diff = m_stopcr.rel_score_diff();
-        double stopval = m_stopcr.stop_score();
+        double abs_diff = stopcr.abs_score_diff();
+        double rel_diff = stopcr.rel_score_diff();
+        double stopval = stopcr.stop_score();
         if(!std::isnan(abs_diff)) nlopt_set_ftol_abs(nl.ptr, abs_diff);
         if(!std::isnan(rel_diff)) nlopt_set_ftol_rel(nl.ptr, rel_diff);
         if(!std::isnan(stopval))  nlopt_set_stopval(nl.ptr, stopval);
 
-        if(m_stopcr.max_iterations() > 0)
-            nlopt_set_maxeval(nl.ptr, m_stopcr.max_iterations());
+        if(stopcr.max_iterations() > 0)
+            nlopt_set_maxeval(nl.ptr, stopcr.max_iterations());
     }
 
     template<class Fn, size_t N, class...EqFns, class...IneqFns>
@@ -211,7 +213,7 @@ public:
                        const std::tuple<IneqFns...> &inequalities)
     {
         NLopt nl{alg, N};
-        set_up(nl, bounds);
+        set_up(nl, bounds, m_stopcr);
 
         return optimize(nl, std::forward<Func>(func), initvals,
                         equalities, inequalities);
@@ -230,6 +232,7 @@ template<nlopt_algorithm glob, nlopt_algorithm loc>
 class NLoptOpt<NLoptAlgComb<glob, loc>>: public NLoptOpt<NLoptAlg<glob>>
 {
     using Base = NLoptOpt<NLoptAlg<glob>>;
+    StopCriteria m_loc_stopcr;
 public:
 
     template<class Fn, size_t N, class...EqFns, class...IneqFns>
@@ -241,15 +244,20 @@ public:
     {
         NLopt nl_glob{glob, N}, nl_loc{loc, N};
 
-        Base::set_up(nl_glob, bounds);
-        Base::set_up(nl_loc, bounds);
+        Base::set_up(nl_glob, bounds, Base::get_criteria());
+        Base::set_up(nl_loc, bounds, m_loc_stopcr);
         nlopt_set_local_optimizer(nl_glob.ptr, nl_loc.ptr);
 
         return Base::optimize(nl_glob, std::forward<Fn>(f), initvals,
                               equalities, inequalities);
     }
 
-    explicit NLoptOpt(StopCriteria stopcr = {}) : Base{stopcr} {}
+    explicit NLoptOpt(StopCriteria stopcr = {})
+        : Base{stopcr}, m_loc_stopcr{stopcr}
+    {}
+
+    void set_loc_criteria(const StopCriteria &cr) { m_loc_stopcr = cr; }
+    const StopCriteria &get_loc_criteria() const noexcept { return m_loc_stopcr; }
 };
 
 } // namespace detail;
@@ -285,6 +293,9 @@ public:
     const StopCriteria &get_criteria() const { return m_opt.get_criteria(); }
 
     void seed(long s) { m_opt.seed(s); }
+
+    void set_loc_criteria(const StopCriteria &cr) { m_opt.set_loc_criteria(cr); }
+    const StopCriteria &get_loc_criteria() const noexcept { return m_opt.get_loc_criteria(); }
 };
 
 // Predefinded NLopt algorithms
