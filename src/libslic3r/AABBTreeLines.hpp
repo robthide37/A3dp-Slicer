@@ -1,10 +1,12 @@
 #ifndef SRC_LIBSLIC3R_AABBTREELINES_HPP_
 #define SRC_LIBSLIC3R_AABBTREELINES_HPP_
 
+#include "Point.hpp"
 #include "Utils.hpp"
 #include "libslic3r.h"
 #include "libslic3r/AABBTreeIndirect.hpp"
 #include "libslic3r/Line.hpp"
+#include <algorithm>
 #include <type_traits>
 #include <vector>
 
@@ -86,6 +88,48 @@ inline std::tuple<size_t, size_t> coordinate_aligned_ray_hit_count(size_t node_i
             intersections_below += below;
         }
         return {intersections_above, intersections_below};
+    }
+}
+
+template<typename LineType, typename TreeType, typename VectorType>
+inline std::vector<VectorType> get_intersections_with_line(size_t                                node_idx,
+                                                           const TreeType                       &tree,
+                                                           const std::vector<LineType>          &lines,
+                                                           const LineType                       &line,
+                                                           const typename TreeType::BoundingBox &line_bb)
+{
+    const auto &node = tree.node(node_idx);
+    assert(node.is_valid());
+    if (node.is_leaf()) {
+        VectorType intersection_pt;
+        if (line_alg::intersection(line, lines[node.idx], &intersection_pt)) {
+            return {intersection_pt};
+        } else {
+            return {};
+        }
+    } else {
+        size_t      left_node_idx  = node_idx * 2 + 1;
+        size_t      right_node_idx = left_node_idx + 1;
+        const auto &node_left      = tree.node(left_node_idx);
+        const auto &node_right     = tree.node(right_node_idx);
+        assert(node_left.is_valid());
+        assert(node_right.is_valid());
+
+        std::vector<VectorType> result;
+
+        if (node_left.bbox.intersects(line_bb)) {
+            std::vector<VectorType> intersections = get_intersections_with_line<LineType, TreeType, VectorType>(left_node_idx, tree, lines,
+                                                                                                                line, line_bb);
+            result.insert(result.end(), intersections.begin(), intersections.end());
+        }
+
+        if (node_right.bbox.intersects(line_bb)) {
+            std::vector<VectorType> intersections = get_intersections_with_line<LineType, TreeType, VectorType>(right_node_idx, tree, lines,
+                                                                                                                line, line_bb);
+            result.insert(result.end(), intersections.begin(), intersections.end());
+        }
+
+        return result;
     }
 }
 
@@ -173,7 +217,6 @@ inline int point_outside_closed_contours(const std::vector<LineType> &lines, con
     if (tree.empty()) { return 1; }
 
     auto [hits_above, hits_below] = detail::coordinate_aligned_ray_hit_count<LineType, TreeType, VectorType, 0>(0, tree, point);
-    std::cout << "hits_above:  " << hits_above << "   hits_below: " << hits_below << std::endl; 
     if (hits_above % 2 == 1 && hits_below % 2 == 1) {
         return -1;
     } else if (hits_above % 2 == 0 && hits_below % 2 == 0) {
@@ -188,6 +231,32 @@ inline int point_outside_closed_contours(const std::vector<LineType> &lines, con
             return 0;
         }
     }
+}
+
+template<bool sorted, typename VectorType, typename LineType, typename TreeType>
+inline std::vector<VectorType> get_intersections_with_line(const std::vector<LineType> &lines, const TreeType &tree, const LineType &line)
+{
+    if (tree.empty()) { return {}; }
+    auto line_bb = typename TreeType::BoundingBox(line.a, line.a);
+    line_bb.extend(line.b);
+
+    auto intersections = detail::get_intersections_with_line<LineType, TreeType, VectorType>(0, tree, lines, line, line_bb);
+    if (sorted) {
+        using Floating =
+            typename std::conditional<std::is_floating_point<typename LineType::Scalar>::value, typename LineType::Scalar, double>::type;
+
+        std::vector<std::pair<Floating, VectorType>> points_with_sq_distance{};
+        for (const VectorType &p : intersections) {
+            points_with_sq_distance.emplace_back((p - line.a).template cast<Floating>().squaredNorm(), p);
+        }
+        std::sort(points_with_sq_distance.begin(), points_with_sq_distance.end(),
+                  [](const std::pair<Floating, VectorType> &left, std::pair<Floating, VectorType> &right) {
+                      return left.first < right.first;
+                  });
+        for (size_t i = 0; i < points_with_sq_distance.size(); i++) { intersections[i] = points_with_sq_distance[i].second; }
+    }
+
+    return intersections;
 }
 
 template<typename LineType> class LinesDistancer
@@ -206,7 +275,7 @@ public:
 
     explicit LinesDistancer(std::vector<LineType> &&lines) : lines(lines)
     {
-        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(this->lines);
+        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(std::move(this->lines));
     }
 
     LinesDistancer() = default;
@@ -238,6 +307,11 @@ public:
     std::vector<size_t> all_lines_in_radius(const Vec<2, typename LineType::Scalar> &point, Floating radius)
     {
         return all_lines_in_radius(this->lines, this->tree, point, radius * radius);
+    }
+
+    template<bool sorted> std::vector<Vec<2, Scalar>> intersections_with_line(const LineType &line) const
+    {
+        return get_intersections_with_line<sorted, Vec<2, Scalar>>(lines, tree, line);
     }
 
     const LineType &get_line(size_t line_idx) const { return lines[line_idx]; }
