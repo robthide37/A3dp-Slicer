@@ -181,6 +181,18 @@ void test_supports(const std::string          &obj_filename,
     if (std::abs(supportcfg.object_elevation_mm) < EPSILON)
         allowed_zmin = zmin - 2 * supportcfg.head_back_radius_mm;
 
+#ifndef NDEBUG
+    if (!(obb.min.z() >= Approx(allowed_zmin)) || !(obb.max.z() <= Approx(zmax)))
+    {
+        indexed_triangle_set its;
+        treebuilder.retrieve_full_mesh(its);
+        TriangleMesh m{its};
+        m.merge(mesh);
+        m.WriteOBJFile((Catch::getResultCapture().getCurrentTestName() + "_" +
+                        obj_filename).c_str());
+    }
+#endif
+
     REQUIRE(obb.min.z() >= Approx(allowed_zmin));
     REQUIRE(obb.max.z() <= Approx(zmax));
 

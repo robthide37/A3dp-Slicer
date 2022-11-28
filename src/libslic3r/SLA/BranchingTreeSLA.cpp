@@ -128,8 +128,8 @@ public:
 
     void report_unroutable(const branchingtree::Node &j) override
     {
-        BOOST_LOG_TRIVIAL(error) << "Cannot route junction at " << j.pos.x()
-                                 << " " << j.pos.y() << " " << j.pos.z();
+        BOOST_LOG_TRIVIAL(warning) << "Cannot route junction at " << j.pos.x()
+                                   << " " << j.pos.y() << " " << j.pos.z();
 
         // Discard all the support points connecting to this branch.
         discard_subtree(j.id);

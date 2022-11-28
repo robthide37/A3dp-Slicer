@@ -591,8 +591,9 @@ GroundConnection deepsearch_ground_connection(
         if (bridge_len > EPSILON)
             conn.path.emplace_back(Junction{bridge_end, bridge_r});
 
-        conn.pillar_base =
-            Pedestal{gp, sm.cfg.base_height_mm, base_r, end_radius};
+        if (bridge_end.z() >= gndlvl)
+            conn.pillar_base =
+                Pedestal{gp, sm.cfg.base_height_mm, base_r, end_radius};
     }
 
     return conn;

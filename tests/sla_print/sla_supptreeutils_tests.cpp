@@ -263,6 +263,24 @@ TEST_CASE("Avoid disk below junction with barrier on the side", "[suptreeutils]"
     }
 }
 
+TEST_CASE("Find ground route just above ground", "[suptreeutils]") {
+    using namespace Slic3r;
+
+    sla::SupportTreeConfig cfg;
+    cfg.object_elevation_mm = 0.;
+
+    sla::Junction j{Vec3d{0., 0., 2. * cfg.head_back_radius_mm}, cfg.head_back_radius_mm};
+
+    sla::SupportableMesh sm{{}, sla::SupportPoints{}, cfg};
+
+    sla::GroundConnection conn =
+        sla::deepsearch_ground_connection(ex_seq, sm, j, Geometry::spheric_to_dir(3 * PI/ 4, PI));
+
+    REQUIRE(conn);
+
+    REQUIRE(conn.pillar_base->pos.z() >= Approx(ground_level(sm)));
+}
+
 TEST_CASE("BranchingSupports::MergePointFinder", "[suptreeutils]") {
     using namespace Slic3r;
 
