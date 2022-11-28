@@ -483,7 +483,7 @@ TriangleMesh priv::create_mesh(DataBase &input, Fnc was_canceled, Job::Ctl& ctl)
 TriangleMesh priv::create_default_mesh()
 {
     // When cant load any font use default object loaded from file
-    std::string  path = Slic3r::resources_dir() + "/data/embossed_text.stl";
+    std::string  path = Slic3r::resources_dir() + "/data/embossed_text.obj";
     TriangleMesh triangle_mesh;
     if (!load_obj(path.c_str(), &triangle_mesh)) {
         // when can't load mesh use cube
