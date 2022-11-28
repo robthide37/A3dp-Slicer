@@ -20,12 +20,6 @@ class BranchingTreeBuilder: public branchingtree::Builder {
 
     std::set<int /*ground node_id that was already processed*/> m_ground_mem;
 
-    // Establish an index of
-    using PointIndexEl = std::pair<Vec3f, unsigned>;
-    boost::geometry::index::
-        rtree<PointIndexEl, boost::geometry::index::rstar<16, 4> /* ? */>
-            m_pillar_index;
-
     std::vector<branchingtree::Node> m_pillars; // to put an index over them
 
     // cache succesfull ground connections
@@ -110,44 +104,6 @@ class BranchingTreeBuilder: public branchingtree::Builder {
 
             return ret;
         });
-    }
-
-    std::optional<PointIndexEl>
-    search_for_existing_pillar(const branchingtree::Node &from) const
-    {
-        namespace bgi = boost::geometry::index;
-
-        struct Output
-        {
-            std::optional<PointIndexEl> &res;
-
-            Output &operator*() { return *this; }
-            Output &operator=(const PointIndexEl &el) { res = el; return *this; }
-            Output &operator++() { return *this; }
-        };
-
-        std::optional<PointIndexEl> result;
-
-        auto filter = bgi::satisfies([this, &from](const PointIndexEl &e) {
-            assert(e.second < m_pillars.size());
-
-            auto len = (from.pos - e.first).norm();
-            const branchingtree::Node &to = m_pillars[e.second];
-            double sd = m_sm.cfg.safety_distance_mm;
-
-            Beam beam{Ball{from.pos.cast<double>(), get_radius(from)},
-                      Ball{e.first.cast<double>(), get_radius(to)}};
-
-            return !branchingtree::is_occupied(to) &&
-                   len < m_sm.cfg.max_bridge_length_mm &&
-                   !m_cloud.is_outside_support_cone(from.pos, e.first) &&
-                   beam_mesh_hit(ex_tbb, m_sm.emesh, beam, sd).distance() > len;
-        });
-
-        m_pillar_index.query(filter && bgi::nearest(from.pos, 1),
-                             Output{result});
-
-        return result;
     }
 
 public:
@@ -368,23 +324,7 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
     BranchingTreeBuilder vbuilder{builder, sm, nodes};
     branchingtree::build_tree(nodes, vbuilder);
 
-    std::cout << "Original pillar count: " << vbuilder.pillars().size() << std::endl;
-
-    if constexpr (props.group_pillars()) {
-
-        std::vector<branchingtree::Node> bedleafs;
-        std::copy(vbuilder.pillars().begin(), vbuilder.pillars().end(), std::back_inserter(bedleafs));
-
-        branchingtree::PointCloud gndnodes{{}, nodes.get_bedpoints(), bedleafs, props};
-        BranchingTreeBuilder gndbuilder{builder, sm, gndnodes};
-        branchingtree::build_tree(gndnodes, gndbuilder);
-
-        std::cout << "Grouped pillar count: " << gndbuilder.pillars().size() << std::endl;
-        build_pillars(builder, gndbuilder, sm);
-
-    } else {
-        build_pillars(builder, vbuilder, sm);
-    }
+    build_pillars(builder, vbuilder, sm);
 
     for (size_t id : vbuilder.unroutable_pinheads())
         builder.head(id).invalidate();
