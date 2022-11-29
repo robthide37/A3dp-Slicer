@@ -1697,6 +1697,8 @@ void GLCanvas3D::render()
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
     }
 
+    ImGui::ShowDemoWindow();
+
     const bool is_looking_downward = camera.is_looking_downward();
 
     // draw scene
