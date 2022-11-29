@@ -112,7 +112,6 @@ inline void append(std::vector<T>& dest, const std::vector<T>& src)
         dest = src; // copy
     else
         dest.insert(dest.end(), src.begin(), src.end());
-    // NOTE: insert reserve space when needed
 }
 
 template <typename T>
