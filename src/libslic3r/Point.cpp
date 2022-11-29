@@ -160,7 +160,7 @@ bool has_duplicate_points(std::vector<Point> &&pts)
 
 Points collect_duplicates(Points pts /* Copy */)
 {
-    std::stable_sort(pts.begin(), pts.end());
+    std::sort(pts.begin(), pts.end());
     Points duplicits;
     const Point *prev = &pts.front();
     for (size_t i = 1; i < pts.size(); ++i) {
