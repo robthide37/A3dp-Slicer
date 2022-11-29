@@ -2915,12 +2915,11 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         );
     }
 
-    bool               variable_speed = false;
-    double             last_set_speed = 0.0;
-    std::vector<float> points_quality{};
+    bool                        variable_speed = false;
+    std::vector<ProcessedPoint> new_points{};
     if (!this->on_first_layer() && is_perimeter(path.role())) {
-        points_quality = m_extrusion_quality_estimator.estimate_extrusion_quality(path);
-        variable_speed = std::any_of(points_quality.begin(), points_quality.end(), [](float q) { return q != 1.0; });
+        new_points     = m_extrusion_quality_estimator.estimate_extrusion_quality(path);
+        variable_speed = std::any_of(new_points.begin(), new_points.end(), [](const ProcessedPoint &p) { return p.speed_factor != 1.0; });
     }
 
     double F = speed * 60;  // convert mm/sec to mm/min
@@ -2984,12 +2983,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             comment += ";_EXTERNAL_PERIMETER";
     }
 
-    // F is mm per minute.
-    if (!variable_speed){
+    if (!variable_speed) {
+        // F is mm per minute.
         gcode += m_writer.set_speed(F, "", comment);
-    }
-
-    {
+        double      path_length = 0.;
         std::string comment;
         if (m_config.gcode_comments) {
             comment = description;
@@ -2998,23 +2995,36 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         Vec2d prev = this->point_to_gcode_quantized(path.polyline.points.front());
         auto  it   = path.polyline.points.begin();
         auto  end  = path.polyline.points.end();
-        int i = 0;
-        for (++ it; it != end; ++ it) {
-            if (variable_speed) {
-                double new_speed = std::max(5.0, points_quality[i] * speed);
-                if (last_set_speed != new_speed) {
-                    last_set_speed = new_speed;
-                    gcode += m_writer.set_speed(new_speed * 60.0, "", comment);
-                }
-            }
-
-            Vec2d p = this->point_to_gcode_quantized(*it);
+        for (++it; it != end; ++it) {
+            Vec2d        p           = this->point_to_gcode_quantized(*it);
+            const double line_length = (p - prev).norm();
+            path_length += line_length;
+            gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
+            prev = p;
+        }
+    } else {
+        std::string comment;
+        if (m_config.gcode_comments) {
+            comment = description;
+            comment += description_bridge;
+        }
+        double last_set_speed = std::max(5.0, new_points[0].speed_factor * speed) * 60.0;
+        gcode += m_writer.set_speed(last_set_speed, "", comment);
+        Vec2d prev = this->point_to_gcode_quantized(new_points[0].p);
+        for (size_t i = 1; i < new_points.size(); i++) {
+            const ProcessedPoint& procesed_point = new_points[i];
+            Vec2d p = this->point_to_gcode_quantized(procesed_point.p);
             const double line_length = (p - prev).norm();
             gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
             prev = p;
-            i++;
+            double new_speed = std::max(5.0, procesed_point.speed_factor * speed) * 60.0;
+            if (last_set_speed != new_speed) {
+                gcode += m_writer.set_speed(new_speed, "", comment);
+                last_set_speed = new_speed;
+            }
         }
     }
+
     if (m_enable_cooling_markers)
         gcode += is_bridge(path.role()) ? ";_BRIDGE_FAN_END\n" : ";_EXTRUDE_END\n";
 
