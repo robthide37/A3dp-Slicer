@@ -161,7 +161,7 @@ public:
         };
 
         float flow_width              = path.width;
-        float min_malformation_dist   = 0.2;
+        float min_malformation_dist   = 0.0;
 
         const Points              &original_points = path.polyline.points;
         std::vector<ExtendedPoint> points;
@@ -174,22 +174,24 @@ public:
             if ((points.back().distance > min_malformation_dist) !=
                 (distance_of_next > min_malformation_dist)) { // not same sign, so one is grounded, one not
                 auto intersections = prev_layer_boundary.intersections_with_line<true>({points.back().position, next_point_pos});
-                for (const auto &intersection : intersections) { points.push_back({intersection, 0.0f, 1.0}); }
+                // for (const auto &intersection : intersections) { points.push_back({intersection, 0.0f, 1.0}); }
             }
             points.push_back({next_point_pos, distance_of_next, 1.0});
         }
-
+        std::cout << "EXTR" << std::endl;
         for (int point_idx = 0; point_idx < int(points.size()) - 1; ++point_idx) {
-            ExtendedPoint &a                    = points[point_idx];
-            ExtendedPoint &b                    = points[point_idx+1];
+            ExtendedPoint &a = points[point_idx];
+            ExtendedPoint &b = points[point_idx + 1];
             if (a.distance < min_malformation_dist && b.distance < min_malformation_dist) {
                 a.quality = 1.0;
                 cestim.reset();
                 continue;
             }
 
+
             float distance = fmax(a.distance, b.distance);
-            float distance_quality = 1.0f - fmin(1.0f, distance - min_malformation_dist);
+            std::cout << "distance: " << distance << std::endl;
+            float distance_quality = 1.0f - fmin(1.0f, distance);
 
             // int prev_point_idx = point_idx;
             // while (prev_point_idx > 0) {
