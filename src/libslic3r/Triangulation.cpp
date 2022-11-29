@@ -241,7 +241,7 @@ Triangulation::Indices Triangulation::triangulate(const ExPolygon &expolygon){
 
 Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons){
     Points pts = to_points(expolygons);
-    Points d_pts = collect_duplications(pts);
+    Points d_pts = collect_duplicates(pts);
     if (d_pts.empty()) return triangulate(expolygons, pts);
 
     Changes changes = create_changes(pts, d_pts);
@@ -262,7 +262,7 @@ Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons, 
 {
     assert(count_points(expolygons) == points.size());
     // when contain duplicit coordinate in points will not work properly
-    assert(collect_duplications(points).empty());
+    assert(collect_duplicates(points).empty());
 
     HalfEdges edges;
     edges.reserve(points.size());

@@ -201,7 +201,7 @@ ExPolygons heal_and_check(const Polygons &polygons)
 {
     Pointfs intersections_prev = intersection_points(polygons);
     Points  polygons_points    = to_points(polygons);
-    Points  duplicits_prev     = collect_duplications(polygons_points);
+    Points  duplicits_prev     = collect_duplicates(polygons_points);
 
     ExPolygons shape = Emboss::heal_shape(polygons);
 
@@ -215,7 +215,7 @@ ExPolygons heal_and_check(const Polygons &polygons)
 
     Pointfs intersections = intersection_points(shape);
     Points  shape_points  = to_points(shape);
-    Points  duplicits     = collect_duplications(shape_points);
+    Points  duplicits     = collect_duplicates(shape_points);
     //{
     //    BoundingBox bb(polygons_points);
     //    // bb.scale(svg_scale);

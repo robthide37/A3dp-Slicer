@@ -283,7 +283,7 @@ ExPolygons Emboss::heal_shape(const Polygons &shape) {
         
     // Do not remove all duplicits but do it better way
     // Overlap all duplicit points by rectangle 3x3
-    Points duplicits = collect_duplications(to_points(polygons));
+    Points duplicits = collect_duplicates(to_points(polygons));
     if (!duplicits.empty()) {
         polygons.reserve(polygons.size() + duplicits.size());
         for (const Point &p : duplicits) {
@@ -310,7 +310,7 @@ bool Emboss::heal_shape(ExPolygons &shape, unsigned max_iteration)
         priv::remove_same_neighbor(shape);
 
         Pointfs intersections = intersection_points(shape);
-        Points  duplicits     = collect_duplications(to_points(shape));
+        Points  duplicits     = collect_duplicates(to_points(shape));
         //Points  close         = priv::collect_close_points(shape, 1.);
         if (intersections.empty() && duplicits.empty() /* && close.empty() */) break;
 
@@ -353,7 +353,7 @@ bool Emboss::heal_shape(ExPolygons &shape, unsigned max_iteration)
         svg.draw(shape, "green");
 
         svg.draw(duplicits, "lightgray", 13 / Emboss::SHAPE_SCALE);
-        Points duplicits3 = collect_duplications(to_points(shape));
+        Points duplicits3 = collect_duplicates(to_points(shape));
         svg.draw(duplicits3, "black", 7 / Emboss::SHAPE_SCALE);
 
         Pointfs pts2 = intersection_points(shape);
@@ -387,7 +387,7 @@ bool Emboss::heal_shape(ExPolygons &shape, unsigned max_iteration)
     }
 
     assert(intersection_points(shape).empty());
-    assert(collect_duplications(to_points(shape)).empty());
+    assert(collect_duplicates(to_points(shape)).empty());
     return true;
 }
 
@@ -1186,7 +1186,7 @@ indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
                                             const IProjection &projection)
 {
     Points points = to_points(shape2d);    
-    Points duplicits = collect_duplications(points);
+    Points duplicits = collect_duplicates(points);
     return (duplicits.empty()) ?
         priv::polygons2model_unique(shape2d, projection, points) :
         priv::polygons2model_duplicit(shape2d, projection, points, duplicits);

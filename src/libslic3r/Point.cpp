@@ -158,7 +158,7 @@ bool has_duplicate_points(std::vector<Point> &&pts)
     return false;
 }
 
-Points collect_duplications(Points pts /* Copy */)
+Points collect_duplicates(Points pts /* Copy */)
 {
     std::stable_sort(pts.begin(), pts.end());
     Points duplicits;
