@@ -180,7 +180,7 @@ TEST_CASE("Avoid disk below junction", "[suptreeutils]")
     SECTION("with elevation") {
 
         sla::GroundConnection conn =
-                sla::deepsearch_ground_connection(ex_seq, sm, j, EndRadius, sla::DOWN);
+                sla::deepsearch_ground_connection(ex_tbb, sm, j, EndRadius, sla::DOWN);
 
         eval_ground_conn(conn, sm, j, EndRadius, "disk.stl");
 
@@ -195,7 +195,7 @@ TEST_CASE("Avoid disk below junction", "[suptreeutils]")
         sm.cfg.object_elevation_mm = 0.;
 
         sla::GroundConnection conn =
-                sla::deepsearch_ground_connection(ex_seq, sm, j, EndRadius, sla::DOWN);
+                sla::deepsearch_ground_connection(ex_tbb, sm, j, EndRadius, sla::DOWN);
 
         eval_ground_conn(conn, sm, j, EndRadius, "disk_ze.stl");
 
