@@ -91,8 +91,10 @@ private:
     // localized default text
     void set_default_text();
 
-    void check_selection();
-    ModelVolume *get_selected_volume();
+    void set_volume_by_selection();
+    // load text configuration from volume into gizmo
+    bool set_volume(ModelVolume *volume); 
+
     // create volume from text - main functionality
     bool process();
     void close();
@@ -157,8 +159,6 @@ private:
     bool choose_font_by_wxdialog();
     bool choose_true_type_file();
     bool choose_svg_file();
-
-    bool load_configuration(ModelVolume *volume);
 
     // When open text loaded from .3mf it could be written with unknown font
     bool m_is_unknown_font;

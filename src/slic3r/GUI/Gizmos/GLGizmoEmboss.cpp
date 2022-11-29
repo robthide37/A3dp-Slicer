@@ -334,6 +334,15 @@ namespace priv {
 /// TODO: it is more general function --> move to utils
 /// </summary>
 /// <param name="gl_volume">Volume to model belongs to</param>
+/// <param name="object">Object containing gl_volume</param>
+/// <returns>Model for volume</returns>
+static ModelVolume *get_model_volume(const GLVolume *gl_volume, const ModelObject *object);
+
+/// <summary>
+/// Access to model from gl_volume
+/// TODO: it is more general function --> move to utils
+/// </summary>
+/// <param name="gl_volume">Volume to model belongs to</param>
 /// <param name="objects">All objects</param>
 /// <returns>Model for volume</returns>
 static ModelVolume *get_model_volume(const GLVolume *gl_volume, const ModelObjectPtrs &objects);
@@ -343,9 +352,8 @@ static ModelVolume *get_model_volume(const GLVolume *gl_volume, const ModelObjec
 /// TODO: it is more general function --> move to select utils
 /// </summary>
 /// <param name="selection">Actual selection</param>
-/// <param name="objects">All objects</param>
 /// <returns>Model from selection</returns>
-static ModelVolume *get_selected_volume(const Selection &selection, const ModelObjectPtrs &objects);
+static ModelVolume *get_selected_volume(const Selection &selection);
 
 /// <summary>
 /// Calculate offset from mouse position to center of text
@@ -671,7 +679,7 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     if (!m_gui_cfg.has_value()) initialize();
-    check_selection();
+    set_volume_by_selection();
 
     // Do not render window for not selected text volume
     if (m_volume == nullptr || !m_volume->text_configuration.has_value()) {
@@ -741,8 +749,8 @@ void GLGizmoEmboss::on_set_state()
         // to reload fonts from system, when install new one
         wxFontEnumerator::InvalidateCache();
 
-        // Try(when exist) set text configuration by volume
-        load_configuration(get_selected_volume());
+        // Try(when exist) set text configuration by volume 
+        set_volume(priv::get_selected_volume(m_parent.get_selection()));
 
         // change position of just opened emboss window
         set_fine_position();
@@ -900,9 +908,9 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
 void GLGizmoEmboss::set_default_text(){ m_text = _u8L("Embossed text"); }
 
 #include "imgui/imgui_internal.h" // to unfocus input --> ClearActiveID
-void GLGizmoEmboss::check_selection()
+void GLGizmoEmboss::set_volume_by_selection()
 {
-    ModelVolume *vol = get_selected_volume();
+    ModelVolume *vol = priv::get_selected_volume(m_parent.get_selection());
     // is same volume selected?
     if (vol != nullptr && m_volume == vol) return;
 
@@ -913,27 +921,88 @@ void GLGizmoEmboss::check_selection()
     if (m_volume != nullptr) ImGui::ClearActiveID();
 
     // is select embossed volume?
-    if (load_configuration(vol)) 
-        // successfull load volume for editing
-        return;
-    
-    // behave like adding new text
-    m_volume = nullptr;
-    set_default_text();
+    if (!set_volume(vol)) {
+        // Can't load so behave like adding new text
+        m_volume = nullptr;
+        set_default_text();    
+    }
+}
+
+bool GLGizmoEmboss::set_volume(ModelVolume *volume)
+{
+    if (volume == nullptr) return false;
+    const std::optional<TextConfiguration> tc_opt = volume->text_configuration;
+    if (!tc_opt.has_value()) return false;
+    const TextConfiguration &tc    = *tc_opt;
+    const EmbossStyle       &style = tc.style;
+
+    auto has_same_name = [&style](const StyleManager::Item &style_item) -> bool {
+        const EmbossStyle &es = style_item.style;
+        return es.name == style.name;
+    };
+
+    wxFont wx_font;
+    bool is_path_changed = false;
+    if (style.type == WxFontUtils::get_actual_type())
+        wx_font = WxFontUtils::load_wxFont(style.path);
+    if (!wx_font.IsOk()) {
+        create_notification_not_valid_font(tc);
+        // Try create similar wx font
+        wx_font = WxFontUtils::create_wxFont(style);
+        is_path_changed = wx_font.IsOk();
+    }
+
+    const auto& styles = m_style_manager.get_styles();
+    auto it = std::find_if(styles.begin(), styles.end(), has_same_name);
+    if (it == styles.end()) {
+        // style was not found
+        if (wx_font.IsOk())
+            m_style_manager.load_style(style, wx_font);
+    } else {
+        size_t style_index = it - styles.begin();
+        if (!m_style_manager.load_style(style_index)) {
+            // can`t load stored style
+            m_style_manager.erase(style_index);
+            if (wx_font.IsOk())
+                m_style_manager.load_style(style, wx_font);
+
+        } else {
+            // stored style is loaded, now set modification of style
+            m_style_manager.get_style() = style;
+            m_style_manager.set_wx_font(wx_font);
+        }
+    }
+
+    if (is_path_changed) {
+        std::string path = WxFontUtils::store_wxFont(wx_font);
+        m_style_manager.get_style().path = path;
+    }
+
+    m_text   = tc.text;
+    m_volume = volume;
+
+    // store volume state before edit
+    m_unmodified_volume = {*volume->get_mesh_shared_ptr(), // copy
+                           tc, volume->get_matrix(), volume->name};
+
+    return true;
+}
+
+ModelVolume *priv::get_model_volume(const GLVolume *gl_volume, const ModelObject *object)
+{
+    int volume_id = gl_volume->volume_idx();
+    if (volume_id < 0 || static_cast<size_t>(volume_id) >= object->volumes.size()) return nullptr;
+    return object->volumes[volume_id];
 }
 
 ModelVolume *priv::get_model_volume(const GLVolume *gl_volume, const ModelObjectPtrs &objects)
 {
-    const GLVolume::CompositeID &id = gl_volume->composite_id;
-
-    if (id.object_id < 0 || static_cast<size_t>(id.object_id) >= objects.size()) return nullptr;
-    ModelObject *object = objects[id.object_id];
-
-    if (id.volume_id < 0 || static_cast<size_t>(id.volume_id) >= object->volumes.size()) return nullptr;
-    return object->volumes[id.volume_id];
+    int object_id = gl_volume->object_idx();
+    if (object_id < 0 || static_cast<size_t>(object_id) >= objects.size()) return nullptr;
+    return get_model_volume(gl_volume, objects[object_id]);
 }
 
-ModelVolume *priv::get_selected_volume(const Selection &selection, const ModelObjectPtrs &objects)
+ModelVolume *priv::get_selected_volume(const Selection &selection)
 {
     int object_idx = selection.get_object_idx();
     // is more object selected?
@@ -944,13 +1013,8 @@ ModelVolume *priv::get_selected_volume(const Selection &selection, const ModelOb
     if (volume_idxs.size() != 1) return nullptr;
     unsigned int    vol_id_gl = *volume_idxs.begin();
     const GLVolume *vol_gl    = selection.get_volume(vol_id_gl);
+    const ModelObjectPtrs &objects = selection.get_model()->objects;
     return get_model_volume(vol_gl, objects);
-}
-
-ModelVolume *GLGizmoEmboss::get_selected_volume()
-{
-    return priv::get_selected_volume(m_parent.get_selection(),
-        wxGetApp().plater()->model().objects);
 }
 
 // Run Job on main thread (blocking) - ONLY DEBUG
@@ -2983,66 +3047,6 @@ bool GLGizmoEmboss::choose_svg_file()
     // SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
     // svg.draw(polys);
     //return add_volume(name, its);
-}
-
-bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
-{
-    if (volume == nullptr) return false;
-    const std::optional<TextConfiguration> tc_opt = volume->text_configuration;
-    if (!tc_opt.has_value()) return false;
-    const TextConfiguration &tc    = *tc_opt;
-    const EmbossStyle       &style = tc.style;
-
-    auto has_same_name = [&style](const StyleManager::Item &style_item) -> bool {
-        const EmbossStyle &es = style_item.style;
-        return es.name == style.name;
-    };
-
-    wxFont wx_font;
-    bool is_path_changed = false;
-    if (style.type == WxFontUtils::get_actual_type())
-        wx_font = WxFontUtils::load_wxFont(style.path);
-    if (!wx_font.IsOk()) {
-        create_notification_not_valid_font(tc);
-        // Try create similar wx font
-        wx_font = WxFontUtils::create_wxFont(style);
-        is_path_changed = wx_font.IsOk();
-    }
-
-    const auto& styles = m_style_manager.get_styles();
-    auto it = std::find_if(styles.begin(), styles.end(), has_same_name);
-    if (it == styles.end()) {
-        // style was not found
-        if (wx_font.IsOk())
-            m_style_manager.load_style(style, wx_font);
-    } else {
-        size_t style_index = it - styles.begin();
-        if (!m_style_manager.load_style(style_index)) {
-            // can`t load stored style
-            m_style_manager.erase(style_index);
-            if (wx_font.IsOk())
-                m_style_manager.load_style(style, wx_font);
-
-        } else {
-            // stored style is loaded, now set modification of style
-            m_style_manager.get_style() = style;
-            m_style_manager.set_wx_font(wx_font);
-        }
-    }
-
-    if (is_path_changed) {
-        std::string path = WxFontUtils::store_wxFont(wx_font);
-        m_style_manager.get_style().path = path;
-    }
-
-    m_text   = tc.text;
-    m_volume = volume;
-
-    // store volume state before edit
-    m_unmodified_volume = {*volume->get_mesh_shared_ptr(), // copy
-                           tc, volume->get_matrix(), volume->name};
-
-    return true;
 }
 
 void GLGizmoEmboss::create_notification_not_valid_font(
