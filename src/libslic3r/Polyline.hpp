@@ -17,7 +17,6 @@ typedef std::vector<ThickPolyline> ThickPolylines;
 class Polyline : public MultiPoint {
 public:
     Polyline() = default;
-    ~Polyline() override = default;
     Polyline(const Polyline &other) : MultiPoint(other.points) {}
     Polyline(Polyline &&other) : MultiPoint(std::move(other.points)) {}
     Polyline(std::initializer_list<Point> list) : MultiPoint(list) {}
@@ -64,11 +63,12 @@ public:
     Point& operator[](Points::size_type idx) { return this->points[idx]; }
     const Point& operator[](Points::size_type idx) const { return this->points[idx]; }
 
-    const Point& last_point() const override { return this->points.back(); }
+    double length() const;
+    const Point& last_point() const { return this->points.back(); }
     const Point& leftmost_point() const;
-    Lines lines() const override;
+    Lines lines() const;
 
-    virtual void clip_end(double distance);
+    void clip_end(double distance);
     void clip_start(double distance);
     void extend_end(double distance);
     void extend_start(double distance);
@@ -170,7 +170,7 @@ public:
         std::swap(this->endpoints.first, this->endpoints.second);
     }
 
-    void clip_end(double distance) override;
+    void clip_end(double distance);
 
     std::vector<coordf_t> width;
     std::pair<bool,bool>  endpoints;
@@ -191,7 +191,8 @@ inline ThickPolylines to_thick_polylines(Polylines &&polylines, const coordf_t w
 class Polyline3 : public MultiPoint3
 {
 public:
-    virtual Lines3 lines() const;
+    double length() const;
+    Lines3 lines() const;
 };
 
 typedef std::vector<Polyline3> Polylines3;

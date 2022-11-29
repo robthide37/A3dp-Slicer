@@ -22,46 +22,45 @@ void SurfaceCollection::simplify(double tolerance)
 }
 
 /* group surfaces by common properties */
-void SurfaceCollection::group(std::vector<SurfacesPtr> *retval)
+void SurfaceCollection::group(std::vector<SurfacesPtr> *retval) const
 {
-    for (Surfaces::iterator it = this->surfaces.begin(); it != this->surfaces.end(); ++it) {
+    for (const Surface &surface : this->surfaces) {
         // find a group with the same properties
-        SurfacesPtr* group = NULL;
+        SurfacesPtr *group = nullptr;
         for (std::vector<SurfacesPtr>::iterator git = retval->begin(); git != retval->end(); ++git)
-            if (! git->empty() && surfaces_could_merge(*git->front(), *it)) {
+            if (! git->empty() && surfaces_could_merge(*git->front(), surface)) {
                 group = &*git;
                 break;
             }
         // if no group with these properties exists, add one
-        if (group == NULL) {
+        if (group == nullptr) {
             retval->resize(retval->size() + 1);
             group = &retval->back();
         }
         // append surface to group
-        group->push_back(&*it);
+        group->push_back(&surface);
     }
 }
 
-SurfacesPtr SurfaceCollection::filter_by_type(const SurfaceType type)
+SurfacesPtr SurfaceCollection::filter_by_type(const SurfaceType type) const
 {
     SurfacesPtr ss;
-    for (Surfaces::iterator surface = this->surfaces.begin(); surface != this->surfaces.end(); ++surface) {
-        if (surface->surface_type == type) ss.push_back(&*surface);
-    }
+    for (const Surface &surface : this->surfaces)
+        if (surface.surface_type == type)
+            ss.push_back(&surface);
     return ss;
 }
 
-SurfacesPtr SurfaceCollection::filter_by_types(const SurfaceType *types, int ntypes)
+SurfacesPtr SurfaceCollection::filter_by_types(const SurfaceType *types, int ntypes) const
 {
     SurfacesPtr ss;
-    for (Surfaces::iterator surface = this->surfaces.begin(); surface != this->surfaces.end(); ++surface) {
+    for (const Surface &surface : this->surfaces)
         for (int i = 0; i < ntypes; ++ i) {
-            if (surface->surface_type == types[i]) {
-                ss.push_back(&*surface);
+            if (surface.surface_type == types[i]) {
+                ss.push_back(&surface);
                 break;
             }
         }
-    }
     return ss;
 }
 

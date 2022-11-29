@@ -54,11 +54,11 @@ double distance_to_squared(const L &line, const Vec<Dim<L>, Scalar<L>> &point, V
     // We find projection of this point onto the line.
     // It falls where t = [(this-a) . (b-a)] / |b-a|^2
     const double t = va.dot(v) / l2;
-    if (t < 0.0) {
+    if (t <= 0.0) {
         // beyond the 'a' end of the segment
         *nearest_point = get_a(line);
         return va.squaredNorm();
-    } else if (t > 1.0) {
+    } else if (t >= 1.0) {
         // beyond the 'b' end of the segment
         *nearest_point = get_b(line);
         return (point - get_b(line)).template cast<double>().squaredNorm();

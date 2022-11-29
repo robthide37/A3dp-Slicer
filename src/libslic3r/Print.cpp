@@ -1223,7 +1223,7 @@ void Print::_make_wipe_tower()
                     volume_to_wipe -= (float)m_config.filament_minimal_purge_on_wipe_tower.get_at(extruder_id);
 
                     // try to assign some infills/objects for the wiping:
-                    volume_to_wipe = layer_tools.wiping_extrusions().mark_wiping_extrusions(*this, current_extruder_id, extruder_id, volume_to_wipe);
+                    volume_to_wipe = layer_tools.wiping_extrusions_nonconst().mark_wiping_extrusions(*this, layer_tools, current_extruder_id, extruder_id, volume_to_wipe);
 
                     // add back the minimal amount toforce on the wipe tower:
                     volume_to_wipe += (float)m_config.filament_minimal_purge_on_wipe_tower.get_at(extruder_id);
@@ -1234,7 +1234,7 @@ void Print::_make_wipe_tower()
                     current_extruder_id = extruder_id;
                 }
             }
-            layer_tools.wiping_extrusions().ensure_perimeters_infills_order(*this);
+            layer_tools.wiping_extrusions_nonconst().ensure_perimeters_infills_order(*this, layer_tools);
             if (&layer_tools == &m_wipe_tower_data.tool_ordering.back() || (&layer_tools + 1)->wipe_tower_partitions == 0)
                 break;
         }

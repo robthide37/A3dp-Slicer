@@ -168,7 +168,7 @@ bool  AppUpdater::priv::http_get_file(const std::string& url, size_t size_limit,
 		.size_limit(size_limit)
 		.on_progress([&, progress_fn](Http::Progress progress, bool& cancel) {
 			// progress function returns true as success (to continue) 
-			cancel = (this->m_cancel ? true : !progress_fn(std::move(progress)));
+			cancel = (m_cancel ? true : !progress_fn(std::move(progress)));
 			if (cancel) {
 				error_message = GUI::format("Error getting: `%1%`: Download was canceled.", //lm:typo //dk: am i blind? :)
 					url);
@@ -259,7 +259,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 	);
 	if (!res)
 	{
-		if (this->m_cancel)
+		if (m_cancel)
 		{
 			BOOST_LOG_TRIVIAL(info) << error_message; //lm:Is this an error? // dk: changed to info
 			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED); // FAILED with empty msg only closes progress notification

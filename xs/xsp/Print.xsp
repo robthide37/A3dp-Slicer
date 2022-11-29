@@ -5,28 +5,6 @@
 #include "libslic3r/Print.hpp"
 %}
 
-%name{Slic3r::Print::Region} class PrintRegion {
-    // owned by Print, no constructor/destructor
-
-    Ref<StaticPrintConfig> config()
-        %code%{ RETVAL = &THIS->config(); %};
-};
-
-%name{Slic3r::Print::Object} class PrintObject {
-    // owned by Print, no constructor/destructor
-
-    Ref<Print> print();
-    Ref<ModelObject> model_object();
-    Ref<StaticPrintConfig> config()
-        %code%{ RETVAL = &THIS->config(); %};
-    Clone<BoundingBox> bounding_box();
-    
-    size_t layer_count();
-    Ref<Layer> get_layer(int idx);
-
-    void slice();
-};
-
 %name{Slic3r::Print} class Print {
     Print();
     ~Print();
@@ -35,31 +13,8 @@
         %code%{ RETVAL = const_cast<Model*>(&THIS->model()); %};
     Ref<StaticPrintConfig> config()
         %code%{ RETVAL = const_cast<GCodeConfig*>(static_cast<const GCodeConfig*>(&THIS->config())); %};
-    Ref<ExtrusionEntityCollection> skirt()
-        %code%{ RETVAL = const_cast<ExtrusionEntityCollection*>(&THIS->skirt()); %};
-    Ref<ExtrusionEntityCollection> brim()
-        %code%{ RETVAL = const_cast<ExtrusionEntityCollection*>(&THIS->brim()); %};
     double total_used_filament()
         %code%{ RETVAL = THIS->print_statistics().total_used_filament; %};
-    double total_extruded_volume()
-        %code%{ RETVAL = THIS->print_statistics().total_extruded_volume; %};
-    double total_weight()
-        %code%{ RETVAL = THIS->print_statistics().total_weight; %};
-    double total_cost()
-        %code%{ RETVAL = THIS->print_statistics().total_cost; %};
-    double total_wipe_tower_cost()
-        %code%{ RETVAL = THIS->print_statistics().total_wipe_tower_cost; %};
-    double total_wipe_tower_filament()
-        %code%{ RETVAL = THIS->print_statistics().total_wipe_tower_filament; %};
-    int wipe_tower_number_of_toolchanges()
-        %code%{ RETVAL = THIS->wipe_tower_data().number_of_toolchanges; %};
-    PrintObjectPtrs* objects()
-        %code%{ RETVAL = const_cast<PrintObjectPtrs*>(&THIS->objects_mutable()); %};
-    Ref<PrintObject> get_object(int idx)
-        %code%{ RETVAL = THIS->objects_mutable()[idx]; %};
-    size_t object_count()
-        %code%{ RETVAL = THIS->objects().size(); %};
-
     
     void auto_assign_extruders(ModelObject* model_object);
     std::string output_filepath(std::string path = "")

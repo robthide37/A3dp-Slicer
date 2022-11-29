@@ -43,22 +43,15 @@ set(XS_MAIN_XS ${CMAKE_CURRENT_BINARY_DIR}/main.xs)
 set(XSP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/xsp)
 #FIXME list the dependecies explicitely, add dependency on the typemap.
 set(XS_XSP_FILES
-    ${XSP_DIR}/BoundingBox.xsp
     ${XSP_DIR}/Config.xsp
     ${XSP_DIR}/ExPolygon.xsp
-    ${XSP_DIR}/ExtrusionEntityCollection.xsp
-    ${XSP_DIR}/ExtrusionLoop.xsp
-    ${XSP_DIR}/ExtrusionPath.xsp
     ${XSP_DIR}/Geometry.xsp
-    ${XSP_DIR}/Layer.xsp
     ${XSP_DIR}/Line.xsp
     ${XSP_DIR}/Model.xsp
     ${XSP_DIR}/Point.xsp
     ${XSP_DIR}/Polygon.xsp
     ${XSP_DIR}/Polyline.xsp
     ${XSP_DIR}/Print.xsp
-    ${XSP_DIR}/Surface.xsp
-    ${XSP_DIR}/SurfaceCollection.xsp
     ${XSP_DIR}/TriangleMesh.xsp
     ${XSP_DIR}/XS.xsp
 )

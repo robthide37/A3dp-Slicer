@@ -41,7 +41,7 @@ public:
 
     void render() const;
 
-    inline bool has_VBO() const { return this->m_contour_EBO_id != 0; }
+    inline bool has_VBO() const { return m_contour_EBO_id != 0; }
 
     // Release the geometry data, release OpenGL VBOs.
     void release_geometry();

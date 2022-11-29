@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Slic3r::XS;
-use Test::More tests => 21;
+use Test::More tests => 16;
 
 my $point = Slic3r::Point->new(10, 15);
 
@@ -57,24 +57,6 @@ is_deeply [ @$point2 ], [30, 15], 'translate';
     my $p1 = Slic3r::Point->new(76989990,109989991);
     my $p2 = Slic3r::Point->new(76989987,89989994);
     ok $p0->ccw($p1, $p2) < 0, 'ccw() does not overflow';
-}
-
-{
-    my $point = Slic3r::Point->new(15,15);
-    my $line = Slic3r::Line->new([10,10], [20,10]);
-    is_deeply $point->projection_onto_line($line)->pp, [15,10], 'project_onto_line';
-    
-    $point = Slic3r::Point->new(0, 15);
-    is_deeply $point->projection_onto_line($line)->pp, [10,10], 'project_onto_line';
-    
-    $point = Slic3r::Point->new(25, 15);
-    is_deeply $point->projection_onto_line($line)->pp, [20,10], 'project_onto_line';
-    
-    $point = Slic3r::Point->new(10,10);
-    is_deeply $point->projection_onto_line($line)->pp, [10,10], 'project_onto_line';
-    
-    $point = Slic3r::Point->new(12, 10);
-    is_deeply $point->projection_onto_line($line)->pp, [12,10], 'project_onto_line';
 }
 
 __END__

@@ -27,9 +27,6 @@
 %typemap{Vec3d*};
 %typemap{Ref<Vec3d>}{simple};
 %typemap{Clone<Vec3d>}{simple};
-%typemap{BoundingBox*};
-%typemap{Ref<BoundingBox>}{simple};
-%typemap{Clone<BoundingBox>}{simple};
 %typemap{DynamicPrintConfig*};
 %typemap{Ref<DynamicPrintConfig>}{simple};
 %typemap{Clone<DynamicPrintConfig>}{simple};
@@ -53,44 +50,13 @@
 %typemap{Polygon*};
 %typemap{Ref<Polygon>}{simple};
 %typemap{Clone<Polygon>}{simple};
-%typemap{ExtrusionEntityCollection*};
-%typemap{Ref<ExtrusionEntityCollection>}{simple};
-%typemap{Clone<ExtrusionEntityCollection>}{simple};
-%typemap{ExtrusionPath*};
-%typemap{Ref<ExtrusionPath>}{simple};
-%typemap{Clone<ExtrusionPath>}{simple};
-%typemap{ExtrusionLoop*};
-%typemap{Ref<ExtrusionLoop>}{simple};
-%typemap{Clone<ExtrusionLoop>}{simple};
 %typemap{TriangleMesh*};
 %typemap{Ref<TriangleMesh>}{simple};
 %typemap{Clone<TriangleMesh>}{simple};
-%typemap{SurfaceCollection*};
-%typemap{Ref<SurfaceCollection>}{simple};
-%typemap{Clone<SurfaceCollection>}{simple};
-
-%typemap{Surface*};
-%typemap{Ref<Surface>}{simple};
-%typemap{Clone<Surface>}{simple};
-
-%typemap{PrintState*};
-%typemap{Ref<PrintState>}{simple};
-
-%typemap{PrintRegion*};
-%typemap{Ref<PrintRegion>}{simple};
-
-%typemap{PrintObject*};
-%typemap{Ref<PrintObject>}{simple};
 
 %typemap{Print*};
 %typemap{Ref<Print>}{simple};
 %typemap{Clone<Print>}{simple};
-
-%typemap{LayerRegion*};
-%typemap{Ref<LayerRegion>}{simple};
-
-%typemap{Layer*};
-%typemap{Ref<Layer>}{simple};
 
 %typemap{Points};
 %typemap{Pointfs};
@@ -98,8 +64,6 @@
 %typemap{Polygons};
 %typemap{Polylines};
 %typemap{ExPolygons};
-%typemap{ExtrusionPaths};
-%typemap{Surfaces};
 %typemap{Polygons*};
 %typemap{TriangleMesh*};
 %typemap{Model*};
@@ -127,31 +91,9 @@
 %typemap{Ref<ModelInstancePtrs>}{simple};
 %typemap{Clone<ModelInstancePtrs>}{simple};
 
-%typemap{PrintRegionPtrs*};
-%typemap{PrintObjectPtrs*};
-%typemap{LayerPtrs*};
-
 %typemap{Axis}{parsed}{
   %cpp_type{Axis};
   %precall_code{%
     $CVar = (Axis)SvUV($PerlVar);
-  %};
-};
-%typemap{SurfaceType}{parsed}{
-  %cpp_type{SurfaceType};
-  %precall_code{%
-    $CVar = (SurfaceType)SvUV($PerlVar);
-  %};
-};
-%typemap{ExtrusionLoopRole}{parsed}{
-  %cpp_type{ExtrusionLoopRole};
-  %precall_code{%
-    $CVar = (ExtrusionLoopRole)SvUV($PerlVar);
-  %};
-};
-%typemap{ExtrusionRole}{parsed}{
-  %cpp_type{ExtrusionRole};
-  %precall_code{%
-    $CVar = (ExtrusionRole)SvUV($PerlVar);
   %};
 };

@@ -772,11 +772,7 @@ wxDataViewItem ObjectDataViewModel::Delete(const wxDataViewItem &item)
 
             // get index of the last VolumeItem in CildrenList
             size_t vol_idx = GetItemIndexForFirstVolume(node_parent);
-
             ObjectDataViewModelNode *last_child_node = node_parent->GetNthChild(vol_idx);
-            // if last volume is text then don't delete it
-            if (last_child_node->is_text_volume())
-                return parent;
 
             // delete this last volume
             DeleteSettings(wxDataViewItem(last_child_node));

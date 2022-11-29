@@ -33,12 +33,13 @@
 #include "Technologies.hpp"
 #include "Semver.hpp"
 
+using coord_t = 
 #if 1
 // Saves around 32% RAM after slicing step, 6.7% after G-code export (tested on PrusaSlicer 2.2.0 final).
-using coord_t = int32_t;
+    int32_t;
 #else
-//FIXME At least FillRectilinear2 and std::boost Voronoi require coord_t to be 32bit.
-typedef int64_t coord_t;
+    //FIXME At least FillRectilinear2 and std::boost Voronoi require coord_t to be 32bit.
+    int64_t;
 #endif
 
 using coordf_t = double;
@@ -381,4 +382,4 @@ inline IntegerOnly<I, I> fast_round_up(double a)
 
 } // namespace Slic3r
 
-#endif
+#endif // _libslic3r_h_

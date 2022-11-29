@@ -1,4 +1,4 @@
-use Test::More tests => 20;
+use Test::More tests => 17;
 use strict;
 use warnings;
 
@@ -12,73 +12,6 @@ use List::Util qw(first sum);
 use Slic3r;
 use Slic3r::Geometry qw(epsilon);
 use Slic3r::Test;
-
-{
-    my $config = Slic3r::Config::new_from_defaults;
-    $config->set('skirts', 0);
-    $config->set('perimeters', 0);
-    $config->set('solid_infill_speed', 99);
-    $config->set('top_solid_infill_speed', 99);
-    $config->set('bridge_speed', 72);
-    $config->set('first_layer_speed', '100%');
-    $config->set('cooling', [ 0 ]);
-    
-    my $test = sub {
-        my ($conf) = @_;
-        $conf ||= $config;
-        
-        my $print = Slic3r::Test::init_print('20mm_cube', config => $config);
-        
-        my %z = ();                            # Z => 1
-        my %layers_with_solid_infill    = ();  # Z => $count
-        my %layers_with_bridge_infill   = ();  # Z => $count
-        Slic3r::GCode::Reader->new->parse(Slic3r::Test::gcode($print), sub {
-            my ($self, $cmd, $args, $info) = @_;
-            
-            if ($self->Z > 0) {
-                $z{ $self->Z } = 1;
-                if ($info->{extruding} && $info->{dist_XY} > 0) {
-                    my $F = $args->{F} // $self->F;
-                    $layers_with_solid_infill{$self->Z} = 1
-                        if $F == $config->solid_infill_speed*60;
-                    $layers_with_bridge_infill{$self->Z} = 1
-                        if $F == $config->bridge_speed*60;
-                }
-            }
-        });
-        my @z = sort { $a <=> $b } keys %z;
-        my @shells = map $layers_with_solid_infill{$_} || $layers_with_bridge_infill{$_}, @z;
-        fail "insufficient number of bottom solid layers"
-            unless !defined(first { !$_ } @shells[0..$config->bottom_solid_layers-1]);
-        fail "excessive number of bottom solid layers"
-            unless scalar(grep $_, @shells[0 .. $#shells/2]) == $config->bottom_solid_layers;
-        fail "insufficient number of top solid layers"
-            unless !defined(first { !$_ } @shells[-$config->top_solid_layers..-1]);
-        fail "excessive number of top solid layers"
-            unless scalar(grep $_, @shells[($#shells/2)..$#shells]) == $config->top_solid_layers;
-        if ($config->top_solid_layers > 0) {
-            fail "unexpected solid infill speed in first solid layer over sparse infill"
-                if $layers_with_solid_infill{ $z[-$config->top_solid_layers] };
-            die "bridge speed not used in first solid layer over sparse infill"
-                if !$layers_with_bridge_infill{ $z[-$config->top_solid_layers] };
-        }
-        1;
-    };
-    
-    $config->set('top_solid_layers', 3);
-    $config->set('bottom_solid_layers', 3);
-    ok $test->(), "proper number of shells is applied";
-    
-    $config->set('top_solid_layers', 0);
-    $config->set('bottom_solid_layers', 0);
-    ok $test->(), "no shells are applied when both top and bottom are set to zero";
-    
-    $config->set('perimeters', 1);
-    $config->set('top_solid_layers', 3);
-    $config->set('bottom_solid_layers', 3);
-    $config->set('fill_density', 0);
-    ok $test->(), "proper number of shells is applied even when fill density is none";
-}
 
 # issue #1161
 {

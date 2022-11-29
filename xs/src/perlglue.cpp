@@ -4,12 +4,7 @@
 namespace Slic3r {
 
 REGISTER_CLASS(ExPolygon, "ExPolygon");
-REGISTER_CLASS(ExtrusionPath, "ExtrusionPath");
-REGISTER_CLASS(ExtrusionLoop, "ExtrusionLoop");
-REGISTER_CLASS(ExtrusionEntityCollection, "ExtrusionPath::Collection");
 REGISTER_CLASS(GCode, "GCode");
-REGISTER_CLASS(Layer, "Layer");
-REGISTER_CLASS(LayerRegion, "Layer::Region");
 REGISTER_CLASS(Line, "Line");
 REGISTER_CLASS(Polygon, "Polygon");
 REGISTER_CLASS(Polyline, "Polyline");

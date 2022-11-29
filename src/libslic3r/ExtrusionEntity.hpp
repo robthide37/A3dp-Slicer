@@ -186,7 +186,7 @@ public:
     ExtrusionEntity* clone() const override { return new ExtrusionPathOriented(*this); }
     // Create a new object, initialize it with this object using the move semantics.
     ExtrusionEntity* clone_move() override { return new ExtrusionPathOriented(std::move(*this)); }
-    virtual bool can_reverse() const { return false; }
+    virtual bool can_reverse() const override { return false; }
 };
 
 typedef std::vector<ExtrusionPath> ExtrusionPaths;

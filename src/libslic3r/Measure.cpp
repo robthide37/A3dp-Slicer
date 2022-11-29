@@ -6,6 +6,8 @@
 #include "libslic3r/SurfaceMesh.hpp"
 #include <numeric>
 
+#include <numeric>
+
 namespace Slic3r {
 namespace Measure {
 

@@ -24,6 +24,8 @@ using Slic3r::ClipperLib::jtSquare;
 
 namespace Slic3r {
 
+class BoundingBox;
+
 static constexpr const float                        ClipperSafetyOffset     = 10.f;
 
 static constexpr const Slic3r::ClipperLib::JoinType DefaultJoinType         = Slic3r::ClipperLib::jtMiter;
@@ -306,6 +308,21 @@ namespace ClipperUtils {
         const SurfacesPtr &m_surfaces;
         size_t             m_size;
     };
+
+    // For ClipperLib with Z coordinates.
+    using ZPoint = Vec3i32;
+    using ZPoints = std::vector<Vec3i32>;
+
+    // Clip source polygon to be used as a clipping polygon with a bouding box around the source (to be clipped) polygon.
+    // Useful as an optimization for expensive ClipperLib operations, for example when clipping source polygons one by one
+    // with a set of polygons covering the whole layer below.
+    void                    clip_clipper_polygon_with_subject_bbox(const Points &src, const BoundingBox &bbox, Points &out);
+    void                    clip_clipper_polygon_with_subject_bbox(const ZPoints &src, const BoundingBox &bbox, ZPoints &out);
+    [[nodiscard]] Points    clip_clipper_polygon_with_subject_bbox(const Points &src, const BoundingBox &bbox);
+    [[nodiscard]] ZPoints   clip_clipper_polygon_with_subject_bbox(const ZPoints &src, const BoundingBox &bbox);
+    void                    clip_clipper_polygon_with_subject_bbox(const Polygon &src, const BoundingBox &bbox, Polygon &out);
+    [[nodiscard]] Polygon   clip_clipper_polygon_with_subject_bbox(const Polygon &src, const BoundingBox &bbox);
+    [[nodiscard]] Polygons  clip_clipper_polygons_with_subject_bbox(const Polygons &src, const BoundingBox &bbox);
 }
 
 // offset Polygons
@@ -326,6 +343,7 @@ Slic3r::ExPolygons offset_ex(const Slic3r::Polygons &polygons, const float delta
 Slic3r::ExPolygons offset_ex(const Slic3r::ExPolygon &expolygon, const float delta, ClipperLib::JoinType joinType = DefaultJoinType, double miterLimit = DefaultMiterLimit);
 Slic3r::ExPolygons offset_ex(const Slic3r::ExPolygons &expolygons, const float delta, ClipperLib::JoinType joinType = DefaultJoinType, double miterLimit = DefaultMiterLimit);
 Slic3r::ExPolygons offset_ex(const Slic3r::Surfaces &surfaces, const float delta, ClipperLib::JoinType joinType = DefaultJoinType, double miterLimit = DefaultMiterLimit);
+Slic3r::ExPolygons offset_ex(const Slic3r::SurfacesPtr &surfaces, const float delta, ClipperLib::JoinType joinType = DefaultJoinType, double miterLimit = DefaultMiterLimit);
 
 inline Slic3r::Polygons   union_safety_offset   (const Slic3r::Polygons   &polygons)   { return offset   (polygons,   ClipperSafetyOffset); }
 inline Slic3r::Polygons   union_safety_offset   (const Slic3r::ExPolygons &expolygons) { return offset   (expolygons, ClipperSafetyOffset); }
@@ -390,6 +408,9 @@ Slic3r::Lines _clipper_ln(ClipperLib::ClipType clipType, const Slic3r::Lines &su
 Slic3r::Polygons   diff(const Slic3r::Polygon &subject, const Slic3r::Polygon &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::Polygons   diff(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::Polygons   diff(const Slic3r::Polygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
+// Optimized version clipping the "clipping" polygon using clip_clipper_polygon_with_subject_bbox().
+// To be used with complex clipping polygons, where majority of the clipping polygons are outside of the source polygon.
+Slic3r::Polygons   diff_clipped(const Slic3r::Polygons &src, const Slic3r::Polygons &clipping, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::Polygons   diff(const Slic3r::ExPolygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::Polygons   diff(const Slic3r::ExPolygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::Polygons   diff(const Slic3r::Surfaces &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);

@@ -650,14 +650,14 @@ Polygons collect_region_slices_by_type(const Layer &layer, SurfaceType surface_t
     // 1) Count the new polygons first.
     size_t n_polygons_new = 0;
     for (const LayerRegion *region : layer.regions())
-        for (const Surface &surface : region->slices.surfaces)
+        for (const Surface &surface : region->slices())
             if (surface.surface_type == surface_type)
                 n_polygons_new += surface.expolygon.holes.size() + 1;
     // 2) Collect the new polygons.
     Polygons out;
     out.reserve(n_polygons_new);
     for (const LayerRegion *region : layer.regions())
-        for (const Surface &surface : region->slices.surfaces)
+        for (const Surface &surface : region->slices())
             if (surface.surface_type == surface_type)
                 polygons_append(out, surface.expolygon);
     return out;
@@ -1213,9 +1213,9 @@ namespace SupportMaterialInternal {
     static bool has_bridging_extrusions(const Layer &layer) 
     {
         for (const LayerRegion *region : layer.regions()) {
-            if (SupportMaterialInternal::has_bridging_perimeters(region->perimeters))
+            if (SupportMaterialInternal::has_bridging_perimeters(region->perimeters()))
                 return true;
-            if (region->fill_surfaces.has(stBottomBridge) && has_bridging_fills(region->fills))
+            if (region->fill_surfaces().has(stBottomBridge) && has_bridging_fills(region->fills()))
                 return true;
         }
         return false;
@@ -1287,7 +1287,7 @@ namespace SupportMaterialInternal {
             // Trim the perimeters of this layer by the lower layer to get the unsupported pieces of perimeters.
             overhang_perimeters = diff_pl(overhang_perimeters, lower_grown_slices);
         #else
-            Polylines overhang_perimeters = diff_pl(layerm.perimeters.as_polylines(), lower_grown_slices);
+            Polylines overhang_perimeters = diff_pl(layerm.perimeters().as_polylines(), lower_grown_slices);
         #endif
             
             // only consider straight overhangs
@@ -1311,7 +1311,7 @@ namespace SupportMaterialInternal {
                     bool  supported[2] = { false, false };
                     for (size_t i = 0; i < lower_layer.lslices.size() && ! (supported[0] && supported[1]); ++ i)
                         for (int j = 0; j < 2; ++ j)
-                            if (! supported[j] && lower_layer.lslices_bboxes[i].contains(pts[j]) && lower_layer.lslices[i].contains(pts[j]))
+                            if (! supported[j] && lower_layer.lslices_ex[i].bbox.contains(pts[j]) && lower_layer.lslices[i].contains(pts[j]))
                                 supported[j] = true;
                     if (supported[0] && supported[1])
                         // Offset a polyline into a thick line.
@@ -1321,7 +1321,7 @@ namespace SupportMaterialInternal {
         }
         // remove the entire bridges and only support the unsupported edges
         //FIXME the brided regions are already collected as layerm.bridged. Use it?
-        for (const Surface &surface : layerm.fill_surfaces.surfaces)
+        for (const Surface &surface : layerm.fill_surfaces())
             if (surface.surface_type == stBottomBridge && surface.bridge_angle < 0.0)
                 polygons_append(bridges, surface.expolygon);
         //FIXME add the gap filled areas. Extrude the gaps with a bridge flow?
@@ -1329,14 +1329,14 @@ namespace SupportMaterialInternal {
         //FIXME add supports at regular intervals to support long bridges!
         bridges = diff(bridges,
                 // Offset unsupported edges into polygons.
-                offset(layerm.unsupported_bridge_edges, scale_(SUPPORT_MATERIAL_MARGIN), SUPPORT_SURFACES_OFFSET_PARAMETERS));
+                offset(layerm.unsupported_bridge_edges(), scale_(SUPPORT_MATERIAL_MARGIN), SUPPORT_SURFACES_OFFSET_PARAMETERS));
         // Remove bridged areas from the supported areas.
         contact_polygons = diff(contact_polygons, bridges, ApplySafetyOffset::Yes);
 
         #ifdef SLIC3R_DEBUG
             static int iRun = 0;
             SVG::export_expolygons(debug_out_path("support-top-contacts-remove-bridges-run%d.svg", iRun ++),
-                { { { union_ex(offset(layerm.unsupported_bridge_edges, scale_(SUPPORT_MATERIAL_MARGIN), SUPPORT_SURFACES_OFFSET_PARAMETERS)) }, { "unsupported_bridge_edges", "orange", 0.5f } },
+                { { { union_ex(offset(layerm.unsupported_bridge_edges(), scale_(SUPPORT_MATERIAL_MARGIN), SUPPORT_SURFACES_OFFSET_PARAMETERS)) }, { "unsupported_bridge_edges", "orange", 0.5f } },
                   { { union_ex(contact_polygons) },            { "contact_polygons",           "blue",   0.5f } },
                   { { union_ex(bridges) },                     { "bridges",                    "red",    "black", "", scaled<coord_t>(0.1f), 0.5f } } });
         #endif /* SLIC3R_DEBUG */
@@ -1487,7 +1487,7 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
                     0.5f * fw);
             // Overhang polygons for this layer and region.
             Polygons diff_polygons;
-            Polygons layerm_polygons = to_polygons(layerm->slices.surfaces);
+            Polygons layerm_polygons = to_polygons(layerm->slices().surfaces);
             if (lower_layer_offset == 0.f) {
                 // Support everything.
                 diff_polygons = diff(layerm_polygons, lower_layer_polygons);
@@ -2858,10 +2858,10 @@ void PrintObjectSupportMaterial::trim_support_layers_by_object(
                                 break;
                             some_region_overlaps = true;
                             polygons_append(polygons_trimming, 
-                                offset(region->fill_surfaces.filter_by_type(stBottomBridge), gap_xy_scaled, SUPPORT_SURFACES_OFFSET_PARAMETERS));
+                                offset(region->fill_surfaces().filter_by_type(stBottomBridge), gap_xy_scaled, SUPPORT_SURFACES_OFFSET_PARAMETERS));
                             if (region->region().config().overhangs.value)
                                 // Add bridging perimeters.
-                                SupportMaterialInternal::collect_bridging_perimeter_areas(region->perimeters, gap_xy_scaled, polygons_trimming);
+                                SupportMaterialInternal::collect_bridging_perimeter_areas(region->perimeters(), gap_xy_scaled, polygons_trimming);
                         }
                         if (! some_region_overlaps)
                             break;

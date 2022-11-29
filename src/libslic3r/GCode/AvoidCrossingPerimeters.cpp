@@ -487,7 +487,7 @@ static float get_perimeter_spacing(const Layer &layer)
     size_t regions_count     = 0;
     float  perimeter_spacing = 0.f;
     for (const LayerRegion *layer_region : layer.regions())
-        if (layer_region != nullptr && !layer_region->slices.empty()) {
+        if (layer_region != nullptr && ! layer_region->slices().empty()) {
             perimeter_spacing += layer_region->flow(frPerimeter).scaled_spacing();
             ++regions_count;
         }
@@ -508,7 +508,7 @@ static float get_perimeter_spacing_external(const Layer &layer)
     for (const PrintObject *object : layer.object()->print()->objects())
         if (const Layer *l = object->get_layer_at_printz(layer.print_z, EPSILON); l)
             for (const LayerRegion *layer_region : l->regions())
-                if (layer_region != nullptr && !layer_region->slices.empty()) {
+                if (layer_region != nullptr && ! layer_region->slices().empty()) {
                     perimeter_spacing += layer_region->flow(frPerimeter).scaled_spacing();
                     ++ regions_count;
                 }
@@ -527,7 +527,7 @@ static float get_external_perimeter_width(const Layer &layer)
     size_t regions_count     = 0;
     float  perimeter_width   = 0.f;
     for (const LayerRegion *layer_region : layer.regions())
-        if (layer_region != nullptr && !layer_region->slices.empty()) {
+        if (layer_region != nullptr && ! layer_region->slices().empty()) {
             perimeter_width += float(layer_region->flow(frExternalPerimeter).scaled_width());
             ++regions_count;
         }
@@ -1070,14 +1070,14 @@ static ExPolygons get_boundary(const Layer &layer)
     // Collect all top layers that will not be crossed.
     size_t      polygons_count    = 0;
     for (const LayerRegion *layer_region : layer.regions())
-        for (const Surface &surface : layer_region->fill_surfaces.surfaces)
+        for (const Surface &surface : layer_region->fill_surfaces())
             if (surface.is_top()) ++polygons_count;
 
     if (polygons_count > 0) {
         ExPolygons top_layer_polygons;
         top_layer_polygons.reserve(polygons_count);
         for (const LayerRegion *layer_region : layer.regions())
-            for (const Surface &surface : layer_region->fill_surfaces.surfaces)
+            for (const Surface &surface : layer_region->fill_surfaces())
                 if (surface.is_top()) top_layer_polygons.emplace_back(surface.expolygon);
 
         top_layer_polygons = union_ex(top_layer_polygons);

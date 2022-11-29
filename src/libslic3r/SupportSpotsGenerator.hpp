@@ -32,8 +32,7 @@ struct Params {
     const float min_distance_between_support_points = 3.0f; //mm
     const float support_points_interface_radius = 1.5f; // mm
     const float connections_min_considerable_area = 1.5f; //mm^2
-    const float small_parts_threshold = 5.0f; //mm^3
-    const float small_parts_support_points_interface_radius = 3.0f; // mm
+    const float min_distance_to_allow_local_supports = 2.0f; //mm
 
     std::string filament_type;
     const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.
@@ -61,11 +60,11 @@ struct Params {
 };
 
 struct SupportPoint {
-    SupportPoint(const Vec3f &position, float force, float spot_radius, const Vec3f &direction);
+    SupportPoint(const Vec3f &position, float force, float spot_radius, const Vec2f &direction);
     Vec3f position;
     float force;
     float spot_radius;
-    Vec3f direction;
+    Vec2f direction;
 };
 
 struct Issues {
@@ -77,7 +76,7 @@ struct Malformations {
 };
 
 // std::vector<size_t> quick_search(const PrintObject *po, const Params &params);
-std::tuple<Issues, Malformations> full_search(const PrintObject *po, const Params &params);
+Issues full_search(const PrintObject *po, const Params &params);
 
 void estimate_supports_malformations(SupportLayerPtrs &layers, float supports_flow_width, const Params &params);
 void estimate_malformations(LayerPtrs &layers, const Params &params);

@@ -14,10 +14,6 @@ std::vector<unsigned int>	    T_STD_VECTOR_UINT
 
 std::vector<double>	            T_STD_VECTOR_DOUBLE
 
-BoundingBox*               O_OBJECT_SLIC3R
-Ref<BoundingBox>           O_OBJECT_SLIC3R_T
-Clone<BoundingBox>         O_OBJECT_SLIC3R_T
-
 DynamicPrintConfig*        O_OBJECT_SLIC3R
 Ref<DynamicPrintConfig>    O_OBJECT_SLIC3R_T
 Clone<DynamicPrintConfig>  O_OBJECT_SLIC3R_T
@@ -70,25 +66,6 @@ ExPolygon*                 O_OBJECT_SLIC3R
 Ref<ExPolygon>             O_OBJECT_SLIC3R_T
 Clone<ExPolygon>           O_OBJECT_SLIC3R_T
 
-ExtrusionEntityCollection*              O_OBJECT_SLIC3R
-Ref<ExtrusionEntityCollection>          O_OBJECT_SLIC3R_T
-Clone<ExtrusionEntityCollection>        O_OBJECT_SLIC3R_T
-
-ExtrusionPath*             O_OBJECT_SLIC3R
-Ref<ExtrusionPath>         O_OBJECT_SLIC3R_T
-Clone<ExtrusionPath>       O_OBJECT_SLIC3R_T
-
-ExtrusionLoop*             O_OBJECT_SLIC3R
-Ref<ExtrusionLoop>         O_OBJECT_SLIC3R_T
-Clone<ExtrusionLoop>       O_OBJECT_SLIC3R_T
-
-Surface*                   O_OBJECT_SLIC3R
-Ref<Surface>               O_OBJECT_SLIC3R_T
-Clone<Surface>             O_OBJECT_SLIC3R_T
-
-SurfaceCollection*         O_OBJECT_SLIC3R
-Ref<SurfaceCollection>     O_OBJECT_SLIC3R_T
-
 Model*                     O_OBJECT_SLIC3R
 Ref<Model>                 O_OBJECT_SLIC3R_T
 Clone<Model>               O_OBJECT_SLIC3R_T
@@ -109,21 +86,9 @@ ModelInstance*             O_OBJECT_SLIC3R
 Ref<ModelInstance>         O_OBJECT_SLIC3R_T
 Clone<ModelInstance>       O_OBJECT_SLIC3R_T
 
-PrintRegion*               O_OBJECT_SLIC3R
-Ref<PrintRegion>           O_OBJECT_SLIC3R_T
-
-PrintObject*               O_OBJECT_SLIC3R
-Ref<PrintObject>           O_OBJECT_SLIC3R_T
-
 Print*                     O_OBJECT_SLIC3R
 Ref<Print>                 O_OBJECT_SLIC3R_T
 Clone<Print>               O_OBJECT_SLIC3R_T
-
-LayerRegion*               O_OBJECT_SLIC3R
-Ref<LayerRegion>           O_OBJECT_SLIC3R_T
-
-Layer*                     O_OBJECT_SLIC3R
-Ref<Layer>                 O_OBJECT_SLIC3R_T
 
 Axis                  T_UV
 ExtrusionLoopRole     T_UV
@@ -137,8 +102,6 @@ Lines           T_ARRAYREF
 Polygons        T_ARRAYREF
 Polylines       T_ARRAYREF
 ExPolygons      T_ARRAYREF
-ExtrusionPaths  T_ARRAYREF
-Surfaces        T_ARRAYREF
 
 # we return these types whenever we want the items to be returned
 # by reference and marked ::Ref because they're contained in another
@@ -147,9 +110,6 @@ Polygons*           T_ARRAYREF_PTR
 ModelObjectPtrs*    T_PTR_ARRAYREF_PTR
 ModelVolumePtrs*    T_PTR_ARRAYREF_PTR
 ModelInstancePtrs*  T_PTR_ARRAYREF_PTR
-PrintRegionPtrs*    T_PTR_ARRAYREF_PTR
-PrintObjectPtrs*    T_PTR_ARRAYREF_PTR
-LayerPtrs*          T_PTR_ARRAYREF_PTR
 
 # we return these types whenever we want the items to be returned
 # by reference and not marked ::Ref because they're newly allocated

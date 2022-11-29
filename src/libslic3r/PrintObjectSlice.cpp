@@ -432,12 +432,12 @@ std::string fix_slicing_errors(LayerPtrs &layers, const std::function<void()> &t
                     const Surfaces *lower_surfaces = nullptr;
                     for (size_t j = idx_layer + 1; j < layers.size(); ++ j)
                         if (! layers[j]->slicing_errors) {
-                            upper_surfaces = &layers[j]->regions()[region_id]->slices.surfaces;
+                            upper_surfaces = &layers[j]->regions()[region_id]->slices().surfaces;
                             break;
                         }
                     for (int j = int(idx_layer) - 1; j >= 0; -- j)
                         if (! layers[j]->slicing_errors) {
-                            lower_surfaces = &layers[j]->regions()[region_id]->slices.surfaces;
+                            lower_surfaces = &layers[j]->regions()[region_id]->slices().surfaces;
                             break;
                         }
                     // Collect outer contours and holes from the valid layers above & below.
@@ -464,7 +464,7 @@ std::string fix_slicing_errors(LayerPtrs &layers, const std::function<void()> &t
                     if (lower_surfaces)
                         for (const auto &surface : *lower_surfaces)
                             polygons_append(holes, surface.expolygon.holes);
-                    layerm->slices.set(diff_ex(union_(outer), holes), stInternal);
+                    layerm->m_slices.set(diff_ex(union_(outer), holes), stInternal);
                 }
                 // Update layer slices after repairing the single regions.
                 layer->make_slices();
@@ -517,15 +517,24 @@ void PrintObject::slice()
     // Update bounding boxes, back up raw slices of complex models.
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, m_layers.size()),
-        [this](const tbb::blocked_range<size_t>& range) {
+        [this](const tbb::blocked_range<size_t> &range) {
             for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
                 m_print->throw_if_canceled();
                 Layer &layer = *m_layers[layer_idx];
-                layer.lslices_bboxes.clear();
-                layer.lslices_bboxes.reserve(layer.lslices.size());
+                layer.lslices_ex.clear();
+                layer.lslices_ex.reserve(layer.lslices.size());
                 for (const ExPolygon &expoly : layer.lslices)
-                	layer.lslices_bboxes.emplace_back(get_extents(expoly));
+                	layer.lslices_ex.push_back({ get_extents(expoly) });
                 layer.backup_untyped_slices();
+            }
+        });
+    // Interlink the lslices into a Z graph.
+    tbb::parallel_for(
+        tbb::blocked_range<size_t>(1, m_layers.size()),
+        [this](const tbb::blocked_range<size_t> &range) {
+            for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
+                m_print->throw_if_canceled();
+                Layer::build_up_down_graph(*m_layers[layer_idx - 1], *m_layers[layer_idx]);
             }
         });
     if (m_layers.empty())
@@ -534,7 +543,7 @@ void PrintObject::slice()
 }
 
 template<typename ThrowOnCancel>
-static inline void apply_mm_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_cancel)
+void apply_mm_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_cancel)
 {
     // Returns MMU segmentation based on painting in MMU segmentation gizmo
     std::vector<std::vector<ExPolygons>> segmentation = multi_material_segmentation_by_painting(print_object, throw_on_cancel);
@@ -579,9 +588,9 @@ static inline void apply_mm_segmentation(PrintObject &print_object, ThrowOnCance
                 // layer_range.painted_regions are sorted by extruder ID and parent PrintObject region ID.
                 auto it_painted_region = layer_range.painted_regions.begin();
                 for (int region_id = 0; region_id < int(layer->region_count()); ++ region_id)
-                    if (LayerRegion &layerm = *layer->get_region(region_id); ! layerm.slices.surfaces.empty()) {
+                    if (LayerRegion &layerm = *layer->get_region(region_id); ! layerm.slices().empty()) {
                         assert(layerm.region().print_object_region_id() == region_id);
-                        const BoundingBox bbox = get_extents(layerm.slices.surfaces);
+                        const BoundingBox bbox = get_extents(layerm.slices().surfaces);
                         assert(it_painted_region < layer_range.painted_regions.end());
                         // Find the first it_painted_region which overrides this region.
                         for (; layer_range.volume_regions[it_painted_region->parent].region->print_object_region_id() < region_id; ++ it_painted_region)
@@ -604,7 +613,7 @@ static inline void apply_mm_segmentation(PrintObject &print_object, ThrowOnCance
                                 }
                                 // Steal from this region.
                                 int         target_region_id = it_painted_region->region->print_object_region_id();
-                                ExPolygons  stolen           = intersection_ex(layerm.slices.surfaces, segmented.expolygons);
+                                ExPolygons  stolen           = intersection_ex(layerm.slices().surfaces, segmented.expolygons);
                                 if (! stolen.empty()) {
                                     ByRegion &dst = by_region[target_region_id];
                                     if (dst.expolygons.empty()) {
@@ -622,7 +631,7 @@ static inline void apply_mm_segmentation(PrintObject &print_object, ThrowOnCance
                             }
                         if (! self_trimmed) {
                             // Trim slices of this LayerRegion with all the MMU regions.
-                            Polygons mine = to_polygons(std::move(layerm.slices.surfaces));
+                            Polygons mine = to_polygons(std::move(layerm.slices().surfaces));
                             for (auto &segmented : by_extruder)
                                 if (&segmented - by_extruder.data() + 1 != self_extruder_id && segmented.bbox.defined && bbox.overlap(segmented.bbox)) {
                                     mine = diff(mine, segmented.expolygons);
@@ -653,7 +662,7 @@ static inline void apply_mm_segmentation(PrintObject &print_object, ThrowOnCance
                     if (src.needs_merge)
                         // Multiple regions were merged into one.
                         src.expolygons = closing_ex(src.expolygons, float(scale_(10 * EPSILON)));
-                    layer->get_region(region_id)->slices.set(std::move(src.expolygons), stInternal);
+                    layer->get_region(region_id)->m_slices.set(std::move(src.expolygons), stInternal);
                 }
             }
         });
@@ -693,7 +702,7 @@ void PrintObject::slice_volumes()
     for (size_t region_id = 0; region_id < region_slices.size(); ++ region_id) {
         std::vector<ExPolygons> &by_layer = region_slices[region_id];
         for (size_t layer_id = 0; layer_id < by_layer.size(); ++ layer_id)
-            m_layers[layer_id]->regions()[region_id]->slices.append(std::move(by_layer[layer_id]), stInternal);
+            m_layers[layer_id]->regions()[region_id]->m_slices.append(std::move(by_layer[layer_id]), stInternal);
     }
     region_slices.clear();
     
@@ -754,14 +763,14 @@ void PrintObject::slice_volumes()
 	                    LayerRegion *layerm = layer->m_regions.front();
 	                    if (elfoot > 0) {
 		                    // Apply the elephant foot compensation and store the 1st layer slices without the Elephant foot compensation applied.
-		                    lslices_1st_layer = to_expolygons(std::move(layerm->slices.surfaces));
+		                    lslices_1st_layer = to_expolygons(std::move(layerm->m_slices.surfaces));
 		                    float delta = xy_compensation_scaled;
 	                        if (delta > elfoot) {
 	                            delta -= elfoot;
 	                            elfoot = 0.f;
 	                        } else if (delta > 0)
 	                            elfoot -= delta;
-							layerm->slices.set(
+							layerm->m_slices.set(
 								union_ex(
 									Slic3r::elephant_foot_compensation(
 										(delta == 0.f) ? lslices_1st_layer : offset_ex(lslices_1st_layer, delta), 
@@ -771,8 +780,8 @@ void PrintObject::slice_volumes()
 								lslices_1st_layer = offset_ex(std::move(lslices_1st_layer), xy_compensation_scaled);
 	                    } else if (xy_compensation_scaled < 0.f) {
 	                        // Apply the XY compensation.
-	                        layerm->slices.set(
-                                offset_ex(to_expolygons(std::move(layerm->slices.surfaces)), xy_compensation_scaled),
+	                        layerm->m_slices.set(
+                                offset_ex(to_expolygons(std::move(layerm->m_slices.surfaces)), xy_compensation_scaled),
 	                            stInternal);
 	                    }
 	                } else {

@@ -2,7 +2,6 @@
 
 %{
 #include <xsinit.h>
-#include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/Polyline.hpp"
 %}
 
@@ -31,7 +30,6 @@
     void simplify(double tolerance);
     void split_at(Point* point, Polyline* p1, Polyline* p2)
         %code{% THIS->split_at(*point, p1, p2); %};
-    Clone<BoundingBox> bounding_box();
 %{
 
 Polyline*

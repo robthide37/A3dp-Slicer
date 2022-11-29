@@ -3,14 +3,17 @@
 #include <numeric>
 #include <sstream>
 
+#include "libslic3r/libslic3r.h"
+
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Fill/Fill.hpp"
 #include "libslic3r/Flow.hpp"
+#include "libslic3r/Layer.hpp"
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
+#include "libslic3r/Point.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/SVG.hpp"
-#include "libslic3r/libslic3r.h"
 
 #include "test_data.hpp"
 
@@ -325,6 +328,130 @@ SCENARIO("Infill only where needed", "[Fill]")
             THEN("infill is only generated under the forced solid shells") {
                 REQUIRE(std::abs(area - 70) < tolerance);
             }
+        }
+    }
+}
+
+SCENARIO("Combine infill", "[Fill]")
+{
+    {
+        auto test = [](const DynamicPrintConfig &config) {
+            std::string gcode = Test::slice({ Test::TestMesh::cube_20x20x20 }, config);
+            THEN("infill_every_layers does not crash") {
+                REQUIRE(! gcode.empty());
+            }
+
+            Slic3r::GCodeReader parser;
+            int tool = -1;
+            std::set<coord_t> layers; // layer_z => 1
+            std::map<coord_t, bool> layer_infill; // layer_z => has_infill
+            const int infill_extruder           = config.opt_int("infill_extruder");
+            const int support_material_extruder = config.opt_int("support_material_extruder");
+            parser.parse_buffer(gcode,
+                [&tool, &layers, &layer_infill, infill_extruder, support_material_extruder](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
+            {
+                coord_t z = line.new_Z(self) / SCALING_FACTOR;
+                if (boost::starts_with(line.cmd(), "T")) {
+                    tool = atoi(line.cmd().data() + 1);
+                } else if (line.cmd_is("G1") && line.extruding(self) && line.dist_XY(self) > 0 && tool + 1 != support_material_extruder) {
+                    if (tool + 1 == infill_extruder)
+                        layer_infill[z] = true;
+                    else if (auto it = layer_infill.find(z); it == layer_infill.end())
+                        layer_infill.insert(it, std::make_pair(z, false));
+                }
+                // Previously, all G-code commands had a fixed number of decimal points with means with redundant zeros after decimal points.
+                // We changed this behavior and got rid of these redundant padding zeros, which caused this test to fail
+                // because the position in Z-axis is compared as a string, and previously, G-code contained the following two commands:
+                // "G1 Z5 F5000 ; lift nozzle"
+                // "G1 Z5.000 F7800.000"
+                // That has a different Z-axis position from the view of string comparisons of floating-point numbers.
+                // To correct the computation of the number of printed layers, even in the case of string comparisons of floating-point numbers,
+                // we filtered out the G-code command with the commend 'lift nozzle'.
+                if (line.cmd_is("G1") && line.dist_Z(self) != 0 && line.comment().find("lift nozzle") == std::string::npos)
+                    layers.insert(z);
+            });
+            
+            auto layers_with_perimeters = int(layer_infill.size());
+            auto layers_with_infill     = int(std::count_if(layer_infill.begin(), layer_infill.end(), [](auto &v){ return v.second; }));
+            THEN("expected number of layers") {
+                REQUIRE(layers.size() == layers_with_perimeters + config.opt_int("raft_layers"));
+            }
+            
+            if (config.opt_int("raft_layers") == 0) {
+                // first infill layer printed directly on print bed is not combined, so we don't consider it.
+                -- layers_with_infill;
+                -- layers_with_perimeters;
+            }
+            
+            // we expect that infill is generated for half the number of combined layers
+            // plus for each single layer that was not combined (remainder)
+            THEN("infill is only present in correct number of layers") {
+                int infill_every = config.opt_int("infill_every_layers");
+                REQUIRE(layers_with_infill == int(layers_with_perimeters / infill_every) + (layers_with_perimeters % infill_every));
+            }
+        };
+        
+        auto config = Slic3r::DynamicPrintConfig::full_print_config_with({
+            { "nozzle_diameter",        "0.5, 0.5, 0.5, 0.5" },
+            { "layer_height",           0.2 },
+            { "first_layer_height",     0.2 },
+            { "infill_every_layers",    2  },
+            { "perimeter_extruder",     1 },
+            { "infill_extruder",        2 },
+            { "wipe_into_infill",       false },
+            { "support_material_extruder", 3 },
+            { "support_material_interface_extruder", 3 },
+            { "top_solid_layers",       0 },
+            { "bottom_solid_layers",    0 }
+        });
+
+        test(config);
+
+        // Reuse the config above
+        config.set_deserialize_strict({
+            { "skirts", 0 }, // prevent usage of perimeter_extruder in raft layers
+            { "raft_layers", 5 }
+        });
+        test(config);
+    }
+
+    WHEN("infill_every_layers == 2") {
+        Slic3r::Print print;
+        Slic3r::Test::init_and_process_print({ Test::TestMesh::cube_20x20x20 }, print, {
+            { "nozzle_diameter",        "0.5" },
+            { "layer_height",           0.2 },
+            { "first_layer_height",     0.2 },
+            { "infill_every_layers",    2  }
+        });        
+        THEN("infill combination produces internal void surfaces") {
+            bool has_void = false;
+            for (const Layer *layer : print.get_object(0)->layers())
+                if (layer->get_region(0)->fill_surfaces().filter_by_type(stInternalVoid).size() > 0) {
+                    has_void = true;
+                    break;
+                }
+            REQUIRE(has_void);
+        }
+    }
+        
+    WHEN("infill_every_layers disabled") {
+        // we disable combination after infill has been generated
+        Slic3r::Print print;
+        Slic3r::Test::init_and_process_print({ Test::TestMesh::cube_20x20x20 }, print, {
+            { "nozzle_diameter",        "0.5" },
+            { "layer_height",           0.2 },
+            { "first_layer_height",     0.2 },
+            { "infill_every_layers",    1  }
+        });        
+
+        THEN("infill combination is idempotent") {
+            bool has_infill_on_each_layer = true;
+            for (const Layer *layer : print.get_object(0)->layers())
+                if (layer->get_region(0)->fill_surfaces().empty()) {
+                    has_infill_on_each_layer = false;
+                    break;
+                }
+            REQUIRE(has_infill_on_each_layer);
         }
     }
 }

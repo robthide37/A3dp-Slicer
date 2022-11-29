@@ -51,23 +51,29 @@ public:
     bool contains(const Line &line) const;
     bool contains(const Polyline &polyline) const;
     bool contains(const Polylines &polylines) const;
-    bool contains(const Point &point) const;
-    bool contains_b(const Point &point) const;
-    bool has_boundary_point(const Point &point) const;
+    bool contains(const Point &point, bool border_result = true) const;
+    // Approximate on boundary test.
+    bool on_boundary(const Point &point, double eps) const;
+    // Projection of a point onto the polygon.
+    Point point_projection(const Point &point) const;
 
     // Does this expolygon overlap another expolygon?
     // Either the ExPolygons intersect, or one is fully inside the other,
     // and it is not inside a hole of the other expolygon.
+    // The test may not be commutative if the two expolygons touch by a boundary only,
+    // see unit test SCENARIO("Clipper diff with polyline", "[Clipper]").
+    // Namely expolygons touching at a vertical boundary are considered overlapping, while expolygons touching
+    // at a horizontal boundary are NOT considered overlapping.
     bool overlaps(const ExPolygon &other) const;
 
     void simplify_p(double tolerance, Polygons* polygons) const;
     Polygons simplify_p(double tolerance) const;
     ExPolygons simplify(double tolerance) const;
     void simplify(double tolerance, ExPolygons* expolygons) const;
-    void medial_axis(double max_width, double min_width, ThickPolylines* polylines) const;
-    void medial_axis(double max_width, double min_width, Polylines* polylines) const;
-    Polylines medial_axis(double max_width, double min_width) const 
-        { Polylines out; this->medial_axis(max_width, min_width, &out); return out; }
+    void medial_axis(double min_width, double max_width, ThickPolylines* polylines) const;
+    void medial_axis(double min_width, double max_width, Polylines* polylines) const;
+    Polylines medial_axis(double min_width, double max_width) const 
+        { Polylines out; this->medial_axis(min_width, max_width, &out); return out; }
     Lines lines() const;
 
     // Number of contours (outer contour with holes).
@@ -420,14 +426,14 @@ inline void expolygons_append(ExPolygons &dst, ExPolygons &&src)
 
 inline void expolygons_rotate(ExPolygons &expolys, double angle)
 {
-    for (ExPolygons::iterator p = expolys.begin(); p != expolys.end(); ++p)
-        p->rotate(angle);
+    for (ExPolygon &expoly : expolys)
+        expoly.rotate(angle);
 }
 
-inline bool expolygons_contain(ExPolygons &expolys, const Point &pt)
+inline bool expolygons_contain(ExPolygons &expolys, const Point &pt, bool border_result = true)
 {
-    for (ExPolygons::iterator p = expolys.begin(); p != expolys.end(); ++p)
-        if (p->contains(pt))
+    for (const ExPolygon &expoly : expolys)
+        if (expoly.contains(pt, border_result))
             return true;
     return false;
 }
@@ -440,6 +446,10 @@ inline ExPolygons expolygons_simplify(const ExPolygons &expolys, double toleranc
 		exp.simplify(tolerance, &out);
 	return out;
 }
+
+// Do expolygons match? If they match, they must have the same topology,
+// however their contours may be rotated.
+bool expolygons_match(const ExPolygon &l, const ExPolygon &r);
 
 BoundingBox get_extents(const ExPolygon &expolygon);
 BoundingBox get_extents(const ExPolygons &expolygons);
