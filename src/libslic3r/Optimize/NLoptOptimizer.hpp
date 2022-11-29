@@ -74,16 +74,26 @@ Fn for_each_argument(Fn &&fn, Args&&...args)
     return fn;
 }
 
-template<class Fn, class...Args>
-Fn for_each_in_tuple(Fn fn, const std::tuple<Args...> &tup)
+// Call fn on each element of the input tuple tup.
+template<class Fn, class Tup>
+Fn for_each_in_tuple(Fn fn, Tup &&tup)
 {
-    auto arg = std::tuple_cat(std::make_tuple(fn), tup);
-    auto mpfn = [](auto fn, auto...pack) {
-        return for_each_argument(fn, pack...);
+    auto mpfn = [&fn](auto&...pack) {
+        for_each_argument(fn, pack...);
     };
-    std::apply(mpfn, arg);
+
+    std::apply(mpfn, tup);
 
     return fn;
+}
+
+// Wrap each element of the tuple tup into a wrapper class W and return
+// a new tuple with each element being of type W<T_i> where T_i is the type of
+// i-th element of tup.
+template<template<class> class W, class...Args>
+auto wrap_tup(const std::tuple<Args...> &tup)
+{
+    return std::tuple<W<Args>...>(tup);
 }
 
 // Optimizers based on NLopt.
@@ -94,32 +104,38 @@ protected:
 
     static constexpr double ConstraintEps = 1e-6;
 
-    template<class Fn> using TOptData =
-        std::tuple<std::remove_reference_t<Fn>*, NLoptOpt*, nlopt_opt>;
+    template<class Fn> struct OptData {
+        Fn fn;
+        NLoptOpt *self = nullptr;
+        nlopt_opt opt_raw = nullptr;
+
+        OptData(const Fn &f): fn{f} {}
+
+        OptData(const Fn &f, NLoptOpt *s, nlopt_opt nlopt_raw)
+            : fn{f}, self{s}, opt_raw{nlopt_raw} {}
+    };
 
     template<class Fn, size_t N>
     static double optfunc(unsigned n, const double *params,
-                          double *gradient,
-                          void *data)
+                          double *gradient, void *data)
     {
         assert(n == N);
 
-        auto tdata = static_cast<TOptData<Fn>*>(data);
+        auto tdata = static_cast<OptData<Fn>*>(data);
 
-        if (std::get<1>(*tdata)->m_stopcr.stop_condition())
-            nlopt_force_stop(std::get<2>(*tdata));
+        if (tdata->self->m_stopcr.stop_condition())
+            nlopt_force_stop(tdata->opt_raw);
 
-        auto fnptr  = std::get<0>(*tdata);
         auto funval = to_arr<N>(params);
 
         double scoreval = 0.;
-        using RetT = decltype((*fnptr)(funval));
+        using RetT = decltype(tdata->fn(funval));
         if constexpr (std::is_convertible_v<RetT, ScoreGradient<N>>) {
-            ScoreGradient<N> score = (*fnptr)(funval);
+            ScoreGradient<N> score = tdata->fn(funval);
             for (size_t i = 0; i < n; ++i) gradient[i] = (*score.gradient)[i];
             scoreval = score.score;
         } else {
-            scoreval = (*fnptr)(funval);
+            scoreval = tdata->fn(funval);
         }
 
         return scoreval;
@@ -127,17 +143,14 @@ protected:
 
     template<class Fn, size_t N>
     static double constrain_func(unsigned n, const double *params,
-                                  double *gradient,
-                                  void *data)
+                                 double *gradient, void *data)
     {
         assert(n == N);
 
-        auto tdata = static_cast<TOptData<Fn>*>(data);
-
-        auto &fnptr  = std::get<0>(*tdata);
+        auto tdata = static_cast<OptData<Fn>*>(data);
         auto funval = to_arr<N>(params);
 
-       return (*fnptr)(funval);
+        return tdata->fn(funval);
     }
 
     template<size_t N>
@@ -173,22 +186,27 @@ protected:
     {
         Result<N> r;
 
-        TOptData<Fn> data = std::make_tuple(&fn, this, nl.ptr);
+        OptData<Fn> data {fn, this, nl.ptr};
 
-        auto do_for_each_eq = [this, &nl](auto &&arg) {
-            auto data = std::make_tuple(&arg, this, nl.ptr);
-            using F = std::remove_cv_t<decltype(arg)>;
-            nlopt_add_equality_constraint (nl.ptr, constrain_func<F, N>, &data, ConstraintEps);
+        auto do_for_each_eq = [this, &nl](auto &arg) {
+            arg.self = this;
+            arg.opt_raw = nl.ptr;
+            using F = decltype(arg.fn);
+            nlopt_add_equality_constraint (nl.ptr, constrain_func<F, N>, &arg, ConstraintEps);
         };
 
-        auto do_for_each_ineq = [this, &nl](auto &&arg) {
-            auto data = std::make_tuple(&arg, this, nl.ptr);
-            using F = std::remove_cv_t<decltype(arg)>;
-            nlopt_add_inequality_constraint (nl.ptr, constrain_func<F, N>, &data, ConstraintEps);
+        auto do_for_each_ineq = [this, &nl](auto &arg) {
+            arg.self = this;
+            arg.opt_raw = nl.ptr;
+            using F = decltype(arg.fn);
+            nlopt_add_inequality_constraint (nl.ptr, constrain_func<F, N>, &arg, ConstraintEps);
         };
 
-        for_each_in_tuple(do_for_each_eq, equalities);
-        for_each_in_tuple(do_for_each_ineq, inequalities);
+        auto eq_data = wrap_tup<OptData>(equalities);
+        for_each_in_tuple(do_for_each_eq, eq_data);
+
+        auto ineq_data = wrap_tup<OptData>(inequalities);
+        for_each_in_tuple(do_for_each_ineq, ineq_data);
 
         switch(m_dir) {
         case OptDir::MIN:
@@ -260,7 +278,18 @@ public:
     const StopCriteria &get_loc_criteria() const noexcept { return m_loc_stopcr; }
 };
 
+template<class Alg> struct AlgFeatures_ {
+    static constexpr bool SupportsInequalities = false;
+    static constexpr bool SupportsEqualities   = false;
+};
+
 } // namespace detail;
+
+template<class Alg> constexpr bool SupportsEqualities =
+    detail::AlgFeatures_<remove_cvref_t<Alg>>::SupportsEqualities;
+
+template<class Alg> constexpr bool SupportsInequalities =
+    detail::AlgFeatures_<remove_cvref_t<Alg>>::SupportsInequalities;
 
 // Optimizers based on NLopt.
 template<class M> class Optimizer<M, detail::NLoptOnly<M>> {
@@ -278,6 +307,14 @@ public:
                        const std::tuple<EqFns...> &eq_constraints = {},
                        const std::tuple<IneqFns...> &ineq_constraint = {})
     {
+        static_assert(std::tuple_size_v<std::tuple<EqFns...>> == 0
+                          || SupportsEqualities<M>,
+                      "Equality constraints are not supported.");
+
+        static_assert(std::tuple_size_v<std::tuple<IneqFns...>> == 0
+                          || SupportsInequalities<M>,
+                      "Inequality constraints are not supported.");
+
         return m_opt.optimize(std::forward<Func>(func), initvals, bounds,
                               eq_constraints,
                               ineq_constraint);
@@ -299,13 +336,41 @@ public:
 };
 
 // Predefinded NLopt algorithms
-using AlgNLoptGenetic = detail::NLoptAlgComb<NLOPT_GN_ESCH>;
-using AlgNLoptSubplex = detail::NLoptAlg<NLOPT_LN_SBPLX>;
-using AlgNLoptSimplex = detail::NLoptAlg<NLOPT_LN_NELDERMEAD>;
-using AlgNLoptCobyla  = detail::NLoptAlg<NLOPT_LN_COBYLA>;
-using AlgNLoptDIRECT  = detail::NLoptAlg<NLOPT_GN_DIRECT>;
-using AlgNLoptISRES   = detail::NLoptAlg<NLOPT_GN_ISRES>;
-using AlgNLoptMLSL    = detail::NLoptAlgComb<NLOPT_GN_MLSL, NLOPT_LN_SBPLX>;
+using AlgNLoptGenetic     = detail::NLoptAlgComb<NLOPT_GN_ESCH>;
+using AlgNLoptSubplex     = detail::NLoptAlg<NLOPT_LN_SBPLX>;
+using AlgNLoptSimplex     = detail::NLoptAlg<NLOPT_LN_NELDERMEAD>;
+using AlgNLoptCobyla      = detail::NLoptAlg<NLOPT_LN_COBYLA>;
+using AlgNLoptDIRECT      = detail::NLoptAlg<NLOPT_GN_DIRECT>;
+using AlgNLoptORIG_DIRECT = detail::NLoptAlg<NLOPT_GN_ORIG_DIRECT>;
+using AlgNLoptISRES       = detail::NLoptAlg<NLOPT_GN_ISRES>;
+using AlgNLoptAGS         = detail::NLoptAlg<NLOPT_GN_AGS>;
+
+using AlgNLoptMLSL        = detail::NLoptAlgComb<NLOPT_GN_MLSL, NLOPT_LN_SBPLX>;
+using AlgNLoptMLSL_Cobyla = detail::NLoptAlgComb<NLOPT_GN_MLSL, NLOPT_LN_COBYLA>;
+
+namespace detail {
+
+template<> struct AlgFeatures_<AlgNLoptCobyla> {
+    static constexpr bool SupportsInequalities = true;
+    static constexpr bool SupportsEqualities   = true;
+};
+
+template<> struct AlgFeatures_<AlgNLoptISRES> {
+    static constexpr bool SupportsInequalities = true;
+    static constexpr bool SupportsEqualities   = false;
+};
+
+template<> struct AlgFeatures_<AlgNLoptORIG_DIRECT> {
+    static constexpr bool SupportsInequalities = true;
+    static constexpr bool SupportsEqualities   = false;
+};
+
+template<> struct AlgFeatures_<AlgNLoptAGS> {
+    static constexpr bool SupportsInequalities = true;
+    static constexpr bool SupportsEqualities   = true;
+};
+
+} // namespace detail
 
 }} // namespace Slic3r::opt
 
