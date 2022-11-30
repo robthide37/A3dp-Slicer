@@ -204,6 +204,9 @@ struct csg_inserter {
 void SLAPrint::Steps::mesh_assembly(SLAPrintObject &po)
 {
     po.m_mesh_to_slice.clear();
+    po.m_supportdata.reset();
+    po.m_hollowing_data.reset();
+
     csg::model_to_csgmesh(*po.model_object(), po.trafo(),
                           csg_inserter{po.m_mesh_to_slice, slaposAssembly},
                           csg::mpartsPositive | csg::mpartsNegative);
@@ -599,6 +602,12 @@ void SLAPrint::Steps::generate_pad(SLAPrintObject &po) {
     // repeated)
 
     if(po.m_config.pad_enable.getBool()) {
+        if (!po.m_supportdata)
+            po.m_supportdata =
+                std::make_unique<SLAPrintObject::SupportData>(
+                    po.get_mesh_to_print()
+                    );
+
         // Get the distilled pad configuration from the config
         // (Again, despite it was retrieved in the previous step. Note that
         // on a param change event, the previous step might not be executed
