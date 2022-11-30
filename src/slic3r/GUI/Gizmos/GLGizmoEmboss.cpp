@@ -1908,6 +1908,7 @@ void GLGizmoEmboss::draw_style_rename_button()
         else            ImGui::SetTooltip("%s", _u8L("Can't rename temporary style.").c_str());
     }
     if (ImGui::BeginPopupModal(popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+        m_imgui->disable_background_fadeout_animation();
         draw_style_rename_popup();
         ImGui::EndPopup();
     }
@@ -2002,6 +2003,7 @@ void GLGizmoEmboss::draw_style_add_button()
     }
 
     if (ImGui::BeginPopupModal(popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+        m_imgui->disable_background_fadeout_animation();
         draw_style_save_as_popup();
         ImGui::EndPopup();
     }
@@ -2050,6 +2052,7 @@ void GLGizmoEmboss::draw_delete_style_button() {
     }
 
     if (ImGui::BeginPopupModal(popup_id)) {
+        m_imgui->disable_background_fadeout_animation();
         const std::string &style_name  = m_style_manager.get_style().name;
         std::string text_in_popup = GUI::format(_L("Are you sure,\nthat you want permanently and unrecoverable \nremove style \"%1%\"?"), style_name);
         ImGui::Text("%s", text_in_popup.c_str());
