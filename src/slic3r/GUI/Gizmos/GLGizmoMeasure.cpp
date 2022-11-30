@@ -422,8 +422,7 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
                     m_selected_sphere_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SEL_SPHERE_1_ID, *m_sphere.mesh_raycaster));
             }
 
-            if (m_selected_features != selected_features_old && m_selected_features.second.feature.has_value())
-                m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
+            update_measurement_result();
 
             m_imgui->set_requires_extra_frame();
 
@@ -469,7 +468,7 @@ void GLGizmoMeasure::data_changed()
     m_last_inv_zoom = 0.0f;
     m_last_plane_idx = -1;
     if (m_pending_scale) {
-        m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
+        update_measurement_result();
         m_pending_scale = false;
     }
     else
@@ -517,8 +516,10 @@ bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_po
         m_parent.request_extra_frame();
     }
     else if (action == SLAGizmoEventType::Escape) {
-        if (!m_selected_features.first.feature.has_value())
+        if (!m_selected_features.first.feature.has_value()) {
+            update_measurement_result();
             return false;
+        }
         else {
             if (m_selected_features.second.feature.has_value()) {
                 remove_selected_sphere_raycaster(SEL_SPHERE_2_ID);
@@ -528,6 +529,8 @@ bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_po
                 remove_selected_sphere_raycaster(SEL_SPHERE_1_ID);
                 m_selected_features.first.feature.reset();
             }
+
+            update_measurement_result();
         }
     }
 
@@ -1132,7 +1135,10 @@ void GLGizmoMeasure::render_dimensioning()
 {
     static SelectedFeatures last_selected_features;
 
-    if (!m_selected_features.first.feature.has_value() || !m_selected_features.second.feature.has_value())
+    if (!m_selected_features.first.feature.has_value())
+        return;
+
+    if (!m_selected_features.second.feature.has_value() && m_selected_features.first.feature->get_type() != Measure::SurfaceFeatureType::Circle)
         return;
 
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
@@ -1340,7 +1346,8 @@ void GLGizmoMeasure::render_dimensioning()
                 const Vec3d new_center = selection.get_bounding_box().center();
                 const TrafoData trafo_data(ratio, old_center, new_center);
                 scale_feature(*m_selected_features.first.feature, trafo_data);
-                scale_feature(*m_selected_features.second.feature, trafo_data);
+                if (m_selected_features.second.feature.has_value())
+                    scale_feature(*m_selected_features.second.feature, trafo_data);
 
                 // update measure on next call to data_changed()
                 m_pending_scale = true;
@@ -1643,41 +1650,51 @@ void GLGizmoMeasure::render_dimensioning()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
-    if (m_selected_features.second.feature.has_value()) {
-        const bool has_distance = m_measurement_result.has_distance_data();
+    const bool has_distance = m_measurement_result.has_distance_data();
 
-        const Measure::SurfaceFeature* f1 = &(*m_selected_features.first.feature);
-        const Measure::SurfaceFeature* f2 = &(*m_selected_features.second.feature);
-        Measure::SurfaceFeatureType ft1 = f1->get_type();
-        Measure::SurfaceFeatureType ft2 = f2->get_type();
-
-        // Order features by type so following conditions are simple.
-        if (ft1 > ft2) {
-            std::swap(ft1, ft2);
-            std::swap(f1, f2);
-        }
-
-        // If there is an angle to show, draw the arc:
-        if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Edge)
-            arc_edge_edge(*f1, *f2);
-        else if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Plane)
-            arc_edge_plane(*f1, *f2);
-        else if (ft1 == Measure::SurfaceFeatureType::Plane && ft2 == Measure::SurfaceFeatureType::Plane)
-            arc_plane_plane(*f1, *f2);
-
-        if (has_distance){
-            // Where needed, draw the extension of the edge to where the dist is measured:
-            if (ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
-                point_edge(*f1, *f2);
-
-            // Render the arrow between the points that the backend passed:
-            const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
-                ? *m_measurement_result.distance_infinite
-                : *m_measurement_result.distance_strict;
-            point_point(dap.from, dap.to, dap.dist);
-        }
+    const Measure::SurfaceFeature* f1 = &(*m_selected_features.first.feature);
+    const Measure::SurfaceFeature* f2 = nullptr;
+    std::unique_ptr<Measure::SurfaceFeature> temp_feature;
+    if (m_selected_features.second.feature.has_value())
+        f2 = &(*m_selected_features.second.feature);
+    else {
+        assert(m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Circle);
+        temp_feature = std::make_unique<Measure::SurfaceFeature>(std::get<0>(m_selected_features.first.feature->get_circle()));
+        f2 = temp_feature.get();
     }
-    
+
+    if (!m_selected_features.second.feature.has_value() && m_selected_features.first.feature->get_type() != Measure::SurfaceFeatureType::Circle)
+        return;
+
+    Measure::SurfaceFeatureType ft1 = f1->get_type();
+    Measure::SurfaceFeatureType ft2 = f2->get_type();
+
+    // Order features by type so following conditions are simple.
+    if (ft1 > ft2) {
+        std::swap(ft1, ft2);
+        std::swap(f1, f2);
+    }
+
+    // If there is an angle to show, draw the arc:
+    if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Edge)
+        arc_edge_edge(*f1, *f2);
+    else if (ft1 == Measure::SurfaceFeatureType::Edge && ft2 == Measure::SurfaceFeatureType::Plane)
+        arc_edge_plane(*f1, *f2);
+    else if (ft1 == Measure::SurfaceFeatureType::Plane && ft2 == Measure::SurfaceFeatureType::Plane)
+        arc_plane_plane(*f1, *f2);
+
+    if (has_distance){
+        // Where needed, draw the extension of the edge to where the dist is measured:
+        if (ft1 == Measure::SurfaceFeatureType::Point && ft2 == Measure::SurfaceFeatureType::Edge)
+            point_edge(*f1, *f2);
+
+        // Render the arrow between the points that the backend passed:
+        const Measure::DistAndPoints& dap = m_measurement_result.distance_infinite.has_value()
+            ? *m_measurement_result.distance_infinite
+            : *m_measurement_result.distance_strict;
+        point_point(dap.from, dap.to, dap.dist);
+    }
+
     glsafe(::glEnable(GL_DEPTH_TEST));
 
     shader->stop_using();
@@ -2046,6 +2063,16 @@ void GLGizmoMeasure::remove_selected_sphere_raycaster(int id)
     if (it != m_selected_sphere_raycasters.end())
         m_selected_sphere_raycasters.erase(it);
     m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, id);
+}
+
+void GLGizmoMeasure::update_measurement_result()
+{
+    if (!m_selected_features.first.feature.has_value())
+        m_measurement_result = Measure::MeasurementResult();
+    else if (m_selected_features.second.feature.has_value())
+        m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, *m_selected_features.second.feature, m_measuring.get());
+    else if (!m_selected_features.second.feature.has_value() && m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Circle)
+        m_measurement_result = Measure::get_measurement(*m_selected_features.first.feature, Measure::SurfaceFeature(std::get<0>(m_selected_features.first.feature->get_circle())), m_measuring.get());
 }
 
 } // namespace GUI

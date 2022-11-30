@@ -176,6 +176,7 @@ protected:
     virtual void on_unregister_raycasters_for_picking() override;
 
     void remove_selected_sphere_raycaster(int id);
+    void update_measurement_result();
 };
 
 } // namespace GUI
