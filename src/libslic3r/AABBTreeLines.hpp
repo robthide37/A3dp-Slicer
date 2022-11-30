@@ -7,6 +7,7 @@
 #include "libslic3r/AABBTreeIndirect.hpp"
 #include "libslic3r/Line.hpp"
 #include <algorithm>
+#include <cmath>
 #include <type_traits>
 #include <vector>
 
@@ -35,9 +36,14 @@ template<typename ALineType, typename ATreeType, typename AVectorType> struct In
     }
 };
 
-// !!! NOTE: algorithm expects the BoundingBoxes to be snug, no epsilon is allowed
+// returns number of intersections of ray starting in ray_origin and following the specified coordinate line with lines in tree
+// first number is hits in positive direction of ray, second number hits in negative direction. returns neagtive numbers when ray_origin is
+// on some line exactly.
 template<typename LineType, typename TreeType, typename VectorType, int coordinate>
-inline std::tuple<size_t, size_t> coordinate_aligned_ray_hit_count(size_t node_idx, const TreeType &tree, const VectorType &ray_origin)
+inline std::tuple<int, int> coordinate_aligned_ray_hit_count(size_t                       node_idx,
+                                                             const TreeType              &tree,
+                                                             const std::vector<LineType> &lines,
+                                                             const VectorType            &ray_origin)
 {
     static constexpr int other_coordinate = (coordinate + 1) % 2;
     using Scalar                          = typename LineType::Scalar;
@@ -45,26 +51,43 @@ inline std::tuple<size_t, size_t> coordinate_aligned_ray_hit_count(size_t node_i
     const auto &node                      = tree.node(node_idx);
     assert(node.is_valid());
     if (node.is_leaf()) {
-        if (ray_origin[coordinate] > node.bbox.max()[coordinate]) {
+        const LineType &line = lines[node.idx];
+        if (ray_origin[other_coordinate] < std::min(line.a[other_coordinate], line.b[other_coordinate]) ||
+            ray_origin[other_coordinate] >= std::max(line.a[other_coordinate], line.b[other_coordinate])) { 
+                // the second inequality is nonsharp for a reason 
+                //  without it, we may count contour border twice when the lines meet exactly at the spot of intersection. this prevents is
+            return {0, 0};
+        }
+
+        Scalar line_max = std::max(line.a[coordinate], line.b[coordinate]);
+        Scalar line_min = std::min(line.a[coordinate], line.b[coordinate]);
+        if (ray_origin[coordinate] > line_max) {
             return {1, 0};
-        } else if (ray_origin[coordinate] < node.bbox.min()[coordinate]) {
+        } else if (ray_origin[coordinate] < line_min) {
             return {0, 1};
         } else {
-            auto     sizes = node.bbox.sizes();
-            Floating t     = (ray_origin[other_coordinate] - node.bbox.min()[other_coordinate]) /
-                         (sizes[other_coordinate] > 0 ? sizes[other_coordinate] : 1);
-            auto intersection = node.bbox.min()[coordinate] + t * sizes[coordinate];
-            if (ray_origin[coordinate] > intersection) {
+            // find intersection of ray with line
+            //  that is when ( line.a + t * (line.b - line.a) )[other_coordinate] == ray_origin[other_coordinate]
+            //  t = ray_origin[oc] - line.a[oc] / (line.b[oc] - line.a[oc]);
+            //  then we want to get value of intersection[ coordinate]
+            //  val_c = line.a[c] + t * (line.b[c] - line.a[c]);
+            //  Note that ray and line may overlap, when  (line.b[oc] - line.a[oc]) is zero
+            //  In that case, we return negative number
+            Floating distance_oc = line.b[other_coordinate] - line.a[other_coordinate];
+            if (distance_oc <= 0) { return {-1, -1}; }
+            Floating t     = (ray_origin[other_coordinate] - line.a[other_coordinate]) / distance_oc;
+            Floating val_c = line.a[coordinate] + t * (line.b[coordinate] - line.a[coordinate]);
+            if (ray_origin[coordinate] > val_c) {
                 return {1, 0};
-            } else if (ray_origin[coordinate] < intersection) {
+            } else if (ray_origin[coordinate] < val_c) {
                 return {0, 1};
             } else { // ray origin is on boundary
-                return {1, 1};
+                return {-1, -1};
             }
         }
     } else {
-        size_t      intersections_above = 0;
-        size_t      intersections_below = 0;
+        int         intersections_above = 0;
+        int         intersections_below = 0;
         size_t      left_node_idx       = node_idx * 2 + 1;
         size_t      right_node_idx      = left_node_idx + 1;
         const auto &node_left           = tree.node(left_node_idx);
@@ -73,17 +96,20 @@ inline std::tuple<size_t, size_t> coordinate_aligned_ray_hit_count(size_t node_i
         assert(node_right.is_valid());
 
         if (node_left.bbox.min()[other_coordinate] <= ray_origin[other_coordinate] &&
-            node_left.bbox.max()[other_coordinate] > ray_origin[other_coordinate]) { // sharp inequality, beacuse we do not want to count point common to two lines more than once
-            auto [above, below] = coordinate_aligned_ray_hit_count<LineType, TreeType, VectorType, coordinate>(left_node_idx, tree,
+            node_left.bbox.max()[other_coordinate] >=
+                ray_origin[other_coordinate]) {
+            auto [above, below] = coordinate_aligned_ray_hit_count<LineType, TreeType, VectorType, coordinate>(left_node_idx, tree, lines,
                                                                                                                ray_origin);
+            if (above < 0 || below < 0) return {-1, -1};
             intersections_above += above;
             intersections_below += below;
         }
 
         if (node_right.bbox.min()[other_coordinate] <= ray_origin[other_coordinate] &&
-            node_right.bbox.max()[other_coordinate] > ray_origin[other_coordinate]) {
-            auto [above, below] = coordinate_aligned_ray_hit_count<LineType, TreeType, VectorType, coordinate>(right_node_idx, tree,
+            node_right.bbox.max()[other_coordinate] >= ray_origin[other_coordinate]) {
+            auto [above, below] = coordinate_aligned_ray_hit_count<LineType, TreeType, VectorType, coordinate>(right_node_idx, tree, lines,
                                                                                                                ray_origin);
+            if (above < 0 || below < 0) return {-1, -1};
             intersections_above += above;
             intersections_below += below;
         }
@@ -190,8 +216,8 @@ inline typename VectorType::Scalar squared_distance_to_indexed_lines(
     using Scalar = typename VectorType::Scalar;
     if (tree.empty()) return Scalar(-1);
     auto distancer = detail::IndexedLinesDistancer<LineType, TreeType, VectorType>{lines, tree, point};
-    return AABBTreeIndirect::detail::squared_distance_to_indexed_primitives_recursive(
-        distancer, size_t(0), Scalar(0), max_sqr_dist, hit_idx_out, hit_point_out);
+    return AABBTreeIndirect::detail::squared_distance_to_indexed_primitives_recursive(distancer, size_t(0), Scalar(0), max_sqr_dist,
+                                                                                      hit_idx_out, hit_point_out);
 }
 
 // Returns all lines within the given radius limit
@@ -210,20 +236,24 @@ inline std::vector<size_t> all_lines_in_radius(const std::vector<LineType> &line
     return found_lines;
 }
 
-// return 1 if true, -1 if false, 0 if cannot be determined
+// return 1 if true, -1 if false, 0 for point on contour (or if cannot be determined)
 template<typename LineType, typename TreeType, typename VectorType>
 inline int point_outside_closed_contours(const std::vector<LineType> &lines, const TreeType &tree, const VectorType &point)
 {
     if (tree.empty()) { return 1; }
 
-    auto [hits_above, hits_below] = detail::coordinate_aligned_ray_hit_count<LineType, TreeType, VectorType, 0>(0, tree, point);
-    if (hits_above % 2 == 1 && hits_below % 2 == 1) {
+    auto [hits_above, hits_below] = detail::coordinate_aligned_ray_hit_count<LineType, TreeType, VectorType, 0>(0, tree, lines, point);
+    if (hits_above < 0 || hits_below < 0) {
+        return 0;
+    } else if (hits_above % 2 == 1 && hits_below % 2 == 1) {
         return -1;
     } else if (hits_above % 2 == 0 && hits_below % 2 == 0) {
         return 1;
     } else { // this should not happen with closed contours. lets check it in Y direction
-        auto [hits_above, hits_below] = detail::coordinate_aligned_ray_hit_count<LineType, TreeType, VectorType, 1>(0, tree, point);
-        if (hits_above % 2 == 1 && hits_below % 2 == 1) {
+        auto [hits_above, hits_below] = detail::coordinate_aligned_ray_hit_count<LineType, TreeType, VectorType, 1>(0, tree, lines, point);
+        if (hits_above < 0 || hits_below < 0) {
+            return 0;
+        } else if (hits_above % 2 == 1 && hits_below % 2 == 1) {
             return -1;
         } else if (hits_above % 2 == 0 && hits_below % 2 == 0) {
             return 1;
