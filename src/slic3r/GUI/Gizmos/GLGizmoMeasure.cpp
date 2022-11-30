@@ -310,7 +310,6 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             return false;
 
         if (m_hover_id != -1) {
-            SelectedFeatures selected_features_old = m_selected_features;
             m_mouse_left_down = true;
             
             auto detect_current_item = [this]() {
