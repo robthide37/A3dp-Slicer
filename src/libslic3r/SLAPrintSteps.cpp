@@ -423,7 +423,7 @@ static void filter_support_points_by_modifiers(
                      !is_enforced && enf_idx < enforcers[idx].size();
                      ++enf_idx)
                 {
-                    if (enforcers[idx][enf_idx].contains_b(sp2d))
+                    if (enforcers[idx][enf_idx].contains(sp2d))
                         is_enforced = true;
                 }
             }
@@ -434,7 +434,7 @@ static void filter_support_points_by_modifiers(
                      !is_blocked && blk_idx < blockers[idx].size();
                      ++blk_idx)
                 {
-                    if (blockers[idx][blk_idx].contains_b(sp2d))
+                    if (blockers[idx][blk_idx].contains(sp2d))
                         is_blocked = true;
                 }
             }

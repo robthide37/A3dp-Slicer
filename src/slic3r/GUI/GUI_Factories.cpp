@@ -164,12 +164,12 @@ static const constexpr std::array<std::pair<const char *, const char *>, 5> ADD_
 }};
 
 // Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
-const std::vector<std::pair<std::string, std::string>> MenuFactory::TEXT_VOLUME_ICONS {
+static const constexpr std::array<std::pair<const char *, const char *>, 3> TEXT_VOLUME_ICONS {{
 //       menu_item Name              menu_item bitmap name
         {L("Add text"),             "add_text_part"},        // ~ModelVolumeType::MODEL_PART
         {L("Add negative text"),    "add_text_negative" },   // ~ModelVolumeType::NEGATIVE_VOLUME
         {L("Add text modifier"),    "add_text_modifier"},    // ~ModelVolumeType::PARAMETER_MODIFIER
-};
+}};
 
 static Plater* plater()
 {

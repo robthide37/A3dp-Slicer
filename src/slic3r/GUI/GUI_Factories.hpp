@@ -33,8 +33,6 @@ struct SettingsFactory
 class MenuFactory
 {
 public:
-    static const std::vector<std::pair<std::string, std::string>> ADD_VOLUME_MENU_ITEMS;
-    static const std::vector<std::pair<std::string, std::string>> TEXT_VOLUME_ICONS;
 	static std::vector<wxBitmapBundle*> get_volume_bitmaps();
 	static std::vector<wxBitmapBundle*> get_text_volume_bitmaps();
 
