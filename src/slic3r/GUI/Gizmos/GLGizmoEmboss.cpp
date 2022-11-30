@@ -205,10 +205,6 @@ static void find_closest_volume(const Selection       &selection,
 /// <param name="coor">Screen coordinat, where to create new object laying on bed</param>
 static void start_create_object_job(DataBase &emboss_data, const Vec2d &coor);
 
-static void message_disable_cut_surface(){
-    wxMessageBox(_L("Can NOT cut surface from nothing. Function 'use surface' was disabled for this text."),
-                 _L("Disable 'use surface' from style"), wxOK | wxICON_WARNING);}
-
 /// <summary>
 /// Create transformation for new created emboss object by mouse position
 /// </summary>
@@ -1063,12 +1059,9 @@ bool GLGizmoEmboss::process()
     // check cutting from source mesh
     bool &use_surface = data.text_configuration.style.prop.use_surface;
     bool  is_object   = m_volume->get_object()->volumes.size() == 1;
-    if (use_surface && is_object) {
-        priv::message_disable_cut_surface();
+    if (use_surface && is_object) 
         use_surface = false;
-    }
-
-
+    
     if (use_surface) {
         // Model to cut surface from.
         SurfaceVolumeData::ModelSources sources = create_volume_sources(m_volume);
@@ -3317,10 +3310,8 @@ void priv::start_create_object_job(DataBase &emboss_data, const Vec2d &coor)
     if (prop.distance.has_value()) prop.distance.reset();
 
     // can't create new object with using surface
-    if (prop.use_surface) {
-        priv::message_disable_cut_surface();
+    if (prop.use_surface)
         prop.use_surface = false;
-    }
 
     //    Transform3d volume_tr = priv::create_transformation_on_bed(mouse_pos, camera, bed_shape, prop.emboss / 2);
     DataCreateObject data{std::move(emboss_data), coor, camera, bed_shape};
@@ -3340,7 +3331,6 @@ void priv::start_create_volume_job(const ModelObject *object,
         // Model to cut surface from.
         SurfaceVolumeData::ModelSources sources = create_sources(object->volumes);
         if (sources.empty()) {
-            priv::message_disable_cut_surface();
             use_surface = false;
         } else {
             bool is_outside = volume_type == ModelVolumeType::MODEL_PART;
