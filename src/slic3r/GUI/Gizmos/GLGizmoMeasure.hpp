@@ -24,20 +24,19 @@ class GLGizmoMeasure : public GLGizmoBase
     enum class EMode : unsigned char
     {
         FeatureSelection,
-        PointSelection,
-        CenterSelection
+        PointSelection
     };
 
     struct SelectedFeatures
     {
         struct Item
         {
-            std::string source;
+            bool is_center{ false };
+            std::optional<Measure::SurfaceFeature> source;
             std::optional<Measure::SurfaceFeature> feature;
 
             bool operator == (const Item& other) const {
-                if (this->source != other.source) return false;
-                return this->feature == other.feature;
+                return this->is_center == other.is_center && this->source == other.source && this->feature == other.feature;
             }
 
             bool operator != (const Item& other) const {
@@ -45,7 +44,8 @@ class GLGizmoMeasure : public GLGizmoBase
             }
 
             void reset() {
-                source.clear();
+                is_center = false;
+                source.reset();
                 feature.reset();
             }
         };
@@ -106,7 +106,8 @@ class GLGizmoMeasure : public GLGizmoBase
 
     std::vector<GLModel> m_plane_models_cache;
     std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
-    std::vector<std::shared_ptr<SceneRaycasterItem>> m_selection_raycasters;
+    // used to keep the raycasters for point/center spheres
+    std::vector<std::shared_ptr<SceneRaycasterItem>> m_selected_sphere_raycasters;
     std::optional<Measure::SurfaceFeature> m_curr_feature;
     std::optional<Vec3d> m_curr_point_on_feature_position;
     struct SceneRaycasterState
@@ -126,7 +127,6 @@ class GLGizmoMeasure : public GLGizmoBase
 
     Vec2d m_mouse_pos{ Vec2d::Zero() };
 
-    KeyAutoRepeatFilter m_ctrl_kar_filter;
     KeyAutoRepeatFilter m_shift_kar_filter;
 
     SelectedFeatures m_selected_features;
@@ -174,6 +174,8 @@ protected:
     virtual void on_render_input_window(float x, float y, float bottom_limit) override;
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
+
+    void remove_selected_sphere_raycaster(int id);
 };
 
 } // namespace GUI

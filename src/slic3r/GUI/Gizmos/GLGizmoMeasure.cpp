@@ -20,15 +20,16 @@
 namespace Slic3r {
 namespace GUI {
 
-static const Slic3r::ColorRGBA SELECTED_1ST_COLOR   = { 0.25f, 0.75f, 0.75f, 1.0f };
-static const Slic3r::ColorRGBA SELECTED_2ND_COLOR   = { 0.75f, 0.25f, 0.75f, 1.0f };
+static const Slic3r::ColorRGBA SELECTED_1ST_COLOR = { 0.25f, 0.75f, 0.75f, 1.0f };
+static const Slic3r::ColorRGBA SELECTED_2ND_COLOR = { 0.75f, 0.25f, 0.75f, 1.0f };
+static const Slic3r::ColorRGBA NEUTRAL_COLOR      = { 0.5f, 0.5f, 0.5f, 1.0f };
 
 static const int POINT_ID         = 100;
 static const int EDGE_ID          = 200;
 static const int CIRCLE_ID        = 300;
 static const int PLANE_ID         = 400;
-static const int SELECTION_1_ID   = 501;
-static const int SELECTION_2_ID   = 502;
+static const int SEL_SPHERE_1_ID  = 501;
+static const int SEL_SPHERE_2_ID  = 502;
 
 static const float TRIANGLE_BASE = 10.0f;
 static const float TRIANGLE_HEIGHT = TRIANGLE_BASE * 1.618033f;
@@ -164,6 +165,41 @@ static GLModel::Geometry init_torus_data(unsigned int primary_resolution, unsign
     return data;
 }
 
+static bool is_feature_with_center(const Measure::SurfaceFeature& feature)
+{
+    const Measure::SurfaceFeatureType type = feature.get_type();
+    return (type == Measure::SurfaceFeatureType::Circle || (type == Measure::SurfaceFeatureType::Edge && feature.get_extra_point().has_value()));
+}
+
+static Vec3d get_feature_offset(const Measure::SurfaceFeature& feature)
+{
+    Vec3d ret;
+    switch (feature.get_type())
+    {
+    case Measure::SurfaceFeatureType::Circle:
+    {
+        const auto [center, radius, normal] = feature.get_circle();
+        ret = center;
+        break;
+    }
+    case Measure::SurfaceFeatureType::Edge:
+    {
+        std::optional<Vec3d> p = feature.get_extra_point();
+        assert(p.has_value());
+        ret = *p;
+        break;
+    }
+    case Measure::SurfaceFeatureType::Point:
+    {
+        ret = feature.get_point();
+        break;
+    }
+    default: { assert(false); }
+    }
+     
+    return ret;
+}
+
 class TransformHelper
 {
     struct Cache
@@ -265,109 +301,125 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
         // Ctrl is pressed or the mouse is not hovering a selected volume
         bool unlock_dragging = mouse_event.CmdDown() || (m_hover_id == -1 && !m_parent.get_selection().contains_volume(m_parent.get_first_hover_volume_idx()));
         // mode is not center selection or mouse is not hovering a center
-        unlock_dragging &= !mouse_event.ShiftDown() || (m_hover_id != SELECTION_1_ID && m_hover_id != SELECTION_2_ID && m_hover_id != POINT_ID);
+        unlock_dragging &= !mouse_event.ShiftDown() || (m_hover_id != SEL_SPHERE_1_ID && m_hover_id != SEL_SPHERE_2_ID && m_hover_id != POINT_ID);
         return !unlock_dragging;
     }
     else if (mouse_event.LeftDown()) {
         // let the event pass through to allow panning/rotating the 3D scene
-        if ((m_mode != EMode::CenterSelection && mouse_event.CmdDown()) ||
-            (m_mode == EMode::CenterSelection && m_hover_id != SELECTION_1_ID && m_hover_id != SELECTION_2_ID && m_hover_id != POINT_ID)) {
+        if (mouse_event.CmdDown())
             return false;
-        }
 
         if (m_hover_id != -1) {
             SelectedFeatures selected_features_old = m_selected_features;
             m_mouse_left_down = true;
             
-            auto item_from_feature = [this]() {
+            auto detect_current_item = [this]() {
                 SelectedFeatures::Item item;
-                if (m_hover_id == SELECTION_1_ID && m_selected_features.first.feature.has_value())
-                    item = m_selected_features.first;
-                else if (m_hover_id == SELECTION_2_ID && m_selected_features.second.feature.has_value())
-                    item = m_selected_features.second;
+                if (m_hover_id == SEL_SPHERE_1_ID) {
+                    if (m_selected_features.first.is_center)
+                        // mouse is hovering over a selected center
+                        item = { true, m_selected_features.first.source, { Measure::SurfaceFeature(get_feature_offset(*m_selected_features.first.source)) } };
+                    else if (is_feature_with_center(*m_selected_features.first.feature))
+                        // mouse is hovering over a unselected center
+                        item = { true, m_selected_features.first.feature, { Measure::SurfaceFeature(get_feature_offset(*m_selected_features.first.feature)) } };
+                    else
+                        // mouse is hovering over a point
+                        item = m_selected_features.first;
+                }
+                else if (m_hover_id == SEL_SPHERE_2_ID) {
+                    if (m_selected_features.second.is_center)
+                        // mouse is hovering over a selected center
+                        item = { true, m_selected_features.second.source, { Measure::SurfaceFeature(get_feature_offset(*m_selected_features.second.source)) } };
+                    else if (is_feature_with_center(*m_selected_features.second.feature))
+                        // mouse is hovering over a center
+                        item = { true, m_selected_features.second.feature, { Measure::SurfaceFeature(get_feature_offset(*m_selected_features.second.feature)) } };
+                    else
+                        // mouse is hovering over a point
+                        item = m_selected_features.second;
+                }
                 else {
                     switch (m_mode)
                     {
-                    case EMode::FeatureSelection:
-                    {
-                        item = { surface_feature_type_as_string(m_curr_feature->get_type()), m_curr_feature };
-                        break;
-                    }
-                    case EMode::PointSelection:
-                    {
-                        item = { point_on_feature_type_as_string(m_curr_feature->get_type(), m_hover_id), Measure::SurfaceFeature(*m_curr_point_on_feature_position) };
-                        break;
-                    }
-                    case EMode::CenterSelection:
-                    {
-                        Vec3d position;
-                        switch (m_curr_feature->get_type())
-                        {
-                        case Measure::SurfaceFeatureType::Circle:
-                        {
-                            position = std::get<0>(m_curr_feature->get_circle());
-                            break;
-                        }
-                        case Measure::SurfaceFeatureType::Edge:
-                        {
-                            assert(m_curr_feature->get_extra_point().has_value());
-                            position = *m_curr_feature->get_extra_point();
-                            break;
-                        }
-                        default: { assert(false); break; }
-                        }
-
-                        item = { center_on_feature_type_as_string(m_curr_feature->get_type()), Measure::SurfaceFeature(position) };
-                        break;
-                    }
+                    case EMode::FeatureSelection: { item = { false, m_curr_feature, m_curr_feature }; break; }
+                    case EMode::PointSelection:   { item = { false, m_curr_feature, Measure::SurfaceFeature(*m_curr_point_on_feature_position) }; break; }
                     }
                 }
                 return item;
             };
 
-            if (m_selected_features.first.feature.has_value()) {
-                auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
-                    [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SELECTION_2_ID; });
-                if (it != m_selection_raycasters.end())
-                    m_selection_raycasters.erase(it);
-                m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_2_ID);
+            auto requires_sphere_raycaster_for_picking = [this](const SelectedFeatures::Item& item) {
+                if (m_mode == EMode::PointSelection)
+                    return true;
+                else if (m_mode == EMode::FeatureSelection) {
+                    if (is_feature_with_center(*item.feature))
+                        return true;
+                }
+                return false;
+            };
 
-                const SelectedFeatures::Item item = item_from_feature();
+            if (m_selected_features.first.feature.has_value()) {
+                const SelectedFeatures::Item item = detect_current_item();
                 if (m_selected_features.first != item) {
-                    if (m_selected_features.second == item)
-                        m_selected_features.second.reset();
-                    else {
-                        m_selected_features.second = item;
-                        if (m_mode == EMode::PointSelection || m_mode == EMode::CenterSelection)
-                            m_selection_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_2_ID, *m_sphere.mesh_raycaster));
-                        if (m_mode == EMode::CenterSelection) {
-                            // Fake ctrl up event to exit the center selection mode
-                            gizmo_event(SLAGizmoEventType::CtrlUp, Vec2d::Zero(), true, false, false);
-                            // increase counter to avoid that keeping the ctrl key pressed triggers a ctrl down event
-                            m_ctrl_kar_filter.increase_count();
+                    bool processed = false;
+                    if (item.is_center) {
+                        if (item.source == m_selected_features.first.feature) {
+                            // switch 1st selection from feature to its center
+                            m_selected_features.first = item;
+                            processed = true;
+                        }
+                        else if (item.source == m_selected_features.second.feature) {
+                            // switch 2nd selection from feature to its center
+                            m_selected_features.second = item;
+                            processed = true;
+                        }
+                    }
+                    else if (is_feature_with_center(*item.feature)) {
+                      if (m_selected_features.first.is_center && m_selected_features.first.source == item.feature) {
+                          // switch 1st selection from center to its feature
+                          m_selected_features.first = item;
+                          processed = true;
+                      }
+                      else if (m_selected_features.second.is_center && m_selected_features.second.source == item.feature) {
+                          // switch 2nd selection from center to its feature
+                          m_selected_features.second = item;
+                          processed = true;
+                      }
+                    }
+
+                    if (!processed) {
+                        remove_selected_sphere_raycaster(SEL_SPHERE_2_ID);
+                        if (m_selected_features.second == item)
+                            // 2nd feature deselection
+                            m_selected_features.second.reset();
+                        else {
+                            // 2nd feature selection
+                            m_selected_features.second = item;
+                            if (requires_sphere_raycaster_for_picking(item))
+                                m_selected_sphere_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SEL_SPHERE_2_ID, *m_sphere.mesh_raycaster));
                         }
                     }
                 }
                 else {
-                    if (!m_selected_features.second.feature.has_value())
-                        m_selected_features.first.reset();
-                    else {
+                    remove_selected_sphere_raycaster(SEL_SPHERE_1_ID);
+                    if (m_selected_features.second.feature.has_value()) {
+                        // promote 2nd feature to 1st feature
+                        remove_selected_sphere_raycaster(SEL_SPHERE_2_ID);
                         m_selected_features.first = m_selected_features.second;
+                        if (requires_sphere_raycaster_for_picking(m_selected_features.first))
+                            m_selected_sphere_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SEL_SPHERE_1_ID, *m_sphere.mesh_raycaster));
                         m_selected_features.second.reset();
                     }
+                    else
+                        // 1st feature deselection
+                        m_selected_features.first.reset();
                 }
             }
             else {
-                const SelectedFeatures::Item item = item_from_feature();
+                // 1st feature selection
+                const SelectedFeatures::Item item = detect_current_item();
                 m_selected_features.first = item;
-                if (m_mode == EMode::PointSelection || m_mode == EMode::CenterSelection)
-                    m_selection_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SELECTION_1_ID, *m_sphere.mesh_raycaster));
-                if (m_mode == EMode::CenterSelection) {
-                    // Fake ctrl up event to exit the center selection mode
-                    gizmo_event(SLAGizmoEventType::CtrlUp, Vec2d::Zero(), true, false, false);
-                    // increase counter to avoid that keeping the ctrl key pressed triggers a ctrl down event
-                    m_ctrl_kar_filter.increase_count();
-                }
+                if (requires_sphere_raycaster_for_picking(item))
+                    m_selected_sphere_raycasters.push_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, SEL_SPHERE_1_ID, *m_sphere.mesh_raycaster));
             }
 
             if (m_selected_features != selected_features_old && m_selected_features.second.feature.has_value())
@@ -399,9 +451,8 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
     }
     else if (mouse_event.RightDown()) {
         // let the event pass through to allow panning/rotating the 3D scene
-        if ((m_mode != EMode::CenterSelection && mouse_event.CmdDown()) || (m_mode == EMode::CenterSelection && m_hover_id != SELECTION_1_ID && m_hover_id != SELECTION_2_ID)) {
+        if (mouse_event.CmdDown())
             return false;
-        }
     }
     else if (mouse_event.Leaving())
         m_mouse_left_down = false;
@@ -423,7 +474,7 @@ void GLGizmoMeasure::data_changed()
     }
     else
         m_selected_features.reset();
-    m_selection_raycasters.clear();
+    m_selected_sphere_raycasters.clear();
     m_editing_distance = false;
     m_is_editing_distance_first_frame = true;
 }
@@ -450,7 +501,7 @@ bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_po
 
     if (action == SLAGizmoEventType::ShiftDown) {
         if (m_shift_kar_filter.is_first()) {
-            m_mode = activate_center_selection(SLAGizmoEventType::ShiftDown) ? EMode::CenterSelection : EMode::PointSelection;
+            m_mode = EMode::PointSelection;
             disable_scene_raycasters();
         }
         m_shift_kar_filter.increase_count();
@@ -460,33 +511,23 @@ bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_po
         m_mode = EMode::FeatureSelection;
         restore_scene_raycasters_state();
     }
-    else if (action == SLAGizmoEventType::CtrlDown) {
-        if (m_ctrl_kar_filter.is_first()) {
-            if (activate_center_selection(SLAGizmoEventType::CtrlDown)) {
-                m_mode = EMode::CenterSelection;
-                disable_scene_raycasters();
-            }
-        }
-        m_ctrl_kar_filter.increase_count();
-    }
-    else if (action == SLAGizmoEventType::CtrlUp) {
-        m_ctrl_kar_filter.reset_count();
-        m_mode = control_down ? EMode::PointSelection : EMode::FeatureSelection;
-        restore_scene_raycasters_state();
-    }
     else if (action == SLAGizmoEventType::Delete) {
         m_selected_features.reset();
-        m_selection_raycasters.clear();
+        m_selected_sphere_raycasters.clear();
         m_parent.request_extra_frame();
     }
     else if (action == SLAGizmoEventType::Escape) {
         if (!m_selected_features.first.feature.has_value())
             return false;
         else {
-          if (m_selected_features.second.feature.has_value())
-              m_selected_features.second.feature.reset();
-          else
-              m_selected_features.first.feature.reset();
+            if (m_selected_features.second.feature.has_value()) {
+                remove_selected_sphere_raycaster(SEL_SPHERE_2_ID);
+                m_selected_features.second.feature.reset();
+            }
+            else {
+                remove_selected_sphere_raycaster(SEL_SPHERE_1_ID);
+                m_selected_features.first.feature.reset();
+            }
         }
     }
 
@@ -503,7 +544,6 @@ void GLGizmoMeasure::on_set_state()
 {
     if (m_state == Off) {
         m_parent.toggle_sla_auxiliaries_visibility(true, nullptr, -1);
-        m_ctrl_kar_filter.reset_count();
         m_shift_kar_filter.reset_count();
         m_curr_feature.reset();
         m_curr_point_on_feature_position.reset();
@@ -566,7 +606,7 @@ void GLGizmoMeasure::on_render()
     Vec3f normal_on_model;
     size_t model_facet_idx;
     const bool mouse_on_object = m_raycaster->unproject_on_mesh(m_mouse_pos, Transform3d::Identity(), camera, position_on_model, normal_on_model, nullptr, &model_facet_idx);
-    const bool is_hovering_on_feature = (m_mode == EMode::PointSelection || m_mode == EMode::CenterSelection) && m_hover_id != -1;
+    const bool is_hovering_on_feature = m_mode == EMode::PointSelection && m_hover_id != -1;
 
     auto update_circle = [this, inv_zoom]() {
         if (m_last_inv_zoom != inv_zoom || m_last_circle != m_curr_feature) {
@@ -583,14 +623,13 @@ void GLGizmoMeasure::on_render()
     };
 
     if (m_mode == EMode::FeatureSelection || m_mode == EMode::PointSelection) {
-        if ((m_hover_id == SELECTION_1_ID && boost::algorithm::istarts_with(m_selected_features.first.source, _u8L("Center"))) ||
-            (m_hover_id == SELECTION_2_ID && boost::algorithm::istarts_with(m_selected_features.second.source, _u8L("Center")))) {
-            // Skip feature detection if hovering on a selected center
-            m_curr_feature.reset();
+        if (m_hover_id == SEL_SPHERE_1_ID || m_hover_id == SEL_SPHERE_2_ID) {
+            // Skip feature detection if hovering on a selected point/center
             m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID);
             m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, EDGE_ID);
             m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, PLANE_ID);
             m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_ID);
+            m_curr_feature.reset();
             m_curr_point_on_feature_position.reset();
         }
         else {
@@ -618,15 +657,12 @@ void GLGizmoMeasure::on_render()
                 case Measure::SurfaceFeatureType::Edge:
                 {
                     m_raycasters.insert({ EDGE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, EDGE_ID, *m_cylinder.mesh_raycaster) });
-                    if (m_curr_feature->get_extra_point().has_value())
-                        m_raycasters.insert({ POINT_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID, *m_sphere.mesh_raycaster) });
                     break;
                 }
                 case Measure::SurfaceFeatureType::Circle:
                 {
                     update_circle();
                     m_raycasters.insert({ CIRCLE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CIRCLE_ID, *m_circle.mesh_raycaster) });
-                    m_raycasters.insert({ POINT_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, POINT_ID, *m_sphere.mesh_raycaster) });
                     break;
                 }
                 case Measure::SurfaceFeatureType::Plane:
@@ -781,70 +817,67 @@ void GLGizmoMeasure::on_render()
             case Measure::SurfaceFeatureType::Circle:
             {
                 const auto& [center, radius, normal] = feature.get_circle();
-                // render center
+                // render circle
+                const Transform3d circle_matrix = Transform3d::Identity();
+                set_matrix_uniforms(circle_matrix);
                 if (update_raycasters_transform) {
+                    set_emission_uniform(colors.front(), hover);
+                    m_circle.model.set_color(colors.front());
+                    m_circle.model.render();
+                    auto it = m_raycasters.find(CIRCLE_ID);
+                    if (it != m_raycasters.end() && it->second != nullptr)
+                        it->second->set_transform(circle_matrix);
+                }
+                else {
+                    GLModel circle;
+                    GLModel::Geometry circle_geometry = init_torus_data(64, 16, center.cast<float>(), float(radius), 5.0f * inv_zoom, normal.cast<float>(), Transform3f::Identity());
+                    circle.init_from(std::move(circle_geometry));
+                    set_emission_uniform(colors.front(), hover);
+                    circle.set_color(colors.front());
+                    circle.render();
+                }
+                // render center
+                if (colors.size() > 1) {
                     const Transform3d center_matrix = Geometry::translation_transform(center) * Geometry::scale_transform(inv_zoom);
                     set_matrix_uniforms(center_matrix);
-                    set_emission_uniform(colors.front(), hover);
-                    m_sphere.model.set_color(colors.front());
+                    set_emission_uniform(colors.back(), hover);
+                    m_sphere.model.set_color(colors.back());
                     m_sphere.model.render();
                     auto it = m_raycasters.find(POINT_ID);
                     if (it != m_raycasters.end() && it->second != nullptr)
                         it->second->set_transform(center_matrix);
-                }
-                // render circle
-                if (m_mode != EMode::CenterSelection) {
-                    const Transform3d circle_matrix = Transform3d::Identity();
-                    set_matrix_uniforms(circle_matrix);
-                    if (update_raycasters_transform) {
-                        set_emission_uniform(colors.back(), hover);
-                        m_circle.model.set_color(colors.back());
-                        m_circle.model.render();
-                        auto it = m_raycasters.find(CIRCLE_ID);
-                        if (it != m_raycasters.end() && it->second != nullptr)
-                            it->second->set_transform(circle_matrix);
-                    }
-                    else {
-                        GLModel circle;
-                        GLModel::Geometry circle_geometry = init_torus_data(64, 16, center.cast<float>(), float(radius), 5.0f * inv_zoom, normal.cast<float>(), Transform3f::Identity());
-                        circle.init_from(std::move(circle_geometry));
-                        set_emission_uniform(colors.back(), hover);
-                        circle.set_color(colors.back());
-                        circle.render();
-                    }
                 }
                 break;
             }
             case Measure::SurfaceFeatureType::Edge:
             {
                 const auto& [from, to] = feature.get_edge();
-                // render extra point
+                // render edge
+                const Transform3d edge_matrix = Geometry::translation_transform(from) *
+                    Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), to - from) *
+                    Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (to - from).norm() });
+                set_matrix_uniforms(edge_matrix);
+                set_emission_uniform(colors.front(), hover);
+                m_cylinder.model.set_color(colors.front());
+                m_cylinder.model.render();
                 if (update_raycasters_transform) {
+                    auto it = m_raycasters.find(EDGE_ID);
+                    if (it != m_raycasters.end() && it->second != nullptr)
+                        it->second->set_transform(edge_matrix);
+                }
+
+                // render extra point
+                if (colors.size() > 1) {
                     const std::optional<Vec3d> extra = feature.get_extra_point();
                     if (extra.has_value()) {
                         const Transform3d point_matrix = Geometry::translation_transform(*extra) * Geometry::scale_transform(inv_zoom);
                         set_matrix_uniforms(point_matrix);
-                        set_emission_uniform(colors.front(), hover);
-                        m_sphere.model.set_color(colors.front());
+                        set_emission_uniform(colors.back(), hover);
+                        m_sphere.model.set_color(colors.back());
                         m_sphere.model.render();
                         auto it = m_raycasters.find(POINT_ID);
                         if (it != m_raycasters.end() && it->second != nullptr)
                             it->second->set_transform(point_matrix);
-                    }
-                }
-                // render edge
-                if (m_mode != EMode::CenterSelection) {
-                    const Transform3d edge_matrix = Geometry::translation_transform(from) *
-                    Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), to - from) *
-                    Geometry::scale_transform({ (double)inv_zoom, (double)inv_zoom, (to - from).norm() });
-                    set_matrix_uniforms(edge_matrix);
-                    set_emission_uniform(colors.back(), hover);
-                    m_cylinder.model.set_color(colors.back());
-                    m_cylinder.model.render();
-                    if (update_raycasters_transform) {
-                      auto it = m_raycasters.find(EDGE_ID);
-                        if (it != m_raycasters.end() && it->second != nullptr)
-                            it->second->set_transform(edge_matrix);
                     }
                 }
                 break;
@@ -878,11 +911,31 @@ void GLGizmoMeasure::on_render()
     };
 
     if (m_curr_feature.has_value()) {
+        // render hovered feature
+
         std::vector<ColorRGBA> colors;
-        if (m_selected_features.first.feature.has_value() && *m_curr_feature == *m_selected_features.first.feature)
-            colors.emplace_back(hovering_color());
-        else if (m_selected_features.second.feature.has_value() && *m_curr_feature == *m_selected_features.second.feature)
-            colors.emplace_back(hovering_color());
+        if (m_selected_features.first.feature.has_value() && *m_curr_feature == *m_selected_features.first.feature) {
+            // hovering over the 1st selected feature
+            if (m_selected_features.first.is_center)
+                // hovering over a center
+                colors = { NEUTRAL_COLOR, hovering_color() };
+            else if (is_feature_with_center(*m_selected_features.first.feature))
+                // hovering over a feature with center
+                colors = { hovering_color(), NEUTRAL_COLOR };
+            else
+                colors = { hovering_color() };
+        }
+        else if (m_selected_features.second.feature.has_value() && *m_curr_feature == *m_selected_features.second.feature) {
+            // hovering over the 2nd selected feature
+            if (m_selected_features.second.is_center)
+                // hovering over a center
+                colors = { NEUTRAL_COLOR, hovering_color() };
+            else if (is_feature_with_center(*m_selected_features.second.feature))
+                // hovering over a feature with center
+                colors = { hovering_color(), NEUTRAL_COLOR };
+            else
+                colors = { hovering_color() };
+        }
         else {
             switch (m_curr_feature->get_type())
             {
@@ -895,8 +948,12 @@ void GLGizmoMeasure::on_render()
             case Measure::SurfaceFeatureType::Edge:
             case Measure::SurfaceFeatureType::Circle:
             {
-                colors.emplace_back((m_hover_id == POINT_ID) ? hover_selection_color() : hovering_color());
-                colors.emplace_back(hovering_color());
+                if (m_selected_features.first.is_center && m_curr_feature == m_selected_features.first.source)
+                    colors = { SELECTED_1ST_COLOR, NEUTRAL_COLOR };
+                else if (m_selected_features.second.is_center && m_curr_feature == m_selected_features.second.source)
+                    colors = { SELECTED_2ND_COLOR, NEUTRAL_COLOR };
+                else
+                    colors = { hovering_color(), hovering_color() };
                 break;
             }
             case Measure::SurfaceFeatureType::Plane:
@@ -911,28 +968,76 @@ void GLGizmoMeasure::on_render()
     }
 
     if (m_selected_features.first.feature.has_value() && (!m_curr_feature.has_value() || *m_curr_feature != *m_selected_features.first.feature)) {
-        const std::vector<ColorRGBA> colors = { SELECTED_1ST_COLOR };
-        render_feature(*m_selected_features.first.feature, colors, inv_zoom, m_hover_id == SELECTION_1_ID, false);
-        if (m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point) {
-            auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
-                [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SELECTION_1_ID; });
-            if (it != m_selection_raycasters.end())
-                (*it)->set_transform(Geometry::translation_transform(m_selected_features.first.feature->get_point()) * Geometry::scale_transform(inv_zoom));
+        // render 1st selected feature
+
+        std::optional<Measure::SurfaceFeature> feature_to_render;
+        std::vector<ColorRGBA> colors;
+        bool requires_raycaster_update = false;
+        if (m_hover_id == SEL_SPHERE_1_ID && (m_selected_features.first.is_center || is_feature_with_center(*m_selected_features.first.feature))) {
+            // hovering over a center
+            feature_to_render = m_selected_features.first.source;
+            colors = { NEUTRAL_COLOR, SELECTED_1ST_COLOR };
+            requires_raycaster_update = true;
+        }
+        else if (is_feature_with_center(*m_selected_features.first.feature)) {
+            // hovering over a feature with center
+            feature_to_render = m_selected_features.first.feature;
+            colors = { SELECTED_1ST_COLOR, NEUTRAL_COLOR };
+            requires_raycaster_update = true;
+        }
+        else {
+            feature_to_render = m_selected_features.first.feature;
+            colors = { SELECTED_1ST_COLOR };
+            requires_raycaster_update = m_selected_features.first.feature->get_type() == Measure::SurfaceFeatureType::Point;
+        }
+
+        render_feature(*feature_to_render, colors, inv_zoom, m_hover_id == SEL_SPHERE_1_ID, false);
+
+        if (requires_raycaster_update) {
+            auto it = std::find_if(m_selected_sphere_raycasters.begin(), m_selected_sphere_raycasters.end(),
+                [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SEL_SPHERE_1_ID; });
+            if (it != m_selected_sphere_raycasters.end())
+                (*it)->set_transform(Geometry::translation_transform(get_feature_offset(*m_selected_features.first.feature)) * Geometry::scale_transform(inv_zoom));
         }
     }
+
     if (m_selected_features.second.feature.has_value() && (!m_curr_feature.has_value() || *m_curr_feature != *m_selected_features.second.feature)) {
-        const std::vector<ColorRGBA> colors = { SELECTED_2ND_COLOR };
-        render_feature(*m_selected_features.second.feature, colors, inv_zoom, m_hover_id == SELECTION_2_ID, false);
-        if (m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point) {
-            auto it = std::find_if(m_selection_raycasters.begin(), m_selection_raycasters.end(),
-                [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SELECTION_2_ID; });
-            if (it != m_selection_raycasters.end())
-                (*it)->set_transform(Geometry::translation_transform(m_selected_features.second.feature->get_point()) * Geometry::scale_transform(inv_zoom));
+        // render 2nd selected feature
+
+        std::optional<Measure::SurfaceFeature> feature_to_render;
+        std::vector<ColorRGBA> colors;
+        bool requires_raycaster_update = false;
+        if (m_hover_id == SEL_SPHERE_2_ID && (m_selected_features.second.is_center || is_feature_with_center(*m_selected_features.second.feature))) {
+            // hovering over a center
+            feature_to_render = m_selected_features.second.source;
+            colors = { NEUTRAL_COLOR, SELECTED_2ND_COLOR };
+            requires_raycaster_update = true;
+        }
+        else if (is_feature_with_center(*m_selected_features.second.feature)) {
+            // hovering over a feature with center
+            feature_to_render = m_selected_features.second.feature;
+            colors = { SELECTED_2ND_COLOR, NEUTRAL_COLOR };
+            requires_raycaster_update = true;
+        }
+        else {
+            feature_to_render = m_selected_features.second.feature;
+            colors = { SELECTED_2ND_COLOR };
+            requires_raycaster_update = m_selected_features.second.feature->get_type() == Measure::SurfaceFeatureType::Point;
+        }
+
+        render_feature(*feature_to_render, colors, inv_zoom, m_hover_id == SEL_SPHERE_2_ID, false);
+
+        if (requires_raycaster_update) {
+            auto it = std::find_if(m_selected_sphere_raycasters.begin(), m_selected_sphere_raycasters.end(),
+                [](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == SEL_SPHERE_2_ID; });
+            if (it != m_selected_sphere_raycasters.end())
+                (*it)->set_transform(Geometry::translation_transform(get_feature_offset(*m_selected_features.second.feature)) * Geometry::scale_transform(inv_zoom));
         }
     }
 
     if (is_hovering_on_feature && m_curr_point_on_feature_position.has_value()) {
         if (m_hover_id != POINT_ID) {
+            // render point on feature while SHIFT is pressed
             const Transform3d matrix = Geometry::translation_transform(*m_curr_point_on_feature_position) * Geometry::scale_transform(inv_zoom);
             set_matrix_uniforms(matrix);
             const ColorRGBA color = hover_selection_color();
@@ -1597,7 +1702,8 @@ static void add_strings_row_to_table(ImGuiWrapper& imgui, const std::string& col
 void GLGizmoMeasure::render_debug_dialog()
 {
     auto add_feature_data = [this](const SelectedFeatures::Item& item) {
-        add_strings_row_to_table(*m_imgui, "Type", ImGuiWrapper::COL_ORANGE_LIGHT, item.source, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        const std::string text = (item.source == item.feature) ? surface_feature_type_as_string(item.feature->get_type()) : point_on_feature_type_as_string(item.source->get_type(), m_hover_id);
+        add_strings_row_to_table(*m_imgui, "Type", ImGuiWrapper::COL_ORANGE_LIGHT, text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
         switch (item.feature->get_type())
         {
         case Measure::SurfaceFeatureType::Point:
@@ -1643,7 +1749,6 @@ void GLGizmoMeasure::render_debug_dialog()
         {
         case EMode::FeatureSelection: { txt = "Feature selection"; break; }
         case EMode::PointSelection:   { txt = "Point selection"; break; }
-        case EMode::CenterSelection:  { txt = "Center selection"; break; }
         default:                      { assert(false); break; }
         }
         add_strings_row_to_table(*m_imgui, "Mode", ImGuiWrapper::COL_ORANGE_LIGHT, txt, ImGui::GetStyleColorVec4(ImGuiCol_Text));
@@ -1727,17 +1832,16 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                         text = _u8L("Unselect feature");
                         color = SELECTED_2ND_COLOR;
                     }
-                    else if (m_hover_id == SELECTION_1_ID) {
-                        text = (m_mode == EMode::CenterSelection) ? _u8L("Unselect center") : _u8L("Unselect point");
+                    else if (m_hover_id == SEL_SPHERE_1_ID) {
+                        text = _u8L("Unselect point");
                         color = SELECTED_1ST_COLOR;
                     }
-                    else if (m_hover_id == SELECTION_2_ID) {
-                        text = (m_mode == EMode::CenterSelection) ? _u8L("Unselect center") : _u8L("Unselect point");
+                    else if (m_hover_id == SEL_SPHERE_2_ID) {
+                        text = _u8L("Unselect point");
                         color = SELECTED_2ND_COLOR;
                     }
                     else {
-                        text = (m_mode == EMode::PointSelection) ? _u8L("Select point") :
-                            (m_mode == EMode::CenterSelection) ? _u8L("Select center") : _u8L("Select feature");
+                        text = (m_mode == EMode::PointSelection) ? _u8L("Select point") : _u8L("Select feature");
                         color = SELECTED_2ND_COLOR;
                     }
                 }
@@ -1747,14 +1851,13 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                             text = _u8L("Unselect feature");
                             color = SELECTED_1ST_COLOR;
                         }
-                        else if (m_hover_id == SELECTION_1_ID) {
-                            text = (m_mode == EMode::CenterSelection) ? _u8L("Unselect center") : _u8L("Unselect point");
+                        else if (m_hover_id == SEL_SPHERE_1_ID) {
+                            text = _u8L("Unselect point");
                             color = SELECTED_1ST_COLOR;
                         }
                     }
                     if (text.empty()) {
-                        text = (m_mode == EMode::PointSelection) ? _u8L("Select point") :
-                            (m_mode == EMode::CenterSelection) ? _u8L("Select center") : _u8L("Select feature");
+                        text = (m_mode == EMode::PointSelection) ? _u8L("Select point") : _u8L("Select feature");
                         color = m_selected_features.first.feature.has_value() ? SELECTED_2ND_COLOR : SELECTED_1ST_COLOR;
                     }
                 }
@@ -1770,11 +1873,6 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
 
         if (m_mode == EMode::FeatureSelection && m_hover_id != -1) {
             add_strings_row_to_table(*m_imgui, _u8L("Shift"), ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Enable point selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-            ++row_count;
-        }
-
-        if (m_mode != EMode::CenterSelection && feature_has_center(m_curr_feature)) {
-            add_strings_row_to_table(*m_imgui, _u8L("Shift") + "+" + CTRL_STR, ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Enable center selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ++row_count;
         }
 
@@ -1803,7 +1901,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
         }
 
         // add dummy rows to keep dialog size fixed
-        for (unsigned int i = row_count; i < 5; ++i) {
+        for (unsigned int i = row_count; i < 4; ++i) {
             add_strings_row_to_table(*m_imgui, " ", ImGuiWrapper::COL_ORANGE_LIGHT, " ", ImGui::GetStyleColorVec4(ImGuiCol_Text));
         }
 
@@ -1816,17 +1914,20 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     ImGui::Separator();
     const ImGuiTableFlags flags = ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersH;
     if (ImGui::BeginTable("Selection", 2, flags)) {
-        auto format_item_text = [use_inches, &units](const SelectedFeatures::Item& item) {
-          std::string txt = item.feature.has_value() ? item.source : _u8L("None");
-          if (item.feature.has_value() && item.feature->get_type() == Measure::SurfaceFeatureType::Circle) {
-              auto [center, radius, normal] = item.feature->get_circle();
-              const Vec3d on_circle = center + radius * Measure::get_orthogonal(normal, true);
-              radius = (on_circle - center).norm();
-              if (use_inches)
-                  radius = ObjectManipulation::mm_to_in * radius;
-              txt += " (" + _u8L("Diameter:") + " " + format_double(2.0 * radius) + units + ")";
-          }
-          return txt;
+        auto format_item_text = [this, use_inches, &units](const SelectedFeatures::Item& item) {
+            if (!item.feature.has_value())
+                return _u8L("None");
+
+            std::string text = (item.source == item.feature) ? surface_feature_type_as_string(item.feature->get_type()) : point_on_feature_type_as_string(item.source->get_type(), m_hover_id);
+            if (item.feature.has_value() && item.feature->get_type() == Measure::SurfaceFeatureType::Circle) {
+                auto [center, radius, normal] = item.feature->get_circle();
+                const Vec3d on_circle = center + radius * Measure::get_orthogonal(normal, true);
+                radius = (on_circle - center).norm();
+                if (use_inches)
+                    radius = ObjectManipulation::mm_to_in * radius;
+                text += " (" + _u8L("Diameter:") + " " + format_double(2.0 * radius) + units + ")";
+            }
+            return text;
         };
 
         add_strings_row_to_table(*m_imgui, _u8L("Selection") + " 1:", ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR), format_item_text(m_selected_features.first),
@@ -1839,7 +1940,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     m_imgui->disabled_begin(!m_selected_features.first.feature.has_value());
         if (m_imgui->button(_u8L("Restart selection"))) {
             m_selected_features.reset();
-            m_selection_raycasters.clear();
+            m_selected_sphere_raycasters.clear();
             m_imgui->set_requires_extra_frame();
         }
     m_imgui->disabled_end();
@@ -1935,7 +2036,16 @@ void GLGizmoMeasure::on_unregister_raycasters_for_picking()
     m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo);
     m_parent.set_raycaster_gizmos_on_top(false);
     m_raycasters.clear();
-    m_selection_raycasters.clear();
+    m_selected_sphere_raycasters.clear();
+}
+
+void GLGizmoMeasure::remove_selected_sphere_raycaster(int id)
+{
+    auto it = std::find_if(m_selected_sphere_raycasters.begin(), m_selected_sphere_raycasters.end(),
+        [id](std::shared_ptr<SceneRaycasterItem> item) { return SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, item->get_id()) == id; });
+    if (it != m_selected_sphere_raycasters.end())
+        m_selected_sphere_raycasters.erase(it);
+    m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, id);
 }
 
 } // namespace GUI
