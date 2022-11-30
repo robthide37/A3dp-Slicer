@@ -174,11 +174,11 @@ public:
             if ((points.back().distance > min_malformation_dist) !=
                 (distance_of_next > min_malformation_dist)) { // not same sign, so one is grounded, one not
                 auto intersections = prev_layer_boundary.intersections_with_line<true>({points.back().position, next_point_pos});
-                // for (const auto &intersection : intersections) { points.push_back({intersection, 0.0f, 1.0}); }
+                for (const auto &intersection : intersections) { points.push_back({intersection, 0.0f, 1.0}); }
             }
             points.push_back({next_point_pos, distance_of_next, 1.0});
         }
-        std::cout << "EXTR" << std::endl;
+
         for (int point_idx = 0; point_idx < int(points.size()) - 1; ++point_idx) {
             ExtendedPoint &a = points[point_idx];
             ExtendedPoint &b = points[point_idx + 1];
@@ -190,40 +190,45 @@ public:
 
 
             float distance = fmax(a.distance, b.distance);
-            std::cout << "distance: " << distance << std::endl;
-            float distance_quality = 1.0f - fmin(1.0f, distance);
+            float distance_quality = 1.0f - fmin(1.0f, distance - min_malformation_dist);
 
-            // int prev_point_idx = point_idx;
-            // while (prev_point_idx > 0) {
-            //     prev_point_idx--;
-            //     if ((b.position - points[prev_point_idx].position).squaredNorm() > EPSILON) { break; }
-            // }
+            int prev_point_idx = point_idx;
+            while (prev_point_idx > 0) {
+                prev_point_idx--;
+                if ((b.position - points[prev_point_idx].position).squaredNorm() > EPSILON) { break; }
+            }
 
-            // int next_point_index = point_idx;
-            // while (next_point_index < int(points.size()) - 1) {
-            //     next_point_index++;
-            //     if ((b.position - points[next_point_index].position).squaredNorm() > EPSILON) { break; }
-            // }
+            int next_point_index = point_idx;
+            while (next_point_index < int(points.size()) - 1) {
+                next_point_index++;
+                if ((b.position - points[next_point_index].position).squaredNorm() > EPSILON) { break; }
+            }
 
-            // float curvature_penalty = 0.0f;
-            // if (prev_point_idx != point_idx && next_point_index != point_idx) {
-            //     float distance = (b.position - a.position).norm();
-            //     float alfa     = angle(b.position - points[prev_point_idx].position, points[next_point_index].position - b.position);
-            //     cestim.add_point(distance, alfa);
+            float curvature_penalty = 0.0f;
+            if (prev_point_idx != point_idx && next_point_index != point_idx) {
+                float distance = (b.position - a.position).norm();
+                float alfa     = angle(b.position - points[prev_point_idx].position, points[next_point_index].position - b.position);
+                cestim.add_point(distance, alfa);
 
-            //     float curvature = std::abs(cestim.get_curvature());
-            //     if (curvature > 1.0f) {
-            //         curvature_penalty = 1.0f;
-            //     } else if (curvature > 0.1f) {
-            //         curvature_penalty = fmin(1.0, distance - min_malformation_dist) * curvature;
-            //     }
-            // }
-            a.quality = std::clamp(distance_quality, 0.0f, 1.0f);
+                float curvature = std::abs(cestim.get_curvature());
+                if (curvature > 1.0f) {
+                    curvature_penalty = 1.0f;
+                } else if (curvature > 0.1f) {
+                    curvature_penalty = fmin(1.0, distance - min_malformation_dist) * curvature;
+                }
+            }
+            a.quality = std::clamp(distance_quality - curvature_penalty, 0.0f, 1.0f);
+        }
+
+        if (points.size() >= 3) {
+            points[0].quality = points[1].quality;
+            points[points.size()-2].quality = points[points.size()-3].quality;
         }
 
         std::vector<ProcessedPoint> result;
         result.reserve(points.size());
-        for (const ExtendedPoint &p : points) { result.push_back({Point::new_scale(p.position), p.quality}); }
+        for (const ExtendedPoint &p : points) { 
+            result.push_back({Point::new_scale(p.position), p.quality}); }
 
         return result;
     }
