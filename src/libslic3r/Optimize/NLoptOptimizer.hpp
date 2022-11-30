@@ -40,29 +40,69 @@ struct IsNLoptAlg<NLoptAlgComb<a1, a2>> {
     static const constexpr bool value = true;
 };
 
+// NLopt can wrap any of its algorithms to use the augmented lagrangian method
+// for deriving an object function from all equality and inequality constraints
+// This way one can use algorithms that do not support these constraints natively
+template<class Alg> struct NLoptAUGLAG {};
+
+template<nlopt_algorithm a1, nlopt_algorithm a2>
+struct IsNLoptAlg<NLoptAUGLAG<NLoptAlgComb<a1, a2>>> {
+    static const constexpr bool value = true;
+};
+
+template<nlopt_algorithm a> struct IsNLoptAlg<NLoptAUGLAG<NLoptAlg<a>>> {
+    static const constexpr bool value = true;
+};
+
 template<class M, class T = void>
 using NLoptOnly = std::enable_if_t<IsNLoptAlg<M>::value, T>;
 
+template<class M> struct GetNLoptAlg_ {
+    static constexpr nlopt_algorithm Local = NLOPT_NUM_ALGORITHMS;
+    static constexpr nlopt_algorithm Global = NLOPT_NUM_ALGORITHMS;
+    static constexpr bool IsAUGLAG = false;
+};
+
+template<nlopt_algorithm a> struct GetNLoptAlg_<NLoptAlg<a>> {
+    static constexpr nlopt_algorithm Local = NLOPT_NUM_ALGORITHMS;
+    static constexpr nlopt_algorithm Global = a;
+    static constexpr bool IsAUGLAG = false;
+};
+
+template<nlopt_algorithm g, nlopt_algorithm l>
+struct GetNLoptAlg_<NLoptAlgComb<g, l>> {
+    static constexpr nlopt_algorithm Local = l;
+    static constexpr nlopt_algorithm Global = g;
+    static constexpr bool IsAUGLAG = false;
+};
+
+template<class M> constexpr nlopt_algorithm GetNLoptAlg_Global = GetNLoptAlg_<remove_cvref_t<M>>::Global;
+template<class M> constexpr nlopt_algorithm GetNLoptAlg_Local = GetNLoptAlg_<remove_cvref_t<M>>::Local;
+template<class M> constexpr bool IsAUGLAG = GetNLoptAlg_<remove_cvref_t<M>>::IsAUGLAG;
+
+template<class M> struct GetNLoptAlg_<NLoptAUGLAG<M>> {
+    static constexpr nlopt_algorithm Local = GetNLoptAlg_Local<M>;
+    static constexpr nlopt_algorithm Global = GetNLoptAlg_Global<M>;
+    static constexpr bool IsAUGLAG = true;
+};
 
 enum class OptDir { MIN, MAX }; // Where to optimize
 
-struct NLopt { // Helper RAII class for nlopt_opt
+struct NLoptRAII { // Helper RAII class for nlopt_opt
     nlopt_opt ptr = nullptr;
 
-    template<class...A> explicit NLopt(A&&...a)
+    template<class...A> explicit NLoptRAII(A&&...a)
     {
         ptr = nlopt_create(std::forward<A>(a)...);
     }
 
-    NLopt(const NLopt&) = delete;
-    NLopt(NLopt&&) = delete;
-    NLopt& operator=(const NLopt&) = delete;
-    NLopt& operator=(NLopt&&) = delete;
+    NLoptRAII(const NLoptRAII&) = delete;
+    NLoptRAII(NLoptRAII&&) = delete;
+    NLoptRAII& operator=(const NLoptRAII&) = delete;
+    NLoptRAII& operator=(NLoptRAII&&) = delete;
 
-    ~NLopt() { nlopt_destroy(ptr); }
+    ~NLoptRAII() { nlopt_destroy(ptr); }
 };
-
-template<class Method> class NLoptOpt {};
 
 // Map a generic function to each argument following the mapping function
 template<class Fn, class...Args>
@@ -96,10 +136,10 @@ auto wrap_tup(const std::tuple<Args...> &tup)
     return std::tuple<W<Args>...>(tup);
 }
 
-// Optimizers based on NLopt.
-template<nlopt_algorithm alg> class NLoptOpt<NLoptAlg<alg>> {
-protected:
+template<class M, class = NLoptOnly<M>>
+class NLoptOpt {
     StopCriteria m_stopcr;
+    StopCriteria m_loc_stopcr;
     OptDir m_dir = OptDir::MIN;
 
     static constexpr double ConstraintEps = 1e-6;
@@ -154,7 +194,7 @@ protected:
     }
 
     template<size_t N>
-    static void set_up(NLopt &nl,
+    static void set_up(NLoptRAII &nl,
                        const Bounds<N> &bounds,
                        const StopCriteria &stopcr)
     {
@@ -180,7 +220,7 @@ protected:
     }
 
     template<class Fn, size_t N, class...EqFns, class...IneqFns>
-    Result<N> optimize(NLopt &nl, Fn &&fn, const Input<N> &initvals,
+    Result<N> optimize(NLoptRAII &nl, Fn &&fn, const Input<N> &initvals,
                        const std::tuple<EqFns...> &equalities,
                        const std::tuple<IneqFns...> &inequalities)
     {
@@ -223,36 +263,6 @@ protected:
 
 public:
 
-    template<class Func, size_t N, class...EqFns, class...IneqFns>
-    Result<N> optimize(Func&& func,
-                       const Input<N> &initvals,
-                       const Bounds<N>& bounds,
-                       const std::tuple<EqFns...> &equalities,
-                       const std::tuple<IneqFns...> &inequalities)
-    {
-        NLopt nl{alg, N};
-        set_up(nl, bounds, m_stopcr);
-
-        return optimize(nl, std::forward<Func>(func), initvals,
-                        equalities, inequalities);
-    }
-
-    explicit NLoptOpt(const StopCriteria &stopcr = {}) : m_stopcr(stopcr) {}
-
-    void set_criteria(const StopCriteria &cr) { m_stopcr = cr; }
-    const StopCriteria &get_criteria() const noexcept { return m_stopcr; }
-    void set_dir(OptDir dir) noexcept { m_dir = dir; }
-
-    void seed(long s) { nlopt_srand(s); }
-};
-
-template<nlopt_algorithm glob, nlopt_algorithm loc>
-class NLoptOpt<NLoptAlgComb<glob, loc>>: public NLoptOpt<NLoptAlg<glob>>
-{
-    using Base = NLoptOpt<NLoptAlg<glob>>;
-    StopCriteria m_loc_stopcr;
-public:
-
     template<class Fn, size_t N, class...EqFns, class...IneqFns>
     Result<N> optimize(Fn&& f,
                        const Input<N> &initvals,
@@ -260,22 +270,59 @@ public:
                        const std::tuple<EqFns...> &equalities,
                        const std::tuple<IneqFns...> &inequalities)
     {
-        NLopt nl_glob{glob, N}, nl_loc{loc, N};
+        if constexpr (IsAUGLAG<M>) {
+            NLoptRAII nl_wrap{NLOPT_AUGLAG, N};
+            set_up(nl_wrap, bounds, get_criteria());
 
-        Base::set_up(nl_glob, bounds, Base::get_criteria());
-        Base::set_up(nl_loc, bounds, m_loc_stopcr);
-        nlopt_set_local_optimizer(nl_glob.ptr, nl_loc.ptr);
+            NLoptRAII nl_glob{GetNLoptAlg_Global<M>, N};
+            set_up(nl_glob, bounds, get_criteria());
+            nlopt_set_local_optimizer(nl_wrap.ptr, nl_glob.ptr);
 
-        return Base::optimize(nl_glob, std::forward<Fn>(f), initvals,
-                              equalities, inequalities);
+            if constexpr (GetNLoptAlg_Local<M> < NLOPT_NUM_ALGORITHMS) {
+                NLoptRAII nl_loc{GetNLoptAlg_Local<M>, N};
+                set_up(nl_loc, bounds, m_loc_stopcr);
+                nlopt_set_local_optimizer(nl_glob.ptr, nl_loc.ptr);
+
+                return optimize(nl_wrap, std::forward<Fn>(f), initvals,
+                                equalities, inequalities);
+            } else {
+                return optimize(nl_wrap, std::forward<Fn>(f), initvals,
+                                equalities, inequalities);
+            }
+        } else {
+            NLoptRAII nl_glob{GetNLoptAlg_Global<M>, N};
+            set_up(nl_glob, bounds, get_criteria());
+
+            if constexpr (GetNLoptAlg_Local<M> < NLOPT_NUM_ALGORITHMS) {
+                NLoptRAII nl_loc{GetNLoptAlg_Local<M>, N};
+                set_up(nl_loc, bounds, m_loc_stopcr);
+                nlopt_set_local_optimizer(nl_glob.ptr, nl_loc.ptr);
+
+                return optimize(nl_glob, std::forward<Fn>(f), initvals,
+                                equalities, inequalities);
+            } else {
+                return optimize(nl_glob, std::forward<Fn>(f), initvals,
+                                equalities, inequalities);
+            }
+        }
+
+        assert(false);
+
+        return {};
     }
 
-    explicit NLoptOpt(StopCriteria stopcr = {})
-        : Base{stopcr}, m_loc_stopcr{stopcr}
+    explicit NLoptOpt(const StopCriteria &stopcr_glob = {})
+        : m_stopcr(stopcr_glob)
     {}
+
+    void set_criteria(const StopCriteria &cr) { m_stopcr = cr; }
+    const StopCriteria &get_criteria() const noexcept { return m_stopcr; }
 
     void set_loc_criteria(const StopCriteria &cr) { m_loc_stopcr = cr; }
     const StopCriteria &get_loc_criteria() const noexcept { return m_loc_stopcr; }
+
+    void set_dir(OptDir dir) noexcept { m_dir = dir; }
+    void seed(long s) { nlopt_srand(s); }
 };
 
 template<class Alg> struct AlgFeatures_ {
@@ -345,8 +392,12 @@ using AlgNLoptORIG_DIRECT = detail::NLoptAlg<NLOPT_GN_ORIG_DIRECT>;
 using AlgNLoptISRES       = detail::NLoptAlg<NLOPT_GN_ISRES>;
 using AlgNLoptAGS         = detail::NLoptAlg<NLOPT_GN_AGS>;
 
-using AlgNLoptMLSL        = detail::NLoptAlgComb<NLOPT_GN_MLSL, NLOPT_LN_SBPLX>;
-using AlgNLoptMLSL_Cobyla = detail::NLoptAlgComb<NLOPT_GN_MLSL, NLOPT_LN_COBYLA>;
+using AlgNLoptMLSL           = detail::NLoptAlgComb<NLOPT_GN_MLSL_LDS, NLOPT_LN_SBPLX>;
+using AlgNLoptMLSL_Cobyla    = detail::NLoptAlgComb<NLOPT_GN_MLSL, NLOPT_LN_COBYLA>;
+using AlgNLoptGenetic_Subplx = detail::NLoptAlgComb<NLOPT_GN_ESCH, NLOPT_LN_SBPLX>;
+
+// To craft auglag algorithms (constraint support through object function transformation)
+using detail::NLoptAUGLAG;
 
 namespace detail {
 
@@ -366,6 +417,11 @@ template<> struct AlgFeatures_<AlgNLoptORIG_DIRECT> {
 };
 
 template<> struct AlgFeatures_<AlgNLoptAGS> {
+    static constexpr bool SupportsInequalities = true;
+    static constexpr bool SupportsEqualities   = true;
+};
+
+template<class M> struct AlgFeatures_<NLoptAUGLAG<M>> {
     static constexpr bool SupportsInequalities = true;
     static constexpr bool SupportsEqualities   = true;
 };
