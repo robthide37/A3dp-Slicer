@@ -487,17 +487,6 @@ static bool feature_has_center(std::optional<Measure::SurfaceFeature> feature)
 
 bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
 {
-    auto activate_center_selection = [this, shift_down, control_down](SLAGizmoEventType action) {
-        bool ret = false;
-        switch (action)
-        {
-        case SLAGizmoEventType::CtrlDown:  { ret = shift_down && feature_has_center(m_curr_feature); break; }
-        case SLAGizmoEventType::ShiftDown: { ret = control_down && feature_has_center(m_curr_feature); break; }
-        default:                           { break; }
-        }
-        return ret;
-    };
-
     if (action == SLAGizmoEventType::ShiftDown) {
         if (m_shift_kar_filter.is_first()) {
             m_mode = EMode::PointSelection;
@@ -597,8 +586,6 @@ void GLGizmoMeasure::on_render()
 //    // do not render if the user is panning/rotating the 3d scene
 //    if (m_parent.is_mouse_dragging())
 //        return;
-
-    const Selection& selection = m_parent.get_selection();
 
     update_if_needed();
 
