@@ -311,6 +311,42 @@ void ImGuiWrapper::new_frame()
 
     ImGui::NewFrame();
     m_new_frame_open = true;
+
+    // synchronize key states
+    // when the application loses the focus it may happen that the key up event is not processed
+
+    // modifier keys
+    auto synchronize_mod_key = [](const std::pair<ImGuiKeyModFlags_, wxKeyCode>& key) {
+        ImGuiIO& io = ImGui::GetIO();
+        if ((io.KeyMods & key.first) != 0 && !wxGetKeyState(key.second))
+            io.KeyMods &= ~key.first;
+    };
+
+    std::vector<std::pair<ImGuiKeyModFlags_, wxKeyCode>> imgui_mod_keys = {
+        { ImGuiKeyModFlags_Ctrl, WXK_CONTROL },
+        { ImGuiKeyModFlags_Shift, WXK_SHIFT },
+        { ImGuiKeyModFlags_Alt, WXK_ALT }
+    };
+
+    for (const std::pair<ImGuiKeyModFlags_, wxKeyCode>& key : imgui_mod_keys) {
+        synchronize_mod_key(key);
+    }
+
+    // regular keys
+    ImGuiIO& io = ImGui::GetIO();
+    for (size_t i = 0; i < IM_ARRAYSIZE(io.KeysDown); ++i) {
+        wxKeyCode keycode = WXK_NONE;
+        if (33 <= i && i <= 126)
+            keycode = (wxKeyCode)i;
+        else {
+            auto it = std::find(std::begin(io.KeyMap), std::end(io.KeyMap), i);
+            if (it != std::end(io.KeyMap))
+                keycode = (wxKeyCode)i;
+        }
+
+        if (io.KeysDown[i] && keycode != WXK_NONE && !wxGetKeyState(keycode))
+          io.KeysDown[i] = false;
+    }
 }
 
 void ImGuiWrapper::render()
