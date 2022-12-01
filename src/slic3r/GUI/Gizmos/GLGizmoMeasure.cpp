@@ -82,17 +82,6 @@ static std::string point_on_feature_type_as_string(Measure::SurfaceFeatureType t
     return ret;
 }
 
-static std::string center_on_feature_type_as_string(Measure::SurfaceFeatureType type)
-{
-    std::string ret;
-    switch (type) {
-    case Measure::SurfaceFeatureType::Edge:   { ret = _u8L("Center of edge"); break; }
-    case Measure::SurfaceFeatureType::Circle: { ret = _u8L("Center of circle"); break; }
-    default:                                  { assert(false); break; }
-    }
-    return ret;
-}
-
 static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const std::vector<std::vector<int>>& planes_triangles, int idx)
 {
     assert(0 <= idx && idx < (int)planes_triangles.size());
@@ -475,13 +464,6 @@ void GLGizmoMeasure::data_changed()
     m_selected_sphere_raycasters.clear();
     m_editing_distance = false;
     m_is_editing_distance_first_frame = true;
-}
-
-static bool feature_has_center(std::optional<Measure::SurfaceFeature> feature)
-{
-    return feature.has_value() ?
-        (feature->get_type() == Measure::SurfaceFeatureType::Circle || (feature->get_type() == Measure::SurfaceFeatureType::Edge && feature->get_extra_point().has_value()))
-        : false;
 }
 
 bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
