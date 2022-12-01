@@ -336,7 +336,7 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
             };
 
             auto requires_sphere_raycaster_for_picking = [this](const SelectedFeatures::Item& item) {
-                if (m_mode == EMode::PointSelection)
+                if (m_mode == EMode::PointSelection || item.feature->get_type() == Measure::SurfaceFeatureType::Point)
                     return true;
                 else if (m_mode == EMode::FeatureSelection) {
                     if (is_feature_with_center(*item.feature))
