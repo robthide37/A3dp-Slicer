@@ -94,6 +94,11 @@ static constexpr const size_t VERTEX_BUFFER_RESERVE_SIZE = 131072 * 2; // 1.05MB
 //static constexpr const size_t VERTEX_BUFFER_RESERVE_SIZE_SUM_MAX = 1024 * 1024 * 128 / 4; // 128MB
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
+#define SHOW_IMGUI_DEMO_WINDOW
+#ifdef SHOW_IMGUI_DEMO_WINDOW
+static bool show_imgui_demo_window = false;
+#endif // SHOW_IMGUI_DEMO_WINDOW
+
 namespace Slic3r {
 namespace GUI {
 
@@ -1694,8 +1699,10 @@ void GLCanvas3D::render()
         }
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
     }
-
-    ImGui::ShowDemoWindow();
+    
+#ifdef SHOW_IMGUI_DEMO_WINDOW
+    if (show_imgui_demo_window) ImGui::ShowDemoWindow();
+#endif // SHOW_IMGUI_DEMO_WINDOW    
 
     const bool is_looking_downward = camera.is_looking_downward();
 
@@ -2642,10 +2649,11 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
     if (!m_initialized)
         return;
 
-    // see include/wx/defs.h enum wxKeyCode
-    int keyCode = evt.GetKeyCode();
-    int ctrlMask = wxMOD_CONTROL;
-    int shiftMask = wxMOD_SHIFT;
+#ifdef SHOW_IMGUI_DEMO_WINDOW
+    static int cur = 0;
+    if (wxString("demo")[cur] = evt.GetUnicodeKey()) ++cur; else cur = 0;
+    if (cur == 4) { show_imgui_demo_window = !show_imgui_demo_window; cur = 0;}
+#endif // SHOW_IMGUI_DEMO_WINDOW
 
     auto imgui = wxGetApp().imgui();
     if (imgui->update_key_data(evt)) {
@@ -2653,6 +2661,10 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
         return;
     }
 
+    // see include/wx/defs.h enum wxKeyCode
+    int keyCode = evt.GetKeyCode();
+    int ctrlMask = wxMOD_CONTROL;
+    int shiftMask = wxMOD_SHIFT;
     if (keyCode == WXK_ESCAPE && (_deactivate_undo_redo_toolbar_items() || _deactivate_search_toolbar_item() || _deactivate_arrange_menu()))
         return;
 
