@@ -1901,14 +1901,15 @@ void GLGizmoCut3D::render_connectors()
             m_has_invalid_connector = true;
             render_color = CONNECTOR_ERR_COLOR;
         }
-        else if (!m_connectors_editing)
+        else // default connector color
+            render_color = connector.attribs.type == CutConnectorType::Dowel ? DOWEL_COLOR          : PLAG_COLOR;
+
+        if (!m_connectors_editing)
             render_color = CONNECTOR_ERR_COLOR;
         else if (size_t(m_hover_id - m_connectors_group_id) == i)
-            render_color = connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR : HOVERED_PLAG_COLOR;
+            render_color = connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR  : HOVERED_PLAG_COLOR;
         else if (m_selected[i])
             render_color = connector.attribs.type == CutConnectorType::Dowel ? SELECTED_DOWEL_COLOR : SELECTED_PLAG_COLOR;
-        else // neither hover nor picking
-            render_color = connector.attribs.type == CutConnectorType::Dowel ? DOWEL_COLOR          : PLAG_COLOR;
 
         const Camera& camera = wxGetApp().plater()->get_camera();
         if (connector.attribs.type  == CutConnectorType::Dowel &&
@@ -2141,12 +2142,14 @@ bool GLGizmoCut3D::add_connector(CutConnectors& connectors, const Vec2d& mouse_p
     std::pair<Vec3d, Vec3d> pos_and_normal;
     Vec3d pos_world;
     if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal, pos_world)) {
-        const Vec3d& hit = pos_and_normal.first;
+        // check if pos is out of enabled clipping plane
+        if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(pos_world))
+            return true;
 
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
         unselect_all_connectors();
 
-        connectors.emplace_back(hit, m_rotation_m,
+        connectors.emplace_back(pos_and_normal.first, m_rotation_m,
                                 m_connector_size * 0.5f, m_connector_depth_ratio,
                                 m_connector_size_tolerance, m_connector_depth_ratio_tolerance,
                                 CutConnectorAttributes( CutConnectorType(m_connector_type),
@@ -2241,8 +2244,20 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
         (action == SLAGizmoEventType::LeftDown || action == SLAGizmoEventType::LeftUp || action == SLAGizmoEventType::Moving) )
         return process_cut_line(action, mouse_position);
 
-    if (!m_connectors_editing)
+    if (!m_connectors_editing) {
+        if (0 && action == SLAGizmoEventType::LeftDown) {
+            // disable / enable current contour
+            std::pair<Vec3d, Vec3d> pos_and_normal;
+            Vec3d pos_world;
+            if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal, pos_world)) {
+                // Following would inform the clipper about the mouse click, so it can
+                // toggle the respective contour as disabled.
+                m_c->object_clipper()->pass_mouse_click(pos_world);
+                return true;
+            }
+        }
         return false;
+    }
 
     CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;
 
