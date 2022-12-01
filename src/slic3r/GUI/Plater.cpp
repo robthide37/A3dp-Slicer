@@ -4977,7 +4977,7 @@ bool Plater::priv::can_split_to_volumes() const
 
 bool Plater::priv::can_arrange() const
 {
-    if (model.objects.empty() && m_worker.is_idle()) return false;
+    if (model.objects.empty() || !m_worker.is_idle()) return false;
     if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
     return true;
 }
@@ -6821,8 +6821,8 @@ GLCanvas3D* Plater::get_current_canvas3D()
 
 void Plater::arrange()
 {
-    auto &w = get_ui_job_worker();
-    if (w.is_idle()) {
+    if (p->can_arrange()) {
+        auto &w = get_ui_job_worker();
         p->take_snapshot(_L("Arrange"));
         replace_job(w, std::make_unique<ArrangeJob>());
     }

@@ -165,8 +165,6 @@ void ArrangeJob::process(Ctl &ctl)
 {
     static const auto arrangestr = _u8L("Arranging");
 
-    ctl.update_status(0, arrangestr);
-
     arrangement::ArrangeParams params;
     Points bedpts;
     ctl.call_on_main_thread([this, &params, &bedpts]{
@@ -175,7 +173,12 @@ void ArrangeJob::process(Ctl &ctl)
            bedpts = get_bed_shape(*m_plater->config());
     }).wait();
 
-    auto   count  = unsigned(m_selected.size() + m_unprintable.size());
+    auto count  = unsigned(m_selected.size() + m_unprintable.size());
+
+    if (count == 0) // Should be taken care of by plater, but doesn't hurt
+        return;
+
+    ctl.update_status(0, arrangestr);
 
     params.stopcondition = [&ctl]() { return ctl.was_canceled(); };
 
