@@ -1138,6 +1138,23 @@ void GLGizmoEmboss::discard_and_close() {
     //  * Volume containing 3mf fix transformation - needs work around
 }
 
+void scopeguard_test() {
+    bool v = false;
+    {
+        ScopeGuard sg;
+        if (!v) { 
+            v = true;
+            sg = ScopeGuard([&v]() { 
+                if(!v) wxMessageBox("Guard is called twice.");
+                v = false; 
+            });
+            if (!v) wxMessageBox("v should be true in condition.");
+        }
+        if (!v) wxMessageBox("v should be true in scope.");
+    }
+    if (v) wxMessageBox("v should NOT be true.");
+}
+
 void GLGizmoEmboss::draw_window()
 {
 #ifdef ALLOW_DEBUG_MODE
@@ -1154,6 +1171,8 @@ void GLGizmoEmboss::draw_window()
     ScopeGuard unknown_font_sc([&]() { 
         m_imgui->disabled_end(); 
     });
+
+    scopeguard_test();
 
     draw_text_input();
     draw_model_type();

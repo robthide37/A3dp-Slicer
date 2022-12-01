@@ -1300,15 +1300,10 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-    ScopeGuard transparent_sg;
     if (type == ERenderType::Transparent) {
         glsafe(::glEnable(GL_BLEND));
         glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
         glsafe(::glDepthMask(false));
-        transparent_sg = ScopeGuard([]() {
-            glsafe(::glDisable(GL_BLEND));
-            glsafe(::glDepthMask(true));
-        });
     }
 
     glsafe(::glCullFace(GL_BACK));
@@ -1436,6 +1431,11 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
     if (disable_cullface)
         glsafe(::glEnable(GL_CULL_FACE));
+
+    if (type == ERenderType::Transparent) {
+        glsafe(::glDisable(GL_BLEND));
+        glsafe(::glDepthMask(true));
+    }
 }
 
 bool GLVolumeCollection::check_outside_state(const BuildVolume &build_volume, ModelInstanceEPrintVolumeState *out_state) const
