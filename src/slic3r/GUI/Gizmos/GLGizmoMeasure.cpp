@@ -1828,22 +1828,61 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 ColorRGBA color;
                 if (m_selected_features.second.feature.has_value()) {
                     if (m_selected_features.first.feature == m_curr_feature && m_mode == EMode::FeatureSelection) {
+                        // hovering over 1st selected feature
                         text = _u8L("Unselect feature");
+                        color = SELECTED_1ST_COLOR;
+                    }
+                    else if (m_hover_id == SEL_SPHERE_1_ID) {
+                        if (m_selected_features.first.is_center) {
+                            // hovering over center selected as 1st feature
+                            text = _u8L("Unselect center");
+                            color = SELECTED_1ST_COLOR;
+                        }
+                        else if (is_feature_with_center(*m_selected_features.first.feature)) {
+                            // hovering over center of 1st selected feature
+                            text = _u8L("Select center");
+                            color = SELECTED_1ST_COLOR;
+                        }
+                        else {
+                            // hovering over point selected as 1st feature
+                            text = _u8L("Unselect point");
+                            color = SELECTED_1ST_COLOR;
+                        }
+                    }
+                    else if (m_selected_features.first.is_center && m_selected_features.first.source == m_curr_feature) {
+                        // hovering over feature whose center is selected as 1st feature
+                        text = _u8L("Select feature");
                         color = SELECTED_1ST_COLOR;
                     }
                     else if (m_selected_features.second.feature == m_curr_feature && m_mode == EMode::FeatureSelection) {
+                        // hovering over 2nd selected feature
                         text = _u8L("Unselect feature");
                         color = SELECTED_2ND_COLOR;
                     }
-                    else if (m_hover_id == SEL_SPHERE_1_ID) {
-                        text = _u8L("Unselect point");
-                        color = SELECTED_1ST_COLOR;
-                    }
                     else if (m_hover_id == SEL_SPHERE_2_ID) {
-                        text = _u8L("Unselect point");
+                        if (m_selected_features.second.is_center) {
+                            // hovering over center selected as 2nd feature
+                            text = _u8L("Unselect feature");
+                            color = SELECTED_2ND_COLOR;
+                        }
+                        else if (is_feature_with_center(*m_selected_features.second.feature)) {
+                            // hovering over center of 2nd selected feature
+                            text = _u8L("Select center");
+                            color = SELECTED_2ND_COLOR;
+                        }
+                        else {
+                            // hovering over point selected as 2nd feature
+                            text = _u8L("Unselect point");
+                            color = SELECTED_2ND_COLOR;
+                        }
+                    }
+                    else if (m_selected_features.second.is_center && m_selected_features.second.source == m_curr_feature) {
+                        // hovering over feature whose center is selected as 2nd feature
+                        text = _u8L("Select feature");
                         color = SELECTED_2ND_COLOR;
                     }
                     else {
+                        // 1st feature selected
                         text = (m_mode == EMode::PointSelection) ? _u8L("Select point") : _u8L("Select feature");
                         color = SELECTED_2ND_COLOR;
                     }
@@ -1851,19 +1890,50 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 else {
                     if (m_selected_features.first.feature.has_value()) {
                         if (m_selected_features.first.feature == m_curr_feature && m_mode == EMode::FeatureSelection) {
+                            // hovering over 1st selected feature
                             text = _u8L("Unselect feature");
                             color = SELECTED_1ST_COLOR;
                         }
-                        else if (m_hover_id == SEL_SPHERE_1_ID) {
-                            text = _u8L("Unselect point");
-                            color = SELECTED_1ST_COLOR;
+                        else {
+                            if (m_hover_id == SEL_SPHERE_1_ID) {
+                                if (m_selected_features.first.is_center) {
+                                    // hovering over center selected as 1st feature
+                                    text = _u8L("Unselect feature");
+                                    color = SELECTED_1ST_COLOR;
+                                }
+                                else if (is_feature_with_center(*m_selected_features.first.feature)) {
+                                    // hovering over center of 1st selected feature
+                                    text = _u8L("Select center");
+                                    color = SELECTED_1ST_COLOR;
+                                }
+                                else {
+                                    // hovering over point selected as 1st feature
+                                    text = _u8L("Unselect point");
+                                    color = SELECTED_1ST_COLOR;
+                                }
+                            }
+                            else {
+                                if (m_selected_features.first.is_center && m_selected_features.first.source == m_curr_feature) {
+                                    // hovering over feature whose center is selected as 1st feature
+                                    text = _u8L("Select feature");
+                                    color = SELECTED_1ST_COLOR;
+                                }
+                                else {
+                                    // 1st feature selected
+                                    text = (m_mode == EMode::PointSelection) ? _u8L("Select point") : _u8L("Select feature");
+                                    color = SELECTED_2ND_COLOR;
+                                }
+                            }
                         }
                     }
-                    if (text.empty()) {
+                    else {
+                        // nothing is selected
                         text = (m_mode == EMode::PointSelection) ? _u8L("Select point") : _u8L("Select feature");
-                        color = m_selected_features.first.feature.has_value() ? SELECTED_2ND_COLOR : SELECTED_1ST_COLOR;
+                        color = SELECTED_1ST_COLOR;
                     }
                 }
+
+                assert(!text.empty());
 
                 m_imgui->text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), text);
                 ImGui::SameLine();
@@ -1982,7 +2052,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 if (use_inches)
                     distance = ObjectManipulation::mm_to_in * distance;
                 ImGui::PushID("ClipboardDistanceInfinite");
-                add_measure_row_to_table(_u8L("Distance Infinite"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
+                add_measure_row_to_table(_u8L("Distance"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
                     ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 ++measure_row_count;
                 ImGui::PopID();
@@ -1993,7 +2063,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 if (use_inches)
                     distance = ObjectManipulation::mm_to_in * distance;
                 ImGui::PushID("ClipboardDistanceStrict");
-                add_measure_row_to_table(_u8L("Distance Strict"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
+                add_measure_row_to_table(_u8L("Distance"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
                     ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 ++measure_row_count;
                 ImGui::PopID();
