@@ -3001,7 +3001,7 @@ bool Plater::priv::delete_object_from_model(size_t obj_idx)
         InfoDialog dialog(q, _L("Delete object which is a part of cut object"), 
                              _L("You try to delete an object which is a part of a cut object.\n"
                                 "This action will break a cut correspondence.\n"
-                                "After that PrusaSlicer can't garantie model consistency"), 
+                                "After that PrusaSlicer can't guarantee model consistency"), 
                                 false, wxYES | wxCANCEL | wxCANCEL_DEFAULT | wxICON_WARNING);
         dialog.SetButtonLabel(wxID_YES, _L("Delete object"));
         if (dialog.ShowModal() == wxID_CANCEL)
@@ -4977,7 +4977,7 @@ bool Plater::priv::can_split_to_volumes() const
 
 bool Plater::priv::can_arrange() const
 {
-    if (model.objects.empty() && m_worker.is_idle()) return false;
+    if (model.objects.empty() || !m_worker.is_idle()) return false;
     if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
     return true;
 }
@@ -6821,8 +6821,8 @@ GLCanvas3D* Plater::get_current_canvas3D()
 
 void Plater::arrange()
 {
-    auto &w = get_ui_job_worker();
-    if (w.is_idle()) {
+    if (p->can_arrange()) {
+        auto &w = get_ui_job_worker();
         p->take_snapshot(_L("Arrange"));
         replace_job(w, std::make_unique<ArrangeJob>());
     }

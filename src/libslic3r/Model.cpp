@@ -1279,6 +1279,14 @@ void ModelObject::invalidate_cut()
         volume->invalidate_cut_info();
 }
 
+void ModelObject::delete_connectors()
+{
+    for (int id = int(this->volumes.size()) - 1; id >= 0; id--) {
+        if (volumes[id]->is_cut_connector())
+            this->delete_volume(size_t(id));
+    }
+}
+
 void ModelObject::synchronize_model_after_cut()
 {
     for (ModelObject* obj : m_model->objects) {
@@ -1992,6 +2000,14 @@ int ModelObject::get_repaired_errors_count(const int vol_idx /*= -1*/) const
 
     return  stats.degenerate_facets + stats.edges_fixed     + stats.facets_removed +
             stats.facets_reversed + stats.backwards_edges;
+}
+
+bool ModelObject::has_solid_mesh() const
+{
+    for (const ModelVolume* volume : volumes)
+        if (volume->is_model_part())
+            return true;
+    return false;
 }
 
 void ModelVolume::set_material_id(t_model_material_id material_id)

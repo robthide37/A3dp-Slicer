@@ -266,6 +266,7 @@ public:
     void                del_instances_from_object(const int obj_idx);
     void                del_layer_from_object(const int obj_idx, const t_layer_height_range& layer_range);
     void                del_layers_from_object(const int obj_idx);
+    bool                del_from_cut_object(bool is_connector, bool is_model_part = false, bool is_negative_volume = false);
     bool                del_subobject_from_object(const int obj_idx, const int idx, const int type);
     void                del_info_item(const int obj_idx, InfoItemType type);
     void                split();
@@ -282,7 +283,9 @@ public:
     bool                can_split_instances();
     bool                has_selected_cut_object() const;
     void                invalidate_cut_info_for_selection();
-    void                invalidate_cut_info_for_object(size_t obj_idx);
+    void                invalidate_cut_info_for_object(int obj_idx);
+    void                delete_all_connectors_for_selection();
+    void                delete_all_connectors_for_object(int obj_idx);
     bool                can_merge_to_multipart_object() const;
     bool                can_merge_to_single_object() const;
 
