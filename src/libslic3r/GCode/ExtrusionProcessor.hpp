@@ -162,20 +162,20 @@ public:
         };
 
         float flow_width             = path.width;
-        float min_malformation_dist  = 0.1;
-        float peak_malformation_dist = 1.0;
+        float min_malformation_dist  = 0.2 * flow_width;
+        float peak_malformation_dist = 0.75 * flow_width;
 
         const Points              &original_points = path.polyline.points;
         std::vector<ExtendedPoint> points;
 
-        float distance = prev_layer_boundary.signed_distance_from_lines(unscaled(original_points[0])) / flow_width + 0.5 * flow_width;
+        float distance = prev_layer_boundary.signed_distance_from_lines(unscaled(original_points[0])) + 0.5 * flow_width;
         points.push_back({unscaled(original_points[0]), distance, 1.0f});
         for (size_t i = 1; i < original_points.size(); i++) {
             Vec2d next_point_pos   = unscaled(original_points[i]);
-            float distance_of_next = prev_layer_boundary.signed_distance_from_lines(next_point_pos) / flow_width + 0.5 * flow_width;
-            if (points.back().distance < min_malformation_dist != distance_of_next < min_malformation_dist) { // one in air, one not
+            float distance_of_next = prev_layer_boundary.signed_distance_from_lines(next_point_pos) + 0.5 * flow_width;
+            if ((points.back().distance < min_malformation_dist) != (distance_of_next < min_malformation_dist)) { // one in air, one not
                 auto intersections = prev_layer_boundary.intersections_with_line<true>({points.back().position, next_point_pos});
-                for (const auto &intersection : intersections) { points.push_back({intersection, 0.0f, 1.0}); }
+                for (const auto &intersection : intersections) { points.push_back({intersection, 0.5f * flow_width, 1.0}); }
                 points.push_back({next_point_pos, distance_of_next, 1.0});
             }
 
@@ -188,10 +188,10 @@ public:
                     double t1 = std::max(a0, a1);
 
                     auto p0      = points.back().position + t0 * (next_point_pos - points.back().position);
-                    auto p0_dist = prev_layer_boundary.signed_distance_from_lines(p0) / flow_width + 0.5 * flow_width;
+                    auto p0_dist = prev_layer_boundary.signed_distance_from_lines(p0) + 0.5 * flow_width;
                     points.push_back({p0, float(p0_dist), 1.0});
                     auto p1      = points.back().position + t1 * (next_point_pos - points.back().position);
-                    auto p1_dist = prev_layer_boundary.signed_distance_from_lines(p1) / flow_width + 0.5 * flow_width;
+                    auto p1_dist = prev_layer_boundary.signed_distance_from_lines(p1) + 0.5 * flow_width;
                     points.push_back({p1, float(p1_dist), 1.0});
                 }
             }
@@ -235,11 +235,15 @@ public:
                 } else if (curvature > 0.1f) {
                     curvature_penalty = fmin(1.0, distance - min_malformation_dist) * curvature;
                 }
-
                 a.quality -= curvature_penalty;
+
             } else {
                 a.quality = 0.0f;
             }
+        }
+
+        if (points.size() > 3) {
+            points[points.size() - 2].quality = points[points.size()-3].quality;
         }
 
         std::vector<ProcessedPoint> result;
