@@ -82,6 +82,17 @@ static std::string point_on_feature_type_as_string(Measure::SurfaceFeatureType t
     return ret;
 }
 
+static std::string center_on_feature_type_as_string(Measure::SurfaceFeatureType type)
+{
+    std::string ret;
+    switch (type) {
+    case Measure::SurfaceFeatureType::Edge:   { ret = _u8L("Center of edge"); break; }
+    case Measure::SurfaceFeatureType::Circle: { ret = _u8L("Center of circle"); break; }
+    default: { assert(false); break; }
+    }
+    return ret;
+}
+
 static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const std::vector<std::vector<int>>& planes_triangles, int idx)
 {
     assert(0 <= idx && idx < (int)planes_triangles.size());
@@ -1973,7 +1984,8 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             if (!item.feature.has_value())
                 return _u8L("None");
 
-            std::string text = (item.source == item.feature) ? surface_feature_type_as_string(item.feature->get_type()) : point_on_feature_type_as_string(item.source->get_type(), m_hover_id);
+            std::string text = (item.source == item.feature) ? surface_feature_type_as_string(item.feature->get_type()) :
+                item.is_center ? center_on_feature_type_as_string(item.source->get_type()) : point_on_feature_type_as_string(item.source->get_type(), m_hover_id);
             if (item.feature.has_value() && item.feature->get_type() == Measure::SurfaceFeatureType::Circle) {
                 auto [center, radius, normal] = item.feature->get_circle();
                 const Vec3d on_circle = center + radius * Measure::get_orthogonal(normal, true);
