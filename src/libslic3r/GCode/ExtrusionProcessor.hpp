@@ -126,8 +126,8 @@ public:
         };
 
         float flow_width             = path.width;
-        float min_malformation_dist  = 0.2 * flow_width;
-        float peak_malformation_dist = 0.75 * flow_width;
+        float min_malformation_dist  = 0.1 * flow_width;
+        float peak_malformation_dist = 0.65 * flow_width;
 
         const Points              &original_points = path.polyline.points;
         std::vector<ExtendedPoint> points;
@@ -199,7 +199,7 @@ public:
                 if (curvature > 1.0f) {
                     curvature_penalty = 1.0f;
                 } else if (curvature > 0.1f) {
-                    curvature_penalty = fmin(1.0, distance - min_malformation_dist) * curvature;
+                    curvature_penalty = fmin(1.0, (distance - min_malformation_dist) / flow_width) * curvature;
                 }
                 a.quality -= curvature_penalty;
 
