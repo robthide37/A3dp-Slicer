@@ -227,7 +227,7 @@ void MeasuringImpl::update_planes()
 
                     // In case of broken meshes, this loop might be infinite. Break
                     // out in case it is clearly going bad.
-                    if (last_border.size() > 3*facets.size())
+                    if (last_border.size() > 3*facets.size()+1)
                         goto PLANE_FAILURE;
 
                 } while (he != he_start);
