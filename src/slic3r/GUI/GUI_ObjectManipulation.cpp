@@ -268,25 +268,39 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         btn->SetToolTip(wxString::Format(_L("Toggle %c axis mirroring"), (int)label));
         btn->SetBitmapDisabled_(m_mirror_bitmap_hidden);
 
+#if ENABLE_WORLD_COORDINATE
+        m_mirror_buttons[axis_idx] = btn;
+#else
         m_mirror_buttons[axis_idx].first = btn;
         m_mirror_buttons[axis_idx].second = mbShown;
+#endif // ENABLE_WORLD_COORDINATE
 
         sizer->AddStretchSpacer(2);
         sizer->Add(btn, 0, wxALIGN_CENTER_VERTICAL);
 
         btn->Bind(wxEVT_BUTTON, [this, axis_idx](wxCommandEvent&) {
+#if !ENABLE_WORLD_COORDINATE
             Axis axis = (Axis)(axis_idx + X);
             if (m_mirror_buttons[axis_idx].second == mbHidden)
-                return;
+              return;
+#endif // !ENABLE_WORLD_COORDINATE
 
             GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
             Selection& selection = canvas->get_selection();
 
 #if ENABLE_WORLD_COORDINATE
-            if (selection.is_single_volume_or_modifier()) {
+            TransformationType transformation_type;
+            if (is_local_coordinates())
+                transformation_type.set_local();
+            else if (is_instance_coordinates())
+                transformation_type.set_instance();
+
+            transformation_type.set_relative();
+
+            selection.setup_cache();
+            selection.mirror((Axis)axis_idx, transformation_type);
 #else
             if (selection.is_single_volume() || selection.is_single_modifier()) {
-#endif // ENABLE_WORLD_COORDINATE
                 GLVolume* volume = const_cast<GLVolume*>(selection.get_first_volume());
                 volume->set_volume_mirror(axis, -volume->get_volume_mirror(axis));
             }
@@ -302,6 +316,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
             // Update mirroring at the GLVolumes.
             selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
             selection.synchronize_unselected_volumes();
+#endif // ENABLE_WORLD_COORDINATE
             // Copy mirroring values from GLVolumes into Model (ModelInstance / ModelVolume), trigger background processing.
             canvas->do_mirror(L("Set Mirror"));
             UpdateAndShow(true);
@@ -977,16 +992,14 @@ void ObjectManipulation::update_mirror_buttons_visibility()
 {
     GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
     Selection& selection = canvas->get_selection();
-    std::array<MirrorButtonState, 3> new_states = {mbHidden, mbHidden, mbHidden};
 
 #if ENABLE_WORLD_COORDINATE
     if (is_local_coordinates()) {
-#else
-    if (!m_world_coordinates) {
-#endif // ENABLE_WORLD_COORDINATE
-#if ENABLE_WORLD_COORDINATE
         if (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) {
 #else
+    std::array<MirrorButtonState, 3> new_states = { mbHidden, mbHidden, mbHidden };
+
+    if (!m_world_coordinates) {
         if (selection.is_single_full_instance() || selection.is_single_modifier() || selection.is_single_volume()) {
 #endif // ENABLE_WORLD_COORDINATE
             const GLVolume* volume = selection.get_first_volume();
@@ -997,10 +1010,13 @@ void ObjectManipulation::update_mirror_buttons_visibility()
             else
                 mirror = volume->get_volume_mirror();
 
+#if !ENABLE_WORLD_COORDINATE
             for (unsigned char i=0; i<3; ++i)
                 new_states[i] = (mirror[i] < 0. ? mbActive : mbShown);
+#endif // !ENABLE_WORLD_COORDINATE
         }
     }
+#if !ENABLE_WORLD_COORDINATE
     else {
         // the mirroring buttons should be hidden in world coordinates,
         // unless we make it actually mirror in world coords.
@@ -1022,6 +1038,7 @@ void ObjectManipulation::update_mirror_buttons_visibility()
             }
         }
     });
+#endif // !ENABLE_WORLD_COORDINATE
 }
 
 
@@ -1432,8 +1449,14 @@ void ObjectManipulation::sys_color_changed()
     m_drop_to_bed_button->sys_color_changed();
     m_lock_bnt->sys_color_changed();
 
+#if ENABLE_WORLD_COORDINATE
+    for (int id = 0; id < 3; ++id) {
+        m_mirror_buttons[id]->sys_color_changed();
+    }
+#else
     for (int id = 0; id < 3; ++id)
         m_mirror_buttons[id].first->sys_color_changed();
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 #if ENABLE_WORLD_COORDINATE
