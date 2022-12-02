@@ -37,12 +37,12 @@
 
 
 //====================
-// 2.5.0.alpha1 techs
+// 2.6.0.alpha1 techs
 //====================
-#define ENABLE_2_5_0_ALPHA1 1
+#define ENABLE_2_6_0_ALPHA1 1
 
 // Enable removal of legacy OpenGL calls
-#define ENABLE_LEGACY_OPENGL_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+#define ENABLE_LEGACY_OPENGL_REMOVAL (1 && ENABLE_2_6_0_ALPHA1)
 // Enable OpenGL ES
 #define ENABLE_OPENGL_ES (0 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable OpenGL core profile context (tested against Mesa 20.1.8 on Windows)
@@ -52,15 +52,15 @@
 // Shows an imgui dialog with GLModel statistics data
 #define ENABLE_GLMODEL_STATISTICS (0 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable rework of Reload from disk command
-#define ENABLE_RELOAD_FROM_DISK_REWORK (1 && ENABLE_2_5_0_ALPHA1)
+#define ENABLE_RELOAD_FROM_DISK_REWORK (1 && ENABLE_2_6_0_ALPHA1)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
-#define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
+#define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_6_0_ALPHA1)
 // Enable alternative version of file_wildcards()
-#define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_5_0_ALPHA1)
+#define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_6_0_ALPHA1)
 // Enable processing of gcode G2 and G3 lines
-#define ENABLE_PROCESS_G2_G3_LINES (1 && ENABLE_2_5_0_ALPHA1)
+#define ENABLE_PROCESS_G2_G3_LINES (1 && ENABLE_2_6_0_ALPHA1)
 // Enable fix of used filament data exported to gcode file
-#define ENABLE_USED_FILAMENT_POST_PROCESS (1 && ENABLE_2_5_0_ALPHA1)
+#define ENABLE_USED_FILAMENT_POST_PROCESS (1 && ENABLE_2_6_0_ALPHA1)
 // Enable picking using raytracing
 #define ENABLE_RAYCAST_PICKING (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
 #define ENABLE_RAYCAST_PICKING_DEBUG (0 && ENABLE_RAYCAST_PICKING)
