@@ -274,10 +274,12 @@ bool ImGuiWrapper::update_key_data(wxKeyEvent &evt)
         // Char event
         const auto   key   = evt.GetUnicodeKey();
         unsigned int key_u = static_cast<unsigned int>(key);
+
         // Release BackSpace, Delete, ... when miss wxEVT_KEY_UP event
-        if (key_u >= 0 && key_u < IM_ARRAYSIZE(io.KeysDown) && io.KeysDown[key_u]) { 
-            io.KeysDown[key_u] = false;
-        }
+        // Already Fixed at begining of new frame
+        //if (key_u >= 0 && key_u < IM_ARRAYSIZE(io.KeysDown) && io.KeysDown[key_u]) { 
+        //    io.KeysDown[key_u] = false;
+        //}
 
         if (key != 0) {
             io.AddInputCharacter(key);
@@ -299,6 +301,7 @@ bool ImGuiWrapper::update_key_data(wxKeyEvent &evt)
     return ret;
 }
 
+#include <array>
 void ImGuiWrapper::new_frame()
 {
     if (m_new_frame_open) {
@@ -312,40 +315,33 @@ void ImGuiWrapper::new_frame()
     ImGui::NewFrame();
     m_new_frame_open = true;
 
+    ImGuiIO& io = ImGui::GetIO();
     // synchronize key states
     // when the application loses the focus it may happen that the key up event is not processed
 
-    // modifier keys
-    auto synchronize_mod_key = [](const std::pair<ImGuiKeyModFlags_, wxKeyCode>& key) {
-        ImGuiIO& io = ImGui::GetIO();
+    // synchronize modifier keys
+    constexpr std::array<std::pair<ImGuiKeyModFlags_, wxKeyCode>, 3> imgui_mod_keys{
+        std::make_pair(ImGuiKeyModFlags_Ctrl, WXK_CONTROL),
+        std::make_pair(ImGuiKeyModFlags_Shift, WXK_SHIFT),
+        std::make_pair(ImGuiKeyModFlags_Alt, WXK_ALT)};
+    for (const std::pair<ImGuiKeyModFlags_, wxKeyCode>& key : imgui_mod_keys) {
         if ((io.KeyMods & key.first) != 0 && !wxGetKeyState(key.second))
             io.KeyMods &= ~key.first;
-    };
-
-    std::vector<std::pair<ImGuiKeyModFlags_, wxKeyCode>> imgui_mod_keys = {
-        { ImGuiKeyModFlags_Ctrl, WXK_CONTROL },
-        { ImGuiKeyModFlags_Shift, WXK_SHIFT },
-        { ImGuiKeyModFlags_Alt, WXK_ALT }
-    };
-
-    for (const std::pair<ImGuiKeyModFlags_, wxKeyCode>& key : imgui_mod_keys) {
-        synchronize_mod_key(key);
     }
 
-    // regular keys
-    ImGuiIO& io = ImGui::GetIO();
-    for (size_t i = 0; i < IM_ARRAYSIZE(io.KeysDown); ++i) {
-        wxKeyCode keycode = WXK_NONE;
-        if (33 <= i && i <= 126)
-            keycode = (wxKeyCode)i;
-        else {
-            auto it = std::find(std::begin(io.KeyMap), std::end(io.KeyMap), i);
-            if (it != std::end(io.KeyMap))
-                keycode = (wxKeyCode)i;
-        }
-
+    // Not sure if it is neccessary
+    // values from 33 to 126 are reserved for the standard ASCII characters
+    for (size_t i = 33; i <= 126; ++i) { 
+        wxKeyCode keycode = static_cast<wxKeyCode>(i);
         if (io.KeysDown[i] && keycode != WXK_NONE && !wxGetKeyState(keycode))
-          io.KeysDown[i] = false;
+            io.KeysDown[i] = false;
+    }
+
+    // special keys: delete, backspace, ...
+    for (int key: io.KeyMap) {
+        wxKeyCode keycode = static_cast<wxKeyCode>(key);
+        if (io.KeysDown[key] && keycode != WXK_NONE && !wxGetKeyState(keycode)) 
+            io.KeysDown[key] = false;
     }
 }
 
