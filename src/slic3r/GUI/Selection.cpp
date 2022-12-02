@@ -1268,6 +1268,13 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
     }
 }
 
+#if ENABLE_WORLD_COORDINATE
+void Selection::mirror(Axis axis, TransformationType transformation_type)
+{
+  const Vec3d mirror((axis == X) ? -1.0 : 1.0, (axis == Y) ? -1.0 : 1.0, (axis == Z) ? -1.0 : 1.0);
+  scale_and_translate(mirror, Vec3d::Zero(), transformation_type);
+}
+#else
 void Selection::mirror(Axis axis)
 {
     if (!m_valid)
@@ -1290,6 +1297,7 @@ void Selection::mirror(Axis axis)
 
     set_bounding_boxes_dirty();
 }
+#endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_WORLD_COORDINATE
 void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation, TransformationType transformation_type)

@@ -302,7 +302,7 @@ public:
     void set_deserialized(EMode mode, const std::vector<std::pair<size_t, size_t>> &volumes_and_instances);
 
     // Update the selection based on the new instance IDs.
-	void instances_changed(const std::vector<size_t> &instance_ids_selected);
+    void instances_changed(const std::vector<size_t> &instance_ids_selected);
     // Update the selection based on the map from old indices to new indices after m_volumes changed.
     // If the current selection is by instance, this call may select newly added volumes, if they belong to already selected instances.
     void volumes_changed(const std::vector<size_t> &map_volume_old_to_new);
@@ -402,11 +402,12 @@ public:
     void flattening_rotate(const Vec3d& normal);
     void scale(const Vec3d& scale, TransformationType transformation_type);
     void scale_to_fit_print_volume(const BuildVolume& volume);
-    void mirror(Axis axis);
 #if ENABLE_WORLD_COORDINATE
     void scale_and_translate(const Vec3d& scale, const Vec3d& translation, TransformationType transformation_type);
+    void mirror(Axis axis, TransformationType transformation_type);
     void reset_skew();
 #else
+    void mirror(Axis axis);
     void translate(unsigned int object_idx, const Vec3d& displacement);
 #endif // ENABLE_WORLD_COORDINATE
     void translate(unsigned int object_idx, unsigned int instance_idx, const Vec3d& displacement);
