@@ -200,7 +200,7 @@ bool StyleManager::load_style(const EmbossStyle &style, const wxFont &font)
     return true;
 }
 
-bool StyleManager::is_activ_font() { return m_style_cache.font_file.has_value(); }
+bool StyleManager::is_active_font() { return m_style_cache.font_file.has_value(); }
 
 bool StyleManager::load_first_valid_font() {
     while (!m_style_items.empty()) {
@@ -228,7 +228,7 @@ void StyleManager::clear_imgui_font() { m_style_cache.atlas.Clear(); }
 
 ImFont *StyleManager::get_imgui_font()
 {
-    if (!is_activ_font()) return nullptr;
+    if (!is_active_font()) return nullptr;
     
     ImVector<ImFont *> &fonts = m_style_cache.atlas.Fonts;
     if (fonts.empty()) return nullptr;

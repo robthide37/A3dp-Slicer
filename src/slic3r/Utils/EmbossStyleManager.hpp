@@ -185,7 +185,7 @@ public:
     };
 
     // check if exist selected font style in manager
-    bool is_activ_font();
+    bool is_active_font();
 
     // Limits for imgui loaded font size
     // Value out of limits is crop

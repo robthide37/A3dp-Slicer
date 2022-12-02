@@ -315,8 +315,8 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
             angle_opt.reset();        
 
         // set into activ style
-        assert(m_style_manager.is_activ_font());
-        if (m_style_manager.is_activ_font())
+        assert(m_style_manager.is_active_font());
+        if (m_style_manager.is_active_font())
             m_style_manager.get_font_prop().angle = angle_opt;
 
     }
@@ -1042,7 +1042,7 @@ bool GLGizmoEmboss::process()
     if (m_text.empty()) return false;
 
     // exist loaded font file?
-    if (!m_style_manager.is_activ_font()) return false;
+    if (!m_style_manager.is_active_font()) return false;
     
     // Cancel previous Job, when it is in process
     // Can't use cancel, because I want cancel only previous EmbossUpdateJob no other jobs
@@ -1145,8 +1145,8 @@ void GLGizmoEmboss::draw_window()
     if (ImGui::Button("add svg")) choose_svg_file();
 #endif //  ALLOW_DEBUG_MODE
 
-    bool is_activ_font = m_style_manager.is_activ_font();
-    if (!is_activ_font)
+    bool is_active_font = m_style_manager.is_active_font();
+    if (!is_active_font)
         m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Warning: No font is selected. Select correct one."));
     
     // Disable all except selection of font, when open text from 3mf with unknown font
@@ -1158,7 +1158,7 @@ void GLGizmoEmboss::draw_window()
     draw_text_input();
     draw_model_type();
     draw_style_list();
-    m_imgui->disabled_begin(!is_activ_font);
+    m_imgui->disabled_begin(!is_active_font);
     ImGui::TreePush();
     draw_style_edit();
     ImGui::TreePop();
@@ -1176,7 +1176,7 @@ void GLGizmoEmboss::draw_window()
         ImGui::TreePop();
     } else if (m_is_advanced_edit_style) 
         set_minimal_window_size(false);
-    m_imgui->disabled_end(); // !is_activ_font
+    m_imgui->disabled_end(); // !is_active_font
        
 #ifdef SHOW_WX_FONT_DESCRIPTOR
     if (is_selected_style)
@@ -1655,7 +1655,7 @@ void GLGizmoEmboss::draw_font_list()
 {
     // Set partial
     wxString actual_face_name;
-    if (m_style_manager.is_activ_font()) {
+    if (m_style_manager.is_active_font()) {
         const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
         if (wx_font_opt.has_value())
             actual_face_name = wx_font_opt->GetFaceName();
@@ -2088,7 +2088,7 @@ void GLGizmoEmboss::fix_transformation(const FontProp &from,
 }
 
 void GLGizmoEmboss::draw_style_list() {
-    if (!m_style_manager.is_activ_font()) return;
+    if (!m_style_manager.is_active_font()) return;
 
     const EmbossStyle *stored_style = nullptr;
     bool is_stored = m_style_manager.exist_stored_style();
@@ -3255,7 +3255,7 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager& st
     };
 
     auto create_configuration = [&]() -> TextConfiguration {
-        if (!style_manager.is_activ_font()) {
+        if (!style_manager.is_active_font()) {
             std::string       default_text_for_emboss = _u8L("Embossed text");
             EmbossStyle       es                      = style_manager.get_style();
             TextConfiguration tc{es, default_text_for_emboss};
