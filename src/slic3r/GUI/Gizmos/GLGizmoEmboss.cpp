@@ -2013,9 +2013,9 @@ void GLGizmoEmboss::draw_delete_style_button() {
     if (draw_button(IconType::erase, !can_delete)) {
         while (true) {
             // NOTE: can't use previous loaded activ index -> erase could change index
-            size_t activ_index = m_style_manager.get_style_index();
-            next_style_index = (activ_index > 0) ? activ_index - 1 :
-                                                   activ_index + 1;
+            size_t active_index = m_style_manager.get_style_index();
+            next_style_index = (active_index > 0) ? active_index - 1 :
+                                                   active_index + 1;
             if (next_style_index >= m_style_manager.get_styles().size()) {
                 // can't remove last font style
                 // TODO: inform user
@@ -2029,7 +2029,7 @@ void GLGizmoEmboss::draw_delete_style_button() {
             }
 
             // load back
-            m_style_manager.load_style(activ_index);
+            m_style_manager.load_style(active_index);
             ImGui::OpenPopup(popup_id);
             break;
         }
@@ -2050,9 +2050,9 @@ void GLGizmoEmboss::draw_delete_style_button() {
         std::string text_in_popup = GUI::format(_L("Are you sure,\nthat you want permanently and unrecoverable \nremove style \"%1%\"?"), style_name);
         ImGui::Text("%s", text_in_popup.c_str());
         if (ImGui::Button(_u8L("Yes").c_str())) {
-            size_t activ_index = m_style_manager.get_style_index();
+            size_t active_index = m_style_manager.get_style_index();
             m_style_manager.load_style(next_style_index);
-            m_style_manager.erase(activ_index);
+            m_style_manager.erase(active_index);
             m_style_manager.store_styles_to_app_config(wxGetApp().app_config);
             ImGui::CloseCurrentPopup();
             process();

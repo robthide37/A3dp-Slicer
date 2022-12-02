@@ -46,7 +46,7 @@ public:
     /// <param name="use_modification">When true cache state will be used for store</param>
     /// <param name="use_modification">When true store activ index into configuration</param>
     /// <returns>True on succes otherwise False.</returns>
-    bool store_styles_to_app_config(bool use_modification = true, bool store_activ_index = true);
+    bool store_styles_to_app_config(bool use_modification = true, bool store_active_index = true);
 
     /// <summary>
     /// Append actual style to style list
