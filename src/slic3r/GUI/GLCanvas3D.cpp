@@ -1755,7 +1755,20 @@ std::vector<int> GLCanvas3D::load_object(const Model& model, int obj_idx)
 
 void GLCanvas3D::mirror_selection(Axis axis)
 {
+#if ENABLE_WORLD_COORDINATE
+    TransformationType transformation_type;
+    if (wxGetApp().obj_manipul()->is_local_coordinates())
+        transformation_type.set_local();
+    else if (wxGetApp().obj_manipul()->is_instance_coordinates())
+        transformation_type.set_instance();
+
+    transformation_type.set_relative();
+
+    m_selection.setup_cache();
+    m_selection.mirror(axis, transformation_type);
+#else
     m_selection.mirror(axis);
+#endif // ENABLE_WORLD_COORDINATE
     do_mirror(L("Mirror Object"));
     wxGetApp().obj_manipul()->set_dirty();
 }
