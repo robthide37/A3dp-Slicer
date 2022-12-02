@@ -2169,12 +2169,9 @@ LayerResult GCode::process_layer(
         }
     }
 
-    std::vector<const Layer*> layers_ptrs;
-    layers_ptrs.reserve(layers.size());
     for (const ObjectLayerToPrint &layer_to_print : layers) {
-        layers_ptrs.push_back(layer_to_print.object_layer);
+        m_extrusion_quality_estimator.prepare_for_new_layer(layer_to_print.object_layer);
     }
-    m_extrusion_quality_estimator.prepare_for_new_layer(layers_ptrs);
 
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
     for (unsigned int extruder_id : layer_tools.extruders)
@@ -2302,6 +2299,8 @@ void GCode::process_layer_single_object(
 
     const PrintObject &print_object = print_instance.print_object;
     const Print       &print        = *print_object.print();
+
+    m_extrusion_quality_estimator.set_current_object(&print_object);
 
     if (! print_wipe_extrusions && layer_to_print.support_layer != nullptr)
         if (const SupportLayer &support_layer = *layer_to_print.support_layer; ! support_layer.support_fills.entities.empty()) {

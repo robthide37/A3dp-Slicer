@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <limits>
 #include <numeric>
+#include <unordered_map>
 #include <vector>
 
 namespace Slic3r {
@@ -95,59 +96,22 @@ struct ProcessedPoint
 
 class ExtrusionQualityEstimator
 {
-    AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary;
-    AABBTreeLines::LinesDistancer<Linef> next_layer_boundary;
-    CurvatureEstimator                   cestim;
+    std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<Linef>> prev_layer_boundaries;
+    std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<Linef>> next_layer_boundaries;
+    CurvatureEstimator                                                            cestim;
+    const PrintObject                                                            *current_object;
 
 public:
     void reset_for_next_extrusion() { cestim.reset(); }
 
-    void prepare_for_new_layer(const std::vector<const Layer *> &layers)
+    void set_current_object(const PrintObject *object) { current_object = object; }
+
+    void prepare_for_new_layer(const Layer *layer)
     {
-        std::vector<Linef> layer_lines;
-        for (const Layer *layer : layers) {
-            if (layer == nullptr) continue;
-            std::vector<Linef> object_lines = to_unscaled_linesf(layer->lslices);
-            layer_lines.insert(layer_lines.end(), object_lines.begin(), object_lines.end());
-        }
-        prev_layer_boundary = next_layer_boundary;
-        next_layer_boundary = AABBTreeLines::LinesDistancer<Linef>{std::move(layer_lines)};
-
-#if 0 // EXPORT DEBUG FILES
-        Lines scaled_lines;
-        for (const Linef &lf : layer_lines) { scaled_lines.push_back({Point::new_scale(lf.a), Point::new_scale(lf.b)}); }
-        BoundingBox bb = get_extents(scaled_lines);
-
-        Points inside;
-        for (const Layer *layer : layers) {
-            if (layer == nullptr) continue;
-            auto in = to_points(to_polygons(offset_ex(layer->lslices, -scale_(0.4))));
-            inside.insert(inside.end(), in.begin(), in.end());
-        }
-
-        ::Slic3r::SVG svg(debug_out_path(("processing" + std::to_string(rand() % 1000)).c_str()).c_str(), bb);
-        svg.draw(scaled_lines, "black", scale_(0.10));
-        for (Point p : inside) {
-            auto [distance, line_idx, nearest_point] = next_layer_boundary.signed_distance_from_lines_extra(unscaled(p));
-            if (distance > 0) {
-                svg.draw(p, "red", scale_(0.2));
-                svg.draw(Point::new_scale(nearest_point.x(), nearest_point.y()), "blue", scale_(0.2));
-                auto li = next_layer_boundary.get_line(line_idx);
-                Line ls{Point::new_scale(li.a), Point::new_scale(li.b)};
-                svg.draw(ls, "yellow", scale_(0.2));
-            }
-        }
-
-        if (inside.size() > 0) {
-        Line line{inside[0], inside[inside.size() * 0.5]};
-        auto inters = next_layer_boundary.intersections_with_line<true>({unscaled(line.a), unscaled(line.b)});
-        svg.draw(line, "purple", scale_(0.15));
-        for (auto inter : inters) {
-             svg.draw(Point::new_scale(inter), "red", scale_(0.2));
-        }
-        }
-
-#endif
+        if (layer == nullptr) return;
+        const PrintObject *object   = layer->object();
+        prev_layer_boundaries[object] = next_layer_boundaries[object];
+        next_layer_boundaries[object] = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(layer->lslices)};
     }
 
     std::vector<ProcessedPoint> estimate_extrusion_quality(const ExtrusionPath &path)
@@ -167,6 +131,8 @@ public:
 
         const Points              &original_points = path.polyline.points;
         std::vector<ExtendedPoint> points;
+
+        const auto& prev_layer_boundary = prev_layer_boundaries[current_object];
 
         float distance = prev_layer_boundary.signed_distance_from_lines(unscaled(original_points[0])) + 0.5 * flow_width;
         points.push_back({unscaled(original_points[0]), distance, 1.0f});
