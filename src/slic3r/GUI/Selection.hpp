@@ -338,6 +338,8 @@ public:
     bool contains_all_volumes(const std::vector<unsigned int>& volume_idxs) const;
     // returns true if the selection contains at least one of the given indices
     bool contains_any_volume(const std::vector<unsigned int>& volume_idxs) const;
+    // returns true if the selection contains any sinking volume
+    bool contains_sinking_volumes(bool ignore_modifiers = true) const;
     // returns true if the selection contains all and only the given indices
     bool matches(const std::vector<unsigned int>& volume_idxs) const;
 

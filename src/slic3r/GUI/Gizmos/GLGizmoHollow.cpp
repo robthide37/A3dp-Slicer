@@ -900,6 +900,11 @@ RENDER_AGAIN:
     bool show_sups = m_c->instances_hider()->are_supports_shown();
     if (m_imgui->checkbox(m_desc["show_supports"], show_sups)) {
         m_c->instances_hider()->show_supports(show_sups);
+#if ENABLE_RAYCAST_PICKING
+        if (show_sups)
+          // ensure supports and pad are disabled from picking even when they are visible
+          set_sla_auxiliary_volumes_picking_state(false);
+#endif // ENABLE_RAYCAST_PICKING
         force_refresh = true;
     }
 

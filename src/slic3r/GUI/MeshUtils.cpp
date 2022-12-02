@@ -429,10 +429,10 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
         // All hits are clipped.
         return false;
     }
-    if  ((hits.size()-i) % 2 != 0) {
+    if  (clipping_plane && (hits.size()-i) % 2 != 0) {
         // There is an odd number of unclipped hits - meaning the nearest must be from inside the mesh.
         // In that case, calculate intersection with the clipping place.
-        if (clipping_plane && was_clipping_plane_hit) {
+        if (was_clipping_plane_hit) {
             direction = direction + point;
             point = trafo * point; // transform to world coords
             direction = trafo * direction - point;

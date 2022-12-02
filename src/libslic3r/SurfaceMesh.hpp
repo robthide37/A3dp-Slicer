@@ -4,6 +4,8 @@
 #include <admesh/stl.h>
 #include <libslic3r/TriangleMesh.hpp>
 
+#include "boost/container/small_vector.hpp"
+
 namespace Slic3r {
 
 class TriangleMesh;
@@ -115,11 +117,18 @@ public:
 
     size_t degree(Vertex_index v) const
     {
+        // In case the mesh is broken badly, the loop might end up to be infinite,
+        // never getting back to the first halfedge. Remember list of all half-edges
+        // and trip if any is encountered for the second time.
         Halfedge_index h_first = halfedge(v);
+        boost::container::small_vector<Halfedge_index, 10> he_visited;
         Halfedge_index h = next_around_target(h_first);
         size_t degree = 2;
         while (! h.is_invalid() && h != h_first) {
+            he_visited.emplace_back(h);
             h = next_around_target(h);
+            if (std::find(he_visited.begin(), he_visited.end(), h) == he_visited.end())
+                return 0;
             ++degree;
         }
         return h.is_invalid() ? 0 : degree - 1;

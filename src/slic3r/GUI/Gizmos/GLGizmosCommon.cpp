@@ -327,8 +327,6 @@ const TriangleMesh* HollowedMesh::get_hollowed_interior() const
 }
 
 
-
-
 void Raycaster::on_update()
 {
     wxBusyCursor wait;

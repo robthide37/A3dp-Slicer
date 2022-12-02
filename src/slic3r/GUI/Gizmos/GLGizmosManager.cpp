@@ -526,7 +526,10 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         case WXK_ESCAPE:
         {
             if (m_current != Undefined) {
-                if ((m_current != SlaSupports) || !gizmo_event(SLAGizmoEventType::DiscardChanges))
+                if (m_current == Measure && gizmo_event(SLAGizmoEventType::Escape)) {
+                    // do nothing
+                }
+                else if (m_current != SlaSupports || !gizmo_event(SLAGizmoEventType::DiscardChanges))
                     reset_all_states();
 
                 processed = true;
@@ -554,7 +557,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         case WXK_BACK:
         case WXK_DELETE:
         {
-            if ((m_current == SlaSupports || m_current == Hollow || m_current == Cut) && gizmo_event(SLAGizmoEventType::Delete))
+            if ((m_current == SlaSupports || m_current == Hollow || m_current == Cut || m_current == Measure) && gizmo_event(SLAGizmoEventType::Delete))
                 processed = true;
 
             break;
