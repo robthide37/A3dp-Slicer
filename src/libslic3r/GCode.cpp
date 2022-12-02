@@ -2705,6 +2705,7 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, const std::s
 
 std::string GCode::extrude_entity(const ExtrusionEntity &entity, const std::string_view description, double speed)
 {
+    m_extrusion_quality_estimator.reset_for_next_extrusion();
     if (const ExtrusionPath* path = dynamic_cast<const ExtrusionPath*>(&entity))
         return this->extrude_path(*path, description, speed);
     else if (const ExtrusionMultiPath* multipath = dynamic_cast<const ExtrusionMultiPath*>(&entity))
