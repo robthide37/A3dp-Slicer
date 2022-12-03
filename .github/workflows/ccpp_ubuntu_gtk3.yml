@@ -3,7 +3,11 @@ name: C/C++ Patch-01 ubuntu-GTK3
 on:
   push:
     branches:
-      - patch-1
+      - Nigthly
+      - nightly_dev
+      - nightly_master
+      - debug_ubuntu
+      - dev
 
 jobs:
   build:
