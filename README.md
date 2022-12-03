@@ -13,6 +13,8 @@ those based on the Marlin, Prusa, Sprinter and Repetier firmware. It also works
 with Mach3, LinuxCNC and Machinekit controllers.
 
 PrusaSlicer is based on [Slic3r](https://github.com/Slic3r/Slic3r) by Alessandro Ranellucci and the RepRap community.
+You can download a precompiled package from this repository release page.
+For now go to the Dev branch and then git actions. I should have a working Mac, Win , Ubuntu Linux version working now.
 
 See the [project homepage](https://www.prusa3d.com/slic3r-prusa-edition/) and
 the [documentation directory](doc/) for more information.
