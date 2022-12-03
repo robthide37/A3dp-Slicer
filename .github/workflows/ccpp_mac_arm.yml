@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - patch-1
+      - Nigthly
+      - nightly_dev
+      - nightly_master
+      - debug_win
+      - dev
 
 jobs:
   build:
