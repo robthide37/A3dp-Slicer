@@ -7,6 +7,7 @@ This slicer is a version of Superslicer/Slic3r (based on PrusaSlicer) for A3dp n
 ### How to install?
 
 You can download a precompiled package from this repository release page.
+For now go to the Dev branch and then git actions. I should have a working Mac, Win , Ubuntu Linux version working now.
 
 ## Licensing and attribution
 
