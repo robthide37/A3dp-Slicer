@@ -3,7 +3,10 @@ name: C/C++ Patch-01 macos
 on:
   push:
     branches:
-      - patch-1
+      - Nigthly
+      - nightly_dev
+      - nightly_master
+      - debug_macos
 
 jobs:
   build:
