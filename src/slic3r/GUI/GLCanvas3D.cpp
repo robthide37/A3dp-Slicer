@@ -5653,9 +5653,9 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
     collapse_toolbar.set_scale(sc);
     size *= m_retina_helper->get_scale_factor();
 #else
-    m_main_toolbar.set_icons_size(size);
-    m_undoredo_toolbar.set_icons_size(size);
-    collapse_toolbar.set_icons_size(size);
+    m_main_toolbar.set_icons_size(int(size));
+    m_undoredo_toolbar.set_icons_size(int(size));
+    collapse_toolbar.set_icons_size(int(size));
 #endif // ENABLE_RETINA_GL
 
     float top_tb_width = m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar.get_width();
@@ -5687,23 +5687,11 @@ void GLCanvas3D::_render_overlays()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
 
+    // main toolbar and undoredo toolbar need to be both updated before rendering because both their sizes are needed
+    // to correctly place them
     _check_and_update_toolbar_icon_scale();
 
     _render_gizmos_overlay();
-
-    // main toolbar and undoredo toolbar need to be both updated before rendering because both their sizes are needed
-    // to correctly place them
-#if ENABLE_RETINA_GL
-    const float scale = m_retina_helper->get_scale_factor() * wxGetApp().toolbar_icon_scale(/*true*/);
-    m_main_toolbar.set_scale(scale);
-    m_undoredo_toolbar.set_scale(scale);
-    wxGetApp().plater()->get_collapse_toolbar().set_scale(scale);
-#else
-    const float size = int(GLToolbar::Default_Icons_Size * wxGetApp().toolbar_icon_scale(/*true*/));
-    m_main_toolbar.set_icons_size(size);
-    m_undoredo_toolbar.set_icons_size(size);
-    wxGetApp().plater()->get_collapse_toolbar().set_icons_size(size);
-#endif // ENABLE_RETINA_GL
 
     _render_main_toolbar();
     _render_undoredo_toolbar();
