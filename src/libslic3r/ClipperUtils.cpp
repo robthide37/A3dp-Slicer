@@ -140,6 +140,21 @@ namespace ClipperUtils {
         out.reserve(src.size());
         for (const Polygon &p : src)
             out.emplace_back(clip_clipper_polygon_with_subject_bbox(p, bbox));
+        out.erase(
+            std::remove_if(out.begin(), out.end(), [](const Polygon &polygon) { return polygon.empty(); }),
+            out.end());
+        return out;
+    }
+    [[nodiscard]] Polygons clip_clipper_polygons_with_subject_bbox(const ExPolygon &src, const BoundingBox &bbox)
+    {
+        Polygons out;
+        out.reserve(src.num_contours());
+        out.emplace_back(clip_clipper_polygon_with_subject_bbox(src.contour, bbox));
+        for (const Polygon &p : src.holes)
+            out.emplace_back(clip_clipper_polygon_with_subject_bbox(p, bbox));
+        out.erase(
+            std::remove_if(out.begin(), out.end(), [](const Polygon &polygon) { return polygon.empty(); }),
+            out.end());
         return out;
     }
 }
@@ -794,6 +809,8 @@ Polylines _clipper_pl_closed(ClipperLib::ClipType clipType, PathProvider1 &&subj
     return retval;
 }
 
+Slic3r::Polylines diff_pl(const Slic3r::Polyline &subject, const Slic3r::Polygons &clip)
+    { return _clipper_pl_open(ClipperLib::ctDifference, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::PolygonsProvider(clip)); }
 Slic3r::Polylines diff_pl(const Slic3r::Polylines &subject, const Slic3r::Polygons &clip)
     { return _clipper_pl_open(ClipperLib::ctDifference, ClipperUtils::PolylinesProvider(subject), ClipperUtils::PolygonsProvider(clip)); }
 Slic3r::Polylines diff_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygon &clip)

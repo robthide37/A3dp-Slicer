@@ -920,29 +920,35 @@ template<class G> auto within(const G &g) { return Within<G>{g}; }
 
 namespace detail {
 
+// Returns true in case traversal should continue,
+// returns false if traversal should stop (for example if the first hit was found).
 template<int Dims, typename T, typename Pred, typename Fn>
-void traverse_recurse(const Tree<Dims, T> &tree,
+bool traverse_recurse(const Tree<Dims, T> &tree,
                       size_t               idx,
                       Pred &&              pred,
                       Fn &&                callback)
 {
     assert(tree.node(idx).is_valid());
 
-    if (!pred(tree.node(idx))) return;
+    if (!pred(tree.node(idx))) 
+    	// Continue traversal.
+    	return true;
 
     if (tree.node(idx).is_leaf()) {
-        callback(tree.node(idx));
+    	// Callback returns true to continue traversal, false to stop traversal.
+        return callback(tree.node(idx));
     } else {
 
         // call this with left and right node idx:
-        auto trv = [&](size_t idx) {
-            traverse_recurse(tree, idx, std::forward<Pred>(pred),
-                             std::forward<Fn>(callback));
+        auto trv = [&](size_t idx) -> bool {
+            return traverse_recurse(tree, idx, std::forward<Pred>(pred),
+                                    std::forward<Fn>(callback));
         };
 
         // Left / right child node index.
-        trv(Tree<Dims, T>::left_child_idx(idx));
-        trv(Tree<Dims, T>::right_child_idx(idx));
+        // Returns true if both children allow the traversal to continue.
+        return trv(Tree<Dims, T>::left_child_idx(idx)) &&
+        	   trv(Tree<Dims, T>::right_child_idx(idx));
     }
 }
 
@@ -952,6 +958,7 @@ void traverse_recurse(const Tree<Dims, T> &tree,
 // traverse(tree, intersecting(QueryBox), [](size_t face_idx) {
 //      /* ... */
 // });
+// Callback shall return true to continue traversal, false if it wants to stop traversal, for example if it found the answer.
 template<int Dims, typename T, typename Predicate, typename Fn>
 void traverse(const Tree<Dims, T> &tree, Predicate &&pred, Fn &&callback)
 {
