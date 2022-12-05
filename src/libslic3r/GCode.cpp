@@ -2877,7 +2877,9 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             speed = m_config.get_abs_value("perimeter_speed");
         } else if (path.role() == erExternalPerimeter) {
             speed = m_config.get_abs_value("external_perimeter_speed");
-        } else if (path.role() == erOverhangPerimeter || path.role() == erBridgeInfill) {
+        }else if (path.role() == erOverhangPerimeter){
+            speed = m_config.get_abs_value("overhang_speed");
+        } else if (path.role() == erBridgeInfill) {
             speed = m_config.get_abs_value("bridge_speed");
         } else if (path.role() == erInternalInfill) {
             speed = m_config.get_abs_value("infill_speed");
@@ -3002,12 +3004,13 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             prev = p;
         }
     } else {
+        double overhang_speed = m_config.get_abs_value("overhang_speed");
         std::string comment;
         if (m_config.gcode_comments) {
             comment = description;
             comment += description_bridge;
         }
-        double last_set_speed = std::max(5.0, new_points[0].speed_factor * speed) * 60.0;
+        double last_set_speed = std::max(overhang_speed, new_points[0].speed_factor * speed) * 60.0;
         gcode += m_writer.set_speed(last_set_speed, "", comment);
         Vec2d prev = this->point_to_gcode_quantized(new_points[0].p);
         for (size_t i = 1; i < new_points.size(); i++) {
@@ -3016,7 +3019,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             const double line_length = (p - prev).norm();
             gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
             prev = p;
-            double new_speed = std::max(5.0, procesed_point.speed_factor * speed) * 60.0;
+            double new_speed = std::max(overhang_speed, procesed_point.speed_factor * speed) * 60.0;
             if (last_set_speed != new_speed) {
                 gcode += m_writer.set_speed(new_speed, "", comment);
                 last_set_speed = new_speed;

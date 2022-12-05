@@ -2358,6 +2358,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
+    def             = this->add("overhang_speed", coFloatOrPercent);
+    def->label      = L("Overhangs");
+    def->category   = L("Speed");
+    def->tooltip    = L("This setting controls the speed of overhangs."
+                           "If expressed as percentage (for example: 80%) it will be calculated "
+                           "on the external perimeters speed setting. Set to zero for auto.");
+    def->sidetext   = L("mm/s or %");
+    def->ratio_over = "external_perimeter_speed";
+    def->min        = 0;
+    def->mode       = comAdvanced;
+    def->set_default_value(new ConfigOptionFloatOrPercent(5, false));
+
     def = this->add("solid_infill_below_area", coFloat);
     def->label = L("Solid infill threshold area");
     def->category = L("Infill");

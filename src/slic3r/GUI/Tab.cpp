@@ -1541,6 +1541,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("perimeter_speed");
         optgroup->append_single_option_line("small_perimeter_speed");
         optgroup->append_single_option_line("external_perimeter_speed");
+        optgroup->append_single_option_line("overhang_speed");
         optgroup->append_single_option_line("infill_speed");
         optgroup->append_single_option_line("solid_infill_speed");
         optgroup->append_single_option_line("top_solid_infill_speed");

@@ -564,6 +564,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<InfillPattern>,  bottom_fill_pattern))
     ((ConfigOptionFloatOrPercent,       external_perimeter_extrusion_width))
     ((ConfigOptionFloatOrPercent,       external_perimeter_speed))
+    ((ConfigOptionFloatOrPercent,       overhang_speed))
     ((ConfigOptionBool,                 external_perimeters_first))
     ((ConfigOptionBool,                 extra_perimeters))
     ((ConfigOptionBool,                 extra_perimeters_on_overhangs))
