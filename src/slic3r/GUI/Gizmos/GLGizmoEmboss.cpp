@@ -526,6 +526,7 @@ bool GLGizmoEmboss::on_init()
     m_rotate_gizmo.init();
     ColorRGBA gray_color(.6f, .6f, .6f, .3f);
     m_rotate_gizmo.set_highlight_color(gray_color);
+    m_shortcut_key = WXK_CONTROL_T;
     return true;
 }
 
@@ -770,6 +771,14 @@ void GLGizmoEmboss::on_set_state()
 
         // Try(when exist) set text configuration by volume 
         set_volume(priv::get_selected_volume(m_parent.get_selection()));
+
+        // when open window by "T" and no valid volume is selected, so Create new one
+        if (m_volume == nullptr) { 
+            // reopen gizmo when new object is created
+            GLGizmoBase::m_state = GLGizmoBase::Off;
+            // start creating new object
+            create_volume(ModelVolumeType::MODEL_PART);
+        }
 
         // change position of just opened emboss window
         if (m_allow_float_window) 
