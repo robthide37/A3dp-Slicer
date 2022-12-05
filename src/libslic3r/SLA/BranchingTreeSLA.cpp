@@ -72,6 +72,22 @@ class BranchingTreeBuilder: public branchingtree::Builder {
     void discard_subtree(size_t root)
     {
         // Discard all the support points connecting to this branch.
+        traverse(m_cloud, root, [this](const branchingtree::Node &node) {
+            int suppid_parent = m_cloud.get_leaf_id(node.id);
+            int suppid_left   = m_cloud.get_leaf_id(node.left);
+            int suppid_right  = m_cloud.get_leaf_id(node.right);
+            if (suppid_parent >= 0)
+                m_unroutable_pinheads.emplace_back(suppid_parent);
+            if (suppid_left >= 0)
+                m_unroutable_pinheads.emplace_back(suppid_left);
+            if (suppid_right >= 0)
+                m_unroutable_pinheads.emplace_back(suppid_right);
+        });
+    }
+
+    void discard_subtree_rescure(size_t root)
+    {
+        // Discard all the support points connecting to this branch.
         // As a last resort, try to route child nodes to ground and stop
         // traversing if any child branch succeeds.
         traverse(m_cloud, root, [this](const branchingtree::Node &node) {
