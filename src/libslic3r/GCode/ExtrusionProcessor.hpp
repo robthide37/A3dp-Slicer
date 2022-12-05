@@ -121,13 +121,13 @@ public:
             ExtendedPoint(const Vec2d &pos, float dist, float quality) : position(pos), distance(dist), quality(quality) {}
 
             Vec2d position;
-            float distance; // in multiples of flow_width
+            float distance;
             float quality;
         };
 
         float flow_width             = path.width;
-        float min_malformation_dist  = 0.1 * flow_width;
-        float peak_malformation_dist = 0.65 * flow_width;
+        float min_malformation_dist  = 0.05 * flow_width;
+        float peak_malformation_dist = 0.5 * flow_width;
 
         const Points              &original_points = path.polyline.points;
         std::vector<ExtendedPoint> points;
@@ -186,25 +186,29 @@ public:
             if (prev_point_idx != point_idx && next_point_index != point_idx) {
                 float distance = (b.position - a.position).norm();
                 float alfa     = angle(b.position - points[prev_point_idx].position, points[next_point_index].position - b.position);
+                if (alfa > 0.9 * PI / 2.0) {
+                    alfa = 0; // Ignore very sharp corners.. The curling problem happens mostly on rounded surfaces, not sudden sharp turns
+                }
                 cestim.add_point(distance, alfa);
             }
 
             if (distance < min_malformation_dist) {
                 a.quality = 1.0;
                 cestim.reset();
-            } else if (distance < peak_malformation_dist) {
-                a.quality               = 1.0 - (distance - min_malformation_dist) / (peak_malformation_dist - min_malformation_dist);
+            } else {
+                float distance_quality = std::min(1.0f, std::abs(distance - peak_malformation_dist) /
+                                                            (peak_malformation_dist - min_malformation_dist));
+                distance_quality       = distance_quality * distance_quality;
+
                 float curvature_penalty = 0.0f;
                 float curvature         = std::abs(cestim.get_curvature());
                 if (curvature > 1.0f) {
                     curvature_penalty = 1.0f;
                 } else if (curvature > 0.1f) {
-                    curvature_penalty = fmin(1.0, (distance - min_malformation_dist) / flow_width) * curvature;
+                    curvature_penalty = sqrt(1.0 - distance_quality) * curvature;
                 }
-                a.quality -= curvature_penalty;
 
-            } else {
-                a.quality = 0.0f;
+                a.quality = std::clamp(distance_quality - curvature_penalty, 0.0f, 1.0f);
             }
         }
 
