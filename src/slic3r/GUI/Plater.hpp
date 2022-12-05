@@ -84,6 +84,7 @@ public:
     void update_reslice_btn_tooltip() const;
     void msw_rescale();
     void sys_color_changed();
+    void update_mode_markers();
     void search();
     void jump_to_option(size_t selected);
     void jump_to_option(const std::string& opt_key, Preset::Type type, const std::wstring& category);

@@ -45,7 +45,7 @@ OG_CustomCtrl::OG_CustomCtrl(   wxWindow*            parent,
     m_v_gap     = lround(1.0 * m_em_unit);
     m_h_gap     = lround(0.2 * m_em_unit);
 
-    m_bmp_mode_sz       = get_bitmap_size(get_bmp_bundle("mode_simple", wxOSX ? 10 : 12), this);
+    m_bmp_mode_sz       = get_bitmap_size(get_bmp_bundle("mode", wxOSX ? 10 : 12), this);
     m_bmp_blinking_sz   = get_bitmap_size(get_bmp_bundle("search_blink"), this);
 
     init_ctrl_lines();// from og.lines()
@@ -418,7 +418,7 @@ void OG_CustomCtrl::msw_rescale()
     m_v_gap     = lround(1.0 * m_em_unit);
     m_h_gap     = lround(0.2 * m_em_unit);
 
-    m_bmp_mode_sz       = get_bitmap_size(get_bmp_bundle("mode_simple", wxOSX ? 10 : 12), this);
+    m_bmp_mode_sz       = get_bitmap_size(get_bmp_bundle("mode", wxOSX ? 10 : 12), this);
     m_bmp_blinking_sz   = get_bitmap_size(get_bmp_bundle("search_blink"), this);
 
     init_max_win_width();
@@ -666,9 +666,7 @@ wxCoord OG_CustomCtrl::CtrlLine::draw_mode_bmp(wxDC& dc, wxCoord v_pos)
         return ctrl->m_h_gap;
 
     ConfigOptionMode mode = og_line.get_options()[0].opt.mode;
-    const std::string& bmp_name = mode == ConfigOptionMode::comSimple   ? "mode_simple" :
-                                  mode == ConfigOptionMode::comAdvanced ? "mode_advanced" : "mode_expert";
-    wxBitmapBundle* bmp = get_bmp_bundle(bmp_name, wxOSX ? 10 : 12);
+    wxBitmapBundle* bmp = get_bmp_bundle("mode", wxOSX ? 10 : 12, wxGetApp().get_mode_btn_color(mode));
     wxCoord y_draw = v_pos + lround((height - get_bitmap_size(bmp, ctrl).GetHeight()) / 2);
 
     if (og_line.get_options().front().opt.gui_type != ConfigOptionDef::GUIType::legend)

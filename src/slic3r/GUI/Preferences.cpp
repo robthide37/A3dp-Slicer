@@ -80,9 +80,15 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 	m_use_custom_toolbar_size	= get_app_config()->get("use_custom_toolbar_size") == "1";
 
 	if (wxGetApp().is_editor()) {
-		// update colors for color pickers
+		// update colors for color pickers of the labels
 		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
 		update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
+
+		// update color pickers for mode palette
+		const auto palette = wxGetApp().get_mode_palette(); 
+		std::vector<wxColourPickerCtrl*> color_pickres = {m_mode_simple, m_mode_advanced, m_mode_expert};
+		for (size_t mode = 0; mode < color_pickres.size(); ++mode)
+			update_color(color_pickres[mode], palette[mode]);
 	}
 
 	this->ShowModal();
@@ -506,6 +512,7 @@ void PreferencesDialog::build()
 
 		create_settings_mode_widget();
 		create_settings_text_color_widget();
+		create_settings_mode_color_widget();
 
 #if ENABLE_ENVIRONMENT_MAP
 		// Add "Render" tab
@@ -660,6 +667,7 @@ void PreferencesDialog::accept(wxEvent&)
 	if (wxGetApp().is_editor()) {
 		wxGetApp().set_label_clr_sys(m_sys_colour->GetColour());
 		wxGetApp().set_label_clr_modified(m_mod_colour->GetColour());
+		wxGetApp().set_mode_palette(m_mode_palette);
 	}
 
 	EndModal(wxID_OK);
@@ -925,6 +933,33 @@ void PreferencesDialog::create_settings_text_color_widget()
 
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
 	ButtonsDescription::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_sys_colour, &m_mod_colour);
+
+	auto sizer = new wxBoxSizer(wxHORIZONTAL);
+	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
+	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
+
+	m_optgroup_gui->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+
+	append_preferences_option_to_searcer(m_optgroup_gui, opt_key, title);
+}
+
+void PreferencesDialog::create_settings_mode_color_widget()
+{
+	wxWindow* parent = m_optgroup_gui->parent();
+
+	wxString title = L("Mode markers");
+	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));
+	wxGetApp().UpdateDarkUI(stb);
+	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
+
+	std::string opt_key = "mode_markers";
+	m_blinkers[opt_key] = new BlinkingBitmap(parent);
+
+	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
+
+    // Mode color markers description
+	m_mode_palette = wxGetApp().get_mode_palette();
+    ButtonsDescription::FillSizerWithModeColorDescriptions(stb_sizer, parent, { &m_mode_simple, &m_mode_advanced, &m_mode_expert }, m_mode_palette);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
 	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);

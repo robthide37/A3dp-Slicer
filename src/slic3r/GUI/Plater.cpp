@@ -1183,6 +1183,12 @@ void Sidebar::sys_color_changed()
     p->searcher.dlg_sys_color_changed();
 }
 
+void Sidebar::update_mode_markers()
+{
+    if (p->mode_sizer)
+        p->mode_sizer->update_mode_markers();
+}
+
 void Sidebar::search()
 {
     p->searcher.search();

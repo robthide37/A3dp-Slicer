@@ -48,6 +48,12 @@ class PreferencesDialog : public DPIDialog
 
 	wxColourPickerCtrl*					m_sys_colour {nullptr};
 	wxColourPickerCtrl*					m_mod_colour {nullptr};
+
+	std::vector<wxColour>				m_mode_palette;
+	wxColourPickerCtrl*					m_mode_simple    { nullptr };
+	wxColourPickerCtrl*					m_mode_advanced  { nullptr };
+	wxColourPickerCtrl*					m_mode_expert    { nullptr };
+
 	wxBookCtrlBase*						tabs {nullptr};
 
     bool                                isOSX {false};
@@ -81,6 +87,7 @@ protected:
     void create_icon_size_slider();
     void create_settings_mode_widget();
     void create_settings_text_color_widget();
+    void create_settings_mode_color_widget();
 	void init_highlighter(const t_config_option_key& opt_key);
 	std::vector<ConfigOptionsGroup*> optgroups();
 
