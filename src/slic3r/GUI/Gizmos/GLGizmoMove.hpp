@@ -62,12 +62,8 @@ protected:
     void on_stop_dragging() override;
     void on_dragging(const UpdateData& data) override;
     void on_render() override;
-#if ENABLE_RAYCAST_PICKING
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
-#else
-    void on_render_for_picking() override;
-#endif // ENABLE_RAYCAST_PICKING
 
 private:
     double calc_projection(const UpdateData& data) const;

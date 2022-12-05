@@ -807,27 +807,17 @@ int GLVolumeCollection::load_object_volume(
     const ModelVolume   *model_volume = model_object->volumes[volume_idx];
     const int            extruder_id  = model_volume->extruder_id();
     const ModelInstance *instance 	  = model_object->instances[instance_idx];
-#if ENABLE_RAYCAST_PICKING
     std::shared_ptr<const TriangleMesh> mesh = model_volume->mesh_ptr();
-#else
-    const TriangleMesh  &mesh 		  = model_volume->mesh();
-#endif // ENABLE_RAYCAST_PICKING
     this->volumes.emplace_back(new GLVolume());
     GLVolume& v = *this->volumes.back();
     v.set_color(color_from_model_volume(*model_volume));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
     v.model.init_from(*mesh, true);
-#if ENABLE_RAYCAST_PICKING
     v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
-#endif // ENABLE_RAYCAST_PICKING
 #else
-#if ENABLE_RAYCAST_PICKING
     v.model.init_from(*mesh);
     v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
-#else
-    v.model.init_from(mesh);
-#endif // ENABLE_RAYCAST_PICKING
 #endif // ENABLE_SMOOTH_NORMALS
 #else
 #if ENABLE_SMOOTH_NORMALS
@@ -893,9 +883,7 @@ void GLVolumeCollection::load_object_auxiliary(
 #else
         v.model.init_from(mesh);
         v.model.set_color((milestone == slaposPad) ? GLVolume::SLA_PAD_COLOR : GLVolume::SLA_SUPPORT_COLOR);
-#if ENABLE_RAYCAST_PICKING
         v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(mesh));
-#endif // ENABLE_RAYCAST_PICKING
 #endif // ENABLE_SMOOTH_NORMALS
 #else
 #if ENABLE_SMOOTH_NORMALS
@@ -954,13 +942,10 @@ int GLVolumeCollection::load_wipe_tower_preview(
         depth = std::max(depth, 10.f);
         float min_width = 30.f;
 
-#if ENABLE_RAYCAST_PICKING
         const float scaled_brim_height = 0.2f / height;
-#endif // ENABLE_RAYCAST_PICKING
 
         // We'll now create the box with jagged edge. y-coordinates of the pre-generated model
         // are shifted so that the front edge has y=0 and centerline of the back edge has y=depth:
-#if ENABLE_RAYCAST_PICKING
         // We split the box in three main pieces,
         // the two laterals are identical and the central is the one containing the jagged geometry
 
@@ -1061,22 +1046,6 @@ int GLVolumeCollection::load_wipe_tower_preview(
         tooth_mesh.merge(TriangleMesh(std::move(data)));
         data = generate_lateral(61.547f, 100.0f);
         tooth_mesh.merge(TriangleMesh(std::move(data)));
-#else
-        float out_points_idx[][3] = { { 0, -depth, 0 }, { 0, 0, 0 }, { 38.453f, 0, 0 }, { 61.547f, 0, 0 }, { 100.0f, 0, 0 }, { 100.0f, -depth, 0 }, { 55.7735f, -10.0f, 0 }, { 44.2265f, 10.0f, 0 },
-        { 38.453f, 0, 1 }, { 0, 0, 1 }, { 0, -depth, 1 }, { 100.0f, -depth, 1 }, { 100.0f, 0, 1 }, { 61.547f, 0, 1 }, { 55.7735f, -10.0f, 1 }, { 44.2265f, 10.0f, 1 } };
-        static constexpr const int out_facets_idx[][3] = { 
-            { 0, 1, 2 }, { 3, 4, 5 }, { 6, 5, 0 }, { 3, 5, 6 }, { 6, 2, 7 }, { 6, 0, 2 }, { 8, 9, 10 }, { 11, 12, 13 }, { 10, 11, 14 }, { 14, 11, 13 }, { 15, 8, 14 },
-            { 8, 10, 14 }, { 3, 12, 4 }, { 3, 13, 12 }, { 6, 13, 3 }, { 6, 14, 13 }, { 7, 14, 6 }, { 7, 15, 14 }, { 2, 15, 7 }, { 2, 8, 15 }, { 1, 8, 2 }, { 1, 9, 8 },
-            { 0, 9, 1 }, { 0, 10, 9 }, { 5, 10, 0 }, { 5, 11, 10 }, { 4, 11, 5 }, { 4, 12, 11 } };
-        indexed_triangle_set its;
-        for (int i = 0; i < 16; ++i)
-            its.vertices.emplace_back(out_points_idx[i][0] / (100.f / min_width),
-                                      out_points_idx[i][1] + depth, out_points_idx[i][2]);
-        its.indices.reserve(28);
-        for (const int *face : out_facets_idx)
-            its.indices.emplace_back(face);
-        TriangleMesh tooth_mesh(std::move(its));
-#endif // ENABLE_RAYCAST_PICKING
 
         // We have the mesh ready. It has one tooth and width of min_width. We will now
         // append several of these together until we are close to the required width
@@ -1084,14 +1053,9 @@ int GLVolumeCollection::load_wipe_tower_preview(
         size_t n = std::max(1, int(width / min_width)); // How many shall be merged?
         for (size_t i = 0; i < n; ++i) {
             mesh.merge(tooth_mesh);
-#if ENABLE_RAYCAST_PICKING
             tooth_mesh.translate(100.0f, 0.0f, 0.0f);
-#else
-            tooth_mesh.translate(min_width, 0.f, 0.f);
-#endif // ENABLE_RAYCAST_PICKING
         }
 
-#if ENABLE_RAYCAST_PICKING
         // Now we add the caps along the X axis
         const float scaled_brim_width_x = brim_width * n * width / min_width;
         auto generate_negx_cap = [&]() {
@@ -1166,19 +1130,9 @@ int GLVolumeCollection::load_wipe_tower_preview(
         data = generate_posx_cap();
         mesh.merge(TriangleMesh(std::move(data)));
         mesh.scale(Vec3f(width / (n * 100.0f), 1.0f, height)); // Scaling to proper width
-#else
-        mesh.scale(Vec3f(width / (n * min_width), 1.f, height)); // Scaling to proper width
-#endif // ENABLE_RAYCAST_PICKING
     }
     else
         mesh = make_cube(width, depth, height);
-
-#if !ENABLE_RAYCAST_PICKING
-    // We'll make another mesh to show the brim (fixed layer height):
-    TriangleMesh brim_mesh = make_cube(width + 2.f * brim_width, depth + 2.f * brim_width, 0.2f);
-    brim_mesh.translate(-brim_width, -brim_width, 0.f);
-    mesh.merge(brim_mesh);
-#endif // !ENABLE_RAYCAST_PICKING
 
     volumes.emplace_back(new GLVolume(color));
     GLVolume& v = *volumes.back();
@@ -1189,9 +1143,7 @@ int GLVolumeCollection::load_wipe_tower_preview(
 #endif // ENABLE_OPENGL_ES
     v.model.init_from(mesh);
     v.model.set_color(color);
-#if ENABLE_RAYCAST_PICKING
     v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(mesh));
-#endif // ENABLE_RAYCAST_PICKING
 #else
     v.indexed_vertex_array.load_mesh(mesh);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
