@@ -2051,8 +2051,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 ++measure_row_count;
                 ImGui::PopID();
             }
-            if (measure.distance_strict.has_value() &&
-                (!measure.distance_infinite.has_value() || std::abs(measure.distance_strict->dist - measure.distance_infinite->dist) > EPSILON)) {
+            if (measure.distance_strict.has_value() && !measure.distance_infinite.has_value()) {
                 double distance = measure.distance_strict->dist;
                 if (use_inches)
                     distance = ObjectManipulation::mm_to_in * distance;
