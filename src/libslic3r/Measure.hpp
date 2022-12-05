@@ -102,11 +102,12 @@ public:
     // should be highlighted (if any).
     std::optional<SurfaceFeature> get_feature(size_t face_idx, const Vec3d& point) const;
 
-    // Returns a list of triangle indices for each identified plane. Each
-    // Plane object contains an index into this vector. Expensive, do not
-    // call too often.
-    std::vector<std::vector<int>> get_planes_triangle_indices() const;
-    
+    // Return total number of planes.
+    int get_num_of_planes() const;
+
+    // Returns a list of triangle indices for given plane.
+    const std::vector<int>& get_plane_triangle_indices(int idx) const;
+
     // Returns the surface features of the plane with the given index
     const std::vector<SurfaceFeature>& get_plane_features(unsigned int plane_id) const;
 

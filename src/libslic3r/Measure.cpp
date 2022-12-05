@@ -68,7 +68,8 @@ public:
 
     std::vector<SurfaceFeature> get_all_features() const;
     std::optional<SurfaceFeature> get_feature(size_t face_idx, const Vec3d& point) const;
-    std::vector<std::vector<int>> get_planes_triangle_indices() const;
+    int get_num_of_planes() const;
+    const std::vector<int>& get_plane_triangle_indices(int idx) const;
     const std::vector<SurfaceFeature>& get_plane_features(unsigned int plane_id) const;
     const TriangleMesh& get_mesh() const;
 
@@ -554,12 +555,17 @@ std::optional<SurfaceFeature> MeasuringImpl::get_feature(size_t face_idx, const 
 
 
 
-std::vector<std::vector<int>> MeasuringImpl::get_planes_triangle_indices() const
+int MeasuringImpl::get_num_of_planes() const
 {
-    std::vector<std::vector<int>> out;
-    for (const PlaneData& plane : m_planes)
-        out.emplace_back(plane.facets);        
-    return out;
+    return (m_planes.size());
+}
+
+
+
+const std::vector<int>& MeasuringImpl::get_plane_triangle_indices(int idx) const
+{
+    assert(idx >= 0 && idx < int(m_planes.size()));
+    return m_planes[idx].facets;
 }
 
 const std::vector<SurfaceFeature>& MeasuringImpl::get_plane_features(unsigned int plane_id) const
@@ -602,10 +608,15 @@ std::optional<SurfaceFeature> Measuring::get_feature(size_t face_idx, const Vec3
 }
 
 
-
-std::vector<std::vector<int>> Measuring::get_planes_triangle_indices() const
+int Measuring::get_num_of_planes() const
 {
-    return priv->get_planes_triangle_indices();
+    return priv->get_num_of_planes();
+}
+
+
+const std::vector<int>& Measuring::get_plane_triangle_indices(int idx) const
+{
+    return priv->get_plane_triangle_indices(idx);
 }
 
 const std::vector<SurfaceFeature>& Measuring::get_plane_features(unsigned int plane_id) const
