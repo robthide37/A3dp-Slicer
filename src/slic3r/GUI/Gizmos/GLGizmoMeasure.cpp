@@ -654,7 +654,6 @@ void GLGizmoMeasure::on_render()
                         GLModel::Geometry init_data = init_plane_data(its, plane_triangles);
                         m_plane.reset();
                         m_plane.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(init_data.get_as_indexed_triangle_set()));
-                        m_plane.model.init_from(std::move(init_data));
                     }
 
                     m_raycasters.insert({ PLANE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, PLANE_ID, *m_plane.mesh_raycaster) });

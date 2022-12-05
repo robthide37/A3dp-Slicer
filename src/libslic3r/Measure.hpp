@@ -93,10 +93,7 @@ public:
     // Construct the measurement object on a given its.
     explicit Measuring(const indexed_triangle_set& its);
     ~Measuring();
-    
-    // Return a reference to a list of all features identified on the its.
-    // Use only for debugging. Expensive, do not call often.
-    std::vector<SurfaceFeature> get_all_features() const;
+
 
     // Given a face_idx where the mouse cursor points, return a feature that
     // should be highlighted (if any).

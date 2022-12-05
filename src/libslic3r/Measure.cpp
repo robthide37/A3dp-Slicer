@@ -14,7 +14,7 @@ namespace Measure {
 
 constexpr double feature_hover_limit = 0.5; // how close to a feature the mouse must be to highlight it
 
-static std::pair<Vec3d, double> get_center_and_radius(const std::vector<Vec3d>& points, const Transform3d& trafo)
+static std::tuple<Vec3d, double, double> get_center_and_radius(const std::vector<Vec3d>& points, const Transform3d& trafo, const Transform3d& trafo_inv)
 {
     Vec2ds out;
     double z = 0.;
@@ -24,18 +24,17 @@ static std::pair<Vec3d, double> get_center_and_radius(const std::vector<Vec3d>& 
         out.emplace_back(pt_transformed.x(), pt_transformed.y());
     }
 
-    auto circle = Geometry::circle_ransac(out, 20); // FIXME: iterations?
+    const int iter = points.size() < 10  ? 2 :
+                     points.size() < 100 ? 4 :
+                     6;
 
-    return std::make_pair(trafo.inverse() * Vec3d(circle.center.x(), circle.center.y(), z), circle.radius);
+    double error = std::numeric_limits<double>::max();
+    auto circle = Geometry::circle_ransac(out, iter, &error);
+    
+    return std::make_tuple(trafo.inverse() * Vec3d(circle.center.x(), circle.center.y(), z), circle.radius, error);
 }
 
-static bool circle_fit_is_ok(const std::vector<Vec3d>& pts, const Vec3d& center, double radius)
-{
-    for (const Vec3d& pt : pts)
-        if (std::abs((pt - center).norm() - radius) > 0.05)
-            return false;
-    return true;
-}
+
 
 static std::array<Vec3d, 3> orthonormal_basis(const Vec3d& v)
 {
@@ -66,7 +65,6 @@ public:
         float area;
     };
 
-    std::vector<SurfaceFeature> get_all_features() const;
     std::optional<SurfaceFeature> get_feature(size_t face_idx, const Vec3d& point) const;
     int get_num_of_planes() const;
     const std::vector<int>& get_plane_triangle_indices(int idx) const;
@@ -267,7 +265,8 @@ void MeasuringImpl::extract_features()
         Eigen::Quaterniond q;
         q.setFromTwoVectors(plane.normal, Vec3d::UnitZ());
         Transform3d trafo = Transform3d::Identity();
-        trafo.rotate(q);    
+        trafo.rotate(q);
+        const Transform3d trafo_inv = trafo.inverse();
 
         for (const std::vector<Vec3d>& border : plane.borders) {
             if (border.size() <= 1)
@@ -275,28 +274,31 @@ void MeasuringImpl::extract_features()
 
             bool done = false;
 
-            if (const auto& [center, radius] = get_center_and_radius(border, trafo);
-                (border.size()>4) && circle_fit_is_ok(border, center, radius)) {
-                // The whole border is one circle. Just add it into the list of features
-                // and we are done.
+            if (border.size() > 4) {
+                const auto& [center, radius, err] = get_center_and_radius(border, trafo, trafo_inv);
 
-                bool is_polygon = border.size()>4 && border.size()<=8;
-                bool lengths_match = std::all_of(border.begin()+2, border.end(), [is_polygon](const Vec3d& pt) {
-                        return Slic3r::is_approx((pt - *((&pt)-1)).squaredNorm(), (*((&pt)-1) - *((&pt)-2)).squaredNorm(), is_polygon ? 0.01 : 0.01);
-                    });
+                if (err < 0.05) {
+                    // The whole border is one circle. Just add it into the list of features
+                    // and we are done.
 
-                if (lengths_match && (is_polygon || border.size() > 8)) {
-                    if (is_polygon) {
-                        // This is a polygon, add the separate edges with the center.
-                        for (int j=0; j<int(border.size()); ++j)
-                            plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
-                                border[j==0 ? border.size()-1 : j-1], border[j],
-                                std::make_optional(center)));
-                    } else {
-                        // The fit went well and it has more than 8 points - let's consider this a circle.
-                        plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Circle, center, plane.normal, std::nullopt, radius));
+                    bool is_polygon = border.size()>4 && border.size()<=8;
+                    bool lengths_match = std::all_of(border.begin()+2, border.end(), [is_polygon](const Vec3d& pt) {
+                            return Slic3r::is_approx((pt - *((&pt)-1)).squaredNorm(), (*((&pt)-1) - *((&pt)-2)).squaredNorm(), is_polygon ? 0.01 : 0.01);
+                        });
+
+                    if (lengths_match && (is_polygon || border.size() > 8)) {
+                        if (is_polygon) {
+                            // This is a polygon, add the separate edges with the center.
+                            for (int j=0; j<int(border.size()); ++j)
+                                plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
+                                    border[j==0 ? border.size()-1 : j-1], border[j],
+                                    std::make_optional(center)));
+                        } else {
+                            // The fit went well and it has more than 8 points - let's consider this a circle.
+                            plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Circle, center, plane.normal, std::nullopt, radius));
+                        }
+                        done = true;
                     }
-                    done = true;
                 }
             }
 
@@ -391,11 +393,11 @@ void MeasuringImpl::extract_features()
                             }
 
                             if (accept_circle) {
-                                const auto& [center, radius] = get_center_and_radius(single_circle, trafo);
+                                const auto& [center, radius, err] = get_center_and_radius(single_circle, trafo, trafo_inv);
 
                                 // Check that the fit went well. The tolerance is high, only to
                                 // reject complete failures.
-                                accept_circle &= circle_fit_is_ok(single_circle, center, radius);
+                                accept_circle &= err < 0.05;
 
                                 // If the segment subtends less than 90 degrees, throw it away.
                                 accept_circle &= single_circle_length / radius > 0.9*M_PI/2.;
@@ -484,16 +486,6 @@ void MeasuringImpl::extract_features()
 }
 
 
-
-std::vector<SurfaceFeature> MeasuringImpl::get_all_features() const
-{
-    std::vector<SurfaceFeature> features;
-    //PlaneData& plane = m_planes[0];
-    for (const PlaneData& plane : m_planes)    
-        for (const SurfaceFeature& feature : plane.surface_features)
-            features.emplace_back(feature);
-    return features;        
-}
 
 
 
@@ -595,11 +587,6 @@ Measuring::Measuring(const indexed_triangle_set& its)
 
 Measuring::~Measuring() {}
 
-
-std::vector<SurfaceFeature> Measuring::get_all_features() const
-{
-    return priv->get_all_features();
-}
 
 
 std::optional<SurfaceFeature> Measuring::get_feature(size_t face_idx, const Vec3d& point) const
