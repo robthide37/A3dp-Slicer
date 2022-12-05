@@ -1880,6 +1880,7 @@ bool ObjectList::del_subobject_item(wxDataViewItem& item)
 
     wxDataViewItem parent = m_objects_model->GetParent(item);
 
+    InfoItemType item_info_type = m_objects_model->GetInfoItemType(item);
     if (type & itSettings)
         del_settings_from_config(parent);
     else if (type & itInstanceRoot && obj_idx != -1)
@@ -1889,7 +1890,7 @@ bool ObjectList::del_subobject_item(wxDataViewItem& item)
     else if (type & itLayer && obj_idx != -1)
         del_layer_from_object(obj_idx, m_objects_model->GetLayerRangeByItem(item));
     else if (type & itInfo && obj_idx != -1)
-        del_info_item(obj_idx, m_objects_model->GetInfoItemType(item));
+        del_info_item(obj_idx, item_info_type);
     else if (idx == -1 || !del_subobject_from_object(obj_idx, idx, type))
         return false;
 
@@ -1898,9 +1899,12 @@ bool ObjectList::del_subobject_item(wxDataViewItem& item)
         const std::string& icon_name = get_warning_icon_name(object(obj_idx)->get_object_stl_stats());
         m_objects_model->UpdateWarningIcon(parent, icon_name);
     }
-    m_objects_model->Delete(item);
 
-    update_info_items(obj_idx);
+    if (!(type & itInfo) || item_info_type != InfoItemType::CutConnectors) {
+        // Connectors Item is already updated/deleted inside the del_info_item()
+        m_objects_model->Delete(item);
+        update_info_items(obj_idx);
+    }
 
     return true;
 }
@@ -1926,7 +1930,10 @@ void ObjectList::del_info_item(const int obj_idx, InfoItemType type)
         break;
 
     case InfoItemType::CutConnectors:
-        show_error(nullptr, _L("Connectors cannot be deleted from cut object."));
+        if (!del_from_cut_object(true)) {
+            // there is no need to post EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS if nothing was changed
+            return; 
+        }
         break;
 
     case InfoItemType::MmuSegmentation:
@@ -2018,6 +2025,38 @@ void ObjectList::del_layers_from_object(const int obj_idx)
     changed_object(obj_idx);
 }
 
+bool ObjectList::del_from_cut_object(bool is_cut_connector, bool is_model_part/* = false*/, bool is_negative_volume/* = false*/)
+{
+    const long buttons_style = is_cut_connector   ? (wxYES | wxNO | wxCANCEL) : (wxYES | wxCANCEL);
+
+    const wxString title     = is_cut_connector   ? _L("Delete connector from object which is a part of cut") :
+                               is_model_part      ? _L("Delete solid part from object which is a part of cut") :
+                               is_negative_volume ? _L("Delete negative volume from object which is a part of cut") : "";
+                             
+    const wxString msg_end   = is_cut_connector   ? ("\n" + _L("To save cut correspondence you can delete all connectors from all related objects.")) : "";
+
+    InfoDialog dialog(wxGetApp().plater(), title,
+                      _L("This action will break a cut correspondence.\n"
+                         "After that PrusaSlicer can't guarantee model consistency.\n"
+                         "\n"
+                         "To manipulate with solid parts or negative volumes you have to invalidate cut infornation first." + msg_end ),
+                      false, buttons_style | wxCANCEL_DEFAULT | wxICON_WARNING);
+
+    dialog.SetButtonLabel(wxID_YES, _L("Invalidate cut info"));
+    if (is_cut_connector)
+        dialog.SetButtonLabel(wxID_NO, _L("Delete all connectors"));
+
+    const int answer = dialog.ShowModal();
+    if (answer == wxID_CANCEL)
+        return false;
+
+    if (answer == wxID_YES)
+        invalidate_cut_info_for_selection();
+    else if (answer == wxID_NO)
+        delete_all_connectors_for_selection();
+    return true;
+}
+
 bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, const int type)
 {
     assert(idx >= 0);
@@ -2039,15 +2078,10 @@ bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, con
             Slic3r::GUI::show_error(nullptr, _L("From Object List You can't delete the last solid part from object."));
             return false;
         }
-        if (object->is_cut()) {
-            if (volume->is_model_part()) {
-                Slic3r::GUI::show_error(nullptr, _L("Solid part cannot be deleted from cut object."));
-                return false;
-            }
-            if (volume->is_negative_volume()) {
-                Slic3r::GUI::show_error(nullptr, _L("Negative volume cannot be deleted from cut object."));
-                return false;
-            }
+        if (object->is_cut() && (volume->is_model_part() || volume->is_negative_volume())) {
+            del_from_cut_object(volume->is_cut_connector(), volume->is_model_part(), volume->is_negative_volume());
+            // in any case return false to break the deletion
+            return false;
         }
 
         take_snapshot(_L("Delete Subobject"));
@@ -2489,6 +2523,7 @@ bool ObjectList::has_selected_cut_object() const
 
     return false;
 }
+
 void ObjectList::invalidate_cut_info_for_selection()
 {
     const wxDataViewItem item = GetSelection();
@@ -2499,27 +2534,61 @@ void ObjectList::invalidate_cut_info_for_selection()
     }
 }
 
-void ObjectList::invalidate_cut_info_for_object(size_t obj_idx)
+void ObjectList::invalidate_cut_info_for_object(int obj_idx)
 {
-    ModelObject* init_obj = object(int(obj_idx));
+    ModelObject* init_obj = object(obj_idx);
     if (!init_obj->is_cut())
         return;
 
     take_snapshot(_L("Invalidate cut info"));
 
-    auto invalidate_cut = [this](size_t obj_idx) {
-        object(int(obj_idx))->invalidate_cut();
-        update_info_items(obj_idx);
-        add_volumes_to_object_in_list(obj_idx);
-    };
-
+    const CutObjectBase cut_id = init_obj->cut_id;
     // invalidate cut for related objects (which have the same cut_id)
     for (size_t idx = 0; idx < m_objects->size(); idx++)
-        if (ModelObject* obj = object(idx); obj != init_obj && obj->cut_id.is_equal(init_obj->cut_id))
-            invalidate_cut(idx);
+        if (ModelObject* obj = object(int(idx)); obj->cut_id.is_equal(cut_id)) {
+            obj->invalidate_cut();
+            update_info_items(idx);
+            add_volumes_to_object_in_list(idx);
+        }
 
-    // invalidate own cut information
-    invalidate_cut(size_t(obj_idx));
+    update_lock_icons_for_model();
+}
+
+void ObjectList::delete_all_connectors_for_selection()
+{
+    const wxDataViewItem item = GetSelection();
+    if (item) {
+        const int obj_idx = m_objects_model->GetObjectIdByItem(item);
+        if (obj_idx >= 0)
+            delete_all_connectors_for_object(size_t(obj_idx));
+    }
+}
+
+void ObjectList::delete_all_connectors_for_object(int obj_idx)
+{
+    ModelObject* init_obj = object(obj_idx);
+    if (!init_obj->is_cut())
+        return;
+
+    take_snapshot(_L("Delete all connectors"));
+
+    const CutObjectBase cut_id = init_obj->cut_id;
+    // Delete all connectors for related objects (which have the same cut_id)
+    Model& model = wxGetApp().plater()->model();
+    for (int idx = int(m_objects->size())-1; idx >= 0; idx--)
+        if (ModelObject* obj = object(idx); obj->cut_id.is_equal(cut_id)) {
+            obj->delete_connectors();
+
+            if (obj->volumes.empty() || !obj->has_solid_mesh()) {
+                model.delete_object(idx);
+                m_objects_model->Delete(m_objects_model->GetItemById(idx));
+                continue;
+            }
+
+            update_info_items(idx);
+            add_volumes_to_object_in_list(idx);
+            changed_object(int(idx));
+        }
 
     update_lock_icons_for_model();
 }
@@ -3044,6 +3113,7 @@ bool ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& it
         return false;
 
     m_prevent_list_events = true;
+    ScopeGuard sg_prevent_list_events = ScopeGuard([this]() { m_prevent_list_events = false; });
 
     std::set<size_t> modified_objects_ids;
     for (std::vector<ItemForDelete>::const_reverse_iterator item = items_for_delete.rbegin(); item != items_for_delete.rend(); ++item) {
@@ -3059,7 +3129,7 @@ bool ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& it
         }
         else {
             if (!del_subobject_from_object(item->obj_idx, item->sub_obj_idx, item->type))
-                continue;
+                return false;// continue;
             if (item->type&itVolume) {
                 m_objects_model->Delete(m_objects_model->GetItemByVolumeId(item->obj_idx, item->sub_obj_idx));
                 ModelObject* obj = object(item->obj_idx);

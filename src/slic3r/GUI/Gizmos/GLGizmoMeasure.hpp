@@ -4,11 +4,11 @@
 #include "GLGizmoBase.hpp"
 #include "slic3r/GUI/GLModel.hpp"
 #include "slic3r/GUI/GUI_Utils.hpp"
+#include "slic3r/GUI/MeshUtils.hpp"
 #include "libslic3r/Measure.hpp"
+#include "libslic3r/Model.hpp"
 
 namespace Slic3r {
-
-class ModelVolume;
 
 enum class ModelVolumeType : int;
 
@@ -24,20 +24,19 @@ class GLGizmoMeasure : public GLGizmoBase
     enum class EMode : unsigned char
     {
         FeatureSelection,
-        PointSelection,
-        CenterSelection
+        PointSelection
     };
 
     struct SelectedFeatures
     {
         struct Item
         {
-            std::string source;
+            bool is_center{ false };
+            std::optional<Measure::SurfaceFeature> source;
             std::optional<Measure::SurfaceFeature> feature;
 
             bool operator == (const Item& other) const {
-                if (this->source != other.source) return false;
-                return this->feature == other.feature;
+                return this->is_center == other.is_center && this->source == other.source && this->feature == other.feature;
             }
 
             bool operator != (const Item& other) const {
@@ -45,7 +44,8 @@ class GLGizmoMeasure : public GLGizmoBase
             }
 
             void reset() {
-                source.clear();
+                is_center = false;
+                source.reset();
                 feature.reset();
             }
         };
@@ -68,6 +68,21 @@ class GLGizmoMeasure : public GLGizmoBase
         }
     };
 
+    struct VolumeCacheItem
+    {
+        const ModelObject* object{ nullptr };
+        const ModelInstance* instance{ nullptr };
+        const ModelVolume* volume{ nullptr };
+        Transform3d world_trafo;
+
+        bool operator == (const VolumeCacheItem& other) const {
+            return this->object == other.object && this->instance == other.instance && this->volume == other.volume &&
+                this->world_trafo.isApprox(other.world_trafo);
+        }
+    };
+
+    std::vector<VolumeCacheItem> m_volumes_cache;
+
     EMode m_mode{ EMode::FeatureSelection };
     Measure::MeasurementResult m_measurement_result;
 
@@ -85,10 +100,14 @@ class GLGizmoMeasure : public GLGizmoBase
     };
     Dimensioning m_dimensioning;
 
-    Transform3d m_volume_matrix{ Transform3d::Identity() };
+    // Uses a standalone raycaster and not the shared one because of the
+    // difference in how the mesh is updated
+    std::unique_ptr<MeshRaycaster> m_raycaster;
+
     std::vector<GLModel> m_plane_models_cache;
     std::map<int, std::shared_ptr<SceneRaycasterItem>> m_raycasters;
-    std::vector<std::shared_ptr<SceneRaycasterItem>> m_selection_raycasters;
+    // used to keep the raycasters for point/center spheres
+    std::vector<std::shared_ptr<SceneRaycasterItem>> m_selected_sphere_raycasters;
     std::optional<Measure::SurfaceFeature> m_curr_feature;
     std::optional<Vec3d> m_curr_point_on_feature_position;
     struct SceneRaycasterState
@@ -100,21 +119,14 @@ class GLGizmoMeasure : public GLGizmoBase
     std::vector<SceneRaycasterState> m_scene_raycasters;
 
     // These hold information to decide whether recalculation is necessary:
-    std::vector<Transform3d> m_volumes_matrices;
-    std::vector<ModelVolumeType> m_volumes_types;
-    Vec3d m_first_instance_scale{ Vec3d::Ones() };
-    Vec3d m_first_instance_mirror{ Vec3d::Ones() };
     float m_last_inv_zoom{ 0.0f };
     std::optional<Measure::SurfaceFeature> m_last_circle;
     int m_last_plane_idx{ -1 };
 
     bool m_mouse_left_down{ false }; // for detection left_up of this gizmo
-    const ModelObject* m_old_model_object{ nullptr };
-    const ModelVolume* m_old_model_volume{ nullptr };
 
     Vec2d m_mouse_pos{ Vec2d::Zero() };
 
-    KeyAutoRepeatFilter m_ctrl_kar_filter;
     KeyAutoRepeatFilter m_shift_kar_filter;
 
     SelectedFeatures m_selected_features;
@@ -147,17 +159,24 @@ public:
 
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
+    bool wants_enter_leave_snapshots() const override { return true; }
+    std::string get_gizmo_entering_text() const override { return _u8L("Entering Measure gizmo"); }
+    std::string get_gizmo_leaving_text() const override { return _u8L("Leaving Measure gizmo"); }
+    std::string get_action_snapshot_name() override { return _u8L("Measure gizmo editing"); }
+
 protected:
     bool on_init() override;
     std::string on_get_name() const override;
     bool on_is_activable() const override;
     void on_render() override;
     void on_set_state() override;
-    CommonGizmosDataID on_get_requirements() const override;
 
     virtual void on_render_input_window(float x, float y, float bottom_limit) override;
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
+
+    void remove_selected_sphere_raycaster(int id);
+    void update_measurement_result();
 };
 
 } // namespace GUI

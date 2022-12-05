@@ -339,17 +339,6 @@ void GLGizmosManager::render_painter_gizmo()
     gizmo->render_painter_gizmo();
 }
 
-#if !ENABLE_RAYCAST_PICKING
-void GLGizmosManager::render_current_gizmo_for_picking_pass() const
-{
-    if (! m_enabled || m_current == Undefined)
-
-        return;
-
-    m_gizmos[m_current]->render_for_picking();
-}
-#endif // !ENABLE_RAYCAST_PICKING
-
 void GLGizmosManager::render_overlay()
 {
     if (!m_enabled)
@@ -526,7 +515,10 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         case WXK_ESCAPE:
         {
             if (m_current != Undefined) {
-                if ((m_current != SlaSupports) || !gizmo_event(SLAGizmoEventType::DiscardChanges))
+                if (m_current == Measure && gizmo_event(SLAGizmoEventType::Escape)) {
+                    // do nothing
+                }
+                else if (m_current != SlaSupports || !gizmo_event(SLAGizmoEventType::DiscardChanges))
                     reset_all_states();
 
                 processed = true;
@@ -554,7 +546,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         case WXK_BACK:
         case WXK_DELETE:
         {
-            if ((m_current == SlaSupports || m_current == Hollow || m_current == Cut) && gizmo_event(SLAGizmoEventType::Delete))
+            if ((m_current == SlaSupports || m_current == Hollow || m_current == Cut || m_current == Measure) && gizmo_event(SLAGizmoEventType::Delete))
                 processed = true;
 
             break;
@@ -1129,9 +1121,7 @@ bool GLGizmosManager::activate_gizmo(EType type)
         if (old_gizmo.get_state() != GLGizmoBase::Off)
             return false; // gizmo refused to be turned off, do nothing.
 
-#if ENABLE_RAYCAST_PICKING
         old_gizmo.unregister_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 
         if (!m_serializing && old_gizmo.wants_enter_leave_snapshots())
             Plater::TakeSnapshot
@@ -1162,9 +1152,7 @@ bool GLGizmosManager::activate_gizmo(EType type)
         return false; // gizmo refused to be turned on.
     }
 
-#if ENABLE_RAYCAST_PICKING
     new_gizmo.register_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 
     // sucessful activation of gizmo
     return true;

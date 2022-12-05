@@ -10,9 +10,7 @@
 #include "libslic3r/Color.hpp"
 
 #include "GLModel.hpp"
-#if ENABLE_RAYCAST_PICKING
 #include "MeshUtils.hpp"
-#endif // ENABLE_RAYCAST_PICKING
 
 #include <functional>
 #include <optional>
@@ -393,10 +391,8 @@ public:
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GUI::GLModel            model;
-#if ENABLE_RAYCAST_PICKING
     // raycaster used for picking
     std::unique_ptr<GUI::MeshRaycaster> mesh_raycaster;
-#endif // ENABLE_RAYCAST_PICKING
 #else
     // Interleaved triangles & normals with indexed triangles & quads.
     GLIndexedVertexArray        indexed_vertex_array;

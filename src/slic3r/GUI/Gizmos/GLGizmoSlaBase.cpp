@@ -10,9 +10,7 @@ namespace Slic3r {
 namespace GUI {
 
 static const ColorRGBA DISABLED_COLOR = ColorRGBA::DARK_GRAY();
-#if ENABLE_RAYCAST_PICKING
 static const int VOLUME_RAYCASTERS_BASE_ID = (int)SceneRaycaster::EIdBase::Gizmo;
-#endif // ENABLE_RAYCAST_PICKING
 
 GLGizmoSlaBase::GLGizmoSlaBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id, SLAPrintObjectStep min_step)
 : GLGizmoBase(parent, icon_filename, sprite_id)
@@ -87,9 +85,7 @@ void GLGizmoSlaBase::update_volumes()
         }
     }
 
-#if ENABLE_RAYCAST_PICKING
     register_volume_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 }
 
 void GLGizmoSlaBase::render_volumes()
@@ -111,7 +107,6 @@ void GLGizmoSlaBase::render_volumes()
 
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLGizmoSlaBase::register_volume_raycasters_for_picking()
 {
     for (size_t i = 0; i < m_volumes.volumes.size(); ++i) {
@@ -127,7 +122,6 @@ void GLGizmoSlaBase::unregister_volume_raycasters_for_picking()
     }
     m_volume_raycasters.clear();
 }
-#endif // ENABLE_RAYCAST_PICKING
 
 int GLGizmoSlaBase::last_completed_step(const SLAPrint& sla)
 {

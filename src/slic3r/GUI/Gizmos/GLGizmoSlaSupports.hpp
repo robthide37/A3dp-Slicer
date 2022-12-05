@@ -77,24 +77,14 @@ public:
 private:
     bool on_init() override;
     void on_render() override;
-#if ENABLE_RAYCAST_PICKING
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
-#else
-    void on_render_for_picking() override;
-#endif // ENABLE_RAYCAST_PICKING
 
-#if ENABLE_RAYCAST_PICKING
     void render_points(const Selection& selection);
-#else
-    void render_points(const Selection& selection, bool picking = false);
-#endif // ENABLE_RAYCAST_PICKING
     bool unsaved_changes() const;
-#if ENABLE_RAYCAST_PICKING
     void register_point_raycasters_for_picking();
     void unregister_point_raycasters_for_picking();
     void update_point_raycasters_for_picking_transform();
-#endif // ENABLE_RAYCAST_PICKING
 
     bool m_lock_unique_islands = false;
     bool m_editing_mode = false;            // Is editing mode active?
@@ -107,14 +97,9 @@ private:
     std::vector<sla::SupportPoint> m_normal_cache; // to restore after discarding changes or undo/redo
     ObjectID m_old_mo_id;
 
-#if ENABLE_RAYCAST_PICKING
     PickingModel m_sphere;
     PickingModel m_cone;
     std::vector<std::pair<std::shared_ptr<SceneRaycasterItem>, std::shared_ptr<SceneRaycasterItem>>> m_point_raycasters;
-#else
-    GLModel m_cone;
-    GLModel m_sphere;
-#endif // ENABLE_RAYCAST_PICKING
 
     // This map holds all translated description texts, so they can be easily referenced during layout calculations
     // etc. When language changes, GUI is recreated and this class constructed again, so the change takes effect.

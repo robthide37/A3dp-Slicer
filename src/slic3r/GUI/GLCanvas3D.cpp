@@ -1346,19 +1346,23 @@ void GLCanvas3D::toggle_sla_auxiliaries_visibility(bool visible, const ModelObje
 
     m_render_sla_auxiliaries = visible;
 
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters_for_picking(SceneRaycaster::EType::Volume);
+
     for (GLVolume* vol : m_volumes.volumes) {
-        if ((mo == nullptr || m_model->objects[vol->composite_id.object_id] == mo)
-        && (instance_idx == -1 || vol->composite_id.instance_id == instance_idx)
-        && vol->composite_id.volume_id < 0)
+      if ((mo == nullptr || m_model->objects[vol->composite_id.object_id] == mo)
+            && (instance_idx == -1 || vol->composite_id.instance_id == instance_idx)
+            && vol->composite_id.volume_id < 0) {
             vol->is_active = visible;
+            auto it = std::find_if(raycasters->begin(), raycasters->end(), [vol](std::shared_ptr<SceneRaycasterItem> item) { return item->get_raycaster() == vol->mesh_raycaster.get(); });
+            if (it != raycasters->end())
+                (*it)->set_active(vol->is_active);
+        }
     }
 }
 
 void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject* mo, int instance_idx, const ModelVolume* mv)
 {
-#if ENABLE_RAYCAST_PICKING
     std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters_for_picking(SceneRaycaster::EType::Volume);
-#endif // ENABLE_RAYCAST_PICKING
     for (GLVolume* vol : m_volumes.volumes) {
         if (vol->is_wipe_tower)
             vol->is_active = (visible && mo == nullptr);
@@ -1376,13 +1380,11 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
                 } else {
                     const GLGizmosManager& gm = get_gizmos_manager();
                     auto gizmo_type = gm.get_current_type();
-                    if (    (gizmo_type == GLGizmosManager::FdmSupports
+                    if (  (gizmo_type == GLGizmosManager::FdmSupports
                         || gizmo_type == GLGizmosManager::Seam
                         || gizmo_type == GLGizmosManager::Cut)
                         && !vol->is_modifier) {
                         vol->force_neutral_color = true;
-                        if (gizmo_type == GLGizmosManager::Cut)
-                            vol->color.a(0.95f);
                     }
                     else if (gizmo_type == GLGizmosManager::MmuSegmentation)
                         vol->is_active = false;
@@ -1391,11 +1393,10 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
                 }
             }
         }
-#if ENABLE_RAYCAST_PICKING
+
         auto it = std::find_if(raycasters->begin(), raycasters->end(), [vol](std::shared_ptr<SceneRaycasterItem> item) { return item->get_raycaster() == vol->mesh_raycaster.get(); });
         if (it != raycasters->end())
             (*it)->set_active(vol->is_active);
-#endif // ENABLE_RAYCAST_PICKING
     }
 
     if (visible && !mo)
@@ -1653,12 +1654,8 @@ void GLCanvas3D::render()
     // and the viewport was set incorrectly, leading to tripping glAsserts further down
     // the road (in apply_projection). That's why the minimum size is forced to 10.
     Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_RAYCAST_PICKING
     camera.set_viewport(0, 0, std::max(10u, (unsigned int)cnv_size.get_width()), std::max(10u, (unsigned int)cnv_size.get_height()));
     camera.apply_viewport();
-#else
-    camera.apply_viewport(0, 0, std::max(10u, (unsigned int)cnv_size.get_width()), std::max(10u, (unsigned int)cnv_size.get_height()));
-#endif // ENABLE_RAYCAST_PICKING
 
     if (camera.requires_zoom_to_bed) {
         zoom_to_bed();
@@ -2270,7 +2267,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             manip->set_dirty();
     }
 
-#if ENABLE_RAYCAST_PICKING
     // refresh volume raycasters for picking
     m_scene_raycaster.remove_raycasters(SceneRaycaster::EType::Volume);
     for (size_t i = 0; i < m_volumes.volumes.size(); ++i) {
@@ -2287,7 +2283,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     m_scene_raycaster.remove_raycasters(SceneRaycaster::EType::Gizmo);
     if (curr_gizmo != nullptr && !m_selection.is_empty())
         curr_gizmo->register_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 
     // and force this canvas to be redrawn.
     m_dirty = true;
@@ -2833,11 +2828,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
 //                    set_cursor(Standard);
                 }
                 else if (keyCode == WXK_CONTROL) {
-#if ENABLE_RAYCAST_PICKING
-                    if (m_mouse.dragging && !m_moving) {
-#else
-                    if (m_mouse.dragging) {
-#endif // ENABLE_RAYCAST_PICKING
+                  if (m_mouse.dragging && !m_moving) {
                         // if the user releases CTRL while rotating the 3D scene
                         // prevent from moving the selected volume
                         m_mouse.drag.move_volume_idx = -1;
@@ -3353,9 +3344,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                         if (!evt.CmdDown())
                             m_mouse.drag.start_position_3D = m_mouse.scene_position;
                         m_sequential_print_clearance_first_displacement = true;
-#if !ENABLE_RAYCAST_PICKING
-                        m_moving = true;
-#endif // !ENABLE_RAYCAST_PICKING
                     }
                 }
             }
@@ -3399,9 +3387,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
 
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_RAYCAST_PICKING
             m_moving = true;
-#endif // ENABLE_RAYCAST_PICKING
             TransformationType trafo_type;
             trafo_type.set_relative();
             m_selection.translate(cur_pos - m_mouse.drag.start_position_3D, trafo_type);
@@ -3432,9 +3418,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         // do not process the dragging if the left mouse was set down in another canvas
         else if (evt.LeftIsDown()) {
             // if dragging over blank area with left button, rotate
-#if ENABLE_RAYCAST_PICKING
             if (!m_moving) {
-#endif // ENABLE_RAYCAST_PICKING
                 if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
                     const Vec3d rot = (Vec3d(pos.x(), pos.y(), 0.0) - m_mouse.drag.start_position_3D) * (PI * TRACKBALLSIZE / 180.0);
                     if (wxGetApp().app_config->get("use_free_camera") == "1")
@@ -3453,9 +3437,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     m_dirty = true;
                 }
                 m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
-#if ENABLE_RAYCAST_PICKING
             }
-#endif // ENABLE_RAYCAST_PICKING
         }
         else if (evt.MiddleIsDown() || evt.RightIsDown()) {
             // If dragging over blank area with right/middle button, pan.
@@ -3480,9 +3462,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
     }
     else if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp()) {
-#if ENABLE_RAYCAST_PICKING
         m_mouse.position = pos.cast<double>();
-#endif // ENABLE_RAYCAST_PICKING
 
         if (m_layers_editing.state != LayersEditing::Unknown) {
             m_layers_editing.state = LayersEditing::Unknown;
@@ -3508,9 +3488,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 deselect_all();
         }
         else if (evt.RightUp()) {
-#if !ENABLE_RAYCAST_PICKING
-            m_mouse.position = pos.cast<double>();
-#endif // !ENABLE_RAYCAST_PICKING
             // forces a frame render to ensure that m_hover_volume_idxs is updated even when the user right clicks while
             // the context menu is already shown
             render();
@@ -4501,12 +4478,8 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     Camera camera;
     camera.set_type(camera_type);
     camera.set_scene_box(scene_bounding_box());
-#if ENABLE_RAYCAST_PICKING
     camera.set_viewport(0, 0, thumbnail_data.width, thumbnail_data.height);
     camera.apply_viewport();
-#else
-    camera.apply_viewport(0, 0, thumbnail_data.width, thumbnail_data.height);
-#endif // ENABLE_RAYCAST_PICKING
     camera.zoom_to_box(volumes_box);
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -4808,11 +4781,7 @@ void GLCanvas3D::_render_thumbnail_legacy(ThumbnailData& thumbnail_data, unsigne
 #endif // ENABLE_THUMBNAIL_GENERATOR_DEBUG_OUTPUT
 
     // restore the default framebuffer size to avoid flickering on the 3D scene
-#if ENABLE_RAYCAST_PICKING
     wxGetApp().plater()->get_camera().apply_viewport();
-#else
-    wxGetApp().plater()->get_camera().apply_viewport(0, 0, cnv_size.get_width(), cnv_size.get_height());
-#endif // ENABLE_RAYCAST_PICKING
 }
 
 bool GLCanvas3D::_init_toolbars()
@@ -5279,7 +5248,6 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
     }
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLCanvas3D::_picking_pass()
 {
     if (!m_picking_enabled || m_mouse.dragging || m_mouse.position == Vec2d(DBL_MAX, DBL_MAX) || m_gizmos.is_dragging()) {
@@ -5365,12 +5333,17 @@ void GLCanvas3D::_picking_pass()
     default: { break; }
     }
 
-    auto add_strings_row_to_table = [&imgui](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
+    auto add_strings_row_to_table = [&imgui](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color,
+        const std::string& col_3 = "", const ImVec4& col_3_color = ImGui::GetStyleColorVec4(ImGuiCol_Text)) {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         imgui.text_colored(col_1_color, col_1.c_str());
         ImGui::TableSetColumnIndex(1);
         imgui.text_colored(col_2_color, col_2.c_str());
+        if (!col_3.empty()) {
+            ImGui::TableSetColumnIndex(2);
+            imgui.text_colored(col_3_color, col_3.c_str());
+        }
     };
 
     char buf[1024];
@@ -5399,85 +5372,24 @@ void GLCanvas3D::_picking_pass()
         add_strings_row_to_table("Gizmo elements", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
         ImGui::EndTable();
     }
+
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* gizmo_raycasters = m_scene_raycaster.get_raycasters(SceneRaycaster::EType::Gizmo);
+    if (gizmo_raycasters != nullptr && !gizmo_raycasters->empty()) {
+        ImGui::Separator();
+        imgui.text("Gizmo raycasters IDs:");
+        if (ImGui::BeginTable("GizmoRaycasters", 3)) {
+            for (size_t i = 0; i < gizmo_raycasters->size(); ++i) {
+                add_strings_row_to_table(std::to_string(i), ImGuiWrapper::COL_ORANGE_LIGHT,
+                    std::to_string(SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, (*gizmo_raycasters)[i]->get_id())), ImGui::GetStyleColorVec4(ImGuiCol_Text),
+                    to_string(Geometry::Transformation((*gizmo_raycasters)[i]->get_transform()).get_offset()), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            }
+            ImGui::EndTable();
+        }
+    }
+
     imgui.end();
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 }
-#else
-void GLCanvas3D::_picking_pass()
-{
-    if (m_picking_enabled && !m_mouse.dragging && m_mouse.position != Vec2d(DBL_MAX, DBL_MAX) && !m_gizmos.is_dragging()) {
-        m_hover_volume_idxs.clear();
-
-        // Render the object for picking.
-        // FIXME This cannot possibly work in a multi - sampled context as the color gets mangled by the anti - aliasing.
-        // Better to use software ray - casting on a bounding - box hierarchy.
-
-        if (m_multisample_allowed)
-        	// This flag is often ignored by NVIDIA drivers if rendering into a screen buffer.
-            glsafe(::glDisable(GL_MULTISAMPLE));
-
-        glsafe(::glDisable(GL_BLEND));
-        glsafe(::glEnable(GL_DEPTH_TEST));
-
-        glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        m_camera_clipping_plane = m_gizmos.get_clipping_plane();
-        if (m_camera_clipping_plane.is_active()) {
-            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data().data());
-            ::glEnable(GL_CLIP_PLANE0);
-        }
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-        _render_volumes_for_picking();
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        if (m_camera_clipping_plane.is_active())
-            ::glDisable(GL_CLIP_PLANE0);
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        _render_bed_for_picking(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward());
-#else
-        _render_bed_for_picking(!wxGetApp().plater()->get_camera().is_looking_downward());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-        m_gizmos.render_current_gizmo_for_picking_pass();
-
-        if (m_multisample_allowed)
-            glsafe(::glEnable(GL_MULTISAMPLE));
-
-        int volume_id = -1;
-        int gizmo_id = -1;
-
-        std::array<GLubyte, 4> color = { 0, 0, 0, 0 };
-        const Size& cnv_size = get_canvas_size();
-        bool inside = 0 <= m_mouse.position(0) && m_mouse.position(0) < cnv_size.get_width() && 0 <= m_mouse.position(1) && m_mouse.position(1) < cnv_size.get_height();
-        if (inside) {
-            glsafe(::glReadPixels(m_mouse.position(0), cnv_size.get_height() - m_mouse.position.y() - 1, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, (void*)color.data()));
-            if (picking_checksum_alpha_channel(color[0], color[1], color[2]) == color[3]) {
-                // Only non-interpolated colors are valid, those have their lowest three bits zeroed.
-                // we reserve color = (0,0,0) for occluders (as the printbed) 
-                // volumes' id are shifted by 1
-                // see: _render_volumes_for_picking()
-                unsigned int id = picking_encode(color[0], color[1], color[2]);
-                volume_id = id - 1;
-                // gizmos' id are instead properly encoded by the color
-                gizmo_id = id;
-            }
-        }
-        if (0 <= volume_id && volume_id < (int)m_volumes.volumes.size()) {
-            // do not add the volume id if any gizmo is active and CTRL is pressed
-            if (m_gizmos.get_current_type() == GLGizmosManager::EType::Undefined || !wxGetKeyState(WXK_CONTROL))
-                m_hover_volume_idxs.emplace_back(volume_id);
-            m_gizmos.set_hover_id(-1);
-        }
-        else
-            m_gizmos.set_hover_id(inside && (unsigned int)gizmo_id <= GLGizmoBase::BASE_ID ? ((int)GLGizmoBase::BASE_ID - gizmo_id) : -1);
-
-        _update_volumes_hover_state();
-    }
-}
-#endif // ENABLE_RAYCAST_PICKING
 
 void GLCanvas3D::_rectangular_selection_picking_pass()
 {
@@ -5486,7 +5398,6 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
     std::set<int> idxs;
 
     if (m_picking_enabled) {
-#if ENABLE_RAYCAST_PICKING
         const size_t width  = std::max<size_t>(m_rectangle_selection.get_width(), 1);
         const size_t height = std::max<size_t>(m_rectangle_selection.get_height(), 1);
 
@@ -5540,7 +5451,6 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
                     use_framebuffer = false;
             }
         }
-#endif // ENABLE_RAYCAST_PICKING
 
         if (m_multisample_allowed)
         	// This flag is often ignored by NVIDIA drivers if rendering into a screen buffer.
@@ -5551,7 +5461,6 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
 
         glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
-#if ENABLE_RAYCAST_PICKING
         const Camera& main_camera = wxGetApp().plater()->get_camera();
         Camera framebuffer_camera;
         framebuffer_camera.set_type(main_camera.get_type());
@@ -5585,16 +5494,8 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
         }
 
         _render_volumes_for_picking(*camera);
-#else
-        _render_volumes_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
         _render_bed_for_picking(camera->get_view_matrix(), camera->get_projection_matrix(), !camera->is_looking_downward());
-#else
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        _render_bed_for_picking(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward());
-#endif // ENABLE_RAYCAST_PICKING
 #else
         _render_bed_for_picking(!wxGetApp().plater()->get_camera().is_looking_downward());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -5602,20 +5503,10 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
         if (m_multisample_allowed)
             glsafe(::glEnable(GL_MULTISAMPLE));
 
-#if ENABLE_RAYCAST_PICKING
         const size_t px_count = width * height;
 
         const size_t left = use_framebuffer ? 0 : (size_t)m_rectangle_selection.get_left();
         const size_t top  = use_framebuffer ? 0 : (size_t)get_canvas_size().get_height() - (size_t)m_rectangle_selection.get_top();
-#else
-        int width = std::max((int)m_rectangle_selection.get_width(), 1);
-        int height = std::max((int)m_rectangle_selection.get_height(), 1);
-        int px_count = width * height;
-
-        int left = (int)m_rectangle_selection.get_left();
-        int top = get_canvas_size().get_height() - (int)m_rectangle_selection.get_top();
-        if (left >= 0 && top >= 0) {
-#endif // ENABLE_RAYCAST_PICKING
 #define USE_PARALLEL 1
 #if USE_PARALLEL
             struct Pixel
@@ -5649,15 +5540,13 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
             std::vector<GLubyte> frame(4 * px_count);
             glsafe(::glReadPixels(left, top, width, height, GL_RGBA, GL_UNSIGNED_BYTE, (void*)frame.data()));
 
-            for (int i = 0; i < px_count; ++i)
-            {
+            for (int i = 0; i < px_count; ++i) {
                 int px_id = 4 * i;
                 int volume_id = frame[px_id] + (frame[px_id + 1] << 8) + (frame[px_id + 2] << 16);
                 if (0 <= volume_id && volume_id < (int)m_volumes.volumes.size())
                     idxs.insert(volume_id);
             }
 #endif // USE_PARALLEL
-#if ENABLE_RAYCAST_PICKING
             if (camera != &main_camera)
                 main_camera.apply_viewport();
 
@@ -5678,9 +5567,6 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
 
             if (render_tex != 0)
                 glsafe(::glDeleteTextures(1, &render_tex));
-#else
-        }
-#endif // ENABLE_RAYCAST_PICKING
     }
 
     m_hover_volume_idxs.assign(idxs.begin(), idxs.end());
@@ -6083,11 +5969,7 @@ void GLCanvas3D::_render_overlays()
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLCanvas3D::_render_volumes_for_picking(const Camera& camera) const
-#else
-void GLCanvas3D::_render_volumes_for_picking() const
-#endif // ENABLE_RAYCAST_PICKING
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("flat_clip");
@@ -6103,11 +5985,7 @@ void GLCanvas3D::_render_volumes_for_picking() const
     glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_RAYCAST_PICKING
     const Transform3d& view_matrix = camera.get_view_matrix();
-#else
-    const Transform3d& view_matrix = wxGetApp().plater()->get_camera().get_view_matrix();
-#endif // ENABLE_RAYCAST_PICKING
     for (size_t type = 0; type < 2; ++ type) {
         GLVolumeWithIdAndZList to_render = volumes_to_render(m_volumes.volumes, (type == 0) ? GLVolumeCollection::ERenderType::Opaque : GLVolumeCollection::ERenderType::Transparent, view_matrix);
         for (const GLVolumeWithIdAndZ& volume : to_render)
@@ -6119,12 +5997,7 @@ void GLCanvas3D::_render_volumes_for_picking() const
 #if ENABLE_LEGACY_OPENGL_REMOVAL
                 volume.first->model.set_color(picking_decode(id));
                 shader->start_using();
-#if ENABLE_RAYCAST_PICKING
                 shader->set_uniform("view_model_matrix", view_matrix * volume.first->world_matrix());
-#else
-                const Camera& camera = wxGetApp().plater()->get_camera();
-                shader->set_uniform("view_model_matrix", camera.get_view_matrix() * volume.first->world_matrix());
-#endif // ENABLE_RAYCAST_PICKING
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());
                 shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
                 shader->set_uniform("z_range", m_volumes.get_z_range());
@@ -6692,7 +6565,6 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
     if (m_canvas == nullptr)
         return Vec3d(DBL_MAX, DBL_MAX, DBL_MAX);
 
-#if ENABLE_RAYCAST_PICKING
     if (z == nullptr) {
         const SceneRaycaster::HitResult hit = m_scene_raycaster.hit(mouse_pos.cast<double>(), wxGetApp().plater()->get_camera(), nullptr);
         return hit.is_valid() ? hit.position.cast<double>() : _mouse_to_bed_3d(mouse_pos);
@@ -6704,23 +6576,6 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
         igl::unproject(Vec3d(mouse_pos.x(), viewport[3] - mouse_pos.y(), *z), camera.get_view_matrix().matrix(), camera.get_projection_matrix().matrix(), viewport, out);
         return out;
     }
-#else
-    const Camera& camera = wxGetApp().plater()->get_camera();
-    const Matrix4d modelview  = camera.get_view_matrix().matrix();
-    const Matrix4d projection = camera.get_projection_matrix().matrix();
-    const Vec4i viewport(camera.get_viewport().data());
-
-    const int y = viewport[3] - mouse_pos.y();
-    float mouse_z;
-    if (z == nullptr)
-        glsafe(::glReadPixels(mouse_pos.x(), y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, (void*)&mouse_z));
-    else
-        mouse_z = *z;
-
-    Vec3d out;
-    igl::unproject(Vec3d(mouse_pos.x(), y, mouse_z), modelview, projection, viewport, out);
-    return out;
-#endif // ENABLE_RAYCAST_PICKING
 }
 
 Vec3d GLCanvas3D::_mouse_to_bed_3d(const Point& mouse_pos)

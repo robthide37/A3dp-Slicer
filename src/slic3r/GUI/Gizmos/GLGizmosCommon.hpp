@@ -29,6 +29,7 @@ enum class SLAGizmoEventType : unsigned char {
     ShiftDown,
     ShiftUp,
     AltUp,
+    Escape,
     ApplyChanges,
     DiscardChanges,
     AutomaticGeneration,
@@ -135,7 +136,6 @@ protected:
     virtual void on_release() = 0;
     virtual void on_update() = 0;
     CommonGizmosDataPool* get_pool() const { return m_common; }
-
 
 private:
     bool m_is_valid = false;

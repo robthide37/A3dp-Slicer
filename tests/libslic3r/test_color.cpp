@@ -20,20 +20,4 @@ SCENARIO("Color encoding/decoding cycle", "[Color]") {
     }
 }
 
-#if !ENABLE_RAYCAST_PICKING
-SCENARIO("Color picking encoding/decoding cycle", "[Color]") {
-    GIVEN("Picking color") {
-        const ColorRGB src_rgb(static_cast<unsigned char>(255), static_cast<unsigned char>(127), static_cast<unsigned char>(63));
-        WHEN("apply encode/decode cycle") {
-            const unsigned int encoded = picking_encode(src_rgb.r_uchar(), src_rgb.g_uchar(), src_rgb.b_uchar());
-            const ColorRGBA res_rgba = picking_decode(encoded);
-            const bool ret = res_rgba.r_uchar() == src_rgb.r_uchar() && res_rgba.g_uchar() == src_rgb.g_uchar() && res_rgba.b_uchar() == src_rgb.b_uchar();
-            THEN("result matches source") {
-                REQUIRE(ret);
-            }
-        }
-    }
-}
-#endif // !ENABLE_RAYCAST_PICKING
-
 

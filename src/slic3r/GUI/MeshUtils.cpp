@@ -24,7 +24,7 @@ namespace GUI {
 
 void MeshClipper::set_behaviour(bool fill_cut, double contour_width)
 {
-    if (fill_cut != m_fill_cut || contour_width != m_contour_width)
+    if (fill_cut != m_fill_cut || is_approx(contour_width, m_contour_width))
         m_result.reset();
     m_fill_cut = fill_cut;
     m_contour_width = contour_width;
@@ -97,7 +97,7 @@ void MeshClipper::render_cut()
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         for (CutIsland& isl : m_result->cut_islands) {
-            isl.model.set_color(isl.disabled ? ColorRGBA(1.f, 0.f, 0.f, 1.f) : color);
+            isl.model.set_color(isl.disabled ? ColorRGBA(0.5f, 0.5f, 0.5f, 1.f) : color);
             isl.model.render();
         }
         shader->stop_using();
@@ -132,7 +132,7 @@ void MeshClipper::render_contour()
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         for (CutIsland& isl : m_result->cut_islands) {
-            isl.model_expanded.set_color(color);
+            isl.model_expanded.set_color(isl.disabled ? ColorRGBA(1.f, 0.f, 0.f, 1.f) : color);
             isl.model_expanded.render();
         }
         shader->stop_using();
@@ -155,7 +155,7 @@ bool MeshClipper::is_projection_inside_cut(const Vec3d& point_in) const
 
     for (const CutIsland& isl : m_result->cut_islands) {
         if (isl.expoly_bb.contains(pt_2d) && isl.expoly.contains(pt_2d))
-            return true;
+            return !isl.disabled;
     }
     return false;
 }
@@ -370,13 +370,8 @@ Vec3f MeshRaycaster::get_triangle_normal(size_t facet_idx) const
     return m_normals[facet_idx];
 }
 
-#if ENABLE_RAYCAST_PICKING
 void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                         Vec3d& point, Vec3d& direction)
-#else
-void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                                        Vec3d& point, Vec3d& direction)
-#endif // ENABLE_RAYCAST_PICKING
 {
     Matrix4d modelview = camera.get_view_matrix().matrix();
     Matrix4d projection= camera.get_projection_matrix().matrix();
@@ -429,10 +424,10 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
         // All hits are clipped.
         return false;
     }
-    if  ((hits.size()-i) % 2 != 0) {
+    if  (clipping_plane && (hits.size()-i) % 2 != 0) {
         // There is an odd number of unclipped hits - meaning the nearest must be from inside the mesh.
         // In that case, calculate intersection with the clipping place.
-        if (clipping_plane && was_clipping_plane_hit) {
+        if (was_clipping_plane_hit) {
             direction = direction + point;
             point = trafo * point; // transform to world coords
             direction = trafo * direction - point;
@@ -540,7 +535,6 @@ std::vector<unsigned> MeshRaycaster::get_unobscured_idxs(const Geometry::Transfo
     return out;
 }
 
-#if ENABLE_RAYCAST_PICKING
 bool MeshRaycaster::closest_hit(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
     Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane, size_t* facet_idx) const
 {
@@ -573,7 +567,6 @@ bool MeshRaycaster::closest_hit(const Vec2d& mouse_pos, const Transform3d& trafo
 
     return true;
 }
-#endif // ENABLE_RAYCAST_PICKING
 
 Vec3f MeshRaycaster::get_closest_point(const Vec3f& point, Vec3f* normal) const
 {

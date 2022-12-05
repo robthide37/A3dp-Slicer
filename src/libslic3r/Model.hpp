@@ -449,6 +449,8 @@ public:
     void apply_cut_connectors(const std::string& name);
     // invalidate cut state for this object and its connectors/volumes
     void invalidate_cut();
+    // delete volumes which are marked as connector for this object
+    void delete_connectors();
     void synchronize_model_after_cut();
     void apply_cut_attributes(ModelObjectCutAttributes attributes);
     void clone_for_cut(ModelObject **obj);
@@ -482,6 +484,8 @@ public:
     // Get count of errors in the mesh( or all object's meshes, if volume index isn't defined)
     int         get_repaired_errors_count(const int vol_idx = -1) const;
 
+    // Detect if object has at least one solid mash
+    bool has_solid_mesh() const;
     bool is_cut() const { return cut_id.id().valid(); }
     bool has_connectors() const;
 
@@ -758,9 +762,7 @@ public:
 
     // The triangular model.
     const TriangleMesh& mesh() const { return *m_mesh.get(); }
-#if ENABLE_RAYCAST_PICKING
     std::shared_ptr<const TriangleMesh> mesh_ptr() const { return m_mesh; }
-#endif // ENABLE_RAYCAST_PICKING
     void                set_mesh(const TriangleMesh &mesh) { m_mesh = std::make_shared<const TriangleMesh>(mesh); }
     void                set_mesh(TriangleMesh &&mesh) { m_mesh = std::make_shared<const TriangleMesh>(std::move(mesh)); }
     void                set_mesh(const indexed_triangle_set &mesh) { m_mesh = std::make_shared<const TriangleMesh>(mesh); }

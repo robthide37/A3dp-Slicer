@@ -1,8 +1,6 @@
 #ifndef slic3r_SceneRaycaster_hpp_
 #define slic3r_SceneRaycaster_hpp_
 
-#if ENABLE_RAYCAST_PICKING
-
 #include "MeshUtils.hpp"
 #include "GLModel.hpp"
 #include <vector>
@@ -115,7 +113,5 @@ private:
 
 } // namespace GUI
 } // namespace Slic3r
-
-#endif // ENABLE_RAYCAST_PICKING
 
 #endif // slic3r_SceneRaycaster_hpp_

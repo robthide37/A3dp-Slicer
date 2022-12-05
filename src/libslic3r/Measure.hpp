@@ -12,6 +12,9 @@ struct indexed_triangle_set;
 
 
 namespace Slic3r {
+
+class TriangleMesh;
+
 namespace Measure {
 
 
@@ -87,8 +90,7 @@ class MeasuringImpl;
 
 class Measuring {
 public:
-    // Construct the measurement object on a given its. The its must remain
-    // valid and unchanged during the whole lifetime of the object.
+    // Construct the measurement object on a given its.
     explicit Measuring(const indexed_triangle_set& its);
     ~Measuring();
     
@@ -108,6 +110,9 @@ public:
     // Returns the surface features of the plane with the given index
     const std::vector<SurfaceFeature>& get_plane_features(unsigned int plane_id) const;
 
+    // Returns the mesh used for measuring
+    const TriangleMesh& get_mesh() const;
+
 private: 
     std::unique_ptr<MeasuringImpl> priv;
 };
@@ -118,8 +123,6 @@ struct DistAndPoints {
     double dist;
     Vec3d from;
     Vec3d to;
-
-    void transform(const Transform3d& trafo);
 };
 
 struct AngleAndEdges {
@@ -131,8 +134,6 @@ struct AngleAndEdges {
     std::pair<Vec3d, Vec3d> e2;
     double radius;
     bool coplanar;
-
-    void transform(const Transform3d& trafo);
 
     static const AngleAndEdges Dummy;
 };
@@ -149,17 +150,6 @@ struct MeasurementResult {
 
     bool has_any_data() const {
         return angle.has_value() || distance_infinite.has_value() || distance_strict.has_value() || distance_xyz.has_value();
-    }
-
-    void transform(const Transform3d& trafo) {
-        if (angle.has_value())
-            angle->transform(trafo);
-        if (distance_infinite.has_value())
-            distance_infinite->transform(trafo);
-        if (distance_strict.has_value()) {
-            distance_strict->transform(trafo);
-            distance_xyz = (distance_strict->to - distance_strict->from).cwiseAbs();
-        }
     }
 };
 

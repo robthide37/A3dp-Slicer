@@ -31,16 +31,21 @@ public:
         int m_max_tex_size{ 0 };
         float m_max_anisotropy{ 0.0f };
 
-        std::string m_version;
-        std::string m_glsl_version;
+        std::string m_version_string;
+        Semver m_version = Semver::invalid();
+        bool m_version_is_mesa = false;
+
+        std::string m_glsl_version_string;
+        Semver m_glsl_version = Semver::invalid();
+
         std::string m_vendor;
         std::string m_renderer;
 
     public:
         GLInfo() = default;
 
-        const std::string& get_version() const;
-        const std::string& get_glsl_version() const;
+        const std::string& get_version_string() const;
+        const std::string& get_glsl_version_string() const;
         const std::string& get_vendor() const;
         const std::string& get_renderer() const;
 

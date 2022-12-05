@@ -32,10 +32,8 @@ protected:
     void update_volumes();
     void render_volumes();
 
-#if ENABLE_RAYCAST_PICKING
     void register_volume_raycasters_for_picking();
     void unregister_volume_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 
     bool is_input_enabled() const { return m_input_enabled; }
     int get_min_sla_print_object_step() const { return m_min_sla_print_object_step; }
@@ -48,9 +46,7 @@ private:
     GLVolumeCollection m_volumes;
     bool m_input_enabled{ false };
     int m_min_sla_print_object_step{ -1 };
-#if ENABLE_RAYCAST_PICKING
     std::vector<std::shared_ptr<SceneRaycasterItem>> m_volume_raycasters;
-#endif // ENABLE_RAYCAST_PICKING
 };
 
 } // namespace GUI

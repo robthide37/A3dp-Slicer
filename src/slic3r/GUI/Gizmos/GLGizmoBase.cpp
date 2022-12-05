@@ -18,29 +18,16 @@ const float GLGizmoBase::Grabber::SizeFactor = 0.05f;
 const float GLGizmoBase::Grabber::MinHalfSize = 1.5f;
 const float GLGizmoBase::Grabber::DraggingScaleFactor = 1.25f;
 
-#if ENABLE_RAYCAST_PICKING
 PickingModel GLGizmoBase::Grabber::s_cube;
 PickingModel GLGizmoBase::Grabber::s_cone;
-#else
-GLModel GLGizmoBase::Grabber::s_cube;
-GLModel GLGizmoBase::Grabber::s_cone;
-#endif // ENABLE_RAYCAST_PICKING
 
 GLGizmoBase::Grabber::~Grabber()
 {
-#if ENABLE_RAYCAST_PICKING
     if (s_cube.model.is_initialized())
         s_cube.model.reset();
 
     if (s_cone.model.is_initialized())
         s_cone.model.reset();
-#else
-    if (s_cube.is_initialized())
-        s_cube.reset();
-
-    if (s_cone.is_initialized())
-        s_cone.reset();
-#endif // ENABLE_RAYCAST_PICKING
 }
 
 float GLGizmoBase::Grabber::get_half_size(float size) const
@@ -53,7 +40,6 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
     return get_half_size(size) * DraggingScaleFactor;
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLGizmoBase::Grabber::register_raycasters_for_picking(int id)
 {
     picking_id = id;
@@ -66,13 +52,8 @@ void GLGizmoBase::Grabber::unregister_raycasters_for_picking()
     picking_id = -1;
     raycasters = { nullptr };
 }
-#endif // ENABLE_RAYCAST_PICKING
 
-#if ENABLE_RAYCAST_PICKING
 void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color)
-#else
-void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, bool picking)
-#endif // ENABLE_RAYCAST_PICKING
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_current_shader();
@@ -80,69 +61,41 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
         return;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_RAYCAST_PICKING
     if (!s_cube.model.is_initialized()) {
-#else
-    if (!s_cube.is_initialized()) {
-#endif // ENABLE_RAYCAST_PICKING
         // This cannot be done in constructor, OpenGL is not yet
         // initialized at that point (on Linux at least).
         indexed_triangle_set its = its_make_cube(1.0, 1.0, 1.0);
         its_translate(its, -0.5f * Vec3f::Ones());
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
         s_cube.model.init_from(its);
         s_cube.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
-#else
-        s_cube.init_from(its);
-#endif // ENABLE_RAYCAST_PICKING
 #else
         s_cube.init_from(its, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_RAYCAST_PICKING
     if (!s_cone.model.is_initialized()) {
         indexed_triangle_set its = its_make_cone(0.375, 1.5, double(PI) / 18.0);
         s_cone.model.init_from(its);
         s_cone.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
     }
-#else
-    if (!s_cone.is_initialized())
-        s_cone.init_from(its_make_cone(0.375, 1.5, double(PI) / 18.0));
-#endif // ENABLE_RAYCAST_PICKING
 
     const float half_size = dragging ? get_dragging_half_size(size) : get_half_size(size);
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
     s_cube.model.set_color(render_color);
     s_cone.model.set_color(render_color);
-#else
-    s_cube.set_color(render_color);
-    s_cone.set_color(render_color);
-#endif // ENABLE_RAYCAST_PICKING
 
     const Camera& camera = wxGetApp().plater()->get_camera();
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#if ENABLE_RAYCAST_PICKING
     const Transform3d& view_matrix = camera.get_view_matrix();
     const Matrix3d view_matrix_no_offset = view_matrix.matrix().block(0, 0, 3, 3);
     std::vector<Transform3d> elements_matrices(GRABBER_ELEMENTS_MAX_COUNT, Transform3d::Identity());
     elements_matrices[0] = matrix * Geometry::translation_transform(center) * Geometry::rotation_transform(angles) * Geometry::scale_transform(2.0 * half_size);
     Transform3d view_model_matrix = view_matrix * elements_matrices[0];
-#else
-    const Transform3d& view_matrix = camera.get_view_matrix();
-    const Transform3d model_matrix = matrix * Geometry::translation_transform(center) * Geometry::rotation_transform(angles) * Geometry::scale_transform(2.0 * half_size);
-    const Transform3d view_model_matrix = view_matrix * model_matrix;
-#endif // ENABLE_RAYCAST_PICKING
 
     shader->set_uniform("view_model_matrix", view_model_matrix);
-#if ENABLE_RAYCAST_PICKING
     Matrix3d view_normal_matrix = view_matrix_no_offset * elements_matrices[0].matrix().block(0, 0, 3, 3).inverse().transpose();
-#else
-    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-#endif // ENABLE_RAYCAST_PICKING
     shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
     s_cube.set_color(-1, render_color);
@@ -154,7 +107,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
     glsafe(::glScaled(2.0 * half_size, 2.0 * half_size, 2.0 * half_size));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
     s_cube.model.render();
 
     auto render_extension = [&view_matrix, &view_matrix_no_offset, shader](const Transform3d& matrix) {
@@ -164,64 +116,31 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
         s_cone.model.render();
     };
-#else
-    s_cube.render();
-#endif // ENABLE_RAYCAST_PICKING
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosX)) != 0) {
-#if ENABLE_RAYCAST_PICKING
         elements_matrices[1] = elements_matrices[0] * Geometry::translation_transform(Vec3d::UnitX()) * Geometry::rotation_transform({ 0.0, 0.5 * double(PI), 0.0 });
         render_extension(elements_matrices[1]);
-#else
-        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::translation_transform(Vec3d::UnitX()) * Geometry::rotation_transform({ 0.0, 0.5 * double(PI), 0.0 }));
-        s_cone.render();
-#endif // ENABLE_RAYCAST_PICKING
     }
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegX)) != 0) {
-#if ENABLE_RAYCAST_PICKING
         elements_matrices[2] = elements_matrices[0] * Geometry::translation_transform(-Vec3d::UnitX()) * Geometry::rotation_transform({ 0.0, -0.5 * double(PI), 0.0 });
         render_extension(elements_matrices[2]);
-#else
-        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::translation_transform(-Vec3d::UnitX()) * Geometry::rotation_transform({ 0.0, -0.5 * double(PI), 0.0 }));
-        s_cone.render();
-#endif // ENABLE_RAYCAST_PICKING
     }
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosY)) != 0) {
-#if ENABLE_RAYCAST_PICKING
         elements_matrices[3] = elements_matrices[0] * Geometry::translation_transform(Vec3d::UnitY()) * Geometry::rotation_transform({ -0.5 * double(PI), 0.0, 0.0 });
         render_extension(elements_matrices[3]);
-#else
-        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::translation_transform(Vec3d::UnitY()) * Geometry::rotation_transform({ -0.5 * double(PI), 0.0, 0.0 }));
-        s_cone.render();
-#endif // ENABLE_RAYCAST_PICKING
     }
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegY)) != 0) {
-#if ENABLE_RAYCAST_PICKING
         elements_matrices[4] = elements_matrices[0] * Geometry::translation_transform(-Vec3d::UnitY()) * Geometry::rotation_transform({ 0.5 * double(PI), 0.0, 0.0 });
         render_extension(elements_matrices[4]);
-#else
-        shader->set_uniform("view_model_matrix", view_model_matrix* Geometry::translation_transform(-Vec3d::UnitY())* Geometry::rotation_transform({ 0.5 * double(PI), 0.0, 0.0 }));
-        s_cone.render();
-#endif // ENABLE_RAYCAST_PICKING
     }
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosZ)) != 0) {
-#if ENABLE_RAYCAST_PICKING
         elements_matrices[5] = elements_matrices[0] * Geometry::translation_transform(Vec3d::UnitZ());
         render_extension(elements_matrices[5]);
-#else
-        shader->set_uniform("view_model_matrix", view_model_matrix* Geometry::translation_transform(Vec3d::UnitZ()));
-        s_cone.render();
-#endif // ENABLE_RAYCAST_PICKING
     }
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegZ)) != 0) {
-#if ENABLE_RAYCAST_PICKING
         elements_matrices[6] = elements_matrices[0] * Geometry::translation_transform(-Vec3d::UnitZ()) * Geometry::rotation_transform({ double(PI), 0.0, 0.0 });
-      render_extension(elements_matrices[6]);
-#else
-        shader->set_uniform("view_model_matrix", view_model_matrix* Geometry::translation_transform(-Vec3d::UnitZ())* Geometry::rotation_transform({ double(PI), 0.0, 0.0 }));
-        s_cone.render();
-#endif // ENABLE_RAYCAST_PICKING
+        render_extension(elements_matrices[6]);
     }
 #else
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosX)) != 0) {
@@ -270,7 +189,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     glsafe(::glPopMatrix());
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_RAYCAST_PICKING
     if (raycasters[0] == nullptr) {
         GLCanvas3D& canvas = *wxGetApp().plater()->canvas3D();
         raycasters[0] = canvas.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, picking_id, *s_cube.mesh_raycaster, elements_matrices[0]);
@@ -293,7 +211,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
                 raycasters[i]->set_transform(elements_matrices[i]);
         }
     }
-#endif // ENABLE_RAYCAST_PICKING
 }
 
 GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
@@ -327,7 +244,6 @@ bool GLGizmoBase::update_items_state()
     return res;
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLGizmoBase::register_grabbers_for_picking()
 {
     for (size_t i = 0; i < m_grabbers.size(); ++i) {
@@ -341,16 +257,6 @@ void GLGizmoBase::unregister_grabbers_for_picking()
         m_grabbers[i].unregister_raycasters_for_picking();
     }
 }
-#else
-ColorRGBA GLGizmoBase::picking_color_component(unsigned int id) const
-{
-    id = BASE_ID - id;
-    if (m_group_id > -1)
-        id -= m_group_id;
-
-    return picking_decode(id);
-}
-#endif // ENABLE_RAYCAST_PICKING
 
 void GLGizmoBase::render_grabbers(const BoundingBoxf3& box) const
 {
@@ -370,29 +276,6 @@ void GLGizmoBase::render_grabbers(float size) const
     }
     shader->stop_using();
 }
-
-#if !ENABLE_RAYCAST_PICKING
-void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
-{
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    GLShaderProgram* shader = wxGetApp().get_shader("flat");
-    if (shader != nullptr) {
-        shader->start_using();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-        const float mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 3.0);
-
-        for (unsigned int i = 0; i < (unsigned int)m_grabbers.size(); ++i) {
-            if (m_grabbers[i].enabled) {
-                m_grabbers[i].color = picking_color_component(i);
-                m_grabbers[i].render_for_picking(mean_size);
-            }
-        }
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-        shader->stop_using();
-    }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-}
-#endif // !ENABLE_RAYCAST_PICKING
 
 // help function to process grabbers
 // call start_dragging, stop_dragging, on_dragging

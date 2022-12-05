@@ -30,20 +30,9 @@ namespace GUI {
         m_end_corner = mouse_position;
     }
 
-#if ENABLE_RAYCAST_PICKING
     std::vector<unsigned int> GLSelectionRectangle::contains(const std::vector<Vec3d>& points) const
-#else
-    std::vector<unsigned int> GLSelectionRectangle::stop_dragging(const GLCanvas3D& canvas, const std::vector<Vec3d>& points)
-#endif // ENABLE_RAYCAST_PICKING
     {
         std::vector<unsigned int> out;
-
-#if !ENABLE_RAYCAST_PICKING
-        if (!is_dragging())
-            return out;
-
-        m_state = EState::Off;
-#endif // !ENABLE_RAYCAST_PICKING
 
         // bounding box created from the rectangle corners - will take care of order of the corners
         const BoundingBox rectangle(Points{ Point(m_start_corner.cast<coord_t>()), Point(m_end_corner.cast<coord_t>()) });

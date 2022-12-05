@@ -4,8 +4,6 @@
 #include "Camera.hpp"
 #include "GUI_App.hpp"
 
-#if ENABLE_RAYCAST_PICKING
-
 namespace Slic3r {
 namespace GUI {
 
@@ -247,5 +245,3 @@ int SceneRaycaster::decode_id(EType type, int id) { return id - base_id(type); }
 
 } // namespace GUI
 } // namespace Slic3r
-
-#endif // ENABLE_RAYCAST_PICKING
