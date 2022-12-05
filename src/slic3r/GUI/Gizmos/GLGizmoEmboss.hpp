@@ -126,12 +126,6 @@ private:
     void do_rotate(float relative_z_angle);
 
     /// <summary>
-    /// Move window for edit emboss text near to embossed object
-    /// NOTE: embossed object must be selected
-    /// </summary>
-    void set_fine_position();
-
-    /// <summary>
     /// Reversible input float with option to restor default value
     /// TODO: make more general, static and move to ImGuiWrapper 
     /// </summary>
@@ -220,9 +214,12 @@ private:
         GuiCfg() = default;
     };
     std::optional<const GuiCfg> m_gui_cfg;
+    bool m_is_advanced_edit_style = false;
+
+    // when true window will appear near to text
+    bool m_allow_float_window = false;
     // setted only when wanted to use - not all the time
     std::optional<ImVec2> m_set_window_offset;
-    bool m_is_advanced_edit_style = false;
 
     Emboss::StyleManager m_style_manager;
 

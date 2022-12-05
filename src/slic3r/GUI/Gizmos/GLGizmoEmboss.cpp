@@ -54,7 +54,7 @@
 #define SHOW_ICONS_TEXTURE
 #define SHOW_FINE_POSITION // draw convex hull around volume
 #define SHOW_WX_WEIGHT_INPUT
-#define DRAW_PLACE_TO_ADD_TEXT
+#define DRAW_PLACE_TO_ADD_TEXT // Interactive draw of window position 
 #endif // ALLOW_DEBUG_MODE
 
 using namespace Slic3r;
@@ -681,7 +681,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     if (m_volume == nullptr || !m_volume->text_configuration.has_value()) {
         close();
         return;
-    } 
+    }
 
     // TODO: fix width - showing scroll in first draw of advanced.
     const ImVec2 &min_window_size = get_minimal_window_size();
@@ -697,13 +697,19 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     draw_mouse_offset(m_dragging_mouse_offset);
 #endif // SHOW_OFFSET_DURING_DRAGGING
 
-    // check if is set window offset
-    if (m_set_window_offset.has_value()) {
-        ImGui::SetNextWindowPos(*m_set_window_offset, ImGuiCond_Always);
-        m_set_window_offset.reset();
+    ImGuiWindowFlags flag = ImGuiWindowFlags_NoCollapse;
+    if (m_allow_float_window){
+        // check if is set window offset
+        if (m_set_window_offset.has_value()) {
+            ImGui::SetNextWindowPos(*m_set_window_offset, ImGuiCond_Always);
+            m_set_window_offset.reset();
+        }
+    } else {
+        flag |= ImGuiWindowFlags_NoMove;
+        y = std::min(y, bottom_limit - min_window_size.y);
+        ImGui::SetNextWindowPos(ImVec2(x, y), ImGuiCond_Always);
     }
 
-    ImGuiWindowFlags flag = ImGuiWindowFlags_NoCollapse;
     if (ImGui::Begin(on_get_name().c_str(), nullptr, flag)) {
         // Need to pop var before draw window
         ImGui::PopStyleVar(); // WindowMinSize
@@ -713,6 +719,29 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     }
     ImGui::End();
 }
+
+namespace priv {
+/// <summary>
+/// Move window for edit emboss text near to embossed object
+/// NOTE: embossed object must be selected
+/// </summary>
+ImVec2 calc_fine_position(const Selection &selection, const ImVec2 &windows_size, const Size &canvas_size)
+{
+    const Selection::IndicesList indices = selection.get_volume_idxs();
+    // no selected volume
+    if (indices.empty()) return {};
+    const GLVolume *volume = selection.get_volume(*indices.begin());
+    // bad volume selected (e.g. deleted one)
+    if (volume == nullptr) return {};
+
+    const Camera   &camera = wxGetApp().plater()->get_camera();
+    Slic3r::Polygon hull   = CameraUtils::create_hull2d(camera, *volume);
+
+    ImVec2 c_size(canvas_size.get_width(), canvas_size.get_height());
+    ImVec2 offset       = ImGuiWrapper::suggest_location(windows_size, hull, c_size);
+    return offset;
+}
+} // namespace priv
 
 void GLGizmoEmboss::on_set_state()
 {
@@ -749,7 +778,8 @@ void GLGizmoEmboss::on_set_state()
         set_volume(priv::get_selected_volume(m_parent.get_selection()));
 
         // change position of just opened emboss window
-        set_fine_position();
+        if (m_allow_float_window) 
+            m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
 
         // when open by hyperlink it needs to show up
         // or after key 'T' windows doesn't appear
@@ -1228,6 +1258,15 @@ void GLGizmoEmboss::draw_window()
     const auto &atlas = m_style_manager.get_atlas();
     ImGui::Image(atlas.TexID, ImVec2(atlas.TexWidth, atlas.TexHeight));
 #endif // SHOW_IMGUI_ATLAS
+    ImGui::SameLine();
+    if (ImGui::Checkbox("##allow_float_window", &m_allow_float_window)) {
+        if (m_allow_float_window)
+            m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
+    } else if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", ((m_allow_float_window) ? 
+            _u8L("Fix settings possition"):
+            _u8L("Allow floating window near text")).c_str());
+    }
 }
 
 void GLGizmoEmboss::draw_text_input()
@@ -2646,34 +2685,6 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     // inside function do_move
     // snapshot_name = L("Set text rotation");
     m_parent.do_rotate(snapshot_name);
-}
-
-void GLGizmoEmboss::set_fine_position()
-{
-    const Selection &selection = m_parent.get_selection();
-    const Selection::IndicesList indices   = selection.get_volume_idxs();
-    // no selected volume
-    if (indices.empty()) return;
-    const GLVolume *volume = selection.get_volume(*indices.begin());
-    // bad volume selected (e.g. deleted one)
-    if (volume == nullptr) return;
-
-    const Camera &camera = wxGetApp().plater()->get_camera();
-    Polygon hull = CameraUtils::create_hull2d(camera, *volume);
-
-    const ImVec2 &windows_size = get_minimal_window_size();
-    Size          c_size       = m_parent.get_canvas_size();
-    ImVec2 canvas_size(c_size.get_width(), c_size.get_height());
-    ImVec2 offset = ImGuiWrapper::suggest_location(windows_size, hull, canvas_size);
-    m_set_window_offset = offset;
-    return;
-
-    Polygon rect({Point(offset.x, offset.y),
-                  Point(offset.x + windows_size.x, offset.y),
-                  Point(offset.x + windows_size.x, offset.y + windows_size.y),
-                  Point(offset.x, offset.y + windows_size.y)});
-    ImGuiWrapper::draw(hull);
-    ImGuiWrapper::draw(rect);
 }
 
 void GLGizmoEmboss::draw_advanced()
