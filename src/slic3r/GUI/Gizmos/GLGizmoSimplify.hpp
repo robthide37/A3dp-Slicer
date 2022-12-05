@@ -38,9 +38,6 @@ protected:
     // must implement
     virtual bool on_init() override { return true;};
     virtual void on_render() override;
-#if !ENABLE_RAYCAST_PICKING
-    virtual void on_render_for_picking() override{};
-#endif // !ENABLE_RAYCAST_PICKING
 
     CommonGizmosDataID on_get_requirements() const override;
 

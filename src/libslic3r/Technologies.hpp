@@ -28,6 +28,8 @@
 #define DISABLE_GCODEVIEWER_INSTANCED_MODELS 1
 // Enable Measure Gizmo debug window
 #define ENABLE_MEASURE_GIZMO_DEBUG 0
+// Enable scene raycast picking debug window
+#define ENABLE_RAYCAST_PICKING_DEBUG 0
 
 
 // Enable rendering of objects using environment map
@@ -61,9 +63,6 @@
 #define ENABLE_PROCESS_G2_G3_LINES (1 && ENABLE_2_6_0_ALPHA1)
 // Enable fix of used filament data exported to gcode file
 #define ENABLE_USED_FILAMENT_POST_PROCESS (1 && ENABLE_2_6_0_ALPHA1)
-// Enable picking using raytracing
-#define ENABLE_RAYCAST_PICKING (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
-#define ENABLE_RAYCAST_PICKING_DEBUG (0 && ENABLE_RAYCAST_PICKING)
 
 
 #endif // _prusaslicer_technologies_h_

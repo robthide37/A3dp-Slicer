@@ -22,10 +22,8 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/SLAPrint.hpp"
 
-#if ENABLE_RAYCAST_PICKING
 static const double CONE_RADIUS = 0.25;
 static const double CONE_HEIGHT = 0.75;
-#endif // ENABLE_RAYCAST_PICKING
 
 namespace Slic3r {
 namespace GUI {
@@ -51,12 +49,6 @@ bool GLGizmoSlaSupports::on_init()
     m_desc["clipping_of_view"] = _L("Clipping of view")+ ": ";
     m_desc["reset_direction"]  = _L("Reset direction");
         
-#if !ENABLE_RAYCAST_PICKING
-    m_cone.init_from(its_make_cone(1., 1., 2 * PI / 24));
-    m_cylinder.init_from(its_make_cylinder(1., 1., 2 * PI / 24.));
-    m_sphere.init_from(its_make_sphere(1., (2 * M_PI) / 24.));
-#endif // !ENABLE_RAYCAST_PICKING
-
     return true;
 }
 
@@ -79,12 +71,10 @@ void GLGizmoSlaSupports::data_changed()
         if (mo->sla_points_status == sla::PointsStatus::Generating)
             get_data_from_backend();
 
-#if ENABLE_RAYCAST_PICKING
         if (m_raycasters.empty())
             on_register_raycasters_for_picking();
         else
             update_raycasters_for_picking_transform();
-#endif // ENABLE_RAYCAST_PICKING
     }
 }
 
@@ -92,7 +82,6 @@ void GLGizmoSlaSupports::data_changed()
 
 void GLGizmoSlaSupports::on_render()
 {
-#if ENABLE_RAYCAST_PICKING
     if (!m_sphere.model.is_initialized()) {
         indexed_triangle_set its = its_make_sphere(1.0, double(PI) / 12.0);
         m_sphere.model.init_from(its);
@@ -103,12 +92,6 @@ void GLGizmoSlaSupports::on_render()
         m_cone.model.init_from(its);
         m_cone.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
     }
-#else
-    if (!m_cone.is_initialized())
-        m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 12.0));
-    if (!m_sphere.is_initialized())
-        m_sphere.init_from(its_make_sphere(1.0, double(PI) / 12.0));
-#endif // ENABLE_RAYCAST_PICKING
     if (!m_cylinder.is_initialized())
         m_cylinder.init_from(its_make_cylinder(1.0, 1.0, double(PI) / 12.0));
 
@@ -127,11 +110,7 @@ void GLGizmoSlaSupports::on_render()
     glsafe(::glEnable(GL_DEPTH_TEST));
 
     if (selection.is_from_single_instance())
-#if ENABLE_RAYCAST_PICKING
         render_points(selection);
-#else
-        render_points(selection, false);
-#endif // ENABLE_RAYCAST_PICKING
 
     m_selection_rectangle.render(m_parent);
     m_c->object_clipper()->render_cut();
@@ -140,7 +119,6 @@ void GLGizmoSlaSupports::on_render()
     glsafe(::glDisable(GL_BLEND));
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLGizmoSlaSupports::on_register_raycasters_for_picking()
 {
     assert(m_raycasters.empty());
@@ -161,20 +139,8 @@ void GLGizmoSlaSupports::on_unregister_raycasters_for_picking()
     m_raycasters.clear();
     set_sla_auxiliary_volumes_picking_state(true);
 }
-#else
-void GLGizmoSlaSupports::on_render_for_picking()
-{
-    const Selection& selection = m_parent.get_selection();
-    //glsafe(::glEnable(GL_DEPTH_TEST));
-    render_points(selection, true);
-}
-#endif // ENABLE_RAYCAST_PICKING
 
-#if ENABLE_RAYCAST_PICKING
 void GLGizmoSlaSupports::render_points(const Selection& selection)
-#else
-void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
-#endif // ENABLE_RAYCAST_PICKING
 {
     const size_t cache_size = m_editing_mode ? m_editing_cache.size() : m_normal_cache.size();
 
@@ -186,11 +152,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         return;
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#else
-    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
-#endif // ENABLE_RAYCAST_PICKING
     if (shader == nullptr)
         return;
 
@@ -230,7 +192,6 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         const sla::SupportPoint& support_point = m_editing_mode ? m_editing_cache[i].support_point : m_normal_cache[i];
         const bool point_selected = m_editing_mode ? m_editing_cache[i].selected : false;
 
-#if ENABLE_RAYCAST_PICKING
         const bool clipped = is_mesh_point_clipped(support_point.pos.cast<double>());
         if (!m_raycasters.empty()) {
             m_raycasters[i].first->set_active(!clipped);
@@ -238,48 +199,28 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         }
         if (clipped)
             continue;
-#else
-        if (is_mesh_point_clipped(support_point.pos.cast<double>()))
-            continue;
-#endif // ENABLE_RAYCAST_PICKING
 
         // First decide about the color of the point.
-#if !ENABLE_RAYCAST_PICKING
-        if (picking)
-            render_color = picking_color_component(i);
-        else {
-#endif // !ENABLE_RAYCAST_PICKING
-            if (size_t(m_hover_id) == i && m_editing_mode) // ignore hover state unless editing mode is active
-                render_color = { 0.f, 1.f, 1.f, 1.f };
-            else { // neigher hover nor picking
-                bool supports_new_island = m_lock_unique_islands && support_point.is_new_island;
-                if (m_editing_mode) {
-                    if (point_selected)
-                        render_color = { 1.f, 0.3f, 0.3f, 1.f};
-                    else
-                        if (supports_new_island)
-                            render_color = { 0.3f, 0.3f, 1.f, 1.f };
-                        else
-                            render_color = { 0.7f, 0.7f, 0.7f, 1.f };
-                }
+        if (size_t(m_hover_id) == i && m_editing_mode) // ignore hover state unless editing mode is active
+            render_color = { 0.f, 1.f, 1.f, 1.f };
+        else { // neigher hover nor picking
+            bool supports_new_island = m_lock_unique_islands && support_point.is_new_island;
+            if (m_editing_mode) {
+                if (point_selected)
+                    render_color = { 1.f, 0.3f, 0.3f, 1.f};
                 else
-                    render_color = { 0.5f, 0.5f, 0.5f, 1.f };
+                    if (supports_new_island)
+                        render_color = { 0.3f, 0.3f, 1.f, 1.f };
+                    else
+                        render_color = { 0.7f, 0.7f, 0.7f, 1.f };
             }
-#if !ENABLE_RAYCAST_PICKING
+            else
+                render_color = { 0.5f, 0.5f, 0.5f, 1.f };
         }
-#endif // !ENABLE_RAYCAST_PICKING
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
         m_cone.model.set_color(render_color);
         m_sphere.model.set_color(render_color);
-#else
-        m_cone.set_color(render_color);
-        m_sphere.set_color(render_color);
-#endif // ENABLE_RAYCAST_PICKING
-#if !ENABLE_RAYCAST_PICKING
-        if (!picking)
-#endif // !ENABLE_RAYCAST_PICKING
 #else
         m_cone.set_color(-1, render_color);
         m_sphere.set_color(-1, render_color);
@@ -309,19 +250,10 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
             Eigen::Quaterniond q;
             q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * m_editing_cache[i].normal.cast<double>());
             const Eigen::AngleAxisd aa(q);
-#if !ENABLE_RAYCAST_PICKING
-            const double cone_radius = 0.25; // mm
-            const double cone_height = 0.75;
-#endif // !ENABLE_RAYCAST_PICKING
 #if ENABLE_LEGACY_OPENGL_REMOVAL
             const Transform3d model_matrix = vol->world_matrix() * support_matrix * Transform3d(aa.toRotationMatrix()) *
-#if ENABLE_RAYCAST_PICKING
                 Geometry::translation_transform((CONE_HEIGHT + support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ()) *
                 Geometry::rotation_transform({ double(PI), 0.0, 0.0 }) * Geometry::scale_transform({ CONE_RADIUS, CONE_RADIUS, CONE_HEIGHT });
-#else
-                Geometry::translation_transform((cone_height + support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ()) *
-                Geometry::rotation_transform({ double(PI), 0.0, 0.0 }), * Geometry::scale_transform({ cone_radius, cone_radius, cone_height });
-#endif // ENABLE_RAYCAST_PICKING
 
             shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
             const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
@@ -333,11 +265,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
             glsafe(::glRotated(180., 1., 0., 0.));
             glsafe(::glScaled(cone_radius, cone_radius, cone_height));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
             m_cone.model.render();
-#else
-            m_cone.render();
-#endif // ENABLE_RAYCAST_PICKING
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
             glsafe(::glPopMatrix());
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
@@ -353,11 +281,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         glsafe(::glPushMatrix());
         glsafe(::glScaled(radius, radius, radius));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
         m_sphere.model.render();
-#else
-        m_sphere.render();
-#endif // ENABLE_RAYCAST_PICKING
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopMatrix());
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
@@ -371,11 +295,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
     }
 
     // Now render the drain holes:
-#if ENABLE_RAYCAST_PICKING
     if (has_holes) {
-#else
-    if (has_holes && ! picking) {
-#endif // ENABLE_RAYCAST_PICKING
         render_color = { 0.7f, 0.7f, 0.7f, 0.7f };
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         m_cylinder.set_color(render_color);
@@ -544,10 +464,8 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
                     m_editing_cache.emplace_back(sla::SupportPoint(pos_and_normal.first, m_new_point_head_diameter/2.f, false), false, pos_and_normal.second);
                     m_parent.set_as_dirty();
                     m_wait_for_up_event = true;
-#if ENABLE_RAYCAST_PICKING
                     on_unregister_raycasters_for_picking();
                     on_register_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
                 }
                 else
                     return false;
@@ -572,12 +490,8 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
 
             // Now ask the rectangle which of the points are inside.
             std::vector<Vec3f> points_inside;
-#if ENABLE_RAYCAST_PICKING
             std::vector<unsigned int> points_idxs = m_selection_rectangle.contains(points);
             m_selection_rectangle.stop_dragging();
-#else
-            std::vector<unsigned int> points_idxs = m_selection_rectangle.stop_dragging(m_parent, points);
-#endif // ENABLE_RAYCAST_PICKING
             for (size_t idx : points_idxs)
                 points_inside.push_back(points[idx].cast<float>());
 
@@ -707,10 +621,8 @@ void GLGizmoSlaSupports::delete_selected_points(bool force)
         }
     }
 
-#if ENABLE_RAYCAST_PICKING
     on_unregister_raycasters_for_picking();
     on_register_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 
     select_point(NoPoints);
 }
@@ -1390,9 +1302,7 @@ void GLGizmoSlaSupports::switch_to_editing_mode()
     for (const sla::SupportPoint& sp : m_normal_cache)
         m_editing_cache.emplace_back(sp);
     select_point(NoPoints);
-#if ENABLE_RAYCAST_PICKING
     on_register_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 
     m_c->instances_hider()->show_supports(false);
     m_parent.set_as_dirty();
@@ -1406,9 +1316,7 @@ void GLGizmoSlaSupports::disable_editing_mode()
         wxGetApp().plater()->leave_gizmos_stack();
         m_c->instances_hider()->show_supports(true);
         m_parent.set_as_dirty();
-#if ENABLE_RAYCAST_PICKING
         on_unregister_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
     }
     wxGetApp().plater()->get_notification_manager()->close_notification_of_type(NotificationType::QuitSLAManualMode);
 }
@@ -1427,7 +1335,6 @@ bool GLGizmoSlaSupports::unsaved_changes() const
     return false;
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLGizmoSlaSupports::set_sla_auxiliary_volumes_picking_state(bool state)
 {
     std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = m_parent.get_raycasters_for_picking(SceneRaycaster::EType::Volume);
@@ -1473,7 +1380,6 @@ void GLGizmoSlaSupports::update_raycasters_for_picking_transform()
         }
     }
 }
-#endif // ENABLE_RAYCAST_PICKING
 
 SlaGizmoHelpDialog::SlaGizmoHelpDialog()
 : wxDialog(nullptr, wxID_ANY, _L("SLA gizmo keyboard shortcuts"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER)

@@ -600,18 +600,12 @@ void GLGizmoEmboss::on_render() {
     }
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLGizmoEmboss::on_register_raycasters_for_picking(){
     m_rotate_gizmo.register_raycasters_for_picking();
 }
 void GLGizmoEmboss::on_unregister_raycasters_for_picking(){
     m_rotate_gizmo.unregister_raycasters_for_picking();
 }
-#else // !ENABLE_RAYCAST_PICKING
-void GLGizmoEmboss::on_render_for_picking() {
-    m_rotate_gizmo.render_for_picking();
-}
-#endif // ENABLE_RAYCAST_PICKING
 
 #ifdef SHOW_FINE_POSITION
 // draw suggested position of window

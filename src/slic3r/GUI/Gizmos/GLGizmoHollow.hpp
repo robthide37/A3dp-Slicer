@@ -46,33 +46,19 @@ public:
 protected:
     bool on_init() override;
     void on_render() override;
-#if ENABLE_RAYCAST_PICKING
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
-#else
-    void on_render_for_picking() override;
-#endif // ENABLE_RAYCAST_PICKING
 
 private:
-#if ENABLE_RAYCAST_PICKING
     void render_points(const Selection& selection);
-#else
-    void render_points(const Selection& selection, bool picking = false);
-#endif // ENABLE_RAYCAST_PICKING
     void hollow_mesh(bool postpone_error_messages = false);
-#if ENABLE_RAYCAST_PICKING
     void set_sla_auxiliary_volumes_picking_state(bool state);
     void update_raycasters_for_picking_transform();
-#endif // ENABLE_RAYCAST_PICKING
 
     ObjectID m_old_mo_id = -1;
 
-#if ENABLE_RAYCAST_PICKING
     PickingModel m_cylinder;
     std::vector<std::shared_ptr<SceneRaycasterItem>> m_raycasters;
-#else
-    GLModel m_cylinder;
-#endif // ENABLE_RAYCAST_PICKING
 
     float m_new_hole_radius = 2.f;        // Size of a new hole.
     float m_new_hole_height = 6.f;
@@ -128,9 +114,7 @@ protected:
     void on_load(cereal::BinaryInputArchive& ar) override;
     void on_save(cereal::BinaryOutputArchive& ar) const override;
 
-#if ENABLE_RAYCAST_PICKING
     void init_cylinder_model();
-#endif // ENABLE_RAYCAST_PICKING
 };
 
 

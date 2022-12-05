@@ -15,9 +15,7 @@
 
 #include <cfloat>
 #include <optional>
-#if ENABLE_RAYCAST_PICKING
 #include <memory>
-#endif // ENABLE_RAYCAST_PICKING
 
 namespace Slic3r {
 
@@ -61,10 +59,8 @@ public:
     void set_offset(double offset) { m_data[3] = offset; }
     double get_offset() const { return m_data[3]; }
     Vec3d get_normal() const { return Vec3d(m_data[0], m_data[1], m_data[2]); }
-#if ENABLE_RAYCAST_PICKING
     void invert_normal() { m_data[0] *= -1.0; m_data[1] *= -1.0; m_data[2] *= -1.0; }
     ClippingPlane inverted_normal() const { return ClippingPlane(-get_normal(), get_offset()); }
-#endif // ENABLE_RAYCAST_PICKING
     bool is_active() const { return m_data[3] != DBL_MAX; }
     static ClippingPlane ClipsNothing() { return ClippingPlane(Vec3d(0., 0., 1.), DBL_MAX); }
     const std::array<double, 4>& get_data() const { return m_data; }
@@ -155,7 +151,6 @@ private:
 // whether certain points are visible or obscured by the mesh etc.
 class MeshRaycaster {
 public:
-#if ENABLE_RAYCAST_PICKING
     explicit MeshRaycaster(std::shared_ptr<const TriangleMesh> mesh)
         : m_mesh(mesh)
         , m_emesh(*mesh, true) // calculate epsilon for triangle-ray intersection from an average edge length
@@ -166,20 +161,6 @@ public:
 
     static void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
         Vec3d& point, Vec3d& direction);
-#else
-    // The class references extern TriangleMesh, which must stay alive
-    // during MeshRaycaster existence.
-    MeshRaycaster(const TriangleMesh& mesh)
-        : m_emesh(mesh, true) // calculate epsilon for triangle-ray intersection from an average edge length
-        , m_normals(its_face_normals(mesh.its))
-    {
-    }
-
-    static void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                             Vec3d& point, Vec3d& direction);
-//    void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-//        Vec3d& point, Vec3d& direction) const;
-#endif // ENABLE_RAYCAST_PICKING
 
     // Given a mouse position, this returns true in case it is on the mesh.
     bool unproject_on_mesh(
@@ -208,7 +189,6 @@ public:
         const ClippingPlane* clipping_plane = nullptr // clipping plane (if active)
     ) const;
 
-#if ENABLE_RAYCAST_PICKING
     // Returns true if the ray, built from mouse position and camera direction, intersects the mesh.
     // In this case, position and normal contain the position and normal, in model coordinates, of the intersection closest to the camera,
     // depending on the position/orientation of the clipping_plane, if specified 
@@ -221,7 +201,6 @@ public:
         const ClippingPlane* clipping_plane = nullptr, // clipping plane (if active)
         size_t* facet_idx = nullptr // index of the facet hit
     ) const;
-#endif // ENABLE_RAYCAST_PICKING
 
     // Given a point in world coords, the method returns closest point on the mesh.
     // The output is in mesh coords.
@@ -234,14 +213,11 @@ public:
     Vec3f get_triangle_normal(size_t facet_idx) const;
 
 private:
-#if ENABLE_RAYCAST_PICKING
     std::shared_ptr<const TriangleMesh> m_mesh;
-#endif // ENABLE_RAYCAST_PICKING
     AABBMesh m_emesh;
     std::vector<stl_normal> m_normals;
 };
 
-#if ENABLE_RAYCAST_PICKING
 struct PickingModel
 {
     GLModel model;
@@ -252,7 +228,6 @@ struct PickingModel
         mesh_raycaster.reset();
     }
 };
-#endif // ENABLE_RAYCAST_PICKING
 
 } // namespace GUI
 } // namespace Slic3r

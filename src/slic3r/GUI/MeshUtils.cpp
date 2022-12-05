@@ -370,13 +370,8 @@ Vec3f MeshRaycaster::get_triangle_normal(size_t facet_idx) const
     return m_normals[facet_idx];
 }
 
-#if ENABLE_RAYCAST_PICKING
 void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                         Vec3d& point, Vec3d& direction)
-#else
-void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                                        Vec3d& point, Vec3d& direction)
-#endif // ENABLE_RAYCAST_PICKING
 {
     Matrix4d modelview = camera.get_view_matrix().matrix();
     Matrix4d projection= camera.get_projection_matrix().matrix();
@@ -540,7 +535,6 @@ std::vector<unsigned> MeshRaycaster::get_unobscured_idxs(const Geometry::Transfo
     return out;
 }
 
-#if ENABLE_RAYCAST_PICKING
 bool MeshRaycaster::closest_hit(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
     Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane, size_t* facet_idx) const
 {
@@ -573,7 +567,6 @@ bool MeshRaycaster::closest_hit(const Vec2d& mouse_pos, const Transform3d& trafo
 
     return true;
 }
-#endif // ENABLE_RAYCAST_PICKING
 
 Vec3f MeshRaycaster::get_closest_point(const Vec3f& point, Vec3f* normal) const
 {

@@ -362,7 +362,6 @@ void GLGizmoMove3D::on_render()
 #endif // ENABLE_WORLD_COORDINATE
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLGizmoMove3D::on_register_raycasters_for_picking()
 {
     // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
@@ -373,32 +372,6 @@ void GLGizmoMove3D::on_unregister_raycasters_for_picking()
 {
     m_parent.set_raycaster_gizmos_on_top(false);
 }
-#else
-void GLGizmoMove3D::on_render_for_picking()
-{
-    glsafe(::glDisable(GL_DEPTH_TEST));
-
-#if ENABLE_WORLD_COORDINATE
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    const Transform3d base_matrix = local_transform(m_parent.get_selection());
-    for (int i = 0; i < 3; ++i) {
-        m_grabbers[i].matrix = base_matrix;
-    }
-#else
-    glsafe(::glPushMatrix());
-    transform_to_local(m_parent.get_selection());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-    render_grabbers_for_picking(m_bounding_box);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-#else
-    glsafe(::glPopMatrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#else
-    const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
-    render_grabbers_for_picking(box);
-#endif // ENABLE_WORLD_COORDINATE
-}
-#endif // ENABLE_RAYCAST_PICKING
 
 double GLGizmoMove3D::calc_projection(const UpdateData& data) const
 {
