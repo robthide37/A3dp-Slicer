@@ -312,9 +312,6 @@ void ImGuiWrapper::new_frame()
         init_font(true);
     }
 
-    ImGui::NewFrame();
-    m_new_frame_open = true;
-
     ImGuiIO& io = ImGui::GetIO();
     // synchronize key states
     // when the application loses the focus it may happen that the key up event is not processed
@@ -343,6 +340,9 @@ void ImGuiWrapper::new_frame()
         if (io.KeysDown[key] && keycode != WXK_NONE && !wxGetKeyState(keycode)) 
             io.KeysDown[key] = false;
     }
+
+    ImGui::NewFrame();
+    m_new_frame_open = true;
 }
 
 void ImGuiWrapper::render()
