@@ -1052,6 +1052,10 @@ void GLGizmoMeasure::update_if_needed()
 
             TriangleMesh volume_mesh = vol.volume->mesh();
             volume_mesh.transform(vol.world_trafo);
+
+            if (vol.world_trafo.matrix().determinant() < 0.0)
+                volume_mesh.flip_triangles();
+
             composite_mesh.merge(volume_mesh);
         }
 
