@@ -74,8 +74,6 @@ std::vector<Node> sample_mesh(const indexed_triangle_set &its, double radius)
 
 std::vector<Node> sample_bed(const ExPolygons &bed, float z, double radius)
 {
-    std::vector<Vec3f> ret;
-
     auto triangles = triangulate_expolygons_3d(bed, z);
     indexed_triangle_set its;
     its.vertices.reserve(triangles.size());
