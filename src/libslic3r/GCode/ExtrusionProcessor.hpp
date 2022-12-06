@@ -126,8 +126,8 @@ public:
         };
 
         float flow_width             = path.width;
-        float min_malformation_dist  = 0.05 * flow_width;
-        float peak_malformation_dist = 0.5 * flow_width;
+        float min_malformation_dist  = 0.2 * flow_width;
+        float peak_malformation_dist = 0.6 * flow_width;
 
         const Points              &original_points = path.polyline.points;
         std::vector<ExtendedPoint> points;
