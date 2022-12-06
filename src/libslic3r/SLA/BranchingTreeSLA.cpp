@@ -150,7 +150,7 @@ public:
                                    << " " << j.pos.y() << " " << j.pos.z();
 
         // Discard all the support points connecting to this branch.
-        discard_subtree(j.id);
+        discard_subtree_rescure(j.id);
     }
 
     const std::vector<size_t>& unroutable_pinheads() const
@@ -335,6 +335,9 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
     auto bedpts  = branchingtree::sample_bed(props.bed_shape(),
                                              float(props.ground_level()),
                                              props.sampling_radius());
+
+    for (auto &bp : bedpts)
+        bp.Rmin = sm.cfg.head_back_radius_mm;
 
     branchingtree::PointCloud nodes{std::move(meshpts), std::move(bedpts),
                                     std::move(leafs), props};
