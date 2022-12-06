@@ -242,7 +242,12 @@ static FacetSliceType slice_facet(
                 std::swap(a, b);
             }
             IntersectionPoint &point = points[num_points];
-            double t = (double(slice_z) - double(b->z())) / (double(a->z()) - double(b->z()));
+            double t = (double(slice_z) - double(a->z())) / (double(b->z()) - double(a->z()));
+#if 0
+            // If the intersection point falls into one of the end points, mark it with the end point identifier.
+            // While this sounds like a good idea, it likely breaks the chaining by logical addresses of the intersection points
+            // and the branch for 0 < t < 1 does not guarantee uniqness of the interection point anyways.
+            // Thus this branch is only kept for reference and it is not used in production code.
             if (t <= 0.) {
                 if (point_on_layer == size_t(-1) || points[point_on_layer].point_id != a_id) {
                     point.x() = a->x();
@@ -258,11 +263,26 @@ static FacetSliceType slice_facet(
                     point.point_id = b_id;
                 }
             } else {
-                point.x() = coord_t(floor(double(b->x()) + (double(a->x()) - double(b->x())) * t + 0.5));
-                point.y() = coord_t(floor(double(b->y()) + (double(a->y()) - double(b->y())) * t + 0.5));
+                point.x() = coord_t(floor(double(a->x()) + (double(b->x()) - double(a->x())) * t + 0.5));
+                point.y() = coord_t(floor(double(a->y()) + (double(b->y()) - double(a->y())) * t + 0.5));
                 point.edge_id = edge_id;
                 ++ num_points;
             }
+#else
+            // Just clamp the intersection point to source triangle edge.
+            if (t <= 0.) {
+                point.x() = a->x();
+                point.y() = a->y();
+            } else if (t >= 1.) {
+                point.x() = b->x();
+                point.y() = b->y();
+            } else {
+                point.x() = coord_t(floor(double(a->x()) + (double(b->x()) - double(a->x())) * t + 0.5));
+                point.y() = coord_t(floor(double(a->y()) + (double(b->y()) - double(a->y())) * t + 0.5));
+            }
+            point.edge_id = edge_id;
+            ++ num_points;
+#endif
         }
     }
 
@@ -284,6 +304,11 @@ static FacetSliceType slice_facet(
         assert(line_out.edge_a_id != -1 || line_out.edge_b_id != -1);
         // General slicing position, use the segment for both slicing and object cutting.
 #if 0
+        // See the discussion on calculating the intersection point on a triangle edge.
+        // Even if the intersection point is clamped to one of the end points of the triangle edge,
+        // the intersection point is still marked as "on edge", not "on vertex". Such implementation
+        // may produce degenerate triangles, but is topologically correct.
+        // Therefore this block for solving snapping of an intersection edge to triangle vertices is not used.
         if (line_out.a_id != -1 && line_out.b_id != -1) {
             // Solving a degenerate case, where both the intersections snapped to an edge.
             // Correctly classify the face as below or above based on the position of the 3rd point.
@@ -2009,6 +2034,7 @@ static void triangulate_slice(
                                                    (l.first.y() == r.first.y() && l.second < r.second))); });
 
     // 2) Discover duplicate points on the slice. Remap duplicate vertices to a vertex with a lowest index.
+    //    Remove denegerate triangles, if they happen to be created by merging duplicate vertices.
     {
         std::vector<int> map_duplicate_vertex(int(its.vertices.size()) - num_original_vertices, -1);
         int i = 0;
@@ -2031,10 +2057,20 @@ static void triangulate_slice(
             i = j;
         }
         map_vertex_to_index.erase(map_vertex_to_index.begin() + k, map_vertex_to_index.end());
-        for (stl_triangle_vertex_indices &f : its.indices)
-            for (i = 0; i < 3; ++ i)
-                if (f(i) >= num_original_vertices)
-                    f(i) = map_duplicate_vertex[f(i) - num_original_vertices];
+        for (i = 0; i < int(its.indices.size());) {
+            stl_triangle_vertex_indices &f = its.indices[i];
+            // Remap the newly added face vertices.
+            for (k = 0; k < 3; ++ k)
+                if (f(k) >= num_original_vertices)
+                    f(k) = map_duplicate_vertex[f(k) - num_original_vertices];
+            if (f(0) == f(1) || f(0) == f(2) || f(1) == f(2)) {
+                // Remove degenerate face.
+                f = its.indices.back();
+                its.indices.pop_back();
+            } else
+                // Keep the face.
+                ++ i;
+        }
     }
 
     if (triangulate) {
@@ -2107,6 +2143,10 @@ void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *u
     assert(upper || lower);
     if (upper == nullptr && lower == nullptr)
         return;
+
+#ifndef NDEBUG
+    const size_t had_degenerate_faces = its_num_degenerate_faces(mesh);
+#endif // NDEBUG
 
     BOOST_LOG_TRIVIAL(trace) << "cut_mesh - slicing object";
 
@@ -2251,8 +2291,27 @@ void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *u
                 new_face(lower, iv0, iv0v1_lower, iv2v0_lower);
             }
         }
+
+/*
+        char buf[2048];
+        static int irun = 0;
+        ++irun;
+        temp.indices.emplace_back(int(temp.vertices.size()), int(temp.vertices.size() + 1), int(temp.vertices.size() + 2));
+        temp.vertices.emplace_back(vertices[0]);
+        temp.vertices.emplace_back(vertices[1]);
+        temp.vertices.emplace_back(vertices[2]);
+        sprintf(buf, "D:\\temp\\test\\temp-%d.obj", irun);
+        its_write_obj(temp, buf);
+        sprintf(buf, "D:\\temp\\test\\upper-%d.obj", irun);
+        its_write_obj(*upper, buf);
+        sprintf(buf, "D:\\temp\\test\\lower-%d.obj", irun);
+        its_write_obj(*lower, buf);
+*/
     }
-    
+
+    assert(had_degenerate_faces || ! upper || its_num_degenerate_faces(*upper) == 0);
+    assert(had_degenerate_faces || ! lower || its_num_degenerate_faces(*lower) == 0);
+
     if (upper != nullptr) {
         triangulate_slice(*upper, upper_lines, upper_slice_vertices, int(mesh.vertices.size()), z, triangulate_caps, NORMALS_DOWN);
 #ifndef NDEBUG
@@ -2272,6 +2331,9 @@ void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *u
         }
 #endif // NDEBUG
     }
+
+    assert(had_degenerate_faces || ! upper || its_num_degenerate_faces(*upper) == 0);
+    assert(had_degenerate_faces || ! lower || its_num_degenerate_faces(*lower) == 0);
 }
 
 } // namespace Slic3r
