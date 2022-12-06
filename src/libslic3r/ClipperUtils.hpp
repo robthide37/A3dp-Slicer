@@ -323,6 +323,7 @@ namespace ClipperUtils {
     void                    clip_clipper_polygon_with_subject_bbox(const Polygon &src, const BoundingBox &bbox, Polygon &out);
     [[nodiscard]] Polygon   clip_clipper_polygon_with_subject_bbox(const Polygon &src, const BoundingBox &bbox);
     [[nodiscard]] Polygons  clip_clipper_polygons_with_subject_bbox(const Polygons &src, const BoundingBox &bbox);
+    [[nodiscard]] Polygons  clip_clipper_polygons_with_subject_bbox(const ExPolygon &src, const BoundingBox &bbox);
 }
 
 // offset Polygons
@@ -427,6 +428,7 @@ Slic3r::ExPolygons diff_ex(const Slic3r::Surfaces &subject, const Slic3r::ExPoly
 Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons &subject, const Slic3r::Surfaces &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::ExPolygons diff_ex(const Slic3r::Surfaces &subject, const Slic3r::Surfaces &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::ExPolygons diff_ex(const Slic3r::SurfacesPtr &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
+Slic3r::Polylines  diff_pl(const Slic3r::Polyline &subject, const Slic3r::Polygons &clip);
 Slic3r::Polylines  diff_pl(const Slic3r::Polylines &subject, const Slic3r::Polygons &clip);
 Slic3r::Polylines  diff_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygon &clip);
 Slic3r::Polylines  diff_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygons &clip);

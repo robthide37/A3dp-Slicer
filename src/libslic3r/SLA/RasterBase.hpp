@@ -60,10 +60,10 @@ public:
     enum Orientation { roLandscape, roPortrait };
     
     using TMirroring = std::array<bool, 2>;
-    static const TMirroring NoMirror;
-    static const TMirroring MirrorX;
-    static const TMirroring MirrorY;
-    static const TMirroring MirrorXY;
+    static const constexpr TMirroring NoMirror = {false, false};
+    static const constexpr TMirroring MirrorX  = {true, false};
+    static const constexpr TMirroring MirrorY  = {false, true};
+    static const constexpr TMirroring MirrorXY = {true, true};
     
     struct Trafo {
         bool mirror_x = false, mirror_y = false, flipXY = false;
