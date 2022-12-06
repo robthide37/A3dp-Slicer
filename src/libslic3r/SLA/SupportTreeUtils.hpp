@@ -723,7 +723,7 @@ struct DefaultWideningModel {
                 "DefaultWideningModel is not a widening function");
 
         double w = WIDENING_SCALE * sm.cfg.pillar_widening_factor * len;
-        return src.R + w;
+        return std::max(src.R, sm.cfg.head_back_radius_mm) + w;
     };
 };
 
