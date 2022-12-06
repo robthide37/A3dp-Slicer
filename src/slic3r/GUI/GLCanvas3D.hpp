@@ -243,7 +243,7 @@ class GLCanvas3D
         int last_object_id{ -1 };
         float last_z{ 0.0f };
         LayerHeightEditActionType last_action{ LAYER_HEIGHT_EDIT_ACTION_INCREASE };
-#if ENABLE_LEGACY_OPENGL_REMOVAL
+
         struct Profile
         {
             GLModel baseline;
@@ -253,7 +253,6 @@ class GLCanvas3D
             std::vector<double> old_layer_height_profile;
         };
         Profile m_profile;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         LayersEditing() = default;
         ~LayersEditing();
@@ -280,9 +279,6 @@ class GLCanvas3D
         static float get_cursor_z_relative(const GLCanvas3D& canvas);
         static bool bar_rect_contains(const GLCanvas3D& canvas, float x, float y);
         static Rect get_bar_rect_screen(const GLCanvas3D& canvas);
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        static Rect get_bar_rect_viewport(const GLCanvas3D& canvas);
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         static float get_overlay_window_width() { return LayersEditing::s_overlay_window_width; }
 
         float object_max_z() const { return m_object_max_z; }
@@ -292,13 +288,8 @@ class GLCanvas3D
     private:
         bool is_initialized() const;
         void generate_layer_height_texture();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         void render_active_object_annotations(const GLCanvas3D& canvas);
         void render_profile(const GLCanvas3D& canvas);
-#else
-        void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect);
-        void render_profile(const Rect& bar_rect);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         void update_slicing_parameters();
 
         static float thickness_bar_width(const GLCanvas3D &canvas);        
@@ -345,7 +336,6 @@ class GLCanvas3D
 
     struct SlaCap
     {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         struct Triangles
         {
             GLModel object;
@@ -354,16 +344,6 @@ class GLCanvas3D
         typedef std::map<unsigned int, Triangles> ObjectIdToModelsMap;
         double z;
         ObjectIdToModelsMap triangles;
-#else
-        struct Triangles
-        {
-            Pointf3s object;
-            Pointf3s supports;
-        };
-        typedef std::map<unsigned int, Triangles> ObjectIdToTrianglesMap;
-        double z;
-        ObjectIdToTrianglesMap triangles;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         SlaCap() { reset(); }
         void reset() { z = DBL_MAX; triangles.clear(); }
@@ -638,7 +618,6 @@ private:
     }
     m_gizmo_highlighter;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SHOW_CAMERA_TARGET
     struct CameraTarget
     {
@@ -649,7 +628,6 @@ private:
     CameraTarget m_camera_target;
 #endif // ENABLE_SHOW_CAMERA_TARGET
     GLModel m_background;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 public:
     explicit GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed);
@@ -985,13 +963,8 @@ private:
     void _picking_pass();
     void _rectangular_selection_picking_pass();
     void _render_background();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     void _render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes);
     void _render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom);
-#else
-    void _render_bed(bool bottom, bool show_axes);
-    void _render_bed_for_picking(bool bottom);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
     void _render_gcode_cog();

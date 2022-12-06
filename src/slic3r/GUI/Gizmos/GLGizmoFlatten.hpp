@@ -2,12 +2,8 @@
 #define slic3r_GLGizmoFlatten_hpp_
 
 #include "GLGizmoBase.hpp"
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GLModel.hpp"
 #include "slic3r/GUI/MeshUtils.hpp"
-#else
-#include "slic3r/GUI/3DScene.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 namespace Slic3r {
 
@@ -27,11 +23,7 @@ private:
 
     struct PlaneData {
         std::vector<Vec3d> vertices; // should be in fact local in update_planes()
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         PickingModel vbo;
-#else
-        GLIndexedVertexArray vbo;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         Vec3d normal;
         float area;
         int picking_id{ -1 };

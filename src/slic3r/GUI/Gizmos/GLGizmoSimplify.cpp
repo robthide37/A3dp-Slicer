@@ -650,25 +650,13 @@ void GLGizmoSimplify::init_model()
         }
         assert(volume != nullptr);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         // set actual triangle count
         m_triangle_count += volume->mesh().its.indices.size();
-#else
-        const indexed_triangle_set &its = volume->mesh().its;
-
-        // set actual triangle count
-        m_triangle_count += its.indices.size();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         assert(m_glmodels.find(id) == m_glmodels.end());
         GLModel &glmodel = m_glmodels[id]; // create new glmodel
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         glmodel.init_from(volume->mesh());
         glmodel.set_color(selected_volume->color);
-#else
-        glmodel.init_from(its);
-        glmodel.set_color(-1,selected_volume->color);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         m_parent.toggle_model_objects_visibility(false, info->model_object(),
                                                  info->get_active_instance(),
@@ -720,11 +708,7 @@ void GLGizmoSimplify::update_model(const State::Data &data)
 #else
         glmodel.init_from(its);
 #endif // ENABLE_OPENGL_ES
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         glmodel.set_color(color);
-#else
-        glmodel.set_color(-1, color);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         m_triangle_count += its.indices.size();
     }
@@ -759,10 +743,6 @@ void GLGizmoSimplify::on_render()
         GLModel &glmodel = it->second;
 
         const Transform3d trafo_matrix = selected_volume->world_matrix();
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        glsafe(::glPushMatrix());
-        glsafe(::glMultMatrixd(trafo_matrix.data()));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         auto* gouraud_shader = wxGetApp().get_shader("gouraud_light");
 #if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
         bool depth_test_enabled = ::glIsEnabled(GL_DEPTH_TEST);
@@ -771,7 +751,6 @@ void GLGizmoSimplify::on_render()
 #endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
         glsafe(::glEnable(GL_DEPTH_TEST));
         gouraud_shader->start_using();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d& view_matrix = camera.get_view_matrix();
         const Transform3d view_model_matrix = view_matrix * trafo_matrix;
@@ -779,7 +758,6 @@ void GLGizmoSimplify::on_render()
         gouraud_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * trafo_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         gouraud_shader->set_uniform("view_normal_matrix", view_normal_matrix);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         glmodel.render();
         gouraud_shader->stop_using();
 
@@ -791,12 +769,10 @@ void GLGizmoSimplify::on_render()
 #endif // ENABLE_OPENGL_ES
             contour_shader->start_using();
             contour_shader->set_uniform("offset", OpenGLManager::get_gl_info().is_mesa() ? 0.0005 : 0.00001);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             contour_shader->set_uniform("view_model_matrix", view_model_matrix);
             contour_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
             const ColorRGBA color = glmodel.get_color();
             glmodel.set_color(ColorRGBA::WHITE());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_CORE_PROFILE
             if (!OpenGLManager::get_gl_info().is_core_profile())
 #endif // ENABLE_GL_CORE_PROFILE
@@ -808,9 +784,7 @@ void GLGizmoSimplify::on_render()
 #if !ENABLE_OPENGL_ES
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
 #endif // !ENABLE_OPENGL_ES
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             glmodel.set_color(color);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             contour_shader->stop_using();
         }
 #if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
@@ -819,9 +793,6 @@ void GLGizmoSimplify::on_render()
 #else
         glsafe(::glPopAttrib());
 #endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 }
 

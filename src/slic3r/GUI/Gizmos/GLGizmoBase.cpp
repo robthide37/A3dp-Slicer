@@ -5,9 +5,7 @@
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 // TODO: Display tooltips quicker on Linux
 
@@ -55,23 +53,17 @@ void GLGizmoBase::Grabber::unregister_raycasters_for_picking()
 
 void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color)
 {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (!s_cube.model.is_initialized()) {
         // This cannot be done in constructor, OpenGL is not yet
         // initialized at that point (on Linux at least).
         indexed_triangle_set its = its_make_cube(1.0, 1.0, 1.0);
         its_translate(its, -0.5f * Vec3f::Ones());
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         s_cube.model.init_from(its);
         s_cube.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
-#else
-        s_cube.init_from(its, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     if (!s_cone.model.is_initialized()) {
@@ -82,7 +74,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color)
 
     const float half_size = dragging ? get_dragging_half_size(size) : get_half_size(size);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     s_cube.model.set_color(render_color);
     s_cone.model.set_color(render_color);
 
@@ -97,16 +88,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color)
     shader->set_uniform("view_model_matrix", view_model_matrix);
     Matrix3d view_normal_matrix = view_matrix_no_offset * elements_matrices[0].matrix().block(0, 0, 3, 3).inverse().transpose();
     shader->set_uniform("view_normal_matrix", view_normal_matrix);
-#else
-    s_cube.set_color(-1, render_color);
-    s_cone.set_color(-1, render_color);
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(center.x(), center.y(), center.z()));
-    glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
-    glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
-    glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
-    glsafe(::glScaled(2.0 * half_size, 2.0 * half_size, 2.0 * half_size));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     s_cube.model.render();
 
     auto render_extension = [&view_matrix, &view_matrix_no_offset, shader](const Transform3d& matrix) {
@@ -117,7 +98,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color)
         s_cone.model.render();
     };
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosX)) != 0) {
         elements_matrices[1] = elements_matrices[0] * Geometry::translation_transform(Vec3d::UnitX()) * Geometry::rotation_transform({ 0.0, 0.5 * double(PI), 0.0 });
         render_extension(elements_matrices[1]);
@@ -142,52 +122,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color)
         elements_matrices[6] = elements_matrices[0] * Geometry::translation_transform(-Vec3d::UnitZ()) * Geometry::rotation_transform({ double(PI), 0.0, 0.0 });
         render_extension(elements_matrices[6]);
     }
-#else
-    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosX)) != 0) {
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(1.0, 0.0, 0.0));
-        glsafe(::glRotated(0.5 * Geometry::rad2deg(double(PI)), 0.0, 1.0, 0.0));
-        s_cone.render();
-        glsafe(::glPopMatrix());
-    }
-    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegX)) != 0) {
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(-1.0, 0.0, 0.0));
-        glsafe(::glRotated(-0.5 * Geometry::rad2deg(double(PI)), 0.0, 1.0, 0.0));
-        s_cone.render();
-        glsafe(::glPopMatrix());
-    }
-    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosY)) != 0) {
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(0.0, 1.0, 0.0));
-        glsafe(::glRotated(-0.5 * Geometry::rad2deg(double(PI)), 1.0, 0.0, 0.0));
-        s_cone.render();
-        glsafe(::glPopMatrix());
-    }
-    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegY)) != 0) {
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(0.0, -1.0, 0.0));
-        glsafe(::glRotated(0.5 * Geometry::rad2deg(double(PI)), 1.0, 0.0, 0.0));
-        s_cone.render();
-        glsafe(::glPopMatrix());
-    }
-    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosZ)) != 0) {
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(0.0, 0.0, 1.0));
-        s_cone.render();
-        glsafe(::glPopMatrix());
-    }
-    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegZ)) != 0) {
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(0.0, 0.0, -1.0));
-        glsafe(::glRotated(Geometry::rad2deg(double(PI)), 1.0, 0.0, 0.0));
-        s_cone.render();
-        glsafe(::glPopMatrix());
-    }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (raycasters[0] == nullptr) {
         GLCanvas3D& canvas = *wxGetApp().plater()->canvas3D();

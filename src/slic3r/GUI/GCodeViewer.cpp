@@ -193,7 +193,6 @@ void GCodeViewer::COG::render()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
     Transform3d model_matrix = Geometry::translation_transform(cog());
     if (m_fixed_size) {
@@ -206,17 +205,6 @@ void GCodeViewer::COG::render()
     const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
     shader->set_uniform("view_normal_matrix", view_normal_matrix);
     m_model.render();
-#else
-    glsafe(::glPushMatrix());
-    const Vec3d position = cog();
-    glsafe(::glTranslated(position.x(), position.y(), position.z()));
-    if (m_fixed_size) {
-        const double inv_zoom = wxGetApp().plater()->get_camera().get_inv_zoom();
-        glsafe(::glScaled(inv_zoom, inv_zoom, inv_zoom));
-    }
-    m_model.render();
-    glsafe(::glPopMatrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     shader->stop_using();
 
@@ -305,11 +293,7 @@ void GCodeViewer::SequentialRangeCap::reset() {
 void GCodeViewer::SequentialView::Marker::init()
 {
     m_model.init_from(stilized_arrow(16, 2.0f, 4.0f, 1.0f, 8.0f));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.set_color({ 1.0f, 1.0f, 1.0f, 0.5f });
-#else
-    m_model.set_color(-1, { 1.0f, 1.0f, 1.0f, 0.5f });
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GCodeViewer::SequentialView::Marker::set_world_position(const Vec3f& position)
@@ -333,7 +317,6 @@ void GCodeViewer::SequentialView::Marker::render()
 
     shader->start_using();
     shader->set_uniform("emission_factor", 0.0f);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
     const Transform3d model_matrix = m_world_transform.cast<double>();
@@ -341,16 +324,8 @@ void GCodeViewer::SequentialView::Marker::render()
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
     shader->set_uniform("view_normal_matrix", view_normal_matrix);
-#else
-    glsafe(::glPushMatrix());
-    glsafe(::glMultMatrixf(m_world_transform.data()));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_model.render();
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     shader->stop_using();
 
@@ -721,17 +696,12 @@ void GCodeViewer::init()
         }
         case EMoveType::Travel: {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Line;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             buffer.vertices.format = VBuffer::EFormat::Position;
 #if ENABLE_GL_CORE_PROFILE
             buffer.shader = OpenGLManager::get_gl_info().is_core_profile() ? "dashed_thick_lines" : "flat";
 #else
             buffer.shader = "flat";
 #endif // ENABLE_GL_CORE_PROFILE
-#else
-            buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
-            buffer.shader = "toolpaths_lines";
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             break;
         }
         }
@@ -745,11 +715,7 @@ void GCodeViewer::init()
     m_gl_data_initialized = true;
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print)
-#else
-void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print, bool initialized)
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     // avoid processing if called with the same gcode_result
     if (m_last_result_id == gcode_result.id &&
@@ -779,11 +745,7 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     m_filament_densities = gcode_result.filament_densities;
 
     if (wxGetApp().is_editor())
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         load_shells(print);
-#else
-        load_shells(print, initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     else {
         Pointfs bed_shape;
         std::string texture;
@@ -1281,30 +1243,12 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
     // format data into the buffers to be rendered as lines
     auto add_vertices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         auto add_vertex = [&vertices](const GCodeProcessorResult::MoveVertex& vertex) {
             // add position
             vertices.push_back(vertex.position.x());
             vertices.push_back(vertex.position.y());
             vertices.push_back(vertex.position.z());
         };
-#else
-        // x component of the normal to the current segment (the normal is parallel to the XY plane)
-        const Vec3f dir = (curr.position - prev.position).normalized();
-        Vec3f normal(dir.y(), -dir.x(), 0.0);
-        normal.normalize();
-
-        auto add_vertex = [&vertices, &normal](const GCodeProcessorResult::MoveVertex& vertex) {
-            // add position
-            vertices.push_back(vertex.position.x());
-            vertices.push_back(vertex.position.y());
-            vertices.push_back(vertex.position.z());
-            // add normal
-            vertices.push_back(normal.x());
-            vertices.push_back(normal.y());
-            vertices.push_back(normal.z());
-        };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // add previous vertex
         add_vertex(prev);
@@ -1555,7 +1499,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
           Geometry::scale_transform({ width, width, height });
         const Eigen::Matrix<double, 3, 3, Eigen::DontAlign> normal_matrix = trafo.matrix().template block<3, 3>(0, 0).inverse().transpose();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         // append vertices
         const size_t vertices_count = data.vertices_count();
         for (size_t i = 0; i < vertices_count; ++i) {
@@ -1571,24 +1514,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             vertices.push_back(float(normal.y()));
             vertices.push_back(float(normal.z()));
         }
-#else
-        for (const auto& entity : data.entities) {
-            // append vertices
-            for (size_t i = 0; i < entity.positions.size(); ++i) {
-                // append position
-                const Vec3d position = trafo * entity.positions[i].cast<double>();
-                vertices.push_back(static_cast<float>(position.x()));
-                vertices.push_back(static_cast<float>(position.y()));
-                vertices.push_back(static_cast<float>(position.z()));
-
-                // append normal
-                const Vec3d normal = normal_matrix * entity.normals[i].cast<double>();
-                vertices.push_back(static_cast<float>(normal.x()));
-                vertices.push_back(static_cast<float>(normal.y()));
-                vertices.push_back(static_cast<float>(normal.z()));
-            }
-        }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // append instance position
         instances.push_back(curr.position.x());
@@ -1599,18 +1524,10 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     };
 
     auto add_indices_as_model_batch = [](const GLModel::Geometry& data, IndexBuffer& indices, IBufferType base_index) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         const size_t indices_count = data.indices_count();
         for (size_t i = 0; i < indices_count; ++i) {
             indices.push_back(static_cast<IBufferType>(data.extract_index(i) + base_index));
         }
-#else
-        for (const auto& entity : data.entities) {
-            for (size_t i = 0; i < entity.indices.size(); ++i) {
-                indices.push_back(static_cast<IBufferType>(entity.indices[i] + base_index));
-            }
-        }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     };
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -2301,11 +2218,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         progress_dialog->Destroy();
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GCodeViewer::load_shells(const Print& print)
-#else
-void GCodeViewer::load_shells(const Print& print, bool initialized)
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (print.objects().empty())
         // no shells, return
@@ -2322,11 +2235,7 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
         }
 
         size_t current_volumes_count = m_shells.volumes.volumes.size();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_shells.volumes.load_object(model_obj, object_id, instance_ids);
-#else
-        m_shells.volumes.load_object(model_obj, object_id, instance_ids, initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // adjust shells' z if raft is present
         const SlicingParameters& slicing_parameters = obj->slicing_parameters();
@@ -2350,13 +2259,8 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
             const float depth = print.wipe_tower_data(extruders_count).depth;
             const float brim_width = print.wipe_tower_data(extruders_count).brim_width;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
                 !print.is_step_done(psWipeTower), brim_width);
-#else
-            m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
-                !print.is_step_done(psWipeTower), brim_width, initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
     }
 
@@ -2947,19 +2851,11 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
 
 void GCodeViewer::render_toolpaths()
 {
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    const std::array<float, 4> light_intensity = { 0.25f, 0.70f, 0.75f, 0.75f };
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
 #if !ENABLE_GL_CORE_PROFILE
     const double zoom = camera.get_zoom();
 #endif // !ENABLE_GL_CORE_PROFILE
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    auto shader_init_as_lines = [light_intensity](GLShaderProgram &shader) {
-        shader.set_uniform("light_intensity", light_intensity);
-    };
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     auto render_as_lines = [
 #if ENABLE_GCODE_VIEWER_STATISTICS
         this
@@ -3031,11 +2927,7 @@ void GCodeViewer::render_toolpaths()
             }
 
             if (range.vbo > 0) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 buffer.model.model.set_color(range.color);
-#else
-                buffer.model.model.set_color(-1, range.color);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 buffer.model.model.render_instanced(range.vbo, range.count);
 #if ENABLE_GCODE_VIEWER_STATISTICS
                 ++m_statistics.gl_instanced_models_calls_count;
@@ -3045,19 +2937,11 @@ void GCodeViewer::render_toolpaths()
         }
     };
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GCODE_VIEWER_STATISTICS
         auto render_as_batched_model = [this](TBuffer& buffer, GLShaderProgram& shader, int position_id, int normal_id) {
 #else
         auto render_as_batched_model = [](TBuffer& buffer, GLShaderProgram& shader, int position_id, int normal_id) {
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
-#else
-#if ENABLE_GCODE_VIEWER_STATISTICS
-    auto render_as_batched_model = [this](TBuffer& buffer, GLShaderProgram& shader) {
-#else
-    auto render_as_batched_model = [](TBuffer& buffer, GLShaderProgram& shader) {
-#endif // ENABLE_GCODE_VIEWER_STATISTICS
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         struct Range
         {
@@ -3076,26 +2960,16 @@ void GCodeViewer::render_toolpaths()
                 glsafe(::glBindVertexArray(i_buffer.vao));
 #endif // ENABLE_GL_CORE_PROFILE
             glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             if (position_id != -1) {
                 glsafe(::glVertexAttribPointer(position_id, buffer.vertices.position_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
                 glsafe(::glEnableVertexAttribArray(position_id));
             }
-#else
-            glsafe(::glVertexPointer(buffer.vertices.position_size_floats(), GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
-            glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             const bool has_normals = buffer.vertices.normal_size_floats() > 0;
             if (has_normals) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 if (normal_id != -1) {
                     glsafe(::glVertexAttribPointer(normal_id, buffer.vertices.normal_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
                     glsafe(::glEnableVertexAttribArray(normal_id));
                 }
-#else
-                glsafe(::glNormalPointer(GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
-                glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
 
             glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer.ibo));
@@ -3119,17 +2993,10 @@ void GCodeViewer::render_toolpaths()
 
             glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             if (normal_id != -1)
                 glsafe(::glDisableVertexAttribArray(normal_id));
             if (position_id != -1)
                 glsafe(::glDisableVertexAttribArray(position_id));
-#else
-            if (has_normals)
-                glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-
-            glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 #if ENABLE_GL_CORE_PROFILE
             if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
@@ -3158,11 +3025,9 @@ void GCodeViewer::render_toolpaths()
 
         shader->start_using();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("view_normal_matrix", (Matrix3d)Matrix3d::Identity());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
             shader->set_uniform("emission_factor", 0.25f);
@@ -3171,24 +3036,15 @@ void GCodeViewer::render_toolpaths()
         }
         else if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::BatchedModel) {
             shader->set_uniform("emission_factor", 0.25f);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             const int position_id = shader->get_attrib_location("v_position");
             const int normal_id   = shader->get_attrib_location("v_normal");
             render_as_batched_model(buffer, *shader, position_id, normal_id);
-#else
-            render_as_batched_model(buffer, *shader);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             shader->set_uniform("emission_factor", 0.0f);
         }
         else {
             shader->set_uniform("emission_factor", 0.15f);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             const int position_id = shader->get_attrib_location("v_position");
             const int normal_id   = shader->get_attrib_location("v_normal");
-#else
-            if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Line)
-                shader_init_as_lines(*shader);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             const int uniform_color = shader->get_uniform_location("uniform_color");
 
             auto it_path = buffer.render_paths.begin();
@@ -3205,26 +3061,16 @@ void GCodeViewer::render_toolpaths()
                     glsafe(::glBindVertexArray(i_buffer.vao));
 #endif // ENABLE_GL_CORE_PROFILE
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 if (position_id != -1) {
                     glsafe(::glVertexAttribPointer(position_id, buffer.vertices.position_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
                     glsafe(::glEnableVertexAttribArray(position_id));
                 }
-#else
-                glsafe(::glVertexPointer(buffer.vertices.position_size_floats(), GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
-                glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 const bool has_normals = buffer.vertices.normal_size_floats() > 0;
                 if (has_normals) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                     if (normal_id != -1) {
                         glsafe(::glVertexAttribPointer(normal_id, buffer.vertices.normal_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
                         glsafe(::glEnableVertexAttribArray(normal_id));
                     }
-#else
-                    glsafe(::glNormalPointer(GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
-                    glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 }
 
                 glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer.ibo));
@@ -3251,17 +3097,10 @@ void GCodeViewer::render_toolpaths()
 
                 glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 if (normal_id != -1)
                     glsafe(::glDisableVertexAttribArray(normal_id));
                 if (position_id != -1)
                     glsafe(::glDisableVertexAttribArray(position_id));
-#else
-                if (has_normals)
-                    glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-
-                glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 #if ENABLE_GL_CORE_PROFILE
                 if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
@@ -3286,40 +3125,28 @@ void GCodeViewer::render_toolpaths()
 
         shader->start_using();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("view_normal_matrix", (Matrix3d)Matrix3d::Identity());
 
         const int position_id = shader->get_attrib_location("v_position");
         const int normal_id   = shader->get_attrib_location("v_normal");
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_CORE_PROFILE
         if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
             glsafe(::glBindVertexArray(cap.vao));
 #endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, cap.vbo));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         if (position_id != -1) {
             glsafe(::glVertexAttribPointer(position_id, buffer->vertices.position_size_floats(), GL_FLOAT, GL_FALSE, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.position_offset_bytes()));
             glsafe(::glEnableVertexAttribArray(position_id));
         }
-#else
-        glsafe(::glVertexPointer(buffer->vertices.position_size_floats(), GL_FLOAT, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.position_offset_bytes()));
-        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         const bool has_normals = buffer->vertices.normal_size_floats() > 0;
         if (has_normals) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             if (normal_id != -1) {
                 glsafe(::glVertexAttribPointer(normal_id, buffer->vertices.normal_size_floats(), GL_FLOAT, GL_FALSE, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.normal_offset_bytes()));
                 glsafe(::glEnableVertexAttribArray(normal_id));
             }
-#else
-            glsafe(::glNormalPointer(GL_FLOAT, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.normal_offset_bytes()));
-            glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
 
         shader->set_uniform("uniform_color", cap.color);
@@ -3332,17 +3159,10 @@ void GCodeViewer::render_toolpaths()
         ++m_statistics.gl_triangles_calls_count;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         if (normal_id != -1)
             glsafe(::glDisableVertexAttribArray(normal_id));
         if (position_id != -1)
             glsafe(::glDisableVertexAttribArray(position_id));
-#else
-        if (has_normals)
-            glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-
-        glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 #if ENABLE_GL_CORE_PROFILE
@@ -3368,25 +3188,11 @@ void GCodeViewer::render_shells()
     if (shader == nullptr)
         return;
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    // when the background processing is enabled, it may happen that the shells data have been loaded
-    // before opengl has been initialized for the preview canvas.
-    // when this happens, the volumes' data have not been sent to gpu yet.
-    for (GLVolume* v : m_shells.volumes.volumes) {
-        if (!v->indexed_vertex_array.has_VBOs())
-            v->finalize_geometry(true);
-    }
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
 //    glsafe(::glDepthMask(GL_FALSE));
 
     shader->start_using();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
     m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, camera.get_view_matrix(), camera.get_projection_matrix());
-#else
-    m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, wxGetApp().plater()->get_camera().get_view_matrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
 
 //    glsafe(::glDepthMask(GL_TRUE));

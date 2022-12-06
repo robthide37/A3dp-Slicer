@@ -253,7 +253,6 @@ private:
 #endif // ENABLE_WORLD_COORDINATE
     GLModel m_arrow;
     GLModel m_curved_arrow;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_box;
     struct Planes
     {
@@ -261,7 +260,6 @@ private:
         std::array<GLModel, 2> models;
     };
     Planes m_planes;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     float m_scale_factor;
 
@@ -467,7 +465,6 @@ private:
     void set_bounding_boxes_dirty() { m_bounding_box.reset(); m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset(); }
 #endif // ENABLE_WORLD_COORDINATE
     void render_synchronized_volumes();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WORLD_COORDINATE
     void render_bounding_box(const BoundingBoxf3& box, const Transform3d& trafo, const ColorRGB& color);
 #else
@@ -479,14 +476,6 @@ private:
     void render_sidebar_rotation_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix);
     void render_sidebar_scale_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix);
     void render_sidebar_layers_hints(const std::string& sidebar_field, GLShaderProgram& shader);
-#else
-    void render_selected_volumes() const;
-    void render_bounding_box(const BoundingBoxf3& box, float* color) const;
-    void render_sidebar_position_hints(const std::string& sidebar_field);
-    void render_sidebar_rotation_hints(const std::string& sidebar_field);
-    void render_sidebar_scale_hints(const std::string& sidebar_field);
-    void render_sidebar_layers_hints(const std::string& sidebar_field);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 public:
     enum class SyncRotationType {

@@ -6,10 +6,8 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Model.hpp"
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/Camera.hpp"
 
 #include <GL/glew.h>
@@ -77,15 +75,10 @@ void MeshClipper::set_transformation(const Geometry::Transformation& trafo)
     }
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void MeshClipper::render_cut(const ColorRGBA& color)
-#else
-void MeshClipper::render_cut()
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (! m_result)
         recalculate_triangles();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
@@ -105,22 +98,14 @@ void MeshClipper::render_cut()
 
     if (curr_shader != nullptr)
         curr_shader->start_using();
-#else
-    if (m_vertex_array.has_VBOs())
-        m_vertex_array.render();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void MeshClipper::render_contour(const ColorRGBA& color)
-#else
-void MeshClipper::render_contour()
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (! m_result)
         recalculate_triangles();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
+
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
@@ -140,10 +125,6 @@ void MeshClipper::render_contour()
 
     if (curr_shader != nullptr)
         curr_shader->start_using();
-#else
-    if (m_vertex_array_expanded.has_VBOs())
-        m_vertex_array_expanded.render();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 bool MeshClipper::is_projection_inside_cut(const Vec3d& point_in) const
@@ -265,7 +246,6 @@ void MeshClipper::recalculate_triangles()
     tr2.pretranslate(0.002 * m_plane.get_normal().normalized());
 
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     std::vector<Vec2f> triangles2d;
 
     for (const ExPolygon& exp : expolys) {
@@ -352,16 +332,6 @@ void MeshClipper::recalculate_triangles()
         isl.expoly = std::move(exp);
         isl.expoly_bb = get_extents(exp);
     }
-#else
-    #error NOT IMPLEMENTED
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-#else
-    #error NOT IMPLEMENTED
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 

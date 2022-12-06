@@ -34,7 +34,6 @@ public:
     Rect() = default;
     Rect(float left, float top, float right, float bottom) : m_left(left) , m_top(top) , m_right(right) , m_bottom(bottom) {}
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     bool operator == (const Rect& other) const {
         if (std::abs(m_left - other.m_left) > EPSILON) return false;
         if (std::abs(m_top - other.m_top) > EPSILON) return false;
@@ -43,7 +42,6 @@ public:
         return true;
     }
     bool operator != (const Rect& other) const { return !operator==(other); }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     float get_left() const { return m_left; }
     void set_left(float left) { m_left = left; }
@@ -107,11 +105,7 @@ private:
     GLTexture m_icons_texture;
     bool m_icons_texture_dirty;
     BackgroundTexture m_background_texture;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLTexture m_arrow_texture;
-#else
-    BackgroundTexture m_arrow_texture;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     Layout m_layout;
     EType m_current;
     EType m_hover;
@@ -139,11 +133,7 @@ public:
 
     bool init();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     bool init_arrow(const std::string& filename);
-#else
-    bool init_arrow(const BackgroundTexture::Metadata& arrow_texture);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     template<class Archive>
     void load(Archive& ar)
@@ -244,11 +234,7 @@ private:
                      bool              alt_down       = false,
                      bool              control_down   = false);
     
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_background(float left, float top, float right, float bottom, float border_w, float border_h) const;
-#else
-    void render_background(float left, float top, float right, float bottom, float border) const;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     void do_render_overlay() const;
 

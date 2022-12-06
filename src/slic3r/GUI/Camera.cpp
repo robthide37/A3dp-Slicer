@@ -177,11 +177,7 @@ double Camera::get_fov() const
 
 void Camera::set_viewport(int x, int y, unsigned int w, unsigned int h)
 {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_viewport = { 0, 0, int(w), int(h) };
-#else
-    glsafe(::glGetIntegerv(GL_VIEWPORT, m_viewport.data()));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void Camera::apply_viewport() const
@@ -189,29 +185,12 @@ void Camera::apply_viewport() const
     glsafe(::glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]));
 }
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-void Camera::apply_view_matrix()
-{
-    glsafe(::glMatrixMode(GL_MODELVIEW));
-    glsafe(::glLoadIdentity());
-    glsafe(::glMultMatrixd(m_view_matrix.data()));
-}
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
 void Camera::apply_projection(const BoundingBoxf3& box, double near_z, double far_z)
 {
     double w = 0.0;
     double h = 0.0;
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    const double old_distance = m_distance;
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     m_frustrum_zs = calc_tight_frustrum_zs_around(box);
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    if (m_distance != old_distance)
-        // the camera has been moved re-apply view matrix
-        apply_view_matrix();
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (near_z > 0.0)
         m_frustrum_zs.first = std::max(std::min(m_frustrum_zs.first, near_z), FrustrumMinNearZ);
@@ -245,30 +224,7 @@ void Camera::apply_projection(const BoundingBoxf3& box, double near_z, double fa
     }
     }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     apply_projection(-w, w, -h, h, m_frustrum_zs.first, m_frustrum_zs.second);
-#else
-    glsafe(::glMatrixMode(GL_PROJECTION));
-    glsafe(::glLoadIdentity());
-
-    switch (m_type)
-    {
-    default:
-    case EType::Ortho:
-    {
-        glsafe(::glOrtho(-w, w, -h, h, m_frustrum_zs.first, m_frustrum_zs.second));
-        break;
-    }
-    case EType::Perspective:
-    {
-        glsafe(::glFrustum(-w, w, -h, h, m_frustrum_zs.first, m_frustrum_zs.second));
-        break;
-    }
-    }
-
-    glsafe(::glGetDoublev(GL_PROJECTION_MATRIX, m_projection_matrix.data()));
-    glsafe(::glMatrixMode(GL_MODELVIEW));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void Camera::apply_projection(double left, double right, double bottom, double top, double near_z, double far_z)

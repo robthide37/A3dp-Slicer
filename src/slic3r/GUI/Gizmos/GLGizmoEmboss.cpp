@@ -535,28 +535,16 @@ void GLGizmoEmboss::on_render() {
 
     if (m_temp_transformation.has_value()) {
         // draw text volume on temporary position
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         GLVolume& gl_volume = *selection.get_volume(*selection.get_volume_idxs().begin());
-#else
-        const GLVolume& gl_volume = *selection.get_volume(*selection.get_volume_idxs().begin());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#else
-        glsafe(::glPushMatrix());
-        glsafe(::glMultMatrixd(m_temp_transformation->data()));                
-        GLShaderProgram *shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         shader->start_using();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d matrix = camera.get_view_matrix() * (*m_temp_transformation);
         shader->set_uniform("view_model_matrix", matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("view_normal_matrix", (Matrix3d) (matrix).matrix().block(0, 0, 3, 3).inverse().transpose());
         shader->set_uniform("emission_factor", 0.0f);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // dragging object must be selected so draw it with correct color
         //auto color = gl_volume.color;
@@ -569,25 +557,15 @@ void GLGizmoEmboss::on_render() {
             glsafe(::glEnable(GL_BLEND));
             glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
         }
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        shader->set_uniform("uniform_color", color);
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
         glsafe(::glEnable(GL_DEPTH_TEST));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         gl_volume.model.set_color(color);
         gl_volume.model.render();
-#else
-        gl_volume.indexed_vertex_array.render();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glDisable(GL_DEPTH_TEST));
 
         if (is_transparent) glsafe(::glDisable(GL_BLEND));
 
         shader->stop_using();
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     bool is_surface_dragging = m_temp_transformation.has_value();

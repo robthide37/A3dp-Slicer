@@ -49,11 +49,7 @@ public:
     float get_tip_length() const { return m_tip_length; }
     float get_total_length() const { return m_stem_length + m_tip_length; }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render(const Transform3d& trafo, float emission_factor = 0.0f);
-#else
-    void render(float emission_factor = 0.0f);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 };
 
 } // GUI
