@@ -1805,7 +1805,7 @@ Polygons slice_mesh(
     {
         bool                trafo_identity = is_identity(params.trafo);
         Transform3f         tf;
-        std::vector<bool>   face_mask(mesh.indices.size(), false);
+        std::vector<char>   face_mask(mesh.indices.size(), 0);
 
         {
             // 1) Mark vertices as below or above the slicing plane.
