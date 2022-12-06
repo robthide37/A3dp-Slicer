@@ -13,6 +13,8 @@
 
 namespace Slic3r { namespace sla {
 
+inline constexpr const auto &beam_ex_policy = ex_tbb;
+
 class BranchingTreeBuilder: public branchingtree::Builder {
     SupportTreeBuilder &m_builder;
     const SupportableMesh  &m_sm;
@@ -178,7 +180,7 @@ bool BranchingTreeBuilder::add_bridge(const branchingtree::Node &from,
     Vec3d fromd = from.pos.cast<double>(), tod = to.pos.cast<double>();
     double fromR = get_radius(from), toR = get_radius(to);
     Beam beam{Ball{fromd, fromR}, Ball{tod, toR}};
-    auto   hit = beam_mesh_hit(ex_tbb, m_sm.emesh, beam,
+    auto   hit = beam_mesh_hit(beam_ex_policy , m_sm.emesh, beam,
                                m_sm.cfg.safety_distance_mm);
 
     bool ret = hit.distance() > (tod - fromd).norm();
@@ -201,8 +203,8 @@ bool BranchingTreeBuilder::add_merger(const branchingtree::Node &node,
     Beam beam2{Ball{from2d, closestR}, Ball{tod, mergeR}};
 
     auto sd = m_sm.cfg.safety_distance_mm ;
-    auto hit1 = beam_mesh_hit(ex_tbb, m_sm.emesh, beam1, sd);
-    auto hit2 = beam_mesh_hit(ex_tbb, m_sm.emesh, beam2, sd);
+    auto hit1 = beam_mesh_hit(beam_ex_policy , m_sm.emesh, beam1, sd);
+    auto hit2 = beam_mesh_hit(beam_ex_policy , m_sm.emesh, beam2, sd);
 
     bool ret = hit1.distance() > (tod - from1d).norm() &&
                hit2.distance() > (tod - from2d).norm();
@@ -222,7 +224,7 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
         sla::Junction j{from.pos.cast<double>(), get_radius(from)};
         Vec3d init_dir = (to.pos - from.pos).cast<double>().normalized();
 
-        auto conn = deepsearch_ground_connection(ex_tbb, m_sm, j,
+        auto conn = deepsearch_ground_connection(beam_ex_policy , m_sm, j,
                                                  get_radius(to), init_dir);
 
         if (conn) {
@@ -255,13 +257,13 @@ bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
 
     auto anchor = m_sm.cfg.ground_facing_only ?
                       std::optional<Anchor>{} : // If no mesh connections are allowed
-                      calculate_anchor_placement(ex_tbb, m_sm, fromj,
+                      calculate_anchor_placement(beam_ex_policy , m_sm, fromj,
                                                  to.pos.cast<double>());
 
     if (anchor) {
         sla::Junction toj = {anchor->junction_point(), anchor->r_back_mm};
 
-        auto hit = beam_mesh_hit(ex_tbb, m_sm.emesh,
+        auto hit = beam_mesh_hit(beam_ex_policy , m_sm.emesh,
                                  Beam{{fromj.pos, fromj.r}, {toj.pos, toj.r}}, 0.);
 
         if (hit.distance() > distance(fromj.pos, toj.pos)) {
