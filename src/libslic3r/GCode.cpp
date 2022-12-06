@@ -851,6 +851,7 @@ namespace DoExport {
 	                if (region.config().get_abs_value("perimeter_speed") == 0 ||
 	                    region.config().get_abs_value("small_perimeter_speed") == 0 ||
 	                    region.config().get_abs_value("external_perimeter_speed") == 0 ||
+	                    region.config().get_abs_value("overhang_speed") == 0 ||
 	                    region.config().get_abs_value("bridge_speed") == 0)
 	                    mm3_per_mm.push_back(layerm->perimeters().min_mm3_per_mm());
 	                if (region.config().get_abs_value("infill_speed") == 0 ||
