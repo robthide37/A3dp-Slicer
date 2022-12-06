@@ -1171,6 +1171,48 @@ void GLGizmoEmboss::discard_and_close() {
     //  * Volume containing 3mf fix transformation - needs work around
 }
 
+void use_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
+    const Vec3d &cam_dir = camera.get_dir_forward();
+
+    Selection &sel = canvas.get_selection();
+    if (sel.is_empty()) return;
+    assert(sel.get_volume_idxs().size() == 1);
+    GLVolume *vol = sel.get_volume(*sel.get_volume_idxs().begin());
+
+    // camera direction transformed into volume coordinate system    
+    Vec3d cam_dir_tr = vol->world_matrix().inverse().linear() * cam_dir;
+    cam_dir_tr.normalize();
+
+    Vec3d emboss_dir(0., 0., -1.);
+
+    // check wether cam_dir is already used
+    if (is_approx(cam_dir_tr, emboss_dir)) return;
+
+    Transform3d vol_rot;
+    Transform3d vol_tr = vol->get_volume_transformation().get_matrix();
+    // check whether cam_dir is opposit to emboss dir
+    if (is_approx(cam_dir_tr, -emboss_dir)) {
+        // rotate 180 DEG by y
+        vol_rot = Eigen::AngleAxis(M_PI_2, Vec3d(0., 1., 0.));
+    } else {
+        // calc params for rotation
+        Vec3d axe = emboss_dir.cross(cam_dir_tr);
+        axe.normalize();
+        double angle = std::acos(emboss_dir.dot(cam_dir_tr));
+        vol_rot = Eigen::AngleAxis(angle, axe);
+    }
+
+    Vec3d offset = vol_tr * Vec3d::Zero();
+    Vec3d offset_inv = vol_rot.inverse() * offset;
+    Transform3d res = vol_tr * 
+        Eigen::Translation<double, 3>(-offset) * 
+        vol_rot * 
+        Eigen::Translation<double, 3>(offset_inv);
+    //Transform3d res = vol_tr * vol_rot;
+    vol->set_volume_transformation(res);
+    priv::get_model_volume(vol, sel.get_model()->objects)->set_transformation(res);
+}
+
 void GLGizmoEmboss::draw_window()
 {
 #ifdef ALLOW_DEBUG_MODE
@@ -1261,6 +1303,7 @@ void GLGizmoEmboss::draw_window()
     const auto &atlas = m_style_manager.get_atlas();
     ImGui::Image(atlas.TexID, ImVec2(atlas.TexWidth, atlas.TexHeight));
 #endif // SHOW_IMGUI_ATLAS
+
     ImGui::SameLine();
     if (ImGui::Checkbox("##allow_float_window", &m_allow_float_window)) {
         if (m_allow_float_window)
@@ -1270,7 +1313,15 @@ void GLGizmoEmboss::draw_window()
             _u8L("Fix settings possition"):
             _u8L("Allow floating window near text")).c_str());
     }
-}
+
+    ImGui::SameLine();
+    if (ImGui::Button("use")) {
+        assert(priv::get_selected_volume(m_parent.get_selection()) == m_volume);
+        use_camera_dir(wxGetApp().plater()->get_camera(), m_parent);
+    } else if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", _u8L("Use camera direction for text orientation").c_str());
+    }
+ }
 
 void GLGizmoEmboss::draw_text_input()
 {
