@@ -12,8 +12,6 @@
 #include <wx/settings.h>
 #include <wx/stattext.h>
 
-#include <boost/log/trivial.hpp>
-
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/GUI_ObjectSettings.hpp"
@@ -1021,8 +1019,6 @@ void GLGizmoSlaSupports::select_point(int i)
             m_new_point_head_diameter = m_editing_cache[0].support_point.head_front_radius * 2.f;
     }
     else {
-        if (!m_editing_cache[i].selected)
-            BOOST_LOG_TRIVIAL(debug) << "Support point selected [" << i << "]: " << m_editing_cache[i].support_point.pos.transpose() << " \tnormal: " << m_editing_cache[i].normal.transpose();
         m_editing_cache[i].selected = true;
         m_selection_empty = false;
         m_new_point_head_diameter = m_editing_cache[i].support_point.head_front_radius * 2.f;
