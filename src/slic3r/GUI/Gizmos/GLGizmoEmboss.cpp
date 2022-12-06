@@ -1171,11 +1171,11 @@ void GLGizmoEmboss::discard_and_close() {
     //  * Volume containing 3mf fix transformation - needs work around
 }
 
-void use_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
+bool use_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
     const Vec3d &cam_dir = camera.get_dir_forward();
 
     Selection &sel = canvas.get_selection();
-    if (sel.is_empty()) return;
+    if (sel.is_empty()) return false;
     assert(sel.get_volume_idxs().size() == 1);
     GLVolume *vol = sel.get_volume(*sel.get_volume_idxs().begin());
 
@@ -1186,7 +1186,7 @@ void use_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
     Vec3d emboss_dir(0., 0., -1.);
 
     // check wether cam_dir is already used
-    if (is_approx(cam_dir_tr, emboss_dir)) return;
+    if (is_approx(cam_dir_tr, emboss_dir)) return false;
 
     Transform3d vol_rot;
     Transform3d vol_tr = vol->get_volume_transformation().get_matrix();
@@ -1211,6 +1211,7 @@ void use_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
     //Transform3d res = vol_tr * vol_rot;
     vol->set_volume_transformation(res);
     priv::get_model_volume(vol, sel.get_model()->objects)->set_transformation(res);
+    return true;
 }
 
 void GLGizmoEmboss::draw_window()
@@ -1317,7 +1318,10 @@ void GLGizmoEmboss::draw_window()
     ImGui::SameLine();
     if (ImGui::Button("use")) {
         assert(priv::get_selected_volume(m_parent.get_selection()) == m_volume);
-        use_camera_dir(wxGetApp().plater()->get_camera(), m_parent);
+        const Camera& cam = wxGetApp().plater()->get_camera();
+        bool use_surface = m_style_manager.get_style().prop.use_surface;
+        if (use_camera_dir(cam, m_parent) && use_surface) 
+            process();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Use camera direction for text orientation").c_str());
     }
