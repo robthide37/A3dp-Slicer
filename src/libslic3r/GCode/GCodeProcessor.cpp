@@ -35,9 +35,7 @@ static const float DEFAULT_TRAVEL_ACCELERATION = 1250.0f;
 static const size_t MIN_EXTRUDERS_COUNT = 5;
 static const float DEFAULT_FILAMENT_DIAMETER = 1.75f;
 static const float DEFAULT_FILAMENT_DENSITY = 1.245f;
-#if ENABLE_USED_FILAMENT_POST_PROCESS
 static const float DEFAULT_FILAMENT_COST = 0.0f;
-#endif // ENABLE_USED_FILAMENT_POST_PROCESS
 static const Slic3r::Vec3f DEFAULT_EXTRUDER_OFFSET = Slic3r::Vec3f::Zero();
 // taken from PrusaResearch.ini - [printer:Original Prusa i3 MK2.5 MMU2]
 static const std::vector<std::string> DEFAULT_EXTRUDER_COLORS = { "#FF8000", "#DB5182", "#3EC0FF", "#FF4F4F", "#FBEB7D" };
@@ -357,314 +355,6 @@ void GCodeProcessor::TimeProcessor::reset()
     machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].enabled = true;
 }
 
-#if !ENABLE_USED_FILAMENT_POST_PROCESS
-void GCodeProcessor::TimeProcessor::post_process(const std::string& filename, std::vector<GCodeProcessorResult::MoveVertex>& moves, std::vector<size_t>& lines_ends)
-{
-    FilePtr in{ boost::nowide::fopen(filename.c_str(), "rb") };
-    if (in.f == nullptr)
-        throw Slic3r::RuntimeError(std::string("Time estimator post process export failed.\nCannot open file for reading.\n"));
-
-    // temporary file to contain modified gcode
-    std::string out_path = filename + ".postprocess";
-    FilePtr out{ boost::nowide::fopen(out_path.c_str(), "wb") };
-    if (out.f == nullptr) {
-        throw Slic3r::RuntimeError(std::string("Time estimator post process export failed.\nCannot open file for writing.\n"));
-    }
-
-    auto time_in_minutes = [](float time_in_seconds) {
-        assert(time_in_seconds >= 0.f);
-        return int((time_in_seconds + 0.5f) / 60.0f);
-    };
-
-    auto time_in_last_minute = [](float time_in_seconds) {
-        assert(time_in_seconds <= 60.0f);
-        return time_in_seconds / 60.0f;
-    };
-
-    auto format_line_M73_main = [](const std::string& mask, int percent, int time) {
-        char line_M73[64];
-        sprintf(line_M73, mask.c_str(),
-            std::to_string(percent).c_str(),
-            std::to_string(time).c_str());
-        return std::string(line_M73);
-    };
-
-    auto format_line_M73_stop_int = [](const std::string& mask, int time) {
-        char line_M73[64];
-        sprintf(line_M73, mask.c_str(), std::to_string(time).c_str());
-        return std::string(line_M73);
-    };
-
-    auto format_time_float = [](float time) {
-        return Slic3r::float_to_string_decimal_point(time, 2);
-    };
-
-    auto format_line_M73_stop_float = [format_time_float](const std::string& mask, float time) {
-        char line_M73[64];
-        sprintf(line_M73, mask.c_str(), format_time_float(time).c_str());
-        return std::string(line_M73);
-    };
-
-    std::string gcode_line;
-    size_t g1_lines_counter = 0;
-    // keeps track of last exported pair <percent, remaining time>
-    std::array<std::pair<int, int>, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> last_exported_main;
-    for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
-        last_exported_main[i] = { 0, time_in_minutes(machines[i].time) };
-    }
-
-    // keeps track of last exported remaining time to next printer stop
-    std::array<int, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> last_exported_stop;
-    for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
-        last_exported_stop[i] = time_in_minutes(machines[i].time);
-    }
-
-    // buffer line to export only when greater than 64K to reduce writing calls
-    std::string export_line;
-
-    // replace placeholder lines with the proper final value
-    // gcode_line is in/out parameter, to reduce expensive memory allocation
-    auto process_placeholders = [&](std::string& gcode_line) {
-        unsigned int extra_lines_count = 0;
-
-        // remove trailing '\n'
-        auto line = std::string_view(gcode_line).substr(0, gcode_line.length() - 1);
-
-        std::string ret;
-        if (line.length() > 1) {
-            line = line.substr(1);
-            if (export_remaining_time_enabled &&
-                (line == reserved_tag(ETags::First_Line_M73_Placeholder) || line == reserved_tag(ETags::Last_Line_M73_Placeholder))) {
-                for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
-                    const TimeMachine& machine = machines[i];
-                    if (machine.enabled) {
-                        // export pair <percent, remaining time>
-                        ret += format_line_M73_main(machine.line_m73_main_mask.c_str(),
-                            (line == reserved_tag(ETags::First_Line_M73_Placeholder)) ? 0 : 100,
-                            (line == reserved_tag(ETags::First_Line_M73_Placeholder)) ? time_in_minutes(machine.time) : 0);
-                        ++extra_lines_count;
-
-                        // export remaining time to next printer stop
-                        if (line == reserved_tag(ETags::First_Line_M73_Placeholder) && !machine.stop_times.empty()) {
-                            int to_export_stop = time_in_minutes(machine.stop_times.front().elapsed_time);
-                            ret += format_line_M73_stop_int(machine.line_m73_stop_mask.c_str(), to_export_stop);
-                            last_exported_stop[i] = to_export_stop;
-                            ++extra_lines_count;
-                        }
-                    }
-                }
-            }
-            else if (line == reserved_tag(ETags::Estimated_Printing_Time_Placeholder)) {
-                for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
-                    const TimeMachine& machine = machines[i];
-                    PrintEstimatedStatistics::ETimeMode mode = static_cast<PrintEstimatedStatistics::ETimeMode>(i);
-                    if (mode == PrintEstimatedStatistics::ETimeMode::Normal || machine.enabled) {
-                        char buf[128];
-                        sprintf(buf, "; estimated printing time (%s mode) = %s\n",
-                            (mode == PrintEstimatedStatistics::ETimeMode::Normal) ? "normal" : "silent",
-                            get_time_dhms(machine.time).c_str());
-                        ret += buf;
-                    }
-                }
-            }
-        }
-
-        if (! ret.empty())
-            // Not moving the move operator on purpose, so that the gcode_line allocation will grow and it will not be reallocated after handful of lines are processed.
-            gcode_line = ret;
-        return std::tuple(!ret.empty(), (extra_lines_count == 0) ? extra_lines_count : extra_lines_count - 1);
-    };
-
-    // check for temporary lines
-    auto is_temporary_decoration = [](const std::string_view gcode_line) {
-        // remove trailing '\n'
-        assert(! gcode_line.empty());
-        assert(gcode_line.back() == '\n');
-
-        // return true for decorations which are used in processing the gcode but that should not be exported into the final gcode
-        // i.e.:
-        // bool ret = gcode_line.substr(0, gcode_line.length() - 1) == ";" + Layer_Change_Tag;
-        // ...
-        // return ret;
-        return false;
-    };
-
-    // Iterators for the normal and silent cached time estimate entry recently processed, used by process_line_G1.
-    auto g1_times_cache_it = Slic3r::reserve_vector<std::vector<TimeMachine::G1LinesCacheItem>::const_iterator>(machines.size());
-    for (const auto& machine : machines)
-        g1_times_cache_it.emplace_back(machine.g1_times_cache.begin());
-
-    // add lines M73 to exported gcode
-    auto process_line_G1 = [
-        // Lambdas, mostly for string formatting, all with an empty capture block.
-        time_in_minutes, format_time_float, format_line_M73_main, format_line_M73_stop_int, format_line_M73_stop_float, time_in_last_minute,
-        &self = std::as_const(*this),
-        // Caches, to be modified
-        &g1_times_cache_it, &last_exported_main, &last_exported_stop,
-        // String output
-        &export_line]
-        (const size_t g1_lines_counter) {
-        unsigned int exported_lines_count = 0;
-        if (self.export_remaining_time_enabled) {
-            for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
-                const TimeMachine& machine = self.machines[i];
-                if (machine.enabled) {
-                    // export pair <percent, remaining time>
-                    // Skip all machine.g1_times_cache below g1_lines_counter.
-                    auto& it = g1_times_cache_it[i];
-                    while (it != machine.g1_times_cache.end() && it->id < g1_lines_counter)
-                        ++it;
-                    if (it != machine.g1_times_cache.end() && it->id == g1_lines_counter) {
-                        std::pair<int, int> to_export_main = { int(100.0f * it->elapsed_time / machine.time),
-                                                               time_in_minutes(machine.time - it->elapsed_time) };
-                        if (last_exported_main[i] != to_export_main) {
-                            export_line += format_line_M73_main(machine.line_m73_main_mask.c_str(),
-                                to_export_main.first, to_export_main.second);
-                            last_exported_main[i] = to_export_main;
-                            ++exported_lines_count;
-                        }
-                        // export remaining time to next printer stop
-                        auto it_stop = std::upper_bound(machine.stop_times.begin(), machine.stop_times.end(), it->elapsed_time,
-                            [](float value, const TimeMachine::StopTime& t) { return value < t.elapsed_time; });
-                        if (it_stop != machine.stop_times.end()) {
-                            int to_export_stop = time_in_minutes(it_stop->elapsed_time - it->elapsed_time);
-                            if (last_exported_stop[i] != to_export_stop) {
-                                if (to_export_stop > 0) {
-                                    if (last_exported_stop[i] != to_export_stop) {
-                                        export_line += format_line_M73_stop_int(machine.line_m73_stop_mask.c_str(), to_export_stop);
-                                        last_exported_stop[i] = to_export_stop;
-                                        ++exported_lines_count;
-                                    }
-                                }
-                                else {
-                                    bool is_last = false;
-                                    auto next_it = it + 1;
-                                    is_last |= (next_it == machine.g1_times_cache.end());
-
-                                    if (next_it != machine.g1_times_cache.end()) {
-                                        auto next_it_stop = std::upper_bound(machine.stop_times.begin(), machine.stop_times.end(), next_it->elapsed_time,
-                                            [](float value, const TimeMachine::StopTime& t) { return value < t.elapsed_time; });
-                                        is_last |= (next_it_stop != it_stop);
-
-                                        std::string time_float_str = format_time_float(time_in_last_minute(it_stop->elapsed_time - it->elapsed_time));
-                                        std::string next_time_float_str = format_time_float(time_in_last_minute(it_stop->elapsed_time - next_it->elapsed_time));
-                                        is_last |= (string_to_double_decimal_point(time_float_str) > 0. && string_to_double_decimal_point(next_time_float_str) == 0.);
-                                    }
-
-                                    if (is_last) {
-                                        if (std::distance(machine.stop_times.begin(), it_stop) == static_cast<ptrdiff_t>(machine.stop_times.size() - 1))
-                                            export_line += format_line_M73_stop_int(machine.line_m73_stop_mask.c_str(), to_export_stop);
-                                        else
-                                            export_line += format_line_M73_stop_float(machine.line_m73_stop_mask.c_str(), time_in_last_minute(it_stop->elapsed_time - it->elapsed_time));
-
-                                        last_exported_stop[i] = to_export_stop;
-                                        ++exported_lines_count;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return exported_lines_count;
-    };
-
-    // helper function to write to disk
-    size_t out_file_pos = 0;
-    lines_ends.clear();
-    auto write_string = [&export_line, &out, &out_path, &out_file_pos, &lines_ends](const std::string& str) {
-        fwrite((const void*)export_line.c_str(), 1, export_line.length(), out.f);
-        if (ferror(out.f)) {
-            out.close();
-            boost::nowide::remove(out_path.c_str());
-            throw Slic3r::RuntimeError(std::string("Time estimator post process export failed.\nIs the disk full?\n"));
-        }
-        for (size_t i = 0; i < export_line.size(); ++ i)
-            if (export_line[i] == '\n')
-                lines_ends.emplace_back(out_file_pos + i + 1);
-        out_file_pos += export_line.size();
-        export_line.clear();
-    };
-
-    unsigned int line_id = 0;
-    std::vector<std::pair<unsigned int, unsigned int>> offsets;
-
-    {
-        // Read the input stream 64kB at a time, extract lines and process them.
-        std::vector<char> buffer(65536 * 10, 0);
-        // Line buffer.
-        assert(gcode_line.empty());
-        for (;;) {
-            size_t cnt_read = ::fread(buffer.data(), 1, buffer.size(), in.f);
-            if (::ferror(in.f))
-                throw Slic3r::RuntimeError(std::string("Time estimator post process export failed.\nError while reading from file.\n"));
-            bool eof       = cnt_read == 0;
-            auto it        = buffer.begin();
-            auto it_bufend = buffer.begin() + cnt_read;
-            while (it != it_bufend || (eof && ! gcode_line.empty())) {
-                // Find end of line.
-                bool eol    = false;
-                auto it_end = it;
-                for (; it_end != it_bufend && ! (eol = *it_end == '\r' || *it_end == '\n'); ++ it_end) ;
-                // End of line is indicated also if end of file was reached.
-                eol |= eof && it_end == it_bufend;
-                gcode_line.insert(gcode_line.end(), it, it_end);
-                if (eol) {
-                    ++line_id;
-
-                    gcode_line += "\n";
-                    // replace placeholder lines
-                    auto [processed, lines_added_count] = process_placeholders(gcode_line);
-                    if (processed && lines_added_count > 0)
-                        offsets.push_back({ line_id, lines_added_count });
-                    if (! processed && ! is_temporary_decoration(gcode_line) && GCodeReader::GCodeLine::cmd_is(gcode_line, "G1")) {
-                        // remove temporary lines, add lines M73 where needed
-                        unsigned int extra_lines_count = process_line_G1(g1_lines_counter ++);
-                        if (extra_lines_count > 0)
-                            offsets.push_back({ line_id, extra_lines_count });
-                    }
-
-                    export_line += gcode_line;
-                    if (export_line.length() > 65535)
-                        write_string(export_line);
-                    gcode_line.clear();
-                }
-                // Skip EOL.
-                it = it_end; 
-                if (it != it_bufend && *it == '\r')
-                    ++ it;
-                if (it != it_bufend && *it == '\n')
-                    ++ it;
-            }
-            if (eof)
-                break;
-        }
-    }
-
-    if (!export_line.empty())
-        write_string(export_line);
-
-    out.close();
-    in.close();
-
-    // updates moves' gcode ids which have been modified by the insertion of the M73 lines
-    unsigned int curr_offset_id = 0;
-    unsigned int total_offset = 0;
-    for (GCodeProcessorResult::MoveVertex& move : moves) {
-        while (curr_offset_id < static_cast<unsigned int>(offsets.size()) && offsets[curr_offset_id].first <= move.gcode_id) {
-            total_offset += offsets[curr_offset_id].second;
-            ++curr_offset_id;
-        }
-        move.gcode_id += total_offset;
-    }
-
-    if (rename_file(out_path, filename))
-        throw Slic3r::RuntimeError(std::string("Failed to rename the output G-code file from ") + out_path + " to " + filename + '\n' +
-            "Is " + out_path + " locked?" + '\n');
-}
-#endif // !ENABLE_USED_FILAMENT_POST_PROCESS
-
 void GCodeProcessor::UsedFilaments::reset()
 {
     color_change_cache = 0.0;
@@ -755,9 +445,7 @@ void GCodeProcessorResult::reset() {
     extruder_colors = std::vector<std::string>();
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
-#if ENABLE_USED_FILAMENT_POST_PROCESS
     filament_cost = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_COST);
-#endif // ENABLE_USED_FILAMENT_POST_PROCESS
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
     spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
     time = 0;
@@ -774,9 +462,7 @@ void GCodeProcessorResult::reset() {
     extruder_colors = std::vector<std::string>();
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
-#if ENABLE_USED_FILAMENT_POST_PROCESS
     filament_cost = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_COST);
-#endif // ENABLE_USED_FILAMENT_POST_PROCESS
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
     spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
 }
@@ -873,9 +559,7 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     m_extruder_colors.resize(extruders_count);
     m_result.filament_diameters.resize(extruders_count);
     m_result.filament_densities.resize(extruders_count);
-#if ENABLE_USED_FILAMENT_POST_PROCESS
     m_result.filament_cost.resize(extruders_count);
-#endif // ENABLE_USED_FILAMENT_POST_PROCESS
     m_extruder_temps.resize(extruders_count);
 
     for (size_t i = 0; i < extruders_count; ++ i) {
@@ -883,9 +567,7 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         m_extruder_colors[i]            = static_cast<unsigned char>(i);
         m_result.filament_diameters[i]  = static_cast<float>(config.filament_diameter.get_at(i));
         m_result.filament_densities[i]  = static_cast<float>(config.filament_density.get_at(i));
-#if ENABLE_USED_FILAMENT_POST_PROCESS
         m_result.filament_cost[i]       = static_cast<float>(config.filament_cost.get_at(i));
-#endif // ENABLE_USED_FILAMENT_POST_PROCESS
     }
 
     if ((m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware) && config.machine_limits_usage.value != MachineLimitsUsage::Ignore) {
@@ -1006,7 +688,6 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
         }
     }
 
-#if ENABLE_USED_FILAMENT_POST_PROCESS
     const ConfigOptionFloats* filament_cost = config.option<ConfigOptionFloats>("filament_cost");
     if (filament_cost != nullptr) {
         m_result.filament_cost.clear();
@@ -1021,7 +702,6 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
             m_result.filament_cost.emplace_back(DEFAULT_FILAMENT_COST);
         }
     }
-#endif // ENABLE_USED_FILAMENT_POST_PROCESS
 
     const ConfigOptionPoints* extruder_offset = config.option<ConfigOptionPoints>("extruder_offset");
     if (extruder_offset != nullptr) {
@@ -1438,11 +1118,7 @@ void GCodeProcessor::finalize(bool perform_post_process)
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
     if (perform_post_process)
-#if ENABLE_USED_FILAMENT_POST_PROCESS
         post_process();
-#else
-        m_time_processor.post_process(m_result.filename, m_result.moves, m_result.lines_ends);
-#endif // ENABLE_USED_FILAMENT_POST_PROCESS
 #if ENABLE_GCODE_VIEWER_STATISTICS
     m_result.time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - m_start_time).count();
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
@@ -1688,12 +1364,10 @@ void GCodeProcessor::apply_config_simplify3d(const std::string& filename)
                         } else if (comment.find("filamentDensities") != comment.npos) {
                             m_result.filament_densities.clear();
                             extract_floats(comment, "filamentDensities", m_result.filament_densities);
-#if ENABLE_USED_FILAMENT_POST_PROCESS
                         }
                         else if (comment.find("filamentPricesPerKg") != comment.npos) {
                             m_result.filament_cost.clear();
                             extract_floats(comment, "filamentPricesPerKg", m_result.filament_cost);
-#endif // ENABLE_USED_FILAMENT_POST_PROCESS
                         } else if (comment.find("extruderDiameter") != comment.npos) {
                             std::vector<float> extruder_diameters;
                             extract_floats(comment, "extruderDiameter", extruder_diameters);
@@ -1709,14 +1383,9 @@ void GCodeProcessor::apply_config_simplify3d(const std::string& filename)
         }
     });
 
-#if ENABLE_USED_FILAMENT_POST_PROCESS
     if (m_result.extruders_count == 0)
         m_result.extruders_count = std::max<size_t>(1, std::min(m_result.filament_diameters.size(), 
             std::min(m_result.filament_densities.size(), m_result.filament_cost.size())));
-#else
-    if (m_result.extruders_count == 0)
-        m_result.extruders_count = std::max<size_t>(1, std::min(m_result.filament_diameters.size(), m_result.filament_densities.size()));
-#endif // ENABLE_USED_FILAMENT_POST_PROCESS
 
     if (bed_size.is_defined()) {
         m_result.bed_shape = {
@@ -3757,7 +3426,6 @@ void GCodeProcessor::process_T(const std::string_view command)
     }
 }
 
-#if ENABLE_USED_FILAMENT_POST_PROCESS
 void GCodeProcessor::post_process()
 {
     FilePtr in{ boost::nowide::fopen(m_result.filename.c_str(), "rb") };
@@ -4110,7 +3778,6 @@ void GCodeProcessor::post_process()
         throw Slic3r::RuntimeError(std::string("Failed to rename the output G-code file from ") + out_path + " to " + m_result.filename + '\n' +
             "Is " + out_path + " locked?" + '\n');
 }
-#endif // ENABLE_USED_FILAMENT_POST_PROCESS
 
 #if ENABLE_PROCESS_G2_G3_LINES
 void GCodeProcessor::store_move_vertex(EMoveType type, bool internal_only)
