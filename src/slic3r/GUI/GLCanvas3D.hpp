@@ -400,6 +400,7 @@ class GLCanvas3D
         std::chrono::steady_clock::time_point m_start_time;
         // Indicator that the mouse is inside an ImGUI dialog, therefore the tooltip should be suppressed.
         bool m_in_imgui = false;
+        float m_cursor_height{ 16.0f };
 
     public:
         bool is_empty() const { return m_text.empty(); }

@@ -773,53 +773,55 @@ void GLCanvas3D::Labels::render(const std::vector<const ModelInstance*>& sorted_
     }
 }
 
+static float get_cursor_height()
+{
+    float ret = 16.0f;
+#ifdef _WIN32
+    // see: https://forums.codeguru.com/showthread.php?449040-get-the-system-current-cursor-size
+    // this code is not perfect because it returns a maximum height equal to 31 even if the cursor bitmap shown on screen is bigger
+    // but at least it gives the same result as wxWidgets in the settings tabs
+    ICONINFO ii;
+    if (::GetIconInfo((HICON)GetCursor(), &ii) != 0) {
+        BITMAP bitmap;
+        ::GetObject(ii.hbmMask, sizeof(BITMAP), &bitmap);
+        const int width = bitmap.bmWidth;
+        const int height = (ii.hbmColor == nullptr) ? bitmap.bmHeight / 2 : bitmap.bmHeight;
+        HDC dc = ::CreateCompatibleDC(nullptr);
+        if (dc != nullptr) {
+            if (::SelectObject(dc, ii.hbmMask) != nullptr) {
+                for (int i = 0; i < width; ++i) {
+                    for (int j = 0; j < height; ++j) {
+                        if (::GetPixel(dc, i, j) != RGB(255, 255, 255)) {
+                            if (ret < float(j))
+                                ret = float(j);
+                        }
+                    }
+                }
+                ::DeleteDC(dc);
+            }
+        }
+        ::DeleteObject(ii.hbmColor);
+        ::DeleteObject(ii.hbmMask);
+    }
+#endif //  _WIN32
+    return ret;
+}
+
 void GLCanvas3D::Tooltip::set_text(const std::string& text)
 {
     // If the mouse is inside an ImGUI dialog, then the tooltip is suppressed.
     m_text = m_in_imgui ? std::string() : text;
+    m_cursor_height = get_cursor_height();
 }
 
 void GLCanvas3D::Tooltip::render(const Vec2d& mouse_position, GLCanvas3D& canvas)
 {
     static ImVec2 size(0.0f, 0.0f);
 
-    auto validate_position = [](const Vec2d& position, const GLCanvas3D& canvas, const ImVec2& wnd_size) {
-        auto calc_cursor_height = []() {
-            float ret = 16.0f;
-#ifdef _WIN32
-            // see: https://forums.codeguru.com/showthread.php?449040-get-the-system-current-cursor-size
-            // this code is not perfect because it returns a maximum height equal to 31 even if the cursor bitmap shown on screen is bigger
-            // but at least it gives the same result as wxWidgets in the settings tabs
-            ICONINFO ii;
-            if (::GetIconInfo((HICON)GetCursor(), &ii) != 0) {
-                BITMAP bitmap;
-                ::GetObject(ii.hbmMask, sizeof(BITMAP), &bitmap);
-                int width = bitmap.bmWidth;
-                int height = (ii.hbmColor == nullptr) ? bitmap.bmHeight / 2 : bitmap.bmHeight;
-                HDC dc = ::CreateCompatibleDC(nullptr);
-                if (dc != nullptr) {
-                    if (::SelectObject(dc, ii.hbmMask) != nullptr) {
-                        for (int i = 0; i < width; ++i) {
-                            for (int j = 0; j < height; ++j) {
-                                if (::GetPixel(dc, i, j) != RGB(255, 255, 255)) {
-                                    if (ret < float(j))
-                                        ret = float(j);
-                                }
-                            }
-                        }
-                        ::DeleteDC(dc);
-                    }
-                }
-                ::DeleteObject(ii.hbmColor);
-                ::DeleteObject(ii.hbmMask);
-            }
-#endif //  _WIN32
-            return ret;
-        };
-
+    auto validate_position = [this](const Vec2d& position, const GLCanvas3D& canvas, const ImVec2& wnd_size) {
         const Size cnv_size = canvas.get_canvas_size();
         const float x = std::clamp(float(position.x()), 0.0f, float(cnv_size.get_width()) - wnd_size.x);
-        const float y = std::clamp(float(position.y()) + calc_cursor_height(), 0.0f, float(cnv_size.get_height()) - wnd_size.y);
+        const float y = std::clamp(float(position.y()) + m_cursor_height, 0.0f, float(cnv_size.get_height()) - wnd_size.y);
         return Vec2f(x, y);
     };
 
