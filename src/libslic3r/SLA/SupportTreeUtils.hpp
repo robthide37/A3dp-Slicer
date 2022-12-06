@@ -136,8 +136,11 @@ struct Beam_ { // Defines a set of rays displaced along a cone's surface
 
 using Beam = Beam_<8>;
 
-template<class Ex, size_t S = 8>
-Hit beam_mesh_hit(Ex ex, const AABBMesh &mesh, const Beam_<S> &beam, double sd)
+template<class Ex, size_t RayCount = 8>
+Hit beam_mesh_hit(Ex policy,
+                  const AABBMesh &mesh,
+                  const Beam_<RayCount> &beam,
+                  double sd)
 {
     Vec3d src = beam.src;
     Vec3d dst = src + beam.dir;
@@ -146,15 +149,15 @@ Hit beam_mesh_hit(Ex ex, const AABBMesh &mesh, const Beam_<S> &beam, double sd)
 
     Vec3d D = (dst - src);
     Vec3d dir = D.normalized();
-    PointRing<S>  ring{dir};
+    PointRing<RayCount>  ring{dir};
 
     using Hit = AABBMesh::hit_result;
 
     // Hit results
-    std::array<Hit, S> hits;
+    std::array<Hit, RayCount> hits;
 
     execution::for_each(
-        ex, size_t(0), hits.size(),
+        policy, size_t(0), hits.size(),
         [&mesh, r_src, r_dst, src, dst, &ring, dir, sd, &hits](size_t i) {
             Hit &hit = hits[i];
 
@@ -175,7 +178,7 @@ Hit beam_mesh_hit(Ex ex, const AABBMesh &mesh, const Beam_<S> &beam, double sd)
                 }
             } else
                 hit = hr;
-        }, std::min(execution::max_concurrency(ex), S));
+        }, std::min(execution::max_concurrency(policy), RayCount));
 
     return min_hit(hits.begin(), hits.end());
 }
@@ -359,7 +362,7 @@ bool optimize_pinhead_placement(Ex                     policy,
         // viable normal that doesn't collide with the model
         // geometry and its very close to the default.
 
-        Optimizer<opt::AlgNLoptMLSL> solver(get_criteria(m.cfg).stop_score(w).max_iterations(100));
+        Optimizer<opt::AlgNLoptMLSL_Subplx> solver(get_criteria(m.cfg).stop_score(w).max_iterations(100));
         solver.seed(0); // we want deterministic behavior
 
         auto oresult = solver.to_max().optimize(
@@ -483,21 +486,27 @@ constexpr bool IsWideningFn = std::is_invocable_r_v</*retval*/ double,
                                                     Vec3d /*dir*/,
                                                     double /*length*/>;
 
+// A widening function can determine how many ray samples should a beam contain
+// (see in beam_mesh_hit)
 template<class WFn> struct BeamSamples { static constexpr size_t Value = 8; };
 template<class WFn> constexpr size_t BeamSamplesV = BeamSamples<remove_cvref_t<WFn>>::Value;
 
-
+// To use with check_ground_route, full will check the bridge and the pillar,
+// PillarOnly checks only the pillar for collisions.
 enum class GroundRouteCheck { Full, PillarOnly };
 
+// Returns the collision point with mesh if there is a collision or a ground point,
+// given a source point with a direction of a potential avoidance bridge and
+// a bridge length.
 template<class Ex, class WideningFn,
          class = std::enable_if_t<IsWideningFn<WideningFn>> >
 Vec3d check_ground_route(
     Ex                     policy,
     const SupportableMesh &sm,
-    const Junction        &source,
-    const Vec3d           &dir,
-    double                bridge_len,
-    WideningFn            &&wideningfn,
+    const Junction        &source,      // source location
+    const Vec3d           &dir,         // direction of the bridge from the source
+    double                bridge_len,   // lenght of the avoidance bridge
+    WideningFn            &&wideningfn, // Widening strategy
     GroundRouteCheck      type = GroundRouteCheck::Full
     )
 {
@@ -556,6 +565,9 @@ Vec3d check_ground_route(
     return ret;
 }
 
+// Searching a ground connection from an arbitrary source point.
+// Currently, the result will contain one avoidance bridge (at most) and a
+// pillar to the ground, if it's feasible
 template<class Ex, class WideningFn,
          class = std::enable_if_t<IsWideningFn<WideningFn>> >
 GroundConnection deepsearch_ground_connection(
@@ -565,26 +577,35 @@ GroundConnection deepsearch_ground_connection(
     WideningFn            &&wideningfn,
     const Vec3d           &init_dir = DOWN)
 {
+    constexpr unsigned MaxIterationsGlobal = 5000;
+    constexpr unsigned MaxIterationsLocal  = 100;
+    constexpr double   RelScoreDiff        = 0.05;
+
     const auto gndlvl = ground_level(sm);
 
-    auto criteria = get_criteria(sm.cfg);
-    criteria.max_iterations(5000);
+    // The used solver (AlgNLoptMLSL_Subplx search method) is composed of a global (MLSL)
+    // and a local (Subplex) search method. Criteria can be set in a way that
+    // local searches are quick and less accurate. The global method will only
+    // consider the max iteration number and the stop score (Z level <= ground)
+
+    auto criteria = get_criteria(sm.cfg); // get defaults from cfg
+    criteria.max_iterations(MaxIterationsGlobal);
     criteria.abs_score_diff(NaNd);
     criteria.rel_score_diff(NaNd);
     criteria.stop_score(gndlvl);
 
     auto criteria_loc = criteria;
-    criteria_loc.max_iterations(100);
+    criteria_loc.max_iterations(MaxIterationsLocal);
     criteria_loc.abs_score_diff(EPSILON);
-    criteria_loc.rel_score_diff(0.05);
+    criteria_loc.rel_score_diff(RelScoreDiff);
 
-    Optimizer<opt::AlgNLoptMLSL> solver(criteria);
+    Optimizer<opt::AlgNLoptMLSL_Subplx> solver(criteria);
     solver.set_loc_criteria(criteria_loc);
-    solver.seed(0);
+    solver.seed(0); // require repeatability
 
     // functor returns the z height of collision point, given a polar and
     // azimuth angles as bridge direction and bridge length. The route is
-    // traced from source, throught this bridge and an attached pillar. If there
+    // traced from source, through this bridge and an attached pillar. If there
     // is a collision with the mesh, the Z height is returned. Otherwise the
     // z level of ground is returned.
     auto z_fn = [&](const opt::Input<3> &input) {
@@ -598,20 +619,22 @@ GroundConnection deepsearch_ground_connection(
         return hitpt.z();
     };
 
+    // Calculate the initial direction of the search by
+    // saturating the polar angle to max tilt defined in config
     auto [plr_init, azm_init] = dir_to_spheric(init_dir);
-
-    // Saturate the polar angle to max tilt defined in config
     plr_init = std::max(plr_init, PI - sm.cfg.bridge_slope);
+
     auto bound_constraints =
-        bounds({ {PI - sm.cfg.bridge_slope, PI}, // bounds for polar angle
-                {-PI, PI},                      // bounds for azimuth
-                {0., sm.cfg.max_bridge_length_mm} }); // bounds bridge length
+        bounds({
+                {PI - sm.cfg.bridge_slope, PI},   // bounds for polar angle
+                {-PI, PI},                        // bounds for azimuth
+                {0., sm.cfg.max_bridge_length_mm} // bounds bridge length
+        });
 
     // The optimizer can navigate fairly well on the mesh surface, finding
     // lower and lower Z coordinates as collision points. MLSL is not a local
     // search method, so it should not be trapped in a local minima. Eventually,
-    // this search should arrive at a ground location, like water flows down a
-    // surface.
+    // this search should arrive at a ground location.
     auto oresult = solver.to_min().optimize(
         z_fn,
         initvals({plr_init, azm_init, 0.}),
@@ -628,7 +651,9 @@ GroundConnection deepsearch_ground_connection(
     // and length. This length can be shortened further by brute-force queries
     // of free route straigt down for a possible pillar.
     // NOTE: This requirement could be incorporated into the optimization as a
-    // constraint, but it would not find quickly enough an accurate solution.
+    // constraint, but it would not find quickly enough an accurate solution,
+    // and it would be very hard to define a stop score which is very useful in
+    // terminating the search as soon as the ground is found.
     double l = 0., l_max = bridge_l;
     double zlvl = std::numeric_limits<double>::infinity();
     while(zlvl > gndlvl && l <= l_max) {
@@ -650,10 +675,14 @@ GroundConnection deepsearch_ground_connection(
     double end_radius = wideningfn(Ball{bridge_end, bridge_r}, DOWN, down_l);
     double base_r = std::max(sm.cfg.base_radius_mm, end_radius);
 
+    // Even if the search was not succesful, the result is populated by the
+    // source and the last best result of the optimization.
     conn.path.emplace_back(source);
     if (bridge_l > EPSILON)
         conn.path.emplace_back(Junction{bridge_end, bridge_r});
 
+    // The resulting ground connection is only valid if the pillar base is set.
+    // At this point it will only be set if the search was succesful.
     if (z_fn(opt::Input<3>({plr, azm, bridge_l})) <= gndlvl)
         conn.pillar_base =
             Pedestal{gp, sm.cfg.base_height_mm, base_r, end_radius};
@@ -661,6 +690,7 @@ GroundConnection deepsearch_ground_connection(
     return conn;
 }
 
+// Ground route search with a predefined end radius
 template<class Ex>
 GroundConnection deepsearch_ground_connection(Ex policy,
                                               const SupportableMesh &sm,

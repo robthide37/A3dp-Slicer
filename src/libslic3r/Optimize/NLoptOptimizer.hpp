@@ -392,7 +392,7 @@ using AlgNLoptORIG_DIRECT = detail::NLoptAlg<NLOPT_GN_ORIG_DIRECT>;
 using AlgNLoptISRES       = detail::NLoptAlg<NLOPT_GN_ISRES>;
 using AlgNLoptAGS         = detail::NLoptAlg<NLOPT_GN_AGS>;
 
-using AlgNLoptMLSL           = detail::NLoptAlgComb<NLOPT_GN_MLSL_LDS, NLOPT_LN_SBPLX>;
+using AlgNLoptMLSL_Subplx    = detail::NLoptAlgComb<NLOPT_GN_MLSL_LDS, NLOPT_LN_SBPLX>;
 using AlgNLoptMLSL_Cobyla    = detail::NLoptAlgComb<NLOPT_GN_MLSL, NLOPT_LN_COBYLA>;
 using AlgNLoptGenetic_Subplx = detail::NLoptAlgComb<NLOPT_GN_ESCH, NLOPT_LN_SBPLX>;
 
