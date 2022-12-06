@@ -44,29 +44,63 @@ sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfig& c)
     
     scfg.enabled = c.supports_enable.getBool();
     scfg.tree_type = c.support_tree_type.value;
-    scfg.head_front_radius_mm = 0.5*c.support_head_front_diameter.getFloat();
-    double pillar_r = 0.5 * c.support_pillar_diameter.getFloat();
-    scfg.head_back_radius_mm = pillar_r;
-    scfg.head_fallback_radius_mm =
-        0.01 * c.support_small_pillar_diameter_percent.getFloat() * pillar_r;
-    scfg.head_penetration_mm = c.support_head_penetration.getFloat();
-    scfg.head_width_mm = c.support_head_width.getFloat();
-    scfg.object_elevation_mm = is_zero_elevation(c) ?
-                                   0. : c.support_object_elevation.getFloat();
-    scfg.bridge_slope = c.support_critical_angle.getFloat() * PI / 180.0 ;
-    scfg.max_bridge_length_mm = c.support_max_bridge_length.getFloat();
-    scfg.max_pillar_link_distance_mm = c.support_max_pillar_link_distance.getFloat();
-    scfg.pillar_connection_mode = c.support_pillar_connection_mode.value;
-    scfg.ground_facing_only = c.support_buildplate_only.getBool();
-    scfg.pillar_widening_factor = c.support_pillar_widening_factor.getFloat();
-    scfg.base_radius_mm = 0.5*c.support_base_diameter.getFloat();
-    scfg.base_height_mm = c.support_base_height.getFloat();
-    scfg.pillar_base_safety_distance_mm =
-        c.support_base_safety_distance.getFloat() < EPSILON ?
-            scfg.safety_distance_mm : c.support_base_safety_distance.getFloat();
-    
-    scfg.max_bridges_on_pillar = unsigned(c.support_max_bridges_on_pillar.getInt());
-    scfg.max_weight_on_model_support = c.support_max_weight_on_model.getFloat();
+
+    switch(scfg.tree_type) {
+    case sla::SupportTreeType::Default: {
+        scfg.head_front_radius_mm = 0.5*c.support_head_front_diameter.getFloat();
+        double pillar_r = 0.5 * c.support_pillar_diameter.getFloat();
+        scfg.head_back_radius_mm = pillar_r;
+        scfg.head_fallback_radius_mm =
+            0.01 * c.support_small_pillar_diameter_percent.getFloat() * pillar_r;
+        scfg.head_penetration_mm = c.support_head_penetration.getFloat();
+        scfg.head_width_mm = c.support_head_width.getFloat();
+        scfg.object_elevation_mm = is_zero_elevation(c) ?
+                                       0. : c.support_object_elevation.getFloat();
+        scfg.bridge_slope = c.support_critical_angle.getFloat() * PI / 180.0 ;
+        scfg.max_bridge_length_mm = c.support_max_bridge_length.getFloat();
+        scfg.max_pillar_link_distance_mm = c.support_max_pillar_link_distance.getFloat();
+        scfg.pillar_connection_mode = c.support_pillar_connection_mode.value;
+        scfg.ground_facing_only = c.support_buildplate_only.getBool();
+        scfg.pillar_widening_factor = c.support_pillar_widening_factor.getFloat();
+        scfg.base_radius_mm = 0.5*c.support_base_diameter.getFloat();
+        scfg.base_height_mm = c.support_base_height.getFloat();
+        scfg.pillar_base_safety_distance_mm =
+            c.support_base_safety_distance.getFloat() < EPSILON ?
+                scfg.safety_distance_mm : c.support_base_safety_distance.getFloat();
+
+        scfg.max_bridges_on_pillar = unsigned(c.support_max_bridges_on_pillar.getInt());
+        scfg.max_weight_on_model_support = c.support_max_weight_on_model.getFloat();
+        break;
+    }
+    case sla::SupportTreeType::Branching:
+        [[fallthrough]];
+    case sla::SupportTreeType::Organic:{
+        scfg.head_front_radius_mm = 0.5*c.branchingsupport_head_front_diameter.getFloat();
+        double pillar_r = 0.5 * c.branchingsupport_pillar_diameter.getFloat();
+        scfg.head_back_radius_mm = pillar_r;
+        scfg.head_fallback_radius_mm =
+            0.01 * c.branchingsupport_small_pillar_diameter_percent.getFloat() * pillar_r;
+        scfg.head_penetration_mm = c.branchingsupport_head_penetration.getFloat();
+        scfg.head_width_mm = c.branchingsupport_head_width.getFloat();
+        scfg.object_elevation_mm = is_zero_elevation(c) ?
+                                       0. : c.branchingsupport_object_elevation.getFloat();
+        scfg.bridge_slope = c.branchingsupport_critical_angle.getFloat() * PI / 180.0 ;
+        scfg.max_bridge_length_mm = c.branchingsupport_max_bridge_length.getFloat();
+        scfg.max_pillar_link_distance_mm = c.branchingsupport_max_pillar_link_distance.getFloat();
+        scfg.pillar_connection_mode = c.branchingsupport_pillar_connection_mode.value;
+        scfg.ground_facing_only = c.branchingsupport_buildplate_only.getBool();
+        scfg.pillar_widening_factor = c.branchingsupport_pillar_widening_factor.getFloat();
+        scfg.base_radius_mm = 0.5*c.branchingsupport_base_diameter.getFloat();
+        scfg.base_height_mm = c.branchingsupport_base_height.getFloat();
+        scfg.pillar_base_safety_distance_mm =
+            c.branchingsupport_base_safety_distance.getFloat() < EPSILON ?
+                scfg.safety_distance_mm : c.branchingsupport_base_safety_distance.getFloat();
+
+        scfg.max_bridges_on_pillar = unsigned(c.branchingsupport_max_bridges_on_pillar.getInt());
+        scfg.max_weight_on_model_support = c.branchingsupport_max_weight_on_model.getFloat();
+        break;
+    }
+    }
     
     return scfg;
 }

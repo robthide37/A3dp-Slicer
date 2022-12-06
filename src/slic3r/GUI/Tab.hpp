@@ -339,7 +339,7 @@ public:
 
 	void		on_roll_back_value(const bool to_sys = false);
 
-	PageShp		add_options_page(const wxString& title, const std::string& icon, bool is_extruder_pages = false);
+    PageShp		add_options_page(const wxString& title, const std::string& icon, bool is_extruder_pages = false);
 	static wxString translate_category(const wxString& title, Preset::Type preset_type);
 
 	virtual void	OnActivate();
@@ -526,6 +526,9 @@ public:
 
 class TabSLAPrint : public Tab
 {
+    void build_sla_support_params(const std::string &prefix,
+                                  const Slic3r::GUI::PageShp &page);
+
 public:
     TabSLAPrint(wxBookCtrlBase* parent) :
         Tab(parent, _(L("Print Settings")), Slic3r::Preset::TYPE_SLA_PRINT) {}

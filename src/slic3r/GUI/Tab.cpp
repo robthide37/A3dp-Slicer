@@ -4821,6 +4821,43 @@ void TabSLAMaterial::update()
         wxGetApp().mainframe->on_config_changed(m_config);
 }
 
+void TabSLAPrint::build_sla_support_params(const std::string &prefix,
+                                           const Slic3r::GUI::PageShp &page)
+{
+    auto optgroup = page->new_optgroup(L("Support head"));
+    optgroup->append_single_option_line(prefix + "support_head_front_diameter");
+    optgroup->append_single_option_line(prefix + "support_head_penetration");
+    optgroup->append_single_option_line(prefix + "support_head_width");
+
+    optgroup = page->new_optgroup(L("Support pillar"));
+    optgroup->append_single_option_line(prefix + "support_pillar_diameter");
+    optgroup->append_single_option_line(prefix + "support_small_pillar_diameter_percent");
+    optgroup->append_single_option_line(prefix + "support_max_bridges_on_pillar");
+
+    optgroup->append_single_option_line(prefix + "support_pillar_connection_mode");
+    optgroup->append_single_option_line(prefix + "support_buildplate_only");
+    optgroup->append_single_option_line(prefix + "support_pillar_widening_factor");
+    optgroup->append_single_option_line(prefix + "support_max_weight_on_model");
+    optgroup->append_single_option_line(prefix + "support_base_diameter");
+    optgroup->append_single_option_line(prefix + "support_base_height");
+    optgroup->append_single_option_line(prefix + "support_base_safety_distance");
+
+    // Mirrored parameter from Pad page for toggling elevation on the same page
+    optgroup->append_single_option_line(prefix + "support_object_elevation");
+
+    Line line{ "", "" };
+    line.full_width = 1;
+    line.widget = [this](wxWindow* parent) {
+        return description_line_widget(parent, &m_support_object_elevation_description_line);
+    };
+    optgroup->append_line(line);
+
+    optgroup = page->new_optgroup(L("Connection of the support sticks and junctions"));
+    optgroup->append_single_option_line(prefix + "support_critical_angle");
+    optgroup->append_single_option_line(prefix + "support_max_bridge_length");
+    optgroup->append_single_option_line(prefix + "support_max_pillar_link_distance");
+}
+
 void TabSLAPrint::build()
 {
     m_presets = &m_preset_bundle->sla_prints;
@@ -4833,42 +4870,47 @@ void TabSLAPrint::build()
     optgroup->append_single_option_line("faded_layers");
 
     page = add_options_page(L("Supports"), "support"/*"sla_supports"*/);
+
+//    page = add_options_page(L("Branching"), "supports");
+
     optgroup = page->new_optgroup(L("Supports"));
     optgroup->append_single_option_line("supports_enable");
     optgroup->append_single_option_line("support_tree_type");
 
-    optgroup = page->new_optgroup(L("Support head"));
-    optgroup->append_single_option_line("support_head_front_diameter");
-    optgroup->append_single_option_line("support_head_penetration");
-    optgroup->append_single_option_line("support_head_width");
+    build_sla_support_params("", page);
+    build_sla_support_params("branching", page);
+//    optgroup = page->new_optgroup(L("Support head"));
+//    optgroup->append_single_option_line("support_head_front_diameter");
+//    optgroup->append_single_option_line("support_head_penetration");
+//    optgroup->append_single_option_line("support_head_width");
 
-    optgroup = page->new_optgroup(L("Support pillar"));
-    optgroup->append_single_option_line("support_pillar_diameter");
-    optgroup->append_single_option_line("support_small_pillar_diameter_percent");
-    optgroup->append_single_option_line("support_max_bridges_on_pillar");
+//    optgroup = page->new_optgroup(L("Support pillar"));
+//    optgroup->append_single_option_line("support_pillar_diameter");
+//    optgroup->append_single_option_line("support_small_pillar_diameter_percent");
+//    optgroup->append_single_option_line("support_max_bridges_on_pillar");
     
-    optgroup->append_single_option_line("support_pillar_connection_mode");
-    optgroup->append_single_option_line("support_buildplate_only");
-    optgroup->append_single_option_line("support_pillar_widening_factor");
-    optgroup->append_single_option_line("support_max_weight_on_model");
-    optgroup->append_single_option_line("support_base_diameter");
-    optgroup->append_single_option_line("support_base_height");
-    optgroup->append_single_option_line("support_base_safety_distance");
+//    optgroup->append_single_option_line("support_pillar_connection_mode");
+//    optgroup->append_single_option_line("support_buildplate_only");
+//    optgroup->append_single_option_line("support_pillar_widening_factor");
+//    optgroup->append_single_option_line("support_max_weight_on_model");
+//    optgroup->append_single_option_line("support_base_diameter");
+//    optgroup->append_single_option_line("support_base_height");
+//    optgroup->append_single_option_line("support_base_safety_distance");
     
-    // Mirrored parameter from Pad page for toggling elevation on the same page
-    optgroup->append_single_option_line("support_object_elevation");
+//    // Mirrored parameter from Pad page for toggling elevation on the same page
+//    optgroup->append_single_option_line("support_object_elevation");
 
-    Line line{ "", "" };
-    line.full_width = 1;
-    line.widget = [this](wxWindow* parent) {
-        return description_line_widget(parent, &m_support_object_elevation_description_line);
-    };
-    optgroup->append_line(line);
+//    Line line{ "", "" };
+//    line.full_width = 1;
+//    line.widget = [this](wxWindow* parent) {
+//        return description_line_widget(parent, &m_support_object_elevation_description_line);
+//    };
+//    optgroup->append_line(line);
 
-    optgroup = page->new_optgroup(L("Connection of the support sticks and junctions"));
-    optgroup->append_single_option_line("support_critical_angle");
-    optgroup->append_single_option_line("support_max_bridge_length");
-    optgroup->append_single_option_line("support_max_pillar_link_distance");
+//    optgroup = page->new_optgroup(L("Connection of the support sticks and junctions"));
+//    optgroup->append_single_option_line("support_critical_angle");
+//    optgroup->append_single_option_line("support_max_bridge_length");
+//    optgroup->append_single_option_line("support_max_pillar_link_distance");
 
     optgroup = page->new_optgroup(L("Automatic generation"));
     optgroup->append_single_option_line("support_points_density_relative");

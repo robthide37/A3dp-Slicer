@@ -185,6 +185,7 @@ private:
     void init_fff_params();
     void init_extruder_option_keys();
     void init_sla_params();
+    void init_sla_support_params(const std::string &method_prefix);
 
     std::vector<std::string>    m_extruder_option_keys;
     std::vector<std::string>    m_extruder_retract_keys;
@@ -890,6 +891,62 @@ PRINT_CONFIG_CLASS_DEFINE(
     // The elevation in Z direction upwards. This is the space between the pad
     // and the model object's bounding box bottom. Units in mm.
     ((ConfigOptionFloat, support_object_elevation))/*= 5.0*/
+
+
+    // Branching tree
+
+    // Diameter in mm of the pointing side of the head.
+    ((ConfigOptionFloat, branchingsupport_head_front_diameter))/*= 0.2*/
+
+    // How much the pinhead has to penetrate the model surface
+    ((ConfigOptionFloat, branchingsupport_head_penetration))/*= 0.2*/
+
+    // Width in mm from the back sphere center to the front sphere center.
+    ((ConfigOptionFloat, branchingsupport_head_width))/*= 1.0*/
+
+    // Radius in mm of the support pillars.
+    ((ConfigOptionFloat, branchingsupport_pillar_diameter))/*= 0.8*/
+
+    // The percentage of smaller pillars compared to the normal pillar diameter
+    // which are used in problematic areas where a normal pilla cannot fit.
+    ((ConfigOptionPercent, branchingsupport_small_pillar_diameter_percent))
+
+    // How much bridge (supporting another pinhead) can be placed on a pillar.
+    ((ConfigOptionInt,   branchingsupport_max_bridges_on_pillar))
+
+    // How the pillars are bridged together
+    ((ConfigOptionEnum<SLAPillarConnectionMode>, branchingsupport_pillar_connection_mode))
+
+    // Generate only ground facing supports
+    ((ConfigOptionBool, branchingsupport_buildplate_only))
+
+    ((ConfigOptionFloat, branchingsupport_max_weight_on_model))
+
+    ((ConfigOptionFloat, branchingsupport_pillar_widening_factor))
+
+    // Radius in mm of the pillar base.
+    ((ConfigOptionFloat, branchingsupport_base_diameter))/*= 2.0*/
+
+    // The height of the pillar base cone in mm.
+    ((ConfigOptionFloat, branchingsupport_base_height))/*= 1.0*/
+
+    // The minimum distance of the pillar base from the model in mm.
+    ((ConfigOptionFloat, branchingsupport_base_safety_distance)) /*= 1.0*/
+
+    // The default angle for connecting support sticks and junctions.
+    ((ConfigOptionFloat, branchingsupport_critical_angle))/*= 45*/
+
+    // The max length of a bridge in mm
+    ((ConfigOptionFloat, branchingsupport_max_bridge_length))/*= 15.0*/
+
+    // The max distance of two pillars to get cross linked.
+    ((ConfigOptionFloat, branchingsupport_max_pillar_link_distance))
+
+    // The elevation in Z direction upwards. This is the space between the pad
+    // and the model object's bounding box bottom. Units in mm.
+    ((ConfigOptionFloat, branchingsupport_object_elevation))/*= 5.0*/
+
+
 
     /////// Following options influence automatic support points placement:
     ((ConfigOptionInt, support_points_density_relative))
