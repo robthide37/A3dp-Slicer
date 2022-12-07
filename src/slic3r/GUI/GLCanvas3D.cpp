@@ -5639,10 +5639,10 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
     if (wxGetApp().plater()->is_preview_shown())
         return;
 
-    float scale = wxGetApp().toolbar_icon_scale();
-    Size cnv_size = get_canvas_size();
+    const float scale = wxGetApp().toolbar_icon_scale();
+    const Size cnv_size = get_canvas_size();
 
-    float size = GLToolbar::Default_Icons_Size * scale;
+    int size = int(GLToolbar::Default_Icons_Size * scale);
 
     // Set current size for all top toolbars. It will be used for next calculations
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
@@ -5651,28 +5651,28 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
     m_main_toolbar.set_scale(sc);
     m_undoredo_toolbar.set_scale(sc);
     collapse_toolbar.set_scale(sc);
-    size *= m_retina_helper->get_scale_factor();
+    size *= int(m_retina_helper->get_scale_factor());
 #else
-    m_main_toolbar.set_icons_size(int(size));
-    m_undoredo_toolbar.set_icons_size(int(size));
-    collapse_toolbar.set_icons_size(int(size));
+    m_main_toolbar.set_icons_size(size);
+    m_undoredo_toolbar.set_icons_size(size);
+    collapse_toolbar.set_icons_size(size);
 #endif // ENABLE_RETINA_GL
 
-    float top_tb_width = m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar.get_width();
+    const float top_tb_width = m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar.get_width();
     int   items_cnt = m_main_toolbar.get_visible_items_cnt() + m_undoredo_toolbar.get_visible_items_cnt() + collapse_toolbar.get_visible_items_cnt();
-    float noitems_width = top_tb_width - size * items_cnt; // width of separators and borders in top toolbars 
+    const float noitems_width = top_tb_width - float(size) * items_cnt; // width of separators and borders in top toolbars 
 
     // calculate scale needed for items in all top toolbars
     // the std::max() is there because on some Linux dialects/virtual machines this code is called when the canvas has not been properly initialized yet,
     // leading to negative values for the scale.
     // See: https://github.com/prusa3d/PrusaSlicer/issues/8563
     //      https://github.com/supermerill/SuperSlicer/issues/854
-    float new_h_scale = std::max((cnv_size.get_width() - noitems_width), 1.0f) / (items_cnt * GLToolbar::Default_Icons_Size);
+    const float new_h_scale = std::max((cnv_size.get_width() - noitems_width), 1.0f) / (items_cnt * GLToolbar::Default_Icons_Size);
 
     items_cnt = m_gizmos.get_selectable_icons_cnt() + 3; // +3 means a place for top and view toolbars and separators in gizmos toolbar
 
     // calculate scale needed for items in the gizmos toolbar
-    float new_v_scale = cnv_size.get_height() / (items_cnt * GLGizmosManager::Default_Icons_Size);
+    const float new_v_scale = cnv_size.get_height() / (items_cnt * GLGizmosManager::Default_Icons_Size);
 
     // set minimum scale as a auto scale for the toolbars
     float new_scale = std::min(new_h_scale, new_v_scale);
