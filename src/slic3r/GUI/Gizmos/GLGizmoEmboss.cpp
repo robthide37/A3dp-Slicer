@@ -2563,23 +2563,60 @@ void GLGizmoEmboss::draw_style_edit() {
     bool use_inch = wxGetApp().app_config->get("use_inches") == "1";
     const std::string revert_text_size = _u8L("Revert text size.");
     FontProp &font_prop = style.prop;
-    const float * def_size = exist_stored_style? 
-        &m_style_manager.get_stored_style()->prop.size_in_mm : nullptr;
-    bool is_size_changed = false;
+    
+    const GLVolume* gl_vol = m_parent.get_selection().get_first_volume();
+    Transform3d to_world = gl_vol->world_matrix();
+    // Use fix of .3mf loaded tranformation when exist
+    if (m_volume->text_configuration->fix_3mf_tr.has_value()) 
+        to_world = to_world * (*m_volume->text_configuration->fix_3mf_tr);
+
+    Vec3d up_world = to_world.linear() * Vec3d(0., 1., 0.);
+    double norm_sq = up_world.squaredNorm();
+    std::optional<float> height_scale;
+    if (!is_approx(norm_sq, 1.))
+        height_scale = sqrt(norm_sq);
+
+    bool use_correction = use_inch || height_scale.has_value();
+    const char *format = ((use_inch) ? "%.2f in" : "%.1f mm");
+    float *size_ptr = nullptr;
+    float size_value;
+    const float * def_size_ptr = nullptr;
+    float def_value;
     if (use_inch) {
-        float size_in_inch = ObjectManipulation::mm_to_in * font_prop.size_in_mm;
-        float def_size_inch = exist_stored_style ? ObjectManipulation::mm_to_in * (*def_size) : 0.f;
-        if (def_size != nullptr) def_size = &def_size_inch;
-        if (rev_input(tr.size, size_in_inch, def_size, revert_text_size, 0.1f, 1.f, "%.2f in")) { 
-            font_prop.size_in_mm = ObjectManipulation::in_to_mm * size_in_inch;
-            is_size_changed = true;
+        // calc value in inch
+        size_value = ObjectManipulation::mm_to_in * font_prop.size_in_mm;
+        if (exist_stored_style) {
+            def_value = ObjectManipulation::mm_to_in * (*def_size_ptr);
+            def_size_ptr = &def_value;        
         }
-    } else {
-        if (rev_input(tr.size, font_prop.size_in_mm, def_size, revert_text_size, 0.1f, 1.f, "%.1f mm"))
-            is_size_changed = true;
+        size_ptr = &size_value;
+    }
+    if (height_scale.has_value()) {
+        // use inch 
+        if (size_ptr == nullptr) {
+            size_value = font_prop.size_in_mm;
+            size_ptr   = &size_value;
+        }
+        size_value *= *height_scale;
+        if (def_size_ptr == nullptr) { 
+            def_size_ptr = &m_style_manager.get_stored_style()->prop.size_in_mm;
+        }
     }
 
-    if (is_size_changed) {
+    if (!use_correction){
+        size_ptr = &font_prop.size_in_mm;
+        if (exist_stored_style)
+            def_size_ptr = &m_style_manager.get_stored_style()->prop.size_in_mm;
+    }
+
+    assert(size_ptr != nullptr);
+    assert(exist_stored_style == (def_size_ptr != nullptr));
+    if (rev_input(tr.size, *size_ptr, def_size_ptr, revert_text_size, 0.1f, 1.f, format)) {
+        if (use_correction) {
+            font_prop.size_in_mm = *size_ptr;
+            if (use_inch) font_prop.size_in_mm *= ObjectManipulation::in_to_mm;
+            if (height_scale.has_value()) font_prop.size_in_mm /= *height_scale;
+        }
         // size can't be zero or negative
         Limits::apply(font_prop.size_in_mm, limits.size_in_mm);
 
@@ -2622,6 +2659,11 @@ void GLGizmoEmboss::draw_style_edit() {
             ImGui::SetTooltip("%s", _u8L("wx Make bold").c_str());
     }
 #endif // SHOW_WX_WEIGHT_INPUT
+
+    Vec3d depth_world = to_world.linear() * Vec3d(0., 0., 1.);
+    double depth_sq = depth_world.squaredNorm();
+    std::optional<float> depth_scale;
+    if (!is_approx(depth_sq, 1.)) depth_scale = sqrt(depth_sq);   
 
     const std::string revert_emboss_depth = _u8L("Revert embossed depth.");
     const float *def_depth = exist_stored_style ?
