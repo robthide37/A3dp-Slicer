@@ -74,11 +74,18 @@ public:
         : its{m}, trafo{tr} {}
 };
 
+struct Interrupter
+{
+    std::function<bool(int)> statusfn;
+
+    void start(const char* name = nullptr) { (void)name; }
+    void end() {}
+
+    inline bool wasInterrupted(int percent = -1) { return statusfn(percent); }
+};
+
 VoxelGridPtr mesh_to_grid(const indexed_triangle_set &mesh,
-                          const Transform3f          &tr,
-                          float                       voxel_scale,
-                          float                       exteriorBandWidth,
-                          float                       interiorBandWidth)
+                          const MeshToGridParams &params)
 {
     // Might not be needed but this is now proven to be working
     openvdb::initialize();
@@ -92,14 +99,22 @@ VoxelGridPtr mesh_to_grid(const indexed_triangle_set &mesh,
 
     meshparts.erase(it, meshparts.end());
 
-    Transform3d trafo = tr.cast<double>();
-    trafo.prescale(voxel_scale);
+    Transform3d trafo = params.trafo().cast<double>();
+    trafo.prescale(params.voxel_scale());
+
+    Interrupter interrupter{params.statusfn()};
 
     openvdb::FloatGrid::Ptr grid;
     for (auto &m : meshparts) {
         auto subgrid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-            TriangleMeshDataAdapter{m, trafo}, {},
-            exteriorBandWidth, interiorBandWidth);
+            interrupter,
+            TriangleMeshDataAdapter{m, trafo},
+            openvdb::math::Transform{},
+            params.exterior_bandwidth(),
+            params.interior_bandwidth());
+
+        if (interrupter.wasInterrupted())
+            break;
 
         if (grid && subgrid)
             openvdb::tools::csgUnion(*grid, *subgrid);
@@ -107,16 +122,24 @@ VoxelGridPtr mesh_to_grid(const indexed_triangle_set &mesh,
             grid = std::move(subgrid);
     }
 
+    if (interrupter.wasInterrupted())
+        return {};
+
     if (meshparts.empty()) {
         // Splitting failed, fall back to hollow the original mesh
         grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-            TriangleMeshDataAdapter{mesh, trafo}, {}, exteriorBandWidth,
-            interiorBandWidth);
+            interrupter,
+            TriangleMeshDataAdapter{mesh, trafo},
+            openvdb::math::Transform{},
+            params.exterior_bandwidth(),
+            params.interior_bandwidth());
     }
 
+    if (interrupter.wasInterrupted())
+        return {};
 
-    grid->transform().preScale(1./voxel_scale);
-    grid->insertMeta("voxel_scale", openvdb::FloatMetadata(voxel_scale));
+    grid->transform().preScale(1./params.voxel_scale());
+    grid->insertMeta("voxel_scale", openvdb::FloatMetadata(params.voxel_scale()));
 
     VoxelGridPtr ret = make_voxelgrid(std::move(*grid));
 

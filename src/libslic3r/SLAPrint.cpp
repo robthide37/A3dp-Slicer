@@ -1160,19 +1160,16 @@ inline bool operator==(const VoxelizeParams &a, const VoxelizeParams &b)
     return h(a) == h(b);
 }
 
-VoxelGridPtr get_voxelgrid(const CSGPartForStep &part, const VoxelizeParams &p)
+VoxelGridPtr get_voxelgrid(const CSGPartForStep &part, VoxelizeParams p)
 {
     VoxelGridPtr &ret = part.gridcache[p];
 
     if (!ret) {
-        ret = mesh_to_grid(*csg::get_mesh(part),
-                           csg::get_transform(part),
-                           p.voxel_scale(),
-                           p.exterior_bandwidth(),
-                           p.interior_bandwidth());
+        p.trafo(csg::get_transform(part));
+        ret = mesh_to_grid(*csg::get_mesh(part), p);
     }
 
-    return clone(*ret);
+    return ret ? clone(*ret) : nullptr;
 }
 
 } // namespace csg

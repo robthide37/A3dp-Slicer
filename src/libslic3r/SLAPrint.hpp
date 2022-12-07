@@ -13,6 +13,8 @@
 #include "libslic3r/CSGMesh/CSGMesh.hpp"
 #include "libslic3r/OpenVDBUtils.hpp"
 
+#include <boost/functional/hash.hpp>
+
 namespace Slic3r {
 
 enum SLAPrintStep : unsigned int {
@@ -51,11 +53,32 @@ namespace std {
 
 template<> struct hash<Slic3r::csg::VoxelizeParams> {
     size_t operator() (const Slic3r::csg::VoxelizeParams &p) const {
-        std::string str = Slic3r::float_to_string_decimal_point(p.voxel_scale());
-        str += Slic3r::float_to_string_decimal_point(p.exterior_bandwidth());
-        str += Slic3r::float_to_string_decimal_point(p.interior_bandwidth());
+        int64_t vs = Slic3r::scaled(p.voxel_scale()) >> 10;
+        int64_t eb = Slic3r::scaled(p.exterior_bandwidth()) >> 10;
+        int64_t ib = Slic3r::scaled(p.interior_bandwidth()) >> 10;
 
-        return std::hash<std::string>{}(str);
+        size_t h = 0;
+        boost::hash_combine(h, vs);
+        boost::hash_combine(h, eb);
+        boost::hash_combine(h, ib);
+
+        return h;
+    }
+};
+
+template<> struct equal_to<Slic3r::csg::VoxelizeParams> {
+    size_t operator() (const Slic3r::csg::VoxelizeParams &p1,
+                       const Slic3r::csg::VoxelizeParams &p2) const {
+
+        int64_t vs1 = Slic3r::scaled(p1.voxel_scale()) >> 10;
+        int64_t eb1 = Slic3r::scaled(p1.exterior_bandwidth()) >> 10;
+        int64_t ib1 = Slic3r::scaled(p1.interior_bandwidth()) >> 10;
+
+        int64_t vs2 = Slic3r::scaled(p2.voxel_scale()) >> 10;
+        int64_t eb2 = Slic3r::scaled(p2.exterior_bandwidth()) >> 10;
+        int64_t ib2 = Slic3r::scaled(p2.interior_bandwidth()) >> 10;
+
+        return vs1 == vs2 && eb1 == eb2 && ib1 == ib2;
     }
 };
 
@@ -91,7 +114,7 @@ struct CSGPartForStep : public csg::CSGPart
 
 namespace csg {
 
-VoxelGridPtr get_voxelgrid(const CSGPartForStep &part, const VoxelizeParams &p);
+VoxelGridPtr get_voxelgrid(const CSGPartForStep &part, VoxelizeParams p);
 
 } // namespace csg
 

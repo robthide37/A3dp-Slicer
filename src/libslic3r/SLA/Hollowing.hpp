@@ -84,16 +84,24 @@ InteriorPtr generate_interior(const VoxelGrid &mesh,
                               const JobController &ctl = {});
 
 inline InteriorPtr generate_interior(const indexed_triangle_set &mesh,
-                              const HollowingConfig      &hc  = {},
-                              const JobController        &ctl = {})
+                                     const HollowingConfig &hc = {},
+                                     const JobController &ctl = {})
 {
     auto voxel_scale = get_voxel_scale(its_volume(mesh), hc);
-    auto grid = mesh_to_grid(mesh, Transform3f::Identity(), voxel_scale, 1.f, 1.f);
+    auto statusfn = [&ctl](int){ return ctl.stopcondition && ctl.stopcondition(); };
+    auto grid = mesh_to_grid(mesh, MeshToGridParams{}
+                                              .voxel_scale(voxel_scale)
+                                              .exterior_bandwidth(1.f)
+                                              .interior_bandwidth(1.f)
+                                              .statusfn(statusfn));
+
+    if (!grid || (ctl.stopcondition && ctl.stopcondition()))
+        return {};
 
     if (its_is_splittable(mesh))
         grid = redistance_grid(*grid, 0.0f, 6.f / voxel_scale, 6.f / voxel_scale);
 
-    return generate_interior(*grid, hc, ctl);
+    return grid ? generate_interior(*grid, hc, ctl) : InteriorPtr{};
 }
 
 template<class It>
@@ -109,9 +117,13 @@ InteriorPtr generate_interior(const Range<It>       &csgparts,
     auto params = csg::VoxelizeParams{}
                       .voxel_scale(get_voxel_scale(mesh_vol, hc))
                       .exterior_bandwidth(1.f)
-                      .interior_bandwidth(1.f);
+                      .interior_bandwidth(1.f)
+                      .statusfn([&ctl](int){ return ctl.stopcondition && ctl.stopcondition(); });
 
     auto ptr = csg::voxelize_csgmesh(csgparts, params);
+
+    if (!ptr || (ctl.stopcondition && ctl.stopcondition()))
+        return {};
 
     if (csgparts.size() > 1 || its_is_splittable(*csg::get_mesh(*csgparts.begin())))
         ptr = redistance_grid(*ptr,
@@ -119,7 +131,7 @@ InteriorPtr generate_interior(const Range<It>       &csgparts,
                               6.f / params.voxel_scale(),
                               6.f / params.voxel_scale());
 
-    return generate_interior(*ptr, hc, ctl);
+    return ptr ? generate_interior(*ptr, hc, ctl) : InteriorPtr{};
 }
 
 // Will do the hollowing

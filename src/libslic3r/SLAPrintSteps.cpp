@@ -41,14 +41,14 @@ namespace Slic3r {
 namespace {
 
 const std::array<unsigned, slaposCount> OBJ_STEP_LEVELS = {
-    5, // slaposAssembly
-    5, // slaposHollowing,
-    10, // slaposDrillHoles
-    10, // slaposObjectSlice,
-    20, // slaposSupportPoints,
-    10, // slaposSupportTree,
-    10, // slaposPad,
-    30, // slaposSliceSupports,
+    13, // slaposAssembly
+    13, // slaposHollowing,
+    13, // slaposDrillHoles
+    13, // slaposObjectSlice,
+    13, // slaposSupportPoints,
+    13, // slaposSupportTree,
+    11, // slaposPad,
+    11, // slaposSliceSupports,
 };
 
 std::string OBJ_STEP_LABELS(size_t idx)
@@ -144,13 +144,20 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
                          .exterior_bandwidth(1.f)
                          .interior_bandwidth(1.f);
 
+    voxparams.statusfn([&po](int){
+        return po.m_print->cancel_status() != CancelStatus::NOT_CANCELED;
+    });
+
     auto grid = csg::voxelize_csgmesh(range(po.m_mesh_to_slice), voxparams);
 
-    indexed_triangle_set m = grid_to_mesh(*grid);
+    auto m = grid ? grid_to_mesh(*grid) : indexed_triangle_set{};
 
     bench.stop();
 
-    BOOST_LOG_TRIVIAL(trace) << "Preview gen took: " << bench.getElapsedSec();
+    if (!m.empty())
+        BOOST_LOG_TRIVIAL(trace) << "Preview gen took: " << bench.getElapsedSec();
+    else
+        BOOST_LOG_TRIVIAL(error) << "Preview failed!";
 
     return m;
 }
