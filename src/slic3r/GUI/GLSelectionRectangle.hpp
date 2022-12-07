@@ -2,9 +2,7 @@
 #define slic3r_GLSelectionRectangle_hpp_
 
 #include "libslic3r/Point.hpp"
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "GLModel.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 namespace Slic3r {
 namespace GUI {
@@ -51,11 +49,9 @@ private:
     EState m_state{ EState::Off };
     Vec2d m_start_corner{ Vec2d::Zero() };
     Vec2d m_end_corner{ Vec2d::Zero() };
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_rectangle;
     Vec2d m_old_start_corner{ Vec2d::Zero() };
     Vec2d m_old_end_corner{ Vec2d::Zero() };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 };
 
     

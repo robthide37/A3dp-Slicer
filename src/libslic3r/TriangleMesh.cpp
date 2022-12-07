@@ -738,6 +738,13 @@ void its_flip_triangles(indexed_triangle_set &its)
         std::swap(face(1), face(2));
 }
 
+int its_num_degenerate_faces(const indexed_triangle_set &its)
+{
+    return std::count_if(its.indices.begin(), its.indices.end(), [](auto &face) {
+        return face(0) == face(1) || face(0) == face(2) || face(1) == face(2);
+    });
+}
+
 int its_remove_degenerate_faces(indexed_triangle_set &its, bool shrink_to_fit)
 {
     auto it = std::remove_if(its.indices.begin(), its.indices.end(), [](auto &face) {

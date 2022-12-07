@@ -66,9 +66,7 @@ protected:
         bool dragging{ false };
         Vec3d center{ Vec3d::Zero() };
         Vec3d angles{ Vec3d::Zero() };
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         Transform3d matrix{ Transform3d::Identity() };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         ColorRGBA color{ ColorRGBA::WHITE() };
         EGrabberExtension extensions{ EGrabberExtension::None };
         // the picking id shared by all the elements

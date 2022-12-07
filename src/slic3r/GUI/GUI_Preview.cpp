@@ -692,7 +692,6 @@ void Preview::update_moves_slider()
     if (view.endpoints.last < view.endpoints.first)
         return;
 
-#if ENABLE_PROCESS_G2_G3_LINES
     assert(view.endpoints.first <= view.current.first && view.current.first <= view.endpoints.last);
     assert(view.endpoints.first <= view.current.last && view.current.last <= view.endpoints.last);
 
@@ -721,22 +720,6 @@ void Preview::update_moves_slider()
     m_moves_slider->SetSliderAlternateValues(alternate_values);
     m_moves_slider->SetMaxValue(int(values.size()) - 1);
     m_moves_slider->SetSelectionSpan(values.front() - 1 - view.endpoints.first, values.back() - 1 - view.endpoints.first);
-#else
-    std::vector<double> values(view.endpoints.last - view.endpoints.first + 1);
-    std::vector<double> alternate_values(view.endpoints.last - view.endpoints.first + 1);
-    unsigned int count = 0;
-    for (unsigned int i = view.endpoints.first; i <= view.endpoints.last; ++i) {
-        values[count] = static_cast<double>(i + 1);
-        if (view.gcode_ids[i] > 0)
-            alternate_values[count] = static_cast<double>(view.gcode_ids[i]);
-        ++count;
-    }
-
-    m_moves_slider->SetSliderValues(values);
-    m_moves_slider->SetSliderAlternateValues(alternate_values);
-    m_moves_slider->SetMaxValue(view.endpoints.last - view.endpoints.first);
-    m_moves_slider->SetSelectionSpan(view.current.first - view.endpoints.first, view.current.last - view.endpoints.first);
-#endif // ENABLE_PROCESS_G2_G3_LINES
 }
 
 void Preview::enable_moves_slider(bool enable)

@@ -584,8 +584,12 @@ bool Selection::is_sla_compliant() const
 
 bool Selection::is_single_text() const
 {
+#if ENABLE_WORLD_COORDINATE
     if (!is_single_volume_or_modifier())
-        return false;
+#else
+    if (!is_single_volume() && !is_single_modifier())
+#endif // ENABLE_WORLD_COORDINATE
+      return false;
 
     const GLVolume* gl_volume = (*m_volumes)[*m_list.begin()];
     const ModelVolume* model_volume = m_model->objects[gl_volume->object_idx()]->volumes[gl_volume->volume_idx()];
@@ -1693,7 +1697,6 @@ void Selection::render(float scale_factor)
 
     m_scale_factor = scale_factor;
     // render cumulative bounding box of selected volumes
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WORLD_COORDINATE
     BoundingBoxf3 box;
     Transform3d trafo;
@@ -1722,9 +1725,6 @@ void Selection::render(float scale_factor)
 #else
     render_bounding_box(get_bounding_box(), ColorRGB::WHITE());
 #endif // ENABLE_WORLD_COORDINATE
-#else
-    render_selected_volumes();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     render_synchronized_volumes();
 }
 
@@ -1734,38 +1734,26 @@ void Selection::render_center(bool gizmo_is_dragging)
     if (!m_valid || is_empty())
         return;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader == nullptr)
         return;
 
     shader->start_using();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const Vec3d center = gizmo_is_dragging ? m_cache.dragging_center : get_bounding_box().center();
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
     Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(center);
 
     shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     m_vbo_sphere.set_color(ColorRGBA::WHITE());
-#else
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(center.x(), center.y(), center.z()));
-    m_vbo_sphere.set_color(-1, ColorRGBA::WHITE());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_vbo_sphere.render();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
-#else
-    glsafe(::glPopMatrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 #endif // ENABLE_RENDER_SELECTION_CENTER
 
@@ -1774,33 +1762,16 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     if (sidebar_field.empty())
         return;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader(boost::starts_with(sidebar_field, "layer") ? "flat" : "gouraud_light");
     if (shader == nullptr)
         return;
 
     shader->start_using();
-#else
-    GLShaderProgram* shader = nullptr;
-
-    if (!boost::starts_with(sidebar_field, "layer")) {
-        shader = wxGetApp().get_shader("gouraud_light");
-        if (shader == nullptr)
-            return;
-
-        shader->start_using();
-        glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
-    }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Transform3d base_matrix = Geometry::translation_transform(get_bounding_box().center());
     Transform3d orient_matrix = Transform3d::Identity();
-#else
-    glsafe(::glPushMatrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_WORLD_COORDINATE
     const Vec3d center = get_bounding_box().center();
@@ -1808,28 +1779,16 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #endif // ENABLE_WORLD_COORDINATE
 
     if (!boost::starts_with(sidebar_field, "layer")) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->set_uniform("emission_factor", 0.05f);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_LEGACY_OPENGL_REMOVAL&& !ENABLE_WORLD_COORDINATE
-        const Vec3d& center = get_bounding_box().center();
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL&& !ENABLE_WORLD_COORDINATE
 #if ENABLE_WORLD_COORDINATE
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
+          orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
+          axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
 #else
+        const Vec3d& center = get_bounding_box().center();
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->get_world_coordinates()) {
-#endif // ENABLE_WORLD_COORDINATE
-#if !ENABLE_LEGACY_OPENGL_REMOVAL&& !ENABLE_WORLD_COORDINATE
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL&& !ENABLE_WORLD_COORDINATE
-#if ENABLE_WORLD_COORDINATE
-            orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
-            axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
-#else
             if (!boost::starts_with(sidebar_field, "position")) {
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-                Transform3d orient_matrix = Transform3d::Identity();
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
                 if (boost::starts_with(sidebar_field, "scale"))
                     orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
                 else if (boost::starts_with(sidebar_field, "rotation")) {
@@ -1843,21 +1802,11 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
                             orient_matrix.rotate(Eigen::AngleAxisd(rotation.z(), Vec3d::UnitZ()));
                     }
                 }
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-                glsafe(::glMultMatrixd(orient_matrix.data()));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
             }
 #endif // ENABLE_WORLD_COORDINATE
         }
 #if ENABLE_WORLD_COORDINATE
         else if (is_single_volume_or_modifier()) {
-#else
-        else if (is_single_volume() || is_single_modifier()) {
-#endif // ENABLE_WORLD_COORDINATE
-#if !ENABLE_LEGACY_OPENGL_REMOVAL&& !ENABLE_WORLD_COORDINATE
-            glsafe(::glTranslated(center.x(), center.y(), center.z()));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL&& !ENABLE_WORLD_COORDINATE
-#if ENABLE_WORLD_COORDINATE
             if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
                 if (wxGetApp().obj_manipul()->is_local_coordinates()) {
                     const GLVolume* v = (*m_volumes)[*m_list.begin()];
@@ -1870,55 +1819,32 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
                 }
             }
 #else
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-            orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
-#else
+        else if (is_single_volume() || is_single_modifier()) {
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
-            Transform3d orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+            orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
             if (!boost::starts_with(sidebar_field, "position"))
                 orient_matrix = orient_matrix * (*m_volumes)[*m_list.begin()]->get_volume_transformation().get_matrix(true, false, true, true);
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-            glsafe(::glMultMatrixd(orient_matrix.data()));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_WORLD_COORDINATE
         }
         else {
-#if ENABLE_LEGACY_OPENGL_REMOVAL|| ENABLE_WORLD_COORDINATE
             if (requires_local_axes())
 #if ENABLE_WORLD_COORDINATE
                 orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
 #else
                 orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
 #endif // ENABLE_WORLD_COORDINATE
-#else
-            glsafe(::glTranslated(center.x(), center.y(), center.z()));
-            if (requires_local_axes()) {
-                const Transform3d orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
-                glsafe(::glMultMatrixd(orient_matrix.data()));
-            }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL|| ENABLE_WORLD_COORDINATE
         }
     }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!boost::starts_with(sidebar_field, "layer"))
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_WORLD_COORDINATE
     if (!boost::starts_with(sidebar_field, "layer")) {
         shader->set_uniform("emission_factor", 0.1f);
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(center.x(), center.y(), center.z()));
-        glsafe(::glMultMatrixd(orient_matrix.data()));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 #endif // ENABLE_WORLD_COORDINATE
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (boost::starts_with(sidebar_field, "position"))
         render_sidebar_position_hints(sidebar_field, *shader, base_matrix * orient_matrix);
     else if (boost::starts_with(sidebar_field, "rotation"))
@@ -1934,39 +1860,8 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
             m_axes.render(Geometry::translation_transform(axes_center) * orient_matrix, 0.25f);
     }
 #endif // ENABLE_WORLD_COORDINATE
-#else
-    if (boost::starts_with(sidebar_field, "position"))
-        render_sidebar_position_hints(sidebar_field);
-    else if (boost::starts_with(sidebar_field, "rotation"))
-        render_sidebar_rotation_hints(sidebar_field);
-    else if (boost::starts_with(sidebar_field, "scale") || boost::starts_with(sidebar_field, "size"))
-        render_sidebar_scale_hints(sidebar_field);
-    else if (boost::starts_with(sidebar_field, "layer"))
-        render_sidebar_layers_hints(sidebar_field);
 
-#if ENABLE_WORLD_COORDINATE
-    if (!boost::starts_with(sidebar_field, "layer")) {
-        glsafe(::glPopMatrix());
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(axes_center.x(), axes_center.y(), axes_center.z()));
-        glsafe(::glMultMatrixd(orient_matrix.data()));
-        if (!wxGetApp().obj_manipul()->is_world_coordinates())
-            m_axes.render(0.25f);
-        glsafe(::glPopMatrix());
-    }
-#endif // ENABLE_WORLD_COORDINATE
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if ENABLE_WORLD_COORDINATE
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-#endif // ENABLE_WORLD_COORDINATE
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    if (!boost::starts_with(sidebar_field, "layer"))
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-        shader->stop_using();
+    shader->stop_using();
 }
 
 bool Selection::requires_local_axes() const
@@ -2380,22 +2275,10 @@ void Selection::do_remove_object(unsigned int object_idx)
     }
 }
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-void Selection::render_selected_volumes() const
-{
-    float color[3] = { 1.0f, 1.0f, 1.0f };
-    render_bounding_box(get_bounding_box(), color);
-}
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
 void Selection::render_synchronized_volumes()
 {
     if (m_mode == Instance)
         return;
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    float color[3] = { 1.0f, 1.0f, 0.0f };
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_WORLD_COORDINATE
     const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
@@ -2415,7 +2298,6 @@ void Selection::render_synchronized_volumes()
             if (v.object_idx() != object_idx || v.volume_idx() != volume_idx)
                 continue;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WORLD_COORDINATE
             if (coordinates_type == ECoordinatesType::World) {
                 box = v.transformed_convex_hull_bounding_box();
@@ -2433,36 +2315,16 @@ void Selection::render_synchronized_volumes()
 #else
             render_bounding_box(v.transformed_convex_hull_bounding_box(), ColorRGB::YELLOW());
 #endif // ENABLE_WORLD_COORDINATE
-#else
-            render_bounding_box(v.transformed_convex_hull_bounding_box(), color);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
     }
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WORLD_COORDINATE
 void Selection::render_bounding_box(const BoundingBoxf3& box, const Transform3d& trafo, const ColorRGB& color)
 #else
 void Selection::render_bounding_box(const BoundingBoxf3& box, const ColorRGB& color)
 #endif // ENABLE_WORLD_COORDINATE
 {
-#else
-void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) const
-{
-    if (color == nullptr)
-        return;
-
-    const Vec3f b_min = box.min.cast<float>();
-    const Vec3f b_max = box.max.cast<float>();
-    const Vec3f size = 0.2f * box.size().cast<float>();
-
-    glsafe(::glEnable(GL_DEPTH_TEST));
-    glsafe(::glColor3fv(color));
-    glsafe(::glLineWidth(2.0f * m_scale_factor));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const BoundingBoxf3& curr_box = m_box.get_bounding_box();
 
     if (!m_box.is_initialized() || !is_approx(box.min, curr_box.min) || !is_approx(box.max, curr_box.max)) {
@@ -2556,13 +2418,6 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
     if (shader == nullptr)
         return;
 
-#if ENABLE_WORLD_COORDINATE
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPushMatrix());
-    glsafe(::glMultMatrixd(trafo.data()));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-#endif // ENABLE_WORLD_COORDINATE
-
     shader->start_using();
     const Camera& camera = wxGetApp().plater()->get_camera();
 #if ENABLE_WORLD_COORDINATE
@@ -2580,49 +2435,6 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
     m_box.set_color(to_rgba(color));
     m_box.render();
     shader->stop_using();
-
-#if ENABLE_WORLD_COORDINATE
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-#endif // ENABLE_WORLD_COORDINATE
-#else
-    ::glBegin(GL_LINES);
-
-    ::glVertex3f(b_min(0), b_min(1), b_min(2)); ::glVertex3f(b_min(0) + size(0), b_min(1), b_min(2));
-    ::glVertex3f(b_min(0), b_min(1), b_min(2)); ::glVertex3f(b_min(0), b_min(1) + size(1), b_min(2));
-    ::glVertex3f(b_min(0), b_min(1), b_min(2)); ::glVertex3f(b_min(0), b_min(1), b_min(2) + size(2));
-
-    ::glVertex3f(b_max(0), b_min(1), b_min(2)); ::glVertex3f(b_max(0) - size(0), b_min(1), b_min(2));
-    ::glVertex3f(b_max(0), b_min(1), b_min(2)); ::glVertex3f(b_max(0), b_min(1) + size(1), b_min(2));
-    ::glVertex3f(b_max(0), b_min(1), b_min(2)); ::glVertex3f(b_max(0), b_min(1), b_min(2) + size(2));
-
-    ::glVertex3f(b_max(0), b_max(1), b_min(2)); ::glVertex3f(b_max(0) - size(0), b_max(1), b_min(2));
-    ::glVertex3f(b_max(0), b_max(1), b_min(2)); ::glVertex3f(b_max(0), b_max(1) - size(1), b_min(2));
-    ::glVertex3f(b_max(0), b_max(1), b_min(2)); ::glVertex3f(b_max(0), b_max(1), b_min(2) + size(2));
-
-    ::glVertex3f(b_min(0), b_max(1), b_min(2)); ::glVertex3f(b_min(0) + size(0), b_max(1), b_min(2));
-    ::glVertex3f(b_min(0), b_max(1), b_min(2)); ::glVertex3f(b_min(0), b_max(1) - size(1), b_min(2));
-    ::glVertex3f(b_min(0), b_max(1), b_min(2)); ::glVertex3f(b_min(0), b_max(1), b_min(2) + size(2));
-
-    ::glVertex3f(b_min(0), b_min(1), b_max(2)); ::glVertex3f(b_min(0) + size(0), b_min(1), b_max(2));
-    ::glVertex3f(b_min(0), b_min(1), b_max(2)); ::glVertex3f(b_min(0), b_min(1) + size(1), b_max(2));
-    ::glVertex3f(b_min(0), b_min(1), b_max(2)); ::glVertex3f(b_min(0), b_min(1), b_max(2) - size(2));
-
-    ::glVertex3f(b_max(0), b_min(1), b_max(2)); ::glVertex3f(b_max(0) - size(0), b_min(1), b_max(2));
-    ::glVertex3f(b_max(0), b_min(1), b_max(2)); ::glVertex3f(b_max(0), b_min(1) + size(1), b_max(2));
-    ::glVertex3f(b_max(0), b_min(1), b_max(2)); ::glVertex3f(b_max(0), b_min(1), b_max(2) - size(2));
-
-    ::glVertex3f(b_max(0), b_max(1), b_max(2)); ::glVertex3f(b_max(0) - size(0), b_max(1), b_max(2));
-    ::glVertex3f(b_max(0), b_max(1), b_max(2)); ::glVertex3f(b_max(0), b_max(1) - size(1), b_max(2));
-    ::glVertex3f(b_max(0), b_max(1), b_max(2)); ::glVertex3f(b_max(0), b_max(1), b_max(2) - size(2));
-
-    ::glVertex3f(b_min(0), b_max(1), b_max(2)); ::glVertex3f(b_min(0) + size(0), b_max(1), b_max(2));
-    ::glVertex3f(b_min(0), b_max(1), b_max(2)); ::glVertex3f(b_min(0), b_max(1) - size(1), b_max(2));
-    ::glVertex3f(b_min(0), b_max(1), b_max(2)); ::glVertex3f(b_min(0), b_max(1), b_max(2) - size(2));
-
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 static ColorRGBA get_color(Axis axis)
@@ -2630,13 +2442,8 @@ static ColorRGBA get_color(Axis axis)
     return AXES_COLOR[axis];
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Selection::render_sidebar_position_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix)
-#else
-void Selection::render_sidebar_position_hints(const std::string& sidebar_field)
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
     shader.set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -2663,31 +2470,10 @@ void Selection::render_sidebar_position_hints(const std::string& sidebar_field)
         m_arrow.set_color(get_color(Z));
         m_arrow.render();
     }
-#else
-    if (boost::ends_with(sidebar_field, "x")) {
-        glsafe(::glRotated(-90.0, 0.0, 0.0, 1.0));
-        m_arrow.set_color(-1, get_color(X));
-        m_arrow.render();
-    }
-    else if (boost::ends_with(sidebar_field, "y")) {
-        m_arrow.set_color(-1, get_color(Y));
-        m_arrow.render();
-    }
-    else if (boost::ends_with(sidebar_field, "z")) {
-        glsafe(::glRotated(90.0, 1.0, 0.0, 0.0));
-        m_arrow.set_color(-1, get_color(Z));
-        m_arrow.render();
-    }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix)
-#else
-void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field)
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     auto render_sidebar_rotation_hint = [this](GLShaderProgram& shader, const Transform3d& view_matrix, const Transform3d& model_matrix) {
         shader.set_uniform("view_model_matrix", view_matrix * model_matrix);
         Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
@@ -2716,35 +2502,9 @@ void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field)
         m_curved_arrow.set_color(get_color(Z));
         render_sidebar_rotation_hint(shader, view_matrix, matrix);
     }
-#else
-    auto render_sidebar_rotation_hint = [this]() {
-        m_curved_arrow.render();
-        glsafe(::glRotated(180.0, 0.0, 0.0, 1.0));
-        m_curved_arrow.render();
-    };
-
-    if (boost::ends_with(sidebar_field, "x")) {
-        glsafe(::glRotated(90.0, 0.0, 1.0, 0.0));
-        m_curved_arrow.set_color(-1, get_color(X));
-        render_sidebar_rotation_hint();
-    }
-    else if (boost::ends_with(sidebar_field, "y")) {
-        glsafe(::glRotated(-90.0, 1.0, 0.0, 0.0));
-        m_curved_arrow.set_color(-1, get_color(Y));
-        render_sidebar_rotation_hint();
-    }
-    else if (boost::ends_with(sidebar_field, "z")) {
-        m_curved_arrow.set_color(-1, get_color(Z));
-        render_sidebar_rotation_hint();
-    }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Selection::render_sidebar_scale_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix)
-#else
-void Selection::render_sidebar_scale_hints(const std::string& sidebar_field)
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
 #if ENABLE_WORLD_COORDINATE
     const bool uniform_scale = wxGetApp().obj_manipul()->get_uniform_scaling();
@@ -2752,80 +2512,36 @@ void Selection::render_sidebar_scale_hints(const std::string& sidebar_field)
     const bool uniform_scale = requires_uniform_scale() || wxGetApp().obj_manipul()->get_uniform_scaling();
 #endif // ENABLE_WORLD_COORDINATE
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     auto render_sidebar_scale_hint = [this, uniform_scale](Axis axis, GLShaderProgram& shader, const Transform3d& view_matrix, const Transform3d& model_matrix) {
         m_arrow.set_color(uniform_scale ? UNIFORM_SCALE_COLOR : get_color(axis));
         Transform3d matrix = model_matrix * Geometry::translation_transform(5.0 * Vec3d::UnitY());
         shader.set_uniform("view_model_matrix", view_matrix * matrix);
         Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader.set_uniform("view_normal_matrix", view_normal_matrix);
-#else
-    auto render_sidebar_scale_hint = [this, uniform_scale](Axis axis) {
-        m_arrow.set_color(-1, uniform_scale ? UNIFORM_SCALE_COLOR : get_color(axis));
-        GLShaderProgram* shader = wxGetApp().get_current_shader();
-        if (shader != nullptr)
-            shader->set_uniform("emission_factor", 0.0f);
-
-        glsafe(::glTranslated(0.0, 5.0, 0.0));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         m_arrow.render();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         matrix = model_matrix * Geometry::translation_transform(-5.0 * Vec3d::UnitY()) * Geometry::rotation_transform(PI * Vec3d::UnitZ());
         shader.set_uniform("view_model_matrix", view_matrix * matrix);
         view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader.set_uniform("view_normal_matrix", view_normal_matrix);
-#else
-        glsafe(::glTranslated(0.0, -10.0, 0.0));
-        glsafe(::glRotated(180.0, 0.0, 0.0, 1.0));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         m_arrow.render();
     };
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
     shader.set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-    if (boost::ends_with(sidebar_field, "x") || uniform_scale) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
+    if (boost::ends_with(sidebar_field, "x") || uniform_scale)
       render_sidebar_scale_hint(X, shader, view_matrix, matrix * Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitZ()));
-#else
-        glsafe(::glPushMatrix());
-        glsafe(::glRotated(-90.0, 0.0, 0.0, 1.0));
-        render_sidebar_scale_hint(X);
-        glsafe(::glPopMatrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-    }
 
-    if (boost::ends_with(sidebar_field, "y") || uniform_scale) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
+    if (boost::ends_with(sidebar_field, "y") || uniform_scale)
         render_sidebar_scale_hint(Y, shader, view_matrix, matrix);
-#else
-        glsafe(::glPushMatrix());
-        render_sidebar_scale_hint(Y);
-        glsafe(::glPopMatrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-    }
 
-    if (boost::ends_with(sidebar_field, "z") || uniform_scale) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
+    if (boost::ends_with(sidebar_field, "z") || uniform_scale)
       render_sidebar_scale_hint(Z, shader, view_matrix, matrix * Geometry::rotation_transform(0.5 * PI * Vec3d::UnitX()));
-#else
-        glsafe(::glPushMatrix());
-        glsafe(::glRotated(90.0, 1.0, 0.0, 0.0));
-        render_sidebar_scale_hint(Z);
-        glsafe(::glPopMatrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-    }
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Selection::render_sidebar_layers_hints(const std::string& sidebar_field, GLShaderProgram& shader)
-#else
-void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     static const float Margin = 10.0f;
 
@@ -2856,29 +2572,19 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
 
     const BoundingBoxf3& box = get_bounding_box();
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    const float min_x = float(box.min.x()) - Margin;
-    const float max_x = float(box.max.x()) + Margin;
-    const float min_y = float(box.min.y()) - Margin;
-    const float max_y = float(box.max.y()) + Margin;
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
     // view dependend order of rendering to keep correct transparency
     const bool camera_on_top = wxGetApp().plater()->get_camera().is_looking_downward();
     const float z1 = camera_on_top ? min_z : max_z;
     const float z2 = camera_on_top ? max_z : min_z;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Vec3f p1 = { float(box.min.x()) - Margin, float(box.min.y()) - Margin, z1 };
     const Vec3f p2 = { float(box.max.x()) + Margin, float(box.max.y()) + Margin, z2 };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_CULL_FACE));
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_planes.models[0].is_initialized() || !is_approx(m_planes.check_points[0], p1)) {
         m_planes.check_points[0] = p1;
         m_planes.models[0].reset();
@@ -2931,23 +2637,6 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
     m_planes.models[0].render();
     m_planes.models[1].set_color((camera_on_top && type == 2) || (!camera_on_top && type == 1) ? SOLID_PLANE_COLOR : TRANSPARENT_PLANE_COLOR);
     m_planes.models[1].render();
-#else
-    ::glBegin(GL_QUADS);
-    ::glColor4fv((camera_on_top && type == 1) || (!camera_on_top && type == 2) ? SOLID_PLANE_COLOR.data() : TRANSPARENT_PLANE_COLOR.data());
-    ::glVertex3f(min_x, min_y, z1);
-    ::glVertex3f(max_x, min_y, z1);
-    ::glVertex3f(max_x, max_y, z1);
-    ::glVertex3f(min_x, max_y, z1);
-    glsafe(::glEnd());
-
-    ::glBegin(GL_QUADS);
-    ::glColor4fv((camera_on_top && type == 2) || (!camera_on_top && type == 1) ? SOLID_PLANE_COLOR.data() : TRANSPARENT_PLANE_COLOR.data());
-    ::glVertex3f(min_x, min_y, z2);
-    ::glVertex3f(max_x, min_y, z2);
-    ::glVertex3f(max_x, max_y, z2);
-    ::glVertex3f(min_x, max_y, z2);
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_CULL_FACE));
     glsafe(::glDisable(GL_BLEND));

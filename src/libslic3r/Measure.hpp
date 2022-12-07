@@ -93,20 +93,18 @@ public:
     // Construct the measurement object on a given its.
     explicit Measuring(const indexed_triangle_set& its);
     ~Measuring();
-    
-    // Return a reference to a list of all features identified on the its.
-    // Use only for debugging. Expensive, do not call often.
-    std::vector<SurfaceFeature> get_all_features() const;
+
 
     // Given a face_idx where the mouse cursor points, return a feature that
     // should be highlighted (if any).
     std::optional<SurfaceFeature> get_feature(size_t face_idx, const Vec3d& point) const;
 
-    // Returns a list of triangle indices for each identified plane. Each
-    // Plane object contains an index into this vector. Expensive, do not
-    // call too often.
-    std::vector<std::vector<int>> get_planes_triangle_indices() const;
-    
+    // Return total number of planes.
+    int get_num_of_planes() const;
+
+    // Returns a list of triangle indices for given plane.
+    const std::vector<int>& get_plane_triangle_indices(int idx) const;
+
     // Returns the surface features of the plane with the given index
     const std::vector<SurfaceFeature>& get_plane_features(unsigned int plane_id) const;
 

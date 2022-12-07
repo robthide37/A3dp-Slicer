@@ -15,37 +15,15 @@ namespace Slic3r {
 class TriangleMesh;
 class Polygon;
 using Polygons = std::vector<Polygon>;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 class BuildVolume;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 namespace GUI {
 
     class GLModel
     {
     public:
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        enum class EPrimitiveType : unsigned char
-        {
-            Triangles,
-            Lines,
-            LineStrip,
-            LineLoop
-        };
-
-        struct RenderData
-        {
-            EPrimitiveType type;
-            unsigned int vbo_id{ 0 };
-            unsigned int ibo_id{ 0 };
-            size_t indices_count{ 0 };
-            ColorRGBA color;
-        };
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
         struct Geometry
         {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             enum class EPrimitiveType : unsigned char
             {
                 Points,
@@ -175,28 +153,8 @@ namespace GUI {
 #if ENABLE_OPENGL_ES
             static bool has_extra(const Format& format);
 #endif // ENABLE_OPENGL_ES
-#else
-            struct Entity
-            {
-                EPrimitiveType type;
-                std::vector<Vec3f> positions;
-                std::vector<Vec3f> normals;
-                std::vector<unsigned int> indices;
-                ColorRGBA color;
-            };
-
-            std::vector<Entity> entities;
-
-            size_t vertices_count() const;
-            size_t vertices_size_floats() const { return vertices_count() * 6; }
-            size_t vertices_size_bytes() const { return vertices_size_floats() * sizeof(float); }
-
-            size_t indices_count() const;
-            size_t indices_size_bytes() const { return indices_count() * sizeof(unsigned int); }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         };
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         struct RenderData
         {
             Geometry geometry;
@@ -208,10 +166,8 @@ namespace GUI {
             size_t vertices_count{ 0 };
             size_t indices_count{ 0 };
         };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     private:
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLMODEL_STATISTICS
         struct Statistics
         {
@@ -245,9 +201,6 @@ namespace GUI {
         // enable_render()
         // to keep the data on cpu side until needed.
         bool m_render_disabled{ false };
-#else
-        std::vector<RenderData> m_render_data;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         BoundingBoxf3 m_bounding_box;
         std::string m_filename;
 
@@ -255,7 +208,6 @@ namespace GUI {
         GLModel() = default;
         virtual ~GLModel() { reset(); }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         size_t vertices_count() const { return m_render_data.vertices_count > 0 ?
             m_render_data.vertices_count : m_render_data.geometry.vertices_count(); }
         size_t indices_count() const { return m_render_data.indices_count > 0 ?
@@ -274,42 +226,24 @@ namespace GUI {
 #else
         void init_from(const TriangleMesh& mesh);
 #endif // ENABLE_SMOOTH_NORMALS
-#else
-        void init_from(const Geometry& data);
-        void init_from(const indexed_triangle_set& its, const BoundingBoxf3& bbox);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         void init_from(const indexed_triangle_set& its);
         void init_from(const Polygons& polygons, float z);
         bool init_from_file(const std::string& filename);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         void set_color(const ColorRGBA& color) { m_render_data.geometry.color = color; }
         const ColorRGBA& get_color() const { return m_render_data.geometry.color; }
-#else
-        // if entity_id == -1 set the color of all entities
-        void set_color(int entity_id, const ColorRGBA& color);
-        ColorRGBA get_color(size_t entity_id = 0U) const;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         void reset();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         void render();
         void render(const std::pair<size_t, size_t>& range);
         void render_instanced(unsigned int instances_vbo, unsigned int instances_count);
 
         bool is_initialized() const { return vertices_count() > 0 && indices_count() > 0; }
         bool is_empty() const { return m_render_data.geometry.is_empty(); }
-#else
-        void render() const;
-        void render_instanced(unsigned int instances_vbo, unsigned int instances_count) const;
-
-        bool is_initialized() const { return !m_render_data.empty(); }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         const BoundingBoxf3& get_bounding_box() const { return m_bounding_box; }
         const std::string& get_filename() const { return m_filename; }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         bool is_render_disabled() const { return m_render_disabled; }
         void enable_render() { m_render_disabled = false; }
         void disable_render() { m_render_disabled = true; }
@@ -338,19 +272,12 @@ namespace GUI {
             s_statistics.render_instanced_calls = 0;
         }
 #endif // ENABLE_GLMODEL_STATISTICS
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     private:
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         bool send_to_gpu();
-#else
-        void send_to_gpu(RenderData& data, const std::vector<float>& vertices, const std::vector<unsigned int>& indices);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     };
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     bool contains(const BuildVolume& volume, const GLModel& model, bool ignore_bottom = true);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // create an arrow with cylindrical stem and conical tip, with the given dimensions and resolution
     // the origin of the arrow is in the center of the stem cap
@@ -375,7 +302,6 @@ namespace GUI {
     // the diamond is contained into a box with size [1, 1, 1]
     GLModel::Geometry diamond(unsigned int resolution);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     // create a sphere with smooth normals
     // the origin of the sphere is in its center
     GLModel::Geometry smooth_sphere(unsigned int resolution, float radius);
@@ -387,7 +313,6 @@ namespace GUI {
     // the axis of the torus is the Z axis
     // the origin of the torus is in its center
     GLModel::Geometry smooth_torus(unsigned int primary_resolution, unsigned int secondary_resolution, float radius, float thickness);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace GUI
 } // namespace Slic3r

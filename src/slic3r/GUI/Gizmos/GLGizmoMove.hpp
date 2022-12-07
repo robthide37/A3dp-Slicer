@@ -25,14 +25,12 @@ class GLGizmoMove3D : public GLGizmoBase
     Vec3d m_starting_box_center{ Vec3d::Zero() };
     Vec3d m_starting_box_bottom_center{ Vec3d::Zero() };
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     struct GrabberConnection
     {
         GLModel model;
         Vec3d old_center{ Vec3d::Zero() };
     };
     std::array<GrabberConnection, 3> m_grabber_connections;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 public:
     GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
@@ -68,11 +66,7 @@ protected:
 private:
     double calc_projection(const UpdateData& data) const;
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     Transform3d local_transform(const Selection& selection) const;
-#else
-    void transform_to_local(const Selection& selection) const;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void calc_selection_box_and_center();
 #endif // ENABLE_WORLD_COORDINATE
 };

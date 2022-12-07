@@ -217,35 +217,19 @@ void InstancesHider::render_cut() const
         else
             clipper->set_limiting_plane(ClippingPlane::ClipsNothing());
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        glsafe(::glPushMatrix());
-        if (mv->is_model_part())
-            glsafe(::glColor3f(0.8f, 0.3f, 0.0f));
-        else {
-            const ColorRGBA color = color_from_model_volume(*mv);
-            glsafe(::glColor4fv(color.data()));
-        }
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
         bool depth_test_enabled = ::glIsEnabled(GL_DEPTH_TEST);
 #else
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
 #endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
         glsafe(::glDisable(GL_DEPTH_TEST));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         clipper->render_cut(mv->is_model_part() ? ColorRGBA(0.8f, 0.3f, 0.0f, 1.0f) : color_from_model_volume(*mv));
-#else
-        clipper->render_cut();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
         if (depth_test_enabled)
             glsafe(::glEnable(GL_DEPTH_TEST));
 #else
         glsafe(::glPopAttrib());
 #endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
         ++clipper_id;
     }
@@ -445,16 +429,8 @@ void ObjectClipper::render_cut() const
         clipper->set_plane(*m_clp);
         clipper->set_transformation(trafo);
         clipper->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         clipper->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f });
         clipper->render_contour({ 1.f, 1.f, 1.f, 1.f});
-#else
-        glsafe(::glPushMatrix());
-        glsafe(::glColor3f(1.0f, 0.37f, 0.0f));
-        clipper->render_cut();
-        glsafe(::glColor3f(1.f, 1.f, 1.f));
-        clipper->render_contour();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         ++clipper_id;
     }
@@ -602,16 +578,8 @@ void SupportsClipper::render_cut() const
     m_clipper->set_plane(*ocl->get_clipping_plane());
     m_clipper->set_transformation(supports_trafo);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_clipper->render_cut({ 1.0f, 0.f, 0.37f, 1.0f });
     m_clipper->render_contour({ 1.f, 1.f, 1.f, 1.f });
-#else
-    glsafe(::glPushMatrix());
-    glsafe(::glColor3f(1.0f, 0.f, 0.37f));
-    m_clipper->render_cut();
-    glsafe(::glColor3f(1.0f, 1.f, 1.f));
-    m_clipper->render_contour();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 

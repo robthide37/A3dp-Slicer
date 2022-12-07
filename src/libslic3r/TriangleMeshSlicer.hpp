@@ -130,6 +130,6 @@ void cut_mesh(
     indexed_triangle_set            *lower,
     bool                             triangulate_caps = true);
 
-}
+} // namespace Slic3r
 
 #endif // slic3r_TriangleMeshSlicer_hpp_

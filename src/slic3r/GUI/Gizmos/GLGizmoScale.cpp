@@ -5,9 +5,7 @@
 #if ENABLE_WORLD_COORDINATE
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #endif // ENABLE_WORLD_COORDINATE
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #include "libslic3r/Model.hpp"
 
 #include <GL/glew.h>
@@ -29,7 +27,6 @@ GLGizmoScale3D::GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filen
     , m_drag_color(DEFAULT_DRAG_COLOR)
     , m_highlight_color(DEFAULT_HIGHLIGHT_COLOR)
 {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_grabber_connections[0].grabber_indices = { 0, 1 };
     m_grabber_connections[1].grabber_indices = { 2, 3 };
     m_grabber_connections[2].grabber_indices = { 4, 5 };
@@ -37,7 +34,6 @@ GLGizmoScale3D::GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filen
     m_grabber_connections[4].grabber_indices = { 7, 8 }; 
     m_grabber_connections[5].grabber_indices = { 8, 9 };
     m_grabber_connections[6].grabber_indices = { 9, 6 };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 std::string GLGizmoScale3D::get_tooltip() const
@@ -380,15 +376,10 @@ void GLGizmoScale3D::on_render()
         glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Transform3d base_matrix = local_transform(selection);
     for (int i = 0; i < 10; ++i) {
         m_grabbers[i].matrix = base_matrix;
     }
-#else
-    glsafe(::glPushMatrix());
-    transform_to_local(selection);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const float grabber_mean_size = (float)((m_bounding_box.size().x() + m_bounding_box.size().y() + m_bounding_box.size().z()) / 3.0);
 #else
@@ -397,7 +388,6 @@ void GLGizmoScale3D::on_render()
 #endif // ENABLE_WORLD_COORDINATE
 
     if (m_hover_id == -1) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
         GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
@@ -431,32 +421,11 @@ void GLGizmoScale3D::on_render()
             render_grabbers_connection(9, 6, m_base_color);
             shader->stop_using();
         }
-#else
-        // draw connections
-        if (m_grabbers[0].enabled && m_grabbers[1].enabled) {
-            glsafe(::glColor4fv(m_grabbers[0].color.data()));
-            render_grabbers_connection(0, 1);
-        }
-        if (m_grabbers[2].enabled && m_grabbers[3].enabled) {
-            glsafe(::glColor4fv(m_grabbers[2].color.data()));
-            render_grabbers_connection(2, 3);
-        }
-        if (m_grabbers[4].enabled && m_grabbers[5].enabled) {
-            glsafe(::glColor4fv(m_grabbers[4].color.data()));
-            render_grabbers_connection(4, 5);
-        }
-        glsafe(::glColor4fv(m_base_color.data()));
-        render_grabbers_connection(6, 7);
-        render_grabbers_connection(7, 8);
-        render_grabbers_connection(8, 9);
-        render_grabbers_connection(9, 6);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // draw grabbers
         render_grabbers(grabber_mean_size);
     }
     else if ((m_hover_id == 0 || m_hover_id == 1) && m_grabbers[0].enabled && m_grabbers[1].enabled) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
         GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
@@ -484,14 +453,6 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         shader = wxGetApp().get_shader("gouraud_light");
-#else
-        // draw connection
-        glsafe(::glColor4fv(AXES_COLOR[0].data()));
-        render_grabbers_connection(0, 1);
-
-        // draw grabbers
-        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -501,7 +462,6 @@ void GLGizmoScale3D::on_render()
         }
     }
     else if ((m_hover_id == 2 || m_hover_id == 3) && m_grabbers[2].enabled && m_grabbers[3].enabled) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
         GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
@@ -529,14 +489,6 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         shader = wxGetApp().get_shader("gouraud_light");
-#else
-        // draw connection
-        glsafe(::glColor4fv(AXES_COLOR[1].data()));
-        render_grabbers_connection(2, 3);
-
-        // draw grabbers
-        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -546,7 +498,6 @@ void GLGizmoScale3D::on_render()
         }
     }
     else if ((m_hover_id == 4 || m_hover_id == 5) && m_grabbers[4].enabled && m_grabbers[5].enabled) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
         GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
@@ -574,14 +525,6 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         shader = wxGetApp().get_shader("gouraud_light");
-#else
-        // draw connection
-        glsafe(::glColor4fv(AXES_COLOR[2].data()));
-        render_grabbers_connection(4, 5);
-
-        // draw grabbers
-        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -591,7 +534,6 @@ void GLGizmoScale3D::on_render()
         }
     }
     else if (m_hover_id >= 6) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
         GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
@@ -622,17 +564,6 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         shader = wxGetApp().get_shader("gouraud_light");
-#else
-        // draw connection
-        glsafe(::glColor4fv(m_drag_color.data()));
-        render_grabbers_connection(6, 7);
-        render_grabbers_connection(7, 8);
-        render_grabbers_connection(8, 9);
-        render_grabbers_connection(9, 6);
-
-        // draw grabbers
-        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -642,12 +573,6 @@ void GLGizmoScale3D::on_render()
             shader->stop_using();
         }
     }
-
-#if ENABLE_WORLD_COORDINATE
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-#endif // ENABLE_WORLD_COORDINATE
 }
 
 void GLGizmoScale3D::on_register_raycasters_for_picking()
@@ -661,7 +586,6 @@ void GLGizmoScale3D::on_unregister_raycasters_for_picking()
     m_parent.set_raycaster_gizmos_on_top(false);
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color)
 {
     auto grabber_connection = [this](unsigned int id_1, unsigned int id_2) {
@@ -701,18 +625,6 @@ void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int 
     m_grabber_connections[id].model.set_color(color);
     m_grabber_connections[id].model.render();
 }
-#else
-void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int id_2) const
-{
-    unsigned int grabbers_count = (unsigned int)m_grabbers.size();
-    if (id_1 < grabbers_count && id_2 < grabbers_count) {
-        ::glBegin(GL_LINES);
-        ::glVertex3dv(m_grabbers[id_1].center.data());
-        ::glVertex3dv(m_grabbers[id_2].center.data());
-        glsafe(::glEnd());
-    }
-}
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_WORLD_COORDINATE
 void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
@@ -884,7 +796,6 @@ double GLGizmoScale3D::calc_ratio(const UpdateData& data) const
 }
 
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 Transform3d GLGizmoScale3D::local_transform(const Selection& selection) const
 {
     Transform3d ret = Geometry::translation_transform(m_center);
@@ -897,19 +808,6 @@ Transform3d GLGizmoScale3D::local_transform(const Selection& selection) const
     }
     return ret;
 }
-#else
-void GLGizmoScale3D::transform_to_local(const Selection& selection) const
-{
-    glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
-
-    if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
-        Transform3d orient_matrix = selection.get_first_volume()->get_instance_transformation().get_matrix(true, false, true, true);
-        if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
-            orient_matrix = orient_matrix * selection.get_first_volume()->get_volume_transformation().get_matrix(true, false, true, true);
-        glsafe(::glMultMatrixd(orient_matrix.data()));
-    }
-}
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_WORLD_COORDINATE
 
 } // namespace GUI

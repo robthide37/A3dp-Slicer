@@ -179,18 +179,13 @@ void GLGizmoRotate::on_render()
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_grabbers.front().matrix = local_transform(selection);
-#else
-    glsafe(::glPushMatrix());
-    transform_to_local(selection);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_CORE_PROFILE
     if (!OpenGLManager::get_gl_info().is_core_profile())
 #endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
+
 #if ENABLE_GL_CORE_PROFILE
     GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
 #else
@@ -228,32 +223,12 @@ void GLGizmoRotate::on_render()
         render_grabber_connection(color, radius_changed);
         shader->stop_using();
     }
-#else
-    glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color.data() : m_highlight_color.data()));
-
-    render_circle();
-
-    if (m_hover_id != -1) {
-        render_scale();
-        render_snap_radii();
-        render_reference_radius();
-    }
-
-    glsafe(::glColor4fv(m_highlight_color.data()));
-
-    if (m_hover_id != -1)
-        render_angle();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_WORLD_COORDINATE
     render_grabber(m_bounding_box);
 #else
     render_grabber(box);
 #endif // ENABLE_WORLD_COORDINATE
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 #if ENABLE_WORLD_COORDINATE
@@ -336,13 +311,8 @@ void GLGizmoRotate3D::load_rotoptimize_state()
     }
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoRotate::render_circle(const ColorRGBA& color, bool radius_changed)
-#else
-void GLGizmoRotate::render_circle() const
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_circle.is_initialized() || radius_changed) {
         m_circle.reset();
 
@@ -363,29 +333,13 @@ void GLGizmoRotate::render_circle() const
 
     m_circle.set_color(color);
     m_circle.render();
-#else
-    ::glBegin(GL_LINE_LOOP);
-    for (unsigned int i = 0; i < ScaleStepsCount; ++i) {
-        const float angle = float(i) * ScaleStepRad;
-        const float x = ::cos(angle) * m_radius;
-        const float y = ::sin(angle) * m_radius;
-        const float z = 0.0f;
-        ::glVertex3f((GLfloat)x, (GLfloat)y, (GLfloat)z);
-    }
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoRotate::render_scale(const ColorRGBA& color, bool radius_changed)
-#else
-void GLGizmoRotate::render_scale() const
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     const float out_radius_long = m_snap_fine_out_radius;
     const float out_radius_short = m_radius * (1.0f + 0.5f * ScaleLongTooth);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_scale.is_initialized() || radius_changed) {
         m_scale.reset();
 
@@ -417,36 +371,14 @@ void GLGizmoRotate::render_scale() const
 
     m_scale.set_color(color);
     m_scale.render();
-#else
-    ::glBegin(GL_LINES);
-    for (unsigned int i = 0; i < ScaleStepsCount; ++i) {
-        const float angle = (float)i * ScaleStepRad;
-        const float cosa = ::cos(angle);
-        const float sina = ::sin(angle);
-        const float in_x = cosa * m_radius;
-        const float in_y = sina * m_radius;
-        const float in_z = 0.0f;
-        const float out_x = (i % ScaleLongEvery == 0) ? cosa * out_radius_long : cosa * out_radius_short;
-        const float out_y = (i % ScaleLongEvery == 0) ? sina * out_radius_long : sina * out_radius_short;
-        const float out_z = 0.0f;
-        ::glVertex3f((GLfloat)in_x, (GLfloat)in_y, (GLfloat)in_z);
-        ::glVertex3f((GLfloat)out_x, (GLfloat)out_y, (GLfloat)out_z);
-    }
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoRotate::render_snap_radii(const ColorRGBA& color, bool radius_changed)
-#else
-void GLGizmoRotate::render_snap_radii() const
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     const float step = 2.0f * float(PI) / float(SnapRegionsCount);
     const float in_radius = m_radius / 3.0f;
     const float out_radius = 2.0f * in_radius;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_snap_radii.is_initialized() || radius_changed) {
         m_snap_radii.reset();
 
@@ -478,26 +410,8 @@ void GLGizmoRotate::render_snap_radii() const
 
     m_snap_radii.set_color(color);
     m_snap_radii.render();
-#else
-    ::glBegin(GL_LINES);
-    for (unsigned int i = 0; i < SnapRegionsCount; ++i) {
-        const float angle = (float)i * step;
-        const float cosa = ::cos(angle);
-        const float sina = ::sin(angle);
-        const float in_x = cosa * in_radius;
-        const float in_y = sina * in_radius;
-        const float in_z = 0.0f;
-        const float out_x = cosa * out_radius;
-        const float out_y = sina * out_radius;
-        const float out_z = 0.0f;
-        ::glVertex3f((GLfloat)in_x, (GLfloat)in_y, (GLfloat)in_z);
-        ::glVertex3f((GLfloat)out_x, (GLfloat)out_y, (GLfloat)out_z);
-    }
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoRotate::render_reference_radius(const ColorRGBA& color, bool radius_changed)
 {
     if (!m_reference_radius.is_initialized() || radius_changed) {
@@ -521,26 +435,12 @@ void GLGizmoRotate::render_reference_radius(const ColorRGBA& color, bool radius_
     m_reference_radius.set_color(color);
     m_reference_radius.render();
 }
-#else
-void GLGizmoRotate::render_reference_radius() const
-{
-    ::glBegin(GL_LINES);
-    ::glVertex3f(0.0f, 0.0f, 0.0f);
-    ::glVertex3f((GLfloat)(m_radius * (1.0f + GrabberOffset)), 0.0f, 0.0f);
-    glsafe(::glEnd());
-}
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoRotate::render_angle_arc(const ColorRGBA& color, bool radius_changed)
-#else
-void GLGizmoRotate::render_angle() const
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     const float step_angle = float(m_angle) / float(AngleResolution);
     const float ex_radius = m_radius * (1.0f + GrabberOffset);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const bool angle_changed = std::abs(m_old_angle - m_angle) > EPSILON;
     m_old_angle = m_angle;
 
@@ -565,20 +465,8 @@ void GLGizmoRotate::render_angle() const
 
     m_angle_arc.set_color(color);
     m_angle_arc.render();
-#else
-    ::glBegin(GL_LINE_STRIP);
-    for (unsigned int i = 0; i <= AngleResolution; ++i) {
-        const float angle = float(i) * step_angle;
-        const float x = ::cos(angle) * ex_radius;
-        const float y = ::sin(angle) * ex_radius;
-        const float z = 0.0f;
-        ::glVertex3f((GLfloat)x, (GLfloat)y, (GLfloat)z);
-    }
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoRotate::render_grabber_connection(const ColorRGBA& color, bool radius_changed)
 {
     if (!m_grabber_connection.model.is_initialized() || radius_changed || !m_grabber_connection.old_center.isApprox(m_grabbers.front().center)) {
@@ -603,28 +491,13 @@ void GLGizmoRotate::render_grabber_connection(const ColorRGBA& color, bool radiu
     m_grabber_connection.model.set_color(color);
     m_grabber_connection.model.render();
 }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 void GLGizmoRotate::render_grabber(const BoundingBoxf3& box)
 {
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    const double grabber_radius = double(m_radius) * (1.0 + double(GrabberOffset));
-    m_grabbers[0].center = Vec3d(::cos(m_angle) * grabber_radius, ::sin(m_angle) * grabber_radius, 0.0);
-    m_grabbers[0].angles.z() = m_angle;
-
-    glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color.data() : m_highlight_color.data()));
-
-    ::glBegin(GL_LINES);
-    ::glVertex3f(0.0f, 0.0f, 0.0f);
-    ::glVertex3dv(m_grabbers[0].center.data());
-    glsafe(::glEnd());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
     m_grabbers.front().color = m_highlight_color;
     render_grabbers(box);
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
 {
     Transform3d ret;
@@ -666,43 +539,6 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
     return Geometry::assemble_transform(m_center) * ret;
 #endif // ENABLE_WORLD_COORDINATE
 }
-#else
-void GLGizmoRotate::transform_to_local(const Selection& selection) const
-{
-    glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
-
-#if ENABLE_WORLD_COORDINATE
-    glsafe(::glMultMatrixd(m_orient_matrix.data()));
-#else
-    if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes()) {
-        const Transform3d orient_matrix = selection.get_first_volume()->get_instance_transformation().get_matrix(true, false, true, true);
-        glsafe(::glMultMatrixd(orient_matrix.data()));
-    }
-#endif // ENABLE_WORLD_COORDINATE
-
-    switch (m_axis)
-    {
-    case X:
-    {
-        glsafe(::glRotatef(90.0f, 0.0f, 1.0f, 0.0f));
-        glsafe(::glRotatef(-90.0f, 0.0f, 0.0f, 1.0f));
-        break;
-    }
-    case Y:
-    {
-        glsafe(::glRotatef(-90.0f, 0.0f, 0.0f, 1.0f));
-        glsafe(::glRotatef(-90.0f, 0.0f, 1.0f, 0.0f));
-        break;
-    }
-    default:
-    case Z:
-    {
-        // no rotation
-        break;
-    }
-    }
-}
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_WORLD_COORDINATE
 Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray) const
