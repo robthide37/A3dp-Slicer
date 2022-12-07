@@ -22,7 +22,7 @@ namespace GUI {
 
 void MeshClipper::set_behaviour(bool fill_cut, double contour_width)
 {
-    if (fill_cut != m_fill_cut || is_approx(contour_width, m_contour_width))
+    if (fill_cut != m_fill_cut || ! is_approx(contour_width, m_contour_width))
         m_result.reset();
     m_fill_cut = fill_cut;
     m_contour_width = contour_width;
