@@ -679,7 +679,7 @@ OrthoProject3d priv::create_emboss_projection(
     bool is_outside, float emboss, Transform3d tr, SurfaceCut &cut)
 {
     // Offset of clossed side to model
-    const float surface_offset = 1e-3f; // [in mm]
+    const float surface_offset = 0.015f; // [in mm]
     float 
         front_move = (is_outside) ? emboss : surface_offset,
         back_move  = -((is_outside) ? surface_offset : emboss);    
