@@ -7,11 +7,7 @@
 #include "libslic3r/AABBMesh.hpp"
 #include "admesh/stl.h"
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GLModel.hpp"
-#else
-#include "slic3r/GUI/3DScene.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <cfloat>
 #include <optional>
@@ -102,12 +98,8 @@ public:
 
     // Render the triangulated cut. Transformation matrices should
     // be set in world coords.
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_cut(const ColorRGBA& color);
     void render_contour(const ColorRGBA& color);
-#else
-    void render_cut();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     void pass_mouse_click(const Vec3d& pt);
 
@@ -122,7 +114,6 @@ private:
     const TriangleMesh* m_negative_mesh = nullptr;
     ClippingPlane m_plane;
     ClippingPlane m_limiting_plane = ClippingPlane::ClipsNothing();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 
     struct CutIsland {
         GLModel model;
@@ -136,11 +127,6 @@ private:
         Transform3d trafo; // this rotates the cut into world coords
     };
     std::optional<ClipResult> m_result;
-    
-#else
-    #error NOT IMLEMENTED
-    GLIndexedVertexArray m_vertex_array;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     bool m_fill_cut = true;
     double m_contour_width = 0.;
 };

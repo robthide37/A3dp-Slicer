@@ -60,7 +60,6 @@ namespace GUI {
             return;
 
         const Size cnv_size = canvas.get_canvas_size();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         const float cnv_width = (float)cnv_size.get_width();
         const float cnv_height = (float)cnv_size.get_height();
         if (cnv_width == 0.0f || cnv_height == 0.0f)
@@ -72,48 +71,14 @@ namespace GUI {
         const float right = 2.0f * (get_right() * cnv_inv_width - 0.5f);
         const float top = -2.0f * (get_top() * cnv_inv_height - 0.5f);
         const float bottom = -2.0f * (get_bottom() * cnv_inv_height - 0.5f);
-#else
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        const float inv_zoom = (float)camera.get_inv_zoom();
-
-        const float cnv_half_width = 0.5f * (float)cnv_size.get_width();
-        const float cnv_half_height = 0.5f * (float)cnv_size.get_height();
-        if (cnv_half_width == 0.0f || cnv_half_height == 0.0f)
-            return;
-
-        const Vec2d start(m_start_corner.x() - cnv_half_width, cnv_half_height - m_start_corner.y());
-        const Vec2d end(m_end_corner.x() - cnv_half_width, cnv_half_height - m_end_corner.y());
-
-        const float left   = (float)std::min(start.x(), end.x()) * inv_zoom;
-        const float top    = (float)std::max(start.y(), end.y()) * inv_zoom;
-        const float right  = (float)std::max(start.x(), end.x()) * inv_zoom;
-        const float bottom = (float)std::min(start.y(), end.y()) * inv_zoom;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_CORE_PROFILE
         const bool core_profile = OpenGLManager::get_gl_info().is_core_profile();
         if (!core_profile)
 #endif // ENABLE_GL_CORE_PROFILE
             glsafe(::glLineWidth(1.5f));
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        float color[3];
-        color[0] = (m_state == EState::Select) ? 0.3f : 1.0f;
-        color[1] = (m_state == EState::Select) ? 1.0f : 0.3f;
-        color[2] = 0.3f;
-        glsafe(::glColor3fv(color));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
         glsafe(::glDisable(GL_DEPTH_TEST));
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        glsafe(::glPushMatrix());
-        glsafe(::glLoadIdentity());
-        // ensure that the rectangle is renderered inside the frustrum
-        glsafe(::glTranslated(0.0, 0.0, -(camera.get_near_z() + 0.5)));
-        // ensure that the overlay fits the frustrum near z plane
-        const double gui_scale = camera.get_gui_scale();
-        glsafe(::glScaled(gui_scale, gui_scale, 1.0));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if !ENABLE_OPENGL_ES
 #if ENABLE_GL_CORE_PROFILE
@@ -127,7 +92,6 @@ namespace GUI {
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // !ENABLE_OPENGL_ES
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_OPENGL_ES
         GLShaderProgram* shader = wxGetApp().get_shader("dashed_lines");
 #elif ENABLE_GL_CORE_PROFILE
@@ -210,14 +174,6 @@ namespace GUI {
             m_rectangle.render();
             shader->stop_using();
         }
-#else
-        ::glBegin(GL_LINE_LOOP);
-        ::glVertex2f((GLfloat)left, (GLfloat)bottom);
-        ::glVertex2f((GLfloat)right, (GLfloat)bottom);
-        ::glVertex2f((GLfloat)right, (GLfloat)top);
-        ::glVertex2f((GLfloat)left, (GLfloat)top);
-        glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if !ENABLE_OPENGL_ES
 #if ENABLE_GL_CORE_PROFILE
@@ -225,10 +181,6 @@ namespace GUI {
 #endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glPopAttrib());
 #endif // !ENABLE_OPENGL_ES
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
 } // namespace GUI

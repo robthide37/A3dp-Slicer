@@ -128,7 +128,6 @@ bool GLGizmosManager::init()
     return true;
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 bool GLGizmosManager::init_arrow(const std::string& filename)
 {
     if (m_arrow_texture.get_id() != 0)
@@ -137,23 +136,6 @@ bool GLGizmosManager::init_arrow(const std::string& filename)
     const std::string path = resources_dir() + "/icons/";
     return (!filename.empty()) ? m_arrow_texture.load_from_svg_file(path + filename, false, false, false, 512) : false;
 }
-#else
-bool GLGizmosManager::init_arrow(const BackgroundTexture::Metadata & arrow_texture)
-{
-    if (m_arrow_texture.texture.get_id() != 0)
-        return true;
-
-    std::string path = resources_dir() + "/icons/";
-    bool res = false;
-
-    if (!arrow_texture.filename.empty())
-        res = m_arrow_texture.texture.load_from_svg_file(path + arrow_texture.filename, false, false, false, 1000);
-    if (res)
-        m_arrow_texture.metadata = arrow_texture;
-
-    return res;
-}
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 void GLGizmosManager::set_overlay_icon_size(float size)
 {
@@ -678,7 +660,6 @@ void GLGizmosManager::update_after_undo_redo(const UndoRedo::Snapshot& snapshot)
         dynamic_cast<GLGizmoSlaSupports*>(m_gizmos[SlaSupports].get())->reslice_until_step(slaposPad, true);
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmosManager::render_background(float left, float top, float right, float bottom, float border_w, float border_h) const
 {
     const unsigned int tex_id = m_background_texture.texture.get_id();
@@ -731,62 +712,7 @@ void GLGizmosManager::render_background(float left, float top, float right, floa
         GLTexture::render_sub_texture(tex_id, internal_right, right, bottom, internal_bottom, { { internal_right_uv, bottom_uv }, { right_uv, bottom_uv }, { right_uv, internal_bottom_uv }, { internal_right_uv, internal_bottom_uv } });
     }
 }
-#else
-void GLGizmosManager::render_background(float left, float top, float right, float bottom, float border) const
-{
-    const unsigned int tex_id = m_background_texture.texture.get_id();
-    const float tex_width = float(m_background_texture.texture.get_width());
-    const float tex_height = float(m_background_texture.texture.get_height());
-    if (tex_id != 0 && tex_width > 0 && tex_height > 0) {
-        const float inv_tex_width = (tex_width != 0.0f) ? 1.0f / tex_width : 0.0f;
-        const float inv_tex_height = (tex_height != 0.0f) ? 1.0f / tex_height : 0.0f;
 
-        const float internal_left = left + border;
-        const float internal_right = right - border;
-        const float internal_top = top - border;
-        const float internal_bottom = bottom + border;
-
-        // float left_uv = 0.0f;
-        const float right_uv = 1.0f;
-        const float top_uv = 1.0f;
-        const float bottom_uv = 0.0f;
-
-        const float internal_left_uv = float(m_background_texture.metadata.left) * inv_tex_width;
-        const float internal_right_uv = 1.0f - float(m_background_texture.metadata.right) * inv_tex_width;
-        const float internal_top_uv = 1.0f - float(m_background_texture.metadata.top) * inv_tex_height;
-        const float internal_bottom_uv = float(m_background_texture.metadata.bottom) * inv_tex_height;
-
-        // top-left corner
-        GLTexture::render_sub_texture(tex_id, left, internal_left, internal_top, top, { { internal_left_uv, internal_bottom_uv }, { internal_right_uv, internal_bottom_uv }, { internal_right_uv, internal_top_uv }, { internal_left_uv, internal_top_uv } });
-
-        // top edge
-        GLTexture::render_sub_texture(tex_id, internal_left, internal_right, internal_top, top, { { internal_left_uv, internal_top_uv }, { internal_right_uv, internal_top_uv }, { internal_right_uv, top_uv }, { internal_left_uv, top_uv } });
-
-        // top-right corner
-        GLTexture::render_sub_texture(tex_id, internal_right, right, internal_top, top, { { internal_right_uv, internal_top_uv }, { right_uv, internal_top_uv }, { right_uv, top_uv }, { internal_right_uv, top_uv } });
-
-        // center-left edge
-        GLTexture::render_sub_texture(tex_id, left, internal_left, internal_bottom, internal_top, { { internal_left_uv, internal_bottom_uv }, { internal_right_uv, internal_bottom_uv }, { internal_right_uv, internal_top_uv }, { internal_left_uv, internal_top_uv } });
-
-        // center
-        GLTexture::render_sub_texture(tex_id, internal_left, internal_right, internal_bottom, internal_top, { { internal_left_uv, internal_bottom_uv }, { internal_right_uv, internal_bottom_uv }, { internal_right_uv, internal_top_uv }, { internal_left_uv, internal_top_uv } });
-
-        // center-right edge
-        GLTexture::render_sub_texture(tex_id, internal_right, right, internal_bottom, internal_top, { { internal_right_uv, internal_bottom_uv }, { right_uv, internal_bottom_uv }, { right_uv, internal_top_uv }, { internal_right_uv, internal_top_uv } });
-
-        // bottom-left corner
-        GLTexture::render_sub_texture(tex_id, left, internal_left, bottom, internal_bottom, { { internal_left_uv, internal_bottom_uv }, { internal_right_uv, internal_bottom_uv }, { internal_right_uv, internal_top_uv }, { internal_left_uv, internal_top_uv } });
-
-        // bottom edge
-        GLTexture::render_sub_texture(tex_id, internal_left, internal_right, bottom, internal_bottom, { { internal_left_uv, bottom_uv }, { internal_right_uv, bottom_uv }, { internal_right_uv, internal_bottom_uv }, { internal_left_uv, internal_bottom_uv } });
-
-        // bottom-right corner
-        GLTexture::render_sub_texture(tex_id, internal_right, right, bottom, internal_bottom, { { internal_right_uv, bottom_uv }, { right_uv, bottom_uv }, { right_uv, internal_bottom_uv }, { internal_right_uv, internal_bottom_uv } });
-    }
-}
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_type) const
 {
     const std::vector<size_t> selectable_idxs = get_selectable_idxs();
@@ -833,48 +759,7 @@ void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_t
         top_y -= stride_y;
     }
 }
-#else
-void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_type) const
-{    
-    std::vector<size_t> selectable_idxs = get_selectable_idxs();
-    if (selectable_idxs.empty())
-        return;
-    float cnv_w = (float)m_parent.get_canvas_size().get_width();
-    float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
-    float height = get_scaled_total_height();
-    float zoomed_border = m_layout.scaled_border() * inv_zoom;
-    float zoomed_top_x = (-0.5f * cnv_w) * inv_zoom;
-    float zoomed_top_y = (0.5f * height) * inv_zoom;
-    zoomed_top_x += zoomed_border;
-    zoomed_top_y -= zoomed_border;
-    float icons_size = m_layout.scaled_icons_size();
-    float zoomed_icons_size = icons_size * inv_zoom;
-    float zoomed_stride_y = m_layout.scaled_stride_y() * inv_zoom;
-    for (size_t idx : selectable_idxs)
-    {
-        if (idx == highlighted_type) {      
-            int tex_width = m_icons_texture.get_width();
-            int tex_height = m_icons_texture.get_height();
-            unsigned int tex_id = m_arrow_texture.texture.get_id();
-            float inv_tex_width = (tex_width != 0.0f) ? 1.0f / tex_width : 0.0f;
-            float inv_tex_height = (tex_height != 0.0f) ? 1.0f / tex_height : 0.0f;
 
-            float internal_left_uv = (float)m_arrow_texture.metadata.left * inv_tex_width;
-            float internal_right_uv = 1.0f - (float)m_arrow_texture.metadata.right * inv_tex_width;
-            float internal_top_uv = 1.0f - (float)m_arrow_texture.metadata.top * inv_tex_height;
-            float internal_bottom_uv = (float)m_arrow_texture.metadata.bottom * inv_tex_height;
-            
-            float arrow_sides_ratio = (float)m_arrow_texture.texture.get_height() / (float)m_arrow_texture.texture.get_width();
-
-            GLTexture::render_sub_texture(tex_id, zoomed_top_x + zoomed_icons_size * 1.2f, zoomed_top_x + zoomed_icons_size * 1.2f + zoomed_icons_size * 2.2f * arrow_sides_ratio, zoomed_top_y - zoomed_icons_size * 1.6f , zoomed_top_y + zoomed_icons_size * 0.6f, { { internal_left_uv, internal_bottom_uv }, { internal_left_uv, internal_top_uv }, { internal_right_uv, internal_top_uv }, { internal_right_uv, internal_bottom_uv } });
-            break;
-        }
-        zoomed_top_y -= zoomed_stride_y;
-    }
-}
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmosManager::do_render_overlay() const
 {
     const std::vector<size_t> selectable_idxs = get_selectable_idxs();
@@ -946,80 +831,6 @@ void GLGizmosManager::do_render_overlay() const
     if (m_current != Undefined)
         m_gizmos[m_current]->render_input_window(get_scaled_total_width(), current_y, cnv_h - wxGetApp().plater()->get_view_toolbar().get_height());
 }
-#else
-void GLGizmosManager::do_render_overlay() const
-{
-    std::vector<size_t> selectable_idxs = get_selectable_idxs();
-    if (selectable_idxs.empty())
-        return;
-
-    const float cnv_w = (float)m_parent.get_canvas_size().get_width();
-    const float cnv_h = (float)m_parent.get_canvas_size().get_height();
-    const float zoom = (float)wxGetApp().plater()->get_camera().get_zoom();
-    const float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
-
-    const float height = get_scaled_total_height();
-    const float width = get_scaled_total_width();
-    const float zoomed_border = m_layout.scaled_border() * inv_zoom;
-
-    float zoomed_top_x = (-0.5f * cnv_w) * inv_zoom;
-    float zoomed_top_y = (0.5f * height) * inv_zoom;
-
-    float zoomed_left = zoomed_top_x;
-    float zoomed_top = zoomed_top_y;
-    float zoomed_right = zoomed_left + width * inv_zoom;
-    float zoomed_bottom = zoomed_top - height * inv_zoom;
-
-    render_background(zoomed_left, zoomed_top, zoomed_right, zoomed_bottom, zoomed_border);
-
-    zoomed_top_x += zoomed_border;
-    zoomed_top_y -= zoomed_border;
-
-    const float icons_size = m_layout.scaled_icons_size();
-    const float zoomed_icons_size = icons_size * inv_zoom;
-    const float zoomed_stride_y = m_layout.scaled_stride_y() * inv_zoom;
-
-    const unsigned int icons_texture_id = m_icons_texture.get_id();
-    const int tex_width = m_icons_texture.get_width();
-    const int tex_height = m_icons_texture.get_height();
-
-    if (icons_texture_id == 0 || tex_width <= 1 || tex_height <= 1)
-        return;
-
-    const float du = (float)(tex_width - 1) / (6.0f * (float)tex_width); // 6 is the number of possible states if the icons
-    const float dv = (float)(tex_height - 1) / (float)(m_gizmos.size() * tex_height);
-
-    // tiles in the texture are spaced by 1 pixel
-    const float u_offset = 1.0f / (float)tex_width;
-    const float v_offset = 1.0f / (float)tex_height;
-
-    float current_y = FLT_MAX;
-    for (size_t idx : selectable_idxs) {
-        GLGizmoBase* gizmo = m_gizmos[idx].get();
-        const unsigned int sprite_id = gizmo->get_sprite_id();
-        // higlighted state needs to be decided first so its highlighting in every other state
-        const int icon_idx = (m_highlight.first == idx ? (m_highlight.second ? 4 : 5) : (m_current == idx) ? 2 : ((m_hover == idx) ? 1 : (gizmo->is_activable()? 0 : 3)));
-
-        const float u_left   = u_offset + icon_idx * du;
-        const float u_right  = u_left + du - u_offset;
-        const float v_top    = v_offset + sprite_id * dv;
-        const float v_bottom = v_top + dv - v_offset;
-
-        GLTexture::render_sub_texture(icons_texture_id, zoomed_top_x, zoomed_top_x + zoomed_icons_size, zoomed_top_y - zoomed_icons_size, zoomed_top_y, { { u_left, v_bottom }, { u_right, v_bottom }, { u_right, v_top }, { u_left, v_top } });
-        if (idx == m_current || current_y == FLT_MAX) {
-            // The FLT_MAX trick is here so that even non-selectable but activable
-            // gizmos are passed some meaningful value.
-            current_y = 0.5f * cnv_h - zoomed_top_y * zoom;
-        }
-        zoomed_top_y -= zoomed_stride_y;
-    }
-
-    if (m_current != Undefined) {
-        const float toolbar_top = cnv_h - wxGetApp().plater()->get_view_toolbar().get_height();
-        m_gizmos[m_current]->render_input_window(width, current_y, toolbar_top);
-    }
-}
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 float GLGizmosManager::get_scaled_total_height() const
 {

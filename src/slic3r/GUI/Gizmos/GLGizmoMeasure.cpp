@@ -93,11 +93,8 @@ static std::string center_on_feature_type_as_string(Measure::SurfaceFeatureType 
     return ret;
 }
 
-static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const std::vector<std::vector<int>>& planes_triangles, int idx)
+static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const std::vector<int>& triangle_indices)
 {
-    assert(0 <= idx && idx < (int)planes_triangles.size());
-    const std::vector<int>& triangle_indices = planes_triangles[idx];
-
     GLModel::Geometry init_data;
     init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
     unsigned int i = 0;
@@ -653,11 +650,10 @@ void GLGizmoMeasure::on_render()
                     if (m_last_plane_idx != idx) {
                         m_last_plane_idx = idx;
                         const indexed_triangle_set& its = m_measuring->get_mesh().its;
-                        const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
-                        GLModel::Geometry init_data = init_plane_data(its, planes_triangles, idx);
+                        const std::vector<int>& plane_triangles = m_measuring->get_plane_triangle_indices(idx);
+                        GLModel::Geometry init_data = init_plane_data(its, plane_triangles);
                         m_plane.reset();
                         m_plane.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(init_data.get_as_indexed_triangle_set()));
-                        m_plane.model.init_from(std::move(init_data));
                     }
 
                     m_raycasters.insert({ PLANE_ID, m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, PLANE_ID, *m_plane.mesh_raycaster) });
@@ -1041,10 +1037,9 @@ void GLGizmoMeasure::update_if_needed()
 {
     auto update_plane_models_cache = [this](const indexed_triangle_set& its) {
         m_plane_models_cache.clear();
-        const std::vector<std::vector<int>> planes_triangles = m_measuring->get_planes_triangle_indices();
-        for (int idx = 0; idx < (int)planes_triangles.size(); ++idx) {
+        for (int idx = 0; idx < m_measuring->get_num_of_planes(); ++idx) {
             m_plane_models_cache.emplace_back(GLModel());
-            GLModel::Geometry init_data = init_plane_data(its, planes_triangles, idx);
+            GLModel::Geometry init_data = init_plane_data(its, m_measuring->get_plane_triangle_indices(idx));
             m_plane_models_cache.back().init_from(std::move(init_data));
         }
     };
@@ -1057,6 +1052,10 @@ void GLGizmoMeasure::update_if_needed()
 
             TriangleMesh volume_mesh = vol.volume->mesh();
             volume_mesh.transform(vol.world_trafo);
+
+            if (vol.world_trafo.matrix().determinant() < 0.0)
+                volume_mesh.flip_triangles();
+
             composite_mesh.merge(volume_mesh);
         }
 
@@ -2051,8 +2050,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 ++measure_row_count;
                 ImGui::PopID();
             }
-            if (measure.distance_strict.has_value() &&
-                (!measure.distance_infinite.has_value() || std::abs(measure.distance_strict->dist - measure.distance_infinite->dist) > EPSILON)) {
+            if (measure.distance_strict.has_value() && !measure.distance_infinite.has_value()) {
                 double distance = measure.distance_strict->dist;
                 if (use_inches)
                     distance = ObjectManipulation::mm_to_in * distance;

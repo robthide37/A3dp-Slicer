@@ -204,6 +204,8 @@ void its_flip_triangles(indexed_triangle_set &its);
 // or more than two faces share the same edge position!
 int its_merge_vertices(indexed_triangle_set &its, bool shrink_to_fit = true);
 
+// Calculate number of degenerate faces. There should be no degenerate faces in a nice mesh.
+int its_num_degenerate_faces(const indexed_triangle_set &its);
 // Remove degenerate faces, return number of faces removed.
 int its_remove_degenerate_faces(indexed_triangle_set &its, bool shrink_to_fit = true);
 
