@@ -138,7 +138,7 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
     bench.start();
 
     // update preview mesh
-    double vscale = 1. / (2. * po.m_config.layer_height.getFloat());
+    double vscale = 1. / po.m_config.layer_height.getFloat();
     auto   voxparams = csg::VoxelizeParams{}
                          .voxel_scale(vscale)
                          .exterior_bandwidth(1.f)
@@ -150,7 +150,7 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
 
     bench.stop();
 
-    std::cout << "Preview gen took: " << bench.getElapsedSec() << std::endl;
+    BOOST_LOG_TRIVIAL(trace) << "Preview gen took: " << bench.getElapsedSec();
 
     return m;
 }
