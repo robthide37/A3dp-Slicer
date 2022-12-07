@@ -176,6 +176,7 @@ SCENARIO("Cooling integration tests", "[Cooling]") {
             { "fan_below_layer_time",       { 0 } },
             { "slowdown_below_layer_time",  { 0 } },
             { "bridge_speed",               99 },
+            { "overhangs",               false },
             // internal bridges use solid_infil speed
             { "bottom_solid_layers",        1 },
             // internal bridges use solid_infil speed

@@ -2919,7 +2919,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
 
     bool                        variable_speed = false;
     std::vector<ProcessedPoint> new_points{};
-    if (!this->on_first_layer() && is_perimeter(path.role())) {
+    if (this->m_config.overhangs && !this->on_first_layer() && is_perimeter(path.role())) {
         new_points     = m_extrusion_quality_estimator.estimate_extrusion_quality(path);
         variable_speed = std::any_of(new_points.begin(), new_points.end(), [](const ProcessedPoint &p) { return p.speed_factor != 1.0; });
     }

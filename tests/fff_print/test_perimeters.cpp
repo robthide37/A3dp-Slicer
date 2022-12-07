@@ -309,6 +309,7 @@ SCENARIO("Perimeters", "[Perimeters]")
             { "perimeters",                 1 },
             { "perimeter_speed",            77 },
             { "external_perimeter_speed",   66 },
+            { "overhang_speed",             60 },
             { "bridge_speed",               99 },
             { "cooling",                    "1" },
             { "fan_below_layer_time",       "0" },
@@ -329,10 +330,11 @@ SCENARIO("Perimeters", "[Perimeters]")
             const double perimeter_speed            = config.opt_float("perimeter_speed") * 60.;
             const double external_perimeter_speed   = config.get_abs_value("external_perimeter_speed") * 60.;
             const double bridge_speed               = config.opt_float("bridge_speed") * 60.;
+            const double overhang_speed             = config.opt<ConfigOptionFloatOrPercent>("overhang_speed")->value * 60.;
             const double nozzle_dmr                 = config.opt<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
             const double filament_dmr               = config.opt<ConfigOptionFloats>("filament_diameter")->get_at(0);
             const double bridge_mm_per_mm           = sqr(nozzle_dmr / filament_dmr) * config.opt_float("bridge_flow_ratio");
-            parser.parse_buffer(gcode, [&layer_speeds, &fan_speed, perimeter_speed, external_perimeter_speed, bridge_speed, nozzle_dmr, filament_dmr, bridge_mm_per_mm]
+            parser.parse_buffer(gcode, [&layer_speeds, &fan_speed, perimeter_speed, external_perimeter_speed, bridge_speed, overhang_speed, nozzle_dmr, filament_dmr, bridge_mm_per_mm]
                 (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
             {
                 if (line.cmd_is("M107"))
@@ -341,13 +343,14 @@ SCENARIO("Perimeters", "[Perimeters]")
                     line.has_value('S', fan_speed);
                 else if (line.extruding(self) && line.dist_XY(self) > 0) {
                     double feedrate = line.new_F(self);
-                    REQUIRE((is_approx(feedrate, perimeter_speed) || is_approx(feedrate, external_perimeter_speed) || is_approx(feedrate, bridge_speed)));
+                    REQUIRE((is_approx(feedrate, perimeter_speed) || is_approx(feedrate, bridge_speed) || 
+                    (feedrate >= overhang_speed && feedrate <= external_perimeter_speed)));
                     layer_speeds[self.z()].insert(feedrate);
                     bool   bridging  = is_approx(feedrate, bridge_speed);
                     double mm_per_mm = line.dist_E(self) / line.dist_XY(self);
                     // Fan enabled at full speed when bridging, disabled when not bridging.
                     REQUIRE((! bridging || fan_speed == 255));
-                    REQUIRE((bridging || fan_speed == 0));
+                    // REQUIRE((bridging || fan_speed == 0)); not true. with dynamic overhangs slowdown, the fan is used as well (and the speed is anywhere between external perimeter speed and overhang speed)
                     // When bridging, bridge flow is applied.
                     REQUIRE((! bridging || std::abs(mm_per_mm - bridge_mm_per_mm) <= 0.01));
                 }
@@ -374,6 +377,7 @@ SCENARIO("Perimeters", "[Perimeters]")
                 { "external_perimeter_speed",   99 },
                 { "small_perimeter_speed",      99 },
                 { "thin_walls",                 0 },
+                { "overhangs",                 false },
             });
         
             std::string gcode = Slic3r::Test::slice({ Slic3r::Test::TestMesh::ipadstand }, config);
@@ -529,7 +533,7 @@ SCENARIO("Perimeters3", "[Perimeters]")
         { "skirts",                 0 },
         { "perimeters",             3 },
         { "layer_height",           0.4 },
-        { "bridge_speed",           99 },
+        { "overhang_speed",         5 },
         // to prevent bridging over sparse infill
         { "fill_density",           0 },
         { "overhangs",              true },
@@ -543,26 +547,25 @@ SCENARIO("Perimeters3", "[Perimeters]")
         std::string         gcode = Slic3r::Test::slice({ mesh(Slic3r::Test::TestMesh::V, Vec3d::Zero(), scale) }, config);
         GCodeReader         parser;
         std::set<coord_t>   z_with_bridges;
-        const double        bridge_speed = config.opt_float("bridge_speed") * 60.;
-        parser.parse_buffer(gcode, [&z_with_bridges, bridge_speed](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
+        const double        overhang_speed = config.opt<ConfigOptionFloatOrPercent>("overhang_speed")->value * 60.;
+        parser.parse_buffer(gcode, [&z_with_bridges, overhang_speed](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
         {
-            if (line.extruding(self) && line.dist_XY(self) > 0 && is_approx<double>(line.new_F(self), bridge_speed))
+            if (line.extruding(self) && line.dist_XY(self) > 0 && 
+            (is_approx<double>(line.new_F(self), overhang_speed)))
                 z_with_bridges.insert(scaled<coord_t>(self.z()));
         });
         return z_with_bridges.size();
     };
 
-    GIVEN("V shape, unscaled") {
-        int n = test(Vec3d(1., 1., 1.));
-        // except for the two internal solid layers above void
-        THEN("no overhangs printed with bridge speed") {
-            REQUIRE(n == 1);
+    GIVEN("V shape, scaled 0.5x in X") {
+        int n = test(Vec3d(0.5, 1., 1.));
+        THEN("no overhangs printed with overhangs speed") {
+            REQUIRE(n == 0);
         }
     }
     GIVEN("V shape, scaled 3x in X") {
         int n = test(Vec3d(3., 1., 1.));
-        // except for the two internal solid layers above void
-        THEN("overhangs printed with bridge speed") {
+        THEN("overhangs printed with overhangs speed") {
             REQUIRE(n > 2);
         }
     }
