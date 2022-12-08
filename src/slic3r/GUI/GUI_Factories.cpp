@@ -1018,16 +1018,19 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
     wxString name        = _L("Edit text");
 
     auto can_edit_text = []() {
-        const auto& sel = plater()->get_selection();
-        if (sel.volumes_count() != 1) return false;
-        auto cid = sel.get_volume(*sel.get_volume_idxs().begin());
-        const ModelVolume* vol = plater()->canvas3D()->get_model()
-            ->objects[cid->object_idx()]->volumes[cid->volume_idx()];
-        return vol->text_configuration.has_value();
+        if (plater() != nullptr) {
+            const Selection& sel = plater()->get_selection();
+            if (sel.volumes_count() == 1) {
+                const GLVolume* gl_vol = sel.get_first_volume();
+                const ModelVolume* vol = plater()->model().objects[gl_vol->object_idx()]->volumes[gl_vol->volume_idx()];
+                return vol->text_configuration.has_value();
+            }
+        }
+        return false;
     };
 
-    if (menu == &m_object_menu) {
-        auto menu_item_id = menu->FindItem(name);
+    if (menu != &m_text_part_menu) {
+        const int menu_item_id = menu->FindItem(name);
         if (menu_item_id != wxNOT_FOUND)
             menu->Destroy(menu_item_id);
         if (!can_edit_text())
