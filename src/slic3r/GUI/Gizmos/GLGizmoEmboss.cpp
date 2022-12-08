@@ -55,6 +55,7 @@
 #define SHOW_FINE_POSITION // draw convex hull around volume
 #define SHOW_WX_WEIGHT_INPUT
 #define DRAW_PLACE_TO_ADD_TEXT // Interactive draw of window position 
+#define ALLOW_FLOAT_WINDOW
 #endif // ALLOW_DEBUG_MODE
 
 using namespace Slic3r;
@@ -1355,6 +1356,7 @@ void GLGizmoEmboss::draw_window()
     ImGui::Image(atlas.TexID, ImVec2(atlas.TexWidth, atlas.TexHeight));
 #endif // SHOW_IMGUI_ATLAS
 
+#ifdef ALLOW_FLOAT_WINDOW
     ImGui::SameLine();
     if (ImGui::Checkbox("##allow_float_window", &m_allow_float_window)) {
         if (m_allow_float_window)
@@ -1364,6 +1366,7 @@ void GLGizmoEmboss::draw_window()
             _u8L("Fix settings possition"):
             _u8L("Allow floating window near text")).c_str());
     }
+#endif // ALLOW_FLOAT_WINDOW
 
     ImGui::SameLine();
     if (ImGui::Button("use")) {
