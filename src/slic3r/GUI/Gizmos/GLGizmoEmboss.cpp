@@ -2449,6 +2449,43 @@ bool GLGizmoEmboss::rev_input(const std::string  &name,
     return revertible(name, value, default_value, undo_tooltip, undo_offset, draw_offseted_input);
 }
 
+bool GLGizmoEmboss::rev_input_mm(const std::string   &name,
+                                 float               &value,
+                                 const float         *default_value_ptr,
+                                 const std::string   &undo_tooltip,
+                                 float                step,
+                                 float                step_fast,
+                                 const char          *format,
+                                 bool                 use_inch,
+                                 std::optional<float> scale)
+{
+    // _variable which temporary keep value
+    float  value_ = value;
+    float  default_value_;
+    if (use_inch) {
+        // calc value in inch
+        value_ *= ObjectManipulation::mm_to_in;
+        if (default_value_ptr) {
+            default_value_    = ObjectManipulation::mm_to_in * (*default_value_ptr);
+            default_value_ptr = &default_value_;
+        }
+    }
+    if (scale.has_value())        
+        value_ *= *scale;
+    bool use_correction = use_inch || scale.has_value();
+    if (rev_input(name, use_correction ? value_ : value, default_value_ptr, undo_tooltip, step, step_fast, format)) {
+        if (use_correction) {
+            value = value_;
+            if (use_inch)
+                value *= ObjectManipulation::in_to_mm;
+            if (scale.has_value())
+                value /= *scale;
+        }
+        return true;
+    }
+    return false;
+}
+
 bool GLGizmoEmboss::rev_checkbox(const std::string &name,
                                  bool              &value,
                                  const bool        *default_value,
@@ -2464,12 +2501,48 @@ bool GLGizmoEmboss::rev_checkbox(const std::string &name,
                       undo_offset, draw_offseted_input);
 }
 
+bool is_font_changed(
+    const wxFont &wx_font, const wxFont &wx_font_stored, 
+    const FontProp &prop, const FontProp &prop_stored)
+{
+    // Exist change in face name?
+    if(wx_font_stored.GetFaceName() != wx_font.GetFaceName()) return true;
+
+    const std::optional<float> &skew = prop.skew;
+    bool is_italic = skew.has_value() || WxFontUtils::is_italic(wx_font);
+    const std::optional<float> &skew_stored = prop_stored.skew;
+    bool is_stored_italic = skew_stored.has_value() || WxFontUtils::is_italic(wx_font_stored);
+    // is italic changed
+    if (is_italic != is_stored_italic)
+        return true;
+
+    const std::optional<float> &boldness = prop.boldness;
+    bool is_bold = boldness.has_value() || WxFontUtils::is_bold(wx_font);
+    const std::optional<float> &boldness_stored = prop_stored.boldness;
+    bool is_stored_bold = boldness_stored.has_value() || WxFontUtils::is_bold(wx_font_stored);
+    // is bold changed
+    return is_bold != is_stored_bold;
+}
+
+bool is_font_changed(const StyleManager &mng) {
+    const std::optional<wxFont> &wx_font_opt = mng.get_wx_font();
+    if (!wx_font_opt.has_value())
+        return false;
+    if (!mng.exist_stored_style())
+        return false;
+    const EmbossStyle *stored_style = mng.get_stored_style();
+    if (stored_style == nullptr)
+        return false;
+
+    const std::optional<wxFont> &wx_font_stored_opt = mng.get_stored_wx_font();
+    if (!wx_font_stored_opt.has_value())
+        return false;
+
+    return is_font_changed(*wx_font_opt, *wx_font_stored_opt, mng.get_style().prop, stored_style->prop);
+}
+
 void GLGizmoEmboss::draw_style_edit() {
-    const GuiCfg::Translations &tr = m_gui_cfg->translations;
-
     const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
-    EmbossStyle &style = m_style_manager.get_style();
-
     assert(wx_font_opt.has_value());
     if (!wx_font_opt.has_value()) {
         ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("WxFont is not loaded properly.").c_str());
@@ -2477,33 +2550,9 @@ void GLGizmoEmboss::draw_style_edit() {
     }
 
     bool exist_stored_style = m_style_manager.exist_stored_style();
-    bool is_font_changed = false;
-    if (exist_stored_style && wx_font_opt.has_value()) {        
-        const wxFont &wx_font = *wx_font_opt;
-        const EmbossStyle *stored_style = m_style_manager.get_stored_style();
-        assert(stored_style != nullptr);
-        const std::optional<wxFont> &stored_wx = m_style_manager.get_stored_wx_font();
-        assert(stored_wx.has_value());
-        bool is_font_face_changed = stored_wx->GetFaceName() != wx_font.GetFaceName();
-
-        const std::optional<float> &skew = m_style_manager.get_font_prop().skew;
-        bool is_italic = skew.has_value() || WxFontUtils::is_italic(wx_font);
-        const std::optional<float> &skew_stored = stored_style->prop.skew;
-        bool is_stored_italic = skew_stored.has_value() || WxFontUtils::is_italic(*stored_wx);
-        bool is_italic_changed = is_italic != is_stored_italic;
-
-        const std::optional<float> &boldness = m_style_manager.get_font_prop().boldness;
-        bool is_bold = boldness.has_value() || WxFontUtils::is_bold(wx_font);
-        const std::optional<float> &boldness_stored = stored_style->prop.boldness;
-        bool is_stored_bold = boldness_stored.has_value() || WxFontUtils::is_bold(*stored_wx);
-        bool is_bold_changed = is_bold != is_stored_bold;
-
-        bool is_font_style_changed = is_italic_changed || is_bold_changed;
-
-        is_font_changed = is_font_face_changed || is_font_style_changed;
-    }
-
-    if (is_font_changed || !exist_stored_style)
+    bool exist_change_in_font = is_font_changed(m_style_manager);
+    const GuiCfg::Translations &tr = m_gui_cfg->translations;
+    if (exist_change_in_font || !exist_stored_style)
         ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, tr.font);
     else
         ImGuiWrapper::text(tr.font);
@@ -2516,8 +2565,9 @@ void GLGizmoEmboss::draw_style_edit() {
 
     ImGui::SameLine();
     if (draw_bold_button()) exist_change = true;
-    
-    if (is_font_changed) {
+        
+    EmbossStyle &style = m_style_manager.get_style();
+    if (exist_change_in_font) {
         ImGui::SameLine(ImGui::GetStyle().FramePadding.x);
         if (draw_button(IconType::undo)) {
             const EmbossStyle *stored_style = m_style_manager.get_stored_style();
@@ -2539,7 +2589,6 @@ void GLGizmoEmboss::draw_style_edit() {
     }
 
     bool use_inch = wxGetApp().app_config->get("use_inches") == "1";
-    const std::string revert_text_size = _u8L("Revert text size.");
     FontProp &font_prop = style.prop;
     
     const GLVolume* gl_vol = m_parent.get_selection().get_first_volume();
@@ -2554,63 +2603,7 @@ void GLGizmoEmboss::draw_style_edit() {
     if (!is_approx(norm_sq, 1.))
         height_scale = sqrt(norm_sq);
 
-    bool use_correction = use_inch || height_scale.has_value();
-    const char *format = ((use_inch) ? "%.2f in" : "%.1f mm");
-    float *size_ptr = nullptr;
-    float size_value;
-    const float * def_size_ptr = nullptr;
-    float def_value;
-    if (use_inch) {
-        // calc value in inch
-        size_value = ObjectManipulation::mm_to_in * font_prop.size_in_mm;
-        if (exist_stored_style) {
-            def_value = ObjectManipulation::mm_to_in * (*def_size_ptr);
-            def_size_ptr = &def_value;        
-        }
-        size_ptr = &size_value;
-    }
-    if (height_scale.has_value()) {
-        // use inch 
-        if (size_ptr == nullptr) {
-            size_value = font_prop.size_in_mm;
-            size_ptr   = &size_value;
-        }
-        size_value *= *height_scale;
-        if (def_size_ptr == nullptr) { 
-            def_size_ptr = &m_style_manager.get_stored_style()->prop.size_in_mm;
-        }
-    }
-
-    if (!use_correction){
-        size_ptr = &font_prop.size_in_mm;
-        if (exist_stored_style)
-            def_size_ptr = &m_style_manager.get_stored_style()->prop.size_in_mm;
-    }
-
-    assert(size_ptr != nullptr);
-    assert(exist_stored_style == (def_size_ptr != nullptr));
-    if (rev_input(tr.size, *size_ptr, def_size_ptr, revert_text_size, 0.1f, 1.f, format)) {
-        if (use_correction) {
-            font_prop.size_in_mm = *size_ptr;
-            if (use_inch) font_prop.size_in_mm *= ObjectManipulation::in_to_mm;
-            if (height_scale.has_value()) font_prop.size_in_mm /= *height_scale;
-        }
-        // size can't be zero or negative
-        Limits::apply(font_prop.size_in_mm, limits.size_in_mm);
-
-        // only different value need process
-        if (!is_approx(font_prop.size_in_mm, m_volume->text_configuration->style.prop.size_in_mm)) {
-            // store font size into path
-            if (style.type == WxFontUtils::get_actual_type()) {
-                if (wx_font_opt.has_value()) {
-                    wxFont wx_font = *wx_font_opt;
-                    wx_font.SetPointSize(static_cast<int>(font_prop.size_in_mm));
-                    m_style_manager.set_wx_font(wx_font);
-                }
-            }
-            process();
-        }
-    }
+    draw_height(height_scale, use_inch);
 
 #ifdef SHOW_WX_WEIGHT_INPUT
     if (wx_font.has_value()) {
@@ -2642,29 +2635,52 @@ void GLGizmoEmboss::draw_style_edit() {
     double depth_sq = depth_world.squaredNorm();
     std::optional<float> depth_scale;
     if (!is_approx(depth_sq, 1.)) depth_scale = sqrt(depth_sq);   
-
-    const std::string revert_emboss_depth = _u8L("Revert embossed depth.");
-    const float *def_depth = exist_stored_style ?
-        &m_style_manager.get_stored_style()->prop.emboss : nullptr;
-    bool is_depth_changed = false;
-    if (use_inch) {
-        float depthj_in_inch = ObjectManipulation::mm_to_in * font_prop.emboss;
-        float def_depth_inch = exist_stored_style ? ObjectManipulation::mm_to_in * (*def_depth) : 0.f;
-        if (def_depth != nullptr) def_depth = &def_depth_inch;
-        if (rev_input(tr.depth, depthj_in_inch, def_depth, revert_emboss_depth, 0.1f, 0.25, "%.3f in")) { 
-            font_prop.emboss = ObjectManipulation::in_to_mm * depthj_in_inch;
-            is_depth_changed = true;
-        }
-    } else {
-        if (rev_input(tr.depth, font_prop.emboss, def_depth, revert_emboss_depth, 0.1f, 0.25, "%.2f mm"))
-            is_depth_changed = true;
-    }
-
-    if (is_depth_changed) {
-        Limits::apply(font_prop.emboss, limits.emboss);
-        process();
-    }    
+    draw_depth(depth_scale, use_inch);
 }
+
+void GLGizmoEmboss::draw_height(std::optional<float> scale, bool use_inch)
+{
+    float &value = m_style_manager.get_style().prop.size_in_mm;
+    const EmbossStyle* stored_style = m_style_manager.get_stored_style();
+    const float *stored = ((stored_style)? &stored_style->prop.size_in_mm : nullptr);
+    const char *size_format = ((use_inch) ? "%.2f in" : "%.1f mm");
+    const std::string revert_text_size = _u8L("Revert text size.");
+    const std::string& name = m_gui_cfg->translations.size;
+    if(rev_input_mm(name, value, stored, revert_text_size, 0.1f, 1.f, size_format, use_inch, scale)){
+        // size can't be zero or negative
+        Limits::apply(value, limits.size_in_mm);
+        // only different value need process
+        if (!is_approx(value, m_volume->text_configuration->style.prop.size_in_mm)) {
+            // store font size into path
+            EmbossStyle &style = m_style_manager.get_style();
+            if (style.type == WxFontUtils::get_actual_type()) {
+                const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
+                if (wx_font_opt.has_value()) {
+                    wxFont wx_font = *wx_font_opt;
+                    wx_font.SetPointSize(static_cast<int>(value));
+                    m_style_manager.set_wx_font(wx_font);
+                }
+            }
+            process();
+        }    
+    }
+}
+
+void GLGizmoEmboss::draw_depth(std::optional<float> scale, bool use_inch)
+{
+    float &value = m_style_manager.get_style().prop.emboss;
+    const EmbossStyle* stored_style = m_style_manager.get_stored_style();
+    const float *stored = ((stored_style)? &stored_style->prop.emboss : nullptr);
+    const std::string  revert_emboss_depth = _u8L("Revert embossed depth.");
+    const char *size_format = ((use_inch) ? "%.3f in" : "%.2f mm");
+    const std::string  name = m_gui_cfg->translations.depth;
+    if (rev_input_mm(name, value, stored, revert_emboss_depth, 0.1f, 1.f, size_format, use_inch, scale)) {
+        // size can't be zero or negative
+        Limits::apply(value, limits.emboss);
+        process();
+    }
+}
+
 
 bool GLGizmoEmboss::rev_slider(const std::string &name,
                                std::optional<int>& value,
@@ -2741,7 +2757,7 @@ void GLGizmoEmboss::do_translate(const Vec3d &relative_move)
     selection.setup_cache();
     selection.translate(relative_move, TransformationType::Local);
 
-    std::string snapshot_name; // empty meand no store undo / redo
+    std::string snapshot_name; // empty mean no store undo / redo
     // NOTE: it use L instead of _L macro because prefix _ is appended inside
     // function do_move
     // snapshot_name = L("Set surface distance");

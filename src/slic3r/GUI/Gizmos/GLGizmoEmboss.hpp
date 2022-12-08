@@ -111,6 +111,9 @@ private:
     void draw_font_preview(FaceName &face, bool is_visible);
     void draw_font_list();
     void draw_style_edit();
+    void draw_height(std::optional<float> scale, bool use_inch);
+    void draw_depth(std::optional<float> scale, bool use_inch);
+
     bool draw_italic_button();
     bool draw_bold_button();
     void draw_advanced();
@@ -120,6 +123,10 @@ private:
 
     void do_translate(const Vec3d& relative_move);
     void do_rotate(float relative_z_angle);
+
+    bool rev_input_mm(const std::string &name, float &value, const float *default_value,
+        const std::string &undo_tooltip, float step, float step_fast, const char *format,
+        bool use_inch = false, std::optional<float> scale = {});
 
     /// <summary>
     /// Reversible input float with option to restor default value
