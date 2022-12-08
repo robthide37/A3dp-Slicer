@@ -450,6 +450,14 @@ struct PageBedShape: ConfigWizardPage
     virtual void apply_custom_config(DynamicPrintConfig &config);
 };
 
+struct PageBuildVolume : ConfigWizardPage
+{
+    wxTextCtrl* build_volume;
+
+    PageBuildVolume(ConfigWizard* parent);
+    virtual void apply_custom_config(DynamicPrintConfig& config);
+};
+
 struct PageDiameters: ConfigWizardPage
 {
     wxTextCtrl *diam_nozzle;
@@ -584,6 +592,7 @@ struct ConfigWizard::priv
     PageBedShape     *page_bed = nullptr;
     PageDiameters    *page_diams = nullptr;
     PageTemperatures *page_temps = nullptr;
+    PageBuildVolume* page_bvolume = nullptr;
 
     // Pointers to all pages (regardless or whether currently part of the ConfigWizardIndex)
     std::vector<ConfigWizardPage*> all_pages;
