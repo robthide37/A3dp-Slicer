@@ -90,15 +90,14 @@ public:
 
 struct ExtendedPoint
 {
-    ExtendedPoint(Vec2d position, float distance = 0.0, size_t nearest_prev_layer_line = size_t(-1), float curvature = 0.0, float quality = 1.0)
-        : position(position), distance(distance), nearest_prev_layer_line(nearest_prev_layer_line), curvature(curvature), quality(quality)
+    ExtendedPoint(Vec2d position, float distance = 0.0, size_t nearest_prev_layer_line = size_t(-1), float curvature = 0.0)
+        : position(position), distance(distance), nearest_prev_layer_line(nearest_prev_layer_line), curvature(curvature)
     {}
 
     Vec2d  position;
     float  distance;
     size_t nearest_prev_layer_line;
     float  curvature;
-    float  quality;
 };
 
 template<bool SCALED_INPUT, bool ADD_INTERSECTIONS, bool PREV_LAYER_BOUNDARY_ONLY, bool CONCAVITY_RESETS_CURVATURE, typename P, typename L>
@@ -109,31 +108,30 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
     if (extrusion_points.empty()) return {};
     float              boundary_offset = PREV_LAYER_BOUNDARY_ONLY ? 0.5 * flow_width : 0.0f;
     CurvatureEstimator cestim;
-    float              min_malformation_dist  = 0.2 * flow_width;
-    float              peak_malformation_dist = 0.6 * flow_width;
+    float              min_malformation_dist = 0.55 * flow_width;
 
     std::vector<ExtendedPoint> points;
     points.reserve(extrusion_points.size() * (ADD_INTERSECTIONS ? 1.5 : 1));
     auto maybe_unscale = [](const P &p) { return SCALED_INPUT ? unscaled(p) : p.template cast<double>(); };
 
     {
-        ExtendedPoint start_point{maybe_unscale(extrusion_points.begin())};
-        auto [distance, nearest_line, x]    = unscaled_prev_layer.signed_distance_from_lines_extra(start_point.position) + boundary_offset;
-        start_point.distance                = distance;
+        ExtendedPoint start_point{maybe_unscale(extrusion_points.front())};
+        auto [distance, nearest_line, x]    = unscaled_prev_layer.signed_distance_from_lines_extra(start_point.position);
+        start_point.distance                = distance + boundary_offset;
         start_point.nearest_prev_layer_line = nearest_line;
         points.push_back(start_point);
     }
     for (size_t i = 1; i < extrusion_points.size(); i++) {
         ExtendedPoint next_point{maybe_unscale(extrusion_points[i])};
-        auto [distance, nearest_line, x]   = unscaled_prev_layer.signed_distance_from_lines_extra(next_point.position) + boundary_offset;
-        next_point.distance                = distance;
+        auto [distance, nearest_line, x]   = unscaled_prev_layer.signed_distance_from_lines_extra(next_point.position);
+        next_point.distance                = distance + boundary_offset;
         next_point.nearest_prev_layer_line = nearest_line;
 
         if (ADD_INTERSECTIONS) {
             const ExtendedPoint &prev_point = points.back();
             if ((prev_point.distance < min_malformation_dist) != (next_point.distance < min_malformation_dist)) { // one in air, one not
-                auto intersections = unscaled_prev_layer.intersections_with_line<true>(L{prev_point.position, next_point.position});
-                for (const auto &intersection : intersections) { points.push_back({intersection, boundary_offset, 1.0}); }
+                auto intersections = unscaled_prev_layer.template intersections_with_line<true>(L{prev_point.position, next_point.position});
+                for (const auto &intersection : intersections) { points.emplace_back(intersection, boundary_offset, 1.0); }
             }
 
             if (PREV_LAYER_BOUNDARY_ONLY && prev_point.distance > min_malformation_dist &&
@@ -146,19 +144,19 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
                     double t1 = std::max(a0, a1);
 
                     auto p0                         = prev_point.position + t0 * (next_point.position - prev_point.position);
-                    auto [p0_dist, p0_near_l, p0_x] = unscaled_prev_layer.signed_distance_from_lines(p0) + boundary_offset;
-                    points.push_back(ExtendedPoint{p0, p0_dist, p0_near_l});
+                    auto [p0_dist, p0_near_l, p0_x] = unscaled_prev_layer.signed_distance_from_lines_extra(p0);
+                    points.push_back(ExtendedPoint{p0, float(p0_dist + boundary_offset), p0_near_l});
 
                     auto p1                         = prev_point.position + t1 * (next_point.position - prev_point.position);
-                    auto [p1_dist, p1_near_l, p1_x] = unscaled_prev_layer.signed_distance_from_lines(p1) + boundary_offset;
-                    points.push_back(ExtendedPoint{p1, p1_dist, p1_near_l});
+                    auto [p1_dist, p1_near_l, p1_x] = unscaled_prev_layer.signed_distance_from_lines_extra(p1);
+                    points.push_back(ExtendedPoint{p1, float(p1_dist + boundary_offset), p1_near_l});
                 }
             }
         }
         points.push_back(next_point);
     }
 
-    for (int point_idx = 0; point_idx < points.size(); ++point_idx) {
+    for (int point_idx = 0; point_idx < int(points.size()); ++point_idx) {
         ExtendedPoint &a    = points[point_idx];
         ExtendedPoint &prev = points[point_idx > 0 ? point_idx - 1 : point_idx];
 
@@ -177,32 +175,12 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
         if (prev_point_idx != point_idx && next_point_index != point_idx) {
             float distance = (prev.position - a.position).norm();
             float alfa     = angle(a.position - points[prev_point_idx].position, points[next_point_index].position - a.position);
-            if (alfa > 0.95 * 0.5 * PI) {
-                alfa = 0; // Ignore very sharp corners.. The curling problem happens mostly on rounded surfaces, not sudden sharp turns
-            }
             cestim.add_point(distance, alfa);
             if (CONCAVITY_RESETS_CURVATURE && alfa < 0.0) { cestim.reset(); }
         }
 
-        if (a.distance < min_malformation_dist) {
-            a.quality = 1.0;
-            cestim.reset();
-        } else {
-            float distance_quality = std::min(1.0f, std::abs(a.distance - peak_malformation_dist) /
-                                                        (peak_malformation_dist - min_malformation_dist));
-            distance_quality       = distance_quality * distance_quality;
-
-            float curvature_penalty = 0.0f;
-            a.curvature             = cestim.get_curvature();
-            float curvature         = std::abs(a.curvature);
-            if (curvature > 1.0f) {
-                curvature_penalty = 1.0f;
-            } else if (curvature > 0.1f) {
-                curvature_penalty = sqrt(1.0 - distance_quality) * curvature;
-            }
-
-            a.quality = std::clamp(distance_quality - curvature_penalty, 0.0f, 1.0f);
-        }
+        if (a.distance < min_malformation_dist) { cestim.reset(); }
+        a.curvature = cestim.get_curvature();
     }
 
     return points;
@@ -235,13 +213,29 @@ public:
     {
         std::vector<ExtendedPoint> extended_points =
             estimate_points_properties<true, true, true, false>(path.polyline.points, prev_layer_boundaries[current_object], path.width);
-        
+
+        float min_malformation_dist  = 0.55 * path.width;
+        float peak_malformation_dist = path.width;
+
         std::vector<ProcessedPoint> processed_points;
         processed_points.reserve(extended_points.size());
         for (size_t i = 0; i < extended_points.size(); i++) {
-            Point position = scaled(extended_points[i].position);
-            float speed_factor = std::min(extended_points[i].quality, extended_points[i+1].quality);
-            processed_points.push_back({position, speed_factor});
+            const ExtendedPoint &curr = extended_points[i];
+            const ExtendedPoint &next = extended_points[i + 1 < extended_points.size() ? i + 1 : i];
+
+            float extrusion_speed_factor = 1.0f;
+            if (std::max(curr.distance, next.distance) < min_malformation_dist) {
+                extrusion_speed_factor = 1.0f;
+            } else {
+                float curvature_penalty = std::min(1.0f, next.curvature);
+                float distance_penalty = (std::max(curr.distance, next.distance) - min_malformation_dist) /
+                                         (peak_malformation_dist - min_malformation_dist);
+                distance_penalty = std::min(1.0f, distance_penalty);
+
+                extrusion_speed_factor = std::clamp(1.0f - distance_penalty - curvature_penalty, 0.0f, 1.0f);
+            }
+
+            processed_points.push_back({scaled(curr.position), extrusion_speed_factor});
         }
         return processed_points;
     }
