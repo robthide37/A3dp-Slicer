@@ -146,8 +146,10 @@ private:
 
     // Bitmaps for the mirroring buttons.
     ScalableBitmap m_mirror_bitmap_on;
+#if !ENABLE_WORLD_COORDINATE
     ScalableBitmap m_mirror_bitmap_off;
     ScalableBitmap m_mirror_bitmap_hidden;
+#endif // !ENABLE_WORLD_COORDINATE
 
     // Needs to be updated from OnIdle?
     bool            m_dirty = false;
@@ -171,7 +173,7 @@ private:
     choice_ctrl*    m_word_local_combo { nullptr };
 
     ScalableBitmap  m_manifold_warning_bmp;
-    wxStaticBitmap* m_fix_throught_netfab_bitmap;
+    wxStaticBitmap* m_fix_throught_netfab_bitmap{ nullptr };
 
 #if ENABLE_WORLD_COORDINATE
     // Currently focused editor (nullptr if none)
