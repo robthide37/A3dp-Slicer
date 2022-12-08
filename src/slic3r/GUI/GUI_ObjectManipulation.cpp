@@ -1080,8 +1080,8 @@ wxString ObjectManipulation::coordinate_type_str(ECoordinatesType type)
     switch (type)
     {
     case ECoordinatesType::World:    { return _L("World coordinates"); }
-    case ECoordinatesType::Instance: { return _L("Instance coordinates"); }
-    case ECoordinatesType::Local:    { return _L("Local coordinates"); }
+    case ECoordinatesType::Instance: { return _L("Object coordinates"); }
+    case ECoordinatesType::Local:    { return _L("Part coordinates"); }
     default:                         { assert(false); return _L("Unknown"); }
     }
 }
