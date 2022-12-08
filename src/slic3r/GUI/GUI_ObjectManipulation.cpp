@@ -125,8 +125,10 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 
     // Load bitmaps to be used for the mirroring buttons:
     m_mirror_bitmap_on     = ScalableBitmap(parent, "mirroring_on");
+#if !ENABLE_WORLD_COORDINATE
     m_mirror_bitmap_off    = ScalableBitmap(parent, "mirroring_off");
     m_mirror_bitmap_hidden = ScalableBitmap(parent, "mirroring_transparent");
+#endif // !ENABLE_WORLD_COORDINATE
 
     const int border = wxOSX ? 0 : 4;
     const int em = wxGetApp().em_unit();
@@ -265,12 +267,14 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 
         // We will add a button to toggle mirroring to each axis:
         auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_off", wxEmptyString, wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER | wxTRANSPARENT_WINDOW);
+#if ENABLE_WORLD_COORDINATE
+        btn->SetToolTip(_L("Mirror along") + wxString::Format(_L(" %c "), (int)label) + _L("axis"));
+
+        m_mirror_buttons[axis_idx] = btn;
+#else
         btn->SetToolTip(wxString::Format(_L("Toggle %c axis mirroring"), (int)label));
         btn->SetBitmapDisabled_(m_mirror_bitmap_hidden);
 
-#if ENABLE_WORLD_COORDINATE
-        m_mirror_buttons[axis_idx] = btn;
-#else
         m_mirror_buttons[axis_idx].first = btn;
         m_mirror_buttons[axis_idx].second = mbShown;
 #endif // ENABLE_WORLD_COORDINATE
@@ -675,7 +679,7 @@ void ObjectManipulation::update_ui_from_settings()
 
 void ObjectManipulation::update_settings_value(const Selection& selection)
 {
-	m_new_move_label_string   = L("Position");
+    m_new_move_label_string   = L("Position");
     m_new_rotate_label_string = L("Rotation");
     m_new_scale_label_string  = L("Scale factors");
 
@@ -722,7 +726,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
 #endif // ENABLE_WORLD_COORDINATE
             m_new_size     = volume->get_instance_scaling_factor().cwiseProduct(wxGetApp().model().objects[volume->object_idx()]->raw_mesh_bounding_box().size());
             m_new_scale    = volume->get_instance_scaling_factor() * 100.0;
-		}
+        }
 
         m_new_enabled  = true;
     }
@@ -733,7 +737,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         m_new_scale    = Vec3d(100.0, 100.0, 100.0);
         m_new_size     = box.size();
         m_new_rotate_label_string = L("Rotate");
-		m_new_scale_label_string  = L("Scale");
+        m_new_scale_label_string  = L("Scale");
         m_new_enabled  = true;
     }
 #if ENABLE_WORLD_COORDINATE
@@ -765,9 +769,9 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         }
         else {
 #endif // ENABLE_WORLD_COORDINATE
-        m_new_position = volume->get_volume_offset();
-        m_new_rotate_label_string = L("Rotate");
-        m_new_rotation = Vec3d::Zero();
+            m_new_position = volume->get_volume_offset();
+            m_new_rotate_label_string = L("Rotate");
+            m_new_rotation = Vec3d::Zero();
 #if ENABLE_WORLD_COORDINATE
             m_new_size = volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix()).size();
             m_new_scale = m_new_size.cwiseQuotient(volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix_no_scaling_factor()).size()) * 100.0;
@@ -780,17 +784,17 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
     }
     else if (obj_list->is_connectors_item_selected() || obj_list->multiple_selection() || obj_list->is_selected(itInstanceRoot)) {
         reset_settings_value();
-		m_new_move_label_string   = L("Translate");
-		m_new_rotate_label_string = L("Rotate");
-		m_new_scale_label_string  = L("Scale");
+        m_new_move_label_string   = L("Translate");
+        m_new_rotate_label_string = L("Rotate");
+        m_new_scale_label_string  = L("Scale");
         m_new_size = selection.get_bounding_box().size();
         m_new_enabled  = true;
     }
-	else {
+    else {
         // No selection, reset the cache.
 //		assert(selection.is_empty());
-		reset_settings_value();
-	}
+        reset_settings_value();
+    }
 }
 
 void ObjectManipulation::update_if_dirty()
@@ -1442,8 +1446,10 @@ void ObjectManipulation::sys_color_changed()
         editor->sys_color_changed(this);
 
     m_mirror_bitmap_on.sys_color_changed();
+#if !ENABLE_WORLD_COORDINATE
     m_mirror_bitmap_off.sys_color_changed();
     m_mirror_bitmap_hidden.sys_color_changed();
+#endif // !ENABLE_WORLD_COORDINATE
     m_reset_scale_button->sys_color_changed();
     m_reset_rotation_button->sys_color_changed();
     m_drop_to_bed_button->sys_color_changed();
