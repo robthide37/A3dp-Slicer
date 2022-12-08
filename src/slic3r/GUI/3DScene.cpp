@@ -448,6 +448,8 @@ int GLVolumeCollection::load_object_volume(
     this->volumes.emplace_back(new GLVolume());
     GLVolume& v = *this->volumes.back();
     v.set_color(color_from_model_volume(*model_volume));
+    // apply printable value from the instance
+    v.printable = instance->printable;
 #if ENABLE_SMOOTH_NORMALS
     v.model.init_from(*mesh, true);
     v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);

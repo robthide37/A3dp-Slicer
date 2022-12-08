@@ -527,10 +527,6 @@ void UpdateJob::update_volume(ModelVolume             *volume,
         obj_list->update_name_in_list(object_idx, volume_idx);
     }
 
-    // update printable state on canvas
-    if (volume->type() == ModelVolumeType::MODEL_PART) 
-        canvas->update_instance_printable_state_for_object((size_t) object_idx);
-
     // Move object on bed
     if (GLGizmoEmboss::is_text_object(volume)) volume->get_object()->ensure_on_bed();
 
