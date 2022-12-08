@@ -425,7 +425,7 @@ class PointCtrl : public Field {
 public:
 	PointCtrl(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt, id) {}
 	PointCtrl(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {}
-	~PointCtrl() {}
+	~PointCtrl();
 
 	wxSizer*		sizer{ nullptr };
 	wxTextCtrl*		x_textctrl{ nullptr };

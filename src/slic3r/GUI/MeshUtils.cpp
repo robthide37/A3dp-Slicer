@@ -22,7 +22,7 @@ namespace GUI {
 
 void MeshClipper::set_behaviour(bool fill_cut, double contour_width)
 {
-    if (fill_cut != m_fill_cut || is_approx(contour_width, m_contour_width))
+    if (fill_cut != m_fill_cut || ! is_approx(contour_width, m_contour_width))
         m_result.reset();
     m_fill_cut = fill_cut;
     m_contour_width = contour_width;
@@ -365,11 +365,8 @@ void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3
 
 bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                       Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane,
-                                      size_t* facet_idx, bool* was_clipping_plane_hit) const
+                                      size_t* facet_idx) const
 {
-    if (was_clipping_plane_hit)
-        *was_clipping_plane_hit = false;
-
     Vec3d point;
     Vec3d direction;
     line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
@@ -390,26 +387,9 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
             break;
     }
 
-    if (i==hits.size()) {
-        // All hits are clipped.
-        return false;
-    }
-    if  (clipping_plane && (hits.size()-i) % 2 != 0) {
-        // There is an odd number of unclipped hits - meaning the nearest must be from inside the mesh.
-        // In that case, calculate intersection with the clipping place.
-        if (was_clipping_plane_hit) {
-            direction = direction + point;
-            point = trafo * point; // transform to world coords
-            direction = trafo * direction - point;
-
-            Vec3d normal = -clipping_plane->get_normal().cast<double>();
-            double den = normal.dot(direction);
-            if (den != 0.) {
-                double t = (-clipping_plane->get_offset() - normal.dot(point))/den;
-                position = (point + t * direction).cast<float>();
-                *was_clipping_plane_hit = true;
-            }
-        }
+    if (i==hits.size() || (hits.size()-i) % 2 != 0) {
+        // All hits are either clipped, or there is an odd number of unclipped
+        // hits - meaning the nearest must be from inside the mesh.
         return false;
     }
 
@@ -423,24 +403,7 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
     return true;
 }
 
-bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                                      Vec3d& position, Vec3d& normal) const
-{
-    Vec3d point;
-    Vec3d direction;
-    line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
 
-    std::vector<AABBMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction);
-
-    if (hits.empty())
-        return false; // no intersection found
-
-    // Now stuff the points in the provided vector and calculate normals if asked about them:
-    position = hits[0].position();
-    normal = hits[0].normal();
-
-    return true;
-}
 
 bool MeshRaycaster::is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const 
 {
