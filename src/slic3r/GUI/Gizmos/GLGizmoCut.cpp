@@ -1144,11 +1144,11 @@ void GLGizmoCut3D::dragging_grabber_xy(const GLGizmoBase::UpdateData &data)
 void GLGizmoCut3D::dragging_connector(const GLGizmoBase::UpdateData &data)
 {
     CutConnectors&          connectors = m_c->selection_info()->model_object()->cut_connectors;
-    std::pair<Vec3d, Vec3d> pos_and_normal;
+    Vec3d                   pos;
     Vec3d                   pos_world;
 
-    if (unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos_and_normal, pos_world)) {
-        connectors[m_hover_id - m_connectors_group_id].pos = pos_and_normal.first;
+    if (unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos, pos_world)) {
+        connectors[m_hover_id - m_connectors_group_id].pos = pos;
         update_raycasters_for_picking_transform();
     }
 }
@@ -2006,44 +2006,41 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
 // Unprojects the mouse position on the mesh and saves hit point and normal of the facet into pos_and_normal
 // Return false if no intersection was found, true otherwise.
-bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair<Vec3d, Vec3d>& pos_and_normal, Vec3d& pos_world)
+bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, Vec3d& pos, Vec3d& pos_world)
 {
     const float sla_shift = m_c->selection_info()->get_sla_shift();
 
     const ModelObject* mo = m_c->selection_info()->model_object();
     const ModelInstance* mi = mo->instances[m_c->selection_info()->get_active_instance()];
-    const Transform3d    instance_trafo = sla_shift > 0.f ? 
-        translation_transform(sla_shift * Vec3d::UnitZ()) * mi->get_transformation().get_matrix() : mi->get_transformation().get_matrix();
     const Camera& camera = wxGetApp().plater()->get_camera();
 
-    int mesh_id = -1;
-    for (const ModelVolume* mv : mo->volumes) {
-        ++mesh_id;
-        if (!mv->is_model_part())
-            continue;
-        Vec3f normal;
-        Vec3f hit;
-        bool clipping_plane_was_hit = false;
+    // Calculate intersection with the clipping plane.
+    const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane(true);
+    Vec3d point;
+    Vec3d direction;
+    Vec3d hit;
+    MeshRaycaster::line_from_mouse_pos(mouse_position, Transform3d::Identity(), camera, point, direction);
+    Vec3d normal = -cp->get_normal().cast<double>();
+    double den = normal.dot(direction);
+    if (den != 0.) {
+        double t = (-cp->get_offset() - normal.dot(point))/den;
+        hit = (point + t * direction);
+    } else
+        return false;
+    
+    if (! m_c->object_clipper()->is_projection_inside_cut(hit))
+        return false;
 
-//        const Transform3d volume_trafo = get_volume_transformation(mv);
-        const Transform3d volume_trafo = mv->get_transformation().get_matrix();
+    // recalculate hit to object's local position
+    Vec3d hit_d = hit;
+    hit_d -= mi->get_offset();
+    hit_d[Z] -= sla_shift;
 
-        m_c->raycaster()->raycasters()[mesh_id]->unproject_on_mesh(mouse_position, instance_trafo * volume_trafo,
-            camera, hit, normal, m_c->object_clipper()->get_clipping_plane(true),
-            nullptr, &clipping_plane_was_hit);
-        if (clipping_plane_was_hit) {
-            // recalculate hit to object's local position
-            Vec3d hit_d = hit.cast<double>();
-            hit_d -= mi->get_offset();
-            hit_d[Z] -= sla_shift;
+    // Return both the point and the facet normal.
+    pos = hit_d;
+    pos_world = hit;
 
-            // Return both the point and the facet normal.
-            pos_and_normal = std::make_pair(hit_d, normal.cast<double>());
-            pos_world = hit.cast<double>();
-            return true;
-        }
-    }
-    return false;
+    return true; 
 }
 
 void GLGizmoCut3D::clear_selection()
@@ -2139,17 +2136,13 @@ bool GLGizmoCut3D::add_connector(CutConnectors& connectors, const Vec2d& mouse_p
     if (!m_connectors_editing)
         return false;
 
-    std::pair<Vec3d, Vec3d> pos_and_normal;
+    Vec3d pos;
     Vec3d pos_world;
-    if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal, pos_world)) {
-        // check if pos is out of enabled clipping plane
-        if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(pos_world))
-            return true;
-
+    if (unproject_on_cut_plane(mouse_position.cast<double>(), pos, pos_world)) {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
         unselect_all_connectors();
 
-        connectors.emplace_back(pos_and_normal.first, m_rotation_m,
+        connectors.emplace_back(pos, m_rotation_m,
                                 m_connector_size * 0.5f, m_connector_depth_ratio,
                                 m_connector_size_tolerance, m_connector_depth_ratio_tolerance,
                                 CutConnectorAttributes( CutConnectorType(m_connector_type),
@@ -2247,9 +2240,9 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
     if (!m_connectors_editing) {
         if (0 && action == SLAGizmoEventType::LeftDown) {
             // disable / enable current contour
-            std::pair<Vec3d, Vec3d> pos_and_normal;
+            Vec3d pos;
             Vec3d pos_world;
-            if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal, pos_world)) {
+            if (unproject_on_cut_plane(mouse_position.cast<double>(), pos, pos_world)) {
                 // Following would inform the clipper about the mouse click, so it can
                 // toggle the respective contour as disabled.
                 m_c->object_clipper()->pass_mouse_click(pos_world);

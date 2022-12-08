@@ -188,7 +188,7 @@ private:
 // Used for chaining slice lines into polygons.
 std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its);
 std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, std::function<void()> throw_on_cancel_callback);
-std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, const std::vector<bool> &face_mask);
+std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, const std::vector<char> &face_mask);
 // Having the face neighbors available, assign unique edge IDs to face edges for chaining of polygons over slices.
 std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, std::vector<Vec3i> &face_neighbors, bool assign_unbound_edges = false, int *num_edges = nullptr);
 
@@ -204,6 +204,8 @@ void its_flip_triangles(indexed_triangle_set &its);
 // or more than two faces share the same edge position!
 int its_merge_vertices(indexed_triangle_set &its, bool shrink_to_fit = true);
 
+// Calculate number of degenerate faces. There should be no degenerate faces in a nice mesh.
+int its_num_degenerate_faces(const indexed_triangle_set &its);
 // Remove degenerate faces, return number of faces removed.
 int its_remove_degenerate_faces(indexed_triangle_set &its, bool shrink_to_fit = true);
 

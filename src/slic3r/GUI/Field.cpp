@@ -1416,6 +1416,14 @@ void ColourPicker::sys_color_changed()
 #endif
 }
 
+PointCtrl::~PointCtrl()
+{
+    if (sizer && sizer->IsEmpty()) {
+        delete sizer;
+        sizer = nullptr;
+    }
+}
+
 void PointCtrl::BUILD()
 {
 	auto temp = new wxBoxSizer(wxHORIZONTAL);

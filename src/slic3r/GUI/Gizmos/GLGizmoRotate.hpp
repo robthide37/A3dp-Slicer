@@ -40,7 +40,6 @@ private:
     Transform3d m_orient_matrix{ Transform3d::Identity() };
 #endif // ENABLE_WORLD_COORDINATE
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
     GLModel m_scale;
     GLModel m_snap_radii;
@@ -55,7 +54,6 @@ private:
     float m_old_radius{ 0.0f };
     float m_old_hover_radius{ 0.0f };
     float m_old_angle{ 0.0f };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // emboss need to draw rotation gizmo in local coordinate systems
     bool m_using_local_coordinate{false};
@@ -98,32 +96,17 @@ protected:
     void on_start_dragging() override;
     void on_dragging(const UpdateData &data) override;
     void on_render() override;
-#if !ENABLE_RAYCAST_PICKING
-    void on_render_for_picking() override;
-#endif // !ENABLE_RAYCAST_PICKING
 
 private:
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_circle(const ColorRGBA& color, bool radius_changed);
     void render_scale(const ColorRGBA& color, bool radius_changed);
     void render_snap_radii(const ColorRGBA& color, bool radius_changed);
     void render_reference_radius(const ColorRGBA& color, bool radius_changed);
     void render_angle_arc(const ColorRGBA& color, bool radius_changed);
     void render_grabber_connection(const ColorRGBA& color, bool radius_changed);
-#else
-    void render_circle() const;
-    void render_scale() const;
-    void render_snap_radii() const;
-    void render_reference_radius() const;
-    void render_angle() const;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void render_grabber(const BoundingBoxf3& box);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     Transform3d local_transform(const Selection& selection) const;
-#else
-    void transform_to_local(const Selection& selection) const;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // returns the intersection of the mouse ray with the plane perpendicular to the gizmo axis, in local coordinate
 #if ENABLE_WORLD_COORDINATE
@@ -189,16 +172,8 @@ protected:
     void on_dragging(const UpdateData &data) override;
         
     void on_render() override;
-#if ENABLE_RAYCAST_PICKING
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
-#else
-    void on_render_for_picking() override {
-        for (GLGizmoRotate& g : m_gizmos) {
-            g.render_for_picking();
-        }
-    }
-#endif // ENABLE_RAYCAST_PICKING
 
     void on_render_input_window(float x, float y, float bottom_limit) override;
 

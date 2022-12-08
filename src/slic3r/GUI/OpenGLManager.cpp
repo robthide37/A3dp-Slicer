@@ -37,20 +37,20 @@ std::string gl_get_string_safe(GLenum param, const std::string& default_value)
     return std::string((value != nullptr) ? value : default_value);
 }
 
-const std::string& OpenGLManager::GLInfo::get_version() const
+const std::string& OpenGLManager::GLInfo::get_version_string() const
 {
     if (!m_detected)
         detect();
 
-    return m_version;
+    return m_version_string;
 }
 
-const std::string& OpenGLManager::GLInfo::get_glsl_version() const
+const std::string& OpenGLManager::GLInfo::get_glsl_version_string() const
 {
     if (!m_detected)
         detect();
 
-    return m_glsl_version;
+    return m_glsl_version_string;
 }
 
 const std::string& OpenGLManager::GLInfo::get_vendor() const
@@ -71,7 +71,7 @@ const std::string& OpenGLManager::GLInfo::get_renderer() const
 
 bool OpenGLManager::GLInfo::is_mesa() const
 {
-    return boost::icontains(m_version, "mesa");
+    return m_version_is_mesa;
 }
 
 int OpenGLManager::GLInfo::get_max_tex_size() const
@@ -97,13 +97,19 @@ float OpenGLManager::GLInfo::get_max_anisotropy() const
     return m_max_anisotropy;
 }
 
+static Semver parse_version_string(const std::string& version);
+
 void OpenGLManager::GLInfo::detect() const
 {
-    *const_cast<std::string*>(&m_version)      = gl_get_string_safe(GL_VERSION, "N/A");
-    *const_cast<std::string*>(&m_glsl_version) = gl_get_string_safe(GL_SHADING_LANGUAGE_VERSION, "N/A");
+    *const_cast<std::string*>(&m_version_string) = gl_get_string_safe(GL_VERSION, "N/A");
+    *const_cast<std::string*>(&m_glsl_version_string) = gl_get_string_safe(GL_SHADING_LANGUAGE_VERSION, "N/A");
     *const_cast<std::string*>(&m_vendor)       = gl_get_string_safe(GL_VENDOR, "N/A");
     *const_cast<std::string*>(&m_renderer)     = gl_get_string_safe(GL_RENDERER, "N/A");
 
+    *const_cast<Semver*>(&m_version)       = parse_version_string(m_version_string);
+    *const_cast<bool*>(&m_version_is_mesa) = boost::icontains(m_version_string, "mesa");
+    *const_cast<Semver*>(&m_glsl_version)  = parse_version_string(m_glsl_version_string);
+    
     int* max_tex_size = const_cast<int*>(&m_max_tex_size);
     glsafe(::glGetIntegerv(GL_MAX_TEXTURE_SIZE, max_tex_size));
 
@@ -119,16 +125,16 @@ void OpenGLManager::GLInfo::detect() const
     *const_cast<bool*>(&m_detected) = true;
 }
 
-static bool version_greater_or_equal_to(const std::string& version, unsigned int major, unsigned int minor)
+static Semver parse_version_string(const std::string& version)
 {
     if (version == "N/A")
-        return false;
+        return Semver::invalid();
 
     std::vector<std::string> tokens;
     boost::split(tokens, version, boost::is_any_of(" "), boost::token_compress_on);
 
     if (tokens.empty())
-        return false;
+        return Semver::invalid();
 
 #if ENABLE_OPENGL_ES
     const std::string version_container = (tokens.size() > 1 && boost::istarts_with(tokens[1], "ES")) ? tokens[2] : tokens[0];
@@ -150,20 +156,15 @@ static bool version_greater_or_equal_to(const std::string& version, unsigned int
     if (numbers.size() > 1)
         gl_minor = ::atoi(numbers[1].c_str());
 
-    if (gl_major < major)
-        return false;
-    else if (gl_major > major)
-        return true;
-    else
-        return gl_minor >= minor;
+    return Semver(gl_major, gl_minor, 0);
 }
 
 bool OpenGLManager::GLInfo::is_version_greater_or_equal_to(unsigned int major, unsigned int minor) const
 {
     if (!m_detected)
         detect();
-
-    return version_greater_or_equal_to(m_version, major, minor);
+    
+    return m_version >= Semver(major, minor, 0);
 }
 
 bool OpenGLManager::GLInfo::is_glsl_version_greater_or_equal_to(unsigned int major, unsigned int minor) const
@@ -171,7 +172,7 @@ bool OpenGLManager::GLInfo::is_glsl_version_greater_or_equal_to(unsigned int maj
     if (!m_detected)
         detect();
 
-    return version_greater_or_equal_to(m_glsl_version, major, minor);
+    return m_glsl_version >= Semver(major, minor, 0);
 }
 
 // If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
@@ -378,13 +379,13 @@ bool OpenGLManager::init_gl()
             wxString message = from_u8((boost::format(
 #if ENABLE_OPENGL_ES
                 _utf8(L("PrusaSlicer requires OpenGL ES 2.0 capable graphics driver to run correctly, \n"
-                    "while OpenGL version %s, render %s, vendor %s was detected."))) % s_gl_info.get_version() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
+                    "while OpenGL version %s, render %s, vendor %s was detected."))) % s_gl_info.get_version_string() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
 #elif ENABLE_GL_CORE_PROFILE
                 _utf8(L("PrusaSlicer requires OpenGL %s capable graphics driver to run correctly, \n"
-                    "while OpenGL version %s, render %s, vendor %s was detected."))) % (s_gl_info.is_core_profile() ? "3.3" : "2.0") % s_gl_info.get_version() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
+                    "while OpenGL version %s, render %s, vendor %s was detected."))) % (s_gl_info.is_core_profile() ? "3.3" : "2.0") % s_gl_info.get_version_string() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
 #else
                 _utf8(L("PrusaSlicer requires OpenGL 2.0 capable graphics driver to run correctly, \n"
-                    "while OpenGL version %s, render %s, vendor %s was detected."))) % s_gl_info.get_version() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
+                    "while OpenGL version %s, render %s, vendor %s was detected."))) % s_gl_info.get_version_string() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
 #endif // ENABLE_OPENGL_ES
             message += "\n";
         	message += _L("You may need to update your graphics card driver.");
@@ -423,7 +424,7 @@ bool OpenGLManager::init_gl()
             //     WHQL: 4.6.14800 Compatibility Profile Context 22.6.1 30.0.21023.1015
             // Non-WHQL: 4.6.0 Compatibility Profile Context 22.8.1.220810
             std::regex version_rgx(R"(Compatibility\sProfile\sContext\s(\d+)\.(\d+)\.(\d+))");
-            if (std::smatch matches; std::regex_search(gl_info.get_version(), matches, version_rgx) && matches.size() == 4) {
+            if (std::smatch matches; std::regex_search(gl_info.get_version_string(), matches, version_rgx) && matches.size() == 4) {
                 int version_major = std::stoi(matches[1].str());
                 int version_minor = std::stoi(matches[2].str());
                 int version_patch = std::stoi(matches[3].str());

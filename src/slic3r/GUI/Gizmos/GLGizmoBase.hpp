@@ -6,10 +6,8 @@
 
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/GLModel.hpp"
-#if ENABLE_RAYCAST_PICKING
 #include "slic3r/GUI/MeshUtils.hpp"
 #include "slic3r/GUI/SceneRaycaster.hpp"
-#endif // ENABLE_RAYCAST_PICKING
 
 #include <cereal/archives/binary.hpp>
 
@@ -68,49 +66,29 @@ protected:
         bool dragging{ false };
         Vec3d center{ Vec3d::Zero() };
         Vec3d angles{ Vec3d::Zero() };
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         Transform3d matrix{ Transform3d::Identity() };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         ColorRGBA color{ ColorRGBA::WHITE() };
         EGrabberExtension extensions{ EGrabberExtension::None };
-#if ENABLE_RAYCAST_PICKING
         // the picking id shared by all the elements
         int picking_id{ -1 };
         std::array<std::shared_ptr<SceneRaycasterItem>, GRABBER_ELEMENTS_MAX_COUNT> raycasters = { nullptr };
-#endif // ENABLE_RAYCAST_PICKING
 
         Grabber() = default;
         ~Grabber();
 
-#if ENABLE_RAYCAST_PICKING
         void render(bool hover, float size) { render(size, hover ? complementary(color) : color); }
-#else
-        void render(bool hover, float size) { render(size, hover ? complementary(color) : color, false); }
-        void render_for_picking(float size) { render(size, color, true); }
-#endif // ENABLE_RAYCAST_PICKING
 
         float get_half_size(float size) const;
         float get_dragging_half_size(float size) const;
 
-#if ENABLE_RAYCAST_PICKING
         void register_raycasters_for_picking(int id);
         void unregister_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 
     private:
-#if ENABLE_RAYCAST_PICKING
         void render(float size, const ColorRGBA& render_color);
-#else
-        void render(float size, const ColorRGBA& render_color, bool picking);
-#endif // ENABLE_RAYCAST_PICKING
 
-#if ENABLE_RAYCAST_PICKING
         static PickingModel s_cube;
         static PickingModel s_cone;
-#else
-        static GLModel s_cube;
-        static GLModel s_cone;
-#endif // ENABLE_RAYCAST_PICKING
     };
 
 public:
@@ -186,9 +164,6 @@ public:
     bool update_items_state();
 
     void render() { on_render(); }
-#if !ENABLE_RAYCAST_PICKING
-    void render_for_picking() { on_render_for_picking(); }
-#endif // !ENABLE_RAYCAST_PICKING
     void render_input_window(float x, float y, float bottom_limit);
 
     /// <summary>
@@ -210,10 +185,8 @@ public:
     /// <returns>Return True when use the information and don't want to propagate it otherwise False.</returns>
     virtual bool on_mouse(const wxMouseEvent &mouse_event) { return false; }
 
-#if ENABLE_RAYCAST_PICKING
     void register_raycasters_for_picking()   { register_grabbers_for_picking(); on_register_raycasters_for_picking(); }
     void unregister_raycasters_for_picking() { unregister_grabbers_for_picking(); on_unregister_raycasters_for_picking(); }
-#endif // ENABLE_RAYCAST_PICKING
 
     virtual bool is_in_editing_mode() const { return false; }
     virtual bool is_selection_rectangle_dragging() const { return false; }
@@ -237,27 +210,15 @@ protected:
     virtual void on_dragging(const UpdateData& data) {}
 
     virtual void on_render() = 0;
-#if !ENABLE_RAYCAST_PICKING
-    virtual void on_render_for_picking() = 0;
-#endif // !ENABLE_RAYCAST_PICKING
     virtual void on_render_input_window(float x, float y, float bottom_limit) {}
 
-#if ENABLE_RAYCAST_PICKING
     void register_grabbers_for_picking();
     void unregister_grabbers_for_picking();
     virtual void on_register_raycasters_for_picking() {}
     virtual void on_unregister_raycasters_for_picking() {}
-#else
-    // Returns the picking color for the given id, based on the BASE_ID constant
-    // No check is made for clashing with other picking color (i.e. GLVolumes)
-    ColorRGBA picking_color_component(unsigned int id) const;
-#endif // ENABLE_RAYCAST_PICKING
 
     void render_grabbers(const BoundingBoxf3& box) const;
     void render_grabbers(float size) const;
-#if !ENABLE_RAYCAST_PICKING
-    void render_grabbers_for_picking(const BoundingBoxf3& box) const;
-#endif // !ENABLE_RAYCAST_PICKING
 
     std::string format(float value, unsigned int decimals) const;
 

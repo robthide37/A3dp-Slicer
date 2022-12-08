@@ -1,10 +1,8 @@
 // Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoFlatten.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
 
@@ -100,13 +98,11 @@ void GLGizmoFlatten::on_render()
 {
     const Selection& selection = m_parent.get_selection();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader == nullptr)
         return;
     
     shader->start_using();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
@@ -115,50 +111,27 @@ void GLGizmoFlatten::on_render()
 
     if (selection.is_single_full_instance()) {
         const Transform3d& inst_matrix = selection.get_first_volume()->get_instance_transformation().get_matrix();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d model_matrix = Geometry::translation_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * inst_matrix;
         const Transform3d view_model_matrix = camera.get_view_matrix() * model_matrix;
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#else
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslatef(0.f, 0.f, selection.get_first_volume()->get_sla_shift_z()));
-        glsafe(::glMultMatrixd(inst_matrix.data()));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (this->is_plane_update_necessary())
             update_planes();
         for (int i = 0; i < (int)m_planes.size(); ++i) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
             m_planes_casters[i]->set_transform(model_matrix);
             m_planes[i].vbo.model.set_color(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
             m_planes[i].vbo.model.render();
-#else
-            m_planes[i].vbo.set_color(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
-            m_planes[i].vbo.render();
-#endif // ENABLE_RAYCAST_PICKING
-#else
-            glsafe(::glColor4fv(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR.data() : DEFAULT_PLANE_COLOR.data()));
-            if (m_planes[i].vbo.has_VBOs())
-                m_planes[i].vbo.render();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     glsafe(::glEnable(GL_CULL_FACE));
     glsafe(::glDisable(GL_BLEND));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLGizmoFlatten::on_register_raycasters_for_picking()
 {
     // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
@@ -183,66 +156,12 @@ void GLGizmoFlatten::on_unregister_raycasters_for_picking()
     m_parent.set_raycaster_gizmos_on_top(false);
     m_planes_casters.clear();
 }
-#else
-void GLGizmoFlatten::on_render_for_picking()
-{
-    const Selection& selection = m_parent.get_selection();
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    GLShaderProgram* shader = wxGetApp().get_shader("flat");
-    if (shader == nullptr)
-        return;
-
-    shader->start_using();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-    glsafe(::glDisable(GL_DEPTH_TEST));
-    glsafe(::glDisable(GL_BLEND));
-
-    if (selection.is_single_full_instance() && !wxGetKeyState(WXK_CONTROL)) {
-        const Transform3d& m = selection.get_first_volume()->get_instance_transformation().get_matrix();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d view_model_matrix = camera.get_view_matrix() *
-          Geometry::translation_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * m;
-
-        shader->set_uniform("view_model_matrix", view_model_matrix);
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#else
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslatef(0.f, 0.f, selection.get_first_volume()->get_sla_shift_z()));
-        glsafe(::glMultMatrixd(m.data()));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-        if (this->is_plane_update_necessary())
-            update_planes();
-        for (int i = 0; i < (int)m_planes.size(); ++i) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-            m_planes[i].vbo.set_color(picking_color_component(i));
-#else
-            glsafe(::glColor4fv(picking_color_component(i).data()));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-            m_planes[i].vbo.render();
-        }
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-    }
-
-    glsafe(::glEnable(GL_CULL_FACE));
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    shader->stop_using();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-}
-#endif // ENABLE_RAYCAST_PICKING
 
 void GLGizmoFlatten::set_flattening_data(const ModelObject* model_object)
 {
     if (model_object != m_old_model_object) {
         m_planes.clear();
-#if ENABLE_RAYCAST_PICKING
         on_unregister_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
     }
 }
 
@@ -259,9 +178,7 @@ void GLGizmoFlatten::update_planes()
     }
     ch = ch.convex_hull_3d();
     m_planes.clear();
-#if ENABLE_RAYCAST_PICKING
     on_unregister_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 #if ENABLE_WORLD_COORDINATE
     const Transform3d inst_matrix = mo->instances.front()->get_matrix_no_offset();
 #else
@@ -457,8 +374,6 @@ void GLGizmoFlatten::update_planes()
     // And finally create respective VBOs. The polygon is convex with
     // the vertices in order, so triangulation is trivial.
     for (auto& plane : m_planes) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
         indexed_triangle_set its;
         its.vertices.reserve(plane.vertices.size());
         its.indices.reserve(plane.vertices.size() / 3);
@@ -470,37 +385,14 @@ void GLGizmoFlatten::update_planes()
         }
         plane.vbo.model.init_from(its);
         plane.vbo.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
-#else
-        GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::TriangleFan, GLModel::Geometry::EVertexLayout::P3N3 };
-        init_data.reserve_vertices(plane.vertices.size());
-        init_data.reserve_indices(plane.vertices.size());
-        // vertices + indices
-        for (size_t i = 0; i < plane.vertices.size(); ++i) {
-            init_data.add_vertex((Vec3f)plane.vertices[i].cast<float>(), (Vec3f)plane.normal.cast<float>());
-            init_data.add_index((unsigned int)i);
-        }
-        plane.vbo.init_from(std::move(init_data));
-#endif // ENABLE_RAYCAST_PICKING
-#else
-        plane.vbo.reserve(plane.vertices.size());
-        for (const auto& vert : plane.vertices)
-            plane.vbo.push_geometry(vert, plane.normal);
-        for (size_t i=1; i<plane.vertices.size()-1; ++i)
-            plane.vbo.push_triangle(0, i, i+1); // triangle fan
-        plane.vbo.finalize_geometry(true);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         // FIXME: vertices should really be local, they need not
         // persist now when we use VBOs
         plane.vertices.clear();
         plane.vertices.shrink_to_fit();
     }
 
-#if ENABLE_RAYCAST_PICKING
     on_register_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 }
-
 
 bool GLGizmoFlatten::is_plane_update_necessary() const
 {

@@ -12,6 +12,9 @@ struct indexed_triangle_set;
 
 
 namespace Slic3r {
+
+class TriangleMesh;
+
 namespace Measure {
 
 
@@ -87,26 +90,26 @@ class MeasuringImpl;
 
 class Measuring {
 public:
-    // Construct the measurement object on a given its. The its must remain
-    // valid and unchanged during the whole lifetime of the object.
+    // Construct the measurement object on a given its.
     explicit Measuring(const indexed_triangle_set& its);
     ~Measuring();
-    
-    // Return a reference to a list of all features identified on the its.
-    // Use only for debugging. Expensive, do not call often.
-    std::vector<SurfaceFeature> get_all_features() const;
+
 
     // Given a face_idx where the mouse cursor points, return a feature that
     // should be highlighted (if any).
     std::optional<SurfaceFeature> get_feature(size_t face_idx, const Vec3d& point) const;
 
-    // Returns a list of triangle indices for each identified plane. Each
-    // Plane object contains an index into this vector. Expensive, do not
-    // call too often.
-    std::vector<std::vector<int>> get_planes_triangle_indices() const;
-    
+    // Return total number of planes.
+    int get_num_of_planes() const;
+
+    // Returns a list of triangle indices for given plane.
+    const std::vector<int>& get_plane_triangle_indices(int idx) const;
+
     // Returns the surface features of the plane with the given index
     const std::vector<SurfaceFeature>& get_plane_features(unsigned int plane_id) const;
+
+    // Returns the mesh used for measuring
+    const TriangleMesh& get_mesh() const;
 
 private: 
     std::unique_ptr<MeasuringImpl> priv;
@@ -118,8 +121,6 @@ struct DistAndPoints {
     double dist;
     Vec3d from;
     Vec3d to;
-
-    void transform(const Transform3d& trafo);
 };
 
 struct AngleAndEdges {
@@ -131,8 +132,6 @@ struct AngleAndEdges {
     std::pair<Vec3d, Vec3d> e2;
     double radius;
     bool coplanar;
-
-    void transform(const Transform3d& trafo);
 
     static const AngleAndEdges Dummy;
 };
@@ -149,17 +148,6 @@ struct MeasurementResult {
 
     bool has_any_data() const {
         return angle.has_value() || distance_infinite.has_value() || distance_strict.has_value() || distance_xyz.has_value();
-    }
-
-    void transform(const Transform3d& trafo) {
-        if (angle.has_value())
-            angle->transform(trafo);
-        if (distance_infinite.has_value())
-            distance_infinite->transform(trafo);
-        if (distance_strict.has_value()) {
-            distance_strict->transform(trafo);
-            distance_xyz = (distance_strict->to - distance_strict->from).cwiseAbs();
-        }
     }
 };
 

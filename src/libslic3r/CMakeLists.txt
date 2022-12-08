@@ -130,6 +130,8 @@ set(SLIC3R_SOURCES
     GCode/PressureEqualizer.hpp
     GCode/PrintExtents.cpp
     GCode/PrintExtents.hpp
+    GCode/RetractWhenCrossingPerimeters.cpp
+    GCode/RetractWhenCrossingPerimeters.hpp
     GCode/SpiralVase.cpp
     GCode/SpiralVase.hpp
     GCode/SeamPlacer.cpp

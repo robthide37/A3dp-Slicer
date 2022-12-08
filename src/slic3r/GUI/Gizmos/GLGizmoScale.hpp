@@ -48,7 +48,6 @@ class GLGizmoScale3D : public GLGizmoBase
     double m_snap_step{ 0.05 };
     StartingData m_starting;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     struct GrabberConnection
     {
         GLModel model;
@@ -57,7 +56,6 @@ class GLGizmoScale3D : public GLGizmoBase
         Vec3d old_v2{ Vec3d::Zero() };
     };
     std::array<GrabberConnection, 7> m_grabber_connections;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     ColorRGBA m_base_color;
     ColorRGBA m_drag_color;
@@ -94,30 +92,18 @@ protected:
     virtual void on_stop_dragging() override;
     virtual void on_dragging(const UpdateData& data) override;
     virtual void on_render() override;
-#if ENABLE_RAYCAST_PICKING
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
-#else
-    virtual void on_render_for_picking() override;
-#endif // ENABLE_RAYCAST_PICKING
 
 private:
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color);
-#else
-    void render_grabbers_connection(unsigned int id_1, unsigned int id_2) const;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     void do_scale_along_axis(Axis axis, const UpdateData& data);
     void do_scale_uniform(const UpdateData& data);
 
     double calc_ratio(const UpdateData& data) const;
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     Transform3d local_transform(const Selection& selection) const;
-#else
-    void transform_to_local(const Selection& selection) const;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_WORLD_COORDINATE
 };
 

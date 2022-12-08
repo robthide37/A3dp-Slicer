@@ -91,7 +91,6 @@ void Camera::select_view(const std::string& direction)
         look_at(m_target + m_distance * Vec3d::UnitY(), m_target, Vec3d::UnitZ());
 }
 
-#if ENABLE_RAYCAST_PICKING
 double Camera::get_near_left() const
 {
     switch (m_type)
@@ -163,7 +162,6 @@ double Camera::get_near_height() const
         return 2.0 / m_projection_matrix.matrix()(1, 1);
     }
 }
-#endif // ENABLE_RAYCAST_PICKING
 
 double Camera::get_fov() const
 {
@@ -177,55 +175,22 @@ double Camera::get_fov() const
     };
 }
 
-#if ENABLE_RAYCAST_PICKING
 void Camera::set_viewport(int x, int y, unsigned int w, unsigned int h)
 {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_viewport = { 0, 0, int(w), int(h) };
-#else
-    glsafe(::glGetIntegerv(GL_VIEWPORT, m_viewport.data()));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void Camera::apply_viewport() const
 {
     glsafe(::glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]));
 }
-#else
-void Camera::apply_viewport(int x, int y, unsigned int w, unsigned int h)
-{
-    glsafe(::glViewport(0, 0, w, h));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    m_viewport = { 0, 0, int(w), int(h) };
-#else
-    glsafe(::glGetIntegerv(GL_VIEWPORT, m_viewport.data()));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-}
-#endif // ENABLE_RAYCAST_PICKING
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-void Camera::apply_view_matrix()
-{
-    glsafe(::glMatrixMode(GL_MODELVIEW));
-    glsafe(::glLoadIdentity());
-    glsafe(::glMultMatrixd(m_view_matrix.data()));
-}
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 void Camera::apply_projection(const BoundingBoxf3& box, double near_z, double far_z)
 {
     double w = 0.0;
     double h = 0.0;
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    const double old_distance = m_distance;
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     m_frustrum_zs = calc_tight_frustrum_zs_around(box);
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    if (m_distance != old_distance)
-        // the camera has been moved re-apply view matrix
-        apply_view_matrix();
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (near_z > 0.0)
         m_frustrum_zs.first = std::max(std::min(m_frustrum_zs.first, near_z), FrustrumMinNearZ);
@@ -259,63 +224,9 @@ void Camera::apply_projection(const BoundingBoxf3& box, double near_z, double fa
     }
     }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
     apply_projection(-w, w, -h, h, m_frustrum_zs.first, m_frustrum_zs.second);
-#else
-    switch (m_type)
-    {
-    default:
-    case EType::Ortho:
-    {
-        const double dz = m_frustrum_zs.second - m_frustrum_zs.first;
-        const double zz = m_frustrum_zs.first + m_frustrum_zs.second;
-        m_projection_matrix.matrix() << 1.0 / w,     0.0,       0.0,      0.0,
-                                            0.0, 1.0 / h,       0.0,      0.0,
-                                            0.0,     0.0, -2.0 / dz, -zz / dz,
-                                            0.0,     0.0,       0.0,      1.0;
-        break;
-    }
-    case EType::Perspective:
-    {
-        const double n = m_frustrum_zs.first;
-        const double f = m_frustrum_zs.second;
-        const double dz = f - n;
-        const double zz = n + f;
-        const double fn = n * f;
-        m_projection_matrix.matrix() << n / w,   0.0,      0.0,            0.0,
-                                          0.0, n / h,      0.0,            0.0,
-                                          0.0,   0.0, -zz / dz, -2.0 * fn / dz,
-                                          0.0,   0.0,     -1.0,            0.0;
-        break;
-    }
-    }
-#endif // ENABLE_RAYCAST_PICKING
-#else
-    glsafe(::glMatrixMode(GL_PROJECTION));
-    glsafe(::glLoadIdentity());
-
-    switch (m_type)
-    {
-    default:
-    case EType::Ortho:
-    {
-        glsafe(::glOrtho(-w, w, -h, h, m_frustrum_zs.first, m_frustrum_zs.second));
-        break;
-    }
-    case EType::Perspective:
-    {
-        glsafe(::glFrustum(-w, w, -h, h, m_frustrum_zs.first, m_frustrum_zs.second));
-        break;
-    }
-    }
-
-    glsafe(::glGetDoublev(GL_PROJECTION_MATRIX, m_projection_matrix.data()));
-    glsafe(::glMatrixMode(GL_MODELVIEW));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_RAYCAST_PICKING
 void Camera::apply_projection(double left, double right, double bottom, double top, double near_z, double far_z)
 {
     assert(left != right && bottom != top && near_z != far_z);
@@ -344,7 +255,6 @@ void Camera::apply_projection(double left, double right, double bottom, double t
     }
     }
 }
-#endif // ENABLE_RAYCAST_PICKING
 
 void Camera::zoom_to_box(const BoundingBoxf3& box, double margin_factor)
 {

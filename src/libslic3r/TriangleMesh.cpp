@@ -622,7 +622,7 @@ std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, std::funct
     return its_face_edge_ids_impl(its, [](const uint32_t){ return true; }, throw_on_cancel_callback);
 }
 
-std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, const std::vector<bool> &face_mask)
+std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, const std::vector<char> &face_mask)
 {
     return its_face_edge_ids_impl(its, [&face_mask](const uint32_t idx){ return face_mask[idx]; }, [](){});
 }
@@ -736,6 +736,13 @@ void its_flip_triangles(indexed_triangle_set &its)
 {
     for (stl_triangle_vertex_indices &face : its.indices)
         std::swap(face(1), face(2));
+}
+
+int its_num_degenerate_faces(const indexed_triangle_set &its)
+{
+    return std::count_if(its.indices.begin(), its.indices.end(), [](auto &face) {
+        return face(0) == face(1) || face(0) == face(2) || face(1) == face(2);
+    });
 }
 
 int its_remove_degenerate_faces(indexed_triangle_set &its, bool shrink_to_fit)

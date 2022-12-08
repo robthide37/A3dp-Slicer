@@ -8,27 +8,51 @@
 
 #include <numeric>
 
+#define DEBUG_EXTRACT_ALL_FEATURES_AT_ONCE 0
+
 namespace Slic3r {
 namespace Measure {
 
 
 constexpr double feature_hover_limit = 0.5; // how close to a feature the mouse must be to highlight it
 
-static std::pair<Vec3d, double> get_center_and_radius(const std::vector<Vec3d>& border, int start_idx, int end_idx, const Transform3d& trafo)
+static std::tuple<Vec3d, double, double> get_center_and_radius(const std::vector<Vec3d>& points, const Transform3d& trafo, const Transform3d& trafo_inv)
 {
-    Vec2ds pts;
+    Vec2ds out;
     double z = 0.;
-    for (int i=start_idx; i<=end_idx; ++i) {
-        Vec3d pt_transformed = trafo * border[i];
+    for (const Vec3d& pt : points) {
+        Vec3d pt_transformed = trafo * pt;
         z = pt_transformed.z();
-        pts.emplace_back(pt_transformed.x(), pt_transformed.y());        
+        out.emplace_back(pt_transformed.x(), pt_transformed.y());
     }
 
-    auto circle = Geometry::circle_ransac(pts, 20); // FIXME: iterations?
+    const int iter = points.size() < 10  ? 2 :
+                     points.size() < 100 ? 4 :
+                     6;
 
-    return std::make_pair(trafo.inverse() * Vec3d(circle.center.x(), circle.center.y(), z), circle.radius);
+    double error = std::numeric_limits<double>::max();
+    auto circle = Geometry::circle_ransac(out, iter, &error);
+    
+    return std::make_tuple(trafo.inverse() * Vec3d(circle.center.x(), circle.center.y(), z), circle.radius, error);
 }
 
+
+
+static std::array<Vec3d, 3> orthonormal_basis(const Vec3d& v)
+{
+    std::array<Vec3d, 3> ret;
+    ret[2] = v.normalized();
+    int index;
+    ret[2].cwiseAbs().maxCoeff(&index);
+    switch (index)
+    {
+    case 0: { ret[0] = Vec3d(ret[2].y(), -ret[2].x(), 0.0).normalized(); break; }
+    case 1: { ret[0] = Vec3d(0.0, ret[2].z(), -ret[2].y()).normalized(); break; }
+    case 2: { ret[0] = Vec3d(-ret[2].z(), 0.0, ret[2].x()).normalized(); break; }
+    }
+    ret[1] = ret[2].cross(ret[0]).normalized();
+    return ret;
+}
 
 
 
@@ -41,20 +65,22 @@ public:
         std::vector<SurfaceFeature> surface_features;
         Vec3d normal;
         float area;
+        bool features_extracted = false;
     };
 
-    std::vector<SurfaceFeature> get_all_features() const;
-    std::optional<SurfaceFeature> get_feature(size_t face_idx, const Vec3d& point) const;
-    std::vector<std::vector<int>> get_planes_triangle_indices() const;
-    const std::vector<SurfaceFeature>& get_plane_features(unsigned int plane_id) const;
+    std::optional<SurfaceFeature> get_feature(size_t face_idx, const Vec3d& point);
+    int get_num_of_planes() const;
+    const std::vector<int>& get_plane_triangle_indices(int idx) const;
+    const std::vector<SurfaceFeature>& get_plane_features(unsigned int plane_id);
+    const TriangleMesh& get_mesh() const;
 
 private:
     void update_planes();
-    void extract_features();
+    void extract_features(int plane_idx);
     
     std::vector<PlaneData> m_planes;
     std::vector<size_t>    m_face_to_plane;
-    const indexed_triangle_set& m_its;
+    TriangleMesh m_mesh;
 };
 
 
@@ -63,10 +89,16 @@ private:
 
 
 MeasuringImpl::MeasuringImpl(const indexed_triangle_set& its)
-: m_its{its}
+: m_mesh(its)
 {
     update_planes();
-    extract_features();
+
+    // Extracting features will be done as needed.
+    // To extract all planes at once, run the following:
+#if DEBUG_EXTRACT_ALL_FEATURES_AT_ONCE
+    for (int i=0; i<int(m_planes.size()); ++i)
+        extract_features(i);
+#endif
 }
 
 
@@ -76,10 +108,10 @@ void MeasuringImpl::update_planes()
 
     // Now we'll go through all the facets and append Points of facets sharing the same normal.
     // This part is still performed in mesh coordinate system.
-    const size_t             num_of_facets  = m_its.indices.size();
+    const size_t             num_of_facets = m_mesh.its.indices.size();
     m_face_to_plane.resize(num_of_facets, size_t(-1));
-    const std::vector<Vec3f> face_normals   = its_face_normals(m_its);
-    const std::vector<Vec3i> face_neighbors = its_face_neighbors(m_its);
+    const std::vector<Vec3f> face_normals = its_face_normals(m_mesh.its);
+    const std::vector<Vec3i> face_neighbors = its_face_neighbors(m_mesh.its);
     std::vector<int>         facet_queue(num_of_facets, 0);
     int                      facet_queue_cnt = 0;
     const stl_normal*        normal_ptr      = nullptr;
@@ -128,7 +160,7 @@ void MeasuringImpl::update_planes()
     assert(std::none_of(m_face_to_plane.begin(), m_face_to_plane.end(), [](size_t val) { return val == size_t(-1); }));
 
     // Now we will walk around each of the planes and save vertices which form the border.
-    SurfaceMesh sm(m_its);
+    SurfaceMesh sm(m_mesh.its);
     for (int plane_id=0; plane_id < int(m_planes.size()); ++plane_id) {
         const auto& facets = m_planes[plane_id].facets;
         m_planes[plane_id].borders.clear();
@@ -173,10 +205,16 @@ void MeasuringImpl::update_planes()
                     he = sm.next_around_target(he);
                     if (he.is_invalid())
                         goto PLANE_FAILURE;
+
+                    // For broken meshes, the iteration might never get back to he_orig.
+                    // Remember all halfedges we saw to break out of such infinite loops.
+                    boost::container::small_vector<Halfedge_index, 10> he_seen;
+
                     while ( (int)m_face_to_plane[sm.face(he)] == plane_id && he != he_orig) {
+                        he_seen.emplace_back(he);
                         he = sm.next_around_target(he);
-                        if (he.is_invalid())
-                        goto PLANE_FAILURE;
+                        if (he.is_invalid() || std::find(he_seen.begin(), he_seen.end(), he) != he_seen.end())
+                            goto PLANE_FAILURE;
                     }
                     he = sm.opposite(he);
                     if (he.is_invalid())
@@ -194,12 +232,19 @@ void MeasuringImpl::update_planes()
                     visited[face_it - facets.begin()][he.side()] = true;
 
                     last_border.emplace_back(sm.point(sm.source(he)).cast<double>());
+
+                    // In case of broken meshes, this loop might be infinite. Break
+                    // out in case it is clearly going bad.
+                    if (last_border.size() > 3*facets.size()+1)
+                        goto PLANE_FAILURE;
+
                 } while (he != he_start);
 
                 if (last_border.size() == 1)
                     m_planes[plane_id].borders.pop_back();
                 else {
                     assert(last_border.front() == last_border.back());
+                    last_border.pop_back();
                 }
             }
         }
@@ -215,167 +260,191 @@ void MeasuringImpl::update_planes()
 
 
 
-void MeasuringImpl::extract_features()
+void MeasuringImpl::extract_features(int plane_idx)
 {
-    std::vector<double> angles;
+    assert(! m_planes[plane_idx].features_extracted);
+
+    PlaneData& plane = m_planes[plane_idx];
+    plane.surface_features.clear();
+    const Vec3d& normal = plane.normal;
+
+    Eigen::Quaterniond q;
+    q.setFromTwoVectors(plane.normal, Vec3d::UnitZ());
+    Transform3d trafo = Transform3d::Identity();
+    trafo.rotate(q);
+    const Transform3d trafo_inv = trafo.inverse();
+
+    std::vector<double> angles; // placed in outer scope to prevent reallocations
     std::vector<double> lengths;
 
+    for (const std::vector<Vec3d>& border : plane.borders) {
+        if (border.size() <= 1)
+            continue;
 
-    for (int i=0; i<(int)m_planes.size(); ++i) {
-        PlaneData& plane = m_planes[i];
-        plane.surface_features.clear();
-        const Vec3d& normal = plane.normal;
+        bool done = false;
 
-        Eigen::Quaterniond q;
-        q.setFromTwoVectors(plane.normal, Vec3d::UnitZ());
-        Transform3d trafo = Transform3d::Identity();
-        trafo.rotate(q);    
-        
-        for (const std::vector<Vec3d>& border : plane.borders) {
-            if (border.size() <= 1)
-                continue;
-            assert(border.front() == border.back());
-            int start_idx = -1;
+        if (border.size() > 4) {
+            const auto& [center, radius, err] = get_center_and_radius(border, trafo, trafo_inv);
 
-            std::vector<SurfaceFeature> edges;
+            if (err < 0.05) {
+                // The whole border is one circle. Just add it into the list of features
+                // and we are done.
+
+                bool is_polygon = border.size()>4 && border.size()<=8;
+                bool lengths_match = std::all_of(border.begin()+2, border.end(), [is_polygon](const Vec3d& pt) {
+                        return Slic3r::is_approx((pt - *((&pt)-1)).squaredNorm(), (*((&pt)-1) - *((&pt)-2)).squaredNorm(), is_polygon ? 0.01 : 0.01);
+                    });
+
+                if (lengths_match && (is_polygon || border.size() > 8)) {
+                    if (is_polygon) {
+                        // This is a polygon, add the separate edges with the center.
+                        for (int j=0; j<int(border.size()); ++j)
+                            plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
+                                border[j==0 ? border.size()-1 : j-1], border[j],
+                                std::make_optional(center)));
+                    } else {
+                        // The fit went well and it has more than 8 points - let's consider this a circle.
+                        plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Circle, center, plane.normal, std::nullopt, radius));
+                    }
+                    done = true;
+                }
+            }
+        }
+
+        if (! done) {
+            // In this case, the border is not a circle and may contain circular
+            // segments. Try to find them and then add all remaining edges as edges.
+
+            auto are_angles_same  = [](double a, double b) { return Slic3r::is_approx(a,b,0.01); };
+            auto are_lengths_same = [](double a, double b) { return Slic3r::is_approx(a,b,0.01); };
+
+
+            // Given an idx into border, return the index that is idx+offset position,
+            // while taking into account the need for wrap-around and the fact that
+            // the first and last point are the same.
+            auto offset_to_index = [border_size = int(border.size())](int idx, int offset) -> int {
+                assert(std::abs(offset) < border_size);
+                int out = idx+offset;
+                if (out >= border_size)
+                    out = out - border_size;
+                else if (out < 0)
+                    out = border_size + out;
+
+                return out;
+            };
 
             // First calculate angles at all the vertices.
             angles.clear();
             lengths.clear();
-            for (int i=0; i<int(border.size()); ++i) { // front is the same as back, hence the weird indexing
-                const Vec3d& v2 = (i == 0 ? border[0] - border[border.size()-2]
-                                          : border[i] - border[i-1]);
-                const Vec3d& v1 = i == (int)border.size()-1 ? border[1] - border.back()
-                                                    : border[i+1] - border[i];
+            int first_different_angle_idx = 0;
+            for (int i=0; i<int(border.size()); ++i) {
+                const Vec3d& v2 = border[i] - (i == 0 ? border[border.size()-1] : border[i-1]);
+                const Vec3d& v1 = (i == int(border.size()-1) ? border[0] : border[i+1]) - border[i];
                 double angle = atan2(-normal.dot(v1.cross(v2)), -v1.dot(v2)) + M_PI;
                 if (angle > M_PI)
                     angle = 2*M_PI - angle;
 
                 angles.push_back(angle);
                 lengths.push_back(v2.norm());
+                if (first_different_angle_idx == 0 && angles.size() > 1) {
+                    if (! are_angles_same(angles.back(), angles[angles.size()-2]))
+                        first_different_angle_idx = angles.size()-1;
+                }
             }
             assert(border.size() == angles.size());
             assert(border.size() == lengths.size());
 
-
             // First go around the border and pick what might be circular segments.
             // Save pair of indices to where such potential segments start and end.
             // Also remember the length of these segments.
+            int start_idx = -1;
             bool circle = false;
+            bool first_iter = true;
             std::vector<SurfaceFeature> circles;
+            std::vector<SurfaceFeature> edges;
             std::vector<std::pair<int, int>> circles_idxs;
-            std::vector<double> circles_lengths;
-            for (int i=1; i<(int)angles.size(); ++i) {
-                if (Slic3r::is_approx(lengths[i], lengths[i-1])
-                    && Slic3r::is_approx(angles[i], angles[i-1])
-                    && i != (int)angles.size()-1 ) {
+            //std::vector<double> circles_lengths;
+            std::vector<Vec3d> single_circle; // could be in loop-scope, but reallocations
+            double single_circle_length = 0.;
+            int first_pt_idx = offset_to_index(first_different_angle_idx, 1);
+            int i = first_pt_idx;
+            while (i != first_pt_idx || first_iter) {
+                if (are_angles_same(angles[i], angles[offset_to_index(i,-1)])
+                && i != offset_to_index(first_pt_idx, -1) // not the last point
+                && i != start_idx  ) {
                     // circle
                     if (! circle) {
                         circle = true;
-                        start_idx = std::max(0, i-2);
+                        single_circle.clear();
+                        single_circle_length = 0.;
+                        start_idx = offset_to_index(i, -2);
+                        single_circle = { border[start_idx], border[offset_to_index(start_idx,1)] };
+                        single_circle_length += lengths[offset_to_index(i, -1)];
                     }
+                    single_circle.emplace_back(border[i]);
+                    single_circle_length += lengths[i];
                 } else {
-                    if (circle) {
-                        const auto& [center, radius] = get_center_and_radius(border, start_idx, i, trafo);
-                        // Add the circle and remember indices into borders.                            
-                        circles_idxs.emplace_back(start_idx, i);
-                        circles.emplace_back(SurfaceFeature(SurfaceFeatureType::Circle, center, plane.normal, std::nullopt, radius));
-                        circles_lengths.emplace_back(std::accumulate(lengths.begin() + start_idx + 1, lengths.begin() + i + 1, 0.));
-                        circle = false;
-                    }
-                }
-            }
+                    if (circle && single_circle.size() >= 5) { // Less than 5 vertices? Not a circle.
+                        single_circle.emplace_back(border[i]);
+                        single_circle_length += lengths[i];
 
-            // At this point we might need to merge the first and last segment, if the starting
-            // point happened to be inside the segment. The discrimination of too small segments
-            // will follow, so we need a complete picture before that.
-            if (circles_idxs.size() > 1
-             && circles_idxs.back().second == angles.size()-1
-             && circles_idxs.front().first == 0) {
-                // Possibly the same circle. Check that the angle and length criterion holds along the combined segment.
-                bool same = true;
-                double last_len = -1.;
-                double last_angle = 0.;
-                for (int i=circles_idxs.back().first + 1; i != circles_idxs.front().second; ++i) {
-                    if (i == angles.size())
-                        i = 1;
-                    if (last_len == -1.) {
-                        last_len = lengths[i];
-                        last_angle = angles[i];
-                    } else {
-                        if (! Slic3r::is_approx(lengths[i], last_len) || ! Slic3r::is_approx(angles[i], last_angle)) {
-                            same = false;
-                            break;
+                        bool accept_circle = true;
+                        {
+                            // Check that lengths of internal (!!!) edges match.
+                            int j = offset_to_index(start_idx, 3);
+                            while (j != i) {
+                                if (! are_lengths_same(lengths[offset_to_index(j,-1)], lengths[j])) {
+                                    accept_circle = false;
+                                    break;
+                                }
+                                j = offset_to_index(j, 1);
+                            }
+                        }
+
+                        if (accept_circle) {
+                            const auto& [center, radius, err] = get_center_and_radius(single_circle, trafo, trafo_inv);
+
+                            // Check that the fit went well. The tolerance is high, only to
+                            // reject complete failures.
+                            accept_circle &= err < 0.05;
+
+                            // If the segment subtends less than 90 degrees, throw it away.
+                            accept_circle &= single_circle_length / radius > 0.9*M_PI/2.;
+
+                            if (accept_circle) {
+                                // Add the circle and remember indices into borders.
+                                circles_idxs.emplace_back(start_idx, i);
+                                circles.emplace_back(SurfaceFeature(SurfaceFeatureType::Circle, center, plane.normal, std::nullopt, radius));
+                            }
                         }
                     }
+                    circle = false;
                 }
-                if (same) {
-                    // This seems to really be the same circle. Better apply ransac again. The parts can be small and inexact.
-                    std::vector<Vec3d> points(border.begin() + circles_idxs.back().first, border.end());
-                    points.insert(points.end(), border.begin(), border.begin() + circles_idxs.front().second+1);
-                    auto [c, radius] = get_center_and_radius(points, 0, points.size()-1, trafo);
-
-                    // Now replace the first circle with the combined one, remove the last circle.
-                    // First index of the first circle is saved negative - we are going to pick edges
-                    // from the border later, we will need to know where the merged in segment was.
-                    // The sign simplifies the algorithm that picks the remaining edges - see below.
-                    circles.front() = SurfaceFeature(SurfaceFeatureType::Circle, c, plane.normal, std::nullopt, radius);
-                    circles_idxs.front().first = - circles_idxs.back().first;
-                    circles_lengths.front() += circles_lengths.back();
-                    circles.pop_back();
-                    circles_idxs.pop_back();
-                    circles_lengths.pop_back();
-                }
-             }
-
-            // Now throw away all circles that subtend less than 90 deg.
-            assert(circles.size() == circles_lengths.size());
-            for (int i=0; i<int(circles.size()); ++i) {
-                double r = std::get<1>(circles[i].get_circle());
-                if (circles_lengths[i] / r < 0.9*M_PI/2.) {
-                    circles_lengths.erase(circles_lengths.begin() + i);
-                    circles.erase(circles.begin() + i);
-                    circles_idxs.erase(circles_idxs.begin() + i);
-                    --i;
-                }
+                // Take care of the wrap around.
+                first_iter = false;
+                i = offset_to_index(i, 1);
             }
-            circles_lengths.clear(); // no longer needed, make it obvious
-
-            // Anything under 5 vertices shall not be considered a circle.
-            assert(circles_idxs.size() == circles.size());
-            for (int i=int(circles_idxs.size())-1; i>=0; --i) {
-                const auto& [start, end] = circles_idxs[i];
-                int N = start >= 0
-                        ? end - start + (start == 0 && end == border.size()-1 ? 0 : 1) // last point is the same as first
-                        : end + (border.size() + start);
-                if (N < 5) {
-                    circles.erase(circles.begin() + i);
-                    circles_idxs.erase(circles_idxs.begin() + i);
-                } else if (N <= 8 && start == 0 && end == border.size()-1) {
-                    // This is a regular 5-8 polygon. Add the edges as edges with a special
-                    // point and remove the circle. Leave the indices in circles_idxs, so
-                    // the edges are not picked up again later.
-                    const Vec3d center = std::get<0>(circles[i].get_circle());
-                    for (int j=1; j<=end; ++j)
-                        edges.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge,
-                            border[j - 1], border[j], std::make_optional(center)));
-                    circles.erase(circles.begin() + i);
-                }
-            }
-
 
             // We have the circles. Now go around again and pick edges, while jumping over circles.
-            // If the first index of the first circle is negative, it means that it was merged
-            // with a segment that was originally at the back and is no longer there. Ressurect
-            // its pair of indices so that edges are not picked again.
-            if (! circles_idxs.empty() && circles_idxs.front().first < 0)
-                circles_idxs.emplace_back(-circles_idxs.front().first, int(border.size()));
-            int cidx = 0; // index of next circle to jump over
-            for (int i=1; i<int(border.size()); ++i) {
-                if (cidx < (int)circles_idxs.size() && i > (int)circles_idxs[cidx].first)
-                    i = circles_idxs[cidx++].second;
-                else
-                    edges.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge, border[i - 1], border[i]));
+            if (circles_idxs.empty()) {
+                // Just add all edges.
+                for (int i=1; i<int(border.size()); ++i)
+                    edges.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge, border[i-1], border[i]));
+                edges.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge, border[0], border[border.size()-1]));
+            } else if (circles_idxs.size() > 1 || circles_idxs.front().first != circles_idxs.front().second) {
+                // There is at least one circular segment. Start at its end and add edges until the start of the next one.
+                int i = circles_idxs.front().second;
+                int circle_idx = 1;
+                while (true) {
+                    i = offset_to_index(i, 1);
+                    edges.emplace_back(SurfaceFeature(SurfaceFeatureType::Edge, border[offset_to_index(i,-1)], border[i]));
+                    if (circle_idx < int(circles_idxs.size()) && i == circles_idxs[circle_idx].first) {
+                        i = circles_idxs[circle_idx].second;
+                        ++circle_idx;
+                    }
+                    if (i == circles_idxs.front().first)
+                        break;
+                }
             }
 
             // Merge adjacent edges where needed.
@@ -399,54 +468,49 @@ void MeasuringImpl::extract_features()
             }));
             assert(std::all_of(edges.begin(), edges.end(), [](const SurfaceFeature& f) {
                 return f.get_type() == SurfaceFeatureType::Edge;
-            }));            
+            }));
             plane.surface_features.insert(plane.surface_features.end(), std::make_move_iterator(circles.begin()),
                 std::make_move_iterator(circles.end()));
             plane.surface_features.insert(plane.surface_features.end(), std::make_move_iterator(edges.begin()),
                 std::make_move_iterator(edges.end()));
         }
-
-        // The last surface feature is the plane itself.
-        Vec3d cog = Vec3d::Zero();
-        size_t counter = 0;
-        for (const std::vector<Vec3d>& b : plane.borders) {
-            for (size_t i = 1; i < b.size(); ++i) {
-                cog += b[i];
-                ++counter;
-            }
-        }
-        cog /= double(counter);
-        plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Plane,
-            plane.normal, cog, std::optional<Vec3d>(), i + 0.0001));
-
-        plane.borders.clear();
-        plane.borders.shrink_to_fit();
     }
+
+    // The last surface feature is the plane itself.
+    Vec3d cog = Vec3d::Zero();
+    size_t counter = 0;
+    for (const std::vector<Vec3d>& b : plane.borders) {
+        for (size_t i = 1; i < b.size(); ++i) {
+            cog += b[i];
+            ++counter;
+        }
+    }
+    cog /= double(counter);
+    plane.surface_features.emplace_back(SurfaceFeature(SurfaceFeatureType::Plane,
+        plane.normal, cog, std::optional<Vec3d>(), plane_idx + 0.0001));
+
+    plane.borders.clear();
+    plane.borders.shrink_to_fit();
+
+    plane.features_extracted = true;
 }
 
 
 
-std::vector<SurfaceFeature> MeasuringImpl::get_all_features() const
-{
-    std::vector<SurfaceFeature> features;
-    //PlaneData& plane = m_planes[0];
-    for (const PlaneData& plane : m_planes)    
-        for (const SurfaceFeature& feature : plane.surface_features)
-            features.emplace_back(feature);
-    return features;        
-}
 
 
 
 
 
-
-std::optional<SurfaceFeature> MeasuringImpl::get_feature(size_t face_idx, const Vec3d& point) const
+std::optional<SurfaceFeature> MeasuringImpl::get_feature(size_t face_idx, const Vec3d& point)
 {
     if (face_idx >= m_face_to_plane.size())
         return std::optional<SurfaceFeature>();
 
     const PlaneData& plane = m_planes[m_face_to_plane[face_idx]];
+
+    if (! plane.features_extracted)
+        extract_features(m_face_to_plane[face_idx]);
     
     size_t closest_feature_idx = size_t(-1);
     double min_dist = std::numeric_limits<double>::max();
@@ -496,20 +560,31 @@ std::optional<SurfaceFeature> MeasuringImpl::get_feature(size_t face_idx, const 
 
 
 
-std::vector<std::vector<int>> MeasuringImpl::get_planes_triangle_indices() const
+int MeasuringImpl::get_num_of_planes() const
 {
-    std::vector<std::vector<int>> out;
-    for (const PlaneData& plane : m_planes)
-        out.emplace_back(plane.facets);        
-    return out;
+    return (m_planes.size());
 }
 
-const std::vector<SurfaceFeature>& MeasuringImpl::get_plane_features(unsigned int plane_id) const
+
+
+const std::vector<int>& MeasuringImpl::get_plane_triangle_indices(int idx) const
+{
+    assert(idx >= 0 && idx < int(m_planes.size()));
+    return m_planes[idx].facets;
+}
+
+const std::vector<SurfaceFeature>& MeasuringImpl::get_plane_features(unsigned int plane_id)
 {
     assert(plane_id < m_planes.size());
+    if (! m_planes[plane_id].features_extracted)
+        extract_features(plane_id);
     return m_planes[plane_id].surface_features;
 }
 
+const TriangleMesh& MeasuringImpl::get_mesh() const
+{
+    return this->m_mesh;
+}
 
 
 
@@ -528,11 +603,6 @@ Measuring::Measuring(const indexed_triangle_set& its)
 Measuring::~Measuring() {}
 
 
-std::vector<SurfaceFeature> Measuring::get_all_features() const
-{
-    return priv->get_all_features();
-}
-
 
 std::optional<SurfaceFeature> Measuring::get_feature(size_t face_idx, const Vec3d& point) const
 {
@@ -540,15 +610,25 @@ std::optional<SurfaceFeature> Measuring::get_feature(size_t face_idx, const Vec3
 }
 
 
-
-std::vector<std::vector<int>> Measuring::get_planes_triangle_indices() const
+int Measuring::get_num_of_planes() const
 {
-    return priv->get_planes_triangle_indices();
+    return priv->get_num_of_planes();
+}
+
+
+const std::vector<int>& Measuring::get_plane_triangle_indices(int idx) const
+{
+    return priv->get_plane_triangle_indices(idx);
 }
 
 const std::vector<SurfaceFeature>& Measuring::get_plane_features(unsigned int plane_id) const
 {
     return priv->get_plane_features(plane_id);
+}
+
+const TriangleMesh& Measuring::get_mesh() const
+{
+    return priv->get_mesh();
 }
 
 const AngleAndEdges AngleAndEdges::Dummy = { 0.0, Vec3d::Zero(), { Vec3d::Zero(), Vec3d::Zero() }, { Vec3d::Zero(), Vec3d::Zero() }, 0.0, true };
@@ -620,8 +700,8 @@ static AngleAndEdges angle_edge_edge(const std::pair<Vec3d, Vec3d>& e1, const st
 static AngleAndEdges angle_edge_plane(const std::pair<Vec3d, Vec3d>& e, const std::tuple<int, Vec3d, Vec3d>& p)
 {
     const auto& [idx, normal, origin] = p;
-    const Vec3d e1e2_unit = edge_direction(e);
-    if (are_parallel(e1e2_unit, normal) || are_perpendicular(e1e2_unit, normal))
+    Vec3d e1e2_unit = edge_direction(e);
+    if (are_perpendicular(e1e2_unit, normal))
         return AngleAndEdges::Dummy;
 
     // ensure the edge is pointing away from the intersection
@@ -633,8 +713,22 @@ static AngleAndEdges angle_edge_plane(const std::pair<Vec3d, Vec3d>& e, const st
     // then verify edge direction and revert it, if needed
     Vec3d e1 = e.first;
     Vec3d e2 = e.second;
-    if ((e1 - inters).squaredNorm() > (e2 - inters).squaredNorm())
+    if ((e1 - inters).squaredNorm() > (e2 - inters).squaredNorm()) {
         std::swap(e1, e2);
+        e1e2_unit = -e1e2_unit;
+    }
+
+    if (are_parallel(e1e2_unit, normal)) {
+        const std::array<Vec3d, 3> basis = orthonormal_basis(e1e2_unit);
+        const double radius = (0.5 * (e1 + e2) - inters).norm();
+        const Vec3d edge_on_plane_dir = (basis[1].dot(origin - inters) >= 0.0) ? basis[1] : -basis[1];
+        std::pair<Vec3d, Vec3d> edge_on_plane = std::make_pair(inters, inters + radius * edge_on_plane_dir);
+        if (!inters.isApprox(e1)) {
+            edge_on_plane.first  += radius * edge_on_plane_dir;
+            edge_on_plane.second += radius * edge_on_plane_dir;
+        }
+        return AngleAndEdges(0.5 * double(PI), inters, std::make_pair(e1, e2), edge_on_plane, radius, inters.isApprox(e1));
+    }
 
     const Vec3d e1e2 = e2 - e1;
     const double e1e2_len = e1e2.norm();
@@ -763,7 +857,8 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
     ///////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////
-    } else if (f1.get_type() == SurfaceFeatureType::Edge) {
+    }
+    else if (f1.get_type() == SurfaceFeatureType::Edge) {
         if (f2.get_type() == SurfaceFeatureType::Edge) {
             std::vector<DistAndPoints> distances;
 
@@ -890,21 +985,6 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
             const Vec3d D = c1 - c0;
 
             if (!are_parallel(n0, n1)) {
-                auto orthonormal_basis = [](const Vec3d& v) {
-                    std::array<Vec3d, 3> ret;
-                    ret[2] = v.normalized();
-                    int index;
-                    ret[2].maxCoeff(&index);
-                    switch (index)
-                    {
-                    case 0: { ret[0] = Vec3d(ret[2].y(), -ret[2].x(), 0.0).normalized(); break; }
-                    case 1: { ret[0] = Vec3d(0.0, ret[2].z(), -ret[2].y()).normalized(); break; }
-                    case 2: { ret[0] = Vec3d(-ret[2].z(), 0.0, ret[2].x()).normalized(); break; }
-                    }
-                    ret[1] = ret[2].cross(ret[0]).normalized();
-                    return ret;
-                };
-
                 // Get parameters for constructing the degree-8 polynomial phi.
                 const double one = 1.0;
                 const double two = 2.0;
@@ -1147,27 +1227,6 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
     }
     
     return result;
-}
-
-void DistAndPoints::transform(const Transform3d& trafo) {
-    from = trafo * from;
-    to = trafo * to;
-    dist = (to - from).norm();
-}
-
-void AngleAndEdges::transform(const Transform3d& trafo) {
-    const Vec3d old_e1 = e1.second - e1.first;
-    const Vec3d old_e2 = e2.second - e2.first;
-    center = trafo * center;
-    e1.first = trafo * e1.first;
-    e1.second = trafo * e1.second;
-    e2.first = trafo * e2.first;
-    e2.second = trafo * e2.second;
-    angle = std::acos(std::clamp(Measure::edge_direction(e1).dot(Measure::edge_direction(e2)), -1.0, 1.0));
-    const Vec3d new_e1 = e1.second - e1.first;
-    const Vec3d new_e2 = e2.second - e2.first;
-    const double average_scale = 0.5 * (new_e1.norm() / old_e1.norm() + new_e2.norm() / old_e2.norm());
-    radius = average_scale * radius;
 }
 
 

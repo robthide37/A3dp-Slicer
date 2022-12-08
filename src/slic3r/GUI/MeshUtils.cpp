@@ -6,10 +6,8 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Model.hpp"
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/Camera.hpp"
 
 #include <GL/glew.h>
@@ -24,7 +22,7 @@ namespace GUI {
 
 void MeshClipper::set_behaviour(bool fill_cut, double contour_width)
 {
-    if (fill_cut != m_fill_cut || is_approx(contour_width, m_contour_width))
+    if (fill_cut != m_fill_cut || ! is_approx(contour_width, m_contour_width))
         m_result.reset();
     m_fill_cut = fill_cut;
     m_contour_width = contour_width;
@@ -77,15 +75,10 @@ void MeshClipper::set_transformation(const Geometry::Transformation& trafo)
     }
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void MeshClipper::render_cut(const ColorRGBA& color)
-#else
-void MeshClipper::render_cut()
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (! m_result)
         recalculate_triangles();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
@@ -105,22 +98,14 @@ void MeshClipper::render_cut()
 
     if (curr_shader != nullptr)
         curr_shader->start_using();
-#else
-    if (m_vertex_array.has_VBOs())
-        m_vertex_array.render();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void MeshClipper::render_contour(const ColorRGBA& color)
-#else
-void MeshClipper::render_contour()
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (! m_result)
         recalculate_triangles();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
+
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
@@ -140,10 +125,6 @@ void MeshClipper::render_contour()
 
     if (curr_shader != nullptr)
         curr_shader->start_using();
-#else
-    if (m_vertex_array_expanded.has_VBOs())
-        m_vertex_array_expanded.render();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 bool MeshClipper::is_projection_inside_cut(const Vec3d& point_in) const
@@ -265,7 +246,6 @@ void MeshClipper::recalculate_triangles()
     tr2.pretranslate(0.002 * m_plane.get_normal().normalized());
 
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     std::vector<Vec2f> triangles2d;
 
     for (const ExPolygon& exp : expolys) {
@@ -352,16 +332,6 @@ void MeshClipper::recalculate_triangles()
         isl.expoly = std::move(exp);
         isl.expoly_bb = get_extents(exp);
     }
-#else
-    #error NOT IMPLEMENTED
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-#else
-    #error NOT IMPLEMENTED
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 
@@ -370,13 +340,8 @@ Vec3f MeshRaycaster::get_triangle_normal(size_t facet_idx) const
     return m_normals[facet_idx];
 }
 
-#if ENABLE_RAYCAST_PICKING
 void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                         Vec3d& point, Vec3d& direction)
-#else
-void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                                        Vec3d& point, Vec3d& direction)
-#endif // ENABLE_RAYCAST_PICKING
 {
     Matrix4d modelview = camera.get_view_matrix().matrix();
     Matrix4d projection= camera.get_projection_matrix().matrix();
@@ -400,11 +365,8 @@ void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3
 
 bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                       Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane,
-                                      size_t* facet_idx, bool* was_clipping_plane_hit) const
+                                      size_t* facet_idx) const
 {
-    if (was_clipping_plane_hit)
-        *was_clipping_plane_hit = false;
-
     Vec3d point;
     Vec3d direction;
     line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
@@ -425,26 +387,9 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
             break;
     }
 
-    if (i==hits.size()) {
-        // All hits are clipped.
-        return false;
-    }
-    if  ((hits.size()-i) % 2 != 0) {
-        // There is an odd number of unclipped hits - meaning the nearest must be from inside the mesh.
-        // In that case, calculate intersection with the clipping place.
-        if (clipping_plane && was_clipping_plane_hit) {
-            direction = direction + point;
-            point = trafo * point; // transform to world coords
-            direction = trafo * direction - point;
-
-            Vec3d normal = -clipping_plane->get_normal().cast<double>();
-            double den = normal.dot(direction);
-            if (den != 0.) {
-                double t = (-clipping_plane->get_offset() - normal.dot(point))/den;
-                position = (point + t * direction).cast<float>();
-                *was_clipping_plane_hit = true;
-            }
-        }
+    if (i==hits.size() || (hits.size()-i) % 2 != 0) {
+        // All hits are either clipped, or there is an odd number of unclipped
+        // hits - meaning the nearest must be from inside the mesh.
         return false;
     }
 
@@ -458,24 +403,7 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
     return true;
 }
 
-bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                                      Vec3d& position, Vec3d& normal) const
-{
-    Vec3d point;
-    Vec3d direction;
-    line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
 
-    std::vector<AABBMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction);
-
-    if (hits.empty())
-        return false; // no intersection found
-
-    // Now stuff the points in the provided vector and calculate normals if asked about them:
-    position = hits[0].position();
-    normal = hits[0].normal();
-
-    return true;
-}
 
 bool MeshRaycaster::is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const 
 {
@@ -540,7 +468,6 @@ std::vector<unsigned> MeshRaycaster::get_unobscured_idxs(const Geometry::Transfo
     return out;
 }
 
-#if ENABLE_RAYCAST_PICKING
 bool MeshRaycaster::closest_hit(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
     Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane, size_t* facet_idx) const
 {
@@ -573,7 +500,6 @@ bool MeshRaycaster::closest_hit(const Vec2d& mouse_pos, const Transform3d& trafo
 
     return true;
 }
-#endif // ENABLE_RAYCAST_PICKING
 
 Vec3f MeshRaycaster::get_closest_point(const Vec3f& point, Vec3f* normal) const
 {

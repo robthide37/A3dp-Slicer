@@ -3,10 +3,8 @@
 
 #include "3DScene.hpp"
 #include "OpenGLManager.hpp"
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "GUI_App.hpp"
 #include "GLModel.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #include "BitmapCache.hpp"
 
 #include <GL/glew.h>
@@ -342,7 +340,6 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)tex_id));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel::Geometry init_data;
     init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2 };
     init_data.reserve_vertices(4);
@@ -364,21 +361,11 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     GLShaderProgram* shader = wxGetApp().get_shader("flat_texture");
     if (shader != nullptr) {
         shader->start_using();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->set_uniform("view_model_matrix", Transform3d::Identity());
         shader->set_uniform("projection_matrix", Transform3d::Identity());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         model.render();
         shader->stop_using();
     }
-#else
-    ::glBegin(GL_QUADS);
-    ::glTexCoord2f(uvs.left_bottom.u, uvs.left_bottom.v); ::glVertex2f(left, bottom);
-    ::glTexCoord2f(uvs.right_bottom.u, uvs.right_bottom.v); ::glVertex2f(right, bottom);
-    ::glTexCoord2f(uvs.right_top.u, uvs.right_top.v); ::glVertex2f(right, top);
-    ::glTexCoord2f(uvs.left_top.u, uvs.left_top.v); ::glVertex2f(left, top);
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 

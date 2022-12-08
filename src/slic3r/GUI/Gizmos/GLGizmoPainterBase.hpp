@@ -3,11 +3,7 @@
 
 #include "GLGizmoBase.hpp"
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GLModel.hpp"
-#else
-#include "slic3r/GUI/3DScene.hpp"
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include "libslic3r/ObjectID.hpp"
 #include "libslic3r/TriangleSelector.hpp"
@@ -33,59 +29,14 @@ enum class PainterGizmoType {
     MMU_SEGMENTATION
 };
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-class GLPaintContour
-{
-public:
-    GLPaintContour() = default;
-
-    void render() const;
-
-    inline bool has_VBO() const { return m_contour_EBO_id != 0; }
-
-    // Release the geometry data, release OpenGL VBOs.
-    void release_geometry();
-
-    // Finalize the initialization of the contour geometry and the indices, upload both to OpenGL VBO objects
-    // and possibly releasing it if it has been loaded into the VBOs.
-    void finalize_geometry();
-
-    void clear()
-    {
-        this->contour_vertices.clear();
-        this->contour_indices.clear();
-        this->contour_indices_size = 0;
-    }
-
-    std::vector<float> contour_vertices;
-    std::vector<int>   contour_indices;
-
-    // When the triangle indices are loaded into the graphics card as Vertex Buffer Objects,
-    // the above mentioned std::vectors are cleared and the following variables keep their original length.
-    size_t contour_indices_size{0};
-
-    // IDs of the Vertex Array Objects, into which the geometry has been loaded.
-    // Zero if the VBOs are not sent to GPU yet.
-    GLuint m_contour_VBO_id{0};
-    GLuint m_contour_EBO_id{0};
-};
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
 class TriangleSelectorGUI : public TriangleSelector {
 public:
     explicit TriangleSelectorGUI(const TriangleMesh& mesh)
         : TriangleSelector(mesh) {}
     virtual ~TriangleSelectorGUI() = default;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     virtual void render(ImGuiWrapper* imgui, const Transform3d& matrix);
     void         render(const Transform3d& matrix) { this->render(nullptr, matrix); }
-#else
-    // Render current selection. Transformation matrices are supposed
-    // to be already set.
-    virtual void render(ImGuiWrapper *imgui);
-    void         render() { this->render(nullptr); }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     void request_update_render_data() { m_update_render_data = true; }
 
@@ -103,29 +54,18 @@ protected:
 private:
     void update_render_data();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel                m_iva_enforcers;
     GLModel                m_iva_blockers;
     std::array<GLModel, 3> m_iva_seed_fills;
 #ifdef PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
     std::array<GLModel, 3> m_varrays;
 #endif // PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
-#else
-    GLIndexedVertexArray                m_iva_enforcers;
-    GLIndexedVertexArray                m_iva_blockers;
-    std::array<GLIndexedVertexArray, 3> m_iva_seed_fills;
-    std::array<GLIndexedVertexArray, 3> m_varrays;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 protected:
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_paint_contour;
 
     void update_paint_contour();
     void render_paint_contour(const Transform3d& matrix);
-#else
-    GLPaintContour                      m_paint_contour;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 };
 
 
@@ -138,9 +78,6 @@ private:
     ObjectID m_old_mo_id;
     size_t m_old_volumes_size = 0;
     void on_render() override {}
-#if !ENABLE_RAYCAST_PICKING
-    void on_render_for_picking() override {}
-#endif // !ENABLE_RAYCAST_PICKING
 
 public:
     GLGizmoPainterBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
@@ -211,13 +148,11 @@ protected:
     bool     m_paint_on_overhangs_only          = false;
     float    m_highlight_by_angle_threshold_deg = 0.f;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
 #if !ENABLE_GL_CORE_PROFILE
     Vec2d m_old_center{ Vec2d::Zero() };
 #endif // !ENABLE_GL_CORE_PROFILE
     float m_old_cursor_radius{ 0.0f };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     static constexpr float SmartFillAngleMin  = 0.0f;
     static constexpr float SmartFillAngleMax  = 90.f;
@@ -251,11 +186,7 @@ private:
                               const Camera& camera,
                               const std::vector<Transform3d>& trafo_matrices) const;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     static std::shared_ptr<GLModel> s_sphere;
-#else
-    static std::shared_ptr<GLIndexedVertexArray> s_sphere;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     bool m_internal_stack_active = false;
     bool m_schedule_update = false;

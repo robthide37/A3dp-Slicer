@@ -73,26 +73,13 @@
 
 static constexpr const float TRACKBALLSIZE = 0.8f;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 static const Slic3r::ColorRGBA DEFAULT_BG_DARK_COLOR  = { 0.478f, 0.478f, 0.478f, 1.0f };
 static const Slic3r::ColorRGBA DEFAULT_BG_LIGHT_COLOR = { 0.753f, 0.753f, 0.753f, 1.0f };
 static const Slic3r::ColorRGBA ERROR_BG_DARK_COLOR    = { 0.478f, 0.192f, 0.039f, 1.0f };
 static const Slic3r::ColorRGBA ERROR_BG_LIGHT_COLOR   = { 0.753f, 0.192f, 0.039f, 1.0f };
-#else
-static const Slic3r::ColorRGB DEFAULT_BG_DARK_COLOR  = { 0.478f, 0.478f, 0.478f };
-static const Slic3r::ColorRGB DEFAULT_BG_LIGHT_COLOR = { 0.753f, 0.753f, 0.753f };
-static const Slic3r::ColorRGB ERROR_BG_DARK_COLOR    = { 0.478f, 0.192f, 0.039f };
-static const Slic3r::ColorRGB ERROR_BG_LIGHT_COLOR   = { 0.753f, 0.192f, 0.039f };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 // Number of floats
 static constexpr const size_t MAX_VERTEX_BUFFER_SIZE     = 131072 * 6; // 3.15MB
-// Reserve size in number of floats.
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-static constexpr const size_t VERTEX_BUFFER_RESERVE_SIZE = 131072 * 2; // 1.05MB
-// Reserve size in number of floats, maximum sum of all preallocated buffers.
-//static constexpr const size_t VERTEX_BUFFER_RESERVE_SIZE_SUM_MAX = 1024 * 1024 * 128 / 4; // 128MB
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 namespace Slic3r {
 namespace GUI {
@@ -266,14 +253,8 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas)
     GLCanvas3D::LayersEditing::s_overlay_window_width = ImGui::GetWindowSize().x /*+ (float)m_layers_texture.width/4*/;
     imgui.end();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     render_active_object_annotations(canvas);
     render_profile(canvas);
-#else
-    const Rect& bar_rect = get_bar_rect_viewport(canvas);
-    render_active_object_annotations(canvas, bar_rect);
-    render_profile(bar_rect);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 float GLCanvas3D::LayersEditing::get_cursor_z_relative(const GLCanvas3D& canvas)
@@ -307,17 +288,6 @@ Rect GLCanvas3D::LayersEditing::get_bar_rect_screen(const GLCanvas3D& canvas)
     return { w - thickness_bar_width(canvas), 0.0f, w, h };
 }
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-Rect GLCanvas3D::LayersEditing::get_bar_rect_viewport(const GLCanvas3D& canvas)
-{
-    const Size& cnv_size = canvas.get_canvas_size();
-    float half_w = 0.5f * (float)cnv_size.get_width();
-    float half_h = 0.5f * (float)cnv_size.get_height();
-    float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
-    return { (half_w - thickness_bar_width(canvas)) * inv_zoom, half_h * inv_zoom, half_w * inv_zoom, -half_h * inv_zoom };
-}
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
 bool GLCanvas3D::LayersEditing::is_initialized() const
 {
     return wxGetApp().get_shader("variable_layer_height") != nullptr;
@@ -349,7 +319,6 @@ std::string GLCanvas3D::LayersEditing::get_tooltip(const GLCanvas3D& canvas) con
     return ret;
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D& canvas)
 {
     const Size cnv_size = canvas.get_canvas_size();
@@ -359,10 +328,6 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
         return;
 
     const float cnv_inv_width = 1.0f / cnv_width;
-#else
-void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect)
-{
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
     if (shader == nullptr)
         return;
@@ -374,17 +339,14 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     shader->set_uniform("z_cursor", m_object_max_z * this->get_cursor_z_relative(canvas));
     shader->set_uniform("z_cursor_band_width", band_width);
     shader->set_uniform("object_max_z", m_object_max_z);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->set_uniform("view_model_matrix", Transform3d::Identity());
     shader->set_uniform("projection_matrix", Transform3d::Identity());
     shader->set_uniform("view_normal_matrix", (Matrix3d)Matrix3d::Identity());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
 
     // Render the color bar
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_profile.background.is_initialized() || m_profile.old_canvas_width != cnv_width) {
         m_profile.old_canvas_width = cnv_width;
         m_profile.background.reset();
@@ -412,38 +374,19 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     }
 
     m_profile.background.render();
-#else
-    const float l = bar_rect.get_left();
-    const float r = bar_rect.get_right();
-    const float t = bar_rect.get_top();
-    const float b = bar_rect.get_bottom();
-
-    ::glBegin(GL_QUADS);
-    ::glNormal3f(0.0f, 0.0f, 1.0f);
-    ::glTexCoord2f(0.0f, 0.0f); ::glVertex2f(l, b);
-    ::glTexCoord2f(1.0f, 0.0f); ::glVertex2f(r, b);
-    ::glTexCoord2f(1.0f, 1.0f); ::glVertex2f(r, t);
-    ::glTexCoord2f(0.0f, 1.0f); ::glVertex2f(l, t);
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 
     shader->stop_using();
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLCanvas3D::LayersEditing::render_profile(const GLCanvas3D& canvas)
-#else
-void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     //FIXME show some kind of legend.
 
     if (!m_slicing_parameters)
         return;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Size cnv_size = canvas.get_canvas_size();
     const float cnv_width  = (float)cnv_size.get_width();
     const float cnv_height = (float)cnv_size.get_height();
@@ -456,13 +399,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
 
     const float cnv_inv_width  = 1.0f / cnv_width;
     const float cnv_inv_height = 1.0f / cnv_height;
-#else
-    // Make the vertical bar a bit wider so the layer height curve does not touch the edge of the bar region.
-    const float scale_x = bar_rect.get_width() / float(1.12 * m_slicing_parameters->max_layer_height);
-    const float scale_y = bar_rect.get_height() / m_object_max_z;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     // Baseline
     if (!m_profile.baseline.is_initialized() || m_profile.old_layer_height_profile != m_layer_height_profile) {
         m_profile.baseline.reset();
@@ -523,23 +460,6 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.profile.render();
         shader->stop_using();
     }
-#else
-    const float x = bar_rect.get_left() + float(m_slicing_parameters->layer_height) * scale_x;
-
-    // Baseline
-    glsafe(::glColor3f(0.0f, 0.0f, 0.0f));
-    ::glBegin(GL_LINE_STRIP);
-    ::glVertex2f(x, bar_rect.get_bottom());
-    ::glVertex2f(x, bar_rect.get_top());
-    glsafe(::glEnd());
-
-    // Curve
-    glsafe(::glColor3f(0.0f, 0.0f, 1.0f));
-    ::glBegin(GL_LINE_STRIP);
-    for (unsigned int i = 0; i < m_layer_height_profile.size(); i += 2)
-        ::glVertex2f(bar_rect.get_left() + (float)m_layer_height_profile[i + 1] * scale_x, bar_rect.get_bottom() + (float)m_layer_height_profile[i] * scale_y);
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const GLVolumeCollection& volumes)
@@ -566,10 +486,8 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
     shader->set_uniform("z_cursor", float(m_object_max_z) * float(this->get_cursor_z_relative(canvas)));
     shader->set_uniform("z_cursor_band_width", float(this->band_width));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // Initialize the layer height texture mapping.
     const GLsizei w = (GLsizei)m_layers_texture.width;
@@ -589,13 +507,11 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
 
         shader->set_uniform("volume_world_matrix", glvolume->world_matrix());
         shader->set_uniform("object_max_z", 0.0f);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Transform3d& view_matrix = camera.get_view_matrix();
         const Transform3d model_matrix = glvolume->world_matrix();
         shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         glvolume->render();
     }
@@ -857,53 +773,55 @@ void GLCanvas3D::Labels::render(const std::vector<const ModelInstance*>& sorted_
     }
 }
 
+static float get_cursor_height()
+{
+    float ret = 16.0f;
+#ifdef _WIN32
+    // see: https://forums.codeguru.com/showthread.php?449040-get-the-system-current-cursor-size
+    // this code is not perfect because it returns a maximum height equal to 31 even if the cursor bitmap shown on screen is bigger
+    // but at least it gives the same result as wxWidgets in the settings tabs
+    ICONINFO ii;
+    if (::GetIconInfo((HICON)GetCursor(), &ii) != 0) {
+        BITMAP bitmap;
+        ::GetObject(ii.hbmMask, sizeof(BITMAP), &bitmap);
+        const int width = bitmap.bmWidth;
+        const int height = (ii.hbmColor == nullptr) ? bitmap.bmHeight / 2 : bitmap.bmHeight;
+        HDC dc = ::CreateCompatibleDC(nullptr);
+        if (dc != nullptr) {
+            if (::SelectObject(dc, ii.hbmMask) != nullptr) {
+                for (int i = 0; i < width; ++i) {
+                    for (int j = 0; j < height; ++j) {
+                        if (::GetPixel(dc, i, j) != RGB(255, 255, 255)) {
+                            if (ret < float(j))
+                                ret = float(j);
+                        }
+                    }
+                }
+                ::DeleteDC(dc);
+            }
+        }
+        ::DeleteObject(ii.hbmColor);
+        ::DeleteObject(ii.hbmMask);
+    }
+#endif //  _WIN32
+    return ret;
+}
+
 void GLCanvas3D::Tooltip::set_text(const std::string& text)
 {
     // If the mouse is inside an ImGUI dialog, then the tooltip is suppressed.
     m_text = m_in_imgui ? std::string() : text;
+    m_cursor_height = get_cursor_height();
 }
 
 void GLCanvas3D::Tooltip::render(const Vec2d& mouse_position, GLCanvas3D& canvas)
 {
     static ImVec2 size(0.0f, 0.0f);
 
-    auto validate_position = [](const Vec2d& position, const GLCanvas3D& canvas, const ImVec2& wnd_size) {
-        auto calc_cursor_height = []() {
-            float ret = 16.0f;
-#ifdef _WIN32
-            // see: https://forums.codeguru.com/showthread.php?449040-get-the-system-current-cursor-size
-            // this code is not perfect because it returns a maximum height equal to 31 even if the cursor bitmap shown on screen is bigger
-            // but at least it gives the same result as wxWidgets in the settings tabs
-            ICONINFO ii;
-            if (::GetIconInfo((HICON)GetCursor(), &ii) != 0) {
-                BITMAP bitmap;
-                ::GetObject(ii.hbmMask, sizeof(BITMAP), &bitmap);
-                int width = bitmap.bmWidth;
-                int height = (ii.hbmColor == nullptr) ? bitmap.bmHeight / 2 : bitmap.bmHeight;
-                HDC dc = ::CreateCompatibleDC(nullptr);
-                if (dc != nullptr) {
-                    if (::SelectObject(dc, ii.hbmMask) != nullptr) {
-                        for (int i = 0; i < width; ++i) {
-                            for (int j = 0; j < height; ++j) {
-                                if (::GetPixel(dc, i, j) != RGB(255, 255, 255)) {
-                                    if (ret < float(j))
-                                        ret = float(j);
-                                }
-                            }
-                        }
-                        ::DeleteDC(dc);
-                    }
-                }
-                ::DeleteObject(ii.hbmColor);
-                ::DeleteObject(ii.hbmMask);
-            }
-#endif //  _WIN32
-            return ret;
-        };
-
+    auto validate_position = [this](const Vec2d& position, const GLCanvas3D& canvas, const ImVec2& wnd_size) {
         const Size cnv_size = canvas.get_canvas_size();
         const float x = std::clamp(float(position.x()), 0.0f, float(cnv_size.get_width()) - wnd_size.x);
-        const float y = std::clamp(float(position.y()) + calc_cursor_height(), 0.0f, float(cnv_size.get_height()) - wnd_size.y);
+        const float y = std::clamp(float(position.y()) + m_cursor_height, 0.0f, float(cnv_size.get_height()) - wnd_size.y);
         return Vec2f(x, y);
     };
 
@@ -944,17 +862,8 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
     if (polygons.empty())
         return;
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    size_t triangles_count = 0;
-    for (const Polygon& poly : polygons) {
-        triangles_count += poly.points.size() - 2;
-    }
-    const size_t vertices_count = 3 * triangles_count;
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
     if (m_render_fill) {
         GLModel::Geometry fill_data;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         fill_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
         fill_data.color  = { 0.3333f, 0.0f, 0.0f, 0.5f };
 
@@ -974,55 +883,9 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
         }
 
         m_fill.init_from(std::move(fill_data));
-#else
-        GLModel::Geometry::Entity entity;
-        entity.type = GLModel::EPrimitiveType::Triangles;
-        entity.color = { 0.3333f, 0.0f, 0.0f, 0.5f };
-        entity.positions.reserve(vertices_count);
-        entity.normals.reserve(vertices_count);
-        entity.indices.reserve(vertices_count);
-
-        const ExPolygons polygons_union = union_ex(polygons);
-        for (const ExPolygon& poly : polygons_union) {
-            const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(poly);
-            for (const Vec3d& v : triangulation) {
-                entity.positions.emplace_back(v.cast<float>() + Vec3f(0.0f, 0.0f, 0.0125f)); // add a small positive z to avoid z-fighting
-                entity.normals.emplace_back(Vec3f::UnitZ());
-                const size_t positions_count = entity.positions.size();
-                if (positions_count % 3 == 0) {
-                    entity.indices.emplace_back(positions_count - 3);
-                    entity.indices.emplace_back(positions_count - 2);
-                    entity.indices.emplace_back(positions_count - 1);
-                }
-            }
-        }
-
-        fill_data.entities.emplace_back(entity);
-        m_fill.init_from(fill_data);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_perimeter.init_from(polygons, 0.025f); // add a small positive z to avoid z-fighting
-#else
-    GLModel::Geometry perimeter_data;
-    for (const Polygon& poly : polygons) {
-        GLModel::Geometry::Entity ent;
-        ent.type = GLModel::EPrimitiveType::LineLoop;
-        ent.positions.reserve(poly.points.size());
-        ent.indices.reserve(poly.points.size());
-        unsigned int id_count = 0;
-        for (const Point& p : poly.points) {
-            ent.positions.emplace_back(unscale<float>(p.x()), unscale<float>(p.y()), 0.025f); // add a small positive z to avoid z-fighting
-            ent.normals.emplace_back(Vec3f::UnitZ());
-            ent.indices.emplace_back(id_count++);
-        }
-
-        perimeter_data.entities.emplace_back(ent);
-    }
-
-    m_perimeter.init_from(perimeter_data);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLCanvas3D::SequentialPrintClearance::render()
@@ -1030,32 +893,22 @@ void GLCanvas3D::SequentialPrintClearance::render()
     const ColorRGBA FILL_COLOR    = { 1.0f, 0.0f, 0.0f, 0.5f };
     const ColorRGBA NO_FILL_COLOR = { 1.0f, 1.0f, 1.0f, 0.75f };
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#else
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     if (shader == nullptr)
         return;
 
     shader->start_using();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
     shader->set_uniform("view_model_matrix", camera.get_view_matrix());
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_CULL_FACE));
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_perimeter.set_color(m_render_fill ? FILL_COLOR : NO_FILL_COLOR);
-#else
-    m_perimeter.set_color(-1, m_render_fill ? FILL_COLOR : NO_FILL_COLOR);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_perimeter.render();
     m_fill.render();
 
@@ -1246,49 +1099,11 @@ bool GLCanvas3D::init()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    // Set antialiasing / multisampling
-    glsafe(::glDisable(GL_LINE_SMOOTH));
-    glsafe(::glDisable(GL_POLYGON_SMOOTH));
-
-    // ambient lighting
-    GLfloat ambient[4] = { 0.3f, 0.3f, 0.3f, 1.0f };
-    glsafe(::glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambient));
-
-    glsafe(::glEnable(GL_LIGHT0));
-    glsafe(::glEnable(GL_LIGHT1));
-
-    // light from camera
-    GLfloat specular_cam[4] = { 0.3f, 0.3f, 0.3f, 1.0f };
-    glsafe(::glLightfv(GL_LIGHT1, GL_SPECULAR, specular_cam));
-    GLfloat diffuse_cam[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
-    glsafe(::glLightfv(GL_LIGHT1, GL_DIFFUSE, diffuse_cam));
-
-    // light from above
-    GLfloat specular_top[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
-    glsafe(::glLightfv(GL_LIGHT0, GL_SPECULAR, specular_top));
-    GLfloat diffuse_top[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
-    glsafe(::glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse_top));
-
-    // Enables Smooth Color Shading; try GL_FLAT for (lack of) fun.
-    glsafe(::glShadeModel(GL_SMOOTH));
-
-    // A handy trick -- have surface material mirror the color.
-    glsafe(::glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE));
-    glsafe(::glEnable(GL_COLOR_MATERIAL));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
     if (m_multisample_allowed)
         glsafe(::glEnable(GL_MULTISAMPLE));
 
     if (m_main_toolbar.is_enabled())
         m_layers_editing.init();
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    // on linux the gl context is not valid until the canvas is not shown on screen
-    // we defer the geometry finalization of volumes until the first call to render()
-    m_volumes.finalize_geometry(true);
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (m_gizmos.is_enabled() && !m_gizmos.init())
         std::cout << "Unable to initialize gizmos: please, check that all the required textures are available" << std::endl;
@@ -1346,19 +1161,23 @@ void GLCanvas3D::toggle_sla_auxiliaries_visibility(bool visible, const ModelObje
 
     m_render_sla_auxiliaries = visible;
 
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters_for_picking(SceneRaycaster::EType::Volume);
+
     for (GLVolume* vol : m_volumes.volumes) {
-        if ((mo == nullptr || m_model->objects[vol->composite_id.object_id] == mo)
-        && (instance_idx == -1 || vol->composite_id.instance_id == instance_idx)
-        && vol->composite_id.volume_id < 0)
+      if ((mo == nullptr || m_model->objects[vol->composite_id.object_id] == mo)
+            && (instance_idx == -1 || vol->composite_id.instance_id == instance_idx)
+            && vol->composite_id.volume_id < 0) {
             vol->is_active = visible;
+            auto it = std::find_if(raycasters->begin(), raycasters->end(), [vol](std::shared_ptr<SceneRaycasterItem> item) { return item->get_raycaster() == vol->mesh_raycaster.get(); });
+            if (it != raycasters->end())
+                (*it)->set_active(vol->is_active);
+        }
     }
 }
 
 void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject* mo, int instance_idx, const ModelVolume* mv)
 {
-#if ENABLE_RAYCAST_PICKING
     std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters_for_picking(SceneRaycaster::EType::Volume);
-#endif // ENABLE_RAYCAST_PICKING
     for (GLVolume* vol : m_volumes.volumes) {
         if (vol->is_wipe_tower)
             vol->is_active = (visible && mo == nullptr);
@@ -1389,11 +1208,10 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
                 }
             }
         }
-#if ENABLE_RAYCAST_PICKING
+
         auto it = std::find_if(raycasters->begin(), raycasters->end(), [vol](std::shared_ptr<SceneRaycasterItem> item) { return item->get_raycaster() == vol->mesh_raycaster.get(); });
         if (it != raycasters->end())
             (*it)->set_active(vol->is_active);
-#endif // ENABLE_RAYCAST_PICKING
     }
 
     if (visible && !mo)
@@ -1651,12 +1469,8 @@ void GLCanvas3D::render()
     // and the viewport was set incorrectly, leading to tripping glAsserts further down
     // the road (in apply_projection). That's why the minimum size is forced to 10.
     Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_RAYCAST_PICKING
     camera.set_viewport(0, 0, std::max(10u, (unsigned int)cnv_size.get_width()), std::max(10u, (unsigned int)cnv_size.get_height()));
     camera.apply_viewport();
-#else
-    camera.apply_viewport(0, 0, std::max(10u, (unsigned int)cnv_size.get_width()), std::max(10u, (unsigned int)cnv_size.get_height()));
-#endif // ENABLE_RAYCAST_PICKING
 
     if (camera.requires_zoom_to_bed) {
         zoom_to_bed();
@@ -1664,17 +1478,7 @@ void GLCanvas3D::render()
         camera.requires_zoom_to_bed = false;
     }
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    camera.apply_view_matrix();
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     camera.apply_projection(_max_bounding_box(true, true));
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    GLfloat position_cam[4] = { 1.0f, 0.0f, 1.0f, 0.0f };
-    glsafe(::glLightfv(GL_LIGHT1, GL_POSITION, position_cam));
-    GLfloat position_top[4] = { -0.5f, -0.5f, 1.0f, 0.0f };
-    glsafe(::glLightfv(GL_LIGHT0, GL_POSITION, position_top));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     wxGetApp().imgui()->new_frame();
 
@@ -1707,11 +1511,7 @@ void GLCanvas3D::render()
     _render_sla_slices();
     _render_selection();
     if (is_looking_downward)
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), false, true);
-#else
-        _render_bed(false, true);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     _render_objects(GLVolumeCollection::ERenderType::Transparent);
 
     _render_sequential_clearance();
@@ -1732,11 +1532,7 @@ void GLCanvas3D::render()
     _render_selection_sidebar_hints();
     _render_current_gizmo();
     if (!is_looking_downward)
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), true, true);
-#else
-        _render_bed(true, true);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_RAYCAST_PICKING_DEBUG
     if (m_picking_enabled && !m_mouse.dragging && !m_gizmos.is_dragging() && !m_rectangle_selection.is_dragging())
@@ -1934,11 +1730,7 @@ std::vector<int> GLCanvas3D::load_object(const ModelObject& model_object, int ob
             instance_idxs.emplace_back(i);
         }
     }
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     return m_volumes.load_object(&model_object, obj_idx, instance_idxs);
-#else
-    return m_volumes.load_object(&model_object, obj_idx, instance_idxs, m_initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 std::vector<int> GLCanvas3D::load_object(const Model& model, int obj_idx)
@@ -2179,11 +1971,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                     // Note the index of the loaded volume, so that we can reload the main model GLVolume with the hollowed mesh
                     // later in this function.
                     it->volume_idx = m_volumes.volumes.size();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                     m_volumes.load_object_volume(&model_object, obj_idx, volume_idx, instance_idx);
-#else
-                    m_volumes.load_object_volume(&model_object, obj_idx, volume_idx, instance_idx, m_initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     m_volumes.volumes.back()->geometry_id = key.geometry_id;
                     update_object_list = true;
                 } else {
@@ -2240,11 +2028,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                         GLVolume &volume = *m_volumes.volumes[it->volume_idx];
                         if (! volume.offsets.empty() && state.step[istep].timestamp != volume.offsets.front()) {
                         	// The backend either produced a new hollowed mesh, or it invalidated the one that the front end has seen.
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                             volume.model.reset();
-#else
-                            volume.indexed_vertex_array.release_geometry();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                             if (state.step[istep].state == PrintStateBase::DONE) {
                                 TriangleMesh mesh = print_object->get_mesh(slaposDrillHoles);
 	                            assert(! mesh.empty());
@@ -2256,52 +2040,27 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                                     * mo.volumes.front()->get_transformation().get_matrix();
                                 mesh.transform(trafo.inverse());
 #if ENABLE_SMOOTH_NORMALS
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                                 volume.model.init_from(mesh, true);
 #else
-                                volume.indexed_vertex_array.load_mesh(mesh, true);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#else
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                                 volume.model.init_from(mesh);
-#if ENABLE_RAYCAST_PICKING
                                 volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(mesh));
-#endif // ENABLE_RAYCAST_PICKING
-#else
-                                volume.indexed_vertex_array.load_mesh(mesh);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_SMOOTH_NORMALS
                             }
                             else {
 	                        	// Reload the original volume.
 #if ENABLE_SMOOTH_NORMALS
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-                                volume.model.init_from(m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh(), true);
+                               volume.model.init_from(m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh(), true);
 #else
-                                volume.indexed_vertex_array.load_mesh(m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh(), true);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#else
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
-                                const TriangleMesh& new_mesh = m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh();
+                              const TriangleMesh& new_mesh = m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh();
                                 volume.model.init_from(new_mesh);
                                 volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(new_mesh));
-#else
-                                volume.model.init_from(m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh());
-#endif // ENABLE_RAYCAST_PICKING
-#else
-                                volume.indexed_vertex_array.load_mesh(m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_SMOOTH_NORMALS
                             }
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-                            volume.finalize_geometry(true);
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
                         }
-                    	//FIXME it is an ugly hack to write the timestamp into the "offsets" field to not have to add another member variable
-                    	// to the GLVolume. We should refactor GLVolume significantly, so that the GLVolume will not contain member variables
-                    	// of various concenrs (model vs. 3D print path).
-                    	volume.offsets = { state.step[istep].timestamp };
+                        //FIXME it is an ugly hack to write the timestamp into the "offsets" field to not have to add another member variable
+                        // to the GLVolume. We should refactor GLVolume significantly, so that the GLVolume will not contain member variables
+                        // of various concenrs (model vs. 3D print path).
+                        volume.offsets = { state.step[istep].timestamp };
                     }
                     else if (state.step[istep].state == PrintStateBase::DONE) {
                         // Check whether there is an existing auxiliary volume to be updated, or a new auxiliary volume to be created.
@@ -2326,11 +2085,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
             for (size_t istep = 0; istep < sla_steps.size(); ++istep)
                 if (!instances[istep].empty())
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                     m_volumes.load_object_auxiliary(print_object, object_idx, instances[istep], sla_steps[istep], state.step[istep].timestamp);
-#else
-                    m_volumes.load_object_auxiliary(print_object, object_idx, instances[istep], sla_steps[istep], state.step[istep].timestamp, m_initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
 
 		// Shift-up all volumes of the object so that it has the right elevation with respect to the print bed
@@ -2360,7 +2115,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             float depth = print->wipe_tower_data(extruders_count).depth;
             float brim_width = print->wipe_tower_data(extruders_count).brim_width;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_OPENGL_ES
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
@@ -2370,11 +2124,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
                 brim_width);
 #endif // ENABLE_OPENGL_ES
-#else
-            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
-                x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
-                brim_width, m_initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             if (volume_idx_wipe_tower_old != -1)
                 map_glvolume_old_to_new[volume_idx_wipe_tower_old] = volume_idx_wipe_tower_new;
         }
@@ -2445,7 +2194,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             manip->set_dirty();
     }
 
-#if ENABLE_RAYCAST_PICKING
     // refresh volume raycasters for picking
     m_scene_raycaster.remove_raycasters(SceneRaycaster::EType::Volume);
     for (size_t i = 0; i < m_volumes.volumes.size(); ++i) {
@@ -2462,36 +2210,14 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     m_scene_raycaster.remove_raycasters(SceneRaycaster::EType::Gizmo);
     if (curr_gizmo != nullptr && !m_selection.is_empty())
         curr_gizmo->register_raycasters_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
 
     // and force this canvas to be redrawn.
     m_dirty = true;
 }
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-static void reserve_new_volume_finalize_old_volume(GLVolume& vol_new, GLVolume& vol_old, bool gl_initialized, size_t prealloc_size = VERTEX_BUFFER_RESERVE_SIZE)
-{
-    // Assign the large pre-allocated buffers to the new GLVolume.
-	vol_new.indexed_vertex_array = std::move(vol_old.indexed_vertex_array);
-	// Copy the content back to the old GLVolume.
-	vol_old.indexed_vertex_array = vol_new.indexed_vertex_array;
-	// Clear the buffers, but keep them pre-allocated.
-	vol_new.indexed_vertex_array.clear();
-	// Just make sure that clear did not clear the reserved memory.
-	// Reserving number of vertices (3x position + 3x color)
-	vol_new.indexed_vertex_array.reserve(prealloc_size / 6);
-	// Finalize the old geometry, possibly move data to the graphics card.
-	vol_old.finalize_geometry(gl_initialized);
-}
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
 void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
 {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_gcode_viewer.load(gcode_result, *this->fff_print());
-#else
-    m_gcode_viewer.load(gcode_result, *this->fff_print(), m_initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (wxGetApp().is_editor()) {
         m_gcode_viewer.update_shells_color_by_extruder(m_config);
@@ -3008,11 +2734,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
 //                    set_cursor(Standard);
                 }
                 else if (keyCode == WXK_CONTROL) {
-#if ENABLE_RAYCAST_PICKING
-                    if (m_mouse.dragging && !m_moving) {
-#else
-                    if (m_mouse.dragging) {
-#endif // ENABLE_RAYCAST_PICKING
+                  if (m_mouse.dragging && !m_moving) {
                         // if the user releases CTRL while rotating the 3D scene
                         // prevent from moving the selected volume
                         m_mouse.drag.move_volume_idx = -1;
@@ -3528,9 +3250,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                         if (!evt.CmdDown())
                             m_mouse.drag.start_position_3D = m_mouse.scene_position;
                         m_sequential_print_clearance_first_displacement = true;
-#if !ENABLE_RAYCAST_PICKING
-                        m_moving = true;
-#endif // !ENABLE_RAYCAST_PICKING
                     }
                 }
             }
@@ -3574,9 +3293,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
 
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_RAYCAST_PICKING
             m_moving = true;
-#endif // ENABLE_RAYCAST_PICKING
             TransformationType trafo_type;
             trafo_type.set_relative();
             m_selection.translate(cur_pos - m_mouse.drag.start_position_3D, trafo_type);
@@ -3607,9 +3324,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         // do not process the dragging if the left mouse was set down in another canvas
         else if (evt.LeftIsDown()) {
             // if dragging over blank area with left button, rotate
-#if ENABLE_RAYCAST_PICKING
             if (!m_moving) {
-#endif // ENABLE_RAYCAST_PICKING
                 if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
                     const Vec3d rot = (Vec3d(pos.x(), pos.y(), 0.0) - m_mouse.drag.start_position_3D) * (PI * TRACKBALLSIZE / 180.0);
                     if (wxGetApp().app_config->get("use_free_camera") == "1")
@@ -3628,9 +3343,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     m_dirty = true;
                 }
                 m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
-#if ENABLE_RAYCAST_PICKING
             }
-#endif // ENABLE_RAYCAST_PICKING
         }
         else if (evt.MiddleIsDown() || evt.RightIsDown()) {
             // If dragging over blank area with right/middle button, pan.
@@ -3655,9 +3368,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
     }
     else if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp()) {
-#if ENABLE_RAYCAST_PICKING
         m_mouse.position = pos.cast<double>();
-#endif // ENABLE_RAYCAST_PICKING
 
         if (m_layers_editing.state != LayersEditing::Unknown) {
             m_layers_editing.state = LayersEditing::Unknown;
@@ -3683,9 +3394,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 deselect_all();
         }
         else if (evt.RightUp()) {
-#if !ENABLE_RAYCAST_PICKING
-            m_mouse.position = pos.cast<double>();
-#endif // !ENABLE_RAYCAST_PICKING
             // forces a frame render to ensure that m_hover_volume_idxs is updated even when the user right clicks while
             // the context menu is already shown
             render();
@@ -4436,12 +4144,7 @@ bool GLCanvas3D::_render_undo_redo_stack(const bool is_undo, float pos_x)
 
     ImGuiWrapper* imgui = wxGetApp().imgui();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     imgui->set_next_window_pos(pos_x, m_undoredo_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
-#else
-    const float x = pos_x * (float)wxGetApp().plater()->get_camera().get_zoom() + 0.5f * (float)get_canvas_size().get_width();
-    imgui->set_next_window_pos(x, m_undoredo_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     std::string title = is_undo ? L("Undo History") : L("Redo History");
     imgui->begin(_(title), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
@@ -4480,12 +4183,7 @@ bool GLCanvas3D::_render_search_list(float pos_x)
     bool action_taken = false;
     ImGuiWrapper* imgui = wxGetApp().imgui();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     imgui->set_next_window_pos(pos_x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
-#else
-    const float x = /*pos_x * (float)wxGetApp().plater()->get_camera().get_zoom() + */0.5f * (float)get_canvas_size().get_width();
-    imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     std::string title = L("Search");
     imgui->begin(_(title), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
@@ -4538,13 +4236,7 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
 {
     ImGuiWrapper *imgui = wxGetApp().imgui();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     imgui->set_next_window_pos(pos_x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
-#else
-    auto canvas_w = float(get_canvas_size().get_width());
-    const float x = pos_x * float(wxGetApp().plater()->get_camera().get_zoom()) + 0.5f * canvas_w;
-    imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     imgui->begin(_L("Arrange options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
@@ -4676,19 +4368,11 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     Camera camera;
     camera.set_type(camera_type);
     camera.set_scene_box(scene_bounding_box());
-#if ENABLE_RAYCAST_PICKING
     camera.set_viewport(0, 0, thumbnail_data.width, thumbnail_data.height);
     camera.apply_viewport();
-#else
-    camera.apply_viewport(0, 0, thumbnail_data.width, thumbnail_data.height);
-#endif // ENABLE_RAYCAST_PICKING
     camera.zoom_to_box(volumes_box);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Transform3d& view_matrix = camera.get_view_matrix();
-#else
-    camera.apply_view_matrix();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     double near_z = -1.0;
     double far_z = -1.0;
@@ -4697,11 +4381,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         // extends the near and far z of the frustrum to avoid the bed being clipped
 
         // box in eye space
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         const BoundingBoxf3 t_bed_box = m_bed.extended_bounding_box().transformed(view_matrix);
-#else
-        const BoundingBoxf3 t_bed_box = m_bed.extended_bounding_box().transformed(camera.get_view_matrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         near_z = -t_bed_box.max.z();
         far_z = -t_bed_box.min.z();
     }
@@ -4721,26 +4401,18 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     shader->start_using();
     shader->set_uniform("emission_factor", 0.0f);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Transform3d& projection_matrix = camera.get_projection_matrix();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     for (GLVolume* vol : visible_volumes) {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         vol->model.set_color((vol->printable && !vol->is_outside) ? (current_printer_technology() == ptSLA ? vol->color : ColorRGBA::ORANGE()) : ColorRGBA::GRAY());
-#else
-        shader->set_uniform("uniform_color", (vol->printable && !vol->is_outside) ? (current_printer_technology() == ptSLA ? vol->color : ColorRGBA::ORANGE()) : ColorRGBA::GRAY());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         // the volume may have been deactivated by an active gizmo
         const bool is_active = vol->is_active;
         vol->is_active = true;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Transform3d model_matrix = vol->world_matrix();
         shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader->set_uniform("view_normal_matrix", view_normal_matrix); 
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         vol->render();
         vol->is_active = is_active;
     }
@@ -4750,11 +4422,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     glsafe(::glDisable(GL_DEPTH_TEST));
 
     if (thumbnail_params.show_bed)
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         _render_bed(view_matrix, projection_matrix, !camera.is_looking_downward(), false);
-#else
-        _render_bed(!camera.is_looking_downward(), false);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // restore background color
     if (thumbnail_params.transparent_background)
@@ -4983,11 +4651,7 @@ void GLCanvas3D::_render_thumbnail_legacy(ThumbnailData& thumbnail_data, unsigne
 #endif // ENABLE_THUMBNAIL_GENERATOR_DEBUG_OUTPUT
 
     // restore the default framebuffer size to avoid flickering on the 3D scene
-#if ENABLE_RAYCAST_PICKING
     wxGetApp().plater()->get_camera().apply_viewport();
-#else
-    wxGetApp().plater()->get_camera().apply_viewport(0, 0, cnv_size.get_width(), cnv_size.get_height());
-#endif // ENABLE_RAYCAST_PICKING
 }
 
 bool GLCanvas3D::_init_toolbars()
@@ -5025,25 +4689,11 @@ bool GLCanvas3D::_init_main_toolbar()
         return true;
     }
     // init arrow
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_main_toolbar.init_arrow("toolbar_arrow_2.svg"))
-#else
-    BackgroundTexture::Metadata arrow_data;
-    arrow_data.filename = "toolbar_arrow.svg";
-    arrow_data.left = 0;
-    arrow_data.top = 0;
-    arrow_data.right = 0;
-    arrow_data.bottom = 0;
-    if (!m_main_toolbar.init_arrow(arrow_data))
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         BOOST_LOG_TRIVIAL(error) << "Main toolbar failed to load arrow texture.";
 
     // m_gizmos is created at constructor, thus we can init arrow here.
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_gizmos.init_arrow("toolbar_arrow_2.svg"))
-#else
-    if (!m_gizmos.init_arrow(arrow_data))
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         BOOST_LOG_TRIVIAL(error) << "Gizmos manager failed to load arrow texture.";
 
 //    m_main_toolbar.set_layout_type(GLToolbar::Layout::Vertical);
@@ -5250,17 +4900,7 @@ bool GLCanvas3D::_init_undoredo_toolbar()
     }
 
     // init arrow
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_undoredo_toolbar.init_arrow("toolbar_arrow_2.svg"))
-#else
-    BackgroundTexture::Metadata arrow_data;
-    arrow_data.filename = "toolbar_arrow.svg";
-    arrow_data.left = 0;
-    arrow_data.top = 0;
-    arrow_data.right = 0;
-    arrow_data.bottom = 0;
-    if (!m_undoredo_toolbar.init_arrow(arrow_data))
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         BOOST_LOG_TRIVIAL(error) << "Undo/Redo toolbar failed to load arrow texture.";
 
 //    m_undoredo_toolbar.set_layout_type(GLToolbar::Layout::Vertical);
@@ -5454,7 +5094,6 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
     }
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLCanvas3D::_picking_pass()
 {
     if (!m_picking_enabled || m_mouse.dragging || m_mouse.position == Vec2d(DBL_MAX, DBL_MAX) || m_gizmos.is_dragging()) {
@@ -5540,12 +5179,17 @@ void GLCanvas3D::_picking_pass()
     default: { break; }
     }
 
-    auto add_strings_row_to_table = [&imgui](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
+    auto add_strings_row_to_table = [&imgui](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color,
+        const std::string& col_3 = "", const ImVec4& col_3_color = ImGui::GetStyleColorVec4(ImGuiCol_Text)) {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         imgui.text_colored(col_1_color, col_1.c_str());
         ImGui::TableSetColumnIndex(1);
         imgui.text_colored(col_2_color, col_2.c_str());
+        if (!col_3.empty()) {
+            ImGui::TableSetColumnIndex(2);
+            imgui.text_colored(col_3_color, col_3.c_str());
+        }
     };
 
     char buf[1024];
@@ -5574,85 +5218,24 @@ void GLCanvas3D::_picking_pass()
         add_strings_row_to_table("Gizmo elements", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
         ImGui::EndTable();
     }
+
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* gizmo_raycasters = m_scene_raycaster.get_raycasters(SceneRaycaster::EType::Gizmo);
+    if (gizmo_raycasters != nullptr && !gizmo_raycasters->empty()) {
+        ImGui::Separator();
+        imgui.text("Gizmo raycasters IDs:");
+        if (ImGui::BeginTable("GizmoRaycasters", 3)) {
+            for (size_t i = 0; i < gizmo_raycasters->size(); ++i) {
+                add_strings_row_to_table(std::to_string(i), ImGuiWrapper::COL_ORANGE_LIGHT,
+                    std::to_string(SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, (*gizmo_raycasters)[i]->get_id())), ImGui::GetStyleColorVec4(ImGuiCol_Text),
+                    to_string(Geometry::Transformation((*gizmo_raycasters)[i]->get_transform()).get_offset()), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            }
+            ImGui::EndTable();
+        }
+    }
+
     imgui.end();
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 }
-#else
-void GLCanvas3D::_picking_pass()
-{
-    if (m_picking_enabled && !m_mouse.dragging && m_mouse.position != Vec2d(DBL_MAX, DBL_MAX) && !m_gizmos.is_dragging()) {
-        m_hover_volume_idxs.clear();
-
-        // Render the object for picking.
-        // FIXME This cannot possibly work in a multi - sampled context as the color gets mangled by the anti - aliasing.
-        // Better to use software ray - casting on a bounding - box hierarchy.
-
-        if (m_multisample_allowed)
-        	// This flag is often ignored by NVIDIA drivers if rendering into a screen buffer.
-            glsafe(::glDisable(GL_MULTISAMPLE));
-
-        glsafe(::glDisable(GL_BLEND));
-        glsafe(::glEnable(GL_DEPTH_TEST));
-
-        glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        m_camera_clipping_plane = m_gizmos.get_clipping_plane();
-        if (m_camera_clipping_plane.is_active()) {
-            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data().data());
-            ::glEnable(GL_CLIP_PLANE0);
-        }
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-        _render_volumes_for_picking();
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        if (m_camera_clipping_plane.is_active())
-            ::glDisable(GL_CLIP_PLANE0);
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        _render_bed_for_picking(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward());
-#else
-        _render_bed_for_picking(!wxGetApp().plater()->get_camera().is_looking_downward());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-        m_gizmos.render_current_gizmo_for_picking_pass();
-
-        if (m_multisample_allowed)
-            glsafe(::glEnable(GL_MULTISAMPLE));
-
-        int volume_id = -1;
-        int gizmo_id = -1;
-
-        std::array<GLubyte, 4> color = { 0, 0, 0, 0 };
-        const Size& cnv_size = get_canvas_size();
-        bool inside = 0 <= m_mouse.position(0) && m_mouse.position(0) < cnv_size.get_width() && 0 <= m_mouse.position(1) && m_mouse.position(1) < cnv_size.get_height();
-        if (inside) {
-            glsafe(::glReadPixels(m_mouse.position(0), cnv_size.get_height() - m_mouse.position.y() - 1, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, (void*)color.data()));
-            if (picking_checksum_alpha_channel(color[0], color[1], color[2]) == color[3]) {
-                // Only non-interpolated colors are valid, those have their lowest three bits zeroed.
-                // we reserve color = (0,0,0) for occluders (as the printbed) 
-                // volumes' id are shifted by 1
-                // see: _render_volumes_for_picking()
-                unsigned int id = picking_encode(color[0], color[1], color[2]);
-                volume_id = id - 1;
-                // gizmos' id are instead properly encoded by the color
-                gizmo_id = id;
-            }
-        }
-        if (0 <= volume_id && volume_id < (int)m_volumes.volumes.size()) {
-            // do not add the volume id if any gizmo is active and CTRL is pressed
-            if (m_gizmos.get_current_type() == GLGizmosManager::EType::Undefined || !wxGetKeyState(WXK_CONTROL))
-                m_hover_volume_idxs.emplace_back(volume_id);
-            m_gizmos.set_hover_id(-1);
-        }
-        else
-            m_gizmos.set_hover_id(inside && (unsigned int)gizmo_id <= GLGizmoBase::BASE_ID ? ((int)GLGizmoBase::BASE_ID - gizmo_id) : -1);
-
-        _update_volumes_hover_state();
-    }
-}
-#endif // ENABLE_RAYCAST_PICKING
 
 void GLCanvas3D::_rectangular_selection_picking_pass()
 {
@@ -5661,7 +5244,6 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
     std::set<int> idxs;
 
     if (m_picking_enabled) {
-#if ENABLE_RAYCAST_PICKING
         const size_t width  = std::max<size_t>(m_rectangle_selection.get_width(), 1);
         const size_t height = std::max<size_t>(m_rectangle_selection.get_height(), 1);
 
@@ -5715,7 +5297,6 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
                     use_framebuffer = false;
             }
         }
-#endif // ENABLE_RAYCAST_PICKING
 
         if (m_multisample_allowed)
         	// This flag is often ignored by NVIDIA drivers if rendering into a screen buffer.
@@ -5726,7 +5307,6 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
 
         glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
-#if ENABLE_RAYCAST_PICKING
         const Camera& main_camera = wxGetApp().plater()->get_camera();
         Camera framebuffer_camera;
         framebuffer_camera.set_type(main_camera.get_type());
@@ -5760,37 +5340,15 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
         }
 
         _render_volumes_for_picking(*camera);
-#else
-        _render_volumes_for_picking();
-#endif // ENABLE_RAYCAST_PICKING
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_RAYCAST_PICKING
         _render_bed_for_picking(camera->get_view_matrix(), camera->get_projection_matrix(), !camera->is_looking_downward());
-#else
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        _render_bed_for_picking(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward());
-#endif // ENABLE_RAYCAST_PICKING
-#else
-        _render_bed_for_picking(!wxGetApp().plater()->get_camera().is_looking_downward());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         if (m_multisample_allowed)
             glsafe(::glEnable(GL_MULTISAMPLE));
 
-#if ENABLE_RAYCAST_PICKING
         const size_t px_count = width * height;
 
         const size_t left = use_framebuffer ? 0 : (size_t)m_rectangle_selection.get_left();
         const size_t top  = use_framebuffer ? 0 : (size_t)get_canvas_size().get_height() - (size_t)m_rectangle_selection.get_top();
-#else
-        int width = std::max((int)m_rectangle_selection.get_width(), 1);
-        int height = std::max((int)m_rectangle_selection.get_height(), 1);
-        int px_count = width * height;
-
-        int left = (int)m_rectangle_selection.get_left();
-        int top = get_canvas_size().get_height() - (int)m_rectangle_selection.get_top();
-        if (left >= 0 && top >= 0) {
-#endif // ENABLE_RAYCAST_PICKING
 #define USE_PARALLEL 1
 #if USE_PARALLEL
             struct Pixel
@@ -5824,15 +5382,13 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
             std::vector<GLubyte> frame(4 * px_count);
             glsafe(::glReadPixels(left, top, width, height, GL_RGBA, GL_UNSIGNED_BYTE, (void*)frame.data()));
 
-            for (int i = 0; i < px_count; ++i)
-            {
+            for (int i = 0; i < px_count; ++i) {
                 int px_id = 4 * i;
                 int volume_id = frame[px_id] + (frame[px_id + 1] << 8) + (frame[px_id + 2] << 16);
                 if (0 <= volume_id && volume_id < (int)m_volumes.volumes.size())
                     idxs.insert(volume_id);
             }
 #endif // USE_PARALLEL
-#if ENABLE_RAYCAST_PICKING
             if (camera != &main_camera)
                 main_camera.apply_viewport();
 
@@ -5853,9 +5409,6 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
 
             if (render_tex != 0)
                 glsafe(::glDeleteTextures(1, &render_tex));
-#else
-        }
-#endif // ENABLE_RAYCAST_PICKING
     }
 
     m_hover_volume_idxs.assign(idxs.begin(), idxs.end());
@@ -5875,18 +5428,9 @@ void GLCanvas3D::_render_background()
             use_error_color &= m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
     }
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPushMatrix());
-    glsafe(::glLoadIdentity());
-    glsafe(::glMatrixMode(GL_PROJECTION));
-    glsafe(::glPushMatrix());
-    glsafe(::glLoadIdentity());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
     // Draws a bottom to top gradient over the complete screen.
     glsafe(::glDisable(GL_DEPTH_TEST));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const ColorRGBA bottom_color = use_error_color ? ERROR_BG_DARK_COLOR : DEFAULT_BG_DARK_COLOR;
 
     if (!m_background.is_initialized()) {
@@ -5918,32 +5462,11 @@ void GLCanvas3D::_render_background()
         m_background.render();
         shader->stop_using();
     }
-#else
-    ::glBegin(GL_QUADS);
-    ::glColor3fv(use_error_color ? ERROR_BG_DARK_COLOR.data(): DEFAULT_BG_DARK_COLOR.data());
-    ::glVertex2f(-1.0f, -1.0f);
-    ::glVertex2f(1.0f, -1.0f);
-
-    ::glColor3fv(use_error_color ? ERROR_BG_LIGHT_COLOR.data() : DEFAULT_BG_LIGHT_COLOR.data());
-    ::glVertex2f(1.0f, 1.0f);
-    ::glVertex2f(-1.0f, 1.0f);
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_DEPTH_TEST));
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPopMatrix());
-    glsafe(::glMatrixMode(GL_MODELVIEW));
-    glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLCanvas3D::_render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes)
-#else
-void GLCanvas3D::_render_bed(bool bottom, bool show_axes)
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     float scale_factor = 1.0;
 #if ENABLE_RETINA_GL
@@ -5957,29 +5480,17 @@ void GLCanvas3D::_render_bed(bool bottom, bool show_axes)
           && m_gizmos.get_current_type() != GLGizmosManager::Seam
           && m_gizmos.get_current_type() != GLGizmosManager::MmuSegmentation);
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_bed.render(*this, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture);
-#else
-    m_bed.render(*this, bottom, scale_factor, show_axes, show_texture);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLCanvas3D::_render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom)
-#else
-void GLCanvas3D::_render_bed_for_picking(bool bottom)
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     float scale_factor = 1.0;
 #if ENABLE_RETINA_GL
     scale_factor = m_retina_helper->get_scale_factor();
 #endif // ENABLE_RETINA_GL
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_bed.render_for_picking(*this, view_matrix, projection_matrix, bottom, scale_factor);
-#else
-    m_bed.render_for_picking(*this, bottom, scale_factor);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
@@ -6045,33 +5556,20 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
         {
             if (m_picking_enabled && !m_gizmos.is_dragging() && m_layers_editing.is_enabled() && (m_layers_editing.last_object_id != -1) && (m_layers_editing.object_max_z() > 0.0f)) {
                 int object_id = m_layers_editing.last_object_id;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 const Camera& camera = wxGetApp().plater()->get_camera();
                 m_volumes.render(type, false, camera.get_view_matrix(), camera.get_projection_matrix(), [object_id](const GLVolume& volume) {
                     // Which volume to paint without the layer height profile shader?
                     return volume.is_active && (volume.is_modifier || volume.composite_id.object_id != object_id);
                     });
-#else
-                m_volumes.render(type, false, wxGetApp().plater()->get_camera().get_view_matrix(), [object_id](const GLVolume& volume) {
-                    // Which volume to paint without the layer height profile shader?
-                    return volume.is_active && (volume.is_modifier || volume.composite_id.object_id != object_id);
-                    });
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 // Let LayersEditing handle rendering of the active object using the layer height profile shader.
                 m_layers_editing.render_volumes(*this, m_volumes);
             }
             else {
                 // do not cull backfaces to show broken geometry, if any
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 const Camera& camera = wxGetApp().plater()->get_camera();
                 m_volumes.render(type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(), [this](const GLVolume& volume) {
                     return (m_render_sla_auxiliaries || volume.composite_id.volume_id >= 0);
                     });
-#else
-                m_volumes.render(type, m_picking_enabled, wxGetApp().plater()->get_camera().get_view_matrix(), [this](const GLVolume& volume) {
-                    return (m_render_sla_auxiliaries || volume.composite_id.volume_id >= 0);
-                    });
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
 
             // In case a painting gizmo is open, it should render the painted triangles
@@ -6090,12 +5588,8 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
         }
         case GLVolumeCollection::ERenderType::Transparent:
         {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             const Camera& camera = wxGetApp().plater()->get_camera();
             m_volumes.render(type, false, camera.get_view_matrix(), camera.get_projection_matrix());
-#else
-            m_volumes.render(type, false, wxGetApp().plater()->get_camera().get_view_matrix());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             break;
         }
         }
@@ -6158,10 +5652,10 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
     if (wxGetApp().plater()->is_preview_shown())
         return;
 
-    float scale = wxGetApp().toolbar_icon_scale();
-    Size cnv_size = get_canvas_size();
+    const float scale = wxGetApp().toolbar_icon_scale();
+    const Size cnv_size = get_canvas_size();
 
-    float size = GLToolbar::Default_Icons_Size * scale;
+    int size = int(GLToolbar::Default_Icons_Size * scale);
 
     // Set current size for all top toolbars. It will be used for next calculations
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
@@ -6170,28 +5664,28 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
     m_main_toolbar.set_scale(sc);
     m_undoredo_toolbar.set_scale(sc);
     collapse_toolbar.set_scale(sc);
-    size *= m_retina_helper->get_scale_factor();
+    size *= int(m_retina_helper->get_scale_factor());
 #else
     m_main_toolbar.set_icons_size(size);
     m_undoredo_toolbar.set_icons_size(size);
     collapse_toolbar.set_icons_size(size);
 #endif // ENABLE_RETINA_GL
 
-    float top_tb_width = m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar.get_width();
+    const float top_tb_width = m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar.get_width();
     int   items_cnt = m_main_toolbar.get_visible_items_cnt() + m_undoredo_toolbar.get_visible_items_cnt() + collapse_toolbar.get_visible_items_cnt();
-    float noitems_width = top_tb_width - size * items_cnt; // width of separators and borders in top toolbars 
+    const float noitems_width = top_tb_width - float(size) * items_cnt; // width of separators and borders in top toolbars 
 
     // calculate scale needed for items in all top toolbars
     // the std::max() is there because on some Linux dialects/virtual machines this code is called when the canvas has not been properly initialized yet,
     // leading to negative values for the scale.
     // See: https://github.com/prusa3d/PrusaSlicer/issues/8563
     //      https://github.com/supermerill/SuperSlicer/issues/854
-    float new_h_scale = std::max((cnv_size.get_width() - noitems_width), 1.0f) / (items_cnt * GLToolbar::Default_Icons_Size);
+    const float new_h_scale = std::max((cnv_size.get_width() - noitems_width), 1.0f) / (items_cnt * GLToolbar::Default_Icons_Size);
 
     items_cnt = m_gizmos.get_selectable_icons_cnt() + 3; // +3 means a place for top and view toolbars and separators in gizmos toolbar
 
     // calculate scale needed for items in the gizmos toolbar
-    float new_v_scale = cnv_size.get_height() / (items_cnt * GLGizmosManager::Default_Icons_Size);
+    const float new_v_scale = cnv_size.get_height() / (items_cnt * GLGizmosManager::Default_Icons_Size);
 
     // set minimum scale as a auto scale for the toolbars
     float new_scale = std::min(new_h_scale, new_v_scale);
@@ -6205,34 +5699,12 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
 void GLCanvas3D::_render_overlays()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPushMatrix());
-    glsafe(::glLoadIdentity());
-    // ensure that the textures are renderered inside the frustrum
-    const Camera& camera = wxGetApp().plater()->get_camera();
-    glsafe(::glTranslated(0.0, 0.0, -(camera.get_near_z() + 0.005)));
-    // ensure that the overlay fits the frustrum near z plane
-    double gui_scale = camera.get_gui_scale();
-    glsafe(::glScaled(gui_scale, gui_scale, 1.0));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
-    _check_and_update_toolbar_icon_scale();
-
-    _render_gizmos_overlay();
 
     // main toolbar and undoredo toolbar need to be both updated before rendering because both their sizes are needed
     // to correctly place them
-#if ENABLE_RETINA_GL
-    const float scale = m_retina_helper->get_scale_factor() * wxGetApp().toolbar_icon_scale(/*true*/);
-    m_main_toolbar.set_scale(scale);
-    m_undoredo_toolbar.set_scale(scale);
-    wxGetApp().plater()->get_collapse_toolbar().set_scale(scale);
-#else
-    const float size = int(GLToolbar::Default_Icons_Size * wxGetApp().toolbar_icon_scale(/*true*/));
-    m_main_toolbar.set_icons_size(size);
-    m_undoredo_toolbar.set_icons_size(size);
-    wxGetApp().plater()->get_collapse_toolbar().set_icons_size(size);
-#endif // ENABLE_RETINA_GL
+    _check_and_update_toolbar_icon_scale();
+
+    _render_gizmos_overlay();
 
     _render_main_toolbar();
     _render_undoredo_toolbar();
@@ -6252,37 +5724,18 @@ void GLCanvas3D::_render_overlays()
             }
     }
     m_labels.render(sorted_instances);
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glPopMatrix());
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_RAYCAST_PICKING
 void GLCanvas3D::_render_volumes_for_picking(const Camera& camera) const
-#else
-void GLCanvas3D::_render_volumes_for_picking() const
-#endif // ENABLE_RAYCAST_PICKING
 {
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("flat_clip");
     if (shader == nullptr)
         return;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // do not cull backfaces to show broken geometry, if any
     glsafe(::glDisable(GL_CULL_FACE));
 
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-    glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if ENABLE_RAYCAST_PICKING
     const Transform3d& view_matrix = camera.get_view_matrix();
-#else
-    const Transform3d& view_matrix = wxGetApp().plater()->get_camera().get_view_matrix();
-#endif // ENABLE_RAYCAST_PICKING
     for (size_t type = 0; type < 2; ++ type) {
         GLVolumeWithIdAndZList to_render = volumes_to_render(m_volumes.volumes, (type == 0) ? GLVolumeCollection::ERenderType::Opaque : GLVolumeCollection::ERenderType::Transparent, view_matrix);
         for (const GLVolumeWithIdAndZ& volume : to_render)
@@ -6291,33 +5744,17 @@ void GLCanvas3D::_render_volumes_for_picking() const
                 // we reserve color = (0,0,0) for occluders (as the printbed) 
                 // so we shift volumes' id by 1 to get the proper color
                 const unsigned int id = 1 + volume.second.first;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 volume.first->model.set_color(picking_decode(id));
                 shader->start_using();
-#if ENABLE_RAYCAST_PICKING
                 shader->set_uniform("view_model_matrix", view_matrix * volume.first->world_matrix());
-#else
-                const Camera& camera = wxGetApp().plater()->get_camera();
-                shader->set_uniform("view_model_matrix", camera.get_view_matrix() * volume.first->world_matrix());
-#endif // ENABLE_RAYCAST_PICKING
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());
                 shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
                 shader->set_uniform("z_range", m_volumes.get_z_range());
                 shader->set_uniform("clipping_plane", m_volumes.get_clipping_plane());
-#else
-                glsafe(::glColor4fv(picking_decode(id).data()));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 volume.first->render();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 shader->stop_using();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-            }
-	}
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-    glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
+          }
+	  }
 
     glsafe(::glEnable(GL_CULL_FACE));
 }
@@ -6352,20 +5789,11 @@ void GLCanvas3D::_render_main_toolbar()
         return;
 
     const Size cnv_size = get_canvas_size();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const float top = 0.5f * (float)cnv_size.get_height();
-#else
-    const float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
-    const float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
     const float collapse_toolbar_width = collapse_toolbar.is_enabled() ? collapse_toolbar.get_width() : 0.0f;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const float left = -0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width);
-#else
-    const float left = -0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width) * inv_zoom;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_main_toolbar.set_position(top, left);
     m_main_toolbar.render(*this);
@@ -6379,20 +5807,10 @@ void GLCanvas3D::_render_undoredo_toolbar()
         return;
 
     const Size cnv_size = get_canvas_size();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const float top = 0.5f * (float)cnv_size.get_height();
-#else
-    float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
-
-    const float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
     const float collapse_toolbar_width = collapse_toolbar.is_enabled() ? collapse_toolbar.get_width() : 0.0f;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const float left = m_main_toolbar.get_width() - 0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width);
-#else
-    const float left = (m_main_toolbar.get_width() - 0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width)) * inv_zoom;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_undoredo_toolbar.set_position(top, left);
     m_undoredo_toolbar.render(*this);
@@ -6406,15 +5824,8 @@ void GLCanvas3D::_render_collapse_toolbar() const
 
     const Size cnv_size = get_canvas_size();
     const float band = m_layers_editing.is_enabled() ? (wxGetApp().imgui()->get_style_scaling() * LayersEditing::THICKNESS_BAR_WIDTH) : 0.0;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const float top  = 0.5f * (float)cnv_size.get_height();
     const float left = 0.5f * (float)cnv_size.get_width() - collapse_toolbar.get_width() - band;
-#else
-    const float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
-
-    const float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
-    const float left = (0.5f * (float)cnv_size.get_width() - (float)collapse_toolbar.get_width() - band) * inv_zoom;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     collapse_toolbar.set_position(top, left);
     collapse_toolbar.render(*this);
@@ -6438,17 +5849,9 @@ void GLCanvas3D::_render_view_toolbar() const
 #endif // ENABLE_RETINA_GL
 
     const Size cnv_size = get_canvas_size();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     // places the toolbar on the bottom-left corner of the 3d scene
     const float top = -0.5f * (float)cnv_size.get_height() + view_toolbar.get_height();
     const float left = -0.5f * (float)cnv_size.get_width();
-#else
-    float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
-
-    // places the toolbar on the bottom-left corner of the 3d scene
-    float top = (-0.5f * (float)cnv_size.get_height() + view_toolbar.get_height()) * inv_zoom;
-    float left = -0.5f * (float)cnv_size.get_width() * inv_zoom;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     view_toolbar.set_position(top, left);
     view_toolbar.render(*this);
 }
@@ -6464,7 +5867,6 @@ void GLCanvas3D::_render_camera_target()
 #endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glLineWidth(2.0f));
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Vec3f& target = wxGetApp().plater()->get_camera().get_target().cast<float>();
     m_camera_target.target = target.cast<double>();
 
@@ -6506,7 +5908,6 @@ void GLCanvas3D::_render_camera_target()
 #endif // ENABLE_GL_CORE_PROFILE
     if (shader != nullptr) {
         shader->start_using();
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(m_camera_target.target));
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -6516,29 +5917,11 @@ void GLCanvas3D::_render_camera_target()
         shader->set_uniform("width", 0.5f);
         shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         for (int i = 0; i < 3; ++i) {
             m_camera_target.axis[i].render();
         }
         shader->stop_using();
     }
-#else
-    ::glBegin(GL_LINES);
-    const Vec3d& target = wxGetApp().plater()->get_camera().get_target();
-    // draw line for x axis
-    ::glColor3f(1.0f, 0.0f, 0.0f);
-    ::glVertex3d(target.x() - half_length, target.y(), target.z());
-    ::glVertex3d(target.x() + half_length, target.y(), target.z());
-    // draw line for y axis
-    ::glColor3f(0.0f, 1.0f, 0.0f);
-    ::glVertex3d(target.x(), target.y() - half_length, target.z());
-    ::glVertex3d(target.x(), target.y() + half_length, target.z());
-    // draw line for z axis
-    ::glColor3f(0.0f, 0.0f, 1.0f);
-    ::glVertex3d(target.x(), target.y(), target.z() - half_length);
-    ::glVertex3d(target.x(), target.y(), target.z() + half_length);
-    glsafe(::glEnd());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 #endif // ENABLE_SHOW_CAMERA_TARGET
 
@@ -6561,52 +5944,29 @@ void GLCanvas3D::_render_sla_slices()
         if (!obj->is_step_done(slaposSliceSupports))
             continue;
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         SlaCap::ObjectIdToModelsMap::iterator it_caps_bottom = m_sla_caps[0].triangles.find(i);
         SlaCap::ObjectIdToModelsMap::iterator it_caps_top = m_sla_caps[1].triangles.find(i);
-#else
-        SlaCap::ObjectIdToTrianglesMap::iterator it_caps_bottom = m_sla_caps[0].triangles.find(i);
-        SlaCap::ObjectIdToTrianglesMap::iterator it_caps_top = m_sla_caps[1].triangles.find(i);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         {
             if (it_caps_bottom == m_sla_caps[0].triangles.end())
                 it_caps_bottom = m_sla_caps[0].triangles.emplace(i, SlaCap::Triangles()).first;
             if (!m_sla_caps[0].matches(clip_min_z)) {
                 m_sla_caps[0].z = clip_min_z;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 it_caps_bottom->second.object.reset();
                 it_caps_bottom->second.supports.reset();
-#else
-                it_caps_bottom->second.object.clear();
-                it_caps_bottom->second.supports.clear();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
             if (it_caps_top == m_sla_caps[1].triangles.end())
                 it_caps_top = m_sla_caps[1].triangles.emplace(i, SlaCap::Triangles()).first;
             if (!m_sla_caps[1].matches(clip_max_z)) {
                 m_sla_caps[1].z = clip_max_z;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 it_caps_top->second.object.reset();
                 it_caps_top->second.supports.reset();
-#else
-                it_caps_top->second.object.clear();
-                it_caps_top->second.supports.clear();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         GLModel& bottom_obj_triangles = it_caps_bottom->second.object;
         GLModel& bottom_sup_triangles = it_caps_bottom->second.supports;
         GLModel& top_obj_triangles = it_caps_top->second.object;
         GLModel& top_sup_triangles = it_caps_top->second.supports;
-#else
-        Pointf3s &bottom_obj_triangles = it_caps_bottom->second.object;
-        Pointf3s &bottom_sup_triangles = it_caps_bottom->second.supports;
-        Pointf3s &top_obj_triangles    = it_caps_top->second.object;
-        Pointf3s &top_sup_triangles    = it_caps_top->second.supports;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         auto init_model = [](GLModel& model, const Pointf3s& triangles, const ColorRGBA& color) {
             GLModel::Geometry init_data;
             init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
@@ -6628,10 +5988,6 @@ void GLCanvas3D::_render_sla_slices()
 
         if ((!bottom_obj_triangles.is_initialized() || !bottom_sup_triangles.is_initialized() ||
             !top_obj_triangles.is_initialized() || !top_sup_triangles.is_initialized()) && !obj->get_slice_index().empty()) {
-#else
-        if ((bottom_obj_triangles.empty() || bottom_sup_triangles.empty() || top_obj_triangles.empty() || top_sup_triangles.empty()) &&
-            !obj->get_slice_index().empty()) {
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             double layer_height         = print->default_object_config().layer_height.value;
             double initial_layer_height = print->material_config().initial_layer_height.value;
             bool   left_handed          = obj->is_left_handed();
@@ -6651,45 +6007,26 @@ void GLCanvas3D::_render_sla_slices()
             if (slice_low.is_valid()) {
                 const ExPolygons& obj_bottom = slice_low.get_slice(soModel);
                 const ExPolygons& sup_bottom = slice_low.get_slice(soSupport);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 // calculate model bottom cap
                 if (!bottom_obj_triangles.is_initialized() && !obj_bottom.empty())
                     init_model(bottom_obj_triangles, triangulate_expolygons_3d(obj_bottom, clip_min_z - plane_shift_z, !left_handed), { 1.0f, 0.37f, 0.0f, 1.0f });
                 // calculate support bottom cap
                 if (!bottom_sup_triangles.is_initialized() && !sup_bottom.empty())
                     init_model(bottom_sup_triangles, triangulate_expolygons_3d(sup_bottom, clip_min_z - plane_shift_z, !left_handed), { 1.0f, 0.0f, 0.37f, 1.0f });
-#else
-                // calculate model bottom cap
-                if (bottom_obj_triangles.empty() && !obj_bottom.empty())
-                    bottom_obj_triangles = triangulate_expolygons_3d(obj_bottom, clip_min_z - plane_shift_z, ! left_handed);
-                // calculate support bottom cap
-                if (bottom_sup_triangles.empty() && !sup_bottom.empty())
-                    bottom_sup_triangles = triangulate_expolygons_3d(sup_bottom, clip_min_z - plane_shift_z, !left_handed);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
 
             if (slice_high.is_valid()) {
                 const ExPolygons& obj_top = slice_high.get_slice(soModel);
                 const ExPolygons& sup_top = slice_high.get_slice(soSupport);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 // calculate model top cap
                 if (!top_obj_triangles.is_initialized() && !obj_top.empty())
                     init_model(top_obj_triangles, triangulate_expolygons_3d(obj_top, clip_max_z + plane_shift_z, left_handed), { 1.0f, 0.37f, 0.0f, 1.0f });
                 // calculate support top cap
                 if (!top_sup_triangles.is_initialized() && !sup_top.empty())
                     init_model(top_sup_triangles, triangulate_expolygons_3d(sup_top, clip_max_z + plane_shift_z, left_handed), { 1.0f, 0.0f, 0.37f, 1.0f });
-#else
-                // calculate model top cap
-                if (top_obj_triangles.empty() && !obj_top.empty())
-                    top_obj_triangles = triangulate_expolygons_3d(obj_top, clip_max_z + plane_shift_z, left_handed);
-                // calculate support top cap
-                if (top_sup_triangles.empty() && !sup_top.empty())
-                    top_sup_triangles = triangulate_expolygons_3d(sup_top, clip_max_z + plane_shift_z, left_handed);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
         if (shader != nullptr) {
             shader->start_using();
@@ -6720,39 +6057,6 @@ void GLCanvas3D::_render_sla_slices()
 
             shader->stop_using();
         }
-#else
-        if (!bottom_obj_triangles.empty() || !top_obj_triangles.empty() || !bottom_sup_triangles.empty() || !top_sup_triangles.empty()) {
-			for (const SLAPrintObject::Instance& inst : obj->instances()) {
-                glsafe(::glPushMatrix());
-                glsafe(::glTranslated(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0));
-                glsafe(::glRotatef(Geometry::rad2deg(inst.rotation), 0.0f, 0.0f, 1.0f));
-				if (obj->is_left_handed())
-                    // The polygons are mirrored by X.
-                    glsafe(::glScalef(-1.0f, 1.0f, 1.0f));
-                glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-                glsafe(::glColor3f(1.0f, 0.37f, 0.0f));
-				if (!bottom_obj_triangles.empty()) {
-                    glsafe(::glVertexPointer(3, GL_DOUBLE, 0, (GLdouble*)bottom_obj_triangles.front().data()));
-                    glsafe(::glDrawArrays(GL_TRIANGLES, 0, bottom_obj_triangles.size()));
-				}
-				if (! top_obj_triangles.empty()) {
-                    glsafe(::glVertexPointer(3, GL_DOUBLE, 0, (GLdouble*)top_obj_triangles.front().data()));
-                    glsafe(::glDrawArrays(GL_TRIANGLES, 0, top_obj_triangles.size()));
-				}
-                glsafe(::glColor3f(1.0f, 0.0f, 0.37f));
-				if (! bottom_sup_triangles.empty()) {
-                    glsafe(::glVertexPointer(3, GL_DOUBLE, 0, (GLdouble*)bottom_sup_triangles.front().data()));
-                    glsafe(::glDrawArrays(GL_TRIANGLES, 0, bottom_sup_triangles.size()));
-				}
-				if (! top_sup_triangles.empty()) {
-                    glsafe(::glVertexPointer(3, GL_DOUBLE, 0, (GLdouble*)top_sup_triangles.front().data()));
-                    glsafe(::glDrawArrays(GL_TRIANGLES, 0, top_sup_triangles.size()));
-				}
-                glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-                glsafe(::glPopMatrix());
-            }
-        }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 }
 
@@ -6867,7 +6171,6 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
     if (m_canvas == nullptr)
         return Vec3d(DBL_MAX, DBL_MAX, DBL_MAX);
 
-#if ENABLE_RAYCAST_PICKING
     if (z == nullptr) {
         const SceneRaycaster::HitResult hit = m_scene_raycaster.hit(mouse_pos.cast<double>(), wxGetApp().plater()->get_camera(), nullptr);
         return hit.is_valid() ? hit.position.cast<double>() : _mouse_to_bed_3d(mouse_pos);
@@ -6879,23 +6182,6 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
         igl::unproject(Vec3d(mouse_pos.x(), viewport[3] - mouse_pos.y(), *z), camera.get_view_matrix().matrix(), camera.get_projection_matrix().matrix(), viewport, out);
         return out;
     }
-#else
-    const Camera& camera = wxGetApp().plater()->get_camera();
-    const Matrix4d modelview  = camera.get_view_matrix().matrix();
-    const Matrix4d projection = camera.get_projection_matrix().matrix();
-    const Vec4i viewport(camera.get_viewport().data());
-
-    const int y = viewport[3] - mouse_pos.y();
-    float mouse_z;
-    if (z == nullptr)
-        glsafe(::glReadPixels(mouse_pos.x(), y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, (void*)&mouse_z));
-    else
-        mouse_z = *z;
-
-    Vec3d out;
-    igl::unproject(Vec3d(mouse_pos.x(), y, mouse_z), modelview, projection, viewport, out);
-    return out;
-#endif // ENABLE_RAYCAST_PICKING
 }
 
 Vec3d GLCanvas3D::_mouse_to_bed_3d(const Point& mouse_pos)
@@ -6951,48 +6237,24 @@ void GLCanvas3D::_load_print_toolpaths(const BuildVolume &build_volume)
     skirt_height = std::min(skirt_height, print_zs.size());
     print_zs.erase(print_zs.begin() + skirt_height, print_zs.end());
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLVolume* volume = m_volumes.new_toolpath_volume(color);
     GLModel::Geometry init_data;
     init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
-#else
-    GLVolume *volume = m_volumes.new_toolpath_volume(color, VERTEX_BUFFER_RESERVE_SIZE);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     for (size_t i = 0; i < skirt_height; ++ i) {
         volume->print_zs.emplace_back(print_zs[i]);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         volume->offsets.emplace_back(init_data.indices_count());
         if (i == 0)
             _3DScene::extrusionentity_to_verts(print->brim(), print_zs[i], Point(0, 0), init_data);
         _3DScene::extrusionentity_to_verts(print->skirt(), print_zs[i], Point(0, 0), init_data);
-#else
-        volume->offsets.emplace_back(volume->indexed_vertex_array.quad_indices.size());
-        volume->offsets.emplace_back(volume->indexed_vertex_array.triangle_indices.size());
-        if (i == 0)
-            _3DScene::extrusionentity_to_verts(print->brim(), print_zs[i], Point(0, 0), *volume);
-        _3DScene::extrusionentity_to_verts(print->skirt(), print_zs[i], Point(0, 0), *volume);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         // Ensure that no volume grows over the limits. If the volume is too large, allocate a new one.
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         if (init_data.vertices_size_bytes() > MAX_VERTEX_BUFFER_SIZE) {
             volume->model.init_from(std::move(init_data));
-#else
-        if (volume->indexed_vertex_array.vertices_and_normals_interleaved.size() > MAX_VERTEX_BUFFER_SIZE) {
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             GLVolume &vol = *volume;
             volume = m_volumes.new_toolpath_volume(vol.color);
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-            reserve_new_volume_finalize_old_volume(*volume, vol, m_initialized);
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         }
     }
-#if ENABLE_LEGACY_OPENGL_REMOVAL
     volume->model.init_from(std::move(init_data));
     volume->is_outside = !contains(build_volume, volume->model);
-#else
-    volume->is_outside = ! build_volume.all_paths_inside_vertices_and_normals_interleaved(volume->indexed_vertex_array.vertices_and_normals_interleaved, volume->indexed_vertex_array.bounding_box());
-    volume->indexed_vertex_array.finalize_geometry(m_initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, const BuildVolume& build_volume, const std::vector<std::string>& str_tool_colors, const std::vector<CustomGCode::Item>& color_print_values)
@@ -7164,11 +6426,9 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
         // Allocate the volume before locking.
 		GLVolume *volume = new GLVolume(color);
 		volume->is_extrusion_path = true;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         // to prevent sending data to gpu (in the main thread) while
         // editing the model geometry
         volume->model.disable_render();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         tbb::spin_mutex::scoped_lock lock;
     	// Lock by ROII, so if the emplace_back() fails, the lock will be released.
         lock.acquire(new_volume_mutex);
@@ -7186,7 +6446,6 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
         tbb::blocked_range<size_t>(0, ctxt.layers.size(), grain_size),
         [&ctxt, &new_volume, is_selected_separate_extruder, this](const tbb::blocked_range<size_t>& range) {
         GLVolumePtrs 		vols;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         std::vector<GLModel::Geometry> geometries;
         auto select_geometry = [&ctxt, &geometries](size_t layer_idx, int extruder, int feature) -> GLModel::Geometry& {
             return geometries[ctxt.color_by_color_print() ?
@@ -7196,41 +6455,21 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                 feature
             ];
         };
-#else
-        auto                volume = [&ctxt, &vols](size_t layer_idx, int extruder, int feature) -> GLVolume& {
-            return *vols[ctxt.color_by_color_print() ?
-                ctxt.color_print_color_idx_by_layer_idx_and_extruder(layer_idx, extruder) :
-                ctxt.color_by_tool() ?
-                std::min<int>(ctxt.number_tools() - 1, std::max<int>(extruder - 1, 0)) :
-                feature
-            ];
-        };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (ctxt.color_by_color_print() || ctxt.color_by_tool()) {
             for (size_t i = 0; i < ctxt.number_tools(); ++i) {
                 vols.emplace_back(new_volume(ctxt.color_tool(i)));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 geometries.emplace_back(GLModel::Geometry());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
         else {
             vols = { new_volume(ctxt.color_perimeters()), new_volume(ctxt.color_infill()), new_volume(ctxt.color_support()) };
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             geometries = { GLModel::Geometry(), GLModel::Geometry(), GLModel::Geometry() };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         assert(vols.size() == geometries.size());
         for (GLModel::Geometry& g : geometries) {
             g.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
         }
-#else
-        for (GLVolume *vol : vols)
-			// Reserving number of vertices (3x position + 3x color)
-        	vol->indexed_vertex_array.reserve(VERTEX_BUFFER_RESERVE_SIZE / 6);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
             const Layer *layer = ctxt.layers[idx_layer];
 
@@ -7251,7 +6490,6 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                     continue;
             }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             for (size_t i = 0; i < vols.size(); ++i) {
                 GLVolume* vol = vols[i];
                 if (vol->print_zs.empty() || vol->print_zs.back() != layer->print_z) {
@@ -7259,14 +6497,6 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                     vol->offsets.emplace_back(geometries[i].indices_count());
                 }
             }
-#else
-            for (GLVolume* vol : vols)
-                if (vol->print_zs.empty() || vol->print_zs.back() != layer->print_z) {
-                    vol->print_zs.emplace_back(layer->print_z);
-                    vol->offsets.emplace_back(vol->indexed_vertex_array.quad_indices.size());
-                    vol->offsets.emplace_back(vol->indexed_vertex_array.triangle_indices.size());
-                }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
             for (const PrintInstance &instance : *ctxt.shifted_copies) {
                 const Point &copy = instance.shift;
@@ -7279,31 +6509,17 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                             continue;
                     }
                     if (ctxt.has_perimeters)
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                         _3DScene::extrusionentity_to_verts(layerm->perimeters(), float(layer->print_z), copy,
                             select_geometry(idx_layer, layerm->region().config().perimeter_extruder.value, 0));
-#else
-                        _3DScene::extrusionentity_to_verts(layerm->perimeters(), float(layer->print_z), copy,
-                        	volume(idx_layer, layerm->region().config().perimeter_extruder.value, 0));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     if (ctxt.has_infill) {
                         for (const ExtrusionEntity *ee : layerm->fills()) {
                             // fill represents infill extrusions of a single island.
                             const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
                             if (! fill->entities.empty())
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                                 _3DScene::extrusionentity_to_verts(*fill, float(layer->print_z), copy,
                                     select_geometry(idx_layer, is_solid_infill(fill->entities.front()->role()) ?
                                                     layerm->region().config().solid_infill_extruder :
                                                     layerm->region().config().infill_extruder, 1));
-#else
-                                _3DScene::extrusionentity_to_verts(*fill, float(layer->print_z), copy,
-	                                volume(idx_layer, 
-		                                is_solid_infill(fill->entities.front()->role()) ?
-			                                layerm->region().config().solid_infill_extruder :
-			                                layerm->region().config().infill_extruder,
-		                                1));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                         }
                     }
                 }
@@ -7311,50 +6527,27 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                     const SupportLayer *support_layer = dynamic_cast<const SupportLayer*>(layer);
                     if (support_layer) {
                         for (const ExtrusionEntity *extrusion_entity : support_layer->support_fills.entities)
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                             _3DScene::extrusionentity_to_verts(extrusion_entity, float(layer->print_z), copy,
                                 select_geometry(idx_layer, (extrusion_entity->role() == erSupportMaterial) ?
                                                 support_layer->object()->config().support_material_extruder :
                                                 support_layer->object()->config().support_material_interface_extruder, 2));
-#else
-                            _3DScene::extrusionentity_to_verts(extrusion_entity, float(layer->print_z), copy,
-	                            volume(idx_layer, 
-		                            (extrusion_entity->role() == erSupportMaterial) ?
-			                            support_layer->object()->config().support_material_extruder :
-			                            support_layer->object()->config().support_material_interface_extruder,
-		                            2));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     }
                 }
             }
             // Ensure that no volume grows over the limits. If the volume is too large, allocate a new one.
 	        for (size_t i = 0; i < vols.size(); ++i) {
 	            GLVolume &vol = *vols[i];
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 if (geometries[i].vertices_size_bytes() > MAX_VERTEX_BUFFER_SIZE) {
                     vol.model.init_from(std::move(geometries[i]));
-#else
-                if (vol.indexed_vertex_array.vertices_and_normals_interleaved.size() > MAX_VERTEX_BUFFER_SIZE) {
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     vols[i] = new_volume(vol.color);
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-                    reserve_new_volume_finalize_old_volume(*vols[i], vol, false);
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
                 }
 	        }
         }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         for (size_t i = 0; i < vols.size(); ++i) {
             if (!geometries[i].is_empty())
                 vols[i]->model.init_from(std::move(geometries[i]));
         }
-#else
-        for (GLVolume *vol : vols)
-        	// Ideally one would call vol->indexed_vertex_array.finalize() here to move the buffers to the OpenGL driver,
-        	// but this code runs in parallel and the OpenGL driver is not thread safe.
-            vol->indexed_vertex_array.shrink_to_fit();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     });
     }); // task arena
 
@@ -7370,14 +6563,9 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
     }
     for (size_t i = volumes_cnt_initial; i < m_volumes.volumes.size(); ++i) {
         GLVolume* v = m_volumes.volumes[i];
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         v->is_outside = !contains(build_volume, v->model);
         // We are done editinig the model, now it can be sent to gpu
         v->model.enable_render();
-#else
-        v->is_outside = ! build_volume.all_paths_inside_vertices_and_normals_interleaved(v->indexed_vertex_array.vertices_and_normals_interleaved, v->indexed_vertex_array.bounding_box());
-        v->indexed_vertex_array.finalize_geometry(m_initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     BOOST_LOG_TRIVIAL(debug) << "Loading print object toolpaths in parallel - end" << m_volumes.log_memory_info() << log_memory_info();
@@ -7442,11 +6630,9 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
     auto            new_volume = [this, &new_volume_mutex](const ColorRGBA& color) {
         auto *volume = new GLVolume(color);
 		volume->is_extrusion_path = true;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         // to prevent sending data to gpu (in the main thread) while
         // editing the model geometry
         volume->model.disable_render();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         tbb::spin_mutex::scoped_lock lock;
         lock.acquire(new_volume_mutex);
         m_volumes.volumes.emplace_back(volume);
@@ -7460,46 +6646,29 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
         [&ctxt, &new_volume](const tbb::blocked_range<size_t>& range) {
         // Bounding box of this slab of a wipe tower.
         GLVolumePtrs vols;
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         std::vector<GLModel::Geometry> geometries;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (ctxt.color_by_tool()) {
             for (size_t i = 0; i < ctxt.number_tools(); ++i) {
                 vols.emplace_back(new_volume(ctxt.color_tool(i)));
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                 geometries.emplace_back(GLModel::Geometry());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
         else {
             vols = { new_volume(ctxt.color_support()) };
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             geometries = { GLModel::Geometry() };
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         assert(vols.size() == geometries.size());
         for (GLModel::Geometry& g : geometries) {
             g.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
         }
-#else
-        for (GLVolume *volume : vols)
-			// Reserving number of vertices (3x position + 3x color)
-            volume->indexed_vertex_array.reserve(VERTEX_BUFFER_RESERVE_SIZE / 6);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++idx_layer) {
             const std::vector<WipeTower::ToolChangeResult> &layer = ctxt.tool_change(idx_layer);
             for (size_t i = 0; i < vols.size(); ++i) {
                 GLVolume &vol = *vols[i];
                 if (vol.print_zs.empty() || vol.print_zs.back() != layer.front().print_z) {
                     vol.print_zs.emplace_back(layer.front().print_z);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                     vol.offsets.emplace_back(geometries[i].indices_count());
-#else
-                    vol.offsets.emplace_back(vol.indexed_vertex_array.quad_indices.size());
-                    vol.offsets.emplace_back(vol.indexed_vertex_array.triangle_indices.size());
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 }
             }
             for (const WipeTower::ToolChangeResult &extrusions : layer) {
@@ -7542,40 +6711,23 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
                         e_prev = e;
                     }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
                     _3DScene::thick_lines_to_verts(lines, widths, heights, lines.front().a == lines.back().b, extrusions.print_z,
                         geometries[ctxt.volume_idx(e.tool, 0)]);
-#else
-                    _3DScene::thick_lines_to_verts(lines, widths, heights, lines.front().a == lines.back().b, extrusions.print_z,
-                        *vols[ctxt.volume_idx(e.tool, 0)]);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 }
             }
         }
         for (size_t i = 0; i < vols.size(); ++i) {
             GLVolume &vol = *vols[i];
-#if ENABLE_LEGACY_OPENGL_REMOVAL
             if (geometries[i].vertices_size_bytes() > MAX_VERTEX_BUFFER_SIZE) {
                 vol.model.init_from(std::move(geometries[i]));
-#else
-            if (vol.indexed_vertex_array.vertices_and_normals_interleaved.size() > MAX_VERTEX_BUFFER_SIZE) {
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 vols[i] = new_volume(vol.color);
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-                reserve_new_volume_finalize_old_volume(*vols[i], vol, false);
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         for (size_t i = 0; i < vols.size(); ++i) {
             if (!geometries[i].is_empty())
                 vols[i]->model.init_from(std::move(geometries[i]));
         }
-#else
-        for (GLVolume *vol : vols)
-            vol->indexed_vertex_array.shrink_to_fit();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         });
 
     BOOST_LOG_TRIVIAL(debug) << "Loading wipe tower toolpaths in parallel - finalizing results" << m_volumes.log_memory_info() << log_memory_info();
@@ -7590,14 +6742,9 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
     }
     for (size_t i = volumes_cnt_initial; i < m_volumes.volumes.size(); ++i) {
         GLVolume* v = m_volumes.volumes[i];
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         v->is_outside = !contains(build_volume, v->model);
         // We are done editinig the model, now it can be sent to gpu
         v->model.enable_render();
-#else
-        v->is_outside = ! build_volume.all_paths_inside_vertices_and_normals_interleaved(v->indexed_vertex_array.vertices_and_normals_interleaved, v->indexed_vertex_array.bounding_box());
-        v->indexed_vertex_array.finalize_geometry(m_initialized);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     BOOST_LOG_TRIVIAL(debug) << "Loading wipe tower toolpaths in parallel - end" << m_volumes.log_memory_info() << log_memory_info();
@@ -7621,21 +6768,10 @@ void GLCanvas3D::_load_sla_shells()
         m_volumes.volumes.emplace_back(new GLVolume(color));
         GLVolume& v = *m_volumes.volumes.back();
 #if ENABLE_SMOOTH_NORMALS
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         v.model.init_from(mesh, true);
 #else
-        v.indexed_vertex_array.load_mesh(mesh, true);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#else
-#if ENABLE_LEGACY_OPENGL_REMOVAL
         v.model.init_from(mesh);
-#else
-        v.indexed_vertex_array.load_mesh(mesh);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_SMOOTH_NORMALS
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-        v.indexed_vertex_array.finalize_geometry(m_initialized);
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         v.shader_outside_printer_detection_enabled = outside_printer_detection_enabled;
         v.composite_id.volume_id = volume_id;
         v.set_instance_offset(unscale(instance.shift.x(), instance.shift.y(), 0.0));

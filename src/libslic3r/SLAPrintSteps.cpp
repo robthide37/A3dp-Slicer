@@ -413,6 +413,8 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
                     [&part_to_drill, &hollowed_mesh](const auto& node)
         {
             part_to_drill.indices.emplace_back(hollowed_mesh.its.indices[node.idx]);
+            // continue traversal
+            return true;
         });
 
         auto cgal_meshpart = MeshBoolean::cgal::triangle_mesh_to_cgal(
