@@ -1418,8 +1418,7 @@ void ColourPicker::sys_color_changed()
 
 PointCtrl::~PointCtrl()
 {
-    if (sizer) {
-        sizer->Clear();
+    if (sizer && sizer->IsEmpty()) {
         delete sizer;
         sizer = nullptr;
     }
