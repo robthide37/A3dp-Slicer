@@ -204,19 +204,6 @@ static void find_closest_volume(const Selection       &selection,
 /// <param name="emboss_data">Define params of text</param>
 /// <param name="coor">Screen coordinat, where to create new object laying on bed</param>
 static void start_create_object_job(DataBase &emboss_data, const Vec2d &coor);
-
-/// <summary>
-/// Create transformation for new created emboss object by mouse position
-/// </summary>
-/// <param name="screen_coor">Define where to add object</param>
-/// <param name="camera">Actual camera view</param>
-/// <param name="bed_shape">Define shape of bed for its center and check that coor is on bed center</param>
-/// <param name="z">Emboss size / 2</param>
-/// <returns>Transformation for create text on bed</returns>
-static Transform3d create_transformation_on_bed(const Vec2d              &screen_coor,
-                                                const Camera             &camera,
-                                                const std::vector<Vec2d> &bed_shape,
-                                                double                    z);
 } // namespace priv
 
 bool priv::is_valid(ModelVolumeType volume_type){
@@ -698,7 +685,7 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
     draw_list->AddLine(p1, p2, color, thickness);
 }
 #endif // SHOW_OFFSET_DURING_DRAGGING
-
+namespace priv {
 static void draw_origin_ball(const GLCanvas3D& canvas) {
     auto draw_list = ImGui::GetOverlayDrawList();
     const Selection &selection = canvas.get_selection();
@@ -712,6 +699,8 @@ static void draw_origin_ball(const GLCanvas3D& canvas) {
     ImU32 color = ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT);
     draw_list->AddCircleFilled(center, radius, color);
 }
+
+} // namespace priv
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
@@ -728,7 +717,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     const ImVec2 &min_window_size = get_minimal_window_size();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, min_window_size);
 
-    draw_origin_ball(m_parent);
+    priv::draw_origin_ball(m_parent);
 
 #ifdef SHOW_FINE_POSITION
     draw_fine_position(m_parent.get_selection(), m_parent.get_canvas_size(), min_window_size);
@@ -2672,8 +2661,7 @@ void GLGizmoEmboss::draw_style_edit() {
     }
 
     bool use_inch = wxGetApp().app_config->get("use_inches") == "1";
-    FontProp &font_prop = style.prop;
-    
+
     // IMPROVE: calc scale only when neccessary not each frame
     Transform3d to_world = priv::world_matrix(m_parent.get_selection());
     Vec3d up_world = to_world.linear() * Vec3d(0., 1., 0.);
@@ -3457,29 +3445,6 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager& st
     };
 
     return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), create_configuration(), create_volume_name()};
-}
-
-
-Transform3d priv::create_transformation_on_bed(const Vec2d &screen_coor, const Camera &camera, const std::vector<Vec2d> &bed_shape, double z)
-{
-    // Create new object
-    // calculate X,Y offset position for lay on platter in place of
-    // mouse click
-    Vec2d bed_coor = CameraUtils::get_z0_position(camera, screen_coor);
-
-    // check point is on build plate:
-    Points bed_shape_;
-    bed_shape_.reserve(bed_shape.size());
-    for (const Vec2d &p : bed_shape) bed_shape_.emplace_back(p.cast<int>());
-    Slic3r::Polygon bed(bed_shape_);
-    if (!bed.contains(bed_coor.cast<int>()))
-        // mouse pose is out of build plate so create object in center of plate
-        bed_coor = bed.centroid().cast<double>();
-
-    Vec3d offset(bed_coor.x(), bed_coor.y(), z);
-    // offset -= m_result.center();
-    Transform3d::TranslationType tt(offset.x(), offset.y(), offset.z());
-    return Transform3d(tt);
 }
 
 void priv::start_create_object_job(DataBase &emboss_data, const Vec2d &coor)
