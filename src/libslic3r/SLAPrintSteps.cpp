@@ -18,7 +18,7 @@
 #include <libslic3r/SlicesToTriangleMesh.hpp>
 #include <libslic3r/CSGMesh/ModelToCSGMesh.hpp>
 #include <libslic3r/CSGMesh/SliceCSGMesh.hpp>
-#include <libslic3r/CSGMesh/VoxelizeCSGMesh.hpp>>
+#include <libslic3r/CSGMesh/VoxelizeCSGMesh.hpp>
 #include <libslic3r/CSGMesh/PerformCSGMeshBooleans.hpp>
 #include <libslic3r/OpenVDBUtils.hpp>
 #include <libslic3r/QuadricEdgeCollapse.hpp>
