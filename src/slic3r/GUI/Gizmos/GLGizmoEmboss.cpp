@@ -359,7 +359,61 @@ static ModelVolume *get_selected_volume(const Selection &selection);
 /// <returns>Offset in screan coordinate</returns>
 static Vec2d calc_mouse_to_center_text_offset(const Vec2d &mouse, const ModelVolume &mv);
 
+/// <summary>
+/// Access to one selected volume
+/// </summary>
+/// <param name="selection">Containe what is selected</param>
+/// <returns>Slected when only one volume otherwise nullptr</returns>
+static const GLVolume *get_gl_volume(const Selection &selection);
+
+/// <summary>
+/// Get transformation to world
+/// - use fix after store to 3mf when exists
+/// </summary>
+/// <param name="gl_volume"></param>
+/// <param name="model">To identify MovelVolume with fix transformation</param>
+/// <returns></returns>
+static Transform3d world_matrix(const GLVolume *gl_volume, const Model *model);
+static Transform3d world_matrix(const Selection &selection);
+
 } // namespace priv
+
+const GLVolume *priv::get_gl_volume(const Selection &selection) {
+    const auto &list = selection.get_volume_idxs();
+    if (list.size() != 1)
+        return nullptr;
+    unsigned int volume_idx = *list.begin();
+    return selection.get_volume(volume_idx);
+}
+
+Transform3d priv::world_matrix(const GLVolume *gl_volume, const Model *model)
+{
+    if (!gl_volume)
+        return Transform3d::Identity();
+    Transform3d res = gl_volume->world_matrix();
+
+    if (!model)
+        return res;
+    ModelVolume* mv = get_model_volume(gl_volume, model->objects);
+    if (!mv)
+        return res;
+
+    const std::optional<TextConfiguration> &tc = mv->text_configuration;
+    if (!tc.has_value())
+        return res;
+    
+    const std::optional<Transform3d> &fix = tc->fix_3mf_tr;
+    if (!fix.has_value())
+        return res;
+
+    return res * (*fix);
+}
+
+Transform3d priv::world_matrix(const Selection &selection)
+{
+    const GLVolume *gl_volume = get_gl_volume(selection);
+    return world_matrix(gl_volume, selection.get_model());
+}
 
 Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolume& mv) {
     const Transform3d &volume_tr   = mv.get_matrix();
@@ -645,6 +699,20 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
 }
 #endif // SHOW_OFFSET_DURING_DRAGGING
 
+static void draw_origin_ball(const GLCanvas3D& canvas) {
+    auto draw_list = ImGui::GetOverlayDrawList();
+    const Selection &selection = canvas.get_selection();
+    Transform3d to_world = priv::world_matrix(selection);
+    Vec3d volume_zero = to_world * Vec3d::Zero();
+    
+    const Camera &camera = wxGetApp().plater()->get_camera();
+    Point screen_coor = CameraUtils::project(camera, volume_zero);
+    ImVec2 center(screen_coor.x(), screen_coor.y());
+    float radius = 10.f;
+    ImU32 color = ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT);
+    draw_list->AddCircleFilled(center, radius, color);
+}
+
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     if (!m_gui_cfg.has_value()) initialize();
@@ -659,6 +727,8 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     // TODO: fix width - showing scroll in first draw of advanced.
     const ImVec2 &min_window_size = get_minimal_window_size();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, min_window_size);
+
+    draw_origin_ball(m_parent);
 
 #ifdef SHOW_FINE_POSITION
     draw_fine_position(m_parent.get_selection(), m_parent.get_canvas_size(), min_window_size);
@@ -1149,22 +1219,35 @@ void GLGizmoEmboss::discard_and_close() {
     //  * Volume containing 3mf fix transformation - needs work around
 }
 
-bool use_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
+namespace priv {
+
+/// <summary>
+/// Apply camera direction for emboss direction
+/// </summary>
+/// <param name="camera">Define view vector</param>
+/// <param name="canvas">Containe Selected Model to modify</param>
+/// <returns>True when apply change otherwise false</returns>
+static bool apply_camera_dir(const Camera &camera, GLCanvas3D &canvas);
+}
+
+bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
     const Vec3d &cam_dir = camera.get_dir_forward();
 
     Selection &sel = canvas.get_selection();
     if (sel.is_empty()) return false;
-    assert(sel.get_volume_idxs().size() == 1);
-    GLVolume *vol = sel.get_volume(*sel.get_volume_idxs().begin());
-
+    
     // camera direction transformed into volume coordinate system    
-    Vec3d cam_dir_tr = vol->world_matrix().inverse().linear() * cam_dir;
+    Transform3d to_world = priv::world_matrix(sel);
+    Vec3d cam_dir_tr = to_world.inverse().linear() * cam_dir;
     cam_dir_tr.normalize();
 
     Vec3d emboss_dir(0., 0., -1.);
 
     // check wether cam_dir is already used
     if (is_approx(cam_dir_tr, emboss_dir)) return false;
+
+    assert(sel.get_volume_idxs().size() == 1);
+    GLVolume *vol = sel.get_volume(*sel.get_volume_idxs().begin());
 
     Transform3d vol_rot;
     Transform3d vol_tr = vol->get_volume_transformation().get_matrix();
@@ -1298,7 +1381,7 @@ void GLGizmoEmboss::draw_window()
         assert(priv::get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera& cam = wxGetApp().plater()->get_camera();
         bool use_surface = m_style_manager.get_style().prop.use_surface;
-        if (use_camera_dir(cam, m_parent) && use_surface) 
+        if (priv::apply_camera_dir(cam, m_parent) && use_surface) 
             process();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Use camera direction for text orientation").c_str());
@@ -2591,12 +2674,8 @@ void GLGizmoEmboss::draw_style_edit() {
     bool use_inch = wxGetApp().app_config->get("use_inches") == "1";
     FontProp &font_prop = style.prop;
     
-    const GLVolume* gl_vol = m_parent.get_selection().get_first_volume();
-    Transform3d to_world = gl_vol->world_matrix();
-    // Use fix of .3mf loaded tranformation when exist
-    if (m_volume->text_configuration->fix_3mf_tr.has_value()) 
-        to_world = to_world * (*m_volume->text_configuration->fix_3mf_tr);
-
+    // IMPROVE: calc scale only when neccessary not each frame
+    Transform3d to_world = priv::world_matrix(m_parent.get_selection());
     Vec3d up_world = to_world.linear() * Vec3d(0., 1., 0.);
     double norm_sq = up_world.squaredNorm();
     std::optional<float> height_scale;
