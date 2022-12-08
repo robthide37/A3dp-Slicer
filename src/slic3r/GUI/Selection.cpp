@@ -119,10 +119,10 @@ Selection::Selection()
 {
     this->set_bounding_boxes_dirty();
 #if ENABLE_WORLD_COORDINATE
-    m_axes.set_stem_radius(0.15f);
-    m_axes.set_stem_length(3.0f);
-    m_axes.set_tip_radius(0.45f);
-    m_axes.set_tip_length(1.5f);
+    m_axes.set_stem_radius(0.5f);
+    m_axes.set_stem_length(20.0f);
+    m_axes.set_tip_radius(1.5f);
+    m_axes.set_tip_length(5.0f);
 #endif // ENABLE_WORLD_COORDINATE
 }
 
@@ -1864,7 +1864,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 
 #if ENABLE_WORLD_COORDINATE
     if (!boost::starts_with(sidebar_field, "layer")) {
-        if (!wxGetApp().obj_manipul()->is_world_coordinates())
+        if (wxGetApp().obj_manipul()->is_instance_coordinates())
             m_axes.render(Geometry::translation_transform(axes_center) * orient_matrix, 0.25f);
     }
 #endif // ENABLE_WORLD_COORDINATE
