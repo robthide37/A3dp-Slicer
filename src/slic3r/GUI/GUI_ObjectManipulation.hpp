@@ -174,6 +174,9 @@ private:
 
     ScalableBitmap  m_manifold_warning_bmp;
     wxStaticBitmap* m_fix_throught_netfab_bitmap{ nullptr };
+#if ENABLE_WORLD_COORDINATE
+    wxStaticBitmap* m_mirror_warning_bitmap{ nullptr };
+#endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_WORLD_COORDINATE
     // Currently focused editor (nullptr if none)
