@@ -977,8 +977,10 @@ indexed_triangle_set its_make_cone(double r, double h, double fa)
     vertices.emplace_back(Vec3f(0., 0., h));
 
     size_t i = 0;
+    const auto vec = Eigen::Vector2f(0, float(r));
     for (double angle=0; angle<2*PI; angle+=fa) {
-        vertices.emplace_back(r*std::cos(angle), r*std::sin(angle), 0.);
+        Vec2f p = Eigen::Rotation2Df(angle) * vec;
+        vertices.emplace_back(Vec3f(p(0), p(1), 0.f));
         if (angle > 0.) {
             facets.emplace_back(0, i+2, i+1);
             facets.emplace_back(1, i+1, i+2);
