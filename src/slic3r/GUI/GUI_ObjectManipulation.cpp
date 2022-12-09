@@ -329,7 +329,12 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         editors_grid_sizer->Add(sizer, 0, wxALIGN_CENTER_HORIZONTAL);
     }
 
+#if ENABLE_WORLD_COORDINATE
+    m_mirror_warning_bitmap = new wxStaticBitmap(parent, wxID_ANY, wxNullBitmap);
+    editors_grid_sizer->Add(m_mirror_warning_bitmap, 0, wxALIGN_CENTER_VERTICAL);
+#else
     editors_grid_sizer->AddStretchSpacer(1);
+#endif // ENABLE_WORLD_COORDINATE
     editors_grid_sizer->AddStretchSpacer(1);
 
     // add EditBoxes 
@@ -901,6 +906,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
     bool show_drop_to_bed = false;
 #if ENABLE_WORLD_COORDINATE
     bool show_skew = false;
+    bool show_mirror_warning = false;
 
     if (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) {
         const double min_z = selection.is_single_full_instance() ? selection.get_scaled_instance_bounding_box().min.z() :
@@ -910,7 +916,6 @@ void ObjectManipulation::update_reset_buttons_visibility()
         const GLVolume* volume = selection.get_first_volume();
         Transform3d rotation = Transform3d::Identity();
         Transform3d scale = Transform3d::Identity();
-        Geometry::Transformation skew;
 #else
     if (selection.is_single_full_instance() || selection.is_single_modifier() || selection.is_single_volume()) {
         const GLVolume* volume = selection.get_first_volume();
@@ -926,11 +931,9 @@ void ObjectManipulation::update_reset_buttons_visibility()
             scale = trafo.get_scaling_factor_matrix();
             const Selection::IndicesList& idxs = selection.get_volume_idxs();
             for (unsigned int id : idxs) {
-                const Geometry::Transformation world_trafo(selection.get_volume(id)->world_matrix());                
-                if (world_trafo.has_skew()) {
-                    skew = world_trafo;
-                    break;
-                }
+                const Geometry::Transformation world_trafo(selection.get_volume(id)->world_matrix());
+                show_skew |= world_trafo.has_skew();
+                show_mirror_warning |= world_trafo.get_matrix().matrix().determinant() < 0.0;
             }
 #else
             rotation = volume->get_instance_rotation();
@@ -944,8 +947,8 @@ void ObjectManipulation::update_reset_buttons_visibility()
             rotation = trafo.get_rotation_matrix();
             scale = trafo.get_scaling_factor_matrix();
             const Geometry::Transformation world_trafo(volume->world_matrix());
-            if (world_trafo.has_skew())
-                skew = world_trafo;
+            show_skew |= world_trafo.has_skew();
+            show_mirror_warning |= world_trafo.get_matrix().matrix().determinant() < 0.0;
 #else
             rotation = volume->get_volume_rotation();
             scale = volume->get_volume_scaling_factor();
@@ -955,7 +958,6 @@ void ObjectManipulation::update_reset_buttons_visibility()
 #if ENABLE_WORLD_COORDINATE
         show_rotation = !rotation.isApprox(Transform3d::Identity());
         show_scale = !scale.isApprox(Transform3d::Identity());
-        show_skew = skew.has_skew();
 #else
         show_rotation = !rotation.isApprox(Vec3d::Zero());
         show_scale = !scale.isApprox(Vec3d::Ones());
@@ -964,7 +966,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
     }
 
 #if ENABLE_WORLD_COORDINATE
-    wxGetApp().CallAfter([this, show_rotation, show_scale, show_drop_to_bed, show_skew] {
+    wxGetApp().CallAfter([this, show_rotation, show_scale, show_drop_to_bed, show_skew, show_mirror_warning] {
 #else
     wxGetApp().CallAfter([this, show_rotation, show_scale, show_drop_to_bed] {
 #endif // ENABLE_WORLD_COORDINATE
@@ -978,6 +980,9 @@ void ObjectManipulation::update_reset_buttons_visibility()
 #if ENABLE_WORLD_COORDINATE
         m_reset_skew_button->Show(show_skew);
         m_skew_label->Show(show_skew);
+        m_mirror_warning_bitmap->SetBitmap(show_mirror_warning ? m_manifold_warning_bmp.bmp() : wxNullBitmap);
+        m_mirror_warning_bitmap->SetMinSize(show_mirror_warning ? m_manifold_warning_bmp.GetSize() : wxSize(0, 0));
+        m_mirror_warning_bitmap->SetToolTip(show_mirror_warning ? _L("Left handed") : "");
 #endif // ENABLE_WORLD_COORDINATE
 
         // Because of CallAfter we need to layout sidebar after Show/hide of reset buttons one more time
