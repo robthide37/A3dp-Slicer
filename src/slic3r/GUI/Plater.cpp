@@ -4961,7 +4961,7 @@ bool Plater::priv::can_split_to_objects() const
 
 bool Plater::priv::can_split_to_volumes() const
 {
-    return (printer_technology != ptSLA) && q->can_split(false);
+    return q->can_split(false);
 }
 
 bool Plater::priv::can_arrange() const
