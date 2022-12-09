@@ -1219,13 +1219,24 @@ void ObjectManipulation::change_size_value(int axis, double value)
 #else
     if (selection.is_single_volume() || selection.is_single_modifier()) {
 #endif // ENABLE_WORLD_COORDINATE
-        const GLVolume* v = selection.get_first_volume();
-        const Vec3d local_size = size.cwiseQuotient(v->get_instance_scaling_factor());
-        const Vec3d local_ref_size = v->bounding_box().size().cwiseProduct(v->get_volume_scaling_factor());
-        const Vec3d local_change = local_size.cwiseQuotient(local_ref_size);
 
-        size = local_change.cwiseProduct(v->get_volume_scaling_factor());
-        ref_size = Vec3d::Ones();
+#if ENABLE_WORLD_COORDINATE
+        if (is_world_coordinates()) {
+            size = size.cwiseQuotient(ref_size);
+            ref_size = Vec3d::Ones();
+        }
+        else {
+#endif // ENABLE_WORLD_COORDINATE
+            const GLVolume* v = selection.get_first_volume();
+            const Vec3d local_size = size.cwiseQuotient(v->get_instance_scaling_factor());
+            const Vec3d local_ref_size = v->bounding_box().size().cwiseProduct(v->get_volume_scaling_factor());
+            const Vec3d local_change = local_size.cwiseQuotient(local_ref_size);
+
+            size = local_change.cwiseProduct(v->get_volume_scaling_factor());
+            ref_size = Vec3d::Ones();
+#if ENABLE_WORLD_COORDINATE
+        }
+#endif // ENABLE_WORLD_COORDINATE
     }
     else if (selection.is_single_full_instance())
 #if ENABLE_WORLD_COORDINATE
@@ -1243,8 +1254,8 @@ void ObjectManipulation::change_size_value(int axis, double value)
 #endif // ENABLE_WORLD_COORDINATE
 
     m_cache.size = size;
-	m_cache.size_rounded(axis) = DBL_MAX;
-	this->UpdateAndShow(true);
+    m_cache.size_rounded(axis) = DBL_MAX;
+    this->UpdateAndShow(true);
 }
 
 void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
