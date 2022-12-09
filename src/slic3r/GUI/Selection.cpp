@@ -1344,8 +1344,7 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                 if (!is_single_volume_or_modifier())
                     original_box = get_bounding_box();
                 else if (transformation_type.world())
-                    original_box = v.transformed_convex_hull_bounding_box((volume_data.get_instance_transform() *
-                        volume_data.get_volume_transform()).get_matrix_no_scaling_factor());
+                    original_box = get_bounding_box();
                 else if (transformation_type.instance())
                     original_box = v.transformed_convex_hull_bounding_box(volume_data.get_volume_transform().get_matrix_no_scaling_factor());
                 else
