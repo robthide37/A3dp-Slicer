@@ -359,10 +359,19 @@ void GLGizmoCut3D::put_connectors_on_cut_plane(const Vec3d& cp_normal, double cp
     }
 }
 
+// returns true if the camera (forward) is pointing in the negative direction of the cut normal
+bool GLGizmoCut3D::is_looking_forward() const
+{
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const double dot = camera.get_dir_forward().dot(m_cut_normal);
+    return dot < 0.05;
+}
+
 void GLGizmoCut3D::update_clipper()
 {
     BoundingBoxf3 box = bounding_box();
 
+    // update cut_normal
     Vec3d beg, end = beg = m_plane_center;
     beg[Z] = box.center().z() - m_radius;
     end[Z] = box.center().z() + m_radius;
@@ -370,12 +379,26 @@ void GLGizmoCut3D::update_clipper()
     rotate_vec3d_around_plane_center(beg);
     rotate_vec3d_around_plane_center(end);
 
-    double dist = (m_plane_center - beg).norm();
+    // calculate normal for cut plane
+    Vec3d normal = m_cut_normal = end - beg;
+    m_cut_normal.normalize();
+
+    if (!is_looking_forward()) {
+        end = beg = m_plane_center;
+        beg[Z] = box.center().z() + m_radius;
+        end[Z] = box.center().z() - m_radius;
+
+        rotate_vec3d_around_plane_center(beg);
+        rotate_vec3d_around_plane_center(end);
+
+        // recalculate normal for clipping plane, if camera is looking downward to cut plane
+        normal = end - beg;
+        if (normal == Vec3d::Zero())
+            return;
+    }
 
     // calculate normal and offset for clipping plane
-    Vec3d normal = end - beg;
-    if (normal == Vec3d::Zero())
-        return;
+    double dist = (m_plane_center - beg).norm();
     dist = std::clamp(dist, 0.0001, normal.norm());
     normal.normalize();
     const double offset = normal.dot(beg) + dist;
@@ -1372,7 +1395,7 @@ void GLGizmoCut3D::render_clipper_cut()
 
 void GLGizmoCut3D::on_render()
 {
-    if (update_bb() || force_update_clipper_on_render) {
+    if (update_bb() || force_update_clipper_on_render || m_connectors_editing) {
         update_clipper_on_render();
         m_c->object_clipper()->set_behavior(m_connectors_editing, m_connectors_editing, 0.4);
     }
@@ -1914,9 +1937,15 @@ void GLGizmoCut3D::render_connectors()
         const Camera& camera = wxGetApp().plater()->get_camera();
         if (connector.attribs.type  == CutConnectorType::Dowel &&
             connector.attribs.style == CutConnectorStyle::Prizm) {
-            pos -= height * normal;
+            if (is_looking_forward())
+                pos -= height * normal;
+            else
+                pos += height * normal;
             height *= 2;
         }
+        else if (!is_looking_forward())
+            pos += 0.05 * normal;
+
         const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(pos) * m_rotation_m * 
                                               scale_transform(Vec3f(connector.radius, connector.radius, height).cast<double>());
 
