@@ -12,6 +12,7 @@
 #include "../Polygon.hpp"
 #include "../ClipperUtils.hpp"
 #include "../Flow.hpp"
+#include "../Config.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -19,6 +20,7 @@
 #include <limits>
 #include <numeric>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace Slic3r {
@@ -67,8 +69,8 @@ public:
 
 class CurvatureEstimator
 {
-    static const size_t               sliders_count          = 3;
-    SlidingWindowCurvatureAccumulator sliders[sliders_count] = {{2.0}, {4.0}, {8.0}};
+    static const size_t               sliders_count          = 2;
+    SlidingWindowCurvatureAccumulator sliders[sliders_count] = {{1.5}, {3.0}};
 
 public:
     void add_point(float distance, float angle)
@@ -189,7 +191,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
 struct ProcessedPoint
 {
     Point p;
-    float speed_factor = 1.0f;
+    float speed = 1.0f;
 };
 
 class ExtrusionQualityEstimator
@@ -209,13 +211,24 @@ public:
         next_layer_boundaries[object] = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(layer->lslices)};
     }
 
-    std::vector<ProcessedPoint> estimate_extrusion_quality(const ExtrusionPath &path)
+    std::vector<ProcessedPoint> estimate_extrusion_quality(const ExtrusionPath                &path,
+                                                           const ConfigOptionPercents         &overlaps,
+                                                           const ConfigOptionFloatsOrPercents &speeds,
+                                                           float                               ext_perimeter_speed,
+                                                           float                               original_speed)
     {
+        size_t                               speed_sections_count = std::min(overlaps.values.size(), speeds.values.size());
+        std::vector<std::pair<float, float>> speed_sections;
+        for (size_t i = 0; i < speed_sections_count; i++) {
+            float distance = path.width * (1.0 - (overlaps.get_at(i) / 100.0));
+            float speed    = speeds.get_at(i).percent ? (ext_perimeter_speed * speeds.get_at(i).value / 100.0) : speeds.get_at(i).value;
+            speed_sections.push_back({distance, speed});
+        }
+        std::sort(speed_sections.begin(), speed_sections.end(),
+                  [](const std::pair<float, float> &a, const std::pair<float, float> &b) { return a.first < b.first; });
+
         std::vector<ExtendedPoint> extended_points =
             estimate_points_properties<true, true, true, false>(path.polyline.points, prev_layer_boundaries[current_object], path.width);
-
-        float min_malformation_dist  = 0.55 * path.width;
-        float peak_malformation_dist = path.width;
 
         std::vector<ProcessedPoint> processed_points;
         processed_points.reserve(extended_points.size());
@@ -223,19 +236,28 @@ public:
             const ExtendedPoint &curr = extended_points[i];
             const ExtendedPoint &next = extended_points[i + 1 < extended_points.size() ? i + 1 : i];
 
-            float extrusion_speed_factor = 1.0f;
-            if (std::max(curr.distance, next.distance) < min_malformation_dist) {
-                extrusion_speed_factor = 1.0f;
-            } else {
-                float curvature_penalty = std::min(1.0f, next.curvature);
-                float distance_penalty = (std::max(curr.distance, next.distance) - min_malformation_dist) /
-                                         (peak_malformation_dist - min_malformation_dist);
-                distance_penalty = std::min(1.0f, distance_penalty);
+            auto calculate_speed = [&speed_sections, &original_speed](float distance) {
+                float final_speed;
+                if (distance <= speed_sections.front().first) {
+                    final_speed = original_speed;
+                } else if (distance >= speed_sections.back().first) {
+                    final_speed = speed_sections.back().second;
+                } else {
+                    size_t section_idx = 0;
+                    while (distance > speed_sections[section_idx + 1].first) {
+                        section_idx++;
+                    }
+                    float t = (distance - speed_sections[section_idx].first) /
+                              (speed_sections[section_idx + 1].first - speed_sections[section_idx].first);
+                    t           = std::clamp(t, 0.0f, 1.0f);
+                    final_speed = (1.0f - t) * speed_sections[section_idx].second + t * speed_sections[section_idx + 1].second;
+                }
+                return final_speed;
+            };
 
-                extrusion_speed_factor = std::clamp(1.0f - distance_penalty - curvature_penalty, 0.0f, 1.0f);
-            }
+            float extrusion_speed = (calculate_speed(curr.distance) + calculate_speed(next.distance)) / 2.0f;
 
-            processed_points.push_back({scaled(curr.position), extrusion_speed_factor});
+            processed_points.push_back({scaled(curr.position), extrusion_speed});
         }
         return processed_points;
     }

@@ -528,6 +528,36 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(60));
 
+    def             = this->add("enable_dynamic_overhang_speeds", coBool);
+    def->label      = L("Enable dynamic overhang speeds (Experimental)");
+    def->category   = L("Speed");
+    def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
+    def->mode       = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def             = this->add("overhang_overlaps", coPercents);
+    def->label      = L("Overhang overlap percentage");
+    def->category   = L("Speed");
+    def->tooltip    = L("Controls percentage of overhang extrusion overlap with the previous layer."
+                        "Each overlap size then corresponds with the overhang speed set below.");
+    def->sidetext   = L("%");
+    def->min        = 0;
+    def->max        = 100;
+    def->mode       = comAdvanced;
+    def->set_default_value(new ConfigOptionPercents({60, 40, 20, 0}));
+
+    def             = this->add("dynamic_overhang_speeds", coFloatsOrPercents);
+    def->label      = L("Dynamic speed on overhangs");
+    def->category   = L("Speed");
+    def->tooltip    = L("This setting controls the speed of the overhangs for overlap values set above."
+                        "The final speed is calculated as an interpolation of the set speed values."
+                        "If set as percentage, the speeds are calculated over the external perimeter speed."
+                        );
+    def->sidetext   = L("mm/s or %");
+    def->min        = 0;
+    def->mode       = comAdvanced;
+    def->set_default_value(new ConfigOptionFloatsOrPercents({{25, false}, {20, false}, {15, false}, {15, false}}));
+
     def = this->add("brim_width", coFloat);
     def->label = L("Brim width");
     def->category = L("Skirt and brim");
@@ -2356,18 +2386,6 @@ void PrintConfigDef::init_fff_params()
     def->ratio_over = "perimeter_speed";
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
-
-    def             = this->add("overhang_speed", coFloatOrPercent);
-    def->label      = L("Overhangs");
-    def->category   = L("Speed");
-    def->tooltip    = L("This setting controls the speed of overhangs."
-                           "If expressed as percentage (for example: 80%) it will be calculated "
-                           "on the external perimeters speed setting. Set to zero for auto.");
-    def->sidetext   = L("mm/s or %");
-    def->ratio_over = "external_perimeter_speed";
-    def->min        = 0;
-    def->mode       = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def = this->add("solid_infill_below_area", coFloat);

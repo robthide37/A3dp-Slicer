@@ -474,7 +474,6 @@ void Layer::make_perimeters()
     		                && config.perimeters                  == other_config.perimeters
     		                && config.perimeter_speed             == other_config.perimeter_speed
     		                && config.external_perimeter_speed    == other_config.external_perimeter_speed
-    		                && config.overhang_speed              == other_config.overhang_speed
     		                && (config.gap_fill_enabled ? config.gap_fill_speed.value : 0.) == 
                                (other_config.gap_fill_enabled ? other_config.gap_fill_speed.value : 0.)
     		                && config.overhangs                   == other_config.overhangs

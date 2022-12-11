@@ -851,7 +851,6 @@ namespace DoExport {
 	                if (region.config().get_abs_value("perimeter_speed") == 0 ||
 	                    region.config().get_abs_value("small_perimeter_speed") == 0 ||
 	                    region.config().get_abs_value("external_perimeter_speed") == 0 ||
-	                    region.config().get_abs_value("overhang_speed") == 0 ||
 	                    region.config().get_abs_value("bridge_speed") == 0)
 	                    mm3_per_mm.push_back(layerm->perimeters().min_mm3_per_mm());
 	                if (region.config().get_abs_value("infill_speed") == 0 ||
@@ -2877,9 +2876,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             speed = m_config.get_abs_value("perimeter_speed");
         } else if (path.role() == erExternalPerimeter) {
             speed = m_config.get_abs_value("external_perimeter_speed");
-        }else if (path.role() == erOverhangPerimeter){
-            speed = m_config.get_abs_value("overhang_speed");
-        } else if (path.role() == erBridgeInfill) {
+        } else if (path.role() == erOverhangPerimeter || path.role() == erBridgeInfill) {
             speed = m_config.get_abs_value("bridge_speed");
         } else if (path.role() == erInternalInfill) {
             speed = m_config.get_abs_value("infill_speed");
@@ -2918,9 +2915,11 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
 
     bool                        variable_speed = false;
     std::vector<ProcessedPoint> new_points{};
-    if (this->m_config.overhangs && !this->on_first_layer() && is_perimeter(path.role())) {
-        new_points     = m_extrusion_quality_estimator.estimate_extrusion_quality(path);
-        variable_speed = std::any_of(new_points.begin(), new_points.end(), [](const ProcessedPoint &p) { return p.speed_factor != 1.0; });
+    if (this->m_config.enable_dynamic_overhang_speeds && !this->on_first_layer() && is_perimeter(path.role())) {
+        new_points     = m_extrusion_quality_estimator.estimate_extrusion_quality(path, m_config.overhang_overlaps,
+                                                                                  m_config.dynamic_overhang_speeds,
+                                                                                  m_config.get_abs_value("external_perimeter_speed"), speed);
+        variable_speed = std::any_of(new_points.begin(), new_points.end(), [speed](const ProcessedPoint &p) { return p.speed != speed; });
     }
 
     double F = speed * 60;  // convert mm/sec to mm/min
@@ -2987,7 +2986,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
     if (!variable_speed) {
         // F is mm per minute.
         gcode += m_writer.set_speed(F, "", comment);
-        double      path_length = 0.;
+        double path_length = 0.;
         std::string comment;
         if (m_config.gcode_comments) {
             comment = description;
@@ -2996,30 +2995,29 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         Vec2d prev = this->point_to_gcode_quantized(path.polyline.points.front());
         auto  it   = path.polyline.points.begin();
         auto  end  = path.polyline.points.end();
-        for (++it; it != end; ++it) {
-            Vec2d        p           = this->point_to_gcode_quantized(*it);
+        for (++ it; it != end; ++ it) {
+            Vec2d p = this->point_to_gcode_quantized(*it);
             const double line_length = (p - prev).norm();
             path_length += line_length;
             gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
             prev = p;
         }
     } else {
-        double overhang_speed = m_config.get_abs_value("overhang_speed");
         std::string comment;
         if (m_config.gcode_comments) {
             comment = description;
             comment += description_bridge;
         }
-        double last_set_speed = std::max(overhang_speed, new_points[0].speed_factor * speed) * 60.0;
+        double last_set_speed = new_points[0].speed * 60.0;
         gcode += m_writer.set_speed(last_set_speed, "", comment);
         Vec2d prev = this->point_to_gcode_quantized(new_points[0].p);
         for (size_t i = 1; i < new_points.size(); i++) {
-            const ProcessedPoint& procesed_point = new_points[i];
-            Vec2d p = this->point_to_gcode_quantized(procesed_point.p);
+            const ProcessedPoint& processed_point = new_points[i];
+            Vec2d p = this->point_to_gcode_quantized(processed_point.p);
             const double line_length = (p - prev).norm();
             gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
             prev = p;
-            double new_speed = std::max(overhang_speed, procesed_point.speed_factor * speed) * 60.0;
+            double new_speed = processed_point.speed * 60.0;
             if (last_set_speed != new_speed) {
                 gcode += m_writer.set_speed(new_speed, "", comment);
                 last_set_speed = new_speed;

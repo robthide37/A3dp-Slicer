@@ -1,4 +1,5 @@
 // #include "libslic3r/GCodeSender.hpp"
+#include "slic3r/GUI/BedShapeDialog.hpp"
 #include "slic3r/Utils/Serial.hpp"
 #include "Tab.hpp"
 #include "PresetHints.hpp"
@@ -1541,7 +1542,6 @@ void TabPrint::build()
         optgroup->append_single_option_line("perimeter_speed");
         optgroup->append_single_option_line("small_perimeter_speed");
         optgroup->append_single_option_line("external_perimeter_speed");
-        optgroup->append_single_option_line("overhang_speed");
         optgroup->append_single_option_line("infill_speed");
         optgroup->append_single_option_line("solid_infill_speed");
         optgroup->append_single_option_line("top_solid_infill_speed");
@@ -1550,6 +1550,20 @@ void TabPrint::build()
         optgroup->append_single_option_line("bridge_speed");
         optgroup->append_single_option_line("gap_fill_speed");
         optgroup->append_single_option_line("ironing_speed");
+
+        optgroup = page->new_optgroup(L("Dynamic overhang speed"));
+        auto append_option_line = [](ConfigOptionsGroupShp optgroup, std::string opt_key) {
+            auto option = optgroup->get_option(opt_key, 0);
+            auto line   = Line{option.opt.full_label, ""};
+            line.append_option(option);
+            line.append_option(optgroup->get_option(opt_key, 1));
+            line.append_option(optgroup->get_option(opt_key, 2));
+            line.append_option(optgroup->get_option(opt_key, 3));
+            optgroup->append_line(line);
+        };
+        optgroup->append_single_option_line("enable_dynamic_overhang_speeds");
+	    append_option_line(optgroup,"overhang_overlaps");
+        append_option_line(optgroup,"dynamic_overhang_speeds");
 
         optgroup = page->new_optgroup(L("Speed for non-print moves"));
         optgroup->append_single_option_line("travel_speed");
