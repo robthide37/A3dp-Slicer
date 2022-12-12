@@ -545,10 +545,15 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
             const bool supports_enable = selection == _("None") ? false : true;
             new_conf.set_key_value("supports_enable", new ConfigOptionBool(supports_enable));
 
+            new_conf.set_key_value("support_enforcers_only", new ConfigOptionBool(false));
+
             if (selection == _("Everywhere"))
                 new_conf.set_key_value("support_buildplate_only", new ConfigOptionBool(false));
             else if (selection == _("Support on build plate only"))
                 new_conf.set_key_value("support_buildplate_only", new ConfigOptionBool(true));
+            else if (selection == _("For support enforcers only")) {
+                new_conf.set_key_value("support_enforcers_only", new ConfigOptionBool(true));
+            }
         }
 
         tab->load_config(new_conf);
@@ -559,8 +564,6 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
 
     ConfigOptionDef support_def_sla = support_def;
     support_def_sla.set_default_value(new ConfigOptionStrings{ "None" });
-    assert(support_def_sla.enum_labels[2] == L("For support enforcers only"));
-    support_def_sla.enum_labels.erase(support_def_sla.enum_labels.begin() + 2);
     option = Option(support_def_sla, "support");
     option.opt.full_width = true;
     line.append_option(option);

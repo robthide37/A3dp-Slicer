@@ -404,11 +404,16 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
 //    report_status(-2, "", SlicingStatus::RELOAD_SLA_PREVIEW);
 }
 
-static void filter_support_points_by_modifiers(
-    sla::SupportPoints            &pts,
-    const std::vector<ExPolygons> &blockers,
-    const std::vector<ExPolygons> &enforcers,
-    const std::vector<float>      &slice_grid)
+
+struct SuppPtMask {
+    const std::vector<ExPolygons> &blockers;
+    const std::vector<ExPolygons> &enforcers;
+    bool enforcers_only = false;
+};
+
+static void filter_support_points_by_modifiers(sla::SupportPoints &pts,
+                                               const SuppPtMask &mask,
+                                               const std::vector<float> &slice_grid)
 {
     assert((blockers.empty() || blockers.size() == slice_grid.size()) &&
            (enforcers.empty() || enforcers.size() == slice_grid.size()));
@@ -423,24 +428,30 @@ static void filter_support_points_by_modifiers(
         if (it != slice_grid.end()) {
             size_t idx = std::distance(slice_grid.begin(), it);
             bool is_enforced = false;
-            if (idx < enforcers.size()) {
+            if (idx < mask.enforcers.size()) {
                 for (size_t enf_idx = 0;
-                     !is_enforced && enf_idx < enforcers[idx].size();
+                     !is_enforced && enf_idx < mask.enforcers[idx].size();
                      ++enf_idx)
                 {
-                    if (enforcers[idx][enf_idx].contains(sp2d))
+                    if (mask.enforcers[idx][enf_idx].contains(sp2d))
                         is_enforced = true;
                 }
             }
 
             bool is_blocked = false;
-            if (!is_enforced && idx < blockers.size()) {
-                for (size_t blk_idx = 0;
-                     !is_blocked && blk_idx < blockers[idx].size();
-                     ++blk_idx)
-                {
-                    if (blockers[idx][blk_idx].contains(sp2d))
-                        is_blocked = true;
+            if (!is_enforced) {
+                if (!mask.enforcers_only) {
+                    if (idx < mask.blockers.size()) {
+                        for (size_t blk_idx = 0;
+                             !is_blocked && blk_idx < mask.blockers[idx].size();
+                             ++blk_idx)
+                        {
+                            if (mask.blockers[idx][blk_idx].contains(sp2d))
+                                is_blocked = true;
+                        }
+                    }
+                } else {
+                    is_blocked = true;
                 }
             }
 
@@ -527,7 +538,8 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
                               return vol->is_support_enforcer();
                           });
 
-        filter_support_points_by_modifiers(points, blockers, enforcers, po.m_model_height_levels);
+        SuppPtMask mask{blockers, enforcers, po.config().support_enforcers_only.getBool()};
+        filter_support_points_by_modifiers(points, mask, po.m_model_height_levels);
 
         po.m_supportdata->input.pts = points;
 

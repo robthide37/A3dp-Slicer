@@ -4777,6 +4777,7 @@ void TabSLAPrint::build()
     
     optgroup->append_single_option_line("support_pillar_connection_mode");
     optgroup->append_single_option_line("support_buildplate_only");
+    optgroup->append_single_option_line("support_enforcers_only");
     optgroup->append_single_option_line("support_pillar_widening_factor");
     optgroup->append_single_option_line("support_base_diameter");
     optgroup->append_single_option_line("support_base_height");

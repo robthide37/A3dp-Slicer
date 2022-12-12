@@ -35,7 +35,7 @@ bool is_zero_elevation(const SLAPrintObjectConfig &c)
 sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfig& c)
 {
     sla::SupportTreeConfig scfg;
-    
+
     scfg.enabled = c.supports_enable.getBool();
     scfg.tree_type = c.support_tree_type.value;
     scfg.head_front_radius_mm = 0.5*c.support_head_front_diameter.getFloat();
@@ -58,7 +58,7 @@ sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfig& c)
     scfg.pillar_base_safety_distance_mm =
         c.support_base_safety_distance.getFloat() < EPSILON ?
             scfg.safety_distance_mm : c.support_base_safety_distance.getFloat();
-    
+
     scfg.max_bridges_on_pillar = unsigned(c.support_max_bridges_on_pillar.getInt());
     
     return scfg;
@@ -827,6 +827,7 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             steps.emplace_back(slaposObjectSlice);
         } else if (
                opt_key == "support_points_density_relative"
+            || opt_key == "support_enforcers_only"
             || opt_key == "support_points_minimal_distance") {
             steps.emplace_back(slaposSupportPoints);
         } else if (

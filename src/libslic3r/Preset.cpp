@@ -502,6 +502,7 @@ static std::vector<std::string> s_Preset_sla_print_options {
     "support_max_bridges_on_pillar",
     "support_pillar_connection_mode",
     "support_buildplate_only",
+    "support_enforcers_only",
     "support_pillar_widening_factor",
     "support_base_diameter",
     "support_base_height",

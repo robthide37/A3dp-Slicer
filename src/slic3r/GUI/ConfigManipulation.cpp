@@ -374,6 +374,7 @@ void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
     toggle_field("support_pillar_connection_mode", supports_en && is_default_tree);
     toggle_field("support_tree_type", supports_en);
     toggle_field("support_buildplate_only", supports_en);
+    toggle_field("support_enforcers_only", supports_en);
     toggle_field("support_base_diameter", supports_en);
     toggle_field("support_base_height", supports_en);
     toggle_field("support_base_safety_distance", supports_en);
