@@ -526,15 +526,11 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // with Mesa driver OR on Linux
         if (!m_temp_transformation.has_value()) return false;
 
-        // TODO: Disable applying of common transformation after draggig
-        // Call after is used for apply transformation after common dragging to rewrite it
+        // Override of common transformation after draggig by set transformation into gl_volume
         Transform3d volume_trmat =
             gl_volume->get_instance_transformation().get_matrix().inverse() *
             *m_temp_transformation;
-        wxGetApp().plater()->CallAfter([volume_trmat, mv = m_volume]() {
-            mv->set_transformation(volume_trmat);
-        });
-
+        gl_volume->set_volume_transformation(volume_trmat);
         m_parent.toggle_model_objects_visibility(true);
         // Apply temporary position
         m_temp_transformation = {};
