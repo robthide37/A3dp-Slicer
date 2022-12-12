@@ -63,30 +63,26 @@ using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
 using namespace Slic3r::GUI::Emboss;
 
-// anonymous namespace for unique names
-namespace {
-template<typename T>
-struct MinMax
-{
-    T min;
-    T max;
-};
-template<typename T>
-struct Limit
-{
+namespace priv {
+template<typename T> struct MinMax { T min; T max;};
+template<typename T> struct Limit {
+    // Limitation for view slider range in GUI
     MinMax<T> gui;
+    // Real limits for setting exacts values
     MinMax<T> values;
 };
-struct Limits
+
+// Variable keep limits for variables
+static const struct Limits
 {
-    MinMax<float> emboss{0.01f, 1e4f};
-    MinMax<float> size_in_mm{0.1f, 1000.f};
-    Limit<float> boldness{{-200.f, 200.f}, {-2e4f, 2e4f}};
-    Limit<float> skew{{-1.f, 1.f}, {-100.f, 100.f}};
-    MinMax<int>  char_gap{-20000, 20000};
-    MinMax<int>  line_gap{-20000, 20000};
+    MinMax<float> emboss{0.01f, 1e4f}; // in mm
+    MinMax<float> size_in_mm{0.1f, 1000.f}; // in mm
+    Limit<float> boldness{{-200.f, 200.f}, {-2e4f, 2e4f}}; // in font points
+    Limit<float> skew{{-1.f, 1.f}, {-100.f, 100.f}}; // ration without unit
+    MinMax<int>  char_gap{-20000, 20000}; // in font points
+    MinMax<int>  line_gap{-20000, 20000}; // in font points
     // distance text object from surface
-    MinMax<float> angle{-180.f, 180.f}; // in mm
+    MinMax<float> angle{-180.f, 180.f}; // in degrees
 
     template<typename T>
     static bool apply(std::optional<T> &val, const MinMax<T> &limit) {
@@ -107,8 +103,7 @@ struct Limits
         }
         return false;
     }
-};
-static const Limits limits;
+} limits;
 
 static bool is_text_empty(const std::string &text){
     return text.empty() ||
@@ -123,8 +118,7 @@ template<typename T> void to_range_pi_pi(T& angle)
         angle -= static_cast<T>(count * 2 * PI);
     }
 }
-
-} // namespace
+} // namespace priv
 
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
@@ -307,7 +301,7 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 
         angle += *m_rotate_start_angle;
         // move to range <-M_PI, M_PI>
-        to_range_pi_pi(angle);
+        priv::to_range_pi_pi(angle);
         // propagate angle into property
         angle_opt = static_cast<float>(angle);
 
@@ -1183,7 +1177,7 @@ void GLGizmoEmboss::close()
     // remove volume when text is empty
     if (m_volume != nullptr && 
         m_volume->text_configuration.has_value() &&
-        is_text_empty(m_text)) {
+        priv::is_text_empty(m_text)) {
         Plater &p = *wxGetApp().plater();
         if (is_text_object(m_volume)) {
             // delete whole object
@@ -1436,7 +1430,7 @@ void GLGizmoEmboss::draw_text_input()
                 tool_tip += t;
             }
         };
-        if (is_text_empty(m_text)) append_warning(_u8L("Empty"), _u8L("Embossed text can NOT contain only white spaces."));
+        if (priv::is_text_empty(m_text)) append_warning(_u8L("Empty"), _u8L("Embossed text can NOT contain only white spaces."));
         if (m_text_contain_unknown_glyph)
             append_warning(_u8L("Bad symbol"), _u8L("Text contain character glyph (represented by '?') unknown by font."));
 
@@ -2731,7 +2725,7 @@ void GLGizmoEmboss::draw_height(std::optional<float> scale, bool use_inch)
     const std::string& name = m_gui_cfg->translations.size;
     if(rev_input_mm(name, value, stored, revert_text_size, 0.1f, 1.f, size_format, use_inch, scale)){
         // size can't be zero or negative
-        Limits::apply(value, limits.size_in_mm);
+        priv::Limits::apply(value, priv::limits.size_in_mm);
         // only different value need process
         if (!is_approx(value, m_volume->text_configuration->style.prop.size_in_mm)) {
             // store font size into path
@@ -2759,7 +2753,7 @@ void GLGizmoEmboss::draw_depth(std::optional<float> scale, bool use_inch)
     const std::string  name = m_gui_cfg->translations.depth;
     if (rev_input_mm(name, value, stored, revert_emboss_depth, 0.1f, 1.f, size_format, use_inch, scale)) {
         // size can't be zero or negative
-        Limits::apply(value, limits.emboss);
+        priv::Limits::apply(value, priv::limits.emboss);
         process();
     }
 }
@@ -2930,7 +2924,7 @@ void GLGizmoEmboss::draw_advanced()
     if (rev_slider(tr.char_gap, font_prop.char_gap, def_char_gap, _u8L("Revert gap between letters"), 
         min_char_gap, max_char_gap, units_fmt, _L("Distance between letters"))){
         // Condition prevent recalculation when insertint out of limits value by imgui input
-        if (!Limits::apply(font_prop.char_gap, limits.char_gap) ||
+        if (!priv::Limits::apply(font_prop.char_gap, priv::limits.char_gap) ||
             !m_volume->text_configuration->style.prop.char_gap.has_value() ||
             m_volume->text_configuration->style.prop.char_gap != font_prop.char_gap) {        
             // char gap is stored inside of imgui font atlas
@@ -2946,7 +2940,7 @@ void GLGizmoEmboss::draw_advanced()
     if (rev_slider(tr.line_gap, font_prop.line_gap, def_line_gap, _u8L("Revert gap between lines"), 
         min_line_gap, max_line_gap, units_fmt, _L("Distance between lines"))){
         // Condition prevent recalculation when insertint out of limits value by imgui input
-        if (!Limits::apply(font_prop.line_gap, limits.line_gap) ||
+        if (!priv::Limits::apply(font_prop.line_gap, priv::limits.line_gap) ||
             !m_volume->text_configuration->style.prop.line_gap.has_value() ||
             m_volume->text_configuration->style.prop.line_gap != font_prop.line_gap) {        
             // line gap is planed to be stored inside of imgui font atlas
@@ -2959,8 +2953,8 @@ void GLGizmoEmboss::draw_advanced()
     auto def_boldness = stored_style ?
         &stored_style->prop.boldness : nullptr;
     if (rev_slider(tr.boldness, font_prop.boldness, def_boldness, _u8L("Undo boldness"), 
-        limits.boldness.gui.min, limits.boldness.gui.max, units_fmt, _L("Tiny / Wide glyphs"))){
-        if (!Limits::apply(font_prop.boldness, limits.boldness.values) ||
+        priv::limits.boldness.gui.min, priv::limits.boldness.gui.max, units_fmt, _L("Tiny / Wide glyphs"))){
+        if (!priv::Limits::apply(font_prop.boldness, priv::limits.boldness.values) ||
             !m_volume->text_configuration->style.prop.boldness.has_value() ||
             m_volume->text_configuration->style.prop.boldness != font_prop.boldness)
             exist_change = true;
@@ -2970,8 +2964,8 @@ void GLGizmoEmboss::draw_advanced()
     auto def_skew = stored_style ?
         &stored_style->prop.skew : nullptr;
     if (rev_slider(tr.italic, font_prop.skew, def_skew, _u8L("Undo letter's skew"),
-        limits.skew.gui.min, limits.skew.gui.max, "%.2f", _L("Italic strength ratio"))){
-        if (!Limits::apply(font_prop.skew, limits.skew.values) ||
+        priv::limits.skew.gui.min, priv::limits.skew.gui.max, "%.2f", _L("Italic strength ratio"))){
+        if (!priv::Limits::apply(font_prop.skew, priv::limits.skew.values) ||
             !m_volume->text_configuration->style.prop.skew.has_value() ||
             m_volume->text_configuration->style.prop.skew != font_prop.skew)
             exist_change = true;
@@ -3037,11 +3031,11 @@ void GLGizmoEmboss::draw_advanced()
     float* def_angle_deg = stored_style ?
         &def_angle_deg_val : nullptr;
     if (rev_slider(tr.angle, angle_deg, def_angle_deg, _u8L("Undo rotation"), 
-        limits.angle.min, limits.angle.max, u8"%.2f °",
+        priv::limits.angle.min, priv::limits.angle.max, u8"%.2f °",
                    _L("Rotate text Clock-wise."))) {
         // convert back to radians and CCW
         angle = -angle_deg * M_PI / 180.0;
-        to_range_pi_pi(*angle);
+        priv::to_range_pi_pi(*angle);
         if (is_approx(*angle, 0.f))
             angle.reset();
         
