@@ -828,7 +828,7 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
             assert(is_from_fully_selected_instance(i));
             if (transformation_type.world())
                 v.set_instance_transformation(Geometry::translation_transform(displacement) * volume_data.get_instance_full_matrix());
-            else if (transformation_type.local()) {
+            else if (transformation_type.instance()) {
                 const Vec3d world_displacement = volume_data.get_instance_rotation_matrix() * displacement;
                 v.set_instance_transformation(Geometry::translation_transform(world_displacement) * volume_data.get_instance_full_matrix());
             }
@@ -918,7 +918,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
             else {
                 if (transformation_type.world())
                     new_rotation_matrix = rotation_matrix * inst_trafo.get_rotation_matrix();
-                else if (transformation_type.local())
+                else if (transformation_type.instance())
                     new_rotation_matrix = inst_trafo.get_rotation_matrix() * rotation_matrix;
                 else
                     assert(false);
@@ -948,7 +948,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
         SyncRotationType synch;
         if (transformation_type.world() && rot_axis_max == 2)
             synch = SyncRotationType::NONE;
-        else if (transformation_type.local())
+        else if (transformation_type.instance())
             synch = SyncRotationType::FULL;
         else
             synch = SyncRotationType::GENERAL;
@@ -1365,7 +1365,7 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                     Geometry::translation_transform(translation) * inst_trafo.get_offset_matrix();
                 v.set_instance_transformation(offset_matrix * scale_matrix * inst_trafo.get_matrix_no_offset());
             }
-            else if (transformation_type.local()) {
+            else if (transformation_type.instance()) {
                 const Transform3d scale_matrix = Geometry::scale_transform(relative_scale);
                 Vec3d offset;
                 if (transformation_type.joint() && translation.isApprox(Vec3d::Zero())) {
