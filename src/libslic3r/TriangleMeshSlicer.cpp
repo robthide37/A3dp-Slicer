@@ -206,7 +206,7 @@ inline FacetSliceType slice_facet(
                 // All three vertices are aligned with slice_z.
                 line_out.edge_type = IntersectionLine::FacetEdgeType::Horizontal;
                 result = FacetSliceType::Cutting;
-                double normal = cross2((to_2d(v1) - to_2d(v0)).cast<double>(), (to_2d(v2) - to_2d(v1)).cast<double>());
+                double normal = cross2((to_2d(v1) - to_2d(v0)).template cast<double>(), (to_2d(v2) - to_2d(v1)).template cast<double>());
                 if (normal < 0) {
                     // If normal points downwards this is a bottom horizontal facet so we reverse its point order.
                     std::swap(a, b);
@@ -292,7 +292,7 @@ inline FacetSliceType slice_facet(
             static_cast<Point&>(point) =
                 t <= 0. ? v3f_scaled_to_contour_point(*a) :
                 t >= 1. ? v3f_scaled_to_contour_point(*b) :
-                v3f_scaled_to_contour_point(a->head<2>().cast<double>() * (1. - t) + b->head<2>().cast<double>() * t + Vec2d(0.5, 0.5));
+                v3f_scaled_to_contour_point(a->template head<2>().template cast<double>() * (1. - t) + b->template head<2>().template cast<double>() * t + Vec2d(0.5, 0.5));
             point.edge_id = edge_id;
             ++ num_points;
 #endif

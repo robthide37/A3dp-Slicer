@@ -121,7 +121,7 @@ public:
 
     Vec3f get_cell_center(const Vec3i &cell_coords) const
     {
-        return origin + cell_coords.cast<float>().cwiseProduct(this->cell_size) + this->cell_size.cwiseQuotient(Vec3f(2.0f, 2.0f, 2.0));
+        return origin + cell_coords.cast<float>().cwiseProduct(this->cell_size) + this->cell_size.cwiseQuotient(Vec3f(2.0f, 2.0f, 2.0f));
     }
 
     void take_position(const Vec3f &position) { taken_cells.insert(to_cell_index(to_cell_coords(position))); }
@@ -198,16 +198,6 @@ struct ExtrusionPropertiesAccumulator
         max_curvature = 0;
     }
 };
-
-// base function: ((e^(((1)/(x^(2)+1)))-1)/(e-1))
-// checkout e.g. here: https://www.geogebra.org/calculator
-float gauss(float value, float mean_x_coord, float mean_value, float falloff_speed)
-{
-    float shifted     = value - mean_x_coord;
-    float denominator = falloff_speed * shifted * shifted + 1.0f;
-    float exponent    = 1.0f / denominator;
-    return mean_value * (std::exp(exponent) - 1.0f) / (std::exp(1.0f) - 1.0f);
-}
 
 std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length_limit)
 {
