@@ -148,9 +148,17 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
         return po.m_print->cancel_status() != CancelStatus::NOT_CANCELED;
     });
 
-    auto grid = csg::voxelize_csgmesh(range(po.m_mesh_to_slice), voxparams);
-
-    auto m = grid ? grid_to_mesh(*grid) : indexed_triangle_set{};
+    auto r = range(po.m_mesh_to_slice);
+    auto m = indexed_triangle_set{};
+    if (r.size() > 1) {
+        auto grid = csg::voxelize_csgmesh(r, voxparams);
+        m = grid ? grid_to_mesh(*grid) : indexed_triangle_set{};
+    } else if (!r.empty()) {
+        m = *(csg::get_mesh(*r.begin()));
+        auto tr = csg::get_transform(*r.begin());
+        for (auto &v : m.vertices)
+            v = tr * v;
+    }
 
     bench.stop();
 
@@ -165,21 +173,6 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
 
 void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
 {
-    // TODO: enable when this works reliably. Currently, perform_csgmesh_booleans
-    // can generate incorrect result despite not throwing any exception.
-//    MeshBoolean::cgal::CGALMeshPtr cgalptr;
-
-//    try {
-//        cgalptr = csg::perform_csgmesh_booleans(range(po.m_mesh_to_slice));
-//    } catch(...) {
-//        cgalptr = nullptr;
-//    }
-
-//    if (cgalptr) {
-//        po.m_preview_meshes[step] = MeshBoolean::cgal::cgal_to_triangle_mesh(*cgalptr);
-//    } else
-//        po.m_preview_meshes[step] = TriangleMesh{generate_preview_vdb(po, step)};
-
     po.m_preview_meshes[step] = TriangleMesh{generate_preview_vdb(po, step)};
 
     for (size_t i = size_t(step) + 1; i < slaposCount; ++i)
@@ -286,6 +279,8 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
     // update preview mesh
     if (r.first != r.second)
         generate_preview(po, slaposDrillHoles);
+    else
+        po.m_preview_meshes[slaposDrillHoles] = po.get_mesh_to_print();
 }
 
 template<class Pred>
