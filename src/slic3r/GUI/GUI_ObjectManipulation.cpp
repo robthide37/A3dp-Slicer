@@ -565,15 +565,15 @@ void ObjectManipulation::Show(const bool show)
         bool show_world_local_combo = wxGetApp().get_mode() != comSimple && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier());
         if (selection.is_single_volume_or_modifier() && m_word_local_combo->GetCount() < 3) {
 #ifdef __linux__
-            m_word_local_combo->Insert(coordinate_type_str(ECoordinatesType::Instance), 1);
+            m_word_local_combo->Insert(coordinate_type_str(ECoordinatesType::Local), 2);
 #else
-            m_word_local_combo->Insert(coordinate_type_str(ECoordinatesType::Instance), wxNullBitmap, 1);
+            m_word_local_combo->Insert(coordinate_type_str(ECoordinatesType::Local), wxNullBitmap, 2);
 #endif // __linux__
             m_word_local_combo->Select((int)ECoordinatesType::World);
             this->set_coordinates_type(m_word_local_combo->GetString(m_word_local_combo->GetSelection()));
         }
         else if (selection.is_single_full_instance() && m_word_local_combo->GetCount() > 2) {
-            m_word_local_combo->Delete(1);
+            m_word_local_combo->Delete(2);
             m_word_local_combo->Select((int)ECoordinatesType::World);
             this->set_coordinates_type(m_word_local_combo->GetString(m_word_local_combo->GetSelection()));
         }
