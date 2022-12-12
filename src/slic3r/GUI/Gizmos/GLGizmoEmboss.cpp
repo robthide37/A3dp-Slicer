@@ -235,6 +235,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     priv::start_create_object_job(emboss_data, mouse_pos);
 }
 
+// Designed for create volume without information of mouse in scene
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 {
     if (!priv::is_valid(volume_type)) return;
@@ -248,29 +249,41 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 
     Size s = m_parent.get_canvas_size();
     Vec2d screen_center(s.get_width() / 2., s.get_height() / 2.);
-    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager); 
-    if (!selection.is_empty() && object_idx >= 0) {
-        // create volume inside of object
-        const Plater &plater = *wxGetApp().plater();
-        const Camera &camera = plater.get_camera();
-        const ModelObjectPtrs &objects = wxGetApp().model().objects;
-
-        Vec2d coor;
-        const GLVolume *vol = nullptr;
-        priv::find_closest_volume(selection, screen_center, camera, objects, &coor, &vol);
-        if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager)) {
-            assert(vol != nullptr);
-            // in centroid of convex hull is not hit with object
-            // soo create transfomation on border of object
-            const ModelObject *obj = objects[vol->object_idx()];
-            const BoundingBoxf3& bb = obj->bounding_box();
-            Transform3d volume_trmat(Eigen::Translation3d(bb.max.x(), 0., 0.));
-            priv::start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
-        }
-    } else {
+    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager);
+    const ModelObjectPtrs &objects = selection.get_model()->objects;
+    // No selected object so create new object
+    if (selection.is_empty() || object_idx < 0 || object_idx >= objects.size()) {
         // create Object on center of screen
-        // when ray throw center of screen not hit bed it create object on center of bed        
+        // when ray throw center of screen not hit bed it create object on center of bed
         priv::start_create_object_job(emboss_data, screen_center);
+        return;
+    }
+
+    // create volume inside of selected object
+    Vec2d coor;
+    const GLVolume *vol = nullptr;
+    const Camera &camera = wxGetApp().plater()->get_camera();
+    priv::find_closest_volume(selection, screen_center, camera, objects, &coor, &vol);
+    if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager)) {
+        assert(vol != nullptr);
+        // in centroid of convex hull is not hit with object
+        // soo create transfomation on border of object
+        
+        // there is no point on surface so no use of surface will be applied
+        if (emboss_data.text_configuration.style.prop.use_surface)
+            emboss_data.text_configuration.style.prop.use_surface = false;
+        
+        // Transformation is inspired add generic volumes in ObjectList::load_generic_subobject
+        const ModelObject *obj = objects[vol->object_idx()];
+        BoundingBoxf3 instance_bb = obj->instance_bounding_box(vol->instance_idx());
+        // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
+        Vec3d offset(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z());
+        // offset += 0.5 * mesh_bb.size(); // No size of text volume at this position
+        offset -= vol->get_instance_offset();
+        Transform3d tr = vol->get_instance_transformation().get_matrix_no_offset().inverse();
+        Vec3d offset_tr = tr * offset;        
+        Transform3d volume_trmat = tr.translate(offset_tr);
+        priv::start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
     }
 }
 

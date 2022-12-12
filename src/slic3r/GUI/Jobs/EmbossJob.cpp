@@ -729,7 +729,8 @@ TriangleMesh priv::cut_surface(DataBase& input1, const SurfaceVolumeData& input2
         s_to_itss[&s - &sources.front()] = itss.size();
         itss.emplace_back(std::move(its));
     }
-    if (itss.empty()) throw JobException(_u8L("There is no volume in projection direction.").c_str());
+    if (itss.empty())
+        throw JobException(_u8L("There is no volume in projection direction.").c_str());
 
     Transform3d   tr_inv     = biggest->tr.inverse();
     size_t        itss_index = s_to_itss[biggest - &sources.front()];
