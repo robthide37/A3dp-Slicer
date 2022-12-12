@@ -603,7 +603,7 @@ void Tab::update_changed_ui()
     if (m_postpone_update_ui)
         return;
 
-    const bool deep_compare = (m_type == Slic3r::Preset::TYPE_PRINTER || m_type == Slic3r::Preset::TYPE_SLA_MATERIAL);
+    const bool deep_compare = m_type != Preset::TYPE_FILAMENT;
     auto dirty_options = m_presets->current_dirty_options(deep_compare);
     auto nonsys_options = m_presets->current_different_from_parent_options(deep_compare);
     if (m_type == Preset::TYPE_PRINTER) {
@@ -644,11 +644,10 @@ void Tab::update_changed_ui()
 
 void Tab::init_options_list()
 {
-    if (!m_options_list.empty())
-        m_options_list.clear();
+    m_options_list.clear();
 
     for (const std::string& opt_key : m_config->keys())
-        m_options_list.emplace(opt_key, m_opt_status_value);
+        emplace_option(opt_key);
 }
 
 template<class T>
@@ -659,10 +658,36 @@ void add_correct_opts_to_options_list(const std::string &opt_key, std::map<std::
         map.emplace(opt_key + "#" + std::to_string(i), value);
 }
 
+void Tab::emplace_option(const std::string& opt_key, bool respect_vec_values/* = false*/)
+{
+    if (respect_vec_values) {
+        switch (m_config->option(opt_key)->type())
+        {
+        case coInts:	add_correct_opts_to_options_list<ConfigOptionInts		>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coBools:	add_correct_opts_to_options_list<ConfigOptionBools		>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coFloats:	add_correct_opts_to_options_list<ConfigOptionFloats		>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coStrings:	add_correct_opts_to_options_list<ConfigOptionStrings	>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coFloatsOrPercents:	add_correct_opts_to_options_list<ConfigOptionFloatsOrPercents		>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        default:		m_options_list.emplace(opt_key, m_opt_status_value);		break;
+        }
+    }
+    else 
+        m_options_list.emplace(opt_key, m_opt_status_value);
+}
+
+void TabPrint::init_options_list()
+{
+    m_options_list.clear();
+
+    for (const std::string& opt_key : m_config->keys())
+        emplace_option(opt_key, true);
+}
+
 void TabPrinter::init_options_list()
 {
-    if (!m_options_list.empty())
-        m_options_list.clear();
+    m_options_list.clear();
 
     for (const std::string& opt_key : m_config->keys())
     {
@@ -670,16 +695,7 @@ void TabPrinter::init_options_list()
             m_options_list.emplace(opt_key, m_opt_status_value);
             continue;
         }
-        switch (m_config->option(opt_key)->type())
-        {
-        case coInts:	add_correct_opts_to_options_list<ConfigOptionInts		>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        case coBools:	add_correct_opts_to_options_list<ConfigOptionBools		>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        case coFloats:	add_correct_opts_to_options_list<ConfigOptionFloats		>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        case coStrings:	add_correct_opts_to_options_list<ConfigOptionStrings	>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        default:		m_options_list.emplace(opt_key, m_opt_status_value);		break;
-        }
+        emplace_option(opt_key, true);
     }
     if (m_printer_technology == ptFFF)
         m_options_list.emplace("extruders_count", m_opt_status_value);
@@ -687,8 +703,7 @@ void TabPrinter::init_options_list()
 
 void TabSLAMaterial::init_options_list()
 {
-    if (!m_options_list.empty())
-        m_options_list.clear();
+    m_options_list.clear();
 
     for (const std::string& opt_key : m_config->keys())
     {
@@ -696,16 +711,7 @@ void TabSLAMaterial::init_options_list()
             m_options_list.emplace(opt_key, m_opt_status_value);
             continue;
         }
-        switch (m_config->option(opt_key)->type())
-        {
-        case coInts:	add_correct_opts_to_options_list<ConfigOptionInts		>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        case coBools:	add_correct_opts_to_options_list<ConfigOptionBools		>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        case coFloats:	add_correct_opts_to_options_list<ConfigOptionFloats		>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        case coStrings:	add_correct_opts_to_options_list<ConfigOptionStrings	>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        default:		m_options_list.emplace(opt_key, m_opt_status_value);		break;
-        }
+        emplace_option(opt_key, true);
     }
 }
 

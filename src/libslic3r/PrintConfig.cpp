@@ -536,7 +536,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(true));
 
     def             = this->add("overhang_overlaps", coPercents);
-    def->label      = L("Overhang overlap percentage");
+    def->full_label = L("Overhang overlap percentage");
     def->category   = L("Speed");
     def->tooltip    = L("Controls percentage of overhang extrusion overlap with the previous layer."
                         "Each overlap size then corresponds with the overhang speed set below.");
@@ -547,7 +547,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionPercents({60, 40, 20, 0}));
 
     def             = this->add("dynamic_overhang_speeds", coFloatsOrPercents);
-    def->label      = L("Dynamic speed on overhangs");
+    def->full_label = L("Dynamic speed on overhangs");
     def->category   = L("Speed");
     def->tooltip    = L("This setting controls the speed of the overhangs for overlap values set above."
                         "The final speed is calculated as an interpolation of the set speed values."

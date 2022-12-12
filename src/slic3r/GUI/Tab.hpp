@@ -348,6 +348,7 @@ public:
 	virtual void	update() = 0;
 	virtual void	toggle_options() = 0;
 	virtual void	init_options_list();
+	void			emplace_option(const std::string &opt_key, bool respect_vec_values = false);
 	void			load_initial_data();
 	void			update_dirty();
 	void			update_tab_ui();
@@ -416,6 +417,7 @@ public:
 	void		toggle_options() override;
 	void		update() override;
 	void		clear_pages() override;
+	void		init_options_list() override;
 	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
 	wxSizer*	create_manage_substitution_widget(wxWindow* parent);
 	wxSizer*	create_substitutions_widget(wxWindow* parent);

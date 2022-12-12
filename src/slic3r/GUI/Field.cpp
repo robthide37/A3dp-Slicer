@@ -290,6 +290,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
 		break; }
 	case coString:
 	case coStrings:
+    case coFloatsOrPercents:
     case coFloatOrPercent: {
         if (m_opt.type == coFloatOrPercent && m_opt.opt_key == "first_layer_height" && !str.IsEmpty() && str.Last() == '%') {
             // Workaroud to avoid of using of the % for first layer height
@@ -301,7 +302,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
             m_value = into_u8(stVal);;
             break;
         }
-        if (m_opt.type == coFloatOrPercent && !str.IsEmpty() &&  str.Last() != '%')
+        if ((m_opt.type == coFloatOrPercent || m_opt.type == coFloatsOrPercents) && !str.IsEmpty() &&  str.Last() != '%')
         {
             double val = 0.;
             const char dec_sep = is_decimal_separator_point() ? '.' : ',';
@@ -443,6 +444,13 @@ void TextCtrl::BUILD() {
 			text_value += "%";
 		break;
 	}
+    case coFloatsOrPercents: {
+		const auto val =  m_opt.get_default_value<ConfigOptionFloatsOrPercents>()->get_at(m_opt_idx);
+        text_value = double_to_string(val.value);
+        if (val.percent)
+            text_value += "%";
+        break;
+	}
 	case coPercent:
 	{
 		text_value = wxString::Format(_T("%i"), int(m_opt.default_value->getFloat()));
@@ -574,6 +582,7 @@ bool TextCtrl::value_was_changed()
     case coString:
     case coStrings:
     case coFloatOrPercent:
+    case coFloatsOrPercents:
         return boost::any_cast<std::string>(m_value) != boost::any_cast<std::string>(val);
     default:
         return true;
