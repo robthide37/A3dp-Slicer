@@ -315,6 +315,9 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
                      "wipe_tower_bridging", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming" })
         toggle_field(el, have_wipe_tower);
 
+    toggle_field("avoid_curled_filament_during_travels", !config->opt_bool("avoid_crossing_perimeters"));
+    toggle_field("avoid_crossing_perimeters", !config->opt_bool("avoid_curled_filament_during_travels"));
+
     bool have_avoid_crossing_perimeters = config->opt_bool("avoid_crossing_perimeters");
     toggle_field("avoid_crossing_perimeters_max_detour", have_avoid_crossing_perimeters);
 
