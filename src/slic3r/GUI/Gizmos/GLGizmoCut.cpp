@@ -30,6 +30,7 @@ static const ColorRGBA SELECTED_PLAG_COLOR  = ColorRGBA::GRAY();
 static const ColorRGBA SELECTED_DOWEL_COLOR = ColorRGBA::DARK_GRAY();
 static const ColorRGBA CONNECTOR_DEF_COLOR  = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
 static const ColorRGBA CONNECTOR_ERR_COLOR  = ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f);
+static const ColorRGBA HOVERED_ERR_COLOR    = ColorRGBA(1.0f, 0.3f, 0.3f, 1.0f);
 
 const unsigned int AngleResolution = 64;
 const unsigned int ScaleStepsCount = 72;
@@ -359,10 +360,19 @@ void GLGizmoCut3D::put_connectors_on_cut_plane(const Vec3d& cp_normal, double cp
     }
 }
 
+// returns true if the camera (forward) is pointing in the negative direction of the cut normal
+bool GLGizmoCut3D::is_looking_forward() const
+{
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const double dot = camera.get_dir_forward().dot(m_cut_normal);
+    return dot < 0.05;
+}
+
 void GLGizmoCut3D::update_clipper()
 {
     BoundingBoxf3 box = bounding_box();
 
+    // update cut_normal
     Vec3d beg, end = beg = m_plane_center;
     beg[Z] = box.center().z() - m_radius;
     end[Z] = box.center().z() + m_radius;
@@ -370,12 +380,26 @@ void GLGizmoCut3D::update_clipper()
     rotate_vec3d_around_plane_center(beg);
     rotate_vec3d_around_plane_center(end);
 
-    double dist = (m_plane_center - beg).norm();
+    // calculate normal for cut plane
+    Vec3d normal = m_cut_normal = end - beg;
+    m_cut_normal.normalize();
+
+    if (!is_looking_forward()) {
+        end = beg = m_plane_center;
+        beg[Z] = box.center().z() + m_radius;
+        end[Z] = box.center().z() - m_radius;
+
+        rotate_vec3d_around_plane_center(beg);
+        rotate_vec3d_around_plane_center(end);
+
+        // recalculate normal for clipping plane, if camera is looking downward to cut plane
+        normal = end - beg;
+        if (normal == Vec3d::Zero())
+            return;
+    }
 
     // calculate normal and offset for clipping plane
-    Vec3d normal = end - beg;
-    if (normal == Vec3d::Zero())
-        return;
+    double dist = (m_plane_center - beg).norm();
     dist = std::clamp(dist, 0.0001, normal.norm());
     normal.normalize();
     const double offset = normal.dot(beg) + dist;
@@ -1372,7 +1396,7 @@ void GLGizmoCut3D::render_clipper_cut()
 
 void GLGizmoCut3D::on_render()
 {
-    if (update_bb() || force_update_clipper_on_render) {
+    if (update_bb() || force_update_clipper_on_render || m_connectors_editing) {
         update_clipper_on_render();
         m_c->object_clipper()->set_behavior(m_connectors_editing, m_connectors_editing, 0.4);
     }
@@ -1826,7 +1850,7 @@ Transform3d GLGizmoCut3D::get_volume_transformation(const ModelVolume* volume) c
     return translation_transform(offset) * scale_transform(Vec3d::Ones() - border_scale) * vol_matrix;
 }
 
-bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
+bool GLGizmoCut3D::is_outside_of_cut_contour(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
 {
     // check if connector pos is out of clipping plane
     if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(cur_pos)) {
@@ -1834,16 +1858,54 @@ bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& co
         return true;
     }
 
+    // check if connector bottom contour is out of clipping plane
     const CutConnector& cur_connector = connectors[idx];
+    const CutConnectorShape shape = CutConnectorShape(cur_connector.attribs.shape);
+    const int   sectorCount = shape == CutConnectorShape::Triangle  ? 3 :
+                              shape == CutConnectorShape::Square    ? 4 :
+                              shape == CutConnectorShape::Circle    ? 60: // supposably, 60 points are enough for conflict detection
+                              shape == CutConnectorShape::Hexagon   ? 6 : 1 ;
+
+    indexed_triangle_set mesh;
+    auto& vertices = mesh.vertices;
+    vertices.reserve(sectorCount + 1);
+
+    float fa = 2 * PI / sectorCount;
+    auto vec = Eigen::Vector2f(0, cur_connector.radius);
+    for (float angle = 0; angle < 2.f * PI; angle += fa) {
+        Vec2f p = Eigen::Rotation2Df(angle) * vec;
+        vertices.emplace_back(Vec3f(p(0), p(1), 0.f));
+    }
+    its_transform(mesh, translation_transform(cur_pos) * m_rotation_m);
+
+    for (auto vertex : vertices) {
+        if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(vertex.cast<double>())) {
+            m_info_stats.outside_cut_contour++;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
+{
+    if (is_outside_of_cut_contour(idx, connectors, cur_pos))
+        return true;
+
+    const CutConnector& cur_connector = connectors[idx];    
+
     const Transform3d matrix = translation_transform(cur_pos) * m_rotation_m *
                                scale_transform(Vec3f(cur_connector.radius, cur_connector.radius, cur_connector.height).cast<double>());
     const BoundingBoxf3 cur_tbb = m_shapes[cur_connector.attribs].model.get_bounding_box().transformed(matrix);
 
+    // check if connector's bounding box is inside the object's bounding box
     if (!bounding_box().contains(cur_tbb)) {
         m_info_stats.outside_bb++;
         return true;
     }
 
+    // check if connectors are overlapping 
     for (size_t i = 0; i < connectors.size(); ++i) {
         if (i == idx)
             continue;
@@ -1897,7 +1959,8 @@ void GLGizmoCut3D::render_connectors()
         Vec3d pos = connector.pos + instance_offset + sla_shift * Vec3d::UnitZ();
 
         // First decide about the color of the point.
-        if (is_conflict_for_connector(i, connectors, pos)) {
+        const bool conflict_connector = is_conflict_for_connector(i, connectors, pos);
+        if (conflict_connector) {
             m_has_invalid_connector = true;
             render_color = CONNECTOR_ERR_COLOR;
         }
@@ -1907,16 +1970,23 @@ void GLGizmoCut3D::render_connectors()
         if (!m_connectors_editing)
             render_color = CONNECTOR_ERR_COLOR;
         else if (size_t(m_hover_id - m_connectors_group_id) == i)
-            render_color = connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR  : HOVERED_PLAG_COLOR;
+            render_color = conflict_connector ? HOVERED_ERR_COLOR :
+                           connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR  : HOVERED_PLAG_COLOR;
         else if (m_selected[i])
             render_color = connector.attribs.type == CutConnectorType::Dowel ? SELECTED_DOWEL_COLOR : SELECTED_PLAG_COLOR;
 
         const Camera& camera = wxGetApp().plater()->get_camera();
         if (connector.attribs.type  == CutConnectorType::Dowel &&
             connector.attribs.style == CutConnectorStyle::Prizm) {
-            pos -= height * normal;
+            if (is_looking_forward())
+                pos -= height * normal;
+            else
+                pos += height * normal;
             height *= 2;
         }
+        else if (!is_looking_forward())
+            pos += 0.05 * normal;
+
         const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(pos) * m_rotation_m * 
                                               scale_transform(Vec3f(connector.radius, connector.radius, height).cast<double>());
 

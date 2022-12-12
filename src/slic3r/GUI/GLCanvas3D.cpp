@@ -81,6 +81,11 @@ static const Slic3r::ColorRGBA ERROR_BG_LIGHT_COLOR   = { 0.753f, 0.192f, 0.039f
 // Number of floats
 static constexpr const size_t MAX_VERTEX_BUFFER_SIZE     = 131072 * 6; // 3.15MB
 
+#define SHOW_IMGUI_DEMO_WINDOW
+#ifdef SHOW_IMGUI_DEMO_WINDOW
+static bool show_imgui_demo_window = false;
+#endif // SHOW_IMGUI_DEMO_WINDOW
+
 namespace Slic3r {
 namespace GUI {
 
@@ -1498,6 +1503,10 @@ void GLCanvas3D::render()
         }
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
     }
+    
+#ifdef SHOW_IMGUI_DEMO_WINDOW
+    if (show_imgui_demo_window) ImGui::ShowDemoWindow();
+#endif // SHOW_IMGUI_DEMO_WINDOW    
 
     const bool is_looking_downward = camera.is_looking_downward();
 
@@ -2379,10 +2388,11 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
     if (!m_initialized)
         return;
 
-    // see include/wx/defs.h enum wxKeyCode
-    int keyCode = evt.GetKeyCode();
-    int ctrlMask = wxMOD_CONTROL;
-    int shiftMask = wxMOD_SHIFT;
+#ifdef SHOW_IMGUI_DEMO_WINDOW
+    static int cur = 0;
+    if (wxString("demo")[cur] == evt.GetUnicodeKey()) ++cur; else cur = 0;
+    if (cur == 4) { show_imgui_demo_window = !show_imgui_demo_window; cur = 0;}
+#endif // SHOW_IMGUI_DEMO_WINDOW
 
     auto imgui = wxGetApp().imgui();
     if (imgui->update_key_data(evt)) {
@@ -2390,6 +2400,10 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
         return;
     }
 
+    // see include/wx/defs.h enum wxKeyCode
+    int keyCode = evt.GetKeyCode();
+    int ctrlMask = wxMOD_CONTROL;
+    int shiftMask = wxMOD_SHIFT;
     if (keyCode == WXK_ESCAPE && (_deactivate_undo_redo_toolbar_items() || _deactivate_search_toolbar_item() || _deactivate_arrange_menu()))
         return;
 
@@ -3447,20 +3461,27 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         evt.Skip();
 
     // Detection of doubleclick on text to open emboss edit window
-    if (evt.LeftDClick() && m_gizmos.get_current() == nullptr && !m_hover_volume_idxs.empty()) { 
+    auto type = m_gizmos.get_current_type();
+    if (evt.LeftDClick() && !m_hover_volume_idxs.empty() && 
+        (type == GLGizmosManager::EType::Undefined ||
+         type == GLGizmosManager::EType::Move ||
+         type == GLGizmosManager::EType::Rotate ||
+         type == GLGizmosManager::EType::Scale ||
+         type == GLGizmosManager::EType::Emboss) ) {
         for (int hover_volume_id : m_hover_volume_idxs) { 
             const GLVolume &hover_gl_volume = *m_volumes.volumes[hover_volume_id];
-            const ModelObject* hover_object = m_model->objects[hover_gl_volume.object_idx()];
+            int object_idx = hover_gl_volume.object_idx();
+            if (object_idx < 0 || object_idx >= m_model->objects.size()) continue;
+            const ModelObject* hover_object = m_model->objects[object_idx];
             int hover_volume_idx = hover_gl_volume.volume_idx();
+            if (hover_volume_idx < 0 || hover_volume_idx >= hover_object->volumes.size()) continue;
             const ModelVolume* hover_volume = hover_object->volumes[hover_volume_idx];
-            if (hover_volume->text_configuration.has_value()) {
-                //m_selection.set_mode(Selection::EMode::Volume);
-                //m_selection.add(hover_volume_id); // add whole instance
-                m_selection.add_volumes(Selection::EMode::Volume, {(unsigned) hover_volume_id});
+            if (!hover_volume->text_configuration.has_value()) continue;
+            m_selection.add_volumes(Selection::EMode::Volume, {(unsigned) hover_volume_id});
+            if (type != GLGizmosManager::EType::Emboss)
                 m_gizmos.open_gizmo(GLGizmosManager::EType::Emboss);
-                wxGetApp().obj_list()->update_selections();
-                return;
-            }
+            wxGetApp().obj_list()->update_selections();
+            return;           
         }
     }
 

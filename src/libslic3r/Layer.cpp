@@ -317,13 +317,16 @@ void Layer::build_up_down_graph(Layer& below, Layer& above)
             coord_t* end = srcs + 4;
             std::sort(begin, end);
             end = std::unique(begin, end);
-            assert(begin + 2 == end);
-            if (begin + 1 == end)
+            if (begin + 1 == end) {
+                // Self intersection may happen on source contour. Just copy the Z value.
                 pt.z() = *begin;
-            else if (begin + 2 <= end) {
-                // store a -1 based negative index into the "intersections" vector here.
-                m_intersections.emplace_back(srcs[0], srcs[1]);
-                pt.z() = -coord_t(m_intersections.size());
+            } else {
+                assert(begin + 2 == end);
+                if (begin + 2 <= end) {
+                    // store a -1 based negative index into the "intersections" vector here.
+                    m_intersections.emplace_back(srcs[0], srcs[1]);
+                    pt.z() = -coord_t(m_intersections.size());
+                }
             }
         }
         const std::vector<std::pair<coord_t, coord_t>>& intersections() const { return m_intersections; }

@@ -3,6 +3,8 @@
 
 using namespace Slic3r;
 
+// inspired by nanosvgrast.h function nsvgRasterize -> nsvg__flattenShape -> nsvg__flattenCubicBez
+// https://github.com/memononen/nanosvg/blob/f0a3e1034dd22e2e87e5db22401e44998383124e/src/nanosvgrast.h#L335
 void NSVGUtils::flatten_cubic_bez(Polygon &polygon,
                                   float    tessTol,
                                   Vec2f    p1,

@@ -257,20 +257,39 @@ bool ImGuiWrapper::update_key_data(wxKeyEvent &evt)
         return false;
     }
 
-    ImGuiIO& io = ImGui::GetIO();
+    auto to_string = [](wxEventType type) -> std::string {
+        if (type == wxEVT_CHAR) return "Char";
+        if (type == wxEVT_KEY_DOWN) return "KeyDown";
+        if (type == wxEVT_KEY_UP) return "KeyUp";
+        return "Other";
+    };
 
-    if (evt.GetEventType() == wxEVT_CHAR) {
+    wxEventType type = evt.GetEventType();
+    ImGuiIO& io = ImGui::GetIO();
+    BOOST_LOG_TRIVIAL(debug) << "ImGui - key event(" << to_string(type) << "):"
+                             //<< " Unicode(" << evt.GetUnicodeKey() << ")"
+                             << " KeyCode(" << evt.GetKeyCode() << ")";
+
+    if (type == wxEVT_CHAR) {
         // Char event
-        const auto key = evt.GetUnicodeKey();
+        const auto   key   = evt.GetUnicodeKey();
+        unsigned int key_u = static_cast<unsigned int>(key);
+
+        // Release BackSpace, Delete, ... when miss wxEVT_KEY_UP event
+        // Already Fixed at begining of new frame
+        //if (key_u >= 0 && key_u < IM_ARRAYSIZE(io.KeysDown) && io.KeysDown[key_u]) { 
+        //    io.KeysDown[key_u] = false;
+        //}
+
         if (key != 0) {
             io.AddInputCharacter(key);
         }
-    } else {
+    } else if (type == wxEVT_KEY_DOWN || type == wxEVT_KEY_UP) {
         // Key up/down event
         int key = evt.GetKeyCode();
         wxCHECK_MSG(key >= 0 && key < IM_ARRAYSIZE(io.KeysDown), false, "Received invalid key code");
 
-        io.KeysDown[key] = evt.GetEventType() == wxEVT_KEY_DOWN;
+        io.KeysDown[key] = (type == wxEVT_KEY_DOWN);
         io.KeyShift = evt.ShiftDown();
         io.KeyCtrl = evt.ControlDown();
         io.KeyAlt = evt.AltDown();
@@ -282,6 +301,7 @@ bool ImGuiWrapper::update_key_data(wxKeyEvent &evt)
     return ret;
 }
 
+#include <array>
 void ImGuiWrapper::new_frame()
 {
     if (m_new_frame_open) {
@@ -290,6 +310,35 @@ void ImGuiWrapper::new_frame()
 
     if (m_font_texture == 0) {
         init_font(true);
+    }
+
+    ImGuiIO& io = ImGui::GetIO();
+    // synchronize key states
+    // when the application loses the focus it may happen that the key up event is not processed
+
+    // synchronize modifier keys
+    constexpr std::array<std::pair<ImGuiKeyModFlags_, wxKeyCode>, 3> imgui_mod_keys{
+        std::make_pair(ImGuiKeyModFlags_Ctrl, WXK_CONTROL),
+        std::make_pair(ImGuiKeyModFlags_Shift, WXK_SHIFT),
+        std::make_pair(ImGuiKeyModFlags_Alt, WXK_ALT)};
+    for (const std::pair<ImGuiKeyModFlags_, wxKeyCode>& key : imgui_mod_keys) {
+        if ((io.KeyMods & key.first) != 0 && !wxGetKeyState(key.second))
+            io.KeyMods &= ~key.first;
+    }
+
+    // Not sure if it is neccessary
+    // values from 33 to 126 are reserved for the standard ASCII characters
+    for (size_t i = 33; i <= 126; ++i) { 
+        wxKeyCode keycode = static_cast<wxKeyCode>(i);
+        if (io.KeysDown[i] && keycode != WXK_NONE && !wxGetKeyState(keycode))
+            io.KeysDown[i] = false;
+    }
+
+    // special keys: delete, backspace, ...
+    for (int key: io.KeyMap) {
+        wxKeyCode keycode = static_cast<wxKeyCode>(key);
+        if (io.KeysDown[key] && keycode != WXK_NONE && !wxGetKeyState(keycode)) 
+            io.KeysDown[key] = false;
     }
 
     ImGui::NewFrame();

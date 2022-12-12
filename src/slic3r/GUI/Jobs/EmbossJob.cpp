@@ -483,7 +483,7 @@ TriangleMesh priv::create_mesh(DataBase &input, Fnc was_canceled, Job::Ctl& ctl)
 TriangleMesh priv::create_default_mesh()
 {
     // When cant load any font use default object loaded from file
-    std::string  path = Slic3r::resources_dir() + "/data/embossed_text.stl";
+    std::string  path = Slic3r::resources_dir() + "/data/embossed_text.obj";
     TriangleMesh triangle_mesh;
     if (!load_obj(path.c_str(), &triangle_mesh)) {
         // when can't load mesh use cube
@@ -526,10 +526,6 @@ void UpdateJob::update_volume(ModelVolume             *volume,
         ObjectList *obj_list   = app.obj_list();
         obj_list->update_name_in_list(object_idx, volume_idx);
     }
-
-    // update printable state on canvas
-    if (volume->type() == ModelVolumeType::MODEL_PART) 
-        canvas->update_instance_printable_state_for_object((size_t) object_idx);
 
     // Move object on bed
     if (GLGizmoEmboss::is_text_object(volume)) volume->get_object()->ensure_on_bed();
@@ -679,7 +675,7 @@ OrthoProject3d priv::create_emboss_projection(
     bool is_outside, float emboss, Transform3d tr, SurfaceCut &cut)
 {
     // Offset of clossed side to model
-    const float surface_offset = 1e-3f; // [in mm]
+    const float surface_offset = 0.015f; // [in mm]
     float 
         front_move = (is_outside) ? emboss : surface_offset,
         back_move  = -((is_outside) ? surface_offset : emboss);    

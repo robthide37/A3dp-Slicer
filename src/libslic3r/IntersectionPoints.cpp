@@ -133,7 +133,7 @@ Slic3r::Pointfs compute_intersections(const Slic3r::Lines &lines)
             Point max_(std::max(a_.x(), b_.x()), std::max(a_.y(), b_.y()));
             BoundingBox bb_(min_, max_);
             // intersect of BB compare min max
-            if (bb.intersects(bb_) &&
+            if (bb.overlap(bb_) &&
                 l.intersection(l_, &i))
                 pts.push_back(i.cast<double>());
         }

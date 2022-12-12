@@ -2327,7 +2327,7 @@ void GCode::process_layer_single_object(
                     interface_extruder = dontcare_extruder;
             }
             bool extrude_support   = has_support && support_extruder == extruder_id;
-            bool extrude_interface = interface_extruder && interface_extruder == extruder_id;
+            bool extrude_interface = has_interface && interface_extruder == extruder_id;
             if (extrude_support || extrude_interface) {
                 init_layer_delayed();
                 m_layer = layer_to_print.support_layer;

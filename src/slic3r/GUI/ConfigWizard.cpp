@@ -1386,6 +1386,45 @@ void PageFirmware::apply_custom_config(DynamicPrintConfig &config)
     }
 }
 
+static void focus_event(wxFocusEvent& e, wxTextCtrl* ctrl, double def_value)
+{
+    e.Skip();
+    wxString str = ctrl->GetValue();
+
+    const char dec_sep = is_decimal_separator_point() ? '.' : ',';
+    const char dec_sep_alt = dec_sep == '.' ? ',' : '.';
+    // Replace the first incorrect separator in decimal number.
+    bool was_replaced = str.Replace(dec_sep_alt, dec_sep, false) != 0;
+
+    double val = 0.0;
+    if (!str.ToDouble(&val)) {
+        if (val == 0.0)
+            val = def_value;
+        ctrl->SetValue(double_to_string(val));
+        show_error(nullptr, _L("Invalid numeric input."));
+        // On Windows, this SetFocus creates an invisible marker.
+        //ctrl->SetFocus();
+    }
+    else if (was_replaced)
+        ctrl->SetValue(double_to_string(val));
+}
+
+class DiamTextCtrl : public wxTextCtrl
+{
+public:
+    DiamTextCtrl(wxWindow* parent)
+    {
+#ifdef _WIN32
+        long style = wxBORDER_SIMPLE;
+#else
+        long style = 0;
+#endif
+        Create(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(Field::def_width_thinner() * wxGetApp().em_unit(), wxDefaultCoord), style);
+        wxGetApp().UpdateDarkUI(this);
+    }
+    ~DiamTextCtrl() {}
+};
+
 PageBedShape::PageBedShape(ConfigWizard *parent)
     : ConfigWizardPage(parent, _L("Bed Shape and Size"), _L("Bed Shape"), 1)
     , shape_panel(new BedShapePanel(this))
@@ -1409,43 +1448,63 @@ void PageBedShape::apply_custom_config(DynamicPrintConfig &config)
     config.set_key_value("bed_custom_model", new ConfigOptionString(custom_model));
 }
 
-static void focus_event(wxFocusEvent& e, wxTextCtrl* ctrl, double def_value) 
+PageBuildVolume::PageBuildVolume(ConfigWizard* parent)
+    : ConfigWizardPage(parent, _L("Build Volume"), _L("Build Volume"), 1)
+    , build_volume(new DiamTextCtrl(this))
 {
-    e.Skip();
-    wxString str = ctrl->GetValue();
+    append_text(_L("Set verctical size of your printer."));
 
-    const char dec_sep = is_decimal_separator_point() ? '.' : ',';
-    const char dec_sep_alt = dec_sep == '.' ? ',' : '.';
-    // Replace the first incorrect separator in decimal number.
-    bool was_replaced = str.Replace(dec_sep_alt, dec_sep, false) != 0;
+    wxString value = "200";
+    build_volume->SetValue(value);
 
-    double val = 0.0;
-    if (!str.ToDouble(&val)) {
-        if (val == 0.0)
+    build_volume->Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent& e) { 
+        double def_value = 200.0;
+        double max_value = 1200.0;
+        e.Skip();
+        wxString str = build_volume->GetValue();
+
+        const char dec_sep = is_decimal_separator_point() ? '.' : ',';
+        const char dec_sep_alt = dec_sep == '.' ? ',' : '.';
+        // Replace the first incorrect separator in decimal number.
+        bool was_replaced = str.Replace(dec_sep_alt, dec_sep, false) != 0;
+
+        double val = 0.0;
+        if (!str.ToDouble(&val)) {
             val = def_value;
-        ctrl->SetValue(double_to_string(val));
-        show_error(nullptr, _L("Invalid numeric input."));
-        ctrl->SetFocus();
-    }
-    else if (was_replaced)
-        ctrl->SetValue(double_to_string(val));
+            build_volume->SetValue(double_to_string(val));
+            show_error(nullptr, _L("Invalid numeric input."));
+            //build_volume->SetFocus();
+        } else if (val < 0.0) {
+            val  = def_value;
+            build_volume->SetValue(double_to_string(val));
+            show_error(nullptr, _L("Invalid numeric input."));
+            //build_volume->SetFocus();
+        } else if (val > max_value) {
+            val = max_value;
+            build_volume->SetValue(double_to_string(val));
+            show_error(nullptr, _L("Invalid numeric input."));
+            //build_volume->SetFocus();
+        } else if (was_replaced)
+            build_volume->SetValue(double_to_string(val));
+    }, build_volume->GetId());
+
+    auto* sizer_volume = new wxFlexGridSizer(3, 5, 5);
+    auto* text_volume = new wxStaticText(this, wxID_ANY, _L("Max print height:"));
+    auto* unit_volume = new wxStaticText(this, wxID_ANY, _L("mm"));
+    sizer_volume->AddGrowableCol(0, 1);
+    sizer_volume->Add(text_volume, 0, wxALIGN_CENTRE_VERTICAL);
+    sizer_volume->Add(build_volume);
+    sizer_volume->Add(unit_volume, 0, wxALIGN_CENTRE_VERTICAL);
+    append(sizer_volume); 
 }
 
-class DiamTextCtrl : public wxTextCtrl
+void PageBuildVolume::apply_custom_config(DynamicPrintConfig& config)
 {
-public:
-    DiamTextCtrl(wxWindow* parent)
-    {
-#ifdef _WIN32
-        long style = wxBORDER_SIMPLE;
-#else
-        long style = 0;
-#endif
-        Create(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(Field::def_width_thinner() * wxGetApp().em_unit(), wxDefaultCoord), style);
-        wxGetApp().UpdateDarkUI(this);
-    }
-    ~DiamTextCtrl() {}
-};
+    double val = 0.0;
+    build_volume->GetValue().ToDouble(&val);
+    auto* opt_volume = new ConfigOptionFloat(val);
+    config.set_key_value("max_print_height", opt_volume);
+}
 
 PageDiameters::PageDiameters(ConfigWizard *parent)
     : ConfigWizardPage(parent, _L("Filament and Nozzle Diameters"), _L("Print Diameters"), 1)
@@ -1915,6 +1974,7 @@ void ConfigWizard::priv::load_pages()
         if (page_custom->custom_wanted()) {
             index->add_page(page_firmware);
             index->add_page(page_bed);
+            index->add_page(page_bvolume);
             index->add_page(page_diams);
             index->add_page(page_temps);
         }
@@ -2773,6 +2833,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
         page_firmware->apply_custom_config(*custom_config);
         page_bed->apply_custom_config(*custom_config);
+        page_bvolume->apply_custom_config(*custom_config);
         page_diams->apply_custom_config(*custom_config);
         page_temps->apply_custom_config(*custom_config);
 
@@ -2923,9 +2984,10 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     p->add_page(p->page_mode     = new PageMode(this));
     p->add_page(p->page_firmware = new PageFirmware(this));
     p->add_page(p->page_bed      = new PageBedShape(this));
+    p->add_page(p->page_bvolume  = new PageBuildVolume(this));
     p->add_page(p->page_diams    = new PageDiameters(this));
     p->add_page(p->page_temps    = new PageTemperatures(this));
-
+    
     p->load_pages();
     p->index->go_to(size_t{0});
 

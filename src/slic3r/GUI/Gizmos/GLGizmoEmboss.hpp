@@ -87,8 +87,10 @@ private:
     // localized default text
     void set_default_text();
 
-    void check_selection();
-    ModelVolume *get_selected_volume();
+    void set_volume_by_selection();
+    // load text configuration from volume into gizmo
+    bool set_volume(ModelVolume *volume); 
+
     // create volume from text - main functionality
     bool process();
     void close();
@@ -109,6 +111,9 @@ private:
     void draw_font_preview(FaceName &face, bool is_visible);
     void draw_font_list();
     void draw_style_edit();
+    void draw_height(std::optional<float> scale, bool use_inch);
+    void draw_depth(std::optional<float> scale, bool use_inch);
+
     bool draw_italic_button();
     bool draw_bold_button();
     void draw_advanced();
@@ -119,11 +124,9 @@ private:
     void do_translate(const Vec3d& relative_move);
     void do_rotate(float relative_z_angle);
 
-    /// <summary>
-    /// Move window for edit emboss text near to embossed object
-    /// NOTE: embossed object must be selected
-    /// </summary>
-    void set_fine_position();
+    bool rev_input_mm(const std::string &name, float &value, const float *default_value,
+        const std::string &undo_tooltip, float step, float step_fast, const char *format,
+        bool use_inch = false, std::optional<float> scale = {});
 
     /// <summary>
     /// Reversible input float with option to restor default value
@@ -153,8 +156,6 @@ private:
     bool choose_font_by_wxdialog();
     bool choose_true_type_file();
     bool choose_svg_file();
-
-    bool load_configuration(ModelVolume *volume);
 
     // When open text loaded from .3mf it could be written with unknown font
     bool m_is_unknown_font;
@@ -216,9 +217,12 @@ private:
         GuiCfg() = default;
     };
     std::optional<const GuiCfg> m_gui_cfg;
+    bool m_is_advanced_edit_style = false;
+
+    // when true window will appear near to text
+    bool m_allow_float_window = false;
     // setted only when wanted to use - not all the time
     std::optional<ImVec2> m_set_window_offset;
-    bool m_is_advanced_edit_style = false;
 
     Emboss::StyleManager m_style_manager;
 

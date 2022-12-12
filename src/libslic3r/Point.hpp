@@ -268,7 +268,7 @@ inline bool has_duplicate_successive_points_closed(const std::vector<Point> &pts
 }
 
 // Collect adjecent(duplicit points)
-Points collect_duplications(Points pts /* Copy */);
+Points collect_duplicates(Points pts /* Copy */);
 
 inline bool shorter_then(const Point& p0, const coord_t len)
 {

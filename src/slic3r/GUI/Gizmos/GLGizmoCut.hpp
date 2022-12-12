@@ -73,6 +73,7 @@ class GLGizmoCut3D : public GLGizmoBase
     GLModel m_angle_arc;
 
     Vec3d   m_old_center;
+    Vec3d   m_cut_normal;
 
     struct InvalidConnectorsStatistics
     {
@@ -160,6 +161,7 @@ public:
 
     bool is_in_editing_mode() const override { return m_connectors_editing; }
     bool is_selection_rectangle_dragging() const override { return m_selection_rectangle.is_dragging(); }
+    bool is_looking_forward() const;
 
     /// <summary>
     /// Drag of plane
@@ -239,6 +241,7 @@ private:
     bool render_reset_button(const std::string& label_id, const std::string& tooltip) const;
     bool render_connect_type_radio_button(CutConnectorType type);
     Transform3d get_volume_transformation(const ModelVolume* volume) const;
+    bool is_outside_of_cut_contour(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos);
     bool is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos);
     void render_connectors();
 
