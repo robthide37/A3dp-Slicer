@@ -417,44 +417,13 @@ std::vector<size_t> problematic_layers = SupportSpotsGenerator::quick_search(thi
 void PrintObject::generate_support_spots()
 {
     if (this->set_started(posSupportSpotsSearch)) {
-        BOOST_LOG_TRIVIAL(debug)
-        << "Searching support spots - start";
+        BOOST_LOG_TRIVIAL(debug) << "Searching support spots - start";
         m_print->set_status(75, L("Searching support spots"));
-        if (m_config.support_material && !m_config.support_material_auto &&
-        std::all_of(this->model_object()->volumes.begin(), this->model_object()->volumes.end(),
-                [](const ModelVolume* mv){return mv->supported_facets.empty();})
-        ) {
-            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values};
-            SupportSpotsGenerator::Issues issues = SupportSpotsGenerator::full_search(this, params);
-
-            auto obj_transform = this->trafo_centered();
-            for (ModelVolume *model_volume : this->model_object()->volumes) {
-                if (model_volume->is_model_part()) {
-                    Transform3d mesh_transformation = obj_transform * model_volume->get_matrix();
-                    Transform3d inv_transform = mesh_transformation.inverse();
-                    TriangleSelectorWrapper selector { model_volume->mesh(), mesh_transformation};
-
-                    for (const SupportSpotsGenerator::SupportPoint &support_point : issues.support_points) {
-                        Vec3f point = Vec3f(inv_transform.cast<float>() * support_point.position);
-                        Vec3f origin = Vec3f(
-                                inv_transform.cast<float>() * Vec3f(support_point.position.x(), support_point.position.y(), 0.0f));
-                        selector.enforce_spot(point, origin, support_point.spot_radius);
-                    }
-
-                    model_volume->supported_facets.set(selector.selector);
-#if 0 //DEBUG export
-                    indexed_triangle_set copy = model_volume->mesh().its;
-                    its_transform(copy, obj_transform * model_transformation);
-                    its_write_obj(copy,
-                            debug_out_path(("model"+std::to_string(model_volume->id().id)+".obj").c_str()).c_str());
-#endif
-                }
-            }
-        }
-
+        SupportSpotsGenerator::Params        params{this->print()->m_config.filament_type.values};
+        SupportSpotsGenerator::SupportPoints supp_points = SupportSpotsGenerator::full_search(this, params);
+        this->m_shared_regions->generated_support_points = supp_points;
         m_print->throw_if_canceled();
-        BOOST_LOG_TRIVIAL(debug)
-           << "Searching support spots - end";
+        BOOST_LOG_TRIVIAL(debug) << "Searching support spots - end";
         this->set_done(posSupportSpotsSearch);
     }
 }

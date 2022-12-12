@@ -665,9 +665,9 @@ public:
     }
 };
 
-Issues check_stability(const PrintObject *po, const Params &params)
+SupportPoints check_stability(const PrintObject *po, const Params &params)
 {
-    Issues            issues{};
+    SupportPoints            supp_points{};
     SupportGridFilter supports_presence_grid(po, params.min_distance_between_support_points);
     ActiveObjectParts active_object_parts{};
     LD                prev_layer_ext_perim_lines({});
@@ -764,14 +764,14 @@ Issues check_stability(const PrintObject *po, const Params &params)
 #endif
             // Function that is used when new support point is generated. It will update the ObjectPart stability, weakest conneciton info,
             // and the support presence grid and add the point to the issues.
-            auto reckon_new_support_point = [&part, &weakest_conn, &issues, &supports_presence_grid, &params,
+            auto reckon_new_support_point = [&part, &weakest_conn, &supp_points, &supports_presence_grid, &params,
                                              &layer_idx](const Vec3f &support_point, float force, const Vec2f &dir) {
                 if (supports_presence_grid.position_taken(support_point) || layer_idx <= 1) { return; }
                 float area = params.support_points_interface_radius * params.support_points_interface_radius * float(PI);
                 part.add_support_point(support_point, area);
 
                 float radius = params.support_points_interface_radius;
-                issues.support_points.emplace_back(support_point, force, radius, dir);
+                supp_points.emplace_back(support_point, force, radius, dir);
                 supports_presence_grid.take_position(support_point);
 
                 if (weakest_conn.area > EPSILON) { // Do not add it to the weakest connection if it is not valid - does not exist
@@ -836,7 +836,7 @@ Issues check_stability(const PrintObject *po, const Params &params)
         } // slice iterations
         prev_layer_ext_perim_lines = LD(current_layer_ext_perims_lines);
     } // layer iterations
-    return issues;
+    return supp_points;
 }
 
 #ifdef DEBUG_FILES
@@ -868,14 +868,14 @@ void debug_export(Issues issues, std::string file_name)
 // std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
 //     return {};
 // }
-Issues full_search(const PrintObject *po, const Params &params)
+SupportPoints full_search(const PrintObject *po, const Params &params)
 {
-    Issues issues = check_stability(po, params);
+    SupportPoints supp_points = check_stability(po, params);
 #ifdef DEBUG_FILES
     debug_export(issues, "issues");
 #endif
 
-    return issues;
+    return supp_points;
 }
 
 

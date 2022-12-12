@@ -516,7 +516,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,      min_feature_size))
     ((ConfigOptionFloatOrPercent,      min_bead_width))
     ((ConfigOptionBool,                support_material))
-    // Automatic supports (generated based on support_material_threshold).
+    // Automatic supports (generated based fdm support point generator).
     ((ConfigOptionBool,                support_material_auto))
     // Direction of the support pattern (in XY plane).`
     ((ConfigOptionFloat,               support_material_angle))

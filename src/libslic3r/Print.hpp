@@ -8,6 +8,7 @@
 #include "Flow.hpp"
 #include "Point.hpp"
 #include "Slicing.hpp"
+#include "SupportSpotsGenerator.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "GCode/ToolOrdering.hpp"
 #include "GCode/WipeTower.hpp"
@@ -20,6 +21,7 @@
 #include <Eigen/Geometry>
 
 #include <functional>
+#include <optional>
 #include <set>
 #include <tcbspan/span.hpp>
 
@@ -207,12 +209,15 @@ public:
     Transform3d                                 trafo_bboxes;
     std::vector<ObjectID>                       cached_volume_ids;
 
+    SupportSpotsGenerator::SupportPoints generated_support_points;
+
     void ref_cnt_inc() { ++ m_ref_cnt; }
     void ref_cnt_dec() { if (-- m_ref_cnt == 0) delete this; }
     void clear() {
         all_regions.clear();
         layer_ranges.clear();
         cached_volume_ids.clear();
+        generated_support_points.clear();
     }
 
 private:

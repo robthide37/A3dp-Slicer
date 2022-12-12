@@ -1,8 +1,10 @@
 #ifndef SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_
 #define SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_
 
-#include "libslic3r/Print.hpp"
+#include "Layer.hpp"
+#include "Line.hpp"
 #include <boost/log/trivial.hpp>
+#include <vector>
 
 namespace Slic3r {
 
@@ -67,19 +69,17 @@ struct SupportPoint {
     Vec2f direction;
 };
 
-struct Issues {
-    std::vector<SupportPoint> support_points;
-};
+using SupportPoints = std::vector<SupportPoint>;
 
 struct Malformations {
     std::vector<Lines> layers; //for each layer
 };
 
 // std::vector<size_t> quick_search(const PrintObject *po, const Params &params);
-Issues full_search(const PrintObject *po, const Params &params);
+SupportPoints full_search(const PrintObject *po, const Params &params);
 
-void estimate_supports_malformations(SupportLayerPtrs &layers, float supports_flow_width, const Params &params);
-void estimate_malformations(LayerPtrs &layers, const Params &params);
+void estimate_supports_malformations(std::vector<SupportLayer*> &layers, float supports_flow_width, const Params &params);
+void estimate_malformations(std::vector<Layer*> &layers, const Params &params);
 
 } // namespace SupportSpotsGenerator
 }
