@@ -30,6 +30,7 @@ static const ColorRGBA SELECTED_PLAG_COLOR  = ColorRGBA::GRAY();
 static const ColorRGBA SELECTED_DOWEL_COLOR = ColorRGBA::DARK_GRAY();
 static const ColorRGBA CONNECTOR_DEF_COLOR  = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
 static const ColorRGBA CONNECTOR_ERR_COLOR  = ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f);
+static const ColorRGBA HOVERED_ERR_COLOR    = ColorRGBA(1.0f, 0.3f, 0.3f, 1.0f);
 
 const unsigned int AngleResolution = 64;
 const unsigned int ScaleStepsCount = 72;
@@ -1849,7 +1850,7 @@ Transform3d GLGizmoCut3D::get_volume_transformation(const ModelVolume* volume) c
     return translation_transform(offset) * scale_transform(Vec3d::Ones() - border_scale) * vol_matrix;
 }
 
-bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
+bool GLGizmoCut3D::is_outside_of_cut_contour(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
 {
     // check if connector pos is out of clipping plane
     if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(cur_pos)) {
@@ -1857,16 +1858,54 @@ bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& co
         return true;
     }
 
+    // check if connector bottom contour is out of clipping plane
     const CutConnector& cur_connector = connectors[idx];
+    const CutConnectorShape shape = CutConnectorShape(cur_connector.attribs.shape);
+    const int   sectorCount = shape == CutConnectorShape::Triangle  ? 3 :
+                              shape == CutConnectorShape::Square    ? 4 :
+                              shape == CutConnectorShape::Circle    ? 60: // supposably, 60 points are enough for conflict detection
+                              shape == CutConnectorShape::Hexagon   ? 6 : 1 ;
+
+    indexed_triangle_set mesh;
+    auto& vertices = mesh.vertices;
+    vertices.reserve(sectorCount + 1);
+
+    float fa = 2 * PI / sectorCount;
+    auto vec = Eigen::Vector2f(0, cur_connector.radius);
+    for (float angle = 0; angle < 2.f * PI; angle += fa) {
+        Vec2f p = Eigen::Rotation2Df(angle) * vec;
+        vertices.emplace_back(Vec3f(p(0), p(1), 0.f));
+    }
+    its_transform(mesh, translation_transform(cur_pos) * m_rotation_m);
+
+    for (auto vertex : vertices) {
+        if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(vertex.cast<double>())) {
+            m_info_stats.outside_cut_contour++;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
+{
+    if (is_outside_of_cut_contour(idx, connectors, cur_pos))
+        return true;
+
+    const CutConnector& cur_connector = connectors[idx];    
+
     const Transform3d matrix = translation_transform(cur_pos) * m_rotation_m *
                                scale_transform(Vec3f(cur_connector.radius, cur_connector.radius, cur_connector.height).cast<double>());
     const BoundingBoxf3 cur_tbb = m_shapes[cur_connector.attribs].model.get_bounding_box().transformed(matrix);
 
+    // check if connector's bounding box is inside the object's bounding box
     if (!bounding_box().contains(cur_tbb)) {
         m_info_stats.outside_bb++;
         return true;
     }
 
+    // check if connectors are overlapping 
     for (size_t i = 0; i < connectors.size(); ++i) {
         if (i == idx)
             continue;
@@ -1920,7 +1959,8 @@ void GLGizmoCut3D::render_connectors()
         Vec3d pos = connector.pos + instance_offset + sla_shift * Vec3d::UnitZ();
 
         // First decide about the color of the point.
-        if (is_conflict_for_connector(i, connectors, pos)) {
+        const bool conflict_connector = is_conflict_for_connector(i, connectors, pos);
+        if (conflict_connector) {
             m_has_invalid_connector = true;
             render_color = CONNECTOR_ERR_COLOR;
         }
@@ -1930,7 +1970,8 @@ void GLGizmoCut3D::render_connectors()
         if (!m_connectors_editing)
             render_color = CONNECTOR_ERR_COLOR;
         else if (size_t(m_hover_id - m_connectors_group_id) == i)
-            render_color = connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR  : HOVERED_PLAG_COLOR;
+            render_color = conflict_connector ? HOVERED_ERR_COLOR :
+                           connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR  : HOVERED_PLAG_COLOR;
         else if (m_selected[i])
             render_color = connector.attribs.type == CutConnectorType::Dowel ? SELECTED_DOWEL_COLOR : SELECTED_PLAG_COLOR;
 

@@ -3002,9 +3002,14 @@ std::string GCode::travel_to(const Point &point, ExtrusionRole role, std::string
     Polyline travel { this->last_pos(), point };
 
     if (this->config().avoid_curled_filament_during_travels) {
-        Point scaled_origin = Point(scaled(this->origin()));
-        travel              = m_avoid_curled_filaments.find_path(this->last_pos() + scaled_origin, point + scaled_origin);
-        travel.translate(-scaled_origin);
+        if (m_config.avoid_crossing_perimeters) {
+            BOOST_LOG_TRIVIAL(warning)
+                << "Option >avoid curled filament during travels< is not compatible with avoid crossing perimeters and it will be ignored!";
+        } else {
+            Point scaled_origin = Point(scaled(this->origin()));
+            travel              = m_avoid_curled_filaments.find_path(this->last_pos() + scaled_origin, point + scaled_origin);
+            travel.translate(-scaled_origin);
+        }
     }
 
     // check whether a straight travel move would need retraction

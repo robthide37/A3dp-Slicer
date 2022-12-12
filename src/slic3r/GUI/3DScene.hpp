@@ -397,6 +397,7 @@ private:
     Slope m_slope;
     bool m_show_sinking_contours{ false };
     bool m_show_non_manifold_edges{ true };
+    bool m_use_raycasters{ true };
 
 public:
     GLVolumePtrs volumes;
@@ -445,6 +446,7 @@ public:
     bool empty() const { return volumes.empty(); }
     void set_range(double low, double high) { for (GLVolume* vol : this->volumes) vol->set_range(low, high); }
 
+    void set_use_raycasters(bool value) { m_use_raycasters = value; }
     void set_print_volume(const PrintVolume& print_volume) { m_print_volume = print_volume; }
 
     void set_z_range(float min_z, float max_z) { m_z_range[0] = min_z; m_z_range[1] = max_z; }

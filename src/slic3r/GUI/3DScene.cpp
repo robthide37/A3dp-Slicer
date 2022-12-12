@@ -127,7 +127,9 @@ void GLVolume::SinkingContours::update()
                 init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
         }
     }
-    m_model.init_from(std::move(init_data));
+
+    if (init_data.vertices_count() > 0)
+      m_model.init_from(std::move(init_data));
 }
 
 void GLVolume::NonManifoldEdges::render()
@@ -437,9 +439,9 @@ std::vector<int> GLVolumeCollection::load_object(
 
 int GLVolumeCollection::load_object_volume(
     const ModelObject* model_object,
-    int                  obj_idx,
-    int                  volume_idx,
-    int                  instance_idx)
+    int                obj_idx,
+    int                volume_idx,
+    int                instance_idx)
 {
     const ModelVolume   *model_volume = model_object->volumes[volume_idx];
     const int            extruder_id  = model_volume->extruder_id();
@@ -452,10 +454,12 @@ int GLVolumeCollection::load_object_volume(
     v.printable = instance->printable;
 #if ENABLE_SMOOTH_NORMALS
     v.model.init_from(*mesh, true);
-    v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
+    if (m_use_raycasters)
+      v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
 #else
     v.model.init_from(*mesh);
-    v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
+    if (m_use_raycasters)
+      v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
 #endif // ENABLE_SMOOTH_NORMALS
     v.composite_id = GLVolume::CompositeID(obj_idx, volume_idx, instance_idx);
     if (model_volume->is_model_part()) {
