@@ -490,25 +490,21 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         m_raycast_manager.actualize(act_model_object, &condition);
         m_dragging_mouse_offset = priv::calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
         // Cancel job to prevent interuption of dragging (duplicit result)
-        if (m_update_job_cancel != nullptr) m_update_job_cancel->store(true);
+        if (m_update_job_cancel != nullptr) 
+            m_update_job_cancel->store(true);
         return false;
     }
 
     // Dragging starts out of window
-    if (!m_dragging_mouse_offset.has_value()) return false;
+    if (!m_dragging_mouse_offset.has_value()) 
+        return false;
 
-    const Camera &camera = wxGetApp().plater()->get_camera();
-    Vec2d offseted_mouse = mouse_pos + *m_dragging_mouse_offset;
-    auto hit = m_raycast_manager.unproject(offseted_mouse, camera, &condition);
-    if (!hit.has_value()) { 
-        // there is no hit
-        // show common translation of object
-        m_parent.toggle_model_objects_visibility(true);
-        m_temp_transformation = {};
-        return false; 
-    }
-        
     if (mouse_event.Dragging()) {
+        const Camera &camera = wxGetApp().plater()->get_camera();
+        Vec2d offseted_mouse = mouse_pos + *m_dragging_mouse_offset;
+        auto hit = m_raycast_manager.unproject(offseted_mouse, camera, &condition);        
+        if (!hit.has_value())
+            return false;
         TextConfiguration &tc = *m_volume->text_configuration;
         // hide common dragging of object
         m_parent.toggle_model_objects_visibility(false, m_volume->get_object(), gl_volume->instance_idx(), m_volume);
@@ -2903,10 +2899,15 @@ void GLGizmoEmboss::draw_advanced()
         &stored_style->prop.use_surface : nullptr;
     if (rev_checkbox(tr.use_surface, font_prop.use_surface, def_use_surface,
                      _u8L("Revert using of model surface."))) {
-        if (font_prop.use_surface) { 
+        if (font_prop.use_surface) {
+            // when using surface distance is not used
             font_prop.distance.reset();
+
+            // there should be minimal embossing depth
             if (font_prop.emboss < 0.1)
                 font_prop.emboss = 1;
+
+            // TODO: project an origin on surface
         }
         process();
     }
