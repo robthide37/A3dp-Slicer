@@ -127,7 +127,9 @@ void GLVolume::SinkingContours::update()
                 init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
         }
     }
-    m_model.init_from(std::move(init_data));
+
+    if (init_data.vertices_count() > 0)
+      m_model.init_from(std::move(init_data));
 }
 
 void GLVolume::NonManifoldEdges::render()
