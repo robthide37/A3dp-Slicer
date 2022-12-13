@@ -1394,9 +1394,7 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
         }
         else {
             if (!is_single_volume_or_modifier()) {
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                 assert(transformation_type.world());
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                 const Transform3d scale_matrix = Geometry::scale_transform(relative_scale);
                 const Vec3d offset = volume_data.get_instance_transform().get_matrix_no_offset().inverse() * (m_cache.dragging_center - inst_trafo.get_offset());
                 v.set_volume_transformation(Geometry::translation_transform(offset) * scale_matrix * Geometry::translation_transform(-offset) * volume_data.get_volume_transform().get_matrix());
@@ -1739,8 +1737,8 @@ void Selection::render(float scale_factor)
     }
     else if (coordinates_type == ECoordinatesType::Local && is_single_volume_or_modifier()) {
         const GLVolume& v = *get_first_volume();
-        box = v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_scaling_factor_matrix());
-        trafo = v.get_instance_transformation().get_matrix() * v.get_volume_transformation().get_matrix_no_scaling_factor();
+        box = v.bounding_box();
+        trafo = v.world_matrix();
     }
     else {
         const Selection::IndicesList& ids = get_volume_idxs();
@@ -1748,9 +1746,7 @@ void Selection::render(float scale_factor)
             const GLVolume& v = *get_volume(id);
             box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
         }
-        const Geometry::Transformation inst_trafo = get_first_volume()->get_instance_transformation();
-        box = box.transformed(inst_trafo.get_scaling_factor_matrix());
-        trafo = inst_trafo.get_matrix_no_scaling_factor();
+        trafo = get_first_volume()->get_instance_transformation().get_matrix();
     }
 
     render_bounding_box(box, trafo, ColorRGB::WHITE());
