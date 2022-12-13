@@ -402,6 +402,7 @@ void GLGizmoCut3D::update_clipper()
     double dist = (m_plane_center - beg).norm();
     dist = std::clamp(dist, 0.0001, normal.norm());
     normal.normalize();
+    m_clp_normal = normal;
     const double offset = normal.dot(beg) + dist;
 
     m_c->object_clipper()->set_range_and_pos(normal, offset, dist);
@@ -973,9 +974,6 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
         const Vec3d& instance_offset = mo->instances[inst_id]->get_offset();
         const double sla_shift = double(m_c->selection_info()->get_sla_shift());
 
-        const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
-        const Vec3d& normal = cp && cp->is_active() ? cp->get_normal() : m_clp_normal;
-
         for (size_t i = 0; i < connectors.size(); ++i) {
             const CutConnector& connector = connectors[i];
 
@@ -984,7 +982,7 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             Vec3d pos = connector.pos + instance_offset;
             if (connector.attribs.type == CutConnectorType::Dowel &&
                 connector.attribs.style == CutConnectorStyle::Prizm) {
-                pos -= height * normal;
+                pos -= height * m_clp_normal;
                 height *= 2;
             }
             pos[Z] += sla_shift;
@@ -1396,10 +1394,12 @@ void GLGizmoCut3D::render_clipper_cut()
 
 void GLGizmoCut3D::on_render()
 {
-    if (update_bb() || force_update_clipper_on_render || m_connectors_editing) {
+    if (update_bb() || force_update_clipper_on_render) {
         update_clipper_on_render();
         m_c->object_clipper()->set_behavior(m_connectors_editing, m_connectors_editing, 0.4);
     }
+    else
+        update_clipper();
 
     init_picking_models();
 
@@ -1558,7 +1558,6 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     ImGui::Separator();
 
     if (m_imgui->button(_L("Confirm connectors"))) {
-        m_clp_normal = m_c->object_clipper()->get_clipping_plane()->get_normal();
         unselect_all_connectors();
         set_connectors_editing(false);
     }
@@ -1566,7 +1565,6 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     ImGui::SameLine(2.75f * m_label_width);
 
     if (m_imgui->button(_L("Cancel"))) {
-        m_clp_normal = m_c->object_clipper()->get_clipping_plane()->get_normal();
         reset_connectors();
         set_connectors_editing(false);
     }
@@ -1945,9 +1943,6 @@ void GLGizmoCut3D::render_connectors()
     const Vec3d& instance_offset = mi->get_offset();
     const double sla_shift       = double(m_c->selection_info()->get_sla_shift());
 
-    const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
-    const Vec3d& normal = cp && cp->is_active() ? cp->get_normal() : m_clp_normal;
-
     m_has_invalid_connector = false;
     m_info_stats.invalidate();
 
@@ -1979,13 +1974,13 @@ void GLGizmoCut3D::render_connectors()
         if (connector.attribs.type  == CutConnectorType::Dowel &&
             connector.attribs.style == CutConnectorStyle::Prizm) {
             if (is_looking_forward())
-                pos -= height * normal;
+                pos -= height * m_clp_normal;
             else
-                pos += height * normal;
+                pos += height * m_clp_normal;
             height *= 2;
         }
         else if (!is_looking_forward())
-            pos += 0.05 * normal;
+            pos += 0.05 * m_clp_normal;
 
         const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(pos) * m_rotation_m * 
                                               scale_transform(Vec3f(connector.radius, connector.radius, height).cast<double>());
