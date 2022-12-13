@@ -202,6 +202,11 @@ public:
         }
     };
 
+    struct GeneratedSupportPoints{
+        Transform3d object_transform; // for frontend object mapping
+        SupportSpotsGenerator::SupportPoints support_points;
+    };
+
     std::vector<std::unique_ptr<PrintRegion>>   all_regions;
     std::vector<LayerRangeRegions>              layer_ranges;
     // Transformation of this ModelObject into one of the associated PrintObjects (all PrintObjects derived from a single modelObject differ by a Z rotation only).
@@ -209,7 +214,7 @@ public:
     Transform3d                                 trafo_bboxes;
     std::vector<ObjectID>                       cached_volume_ids;
 
-    SupportSpotsGenerator::SupportPoints generated_support_points;
+    std::optional<GeneratedSupportPoints> generated_support_points;
 
     void ref_cnt_inc() { ++ m_ref_cnt; }
     void ref_cnt_dec() { if (-- m_ref_cnt == 0) delete this; }
@@ -217,7 +222,7 @@ public:
         all_regions.clear();
         layer_ranges.clear();
         cached_volume_ids.clear();
-        generated_support_points.clear();
+        generated_support_points.reset();
     }
 
 private:

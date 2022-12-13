@@ -419,10 +419,12 @@ void PrintObject::generate_support_spots()
     if (this->set_started(posSupportSpotsSearch)) {
         BOOST_LOG_TRIVIAL(debug) << "Searching support spots - start";
         m_print->set_status(75, L("Searching support spots"));
-        SupportSpotsGenerator::Params        params{this->print()->m_config.filament_type.values};
-        SupportSpotsGenerator::SupportPoints supp_points = SupportSpotsGenerator::full_search(this, params);
-        this->m_shared_regions->generated_support_points = supp_points;
-        m_print->throw_if_canceled();
+        if (!this->shared_regions()->generated_support_points.has_value()) {
+            SupportSpotsGenerator::Params        params{this->print()->m_config.filament_type.values};
+            SupportSpotsGenerator::SupportPoints supp_points = SupportSpotsGenerator::full_search(this, params);
+            this->m_shared_regions->generated_support_points = {this->trafo_centered(), supp_points};
+            m_print->throw_if_canceled();
+        }
         BOOST_LOG_TRIVIAL(debug) << "Searching support spots - end";
         this->set_done(posSupportSpotsSearch);
     }
