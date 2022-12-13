@@ -1221,36 +1221,29 @@ void ObjectManipulation::change_size_value(int axis, double value)
     Vec3d ref_size = m_cache.size;
 #if ENABLE_WORLD_COORDINATE
     if (selection.is_single_volume_or_modifier()) {
+        size = size.cwiseQuotient(ref_size);
+        ref_size = Vec3d::Ones();
 #else
     if (selection.is_single_volume() || selection.is_single_modifier()) {
-#endif // ENABLE_WORLD_COORDINATE
+        const GLVolume* v = selection.get_first_volume();
+        const Vec3d local_size = size.cwiseQuotient(v->get_instance_scaling_factor());
+        const Vec3d local_ref_size = v->bounding_box().size().cwiseProduct(v->get_volume_scaling_factor());
+        const Vec3d local_change = local_size.cwiseQuotient(local_ref_size);
 
-#if ENABLE_WORLD_COORDINATE
-        if (is_world_coordinates()) {
-            size = size.cwiseQuotient(ref_size);
-            ref_size = Vec3d::Ones();
-        }
-        else {
-#endif // ENABLE_WORLD_COORDINATE
-            const GLVolume* v = selection.get_first_volume();
-            const Vec3d local_size = size.cwiseQuotient(v->get_instance_scaling_factor());
-            const Vec3d local_ref_size = v->bounding_box().size().cwiseProduct(v->get_volume_scaling_factor());
-            const Vec3d local_change = local_size.cwiseQuotient(local_ref_size);
-
-            size = local_change.cwiseProduct(v->get_volume_scaling_factor());
-            ref_size = Vec3d::Ones();
-#if ENABLE_WORLD_COORDINATE
-        }
+        size = local_change.cwiseProduct(v->get_volume_scaling_factor());
+        ref_size = Vec3d::Ones();
 #endif // ENABLE_WORLD_COORDINATE
     }
-    else if (selection.is_single_full_instance())
+    else if (selection.is_single_full_instance()) {
 #if ENABLE_WORLD_COORDINATE
-        ref_size = is_world_coordinates() ?
+        size = size.cwiseQuotient(ref_size);
+        ref_size = Vec3d::Ones();
 #else
         ref_size = m_world_coordinates ?
-#endif // ENABLE_WORLD_COORDINATE
             selection.get_unscaled_instance_bounding_box().size() :
             wxGetApp().model().objects[selection.get_first_volume()->object_idx()]->raw_mesh_bounding_box().size();
+#endif // ENABLE_WORLD_COORDINATE
+    }
 
 #if ENABLE_WORLD_COORDINATE
     this->do_size(axis, size.cwiseQuotient(ref_size));
