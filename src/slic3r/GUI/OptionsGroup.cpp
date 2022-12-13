@@ -1001,10 +1001,18 @@ bool OptionsGroup::launch_browser(const std::string& path_end)
     return wxGetApp().open_browser_with_warning_dialog(OptionsGroup::get_url(path_end), wxGetApp().mainframe->m_tabpanel);
 }
 
+// list of options, which doesn't have a related filed
+static const std::set<std::string> options_without_field = {
+    "compatible_printers",
+    "compatible_prints",
+    "bed_shape",
+    "filament_ramming_parameters",
+    "gcode_substitutions",
+};
+
 bool OptionsGroup::is_option_without_field(const std::string& opt_key)
 {
-    return  opt_key!= "thumbnails" // "thumbnails" has related field
-            && PresetCollection::is_independent_from_extruder_number_option(opt_key);
+    return  options_without_field.find(opt_key) != options_without_field.end();
 }
 
 

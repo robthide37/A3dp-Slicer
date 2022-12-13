@@ -1215,18 +1215,19 @@ void add_correct_opts_to_diff(const std::string &opt_key, t_config_option_keys& 
 }
 
 // list of options with vector variable, which is independent from number of extruders
-static const std::vector<std::string> independent_from_extruder_number_options = {
+static const std::set<std::string> independent_from_extruder_number_options = {
     "bed_shape",
-    "thumbnails",
+    "compatible_printers",
+    "compatible_prints",
     "filament_ramming_parameters",
     "gcode_substitutions",
-    "compatible_prints",
-    "compatible_printers"
+    "post_process",
+    "thumbnails",
 };
 
 bool PresetCollection::is_independent_from_extruder_number_option(const std::string& opt_key)
 {
-    return std::find(independent_from_extruder_number_options.begin(), independent_from_extruder_number_options.end(), opt_key) != independent_from_extruder_number_options.end();
+    return independent_from_extruder_number_options.find(opt_key) != independent_from_extruder_number_options.end();
 }
 
 // Use deep_diff to correct return of changed options, considering individual options for each extruder.

@@ -417,7 +417,6 @@ public:
 	void		toggle_options() override;
 	void		update() override;
 	void		clear_pages() override;
-	void		init_options_list() override;
 	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
 	wxSizer*	create_manage_substitution_widget(wxWindow* parent);
 	wxSizer*	create_substitutions_widget(wxWindow* parent);
@@ -522,7 +521,6 @@ public:
 	void		build() override;
 	void		toggle_options() override;
 	void		update() override;
-    void		init_options_list() override;
 	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptSLA; }
 };
 

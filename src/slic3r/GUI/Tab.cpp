@@ -647,7 +647,7 @@ void Tab::init_options_list()
     m_options_list.clear();
 
     for (const std::string& opt_key : m_config->keys())
-        emplace_option(opt_key);
+        emplace_option(opt_key, m_type != Preset::TYPE_FILAMENT && !PresetCollection::is_independent_from_extruder_number_option(opt_key));
 }
 
 template<class T>
@@ -677,42 +677,12 @@ void Tab::emplace_option(const std::string& opt_key, bool respect_vec_values/* =
         m_options_list.emplace(opt_key, m_opt_status_value);
 }
 
-void TabPrint::init_options_list()
-{
-    m_options_list.clear();
-
-    for (const std::string& opt_key : m_config->keys())
-        emplace_option(opt_key, true);
-}
-
 void TabPrinter::init_options_list()
 {
-    m_options_list.clear();
+    Tab::init_options_list();
 
-    for (const std::string& opt_key : m_config->keys())
-    {
-        if (opt_key == "bed_shape" || opt_key == "thumbnails") {
-            m_options_list.emplace(opt_key, m_opt_status_value);
-            continue;
-        }
-        emplace_option(opt_key, true);
-    }
     if (m_printer_technology == ptFFF)
         m_options_list.emplace("extruders_count", m_opt_status_value);
-}
-
-void TabSLAMaterial::init_options_list()
-{
-    m_options_list.clear();
-
-    for (const std::string& opt_key : m_config->keys())
-    {
-        if (opt_key == "compatible_prints" || opt_key == "compatible_printers") {
-            m_options_list.emplace(opt_key, m_opt_status_value);
-            continue;
-        }
-        emplace_option(opt_key, true);
-    }
 }
 
 void Tab::get_sys_and_mod_flags(const std::string& opt_key, bool& sys_page, bool& modified_page)
