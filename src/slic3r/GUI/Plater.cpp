@@ -6089,7 +6089,7 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
         return;
 
     // Following lambda generates a combined mesh for export with normals pointing outwards.
-    auto mesh_to_export = [](const ModelObject& mo, int instance_id) {
+    auto mesh_to_export_fff = [](const ModelObject& mo, int instance_id) {
         TriangleMesh mesh;
         for (const ModelVolume* v : mo.volumes)
             if (v->is_model_part()) {
@@ -6110,6 +6110,81 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
             mesh.transform(mo.instances[instance_id]->get_matrix(), true);
         return mesh;
     };
+
+    auto mesh_to_export_sla = [&, this](const ModelObject& mo, int instance_id) {
+        TriangleMesh mesh;
+
+        const SLAPrintObject *object = this->p->sla_print.get_print_object_by_model_object_id(mo.id());
+
+        if (object->get_mesh_to_print().empty())
+            mesh = mesh_to_export_fff(mo, instance_id);
+        else {
+            const Transform3d mesh_trafo_inv = object->trafo().inverse();
+            const bool is_left_handed = object->is_left_handed();
+
+            auto pad_mesh = extended? object->pad_mesh() : TriangleMesh{};
+            pad_mesh = object->pad_mesh();
+            pad_mesh.transform(mesh_trafo_inv);
+
+            auto supports_mesh = extended ? object->support_mesh() : TriangleMesh{};
+            supports_mesh.transform(mesh_trafo_inv);
+
+            const std::vector<SLAPrintObject::Instance>& obj_instances = object->instances();
+            for (const SLAPrintObject::Instance& obj_instance : obj_instances) {
+                auto it = std::find_if(object->model_object()->instances.begin(), object->model_object()->instances.end(),
+                                       [&obj_instance](const ModelInstance *mi) { return mi->id() == obj_instance.instance_id; });
+                assert(it != model_object->instances.end());
+
+                if (it != object->model_object()->instances.end()) {
+                    const bool one_inst_only = selection_only && ! selection.is_single_full_object();
+
+                    const int instance_idx = it - object->model_object()->instances.begin();
+                    const Transform3d& inst_transform = one_inst_only
+                                                            ? Transform3d::Identity()
+                                                            : object->model_object()->instances[instance_idx]->get_transformation().get_matrix();
+
+                    TriangleMesh inst_mesh;
+
+                    if (!pad_mesh.empty()) {
+                        TriangleMesh inst_pad_mesh = pad_mesh;
+                        inst_pad_mesh.transform(inst_transform, is_left_handed);
+                        inst_mesh.merge(inst_pad_mesh);
+                    }
+
+                    if (!supports_mesh.empty()) {
+                        TriangleMesh inst_supports_mesh = supports_mesh;
+                        inst_supports_mesh.transform(inst_transform, is_left_handed);
+                        inst_mesh.merge(inst_supports_mesh);
+                    }
+
+                    TriangleMesh inst_object_mesh = object->get_mesh_to_print();
+                    inst_object_mesh.transform(mesh_trafo_inv);
+                    inst_object_mesh.transform(inst_transform, is_left_handed);
+
+                    inst_mesh.merge(inst_object_mesh);
+
+                           // ensure that the instance lays on the bed
+                    inst_mesh.translate(0.0f, 0.0f, -inst_mesh.bounding_box().min.z());
+
+                           // merge instance with global mesh
+                    mesh.merge(inst_mesh);
+
+                    if (one_inst_only)
+                        break;
+                }
+            }
+        }
+
+        return mesh;
+    };
+
+    std::function<TriangleMesh(const ModelObject& mo, int instance_id)>
+        mesh_to_export;
+
+    if (p->printer_technology == ptFFF )
+        mesh_to_export = mesh_to_export_fff;
+    else
+        mesh_to_export = mesh_to_export_sla;
 
     TriangleMesh mesh;
     if (selection_only) {
