@@ -4484,9 +4484,9 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
         // so this selection should be updated before menu creation
         wxGetApp().obj_list()->update_selections();
 
-        if (printer_technology == ptSLA)
-            menu = menus.sla_object_menu();
-        else {
+//        if (printer_technology == ptSLA)
+//            menu = menus.sla_object_menu();
+//        else {
             const Selection& selection = get_selection();
             // show "Object menu" for each one or several FullInstance instead of FullObject
             const bool is_some_full_instances = selection.is_single_full_instance() || 
@@ -4498,12 +4498,12 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
             const bool is_part = selection.is_single_volume() || selection.is_single_modifier();
 #endif // ENABLE_WORLD_COORDINATE
             if (is_some_full_instances)
-                menu = menus.object_menu();
+                menu = printer_technology == ptSLA ? menus.sla_object_menu() : menus.object_menu();
             else if (is_part)
                 menu = selection.is_single_text() ? menus.text_part_menu() : menus.part_menu();
             else
                 menu = menus.multi_selection_menu();
-        }
+//        }
     }
 
     if (q != nullptr && menu) {

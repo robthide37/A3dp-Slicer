@@ -113,6 +113,7 @@ private:
     void        append_menu_item_edit_text(wxMenu *menu);
     void        append_menu_items_instance_manipulation(wxMenu *menu);
     void        update_menu_items_instance_manipulation(MenuType type);
+    void        append_menu_items_split(wxMenu *menu);
 };
 
 }}

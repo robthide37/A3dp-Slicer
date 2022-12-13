@@ -1088,22 +1088,28 @@ void MenuFactory::create_common_object_menu(wxMenu* menu)
     append_menu_items_mirror(menu);
 }
 
-void MenuFactory::create_object_menu()
+void MenuFactory::append_menu_items_split(wxMenu *menu)
 {
-    create_common_object_menu(&m_object_menu);
     wxMenu* split_menu = new wxMenu();
     if (!split_menu)
         return;
 
     append_menu_item(split_menu, wxID_ANY, _L("To objects"), _L("Split the selected object into individual objects"),
-        [](wxCommandEvent&) { plater()->split_object(); }, "split_object_SMALL", &m_object_menu, 
+        [](wxCommandEvent&) { plater()->split_object(); }, "split_object_SMALL", menu,
         []() { return plater()->can_split(true); }, m_parent);
     append_menu_item(split_menu, wxID_ANY, _L("To parts"), _L("Split the selected object into individual parts"),
-        [](wxCommandEvent&) { plater()->split_volume(); }, "split_parts_SMALL", &m_object_menu, 
+        [](wxCommandEvent&) { plater()->split_volume(); }, "split_parts_SMALL", menu,
         []() { return plater()->can_split(false); }, m_parent);
 
-    append_submenu(&m_object_menu, split_menu, wxID_ANY, _L("Split"), _L("Split the selected object"), "",
+    append_submenu(menu, split_menu, wxID_ANY, _L("Split"), _L("Split the selected object"), "",
         []() { return plater()->can_split(true); }, m_parent);
+}
+
+void MenuFactory::create_object_menu()
+{
+    create_common_object_menu(&m_object_menu);
+
+    append_menu_items_split(&m_object_menu);
     m_object_menu.AppendSeparator();
 
     // "Height range Modifier" and "Add (volumes)" menu items will be added later in append_menu_items_add_volume()
@@ -1112,9 +1118,7 @@ void MenuFactory::create_object_menu()
 void MenuFactory::create_sla_object_menu()
 {
     create_common_object_menu(&m_sla_object_menu);
-    append_menu_item(&m_sla_object_menu, wxID_ANY, _L("Split"), _L("Split the selected object into individual objects"),
-        [](wxCommandEvent&) { plater()->split_object(); }, "split_object_SMALL", nullptr,
-        []() { return plater()->can_split(true); }, m_parent);
+    append_menu_items_split(&m_sla_object_menu);
 
     m_sla_object_menu.AppendSeparator();
     append_menu_items_add_sla_volume(&m_sla_object_menu);
