@@ -836,9 +836,8 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
                 assert(false);
         }
         else {
-            const Vec3d offset = transformation_type.local() ? 
-                (Vec3d)(volume_data.get_volume_transform().get_rotation_matrix() * displacement) : displacement;
-            transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(offset));
+            assert(transformation_type.relative());
+            transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(displacement), m_cache.dragging_center);
         }
     }
 
@@ -933,20 +932,12 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
         else {
             if (!is_single_volume_or_modifier()) {
                 assert(transformation_type.world());
-                const Geometry::Transformation& volume_trafo = volume_data.get_volume_transform();
-                const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
-                const Vec3d inst_pivot = transformation_type.independent() ? volume_trafo.get_offset() : (Vec3d)(inst_trafo.get_matrix().inverse() * m_cache.dragging_center);
-                const Transform3d trafo = Geometry::translation_transform(inst_pivot) * rotation_matrix * Geometry::translation_transform(-inst_pivot);
-                v.set_volume_transformation(trafo * volume_trafo.get_matrix());
+                transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
             }
             else {
-                if (transformation_type.absolute()) {
-                    const Geometry::Transformation& volume_trafo = volume_data.get_volume_transform();
-                    v.set_volume_transformation(Geometry::assemble_transform(volume_trafo.get_offset_matrix(), Geometry::rotation_transform(rotation),
-                        volume_trafo.get_scaling_factor_matrix(), volume_trafo.get_mirror_matrix()));
-                }
-                else
-                    transform_volume_relative(v, volume_data, transformation_type, Geometry::rotation_transform(rotation));
+                assert(transformation_type.relative());
+                transformation_type.set_independent();
+                transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
             }
         }
     }
@@ -1395,12 +1386,13 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
         else {
             if (!is_single_volume_or_modifier()) {
                 assert(transformation_type.world());
-                const Transform3d scale_matrix = Geometry::scale_transform(relative_scale);
-                const Vec3d offset = volume_data.get_instance_transform().get_matrix_no_offset().inverse() * (m_cache.dragging_center - inst_trafo.get_offset());
-                v.set_volume_transformation(Geometry::translation_transform(offset) * scale_matrix * Geometry::translation_transform(-offset) * volume_data.get_volume_transform().get_matrix());
+                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
             }
-            else
-                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale));
+            else {
+                assert(transformation_type.relative());
+                transformation_type.set_independent();
+                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
+            }
         }
     }
 
@@ -3049,17 +3041,24 @@ void Selection::paste_objects_from_clipboard()
 
 #if ENABLE_WORLD_COORDINATE
 void Selection::transform_volume_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
-    const Transform3d& transform)
+    const Transform3d& transform, const Vec3d& world_pivot)
 {
-    const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
+    assert(transformation_type.relative());
+
     const Geometry::Transformation& volume_trafo = volume_data.get_volume_transform();
+    const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
+
     if (transformation_type.world()) {
+        const Vec3d inst_pivot = transformation_type.independent() ? volume_trafo.get_offset() : (Vec3d)(inst_trafo.get_matrix().inverse() * world_pivot);
         const Transform3d inst_matrix_no_offset = inst_trafo.get_matrix_no_offset();
-        const Transform3d new_volume_matrix = inst_matrix_no_offset.inverse() * transform * inst_matrix_no_offset;
-        volume.set_volume_transformation(volume_trafo.get_offset_matrix() * new_volume_matrix * volume_trafo.get_matrix_no_offset());
+        const Transform3d trafo = Geometry::translation_transform(inst_pivot) * inst_matrix_no_offset.inverse() * transform * inst_matrix_no_offset * Geometry::translation_transform(-inst_pivot);
+        volume.set_volume_transformation(trafo * volume_trafo.get_matrix());
     }
-    else if (transformation_type.instance())
-        volume.set_volume_transformation(volume_trafo.get_offset_matrix() * transform * volume_trafo.get_matrix_no_offset());
+    else if (transformation_type.instance()) {
+        const Vec3d inst_pivot = transformation_type.independent() ? volume_trafo.get_offset() : (Vec3d)(inst_trafo.get_matrix().inverse() * world_pivot);
+        const Transform3d trafo = Geometry::translation_transform(inst_pivot) * transform * Geometry::translation_transform(-inst_pivot);
+        volume.set_volume_transformation(trafo * volume_trafo.get_matrix());
+    }
     else if (transformation_type.local()) {
         const Geometry::Transformation trafo(transform);
         volume.set_volume_transformation(trafo.get_offset_matrix() * volume_trafo.get_matrix() * trafo.get_matrix_no_offset());
