@@ -6112,92 +6112,22 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
     };
 
     TriangleMesh mesh;
-    if (p->printer_technology == ptFFF) {
-        if (selection_only) {
-            const ModelObject* model_object = p->model.objects[obj_idx];
-            if (selection.get_mode() == Selection::Instance)
-                mesh = mesh_to_export(*model_object, (selection.is_single_full_object() && model_object->instances.size() > 1) ? -1 : selection.get_instance_idx());
-            else {
-                const GLVolume* volume = selection.get_first_volume();
-                mesh = model_object->volumes[volume->volume_idx()]->mesh();
-                mesh.transform(volume->get_volume_transformation().get_matrix(), true);
-            }
-
-            if (!selection.is_single_full_object() || model_object->instances.size() == 1)
-                mesh.translate(-model_object->origin_translation.cast<float>());
-        }
+    if (selection_only) {
+        const ModelObject* model_object = p->model.objects[obj_idx];
+        if (selection.get_mode() == Selection::Instance)
+            mesh = mesh_to_export(*model_object, (selection.is_single_full_object() && model_object->instances.size() > 1) ? -1 : selection.get_instance_idx());
         else {
-            for (const ModelObject* o : p->model.objects) {
-                mesh.merge(mesh_to_export(*o, -1));
-            }
+            const GLVolume* volume = selection.get_first_volume();
+            mesh = model_object->volumes[volume->volume_idx()]->mesh();
+            mesh.transform(volume->get_volume_transformation().get_matrix(), true);
         }
+
+        if (!selection.is_single_full_object() || model_object->instances.size() == 1)
+            mesh.translate(-model_object->origin_translation.cast<float>());
     }
     else {
-        // This is SLA mode, all objects have only one volume.
-        // However, we must have a look at the backend to load
-        // hollowed mesh and/or supports
-
-        const PrintObjects& objects = p->sla_print.objects();
-        for (const SLAPrintObject* object : objects) {
-            const ModelObject* model_object = object->model_object();
-            if (selection_only) {
-                if (model_object->id() != p->model.objects[obj_idx]->id())
-                    continue;
-            }
-            const Transform3d mesh_trafo_inv = object->trafo().inverse();
-            const bool is_left_handed = object->is_left_handed();
-
-            auto pad_mesh = extended? object->pad_mesh() : TriangleMesh{};
-            pad_mesh = object->pad_mesh();
-            pad_mesh.transform(mesh_trafo_inv);
-
-            auto supports_mesh = extended ? object->support_mesh() : TriangleMesh{};
-            supports_mesh.transform(mesh_trafo_inv);
-
-            const std::vector<SLAPrintObject::Instance>& obj_instances = object->instances();
-            for (const SLAPrintObject::Instance& obj_instance : obj_instances) {
-                auto it = std::find_if(model_object->instances.begin(), model_object->instances.end(),
-                    [&obj_instance](const ModelInstance *mi) { return mi->id() == obj_instance.instance_id; });
-                assert(it != model_object->instances.end());
-
-                if (it != model_object->instances.end()) {
-                    const bool one_inst_only = selection_only && ! selection.is_single_full_object();
-
-                    const int instance_idx = it - model_object->instances.begin();
-                    const Transform3d& inst_transform = one_inst_only
-                            ? Transform3d::Identity()
-                            : object->model_object()->instances[instance_idx]->get_transformation().get_matrix();
-
-                    TriangleMesh inst_mesh;
-
-                    if (!pad_mesh.empty()) {
-                        TriangleMesh inst_pad_mesh = pad_mesh;
-                        inst_pad_mesh.transform(inst_transform, is_left_handed);
-                        inst_mesh.merge(inst_pad_mesh);
-                    }
-
-                    if (!supports_mesh.empty()) {
-                        TriangleMesh inst_supports_mesh = supports_mesh;
-                        inst_supports_mesh.transform(inst_transform, is_left_handed);
-                        inst_mesh.merge(inst_supports_mesh);
-                    }
-
-                    TriangleMesh inst_object_mesh = object->get_mesh_to_print();
-                    inst_object_mesh.transform(mesh_trafo_inv);
-                    inst_object_mesh.transform(inst_transform, is_left_handed);
-
-                    inst_mesh.merge(inst_object_mesh);
-
-                    // ensure that the instance lays on the bed
-                    inst_mesh.translate(0.0f, 0.0f, -inst_mesh.bounding_box().min.z());
-
-                    // merge instance with global mesh
-                    mesh.merge(inst_mesh);
-
-                    if (one_inst_only)
-                        break;
-                }
-            }
+        for (const ModelObject* o : p->model.objects) {
+            mesh.merge(mesh_to_export(*o, -1));
         }
     }
 
