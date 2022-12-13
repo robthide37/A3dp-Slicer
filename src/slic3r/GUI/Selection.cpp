@@ -931,13 +931,23 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 inst_trafo.get_scaling_factor_matrix(), inst_trafo.get_mirror_matrix()));
         }
         else {
-            if (transformation_type.absolute()) {
+            if (!is_single_volume_or_modifier()) {
+                assert(transformation_type.world());
                 const Geometry::Transformation& volume_trafo = volume_data.get_volume_transform();
-                v.set_volume_transformation(Geometry::assemble_transform(volume_trafo.get_offset_matrix(), Geometry::rotation_transform(rotation),
-                    volume_trafo.get_scaling_factor_matrix(), volume_trafo.get_mirror_matrix()));
+                const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
+                const Vec3d inst_pivot = transformation_type.independent() ? volume_trafo.get_offset() : (Vec3d)(inst_trafo.get_matrix().inverse() * m_cache.dragging_center);
+                const Transform3d trafo = Geometry::translation_transform(inst_pivot) * rotation_matrix * Geometry::translation_transform(-inst_pivot);
+                v.set_volume_transformation(trafo * volume_trafo.get_matrix());
             }
-            else
-                transform_volume_relative(v, volume_data, transformation_type, Geometry::rotation_transform(rotation));
+            else {
+                if (transformation_type.absolute()) {
+                    const Geometry::Transformation& volume_trafo = volume_data.get_volume_transform();
+                    v.set_volume_transformation(Geometry::assemble_transform(volume_trafo.get_offset_matrix(), Geometry::rotation_transform(rotation),
+                        volume_trafo.get_scaling_factor_matrix(), volume_trafo.get_mirror_matrix()));
+                }
+                else
+                    transform_volume_relative(v, volume_data, transformation_type, Geometry::rotation_transform(rotation));
+            }
         }
     }
 
@@ -1384,6 +1394,9 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
         }
         else {
             if (!is_single_volume_or_modifier()) {
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                assert(transformation_type.world());
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                 const Transform3d scale_matrix = Geometry::scale_transform(relative_scale);
                 const Vec3d offset = volume_data.get_instance_transform().get_matrix_no_offset().inverse() * (m_cache.dragging_center - inst_trafo.get_offset());
                 v.set_volume_transformation(Geometry::translation_transform(offset) * scale_matrix * Geometry::translation_transform(-offset) * volume_data.get_volume_transform().get_matrix());
