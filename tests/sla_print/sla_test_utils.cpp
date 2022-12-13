@@ -282,8 +282,22 @@ static void _test_concave_hull(const Polygons &hull, const ExPolygons &polys)
     
     REQUIRE(cchull_holes == 0);
     
-    Polygons intr = diff(to_polygons(polys), hull);
-    REQUIRE(intr.empty());
+    Polygons diff_poly = diff(to_polygons(polys), hull);
+
+    if (!diff_poly.empty()) {
+        BOOST_LOG_TRIVIAL(warning)
+            << "Concave hull diff with original shape is not completely empty."
+            << "See pad_chull.svg for details.";
+
+        SVG svg("pad_chull.svg");
+        svg.draw(polys, "green");
+        svg.draw(hull, "red");
+        svg.draw(diff_poly, "blue");
+    }
+
+    double diff_area = area(diff_poly);
+
+    REQUIRE(std::abs(diff_area) < std::pow(scaled(2 * EPSILON), 2));
 }
 
 void test_concave_hull(const ExPolygons &polys) {
