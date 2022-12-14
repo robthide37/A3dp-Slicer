@@ -835,10 +835,8 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
             else
                 assert(false);
         }
-        else {
-            assert(transformation_type.relative());
+        else
             transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(displacement), m_cache.dragging_center);
-        }
     }
 
 #if !DISABLE_INSTANCES_SYNCH
@@ -935,7 +933,6 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
             }
             else {
-                assert(transformation_type.relative());
                 transformation_type.set_independent();
                 transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
             }
@@ -1331,6 +1328,7 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
         if (transformation_type.absolute()) {
             // convert from absolute scaling to relative scaling
             BoundingBoxf3 original_box;
+            BoundingBoxf3 reference_box = m_box.get_bounding_box();
             if (m_mode == Instance) {
               if (is_single_full_instance()) {
                 if (transformation_type.world())
@@ -1348,11 +1346,14 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                     original_box = get_bounding_box();
                 else if (transformation_type.instance())
                     original_box = v.transformed_convex_hull_bounding_box(volume_data.get_volume_transform().get_matrix());
-                else
+                else {
                     original_box = v.bounding_box();
+                    reference_box = v.bounding_box().transformed(volume_data.get_volume_transform().get_scaling_factor_matrix());
+                }
+                transformation_type.set_relative();
             }
-
-            relative_scale = original_box.size().cwiseProduct(scale).cwiseQuotient(m_box.get_bounding_box().size());
+                        
+            relative_scale = original_box.size().cwiseProduct(scale).cwiseQuotient(reference_box.size());
         }
 
         if (m_mode == Instance) {
@@ -1389,7 +1390,6 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                 transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
             }
             else {
-                assert(transformation_type.relative());
                 transformation_type.set_independent();
                 transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
             }
