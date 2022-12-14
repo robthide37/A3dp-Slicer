@@ -2992,7 +2992,8 @@ wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, st
         int volume_idx{ -1 };
         for (const ModelVolume* volume : object->volumes) {
             ++volume_idx;
-            if (object->is_cut() && volume->is_cut_connector())
+            if ((object->is_cut() && volume->is_cut_connector()) ||
+                (printer_technology() == ptSLA && volume->type() == ModelVolumeType::PARAMETER_MODIFIER))
                 continue;
             const wxDataViewItem& vol_item = m_objects_model->AddVolumeChild(object_item,
                 from_u8(volume->name),
@@ -4262,17 +4263,32 @@ void ObjectList::change_part_type()
     }
 
     const bool is_cut_object = obj->is_cut();
-    wxArrayString names;
-    if (!is_cut_object)
-        for (const wxString& type : { _L("Part"), _L("Negative Volume") })
-            names.Add(type);
-    names.Add(_L("Modifier"));
-    if (!volume->text_configuration.has_value())
-        for (const wxString& name : { _L("Support Blocker"), _L("Support Enforcer") })
+    wxArrayString                   names;
+    std::vector<ModelVolumeType>    types;
+    types.reserve(5);
+    if (!is_cut_object) {
+        for (const wxString&        name    : { _L("Part"),                     _L("Negative Volume") })
             names.Add(name);
+        for (const ModelVolumeType  type_id : { ModelVolumeType::MODEL_PART,    ModelVolumeType::NEGATIVE_VOLUME })
+            types.emplace_back(type_id);
+    }
 
-    const int type_shift = is_cut_object ? 2 : 0;
-    auto new_type = ModelVolumeType(type_shift + wxGetApp().GetSingleChoiceIndex(_L("Type:"), _L("Select type of part"), names, int(type) - type_shift));
+    if (printer_technology() != ptSLA) {
+        names.Add(_L("Modifier"));
+        types.emplace_back(ModelVolumeType::PARAMETER_MODIFIER);
+    }
+
+    if (!volume->text_configuration.has_value()) {
+        for (const wxString&        name    : { _L("Support Blocker"),          _L("Support Enforcer") })
+            names.Add(name);
+        for (const ModelVolumeType  type_id : { ModelVolumeType::SUPPORT_BLOCKER, ModelVolumeType::SUPPORT_ENFORCER })
+            types.emplace_back(type_id);
+    }
+
+    int selection = 0;
+    if (auto it = std::find(types.begin(), types.end(), type); it != types.end())
+        selection = it - types.begin();
+    const auto new_type = types[wxGetApp().GetSingleChoiceIndex(_L("Type:"), _L("Select type of part"), names, selection)];
 	if (new_type == type || new_type == ModelVolumeType::INVALID)
         return;
 
@@ -4357,8 +4373,9 @@ void ObjectList::update_object_list_by_printer_technology()
     m_objects_model->GetChildren(wxDataViewItem(nullptr), object_items);
 
     for (auto& object_item : object_items) {
+        const int obj_idx = m_objects_model->GetObjectIdByItem(object_item);
         // update custom supports info
-        update_info_items(m_objects_model->GetObjectIdByItem(object_item), &sel);
+        update_info_items(obj_idx, &sel);
 
         // Update Settings Item for object
         update_settings_item_and_selection(object_item, sel);
@@ -4366,10 +4383,26 @@ void ObjectList::update_object_list_by_printer_technology()
         // Update settings for Volumes
         wxDataViewItemArray all_object_subitems;
         m_objects_model->GetChildren(object_item, all_object_subitems);
+
+        bool was_selected_some_subitem = false;
         for (auto item : all_object_subitems)
-            if (m_objects_model->GetItemType(item) & itVolume)
-                // update settings for volume
-                update_settings_item_and_selection(item, sel);
+            if (m_objects_model->GetItemType(item) & itVolume) {
+                if (sel.Index(item) != wxNOT_FOUND) {
+                    sel.Remove(item);
+                    was_selected_some_subitem = true;
+                }
+                else if (const wxDataViewItem vol_settings_item = m_objects_model->GetSettingsItem(item);
+                    sel.Index(vol_settings_item) != wxNOT_FOUND) {
+                    sel.Remove(vol_settings_item);
+                    was_selected_some_subitem = true;
+                    break;
+                }
+            }
+        if (was_selected_some_subitem)
+            sel.Add(object_item);
+
+        // Update volumes list in respect to the print mode
+        add_volumes_to_object_in_list(obj_idx);
 
         // Update Layers Items
         wxDataViewItem layers_item = m_objects_model->GetLayerRootItem(object_item);
@@ -4411,6 +4444,8 @@ void ObjectList::update_object_list_by_printer_technology()
     // restore selection:
     SetSelections(sel);
     m_prevent_canvas_selection_update = false;
+
+    update_selections_on_canvas();
 }
 
 void ObjectList::instances_to_separated_object(const int obj_idx, const std::set<int>& inst_idxs)

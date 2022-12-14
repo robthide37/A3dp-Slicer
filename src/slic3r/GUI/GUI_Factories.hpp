@@ -41,7 +41,7 @@ public:
 
     void    init(wxWindow* parent);
     void    update();
-    void    update_object_menu();
+    void    update_objects_menu();
     void    update_default_menu();
     void    sys_color_changed();
 
@@ -79,8 +79,6 @@ private:
 
     void        create_default_menu();
     void        create_common_object_menu(wxMenu *menu);
-    void        create_object_menu();
-    void        create_sla_object_menu();
     void        append_immutable_part_menu_items(wxMenu* menu);
     void        append_mutable_part_menu_items(wxMenu* menu);
     void        create_part_menu();
@@ -89,8 +87,7 @@ private:
 
     wxMenu*     append_submenu_add_generic(wxMenu* menu, ModelVolumeType type);
     void        append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, bool is_submenu_item = true);
-    void        append_menu_items_add_volume(wxMenu* menu);
-    void        append_menu_items_add_sla_volume(wxMenu* menu);
+    void        append_menu_items_add_volume(MenuType type);
     wxMenuItem* append_menu_item_layers_editing(wxMenu* menu);
     wxMenuItem* append_menu_item_settings(wxMenu* menu);
     wxMenuItem* append_menu_item_change_type(wxMenu* menu);

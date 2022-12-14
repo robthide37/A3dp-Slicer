@@ -532,8 +532,12 @@ void MenuFactory::append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, 
     }
 }
 
-void MenuFactory::append_menu_items_add_volume(wxMenu* menu)
+void MenuFactory::append_menu_items_add_volume(MenuType menu_type)
 {
+    wxMenu* menu = menu_type == mtObjectFFF ? &m_object_menu : menu_type == mtObjectSLA ? &m_sla_object_menu : nullptr;
+    if (!menu)
+        return;
+
     // Update "add" items(delete old & create new) items popupmenu
     for (auto& item : ADD_VOLUME_MENU_ITEMS) {
         const wxString item_name = _(item.first);
@@ -569,9 +573,11 @@ void MenuFactory::append_menu_items_add_volume(wxMenu* menu)
         return;
     }
 
-    int type = 0;
-    for (auto& item : ADD_VOLUME_MENU_ITEMS) {
-        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType(type++));
+    for (size_t type = 0; type < ADD_VOLUME_MENU_ITEMS.size(); type++) {
+        auto& item = ADD_VOLUME_MENU_ITEMS[type];
+        if (menu_type == mtObjectSLA && ModelVolumeType(type) == ModelVolumeType::PARAMETER_MODIFIER)
+            continue;
+        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType(type));
         append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
             [type]() { 
                 bool can_add = type < size_t(ModelVolumeType::PARAMETER_MODIFIER) ? !obj_list()->is_selected_object_cut() : true;
@@ -579,56 +585,8 @@ void MenuFactory::append_menu_items_add_volume(wxMenu* menu)
             }, m_parent);
     }
 
-    append_menu_item_layers_editing(menu);
-}
-
-void MenuFactory::append_menu_items_add_sla_volume(wxMenu *menu)
-{
-    // Update "add" items(delete old & create new)  settings popupmenu
-    for (auto& item : ADD_VOLUME_MENU_ITEMS) {
-        const auto settings_id = menu->FindItem(_(item.first));
-        if (settings_id != wxNOT_FOUND)
-            menu->Destroy(settings_id);
-    }
-
-    const ConfigOptionMode mode = wxGetApp().get_mode();
-
-    if (mode == comAdvanced) {
-        append_menu_item(menu, wxID_ANY, _(ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::MODEL_PART)].first), "",
-            [](wxCommandEvent&) { obj_list()->load_subobject(ModelVolumeType::MODEL_PART); },
-            ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::MODEL_PART)].second, nullptr,
-            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
-    } else {
-        auto& item = ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::MODEL_PART)];
-
-        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType::MODEL_PART);
-        append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
-            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
-    }
-
-    {
-        auto& item = ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::NEGATIVE_VOLUME)];
-
-        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType::NEGATIVE_VOLUME);
-        append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
-            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
-    }
-
-    {
-        auto& item = ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::SUPPORT_ENFORCER)];
-
-        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType::SUPPORT_ENFORCER);
-        append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
-            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
-    }
-
-    {
-        auto& item = ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::SUPPORT_BLOCKER)];
-
-        wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType::SUPPORT_BLOCKER);
-        append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
-            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
-    }
+    if (menu_type == mtObjectFFF)
+        append_menu_item_layers_editing(menu);
 }
 
 wxMenuItem* MenuFactory::append_menu_item_layers_editing(wxMenu* menu)
@@ -1086,6 +1044,9 @@ void MenuFactory::create_common_object_menu(wxMenu* menu)
     append_menu_item_fix_through_netfabb(menu);
     append_menu_item_simplify(menu);
     append_menu_items_mirror(menu);
+
+    append_menu_items_split(menu);
+    menu->AppendSeparator();
 }
 
 void MenuFactory::append_menu_items_split(wxMenu *menu)
@@ -1103,26 +1064,6 @@ void MenuFactory::append_menu_items_split(wxMenu *menu)
 
     append_submenu(menu, split_menu, wxID_ANY, _L("Split"), _L("Split the selected object"), "",
         []() { return plater()->can_split(true); }, m_parent);
-}
-
-void MenuFactory::create_object_menu()
-{
-    create_common_object_menu(&m_object_menu);
-
-    append_menu_items_split(&m_object_menu);
-    m_object_menu.AppendSeparator();
-
-    // "Height range Modifier" and "Add (volumes)" menu items will be added later in append_menu_items_add_volume()
-}
-
-void MenuFactory::create_sla_object_menu()
-{
-    create_common_object_menu(&m_sla_object_menu);
-    append_menu_items_split(&m_sla_object_menu);
-
-    m_sla_object_menu.AppendSeparator();
-    append_menu_items_add_sla_volume(&m_sla_object_menu);
-    m_sla_object_menu.AppendSeparator();
 }
 
 void MenuFactory::append_immutable_part_menu_items(wxMenu* menu)
@@ -1184,8 +1125,8 @@ void MenuFactory::init(wxWindow* parent)
     m_parent = parent;
 
     create_default_menu();
-    create_object_menu();
-    create_sla_object_menu();
+    create_common_object_menu(&m_object_menu);
+    create_common_object_menu(&m_sla_object_menu);
     create_part_menu();
     create_text_part_menu();
     create_instance_menu();
@@ -1194,7 +1135,7 @@ void MenuFactory::init(wxWindow* parent)
 void MenuFactory::update()
 {
     update_default_menu();
-    update_object_menu();
+    update_objects_menu();
 }
 
 wxMenu* MenuFactory::default_menu()
@@ -1331,9 +1272,10 @@ void MenuFactory::update_menu_items_instance_manipulation(MenuType type)
     }
 }
 
-void MenuFactory::update_object_menu()
+void MenuFactory::update_objects_menu()
 {
-    append_menu_items_add_volume(&m_object_menu);
+    append_menu_items_add_volume(mtObjectFFF);
+    append_menu_items_add_volume(mtObjectSLA);
 }
 
 void MenuFactory::update_default_menu()

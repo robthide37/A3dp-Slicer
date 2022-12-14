@@ -1529,7 +1529,6 @@ void Sidebar::update_mode()
 
     p->object_list->unselect_objects();
     p->object_list->update_selections();
-//    p->object_list->update_object_menu();
 
     Layout();
 }
