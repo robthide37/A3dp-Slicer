@@ -144,7 +144,7 @@ print_config_def()
             ConfigOptionDef* optdef     = &oit->second;
             
             const char* opt_type;
-            if (optdef->type == coFloat || optdef->type == coFloats || optdef->type == coFloatOrPercent) {
+            if (optdef->type == coFloat || optdef->type == coFloats || optdef->type == coFloatOrPercent ||  optdef->type == coFloatsOrPercents) {
                 opt_type = "f";
             } else if (optdef->type == coPercent || optdef->type == coPercents) {
                 opt_type = "percent";
