@@ -817,10 +817,12 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
 {
     coord_t anchors_size = scale_(EXTERNAL_INFILL_MARGIN);
 
-    Polygons anchors    = intersection(infill_area, lower_slices_polygons);
-    Polygons overhangs  = diff(infill_area, lower_slices_polygons);
-    if (overhangs.empty()) { return {}; }
+    BoundingBox infill_area_bb = get_extents(infill_area).inflated(SCALED_EPSILON);
+    Polygons optimized_lower_slices = ClipperUtils::clip_clipper_polygons_with_subject_bbox(lower_slices_polygons, infill_area_bb);
+    Polygons overhangs  = diff(infill_area, optimized_lower_slices);
 
+    if (overhangs.empty()) { return {}; }
+    Polygons anchors    = intersection(infill_area, optimized_lower_slices);
     Polygons inset_anchors; // anchored area inset by the anchor length
     {
         std::vector<double> deltas{anchors_size * 0.15 + 0.5 * overhang_flow.scaled_spacing(),
@@ -951,7 +953,7 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
 
                     //gap = expolygons_simplify(gap, overhang_flow.scaled_spacing());
                     for (const ExPolygon &ep : gap) {
-                        ep.medial_axis(overhang_flow.scaled_spacing() * 2.0, 0.3 * overhang_flow.scaled_width(), &fills);
+                        ep.medial_axis(0.3 * overhang_flow.scaled_width(), overhang_flow.scaled_spacing() * 2.0, &fills);
                     }
                     if (!fills.empty()) {
                         fills = intersection_pl(fills, inset_overhang_area);
