@@ -132,7 +132,7 @@ void SelectionInfo::on_release()
 ModelInstance *SelectionInfo::model_instance() const
 {
     int inst_idx = get_active_instance();
-    return int(m_model_object->instances.size()) < inst_idx ?
+    return inst_idx < int(m_model_object->instances.size()) ?
                m_model_object->instances[get_active_instance()] : nullptr;
 }
 

@@ -148,8 +148,15 @@ void GLGizmoSlaSupports::render_points(const Selection& selection)
     shader->start_using();
     ScopeGuard guard([shader]() { shader->stop_using(); });
 
-    const GLVolume* vol = selection.get_first_volume();
-    const Geometry::Transformation transformation(vol->world_matrix());
+    auto *inst = m_c->selection_info()->model_instance();
+    if (!inst)
+        return;
+
+    double shift_z = m_c->selection_info()->print_object()->get_current_elevation();
+    Transform3d trafo(inst->get_transformation().get_matrix());
+    trafo.translate(Vec3d{0., 0., shift_z});
+    const Geometry::Transformation transformation{trafo};
+
 #if ENABLE_WORLD_COORDINATE
     const Transform3d instance_scaling_matrix_inverse = transformation.get_scaling_factor_matrix().inverse();
 #else
@@ -197,7 +204,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection)
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
         const Transform3d support_matrix = Geometry::translation_transform(support_point.pos.cast<double>()) * instance_scaling_matrix_inverse;
 
-        if (vol->is_left_handed())
+        if (transformation.is_left_handed())
             glsafe(::glFrontFace(GL_CW));
 
         // Matrices set, we can render the point mark now.
@@ -210,7 +217,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection)
             Eigen::Quaterniond q;
             q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * m_editing_cache[i].normal.cast<double>());
             const Eigen::AngleAxisd aa(q);
-            const Transform3d model_matrix = vol->world_matrix() * support_matrix * Transform3d(aa.toRotationMatrix()) *
+            const Transform3d model_matrix = transformation.get_matrix() * support_matrix * Transform3d(aa.toRotationMatrix()) *
                 Geometry::translation_transform((CONE_HEIGHT + support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ()) *
                 Geometry::rotation_transform({ double(PI), 0.0, 0.0 }) * Geometry::scale_transform({ CONE_RADIUS, CONE_RADIUS, CONE_HEIGHT });
 
@@ -221,13 +228,13 @@ void GLGizmoSlaSupports::render_points(const Selection& selection)
         }
 
         const double radius = (double)support_point.head_front_radius * RenderPointScale;
-        const Transform3d model_matrix = vol->world_matrix() * support_matrix * Geometry::scale_transform(radius);
+        const Transform3d model_matrix = transformation.get_matrix() * support_matrix * Geometry::scale_transform(radius);
         shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
         m_sphere.model.render();
 
-        if (vol->is_left_handed())
+        if (transformation.is_left_handed())
             glsafe(::glFrontFace(GL_CCW));
     }
 }
