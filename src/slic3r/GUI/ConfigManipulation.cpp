@@ -390,29 +390,28 @@ void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
     toggle_field("support_critical_angle", supports_en && is_default_tree);
     toggle_field("support_max_bridge_length", supports_en && is_default_tree);
     toggle_field("support_max_pillar_link_distance", supports_en && is_default_tree);
-    toggle_field("support_pillar_widening_factor", supports_en && is_default_tree);
-    toggle_field("support_max_weight_on_model", supports_en && is_default_tree);
-    toggle_field("support_points_density_relative", supports_en && is_default_tree);
-    toggle_field("support_points_minimal_distance", supports_en && is_default_tree);
+    toggle_field("support_pillar_widening_factor", false);
+    toggle_field("support_max_weight_on_model", false);
 
     toggle_field("branchingsupport_head_front_diameter", supports_en && is_branching_tree);
     toggle_field("branchingsupport_head_penetration", supports_en && is_branching_tree);
     toggle_field("branchingsupport_head_width", supports_en && is_branching_tree);
     toggle_field("branchingsupport_pillar_diameter", supports_en && is_branching_tree);
     toggle_field("branchingsupport_small_pillar_diameter_percent", supports_en && is_branching_tree);
-    toggle_field("branchingsupport_max_bridges_on_pillar", supports_en && is_branching_tree);
-    toggle_field("branchingsupport_pillar_connection_mode", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_max_bridges_on_pillar", false);
+    toggle_field("branchingsupport_pillar_connection_mode", false);
     toggle_field("branchingsupport_buildplate_only", supports_en && is_branching_tree);
     toggle_field("branchingsupport_base_diameter", supports_en && is_branching_tree);
     toggle_field("branchingsupport_base_height", supports_en && is_branching_tree);
     toggle_field("branchingsupport_base_safety_distance", supports_en && is_branching_tree);
     toggle_field("branchingsupport_critical_angle", supports_en && is_branching_tree);
     toggle_field("branchingsupport_max_bridge_length", supports_en && is_branching_tree);
-    toggle_field("branchingsupport_max_pillar_link_distance", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_max_pillar_link_distance", false);
     toggle_field("branchingsupport_pillar_widening_factor", supports_en && is_branching_tree);
     toggle_field("branchingsupport_max_weight_on_model", supports_en && is_branching_tree);
-    toggle_field("branchingsupport_points_density_relative", supports_en && is_branching_tree);
-    toggle_field("branchingsupport_points_minimal_distance", supports_en && is_branching_tree);
+
+    toggle_field("support_points_density_relative", supports_en);
+    toggle_field("support_points_minimal_distance", supports_en);
 
     bool pad_en = config->opt_bool("pad_enable");
 

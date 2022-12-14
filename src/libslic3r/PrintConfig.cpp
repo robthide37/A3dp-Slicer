@@ -3277,6 +3277,9 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 {
     ConfigOptionDef* def;
 
+    constexpr const char * pretext_unavailable = L("Unavailable for this method.\n");
+    std::string pretext;
+
     def = this->add(prefix + "support_head_front_diameter", coFloat);
     def->label = L("Pinhead front diameter");
     def->category = L("Supports");
@@ -3326,20 +3329,28 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionPercent(50));
 
+    pretext = "";
+    if (prefix == "branching")
+        pretext = pretext_unavailable;
+
     def = this->add(prefix + "support_max_bridges_on_pillar", coInt);
     def->label = L("Max bridges on a pillar");
-    def->tooltip = L(
+    def->tooltip = pretext + L(
         "Maximum number of bridges that can be placed on a pillar. Bridges "
         "hold support point pinheads and connect to pillars as small branches.");
     def->min = 0;
     def->max = 50;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionInt(3));
+    def->set_default_value(new ConfigOptionInt(prefix == "branching" ? 2 : 3));
+
+    pretext = "";
+    if (prefix.empty())
+        pretext = pretext_unavailable;
 
     def = this->add(prefix + "support_max_weight_on_model", coFloat);
     def->label = L("Max weight on model");
     def->category = L("Supports");
-    def->tooltip  = L(
+    def->tooltip  = pretext + L(
         "Maximum weight of sub-trees that terminate on the model instead of the print bed. The weight is the sum of the lenghts of all "
         "branches emanating from the endpoint.");
     def->sidetext = L("mm");
@@ -3347,9 +3358,13 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(10.));
 
+    pretext = "";
+    if (prefix == "branching")
+        pretext = pretext_unavailable;
+
     def = this->add(prefix + "support_pillar_connection_mode", coEnum);
     def->label = L("Pillar connection mode");
-    def->tooltip = L("Controls the bridge type between two neighboring pillars."
+    def->tooltip = pretext + L("Controls the bridge type between two neighboring pillars."
                             " Can be zig-zag, cross (double zig-zag) or dynamic which"
                             " will automatically switch between the first two depending"
                             " on the distance of the two pillars.");
@@ -3373,12 +3388,16 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def = this->add(prefix + "support_pillar_widening_factor", coFloat);
     def->label = L("Pillar widening factor");
     def->category = L("Supports");
-    def->tooltip  = L(
-        "Merging bridges or pillars into another pillars can "
+
+    pretext = "";
+    if (prefix.empty())
+        pretext = pretext_unavailable;
+
+    def->tooltip  = pretext +
+        L("Merging bridges or pillars into another pillars can "
         "increase the radius. Zero means no increase, one means "
         "full increase. The exact amount of increase is unspecified and can "
-        "change in the future. What is garanteed is that thickness will not "
-        "exceed \"support_base_diameter\"");
+        "change in the future.");
 
     def->min = 0;
     def->max = 1;
@@ -3434,13 +3453,22 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(15.0));
+
+    double default_val = 15.0;
+    if (prefix == "branching")
+        default_val = 5.0;
+
+    def->set_default_value(new ConfigOptionFloat(default_val));
+
+    pretext = "";
+    if (prefix == "branching")
+        pretext = pretext_unavailable;
 
     def = this->add(prefix + "support_max_pillar_link_distance", coFloat);
     def->label = L("Max pillar linking distance");
     def->category = L("Supports");
-    def->tooltip = L("The max distance of two pillars to get linked with each other."
-                      " A zero value will prohibit pillar cascading.");
+    def->tooltip = pretext + L("The max distance of two pillars to get linked with each other."
+                               " A zero value will prohibit pillar cascading.");
     def->sidetext = L("mm");
     def->min = 0;   // 0 means no linking
     def->mode = comAdvanced;
@@ -3801,7 +3829,7 @@ void PrintConfigDef::init_sla_params()
     def->enum_labels[0] = L("Default");
     def->enum_labels[1] = L("Branching");
     // TODO: def->enum_labels[2] = L("Organic");
-    def->mode = comAdvanced;
+    def->mode = comSimple;
     def->set_default_value(new ConfigOptionEnum(sla::SupportTreeType::Default));
 
     init_sla_support_params("");
