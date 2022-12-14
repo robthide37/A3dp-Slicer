@@ -42,6 +42,8 @@ protected:
 
     bool unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal);
 
+    const GLVolumeCollection &volumes() const { return m_volumes; }
+
 private:
     GLVolumeCollection m_volumes;
     bool m_input_enabled{ false };

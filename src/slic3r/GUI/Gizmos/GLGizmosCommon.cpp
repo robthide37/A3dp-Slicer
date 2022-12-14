@@ -129,6 +129,13 @@ void SelectionInfo::on_release()
     m_model_volume = nullptr;
 }
 
+ModelInstance *SelectionInfo::model_instance() const
+{
+    int inst_idx = get_active_instance();
+    return int(m_model_object->instances.size()) < inst_idx ?
+               m_model_object->instances[get_active_instance()] : nullptr;
+}
+
 int SelectionInfo::get_active_instance() const
 {
     return get_pool()->get_canvas()->get_selection().get_instance_idx();

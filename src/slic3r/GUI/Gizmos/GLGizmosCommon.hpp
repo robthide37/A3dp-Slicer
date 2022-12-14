@@ -9,6 +9,7 @@
 namespace Slic3r {
 
 class ModelObject;
+class ModelInstance;
 class SLAPrintObject;
 class ModelVolume;
 
@@ -160,6 +161,7 @@ public:
     const SLAPrintObject *print_object() const { return m_print_object; }
     // Returns a non-null pointer if the selection is a single volume
     ModelVolume* model_volume() const { return m_model_volume; }
+    ModelInstance *model_instance() const;
     int get_active_instance() const;
     float get_sla_shift() const { return m_z_shift; }
 
