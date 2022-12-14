@@ -530,6 +530,7 @@ SCENARIO("Perimeters3", "[Perimeters]")
         { "skirts",                 0 },
         { "perimeters",             3 },
         { "layer_height",           0.4 },
+        { "bridge_speed",           99 },
         { "enable_dynamic_overhang_speeds",         false },
         // to prevent bridging over sparse infill
         { "fill_density",           0 },
