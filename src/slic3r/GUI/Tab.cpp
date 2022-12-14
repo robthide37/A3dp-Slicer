@@ -1538,7 +1538,7 @@ void TabPrint::build()
             optgroup->append_line(line);
         };
         optgroup->append_single_option_line("enable_dynamic_overhang_speeds");
-	    append_option_line(optgroup,"overhang_overlaps");
+	    append_option_line(optgroup,"overhang_steepness_levels");
         append_option_line(optgroup,"dynamic_overhang_speeds");
 
         optgroup = page->new_optgroup(L("Speed for non-print moves"));

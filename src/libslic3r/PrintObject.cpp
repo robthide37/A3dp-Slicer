@@ -749,7 +749,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "support_material_interface_speed"
             || opt_key == "bridge_speed"
             || opt_key == "enable_dynamic_overhang_speeds"
-            || opt_key == "overhang_overlaps"
+            || opt_key == "overhang_steepness_levels"
             || opt_key == "dynamic_overhang_speeds"
             || opt_key == "external_perimeter_speed"
             || opt_key == "infill_speed"

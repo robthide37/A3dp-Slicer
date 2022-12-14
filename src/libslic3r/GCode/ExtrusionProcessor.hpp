@@ -129,33 +129,46 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
         next_point.distance                = distance + boundary_offset;
         next_point.nearest_prev_layer_line = nearest_line;
 
-        if (ADD_INTERSECTIONS) {
+        if (ADD_INTERSECTIONS &&
+            ((points.back().distance > boundary_offset + EPSILON) != (next_point.distance > boundary_offset + EPSILON))) {
             const ExtendedPoint &prev_point = points.back();
-            if ((prev_point.distance < min_malformation_dist) != (next_point.distance < min_malformation_dist)) { // one in air, one not
-                auto intersections = unscaled_prev_layer.template intersections_with_line<true>(L{prev_point.position, next_point.position});
-                for (const auto &intersection : intersections) { points.emplace_back(intersection, boundary_offset, 1.0); }
-            }
-
-            if (PREV_LAYER_BOUNDARY_ONLY && prev_point.distance > min_malformation_dist &&
-                next_point.distance > min_malformation_dist) { // both in air
-                double line_len = (prev_point.position - next_point.position).norm();
-                if (line_len > 3.0) {
-                    double a0 = std::clamp((boundary_offset + prev_point.distance) / line_len, 0.0, 1.0);
-                    double a1 = std::clamp((boundary_offset + next_point.distance) / line_len, 0.0, 1.0);
-                    double t0 = std::min(a0, a1);
-                    double t1 = std::max(a0, a1);
-
-                    auto p0                         = prev_point.position + t0 * (next_point.position - prev_point.position);
-                    auto [p0_dist, p0_near_l, p0_x] = unscaled_prev_layer.signed_distance_from_lines_extra(p0);
-                    points.push_back(ExtendedPoint{p0, float(p0_dist + boundary_offset), p0_near_l});
-
-                    auto p1                         = prev_point.position + t1 * (next_point.position - prev_point.position);
-                    auto [p1_dist, p1_near_l, p1_x] = unscaled_prev_layer.signed_distance_from_lines_extra(p1);
-                    points.push_back(ExtendedPoint{p1, float(p1_dist + boundary_offset), p1_near_l});
-                }
+            auto intersections = unscaled_prev_layer.template intersections_with_line<true>(L{prev_point.position, next_point.position});
+            for (const auto &intersection : intersections) {
+                points.emplace_back(intersection, boundary_offset);
             }
         }
         points.push_back(next_point);
+    }
+
+    if (PREV_LAYER_BOUNDARY_ONLY && ADD_INTERSECTIONS) {
+        std::vector<ExtendedPoint> new_points;
+        new_points.reserve(points.size() * 2);
+        new_points.push_back(points.front());
+        for (int point_idx = 0; point_idx < int(points.size()) - 1; ++point_idx) {
+            const ExtendedPoint &curr = points[point_idx];
+            const ExtendedPoint &next = points[point_idx + 1];
+
+            if ((curr.distance > 0 && curr.distance < boundary_offset + 2.0f) &&
+                (next.distance > 0 && next.distance < boundary_offset + 2.0f)) {
+                double line_len = (next.position - curr.position).norm();
+                if (line_len > 4.0f) {
+                    double a0 = std::clamp((curr.distance + 2 * boundary_offset) / line_len, 0.0, 1.0);
+                    double a1 = std::clamp(1.0f - (next.distance + 2 * boundary_offset) / line_len, 0.0, 1.0);
+                    double t0 = std::min(a0, a1);
+                    double t1 = std::max(a0, a1);
+
+                    auto p0                         = curr.position + t0 * (next.position - curr.position);
+                    auto [p0_dist, p0_near_l, p0_x] = unscaled_prev_layer.signed_distance_from_lines_extra(p0);
+                    new_points.push_back(ExtendedPoint{p0, float(p0_dist + boundary_offset), p0_near_l});
+
+                    auto p1                         = curr.position + t1 * (next.position - curr.position);
+                    auto [p1_dist, p1_near_l, p1_x] = unscaled_prev_layer.signed_distance_from_lines_extra(p1);
+                    new_points.push_back(ExtendedPoint{p1, float(p1_dist + boundary_offset), p1_near_l});
+                }
+            }
+            new_points.push_back(next);
+        }
+        points = std::move(new_points);
     }
 
     for (int point_idx = 0; point_idx < int(points.size()); ++point_idx) {
@@ -255,7 +268,7 @@ public:
                 return final_speed;
             };
 
-            float extrusion_speed = (calculate_speed(curr.distance) + calculate_speed(next.distance)) / 2.0f;
+            float extrusion_speed = std::min(calculate_speed(curr.distance), calculate_speed(next.distance));
 
             processed_points.push_back({scaled(curr.position), extrusion_speed});
         }

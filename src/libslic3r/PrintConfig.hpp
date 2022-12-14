@@ -565,7 +565,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       external_perimeter_extrusion_width))
     ((ConfigOptionFloatOrPercent,       external_perimeter_speed))
     ((ConfigOptionBool,                 enable_dynamic_overhang_speeds))
-    ((ConfigOptionPercents,             overhang_overlaps))
+    ((ConfigOptionPercents,             overhang_steepness_levels))
     ((ConfigOptionFloatsOrPercents,     dynamic_overhang_speeds))
     ((ConfigOptionBool,                 external_perimeters_first))
     ((ConfigOptionBool,                 extra_perimeters))

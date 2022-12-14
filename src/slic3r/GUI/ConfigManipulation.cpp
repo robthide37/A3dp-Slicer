@@ -7,6 +7,7 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "MsgDialog.hpp"
 
+#include <string>
 #include <wx/msgdlg.h>
 
 namespace Slic3r {
@@ -220,11 +221,13 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     bool have_perimeters = config->opt_int("perimeters") > 0;
     for (auto el : { "extra_perimeters","extra_perimeters_on_overhangs", "ensure_vertical_shell_thickness", "thin_walls", "overhangs",
                     "seam_position","staggered_inner_seams", "external_perimeters_first", "external_perimeter_extrusion_width",
-                    "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "enable_dynamic_overhang_speeds", "overhang_overlaps", "dynamic_overhang_speeds" })
+                    "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "enable_dynamic_overhang_speeds", "overhang_steepness_levels", "dynamic_overhang_speeds" })
         toggle_field(el, have_perimeters);
 
-    toggle_field("overhang_overlaps", config->opt_bool("enable_dynamic_overhang_speeds"));
-    toggle_field("dynamic_overhang_speeds", config->opt_bool("enable_dynamic_overhang_speeds"));
+    for (size_t i = 0; i < 4; i++) {
+        toggle_field("overhang_steepness_levels#" + std::to_string(i), config->opt_bool("enable_dynamic_overhang_speeds"));
+        toggle_field("dynamic_overhang_speeds#" + std::to_string(i), config->opt_bool("enable_dynamic_overhang_speeds"));
+    }
 
     bool have_infill = config->option<ConfigOptionPercent>("fill_density")->value > 0;
     // infill_extruder uses the same logic as in Print::extruders()
