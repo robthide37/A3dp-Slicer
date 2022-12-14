@@ -6133,7 +6133,7 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
             for (const SLAPrintObject::Instance& obj_instance : obj_instances) {
                 auto it = std::find_if(object->model_object()->instances.begin(), object->model_object()->instances.end(),
                                        [&obj_instance](const ModelInstance *mi) { return mi->id() == obj_instance.instance_id; });
-                assert(it != model_object->instances.end());
+                assert(it != object->model_object()->instances.end());
 
                 if (it != object->model_object()->instances.end()) {
                     const bool one_inst_only = selection_only && ! selection.is_single_full_object();

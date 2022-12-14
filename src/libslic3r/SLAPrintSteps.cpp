@@ -415,8 +415,8 @@ static void filter_support_points_by_modifiers(sla::SupportPoints &pts,
                                                const SuppPtMask &mask,
                                                const std::vector<float> &slice_grid)
 {
-    assert((blockers.empty() || blockers.size() == slice_grid.size()) &&
-           (enforcers.empty() || enforcers.size() == slice_grid.size()));
+    assert((mask.blockers.empty() || mask.blockers.size() == slice_grid.size()) &&
+           (mask.enforcers.empty() || mask.enforcers.size() == slice_grid.size()));
 
     auto new_pts = reserve_vector<sla::SupportPoint>(pts.size());
 
