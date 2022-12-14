@@ -148,7 +148,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
             const ExtendedPoint &curr = points[point_idx];
             const ExtendedPoint &next = points[point_idx + 1];
 
-            if ((curr.distance > 0 && curr.distance < boundary_offset + 2.0f) &&
+            if ((curr.distance > 0 && curr.distance < boundary_offset + 2.0f) ||
                 (next.distance > 0 && next.distance < boundary_offset + 2.0f)) {
                 double line_len = (next.position - curr.position).norm();
                 if (line_len > 4.0f) {
@@ -157,13 +157,16 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
                     double t0 = std::min(a0, a1);
                     double t1 = std::max(a0, a1);
 
-                    auto p0                         = curr.position + t0 * (next.position - curr.position);
-                    auto [p0_dist, p0_near_l, p0_x] = unscaled_prev_layer.signed_distance_from_lines_extra(p0);
-                    new_points.push_back(ExtendedPoint{p0, float(p0_dist + boundary_offset), p0_near_l});
-
-                    auto p1                         = curr.position + t1 * (next.position - curr.position);
-                    auto [p1_dist, p1_near_l, p1_x] = unscaled_prev_layer.signed_distance_from_lines_extra(p1);
-                    new_points.push_back(ExtendedPoint{p1, float(p1_dist + boundary_offset), p1_near_l});
+                    if (t0 < 1.0) {
+                        auto p0                         = curr.position + t0 * (next.position - curr.position);
+                        auto [p0_dist, p0_near_l, p0_x] = unscaled_prev_layer.signed_distance_from_lines_extra(p0);
+                        new_points.push_back(ExtendedPoint{p0, float(p0_dist + boundary_offset), p0_near_l});
+                    }
+                    if (t1 > 0.0) {
+                        auto p1                         = curr.position + t1 * (next.position - curr.position);
+                        auto [p1_dist, p1_near_l, p1_x] = unscaled_prev_layer.signed_distance_from_lines_extra(p1);
+                        new_points.push_back(ExtendedPoint{p1, float(p1_dist + boundary_offset), p1_near_l});
+                    }
                 }
             }
             new_points.push_back(next);
