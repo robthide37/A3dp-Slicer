@@ -726,14 +726,13 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
 #if ENABLE_WORLD_COORDINATE
             m_new_move_label_string = L("Translate");
             m_new_rotate_label_string = L("Rotate");
-            m_new_scale_label_string = L("Scale");
             m_new_position = Vec3d::Zero();
             m_new_rotation = Vec3d::Zero();
             m_new_scale = Vec3d(100.0, 100.0, 100.0);
 #else
             m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
-            m_new_scale    = volume->get_instance_scaling_factor() * 100.0;
 #endif // ENABLE_WORLD_COORDINATE
+            m_new_scale = volume->get_instance_scaling_factor() * 100.0;
             m_new_size     = volume->get_instance_scaling_factor().cwiseProduct(wxGetApp().model().objects[volume->object_idx()]->raw_mesh_bounding_box().size());
         }
 
@@ -1194,13 +1193,24 @@ void ObjectManipulation::change_scale_value(int axis, double value)
         return;
 
     Vec3d scale = m_cache.scale;
-	scale(axis) = value;
+    scale(axis) = value;
 
+#if ENABLE_WORLD_COORDINATE
+    const Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
+    Vec3d ref_scale = m_cache.scale;
+    if (selection.is_single_full_instance()) {
+        scale = scale.cwiseQuotient(ref_scale);
+        ref_scale = Vec3d::Ones();
+    }
+
+    this->do_scale(axis, scale.cwiseQuotient(ref_scale));
+#else
     this->do_scale(axis, 0.01 * scale);
+#endif // ENABLE_WORLD_COORDINATE
 
     m_cache.scale = scale;
-	m_cache.scale_rounded(axis) = DBL_MAX;
-	this->UpdateAndShow(true);
+    m_cache.scale_rounded(axis) = DBL_MAX;
+    this->UpdateAndShow(true);
 }
 
 
@@ -1227,6 +1237,8 @@ void ObjectManipulation::change_size_value(int axis, double value)
     Vec3d ref_size = m_cache.size;
 #if ENABLE_WORLD_COORDINATE
     if (selection.is_single_volume_or_modifier()) {
+        if (is_local_coordinates())
+            ref_size = selection.get_first_volume()->bounding_box().size();
         size = size.cwiseQuotient(ref_size);
         ref_size = Vec3d::Ones();
 #else
@@ -1242,6 +1254,8 @@ void ObjectManipulation::change_size_value(int axis, double value)
     }
     else if (selection.is_single_full_instance()) {
 #if ENABLE_WORLD_COORDINATE
+        if (is_world_coordinates())
+            ref_size = selection.get_unscaled_instance_bounding_box().size();
         size = size.cwiseQuotient(ref_size);
         ref_size = Vec3d::Ones();
 #else
@@ -1276,7 +1290,8 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
     else if (is_instance_coordinates())
         transformation_type.set_instance();
 
-    if (!(selection.is_single_volume_or_modifier() && is_local_coordinates()))
+    if (!(selection.is_single_volume_or_modifier() && is_local_coordinates()) &&
+        !(selection.is_single_full_instance() && is_instance_coordinates()))
         transformation_type.set_relative();
 
     const Vec3d scaling_factor = m_uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
