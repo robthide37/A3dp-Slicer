@@ -9,6 +9,7 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/Camera.hpp"
+#include "slic3r/GUI/CameraUtils.hpp"
 
 #include <GL/glew.h>
 
@@ -340,28 +341,13 @@ Vec3f MeshRaycaster::get_triangle_normal(size_t facet_idx) const
     return m_normals[facet_idx];
 }
 
-void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                                        Vec3d& point, Vec3d& direction)
+void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera, Vec3d& point, Vec3d& direction)
 {
-    Matrix4d modelview = camera.get_view_matrix().matrix();
-    Matrix4d projection= camera.get_projection_matrix().matrix();
-    Vec4i viewport(camera.get_viewport().data());
-
-    Vec3d pt1;
-    Vec3d pt2;
-    igl::unproject(Vec3d(mouse_pos.x(), viewport[3] - mouse_pos.y(), 0.),
-                   modelview, projection, viewport, pt1);
-    igl::unproject(Vec3d(mouse_pos.x(), viewport[3] - mouse_pos.y(), 1.),
-                   modelview, projection, viewport, pt2);
-
+    CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);
     Transform3d inv = trafo.inverse();
-    pt1 = inv * pt1;
-    pt2 = inv * pt2;
-
-    point = pt1;
-    direction = pt2-pt1;
+    point     = inv*point;
+    direction = inv.linear()*direction;
 }
-
 
 bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                       Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane,
@@ -369,7 +355,10 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
 {
     Vec3d point;
     Vec3d direction;
-    line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
+    CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);
+    Transform3d inv = trafo.inverse();
+    point     = inv*point;
+    direction = inv.linear()*direction;
 
     std::vector<AABBMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction);
 

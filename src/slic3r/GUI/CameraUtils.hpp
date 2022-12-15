@@ -36,12 +36,15 @@ public:
 	static Polygon create_hull2d(const Camera &camera, const GLVolume &volume);
 	
 	/// <summary>
-	/// Unproject screen coordinate to scene direction start from camera position
+	/// Create ray(point and direction) for screen coordinate
 	/// </summary>
-	/// <param name="camera">Projection params</param>
-	/// <param name="coor">Coordinate on screen</param>
-	/// <returns>Scene direction</returns>
-	static Vec3d create_ray(const Camera &camera, const Vec2d &coor);
+	/// <param name="camera">Definition of camera</param>
+	/// <param name="position">Position on screen(aka mouse position) </param>
+	/// <param name="point">OUT start of ray</param>
+	/// <param name="direction">OUT direction of ray</param>
+    static void ray_from_screen_pos(const Camera &camera, const Vec2d &position, Vec3d &point, Vec3d &direction); 
+    static void ray_from_ortho_screen_pos(const Camera &camera, const Vec2d &position, Vec3d &point, Vec3d &direction);
+    static void ray_from_persp_screen_pos(const Camera &camera, const Vec2d &position, Vec3d &point, Vec3d &direction);
 
 	/// <summary>
 	/// Unproject mouse coordinate to get position in space where z coor is zero
@@ -51,6 +54,14 @@ public:
 	/// <param name="coor">Mouse position</param>
 	/// <returns>Position on platter under mouse</returns>
     static Vec2d get_z0_position(const Camera &camera, const Vec2d &coor);
+
+    /// <summary>
+    /// Create 3d screen point from 2d position
+    /// </summary>
+    /// <param name="camera">Define camera viewport</param>
+    /// <param name="position">Position on screen(aka mouse position)</param>
+    /// <returns>Point represented screen coor in 3d</returns>
+    static Vec3d screen_point(const Camera &camera, const Vec2d &position);
 
 };
 } // Slic3r::GUI

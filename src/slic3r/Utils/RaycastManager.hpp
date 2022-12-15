@@ -65,8 +65,9 @@ public:
 
     struct Hit: public SurfacePoint
     {
-        TrKey tr_key;
-        Hit(TrKey tr_key, Vec3f position, Vec3f normal)
+        using Key = TrKey;
+        Key tr_key;
+        Hit(Key tr_key, Vec3f position, Vec3f normal)
             : SurfacePoint(position, normal), tr_key(tr_key)
         {} 
     };    
@@ -101,6 +102,23 @@ public:
     std::optional<Hit> unproject(const Vec2d &mouse_pos, 
                                  const Camera &camera,
                                  const ISkip *skip = nullptr) const;
+
+    /// <summary>
+    /// Unproject Ray(point direction) on mesh by MeshRaycasters
+    /// </summary>
+    /// <param name="point">Start point for ray</param>
+    /// <param name="direction">Direction of ray</param>
+    /// <param name="skip">Define which caster will be skipped, null mean no skip</param>
+    /// <returns>Position on surface, normal direction and transformation key, which define hitted object instance</returns>
+    std::optional<Hit> unproject(const Vec3d &point, const Vec3d &direction, const ISkip *skip = nullptr) const;
+
+    /// <summary>
+    /// Search of closest point
+    /// </summary>
+    /// <param name="point">Point</param>
+    /// <param name="skip">Define which caster will be skipped, null mean no skip</param>
+    /// <returns></returns>
+    std::optional<Hit> closest(const Vec3d &point, const ISkip *skip = nullptr) const;
 
     /// <summary>
     /// Getter on transformation

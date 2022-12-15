@@ -506,7 +506,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         if (!hit.has_value())
             return false;
         TextConfiguration &tc = *m_volume->text_configuration;
-        // hide common dragging of object
+        // INFO: GLVolume is transformed by common movement but we need move over surface
+        // so hide common dragging of object
         m_parent.toggle_model_objects_visibility(false, m_volume->get_object(), gl_volume->instance_idx(), m_volume);
 
         // Calculate temporary position
@@ -519,7 +520,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         if (tc.fix_3mf_tr.has_value())
             trmat = trmat * (*tc.fix_3mf_tr);
 
-        // temp is in wolrld coors
+        // temp is in world coors
         m_temp_transformation = object_trmat * trmat;
     } else if (mouse_event.LeftUp()) {
         // Added because of weird case after double click into scene 
@@ -2849,6 +2850,44 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     // snapshot_name = L("Set text rotation");
     m_parent.do_rotate(snapshot_name);
 }
+namespace priv {
+bool transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection)
+{
+    // Move object on surface
+    auto cond = RaycastManager::SkipVolume({volume.id().id});
+    raycast_manager.actualize(volume.get_object(), &cond);
+
+    //const Selection &selection = m_parent.get_selection();
+    const GLVolume *gl_volume = priv::get_gl_volume(selection);
+    Transform3d to_world = priv::world_matrix(gl_volume, selection.get_model());
+    Vec3d point     = to_world * Vec3d::Zero();
+    Vec3d direction = to_world.linear() * (-Vec3d::UnitZ());
+    //direction.normalize();
+
+    // ray in direction of text projection(from volume zero to z-dir)
+    std::optional<RaycastManager::Hit> hit_opt = raycast_manager.unproject(point, direction, &cond);
+    if (!hit_opt.has_value())
+        hit_opt = raycast_manager.closest(point);
+
+    if (!hit_opt.has_value())
+        return false;
+
+    const RaycastManager::Hit &hit          = *hit_opt;
+    Transform3d                hit_tr       = raycast_manager.get_transformation(hit.tr_key);
+    Vec3d                      hit_world    = hit_tr * hit.position.cast<double>();
+    Vec3d                      offset_world = hit_world - point; // vector in world
+    // TIP: It should be close to only z move
+    Vec3d offset_volume = to_world.inverse().linear() * offset_world;
+
+    // when try to use surface on just loaded text from 3mf
+    auto fix = volume.text_configuration->fix_3mf_tr;
+    if (fix.has_value())
+        offset_volume = fix->linear() * offset_volume;
+
+    volume.set_transformation(volume.get_matrix() * Eigen::Translation<double, 3>(offset_volume));
+    return true;
+}
+} // namespace priv
 
 void GLGizmoEmboss::draw_advanced()
 {
@@ -2903,7 +2942,7 @@ void GLGizmoEmboss::draw_advanced()
             if (font_prop.emboss < 0.1)
                 font_prop.emboss = 1;
 
-            // TODO: project an origin on surface
+            priv::transform_on_surface(*m_volume, m_raycast_manager, m_parent.get_selection());
         }
         process();
     }

@@ -1,5 +1,6 @@
 #include "CameraUtils.hpp"
 #include <igl/project.h> // projecting points
+#include <igl/unproject.h>
 
 #include "slic3r/GUI/3DScene.hpp" // GLVolume
 #include "libslic3r/Geometry/ConvexHull.hpp"
@@ -79,37 +80,48 @@ Slic3r::Polygon CameraUtils::create_hull2d(const Camera &  camera,
     return Geometry::convex_hull(vertices_2d);
 }
 
-#include <igl/unproject.h>
-Vec3d CameraUtils::create_ray(const Camera &camera, const Vec2d &coor) {
-    if (camera.get_type() == Camera::EType::Ortho) 
-        return camera.get_dir_forward();
-    // check that it is known camera no other tha ORTHO or Persepective
-    assert(camera.get_type() == Camera::EType::Perspective);
+void CameraUtils::ray_from_screen_pos(const Camera &camera, const Vec2d &position, Vec3d &point, Vec3d &direction) {
+    switch (camera.get_type()) {
+    case Camera::EType::Ortho:       return ray_from_ortho_screen_pos(camera, position, point, direction);
+    case Camera::EType::Perspective: return ray_from_persp_screen_pos(camera, position, point, direction);
+    default: break;
+    }
+}
 
+Vec3d CameraUtils::screen_point(const Camera &camera, const Vec2d &position)
+{ 
+    double height = camera.get_viewport().data()[3];
+    // Y coordinate has opposit direction
+    return Vec3d(position.x(), height - position.y(), 0.);
+}
+
+void CameraUtils::ray_from_ortho_screen_pos(const Camera &camera, const Vec2d &position, Vec3d &point, Vec3d &direction)
+{
+    assert(camera.get_type() == Camera::EType::Ortho);
+    Matrix4d modelview  = camera.get_view_matrix().matrix();
+    Matrix4d projection = camera.get_projection_matrix().matrix();
+    Vec4i    viewport(camera.get_viewport().data());
+    igl::unproject(screen_point(camera,position), modelview, projection, viewport, point);
+    direction = camera.get_dir_forward();
+}
+void CameraUtils::ray_from_persp_screen_pos(const Camera &camera, const Vec2d &position, Vec3d &point, Vec3d &direction)
+{
+    assert(camera.get_type() == Camera::EType::Perspective);
     Matrix4d modelview  = camera.get_view_matrix().matrix();
     Matrix4d projection = camera.get_projection_matrix().matrix();
     Vec4i    viewport(camera.get_viewport().data());
 
-    Vec3d scene_point(coor.x(), viewport[3] - coor.y(), 0.);
     Vec3d unprojected_point;
-    igl::unproject(scene_point, modelview, projection, viewport, unprojected_point);
+    igl::unproject(screen_point(camera, position), modelview, projection, viewport, unprojected_point);
 
-    Vec3d p0 = camera.get_position();
-    Vec3d dir = unprojected_point - p0;
-    dir.normalize();
-    return dir;
+    point = camera.get_position();
+    direction = unprojected_point - point;
 }
 
 Vec2d CameraUtils::get_z0_position(const Camera &camera, const Vec2d & coor)
 {
-    Vec3d dir = CameraUtils::create_ray(camera, coor);
-    Vec3d p0  = camera.get_position();
-    if (camera.get_type() == Camera::EType::Ortho) { 
-        Matrix4d modelview  = camera.get_view_matrix().matrix();
-        Matrix4d projection = camera.get_projection_matrix().matrix();
-        Vec4i    viewport(camera.get_viewport().data());
-        igl::unproject(Vec3d(coor.x(), viewport[3] - coor.y(), 0.), modelview, projection, viewport, p0);
-    }
+    Vec3d p0, dir;
+    ray_from_screen_pos(camera, coor, p0, dir);
 
     // is approx zero
     if ((fabs(dir.z()) - 1e-4) < 0)
@@ -117,7 +129,7 @@ Vec2d CameraUtils::get_z0_position(const Camera &camera, const Vec2d & coor)
                      std::numeric_limits<double>::max());
 
     // find position of ray cross plane(z = 0)
-    double t  = p0.z() / dir.z();
+    double t = p0.z() / dir.z();
     Vec3d p = p0 - t * dir;
     return Vec2d(p.x(), p.y());
 }

@@ -145,6 +145,7 @@ public:
         assert(m_mesh != nullptr);
     }
 
+    // DEPRICATED - use CameraUtils::ray_from_screen_pos
     static void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
         Vec3d& point, Vec3d& direction);
 
@@ -158,6 +159,8 @@ public:
         const ClippingPlane* clipping_plane = nullptr, // clipping plane (if active)
         size_t* facet_idx = nullptr // index of the facet hit
     ) const;
+    
+    const AABBMesh &get_aabb_mesh() const { return m_emesh; }
 
     bool is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const;
 
