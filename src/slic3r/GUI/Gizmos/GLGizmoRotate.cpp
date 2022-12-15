@@ -614,7 +614,7 @@ bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
 #if ENABLE_WORLD_COORDINATE
         TransformationType transformation_type;
         if (m_parent.get_selection().is_wipe_tower())
-            transformation_type = TransformationType::Instance_Relative_Joint;
+            transformation_type = TransformationType::World_Relative_Joint;
         else {
             switch (wxGetApp().obj_manipul()->get_coordinates_type())
             {

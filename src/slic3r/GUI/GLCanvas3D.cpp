@@ -3627,6 +3627,56 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
     m_dirty = true;
 }
 
+#if ENABLE_WORLD_COORDINATE
+// This function is a replacement for function Vec3d Geometry::extract_rotation(const Transform3d& transform)
+// which is returning wrong values for the call made in the following method GLCanvas3D::do_rotate() when rotating the wipe tower
+Vec3d extract_rotation(const Transform3d& transform)
+{
+    // use only the non-translational part of the transform
+    Eigen::Matrix<double, 3, 3, Eigen::DontAlign> rotation_matrix = transform.matrix().block(0, 0, 3, 3);
+    // remove scale
+    rotation_matrix.col(0).normalize();
+    rotation_matrix.col(1).normalize();
+    rotation_matrix.col(2).normalize();
+
+    // reference: http://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
+    Vec3d angles1 = Vec3d::Zero();
+    Vec3d angles2 = Vec3d::Zero();
+    if (std::abs(std::abs(rotation_matrix(2, 0)) - 1.0) < 1e-5) {
+        angles1.z() = 0.0;
+        if (rotation_matrix(2, 0) < 0.0) { // == -1.0
+            angles1.y() = 0.5 * double(PI);
+            angles1.x() = angles1.z() + ::atan2(rotation_matrix(0, 1), rotation_matrix(0, 2));
+        }
+        else { // == 1.0
+            angles1.y() = -0.5 * double(PI);
+            angles1.x() = -angles1.y() + ::atan2(-rotation_matrix(0, 1), -rotation_matrix(0, 2));
+        }
+        angles2 = angles1;
+    }
+    else {
+        angles1.y() = -::asin(rotation_matrix(2, 0));
+        const double inv_cos1 = 1.0 / ::cos(angles1.y());
+        angles1.x() = ::atan2(rotation_matrix(2, 1) * inv_cos1, rotation_matrix(2, 2) * inv_cos1);
+        angles1.z() = ::atan2(rotation_matrix(1, 0) * inv_cos1, rotation_matrix(0, 0) * inv_cos1);
+
+        angles2.y() = double(PI) - angles1.y();
+        const double inv_cos2 = 1.0 / ::cos(angles2.y());
+        angles2.x() = ::atan2(rotation_matrix(2, 1) * inv_cos2, rotation_matrix(2, 2) * inv_cos2);
+        angles2.z() = ::atan2(rotation_matrix(1, 0) * inv_cos2, rotation_matrix(0, 0) * inv_cos2);
+    }
+
+    // The following euristic is the best found up to now (in the sense that it works fine with the greatest number of edge use-cases)
+    // but there are other use-cases were it does not
+    // We need to improve it
+    const double min_1 = angles1.cwiseAbs().minCoeff();
+    const double min_2 = angles2.cwiseAbs().minCoeff();
+    const bool use_1 = (min_1 < min_2) || (is_approx(min_1, min_2) && (angles1.norm() <= angles2.norm()));
+
+    return use_1 ? angles1 : angles2;
+}
+#endif // ENABLE_WORLD_COORDINATE
+
 void GLCanvas3D::do_rotate(const std::string& snapshot_type)
 {
     if (m_model == nullptr)
@@ -3659,7 +3709,11 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     for (const GLVolume* v : m_volumes.volumes) {
         if (v->is_wipe_tower) {
             const Vec3d offset = v->get_volume_offset();
+#if ENABLE_WORLD_COORDINATE
+            post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset.x(), offset.y(), extract_rotation(v->get_volume_transformation().get_matrix()).z())));
+#else
             post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset.x(), offset.y(), v->get_volume_rotation().z())));
+#endif // ENABLE_WORLD_COORDINATE
         }
         const int object_idx = v->object_idx();
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
@@ -5109,9 +5163,17 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
         const Size& cnv_size = get_canvas_size();
         _resize((unsigned int)cnv_size.get_width(), (unsigned int)cnv_size.get_height());
 
+        // When the application starts the following call to render() triggers the opengl initialization.
+        // We need to ask for an extra call to reload_scene() to force the generation of the model for wipe tower
+        // for printers using it, which is skipped by all the previous calls to reload_scene() because m_initialized == false
+        const bool requires_reload_scene = !m_initialized;
+
         // Because of performance problems on macOS, where PaintEvents are not delivered
         // frequently enough, we call render() here directly when we can.
         render();
+        assert(m_initialized);
+        if (requires_reload_scene)
+            reload_scene(true);
     }
 }
 
