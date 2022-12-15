@@ -117,11 +117,17 @@ void GLGizmoHollow::render_points(const Selection& selection)
     shader->start_using();
     ScopeGuard guard([shader]() { shader->stop_using(); });
 
-    const GLVolume* vol = selection.get_first_volume();
-    const Transform3d trafo = vol->world_matrix();
+    auto *inst = m_c->selection_info()->model_instance();
+    if (!inst)
+        return;
+
+    double shift_z = m_c->selection_info()->print_object()->get_current_elevation();
+    Transform3d trafo(inst->get_transformation().get_matrix() * inst->get_object()->volumes.front()->get_matrix());
+    trafo.translation()(2) += shift_z;
+    const Geometry::Transformation transformation{trafo};
 
 #if ENABLE_WORLD_COORDINATE
-    const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_scaling_factor_matrix().inverse();
+    const Transform3d instance_scaling_matrix_inverse = transformation.get_scaling_factor_matrix().inverse();
 #else
     const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
 #endif // ENABLE_WORLD_COORDINATE
@@ -152,7 +158,7 @@ void GLGizmoHollow::render_points(const Selection& selection)
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
         const Transform3d hole_matrix = Geometry::translation_transform(drain_hole.pos.cast<double>()) * instance_scaling_matrix_inverse;
 
-        if (vol->is_left_handed())
+        if (transformation.is_left_handed())
             glsafe(::glFrontFace(GL_CW));
 
         // Matrices set, we can render the point mark now.
@@ -166,7 +172,7 @@ void GLGizmoHollow::render_points(const Selection& selection)
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
         m_cylinder.model.render();
 
-        if (vol->is_left_handed())
+        if (transformation.is_left_handed())
             glsafe(::glFrontFace(GL_CCW));
     }
 }
