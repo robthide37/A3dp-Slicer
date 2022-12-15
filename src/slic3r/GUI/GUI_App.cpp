@@ -2884,6 +2884,14 @@ void GUI_App::open_web_page_localized(const std::string &http_address)
 // Because of we can't to print the multi-part objects with SLA technology.
 bool GUI_App::may_switch_to_SLA_preset(const wxString& caption)
 {
+    if (model_has_parameter_modifiers_in_objects(model())) {
+        show_info(nullptr,
+            _L("It's impossible to print object(s) which contains parameter modifiers with SLA technology.") + "\n\n" +
+            _L("Please check your object list before preset changing."),
+            caption);
+        return false;
+    }
+/*
     if (model_has_multi_part_objects(model())) {
         show_info(nullptr,
             _L("It's impossible to print multi-part object(s) with SLA technology.") + "\n\n" +
@@ -2898,6 +2906,7 @@ bool GUI_App::may_switch_to_SLA_preset(const wxString& caption)
             caption);
         return false;
     }
+*/
     return true;
 }
 

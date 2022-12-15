@@ -2049,6 +2049,12 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         raycaster->set_active(v->is_active);
     }
 
+    for (GLVolume* volume : m_volumes.volumes)
+        if (volume->object_idx() < (int)m_model->objects.size() && m_model->objects[volume->object_idx()]->instances[volume->instance_idx()]->is_printable()) {
+            if (volume->is_modifier && m_model->objects[volume->object_idx()]->volumes[volume->volume_idx()]->is_modifier())
+                volume->is_active = printer_technology != ptSLA;
+        }
+
     // refresh gizmo elements raycasters for picking
     GLGizmoBase* curr_gizmo = m_gizmos.get_current();
     if (curr_gizmo != nullptr)
