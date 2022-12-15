@@ -5,6 +5,7 @@
 
 #include "CSGMesh.hpp"
 #include "libslic3r/OpenVDBUtils.hpp"
+#include "libslic3r/Execution/ExecutionTBB.hpp"
 
 namespace Slic3r { namespace csg {
 
@@ -32,11 +33,24 @@ VoxelGridPtr voxelize_csgmesh(const Range<It>      &csgrange,
 {
     VoxelGridPtr ret;
 
+    std::vector<VoxelGridPtr> grids (csgrange.size());
+
+    execution::for_each(ex_tbb, size_t(0), csgrange.size(), [&](size_t csgidx) {
+        if (params.statusfn() && params.statusfn()(-1))
+            return;
+
+        auto it = csgrange.begin();
+        std::advance(it, csgidx);
+        auto &csgpart = *it;
+        grids[csgidx] = get_voxelgrid(csgpart, params);
+    }, execution::max_concurrency(ex_tbb));
+
+    size_t csgidx = 0;
     for (auto &csgpart : csgrange) {
         if (params.statusfn() && params.statusfn()(-1))
             break;
 
-        VoxelGridPtr partgrid = get_voxelgrid(csgpart, params);
+        auto &partgrid = grids[csgidx++];
 
         if (!ret && get_operation(csgpart) == CSGType::Union) {
             ret = std::move(partgrid);
