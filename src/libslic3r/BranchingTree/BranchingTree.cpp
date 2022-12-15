@@ -76,7 +76,17 @@ void build_tree(PointCloud &nodes, Builder &builder)
             switch (type) {
             case BED: {
                 closest_node.weight = w;
-                if ((routed = builder.add_ground_bridge(node, closest_node))) {
+                if (closest_it->dst_branching > nodes.properties().max_branch_length()) {
+                    auto hl_br_len = float(nodes.properties().max_branch_length()) / 2.f;
+                    Node new_node {{node.pos.x(), node.pos.y(), node.pos.z() - hl_br_len}, node.Rmin};
+                    new_node.id = int(nodes.next_junction_id());
+                    new_node.weight = nodes.get(node_id).weight + hl_br_len;
+                    new_node.left = node.id;
+                    if ((routed = builder.add_bridge(node, new_node))) {
+                        size_t new_idx = nodes.insert_junction(new_node);
+                        ptsqueue.push(new_idx);
+                    }
+                } else if ((routed = builder.add_ground_bridge(node, closest_node))) {
                     closest_node.left = closest_node.right = node_id;
                     nodes.get(closest_node_id) = closest_node;
                     nodes.mark_unreachable(closest_node_id);

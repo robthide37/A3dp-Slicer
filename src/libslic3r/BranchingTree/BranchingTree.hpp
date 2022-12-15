@@ -105,6 +105,12 @@ public:
     // Add an anchor bridge to the model body
     virtual bool add_mesh_bridge(const Node &from, const Node &to) = 0;
 
+    virtual std::optional<Vec3f> suggest_avoidance(const Node &from,
+                                                   float max_bridge_len)
+    {
+        return {};
+    }
+
     // Report nodes that can not be routed to an endpoint (model or ground)
     virtual void report_unroutable(const Node &j) = 0;
 

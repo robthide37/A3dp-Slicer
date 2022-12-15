@@ -29,7 +29,7 @@ class BranchingTreeBuilder: public branchingtree::Builder {
 
     // Scaling of the input value 'widening_factor:<0, 1>' to produce resonable
     // widening behaviour
-    static constexpr double WIDENING_SCALE = 0.02;
+    static constexpr double WIDENING_SCALE = 0.05;
 
     double get_radius(const branchingtree::Node &j) const
     {
@@ -99,9 +99,10 @@ class BranchingTreeBuilder: public branchingtree::Builder {
             int suppid_left   = branchingtree::Node::ID_NONE;
             int suppid_right  = branchingtree::Node::ID_NONE;
 
+            double glvl = ground_level(m_sm);
             branchingtree::Node dst = node;
-            dst.weight += node.pos.z();
-            dst.Rmin = std::max(node.Rmin, dst.Rmin);
+            dst.pos.z() = glvl;
+            dst.weight += node.pos.z() - glvl;
 
             if (node.left >= 0 && add_ground_bridge(m_cloud.get(node.left), dst))
                 ret.to_left = false;
@@ -144,8 +145,18 @@ public:
     bool add_mesh_bridge(const branchingtree::Node &from,
                          const branchingtree::Node &to) override;
 
+    std::optional<Vec3f> suggest_avoidance(const branchingtree::Node &from,
+                                           float max_bridge_len) override;;
+
     void report_unroutable(const branchingtree::Node &j) override
     {
+        double glvl = ground_level(m_sm);
+        branchingtree::Node dst = j;
+        dst.pos.z() = glvl;
+        dst.weight += j.pos.z() - glvl;
+        if (add_ground_bridge(j, dst))
+            return;
+
         BOOST_LOG_TRIVIAL(warning) << "Cannot route junction at " << j.pos.x()
                                    << " " << j.pos.y() << " " << j.pos.z();
 
@@ -277,6 +288,32 @@ bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
     }
 
     return bool(anchor);
+}
+
+static std::optional<Vec3f> get_avoidance(const GroundConnection &conn,
+                                          float maxdist)
+{
+    return {};
+}
+
+std::optional<Vec3f> BranchingTreeBuilder::suggest_avoidance(
+    const branchingtree::Node &from, float max_bridge_len)
+{
+    double glvl = ground_level(m_sm);
+    branchingtree::Node dst = from;
+    dst.pos.z() = glvl;
+    dst.weight += from.pos.z() - glvl;
+    bool succ = add_ground_bridge(from, dst);
+
+    std::optional<Vec3f> ret;
+
+    if (succ) {
+        auto it = m_gnd_connections.find(from.id);
+        if (it != m_gnd_connections.end())
+            ret = get_avoidance(it->second, max_bridge_len);
+    }
+
+    return ret;
 }
 
 inline void build_pillars(SupportTreeBuilder &builder,

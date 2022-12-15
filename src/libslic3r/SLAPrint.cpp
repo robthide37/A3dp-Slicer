@@ -862,6 +862,7 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             || opt_key == "supports_enable"
             || opt_key == "support_tree_type"
             || opt_key == "support_object_elevation"
+            || opt_key == "branchingsupport_object_elevation"
             || opt_key == "pad_around_object"
             || opt_key == "pad_around_object_everywhere"
             || opt_key == "slice_closing_radius"
@@ -888,6 +889,24 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             || opt_key == "support_max_bridge_length"
             || opt_key == "support_max_pillar_link_distance"
             || opt_key == "support_base_safety_distance"
+
+            || opt_key == "branchingsupport_head_front_diameter"
+            || opt_key == "branchingsupport_head_penetration"
+            || opt_key == "branchingsupport_head_width"
+            || opt_key == "branchingsupport_pillar_diameter"
+            || opt_key == "branchingsupport_pillar_widening_factor"
+            || opt_key == "branchingsupport_small_pillar_diameter_percent"
+            || opt_key == "branchingsupport_max_weight_on_model"
+            || opt_key == "branchingsupport_max_bridges_on_pillar"
+            || opt_key == "branchingsupport_pillar_connection_mode"
+            || opt_key == "branchingsupport_buildplate_only"
+            || opt_key == "branchingsupport_base_diameter"
+            || opt_key == "branchingsupport_base_height"
+            || opt_key == "branchingsupport_critical_angle"
+            || opt_key == "branchingsupport_max_bridge_length"
+            || opt_key == "branchingsupport_max_pillar_link_distance"
+            || opt_key == "branchingsupport_base_safety_distance"
+
             || opt_key == "pad_object_gap"
             ) {
             steps.emplace_back(slaposSupportTree);

@@ -547,7 +547,7 @@ Vec3d check_ground_route(
         auto gndhit = beam_mesh_hit(policy, sm.emesh, gndbeam, sd);
         double gnd_hit_d = std::min(gndhit.distance(), down_l + EPSILON);
 
-        if (std::isinf(gndhit.distance()) && sm.cfg.object_elevation_mm < EPSILON) {
+        if (gndhit.distance() > down_l && sm.cfg.object_elevation_mm < EPSILON) {
             // Dealing with zero elevation mode, to not route pillars
             // into the gap between the optional pad and the model
             double gap     = std::sqrt(sm.emesh.squared_distance(gp));
