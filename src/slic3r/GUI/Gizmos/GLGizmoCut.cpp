@@ -1627,12 +1627,10 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         if (auto oc = m_c->object_clipper(); oc && m_is_contour_changed)
             oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
 
-        if (wxGetApp().plater()->printer_technology() == ptFFF) {
-            m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
-                if (m_imgui->button(_L("Add/Edit connectors")))
-                    set_connectors_editing(true);
-            m_imgui->disabled_end();
-        }
+        m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
+            if (m_imgui->button(_L("Add/Edit connectors")))
+                set_connectors_editing(true);
+        m_imgui->disabled_end();
 
         ImGui::Separator();
 
@@ -1755,7 +1753,7 @@ void GLGizmoCut3D::render_input_window_warning() const
 {
     if (m_is_contour_changed)
         return;
-    if (wxGetApp().plater()->printer_technology() == ptFFF && m_has_invalid_connector) {
+    if (m_has_invalid_connector) {
         wxString out = wxString(ImGui::WarningMarkerSmall) + _L("Invalid connectors detected") + ":";
         if (m_info_stats.outside_cut_contour > size_t(0))
             out += "\n - " + format_wxstr(_L_PLURAL("%1$d connector is out of cut contour", "%1$d connectors are out of cut contour", m_info_stats.outside_cut_contour),
