@@ -1940,16 +1940,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         }
     }
 
-//    if (printer_technology == ptSLA) {
-//        // Shift-up all volumes of the object so that it has the right elevation with respect to the print bed
-//        for (GLVolume* volume : m_volumes.volumes)
-//            if (volume->object_idx() < (int)m_model->objects.size() && m_model->objects[volume->object_idx()]->instances[volume->instance_idx()]->is_printable()) {
-//                const SLAPrintObject* po = sla_print()->objects()[volume->object_idx()];//sla_print()->get_print_object_by_model_object_id(volume->object_idx());
-////                if (po != nullptr)
-////                    volume->set_sla_shift_z(po->get_current_elevation() / sla_print()->relative_correction().z());
-//            }
-//    }
-
     if (printer_technology == ptFFF && m_config->has("nozzle_diameter")) {
         // Should the wipe tower be visualized ?
         unsigned int extruders_count = (unsigned int)dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"))->values.size();
