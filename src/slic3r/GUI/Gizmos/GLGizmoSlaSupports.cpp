@@ -153,8 +153,8 @@ void GLGizmoSlaSupports::render_points(const Selection& selection)
         return;
 
     double shift_z = m_c->selection_info()->print_object()->get_current_elevation();
-    Transform3d trafo(inst->get_transformation().get_matrix());
-    trafo.translate(Vec3d{0., 0., shift_z});
+    Transform3d trafo(inst->get_transformation().get_matrix() * inst->get_object()->volumes.front()->get_matrix());
+    trafo.translation()(2) += shift_z;
     const Geometry::Transformation transformation{trafo};
 
 #if ENABLE_WORLD_COORDINATE
