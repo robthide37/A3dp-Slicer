@@ -1352,7 +1352,7 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                 }
                 transformation_type.set_relative();
             }
-                        
+
             relative_scale = original_box.size().cwiseProduct(scale).cwiseQuotient(reference_box.size());
         }
 
