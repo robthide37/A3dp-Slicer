@@ -994,44 +994,6 @@ const ExPolygons &SliceRecord::get_slice(SliceOrigin o) const
     return idx >= v.size() ? EMPTY_SLICE : v[idx];
 }
 
-//bool SLAPrintObject::has_mesh(SLAPrintObjectStep step) const
-//{
-//    switch (step) {
-//    case slaposAssembly:
-//        return true;
-//    case slaposObjectSlice:
-//        return ! this->m_mesh_from_slices.empty();
-//    case slaposDrillHoles:
-//        return ! this->m_mesh_from_slices.empty();
-//    case slaposSupportTree:
-//        return ! this->support_mesh().empty();
-//    case slaposPad:
-//        return ! this->pad_mesh().empty();
-//    default:
-//        return false;
-//    }
-//}
-
-//TriangleMesh SLAPrintObject::get_mesh(SLAPrintObjectStep step) const
-//{
-//    switch (step) {
-//    case slaposAssembly:
-//        return m_transformed_rmesh;
-//    case slaposObjectSlice:
-//        return this->m_mesh_from_slices;
-//    case slaposSupportTree:
-//        return this->support_mesh();
-//    case slaposPad:
-//        return this->pad_mesh();
-//    case slaposDrillHoles:
-////        if (m_hollowing_data)
-//            return get_mesh_to_print();
-//        [[fallthrough]];
-//    default:
-//        return TriangleMesh();
-//    }
-//}
-
 const TriangleMesh& SLAPrintObject::support_mesh() const
 {
     if (m_config.supports_enable.getBool() &&
@@ -1067,19 +1029,6 @@ const TriangleMesh &SLAPrintObject::get_mesh_to_print() const
 
     return *ret;
 }
-
-//const indexed_triangle_set &SLAPrintObject::hollowed_interior_mesh() const
-//{
-//    if (m_hollowing_data && m_hollowing_data->interior &&
-//        m_config.hollowing_enable.getBool())
-//        return sla::get_mesh(*m_hollowing_data->interior);
-    
-//    return EMPTY_TRIANGLE_SET;
-//}
-
-//const TriangleMesh &SLAPrintObject::transformed_mesh() const {
-//    return m_transformed_rmesh;
-//}
 
 sla::SupportPoints SLAPrintObject::transformed_support_points() const
 {

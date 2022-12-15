@@ -145,25 +145,16 @@ public:
     };
     const std::vector<Instance>& instances() const { return m_instances; }
 
-//    bool                    has_mesh(SLAPrintObjectStep step) const;
-//    TriangleMesh            get_mesh(SLAPrintObjectStep step) const;
-
     // Get a support mesh centered around origin in XY, and with zero rotation around Z applied.
     // Support mesh is only valid if this->is_step_done(slaposSupportTree) is true.
     const TriangleMesh&     support_mesh() const;
     // Get a pad mesh centered around origin in XY, and with zero rotation around Z applied.
     // Support mesh is only valid if this->is_step_done(slaposPad) is true.
     const TriangleMesh&     pad_mesh() const;
-    
-//    // Ready after this->is_step_done(slaposDrillHoles) is true
-//    const indexed_triangle_set &hollowed_interior_mesh() const;
 
     // Get the mesh that is going to be printed with all the modifications
     // like hollowing and drilled holes.
     const TriangleMesh & get_mesh_to_print() const;
-
-//    // This will return the transformed mesh which is cached
-//    const TriangleMesh&     transformed_mesh() const;
 
     sla::SupportPoints      transformed_support_points() const;
     sla::DrainHoles         transformed_drainhole_points() const;
