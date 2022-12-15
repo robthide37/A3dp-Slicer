@@ -111,7 +111,9 @@ class GLGizmoCut3D : public GLGizmoBase
     bool  force_update_clipper_on_render{false};
 
     float m_contour_width{ 0.4f };
+    float m_cut_plane_radius_koef{ 1.5f };
     bool  m_is_contour_changed{ false };
+    float m_shortcut_label_width{ -1.f };
 
     mutable std::vector<bool> m_selected; // which pins are currently selected
     int  m_selected_count{ 0 };
@@ -199,7 +201,7 @@ protected:
     void               on_stop_dragging() override;
     void               on_render() override;
 
-    void render_debug_input_window();
+    void render_debug_input_window(float x);
     void adjust_window_position(float x, float y, float bottom_limit);
     void unselect_all_connectors();
     void select_all_connectors();
