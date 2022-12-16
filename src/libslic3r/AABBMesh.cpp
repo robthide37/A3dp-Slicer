@@ -68,8 +68,6 @@ public:
 
 template<class M> void AABBMesh::init(const M &mesh, bool calculate_epsilon)
 {
-    BoundingBoxf3 bb = bounding_box(mesh);
-
     // Build the AABB accelaration tree
     m_aabb->init(*m_tm, calculate_epsilon);
 }
