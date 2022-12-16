@@ -2216,6 +2216,17 @@ bool GUI_App::load_language(wxString language, bool initial)
     // Override language at the active wxTranslations class (which is stored in the active m_wxLocale)
     // to load possibly different dictionary, for example, load Czech dictionary for Slovak language.
     wxTranslations::Get()->SetLanguage(language_dict);
+    {
+        // UKR Localization specific workaround till the wxWidgets doesn't fixed:
+        // From wxWidgets 3.1.6 calls setlocation(0, wxInfoLanguage->LocaleTag), see (https://github.com/prusa3d/wxWidgets/commit/deef116a09748796711d1e3509965ee208dcdf0b#diff-7de25e9a71c4dce61bbf76492c589623d5b93fd1bb105ceaf0662075d15f4472),
+        // where LocaleTag is a Tag of locale in BCP 47 - like notation.
+        // For Ukrainian Language LocaleTag == "uk".
+        // But setlocale(0, "uk") returns "English_United Kingdom.1252" instead of "uk",
+        // and, as a result, locales are set to English_United Kingdom        
+         
+        if (language_info->CanonicalName == "uk")
+            setlocale(0, language_info->GetCanonicalWithRegion().data());
+    }
     m_wxLocale->AddCatalog(SLIC3R_APP_KEY);
     m_imgui->set_language(into_u8(language_info->CanonicalName));
     //FIXME This is a temporary workaround, the correct solution is to switch to "C" locale during file import / export only.

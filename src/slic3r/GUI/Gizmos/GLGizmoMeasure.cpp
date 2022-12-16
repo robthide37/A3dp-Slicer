@@ -1359,10 +1359,10 @@ void GLGizmoMeasure::render_dimensioning()
                 action_exit();
 
             ImGui::SameLine();
-            if (m_imgui->button(_u8L("Scale")))
+            if (m_imgui->button(_CTX(L_CONTEXT("Scale", "Verb"), "Verb")))
                 action_scale(edit_value, curr_value);
             ImGui::SameLine();
-            if (m_imgui->button(_u8L("Cancel")))
+            if (m_imgui->button(_L("Cancel")))
                 action_exit();
             ImGui::EndPopup();
         }
@@ -1991,7 +1991,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 radius = (on_circle - center).norm();
                 if (use_inches)
                     radius = ObjectManipulation::mm_to_in * radius;
-                text += " (" + _u8L("Diameter:") + " " + format_double(2.0 * radius) + units + ")";
+                text += " (" + _u8L("Diameter") + ": " + format_double(2.0 * radius) + units + ")";
             }
             return text;
         };
@@ -2004,7 +2004,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     }
 
     m_imgui->disabled_begin(!m_selected_features.first.feature.has_value());
-        if (m_imgui->button(_u8L("Restart selection"))) {
+        if (m_imgui->button(_L("Restart selection"))) {
             m_selected_features.reset();
             m_selected_sphere_raycasters.clear();
             m_imgui->set_requires_extra_frame();
