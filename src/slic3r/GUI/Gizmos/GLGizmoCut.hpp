@@ -97,7 +97,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
     bool m_hide_cut_plane{ false };
     bool m_connectors_editing{ false };
-    bool m_cut_plane_as_circle{ true };
+    bool m_cut_plane_as_circle{ false };
 
     float m_connector_depth_ratio{ 3.f };
     float m_connector_size{ 2.5f };

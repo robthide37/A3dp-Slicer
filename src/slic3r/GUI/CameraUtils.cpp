@@ -110,12 +110,8 @@ void CameraUtils::ray_from_persp_screen_pos(const Camera &camera, const Vec2d &p
     Matrix4d modelview  = camera.get_view_matrix().matrix();
     Matrix4d projection = camera.get_projection_matrix().matrix();
     Vec4i    viewport(camera.get_viewport().data());
-
-    Vec3d unprojected_point;
-    igl::unproject(screen_point(camera, position), modelview, projection, viewport, unprojected_point);
-
-    point = camera.get_position();
-    direction = unprojected_point - point;
+    igl::unproject(screen_point(camera, position), modelview, projection, viewport, point);
+    direction = point - camera.get_position();
 }
 
 Vec2d CameraUtils::get_z0_position(const Camera &camera, const Vec2d & coor)

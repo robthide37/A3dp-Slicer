@@ -1426,6 +1426,7 @@ void GLGizmoCut3D::on_render()
 
 void GLGizmoCut3D::render_debug_input_window(float x)
 {
+    return;
     m_imgui->begin(wxString("DEBUG"));
 
     ImVec2 pos = ImGui::GetWindowPos();
