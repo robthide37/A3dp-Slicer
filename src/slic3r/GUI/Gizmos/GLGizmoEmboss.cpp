@@ -2868,6 +2868,14 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     m_parent.do_rotate(snapshot_name);
 }
 namespace priv {
+
+/// <summary>
+/// Transform origin of Text volume onto surface of model.
+/// </summary>
+/// <param name="volume">Text</param>
+/// <param name="raycast_manager">AABB trees of object</param>
+/// <param name="selection">Transformation of actual instance</param>
+/// <returns>True when transform otherwise false</returns>
 bool transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection)
 {
     // Move object on surface

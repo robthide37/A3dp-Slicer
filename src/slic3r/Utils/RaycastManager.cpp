@@ -134,7 +134,7 @@ std::optional<RaycastManager::Hit> RaycastManager::unproject(const Vec3d &point,
         if (raycaster_it == m_raycasters.end()) continue;
         const MeshRaycaster &raycaster = *(raycaster_it->second);
         const AABBMesh& mesh = raycaster.get_aabb_mesh();                
-        const Transform3d & tr_inv = transformation.inverse();
+        Transform3d tr_inv = transformation.inverse();
         Vec3d mesh_point = tr_inv * point;
         Vec3d mesh_direction = tr_inv.linear() * direction;
         std::vector<AABBMesh::hit_result> hits = mesh.query_ray_hits(mesh_point, mesh_direction);
@@ -151,22 +151,24 @@ std::optional<RaycastManager::Hit> RaycastManager::unproject(const Vec3d &point,
 }
 
 std::optional<RaycastManager::Hit> RaycastManager::closest(const Vec3d &point, const ISkip *skip) const {
-    Vec3f point_f = point.cast<float>();
     std::optional<priv::HitWithDistance> closest;
     for (const auto &item : m_transformations) {
         const TrKey &key       = item.first;
         size_t       volume_id = key.second;
         if (skip != nullptr && skip->skip(volume_id))
             continue;
-        const Transform3d &transformation = item.second;
         auto raycaster_it = std::find_if(m_raycasters.begin(), m_raycasters.end(), 
             [volume_id](const RaycastManager::Raycaster &it) -> bool { return volume_id == it.first; });
         if (raycaster_it == m_raycasters.end())
             continue;
         const MeshRaycaster &raycaster = *(raycaster_it->second);
+        const Transform3d &transformation = item.second;
+        Transform3d tr_inv = transformation.inverse();
+        Vec3d mesh_point_d = tr_inv * point;
+        Vec3f mesh_point_f = mesh_point_d.cast<float>();
         Vec3f n;
-        Vec3f p = raycaster.get_closest_point(point_f, &n);
-        double squared_distance = (point_f - p).squaredNorm();
+        Vec3f p = raycaster.get_closest_point(mesh_point_f, &n);
+        double squared_distance = (mesh_point_f - p).squaredNorm();
         if (closest.has_value() && closest->squared_distance < squared_distance)
             continue;
         SurfacePoint surface_point(p,n);
