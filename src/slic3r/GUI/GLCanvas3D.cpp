@@ -1755,7 +1755,20 @@ std::vector<int> GLCanvas3D::load_object(const Model& model, int obj_idx)
 
 void GLCanvas3D::mirror_selection(Axis axis)
 {
+#if ENABLE_WORLD_COORDINATE
+    TransformationType transformation_type;
+    if (wxGetApp().obj_manipul()->is_local_coordinates())
+        transformation_type.set_local();
+    else if (wxGetApp().obj_manipul()->is_instance_coordinates())
+        transformation_type.set_instance();
+
+    transformation_type.set_relative();
+
+    m_selection.setup_cache();
+    m_selection.mirror(axis, transformation_type);
+#else
     m_selection.mirror(axis);
+#endif // ENABLE_WORLD_COORDINATE
     do_mirror(L("Mirror Object"));
     wxGetApp().obj_manipul()->set_dirty();
 }
@@ -3646,7 +3659,13 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     for (const GLVolume* v : m_volumes.volumes) {
         if (v->is_wipe_tower) {
             const Vec3d offset = v->get_volume_offset();
+#if ENABLE_WORLD_COORDINATE
+            Vec3d rot_unit_x = v->get_volume_transformation().get_matrix().linear() * Vec3d::UnitX();
+            double z_rot = std::atan2(rot_unit_x.y(), rot_unit_x.x());
+            post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset.x(), offset.y(), z_rot)));
+#else
             post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset.x(), offset.y(), v->get_volume_rotation().z())));
+#endif // ENABLE_WORLD_COORDINATE
         }
         const int object_idx = v->object_idx();
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
@@ -5096,9 +5115,17 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
         const Size& cnv_size = get_canvas_size();
         _resize((unsigned int)cnv_size.get_width(), (unsigned int)cnv_size.get_height());
 
+        // When the application starts the following call to render() triggers the opengl initialization.
+        // We need to ask for an extra call to reload_scene() to force the generation of the model for wipe tower
+        // for printers using it, which is skipped by all the previous calls to reload_scene() because m_initialized == false
+        const bool requires_reload_scene = !m_initialized;
+
         // Because of performance problems on macOS, where PaintEvents are not delivered
         // frequently enough, we call render() here directly when we can.
         render();
+        assert(m_initialized);
+        if (requires_reload_scene)
+            reload_scene(true);
     }
 }
 

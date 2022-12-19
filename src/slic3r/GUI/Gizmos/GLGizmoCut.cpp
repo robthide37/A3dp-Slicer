@@ -15,6 +15,7 @@
 #include "libslic3r/TriangleMeshSlicer.hpp"
 
 #include "imgui/imgui_internal.h"
+#include "slic3r/GUI/MsgDialog.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -913,7 +914,7 @@ void GLGizmoCut3D::on_register_raycasters_for_picking()
                 m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i + m_connectors_group_id, *(m_shapes[connectors[i].attribs]).mesh_raycaster, Transform3d::Identity()));
         }
     }
-    else {
+    else if (!cut_line_processing()) {
         m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, X, *m_cone.mesh_raycaster, Transform3d::Identity()));
         m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, X, *m_cone.mesh_raycaster, Transform3d::Identity()));
 
@@ -991,7 +992,7 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             m_raycasters[i]->set_transform(translation_transform(pos) * m_rotation_m * scale_trafo);
         }
     }
-    else {
+    else if (!cut_line_processing()){
         const Transform3d trafo = translation_transform(m_plane_center) * m_rotation_m;
 
         const BoundingBoxf3 box = bounding_box();
@@ -1376,10 +1377,14 @@ void GLGizmoCut3D::init_rendering_items()
         init_from_angle_arc(m_angle_arc, m_angle, m_grabber_connection_len);
 
     if (!m_plane.is_initialized() && !m_hide_cut_plane && !m_connectors_editing) {
+#if 1
+        m_plane.init_from(its_make_frustum_dowel((double)m_cut_plane_radius_koef * m_radius, 0.3, m_cut_plane_as_circle ? 180 : 4));
+#else
         if (m_cut_plane_as_circle)
             m_plane.init_from(its_make_frustum_dowel(2. * m_radius, 0.3, 180));
         else
             m_plane.init_from(its_make_square_plane(float(m_radius)));
+#endif
     }
 }
 
@@ -1419,9 +1424,13 @@ void GLGizmoCut3D::on_render()
     m_selection_rectangle.render(m_parent);
 }
 
-void GLGizmoCut3D::render_debug_input_window()
+void GLGizmoCut3D::render_debug_input_window(float x)
 {
     m_imgui->begin(wxString("DEBUG"));
+
+    ImVec2 pos = ImGui::GetWindowPos();
+    pos.x = x;
+    ImGui::SetWindowPos(pos, ImGuiCond_Always);
 /*
     static bool  hide_clipped  = false;
     static bool  fill_cut      = false;
@@ -1434,10 +1443,18 @@ void GLGizmoCut3D::render_debug_input_window()
     m_imgui->slider_float("contour_width", &contour_width, 0.f, 3.f);
     if (auto oc = m_c->object_clipper())
         oc->set_behavior(hide_clipped || m_connectors_editing, fill_cut || m_connectors_editing, double(contour_width));
+*/
+    ImGui::PushItemWidth(0.5f * m_label_width);
+    if (auto oc = m_c->object_clipper(); oc && m_imgui->slider_float("contour_width", &m_contour_width, 0.f, 3.f))
+        oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
 
     ImGui::Separator();
-*/
+
     if (m_imgui->checkbox(_L("Render cut plane as circle"), m_cut_plane_as_circle))
+        m_plane.reset();
+
+    ImGui::PushItemWidth(0.5f * m_label_width);
+    if (m_imgui->slider_float("cut_plane_radius_koef", &m_cut_plane_radius_koef, 1.f, 2.f))
         m_plane.reset();
 
     m_imgui->end();
@@ -1481,10 +1498,19 @@ void GLGizmoCut3D::render_shortcuts()
     if (m_imgui->button("? " + (m_show_shortcuts ? wxString(ImGui::CollapseBtn) : wxString(ImGui::ExpandBtn))))
         m_show_shortcuts = !m_show_shortcuts;
 
+    if (m_shortcut_label_width < 0.f) {
+        for (const auto& shortcut : m_shortcuts) {
+            const float width = m_imgui->calc_text_size(shortcut.first).x;
+            if (m_shortcut_label_width < width)
+                m_shortcut_label_width = width;
+        }
+        m_shortcut_label_width += +m_imgui->scaled(1.f);
+    }
+
     if (m_show_shortcuts)
         for (const auto&shortcut : m_shortcuts ){
             m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, shortcut.first);
-            ImGui::SameLine(m_label_width);
+            ImGui::SameLine(m_shortcut_label_width);
             m_imgui->text(shortcut.second);
         }
 }
@@ -1624,8 +1650,8 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGui::AlignTextToFramePadding();
         m_imgui->text(wxString(ImGui::InfoMarkerSmall));
         ImGui::SameLine();
-        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Hold SHIFT key and connect some two points of an object to cut by line"));
-
+        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, 
+                              get_wraped_wxString(_L("Hold SHIFT key and connect some two points of an object to cut by line"), 40));
         ImGui::Separator();
 
         render_build_size();
@@ -1642,13 +1668,6 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
             reset_cut_plane();
         m_imgui->disabled_end();
 
-        ImGui::SameLine(2.25f * m_label_width);
-        ImGui::PushItemWidth(0.75f * m_label_width);
-        m_is_contour_changed = m_imgui->slider_float("contour width", &m_contour_width, 0.f, 3.f);
-
-        if (auto oc = m_c->object_clipper(); oc && m_is_contour_changed)
-            oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
-
         if (wxGetApp().plater()->printer_technology() == ptFFF) {
             m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
                 if (m_imgui->button(_L("Add/Edit connectors")))
@@ -1658,18 +1677,25 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
         ImGui::Separator();
 
-        auto render_part_action_line = [this, connectors](const wxString& label, const wxString& suffix, bool& keep_part, bool& place_on_cut_part, bool& rotate_part) {
+        float label_width = 0;
+        for (const wxString& label : {_L("Upper part"), _L("Lower part")}) {
+            const float width = m_imgui->calc_text_size(label).x + m_imgui->scaled(1.5f);
+            if (label_width < width)
+                label_width = width;
+        }
+        
+        auto render_part_action_line = [this, label_width, connectors](const wxString& label, const wxString& suffix, bool& keep_part, bool& place_on_cut_part, bool& rotate_part) {
             bool keep = true;
             ImGui::AlignTextToFramePadding();
             m_imgui->text(label);
 
-            ImGui::SameLine(m_label_width);
+            ImGui::SameLine(label_width);
 
             m_imgui->disabled_begin(!connectors.empty());
                 m_imgui->checkbox(_L("Keep") + suffix, connectors.empty() ? keep_part : keep);
             m_imgui->disabled_end();
 
-            ImGui::SameLine(2 * m_label_width);
+            ImGui::SameLine();
 
             m_imgui->disabled_begin(!keep_part);
                 if (m_imgui->checkbox(_L("Place on cut") + suffix, place_on_cut_part))
@@ -1813,7 +1839,8 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
     m_imgui->end();
 
-    render_debug_input_window();
+    if (!m_connectors_editing) // connectors mode
+        render_debug_input_window(x);
 }
 
 // get volume transformation regarding to the "border". Border is related from the size of connectors

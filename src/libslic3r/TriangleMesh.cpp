@@ -1154,7 +1154,7 @@ indexed_triangle_set its_make_frustum_dowel(double radius, double h, int sectorC
         else
             for (int j = 0; j < sectorCount; ++j) {
                 // from 0 to 2pi
-                double sectorAngle = sectorStep * j;
+                double sectorAngle = sectorStep * j + 0.25 * M_PI;
                 vertices.emplace_back(Vec3d(xy * std::cos(sectorAngle), xy * std::sin(sectorAngle), z).cast<float>());
             }
     }

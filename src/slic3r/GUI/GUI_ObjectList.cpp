@@ -2825,8 +2825,12 @@ void ObjectList::part_selection_changed()
     panel.Freeze();
 
 #if ENABLE_WORLD_COORDINATE
-    const ManipulationEditor* const editor = wxGetApp().obj_manipul()->get_focused_editor();
-    const std::string opt_key = (editor != nullptr) ? editor->get_full_opt_name() : "";
+    std::string opt_key;
+    if (m_selected_object_id >= 0) {
+        const ManipulationEditor* const editor = wxGetApp().obj_manipul()->get_focused_editor();
+        if (editor != nullptr)
+            opt_key = editor->get_full_opt_name();
+    }
     wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event(opt_key, !opt_key.empty());
 #else
     wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event("", false);
