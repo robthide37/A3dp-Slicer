@@ -344,6 +344,14 @@ void PresetComboBox::add_physical_printer()
         update();
 }
 
+void PresetComboBox::open_physical_printer_url()
+{
+    const PhysicalPrinter& pp = m_preset_bundle->physical_printers.get_selected_printer();
+    std::string host = pp.config.opt_string("print_host");
+    assert(!host.empty());
+    wxGetApp().open_browser_with_warning_dialog(host);
+}
+
 bool PresetComboBox::del_physical_printer(const wxString& note_string/* = wxEmptyString*/)
 {
     const std::string& printer_name = m_preset_bundle->physical_printers.get_selected_full_printer_name();
@@ -751,6 +759,14 @@ void PlaterPresetComboBox::show_edit_menu()
     if (this->is_selected_physical_printer()) {
         append_menu_item(menu, wxID_ANY, _L("Edit physical printer"), "",
             [this](wxCommandEvent&) { this->edit_physical_printer(); }, "cog", menu, []() { return true; }, wxGetApp().plater());
+
+        const PhysicalPrinter& pp = m_preset_bundle->physical_printers.get_selected_printer();
+        std::string host = pp.config.opt_string("print_host");
+        if (!host.empty()) {
+            append_menu_item(menu, wxID_ANY, _L("Open physical printer URL"), "",
+                [this](wxCommandEvent&) { this->open_physical_printer_url(); }, "open_browser", menu, []() { return true; }, wxGetApp().plater());
+        }
+        
 
         append_menu_item(menu, wxID_ANY, _L("Delete physical printer"), "",
             [this](wxCommandEvent&) { this->del_physical_printer(); }, "cross", menu, []() { return true; }, wxGetApp().plater());
