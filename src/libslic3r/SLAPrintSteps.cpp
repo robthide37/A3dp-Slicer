@@ -138,7 +138,7 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
     bench.start();
 
     // update preview mesh
-    double vscale = 1. / po.m_config.layer_height.getFloat();
+    double vscale = 1. / (1.5 * po.m_config.layer_height.getFloat());
     auto   voxparams = csg::VoxelizeParams{}
                          .voxel_scale(vscale)
                          .exterior_bandwidth(1.f)
