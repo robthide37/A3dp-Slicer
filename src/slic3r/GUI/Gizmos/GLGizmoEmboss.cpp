@@ -1009,13 +1009,27 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
     };
 
     wxFont wx_font;
+    bool is_exact_font = true;
     bool is_path_changed = false;
     if (style.type == WxFontUtils::get_actual_type())
         wx_font = WxFontUtils::load_wxFont(style.path);
-    if (!wx_font.IsOk()) {
-        create_notification_not_valid_font(tc);
+
+    if (!wx_font.IsOk()) {        
+        is_exact_font = false;
         // Try create similar wx font
         wx_font = WxFontUtils::create_wxFont(style);
+        std::optional<std::string> face_name_opt = style.prop.face_name;
+        if (face_name_opt.has_value()) {
+            wxString face_name(style.prop.face_name->c_str());
+            init_face_names();
+            m_face_names.is_init = false;
+            auto it = std::lower_bound(m_face_names.faces.begin(), m_face_names.faces.end(), face_name, 
+                [](const FaceName &fn, const wxString& face_name)->bool { return fn.wx_name == face_name; });
+            // only known font could be setted 
+            // (unknown has undefined behavior)
+            if (it != m_face_names.faces.end())
+                wx_font.SetFaceName(face_name);
+        }
         is_path_changed = wx_font.IsOk();
     }
 
@@ -1044,6 +1058,9 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
         std::string path = WxFontUtils::store_wxFont(wx_font);
         m_style_manager.get_style().path = path;
     }
+
+    if (!is_exact_font)        
+        create_notification_not_valid_font(tc);
 
     m_text   = tc.text;
     m_volume = volume;
@@ -2862,7 +2879,6 @@ bool transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, 
     Transform3d to_world = priv::world_matrix(gl_volume, selection.get_model());
     Vec3d point     = to_world * Vec3d::Zero();
     Vec3d direction = to_world.linear() * (-Vec3d::UnitZ());
-    //direction.normalize();
 
     // ray in direction of text projection(from volume zero to z-dir)
     std::optional<RaycastManager::Hit> hit_opt = raycast_manager.unproject(point, direction, &cond);
@@ -2871,11 +2887,11 @@ bool transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, 
 
     if (!hit_opt.has_value())
         return false;
+    const RaycastManager::Hit &hit = *hit_opt;
 
-    const RaycastManager::Hit &hit          = *hit_opt;
-    Transform3d                hit_tr       = raycast_manager.get_transformation(hit.tr_key);
-    Vec3d                      hit_world    = hit_tr * hit.position.cast<double>();
-    Vec3d                      offset_world = hit_world - point; // vector in world
+    Transform3d hit_tr       = raycast_manager.get_transformation(hit.tr_key);
+    Vec3d       hit_world    = hit_tr * hit.position.cast<double>();
+    Vec3d       offset_world = hit_world - point; // vector in world
     // TIP: It should be close to only z move
     Vec3d offset_volume = to_world.inverse().linear() * offset_world;
 
