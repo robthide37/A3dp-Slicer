@@ -6122,7 +6122,6 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
             const bool is_left_handed = object->is_left_handed();
 
             auto pad_mesh = extended? object->pad_mesh() : TriangleMesh{};
-            pad_mesh = object->pad_mesh();
             pad_mesh.transform(mesh_trafo_inv);
 
             auto supports_mesh = extended ? object->support_mesh() : TriangleMesh{};
