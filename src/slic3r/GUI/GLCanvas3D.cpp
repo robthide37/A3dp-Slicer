@@ -6648,14 +6648,17 @@ void GLCanvas3D::_load_sla_shells()
     for (const SLAPrintObject* obj : print->objects()) {
         unsigned int initial_volumes_count = (unsigned int)m_volumes.volumes.size();
         for (const SLAPrintObject::Instance& instance : obj->instances()) {
-            add_volume(*obj, 0, instance, obj->get_mesh_to_print(), GLVolume::MODEL_COLOR[0], true);
-            // Set the extruder_id and volume_id to achieve the same color as in the 3D scene when
-            // through the update_volumes_colors_by_extruder() call.
-            m_volumes.volumes.back()->extruder_id = obj->model_object()->volumes.front()->extruder_id();
-            if (auto &tree_mesh = obj->support_mesh(); !tree_mesh.empty())
-                add_volume(*obj, -int(slaposSupportTree), instance, tree_mesh, GLVolume::SLA_SUPPORT_COLOR, true);
-            if (auto &pad_mesh = obj->pad_mesh(); !pad_mesh.empty())
-                add_volume(*obj, -int(slaposPad), instance, pad_mesh, GLVolume::SLA_PAD_COLOR, false);
+            auto & m = obj->get_mesh_to_print();
+            if (!m.empty()) {
+                add_volume(*obj, 0, instance, m, GLVolume::MODEL_COLOR[0], true);
+                // Set the extruder_id and volume_id to achieve the same color as in the 3D scene when
+                // through the update_volumes_colors_by_extruder() call.
+                m_volumes.volumes.back()->extruder_id = obj->model_object()->volumes.front()->extruder_id();
+                if (auto &tree_mesh = obj->support_mesh(); !tree_mesh.empty())
+                    add_volume(*obj, -int(slaposSupportTree), instance, tree_mesh, GLVolume::SLA_SUPPORT_COLOR, true);
+                if (auto &pad_mesh = obj->pad_mesh(); !pad_mesh.empty())
+                    add_volume(*obj, -int(slaposPad), instance, pad_mesh, GLVolume::SLA_PAD_COLOR, false);
+            }
         }
         double shift_z = obj->get_current_elevation();
         for (unsigned int i = initial_volumes_count; i < m_volumes.volumes.size(); ++ i) {
