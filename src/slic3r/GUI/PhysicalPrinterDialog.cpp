@@ -67,14 +67,15 @@ PresetForPrinter::PresetForPrinter(PhysicalPrinterDialog* parent, const std::str
         if (m_parent->get_printer()->has_empty_config()) {
             // update Print Host upload from the selected preset
             m_parent->get_printer()->update_from_preset(*preset);
-            // update values in parent (PhysicalPrinterDialog)
-            m_parent->update(true);
+            // update values in parent (PhysicalPrinterDialog) 
+        } 
             
-        }
 
         // update PrinterTechnology if it was changed
         if (m_presets_list->set_printer_technology(preset->printer_technology()))
             m_parent->set_printer_technology(preset->printer_technology());
+        else 
+            m_parent->update(true);
 
         update_full_printer_name();
     });
@@ -155,8 +156,7 @@ void PresetForPrinter::on_sys_color_changed()
 
 PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_name) :
     DPIDialog(parent, wxID_ANY, _L("Physical Printer"), wxDefaultPosition, wxSize(45 * wxGetApp().em_unit(), -1), wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
-    m_printer("", wxGetApp().preset_bundle->physical_printers.default_config()),
-    had_all_mk3(!printer_name.empty())
+    m_printer("", wxGetApp().preset_bundle->physical_printers.default_config())
 {
     SetFont(wxGetApp().normal_font());
 #ifndef _WIN32
@@ -240,6 +240,11 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
         m_printer_name->SetFocus();
         m_printer_name->SelectAll();
     }
+
+    const wxSize& bestsize = this->GetBestSize();
+    const wxSize& size = wxSize(bestsize.x, 1.1f * bestsize.y);
+    this->SetSize(size);
+    this->Layout();
 
     this->CenterOnScreen();
 }
@@ -480,19 +485,32 @@ void PhysicalPrinterDialog::update(bool printer_change)
         update_host_type(printer_change);
         const auto opt = m_config->option<ConfigOptionEnum<PrintHostType>>("host_type");
         m_optgroup->show_field("host_type");
-        if (opt->value == htPrusaLink)
-        {
+
+        // hide PrusaConnect address
+        if (Field* printhost_field = m_optgroup->get_field("print_host"); printhost_field) {
+            if (wxTextCtrl* temp = dynamic_cast<wxTextCtrl*>(printhost_field->getWindow()); temp && temp->GetValue() == L"https://connect.prusa3d.com") {
+                temp->SetValue(wxString());
+            }
+        }
+        if (opt->value == htPrusaLink) { // PrusaConnect does NOT allow http digest
             m_optgroup->show_field("printhost_authorization_type");
             AuthorizationType auth_type = m_config->option<ConfigOptionEnum<AuthorizationType>>("printhost_authorization_type")->value;
             m_optgroup->show_field("printhost_apikey", auth_type == AuthorizationType::atKeyPassword);
             for (const char* opt_key : { "printhost_user", "printhost_password" })
-                m_optgroup->show_field(opt_key, auth_type == AuthorizationType::atUserPassword);
+                m_optgroup->show_field(opt_key, auth_type == AuthorizationType::atUserPassword); 
         } else {
             m_optgroup->hide_field("printhost_authorization_type");
             m_optgroup->show_field("printhost_apikey", true);
             for (const std::string& opt_key : std::vector<std::string>{ "printhost_user", "printhost_password" })
                 m_optgroup->hide_field(opt_key);
             supports_multiple_printers = opt && opt->value == htRepetier;
+            if (opt->value == htPrusaConnect) { // automatically show default prusaconnect address
+                if (Field* printhost_field = m_optgroup->get_field("print_host"); printhost_field) {
+                    if (wxTextCtrl* temp = dynamic_cast<wxTextCtrl*>(printhost_field->getWindow()); temp && temp->GetValue().IsEmpty()) {
+                        temp->SetValue(L"https://connect.prusa3d.com");
+                    }
+                }
+            }
         }
         
     }
@@ -514,7 +532,9 @@ void PhysicalPrinterDialog::update(bool printer_change)
 
     update_printhost_buttons();
 
-    this->SetSize(this->GetBestSize());
+    const wxSize& bestsize= this->GetBestSize();
+    const wxSize& size = wxSize( bestsize.x, 1.1f * bestsize.y);
+    this->SetSize(size);
     this->Layout();
 }
 
@@ -522,17 +542,32 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
 {
     if (m_presets.empty())
         return;
-    bool all_presets_are_from_mk3_family = true;
+    struct {
+        bool supported { true };
+        wxString label;
+    } link, connect;
+    // allowed models are: all MINI, all MK3 and newer, MK2.5 and MK2.5S  
+    auto model_supports_prusalink = [](const std::string& model) {
+        return model.size() >= 3 &&
+                (( boost::starts_with(model, "MK") && model[2] > '2' && model[2] <= '9')
+                || boost::starts_with(model, "MINI")
+                || boost::starts_with(model, "MK2.5")
+                //|| boost::starts_with(model, "MK2.5S")
+                );
+    };
+    // allowed models are: all MK3/S and MK2.5/S
+    auto model_supports_prusaconnect = [](const std::string& model) {
+        return model.size() >= 3 &&
+                (boost::starts_with(model, "MK3")
+                || boost::starts_with(model, "MK2.5")
+                );
+    };
 
+    // set all_presets_are_prusalink_supported
     for (PresetForPrinter* prstft : m_presets) {
         std::string preset_name = prstft->get_preset_name();
         if (Preset* preset = wxGetApp().preset_bundle->printers.find_preset(preset_name)) {
-            std::string model_id = preset->config.opt_string("printer_model");
-            auto model_supports_prusalink = [](const std::string &model) {
-                return model.size() >= 3 &&
-                    ((boost::starts_with(model, "MK") && model[2] > '2' && model[2] <= '9') ||
-                      boost::starts_with(model, "MINI"));
-            };
+            std::string model_id = preset->config.opt_string("printer_model");            
             if (preset->vendor) {
                 if (preset->vendor->name == "Prusa Research") {
                     const std::vector<VendorProfile::PrinterModel>& models = preset->vendor->models;
@@ -541,37 +576,73 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
                     if (it != models.end() && model_supports_prusalink(it->family))
                         continue;
                 }
-            } else if (model_supports_prusalink(model_id))
+            }
+            else if (model_supports_prusalink(model_id))
                 continue;
         }
-        all_presets_are_from_mk3_family = false;
+        link.supported = false;
         break;
     }
 
-    Field* ht = m_optgroup->get_field("host_type");
+    // set all_presets_are_prusaconnect_supported
+    for (PresetForPrinter* prstft : m_presets) {
+        std::string preset_name = prstft->get_preset_name();
+        Preset* preset = wxGetApp().preset_bundle->printers.find_preset(preset_name);
+        if (!preset) {
+            connect.supported = false;
+            break;
+        }
+        std::string model_id = preset->config.opt_string("printer_model");
+        if (preset->vendor && preset->vendor->name != "Prusa Research") {
+            connect.supported = false;
+            break;
+        }
+        if (preset->vendor && preset->vendor->name != "Prusa Research") {
+            connect.supported = false;
+            break;
+        }
+        // model id should be enough for this case
+        if (!model_supports_prusaconnect(model_id)) {
+            connect.supported = false;
+            break;
+        }
+    }
 
+    Field* ht = m_optgroup->get_field("host_type");
     wxArrayString types;
+    int last_in_conf = m_config->option("host_type")->getInt(); //  this is real position in last choice
+
+
     // Append localized enum_labels
     assert(ht->m_opt.enum_labels.size() == ht->m_opt.enum_values.size());
     for (size_t i = 0; i < ht->m_opt.enum_labels.size(); i++) {
-        if (ht->m_opt.enum_values[i] == "prusalink" && !all_presets_are_from_mk3_family)
-            continue;
+        if (ht->m_opt.enum_values[i] == "prusalink"){
+            link.label = _(ht->m_opt.enum_labels[i]);
+            if (!link.supported)
+                continue;
+        }
+        if (ht->m_opt.enum_values[i] == "prusaconnect") {
+            connect.label = _(ht->m_opt.enum_labels[i]);
+            if (!connect.supported)
+                continue;
+        }
+
         types.Add(_(ht->m_opt.enum_labels[i]));
     }
 
     Choice* choice = dynamic_cast<Choice*>(ht);
     choice->set_values(types);
-    auto set_to_choice_and_config = [this, choice](PrintHostType type) {
-        choice->set_value(static_cast<int>(type));
+    int index_in_choice = (printer_change ? 0 : last_in_conf);
+    choice->set_value(index_in_choice);
+    if (link.supported && link.label == _(ht->m_opt.enum_labels[index_in_choice]))
+        m_config->set_key_value("host_type", new ConfigOptionEnum<PrintHostType>(htPrusaLink));
+    else if (link.supported && link.label == _(ht->m_opt.enum_labels[index_in_choice]))
+        m_config->set_key_value("host_type", new ConfigOptionEnum<PrintHostType>(htPrusaConnect));
+    else {
+        int host_type = std::clamp(index_in_choice + ((int)ht->m_opt.enum_values.size() - (int)types.size()), 0, (int)ht->m_opt.enum_values.size() - 1);
+        PrintHostType type = static_cast<PrintHostType>(host_type);
         m_config->set_key_value("host_type", new ConfigOptionEnum<PrintHostType>(type));
-    };
-    if ((printer_change && all_presets_are_from_mk3_family) || (!had_all_mk3 && all_presets_are_from_mk3_family))
-        set_to_choice_and_config(htPrusaLink);  
-    else if ((printer_change && !all_presets_are_from_mk3_family) || (!all_presets_are_from_mk3_family && m_config->option<ConfigOptionEnum<PrintHostType>>("host_type")->value == htPrusaLink))
-        set_to_choice_and_config(htOctoPrint);
-    else
-        choice->set_value(m_config->option("host_type")->getInt());
-    had_all_mk3 = all_presets_are_from_mk3_family;
+    }
 }
 
 
@@ -591,7 +662,7 @@ void PhysicalPrinterDialog::update_full_printer_names()
 void PhysicalPrinterDialog::set_printer_technology(PrinterTechnology pt)
 {
     m_config->set_key_value("printer_technology", new ConfigOptionEnum<PrinterTechnology>(pt));
-    update();
+    update(true);
 }
 
 PrinterTechnology PhysicalPrinterDialog::get_printer_technology()
