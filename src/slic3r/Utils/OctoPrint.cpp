@@ -716,7 +716,7 @@ bool PrusaLink::get_storage(wxArrayString& output) const
             res = true;
        
     })
-    .on_complete([&, this](std::string body, unsigned) {
+    .on_complete([&](std::string body, unsigned) {
         BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: Got storage: %2%") % name % body;
         try
         {
@@ -968,7 +968,6 @@ bool PrusaLink::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn p
     }
 
     std::string url;
-    bool res = true;
     std::string storage_path = (use_put ? "api/v1/files" : "api/files");
     storage_path += (upload_data.storage.empty() ? "/local" : upload_data.storage);
 #ifdef WIN32

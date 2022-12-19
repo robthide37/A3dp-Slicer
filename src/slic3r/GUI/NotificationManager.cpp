@@ -1135,7 +1135,7 @@ void NotificationManager::PrintHostUploadNotification::generate_text()
 		line1 = shorten_to_line(m_filename, true);
 	} else  {
 		line1 = shorten_to_line(m_filename + rest, false);
-		int over = line1.size() - m_filename.size();
+		size_t over = line1.size() - m_filename.size();
 		if (over < 0)
 			over = 0;
 		if (over < rest.size())
