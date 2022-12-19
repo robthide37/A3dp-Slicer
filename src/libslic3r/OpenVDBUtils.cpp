@@ -49,7 +49,7 @@ template VoxelGridPtr make_voxelgrid<>();
 
 inline Vec3f to_vec3f(const openvdb::Vec3s &v) { return Vec3f{v.x(), v.y(), v.z()}; }
 inline Vec3d to_vec3d(const openvdb::Vec3s &v) { return to_vec3f(v).cast<double>(); }
-inline Vec3i to_vec3i(const openvdb::Vec3I &v) { return Vec3i{int(v[0]), int(v[1]), int(v[2])}; }
+inline Vec3i to_vec3i(const openvdb::Vec3I &v) { return Vec3i{int(v[2]), int(v[1]), int(v[0])}; }
 
 class TriangleMeshDataAdapter {
 public:
@@ -170,7 +170,7 @@ indexed_triangle_set grid_to_mesh(const VoxelGrid &vgrid,
     for (auto &v : triangles) ret.indices.emplace_back(to_vec3i(v));
     for (auto &quad : quads) {
         ret.indices.emplace_back(quad(2), quad(1), quad(0));
-        ret.indices.emplace_back(quad(0), quad(3), quad(2));
+        ret.indices.emplace_back(quad(3), quad(2), quad(0));
     }
 
     return ret;
