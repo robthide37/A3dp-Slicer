@@ -130,15 +130,49 @@ void SLAPrint::Steps::apply_printer_corrections(SLAPrintObject &po, SliceOrigin 
     }
 }
 
+template<class Cont> bool is_all_positive(const Cont &csgmesh)
+{
+    bool is_all_pos =
+        std::all_of(csgmesh.begin(),
+                    csgmesh.end(),
+                    [](auto &part) {
+                        return csg::get_operation(part) == csg::CSGType::Union;
+                    });
+
+    return is_all_pos;
+}
+
+template<class Cont>
+static indexed_triangle_set csgmesh_merge_positive_parts(const Cont &csgmesh)
+{
+    indexed_triangle_set m;
+    for (auto &csgpart : csgmesh) {
+        auto op = csg::get_operation(csgpart);
+        const indexed_triangle_set * pmesh = csg::get_mesh(csgpart);
+        if (pmesh && op == csg::CSGType::Union) {
+            indexed_triangle_set mcpy = *pmesh;
+            its_transform(mcpy, csg::get_transform(csgpart));
+            its_merge(m, mcpy);
+        }
+    }
+
+    return m;
+}
+
 indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
     SLAPrintObject &po, SLAPrintObjectStep step)
 {
+    // Empirical upper limit to not get excessive performance hit
+    constexpr double MaxPreviewVoxelScale = 18.;
+
     Benchmark bench;
 
     bench.start();
 
     // update preview mesh
-    double vscale = 1. / (1.5 * po.m_config.layer_height.getFloat());
+    double vscale = std::min(MaxPreviewVoxelScale,
+                             1. / po.m_config.layer_height.getFloat());
+
     auto   voxparams = csg::VoxelizeParams{}
                          .voxel_scale(vscale)
                          .exterior_bandwidth(1.f)
@@ -150,14 +184,13 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
 
     auto r = range(po.m_mesh_to_slice);
     auto m = indexed_triangle_set{};
-    if (r.size() > 1) {
+    if (r.size() > 1 && !is_all_positive(r)) {
         auto grid = csg::voxelize_csgmesh(r, voxparams);
         m = grid ? grid_to_mesh(*grid) : indexed_triangle_set{};
-    } else if (!r.empty()) {
-        m = *(csg::get_mesh(*r.begin()));
-        auto tr = csg::get_transform(*r.begin());
-        for (auto &v : m.vertices)
-            v = tr * v;
+//        float loss_less_max_error = 1e-6;
+//        its_quadric_edge_collapse(m, 0U, &loss_less_max_error);
+    } else {
+        m = csgmesh_merge_positive_parts(r);
     }
 
     bench.stop();
