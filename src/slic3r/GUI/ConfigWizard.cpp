@@ -57,7 +57,7 @@
 namespace Slic3r {
 namespace GUI {
 
-#define MAIN_VENDOR "None"
+
 
 using Config::Snapshot;
 using Config::SnapshotDB;

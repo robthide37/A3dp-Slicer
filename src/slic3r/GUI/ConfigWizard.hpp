@@ -14,7 +14,8 @@ class PresetUpdater;
 
 namespace GUI {
 
-//#define ALLOW_PRUSA_FIRST 1
+#define ALLOW_PRUSA_FIRST "A3dp"
+//#define MAIN_VENDOR "A3dp"
 
 class ConfigWizard: public DPIDialog
 {
