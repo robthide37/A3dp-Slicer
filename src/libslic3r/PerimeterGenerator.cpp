@@ -664,11 +664,11 @@ bool paths_touch(const ExtrusionPath &path_one, const ExtrusionPath &path_two, d
     AABBTreeLines::LinesDistancer<Line> lines_two{path_two.as_polyline().lines()};
 
     for (size_t pt_idx = 0; pt_idx < path_one.polyline.size(); pt_idx++) {
-        if (std::abs(lines_two.signed_distance_from_lines(path_one.polyline.points[pt_idx])) < limit_distance) { return true; }
+        if (lines_two.distance_from_lines<false>(path_one.polyline.points[pt_idx]) < limit_distance) { return true; }
     }
 
     for (size_t pt_idx = 0; pt_idx < path_two.polyline.size(); pt_idx++) {
-        if (std::abs(lines_one.signed_distance_from_lines(path_two.polyline.points[pt_idx])) < limit_distance) { return true; }
+        if (lines_one.distance_from_lines<false>(path_two.polyline.points[pt_idx]) < limit_distance) { return true; }
     }
     return false;
 }
