@@ -277,7 +277,10 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
         po.m_hollowing_data.reset(new SLAPrintObject::HollowingData());
         po.m_hollowing_data->interior = std::move(interior);
 
-        indexed_triangle_set &m = sla::get_mesh(*po.m_hollowing_data->interior);
+        indexed_triangle_set m = sla::get_mesh(*po.m_hollowing_data->interior);
+
+        // Release the data, won't be needed anymore, takes huge amount of ram
+        po.m_hollowing_data->interior.reset();
 
         if (!m.empty()) {
             // simplify mesh lossless
@@ -291,8 +294,7 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
         // Put the interior into the target mesh as a negative
         po.m_mesh_to_slice
             .emplace(slaposHollowing,
-                     csg::CSGPart{&sla::get_mesh(*po.m_hollowing_data->interior),
-                                  csg::CSGType::Difference});
+                     csg::CSGPart{std::make_unique<indexed_triangle_set>(std::move(m)), csg::CSGType::Difference});
 
         generate_preview(po, slaposHollowing);
     }
