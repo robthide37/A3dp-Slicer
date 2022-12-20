@@ -2,6 +2,9 @@
 #define SLICECSGMESH_HPP
 
 #include "CSGMesh.hpp"
+
+#include <stack>
+
 #include "libslic3r/TriangleMeshSlicer.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Execution/ExecutionTBB.hpp"
@@ -10,56 +13,106 @@ namespace Slic3r { namespace csg {
 
 template<class ItCSG>
 std::vector<ExPolygons> slice_csgmesh_ex(
-    const Range<ItCSG>          &csg,
+    const Range<ItCSG>          &csgrange,
     const std::vector<float>    &slicegrid,
     const MeshSlicingParamsEx   &params,
     const std::function<void()> &throw_on_cancel = [] {})
 {
-    std::vector<ExPolygons> ret(slicegrid.size());
+    struct Frame { CSGType op; std::vector<ExPolygons> slices; };
+
+    std::stack opstack{std::vector<Frame>{}};
 
     MeshSlicingParamsEx params_cpy = params;
     auto trafo = params.trafo;
     auto nonempty_indices = reserve_vector<size_t>(slicegrid.size());
 
-    for (const auto &m : csg) {
-        const indexed_triangle_set *its = csg::get_mesh(m);
-        if (!its)
-            continue;
+    if (!csgrange.empty() && csg::get_stack_operation(*csgrange.begin()) != CSGStackOp::Push)
+        opstack.push({CSGType::Union, std::vector<ExPolygons>(slicegrid.size())});
 
-        params_cpy.trafo = trafo * csg::get_transform(m).template cast<double>();
-        std::vector<ExPolygons> slices = slice_mesh_ex(*its,
-                                                       slicegrid, params_cpy,
-                                                       throw_on_cancel);
+    for (const auto &csgpart : csgrange) {
+        const indexed_triangle_set *its = csg::get_mesh(csgpart);
 
-        assert(slices.size() == slicegrid.size());
+        auto op = get_operation(csgpart);
 
-        nonempty_indices.clear();
-        for (size_t i = 0; i < slicegrid.size(); ++i) {
-            if (get_operation(m) == CSGType::Intersection || !slices[i].empty())
-                nonempty_indices.emplace_back(i);
+        if (get_stack_operation(csgpart) == CSGStackOp::Push) {
+            opstack.push({op, std::vector<ExPolygons>(slicegrid.size())});
+            op = CSGType::Union;
         }
 
-        auto mergefn = [&m, &slices, &ret](size_t i){
-            switch(get_operation(m)) {
-            case CSGType::Union:
-                for (ExPolygon &expoly : slices[i])
-                    ret[i].emplace_back(std::move(expoly));
+        Frame *top = &opstack.top();
 
-                break;
-            case CSGType::Difference:
-                ret[i] = diff_ex(ret[i], slices[i]);
-                break;
-            case CSGType::Intersection:
-                ret[i] = intersection_ex(ret[i], slices[i]);
-                break;
+        if (its) {
+            params_cpy.trafo = trafo * csg::get_transform(csgpart).template cast<double>();
+            std::vector<ExPolygons> slices = slice_mesh_ex(*its,
+                                                           slicegrid, params_cpy,
+                                                           throw_on_cancel);
+
+            assert(slices.size() == slicegrid.size());
+
+            nonempty_indices.clear();
+            for (size_t i = 0; i < slicegrid.size(); ++i) {
+                if (op == CSGType::Intersection || !slices[i].empty())
+                    nonempty_indices.emplace_back(i);
             }
-        };
 
-        execution::for_each(ex_tbb,
-                            nonempty_indices.begin(), nonempty_indices.end(),
-                            mergefn,
-                            execution::max_concurrency(ex_tbb));
+            auto mergefn = [&csgpart, &slices, &top](size_t i){
+                switch(get_operation(csgpart)) {
+                case CSGType::Union:
+                    for (ExPolygon &expoly : slices[i])
+                        top->slices[i].emplace_back(std::move(expoly));
+
+                    break;
+                case CSGType::Difference:
+                    top->slices[i] = diff_ex(top->slices[i], slices[i]);
+                    break;
+                case CSGType::Intersection:
+                    top->slices[i] = intersection_ex(top->slices[i], slices[i]);
+                    break;
+                }
+            };
+
+            execution::for_each(ex_tbb,
+                                nonempty_indices.begin(), nonempty_indices.end(),
+                                mergefn,
+                                execution::max_concurrency(ex_tbb));
+        }
+
+        if (get_stack_operation(csgpart) == CSGStackOp::Pop) {
+            std::vector<ExPolygons> popslices = std::move(top->slices);
+            auto popop = opstack.top().op;
+            opstack.pop();
+            std::vector<ExPolygons> &prev_slices = opstack.top().slices;
+
+            nonempty_indices.clear();
+            for (size_t i = 0; i < slicegrid.size(); ++i) {
+                if (popop == CSGType::Intersection || !popslices[i].empty())
+                    nonempty_indices.emplace_back(i);
+            }
+
+            auto mergefn2 = [&popslices, &prev_slices, popop](size_t i){
+                switch(popop) {
+                case CSGType::Union:
+                    for (ExPolygon &expoly : popslices[i])
+                        prev_slices[i].emplace_back(std::move(expoly));
+
+                    break;
+                case CSGType::Difference:
+                    prev_slices[i] = diff_ex(prev_slices[i], popslices[i]);
+                    break;
+                case CSGType::Intersection:
+                    prev_slices[i] = intersection_ex(prev_slices[i], popslices[i]);
+                    break;
+                }
+            };
+
+            execution::for_each(ex_tbb,
+                                nonempty_indices.begin(), nonempty_indices.end(),
+                                mergefn2,
+                                execution::max_concurrency(ex_tbb));
+        }
     }
+
+    std::vector<ExPolygons> ret = std::move(opstack.top().slices);
 
     execution::for_each(ex_tbb, ret.begin(), ret.end(), [](ExPolygons &slice) {
         auto it = std::remove_if(slice.begin(), slice.end(), [](const ExPolygon &p){

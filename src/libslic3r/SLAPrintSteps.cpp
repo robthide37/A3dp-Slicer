@@ -242,7 +242,7 @@ void SLAPrint::Steps::mesh_assembly(SLAPrintObject &po)
 
     csg::model_to_csgmesh(*po.model_object(), po.trafo(),
                           csg_inserter{po.m_mesh_to_slice, slaposAssembly},
-                          csg::mpartsPositive | csg::mpartsNegative);
+                          csg::mpartsPositive | csg::mpartsNegative | csg::mpartsDoSplits);
 
     generate_preview(po, slaposAssembly);
 }
@@ -352,9 +352,18 @@ template<class Cont> BoundingBoxf3 csgmesh_positive_bb(const Cont &csg)
                               bounding_box(*csg::get_mesh(*csg.begin()),
                                            csg::get_transform(*csg.begin()));
 
+    bool skip = false;
     for (const auto &m : csg) {
-        if (m.operation == csg::CSGType::Union)
+        auto op = csg::get_operation(m);
+        auto stackop = csg::get_stack_operation(m);
+        if (stackop == csg::CSGStackOp::Push && op != csg::CSGType::Union)
+            skip = true;
+
+        if (!skip && csg::get_mesh(m) && op == csg::CSGType::Union)
             bb3d.merge(bounding_box(*csg::get_mesh(m), csg::get_transform(m)));
+
+        if (stackop == csg::CSGStackOp::Pop)
+            skip = false;
     }
 
     return bb3d;

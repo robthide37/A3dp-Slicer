@@ -2,6 +2,7 @@
 #define VOXELIZECSGMESH_HPP
 
 #include <functional>
+#include <stack>
 
 #include "CSGMesh.hpp"
 #include "libslic3r/OpenVDBUtils.hpp"
@@ -46,28 +47,64 @@ VoxelGridPtr voxelize_csgmesh(const Range<It>      &csgrange,
     }, execution::max_concurrency(ex_tbb));
 
     size_t csgidx = 0;
+    struct Frame { CSGType op = CSGType::Union; VoxelGridPtr grid; };
+    std::stack opstack{std::vector<Frame>{}};
+
+    if (!csgrange.empty() && csg::get_stack_operation(*csgrange.begin()) != CSGStackOp::Push)
+        opstack.push({});
+
     for (auto &csgpart : csgrange) {
         if (params.statusfn() && params.statusfn()(-1))
             break;
 
         auto &partgrid = grids[csgidx++];
 
-        if (!ret && get_operation(csgpart) == CSGType::Union) {
-            ret = std::move(partgrid);
-        } else if (ret) {
+        auto op = get_operation(csgpart);
+
+        if (get_stack_operation(csgpart) == CSGStackOp::Push) {
+            opstack.push({op, nullptr});
+            op = CSGType::Union;
+        }
+
+        Frame *top = &opstack.top();
+
+        if (!top->grid && op == CSGType::Union) {
+            top->grid = std::move(partgrid);
+        } else if (top->grid && partgrid) {
             switch (get_operation(csgpart)) {
             case CSGType::Union:
-                grid_union(*ret, *partgrid);
+                grid_union(*(top->grid), *partgrid);
                 break;
             case CSGType::Difference:
-                grid_difference(*ret, *partgrid);
+                grid_difference(*(top->grid), *partgrid);
                 break;
             case CSGType::Intersection:
-                grid_intersection(*ret, *partgrid);
+                grid_intersection(*(top->grid), *partgrid);
+                break;
+            }
+        }
+
+        if (get_stack_operation(csgpart) == CSGStackOp::Pop) {
+            VoxelGridPtr popgrid = std::move(top->grid);
+            auto popop = opstack.top().op;
+            opstack.pop();
+            VoxelGridPtr &grid = opstack.top().grid;
+
+            switch (popop) {
+            case CSGType::Union:
+                grid_union(*grid, *popgrid);
+                break;
+            case CSGType::Difference:
+                grid_difference(*grid, *popgrid);
+                break;
+            case CSGType::Intersection:
+                grid_intersection(*grid, *popgrid);
                 break;
             }
         }
     }
+
+    ret = std::move(opstack.top().grid);
 
     return ret;
 }

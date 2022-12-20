@@ -1114,7 +1114,7 @@ VoxelGridPtr get_voxelgrid(const CSGPartForStep &part, VoxelizeParams p)
 {
     VoxelGridPtr &ret = part.gridcache[p];
 
-    if (!ret) {
+    if (!ret && csg::get_mesh(part)) {
         p.trafo(csg::get_transform(part));
         ret = mesh_to_grid(*csg::get_mesh(part), p);
     }

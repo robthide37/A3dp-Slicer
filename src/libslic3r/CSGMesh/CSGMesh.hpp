@@ -18,11 +18,17 @@ namespace Slic3r { namespace csg {
 
 // Supported CSG operation types
 enum class CSGType { Union, Difference, Intersection };
+enum class CSGStackOp { Push, Continue, Pop };
 
 // Get the CSG operation of the part. Can be overriden for any type
 template<class CSGPartT> CSGType get_operation(const CSGPartT &part)
 {
     return part.operation;
+}
+
+template<class CSGPartT> CSGStackOp get_stack_operation(const CSGPartT &part)
+{
+    return part.stack_operation;
 }
 
 // Get the mesh for the part. Can be overriden for any type
@@ -48,6 +54,11 @@ inline CSGType get_operation(const indexed_triangle_set &part)
     return CSGType::Union;
 }
 
+inline CSGStackOp get_stack_operation(const indexed_triangle_set &part)
+{
+    return CSGStackOp::Continue;
+}
+
 inline const indexed_triangle_set * get_mesh(const indexed_triangle_set &part)
 {
     return &part;
@@ -63,6 +74,7 @@ struct CSGPart {
     AnyPtr<const indexed_triangle_set> its_ptr;
     Transform3f trafo;
     CSGType operation;
+    CSGStackOp stack_operation;
 
     CSGPart(AnyPtr<const indexed_triangle_set> ptr = {},
             CSGType                            op  = CSGType::Union,
