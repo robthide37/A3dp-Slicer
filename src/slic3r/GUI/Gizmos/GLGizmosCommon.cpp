@@ -119,7 +119,7 @@ void SelectionInfo::on_update()
         if (m_model_object)
             m_print_object = get_pool()->get_canvas()->sla_print()->get_print_object_by_model_object_id(m_model_object->id());
 
-        m_z_shift = selection.get_first_volume()->get_sla_shift_z();
+        m_z_shift = m_print_object ? m_print_object->get_current_elevation() : selection.get_first_volume()->get_sla_shift_z();
     }
 }
 
