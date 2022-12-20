@@ -613,6 +613,8 @@ void TreeModelVolumes::calculateAvoidance(const std::vector<RadiusLayerPair> &ke
             BOOST_LOG_TRIVIAL(debug) << "Calculation requested for value already calculated?";
             continue;
         }
+        if ((task.to_model && !to_model) || (!task.to_model && !to_build_plate))
+            continue;
         if (! task.holefree() || task.radius < m_increase_until_radius + m_current_min_xy_dist_delta)
             avoidance_tasks.emplace_back(task);
     }
