@@ -2231,6 +2231,18 @@ void GLGizmoEmboss::draw_delete_style_button() {
     }
 }
 
+namespace priv {
+/// <summary>
+/// Transform origin of Text volume onto surface of model.
+/// </summary>
+/// <param name="volume">Text</param>
+/// <param name="raycast_manager">AABB trees of object</param>
+/// <param name="selection">Transformation of actual instance</param>
+/// <returns>True when transform otherwise false</returns>
+bool transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection);
+} // namespace priv
+
+
 void GLGizmoEmboss::fix_transformation(const FontProp &from,
                                        const FontProp &to)
 {
@@ -2252,6 +2264,10 @@ void GLGizmoEmboss::fix_transformation(const FontProp &from,
         float t_move = t_move_opt.has_value() ? *t_move_opt : .0f;
         do_translate(Vec3d::UnitZ() * (t_move - f_move));
     }
+
+    // when start using surface than move volume origin onto surface
+    if (!from.use_surface && to.use_surface)
+        priv::transform_on_surface(*m_volume, m_raycast_manager, m_parent.get_selection());
 }
 
 void GLGizmoEmboss::draw_style_list() {
@@ -2354,8 +2370,11 @@ void GLGizmoEmboss::draw_style_list() {
     // selected style from combo box
     if (selected_style_index.has_value()) {
         const EmbossStyle &style = m_style_manager.get_styles()[*selected_style_index].style;
-        fix_transformation(actual_style.prop, style.prop);
+        // create copy to be able do fix transformation only when successfully load style
+        FontProp act_prop = actual_style.prop;  // copy
+        FontProp new_prop = style.prop;         // copy
         if (m_style_manager.load_style(*selected_style_index)) {
+            fix_transformation(act_prop, new_prop);
             process();
         } else {
             wxString title   = _L("Not valid style.");
@@ -2867,16 +2886,8 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     // snapshot_name = L("Set text rotation");
     m_parent.do_rotate(snapshot_name);
 }
-namespace priv {
 
-/// <summary>
-/// Transform origin of Text volume onto surface of model.
-/// </summary>
-/// <param name="volume">Text</param>
-/// <param name="raycast_manager">AABB trees of object</param>
-/// <param name="selection">Transformation of actual instance</param>
-/// <returns>True when transform otherwise false</returns>
-bool transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection)
+bool priv::transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection)
 {
     // Move object on surface
     auto cond = RaycastManager::SkipVolume({volume.id().id});
@@ -2911,7 +2922,6 @@ bool transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, 
     volume.set_transformation(volume.get_matrix() * Eigen::Translation<double, 3>(offset_volume));
     return true;
 }
-} // namespace priv
 
 void GLGizmoEmboss::draw_advanced()
 {
