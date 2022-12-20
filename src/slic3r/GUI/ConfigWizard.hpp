@@ -47,6 +47,9 @@ namespace DownloaderUtils {
     };
 }
 
+#define ALLOW_PRUSA_FIRST "A3dp"
+//#define MAIN_VENDOR "A3dp"
+
 class ConfigWizard: public DPIDialog
 {
 public:
