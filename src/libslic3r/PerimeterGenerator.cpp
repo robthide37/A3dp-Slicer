@@ -433,10 +433,12 @@ static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Path &subject, con
     clipper.AddPath(subject, ClipperLib_Z::ptSubject, false);
     clipper.AddPaths(clip, ClipperLib_Z::ptClip, true);
 
-    ClipperLib_Z::PolyTree clipped_polytree;
     ClipperLib_Z::Paths    clipped_paths;
-    clipper.Execute(clipType, clipped_polytree, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
-    ClipperLib_Z::PolyTreeToPaths(clipped_polytree, clipped_paths);
+    {
+        ClipperLib_Z::PolyTree clipped_polytree;
+        clipper.Execute(clipType, clipped_polytree, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
+        ClipperLib_Z::PolyTreeToPaths(std::move(clipped_polytree), clipped_paths);
+    }
 
     // Clipped path could contain vertices from the clip with a Z coordinate equal to zero.
     // For those vertices, we must assign value based on the subject.

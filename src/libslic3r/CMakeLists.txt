@@ -22,6 +22,8 @@ set(SLIC3R_SOURCES
     AABBTreeLines.hpp
     AABBMesh.hpp
     AABBMesh.cpp
+    Algorithm/RegionExpansion.cpp
+    Algorithm/RegionExpansion.hpp
     BoundingBox.cpp
     BoundingBox.hpp
     BridgeDetector.cpp
@@ -35,6 +37,7 @@ set(SLIC3R_SOURCES
     clipper.hpp
     ClipperUtils.cpp
     ClipperUtils.hpp
+    ClipperZUtils.hpp
     Color.cpp
     Color.hpp
     Config.cpp
