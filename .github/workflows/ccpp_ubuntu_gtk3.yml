@@ -1,13 +1,9 @@
-name: C/C++ Nightly ubuntu-GTK3
+name: C/C++ Patch-01 ubuntu-GTK3
 
 on:
   push:
     branches:
-      - Nigthly
-      - nightly_dev
-      - nightly_master
-      - debug_ubuntu
-      - dev
+      - patch-1
 
 jobs:
   build:
@@ -38,7 +34,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
-        name: nightly_linux_gtk3.tar
+        name: ${{ github.event.repository.name }}_gtk3.tar
         path: build/${{ github.event.repository.name }}.tar
     - name: Upload appimage
       uses: actions/upload-artifact@v1.0.0
