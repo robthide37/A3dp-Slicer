@@ -188,7 +188,7 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
 #else
                     GetTextExtent(label, &label_w, &label_h, 0, 0, &m_font);
 #endif //__WXMSW__
-                    h_pos += label_w + 1 + m_h_gap;
+                    h_pos += label_w + m_h_gap;
                 }                
                 h_pos += (opt.opt.gui_type == ConfigOptionDef::GUIType::legend ? 1 : 3) * blinking_button_width;
                 
@@ -199,7 +199,7 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
                 if (opt.opt.gui_type == ConfigOptionDef::GUIType::legend)
                     h_pos += 2 * blinking_button_width;
 
-                h_pos += field->getWindow()->GetSize().x;
+                h_pos += field->getWindow()->GetSize().x + m_h_gap;
 
                 if (option_set.size() == 1 && option_set.front().opt.full_width)
                     break;
