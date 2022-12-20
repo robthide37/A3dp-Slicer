@@ -893,7 +893,7 @@ static void generate_initial_areas(
     //FIXME Vojtech: This is not sufficient for support enforcers to work.
     //FIXME There is no account for the support overhang angle.
     //FIXME There is no account for the width of the collision regions.
-    const coord_t extra_outset = std::max(coord_t(0), mesh_config.min_radius - mesh_config.support_line_width) + (min_xy_dist ? mesh_config.support_line_width / 2 : 0)
+    const coord_t extra_outset = std::max(coord_t(0), mesh_config.min_radius - mesh_config.support_line_width / 2) + (min_xy_dist ? mesh_config.support_line_width / 2 : 0)
         //FIXME this is a heuristic value for support enforcers to work.
 //        + 10 * mesh_config.support_line_width;
         ;
