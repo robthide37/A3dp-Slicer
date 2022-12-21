@@ -28,10 +28,31 @@ VoxelGridPtr get_voxelgrid(const CSGPartT &csgpart, VoxelizeParams params)
     return ret;
 }
 
+namespace detail {
+
+inline void perform_csg(CSGType op, VoxelGridPtr &dst, VoxelGridPtr &src)
+{
+    switch (op) {
+    case CSGType::Union:
+        grid_union(*dst, *src);
+        break;
+    case CSGType::Difference:
+        grid_difference(*dst, *src);
+        break;
+    case CSGType::Intersection:
+        grid_intersection(*dst, *src);
+        break;
+    }
+}
+
+} // namespace detail
+
 template<class It>
 VoxelGridPtr voxelize_csgmesh(const Range<It>      &csgrange,
                               const VoxelizeParams &params = {})
 {
+    using namespace detail;
+
     VoxelGridPtr ret;
 
     std::vector<VoxelGridPtr> grids (csgrange.size());
@@ -50,7 +71,8 @@ VoxelGridPtr voxelize_csgmesh(const Range<It>      &csgrange,
     struct Frame { CSGType op = CSGType::Union; VoxelGridPtr grid; };
     std::stack opstack{std::vector<Frame>{}};
 
-    if (!csgrange.empty() && csg::get_stack_operation(*csgrange.begin()) != CSGStackOp::Push)
+    if (!csgrange.empty() &&
+        csg::get_stack_operation(*csgrange.begin()) != CSGStackOp::Push)
         opstack.push({});
 
     for (auto &csgpart : csgrange) {
@@ -71,17 +93,7 @@ VoxelGridPtr voxelize_csgmesh(const Range<It>      &csgrange,
         if (!top->grid && op == CSGType::Union) {
             top->grid = std::move(partgrid);
         } else if (top->grid && partgrid) {
-            switch (get_operation(csgpart)) {
-            case CSGType::Union:
-                grid_union(*(top->grid), *partgrid);
-                break;
-            case CSGType::Difference:
-                grid_difference(*(top->grid), *partgrid);
-                break;
-            case CSGType::Intersection:
-                grid_intersection(*(top->grid), *partgrid);
-                break;
-            }
+            perform_csg(get_operation(csgpart), top->grid, partgrid);
         }
 
         if (get_stack_operation(csgpart) == CSGStackOp::Pop) {
@@ -89,18 +101,7 @@ VoxelGridPtr voxelize_csgmesh(const Range<It>      &csgrange,
             auto popop = opstack.top().op;
             opstack.pop();
             VoxelGridPtr &grid = opstack.top().grid;
-
-            switch (popop) {
-            case CSGType::Union:
-                grid_union(*grid, *popgrid);
-                break;
-            case CSGType::Difference:
-                grid_difference(*grid, *popgrid);
-                break;
-            case CSGType::Intersection:
-                grid_intersection(*grid, *popgrid);
-                break;
-            }
+            perform_csg(popop, grid, popgrid);
         }
     }
 

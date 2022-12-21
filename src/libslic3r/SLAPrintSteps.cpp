@@ -206,7 +206,15 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
 
 void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
 {
-    po.m_preview_meshes[step] = TriangleMesh{generate_preview_vdb(po, step)};
+    auto r = range(po.m_mesh_to_slice);
+    if (csg::check_csgmesh_booleans(r) == r.end()) {
+        auto cgalmesh = csg::perform_csgmesh_booleans(r);
+        po.m_preview_meshes[step] = MeshBoolean::cgal::cgal_to_triangle_mesh(*cgalmesh);
+    } else {
+        po.active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
+                                   L("Can't do proper mesh booleans!"));
+        po.m_preview_meshes[step] = TriangleMesh{generate_preview_vdb(po, step)};
+    }
 
     for (size_t i = size_t(step) + 1; i < slaposCount; ++i)
     {

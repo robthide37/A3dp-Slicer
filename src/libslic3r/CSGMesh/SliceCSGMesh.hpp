@@ -11,6 +11,40 @@
 
 namespace Slic3r { namespace csg {
 
+namespace detail {
+
+void merge_slices(csg::CSGType op, size_t i,
+                  std::vector<ExPolygons> &target,
+                  std::vector<ExPolygons> &source)
+{
+    switch(op) {
+    case CSGType::Union:
+        for (ExPolygon &expoly : source[i])
+            target[i].emplace_back(std::move(expoly));
+        break;
+    case CSGType::Difference:
+        target[i] = diff_ex(target[i], source[i]);
+        break;
+    case CSGType::Intersection:
+        target[i] = intersection_ex(target[i], source[i]);
+        break;
+    }
+}
+
+void collect_nonempty_indices(csg::CSGType                   op,
+                              const std::vector<float>      &slicegrid,
+                              const std::vector<ExPolygons> &slices,
+                              std::vector<size_t>            indices)
+{
+    indices.clear();
+    for (size_t i = 0; i < slicegrid.size(); ++i) {
+        if (op == CSGType::Intersection || !slices[i].empty())
+            indices.emplace_back(i);
+    }
+}
+
+} // namespace detail
+
 template<class ItCSG>
 std::vector<ExPolygons> slice_csgmesh_ex(
     const Range<ItCSG>          &csgrange,
@@ -18,6 +52,8 @@ std::vector<ExPolygons> slice_csgmesh_ex(
     const MeshSlicingParamsEx   &params,
     const std::function<void()> &throw_on_cancel = [] {})
 {
+    using namespace detail;
+
     struct Frame { CSGType op; std::vector<ExPolygons> slices; };
 
     std::stack opstack{std::vector<Frame>{}};
@@ -49,32 +85,13 @@ std::vector<ExPolygons> slice_csgmesh_ex(
 
             assert(slices.size() == slicegrid.size());
 
-            nonempty_indices.clear();
-            for (size_t i = 0; i < slicegrid.size(); ++i) {
-                if (op == CSGType::Intersection || !slices[i].empty())
-                    nonempty_indices.emplace_back(i);
-            }
+            collect_nonempty_indices(op, slicegrid, slices, nonempty_indices);
 
-            auto mergefn = [&csgpart, &slices, &top](size_t i){
-                switch(get_operation(csgpart)) {
-                case CSGType::Union:
-                    for (ExPolygon &expoly : slices[i])
-                        top->slices[i].emplace_back(std::move(expoly));
-
-                    break;
-                case CSGType::Difference:
-                    top->slices[i] = diff_ex(top->slices[i], slices[i]);
-                    break;
-                case CSGType::Intersection:
-                    top->slices[i] = intersection_ex(top->slices[i], slices[i]);
-                    break;
-                }
-            };
-
-            execution::for_each(ex_tbb,
-                                nonempty_indices.begin(), nonempty_indices.end(),
-                                mergefn,
-                                execution::max_concurrency(ex_tbb));
+            execution::for_each(
+                ex_tbb, nonempty_indices.begin(), nonempty_indices.end(),
+                [op, &slices, &top](size_t i) {
+                    merge_slices(op, i, top->slices, slices);
+                }, execution::max_concurrency(ex_tbb));
         }
 
         if (get_stack_operation(csgpart) == CSGStackOp::Pop) {
@@ -83,37 +100,19 @@ std::vector<ExPolygons> slice_csgmesh_ex(
             opstack.pop();
             std::vector<ExPolygons> &prev_slices = opstack.top().slices;
 
-            nonempty_indices.clear();
-            for (size_t i = 0; i < slicegrid.size(); ++i) {
-                if (popop == CSGType::Intersection || !popslices[i].empty())
-                    nonempty_indices.emplace_back(i);
-            }
+            collect_nonempty_indices(popop, slicegrid, popslices, nonempty_indices);
 
-            auto mergefn2 = [&popslices, &prev_slices, popop](size_t i){
-                switch(popop) {
-                case CSGType::Union:
-                    for (ExPolygon &expoly : popslices[i])
-                        prev_slices[i].emplace_back(std::move(expoly));
-
-                    break;
-                case CSGType::Difference:
-                    prev_slices[i] = diff_ex(prev_slices[i], popslices[i]);
-                    break;
-                case CSGType::Intersection:
-                    prev_slices[i] = intersection_ex(prev_slices[i], popslices[i]);
-                    break;
-                }
-            };
-
-            execution::for_each(ex_tbb,
-                                nonempty_indices.begin(), nonempty_indices.end(),
-                                mergefn2,
-                                execution::max_concurrency(ex_tbb));
+            execution::for_each(
+                ex_tbb, nonempty_indices.begin(), nonempty_indices.end(),
+                [&popslices, &prev_slices, popop](size_t i) {
+                    merge_slices(popop, i, prev_slices, popslices);
+                }, execution::max_concurrency(ex_tbb));
         }
     }
 
     std::vector<ExPolygons> ret = std::move(opstack.top().slices);
 
+    // TODO: verify if this part can be omitted or not.
     execution::for_each(ex_tbb, ret.begin(), ret.end(), [](ExPolygons &slice) {
         auto it = std::remove_if(slice.begin(), slice.end(), [](const ExPolygon &p){
             return p.area() < double(SCALED_EPSILON) * double(SCALED_EPSILON);
