@@ -3471,10 +3471,10 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         for (int hover_volume_id : m_hover_volume_idxs) { 
             const GLVolume &hover_gl_volume = *m_volumes.volumes[hover_volume_id];
             int object_idx = hover_gl_volume.object_idx();
-            if (object_idx < 0 || object_idx >= m_model->objects.size()) continue;
+            if (object_idx < 0 || static_cast<size_t>(object_idx) >= m_model->objects.size()) continue;
             const ModelObject* hover_object = m_model->objects[object_idx];
             int hover_volume_idx = hover_gl_volume.volume_idx();
-            if (hover_volume_idx < 0 || hover_volume_idx >= hover_object->volumes.size()) continue;
+            if (hover_volume_idx < 0 || static_cast<size_t>(hover_volume_idx) >= hover_object->volumes.size()) continue;
             const ModelVolume* hover_volume = hover_object->volumes[hover_volume_idx];
             if (!hover_volume->text_configuration.has_value()) continue;
             m_selection.add_volumes(Selection::EMode::Volume, {(unsigned) hover_volume_id});

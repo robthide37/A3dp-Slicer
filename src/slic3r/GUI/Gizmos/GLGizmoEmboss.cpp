@@ -246,7 +246,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
     DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager);
     const ModelObjectPtrs &objects = selection.get_model()->objects;
     // No selected object so create new object
-    if (selection.is_empty() || object_idx < 0 || object_idx >= objects.size()) {
+    if (selection.is_empty() || object_idx < 0 || static_cast<size_t>(object_idx) >= objects.size()) {
         // create Object on center of screen
         // when ray throw center of screen not hit bed it create object on center of bed
         priv::start_create_object_job(emboss_data, screen_center);
@@ -3600,7 +3600,7 @@ bool priv::start_create_volume_on_surface_job(
     const ModelObjectPtrs &objects = plater->model().objects;
 
     int object_idx = gl_volume->object_idx();
-    if (object_idx < 0 ||  object_idx >= objects.size()) return false;
+    if (object_idx < 0 || static_cast<size_t>(object_idx) >= objects.size()) return false;
     ModelObject *obj = objects[object_idx];
     size_t vol_id = obj->volumes[gl_volume->volume_idx()]->id().id;
     auto cond = RaycastManager::AllowVolumes({vol_id});
