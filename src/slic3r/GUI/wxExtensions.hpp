@@ -50,7 +50,7 @@ void    msw_buttons_rescale(wxDialog* dlg, const int em_unit, const std::vector<
 int     em_unit(wxWindow* win);
 int     mode_icon_px_size();
 
-wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name, int px_cnt = 16);
+wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name, int px_cnt = 16, const std::string& new_color_rgb = std::string());
 wxBitmapBundle* get_empty_bmp_bundle(int width, int height);
 wxBitmapBundle* get_solid_bmp_bundle(int width, int height, const std::string& color);
 
@@ -247,7 +247,7 @@ public:
     void SetBitmapDisabled_(const ScalableBitmap &bmp);
     int  GetBitmapHeight();
 
-    void    sys_color_changed();
+    virtual void    sys_color_changed();
 
 private:
     wxWindow*       m_parent { nullptr };
@@ -256,6 +256,7 @@ private:
     int             m_width {-1}; // should be multiplied to em_unit
     int             m_height{-1}; // should be multiplied to em_unit
 
+protected:
     // bitmap dimensions 
     int             m_px_cnt{ 16 };
     bool            m_has_border {false};
@@ -283,6 +284,12 @@ public:
         const std::string&  icon_name = "",
         int                 px_cnt = 16);
 
+    ModeButton(
+        wxWindow*           parent,
+        int                 mode_id,/*ConfigOptionMode*/
+        const wxString&     mode = wxEmptyString,
+        int                 px_cnt = 16);
+
     ~ModeButton() {}
 
     void Init(const wxString& mode);
@@ -292,16 +299,20 @@ public:
     void    OnLeaveBtn(wxMouseEvent& event) { focus_button(m_is_selected); event.Skip(); }
 
     void    SetState(const bool state);
+    void    update_bitmap();
     bool    is_selected() { return m_is_selected; }
+    void    sys_color_changed() override;
 
 protected:
     void    focus_button(const bool focus);
 
 private:
-    bool        m_is_selected = false;
+    bool        m_is_selected   {false};
+    int         m_mode_id       {-1};
 
     wxString    m_tt_selected;
     wxString    m_tt_focused;
+    wxBitmapBundle    m_bmp;
 };
 
 
@@ -322,6 +333,7 @@ public:
     void set_items_border(int border);
 
     void sys_color_changed();
+    void update_mode_markers();
     const std::vector<ModeButton*>& get_btns() { return m_mode_btns; }
 
 private:

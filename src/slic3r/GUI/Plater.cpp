@@ -1183,6 +1183,12 @@ void Sidebar::sys_color_changed()
     p->searcher.dlg_sys_color_changed();
 }
 
+void Sidebar::update_mode_markers()
+{
+    if (p->mode_sizer)
+        p->mode_sizer->update_mode_markers();
+}
+
 void Sidebar::search()
 {
     p->searcher.search();
@@ -6469,12 +6475,31 @@ void Plater::send_gcode()
         wxBusyCursor wait;
         upload_job.printhost->get_groups(groups);
     }
-    
-    PrintHostSendDialog dlg(default_output_file, upload_job.printhost->get_post_upload_actions(), groups);
+    // PrusaLink specific: Query the server for the list of file groups.
+    wxArrayString storage;
+    {
+        wxBusyCursor wait;
+        try {
+            upload_job.printhost->get_storage(storage);
+        } catch (const Slic3r::IOError& ex) {
+            show_error(this, ex.what(), false);
+            return;
+        }
+    }
+
+    PrintHostSendDialog dlg(default_output_file, upload_job.printhost->get_post_upload_actions(), groups, storage);
     if (dlg.ShowModal() == wxID_OK) {
         upload_job.upload_data.upload_path = dlg.filename();
         upload_job.upload_data.post_action = dlg.post_action();
         upload_job.upload_data.group       = dlg.group();
+        upload_job.upload_data.storage     = dlg.storage();
+
+        // Show "Is printer clean" dialog for PrusaConnect - Upload and print.
+        if (std::string(upload_job.printhost->get_name()) == "PrusaConnect" && upload_job.upload_data.post_action == PrintHostPostUploadAction::StartPrint) {
+            GUI::MessageDialog dlg(nullptr, _L("Is the printer ready? Is the print sheet in place, empty and clean?"), _L("Upload and Print"), wxOK | wxCANCEL);
+            if (dlg.ShowModal() != wxID_OK)
+                return;
+        }
 
         p->export_gcode(fs::path(), false, std::move(upload_job));
     }

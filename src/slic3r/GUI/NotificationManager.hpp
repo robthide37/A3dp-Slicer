@@ -206,6 +206,10 @@ public:
 	void push_upload_job_notification(int id, float filesize, const std::string& filename, const std::string& host, float percentage = 0);
 	void set_upload_job_notification_percentage(int id, const std::string& filename, const std::string& host, float percentage);
 	void set_upload_job_notification_host(int id, const std::string& host);
+	void set_upload_job_notification_status(int id, const std::string& status);
+	void set_upload_job_notification_comp_on_100(int id, bool comp);
+	void set_upload_job_notification_completed(int id);
+	void set_upload_job_notification_completed_with_warning(int id);
 	void upload_job_notification_show_canceled(int id, const std::string& filename, const std::string& host);
 	void upload_job_notification_show_error(int id, const std::string& filename, const std::string& host);
 	// Download App progress
@@ -352,7 +356,8 @@ private:
 		// Hypertext action, returns true if notification should close.
 		// Action is stored in NotificationData::callback as std::function<bool(wxEvtHandler*)>
 		virtual bool on_text_click();
-	
+		// "More" hypertext to show full message
+		virtual void on_more_hypertext_click();
 		// Part of init(), counts horizontal spacing like left indentation 
 		virtual void count_spaces();
 		// Part of init(), counts end lines
@@ -413,6 +418,8 @@ private:
 		// True if minimized button is rendered, helps to decide where is area for invisible close button
 		bool             m_minimize_b_visible   { false };
         size_t           m_lines_count{ 1 };
+		// Number of lines to be shown when m_multiline = false. If m_lines_count = m_normal_lines_count + 1 -> all lines are shown,
+		size_t           m_normal_lines_count { 2 }; 
 	    // Target for wxWidgets events sent by clicking on the hyperlink available at some notifications.
 		wxEvtHandler*    m_evt_handler;
 	};
@@ -506,7 +513,9 @@ private:
 			PB_PROGRESS,
 			PB_ERROR,
 			PB_CANCELLED,
-			PB_COMPLETED
+			PB_COMPLETED,
+			PB_COMPLETED_WITH_WARNING,
+			PB_RESOLVING
 		};
 		PrintHostUploadNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler, float percentage, int job_id, float filesize, const std::string& filename, const std::string& host)
 			:ProgressBarNotification(n, id_provider, evt_handler)
@@ -514,37 +523,57 @@ private:
 			, m_file_size(filesize)
 			, m_filename(filename)
 			, m_host(host)
+			, m_original_host(host)
 		{
 			m_has_cancel_button = true;
-			set_percentage(percentage);
+			if (percentage != 0.f)
+				set_percentage(percentage);
 		}
-		static std::string	get_upload_job_text(int id, const std::string& filename, const std::string& host) { return /*"[" + std::to_string(id) + "] " + */filename + " -> " + host; }
 		void				set_percentage(float percent) override;
 		void				cancel() { m_uj_state = UploadJobState::PB_CANCELLED; m_has_cancel_button = false; }
 		void				error()  { m_uj_state = UploadJobState::PB_ERROR;     m_has_cancel_button = false; init(); }
 		bool				compare_job_id(const int other_id) const { return m_job_id == other_id; }
 		bool				compare_text(const std::string& text) const override { return false; }
-		void				set_host(const std::string& host) { m_host = host; update({ NotificationType::PrintHostUpload, NotificationLevel::ProgressBarNotificationLevel, 10, get_upload_job_text(m_id, m_filename, m_host)}); }
+		void				set_host(const std::string& host) { m_host = host; init(); }
 		std::string			get_host() const { return m_host; }
+		void                set_status(const std::string& status) { m_status_message = status; init(); }
+		void				set_complete_on_100(bool val) { m_complete_on_100 = val; }
+		void                complete();
+		void                complete_with_warning();
 	protected:
 		void        init() override;
 		void		count_spaces() override;
 		bool		push_background_color() override;
+		virtual void	render_text(ImGuiWrapper& imgui,
+								const float win_size_x, const float win_size_y,
+								const float win_pos_x, const float win_pos_y) override;
 		void		render_bar(ImGuiWrapper& imgui,
 								const float win_size_x, const float win_size_y,
 								const float win_pos_x, const float win_pos_y) override;
+		virtual void render_close_button(ImGuiWrapper& imgui,
+									const float win_size_x, const float win_size_y,
+									const float win_pos_x, const float win_pos_y) override;
 		void		render_cancel_button(ImGuiWrapper& imgui,
 											const float win_size_x, const float win_size_y,
 											const float win_pos_x, const float win_pos_y) override;
 		void		render_left_sign(ImGuiWrapper& imgui) override;
+	
+		void        generate_text();
+		void		on_more_hypertext_click() override { ProgressBarNotification::on_more_hypertext_click(); m_more_hypertext_used = true; }
+
 		// Identifies job in cancel callback
 		int					m_job_id;
 		// Size of uploaded size to be displayed in MB
 		float			    m_file_size;
 		long				m_hover_time{ 0 };
-		UploadJobState		m_uj_state{ UploadJobState::PB_PROGRESS };
+		UploadJobState		m_uj_state{ UploadJobState::PB_RESOLVING };
 		std::string         m_filename;
 		std::string         m_host;
+		std::string         m_original_host; // when hostname is resolved into ip address, we can still display original hostname (that user inserted)
+		std::string         m_status_message;
+		bool				m_more_hypertext_used { false };
+		// When m_complete_on_100 is set to false - percent >= 1 wont switch to PB_COMPLETED state.
+		bool				m_complete_on_100 { true };
 	};
 
 	class SlicingProgressNotification : public ProgressBarNotification

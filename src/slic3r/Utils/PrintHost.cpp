@@ -52,6 +52,7 @@ PrintHost* PrintHost::get_print_host(DynamicPrintConfig *config)
             case htAstroBox:  return new AstroBox(config);
             case htRepetier:  return new Repetier(config);
             case htPrusaLink: return new PrusaLink(config);
+            case htPrusaConnect: return new PrusaConnect(config);
             case htMKS:       return new MKS(config);
             default:          return nullptr;
         }
@@ -93,12 +94,13 @@ struct PrintHostJobQueue::priv
     void emit_progress(int progress);
     void emit_error(wxString error);
     void emit_cancel(size_t id);
-    void emit_resolve(wxString host);
+    void emit_info(wxString tag, wxString status);
     void start_bg_thread();
     void stop_bg_thread();
     void bg_thread_main();
     void progress_fn(Http::Progress progress, bool &cancel);
     void error_fn(wxString error);
+    void info_fn(wxString tag, wxString status);
     void remove_source(const fs::path &path);
     void remove_source();
     void perform_job(PrintHostJob the_job);
@@ -127,18 +129,17 @@ void PrintHostJobQueue::priv::emit_error(wxString error)
     wxQueueEvent(queue_dialog, evt);
 }
 
+void PrintHostJobQueue::priv::emit_info(wxString tag, wxString status)
+{
+    auto evt = new PrintHostQueueDialog::Event(GUI::EVT_PRINTHOST_INFO, queue_dialog->GetId(), job_id, std::move(tag), std::move(status));
+    wxQueueEvent(queue_dialog, evt);
+}
+
 void PrintHostJobQueue::priv::emit_cancel(size_t id)
 {
     auto evt = new PrintHostQueueDialog::Event(GUI::EVT_PRINTHOST_CANCEL, queue_dialog->GetId(), id);
     wxQueueEvent(queue_dialog, evt);
 }
-
-void PrintHostJobQueue::priv::emit_resolve(wxString host)
-{
-    auto evt = new PrintHostQueueDialog::Event(GUI::EVT_PRINTHOST_RESOLVE, queue_dialog->GetId(), job_id, host);
-    wxQueueEvent(queue_dialog, evt);
-}
-
 
 void PrintHostJobQueue::priv::start_bg_thread()
 {
@@ -271,6 +272,10 @@ void PrintHostJobQueue::priv::error_fn(wxString error)
         emit_error(std::move(error));
 }
 
+void PrintHostJobQueue::priv::info_fn(wxString tag, wxString status)
+{
+    emit_info(tag, status);
+}
 
 void PrintHostJobQueue::priv::remove_source(const fs::path &path)
 {
@@ -296,7 +301,7 @@ void PrintHostJobQueue::priv::perform_job(PrintHostJob the_job)
     bool success = the_job.printhost->upload(std::move(the_job.upload_data),
         [this](Http::Progress progress, bool &cancel)   { this->progress_fn(std::move(progress), cancel); },
         [this](wxString error)                          { this->error_fn(std::move(error)); },
-        [this](wxString host)                           { emit_resolve(std::move(host)); }
+        [this](wxString tag, wxString host)             { this->info_fn(std::move(tag), std::move(host)); }
     );
 
     if (success) {

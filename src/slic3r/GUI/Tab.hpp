@@ -355,6 +355,7 @@ public:
 	void			load_config(const DynamicPrintConfig& config);
 	virtual void	reload_config();
     void            update_mode();
+    void            update_mode_markers();
     void            update_visibility();
     virtual void    msw_rescale();
     virtual void	sys_color_changed();
@@ -473,8 +474,6 @@ private:
     std::vector<PageShp>			m_pages_sla;
 
 public:
-	ScalableButton*	m_reset_to_filament_color = nullptr;
-
 	size_t		m_extruders_count;
 	size_t		m_extruders_count_old = 0;
 	size_t		m_initial_extruders_count;
@@ -501,6 +500,7 @@ public:
     void        update_pages(); // update m_pages according to printer technology
 	void		extruders_count_changed(size_t extruders_count);
 	PageShp		build_kinematics_page();
+	void		build_extruder_pages(size_t n_before_extruders);
 	void		build_unregular_pages(bool from_initial_build = false);
 	void		on_preset_loaded() override;
 	void		init_options_list() override;

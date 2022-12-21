@@ -715,6 +715,8 @@ void MainFrame::update_title()
 
 void MainFrame::init_tabpanel()
 {
+    wxGetApp().update_ui_colours_from_appconfig();
+
     // wxNB_NOPAGETHEME: Disable Windows Vista theme for the Notebook background. The theme performance is terrible on Windows 10
     // with multiple high resolution displays connected.
 #ifdef _MSW_DARK_MODE
@@ -847,7 +849,6 @@ void MainFrame::register_win32_callbacks()
 
 void MainFrame::create_preset_tabs()
 {
-    wxGetApp().update_label_colours_from_appconfig();
     add_created_tab(new TabPrint(m_tabpanel), "cog");
     add_created_tab(new TabFilament(m_tabpanel), "spool");
     add_created_tab(new TabSLAPrint(m_tabpanel), "cog");
@@ -1091,7 +1092,9 @@ void MainFrame::on_sys_color_changed()
     wxBusyCursor wait;
 
     // update label colors in respect to the system mode
-    wxGetApp().init_label_colours();
+    wxGetApp().init_ui_colours();
+    // but if there are some ui colors in appconfig, they have to be applied
+    wxGetApp().update_ui_colours_from_appconfig();
 #ifdef __WXMSW__
     wxGetApp().UpdateDarkUI(m_tabpanel);
  //   m_statusbar->update_dark_ui();
@@ -1112,6 +1115,24 @@ void MainFrame::on_sys_color_changed()
     MenuFactory::sys_color_changed(m_menubar);
 
     this->Refresh();
+}
+
+void MainFrame::update_mode_markers()
+{
+#ifdef __WXMSW__
+#ifdef _MSW_DARK_MODE
+    // update markers in common mode sizer
+    if (!wxGetApp().tabs_as_menu())
+        dynamic_cast<Notebook*>(m_tabpanel)->UpdateModeMarkers();
+#endif
+#endif
+
+    // update mode markers on side_bar
+    wxGetApp().sidebar().update_mode_markers();
+
+    // update mode markers in tabs
+    for (auto tab : wxGetApp().tabs_list)
+        tab->update_mode_markers();
 }
 
 #ifdef _MSC_VER

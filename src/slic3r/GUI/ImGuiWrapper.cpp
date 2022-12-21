@@ -273,10 +273,10 @@ bool ImGuiWrapper::update_key_data(wxKeyEvent &evt)
     if (type == wxEVT_CHAR) {
         // Char event
         const auto   key   = evt.GetUnicodeKey();
-        unsigned int key_u = static_cast<unsigned int>(key);
 
         // Release BackSpace, Delete, ... when miss wxEVT_KEY_UP event
         // Already Fixed at begining of new frame
+        // unsigned int key_u = static_cast<unsigned int>(key);
         //if (key_u >= 0 && key_u < IM_ARRAYSIZE(io.KeysDown) && io.KeysDown[key_u]) { 
         //    io.KeysDown[key_u] = false;
         //}
