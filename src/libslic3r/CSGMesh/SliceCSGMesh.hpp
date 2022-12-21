@@ -34,7 +34,7 @@ void merge_slices(csg::CSGType op, size_t i,
 void collect_nonempty_indices(csg::CSGType                   op,
                               const std::vector<float>      &slicegrid,
                               const std::vector<ExPolygons> &slices,
-                              std::vector<size_t>            indices)
+                              std::vector<size_t>           &indices)
 {
     indices.clear();
     for (size_t i = 0; i < slicegrid.size(); ++i) {
@@ -62,8 +62,7 @@ std::vector<ExPolygons> slice_csgmesh_ex(
     auto trafo = params.trafo;
     auto nonempty_indices = reserve_vector<size_t>(slicegrid.size());
 
-    if (!csgrange.empty() && csg::get_stack_operation(*csgrange.begin()) != CSGStackOp::Push)
-        opstack.push({CSGType::Union, std::vector<ExPolygons>(slicegrid.size())});
+    opstack.push({CSGType::Union, std::vector<ExPolygons>(slicegrid.size())});
 
     for (const auto &csgpart : csgrange) {
         const indexed_triangle_set *its = csg::get_mesh(csgpart);

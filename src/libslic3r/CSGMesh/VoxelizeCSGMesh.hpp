@@ -32,6 +32,9 @@ namespace detail {
 
 inline void perform_csg(CSGType op, VoxelGridPtr &dst, VoxelGridPtr &src)
 {
+    if (!dst || !src)
+        return;
+
     switch (op) {
     case CSGType::Union:
         grid_union(*dst, *src);
@@ -71,9 +74,7 @@ VoxelGridPtr voxelize_csgmesh(const Range<It>      &csgrange,
     struct Frame { CSGType op = CSGType::Union; VoxelGridPtr grid; };
     std::stack opstack{std::vector<Frame>{}};
 
-    if (!csgrange.empty() &&
-        csg::get_stack_operation(*csgrange.begin()) != CSGStackOp::Push)
-        opstack.push({});
+    opstack.push({CSGType::Union, mesh_to_grid({}, params)});
 
     for (auto &csgpart : csgrange) {
         if (params.statusfn() && params.statusfn()(-1))
@@ -84,17 +85,13 @@ VoxelGridPtr voxelize_csgmesh(const Range<It>      &csgrange,
         auto op = get_operation(csgpart);
 
         if (get_stack_operation(csgpart) == CSGStackOp::Push) {
-            opstack.push({op, nullptr});
+            opstack.push({op, mesh_to_grid({}, params)});
             op = CSGType::Union;
         }
 
         Frame *top = &opstack.top();
 
-        if (!top->grid && op == CSGType::Union) {
-            top->grid = std::move(partgrid);
-        } else if (top->grid && partgrid) {
-            perform_csg(get_operation(csgpart), top->grid, partgrid);
-        }
+        perform_csg(get_operation(csgpart), top->grid, partgrid);
 
         if (get_stack_operation(csgpart) == CSGStackOp::Pop) {
             VoxelGridPtr popgrid = std::move(top->grid);

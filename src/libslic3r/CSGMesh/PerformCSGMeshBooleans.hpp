@@ -7,6 +7,7 @@
 #include "CSGMesh.hpp"
 
 #include "libslic3r/Execution/ExecutionTBB.hpp"
+//#include "libslic3r/Execution/ExecutionSeq.hpp"
 #include "libslic3r/MeshBoolean.hpp"
 
 namespace Slic3r { namespace csg {
@@ -17,12 +18,21 @@ template<class CSGPartT>
 MeshBoolean::cgal::CGALMeshPtr get_cgalmesh(const CSGPartT &csgpart)
 {
     const indexed_triangle_set *its = csg::get_mesh(csgpart);
+    indexed_triangle_set dummy;
+
+    if (!its)
+        its = &dummy;
+
     MeshBoolean::cgal::CGALMeshPtr ret;
 
-    if (its) {
-        indexed_triangle_set m = *its;
-        its_transform(m, get_transform(csgpart));
+    indexed_triangle_set m = *its;
+    its_transform(m, get_transform(csgpart));
+
+    try {
         ret = MeshBoolean::cgal::triangle_mesh_to_cgal(m);
+    } catch (...) {
+        // errors are ignored, simply return null
+        ret = nullptr;
     }
 
     return ret;
@@ -34,6 +44,14 @@ using MeshBoolean::cgal::CGALMeshPtr;
 
 inline void perform_csg(CSGType op, CGALMeshPtr &dst, CGALMeshPtr &src)
 {
+    if (!dst && op == CSGType::Union && src) {
+        dst = std::move(src);
+        return;
+    }
+
+    if (!dst || !src)
+        return;
+
     switch (op) {
     case CSGType::Union:
         MeshBoolean::cgal::plus(*dst, *src);
@@ -72,13 +90,17 @@ void perform_csgmesh_booleans(MeshBoolean::cgal::CGALMeshPtr &cgalm,
     using MeshBoolean::cgal::CGALMeshPtr;
     using namespace detail_cgal;
 
-    struct Frame { CSGType op = CSGType::Union; CGALMeshPtr cgalptr; };
+    struct Frame {
+        CSGType op; CGALMeshPtr cgalptr;
+        explicit Frame(CSGType csgop = CSGType::Union)
+            : op{csgop}
+            , cgalptr{MeshBoolean::cgal::triangle_mesh_to_cgal(indexed_triangle_set{})}
+        {}
+    };
 
     std::stack opstack{std::vector<Frame>{}};
 
-    if (!csgrange.empty() &&
-        csg::get_stack_operation(*csgrange.begin()) != CSGStackOp::Push)
-        opstack.push({});
+    opstack.push(Frame{});
 
     std::vector<CGALMeshPtr> cgalmeshes = get_cgalptrs(ex_tbb, csgrange);
 
@@ -89,17 +111,13 @@ void perform_csgmesh_booleans(MeshBoolean::cgal::CGALMeshPtr &cgalm,
         CGALMeshPtr &cgalptr = cgalmeshes[csgidx++];
 
         if (get_stack_operation(csgpart) == CSGStackOp::Push) {
-            opstack.push({op, nullptr});
+            opstack.push(Frame{op});
             op = CSGType::Union;
         }
 
         Frame *top = &opstack.top();
 
-        if (!top->cgalptr && op == CSGType::Union) {
-            top->cgalptr = std::move(cgalptr);
-        } else if (top->cgalptr && cgalptr) {
-            perform_csg(get_operation(csgpart), top->cgalptr, cgalptr);
-        }
+        perform_csg(get_operation(csgpart), top->cgalptr, cgalptr);
 
         if (get_stack_operation(csgpart) == CSGStackOp::Pop) {
             CGALMeshPtr src = std::move(top->cgalptr);
@@ -126,12 +144,23 @@ It check_csgmesh_booleans(const Range<It> &csgrange, Visitor &&vfn)
         auto &csgpart = *it;
         auto m = get_cgalmesh(csgpart);
 
-        if (!m || MeshBoolean::cgal::empty(*m))
+        // mesh can be nullptr if this is a stack push or pull
+        if (!get_mesh(csgpart) && get_stack_operation(csgpart) != CSGStackOp::Continue) {
+            cgalmeshes[i] = MeshBoolean::cgal::triangle_mesh_to_cgal(indexed_triangle_set{});
             return;
+        }
 
-        if (!MeshBoolean::cgal::does_bound_a_volume(*m) ||
-            MeshBoolean::cgal::does_self_intersect(*m))
-            return;
+        try {
+            if (!m || MeshBoolean::cgal::empty(*m))
+                return;
+
+            if (!MeshBoolean::cgal::does_bound_a_volume(*m))
+                return;
+
+            if (MeshBoolean::cgal::does_self_intersect(*m))
+                return;
+        }
+        catch (...) { return; }
 
         cgalmeshes[i] = std::move(m);
     };
@@ -144,12 +173,12 @@ It check_csgmesh_booleans(const Range<It> &csgrange, Visitor &&vfn)
             std::advance(it, i);
             vfn(it);
 
-            if (it == csgrange.end())
+            if (ret == csgrange.end())
                 ret = it;
         }
     }
 
-    return csgrange.end();
+    return ret;
 }
 
 template<class It>

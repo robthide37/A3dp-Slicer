@@ -104,15 +104,34 @@ inline InteriorPtr generate_interior(const indexed_triangle_set &mesh,
     return grid ? generate_interior(*grid, hc, ctl) : InteriorPtr{};
 }
 
+template<class Cont> double csgmesh_positive_maxvolume(const Cont &csg)
+{
+    double mesh_vol = 0;
+
+    bool skip = false;
+    for (const auto &m : csg) {
+        auto op = csg::get_operation(m);
+        auto stackop = csg::get_stack_operation(m);
+        if (stackop == csg::CSGStackOp::Push && op != csg::CSGType::Union)
+            skip = true;
+
+        if (!skip && csg::get_mesh(m) && op == csg::CSGType::Union)
+            mesh_vol = std::max(mesh_vol,
+                                double(its_volume(*(csg::get_mesh(m)))));
+
+        if (stackop == csg::CSGStackOp::Pop)
+            skip = false;
+    }
+
+    return mesh_vol;
+}
+
 template<class It>
 InteriorPtr generate_interior(const Range<It>       &csgparts,
                               const HollowingConfig &hc  = {},
                               const JobController   &ctl = {})
 {
-    double mesh_vol = 0;
-    for (auto &part : csgparts)
-        mesh_vol = std::max(mesh_vol,
-                            double(its_volume(*(csg::get_mesh(part)))));
+    double mesh_vol = csgmesh_positive_maxvolume(csgparts);
 
     auto params = csg::VoxelizeParams{}
                       .voxel_scale(get_voxel_scale(mesh_vol, hc))

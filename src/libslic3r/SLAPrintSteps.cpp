@@ -163,11 +163,7 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
     SLAPrintObject &po, SLAPrintObjectStep step)
 {
     // Empirical upper limit to not get excessive performance hit
-    constexpr double MaxPreviewVoxelScale = 18.;
-
-    Benchmark bench;
-
-    bench.start();
+    constexpr double MaxPreviewVoxelScale = 12.;
 
     // update preview mesh
     double vscale = std::min(MaxPreviewVoxelScale,
@@ -183,14 +179,40 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
     });
 
     auto r = range(po.m_mesh_to_slice);
+    auto grid = csg::voxelize_csgmesh(r, voxparams);
+    auto m = grid ? grid_to_mesh(*grid, 0., 0.01) : indexed_triangle_set{};
+    float loss_less_max_error = 1e-6;
+    its_quadric_edge_collapse(m, 0U, &loss_less_max_error);
+
+    return m;
+}
+
+
+void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
+{
+    Benchmark bench;
+
+    bench.start();
+
+    auto r = range(po.m_mesh_to_slice);
     auto m = indexed_triangle_set{};
-    if (r.size() > 1 && !is_all_positive(r)) {
-        auto grid = csg::voxelize_csgmesh(r, voxparams);
-        m = grid ? grid_to_mesh(*grid) : indexed_triangle_set{};
-//        float loss_less_max_error = 1e-6;
-//        its_quadric_edge_collapse(m, 0U, &loss_less_max_error);
-    } else {
+    if (r.size() == 1 || is_all_positive(r)) {
         m = csgmesh_merge_positive_parts(r);
+    } else if (csg::check_csgmesh_booleans(r) == r.end()) {
+        auto cgalmeshptr = csg::perform_csgmesh_booleans(r);
+        if (cgalmeshptr)
+            m = MeshBoolean::cgal::cgal_to_indexed_triangle_set(*cgalmeshptr);
+    } else {
+        po.active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
+                                   L("Can't do proper mesh booleans!"));
+        m = generate_preview_vdb(po, step);
+    }
+
+    po.m_preview_meshes[step] = TriangleMesh{std::move(m)};
+
+    for (size_t i = size_t(step) + 1; i < slaposCount; ++i)
+    {
+        po.m_preview_meshes[i] = {};
     }
 
     bench.stop();
@@ -199,27 +221,6 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
         BOOST_LOG_TRIVIAL(trace) << "Preview gen took: " << bench.getElapsedSec();
     else
         BOOST_LOG_TRIVIAL(error) << "Preview failed!";
-
-    return m;
-}
-
-
-void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
-{
-    auto r = range(po.m_mesh_to_slice);
-    if (csg::check_csgmesh_booleans(r) == r.end()) {
-        auto cgalmesh = csg::perform_csgmesh_booleans(r);
-        po.m_preview_meshes[step] = MeshBoolean::cgal::cgal_to_triangle_mesh(*cgalmesh);
-    } else {
-        po.active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
-                                   L("Can't do proper mesh booleans!"));
-        po.m_preview_meshes[step] = TriangleMesh{generate_preview_vdb(po, step)};
-    }
-
-    for (size_t i = size_t(step) + 1; i < slaposCount; ++i)
-    {
-        po.m_preview_meshes[i] = {};
-    }
 
     using namespace std::string_literals;
 
@@ -356,9 +357,7 @@ template<class Cont> BoundingBoxf3 csgmesh_positive_bb(const Cont &csg)
 {
     // Calculate the biggest possible bounding box of the mesh to be sliced
     // from all the positive parts that it contains.
-    auto bb3d = csg.empty() ? BoundingBoxf3{} :
-                              bounding_box(*csg::get_mesh(*csg.begin()),
-                                           csg::get_transform(*csg.begin()));
+    BoundingBoxf3 bb3d;
 
     bool skip = false;
     for (const auto &m : csg) {

@@ -79,7 +79,10 @@ struct CSGPart {
     CSGPart(AnyPtr<const indexed_triangle_set> ptr = {},
             CSGType                            op  = CSGType::Union,
             const Transform3f                 &tr  = Transform3f::Identity())
-        : its_ptr{std::move(ptr)}, operation{op}, trafo{tr}
+        : its_ptr{std::move(ptr)}
+        , operation{op}
+        , stack_operation{CSGStackOp::Continue}
+        , trafo{tr}
     {}
 };
 
