@@ -18,7 +18,7 @@ namespace GUI {
 //static ModePaletteComboBox::PalettesMap MODE_PALETTES =
 static std::vector<std::pair<std::string, std::vector<std::string>>> MODE_PALETTES =
 {
-	{ L("Palette 1"), { "#7DF028", "#FFDC00", "#E70000" } },
+	{ L("Palette 1 (default)"), { "#7DF028", "#FFDC00", "#E70000" } },
 	{ L("Palette 2"), { "#FC766A", "#B0B8B4", "#184A45" } },
 	{ L("Palette 3"), { "#567572", "#964F4C", "#696667" } },
 	{ L("Palette 4"), { "#DA291C", "#56A8CB", "#53A567" } },

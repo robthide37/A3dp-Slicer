@@ -185,6 +185,17 @@ void SavePresetDialog::Item::update()
         m_valid_type = ValidationType::NoValid;
     }
 
+#ifdef __WXMSW__
+    const int max_path_length = MAX_PATH;
+#else
+    const int max_path_length = 255;
+#endif
+
+    if (m_valid_type == ValidationType::Valid && m_presets->path_from_name(m_preset_name).length() >= max_path_length) {
+        info_line = _L("The name is too long.");
+        m_valid_type = ValidationType::NoValid;
+    }
+
     if (m_valid_type == ValidationType::Valid && m_preset_name.find_first_of(' ') == 0) {
         info_line = _L("The name cannot start with space character.");
         m_valid_type = ValidationType::NoValid;
