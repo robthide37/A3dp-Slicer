@@ -68,23 +68,32 @@ public:
 class CurvatureEstimator
 {
     static const size_t               sliders_count          = 2;
-    SlidingWindowCurvatureAccumulator sliders[sliders_count] = {{4.0}, {12.0}};
+    SlidingWindowCurvatureAccumulator sliders[sliders_count] = {{4.0}, {10.0}};
 
 public:
     void add_point(float distance, float angle)
     {
-        if (distance < EPSILON) return;
-        for (SlidingWindowCurvatureAccumulator &slider : sliders) { slider.add_point(distance, angle); }
+        if (distance < EPSILON)
+            return;
+        for (SlidingWindowCurvatureAccumulator &slider : sliders) {
+            slider.add_point(distance, angle);
+        }
     }
     float get_curvature()
     {
-        float max_curvature = std::numeric_limits<float>::min();
-        for (const SlidingWindowCurvatureAccumulator &slider : sliders) { max_curvature = std::max(max_curvature, slider.get_curvature()); }
+        float max_curvature = 0.0f;
+        for (const SlidingWindowCurvatureAccumulator &slider : sliders) {
+            if (abs(slider.get_curvature()) > abs(max_curvature)) {
+                max_curvature = slider.get_curvature();
+            }
+        }
         return max_curvature;
     }
     void reset()
     {
-        for (SlidingWindowCurvatureAccumulator &slider : sliders) { slider.reset(); }
+        for (SlidingWindowCurvatureAccumulator &slider : sliders) {
+            slider.reset();
+        }
     }
 };
 
@@ -111,7 +120,6 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
         return {};
     float              boundary_offset = PREV_LAYER_BOUNDARY_OFFSET ? 0.5 * flow_width : 0.0f;
     CurvatureEstimator cestim;
-    float              min_malformation_dist = 0.55 * flow_width;
     auto maybe_unscale = [](const P &p) { return SCALED_INPUT ? unscaled(p) : p.template cast<double>(); };
 
     std::vector<P> extrusion_points;
@@ -218,7 +226,6 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
             cestim.add_point(distance, alfa);
         }
 
-        if (a.distance < min_malformation_dist) { cestim.reset(); }
         a.curvature = cestim.get_curvature();
     }
 

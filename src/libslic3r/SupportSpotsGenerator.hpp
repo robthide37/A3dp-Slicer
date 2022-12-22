@@ -28,7 +28,7 @@ struct Params {
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
     const float bridge_distance = 12.0f; //mm
     const float bridge_distance_decrease_by_curvature_factor = 10.0f; // allowed bridge distance = bridge_distance / (1 + this factor * curvature )
-    const std::pair<float,float> malformation_overlap_factor = std::pair<float, float> { 0.50, -0.1 };
+    const std::pair<float,float> malformation_distance_factors = std::pair<float, float> { 0.4, 1.2 };
     const float max_malformation_factor = 10.0f;
 
     const float min_distance_between_support_points = 3.0f; //mm
