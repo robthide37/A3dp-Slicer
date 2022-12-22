@@ -238,8 +238,9 @@ namespace Slic3r {
 
         std::string tcr_rotated_gcode = post_process_wipe_tower_moves(tcr, wipe_tower_offset, wipe_tower_rotation);
 
-        if (! tcr.priming) {
-            // Move over the wipe tower.
+        if (gcodegen.config().single_extruder_multi_material && ! tcr.priming) {
+            // Move over the wipe tower. If this is not single-extruder MM, the first wipe tower move following the
+            // toolchange will travel there anyway.
             gcode += gcodegen.retract();
             gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
             gcode += gcodegen.travel_to(
