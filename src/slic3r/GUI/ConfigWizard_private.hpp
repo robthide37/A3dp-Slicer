@@ -26,6 +26,7 @@
 #include "slic3r/Utils/PresetUpdater.hpp"
 #include "BedShapeDialog.hpp"
 #include "GUI.hpp"
+#include "SavePresetDialog.hpp"
 #include "wxExtensions.hpp"
 
 
@@ -370,16 +371,20 @@ struct PageMaterials: ConfigWizardPage
 struct PageCustom: ConfigWizardPage
 {
     PageCustom(ConfigWizard *parent);
+    ~PageCustom() {
+        if (profile_name_editor) 
+            delete profile_name_editor;
+    }
 
-    bool custom_wanted() const { return cb_custom->GetValue(); }
-    std::string profile_name() const { return into_u8(tc_profile_name->GetValue()); }
+    bool        custom_wanted()         const { return cb_custom->GetValue(); }
+    bool        is_valid_profile_name() const { return profile_name_editor->is_valid();}
+    std::string profile_name()          const { return profile_name_editor->preset_name(); }
 
 private:
     static const char* default_profile_name;
 
-    wxCheckBox *cb_custom;
-    wxTextCtrl *tc_profile_name;
-    wxString profile_name_prev;
+    wxCheckBox              *cb_custom {nullptr};
+    SavePresetDialog::Item  *profile_name_editor {nullptr};
 
 };
 
