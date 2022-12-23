@@ -1,9 +1,9 @@
-name: C/C++ Patch-01 ubuntu-GTK3
+name: C/C++ dev ubuntu-GTK3
 
 on:
   push:
     branches:
-      - patch-1
+      - dev
 
 jobs:
   build:
