@@ -18,6 +18,9 @@ For now go to the Dev branch and then git actions. I should have a working Mac, 
 
 See the [project homepage](https://www.prusa3d.com/slic3r-prusa-edition/) and
 the [documentation directory](doc/) for more information.
+To try nightly builds make sure to login to github adn then select the dev branch . Then go to the actions page where their will be compiled versions on teh server ready for download .
+
+## Licensing and attribution
 
 ### What language is it written in?
 
