@@ -26,6 +26,34 @@ group:Print speed override
 	setting:filament_max_speed
 	setting:filament_max_volumetric_speed
 	volumetric_speed_description
+group:Pressure/Linear advance
+	line:Default
+		setting:width$4:filament_default_pa
+	line:Perimeter pa
+		setting:width$4:filament_perimeter_pa
+		setting:width$4:filament_external_perimeter_pa
+	line:Infill pa
+		setting:width$4:filament_solid_infill_pa
+		setting:width$4:filament_infill_pa
+		setting:width$4:filament_top_solid_infill_pa
+	line:Support pa
+		setting:width$4:filament_support_material_pa
+		setting:width$4:filament_support_material_interface_pa
+		setting:width$4:filament_brim_pa
+	line:Bridge pa
+		setting:width$4:filament_bridge_pa
+		setting:width$4:filament_bridge_internal_pa
+		setting:width$4:filament_overhangs_pa
+	line:Other extrusions pa
+		setting:width$4:filament_gap_fill_pa
+		setting:width$4:filament_thin_walls_pa
+		setting:width$4:filament_ironing_pa
+	line:Travel pa
+		setting:width$4:filament_travel_pa
+	line:First layer pa
+		setting:width$4:filament_first_layer_pa
+		setting:label_width$35:width$4:filament_first_layer_pa_over_raft
+	end_line
 
 page:Cooling:time
 group:Fan speed - default

@@ -4842,7 +4842,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
     if(acceleration > 0){
         switch (path.role()){
             case erPerimeter:
-            perimeter:
+            accel_perimeter:
                 if (m_config.perimeter_acceleration.value > 0) {
                     double perimeter_acceleration = m_config.get_computed_value("perimeter_acceleration");
                     if (perimeter_acceleration > 0)
@@ -4850,7 +4850,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                 }
                 break;
             case erExternalPerimeter:
-            externalPerimeter:
+            accel_externalPerimeter:
                 if (m_config.external_perimeter_acceleration.value > 0) {
                     double external_perimeter_acceleration = m_config.get_computed_value("external_perimeter_acceleration");
                     if (external_perimeter_acceleration > 0) {
@@ -4858,9 +4858,9 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         break;
                     }
                 }
-                goto perimeter;
+                goto accel_perimeter;
             case erSolidInfill:
-            solidInfill:
+            accel_solidInfill:
                 if (m_config.solid_infill_acceleration.value > 0) {
                     double solid_infill_acceleration = m_config.get_computed_value("solid_infill_acceleration");
                     if (solid_infill_acceleration > 0)
@@ -4876,9 +4876,9 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         break;
                     }
                 }
-                goto solidInfill;
+                goto accel_solidInfill;
             case erTopSolidInfill:
-            topSolidInfill:
+            accel_topSolidInfill:
                 if (m_config.top_solid_infill_acceleration.value > 0) {
                     double top_solid_infill_acceleration = m_config.get_computed_value("top_solid_infill_acceleration");
                     if (top_solid_infill_acceleration > 0) {
@@ -4886,7 +4886,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         break;
                     }
                 }
-                goto solidInfill;
+                goto accel_solidInfill;
             case erIroning:
                 if (m_config.ironing_acceleration.value > 0) {
                     double ironing_acceleration = m_config.get_computed_value("ironing_acceleration");
@@ -4895,10 +4895,10 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         break;
                     }
                 }
-                goto topSolidInfill;
+                goto accel_topSolidInfill;
             case erSupportMaterial:
             case erWipeTower:
-            supportMaterial:
+            accel_supportMaterial:
                 if (m_config.support_material_acceleration.value > 0) {
                     double support_material_acceleration = m_config.get_computed_value("support_material_acceleration");
                     if (support_material_acceleration > 0)
@@ -4913,7 +4913,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         break;
                     }
                 }
-                goto supportMaterial;
+                goto accel_supportMaterial;
             case erSkirt:
                 //skirtBrim:
                 if (m_config.brim_acceleration.value > 0) {
@@ -4923,9 +4923,9 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         break;
                     }
                 }
-                goto supportMaterial;
+                goto accel_supportMaterial;
             case erBridgeInfill:
-            bridgeInfill:
+            accel_bridgeInfill:
                 if (m_config.bridge_acceleration.value > 0) {
                     double bridge_acceleration = m_config.get_computed_value("bridge_acceleration");
                     if (bridge_acceleration > 0)
@@ -4940,7 +4940,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         break;
                     }
                 }
-                goto bridgeInfill;
+                goto accel_bridgeInfill;
             case erOverhangPerimeter:
                 if (m_config.overhangs_acceleration.value > 0) {
                     double overhangs_acceleration = m_config.get_computed_value("overhangs_acceleration");
@@ -4949,7 +4949,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         break;
                     }
                 }
-                goto bridgeInfill;
+                goto accel_bridgeInfill;
             case erGapFill:
                 if (m_config.gap_fill_acceleration.value > 0) {
                     double gap_fill_acceleration = m_config.get_computed_value("gap_fill_acceleration");
@@ -4958,7 +4958,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         break;
                     }
                 }
-                goto perimeter;
+                goto accel_perimeter;
                 break;
             case erThinWall:
                 if (m_config.thin_walls_acceleration.value > 0) {
@@ -4968,7 +4968,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         break;
                     }
                 }
-                goto externalPerimeter;
+                goto accel_externalPerimeter;
             case erMilling:
             case erCustom:
             case erMixed:
@@ -4985,7 +4985,69 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
         }
 
         acceleration = std::min(max_acceleration, acceleration);
+    }
 
+    double pa = m_config.filament_default_pa.get_at(m_writer.tool()->id());
+    double travel_pa = m_config.filament_travel_pa.get_abs_value(m_writer.tool()->id(), pa);
+    if (pa > 0) {
+        switch (path.role()) {
+        case erPerimeter:
+            pa = m_config.get_computed_value("filament_perimeter_pa", m_writer.tool()->id());
+            break;
+        case erExternalPerimeter:
+            pa = m_config.get_computed_value("filament_external_perimeter_pa", m_writer.tool()->id());
+            break;
+        case erSolidInfill:
+            pa = m_config.get_computed_value("filament_solid_infill_pa", m_writer.tool()->id());
+            break;
+        case erInternalInfill:
+            pa = m_config.get_computed_value("filament_infill_pa", m_writer.tool()->id());
+            break;
+        case erTopSolidInfill:
+            pa = m_config.get_computed_value("filament_top_solid_infill_pa", m_writer.tool()->id());
+            break;
+        case erIroning:
+            pa = m_config.get_computed_value("filament_ironing_pa", m_writer.tool()->id());
+            break;
+        case erSupportMaterial:
+        case erWipeTower:
+            pa = m_config.get_computed_value("filament_support_material_pa", m_writer.tool()->id());
+            break;
+        case erSupportMaterialInterface:
+            pa = m_config.get_computed_value("filament_support_material_interface_pa", m_writer.tool()->id());
+            break;
+        case erSkirt:
+            pa = m_config.get_computed_value("filament_brim_pa", m_writer.tool()->id());
+            break;
+        case erBridgeInfill:
+            pa = m_config.get_computed_value("filament_bridge_pa", m_writer.tool()->id());
+            break;
+        case erInternalBridgeInfill:
+            pa = m_config.get_computed_value("filament_bridge_internal_pa", m_writer.tool()->id());
+            break;
+        case erOverhangPerimeter:
+            pa = m_config.get_computed_value("filament_overhangs_pa", m_writer.tool()->id());
+            break;
+        case erGapFill:
+            pa = m_config.get_computed_value("filament_gap_fill_pa", m_writer.tool()->id());
+            break;
+        case erThinWall:
+            pa = m_config.get_computed_value("filament_thin_walls_pa", m_writer.tool()->id());
+            break;
+        case erMilling:
+        case erCustom:
+        case erMixed:
+        case erCount:
+        case erNone:
+        default:
+            break;
+        }
+
+        if (this->on_first_layer() && m_config.filament_first_layer_pa.get_at(m_writer.tool()->id()).value > 0) {
+            pa = std::min(pa, m_config.filament_first_layer_pa.get_abs_value(m_writer.tool()->id(), pa));
+        } else if (this->object_layer_over_raft() && m_config.filament_first_layer_pa_over_raft.get_at(m_writer.tool()->id()).value > 0) {
+            pa = m_config.filament_first_layer_pa_over_raft.get_abs_value(m_writer.tool()->id(), pa);
+        }
     }
 
     // compute speed here to be able to know it for travel_deceleration_use_target
@@ -4995,6 +5057,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
         if (travel_acceleration <= acceleration || travel_acceleration == 0 || acceleration == 0) {
             m_writer.set_travel_acceleration((uint32_t)floor(acceleration + 0.5));
             m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+            m_writer.set_pa(pa);
             // go to first point of extrusion path (stop at midpoint to let us set the decel speed)
             if (!m_last_pos_defined || m_last_pos != path.first_point()) {
                 Polyline polyline = this->travel_to(gcode, path.first_point(), path.role());
@@ -5044,6 +5107,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                 if (cant_use_deceleration) {
                     m_writer.set_travel_acceleration((uint32_t)floor(acceleration + 0.5));
                     m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+                    m_writer.set_pa(pa);
                     this->write_travel_to(gcode, poly_start, "move to first " + description + " point (minimum acceleration)");
                 } else {
                     // if length is enough, it's not the hack for first move, and the travel accel is different than the normal accel
@@ -5072,10 +5136,12 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         }
                         gcode += "; acceleration to travel\n";
                         m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
+                        m_writer.set_pa(travel_pa);
                         this->write_travel_to(gcode, poly_start, "move to first " + description + " point (acceleration)");
                         //travel acceleration should be already set at startup via special gcode, and so it's automatically used by G0.
                         gcode += "; decel to extrusion\n";
                         m_writer.set_travel_acceleration((uint32_t)floor(acceleration + 0.5));
+                        m_writer.set_pa(pa);
                         this->write_travel_to(gcode, poly_end, "move to first " + description + " point (deceleration)");
                         // restore travel accel and ensure the new extrusion accel is set
                         m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
@@ -5084,16 +5150,20 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                 }
             } else {
                 m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+                m_writer.set_pa(acceleration);
             }
         }
     } else {
         if (!m_last_pos_defined || m_last_pos != path.first_point()) {
             m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
+            m_writer.set_pa(travel_pa);
             Polyline polyline = this->travel_to(gcode, path.first_point(), path.role());
             this->write_travel_to(gcode, polyline, "move to first " + description + " point");
             m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+            m_writer.set_pa(pa);
         } else {
             m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+            m_writer.set_pa(pa);
         }
     }
 

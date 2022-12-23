@@ -241,6 +241,9 @@ std::string GCodeWriter::set_bed_temperature(uint32_t temperature, bool wait)
 }
 
 
+void GCodeWriter::set_pa(double pa) {
+    m_current_pressure_advance = pa;
+}
 
 void GCodeWriter::set_acceleration(uint32_t acceleration)
 {
@@ -269,31 +272,41 @@ uint32_t GCodeWriter::get_acceleration() const
 }
 
 std::string GCodeWriter::write_acceleration(){
-    if (m_current_acceleration == m_last_acceleration || m_current_acceleration == 0)
-        return "";
-
-    m_last_acceleration = m_current_acceleration;
-
     std::ostringstream gcode;
-	//try to set only printing acceleration, travel should be untouched if possible
-    if (FLAVOR_IS(gcfRepetier)) {
-        // M201: Set max printing acceleration
-        gcode << "M201 X" << m_current_acceleration << " Y" << m_current_acceleration;
-    } else if(FLAVOR_IS(gcfLerdge) || FLAVOR_IS(gcfSprinter)){
-        // M204: Set printing acceleration
-        // This is new MarlinFirmware with separated print/retraction/travel acceleration.
-        // Use M204 P, we don't want to override travel acc by M204 S (which is deprecated anyway).
-        gcode << "M204 P" << m_current_acceleration;
-    } else if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfRepRap)) {
-        // M204: Set printing & travel acceleration
-        gcode << "M204 P" << m_current_acceleration << " T" << (m_current_travel_acceleration > 0 ? m_current_travel_acceleration : m_current_acceleration);
-    } else { // gcfMarlinLegacy
-        // M204: Set default acceleration
-        gcode << "M204 S" << m_current_acceleration;
+    if (m_current_acceleration != m_last_acceleration && m_current_acceleration != 0) {
+        m_last_acceleration = m_current_acceleration;
+
+        //try to set only printing acceleration, travel should be untouched if possible
+        if (FLAVOR_IS(gcfRepetier)) {
+            // M201: Set max printing acceleration
+            gcode << "M201 X" << m_current_acceleration << " Y" << m_current_acceleration;
+        } else if (FLAVOR_IS(gcfLerdge) || FLAVOR_IS(gcfSprinter)) {
+            // M204: Set printing acceleration
+            // This is new MarlinFirmware with separated print/retraction/travel acceleration.
+            // Use M204 P, we don't want to override travel acc by M204 S (which is deprecated anyway).
+            gcode << "M204 P" << m_current_acceleration;
+        } else if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfRepRap)) {
+            // M204: Set printing & travel acceleration
+            gcode << "M204 P" << m_current_acceleration << " T" << (m_current_travel_acceleration > 0 ? m_current_travel_acceleration : m_current_acceleration);
+        } else { // gcfMarlinLegacy
+            // M204: Set default acceleration
+            gcode << "M204 S" << m_current_acceleration;
+        }
+        if (this->config.gcode_comments) gcode << " ; adjust acceleration";
+        gcode << "\n";
     }
-    if (this->config.gcode_comments) gcode << " ; adjust acceleration";
-    gcode << "\n";
-    
+    if (m_current_pressure_advance != m_last_pressure_advance && m_current_pressure_advance != 0) {
+        m_last_pressure_advance = m_current_pressure_advance;
+        if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfMarlinLegacy) || FLAVOR_IS(gcfLerdge)) {
+            gcode << "M900 K" << m_current_pressure_advance;
+        } else if (FLAVOR_IS(gcfRepRap)) {
+            gcode << "M572 D" << this->tool()->id() << " S" << m_current_pressure_advance;
+        } else if (FLAVOR_IS(gcfKlipper)) {
+            gcode << "pressure_advance = " << m_current_pressure_advance;
+        }
+        gcode << "\n";
+
+    }
     return gcode.str();
 }
 
