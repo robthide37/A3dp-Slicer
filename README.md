@@ -9,6 +9,8 @@ This slicer is a version of Superslicer/Slic3r (based on PrusaSlicer) for A3dp n
 You can download a precompiled package from this repository release page.
 For now go to the Dev branch and then git actions. I should have a working Mac, Win , Ubuntu Linux version working now.
 
+To try nightly builds make sure to login to github adn then select the dev branch . Then go to the actions page where their will be compiled versions on teh server ready for download .
+
 ## Licensing and attribution
 
 Slic3r is licensed under the _GNU Affero General Public License, version 3_.
