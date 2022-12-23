@@ -1,0 +1,20 @@
+
+#: ../../ui_layout/default/print.ui
+msgid "_"
+msgstr ""
+
+#: ../../ui_layout/default/printer_sla.ui : l9
+msgid "X"
+msgstr ""
+
+#: ../../ui_layout/default/printer_sla.ui : l10
+msgid "Y"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l286
+msgid "z"
+msgstr ""
+
+#: ../../ui_layout/default/printer_sla.ui : l28
+msgid "Z"
+msgstr ""
