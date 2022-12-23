@@ -1,4 +1,4 @@
-name: C/C++ Patch-01 macos
+name: C/C++ dev macos
 
 on:
   push:
