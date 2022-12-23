@@ -3016,6 +3016,158 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
                                      {50, m_config.overhang_speed_2},
                                      {75, m_config.overhang_speed_3},
                                      {100, ConfigOptionFloatOrPercent{speed, false}}};
+    return speed;
+}
+
+std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string &description_in, double speed) {
+    std::string gcode;
+    std::string description{ description_in };
+
+
+    // adjust acceleration, inside the travel to set the deceleration (unless it's deactivated)
+    double acceleration = get_default_acceleration(m_config);
+    double max_acceleration = std::numeric_limits<double>::max();
+    // on 2.3, check for enable/disable if(config.machine_limits_usage)
+    if (m_config.machine_limits_usage <= MachineLimitsUsage::Limits)
+        max_acceleration = m_config.machine_max_acceleration_extruding.get_at(0);
+    double travel_acceleration = get_travel_acceleration(m_config);
+    if(acceleration > 0){
+        switch (path.role()){
+            case erPerimeter:
+            accel_perimeter:
+                if (m_config.perimeter_acceleration.value > 0) {
+                    double perimeter_acceleration = m_config.get_computed_value("perimeter_acceleration");
+                    if (perimeter_acceleration > 0)
+                        acceleration = perimeter_acceleration;
+                }
+                break;
+            case erExternalPerimeter:
+            accel_externalPerimeter:
+                if (m_config.external_perimeter_acceleration.value > 0) {
+                    double external_perimeter_acceleration = m_config.get_computed_value("external_perimeter_acceleration");
+                    if (external_perimeter_acceleration > 0) {
+                        acceleration = external_perimeter_acceleration;
+                        break;
+                    }
+                }
+                goto accel_perimeter;
+            case erSolidInfill:
+            accel_solidInfill:
+                if (m_config.solid_infill_acceleration.value > 0) {
+                    double solid_infill_acceleration = m_config.get_computed_value("solid_infill_acceleration");
+                    if (solid_infill_acceleration > 0)
+                        acceleration = solid_infill_acceleration;
+                }
+                break;
+            case erInternalInfill:
+            //internalInfill:
+                if (m_config.infill_acceleration.value > 0) {
+                    double infill_acceleration = m_config.get_computed_value("infill_acceleration");
+                    if (infill_acceleration > 0) {
+                        acceleration = infill_acceleration;
+                        break;
+                    }
+                }
+                goto accel_solidInfill;
+            case erTopSolidInfill:
+            accel_topSolidInfill:
+                if (m_config.top_solid_infill_acceleration.value > 0) {
+                    double top_solid_infill_acceleration = m_config.get_computed_value("top_solid_infill_acceleration");
+                    if (top_solid_infill_acceleration > 0) {
+                        acceleration = top_solid_infill_acceleration;
+                        break;
+                    }
+                }
+                goto accel_solidInfill;
+            case erIroning:
+                if (m_config.ironing_acceleration.value > 0) {
+                    double ironing_acceleration = m_config.get_computed_value("ironing_acceleration");
+                    if (ironing_acceleration > 0) {
+                        acceleration = ironing_acceleration;
+                        break;
+                    }
+                }
+                goto accel_topSolidInfill;
+            case erSupportMaterial:
+            case erWipeTower:
+            accel_supportMaterial:
+                if (m_config.support_material_acceleration.value > 0) {
+                    double support_material_acceleration = m_config.get_computed_value("support_material_acceleration");
+                    if (support_material_acceleration > 0)
+                        acceleration = support_material_acceleration;
+                }
+                break;
+            case erSupportMaterialInterface:
+                if (m_config.support_material_interface_acceleration.value > 0) {
+                    double support_material_interface_acceleration = m_config.get_computed_value("support_material_interface_acceleration");
+                    if (support_material_interface_acceleration > 0) {
+                        acceleration = support_material_interface_acceleration;
+                        break;
+                    }
+                }
+                goto accel_supportMaterial;
+            case erSkirt:
+                //skirtBrim:
+                if (m_config.brim_acceleration.value > 0) {
+                    double brim_acceleration = m_config.get_computed_value("brim_acceleration");
+                    if (brim_acceleration > 0) {
+                        acceleration = brim_acceleration;
+                        break;
+                    }
+                }
+                goto accel_supportMaterial;
+            case erBridgeInfill:
+            accel_bridgeInfill:
+                if (m_config.bridge_acceleration.value > 0) {
+                    double bridge_acceleration = m_config.get_computed_value("bridge_acceleration");
+                    if (bridge_acceleration > 0)
+                        acceleration = bridge_acceleration;
+                }
+                break;
+            case erInternalBridgeInfill:
+                if (m_config.bridge_internal_acceleration.value > 0) {
+                    double bridge_internal_acceleration = m_config.get_computed_value("bridge_internal_acceleration");
+                    if (bridge_internal_acceleration > 0) {
+                        acceleration = bridge_internal_acceleration;
+                        break;
+                    }
+                }
+                goto accel_bridgeInfill;
+            case erOverhangPerimeter:
+                if (m_config.overhangs_acceleration.value > 0) {
+                    double overhangs_acceleration = m_config.get_computed_value("overhangs_acceleration");
+                    if (overhangs_acceleration > 0) {
+                        acceleration = overhangs_acceleration;
+                        break;
+                    }
+                }
+                goto accel_bridgeInfill;
+            case erGapFill:
+                if (m_config.gap_fill_acceleration.value > 0) {
+                    double gap_fill_acceleration = m_config.get_computed_value("gap_fill_acceleration");
+                    if (gap_fill_acceleration > 0) {
+                        acceleration = gap_fill_acceleration;
+                        break;
+                    }
+                }
+                goto accel_perimeter;
+                break;
+            case erThinWall:
+                if (m_config.thin_walls_acceleration.value > 0) {
+                    double thin_walls_acceleration = m_config.get_computed_value("thin_walls_acceleration");
+                    if (thin_walls_acceleration > 0) {
+                        acceleration = thin_walls_acceleration;
+                        break;
+                    }
+                }
+                goto accel_externalPerimeter;
+            case erMilling:
+            case erCustom:
+            case erMixed:
+            case erCount:
+            case erNone:
+            default:
+                break;
         }
 
         std::vector<std::pair<int, ConfigOptionInts>> overhang_w_fan_speeds = {{100, ConfigOptionInts{0}}};
@@ -3035,6 +3187,187 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         if (EXTRUDER_CONFIG(filament_max_volumetric_speed) > 0) {
             external_perim_reference_speed = std::min(external_perim_reference_speed,
                                                       EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm);
+        acceleration = std::min(max_acceleration, acceleration);
+    }
+
+    double pa = m_config.filament_default_pa.get_at(m_writer.tool()->id());
+    double travel_pa = m_config.filament_travel_pa.get_abs_value(m_writer.tool()->id(), pa);
+    if (pa > 0) {
+        switch (path.role()) {
+        case erPerimeter:
+            pa = m_config.get_computed_value("filament_perimeter_pa", m_writer.tool()->id());
+            break;
+        case erExternalPerimeter:
+            pa = m_config.get_computed_value("filament_external_perimeter_pa", m_writer.tool()->id());
+            break;
+        case erSolidInfill:
+            pa = m_config.get_computed_value("filament_solid_infill_pa", m_writer.tool()->id());
+            break;
+        case erInternalInfill:
+            pa = m_config.get_computed_value("filament_infill_pa", m_writer.tool()->id());
+            break;
+        case erTopSolidInfill:
+            pa = m_config.get_computed_value("filament_top_solid_infill_pa", m_writer.tool()->id());
+            break;
+        case erIroning:
+            pa = m_config.get_computed_value("filament_ironing_pa", m_writer.tool()->id());
+            break;
+        case erSupportMaterial:
+        case erWipeTower:
+            pa = m_config.get_computed_value("filament_support_material_pa", m_writer.tool()->id());
+            break;
+        case erSupportMaterialInterface:
+            pa = m_config.get_computed_value("filament_support_material_interface_pa", m_writer.tool()->id());
+            break;
+        case erSkirt:
+            pa = m_config.get_computed_value("filament_brim_pa", m_writer.tool()->id());
+            break;
+        case erBridgeInfill:
+            pa = m_config.get_computed_value("filament_bridge_pa", m_writer.tool()->id());
+            break;
+        case erInternalBridgeInfill:
+            pa = m_config.get_computed_value("filament_bridge_internal_pa", m_writer.tool()->id());
+            break;
+        case erOverhangPerimeter:
+            pa = m_config.get_computed_value("filament_overhangs_pa", m_writer.tool()->id());
+            break;
+        case erGapFill:
+            pa = m_config.get_computed_value("filament_gap_fill_pa", m_writer.tool()->id());
+            break;
+        case erThinWall:
+            pa = m_config.get_computed_value("filament_thin_walls_pa", m_writer.tool()->id());
+            break;
+        case erMilling:
+        case erCustom:
+        case erMixed:
+        case erCount:
+        case erNone:
+        default:
+            break;
+        }
+
+        if (this->on_first_layer() && m_config.filament_first_layer_pa.get_at(m_writer.tool()->id()).value > 0) {
+            pa = std::min(pa, m_config.filament_first_layer_pa.get_abs_value(m_writer.tool()->id(), pa));
+        } else if (this->object_layer_over_raft() && m_config.filament_first_layer_pa_over_raft.get_at(m_writer.tool()->id()).value > 0) {
+            pa = m_config.filament_first_layer_pa_over_raft.get_abs_value(m_writer.tool()->id(), pa);
+        }
+    }
+
+    // compute speed here to be able to know it for travel_deceleration_use_target
+    speed = _compute_speed_mm_per_sec(path, speed);
+        
+    if (m_config.travel_deceleration_use_target){
+        if (travel_acceleration <= acceleration || travel_acceleration == 0 || acceleration == 0) {
+            m_writer.set_travel_acceleration((uint32_t)floor(acceleration + 0.5));
+            m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+            m_writer.set_pa(pa);
+            // go to first point of extrusion path (stop at midpoint to let us set the decel speed)
+            if (!m_last_pos_defined || m_last_pos != path.first_point()) {
+                Polyline polyline = this->travel_to(gcode, path.first_point(), path.role());
+                this->write_travel_to(gcode, polyline, "move to first " + description + " point");
+            }
+        } else {
+            // go to midpoint to let us set the decel speed)
+            if (!m_last_pos_defined || m_last_pos != path.first_point()) {
+                Polyline poly_start = this->travel_to(gcode, path.first_point(), path.role());
+                coordf_t length = poly_start.length();
+                // compute some numbers
+                double previous_accel = m_writer.get_acceleration(); // in mm/s²
+                double previous_speed = m_writer.get_speed(); // in mm/s
+                double travel_speed = m_config.get_computed_value("travel_speed");
+                // first, the acceleration distance
+                const double extrude2travel_speed_diff = previous_speed >= travel_speed ? 0 : (travel_speed - previous_speed);
+                const double seconds_to_go_travel_speed = (extrude2travel_speed_diff / travel_acceleration);
+                const coordf_t dist_to_go_travel_speed = scaled(seconds_to_go_travel_speed * (travel_speed - extrude2travel_speed_diff/2));
+                assert(dist_to_go_travel_speed >= 0);
+                assert(!std::isinf(dist_to_go_travel_speed));
+                assert(!std::isnan(dist_to_go_travel_speed));
+                // then the deceleration distance
+                const double travel2extrude_speed_diff = speed >= travel_speed ? 0 : (travel_speed - speed);
+                const double seconds_to_go_extrude_speed = (travel2extrude_speed_diff / acceleration);
+                const coordf_t dist_to_go_extrude_speed = scaled(seconds_to_go_extrude_speed * (travel_speed - travel2extrude_speed_diff / 2));
+                assert(dist_to_go_extrude_speed >= 0);
+                assert(!std::isinf(dist_to_go_extrude_speed));
+                assert(!std::isnan(dist_to_go_extrude_speed));
+                // acceleration to go from previous speed to the new one without going by the travel speed
+                const double extrude2extrude_speed_diff = std::abs(previous_speed - speed);
+                const double accel_extrude2extrude = extrude2extrude_speed_diff * (previous_speed + speed) / (2 * length);
+                assert(dist_to_go_extrude_speed >= 0);
+                assert(!std::isinf(accel_extrude2extrude));
+                assert(!std::isnan(accel_extrude2extrude));
+                // check if using a deceleration is useful
+                // can't use it if no previous pos
+                bool cant_use_deceleration = !m_last_pos_defined;
+                // don't use it if the distance is too small
+                coordf_t min_dist_for_deceleration = coordf_t(SCALED_EPSILON);
+                min_dist_for_deceleration = std::max(min_dist_for_deceleration, dist_to_go_extrude_speed / 10);
+                min_dist_for_deceleration = std::max(min_dist_for_deceleration, scale_d(m_config.min_length));
+                cant_use_deceleration = cant_use_deceleration || length < min_dist_for_deceleration;
+                // don't use it their isn't enough acceleration to go to the next speed without going by the travel speed
+                cant_use_deceleration = cant_use_deceleration || accel_extrude2extrude * 1.1 > acceleration;
+                // don't use it if the travel speed isn't high enough vs next speed
+                cant_use_deceleration = cant_use_deceleration || dist_to_go_extrude_speed < coordf_t(SCALED_EPSILON);
+                if (cant_use_deceleration) {
+                    m_writer.set_travel_acceleration((uint32_t)floor(acceleration + 0.5));
+                    m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+                    m_writer.set_pa(pa);
+                    this->write_travel_to(gcode, poly_start, "move to first " + description + " point (minimum acceleration)");
+                } else {
+                    // if length is enough, it's not the hack for first move, and the travel accel is different than the normal accel
+                    // then cut the travel in two to change the accel in-between
+                    // TODO: compute the real point where it should be cut, considering an infinite max speed.
+                        Polyline poly_end;
+                        const coordf_t needed_decel_length = dist_to_go_extrude_speed + min_dist_for_deceleration;
+                        if (poly_start.size() > 2 && length > dist_to_go_travel_speed + needed_decel_length) {
+                            //if complex travel, try to deccelerate only at the end, unless it's less than ~ 20 nozzle
+                            if (poly_start.lines().back().length() < needed_decel_length) {
+                                poly_end = poly_start;
+                                poly_start.clip_end(needed_decel_length);
+                                poly_end.clip_start(length - needed_decel_length);
+                            } else {
+                                poly_end.points.push_back(poly_start.points.back());
+                                poly_start.points.pop_back();
+                                poly_end.points.push_back(poly_start.points.back());
+                                poly_end.reverse();
+                            }
+                        } else {
+                            // simple & not long enough travel : split at the point of inflexion
+                            double ratio = (dist_to_go_travel_speed + 1) / (dist_to_go_travel_speed + dist_to_go_extrude_speed + 1);
+                            poly_end = poly_start;
+                            poly_start.clip_end(length  * ratio);
+                            poly_end.clip_start(length * (1-ratio));
+                        }
+                        gcode += "; acceleration to travel\n";
+                        m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
+                        m_writer.set_pa(travel_pa);
+                        this->write_travel_to(gcode, poly_start, "move to first " + description + " point (acceleration)");
+                        //travel acceleration should be already set at startup via special gcode, and so it's automatically used by G0.
+                        gcode += "; decel to extrusion\n";
+                        m_writer.set_travel_acceleration((uint32_t)floor(acceleration + 0.5));
+                        m_writer.set_pa(pa);
+                        this->write_travel_to(gcode, poly_end, "move to first " + description + " point (deceleration)");
+                        // restore travel accel and ensure the new extrusion accel is set
+                        m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
+                        m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+                        gcode += "; end travel\n";
+                }
+            } else {
+                m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+                m_writer.set_pa(acceleration);
+            }
+        }
+    } else {
+        if (!m_last_pos_defined || m_last_pos != path.first_point()) {
+            m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
+            m_writer.set_pa(travel_pa);
+            Polyline polyline = this->travel_to(gcode, path.first_point(), path.role());
+            this->write_travel_to(gcode, polyline, "move to first " + description + " point");
+            m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+            m_writer.set_pa(pa);
+        } else {
+            m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+            m_writer.set_pa(pa);
+>>>>>>> Add "pressure"/"linear" advance like for acceleration for marlin, reprap and klipper
         }
 
         new_points = m_extrusion_quality_estimator.estimate_speed_from_extrusion_quality(path, overhangs_with_speeds, overhang_w_fan_speeds,

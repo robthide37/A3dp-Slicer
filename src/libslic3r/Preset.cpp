@@ -462,19 +462,75 @@ static std::vector<std::string> s_Preset_print_options {
 };
 
 static std::vector<std::string> s_Preset_filament_options {
-    "filament_colour", "filament_diameter", "filament_type", "filament_soluble", "filament_notes", "filament_max_volumetric_speed",
-    "extrusion_multiplier", "filament_density", "filament_cost", "filament_spool_weight", "filament_loading_speed", "filament_loading_speed_start", "filament_load_time",
-    "filament_unloading_speed", "filament_unloading_speed_start", "filament_unload_time", "filament_toolchange_delay", "filament_cooling_moves",
-    "filament_cooling_initial_speed", "filament_cooling_final_speed", "filament_ramming_parameters", "filament_minimal_purge_on_wipe_tower",
-    "temperature", "idle_temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", "fan_always_on", "cooling", "min_fan_speed",
-    "max_fan_speed", "bridge_fan_speed", "disable_fan_first_layers", "full_fan_speed_layer", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed",
-    "start_filament_gcode", "end_filament_gcode", "enable_dynamic_fan_speeds",
-    "overhang_fan_speed_0", "overhang_fan_speed_1", "overhang_fan_speed_2", "overhang_fan_speed_3",
-    // Retract overrides
-    "filament_retract_length", "filament_retract_lift", "filament_retract_lift_above", "filament_retract_lift_below", "filament_retract_speed", "filament_deretract_speed", "filament_retract_restart_extra", "filament_retract_before_travel",
-    "filament_retract_layer_change", "filament_wipe", "filament_retract_before_wipe",
-    // Profile compatibility
-    "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits"
+        "filament_colour", 
+        "filament_custom_variables",
+        "filament_diameter", "filament_type", "filament_soluble", "filament_notes",
+        "filament_max_speed",
+        "filament_max_volumetric_speed",
+        "filament_max_wipe_tower_speed",
+        "extrusion_multiplier", "filament_density", "filament_cost", "filament_spool_weight", "filament_loading_speed", "filament_loading_speed_start", "filament_load_time",
+        "filament_unloading_speed", "filament_toolchange_delay", "filament_unloading_speed_start", "filament_unload_time", "filament_cooling_moves",
+        "filament_cooling_initial_speed", "filament_cooling_final_speed", "filament_ramming_parameters", "filament_minimal_purge_on_wipe_tower",
+        "filament_max_overlap",
+        "filament_shrink",
+        "filament_use_skinnydip",  // skinnydip params start
+        "filament_use_fast_skinnydip",
+        "filament_skinnydip_distance",
+        "filament_melt_zone_pause",
+        "filament_cooling_zone_pause",
+        "filament_toolchange_temp",
+        "filament_enable_toolchange_temp",
+        "filament_enable_toolchange_part_fan",
+        "filament_toolchange_part_fan_speed",
+        "filament_dip_insertion_speed",
+        "filament_dip_extraction_speed",  //skinnydip params end
+        "filament_bridge_pa", //pa
+        "filament_bridge_internal_pa",
+        "filament_brim_pa",
+        "filament_default_pa",
+        "filament_external_perimeter_pa",
+        "filament_first_layer_pa",
+        "filament_first_layer_pa_over_raft",
+        "filament_gap_fill_pa",
+        "filament_infill_pa",
+        "filament_ironing_pa",
+        "filament_overhangs_pa",
+        "filament_perimeter_pa",
+        "filament_solid_infill_pa",
+        "filament_support_material_pa",
+        "filament_support_material_interface_pa",
+        "filament_thin_walls_pa",
+        "filament_top_solid_infill_pa",
+        "filament_travel_pa", //pa end
+        "temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", 
+        "full_fan_speed_layer",
+        "fan_always_on", 
+        "min_fan_speed",
+        "max_fan_speed", 
+        "bridge_fan_speed",
+        "bridge_internal_fan_speed",
+        "support_material_interface_fan_speed",
+        "top_fan_speed",
+        "disable_fan_first_layers",
+        "fan_below_layer_time", 
+        "slowdown_below_layer_time",
+        "max_speed_reduction",
+        "min_print_speed",
+        "start_filament_gcode", "end_filament_gcode",
+        "external_perimeter_fan_speed",
+        // Retract overrides
+        "filament_retract_length", "filament_retract_lift", "filament_retract_lift_above", "filament_retract_lift_below", "filament_retract_speed", "filament_deretract_speed", "filament_retract_restart_extra", "filament_retract_before_travel",
+        "filament_retract_layer_change", "filament_retract_before_wipe", 
+        "filament_seam_gap",
+        "filament_wipe", "filament_wipe_only_crossing", "filament_wipe_extra_perimeter", "filament_wipe_speed",
+        "filament_wipe_inside_depth",
+        "filament_wipe_inside_end",
+        "filament_wipe_inside_start",
+        // Profile compatibility
+        "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits",
+        //merill adds
+        "filament_wipe_advanced_pigment",
+        "chamber_temperature",
 };
 
 static std::vector<std::string> s_Preset_machine_limits_options {

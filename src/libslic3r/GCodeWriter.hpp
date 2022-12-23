@@ -45,6 +45,11 @@ public:
     std::string set_bed_temperature(unsigned int temperature, bool wait = false);
     std::string set_print_acceleration(unsigned int acceleration)   { return set_acceleration_internal(Acceleration::Print, acceleration); }
     std::string set_travel_acceleration(unsigned int acceleration)  { return set_acceleration_internal(Acceleration::Travel, acceleration); }
+    void        set_pa(double pa);
+    void        set_acceleration(uint32_t acceleration);
+    void        set_travel_acceleration(uint32_t acceleration);
+    uint32_t    get_acceleration() const;
+    std::string write_acceleration();
     std::string reset_e(bool force = false);
     std::string update_progress(unsigned int num, unsigned int tot, bool allow_100 = false) const;
     // return false if this extruder was already selected
@@ -104,6 +109,17 @@ private:
     unsigned int    m_max_travel_acceleration;
 
     unsigned int    m_last_bed_temperature;
+    Tool*           m_tool;
+    double          m_last_pressure_advance;
+    double          m_current_pressure_advance;
+    uint32_t        m_last_acceleration;
+    uint32_t        m_current_acceleration;
+    uint32_t        m_current_travel_acceleration;
+    double          m_current_speed;
+    uint8_t         m_last_fan_speed;
+    int16_t         m_last_temperature;
+    int16_t         m_last_temperature_with_offset;
+    int16_t         m_last_bed_temperature;
     bool            m_last_bed_temperature_reached;
     double          m_lifted;
     Vec3d           m_pos = Vec3d::Zero();

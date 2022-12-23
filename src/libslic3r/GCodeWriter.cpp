@@ -163,6 +163,73 @@ std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait
     return gcode.str();
 }
 
+void GCodeWriter::set_pa(double pa) { m_current_pressure_advance = pa; }
+
+void GCodeWriter::set_acceleration(uint32_t acceleration)
+{
+    if (acceleration == 0 || acceleration == m_current_acceleration)
+        return;
+
+    m_current_acceleration = acceleration;
+}
+
+void GCodeWriter::set_travel_acceleration(uint32_t acceleration)
+{
+    // Clamp the acceleration to the allowed maximum.
+    if (type == Acceleration::Print && m_max_acceleration > 0 && acceleration > m_max_acceleration)
+        acceleration = m_max_acceleration;
+    if (type == Acceleration::Travel && m_max_travel_acceleration > 0 && acceleration > m_max_travel_acceleration)
+        acceleration = m_max_travel_acceleration;
+    if (acceleration == m_current_travel_acceleration)
+        return;
+
+    m_current_travel_acceleration = acceleration;
+}
+
+uint32_t GCodeWriter::get_acceleration() const { return m_current_acceleration; }
+
+std::string GCodeWriter::write_acceleration()
+{
+    std::ostringstream gcode;
+    if (m_current_acceleration != m_last_acceleration && m_current_acceleration != 0) {
+        m_last_acceleration = m_current_acceleration;
+
+        // try to set only printing acceleration, travel should be untouched if possible
+        if (FLAVOR_IS(gcfRepetier)) {
+            // M201: Set max printing acceleration
+            gcode << "M201 X" << m_current_acceleration << " Y" << m_current_acceleration;
+        } else if (FLAVOR_IS(gcfLerdge) || FLAVOR_IS(gcfSprinter)) {
+            // M204: Set printing acceleration
+            // This is new MarlinFirmware with separated print/retraction/travel acceleration.
+            // Use M204 P, we don't want to override travel acc by M204 S (which is deprecated anyway).
+            gcode << "M204 P" << m_current_acceleration;
+        } else if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfRepRap)) {
+            // M204: Set printing & travel acceleration
+            gcode << "M204 P" << m_current_acceleration << " T"
+                  << (m_current_travel_acceleration > 0 ? m_current_travel_acceleration : m_current_acceleration);
+        } else { // gcfMarlinLegacy
+            // M204: Set default acceleration
+            gcode << "M204 S" << m_current_acceleration;
+        }
+        if (this->config.gcode_comments)
+            gcode << " ; adjust acceleration";
+        gcode << "\n";
+    }
+    if (m_current_pressure_advance != m_last_pressure_advance && m_current_pressure_advance != 0) {
+        m_last_pressure_advance = m_current_pressure_advance;
+        if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfMarlinLegacy) || FLAVOR_IS(gcfLerdge)) {
+            gcode << "M900 K" << m_current_pressure_advance;
+        } else if (FLAVOR_IS(gcfRepRap)) {
+            gcode << "M572 D" << this->tool()->id() << " S" << m_current_pressure_advance;
+        } else if (FLAVOR_IS(gcfKlipper)) {
+            gcode << "pressure_advance = " << m_current_pressure_advance;
+        }
+        gcode << "\n";
+    }
+    return gcode.str();
+}
+
+
 std::string GCodeWriter::set_acceleration_internal(Acceleration type, unsigned int acceleration)
 {
     // Clamp the acceleration to the allowed maximum.
@@ -170,7 +237,6 @@ std::string GCodeWriter::set_acceleration_internal(Acceleration type, unsigned i
         acceleration = m_max_acceleration;
     if (type == Acceleration::Travel && m_max_travel_acceleration > 0 && acceleration > m_max_travel_acceleration)
         acceleration = m_max_travel_acceleration;
-
     // Are we setting travel acceleration for a flavour that supports separate travel and print acc?
     bool separate_travel = (type == Acceleration::Travel && supports_separate_travel_acceleration(this->config.gcode_flavor));
 
@@ -189,8 +255,7 @@ std::string GCodeWriter::set_acceleration_internal(Acceleration type, unsigned i
         gcode << "M204 S" << acceleration;
 
     if (this->config.gcode_comments) gcode << " ; adjust acceleration";
-    gcode << "\n";
-    
+    gcode << "\n";    
     return gcode.str();
 }
 
