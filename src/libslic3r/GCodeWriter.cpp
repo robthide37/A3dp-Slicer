@@ -302,7 +302,7 @@ std::string GCodeWriter::write_acceleration(){
         } else if (FLAVOR_IS(gcfRepRap)) {
             gcode << "M572 D" << this->tool()->id() << " S" << m_current_pressure_advance;
         } else if (FLAVOR_IS(gcfKlipper)) {
-            gcode << "pressure_advance = " << m_current_pressure_advance;
+            gcode << "SET_PRESSURE_ADVANCE ADVANCE=" << m_current_pressure_advance;
         }
         gcode << "\n";
 
