@@ -4139,7 +4139,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("filament_bridge_internal_pa", coFloatsOrPercents);
     def->label = L("internal bridge");
     def->category = OptionCategory::filament;
-    def->tooltip = L("Pressure advance for bridge sections. Can be a % over default pa");
+    def->tooltip = L("Pressure advance for internal bridge sections. Can be a % over default pa");
     def->mode = comExpert | comSuSi;
     def->ratio_over = "filament_default_pa";
     def->is_vector_extruder = true;
@@ -4148,7 +4148,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("filament_brim_pa", coFloatsOrPercents);
     def->label = L("brim");
     def->category = OptionCategory::filament;
-    def->tooltip = L("Pressure advance for bridge sections. Can be a % over support pa");
+    def->tooltip = L("Pressure advance for brim. Can be a % over support pa");
     def->mode = comExpert | comSuSi;
     def->ratio_over = "filament_support_material_pa";
     def->is_vector_extruder = true;
@@ -4157,7 +4157,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("filament_external_perimeter_pa", coFloatsOrPercents);
     def->label = L("external perimeter");
     def->category = OptionCategory::filament;
-    def->tooltip = L("Pressure advance for bridge sections. Can be a % over support pa");
+    def->tooltip = L("Pressure advance for external perimeter. Can be a % over support pa");
     def->mode = comExpert | comSuSi;
     def->ratio_over = "filament_support_material_pa";
     def->is_vector_extruder = true;
@@ -4175,7 +4175,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("filament_first_layer_pa_over_raft", coFloatsOrPercents);
     def->label = L("over raft");
     def->category = OptionCategory::filament;
-    def->tooltip = L("Pressure advance for first layer sections. If %, it's a % over the current feature");
+    def->tooltip = L("Pressure advance for first layer sections over raft . If %, it's a % over the current feature");
     def->mode = comExpert | comSuSi;
     def->ratio_over = "depends";
     def->is_vector_extruder = true;
@@ -4238,7 +4238,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("filament_support_material_pa", coFloatsOrPercents);
     def->label = L("support");
     def->category = OptionCategory::filament;
-    def->tooltip = L("Pressure advance for bridge sections. Can be a % over default pa");
+    def->tooltip = L("Pressure advance for support sections. Can be a % over default pa");
     def->mode = comExpert | comSuSi;
     def->ratio_over = "filament_default_pa";
     def->is_vector_extruder = true;
@@ -4247,7 +4247,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("filament_support_material_interface_pa", coFloatsOrPercents);
     def->label = L("support interface");
     def->category = OptionCategory::filament;
-    def->tooltip = L("Pressure advance for bridge sections. Can be a % over support pa");
+    def->tooltip = L("Pressure advance for support interface sections. Can be a % over support pa");
     def->mode = comExpert | comSuSi;
     def->ratio_over = "filament_support_material_pa";
     def->is_vector_extruder = true;
@@ -4274,7 +4274,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("filament_travel_pa", coFloatsOrPercents);
     def->label = L("travel");
     def->category = OptionCategory::filament;
-    def->tooltip = L("Pressure advance for travel sections. Can be a % over default pa");
+    def->tooltip = L("Pressure advance for travel sections, may help retraction experimental. Can be a % over default pa");
     def->mode = comExpert | comSuSi;
     def->ratio_over = "filament_default_pa";
     def->is_vector_extruder = true;
@@ -4385,7 +4385,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Internal resolution");
     def->category = OptionCategory::slicing;
     def->tooltip = L("Minimum detail resolution, used for internal structures (gapfill and some infill patterns)."
-            "\nDon't put a too-small value (0.05mm is way too low for many printers), as it may create too many very small segments that may be difficult to display and print.");
+            "\nDon't put a too-small value (0.05mm is way too low for many printers A3dp machines .1 rec), as it may create too many very small segments that may be difficult to display and print.");
     def->sidetext = L("mm");
     def->min = 0.001;
     def->precision = 8;
