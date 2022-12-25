@@ -5150,7 +5150,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                 }
             } else {
                 m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
-                m_writer.set_pa(acceleration);
+                m_writer.set_pa(pa);
             }
         }
     } else {
