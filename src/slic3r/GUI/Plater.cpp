@@ -2186,9 +2186,9 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         this->q->Bind(EVT_EJECT_DRIVE_NOTIFICAION_CLICKED, [this](EjectDriveNotificationClickedEvent&) { this->q->eject_drive(); });
         this->q->Bind(EVT_EXPORT_GCODE_NOTIFICAION_CLICKED, [this](ExportGcodeNotificationClickedEvent&) { this->q->export_gcode(true); });
         this->q->Bind(EVT_PRESET_UPDATE_AVAILABLE_CLICKED, [](PresetUpdateAvailableClickedEvent&) {  wxGetApp().get_preset_updater()->on_update_notification_confirm(); });
-        this->q->Bind(EVT_REMOVABLE_DRIVE_EJECTED, [this](RemovableDriveEjectEvent &evt) {
+        this->q->Bind(EVT_REMOVABLE_DRIVE_EJECTED, [this, q](RemovableDriveEjectEvent &evt) {
 		    if (evt.data.second) {
-			    this->show_action_buttons(this->ready_to_slice);
+			    q->show_action_buttons();
                 notification_manager->close_notification_of_type(NotificationType::ExportFinished);
                 notification_manager->push_notification(NotificationType::CustomNotification,
                                                         NotificationManager::NotificationLevel::RegularNotificationLevel,
@@ -2202,8 +2202,8 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
                     );
             }
 	    });
-        this->q->Bind(EVT_REMOVABLE_DRIVES_CHANGED, [this](RemovableDrivesChangedEvent &) {
-		    this->show_action_buttons(this->ready_to_slice); 
+        this->q->Bind(EVT_REMOVABLE_DRIVES_CHANGED, [this, q](RemovableDrivesChangedEvent &) {
+		    q->show_action_buttons(); 
 		    // Close notification ExportingFinished but only if last export was to removable
 		    notification_manager->device_ejected();
 	    });
@@ -3308,7 +3308,15 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             }
         }
     }
-    else if (! this->delayed_error_message.empty()) {
+    else {
+        if (invalidated == Print::APPLY_STATUS_UNCHANGED && !background_process.empty()) {
+            std::string warning;
+            std::string err = background_process.validate(&warning);
+            if (!err.empty())
+                return return_state;
+        }
+    
+        if (! this->delayed_error_message.empty())
     	// Reusing the old state.
         return_state |= UPDATE_BACKGROUND_PROCESS_INVALID;
     }
@@ -4993,10 +5001,10 @@ bool Plater::priv::can_layers_editing() const
     return layers_height_allowed();
 }
 
-void Plater::priv::show_action_buttons(const bool ready_to_slice) const
+void Plater::priv::show_action_buttons(const bool ready_to_slice_) const
 {
 	// Cache this value, so that the callbacks from the RemovableDriveManager may repeat that value when calling show_action_buttons().
-    this->ready_to_slice = ready_to_slice;
+    this->ready_to_slice = ready_to_slice_;
 
     wxWindowUpdateLocker noUpdater(sidebar);
 
@@ -7021,6 +7029,7 @@ void Plater::split_object()         { p->split_object(); }
 void Plater::split_volume()         { p->split_volume(); }
 void Plater::update_menus()         { p->menus.update(); }
 void Plater::show_action_buttons(const bool ready_to_slice) const   { p->show_action_buttons(ready_to_slice); }
+void Plater::show_action_buttons() const                            { p->show_action_buttons(p->ready_to_slice); }
 
 void Plater::copy_selection_to_clipboard()
 {

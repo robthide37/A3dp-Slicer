@@ -313,6 +313,7 @@ public:
 
     void update_menus();
     void show_action_buttons(const bool is_ready_to_slice) const;
+    void show_action_buttons() const;
 
     wxString get_project_filename(const wxString& extension = wxEmptyString) const;
     void set_project_filename(const wxString& filename);
