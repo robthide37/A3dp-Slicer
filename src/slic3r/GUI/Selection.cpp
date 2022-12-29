@@ -2145,6 +2145,16 @@ std::vector<unsigned int> Selection::get_unselected_volume_idxs_from(const std::
     return idxs;
 }
 
+std::set<unsigned int> Selection::get_object_idxs() const
+{
+    std::set<unsigned int> idxs;
+
+    for (unsigned int i : m_list)
+        idxs.emplace((*m_volumes)[i]->object_idx());
+
+    return idxs;
+}
+
 void Selection::update_valid()
 {
     m_valid = (m_volumes != nullptr) && (m_model != nullptr);

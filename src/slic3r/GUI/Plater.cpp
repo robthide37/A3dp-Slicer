@@ -1941,7 +1941,7 @@ struct Plater::priv
     bool can_delete() const;
     bool can_delete_all() const;
     bool can_increase_instances() const;
-    bool can_decrease_instances() const;
+    bool can_decrease_instances(int obj_idx = -1) const;
     bool can_split_to_objects() const;
     bool can_split_to_volumes() const;
     bool can_arrange() const;
@@ -5004,18 +5004,18 @@ bool Plater::priv::can_increase_instances() const
     // Prevent strobo effect during editing emboss parameters.
     if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
 
-    const int obj_idx = get_selected_object_idx();
-    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) &&
-            !sidebar->obj_list()->has_selected_cut_object();
+    const auto obj_idxs = get_selection().get_object_idxs();
+    return !obj_idxs.empty() && !sidebar->obj_list()->has_selected_cut_object();
 }
 
-bool Plater::priv::can_decrease_instances() const
+bool Plater::priv::can_decrease_instances(int obj_idx /*= -1*/) const
 {
     if (!m_worker.is_idle()
      || q->canvas3D()->get_gizmos_manager().is_in_editing_mode())
             return false;
 
-    const int obj_idx = get_selected_object_idx();
+    if (obj_idx < 0)
+        obj_idx = get_selected_object_idx();
     return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) && 
             (model.objects[obj_idx]->instances.size() > 1) &&
             !sidebar->obj_list()->has_selected_cut_object();
@@ -6273,13 +6273,14 @@ void Plater::remove_selected()
     p->view3D->delete_selected();
 }
 
-void Plater::increase_instances(size_t num)
+void Plater::increase_instances(size_t num, int obj_idx/* = -1*/)
 {
     if (! can_increase_instances()) { return; }
 
     Plater::TakeSnapshot snapshot(this, _L("Increase Instances"));
 
-    int obj_idx = p->get_selected_object_idx();
+    if (obj_idx < 0)
+        obj_idx = p->get_selected_object_idx();
 
     ModelObject* model_object = p->model.objects[obj_idx];
     ModelInstance* model_instance = model_object->instances.back();
@@ -6307,13 +6308,14 @@ void Plater::increase_instances(size_t num)
     this->p->schedule_background_process();
 }
 
-void Plater::decrease_instances(size_t num)
+void Plater::decrease_instances(size_t num, int obj_idx/* = -1*/)
 {
-    if (! can_decrease_instances()) { return; }
+    if (! can_decrease_instances(obj_idx)) { return; }
 
     Plater::TakeSnapshot snapshot(this, _L("Decrease Instances"));
 
-    int obj_idx = p->get_selected_object_idx();
+    if (obj_idx < 0)
+        obj_idx = p->get_selected_object_idx();
 
     ModelObject* model_object = p->model.objects[obj_idx];
     if (model_object->instances.size() > num) {
@@ -6354,26 +6356,27 @@ static long GetNumberFromUser(  const wxString& msg,
 #endif
 }
 
-void Plater::set_number_of_copies(/*size_t num*/)
+void Plater::set_number_of_copies()
 {
-    int obj_idx = p->get_selected_object_idx();
-    if (obj_idx == -1)
+    const auto obj_idxs = get_selection().get_object_idxs();
+    if (obj_idxs.empty())
         return;
 
-    ModelObject* model_object = p->model.objects[obj_idx];
-
+    const size_t init_cnt = obj_idxs.size() == 1 ? p->model.objects[*obj_idxs.begin()]->instances.size() : 1;
     const int num = GetNumberFromUser( " ", _L("Enter the number of copies:"),
-                                    _L("Copies of the selected object"), model_object->instances.size(), 0, 1000, this );
+                                    _L("Copies of the selected object"), init_cnt, 0, 1000, this );
     if (num < 0)
         return;
+    TakeSnapshot snapshot(this, wxString::Format(_L("Set numbers of copies to %d"), num));
 
-    Plater::TakeSnapshot snapshot(this, wxString::Format(_L("Set numbers of copies to %d"), num));
-
-    int diff = num - (int)model_object->instances.size();
-    if (diff > 0)
-        increase_instances(diff);
-    else if (diff < 0)
-        decrease_instances(-diff);
+    for (const auto obj_idx : obj_idxs) {
+        ModelObject* model_object = p->model.objects[obj_idx];
+        const int diff = num - (int)model_object->instances.size();
+        if (diff > 0)
+            increase_instances(diff, int(obj_idx));
+        else if (diff < 0)
+            decrease_instances(-diff, int(obj_idx));
+    }
 }
 
 void Plater::fill_bed_with_instances()
@@ -7665,7 +7668,7 @@ void Plater::init_notification_manager()
 bool Plater::can_delete() const { return p->can_delete(); }
 bool Plater::can_delete_all() const { return p->can_delete_all(); }
 bool Plater::can_increase_instances() const { return p->can_increase_instances(); }
-bool Plater::can_decrease_instances() const { return p->can_decrease_instances(); }
+bool Plater::can_decrease_instances(int obj_idx/* = -1*/) const { return p->can_decrease_instances(obj_idx); }
 bool Plater::can_set_instance_to_object() const { return p->can_set_instance_to_object(); }
 bool Plater::can_fix_through_netfabb() const { return p->can_fix_through_netfabb(); }
 bool Plater::can_simplify() const { return p->can_simplify(); }
