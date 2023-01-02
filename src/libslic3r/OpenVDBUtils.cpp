@@ -81,7 +81,7 @@ struct Interrupter
     void start(const char* name = nullptr) { (void)name; }
     void end() {}
 
-    inline bool wasInterrupted(int percent = -1) { return statusfn(percent); }
+    inline bool wasInterrupted(int percent = -1) { return statusfn && statusfn(percent); }
 };
 
 VoxelGridPtr mesh_to_grid(const indexed_triangle_set &mesh,

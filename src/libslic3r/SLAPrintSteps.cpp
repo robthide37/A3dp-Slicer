@@ -196,7 +196,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
 
     auto r = range(po.m_mesh_to_slice);
     auto m = indexed_triangle_set{};
-    if (r.size() == 1 || is_all_positive(r)) {
+    if (is_all_positive(r)) {
         m = csgmesh_merge_positive_parts(r);
     } else if (csg::check_csgmesh_booleans(r) == r.end()) {
         auto cgalmeshptr = csg::perform_csgmesh_booleans(r);
@@ -204,7 +204,9 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
             m = MeshBoolean::cgal::cgal_to_indexed_triangle_set(*cgalmeshptr);
     } else {
         po.active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
-                                   L("Can't do proper mesh booleans!"));
+                                   L("Can't perform full mesh booleans! "
+                                     "Some parts of the print will be previewed with approximated meshes. "
+                                     "This does not affect the quality of slices or the physical print in any way."));
         m = generate_preview_vdb(po, step);
     }
 

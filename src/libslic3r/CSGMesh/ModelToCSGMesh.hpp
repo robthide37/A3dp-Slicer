@@ -43,6 +43,9 @@ void model_to_csgmesh(const ModelObject &mo,
                 ++out;
 
                 its_split(vol->mesh().its, SplitOutputFn{[&out, &vol, &trafo](indexed_triangle_set &&its) {
+                              if (its.empty())
+                                  return;
+
                               CSGPart part{std::make_unique<indexed_triangle_set>(std::move(its)),
                                        CSGType::Union,
                                        (trafo * vol->get_matrix()).cast<float>()};
