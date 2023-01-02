@@ -2978,6 +2978,10 @@ void TabPrinter::activate_selected_page(std::function<void()> throw_if_canceled)
 void TabPrinter::clear_pages()
 {
     Tab::clear_pages();
+
+    m_machine_limits_description_line           = nullptr;
+    m_fff_print_host_upload_description_line    = nullptr;
+    m_sla_print_host_upload_description_line    = nullptr;
 }
 
 void TabPrinter::toggle_options()
