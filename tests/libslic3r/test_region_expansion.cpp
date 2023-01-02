@@ -251,4 +251,34 @@ SCENARIO("Region expansion basics", "[RegionExpansion]") {
             }
         }
     }
+    GIVEN("square with hole, hole edge anchored") {
+        Polygon outer{ { -1 * ten, -1 * ten }, { 2 * ten, -1 * ten }, { 2 * ten, 2 * ten }, { -1 * ten, 2 * ten } };
+        Polygon hole { { 0, ten }, { ten, ten }, { ten, 0 }, { 0, 0 } };
+        Polygon anchor{ { 0, 0 }, { ten, 0 }, { ten, ten }, { 0, ten } };
+        ExPolygon boundary(outer);
+        boundary.holes = { hole };
+
+        WHEN("expanded") {
+            static constexpr const float expansion = scaled<float>(5.);
+            std::vector<Polygons> expanded = Algorithm::expand_expolygons({ ExPolygon{anchor} }, { boundary },
+                expansion,
+                scaled<float>(0.4), // expansion step
+                15);                // max num steps
+#if 0
+            SVG::export_expolygons(DEBUG_TEMP_DIR "square_with_hole_anchored-out.svg",
+                { { { { ExPolygon{anchor} } }, { "anchor", "orange", 0.5f } },
+                  { { { boundary } },          { "boundary", "blue", 0.5f } },
+                  { { union_ex(expanded.front()) }, { "expanded", "red", "black", "", scaled<coord_t>(0.1f), 0.5f } } });
+#endif
+            THEN("The anchor expands into a single region with a hole") {
+                REQUIRE(expanded.size() == 1);
+                REQUIRE(expanded.front().size() == 2);
+            }
+            THEN("The area of anchor is correct") {
+                double area_calculated = area(expanded.front());
+                double area_expected = double(expansion) * 4. * double(ten) + M_PI * sqr(expansion);
+                REQUIRE(is_approx(area_expected, area_calculated, sqr(scaled<double>(0.6))));
+            }
+        }
+    }
 }

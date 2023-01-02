@@ -1,10 +1,75 @@
 #include "RegionExpansion.hpp"
 
+#include <libslic3r/AABBTreeIndirect.hpp>
 #include <libslic3r/ClipperZUtils.hpp>
 #include <libslic3r/ClipperUtils.hpp>
+#include <libslic3r/Utils.hpp>
 
 namespace Slic3r {
 namespace Algorithm {
+
+// Calculating radius discretization according to ClipperLib offsetter code, see void ClipperOffset::DoOffset(double delta)
+inline double clipper_round_offset_error(double offset, double arc_tolerance)
+{
+    static constexpr const double def_arc_tolerance = 0.25;
+    const double y =
+        arc_tolerance <= 0 ?
+            def_arc_tolerance :
+            arc_tolerance > offset * def_arc_tolerance ?
+                offset * def_arc_tolerance :
+                arc_tolerance;
+    double steps = std::min(M_PI / std::acos(1. - y / offset), offset * M_PI);
+    return offset * (1. - cos(M_PI / steps));
+}
+
+RegionExpansionParameters RegionExpansionParameters::build(
+    // Scaled expansion value
+    float                full_expansion,
+    // Expand by waves of expansion_step size (expansion_step is scaled).
+    float                expansion_step,
+    // Don't take more than max_nr_steps for small expansion_step.
+    size_t               max_nr_expansion_steps)
+{
+    assert(full_expansion > 0);
+    assert(expansion_step > 0);
+    assert(max_nr_expansion_steps > 0);
+
+    RegionExpansionParameters out;
+    // Initial expansion of src to make the source regions intersect with boundary regions just a bit.
+    // The expansion should not be too tiny, but also small enough, so the following expansion will
+    // compensate for tiny_expansion and bring the wave back to the boundary without producing
+    // ugly cusps where it touches the boundary.
+    out.tiny_expansion = std::min(0.25f * full_expansion, scaled<float>(0.05f));
+    size_t nsteps = size_t(ceil((full_expansion - out.tiny_expansion) / expansion_step));
+    if (max_nr_expansion_steps > 0)
+        nsteps = std::min(nsteps, max_nr_expansion_steps);
+    assert(nsteps > 0);
+    out.initial_step = (full_expansion - out.tiny_expansion) / nsteps;
+    if (nsteps > 1 && 0.25 * out.initial_step < out.tiny_expansion) {
+        // Decrease the step size by lowering number of steps.
+        nsteps       = std::max<size_t>(1, (floor((full_expansion - out.tiny_expansion) / (4. * out.tiny_expansion))));
+        out.initial_step = (full_expansion - out.tiny_expansion) / nsteps;
+    }
+    if (0.25 * out.initial_step < out.tiny_expansion || nsteps == 1) {
+        out.tiny_expansion = 0.2f * full_expansion;
+        out.initial_step   = 0.8f * full_expansion;
+    }
+    out.other_step           = out.initial_step;
+    out.num_other_steps      = nsteps - 1;
+
+    // Accuracy of the offsetter for wave propagation.
+    out.arc_tolerance        = scaled<double>(0.1);
+    out.shortest_edge_length = out.initial_step * ClipperOffsetShortestEdgeFactor;
+
+    // Maximum inflation of seed contours over the boundary. Used to trim boundary to speed up
+    // clipping during wave propagation. Needs to be in sync with the offsetter accuracy.
+    // Clipper positive round offset should rather offset less than more.
+    // Still a little bit of additional offset was added.
+    out.max_inflation = (out.tiny_expansion + nsteps * out.initial_step) * 1.1;
+//                (clipper_round_offset_error(out.tiny_expansion, co.ArcTolerance) + nsteps * clipper_round_offset_error(out.initial_step, co.ArcTolerance) * 1.5; // Account for uncertainty 
+
+    return out;
+}
 
 // similar to expolygons_to_zpaths(), but each contour is expanded before converted to zpath.
 // The expanded contours are then opened (the first point is repeated at the end).
@@ -48,8 +113,7 @@ static inline void merge_splits(ClipperLib_Z::Paths &paths, std::vector<std::pai
             const ClipperLib_Z::IntPoint &front = path.front();
             const ClipperLib_Z::IntPoint &back  = path.back();
             // The path before clipping was supposed to cross the clipping boundary or be fully out of it.
-            // Thus the clipped contour is supposed to become open.
-            assert(front.x() != back.x() || front.y() != back.y());
+            // Thus the clipped contour is supposed to become open, with one exception: The anchor expands into a closed hole.
             if (front.x() != back.x() || front.y() != back.y()) {
                 // Look up the ends in "splits", possibly join the contours.
                 // "splits" maps into the other piece connected to the same end point.
@@ -89,14 +153,156 @@ static inline void merge_splits(ClipperLib_Z::Paths &paths, std::vector<std::pai
     }
 }
 
+std::vector<WaveSeed> wave_seeds(
+    // Source regions that are supposed to touch the boundary.
+    const ExPolygons      &src,
+    // Boundaries of source regions touching the "boundary" regions will be expanded into the "boundary" region.
+    const ExPolygons      &boundary,
+    // Initial expansion of src to make the source regions intersect with boundary regions just a bit.
+    float                  tiny_expansion,
+    // Sort output by boundary ID and source ID.
+    bool                   sorted)
+{
+    assert(tiny_expansion > 0);
+
+    if (src.empty())
+        return {};
+
+    using Intersection  = ClipperZUtils::ClipperZIntersectionVisitor::Intersection;
+    using Intersections = ClipperZUtils::ClipperZIntersectionVisitor::Intersections;
+
+    ClipperLib_Z::Paths segments;
+    Intersections       intersections;
+
+    coord_t             idx_boundary_begin = 1;
+    coord_t             idx_boundary_end;
+    coord_t             idx_src_end;
+
+    {
+        ClipperLib_Z::Clipper zclipper;
+        ClipperZUtils::ClipperZIntersectionVisitor visitor(intersections);
+        zclipper.ZFillFunction(visitor.clipper_callback());
+        // as closed contours
+        {
+            ClipperLib_Z::Paths zboundary = ClipperZUtils::expolygons_to_zpaths(boundary, idx_boundary_begin);
+            idx_boundary_end = idx_boundary_begin + coord_t(zboundary.size());
+            zclipper.AddPaths(zboundary, ClipperLib_Z::ptClip, true);
+        }
+        // as open contours
+        std::vector<std::pair<ClipperLib_Z::IntPoint, int>> zsrc_splits;
+        {
+            ClipperLib_Z::Paths zsrc = expolygons_to_zpaths_expanded_opened(src, tiny_expansion, idx_boundary_end);
+            zclipper.AddPaths(zsrc, ClipperLib_Z::ptSubject, false);
+            idx_src_end = idx_boundary_end + coord_t(zsrc.size());
+            zsrc_splits.reserve(zsrc.size());
+            for (const ClipperLib_Z::Path &path : zsrc) {
+                assert(path.size() >= 2);
+                assert(path.front() == path.back());
+                zsrc_splits.emplace_back(path.front(), -1);
+            }
+            std::sort(zsrc_splits.begin(), zsrc_splits.end(), [](const auto &l, const auto &r){ return ClipperZUtils::zpoint_lower(l.first, r.first); });
+        }
+        ClipperLib_Z::PolyTree polytree;
+        zclipper.Execute(ClipperLib_Z::ctIntersection, polytree, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
+        ClipperLib_Z::PolyTreeToPaths(std::move(polytree), segments);
+        merge_splits(segments, zsrc_splits);
+    }
+
+    // AABBTree over bounding boxes of boundaries.
+    // Only built if necessary, that is if any of the seed contours is closed, thus there is no intersection point
+    // with the boundary and all Z coordinates of the closed contour point to the source contour.
+    using AABBTree = AABBTreeIndirect::Tree<2, coord_t>;
+    AABBTree aabb_tree;
+    auto init_aabb_tree = [&aabb_tree, &boundary]() {
+        if (aabb_tree.empty()) {
+            // Calculate bounding boxes of internal slices.
+            std::vector<AABBTreeIndirect::BoundingBoxWrapper> bboxes;
+            bboxes.reserve(boundary.size());
+            for (size_t i = 0; i < boundary.size(); ++ i)
+                bboxes.emplace_back(i, get_extents(boundary[i].contour));
+            // Build AABB tree over bounding boxes of boundary expolygons.
+            aabb_tree.build_modify_input(bboxes);
+        }
+    };
+
+    // Sort paths into their respective islands.
+    // Each src x boundary will be processed (wave expanded) independently.
+    // Multiple pieces of a single src may intersect the same boundary.
+    WaveSeeds out;
+    out.reserve(segments.size());
+    int iseed = 0;
+    for (const ClipperLib_Z::Path &path : segments) {
+        assert(path.size() >= 2);
+        const ClipperLib_Z::IntPoint &front = path.front();
+        const ClipperLib_Z::IntPoint &back  = path.back();
+        // Both ends of a seed segment are supposed to be inside a single boundary expolygon.
+        // Thus as long as the seed contour is not closed, it should be open at a boundary point.
+        assert((front == back && front.z() >= idx_boundary_end && front.z() < idx_src_end) || (front.z() < 0 && back.z() < 0));
+        const Intersection *intersection = nullptr;
+        auto intersection_point_valid = [idx_boundary_end, idx_src_end](const Intersection &is) {
+            return is.first >= 1 && is.first < idx_boundary_end &&
+                   is.second >= idx_boundary_end && is.second < idx_src_end;
+        };
+        if (front.z() < 0) {
+            const Intersection &is = intersections[- front.z() - 1];
+            assert(intersection_point_valid(is));
+            if (intersection_point_valid(is))
+                intersection = &is;
+        }
+        if (! intersection && back.z() < 0) {
+            const Intersection &is = intersections[- back.z() - 1];
+            assert(intersection_point_valid(is));
+            if (intersection_point_valid(is))
+                intersection = &is;
+        }
+        if (intersection) {
+            // The path intersects the boundary contour at least at one side. 
+            out.push_back({ uint32_t(intersection->second - idx_boundary_end), uint32_t(intersection->first - 1), ClipperZUtils::from_zpath(path) });
+        } else {
+            // This should be a closed contour.
+            assert(front == back && front.z() >= idx_boundary_end && front.z() < idx_src_end);
+            // Find a source boundary expolygon of one sample of this closed path.
+            init_aabb_tree();
+            Point sample(front.x(), front.y());
+            int boundary_id = -1;
+            AABBTreeIndirect::traverse(aabb_tree,
+                [&sample](const AABBTree::Node &node) {
+                    return node.bbox.contains(sample);
+                },
+                [&boundary, &sample, &boundary_id](const AABBTree::Node &node) {
+                    assert(node.is_leaf());
+                    assert(node.is_valid());
+                    if (boundary[node.idx].contains(sample)) {
+                        boundary_id = int(node.idx);
+                        // Stop traversal.
+                        return false;
+                    }
+                    // Continue traversal.
+                    return true;
+                });
+            // Boundary that contains the sample point was found.
+            assert(boundary_id >= 0);
+            if (boundary_id >= 0)
+                out.push_back({ uint32_t(front.z() - idx_boundary_end), uint32_t(boundary_id), ClipperZUtils::from_zpath(path) });
+        }
+        ++ iseed;
+    }
+
+    if (sorted)
+        // Sort the seeds by their intersection boundary and source contour.
+        std::sort(out.begin(), out.end(), lower_by_boundary_and_src);
+    return out;
+}
+
 static ClipperLib::Paths wavefront_initial(ClipperLib::ClipperOffset &co, const ClipperLib::Paths &polylines, float offset)
 {
     ClipperLib::Paths out;
     out.reserve(polylines.size());
     ClipperLib::Paths out_this;
     for (const ClipperLib::Path &path : polylines) {
+        assert(path.size() >= 2);
         co.Clear();
-        co.AddPath(path, jtRound, ClipperLib::etOpenRound);
+        co.AddPath(path, jtRound, path.front() == path.back() ? ClipperLib::etClosedLine : ClipperLib::etOpenRound);
         co.Execute(out_this, offset);
         append(out, std::move(out_this));
     }
@@ -164,22 +370,73 @@ static Polygons propagate_wave_from_boundary(
     return to_polygons(polygons);
 }
 
-// Calculating radius discretization according to ClipperLib offsetter code, see void ClipperOffset::DoOffset(double delta)
-inline double clipper_round_offset_error(double offset, double arc_tolerance)
+// Resulting regions are sorted by boundary id and source id.
+std::vector<RegionExpansion> propagate_waves(const WaveSeeds &seeds, const ExPolygons &boundary, const RegionExpansionParameters &params)
 {
-    static constexpr const double def_arc_tolerance = 0.25;
-    const double y =
-        arc_tolerance <= 0 ?
-            def_arc_tolerance :
-            arc_tolerance > offset * def_arc_tolerance ?
-                offset * def_arc_tolerance :
-                arc_tolerance;
-    double steps = std::min(M_PI / std::acos(1. - y / offset), offset * M_PI);
-    return offset * (1. - cos(M_PI / steps));
+    std::vector<RegionExpansion> out;
+    ClipperLib::Paths            paths;
+    ClipperLib::ClipperOffset co;
+    co.ArcTolerance       = params.arc_tolerance;
+    co.ShortestEdgeLength = params.shortest_edge_length;
+    for (auto it_seed = seeds.begin(); it_seed != seeds.end();) {
+        auto it = it_seed;
+        paths.clear();
+        for (; it != seeds.end() && it->boundary == it_seed->boundary && it->src == it_seed->src; ++ it)
+            paths.emplace_back(it->path);
+        // Propagate the wavefront while clipping it with the trimmed boundary.
+        // Collect the expanded polygons, merge them with the source polygons.
+        RegionExpansion re;
+        for (Polygon &polygon : propagate_wave_from_boundary(co, paths, boundary[it_seed->boundary], params.initial_step, params.other_step, params.num_other_steps, params.max_inflation))
+            out.push_back({ std::move(polygon), it_seed->src, it_seed->boundary });
+        it_seed = it;
+    }
+
+    return out;
+}
+
+std::vector<RegionExpansion> propagate_waves(const ExPolygons &src, const ExPolygons &boundary, const RegionExpansionParameters &params)
+{
+    return propagate_waves(wave_seeds(src, boundary, params.tiny_expansion, true), boundary, params);
+}
+
+std::vector<RegionExpansion> propagate_waves(const ExPolygons &src, const ExPolygons &boundary,
+    // Scaled expansion value
+    float expansion, 
+    // Expand by waves of expansion_step size (expansion_step is scaled).
+    float expansion_step,
+    // Don't take more than max_nr_steps for small expansion_step.
+    size_t max_nr_steps)
+{
+    return propagate_waves(src, boundary, RegionExpansionParameters::build(expansion, expansion_step, max_nr_steps));
 }
 
 // Returns regions per source ExPolygon expanded into boundary.
-std::vector<Polygons> expand_expolygons(
+std::vector<RegionExpansionEx> propagate_waves_ex(const WaveSeeds &seeds, const ExPolygons &boundary, const RegionExpansionParameters &params)
+{
+    std::vector<RegionExpansion> expanded = propagate_waves(seeds, boundary, params);
+    assert(std::is_sorted(seeds.begin(), seeds.end(), [](const auto &l, const auto &r){ return l.boundary < r.boundary || (l.boundary == r.boundary && l.src < r.src); }));
+    Polygons acc;
+    std::vector<RegionExpansionEx> out;
+    for (auto it = expanded.begin(); it != expanded.end(); ) {
+        auto it2 = it;
+        acc.clear();
+        for (; it2 != expanded.end() && it2->boundary_id == it->boundary_id && it2->src_id == it->src_id; ++ it2)
+            acc.emplace_back(std::move(it2->polygon));
+        size_t size = it2 - it;
+        if (size == 1)
+            out.push_back({ ExPolygon{std::move(acc.front())}, it->src_id, it->boundary_id });
+        else {
+            ExPolygons expolys = union_ex(acc);
+            reserve_more_power_of_2(out, expolys.size());
+            for (ExPolygon &ex : expolys)
+                out.push_back({ std::move(ex), it->src_id, it->boundary_id });
+        }
+    }
+    return out;
+}
+
+// Returns regions per source ExPolygon expanded into boundary.
+std::vector<RegionExpansionEx> propagate_waves_ex(
     // Source regions that are supposed to touch the boundary.
     // Boundaries of source regions touching the "boundary" regions will be expanded into the "boundary" region.
     const ExPolygons    &src,
@@ -191,159 +448,53 @@ std::vector<Polygons> expand_expolygons(
     // Don't take more than max_nr_steps for small expansion_step.
     size_t               max_nr_expansion_steps)
 {
-    assert(full_expansion > 0);
-    assert(expansion_step > 0);
-    assert(max_nr_expansion_steps > 0);
+    auto params = RegionExpansionParameters::build(full_expansion, expansion_step, max_nr_expansion_steps);
+    return propagate_waves_ex(wave_seeds(src, boundary, params.tiny_expansion, true), boundary, params);
+}
 
-    // Initial expansion of src to make the source regions intersect with boundary regions just a bit.
-    float                  tiny_expansion;
-    // How much to inflate the seed lines to produce the first wave area.
-    float                  initial_step;
-    // How much to inflate the first wave area and the successive wave areas in each step.
-    float                  other_step;
-    // Number of inflate steps after the initial step.
-    size_t                 num_other_steps;
-    // Maximum inflation of seed contours over the boundary. Used to trim boundary to speed up
-    // clipping during wave propagation.
-    float                  max_inflation;
-
-    // Offsetter to be applied for all inflation waves. Its accuracy is set with the block below.
-    ClipperLib::ClipperOffset co;
-
-    {
-        // Initial expansion of src to make the source regions intersect with boundary regions just a bit.
-        // The expansion should not be too tiny, but also small enough, so the following expansion will
-        // compensate for tiny_expansion and bring the wave back to the boundary without producing
-        // ugly cusps where it touches the boundary.
-        tiny_expansion = std::min(0.25f * full_expansion, scaled<float>(0.05f));
-        size_t nsteps = size_t(ceil((full_expansion - tiny_expansion) / expansion_step));
-        if (max_nr_expansion_steps > 0)
-            nsteps = std::min(nsteps, max_nr_expansion_steps);
-        assert(nsteps > 0);
-        initial_step = (full_expansion - tiny_expansion) / nsteps;
-        if (nsteps > 1 && 0.25 * initial_step < tiny_expansion) {
-            // Decrease the step size by lowering number of steps.
-            nsteps       = std::max<size_t>(1, (floor((full_expansion - tiny_expansion) / (4. * tiny_expansion))));
-            initial_step = (full_expansion - tiny_expansion) / nsteps;
-        }
-        if (0.25 * initial_step < tiny_expansion || nsteps == 1) {
-            tiny_expansion = 0.2f * full_expansion;
-            initial_step   = 0.8f * full_expansion;
-        }
-        other_step = initial_step;
-        num_other_steps = nsteps - 1;
-
-        // Accuracy of the offsetter for wave propagation.
-        co.ArcTolerance       = float(scale_(0.1));
-        co.ShortestEdgeLength = std::abs(initial_step * ClipperOffsetShortestEdgeFactor);
-
-        // Maximum inflation of seed contours over the boundary. Used to trim boundary to speed up
-        // clipping during wave propagation. Needs to be in sync with the offsetter accuracy.
-        // Clipper positive round offset should rather offset less than more.
-        // Still a little bit of additional offset was added.
-        max_inflation = (tiny_expansion + nsteps * initial_step) * 1.1;
-//                (clipper_round_offset_error(tiny_expansion, co.ArcTolerance) + nsteps * clipper_round_offset_error(initial_step, co.ArcTolerance) * 1.5; // Account for uncertainty 
-    }
-
-    using Intersection  = ClipperZUtils::ClipperZIntersectionVisitor::Intersection;
-    using Intersections = ClipperZUtils::ClipperZIntersectionVisitor::Intersections;
-
-    ClipperLib_Z::Paths expansion_seeds;
-    Intersections       intersections;
-
-    coord_t             idx_boundary_begin = 1;
-    coord_t             idx_boundary_end;
-    coord_t             idx_src_end;
-
-    {
-        ClipperLib_Z::Clipper zclipper;
-        ClipperZUtils::ClipperZIntersectionVisitor visitor(intersections);
-        zclipper.ZFillFunction(visitor.clipper_callback());
-        // as closed contours
-        {
-            ClipperLib_Z::Paths zboundary = ClipperZUtils::expolygons_to_zpaths(boundary, idx_boundary_begin);
-            idx_boundary_end = idx_boundary_begin + coord_t(zboundary.size());
-            zclipper.AddPaths(zboundary, ClipperLib_Z::ptClip, true);
-        }
-        // as open contours
-        std::vector<std::pair<ClipperLib_Z::IntPoint, int>> zsrc_splits;
-        {
-            ClipperLib_Z::Paths zsrc = expolygons_to_zpaths_expanded_opened(src, tiny_expansion, idx_boundary_end);
-            zclipper.AddPaths(zsrc, ClipperLib_Z::ptSubject, false);
-            idx_src_end = idx_boundary_end + coord_t(zsrc.size());
-            zsrc_splits.reserve(zsrc.size());
-            for (const ClipperLib_Z::Path &path : zsrc) {
-                assert(path.size() >= 2);
-                assert(path.front() == path.back());
-                zsrc_splits.emplace_back(path.front(), -1);
-            }
-            std::sort(zsrc_splits.begin(), zsrc_splits.end(), [](const auto &l, const auto &r){ return ClipperZUtils::zpoint_lower(l.first, r.first); });
-        }
-        ClipperLib_Z::PolyTree polytree;
-        zclipper.Execute(ClipperLib_Z::ctIntersection, polytree, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
-        ClipperLib_Z::PolyTreeToPaths(std::move(polytree), expansion_seeds);
-        merge_splits(expansion_seeds, zsrc_splits);
-    }
-
-    // Sort paths into their respective islands.
-    // Each src x boundary will be processed (wave expanded) independently.
-    // Multiple pieces of a single src may intersect the same boundary.
-    struct SeedOrigin {
-        int     src;
-        int     boundary;
-        int     seed;
-    };
-    std::vector<SeedOrigin> map_seeds;
-    map_seeds.reserve(expansion_seeds.size());
-    int iseed = 0;
-    for (const ClipperLib_Z::Path &path : expansion_seeds) {
-        assert(path.size() >= 2);
-        const ClipperLib_Z::IntPoint &front = path.front();
-        const ClipperLib_Z::IntPoint &back  = path.back();
-        // Both ends of a seed segment are supposed to be inside a single boundary expolygon.
-        assert(front.z() < 0);
-        assert(back.z() < 0);
-        const Intersection *intersection = nullptr;
-        auto intersection_point_valid = [idx_boundary_end, idx_src_end](const Intersection &is) {
-            return is.first >= 1 && is.first < idx_boundary_end &&
-                   is.second >= idx_boundary_end && is.second < idx_src_end;
-        };
-        if (front.z() < 0) {
-            const Intersection &is = intersections[- front.z() - 1];
-            assert(intersection_point_valid(is));
-            if (intersection_point_valid(is))
-                intersection = &is;
-        }
-        if (! intersection && back.z() < 0) {
-            const Intersection &is = intersections[- back.z() - 1];
-            assert(intersection_point_valid(is));
-            if (intersection_point_valid(is))
-                intersection = &is;
-        }
-        if (intersection) {
-            // The path intersects the boundary contour at least at one side. 
-            map_seeds.push_back({ intersection->second - idx_boundary_end, intersection->first - 1, iseed });
-        }
-        ++ iseed;
-    }
-    // Sort the seeds by their intersection boundary and source contour.
-    std::sort(map_seeds.begin(), map_seeds.end(), [](const auto &l, const auto &r){ 
-        return l.boundary < r.boundary || (l.boundary == r.boundary && l.src < r.src); 
-    });
-
+std::vector<Polygons> expand_expolygons(const ExPolygons &src, const ExPolygons &boundary,
+    // Scaled expansion value
+    float expansion, 
+    // Expand by waves of expansion_step size (expansion_step is scaled).
+    float expansion_step,
+    // Don't take more than max_nr_steps for small expansion_step.
+    size_t max_nr_steps)
+{
     std::vector<Polygons> out(src.size(), Polygons{});
-    ClipperLib::Paths     paths;
-    for (auto it_seed = map_seeds.begin(); it_seed != map_seeds.end();) {
-        auto it = it_seed;
-        paths.clear();
-        for (; it != map_seeds.end() && it->boundary == it_seed->boundary && it->src == it_seed->src; ++ it)
-            paths.emplace_back(ClipperZUtils::from_zpath(expansion_seeds[it->seed]));
-        // Propagate the wavefront while clipping it with the trimmed boundary.
-        // Collect the expanded polygons, merge them with the source polygons.
-        append(out[it_seed->src], propagate_wave_from_boundary(co, paths, boundary[it_seed->boundary], initial_step, other_step, num_other_steps, max_inflation));
-        it_seed = it;
-    }
+    for (RegionExpansion &r : propagate_waves(src, boundary, expansion, expansion_step, max_nr_steps))
+        out[r.src_id].emplace_back(std::move(r.polygon));
+    return out;
+}
 
+std::vector<ExPolygon> expand_merge_expolygons(ExPolygons &&src, const ExPolygons &boundary, const RegionExpansionParameters &params)
+{
+    // expanded regions are sorted by boundary id and source id
+    std::vector<RegionExpansion> expanded = propagate_waves(src, boundary, params);
+    // expanded regions will be merged into source regions, thus they will be re-sorted by source id.
+    std::sort(expanded.begin(), expanded.end(), [](const auto &l, const auto &r) { return l.src_id < r.src_id; });
+    uint32_t   last = 0;
+    Polygons   acc;
+    ExPolygons out;
+    out.reserve(src.size());
+    for (auto it = expanded.begin(); it != expanded.end();) {
+        auto it2 = it;
+        acc.clear();
+        for (; it2 != expanded.end() && it->src_id == it2->src_id; ++ it2)
+            acc.emplace_back(std::move(it2->polygon));
+        for (; last < it->src_id; ++ last)
+            out.emplace_back(std::move(src[last]));
+        //FIXME offset & merging could be more efficient, for example one does not need to copy the source expolygon
+        append(acc, to_polygons(std::move(src[it->src_id])));
+        ExPolygons merged = union_safety_offset_ex(acc);
+        // Expanding one expolygon by waves should not change connectivity of the source expolygon:
+        // Single expolygon should be produced possibly with increased number of holes.
+        assert(merged.size() == 1);
+        if (! merged.empty())
+            out.emplace_back(std::move(merged.front()));
+        it = it2;
+    }
+    for (; last < uint32_t(src.size()); ++ last)
+        out.emplace_back(std::move(src[last]));
     return out;
 }
 
