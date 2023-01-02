@@ -269,7 +269,20 @@ public:
             speed_sections.push_back({distance, speed});
         }
         std::sort(speed_sections.begin(), speed_sections.end(),
-                  [](const std::pair<float, float> &a, const std::pair<float, float> &b) { return a.first < b.first; });
+                  [](const std::pair<float, float> &a, const std::pair<float, float> &b) { 
+                    if (a.first == b.first) {
+                        return a.second > b.second;
+                    }
+                    return a.first < b.first; });
+
+        std::pair<float, float> last_section{INFINITY, 0};
+        for (auto &section : speed_sections) {
+            if (section.first == last_section.first) {
+                section.second = last_section.second;
+            } else {
+                last_section = section;
+            }
+        }
 
         std::vector<ExtendedPoint> extended_points =
             estimate_points_properties<true, true, true, true>(path.polyline.points, prev_layer_boundaries[current_object], path.width);
