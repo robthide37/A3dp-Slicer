@@ -82,6 +82,7 @@ std::vector<CGALMeshPtr> get_cgalptrs(Ex policy, const Range<It> &csgrange)
 
 } // namespace detail
 
+// Process the sequence of CSG parts with CGAL.
 template<class It>
 void perform_csgmesh_booleans(MeshBoolean::cgal::CGALMeshPtr &cgalm,
                               const Range<It>                &csgrange)

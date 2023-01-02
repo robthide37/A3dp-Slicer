@@ -18,6 +18,23 @@ namespace Slic3r { namespace csg {
 
 // Supported CSG operation types
 enum class CSGType { Union, Difference, Intersection };
+
+// A CSG part can instruct the processing to push the sub-result until a new
+// csg part with a pop instruction appears. This can be used to implement
+// parentheses in a CSG expression represented by the collection of csg parts.
+// A CSG part can not contain another CSG collection, only a mesh, this is why
+// its easier to do this stacking instead of recursion in the data definition.
+// CSGStackOp::Continue means no stack operation required.
+// When a CSG part contains a Push instruction, it is expected that the CSG
+// operation it contains refers to the whole collection spanning to the nearest
+// part with a Pop instruction.
+// e.g.:
+// {
+//      CUBE1: { mesh: cube, op: Union, stack op: Continue },
+//      CUBE2: { mesh: cube, op: Difference, stack op: Push},
+//      CUBE3: { mesh: cube, op: Union, stack op: Pop}
+// }
+// is a collection of csg parts representing the expression CUBE1 - (CUBE2 + CUBE3)
 enum class CSGStackOp { Push, Continue, Pop };
 
 // Get the CSG operation of the part. Can be overriden for any type
@@ -26,6 +43,7 @@ template<class CSGPartT> CSGType get_operation(const CSGPartT &part)
     return part.operation;
 }
 
+// Get the stack operation required by the CSG part.
 template<class CSGPartT> CSGStackOp get_stack_operation(const CSGPartT &part)
 {
     return part.stack_operation;

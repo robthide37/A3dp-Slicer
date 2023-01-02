@@ -9,18 +9,20 @@
 
 namespace Slic3r { namespace csg {
 
+// Flags to select which parts to export from Model into a csg part collection.
+// These flags can be chained with the | operator
 enum ModelParts {
-    mpartsPositive = 1,
-    mpartsNegative = 2,
-    mpartsDrillHoles = 4,
-    mpartsDoSplits = 8
+    mpartsPositive = 1,     // Include positive parts
+    mpartsNegative = 2,     // Include negative parts
+    mpartsDrillHoles = 4,   // Include drill holes
+    mpartsDoSplits = 8      // Split each splitable mesh and export as a union of csg parts
 };
 
 template<class OutIt>
 void model_to_csgmesh(const ModelObject &mo,
-                      const Transform3d &trafo,
-                      OutIt              out,
-                      // values of ModelParts ORed
+                      const Transform3d &trafo, // Applies to all exported parts
+                      OutIt              out,   // Output iterator
+                      // values of ModelParts OR-ed
                       int                parts_to_include = mpartsPositive
                       )
 {
