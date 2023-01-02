@@ -146,7 +146,7 @@ public:
                          const branchingtree::Node &to) override;
 
     std::optional<Vec3f> suggest_avoidance(const branchingtree::Node &from,
-                                           float max_bridge_len) override;;
+                                           float max_bridge_len) override;
 
     void report_unroutable(const branchingtree::Node &j) override
     {
@@ -293,27 +293,64 @@ bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
 static std::optional<Vec3f> get_avoidance(const GroundConnection &conn,
                                           float maxdist)
 {
-    return {};
+    std::optional<Vec3f> ret;
+
+    if (conn) {
+        if (conn.path.size() > 1) {
+            ret = conn.path[1].pos.cast<float>();
+        } else {
+            Vec3f pbeg = conn.path[0].pos.cast<float>();
+            Vec3f pend = conn.pillar_base->pos.cast<float>();
+            pbeg.z()   = std::max(pbeg.z() - maxdist, pend.z());
+            ret = pbeg;
+        }
+    }
+
+    return ret;
 }
 
 std::optional<Vec3f> BranchingTreeBuilder::suggest_avoidance(
     const branchingtree::Node &from, float max_bridge_len)
 {
+    std::optional<Vec3f> ret;
+
     double glvl = ground_level(m_sm);
     branchingtree::Node dst = from;
     dst.pos.z() = glvl;
     dst.weight += from.pos.z() - glvl;
-    bool succ = add_ground_bridge(from, dst);
+    sla::Junction j{from.pos.cast<double>(), get_radius(from)};
 
-    std::optional<Vec3f> ret;
+//    auto found_it = m_ground_mem.find(from.id);
+//    if (found_it != m_ground_mem.end()) {
+//        // TODO look up the conn object
+//    }
+//    else if (auto conn = deepsearch_ground_connection(
+//                   beam_ex_policy , m_sm, j, get_radius(dst), sla::DOWN)) {
+//        ret = get_avoidance(conn, max_bridge_len);
+//    }
 
-    if (succ) {
-        auto it = m_gnd_connections.find(from.id);
-        if (it != m_gnd_connections.end())
-            ret = get_avoidance(it->second, max_bridge_len);
-    }
+    auto conn = deepsearch_ground_connection(
+        beam_ex_policy , m_sm, j, get_radius(dst), sla::DOWN);
+
+    ret = get_avoidance(conn, max_bridge_len);
 
     return ret;
+
+//    double glvl = ground_level(m_sm);
+//    branchingtree::Node dst = from;
+//    dst.pos.z() = glvl;
+//    dst.weight += from.pos.z() - glvl;
+//    bool succ = add_ground_bridge(from, dst);
+
+//    std::optional<Vec3f> ret;
+
+//    if (succ) {
+//        auto it = m_gnd_connections.find(m_pillars.size() - 1);
+//        if (it != m_gnd_connections.end())
+//            ret = get_avoidance(it->second, max_bridge_len);
+//    }
+
+//    return ret;
 }
 
 inline void build_pillars(SupportTreeBuilder &builder,

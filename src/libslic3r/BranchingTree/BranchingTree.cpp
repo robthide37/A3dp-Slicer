@@ -76,16 +76,28 @@ void build_tree(PointCloud &nodes, Builder &builder)
             switch (type) {
             case BED: {
                 closest_node.weight = w;
-                if (closest_it->dst_branching > nodes.properties().max_branch_length()) {
-                    auto hl_br_len = float(nodes.properties().max_branch_length()) / 2.f;
-                    Node new_node {{node.pos.x(), node.pos.y(), node.pos.z() - hl_br_len}, node.Rmin};
-                    new_node.id = int(nodes.next_junction_id());
-                    new_node.weight = nodes.get(node_id).weight + hl_br_len;
-                    new_node.left = node.id;
+                double max_br_len   = nodes.properties().max_branch_length();
+                if (closest_it->dst_branching > max_br_len) {
+                    std::optional<Vec3f> avo = builder.suggest_avoidance(node, max_br_len);
+                    if (!avo)
+                        break;
+
+                    Node new_node {*avo, node.Rmin};
+                    new_node.weight = nodes.get(node_id).weight + (node.pos - *avo).squaredNorm();
+                    new_node.left   = node.id;
                     if ((routed = builder.add_bridge(node, new_node))) {
                         size_t new_idx = nodes.insert_junction(new_node);
                         ptsqueue.push(new_idx);
                     }
+//                    auto hl_br_len = float(nodes.properties().max_branch_length()) / 2.f;
+//                    Node new_node {{node.pos.x(), node.pos.y(), node.pos.z() - hl_br_len}, node.Rmin};
+//                    new_node.id = int(nodes.next_junction_id());
+//                    new_node.weight = nodes.get(node_id).weight + hl_br_len;
+//                    new_node.left = node.id;
+//                    if ((routed = builder.add_bridge(node, new_node))) {
+//                        size_t new_idx = nodes.insert_junction(new_node);
+//                        ptsqueue.push(new_idx);
+//                    }
                 } else if ((routed = builder.add_ground_bridge(node, closest_node))) {
                     closest_node.left = closest_node.right = node_id;
                     nodes.get(closest_node_id) = closest_node;
