@@ -892,6 +892,16 @@ void Tab::update_mode()
     update_changed_tree_ui();
 }
 
+void Tab::update_mode_markers()
+{
+    // update mode for ModeSizer
+    if (m_mode_sizer)
+        m_mode_sizer->update_mode_markers();
+
+    if (m_active_page)
+        m_active_page->refresh();
+}
+
 void Tab::update_visibility()
 {
     Freeze(); // There is needed Freeze/Thaw to avoid a flashing after Show/Layout

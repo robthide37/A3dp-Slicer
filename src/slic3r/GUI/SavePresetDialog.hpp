@@ -26,7 +26,7 @@ class SavePresetDialog : public DPIDialog
         Switch, 
         UndefAction
     };
-
+public:
     struct Item
     {
         enum class ValidationType
@@ -37,20 +37,24 @@ class SavePresetDialog : public DPIDialog
         };
 
         Item(Preset::Type type, const std::string& suffix, wxBoxSizer* sizer, SavePresetDialog* parent);
+        Item(wxWindow* parent, wxBoxSizer* sizer, const std::string& def_name, PrinterTechnology pt = ptFFF);
 
         void            update_valid_bmp();
         void            accept();
+        void            Enable(bool enable = true);
 
         bool            is_valid()      const { return m_valid_type != ValidationType::NoValid; }
         Preset::Type    type()          const { return m_type; }
         std::string     preset_name()   const { return m_preset_name; }
 
     private:
-        Preset::Type    m_type;
+        Preset::Type    m_type {Preset::TYPE_INVALID};
         std::string		m_preset_name;
+        bool            m_use_text_ctrl {true};
 
+        PrinterTechnology   m_printer_technology {ptAny};
         ValidationType      m_valid_type    {ValidationType::NoValid};
-        SavePresetDialog*   m_parent        {nullptr};
+        wxWindow*           m_parent        {nullptr};
         wxStaticBitmap*     m_valid_bmp     {nullptr};
         wxComboBox*         m_combo         {nullptr};
         wxTextCtrl*         m_text_ctrl     {nullptr};
@@ -60,11 +64,12 @@ class SavePresetDialog : public DPIDialog
 
         std::string get_init_preset_name(const std::string &suffix);
         void        init_input_name_ctrl(wxBoxSizer *input_name_sizer, std::string preset_name);
-        wxString    get_top_label_text() const ;
+        const Preset*   get_existing_preset() const ;
+        wxString        get_top_label_text() const ;
 
         void        update();
     };
-
+private:
     std::vector<Item*>   m_items;
 
     wxBoxSizer*         m_presets_sizer     {nullptr};
@@ -97,7 +102,7 @@ public:
     bool enable_ok_btn() const;
     void add_info_for_edit_ph_printer(wxBoxSizer *sizer);
     void update_info_for_edit_ph_printer(const std::string &preset_name);
-    void layout();
+    bool Layout() override;
     bool is_for_rename() { return m_use_for_rename; }
 
 protected:

@@ -355,6 +355,7 @@ public:
 	void			load_config(const DynamicPrintConfig& config);
 	virtual void	reload_config();
     void            update_mode();
+    void            update_mode_markers();
     void            update_visibility();
     virtual void    msw_rescale();
     virtual void	sys_color_changed();

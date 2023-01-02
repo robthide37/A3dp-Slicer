@@ -143,6 +143,7 @@ public:
     ~MainFrame() = default;
 
     void update_layout();
+    void update_mode_markers();
 
 	// Called when closing the application and when switching the application language.
 	void 		shutdown();

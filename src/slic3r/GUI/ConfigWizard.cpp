@@ -1176,31 +1176,20 @@ PageCustom::PageCustom(ConfigWizard *parent)
     : ConfigWizardPage(parent, _L("Custom Printer Setup"), _L("Custom Printer"))
 {
     cb_custom = new wxCheckBox(this, wxID_ANY, _L("Define a custom printer profile"));
-    tc_profile_name = new wxTextCtrl(this, wxID_ANY, default_profile_name);
     auto *label = new wxStaticText(this, wxID_ANY, _L("Custom profile name:"));
 
-    wxGetApp().UpdateDarkUI(tc_profile_name);
+    wxBoxSizer* profile_name_sizer = new wxBoxSizer(wxVERTICAL);
+    profile_name_editor = new SavePresetDialog::Item{ this, profile_name_sizer, default_profile_name };
+    profile_name_editor->Enable(false);
 
-    tc_profile_name->Enable(false);
-    tc_profile_name->Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent &evt) {
-        if (tc_profile_name->GetValue().IsEmpty()) {
-            if (profile_name_prev.IsEmpty()) { tc_profile_name->SetValue(default_profile_name); }
-            else { tc_profile_name->SetValue(profile_name_prev); }
-        } else {
-            profile_name_prev = tc_profile_name->GetValue();
-        }
-        evt.Skip();
-    });
-
-    cb_custom->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &event) {
-        tc_profile_name->Enable(custom_wanted());
+    cb_custom->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &) {
+        profile_name_editor->Enable(custom_wanted());
         wizard_p()->on_custom_setup(custom_wanted());
-		
     });
 
     append(cb_custom);
     append(label);
-    append(tc_profile_name);
+    append(profile_name_sizer);
 }
 
 PageUpdate::PageUpdate(ConfigWizard *parent)
@@ -2825,7 +2814,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem, 
                                     {preferred_model, preferred_variant, first_added_filament, first_added_sla_material});
 
-    if (!only_sla_mode && page_custom->custom_wanted()) {
+    if (!only_sla_mode && page_custom->custom_wanted() && page_custom->is_valid_profile_name()) {
         // if unsaved changes was not cheched till this moment
         if (!check_unsaved_preset_changes && 
             !wxGetApp().check_and_keep_current_preset_changes(caption, _L("Custom printer was installed and it will be activated."), act_btns, &apply_keeped_changes))

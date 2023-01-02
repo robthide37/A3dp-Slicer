@@ -555,7 +555,8 @@ bool PresetComboBox::selection_is_changed_according_to_physical_printers()
     // if new preset wasn't selected, there is no need to call update preset selection
     if (old_printer_preset == preset_name) {
         tab->update_preset_choice();
-        wxGetApp().plater()->show_action_buttons(false);
+        // update action buttons to show/hide "Send to" button
+        wxGetApp().plater()->show_action_buttons();
 
         // we need just to update according Plater<->Tab PresetComboBox 
         if (dynamic_cast<PlaterPresetComboBox*>(this)!=nullptr) {

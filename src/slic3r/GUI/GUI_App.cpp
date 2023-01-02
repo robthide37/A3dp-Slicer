@@ -1127,7 +1127,7 @@ bool GUI_App::on_init_inner()
     NppDarkMode::InitDarkMode(init_dark_color_mode, init_sys_menu_enabled);
 #endif
     // initialize label colors and fonts
-    init_label_colours();
+    init_ui_colours();
     init_fonts();
 
     std::string older_data_dir_path;
@@ -1145,8 +1145,8 @@ bool GUI_App::on_init_inner()
     if (bool new_dark_color_mode = app_config->get("dark_color_mode") == "1";
         init_dark_color_mode != new_dark_color_mode) {
         NppDarkMode::SetDarkMode(new_dark_color_mode);
-        init_label_colours();
-        update_label_colours_from_appconfig();
+        init_ui_colours();
+        update_ui_colours_from_appconfig();
     }
     if (bool new_sys_menu_enabled = app_config->get("sys_menu_enabled") == "1";
         init_sys_menu_enabled != new_sys_menu_enabled)
@@ -1431,10 +1431,16 @@ const wxColour GUI_App::get_label_default_clr_modified()
     return dark_mode() ? wxColour(253, 111, 40) : wxColour(252, 77, 1);
 }
 
-void GUI_App::init_label_colours()
+const std::vector<std::string> GUI_App::get_mode_default_palette()
+{
+    return { "#7DF028", "#FFDC00", "#E70000" };
+}
+
+void GUI_App::init_ui_colours()
 {
     m_color_label_modified          = get_label_default_clr_modified();
     m_color_label_sys               = get_label_default_clr_system();
+    m_mode_palette                  = get_mode_default_palette();
 
     bool is_dark_mode = dark_mode();
 #ifdef _WIN32
@@ -1450,18 +1456,29 @@ void GUI_App::init_label_colours()
     m_color_window_default          = is_dark_mode ? wxColour(43, 43, 43)   : wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
 }
 
-void GUI_App::update_label_colours_from_appconfig()
+void GUI_App::update_ui_colours_from_appconfig()
 {
+    // load label colors
     if (app_config->has("label_clr_sys")) {
         auto str = app_config->get("label_clr_sys");
-        if (str != "")
+        if (!str.empty())
             m_color_label_sys = wxColour(str);
     }
 
     if (app_config->has("label_clr_modified")) {
         auto str = app_config->get("label_clr_modified");
-        if (str != "")
+        if (!str.empty())
             m_color_label_modified = wxColour(str);
+    }
+
+    // load mode markers colors
+    if (app_config->has("mode_palette")) {
+        const auto colors = app_config->get("mode_palette");
+        if (!colors.empty()) {
+            m_mode_palette.clear();
+            if (!unescape_strings_cstyle(colors, m_mode_palette))
+                m_mode_palette = get_mode_default_palette();
+        }
     }
 }
 
@@ -1647,6 +1664,39 @@ void GUI_App::set_label_clr_sys(const wxColour& clr)
     const std::string str = encode_color(ColorRGB(clr.Red(), clr.Green(), clr.Blue()));
     app_config->set("label_clr_sys", str);
     app_config->save();
+}
+
+const std::string& GUI_App::get_mode_btn_color(int mode_id)
+{
+    assert(0 <= mode_id && size_t(mode_id) < m_mode_palette.size());
+    return m_mode_palette[mode_id];
+}
+
+std::vector<wxColour> GUI_App::get_mode_palette()
+{
+    return { wxColor(m_mode_palette[0]),
+             wxColor(m_mode_palette[1]),
+             wxColor(m_mode_palette[2]) };
+}
+
+void GUI_App::set_mode_palette(const std::vector<wxColour>& palette)
+{
+    bool save = false;
+
+    for (size_t mode = 0; mode < palette.size(); ++mode) {
+        const wxColour& clr = palette[mode];
+        std::string color_str = clr == wxTransparentColour ? std::string("") : encode_color(ColorRGB(clr.Red(), clr.Green(), clr.Blue()));
+        if (m_mode_palette[mode] != color_str) {
+            m_mode_palette[mode] = color_str;
+            save = true;
+        }
+    }
+
+    if (save) {
+        mainframe->update_mode_markers();
+        app_config->set("mode_palette", escape_strings_cstyle(m_mode_palette));
+        app_config->save();
+    }
 }
 
 bool GUI_App::tabs_as_menu() const

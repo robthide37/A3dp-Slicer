@@ -139,6 +139,7 @@ private:
     wxColour        m_color_selected_btn_bg;
     bool            m_force_colors_update { false };
 #endif
+    std::vector<std::string>     m_mode_palette;
 
     wxFont		    m_small_font;
     wxFont		    m_bold_font;
@@ -194,8 +195,9 @@ public:
     static bool     dark_mode();
     const wxColour  get_label_default_clr_system();
     const wxColour  get_label_default_clr_modified();
-    void            init_label_colours();
-    void            update_label_colours_from_appconfig();
+    const std::vector<std::string> get_mode_default_palette();
+    void            init_ui_colours();
+    void            update_ui_colours_from_appconfig();
     void            update_label_colours();
     // update color mode for window
     void            UpdateDarkUI(wxWindow *window, bool highlited = false, bool just_font = false);
@@ -215,6 +217,9 @@ public:
     const wxColour& get_label_clr_default() { return m_color_label_default; }
     const wxColour& get_window_default_clr(){ return m_color_window_default; }
 
+    const std::string&      get_mode_btn_color(int mode_id);
+    std::vector<wxColour>   get_mode_palette();
+    void                    set_mode_palette(const std::vector<wxColour> &palette);
 
 #ifdef _WIN32
     const wxColour& get_label_highlight_clr()   { return m_color_highlight_label_default; }
