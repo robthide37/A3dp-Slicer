@@ -400,10 +400,10 @@ void PrintConfigDef::init_fff_params()
 
     // Maximum extruder temperature, bumped to 1500 to support printing of glass.
     const int max_temp = 1500;
-    def = this->add("avoid_curled_filament_during_travels", coBool);
-    def->label = L("Avoid curled filament during travels");
-    def->tooltip = L("Plan travel moves such that the extruder avoids areas where filament may be curled up. "
-                   "This is mostly happening on steeper rounded overhangs and may cause crash or borken print. "
+    def = this->add("avoid_crossing_curled_overhangs", coBool);
+    def->label = L("Avoid crossing curled overhangs (Experimental)");
+    def->tooltip = L("Plan travel moves such that the extruder avoids areas where the filament may be curled up. "
+                   "This is mostly happening on steeper rounded overhangs and may cause a crash with the nozzle. "
                    "This feature slows down both the print and the G-code generation.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
@@ -536,11 +536,15 @@ void PrintConfigDef::init_fff_params()
     def->mode       = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 
-    def             = this->add("overhang_steepness_levels", coPercents);
-    def->full_label = L("Steepness levels of overhangs");
+    def             = this->add("overhang_overlap_levels", coPercents);
+    def->full_label = L("Overhang overlap levels");
     def->category   = L("Speed");
-    def->tooltip    = L("Controls overhang steepness, expressed as percentage of overlap of the extrusion with the previous layer. "
-                        "Each overhang level then corresponds with the overhang speed below.");
+    def->tooltip    = L("Controls overhang levels, expressed as a percentage of overlap of the extrusion with the previous layer - "
+                        "100% represents full overlap - no overhang is present, while 0% represents full overhang (floating extrusion). "
+                        "Each overhang level then corresponds with the overhang speed below. Speeds for overhang levels in between are "
+                        "calculated via linear interpolation."
+                        "If you set multiple different speeds for the same overhang level, only the largest speed is used. "
+                        );
     def->sidetext   = L("%");
     def->min        = 0;
     def->max        = 100;
@@ -550,7 +554,8 @@ void PrintConfigDef::init_fff_params()
     def             = this->add("dynamic_overhang_speeds", coFloatsOrPercents);
     def->full_label = L("Dynamic speed on overhangs");
     def->category   = L("Speed");
-    def->tooltip    = L("This setting controls the speed on the overhang with steepness value above. "
+    def->tooltip    = L("This setting controls the speed on the overhang with the overlap value set above. "
+                        "The speed of the extrusion is calculated as a linear interpolation of the speeds for higher and lower overlap. "
                         "If set as percentage, the speed is calculated over the external perimeter speed."
                         );
     def->sidetext   = L("mm/s or %");
