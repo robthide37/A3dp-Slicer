@@ -905,7 +905,7 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
                 ExtrusionLine  line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
                                        curr_point.position.cast<float>(), line_len, extrusion};
 
-                const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > 0 ?
+                const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > curr_point.nearest_prev_layer_line ?
                                                                   prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
                                                                   ExtrusionLine{};
 
