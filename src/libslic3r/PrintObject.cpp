@@ -1147,6 +1147,9 @@ void PrintObject::discover_vertical_shells()
     };
     std::vector<DiscoverVerticalShellsCacheEntry> cache_top_botom_regions(num_layers, DiscoverVerticalShellsCacheEntry());
     bool top_bottom_surfaces_all_regions = this->num_printing_regions() > 1 && ! m_config.interface_shells.value;
+//    static constexpr const float top_bottom_expansion_coeff = 1.05f;
+    // Just a tiny fraction of an infill extrusion width to merge neighbor regions reliably.
+    static constexpr const float top_bottom_expansion_coeff = 0.05f;
     if (top_bottom_surfaces_all_regions) {
         // This is a multi-material print and interface_shells are disabled, meaning that the vertical shell thickness
         // is calculated over all materials.
@@ -1182,14 +1185,14 @@ void PrintObject::discover_vertical_shells()
                     ++ debug_idx;
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
                     for (size_t region_id = 0; region_id < num_regions; ++ region_id) {
-                        LayerRegion &layerm                       = *layer.m_regions[region_id];
-                        float        min_perimeter_infill_spacing = float(layerm.flow(frSolidInfill).scaled_spacing()) * 1.05f;
+                        LayerRegion &layerm               = *layer.m_regions[region_id];
+                        float        top_bottom_expansion = float(layerm.flow(frSolidInfill).scaled_spacing()) * top_bottom_expansion_coeff;
                         // Top surfaces.
-                        append(cache.top_surfaces, offset(layerm.slices().filter_by_type(stTop), min_perimeter_infill_spacing));
-                        append(cache.top_surfaces, offset(layerm.fill_surfaces().filter_by_type(stTop), min_perimeter_infill_spacing));
+                        append(cache.top_surfaces, offset(layerm.slices().filter_by_type(stTop), top_bottom_expansion));
+//                        append(cache.top_surfaces, offset(layerm.fill_surfaces().filter_by_type(stTop), top_bottom_expansion));
                         // Bottom surfaces.
-                        append(cache.bottom_surfaces, offset(layerm.slices().filter_by_types(surfaces_bottom), min_perimeter_infill_spacing));
-                        append(cache.bottom_surfaces, offset(layerm.fill_surfaces().filter_by_types(surfaces_bottom), min_perimeter_infill_spacing));
+                        append(cache.bottom_surfaces, offset(layerm.slices().filter_by_types(surfaces_bottom), top_bottom_expansion));
+//                        append(cache.bottom_surfaces, offset(layerm.fill_surfaces().filter_by_types(surfaces_bottom), top_bottom_expansion));
                         // Calculate the maximum perimeter offset as if the slice was extruded with a single extruder only.
                         // First find the maxium number of perimeters per region slice.
                         unsigned int perimeters = 0;
@@ -1252,16 +1255,16 @@ void PrintObject::discover_vertical_shells()
                     const std::initializer_list<SurfaceType> surfaces_bottom { stBottom, stBottomBridge };
                     for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
                         m_print->throw_if_canceled();
-                        Layer       &layer                        = *m_layers[idx_layer];
-                        LayerRegion &layerm                       = *layer.m_regions[region_id];
-                        float        min_perimeter_infill_spacing = float(layerm.flow(frSolidInfill).scaled_spacing()) * 1.05f;
+                        Layer       &layer                = *m_layers[idx_layer];
+                        LayerRegion &layerm               = *layer.m_regions[region_id];
+                        float        top_bottom_expansion = float(layerm.flow(frSolidInfill).scaled_spacing()) * top_bottom_expansion_coeff;
                         // Top surfaces.
                         auto &cache = cache_top_botom_regions[idx_layer];
-                        cache.top_surfaces = offset(layerm.slices().filter_by_type(stTop), min_perimeter_infill_spacing);
-                        append(cache.top_surfaces, offset(layerm.fill_surfaces().filter_by_type(stTop), min_perimeter_infill_spacing));
+                        cache.top_surfaces = offset(layerm.slices().filter_by_type(stTop), top_bottom_expansion);
+//                        append(cache.top_surfaces, offset(layerm.fill_surfaces().filter_by_type(stTop), top_bottom_expansion));
                         // Bottom surfaces.
-                        cache.bottom_surfaces = offset(layerm.slices().filter_by_types(surfaces_bottom), min_perimeter_infill_spacing);
-                        append(cache.bottom_surfaces, offset(layerm.fill_surfaces().filter_by_types(surfaces_bottom), min_perimeter_infill_spacing));
+                        cache.bottom_surfaces = offset(layerm.slices().filter_by_types(surfaces_bottom), top_bottom_expansion);
+//                        append(cache.bottom_surfaces, offset(layerm.fill_surfaces().filter_by_types(surfaces_bottom), top_bottom_expansion));
                         // Holes over all regions. Only collect them once, they are valid for all region_id iterations.
                         if (cache.holes.empty()) {
                             for (size_t region_id = 0; region_id < layer.regions().size(); ++ region_id)
@@ -1437,9 +1440,24 @@ void PrintObject::discover_vertical_shells()
                     Polygons shell_before = shell;
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 #if 1
-                    // Intentionally inflate a bit more than how much the region has been shrunk, 
-                    // so there will be some overlap between this solid infill and the other infill regions (mainly the sparse infill).
-                    shell = opening(union_(shell), 0.5f * min_perimeter_infill_spacing, 0.8f * min_perimeter_infill_spacing, ClipperLib::jtSquare);
+                    {
+                        // Open to remove (filter out) regions narrower than a bit less than an infill extrusion line width.
+                        // Such narrow regions are difficult to fill in with a gap fill algorithm (or Arachne), however they are most likely
+                        // not needed for print stability / quality.
+                        const float narrow_ensure_vertical_wall_thickness_region_radius = 0.5f * 0.65f * min_perimeter_infill_spacing;
+                        // Then close gaps narrower than 1.2 * line width, such gaps are difficult to fill in with sparse infill,
+                        // thus they will be merged into the solid infill.
+                        const float narrow_sparse_infill_region_radius                  = 0.5f * 1.2f * min_perimeter_infill_spacing;
+                        // Finally expand the infill a bit to remove tiny gaps between solid infill and the other regions.
+                        const float tiny_overlap_radius                                 = 0.2f        * min_perimeter_infill_spacing;
+                        shell = shrink(opening(union_(shell),
+                            // Open to remove (filter out) regions narrower than an infill extrusion line width.
+                            narrow_ensure_vertical_wall_thickness_region_radius,
+                            // Then close gaps narrower than 1.2 * line width, such gaps are difficult to fill in with sparse infill.
+                            narrow_ensure_vertical_wall_thickness_region_radius + narrow_sparse_infill_region_radius, ClipperLib::jtSquare),
+                            // Finally expand the infill a bit to remove tiny gaps between solid infill and the other regions.
+                            narrow_sparse_infill_region_radius - tiny_overlap_radius, ClipperLib::jtSquare);
+                    }
                     if (shell.empty())
                         continue;
 #else
