@@ -1,5 +1,6 @@
 #include "SLAPrint.hpp"
 #include "SLAPrintSteps.hpp"
+#include "CSGMesh/PerformCSGMeshBooleans.hpp"
 
 #include "Geometry.hpp"
 #include "Thread.hpp"
@@ -1104,22 +1105,13 @@ void SLAPrint::StatusReporter::operator()(SLAPrint &         p,
 
 namespace csg {
 
-inline bool operator==(const VoxelizeParams &a, const VoxelizeParams &b)
+MeshBoolean::cgal::CGALMeshPtr get_cgalmesh(const CSGPartForStep &part)
 {
-    std::hash<Slic3r::csg::VoxelizeParams> h;
-    return h(a) == h(b);
-}
-
-VoxelGridPtr get_voxelgrid(const CSGPartForStep &part, VoxelizeParams p)
-{
-    VoxelGridPtr &ret = part.gridcache[p];
-
-    if (!ret && csg::get_mesh(part)) {
-        p.trafo(csg::get_transform(part));
-        ret = mesh_to_grid(*csg::get_mesh(part), p);
+    if (!part.cgalcache && csg::get_mesh(part)) {
+        part.cgalcache = csg::get_cgalmesh(static_cast<const csg::CSGPart&>(part));
     }
 
-    return ret ? clone(*ret) : nullptr;
+    return part.cgalcache? clone(*part.cgalcache) : nullptr;
 }
 
 } // namespace csg

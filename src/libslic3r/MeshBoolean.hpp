@@ -28,6 +28,8 @@ struct CGALMesh;
 struct CGALMeshDeleter { void operator()(CGALMesh *ptr); };
 using CGALMeshPtr = std::unique_ptr<CGALMesh, CGALMeshDeleter>;
 
+CGALMeshPtr clone(const CGALMesh &m);
+
 CGALMeshPtr triangle_mesh_to_cgal(
     const std::vector<stl_vertex> &V,
     const std::vector<stl_triangle_vertex_indices> &F);

@@ -11,6 +11,7 @@
 #include "Format/SLAArchiveWriter.hpp"
 #include "GCode/ThumbnailData.hpp"
 #include "libslic3r/CSGMesh/CSGMesh.hpp"
+#include "libslic3r/MeshBoolean.hpp"
 #include "libslic3r/OpenVDBUtils.hpp"
 
 #include <boost/functional/hash.hpp>
@@ -49,41 +50,6 @@ enum SliceOrigin { soSupport, soModel };
 
 } // namespace Slic3r
 
-namespace std {
-
-template<> struct hash<Slic3r::csg::VoxelizeParams> {
-    size_t operator() (const Slic3r::csg::VoxelizeParams &p) const {
-        int64_t vs = Slic3r::scaled(p.voxel_scale()) >> 10;
-        int64_t eb = Slic3r::scaled(p.exterior_bandwidth()) >> 10;
-        int64_t ib = Slic3r::scaled(p.interior_bandwidth()) >> 10;
-
-        size_t h = 0;
-        boost::hash_combine(h, vs);
-        boost::hash_combine(h, eb);
-        boost::hash_combine(h, ib);
-
-        return h;
-    }
-};
-
-template<> struct equal_to<Slic3r::csg::VoxelizeParams> {
-    size_t operator() (const Slic3r::csg::VoxelizeParams &p1,
-                       const Slic3r::csg::VoxelizeParams &p2) const {
-
-        int64_t vs1 = Slic3r::scaled(p1.voxel_scale()) >> 10;
-        int64_t eb1 = Slic3r::scaled(p1.exterior_bandwidth()) >> 10;
-        int64_t ib1 = Slic3r::scaled(p1.interior_bandwidth()) >> 10;
-
-        int64_t vs2 = Slic3r::scaled(p2.voxel_scale()) >> 10;
-        int64_t eb2 = Slic3r::scaled(p2.exterior_bandwidth()) >> 10;
-        int64_t ib2 = Slic3r::scaled(p2.interior_bandwidth()) >> 10;
-
-        return vs1 == vs2 && eb1 == eb2 && ib1 == ib2;
-    }
-};
-
-} // namespace std
-
 namespace Slic3r {
 
 // Each sla object step can hold a collection of csg operations on the
@@ -95,7 +61,7 @@ namespace Slic3r {
 struct CSGPartForStep : public csg::CSGPart
 {
     SLAPrintObjectStep key;
-    mutable std::unordered_map<csg::VoxelizeParams, VoxelGridPtr> gridcache;
+    mutable MeshBoolean::cgal::CGALMeshPtr cgalcache;
 
     CSGPartForStep(SLAPrintObjectStep k, CSGPart &&p = {})
         : key{k}, CSGPart{std::move(p)}
@@ -114,7 +80,7 @@ struct CSGPartForStep : public csg::CSGPart
 
 namespace csg {
 
-VoxelGridPtr get_voxelgrid(const CSGPartForStep &part, VoxelizeParams p);
+MeshBoolean::cgal::CGALMeshPtr get_cgalmesh(const CSGPartForStep &part);
 
 } // namespace csg
 

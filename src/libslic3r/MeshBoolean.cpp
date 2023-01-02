@@ -315,6 +315,11 @@ bool empty(const CGALMesh &mesh)
     return mesh.m.is_empty();
 }
 
+CGALMeshPtr clone(const CGALMesh &m)
+{
+    return CGALMeshPtr{new CGALMesh{m}};
+}
+
 } // namespace cgal
 
 } // namespace MeshBoolean
