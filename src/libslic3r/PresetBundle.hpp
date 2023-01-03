@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <array>
 #include <boost/filesystem/path.hpp>
 
 namespace Slic3r {
@@ -155,6 +156,13 @@ public:
                                                   const std::string& new_name, const std::vector<std::string>& options);
 
     static const char *PRUSA_BUNDLE;
+
+    static std::array<Preset::Type, 3>  types_list(PrinterTechnology pt) {
+        if (pt == ptFFF)
+            return  { Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT };
+        return      { Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
+    }
+
 private:
     std::pair<PresetsConfigSubstitutions, std::string> load_system_presets(ForwardCompatibilitySubstitutionRule compatibility_rule);
     // Merge one vendor's presets with the other vendor's presets, report duplicates.
