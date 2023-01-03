@@ -666,6 +666,18 @@ void PlaterPresetComboBox::OnSelect(wxCommandEvent &evt)
     evt.Skip();
 }
 
+std::string PlaterPresetComboBox::get_selected_ph_printer_name() const
+{
+    if (m_type != Preset::TYPE_PRINTER)
+        return {};
+
+    const PhysicalPrinterCollection& physical_printers = m_preset_bundle->physical_printers;
+    if (physical_printers.has_selection())
+        return physical_printers.get_selected_full_printer_name();
+
+    return {};
+}
+
 void PlaterPresetComboBox::switch_to_tab()
 {
     Tab* tab = wxGetApp().get_tab(m_type);

@@ -430,7 +430,26 @@ static bool contains_skew(const Transform3d& trafo)
     Matrix3d rotation;
     Matrix3d scale;
     trafo.computeRotationScaling(&rotation, &scale);
-    return !scale.isDiagonal();
+
+    if (scale.isDiagonal())
+      return false;
+    
+    if (scale.determinant() >= 0.0)
+      return true;
+
+    // the matrix contains mirror
+    const Matrix3d ratio = scale.cwiseQuotient(trafo.matrix().block<3,3>(0,0));
+
+    auto check_skew = [&ratio](int i, int j, bool& skew) {
+      if (!std::isnan(ratio(i, j)) && !std::isnan(ratio(j, i)))
+        skew |= std::abs(ratio(i, j) * ratio(j, i) - 1.0) > EPSILON;
+    };
+
+    bool has_skew = false;
+    check_skew(0, 1, has_skew);
+    check_skew(0, 2, has_skew);
+    check_skew(1, 2, has_skew);
+    return has_skew;
 }
 
 Vec3d Transformation::get_rotation() const

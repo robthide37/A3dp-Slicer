@@ -1198,7 +1198,11 @@ void ObjectManipulation::change_scale_value(int axis, double value)
 #if ENABLE_WORLD_COORDINATE
     const Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
     Vec3d ref_scale = m_cache.scale;
-    if (selection.is_single_full_instance()) {
+    if (selection.is_single_volume_or_modifier()) {
+        if (is_local_coordinates())
+        ref_scale = 100.0 * Vec3d::Ones();
+    }
+    else if (selection.is_single_full_instance()) {
         scale = scale.cwiseQuotient(ref_scale);
         ref_scale = Vec3d::Ones();
     }

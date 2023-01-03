@@ -826,17 +826,26 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
         const VolumeCache& volume_data = m_cache.volumes_data[i];
         if (m_mode == Instance && !is_wipe_tower()) {
             assert(is_from_fully_selected_instance(i));
-            if (transformation_type.world())
-                v.set_instance_transformation(Geometry::translation_transform(displacement) * volume_data.get_instance_full_matrix());
-            else if (transformation_type.instance()) {
-                const Vec3d world_displacement = volume_data.get_instance_rotation_matrix() * displacement;
-                v.set_instance_transformation(Geometry::translation_transform(world_displacement) * volume_data.get_instance_full_matrix());
+            if (transformation_type.instance()) {
+                const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
+                v.set_instance_offset(inst_trafo.get_offset() + inst_trafo.get_rotation_matrix() * displacement);
             }
             else
-                assert(false);
+                transform_instance_relative(v, volume_data, transformation_type, Geometry::translation_transform(displacement), m_cache.dragging_center);
         }
-        else
-            transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(displacement), m_cache.dragging_center);
+        else {
+            if (transformation_type.local()) {
+                const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
+                v.set_volume_offset(vol_trafo.get_offset() + vol_trafo.get_rotation_matrix() * displacement);
+            }
+            else {
+                Vec3d relative_disp = displacement;
+                if (transformation_type.instance())
+                    relative_disp = volume_data.get_instance_scale_matrix().inverse() * relative_disp;
+
+                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(relative_disp), m_cache.dragging_center);
+            }
+        }
     }
 
 #if !DISABLE_INSTANCES_SYNCH
@@ -909,23 +918,16 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
         const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
         if (m_mode == Instance && !is_wipe_tower()) {
             assert(is_from_fully_selected_instance(i));
-            Transform3d new_rotation_matrix = Transform3d::Identity();
-            if (transformation_type.absolute())
-                new_rotation_matrix = rotation_matrix;
-            else {
-                if (transformation_type.world())
-                    new_rotation_matrix = rotation_matrix * inst_trafo.get_rotation_matrix();
-                else if (transformation_type.instance())
-                    new_rotation_matrix = inst_trafo.get_rotation_matrix() * rotation_matrix;
-                else
-                    assert(false);
+            if (transformation_type.instance()) {
+                const Vec3d world_inst_pivot = m_cache.dragging_center - inst_trafo.get_offset();
+                const Vec3d local_inst_pivot = inst_trafo.get_matrix_no_offset().inverse() * world_inst_pivot;
+                Matrix3d inst_rotation, inst_scale;
+                inst_trafo.get_matrix().computeRotationScaling(&inst_rotation, &inst_scale);
+                const Transform3d trafo = inst_trafo.get_rotation_matrix() * rotation_matrix;
+                v.set_instance_transformation(Geometry::translation_transform(world_inst_pivot) * inst_trafo.get_offset_matrix() * trafo * Transform3d(inst_scale) * Geometry::translation_transform(-local_inst_pivot));
             }
-
-            const Vec3d new_offset = transformation_type.independent() ? inst_trafo.get_offset() :
-                m_cache.dragging_center + new_rotation_matrix * inst_trafo.get_rotation_matrix().inverse() *
-                (inst_trafo.get_offset() - m_cache.dragging_center);
-            v.set_instance_transformation(Geometry::assemble_transform(Geometry::translation_transform(new_offset), new_rotation_matrix,
-                inst_trafo.get_scaling_factor_matrix(), inst_trafo.get_mirror_matrix()));
+            else
+                transform_instance_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
         }
         else {
             if (!is_single_volume_or_modifier()) {
@@ -933,8 +935,15 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
             }
             else {
-                transformation_type.set_independent();
-                transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
+                if (transformation_type.local()) {
+                    const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
+                    Matrix3d vol_rotation, vol_scale;
+                    vol_trafo.get_matrix().computeRotationScaling(&vol_rotation, &vol_scale);
+                    const Transform3d trafo = vol_trafo.get_rotation_matrix() * rotation_matrix;
+                    v.set_volume_transformation(vol_trafo.get_offset_matrix() * trafo * Transform3d(vol_scale));
+                }
+                else
+                    transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
             }
         }
     }
@@ -1357,32 +1366,17 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
         }
 
         if (m_mode == Instance) {
-            assert(is_from_fully_selected_instance(i));
-            if (transformation_type.world()) {
-                const Transform3d scale_matrix = Geometry::scale_transform(relative_scale);
-                const Transform3d offset_matrix = (transformation_type.joint() && translation.isApprox(Vec3d::Zero())) ?
-                    // non-constrained scaling - add offset to scale around selection center
-                    Geometry::translation_transform(m_cache.dragging_center + scale_matrix * (inst_trafo.get_offset() - m_cache.dragging_center)) :
-                    // constrained scaling - add offset to keep constraint
-                    Geometry::translation_transform(translation) * inst_trafo.get_offset_matrix();
-                v.set_instance_transformation(offset_matrix * scale_matrix * inst_trafo.get_matrix_no_offset());
-            }
-            else if (transformation_type.instance()) {
-                const Transform3d scale_matrix = Geometry::scale_transform(relative_scale);
-                Vec3d offset;
-                if (transformation_type.joint() && translation.isApprox(Vec3d::Zero())) {
-                    // non-constrained scaling - add offset to scale around selection center
-                    offset = inst_trafo.get_matrix_no_offset().inverse() * (inst_trafo.get_offset() - m_cache.dragging_center);
-                    offset = inst_trafo.get_matrix_no_offset() * (scale_matrix * offset - offset);
-                }
-                else
-                    // constrained scaling - add offset to keep constraint
-                    offset = translation;
-
-                v.set_instance_transformation(Geometry::translation_transform(offset) * inst_trafo.get_matrix() * scale_matrix);
+            if (transformation_type.instance()) {
+                const Vec3d world_inst_pivot = m_cache.dragging_center - inst_trafo.get_offset();
+                const Vec3d local_inst_pivot = inst_trafo.get_matrix_no_offset().inverse() * world_inst_pivot;
+                Matrix3d inst_rotation, inst_scale;
+                inst_trafo.get_matrix().computeRotationScaling(&inst_rotation, &inst_scale);
+                const Transform3d offset_trafo = Geometry::translation_transform(inst_trafo.get_offset() + inst_rotation * translation);
+                const Transform3d scale_trafo = Transform3d(inst_scale) * Geometry::scale_transform(relative_scale);
+                v.set_instance_transformation(Geometry::translation_transform(world_inst_pivot) * offset_trafo * Transform3d(inst_rotation) * scale_trafo * Geometry::translation_transform(-local_inst_pivot));
             }
             else
-                assert(false);
+                transform_instance_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
         }
         else {
             if (!is_single_volume_or_modifier()) {
@@ -1390,8 +1384,18 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                 transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
             }
             else {
-                transformation_type.set_independent();
-                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
+              if (transformation_type.local()) {
+                  const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
+                  Matrix3d vol_rotation, vol_scale;
+                  vol_trafo.get_matrix().computeRotationScaling(&vol_rotation, &vol_scale);
+                  const Transform3d offset_trafo = Geometry::translation_transform(vol_trafo.get_offset() + vol_rotation * translation);
+                  const Transform3d scale_trafo = Transform3d(vol_scale) * Geometry::scale_transform(relative_scale);
+                  v.set_volume_transformation(offset_trafo * Transform3d(vol_rotation) * scale_trafo);
+              }
+              else {
+                  transformation_type.set_independent();
+                  transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
+              }
             }
         }
     }
@@ -3040,28 +3044,36 @@ void Selection::paste_objects_from_clipboard()
 }
 
 #if ENABLE_WORLD_COORDINATE
+void Selection::transform_instance_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
+    const Transform3d& transform, const Vec3d& world_pivot)
+{
+    assert(transformation_type.relative());
+    assert(transformation_type.world());
+
+    const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
+    const Vec3d inst_pivot = transformation_type.independent() && !is_from_single_instance() ? inst_trafo.get_offset() : world_pivot;
+    const Transform3d trafo = Geometry::translation_transform(inst_pivot) * transform * Geometry::translation_transform(-inst_pivot);
+    volume.set_instance_transformation(trafo * inst_trafo.get_matrix());
+}
+
 void Selection::transform_volume_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
     const Transform3d& transform, const Vec3d& world_pivot)
 {
     assert(transformation_type.relative());
 
-    const Geometry::Transformation& volume_trafo = volume_data.get_volume_transform();
+    const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
     const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
 
     if (transformation_type.world()) {
-        const Vec3d inst_pivot = transformation_type.independent() ? volume_trafo.get_offset() : (Vec3d)(inst_trafo.get_matrix().inverse() * world_pivot);
+        const Vec3d inst_pivot = transformation_type.independent() ? vol_trafo.get_offset() : (Vec3d)(inst_trafo.get_matrix().inverse() * world_pivot);
         const Transform3d inst_matrix_no_offset = inst_trafo.get_matrix_no_offset();
         const Transform3d trafo = Geometry::translation_transform(inst_pivot) * inst_matrix_no_offset.inverse() * transform * inst_matrix_no_offset * Geometry::translation_transform(-inst_pivot);
-        volume.set_volume_transformation(trafo * volume_trafo.get_matrix());
+        volume.set_volume_transformation(trafo * vol_trafo.get_matrix());
     }
     else if (transformation_type.instance()) {
-        const Vec3d inst_pivot = transformation_type.independent() ? volume_trafo.get_offset() : (Vec3d)(inst_trafo.get_matrix().inverse() * world_pivot);
+        const Vec3d inst_pivot = transformation_type.independent() ? vol_trafo.get_offset() : (Vec3d)(inst_trafo.get_matrix().inverse() * world_pivot);
         const Transform3d trafo = Geometry::translation_transform(inst_pivot) * transform * Geometry::translation_transform(-inst_pivot);
-        volume.set_volume_transformation(trafo * volume_trafo.get_matrix());
-    }
-    else if (transformation_type.local()) {
-        const Geometry::Transformation trafo(transform);
-        volume.set_volume_transformation(trafo.get_offset_matrix() * volume_trafo.get_matrix() * trafo.get_matrix_no_offset());
+        volume.set_volume_transformation(trafo * vol_trafo.get_matrix());
     }
     else
         assert(false);
