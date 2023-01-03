@@ -153,6 +153,46 @@ static inline void merge_splits(ClipperLib_Z::Paths &paths, std::vector<std::pai
     }
 }
 
+using AABBTreeBBoxes = AABBTreeIndirect::Tree<2, coord_t>;
+
+static AABBTreeBBoxes build_aabb_tree_over_expolygons(const ExPolygons &expolygons) 
+{
+    // Calculate bounding boxes of internal slices.
+    std::vector<AABBTreeIndirect::BoundingBoxWrapper> bboxes;
+    bboxes.reserve(expolygons.size());
+    for (size_t i = 0; i < expolygons.size(); ++ i)
+        bboxes.emplace_back(i, get_extents(expolygons[i].contour));
+    // Build AABB tree over bounding boxes of boundary expolygons.
+    AABBTreeBBoxes out;
+    out.build_modify_input(bboxes);
+    return out;
+}
+
+static int sample_in_expolygons(
+    // AABB tree over boundary expolygons
+    const AABBTreeBBoxes &aabb_tree, 
+    const ExPolygons     &expolygons,
+    const Point          &sample)
+{
+    int out = -1;
+    AABBTreeIndirect::traverse(aabb_tree,
+        [&sample](const AABBTreeBBoxes::Node &node) {
+            return node.bbox.contains(sample);
+        },
+        [&expolygons, &sample, &out](const AABBTreeBBoxes::Node &node) {
+            assert(node.is_leaf());
+            assert(node.is_valid());
+            if (expolygons[node.idx].contains(sample)) {
+                out = int(node.idx);
+                // Stop traversal.
+                return false;
+            }
+            // Continue traversal.
+            return true;
+        });
+    return out;
+}
+
 std::vector<WaveSeed> wave_seeds(
     // Source regions that are supposed to touch the boundary.
     const ExPolygons      &src,
@@ -211,19 +251,7 @@ std::vector<WaveSeed> wave_seeds(
     // AABBTree over bounding boxes of boundaries.
     // Only built if necessary, that is if any of the seed contours is closed, thus there is no intersection point
     // with the boundary and all Z coordinates of the closed contour point to the source contour.
-    using AABBTree = AABBTreeIndirect::Tree<2, coord_t>;
-    AABBTree aabb_tree;
-    auto init_aabb_tree = [&aabb_tree, &boundary]() {
-        if (aabb_tree.empty()) {
-            // Calculate bounding boxes of internal slices.
-            std::vector<AABBTreeIndirect::BoundingBoxWrapper> bboxes;
-            bboxes.reserve(boundary.size());
-            for (size_t i = 0; i < boundary.size(); ++ i)
-                bboxes.emplace_back(i, get_extents(boundary[i].contour));
-            // Build AABB tree over bounding boxes of boundary expolygons.
-            aabb_tree.build_modify_input(bboxes);
-        }
-    };
+    AABBTreeBBoxes aabb_tree;
 
     // Sort paths into their respective islands.
     // Each src x boundary will be processed (wave expanded) independently.
@@ -262,24 +290,9 @@ std::vector<WaveSeed> wave_seeds(
             // This should be a closed contour.
             assert(front == back && front.z() >= idx_boundary_end && front.z() < idx_src_end);
             // Find a source boundary expolygon of one sample of this closed path.
-            init_aabb_tree();
-            Point sample(front.x(), front.y());
-            int boundary_id = -1;
-            AABBTreeIndirect::traverse(aabb_tree,
-                [&sample](const AABBTree::Node &node) {
-                    return node.bbox.contains(sample);
-                },
-                [&boundary, &sample, &boundary_id](const AABBTree::Node &node) {
-                    assert(node.is_leaf());
-                    assert(node.is_valid());
-                    if (boundary[node.idx].contains(sample)) {
-                        boundary_id = int(node.idx);
-                        // Stop traversal.
-                        return false;
-                    }
-                    // Continue traversal.
-                    return true;
-                });
+            if (aabb_tree.empty())
+                aabb_tree = build_aabb_tree_over_expolygons(boundary);
+            int boundary_id = sample_in_expolygons(aabb_tree, boundary, Point(front.x(), front.y()));
             // Boundary that contains the sample point was found.
             assert(boundary_id >= 0);
             if (boundary_id >= 0)
@@ -431,6 +444,7 @@ std::vector<RegionExpansionEx> propagate_waves_ex(const WaveSeeds &seeds, const 
             for (ExPolygon &ex : expolys)
                 out.push_back({ std::move(ex), it->src_id, it->boundary_id });
         }
+        it = it2;
     }
     return out;
 }
@@ -477,21 +491,44 @@ std::vector<ExPolygon> expand_merge_expolygons(ExPolygons &&src, const ExPolygon
     ExPolygons out;
     out.reserve(src.size());
     for (auto it = expanded.begin(); it != expanded.end();) {
-        auto it2 = it;
-        acc.clear();
-        for (; it2 != expanded.end() && it->src_id == it2->src_id; ++ it2)
-            acc.emplace_back(std::move(it2->polygon));
         for (; last < it->src_id; ++ last)
             out.emplace_back(std::move(src[last]));
+        acc.clear();
+        assert(it->src_id == last);
+        for (; it != expanded.end() && it->src_id == last; ++ it)
+            acc.emplace_back(std::move(it->polygon));
         //FIXME offset & merging could be more efficient, for example one does not need to copy the source expolygon
-        append(acc, to_polygons(std::move(src[it->src_id])));
+        ExPolygon &src_ex = src[last ++];
+        assert(! src_ex.contour.empty());
+#if 0
+        {
+            static int iRun = 0;
+            BoundingBox bbox = get_extents(acc);
+            bbox.merge(get_extents(src_ex));
+            SVG svg(debug_out_path("expand_merge_expolygons-failed-union=%d.svg", iRun ++).c_str(), bbox);
+            svg.draw(acc);
+            svg.draw_outline(acc, "black", scale_(0.05));
+            svg.draw(src_ex, "red");
+            svg.Close();
+        }
+#endif
+        Point sample = src_ex.contour.front();
+        append(acc, to_polygons(std::move(src_ex)));
         ExPolygons merged = union_safety_offset_ex(acc);
         // Expanding one expolygon by waves should not change connectivity of the source expolygon:
         // Single expolygon should be produced possibly with increased number of holes.
-        assert(merged.size() == 1);
-        if (! merged.empty())
+        if (merged.size() > 1) {
+            // assert(merged.size() == 1);
+            // There is something wrong with the initial waves. Most likely the bridge was not valid at all
+            // or the boundary region was very close to some bridge edge, but not really touching.
+            // Pick only a single merged expolygon, which contains one sample point of the source expolygon.
+            auto aabb_tree = build_aabb_tree_over_expolygons(merged);
+            int id = sample_in_expolygons(aabb_tree, merged, sample);
+            assert(id != -1);
+            if (id != -1)
+                out.emplace_back(std::move(merged[id]));
+        } else if (merged.size() == 1)
             out.emplace_back(std::move(merged.front()));
-        it = it2;
     }
     for (; last < uint32_t(src.size()); ++ last)
         out.emplace_back(std::move(src[last]));

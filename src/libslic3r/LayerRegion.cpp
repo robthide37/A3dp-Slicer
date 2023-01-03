@@ -183,16 +183,17 @@ Surfaces expand_bridges_detect_orientations(
 
     // Cache for detecting bridge orientation and merging regions with overlapping expansions.
     struct Bridge {
-        ExPolygon  expolygon;
-        uint32_t   group_id;
-        double     angle = -1;
+        ExPolygon                                       expolygon;
+        uint32_t                                        group_id;
+        std::vector<RegionExpansionEx>::const_iterator  bridge_expansion_begin;
+        double                                          angle = -1;
     };
     std::vector<Bridge> bridges;
     {
         bridges.reserve(bridges_ex.size());
         uint32_t group_id = 0;
         for (ExPolygon &ex : bridges_ex)
-            bridges.push_back({ std::move(ex), group_id ++ });
+            bridges.push_back({ std::move(ex), group_id ++, bridge_expansions.end() });
         bridges_ex.clear();
     }
 
@@ -243,15 +244,24 @@ Surfaces expand_bridges_detect_orientations(
         std::sort(bridge_anchors.begin(), bridge_anchors.end(), Algorithm::lower_by_src_and_boundary);
         auto it_bridge_anchor = bridge_anchors.begin();
         Lines lines;
+        Polygons anchor_areas;
         for (uint32_t bridge_id = 0; bridge_id < uint32_t(bridges.size()); ++ bridge_id) {
             Bridge &bridge = bridges[bridge_id];
-            lines.clear();
-            for (++ it_bridge_anchor; it_bridge_anchor != bridge_anchors.end() && it_bridge_anchor->src == bridge_id; ++ it_bridge_anchor)
-                if (Points &polyline = it_bridge_anchor->path; polyline.size() >= 2) {
-                    reserve_more_power_of_2(lines, polyline.size() - 1);
-                    for (size_t i = 1; i < polyline.size(); ++ i)
-                        lines.push_back({ polyline[i - 1], polyline[1] });
+//            lines.clear();
+            anchor_areas.clear();
+            int32_t last_anchor_id = -1;
+            for (; it_bridge_anchor != bridge_anchors.end() && it_bridge_anchor->src == bridge_id; ++ it_bridge_anchor) {
+                if (last_anchor_id != int(it_bridge_anchor->boundary)) {
+                    last_anchor_id = int(it_bridge_anchor->boundary);
+                    append(anchor_areas, std::move(to_polygons(shells[last_anchor_id])));
                 }
+//                if (Points &polyline = it_bridge_anchor->path; polyline.size() >= 2) {
+//                    reserve_more_power_of_2(lines, polyline.size() - 1);
+//                    for (size_t i = 1; i < polyline.size(); ++ i)
+//                        lines.push_back({ polyline[i - 1], polyline[1] });
+//                }
+            }
+            lines = to_lines(diff_pl(to_polylines(bridge.expolygon), expand(anchor_areas, float(SCALED_EPSILON))));
             auto [bridging_dir, unsupported_dist] = detect_bridging_direction(lines, to_polygons(bridge.expolygon));
             bridge.angle = M_PI + std::atan2(bridging_dir.y(), bridging_dir.x());
             // #if 1
@@ -273,12 +283,23 @@ Surfaces expand_bridges_detect_orientations(
     {
         Polygons acc;
         Surface templ{ stBottomBridge, {} };
+        std::sort(bridge_expansions.begin(), bridge_expansions.end(), [](auto &l, auto &r) {
+            return l.src_id < r.src_id || (l.src_id == r.src_id && l.boundary_id < r.boundary_id);
+        });
+        for (auto it = bridge_expansions.begin(); it != bridge_expansions.end(); ) {
+            bridges[it->src_id].bridge_expansion_begin = it;
+            uint32_t src_id = it->src_id;
+            for (++ it; it != bridge_expansions.end() && it->src_id == src_id; ++ it) ;
+        }
         for (uint32_t bridge_id = 0; bridge_id < uint32_t(bridges.size()); ++ bridge_id) {
             acc.clear();
             for (uint32_t bridge_id2 = bridge_id; bridge_id2 < uint32_t(bridges.size()); ++ bridge_id2)
                 if (group_id(bridge_id) == bridge_id) {
                     append(acc, to_polygons(std::move(bridges[bridge_id2].expolygon)));
-                    append(acc, to_polygons(std::move(bridge_expansions[bridge_id2].expolygon)));
+                    auto it_bridge_expansion = bridges[bridge_id2].bridge_expansion_begin;
+                    assert(it_bridge_expansion == bridge_expansions.end() || it_bridge_expansion->src_id == bridge_id2);
+                    for (; it_bridge_expansion != bridge_expansions.end() && it_bridge_expansion->src_id == bridge_id2; ++ it_bridge_expansion)
+                        append(acc, to_polygons(std::move(it_bridge_expansion->expolygon)));
                 }
             //FIXME try to be smart and pick the best bridging angle for all?
             templ.bridge_angle = bridges[bridge_id].angle;
@@ -355,8 +376,8 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
         const double custom_angle = this->region().config().bridge_angle.value;
         const auto   params = Algorithm::RegionExpansionParameters::build(expansion_bottom_bridge, expansion_step, max_nr_expansion_steps);
         bridges.surfaces = custom_angle > 0 ?
-            expand_bridges_detect_orientations(m_fill_surfaces.surfaces, shells, params) :
-            expand_merge_surfaces(m_fill_surfaces.surfaces, stBottomBridge, shells, params, custom_angle);
+            expand_merge_surfaces(m_fill_surfaces.surfaces, stBottomBridge, shells, params, custom_angle) :
+            expand_bridges_detect_orientations(m_fill_surfaces.surfaces, shells, params);
         BOOST_LOG_TRIVIAL(trace) << "Processing external surface, detecting bridges - done";
 #if 0
         {
