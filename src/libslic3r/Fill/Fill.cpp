@@ -16,8 +16,9 @@
 #include "FillLightning.hpp"
 #include "FillConcentric.hpp"
 
-
 namespace Slic3r {
+
+static constexpr const float NarrowInfillAreaThresholdMM = 3.f;
 
 struct SurfaceFillParams
 {
@@ -148,6 +149,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		                erBridgeInfill :
 		                (surface.is_solid() ?
 		                    (surface.is_top() ? erTopSolidInfill : erSolidInfill) :
+		                  	//(surface.is_top() ? erTopSolidInfill : (surface.is_bottom()? erBottomSurface : erSolidInfill)) :
 		                    erInternalInfill);
 		        params.bridge_angle = float(surface.bridge_angle);
 		        params.angle 		= float(Geometry::deg2rad(region_config.fill_angle.value));
@@ -155,7 +157,8 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		        // Calculate the actual flow we'll be using for this infill.
 		        params.bridge = is_bridge || Fill::use_bridge_flow(params.pattern);
 				params.flow   = params.bridge ?
-					layerm.bridging_flow(extrusion_role) :
+					// Always enable thick bridges for internal bridges.
+					layerm.bridging_flow(extrusion_role, surface.is_bridge() && ! surface.is_external()) :
 					layerm.flow(extrusion_role, (surface.thickness == -1) ? layer.height : surface.thickness);
 
 				// Calculate flow spacing for infill pattern generation.
@@ -297,6 +300,46 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 	        }
 		}
     }
+
+	// Detect narrow internal solid infill area and use ipBoundedRectilinear pattern instead.
+	{
+		std::vector<char> narrow_expolygons;
+		static constexpr const auto narrow_pattern = ipBoundedRectilinear;
+		for (size_t surface_fill_id = 0, num_old_fills = surface_fills.size(); surface_fill_id < num_old_fills; ++ surface_fill_id)
+			if (SurfaceFill &fill = surface_fills[surface_fill_id]; fill.surface.surface_type == stInternalSolid) {
+				size_t num_expolygons = fill.expolygons.size();
+				narrow_expolygons.clear();
+				narrow_expolygons.reserve(num_expolygons);
+				// Detect narrow expolygons.
+				int num_narrow = 0;
+				for (const ExPolygon &ex : fill.expolygons) {
+					bool narrow = offset_ex(ex, -scaled<float>(NarrowInfillAreaThresholdMM)).empty();
+					num_narrow += int(narrow);
+					narrow_expolygons.emplace_back(narrow);
+				}
+				if (num_narrow == num_expolygons) {
+					// All expolygons are narrow, change the fill pattern.
+					fill.params.pattern = narrow_pattern;
+				} else if (num_narrow > 0) {
+					// Some expolygons are narrow, split the fills.
+					params = fill.params;
+					params.pattern = narrow_pattern;
+					surface_fills.emplace_back(params);
+					SurfaceFill &old_fill = surface_fills[surface_fill_id];
+					SurfaceFill &new_fill = surface_fills.back();
+					new_fill.region_id 				= old_fill.region_id;
+					new_fill.surface.surface_type 	= stInternalSolid;
+					new_fill.surface.thickness 		= old_fill.surface.thickness;
+					new_fill.expolygons.reserve(num_narrow);
+					for (size_t i = 0; i < narrow_expolygons.size(); ++ i)
+						if (narrow_expolygons[i])
+							new_fill.expolygons.emplace_back(std::move(old_fill.expolygons[i]));
+					old_fill.expolygons.erase(std::remove_if(old_fill.expolygons.begin(), old_fill.expolygons.end(),
+						[&narrow_expolygons, ex_first = old_fill.expolygons.data()](const ExPolygon& ex) { return narrow_expolygons[&ex - ex_first]; }),
+						old_fill.expolygons.end());
+				}
+			}
+	}
 
 	return surface_fills;
 }
@@ -444,16 +487,17 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         f->layer_id = this->id();
         f->z 		= this->print_z;
         f->angle 	= surface_fill.params.angle;
-        f->adapt_fill_octree = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
+        f->adapt_fill_octree   = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
+        f->print_config        = &this->object()->print()->config();
+        f->print_object_config = &this->object()->config();
 
         if (surface_fill.params.pattern == ipLightning)
             dynamic_cast<FillLightning::Filler*>(f.get())->generator = lightning_generator;
 
-        if (perimeter_generator.value == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) {
-            FillConcentric *fill_concentric = dynamic_cast<FillConcentric *>(f.get());
-            assert(fill_concentric != nullptr);
-            fill_concentric->print_config        = &this->object()->print()->config();
-            fill_concentric->print_object_config = &this->object()->config();
+        if (surface_fill.params.pattern == ipBoundedRectilinear) {
+            auto *fill_bounded_rectilinear = dynamic_cast<FillBoundedRectilinear *>(f.get());
+            assert(fill_bounded_rectilinear != nullptr);
+            fill_bounded_rectilinear->print_region_config = &m_regions[surface_fill.region_id]->region().config();
         }
 
         // calculate flow spacing for infill pattern generation
@@ -483,7 +527,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         params.anchor_length     = surface_fill.params.anchor_length;
         params.anchor_length_max = surface_fill.params.anchor_length_max;
         params.resolution        = resolution;
-        params.use_arachne       = perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric;
+        params.use_arachne       = (perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) || surface_fill.params.pattern == ipBoundedRectilinear;
         params.layer_height      = layerm.layer()->height;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
