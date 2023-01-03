@@ -646,6 +646,7 @@ GroundConnection deepsearch_ground_connection(
     // Extract and apply the result
     auto [plr, azm, bridge_l] = oresult.optimum;
     Vec3d n = spheric_to_dir(plr, azm);
+    assert(std::abs(n.norm() - 1.) < EPSILON);
 
     // Now the optimizer gave a possible route to ground with a bridge direction
     // and length. This length can be shortened further by brute-force queries
@@ -654,7 +655,7 @@ GroundConnection deepsearch_ground_connection(
     // constraint, but it would not find quickly enough an accurate solution,
     // and it would be very hard to define a stop score which is very useful in
     // terminating the search as soon as the ground is found.
-    double l = 0., l_max = bridge_l;
+    double l = 0., l_max = sm.cfg.max_bridge_length_mm;
     double zlvl = std::numeric_limits<double>::infinity();
     while(zlvl > gndlvl && l <= l_max) {
 

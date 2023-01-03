@@ -20,12 +20,10 @@ class BranchingTreeBuilder: public branchingtree::Builder {
     const SupportableMesh  &m_sm;
     const branchingtree::PointCloud &m_cloud;
 
-    std::set<int /*ground node_id that was already processed*/> m_ground_mem;
-
     std::vector<branchingtree::Node> m_pillars; // to put an index over them
 
     // cache succesfull ground connections
-    std::map<size_t, GroundConnection>    m_gnd_connections;
+    std::map<int, GroundConnection> m_gnd_connections;
 
     // Scaling of the input value 'widening_factor:<0, 1>' to produce resonable
     // widening behaviour
@@ -162,6 +160,7 @@ public:
 
         // Discard all the support points connecting to this branch.
         discard_subtree_rescure(j.id);
+//        discard_subtree(j.id);
     }
 
     const std::vector<size_t>& unroutable_pinheads() const
@@ -177,7 +176,7 @@ public:
     {
         const GroundConnection *ret = nullptr;
 
-        auto it = m_gnd_connections.find(pillar);
+        auto it = m_gnd_connections.find(m_pillars[pillar].id);
         if (it != m_gnd_connections.end())
             ret = &it->second;
 
@@ -230,25 +229,23 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
 
     namespace bgi = boost::geometry::index;
 
-    auto it = m_ground_mem.find(from.id);
-    if (it == m_ground_mem.end()) {
+    auto it = m_gnd_connections.find(from.id);
+    if (it == m_gnd_connections.end()) {
         sla::Junction j{from.pos.cast<double>(), get_radius(from)};
         Vec3d init_dir = (to.pos - from.pos).cast<double>().normalized();
 
         auto conn = deepsearch_ground_connection(beam_ex_policy , m_sm, j,
                                                  get_radius(to), init_dir);
 
-        if (conn) {
-            m_pillars.emplace_back(from);
-            m_gnd_connections[m_pillars.size() - 1] = conn;
-
-            ret = true;
-        }
-
         // Remember that this node was tested if can go to ground, don't
         // test it with any other destination ground point because
         // it is unlikely that search_ground_route would find a better solution
-        m_ground_mem.insert(from.id);
+        m_gnd_connections[from.id] = conn;
+
+        if (conn) {
+            m_pillars.emplace_back(from);
+            ret = true;
+        }
     }
 
     if (ret) {
@@ -320,37 +317,17 @@ std::optional<Vec3f> BranchingTreeBuilder::suggest_avoidance(
     dst.weight += from.pos.z() - glvl;
     sla::Junction j{from.pos.cast<double>(), get_radius(from)};
 
-//    auto found_it = m_ground_mem.find(from.id);
-//    if (found_it != m_ground_mem.end()) {
-//        // TODO look up the conn object
-//    }
-//    else if (auto conn = deepsearch_ground_connection(
-//                   beam_ex_policy , m_sm, j, get_radius(dst), sla::DOWN)) {
-//        ret = get_avoidance(conn, max_bridge_len);
-//    }
-
-    auto conn = deepsearch_ground_connection(
-        beam_ex_policy , m_sm, j, get_radius(dst), sla::DOWN);
-
-    ret = get_avoidance(conn, max_bridge_len);
+    auto found_it = m_gnd_connections.find(from.id);
+    if (found_it != m_gnd_connections.end()) {
+        ret = get_avoidance(found_it->second, max_bridge_len);
+    } else {
+        auto conn = deepsearch_ground_connection(
+            beam_ex_policy , m_sm, j, get_radius(dst), sla::DOWN);
+        m_gnd_connections[from.id] = conn;
+        ret = get_avoidance(conn, max_bridge_len);
+    }
 
     return ret;
-
-//    double glvl = ground_level(m_sm);
-//    branchingtree::Node dst = from;
-//    dst.pos.z() = glvl;
-//    dst.weight += from.pos.z() - glvl;
-//    bool succ = add_ground_bridge(from, dst);
-
-//    std::optional<Vec3f> ret;
-
-//    if (succ) {
-//        auto it = m_gnd_connections.find(m_pillars.size() - 1);
-//        if (it != m_gnd_connections.end())
-//            ret = get_avoidance(it->second, max_bridge_len);
-//    }
-
-//    return ret;
 }
 
 inline void build_pillars(SupportTreeBuilder &builder,
