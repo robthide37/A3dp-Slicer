@@ -1793,7 +1793,7 @@ public:
         enum_values.reserve(il.size());
         enum_labels.clear();
         enum_labels.reserve(il.size());
-        for (const std::pair<std::string_view, std::string_view> p : il) {
+        for (const std::pair<std::string_view, std::string_view> &p : il) {
             enum_values.emplace_back(p.first);
             enum_labels.emplace_back(p.second);
         }

@@ -233,19 +233,15 @@ inline Point lerp(const Point &a, const Point &b, double t)
 // otherwise a bounding box is only defined if it has a positive area.
 template<bool IncludeBoundary = false>
 BoundingBox get_extents(const Points &pts);
-extern template BoundingBox get_extents<false>(const Points& pts);
-extern template BoundingBox get_extents<true>(const Points& pts);
+extern template BoundingBox get_extents<false>(const Points &pts);
+extern template BoundingBox get_extents<true>(const Points &pts);
 
 // if IncludeBoundary, then a bounding box is defined even for a single point.
 // otherwise a bounding box is only defined if it has a positive area.
 template<bool IncludeBoundary = false>
-BoundingBox get_extents(const std::vector<Points> &pts)
-{
-    BoundingBox bbox;
-    for (const Points &p : pts)
-        bbox.merge(get_extents<IncludeBoundary>(p));
-    return bbox;
-}
+BoundingBox get_extents(const std::vector<Points> &pts);
+extern template BoundingBox get_extents<false>(const std::vector<Points> &pts);
+extern template BoundingBox get_extents<true>(const std::vector<Points> &pts);
 
 BoundingBoxf get_extents(const std::vector<Vec2d> &pts);
 
