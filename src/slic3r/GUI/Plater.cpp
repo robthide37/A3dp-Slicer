@@ -4188,6 +4188,8 @@ void Plater::priv::on_select_preset(wxCommandEvent &evt)
         wxGetApp().preset_bundle->set_filament_preset(idx, preset_name);
     }
 
+    std::string last_selected_ph_printer_name = combo->get_selected_ph_printer_name();
+
     bool select_preset = !combo->selection_is_changed_according_to_physical_printers();
     // TODO: ?
     if (preset_type == Preset::TYPE_FILAMENT && sidebar->is_multifilament()) {
@@ -4196,7 +4198,7 @@ void Plater::priv::on_select_preset(wxCommandEvent &evt)
     }
     else if (select_preset) {
         wxWindowUpdateLocker noUpdates(sidebar->presets_panel());
-        wxGetApp().get_tab(preset_type)->select_preset(preset_name);
+        wxGetApp().get_tab(preset_type)->select_preset(preset_name, false, last_selected_ph_printer_name);
     }
 
     if (preset_type != Preset::TYPE_PRINTER || select_preset) {
