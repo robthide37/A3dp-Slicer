@@ -1571,6 +1571,13 @@ void DiffPresetDialog::create_tree()
     m_tree->GetColumn(DiffModel::colToggle)->SetHidden(true);
 }
 
+static std::array<Preset::Type, 3> types_list(PrinterTechnology pt)
+{
+    if (pt == ptFFF)
+        return  { Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT };
+    return      { Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
+}
+
 void DiffPresetDialog::create_buttons()
 {
     wxFont font = this->GetFont().Scaled(1.4f);
@@ -1598,8 +1605,7 @@ void DiffPresetDialog::create_buttons()
         bool enable = m_tree->has_selection();
         if (enable) {
             if (m_view_type == Preset::TYPE_INVALID) {
-                for (const Preset::Type& type : (m_pr_technology == ptFFF ? std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
-                                                                            std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL }))
+                for (const Preset::Type& type : types_list(m_pr_technology))
                     if (!enable_transfer(type)) {
                         enable = false;
                         break;
@@ -2024,10 +2030,7 @@ bool DiffPresetDialog::is_save_confirmed()
 
     std::vector<Preset::Type> types_for_save;
 
-    const auto list = m_pr_technology == ptFFF ? std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
-        std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
-
-    for (const Preset::Type& type : list) {
+    for (const Preset::Type& type : types_list(m_pr_technology)) {
         if (!m_tree->options(type, true).empty()) {
             types_for_save.emplace_back(type);
             presets_to_save.emplace_back(PresetToSave{ type, get_left_preset_name(type), get_right_preset_name(type), get_right_preset_name(type) });
