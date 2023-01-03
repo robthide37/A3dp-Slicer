@@ -73,23 +73,10 @@ void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
             m_transformations.erase(m_transformations.begin() + i);
 }
 
-namespace priv {
-struct HitWithDistance : public RaycastManager::Hit
-{
-    double squared_distance;
-    HitWithDistance(double squared_distance, 
-                    const Hit::Key &key,
-                    const SurfacePoint &surface_point)
-        : Hit(key, surface_point.position, surface_point.normal)
-        , squared_distance(squared_distance)
-    {}
-};
-}
-
 std::optional<RaycastManager::Hit> RaycastManager::unproject(
     const Vec2d &mouse_pos, const Camera &camera, const ISkip *skip) const
 {
-    std::optional<priv::HitWithDistance> closest;
+    std::optional<Hit> closest;
     for (const auto &item : m_transformations) { 
         const TrKey &key = item.first;
         size_t       volume_id = key.second;
@@ -112,7 +99,7 @@ std::optional<RaycastManager::Hit> RaycastManager::unproject(
         if (closest.has_value() &&
             closest->squared_distance < squared_distance)
             continue;
-        closest = priv::HitWithDistance(squared_distance, key, surface_point);
+        closest = Hit(key, surface_point, squared_distance);
     }
 
     //if (!closest.has_value()) return {};
@@ -121,7 +108,7 @@ std::optional<RaycastManager::Hit> RaycastManager::unproject(
 
 std::optional<RaycastManager::Hit> RaycastManager::unproject(const Vec3d &point, const Vec3d &direction, const ISkip *skip) const
 {
-    std::optional<priv::HitWithDistance> closest;
+    std::optional<Hit> closest;
     for (const auto &item : m_transformations) { 
         const TrKey &key = item.first;
         size_t       volume_id = key.second;
@@ -144,14 +131,14 @@ std::optional<RaycastManager::Hit> RaycastManager::unproject(const Vec3d &point,
                 closest->squared_distance < squared_distance)
                 continue;
             SurfacePoint surface_point(hit.position().cast<float>(), hit.normal().cast<float>());
-            closest = priv::HitWithDistance(squared_distance, key, surface_point);
+            closest = Hit(key, surface_point, squared_distance);
         }
     }
     return closest;
 }
 
 std::optional<RaycastManager::Hit> RaycastManager::closest(const Vec3d &point, const ISkip *skip) const {
-    std::optional<priv::HitWithDistance> closest;
+    std::optional<Hit> closest;
     for (const auto &item : m_transformations) {
         const TrKey &key       = item.first;
         size_t       volume_id = key.second;
@@ -172,7 +159,7 @@ std::optional<RaycastManager::Hit> RaycastManager::closest(const Vec3d &point, c
         if (closest.has_value() && closest->squared_distance < squared_distance)
             continue;
         SurfacePoint surface_point(p,n);
-        closest = priv::HitWithDistance(squared_distance, key, surface_point);
+        closest = Hit(key, surface_point, squared_distance);
     }
     return closest;
 }

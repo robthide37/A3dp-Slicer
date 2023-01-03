@@ -136,6 +136,14 @@ inline std::string to_string(const Vec3d   &pt) { return std::string("[") + floa
 std::vector<Vec3f> transform(const std::vector<Vec3f>& points, const Transform3f& t);
 Pointf3s transform(const Pointf3s& points, const Transform3d& t);
 
+/// <summary>
+/// Check whether transformation matrix contains odd number of mirroring.
+/// NOTE: In code is sometime function named is_left_handed
+/// </summary>
+/// <param name="transform">Transformation to check</param>
+/// <returns>Is positive determinant</returns>
+inline bool has_reflection(const Transform3d &transform) { return transform.matrix().determinant() < 0; }
+
 template<int N, class T> using Vec = Eigen::Matrix<T,  N, 1, Eigen::DontAlign, N, 1>;
 
 class Point : public Vec2crd

@@ -1120,6 +1120,17 @@ static inline void execute_job(std::shared_ptr<Job> j)
     });
 }
 
+namespace priv {
+/// <summary>
+/// Calculate translation of text volume onto surface of model
+/// </summary>
+/// <param name="volume">Text</param>
+/// <param name="raycast_manager">AABB trees of object. Actualize object containing text</param>
+/// <param name="selection">Transformation of actual instance</param>
+/// <returns>Offset of volume in volume coordinate</returns>
+std::optional<Vec3d> calc_surface_offset(const ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection);
+} // namespace priv
+
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
@@ -1159,6 +1170,13 @@ bool GLGizmoEmboss::process()
         auto& fix_3mf = m_volume->text_configuration->fix_3mf_tr;
         if (fix_3mf.has_value())
             text_tr = text_tr * fix_3mf->inverse();
+
+        // when it is new applying of use surface than move origin onto surfaca
+        if (!m_volume->text_configuration->style.prop.use_surface) {
+            auto offset = priv::calc_surface_offset(*m_volume, m_raycast_manager, m_parent.get_selection());
+            if (offset.has_value())
+                text_tr *= Eigen::Translation<double, 3>(*offset);
+        }
 
         bool is_outside = m_volume->is_model_part();
         // check that there is not unexpected volume type
@@ -2231,18 +2249,7 @@ void GLGizmoEmboss::draw_delete_style_button() {
     }
 }
 
-namespace priv {
-/// <summary>
-/// Transform origin of Text volume onto surface of model.
-/// </summary>
-/// <param name="volume">Text</param>
-/// <param name="raycast_manager">AABB trees of object</param>
-/// <param name="selection">Transformation of actual instance</param>
-/// <returns>True when transform otherwise false</returns>
-bool transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection);
-} // namespace priv
-
-
+// FIX IT: it should not change volume position before successfull change
 void GLGizmoEmboss::fix_transformation(const FontProp &from,
                                        const FontProp &to)
 {
@@ -2264,10 +2271,6 @@ void GLGizmoEmboss::fix_transformation(const FontProp &from,
         float t_move = t_move_opt.has_value() ? *t_move_opt : .0f;
         do_translate(Vec3d::UnitZ() * (t_move - f_move));
     }
-
-    // when start using surface than move volume origin onto surface
-    if (!from.use_surface && to.use_surface)
-        priv::transform_on_surface(*m_volume, m_raycast_manager, m_parent.get_selection());
 }
 
 void GLGizmoEmboss::draw_style_list() {
@@ -2887,8 +2890,7 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     m_parent.do_rotate(snapshot_name);
 }
 
-bool priv::transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection)
-{
+std::optional<Vec3d> priv::calc_surface_offset(const ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection) {
     // Move object on surface
     auto cond = RaycastManager::SkipVolume({volume.id().id});
     raycast_manager.actualize(volume.get_object(), &cond);
@@ -2901,26 +2903,31 @@ bool priv::transform_on_surface(ModelVolume &volume, RaycastManager &raycast_man
 
     // ray in direction of text projection(from volume zero to z-dir)
     std::optional<RaycastManager::Hit> hit_opt = raycast_manager.unproject(point, direction, &cond);
+    // start point lay on surface could appear slightly behind surface
+    std::optional<RaycastManager::Hit> hit_opt_opposit = raycast_manager.unproject(point, -direction, &cond);
+    if (!hit_opt.has_value() || 
+        (hit_opt_opposit.has_value() && hit_opt->squared_distance > hit_opt_opposit->squared_distance))
+        hit_opt = hit_opt_opposit;
+
+    // Try to find closest point when no hit object in emboss direction
     if (!hit_opt.has_value())
         hit_opt = raycast_manager.closest(point);
 
+    // It should NOT appear. Closest point always exists.
     if (!hit_opt.has_value())
-        return false;
-    const RaycastManager::Hit &hit = *hit_opt;
+        return {};
 
+    // It is no neccesary to move with origin by very small value
+    if (hit_opt->squared_distance < EPSILON)
+        return {};
+
+    const RaycastManager::Hit &hit = *hit_opt;
     Transform3d hit_tr       = raycast_manager.get_transformation(hit.tr_key);
     Vec3d       hit_world    = hit_tr * hit.position.cast<double>();
     Vec3d       offset_world = hit_world - point; // vector in world
     // TIP: It should be close to only z move
     Vec3d offset_volume = to_world.inverse().linear() * offset_world;
-
-    // when try to use surface on just loaded text from 3mf
-    auto fix = volume.text_configuration->fix_3mf_tr;
-    if (fix.has_value())
-        offset_volume = fix->linear() * offset_volume;
-
-    volume.set_transformation(volume.get_matrix() * Eigen::Translation<double, 3>(offset_volume));
-    return true;
+    return offset_volume;
 }
 
 void GLGizmoEmboss::draw_advanced()
@@ -2975,8 +2982,6 @@ void GLGizmoEmboss::draw_advanced()
             // there should be minimal embossing depth
             if (font_prop.emboss < 0.1)
                 font_prop.emboss = 1;
-
-            priv::transform_on_surface(*m_volume, m_raycast_manager, m_parent.get_selection());
         }
         process();
     }
