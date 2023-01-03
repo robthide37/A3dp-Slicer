@@ -5,6 +5,8 @@
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/Utils.hpp>
 
+#include <numeric>
+
 namespace Slic3r {
 namespace Algorithm {
 

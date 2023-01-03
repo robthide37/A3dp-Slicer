@@ -1,6 +1,7 @@
 #ifndef slic3r_ClipperZUtils_hpp_
 #define slic3r_ClipperZUtils_hpp_
 
+#include <numeric>
 #include <vector>
 
 #include <clipper/clipper_z.hpp>
