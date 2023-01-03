@@ -49,6 +49,7 @@ Fill* Fill::new_from_type(const InfillPattern type)
     case ipSupportCubic:        return new FillAdaptive::Filler();
     case ipSupportBase:         return new FillSupportBase();
     case ipLightning:           return new FillLightning::Filler();
+    case ipBoundedRectilinear:  return new FillBoundedRectilinear();
     default: throw Slic3r::InvalidArgument("unknown type");
     }
 }

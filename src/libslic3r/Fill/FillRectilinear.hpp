@@ -7,6 +7,7 @@
 
 namespace Slic3r {
 
+class PrintRegionConfig;
 class Surface;
 
 class FillRectilinear : public Fill
@@ -107,6 +108,25 @@ public:
 protected:
     // The grid fill will keep the angle constant between the layers, see the implementation of Slic3r::Fill.
     float _layer_angle(size_t idx) const override { return 0.f; }
+};
+
+class FillBoundedRectilinear : public FillRectilinear
+{
+public:
+    Fill *clone() const override { return new FillBoundedRectilinear(*this); }
+    ~FillBoundedRectilinear() override = default;
+    Polylines      fill_surface(const Surface *surface, const FillParams &params) override { return {}; };
+    ThickPolylines fill_surface_arachne(const Surface *surface, const FillParams &params) override;
+
+protected:
+    void _fill_surface_single(const Surface &surface, const FillParams &params, ThickPolylines &thick_polylines_out);
+
+    bool no_sort() const override { return true; }
+
+    // PrintRegionConfig is used for computing overlap between boundary contour and inner Rectilinear infill.
+    const PrintRegionConfig *print_region_config = nullptr;
+
+    friend class Layer;
 };
 
 Points sample_grid_pattern(const ExPolygon &expolygon, coord_t spacing, const BoundingBox &global_bounding_box);

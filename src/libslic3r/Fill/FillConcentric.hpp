@@ -26,11 +26,6 @@ protected:
                               ThickPolylines                &thick_polylines_out) override;
 
     bool no_sort() const override { return true; }
-
-    const PrintConfig       *print_config        = nullptr;
-    const PrintObjectConfig *print_object_config = nullptr;
-
-    friend class Layer;
 };
 
 } // namespace Slic3r

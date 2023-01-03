@@ -191,6 +191,11 @@ public:
 
     void clip_end(double distance);
 
+    // Make this closed ThickPolyline starting in the specified index.
+    // Be aware that this method can be applicable just for closed ThickPolyline.
+    // On open ThickPolyline make no effect.
+    void start_at_index(int index);
+
     std::vector<coordf_t> width;
     std::pair<bool,bool>  endpoints;
 };
