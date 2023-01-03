@@ -1571,11 +1571,9 @@ void DiffPresetDialog::create_tree()
     m_tree->GetColumn(DiffModel::colToggle)->SetHidden(true);
 }
 
-static std::array<Preset::Type, 3> types_list(PrinterTechnology pt)
+std::array<Preset::Type, 3> DiffPresetDialog::types_list() const
 {
-    if (pt == ptFFF)
-        return  { Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT };
-    return      { Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
+    return PresetBundle::types_list(m_pr_technology);
 }
 
 void DiffPresetDialog::create_buttons()
@@ -1605,7 +1603,7 @@ void DiffPresetDialog::create_buttons()
         bool enable = m_tree->has_selection();
         if (enable) {
             if (m_view_type == Preset::TYPE_INVALID) {
-                for (const Preset::Type& type : types_list(m_pr_technology))
+                for (const Preset::Type& type : types_list())
                     if (!enable_transfer(type)) {
                         enable = false;
                         break;
@@ -2030,7 +2028,7 @@ bool DiffPresetDialog::is_save_confirmed()
 
     std::vector<Preset::Type> types_for_save;
 
-    for (const Preset::Type& type : types_list(m_pr_technology)) {
+    for (const Preset::Type& type : types_list()) {
         if (!m_tree->options(type, true).empty()) {
             types_for_save.emplace_back(type);
             presets_to_save.emplace_back(PresetToSave{ type, get_left_preset_name(type), get_right_preset_name(type), get_right_preset_name(type) });

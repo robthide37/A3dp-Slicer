@@ -141,11 +141,7 @@ const Preset* SavePresetDialog::Item::get_existing_preset() const
     if (m_presets)
         return m_presets->find_preset(m_preset_name, false);
 
-    const auto types = m_printer_technology == ptFFF ?
-        std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT,     Preset::TYPE_FILAMENT       } :
-        std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL   };
-
-    for (auto type : types) {
+    for (const Preset::Type& type : PresetBundle::types_list(m_printer_technology)) {
         const PresetCollection& presets = wxGetApp().preset_bundle->get_presets(type);
         if (const Preset* preset = presets.find_preset(m_preset_name, false))
             return preset;

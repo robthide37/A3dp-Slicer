@@ -307,9 +307,7 @@ void MainFrame::bind_diff_dialog()
     auto process_options = [this](std::function<void(Preset::Type)> process) {
         const Preset::Type diff_dlg_type = diff_dialog.view_type();
         if (diff_dlg_type == Preset::TYPE_INVALID) {
-            for (const Preset::Type& type : diff_dialog.printer_technology() == ptFFF ? 
-                                            std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
-                                            std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL } )
+            for (const Preset::Type& type : diff_dialog.types_list() )
                 process(type);
         }
         else
