@@ -2323,12 +2323,15 @@ void GLGizmoCut3D::process_selection_rectangle(CutConnectors &connectors)
 
 bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
 {
-    if (is_dragging() || m_connector_mode == CutConnectorMode::Auto || (!m_keep_upper || !m_keep_lower))
+    if (is_dragging() || m_connector_mode == CutConnectorMode::Auto)
         return false;
 
     if ( m_hover_id < 0 && shift_down &&  ! m_connectors_editing &&
         (action == SLAGizmoEventType::LeftDown || action == SLAGizmoEventType::LeftUp || action == SLAGizmoEventType::Moving) )
         return process_cut_line(action, mouse_position);
+
+    if (!m_keep_upper || !m_keep_lower)
+        return false;
 
     if (!m_connectors_editing) {
         if (0 && action == SLAGizmoEventType::LeftDown) {
