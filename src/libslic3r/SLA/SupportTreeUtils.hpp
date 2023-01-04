@@ -517,6 +517,11 @@ Vec3d check_ground_route(
     const auto sd     = sm.cfg.safety_distance(source.r);
     const auto gndlvl = ground_level(sm);
 
+    // Intersection of the suggested bridge with ground plane. If the bridge
+    // spans below ground, stop it at ground level.
+    double t = (gndlvl - source.pos.z()) / dir.z();
+    bridge_len = std::min(t, bridge_len);
+
     Vec3d bridge_end = source.pos + bridge_len * dir;
 
     double down_l     = bridge_end.z() - gndlvl;
@@ -648,6 +653,9 @@ GroundConnection deepsearch_ground_connection(
     Vec3d n = spheric_to_dir(plr, azm);
     assert(std::abs(n.norm() - 1.) < EPSILON);
 
+    double t = (gndlvl - source.pos.z()) / n.z();
+    bridge_l = std::min(t, bridge_l);
+
     // Now the optimizer gave a possible route to ground with a bridge direction
     // and length. This length can be shortened further by brute-force queries
     // of free route straigt down for a possible pillar.
@@ -655,7 +663,7 @@ GroundConnection deepsearch_ground_connection(
     // constraint, but it would not find quickly enough an accurate solution,
     // and it would be very hard to define a stop score which is very useful in
     // terminating the search as soon as the ground is found.
-    double l = 0., l_max = sm.cfg.max_bridge_length_mm;
+    double l = 0., l_max = bridge_l;
     double zlvl = std::numeric_limits<double>::infinity();
     while(zlvl > gndlvl && l <= l_max) {
 
