@@ -274,8 +274,12 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
         Vec3d offset(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z());
         // offset += 0.5 * mesh_bb.size(); // No size of text volume at this position
         offset -= vol->get_instance_offset();
+#if ENABLE_WORLD_COORDINATE
         Transform3d tr = vol->get_instance_transformation().get_matrix_no_offset().inverse();
-        Vec3d offset_tr = tr * offset;        
+#else
+        Transform3d tr = vol->get_instance_transformation().get_matrix(true).inverse();
+#endif // ENABLE_WORLD_COORDINATE
+        Vec3d offset_tr = tr * offset;
         Transform3d volume_trmat = tr.translate(offset_tr);
         priv::start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
     }
@@ -531,7 +535,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Transform3d volume_trmat =
             gl_volume->get_instance_transformation().get_matrix().inverse() *
             *m_temp_transformation;
-        gl_volume->set_volume_transformation(volume_trmat);
+        gl_volume->set_volume_transformation(Geometry::Transformation(volume_trmat));
         m_parent.toggle_model_objects_visibility(true);
         // Apply temporary position
         m_temp_transformation = {};
@@ -1277,7 +1281,7 @@ bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
         vol_rot * 
         Eigen::Translation<double, 3>(offset_inv);
     //Transform3d res = vol_tr * vol_rot;
-    vol->set_volume_transformation(res);
+    vol->set_volume_transformation(Geometry::Transformation(res));
     priv::get_model_volume(vol, sel.get_model()->objects)->set_transformation(res);
     return true;
 }
