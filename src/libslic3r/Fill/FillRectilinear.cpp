@@ -3051,12 +3051,12 @@ ThickPolylines FillBoundedRectilinear::fill_surface_arachne(const Surface *surfa
     // Create the infills for each of the regions.
     ThickPolylines thick_polylines_out;
     for (ExPolygon &ex_poly : expp)
-        _fill_surface_single(Surface(*surface, std::move(ex_poly)), params, thick_polylines_out);
+        fill_surface_single_arachne(Surface(*surface, std::move(ex_poly)), params, thick_polylines_out);
 
     return thick_polylines_out;
 }
 
-void FillBoundedRectilinear::_fill_surface_single(const Surface &surface, const FillParams &params, ThickPolylines &thick_polylines_out)
+void FillBoundedRectilinear::fill_surface_single_arachne(const Surface &surface, const FillParams &params, ThickPolylines &thick_polylines_out)
 {
     assert(params.use_arachne);
     assert(this->print_config != nullptr && this->print_object_config != nullptr && this->print_region_config != nullptr);

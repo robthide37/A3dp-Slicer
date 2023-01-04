@@ -2188,11 +2188,9 @@ static void merge_influence_areas(
     // 1st merge iteration, merge one with each other.
     tbb::parallel_for(tbb::blocked_range<size_t>(0, num_buckets_initial),
         [&](const tbb::blocked_range<size_t> &range) {
-        for (size_t idx = range.begin(); idx < range.end(); ++ idx) {
-            const size_t bucket_pair_idx = idx * 2;
+        for (size_t idx = range.begin(); idx < range.end(); ++ idx)
             // Merge bucket_count adjacent to each other, merging uneven bucket numbers into even buckets
             buckets[idx].second = merge_influence_areas_leaves(volumes, config, layer_idx, buckets[idx].first, buckets[idx].second);
-        }
     });
 
     // Further merge iterations, merging one AABB subtree with another one, hopefully minimizing intersections between the elements
@@ -3394,8 +3392,6 @@ static void draw_branches(
     SupportGeneratorLayersPtr       &intermediate_layers,
     SupportGeneratorLayerStorage    &layer_storage)
 {
-    static int irun = 0;
-
     const SlicingParameters& slicing_params = print_object.slicing_parameters();
 
     // All SupportElements are put into a layer independent storage to improve parallelization.
@@ -3420,8 +3416,12 @@ static void draw_branches(
                         // Only one link points to a node above from below.
                         assert(!(++it != map_downwards_old.end() && it->first == &elem));
                     }
-                    const SupportElement *pchild = child == -1 ? nullptr : &move_bounds[layer_idx - 1][child];
-                    assert(pchild ? pchild->state.result_on_layer_is_set() : elem.state.target_height > layer_idx);
+#ifndef NDEBUG
+                    {
+                        const SupportElement *pchild = child == -1 ? nullptr : &move_bounds[layer_idx - 1][child];
+                        assert(pchild ? pchild->state.result_on_layer_is_set() : elem.state.target_height > layer_idx);
+                    }
+#endif // NDEBUG
                 }
                 for (int32_t parent_idx : elem.parents) {
                     SupportElement &parent = (*layer_above)[parent_idx];
@@ -3581,19 +3581,22 @@ static void draw_branches(
                     partial_mesh.clear();
                     extrude_branch(path, config, slicing_params, move_bounds, partial_mesh);
 #if 0
-                    char fname[2048];
-                    sprintf(fname, "d:\\temp\\meshes\\tree-raw-%d.obj", ++ irun);
-                    its_write_obj(partial_mesh, fname);
-#if 0
-                    temp_mesh.clear();
-                    cut_mesh(partial_mesh, layer_z(slicing_params, path.back()->state.layer_idx) + EPSILON, nullptr, &temp_mesh, false);
-                    sprintf(fname, "d:\\temp\\meshes\\tree-trimmed1-%d.obj", irun);
-                    its_write_obj(temp_mesh, fname);
-                    partial_mesh.clear();
-                    cut_mesh(temp_mesh, layer_z(slicing_params, path.front()->state.layer_idx) - EPSILON, &partial_mesh, nullptr, false);
-                    sprintf(fname, "d:\\temp\\meshes\\tree-trimmed2-%d.obj", irun);
-#endif
-                    its_write_obj(partial_mesh, fname);
+                    {
+                        char fname[2048];
+                        static int irun = 0;
+                        sprintf(fname, "d:\\temp\\meshes\\tree-raw-%d.obj", ++ irun);
+                        its_write_obj(partial_mesh, fname);
+    #if 0
+                        temp_mesh.clear();
+                        cut_mesh(partial_mesh, layer_z(slicing_params, path.back()->state.layer_idx) + EPSILON, nullptr, &temp_mesh, false);
+                        sprintf(fname, "d:\\temp\\meshes\\tree-trimmed1-%d.obj", irun);
+                        its_write_obj(temp_mesh, fname);
+                        partial_mesh.clear();
+                        cut_mesh(temp_mesh, layer_z(slicing_params, path.front()->state.layer_idx) - EPSILON, &partial_mesh, nullptr, false);
+                        sprintf(fname, "d:\\temp\\meshes\\tree-trimmed2-%d.obj", irun);
+    #endif
+                        its_write_obj(partial_mesh, fname);
+                    }
 #endif
                     its_merge(cummulative_mesh, partial_mesh);
                 }

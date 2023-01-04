@@ -28,7 +28,7 @@ inline ZPath to_zpath(const Points &path, coord_t z)
 {
     ZPath out;
     if (! path.empty()) {
-        out.reserve(path.size() + Open ? 1 : 0);
+        out.reserve((path.size() + Open) ? 1 : 0);
         for (const Point &p : path)
             out.emplace_back(p.x(), p.y(), z);
         if (Open)
@@ -75,7 +75,7 @@ inline Points from_zpath(const ZPoints &path)
 {
     Points out;
     if (! path.empty()) {
-        out.reserve(path.size() + Open ? 1 : 0);
+        out.reserve((path.size() + Open) ? 1 : 0);
         for (const ZPoint &p : path)
             out.emplace_back(p.x(), p.y());
         if (Open)

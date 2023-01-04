@@ -119,7 +119,7 @@ public:
     ThickPolylines fill_surface_arachne(const Surface *surface, const FillParams &params) override;
 
 protected:
-    void _fill_surface_single(const Surface &surface, const FillParams &params, ThickPolylines &thick_polylines_out);
+    void fill_surface_single_arachne(const Surface &surface, const FillParams &params, ThickPolylines &thick_polylines_out);
 
     bool no_sort() const override { return true; }
 

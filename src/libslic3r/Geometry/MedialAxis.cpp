@@ -468,9 +468,6 @@ void MedialAxis::build(ThickPolylines* polylines)
     }
     */
     
-    //typedef const VD::vertex_type vert_t;
-    using edge_t = const VD::edge_type;
-    
     // collect valid edges (i.e. prune those not belonging to MAT)
     // note: this keeps twins, so it inserts twice the number of the valid edges
     m_edge_data.assign(m_vd.edges().size() / 2, EdgeData{});

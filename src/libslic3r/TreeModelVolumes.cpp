@@ -825,7 +825,7 @@ std::vector<std::pair<TreeModelVolumes::RadiusLayerPair, std::reference_wrapper<
     std::vector<std::pair<RadiusLayerPair, std::reference_wrapper<const Polygons>>> out;
     for (auto it = this->data.begin(); it != this->data.end(); ++ it)
         out.emplace_back(it->first, it->second);
-    std::sort(out.begin(), out.end(), [](auto &l, auto &r){ return l.first.second < r.first.second || (l.first.second == r.first.second) && l.first.first < r.first.first; });
+    std::sort(out.begin(), out.end(), [](auto &l, auto &r){ return l.first.second < r.first.second || (l.first.second == r.first.second && l.first.first < r.first.first); });
     return out;
 }
 
