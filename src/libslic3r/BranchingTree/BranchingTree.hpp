@@ -106,7 +106,7 @@ public:
     virtual bool add_mesh_bridge(const Node &from, const Node &to) = 0;
 
     virtual std::optional<Vec3f> suggest_avoidance(const Node &from,
-                                                   float max_bridge_len)
+                                                   float max_bridge_len) const
     {
         return {};
     }

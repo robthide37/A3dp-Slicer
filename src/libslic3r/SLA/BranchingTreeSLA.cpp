@@ -23,7 +23,8 @@ class BranchingTreeBuilder: public branchingtree::Builder {
     std::vector<branchingtree::Node> m_pillars; // to put an index over them
 
     // cache succesfull ground connections
-    std::map<int, GroundConnection> m_gnd_connections;
+    mutable std::map<int, GroundConnection> m_gnd_connections;
+    mutable execution::SpinningMutex<ExecutionTBB>  m_gnd_connections_mtx;
 
     // Scaling of the input value 'widening_factor:<0, 1>' to produce resonable
     // widening behaviour
@@ -144,7 +145,7 @@ public:
                          const branchingtree::Node &to) override;
 
     std::optional<Vec3f> suggest_avoidance(const branchingtree::Node &from,
-                                           float max_bridge_len) override;
+                                           float max_bridge_len) const override;
 
     void report_unroutable(const branchingtree::Node &j) override
     {
@@ -307,7 +308,7 @@ static std::optional<Vec3f> get_avoidance(const GroundConnection &conn,
 }
 
 std::optional<Vec3f> BranchingTreeBuilder::suggest_avoidance(
-    const branchingtree::Node &from, float max_bridge_len)
+    const branchingtree::Node &from, float max_bridge_len) const
 {
     std::optional<Vec3f> ret;
 
@@ -317,13 +318,23 @@ std::optional<Vec3f> BranchingTreeBuilder::suggest_avoidance(
     dst.weight += from.pos.z() - glvl;
     sla::Junction j{from.pos.cast<double>(), get_radius(from)};
 
-    auto found_it = m_gnd_connections.find(from.id);
+    auto found_it = m_gnd_connections.end();
+    {
+        std::lock_guard lk{m_gnd_connections_mtx};
+        found_it = m_gnd_connections.find(from.id);
+    }
+
     if (found_it != m_gnd_connections.end()) {
         ret = get_avoidance(found_it->second, max_bridge_len);
     } else {
         auto conn = deepsearch_ground_connection(
             beam_ex_policy , m_sm, j, get_radius(dst), sla::DOWN);
-        m_gnd_connections[from.id] = conn;
+
+        {
+            std::lock_guard lk{m_gnd_connections_mtx};
+            m_gnd_connections[from.id] = conn;
+        }
+
         ret = get_avoidance(conn, max_bridge_len);
     }
 
@@ -394,6 +405,15 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
                                     std::move(leafs), props};
 
     BranchingTreeBuilder vbuilder{builder, sm, nodes};
+
+    execution::for_each(ex_tbb,
+                        size_t(0),
+                        nodes.get_leafs().size(),
+                        [&nodes, &vbuilder](size_t leaf_idx) {
+                            vbuilder.suggest_avoidance(nodes.get_leafs()[leaf_idx],
+                                                       nodes.properties().max_branch_length());
+                        });
+
     branchingtree::build_tree(nodes, vbuilder);
 
     build_pillars(builder, vbuilder, sm);
