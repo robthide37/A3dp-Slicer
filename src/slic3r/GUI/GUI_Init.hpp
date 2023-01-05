@@ -30,6 +30,9 @@ struct GUI_InitParams
     std::vector<std::string>    input_files;
 
 	bool	                    start_as_gcodeviewer;
+	bool						start_downloader;
+	bool					    delete_after_load;
+    std::string                 download_url;
 #if ENABLE_GL_CORE_PROFILE
 	std::pair<int, int>         opengl_version;
 #if ENABLE_OPENGL_DEBUG_OPTION

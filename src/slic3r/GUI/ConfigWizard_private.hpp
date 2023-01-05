@@ -392,8 +392,54 @@ struct PageUpdate: ConfigWizardPage
 {
     bool version_check;
     bool preset_update;
+    wxTextCtrl* path_text_ctrl;
 
     PageUpdate(ConfigWizard *parent);
+};
+
+namespace DownloaderUtils {
+    wxString get_downloads_path();
+
+class Worker : public wxBoxSizer
+{
+    wxWindow*   m_parent {nullptr};
+    wxTextCtrl* m_input_path {nullptr};
+    bool        downloader_checked {false};
+#ifdef __linux__
+    bool        perform_registration_linux { false };
+#endif // __linux__
+
+    bool perform_register();
+    void deregister();
+
+public:
+    Worker(wxWindow* parent);
+    ~Worker(){}
+
+    void allow(bool allow_)     { downloader_checked = allow_; }
+    bool is_checked() const     { return downloader_checked; }
+    wxString path_name() const  { return m_input_path ? m_input_path->GetValue() : wxString(); }
+
+    void set_path_name(wxString name);
+    void set_path_name(const std::string& name);
+
+    bool on_finish();
+
+#ifdef __linux__
+    bool get_perform_registration_linux() { return perform_registration_linux; }
+#endif // __linux__
+};
+
+}
+
+
+struct PageDownloader : ConfigWizardPage
+{
+    DownloaderUtils::Worker* downloader{ nullptr };
+
+    PageDownloader(ConfigWizard* parent);
+
+    bool on_finish_downloader() const ;
 };
 
 struct PageReloadFromDisk : ConfigWizardPage
@@ -583,7 +629,8 @@ struct ConfigWizard::priv
     PageMaterials    *page_filaments = nullptr;
     PageMaterials    *page_sla_materials = nullptr;
     PageCustom       *page_custom = nullptr;
-    PageUpdate       *page_update = nullptr;
+    PageUpdate* page_update = nullptr;
+    PageDownloader* page_downloader = nullptr;
     PageReloadFromDisk *page_reload_from_disk = nullptr;
 #ifdef _WIN32
     PageFilesAssociation* page_files_association = nullptr;
@@ -631,9 +678,9 @@ struct ConfigWizard::priv
     bool apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater, bool& apply_keeped_changes);
     // #ys_FIXME_alise
     void update_presets_in_config(const std::string& section, const std::string& alias_key, bool add);
-#ifdef __linux__
-    void perform_desktop_integration() const;
-#endif
+//#ifdef __linux__
+//    void perform_desktop_integration() const;
+//#endif
     bool check_fff_selected();        // Used to decide whether to display Filaments page
     bool check_sla_selected();        // Used to decide whether to display SLA Materials page
 
