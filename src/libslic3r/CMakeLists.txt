@@ -72,6 +72,8 @@ set(SLIC3R_SOURCES
     Fill/FillBase.hpp
     Fill/FillConcentric.cpp
     Fill/FillConcentric.hpp
+    Fill/FillEnsuring.cpp
+    Fill/FillEnsuring.hpp
     Fill/FillHoneycomb.cpp
     Fill/FillHoneycomb.hpp
     Fill/FillGyroid.cpp

@@ -15,6 +15,7 @@
 #include "FillRectilinear.hpp"
 #include "FillLightning.hpp"
 #include "FillConcentric.hpp"
+#include "FillEnsuring.hpp"
 
 namespace Slic3r {
 
@@ -301,10 +302,10 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		}
     }
 
-	// Detect narrow internal solid infill area and use ipBoundedRectilinear pattern instead.
+	// Detect narrow internal solid infill area and use ipEnsuring pattern instead.
 	{
 		std::vector<char> narrow_expolygons;
-		static constexpr const auto narrow_pattern = ipBoundedRectilinear;
+		static constexpr const auto narrow_pattern = ipEnsuring;
 		for (size_t surface_fill_id = 0, num_old_fills = surface_fills.size(); surface_fill_id < num_old_fills; ++ surface_fill_id)
 			if (SurfaceFill &fill = surface_fills[surface_fill_id]; fill.surface.surface_type == stInternalSolid) {
 				size_t num_expolygons = fill.expolygons.size();
@@ -494,8 +495,8 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         if (surface_fill.params.pattern == ipLightning)
             dynamic_cast<FillLightning::Filler*>(f.get())->generator = lightning_generator;
 
-        if (surface_fill.params.pattern == ipBoundedRectilinear) {
-            auto *fill_bounded_rectilinear = dynamic_cast<FillBoundedRectilinear *>(f.get());
+        if (surface_fill.params.pattern == ipEnsuring) {
+            auto *fill_bounded_rectilinear = dynamic_cast<FillEnsuring *>(f.get());
             assert(fill_bounded_rectilinear != nullptr);
             fill_bounded_rectilinear->print_region_config = &m_regions[surface_fill.region_id]->region().config();
         }
@@ -527,7 +528,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         params.anchor_length     = surface_fill.params.anchor_length;
         params.anchor_length_max = surface_fill.params.anchor_length_max;
         params.resolution        = resolution;
-        params.use_arachne       = (perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) || surface_fill.params.pattern == ipBoundedRectilinear;
+        params.use_arachne       = (perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) || surface_fill.params.pattern == ipEnsuring;
         params.layer_height      = layerm.layer()->height;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
