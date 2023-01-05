@@ -3047,7 +3047,7 @@ Polylines FillSupportBase::fill_surface(const Surface *surface, const FillParams
 ThickPolylines FillBoundedRectilinear::fill_surface_arachne(const Surface *surface, const FillParams &params)
 {
     // Perform offset.
-    Slic3r::ExPolygons expp = offset_ex(surface->expolygon, float(scale_(this->overlap - 0.5 * this->spacing)));
+    Slic3r::ExPolygons expp = this->overlap != 0. ? offset_ex(surface->expolygon, scaled<float>(this->overlap)) : ExPolygons{surface->expolygon};
     // Create the infills for each of the regions.
     ThickPolylines thick_polylines_out;
     for (ExPolygon &ex_poly : expp)
@@ -3062,7 +3062,7 @@ void FillBoundedRectilinear::fill_surface_single_arachne(const Surface &surface,
     assert(this->print_config != nullptr && this->print_object_config != nullptr && this->print_region_config != nullptr);
 
     coord_t                scaled_spacing = scaled<coord_t>(this->spacing);
-    Polygons               polygons       = offset(surface.expolygon, float(scaled_spacing) / 2.f);
+    Polygons               polygons       = to_polygons(surface.expolygon);
     Arachne::WallToolPaths wall_tool_paths(polygons, scaled_spacing, scaled_spacing, 1, 0, params.layer_height, *this->print_object_config, *this->print_config);
     if (std::vector<Arachne::VariableWidthLines> loop = wall_tool_paths.getToolPaths(); !loop.empty()) {
         assert(loop.size() == 1);
