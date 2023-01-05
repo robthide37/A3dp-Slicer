@@ -931,9 +931,6 @@ void ObjectManipulation::update_reset_buttons_visibility()
 
         if (selection.is_single_full_instance()) {
 #if ENABLE_WORLD_COORDINATE
-            const Geometry::Transformation& trafo = volume->get_instance_transformation();
-            rotation = trafo.get_rotation_matrix();
-            scale = trafo.get_scaling_factor_matrix();
             const Selection::IndicesList& idxs = selection.get_volume_idxs();
             for (unsigned int id : idxs) {
                 const Geometry::Transformation world_trafo(selection.get_volume(id)->world_matrix());

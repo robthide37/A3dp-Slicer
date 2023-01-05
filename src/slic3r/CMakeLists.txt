@@ -232,6 +232,12 @@ set(SLIC3R_GUI_SOURCES
     GUI/DesktopIntegrationDialog.hpp
     GUI/HintNotification.cpp
     GUI/HintNotification.hpp
+    GUI/FileArchiveDialog.cpp
+    GUI/FileArchiveDialog.hpp
+    GUI/Downloader.cpp
+    GUI/Downloader.hpp
+    GUI/DownloaderFileGet.cpp
+    GUI/DownloaderFileGet.hpp
     Utils/AppUpdater.cpp
     Utils/AppUpdater.hpp
     Utils/Http.cpp

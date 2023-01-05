@@ -2666,6 +2666,94 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field, GL
     glsafe(::glDisable(GL_BLEND));
 }
 
+#if ENABLE_WORLD_COORDINATE_DEBUG
+void Selection::render_debug_window() const
+{
+  if (m_list.empty())
+    return;
+
+  if (get_first_volume()->is_wipe_tower)
+    return;
+
+  ImGuiWrapper& imgui = *wxGetApp().imgui();
+  imgui.begin(std::string("Selection matrices"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+
+  auto volume_name = [this](size_t id) {
+    const GLVolume& v = *(*m_volumes)[id];
+    return m_model->objects[v.object_idx()]->volumes[v.volume_idx()]->name;
+  };
+
+  static size_t current_cmb_idx = 0;
+  static size_t current_vol_idx = *m_list.begin();
+
+  if (m_list.find(current_vol_idx) == m_list.end())
+    current_vol_idx = *m_list.begin();
+
+  if (ImGui::BeginCombo("Volumes", volume_name(current_vol_idx).c_str())) {
+    size_t count = 0;
+    for (unsigned int id : m_list) {
+      const GLVolume& v = *(*m_volumes)[id];
+      const bool is_selected = (current_cmb_idx == count);
+      if (ImGui::Selectable(volume_name(id).c_str(), is_selected)) {
+        current_cmb_idx = count;
+        current_vol_idx = id;
+      }
+      if (is_selected)
+        ImGui::SetItemDefaultFocus();
+      ++count;
+    }
+    ImGui::EndCombo();
+  }
+
+  static int current_method_idx = 0;
+  ImGui::Combo("Decomposition method", &current_method_idx, "computeRotationScaling\0computeScalingRotation\0");
+
+  const GLVolume& v = *get_volume(current_vol_idx);
+
+  auto add_matrix = [&imgui](const std::string& name, const Transform3d& m, unsigned int size) {
+    ImGui::BeginGroup();
+    imgui.text(name);
+    if (ImGui::BeginTable(name.c_str(), size, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInner)) {
+      for (unsigned int r = 0; r < size; ++r) {
+        ImGui::TableNextRow();
+        for (unsigned int c = 0; c < size; ++c) {
+          ImGui::TableSetColumnIndex(c);
+          imgui.text(std::to_string(m(r, c)));
+        }
+      }
+      ImGui::EndTable();
+    }
+    ImGui::EndGroup();
+  };
+
+  auto add_matrices_set = [add_matrix](const std::string& name, const Transform3d& m, size_t method) {
+    static unsigned int counter = 0;
+    ++counter;
+    if (ImGui::CollapsingHeader(name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+      add_matrix("Full", m, 4);
+
+      Matrix3d rotation;
+      Matrix3d scale;
+      if (method == 0)
+        m.computeRotationScaling(&rotation, &scale);
+      else
+        m.computeScalingRotation(&scale, &rotation);
+
+      ImGui::SameLine();
+      add_matrix("Rotation component", Transform3d(rotation), 3);
+      ImGui::SameLine();
+      add_matrix("Scale component", Transform3d(scale), 3);
+    }
+  };
+
+  add_matrices_set("World", v.world_matrix(), current_method_idx);
+  add_matrices_set("Instance", v.get_instance_transformation().get_matrix(), current_method_idx);
+  add_matrices_set("Volume", v.get_volume_transformation().get_matrix(), current_method_idx);
+
+  imgui.end();
+}
+#endif // ENABLE_WORLD_COORDINATE_DEBUG
+
 #ifndef NDEBUG
 static bool is_rotation_xy_synchronized(const Vec3d &rot_xyz_from, const Vec3d &rot_xyz_to)
 {
