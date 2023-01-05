@@ -27,6 +27,7 @@
 #include <wx/numdlg.h>
 #include <wx/debug.h>
 #include <wx/busyinfo.h>
+#include <wx/stdpaths.h>
 #ifdef _WIN32
 #include <wx/richtooltip.h>
 #include <wx/custombgwin.h>
@@ -50,6 +51,7 @@
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/miniz_extension.hpp"
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
@@ -98,6 +100,7 @@
 #include "ProjectDirtyStateManager.hpp"
 #include "Gizmos/GLGizmoSimplify.hpp" // create suggestion notification
 #include "Gizmos/GLGizmoCut.hpp"
+#include "FileArchiveDialog.hpp"
 
 #ifdef __APPLE__
 #include "Gizmos/GLGizmosManager.hpp"
@@ -2231,6 +2234,16 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         wxGetApp().mainframe->Raise();
         this->q->load_files(input_files);
     });
+  
+    this->q->Bind(EVT_START_DOWNLOAD_OTHER_INSTANCE, [this](StartDownloadOtherInstanceEvent& evt) {
+        BOOST_LOG_TRIVIAL(trace) << "Received url from other instance event.";
+        wxGetApp().mainframe->Raise();
+        for (size_t i = 0; i < evt.data.size(); ++i) {
+            wxGetApp().start_download(evt.data[i]);
+        }
+       
+    });
+
     this->q->Bind(EVT_INSTANCE_GO_TO_FRONT, [this](InstanceGoToFrontEvent &) {
         bring_instance_forward();
     });
@@ -2446,6 +2459,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     int answer_convert_from_meters          = wxOK_DEFAULT;
     int answer_convert_from_imperial_units  = wxOK_DEFAULT;
 
+    bool in_temp = false; 
+    const fs::path temp_path = wxStandardPaths::Get().GetTempDir().utf8_str().data();
+
     size_t input_files_size = input_files.size();
     for (size_t i = 0; i < input_files_size; ++i) {
 #ifdef _WIN32
@@ -2456,6 +2472,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         // Don't make a copy on Posix. Slash is a path separator, back slashes are not accepted as a substitute.
         const auto &path = input_files[i];
 #endif // _WIN32
+        in_temp = (path.parent_path() == temp_path);
         const auto filename = path.filename();
         if (progress_dlg) {
             progress_dlg->Update(static_cast<int>(100.0f * static_cast<float>(i) / static_cast<float>(input_files.size())), _L("Loading file") + ": " + from_path(filename));
@@ -2536,7 +2553,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         q->update_filament_colors_in_full_config();
                         is_project_file = true;
                     }
-                    wxGetApp().app_config->update_config_dir(path.parent_path().string());
+                    if (!in_temp)
+                        wxGetApp().app_config->update_config_dir(path.parent_path().string());
                 }
             }
             else {
@@ -2695,10 +2713,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         obj_idxs.insert(obj_idxs.end(), loaded_idxs.begin(), loaded_idxs.end());
     }
 
-    if (load_model) {
+    if (load_model && !in_temp) {
         wxGetApp().app_config->update_skein_dir(input_files[input_files.size() - 1].parent_path().make_preferred().string());
         // XXX: Plater.pm had @loaded_files, but didn't seem to fill them with the filenames...
-//        statusbar()->set_status_text(_L("Loaded"));
+        // statusbar()->set_status_text(_L("Loaded"));
     }
 
     // automatic selection of added objects
@@ -2909,9 +2927,10 @@ wxString Plater::priv::get_export_file(GUI::FileType file_type)
     }
 
     std::string out_dir = (boost::filesystem::path(output_file).parent_path()).string();
-
+    std::string temp_dir = wxStandardPaths::Get().GetTempDir().utf8_str().data();
+    
     wxFileDialog dlg(q, dlg_title,
-        is_shapes_dir(out_dir) ? from_u8(wxGetApp().app_config->get_last_dir()) : from_path(output_file.parent_path()), from_path(output_file.filename()),
+        out_dir == temp_dir ? from_u8(wxGetApp().app_config->get("last_output_path"))  : (is_shapes_dir(out_dir) ? from_u8(wxGetApp().app_config->get_last_dir()) : from_path(output_file.parent_path())), from_path(output_file.filename()),
         wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
 
     if (dlg.ShowModal() != wxID_OK)
@@ -4626,7 +4645,10 @@ void Plater::priv::set_project_filename(const wxString& filename)
     m_project_filename = from_path(full_path);
     wxGetApp().mainframe->update_title();
 
-    if (!filename.empty())
+    const fs::path temp_path = wxStandardPaths::Get().GetTempDir().utf8_str().data();
+    bool in_temp = (temp_path == full_path.parent_path().make_preferred());
+
+    if (!filename.empty() && !in_temp)
         wxGetApp().mainframe->add_to_recent_projects(filename);
 }
 
@@ -5359,6 +5381,11 @@ Print&          Plater::fff_print()         { return p->fff_print; }
 const SLAPrint& Plater::sla_print() const   { return p->sla_print; }
 SLAPrint&       Plater::sla_print()         { return p->sla_print; }
 
+bool Plater::is_project_temp() const
+{
+    return false;
+}
+
 void Plater::new_project()
 {
     if (int saved_project = p->save_project_if_dirty(_L("Creating a new project while the current project is modified.")); saved_project == wxID_CANCEL)
@@ -5563,18 +5590,418 @@ std::vector<size_t> Plater::load_files(const std::vector<std::string>& input_fil
     return p->load_files(paths, load_model, load_config, imperial_units);
 }
 
-enum class LoadType : unsigned char
+
+class LoadProjectsDialog : public DPIDialog
 {
-    Unknown,
-    OpenProject,
-    LoadGeometry,
-    LoadConfig
+    int m_action{ 0 };
+    bool m_all { false };
+    wxComboBox* m_combo_project { nullptr };
+    wxComboBox* m_combo_config { nullptr };
+public:
+    enum class LoadProjectOption : unsigned char
+    {
+        Unknown,
+        AllGeometry,
+        AllNewWindow,
+        OneProject,
+        OneConfig
+    };
+
+    LoadProjectsDialog(const std::vector<fs::path>& paths);
+
+    int get_action() const { return m_action + 1; }
+    bool get_all() const { return m_all; }
+    int get_selected() const 
+    { 
+        if (m_combo_project && m_combo_project->IsEnabled()) 
+            return m_combo_project->GetSelection(); 
+        else if (m_combo_config && m_combo_config->IsEnabled()) 
+            return m_combo_config->GetSelection(); 
+        else 
+            return -1;
+    }
+protected:
+    void on_dpi_changed(const wxRect& suggested_rect) override;
 };
+
+LoadProjectsDialog::LoadProjectsDialog(const std::vector<fs::path>& paths)
+    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY,
+        from_u8((boost::format(_utf8(L("%s - Multiple projects file"))) % SLIC3R_APP_NAME).str()), wxDefaultPosition,
+        wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+{
+    SetFont(wxGetApp().normal_font());
+
+    wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
+    bool contains_projects = !paths.empty();
+    bool instances_allowed = wxGetApp().app_config->get("single_instance") != "1";
+    if (contains_projects)
+        main_sizer->Add(new wxStaticText(this, wxID_ANY,
+            get_wraped_wxString(_L("There are several files being loaded, including Project files.") + "\n" + _L("Select an action to apply to all files."))), 0, wxEXPAND | wxALL, 10);
+    else 
+        main_sizer->Add(new wxStaticText(this, wxID_ANY,
+            get_wraped_wxString(_L("There are several files being loaded.") + "\n" + _L("Select an action to apply to all files."))), 0, wxEXPAND | wxALL, 10);
+
+    wxStaticBox* action_stb = new wxStaticBox(this, wxID_ANY, _L("Action"));
+    if (!wxOSX) action_stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
+    action_stb->SetFont(wxGetApp().normal_font());
+    
+    if (contains_projects) {
+        wxArrayString filenames;
+        for (const fs::path& path : paths) {
+            filenames.push_back(from_u8(path.filename().string()));
+        }
+        m_combo_project = new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, filenames, wxCB_READONLY);
+        m_combo_project->SetValue(filenames.front());
+        m_combo_project->Enable(false);
+       
+        m_combo_config = new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, filenames, wxCB_READONLY);
+        m_combo_config->SetValue(filenames.front());
+        m_combo_config->Enable(false);
+    }
+    wxStaticBoxSizer* stb_sizer = new wxStaticBoxSizer(action_stb, wxVERTICAL);
+    int id = 0;
+  
+    // all geometry
+    wxRadioButton* btn = new wxRadioButton(this, wxID_ANY, _L("Import geometry"), wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
+    btn->SetValue(id == m_action);
+    btn->Bind(wxEVT_RADIOBUTTON, [this, id, contains_projects](wxCommandEvent&) {
+        m_action = id;
+        if (contains_projects) {
+            m_combo_project->Enable(false);
+            m_combo_config->Enable(false);
+        }
+        });
+    stb_sizer->Add(btn, 0, wxEXPAND | wxTOP, 5);
+    id++;
+    // all new window
+    if (instances_allowed) {
+        btn = new wxRadioButton(this, wxID_ANY, _L("Start new PrusaSlicer instance"), wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
+        btn->SetValue(id == m_action);
+        btn->Bind(wxEVT_RADIOBUTTON, [this, id, contains_projects](wxCommandEvent&) {
+            m_action = id;
+            if (contains_projects) {
+                m_combo_project->Enable(false);
+                m_combo_config->Enable(false);
+            }
+            });
+        stb_sizer->Add(btn, 0, wxEXPAND | wxTOP, 5);
+    }
+    id++; // IMPORTANT TO ALWAYS UP THE ID EVEN IF OPTION IS NOT ADDED!
+    if (contains_projects) {
+        // one project
+        btn = new wxRadioButton(this, wxID_ANY, _L("Select one to load as project"), wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
+        btn->SetValue(false);
+        btn->Bind(wxEVT_RADIOBUTTON, [this, id](wxCommandEvent&) {
+            m_action = id;
+            m_combo_project->Enable(true);
+            m_combo_config->Enable(false);
+        });
+        stb_sizer->Add(btn, 0, wxEXPAND | wxTOP, 5);
+        stb_sizer->Add(m_combo_project, 0, wxEXPAND | wxTOP, 5);
+        // one config
+        id++;
+        btn = new wxRadioButton(this, wxID_ANY, _L("Select one to load config only"), wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
+        btn->SetValue(id == m_action);
+        btn->Bind(wxEVT_RADIOBUTTON, [this, id, instances_allowed](wxCommandEvent&) {
+            m_action = id;
+            if (instances_allowed)
+                m_combo_project->Enable(false);
+            m_combo_config->Enable(true);
+            });
+        stb_sizer->Add(btn, 0, wxEXPAND | wxTOP, 5);
+        stb_sizer->Add(m_combo_config, 0, wxEXPAND | wxTOP, 5);
+    }
+
+
+    main_sizer->Add(stb_sizer, 1, wxEXPAND | wxRIGHT | wxLEFT, 10);
+    wxBoxSizer* bottom_sizer = new wxBoxSizer(wxHORIZONTAL);
+    bottom_sizer->Add(CreateStdDialogButtonSizer(wxOK | wxCANCEL), 0, wxEXPAND | wxLEFT, 5);
+    main_sizer->Add(bottom_sizer, 0, wxEXPAND | wxALL, 10);
+    SetSizer(main_sizer);
+    main_sizer->SetSizeHints(this);
+
+    // Update DarkUi just for buttons
+    wxGetApp().UpdateDlgDarkUI(this, true);
+}
+
+void LoadProjectsDialog::on_dpi_changed(const wxRect& suggested_rect)
+{
+    const int em = em_unit();
+    SetMinSize(wxSize(65 * em, 30 * em));
+    Fit();
+    Refresh();
+}
+
+
+
+
+bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
+{
+    //std::vector<fs::path> unzipped_paths;
+    std::vector<fs::path> non_project_paths;
+    std::vector<fs::path> project_paths;
+    try
+    {
+        mz_zip_archive archive;
+        mz_zip_zero_struct(&archive);
+
+        if (!open_zip_reader(&archive, archive_path.string())) {
+            std::string err_msg = GUI::format(_utf8("Loading of a zip archive on path %1% has failed."), archive_path.string());
+            throw Slic3r::FileIOError(err_msg);
+        }
+
+        mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
+
+        mz_zip_archive_file_stat stat;
+
+        std::vector<fs::path> selected_paths;
+
+        FileArchiveDialog dlg(static_cast<wxWindow*>(wxGetApp().mainframe), &archive, selected_paths);
+        if (dlg.ShowModal() == wxID_OK)
+        {
+            std::string archive_path_string = archive_path.string();
+            archive_path_string = archive_path_string.substr(0, archive_path_string.size() - 4);
+
+            fs::path archive_dir(wxStandardPaths::Get().GetTempDir().utf8_str().data());
+
+            for (mz_uint i = 0; i < num_entries; ++i) {
+                if (mz_zip_reader_file_stat(&archive, i, &stat)) {
+                    wxString wname = boost::nowide::widen(stat.m_filename);
+                    std::string name = GUI::format(wname);
+                    fs::path archive_path(name);
+
+                    std::string extra(1024, 0);
+                    size_t extra_size = mz_zip_reader_get_filename_from_extra(&archive, i, extra.data(), extra.size());
+                    if (extra_size > 0) {
+                        archive_path = fs::path(extra.substr(0, extra_size));
+                        name = archive_path.string();
+                    }
+
+                    if (archive_path.empty())
+                        continue;
+                    for (const auto& path : selected_paths) {
+                        if (path == archive_path) {
+                            try
+                            {
+                                std::replace(name.begin(), name.end(), '\\', '/');
+                                // rename if file exists
+                                std::string filename = path.filename().string();
+                                std::string extension = boost::filesystem::extension(path);
+                                std::string just_filename = filename.substr(0, filename.size() - extension.size());
+                                std::string final_filename = just_filename;
+
+                                size_t version = 0;
+                                while (fs::exists(archive_dir / (final_filename + extension)))
+                                {
+                                    ++version;
+                                    final_filename = just_filename + "(" + std::to_string(version) + ")";
+                                }
+                                filename = final_filename + extension;
+                                fs::path final_path = archive_dir / filename;
+
+                                std::string buffer((size_t)stat.m_uncomp_size, 0);
+                                mz_bool res = mz_zip_reader_extract_file_to_mem(&archive, stat.m_filename, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
+                                if (res == 0) {
+                                    wxString error_log = GUI::format_wxstr(_L("Failed to unzip file to %1%: %2% "), final_path.string(), mz_zip_get_error_string(mz_zip_get_last_error(&archive)));
+                                    BOOST_LOG_TRIVIAL(error) << error_log;
+                                    show_error(nullptr, error_log);
+                                    continue;
+                                }
+                                fs::fstream file(final_path, std::ios::out | std::ios::binary | std::ios::trunc);
+                                file.write(buffer.c_str(), buffer.size());
+                                file.close();
+                                if (!fs::exists(final_path)) {
+                                    wxString error_log = GUI::format_wxstr(_L("Failed to find unzipped file at %1%. Unzipping of file has failed."), final_path.string());
+                                    BOOST_LOG_TRIVIAL(error) << error_log;
+                                    show_error(nullptr, error_log);
+                                    continue;
+                                }
+                                BOOST_LOG_TRIVIAL(info) << "Unzipped " << final_path;
+
+                                if (!boost::algorithm::iends_with(filename, ".3mf") && !boost::algorithm::iends_with(filename, ".amf")) {
+                                    non_project_paths.emplace_back(final_path);
+                                    continue;
+                                }
+                                // if 3mf - read archive headers to find project file
+                                if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(final_path.string())) ||
+                                    (boost::algorithm::iends_with(filename, ".amf") && !boost::algorithm::iends_with(filename, ".zip.amf"))) {
+                                    non_project_paths.emplace_back(final_path);
+                                    continue;
+                                }
+
+                                project_paths.emplace_back(final_path);
+                            }
+                            catch (const std::exception& e)
+                            {
+                                // ensure the zip archive is closed and rethrow the exception
+                                close_zip_reader(&archive);
+                                throw Slic3r::FileIOError(e.what());
+                            }
+                        }
+                    }
+                }
+            }
+            close_zip_reader(&archive);
+            if (non_project_paths.size() + project_paths.size() != selected_paths.size())
+                BOOST_LOG_TRIVIAL(error) << "Decompresing of archive did not retrieve all files. Expected files: " 
+                                         << selected_paths.size() 
+                                         << " Decopressed files: " 
+                                         << non_project_paths.size() + project_paths.size();
+        } else {
+            close_zip_reader(&archive);
+            return false;
+        }
+        
+    }
+    catch (const Slic3r::FileIOError& e) {
+        // zip reader should be already closed or not even opened
+        GUI::show_error(this, e.what());
+        return false;
+    }
+    // none selected
+    if (project_paths.empty() && non_project_paths.empty())
+    {
+        return false;
+    }
+#if 0
+    // 1 project, 0 models - behave like drag n drop
+    if (project_paths.size() == 1 && non_project_paths.empty())
+    {
+        wxArrayString aux;
+        aux.Add(from_u8(project_paths.front().string()));
+        load_files(aux);
+        //load_files(project_paths, true, true);
+        boost::system::error_code ec;
+        fs::remove(project_paths.front(), ec);
+        if (ec)
+            BOOST_LOG_TRIVIAL(error) << ec.message();
+        return true;
+    }
+    // 1 model (or more and other instances are not allowed), 0 projects - open geometry
+    if (project_paths.empty() && (non_project_paths.size() == 1 || wxGetApp().app_config->get("single_instance") == "1"))
+    {
+        load_files(non_project_paths, true, false);
+        boost::system::error_code ec;
+        fs::remove(non_project_paths.front(), ec);
+        if (ec)
+            BOOST_LOG_TRIVIAL(error) << ec.message();
+        return true;
+    }
+
+    bool delete_after = true;
+
+    LoadProjectsDialog dlg(project_paths);
+    if (dlg.ShowModal() == wxID_OK) {
+        LoadProjectsDialog::LoadProjectOption option = static_cast<LoadProjectsDialog::LoadProjectOption>(dlg.get_action());
+        switch (option)
+        {
+        case LoadProjectsDialog::LoadProjectOption::AllGeometry: {
+            load_files(project_paths, true, false);
+            load_files(non_project_paths, true, false);
+            break;
+        }
+        case LoadProjectsDialog::LoadProjectOption::AllNewWindow: {
+            delete_after = false;
+            for (const fs::path& path : project_paths) {
+                wxString f = from_path(path);
+                start_new_slicer(&f, false);
+            }
+            for (const fs::path& path : non_project_paths) {
+                wxString f = from_path(path);
+                start_new_slicer(&f, false);
+            }
+            break;
+        }
+        case LoadProjectsDialog::LoadProjectOption::OneProject: {
+            int pos = dlg.get_selected();
+            assert(pos >= 0 && pos < project_paths.size());
+            if (wxGetApp().can_load_project())
+                load_project(from_path(project_paths[pos]));
+            project_paths.erase(project_paths.begin() + pos);
+            load_files(project_paths, true, false);
+            load_files(non_project_paths, true, false);
+            break;
+        }
+        case LoadProjectsDialog::LoadProjectOption::OneConfig: {
+            int pos = dlg.get_selected();
+            assert(pos >= 0 && pos < project_paths.size());
+            std::vector<fs::path> aux;
+            aux.push_back(project_paths[pos]);
+            load_files(aux, false, true);
+            project_paths.erase(project_paths.begin() + pos);
+            load_files(project_paths, true, false);
+            load_files(non_project_paths, true, false);
+            break;
+        }
+        case LoadProjectsDialog::LoadProjectOption::Unknown:
+        default:
+            assert(false);
+            break;
+        }
+    }
+
+    if (!delete_after)
+        return true;
+#else 
+    // 1 project file and some models - behave like drag n drop of 3mf and then load models
+    if (project_paths.size() == 1)
+    {
+        wxArrayString aux;
+        aux.Add(from_u8(project_paths.front().string()));
+        bool loaded3mf = load_files(aux, true);
+        load_files(non_project_paths, true, false);
+        boost::system::error_code ec;
+        if (loaded3mf) {
+            fs::remove(project_paths.front(), ec);
+            if (ec)
+                BOOST_LOG_TRIVIAL(error) << ec.message();
+        }
+        for (const fs::path& path : non_project_paths) {
+            // Delete file from temp file (path variable), it will stay only in app memory.
+            boost::system::error_code ec;
+            fs::remove(path, ec);
+            if (ec)
+                BOOST_LOG_TRIVIAL(error) << ec.message();
+        }
+        return true;
+    }
+
+    // load all projects and all models as geometry
+    load_files(project_paths, true, false);
+    load_files(non_project_paths, true, false);
+#endif // 0
+   
+
+    for (const fs::path& path : project_paths) {
+        // Delete file from temp file (path variable), it will stay only in app memory.
+        boost::system::error_code ec;
+        fs::remove(path, ec);
+        if (ec)
+            BOOST_LOG_TRIVIAL(error) << ec.message();
+    }
+    for (const fs::path& path : non_project_paths) {
+        // Delete file from temp file (path variable), it will stay only in app memory.
+        boost::system::error_code ec;
+        fs::remove(path, ec);
+        if (ec)
+            BOOST_LOG_TRIVIAL(error) << ec.message();
+    }
+
+    return true;
+}
 
 class ProjectDropDialog : public DPIDialog
 {
     int m_action { 0 };
 public:
+    enum class LoadType : unsigned char
+    {
+        Unknown,
+        OpenProject,
+        LoadGeometry,
+        LoadConfig,
+        OpenWindow
+    };
     ProjectDropDialog(const std::string& filename);
 
     int get_action() const { return m_action + 1; }
@@ -5590,17 +6017,21 @@ ProjectDropDialog::ProjectDropDialog(const std::string& filename)
 {
     SetFont(wxGetApp().normal_font());
 
+    bool single_instance_only = wxGetApp().app_config->get("single_instance") == "1";
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
-
-    const wxString choices[] = { _L("Open as project"),
-                                 _L("Import geometry only"),
-                                 _L("Import config only") };
+    wxArrayString choices;
+    choices.reserve(4);
+    choices.Add(_L("Open as project"));
+    choices.Add(_L("Import geometry only"));
+    choices.Add(_L("Import config only"));
+    if (!single_instance_only)
+        choices.Add(_L("Start new PrusaSlicer instance"));
 
     main_sizer->Add(new wxStaticText(this, wxID_ANY,
         get_wraped_wxString(_L("Select an action to apply to the file") + ": " + from_u8(filename))), 0, wxEXPAND | wxALL, 10);
 
     m_action = std::clamp(std::stoi(wxGetApp().app_config->get("drop_project_action")),
-        static_cast<int>(LoadType::OpenProject), static_cast<int>(LoadType::LoadConfig)) - 1;
+        static_cast<int>(LoadType::OpenProject), single_instance_only? static_cast<int>(LoadType::LoadConfig) : static_cast<int>(LoadType::OpenWindow)) - 1;
 
     wxStaticBox* action_stb = new wxStaticBox(this, wxID_ANY, _L("Action"));
     if (!wxOSX) action_stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -5642,9 +6073,9 @@ void ProjectDropDialog::on_dpi_changed(const wxRect& suggested_rect)
     Refresh();
 }
 
-bool Plater::load_files(const wxArrayString& filenames)
+bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*=false*/)
 {
-    const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa|step|stp)", std::regex::icase);
+    const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa|step|stp|zip)", std::regex::icase);
     const std::regex pattern_gcode_drop(".*[.](gcode|g)", std::regex::icase);
 
     std::vector<fs::path> paths;
@@ -5688,53 +6119,61 @@ bool Plater::load_files(const wxArrayString& filenames)
     for (std::vector<fs::path>::const_reverse_iterator it = paths.rbegin(); it != paths.rend(); ++it) {
         std::string filename = (*it).filename().string();
         if (boost::algorithm::iends_with(filename, ".3mf") || boost::algorithm::iends_with(filename, ".amf")) {
-            LoadType load_type = LoadType::Unknown;
+            ProjectDropDialog::LoadType load_type = ProjectDropDialog::LoadType::Unknown;
             if (!model().objects.empty()) {
                 if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(it->string())) ||
                     (boost::algorithm::iends_with(filename, ".amf") && !boost::algorithm::iends_with(filename, ".zip.amf")))
-                    load_type = LoadType::LoadGeometry;
+                    load_type = ProjectDropDialog::LoadType::LoadGeometry;
                 else {
                     if (wxGetApp().app_config->get("show_drop_project_dialog") == "1") {
                         ProjectDropDialog dlg(filename);
                         if (dlg.ShowModal() == wxID_OK) {
                             int choice = dlg.get_action();
-                            load_type = static_cast<LoadType>(choice);
+                            load_type = static_cast<ProjectDropDialog::LoadType>(choice);
                             wxGetApp().app_config->set("drop_project_action", std::to_string(choice));
                         }
                     }
                     else
-                        load_type = static_cast<LoadType>(std::clamp(std::stoi(wxGetApp().app_config->get("drop_project_action")),
-                            static_cast<int>(LoadType::OpenProject), static_cast<int>(LoadType::LoadConfig)));
+                        load_type = static_cast<ProjectDropDialog::LoadType>(std::clamp(std::stoi(wxGetApp().app_config->get("drop_project_action")),
+                            static_cast<int>(ProjectDropDialog::LoadType::OpenProject), static_cast<int>(ProjectDropDialog::LoadType::LoadConfig)));
                 }
             }
             else
-                load_type = LoadType::OpenProject;
+                load_type = ProjectDropDialog::LoadType::OpenProject;
 
-            if (load_type == LoadType::Unknown)
+            if (load_type == ProjectDropDialog::LoadType::Unknown)
                 return false;
 
             switch (load_type) {
-            case LoadType::OpenProject: {
+            case ProjectDropDialog::LoadType::OpenProject: {
                 if (wxGetApp().can_load_project())
                     load_project(from_path(*it));
                 break;
             }
-            case LoadType::LoadGeometry: {
+            case ProjectDropDialog::LoadType::LoadGeometry: {
                 Plater::TakeSnapshot snapshot(this, _L("Import Object"));
                 load_files({ *it }, true, false);
                 break;
             }
-            case LoadType::LoadConfig: {
+            case ProjectDropDialog::LoadType::LoadConfig: {
                 load_files({ *it }, false, true);
                 break;
             }
-            case LoadType::Unknown : {
+            case ProjectDropDialog::LoadType::OpenWindow: {
+                wxString f = from_path(*it);
+                start_new_slicer(&f, false, delete_after_load);
+                return false; // did not load anything to this instance
+            }
+            case ProjectDropDialog::LoadType::Unknown : {
                 assert(false);
                 break;
             }
             }
 
             return true;
+        } else if (boost::algorithm::iends_with(filename, ".zip")) {
+            return preview_zip_archive(*it);
+            
         }
     }
 

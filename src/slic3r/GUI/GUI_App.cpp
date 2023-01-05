@@ -20,6 +20,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/convert.hpp>
+#include <boost/dll/runtime_symbol_info.hpp>
 
 #include <wx/stdpaths.h>
 #include <wx/imagpng.h>
@@ -77,6 +78,7 @@
 #include "PrintHostDialogs.hpp"
 #include "DesktopIntegrationDialog.hpp"
 #include "SendSystemInfoDialog.hpp"
+#include "Downloader.hpp"
 
 #include "BitmapCache.hpp"
 #include "Notebook.hpp"
@@ -749,7 +751,9 @@ void GUI_App::post_init()
         if (! this->init_params->input_files.empty())
             this->plater()->load_gcode(wxString::FromUTF8(this->init_params->input_files[0].c_str()));
     }
-    else {
+    else if (this->init_params->start_downloader) {
+        start_download(this->init_params->download_url);
+    } else {
         if (! this->init_params->preset_substitutions.empty())
             show_substitutions_info(this->init_params->preset_substitutions);
 
@@ -776,6 +780,15 @@ void GUI_App::post_init()
                     boost::algorithm::iends_with(filename, ".amf.xml") ||
                     boost::algorithm::iends_with(filename, ".3mf"))
                     this->plater()->set_project_filename(from_u8(filename));
+            }
+            if (this->init_params->delete_after_load) {
+                for (const std::string& p : this->init_params->input_files) {
+                    boost::system::error_code ec;
+                    boost::filesystem::remove(boost::filesystem::path(p), ec);
+                    if (ec) {
+                        BOOST_LOG_TRIVIAL(error) << ec.message();
+                    }
+                } 
             }
         }
         if (! this->init_params->extra_config.empty())
@@ -826,6 +839,7 @@ GUI_App::GUI_App(EAppMode mode)
     , m_imgui(new ImGuiWrapper())
 	, m_removable_drive_manager(std::make_unique<RemovableDriveManager>())
 	, m_other_instance_message_handler(std::make_unique<OtherInstanceMessageHandler>())
+    , m_downloader(std::make_unique<Downloader>())
 {
 	//app config initializes early becasuse it is used in instance checking in PrusaSlicer.cpp
 	this->init_app_config();
@@ -1258,7 +1272,8 @@ bool GUI_App::on_init_inner()
 
         Bind(EVT_SLIC3R_APP_OPEN_FAILED, [](const wxCommandEvent& evt) {
             show_error(nullptr, evt.GetString());
-        });
+        }); 
+
     }
     else {
 #ifdef __WXMSW__ 
@@ -2837,6 +2852,17 @@ void GUI_App::MacOpenFiles(const wxArrayString &fileNames)
             start_new_gcodeviewer(&filename);
     }
 }
+
+void GUI_App::MacOpenURL(const wxString& url)
+{
+    if (app_config && app_config->get("downloader_url_registered") != "1")
+    {
+        BOOST_LOG_TRIVIAL(error) << "Recieved command to open URL, but it is not allowed in app configuration. URL: " << url;
+        return;
+    }
+    start_download(boost::nowide::narrow(url));
+}
+
 #endif /* __APPLE */
 
 Sidebar& GUI_App::sidebar()
@@ -2884,7 +2910,7 @@ wxBookCtrlBase* GUI_App::tab_panel() const
     return mainframe->m_tabpanel;
 }
 
-NotificationManager * GUI_App::notification_manager()
+NotificationManager* GUI_App::notification_manager()
 {
     return plater_->get_notification_manager();
 }
@@ -2892,6 +2918,11 @@ NotificationManager * GUI_App::notification_manager()
 GalleryDialog* GUI_App::gallery_dialog()
 {
     return mainframe->gallery_dialog();
+}
+
+Downloader* GUI_App::downloader()
+{
+    return m_downloader.get();
 }
 
 // extruders count from selected printer preset
@@ -3330,6 +3361,24 @@ void GUI_App::app_version_check(bool from_user)
     }
     std::string version_check_url = app_config->version_check_url();
     m_app_updater->sync_version(version_check_url, from_user);
+}
+
+void GUI_App::start_download(std::string url)
+{
+    if (!plater_) {
+        BOOST_LOG_TRIVIAL(error) << "Could not start URL download: plater is nullptr.";
+        return; 
+    }
+    //lets always init so if the download dest folder was changed, new dest is used 
+        boost::filesystem::path dest_folder(app_config->get("url_downloader_dest"));
+        if (dest_folder.empty() || !boost::filesystem::is_directory(dest_folder)) {
+            std::string msg = _utf8("Could not start URL download. Destination folder is not set. Please choose destination folder in Configuration Wizard.");
+            BOOST_LOG_TRIVIAL(error) << msg;
+            show_error(nullptr, msg);
+            return;
+        } 
+    m_downloader->init(dest_folder);
+    m_downloader->start_download(url);
 }
 
 } // GUI

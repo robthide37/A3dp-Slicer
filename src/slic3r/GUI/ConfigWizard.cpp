@@ -11,6 +11,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/nowide/convert.hpp>
+#include <boost/dll/runtime_symbol_info.hpp>
 
 #include <wx/settings.h>
 #include <wx/stattext.h>
@@ -26,6 +27,12 @@
 #include <wx/filefn.h>
 #include <wx/wupdlock.h>
 #include <wx/debug.h>
+
+#ifdef WIN32
+#include <wx/msw/registry.h>
+#include <KnownFolders.h>
+#include <Shlobj_core.h>
+#endif // WIN32
 
 #ifdef _MSW_DARK_MODE
 #include <wx/msw/dark_mode.h>
@@ -48,6 +55,7 @@
 #include "format.hpp"
 #include "MsgDialog.hpp"
 #include "UnsavedChangesDialog.hpp"
+#include "slic3r/Utils/AppUpdater.hpp"
 
 #if defined(__linux__) && defined(__WXGTK3__)
 #define wxLinux_gtk3 true
@@ -1229,6 +1237,227 @@ PageUpdate::PageUpdate(ConfigWizard *parent)
     box_presets->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &event) { this->preset_update = event.IsChecked(); });
 }
 
+namespace DownloaderUtils
+{
+#ifdef _WIN32
+
+    wxString get_downloads_path()
+    {
+        wxString ret;
+        PWSTR path = NULL;
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Downloads, 0, NULL, &path);
+        if (SUCCEEDED(hr)) {
+            ret = wxString(path);
+        }
+        CoTaskMemFree(path);
+        return ret;
+    }
+
+#elif  __APPLE__
+    wxString get_downloads_path()
+    {
+        // call objective-c implementation
+        return wxString::FromUTF8(get_downloads_path_mac());
+    }
+#else
+    wxString get_downloads_path()
+    {
+        wxString command = "xdg-user-dir DOWNLOAD";
+        wxArrayString output;
+        GUI::desktop_execute_get_result(command, output);
+        if (output.GetCount() > 0) {
+            return output[0];
+        }
+        return wxString();
+    }
+
+#endif
+
+Worker::Worker(wxWindow* parent)
+: wxBoxSizer(wxHORIZONTAL)
+, m_parent(parent)
+{
+    m_input_path = new wxTextCtrl(m_parent, wxID_ANY);
+    set_path_name(get_app_config()->get("url_downloader_dest"));
+
+    auto* path_label = new wxStaticText(m_parent, wxID_ANY, _L("Download path") + ":");
+
+    this->Add(path_label, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
+    this->Add(m_input_path, 1, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
+
+    auto* button_path = new wxButton(m_parent, wxID_ANY, _L("Browse"));
+    this->Add(button_path, 0, wxEXPAND | wxTOP | wxLEFT, 5);
+    button_path->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
+        boost::filesystem::path chosen_dest(boost::nowide::narrow(m_input_path->GetValue()));
+
+        wxDirDialog dialog(m_parent, L("Choose folder:"), chosen_dest.string() );
+        if (dialog.ShowModal() == wxID_OK)
+            this->m_input_path->SetValue(dialog.GetPath());
+    });
+
+    for (wxSizerItem* item : this->GetChildren())
+        if (item->IsWindow()) {
+            wxWindow* win = item->GetWindow();
+            wxGetApp().UpdateDarkUI(win);
+        }
+}
+
+void Worker::set_path_name(wxString path)
+{
+    if (path.empty())
+        path = boost::nowide::widen(get_app_config()->get("url_downloader_dest"));
+
+    if (path.empty()) {
+        // What should be default path? Each system has Downloads folder, that could be good one.
+        // Other would be program location folder - not so good: access rights, apple bin is inside bundle...
+        // default_path = boost::dll::program_location().parent_path().string();
+        path = get_downloads_path();
+    }
+
+    m_input_path->SetValue(path);
+}
+
+void Worker::set_path_name(const std::string& name)
+{
+    if (!m_input_path)
+        return;
+
+    set_path_name(boost::nowide::widen(name));
+}
+
+} // DownLoader
+
+PageDownloader::PageDownloader(ConfigWizard* parent)
+    : ConfigWizardPage(parent, _L("Downloads from URL"), _L("Downloads"))
+{
+    const AppConfig* app_config = wxGetApp().app_config;
+    auto boldfont = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
+    boldfont.SetWeight(wxFONTWEIGHT_BOLD);
+
+    append_spacer(VERTICAL_SPACING);
+
+    auto* box_allow_downloads = new wxCheckBox(this, wxID_ANY, _L("Allow build-in downloader"));
+    // TODO: Do we want it like this? The downloader is allowed for very first time the wizard is run. 
+    bool box_allow_value = (app_config->has("downloader_url_registered") ? app_config->get("downloader_url_registered") == "1" : true);
+    box_allow_downloads->SetValue(box_allow_value);
+    append(box_allow_downloads);
+
+    append_text(wxString::Format(_L(
+        "If enabled, %s registers to start on custom URL on www.printables.com."
+        " You will be able to use button with %s logo to open models in this %s."
+        " The model will be downloaded into folder you choose bellow."
+    ), SLIC3R_APP_NAME, SLIC3R_APP_NAME, SLIC3R_APP_NAME));
+
+#ifdef __linux__
+    append_text(wxString::Format(_L(
+        "On Linux systems the process of registration also creates desktop integration files for this version of application."
+    )));
+#endif
+
+    box_allow_downloads->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) { this->downloader->allow(event.IsChecked()); });
+
+    downloader = new DownloaderUtils::Worker(this);
+    append(downloader);
+    downloader->allow(box_allow_value);
+}
+
+bool PageDownloader::on_finish_downloader() const
+{
+    return downloader->on_finish();
+}
+
+bool DownloaderUtils::Worker::perform_register()
+{
+    //boost::filesystem::path chosen_dest/*(path_text_ctrl->GetValue());*/(boost::nowide::narrow(path_text_ctrl->GetValue()));
+    boost::filesystem::path chosen_dest (GUI::format(path_name()));
+    boost::system::error_code ec;
+    if (chosen_dest.empty() || !boost::filesystem::is_directory(chosen_dest, ec) || ec) {
+        std::string err_msg = GUI::format("%1%\n\n%2%",_L("Chosen directory for downloads does not Exists.") ,chosen_dest.string());
+        BOOST_LOG_TRIVIAL(error) << err_msg;
+        show_error(m_parent, err_msg);
+        return false;
+    }
+    BOOST_LOG_TRIVIAL(info) << "Downloader registration: Directory for downloads: " << chosen_dest.string();
+    wxGetApp().app_config->set("url_downloader_dest", chosen_dest.string());
+#ifdef _WIN32
+    // Registry key creation for "prusaslicer://" URL
+
+    boost::filesystem::path binary_path(boost::filesystem::canonical(boost::dll::program_location()));
+    // the path to binary needs to be correctly saved in string with respect to localized characters
+    wxString wbinary = wxString::FromUTF8(binary_path.string());
+    std::string binary_string = (boost::format("%1%") % wbinary).str();
+    BOOST_LOG_TRIVIAL(info) << "Downloader registration: Path of binary: " << binary_string;
+
+    //std::string key_string = "\"" + binary_string + "\" \"-u\" \"%1\"";
+    //std::string key_string = "\"" + binary_string + "\" \"%1\"";
+    std::string key_string = "\"" + binary_string + "\" \"--single-instance\" \"%1\"";
+
+    wxRegKey key_first(wxRegKey::HKCU, "Software\\Classes\\prusaslicer");
+    wxRegKey key_full(wxRegKey::HKCU, "Software\\Classes\\prusaslicer\\shell\\open\\command");
+    if (!key_first.Exists()) {
+        key_first.Create(false);
+    }
+    key_first.SetValue("URL Protocol", "");
+
+    if (!key_full.Exists()) {
+        key_full.Create(false);
+    }
+    //key_full = "\"C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe\" \"%1\"";
+    key_full = key_string;
+#elif __APPLE__
+    // Apple registers for custom url in info.plist thus it has to be already registered since build.
+    // The url will always trigger opening of prusaslicer and we have to check that user has allowed it. (GUI_App::MacOpenURL is the triggered method)
+#else 
+    // the performation should be called later during desktop integration
+    perform_registration_linux = true;
+#endif
+    return true;
+}
+
+void DownloaderUtils::Worker::deregister()
+{
+#ifdef _WIN32
+    std::string key_string = "";
+    wxRegKey key_full(wxRegKey::HKCU, "Software\\Classes\\prusaslicer\\shell\\open\\command");
+    if (!key_full.Exists()) {
+        return;
+    }
+    key_full = key_string;
+#elif __APPLE__
+    // TODO
+#else 
+    BOOST_LOG_TRIVIAL(debug) << "DesktopIntegrationDialog::undo_downloader_registration";
+    DesktopIntegrationDialog::undo_downloader_registration();
+    perform_registration_linux = false;
+#endif
+}
+
+bool DownloaderUtils::Worker::on_finish() {
+    AppConfig* app_config = wxGetApp().app_config;
+    bool ac_value = app_config->get("downloader_url_registered") == "1";
+    BOOST_LOG_TRIVIAL(debug) << "PageDownloader::on_finish_downloader ac_value " << ac_value << " downloader_checked " << downloader_checked;
+    if (ac_value && downloader_checked) {
+        // already registered but we need to do it again
+        if (!perform_register())
+            return false;
+        app_config->set("downloader_url_registered", "1");
+    } else if (!ac_value && downloader_checked) {
+        // register
+        if (!perform_register())
+            return false;
+        app_config->set("downloader_url_registered", "1");
+    } else if (ac_value && !downloader_checked) {
+        // deregister, downloads are banned now  
+        deregister();
+        app_config->set("downloader_url_registered", "0");
+    } /*else if (!ac_value && !downloader_checked) {
+        // not registered and we dont want to do it
+        // do not deregister as other instance might be registered
+    } */
+    return true;
+}
+
+
 PageReloadFromDisk::PageReloadFromDisk(ConfigWizard* parent)
     : ConfigWizardPage(parent, _L("Reload from disk"), _L("Reload from disk"))
     , full_pathnames(false)
@@ -1977,6 +2206,7 @@ void ConfigWizard::priv::load_pages()
     btn_finish->Enable(any_fff_selected || any_sla_selected || custom_printer_selected);
 
     index->add_page(page_update);
+    index->add_page(page_downloader);
     index->add_page(page_reload_from_disk);
 #ifdef _WIN32
     index->add_page(page_files_association);
@@ -2406,6 +2636,11 @@ void ConfigWizard::priv::on_3rdparty_install(const VendorProfile *vendor, bool i
 bool ConfigWizard::priv::on_bnt_finish()
 {
     wxBusyCursor wait;
+
+    if (!page_downloader->on_finish_downloader()) {
+        index->go_to(page_downloader);
+        return false;
+    }
     /* When Filaments or Sla Materials pages are activated, 
      * materials for this pages are automaticaly updated and presets are reloaded.
      * 
@@ -2646,8 +2881,9 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
 #ifdef __linux__
     // Desktop integration on Linux
-    if (page_welcome->integrate_desktop()) 
-        DesktopIntegrationDialog::perform_desktop_integration();
+    BOOST_LOG_TRIVIAL(debug) << "ConfigWizard::priv::apply_config integrate_desktop" << page_welcome->integrate_desktop()  << " perform_registration_linux " << page_downloader->downloader->get_perform_registration_linux();
+    if (page_welcome->integrate_desktop() || page_downloader->downloader->get_perform_registration_linux())
+        DesktopIntegrationDialog::perform_desktop_integration(page_downloader->downloader->get_perform_registration_linux());
 #endif
 
     // Decide whether to create snapshot based on run_reason and the reset profile checkbox
@@ -2966,6 +3202,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
 
     
     p->add_page(p->page_update   = new PageUpdate(this));
+    p->add_page(p->page_downloader = new PageDownloader(this));
     p->add_page(p->page_reload_from_disk = new PageReloadFromDisk(this));
 #ifdef _WIN32
     p->add_page(p->page_files_association = new PageFilesAssociation(this));

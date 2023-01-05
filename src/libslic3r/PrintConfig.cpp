@@ -4632,6 +4632,10 @@ CLITransformConfigDef::CLITransformConfigDef()
     def->label = L("Scale to Fit");
     def->tooltip = L("Scale to fit the given volume.");
     def->set_default_value(new ConfigOptionPoint3(Vec3d(0,0,0)));
+
+    def = this->add("delete-after-load", coString);
+    def->label = L("Delete files after loading");
+    def->tooltip = L("Delete files after loading.");
 }
 
 CLIMiscConfigDef::CLIMiscConfigDef()
