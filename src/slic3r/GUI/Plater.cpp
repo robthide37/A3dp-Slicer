@@ -5769,6 +5769,16 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                     wxString wname = boost::nowide::widen(stat.m_filename);
                     std::string name = GUI::format(wname);
                     fs::path archive_path(name);
+
+                    std::string extra(1024, 0);
+                    size_t extra_size = mz_zip_reader_get_filename_from_extra(&archive, i, extra.data(), extra.size());
+                    if (extra_size > 0) {
+                        archive_path = fs::path(extra.substr(0, extra_size));
+                        name = archive_path.string();
+                    }
+
+                    if (archive_path.empty())
+                        continue;
                     for (const auto& path : selected_paths) {
                         if (path == archive_path) {
                             try
