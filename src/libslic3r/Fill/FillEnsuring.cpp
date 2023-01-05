@@ -13,8 +13,9 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     assert(params.use_arachne);
     assert(this->print_config != nullptr && this->print_object_config != nullptr && this->print_region_config != nullptr);
 
-    const coord_t                          scaled_spacing         = scaled<coord_t>(this->spacing);
-    const bool                             is_bounded_rectilinear = true;
+    const coord_t               scaled_spacing         = scaled<coord_t>(this->spacing);
+    const EnsuringInfillPattern infill_patter          = this->print_object_config->ensure_vertical_shell_infill;
+    const bool                  is_bounded_rectilinear = infill_patter == EnsuringInfillPattern::eipBoundedRectilinear;
 
     // Perform offset.
     Slic3r::ExPolygons expp = this->overlap != 0. ? offset_ex(surface->expolygon, scaled<float>(this->overlap)) : ExPolygons{surface->expolygon};
@@ -96,7 +97,8 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                     BOOST_LOG_TRIVIAL(error) << "FillBoundedRectilinear::fill_surface() failed to fill a region.";
                 append(thick_polylines_out, to_thick_polylines(std::move(polylines), scaled<coord_t>(this->spacing)));
             }
-        }
+        } else
+            assert(infill_patter == EnsuringInfillPattern::eipConcentric);
     }
 
     return thick_polylines_out;

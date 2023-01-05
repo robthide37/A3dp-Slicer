@@ -751,7 +751,8 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "wall_transition_angle"
             || opt_key == "wall_distribution_count"
             || opt_key == "min_feature_size"
-            || opt_key == "min_bead_width") {
+            || opt_key == "min_bead_width"
+            || opt_key == "ensure_vertical_shell_infill") {
             steps.emplace_back(posSlice);
         } else if (
                opt_key == "seam_position"
