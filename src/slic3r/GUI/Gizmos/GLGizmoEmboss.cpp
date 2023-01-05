@@ -605,12 +605,20 @@ void GLGizmoEmboss::on_render() {
             glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
         }
 
+        bool is_left_handed = has_reflection(*m_temp_transformation);
+        if (is_left_handed)
+            glsafe(::glFrontFace(GL_CW));        
+
         glsafe(::glEnable(GL_DEPTH_TEST));
         gl_volume.model.set_color(color);
         gl_volume.model.render();
         glsafe(::glDisable(GL_DEPTH_TEST));
 
-        if (is_transparent) glsafe(::glDisable(GL_BLEND));
+        // set it back to pevious state
+        if (is_left_handed)
+            glsafe(::glFrontFace(GL_CCW));
+        if (is_transparent)
+            glsafe(::glDisable(GL_BLEND));
 
         shader->stop_using();
     }
