@@ -42,7 +42,11 @@ void ProjectDirtyStateManager::update_from_presets()
 
 void ProjectDirtyStateManager::update_from_preview()
 {
-    m_custom_gcode_per_print_z_dirty = m_initial_custom_gcode_per_print_z != wxGetApp().model().custom_gcode_per_print_z;
+    const bool is_dirty = m_initial_custom_gcode_per_print_z != wxGetApp().model().custom_gcode_per_print_z;
+    if (m_custom_gcode_per_print_z_dirty != is_dirty) {
+        m_custom_gcode_per_print_z_dirty = is_dirty;
+        wxGetApp().mainframe->update_title();
+    }
 }
 
 void ProjectDirtyStateManager::reset_after_save()
