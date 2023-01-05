@@ -2364,7 +2364,7 @@ void GLGizmoEmboss::draw_style_list() {
     if (selected_style_index.has_value() && is_modified) { 
         wxString title   = _L("Style modification will be lost.");
         const EmbossStyle &style = m_style_manager.get_styles()[*selected_style_index].style;        
-        wxString message = GUI::format_wxstr(_L("Changing style to '%1%' will discard actual style modification.\n\n Would you like to continue anyway?"), style.name);
+        wxString message = GUI::format_wxstr(_L("Changing style to '%1%' will discard current style modification.\n\n Would you like to continue anyway?"), style.name);
         MessageDialog not_loaded_style_message(nullptr, message, title, wxICON_WARNING | wxYES|wxNO);
         if (not_loaded_style_message.ShowModal() != wxID_YES) 
             selected_style_index.reset();
