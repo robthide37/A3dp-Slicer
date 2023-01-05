@@ -55,6 +55,8 @@
 #define ENABLE_RELOAD_FROM_DISK_REWORK (1 && ENABLE_2_6_0_ALPHA1)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_6_0_ALPHA1)
+// Shows an imgui dialog containing the matrices of the selected volumes
+#define ENABLE_WORLD_COORDINATE_DEBUG (0 && ENABLE_WORLD_COORDINATE)
 // Enable alternative version of file_wildcards()
 #define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_6_0_ALPHA1)
 
