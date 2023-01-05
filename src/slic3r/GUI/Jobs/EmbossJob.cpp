@@ -739,28 +739,16 @@ TriangleMesh priv::cut_surface(DataBase& input1, const SurfaceVolumeData& input2
 
     Transform3d tr_inv = biggest->tr.inverse();
     Transform3d cut_projection_tr = tr_inv * input2.text_tr;
-    // Cut surface in reflected system?
-    bool use_reflection = Slic3r::has_reflection(cut_projection_tr);
-    if (use_reflection)
-        cut_projection_tr *= Eigen::Scaling(-1., 1., 1.);
 
     size_t        itss_index = s_to_itss[biggest - &sources.front()];
     BoundingBoxf3 mesh_bb    = bounding_box(itss[itss_index]);
     for (const SurfaceVolumeData::ModelSource &s : sources) {
         size_t itss_index = s_to_itss[&s - &sources.front()];
         if (itss_index == std::numeric_limits<size_t>::max()) continue;
-        Transform3d tr;
-        if (&s == biggest) {
-            if (!use_reflection)
-                continue;            
-            // add reflection for biggest source
-            tr = Eigen::Scaling(-1., 1., 1.);
-        } else {
-            tr = s.tr * tr_inv;
-            if (use_reflection)
-                tr *= Eigen::Scaling(-1., 1., 1.);
-        }
+        if (&s == biggest) 
+            continue;
 
+        Transform3d tr = s.tr * tr_inv;
         bool fix_reflected = true;
         indexed_triangle_set &its = itss[itss_index];
         its_transform(its, tr, fix_reflected);
@@ -775,8 +763,27 @@ TriangleMesh priv::cut_surface(DataBase& input1, const SurfaceVolumeData& input2
     OrthoProject cut_projection = create_projection_for_cut(cut_projection_tr, shape_scale, z_range);
     float projection_ratio = (-z_range.first + safe_extension) / (z_range.second - z_range.first + 2 * safe_extension);
 
+    bool is_text_reflected = Slic3r::has_reflection(input2.text_tr);
+    if (is_text_reflected) {
+        // revert order of points in expolygons
+        // CW --> CCW
+        for (ExPolygon &shape : shapes) {
+            shape.contour.reverse();
+            for (Slic3r::Polygon &hole : shape.holes)
+                hole.reverse();
+        }
+    }
+
     // Use CGAL to cut surface from triangle mesh
     SurfaceCut cut = cut_surface(shapes, itss, cut_projection, projection_ratio);
+
+    if (is_text_reflected) {
+        for (SurfaceCut::Contour &c : cut.contours)
+            std::reverse(c.begin(), c.end());
+        for (Vec3i &t : cut.indices)
+            std::swap(t[0], t[1]);
+    }
+
     if (cut.empty()) throw JobException(_u8L("There is no valid surface for text projection.").c_str());
     if (was_canceled()) return {};
 
@@ -784,12 +791,6 @@ TriangleMesh priv::cut_surface(DataBase& input1, const SurfaceVolumeData& input2
     OrthoProject3d projection = create_emboss_projection(input2.is_outside, fp.emboss, emboss_tr, cut);
     indexed_triangle_set new_its = cut2model(cut, projection);
     assert(!new_its.empty());
-    if (use_reflection) {
-        // when cut was made in reflected system it must be converted back
-        Transform3d tr(Eigen::Scaling(-1., 1., 1.));
-        its_transform(new_its, tr, true);
-    }
-
     if (was_canceled()) return {};
     return TriangleMesh(std::move(new_its));
 }

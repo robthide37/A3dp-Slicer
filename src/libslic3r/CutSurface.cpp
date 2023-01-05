@@ -3471,9 +3471,21 @@ ExPolygon priv::to_expoly(const SurfacePatch &patch, const Project &projection, 
     // should not be used when no opposit triangle are counted so should not create overlaps
     ClipperLib::PolyFillType fill_type = ClipperLib::PolyFillType::pftEvenOdd;
     ExPolygons expolys = Slic3r::union_ex(polys, fill_type);
-    assert(expolys.size() == 1);
+    if (expolys.size() == 1)
+        return expolys.front();
+
+    // It should be one expolygon
+    assert(false);
+
     if (expolys.empty()) return {};
-    return expolys.front();
+    // find biggest
+    const ExPolygon *biggest = &expolys.front();
+    for (size_t index = 1; index < expolys.size(); ++index) {
+        const ExPolygon *current = &expolys[index];
+        if (biggest->contour.size() < current->contour.size())
+            biggest = current;
+    }
+    return *biggest;
 }
 
 SurfaceCut priv::patch2cut(SurfacePatch &patch)
