@@ -2676,7 +2676,7 @@ void Selection::render_debug_window() const
     return;
 
   ImGuiWrapper& imgui = *wxGetApp().imgui();
-  imgui.begin(std::string("Selection matrices"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+  imgui.begin(std::string("Selection matrices"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
   auto volume_name = [this](size_t id) {
     const GLVolume& v = *(*m_volumes)[id];
@@ -2705,20 +2705,8 @@ void Selection::render_debug_window() const
     ImGui::EndCombo();
   }
 
-  const std::vector<std::string> methods = { "computeRotationScaling", "computeScalingRotation" };
-  static size_t current_method_idx = 0;
-  if (ImGui::BeginCombo("Decomposition method", methods[current_method_idx].c_str())) {
-    size_t count = 0;
-    for (const std::string& method : methods) {
-      const bool is_selected = (current_method_idx == count);
-      if (ImGui::Selectable(method.c_str(), is_selected))
-        current_method_idx = count;
-      if (is_selected)
-        ImGui::SetItemDefaultFocus();
-      ++count;
-    }
-    ImGui::EndCombo();
-  }
+  static int current_method_idx = 0;
+  ImGui::Combo("Decomposition method", &current_method_idx, "computeRotationScaling\0computeScalingRotation\0");
 
   const GLVolume& v = *get_volume(current_vol_idx);
 
