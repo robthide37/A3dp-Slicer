@@ -964,9 +964,9 @@ void PrintObject::detect_surfaces_type()
                     {
                         static int iRun = 0;
                         std::vector<std::pair<Slic3r::ExPolygons, SVG::ExPolygonAttributes>> expolygons_with_attributes;
-                        expolygons_with_attributes.emplace_back(std::make_pair(union_ex(top),                           SVG::ExPolygonAttributes("green")));
-                        expolygons_with_attributes.emplace_back(std::make_pair(union_ex(bottom),                        SVG::ExPolygonAttributes("brown")));
-                        expolygons_with_attributes.emplace_back(std::make_pair(to_expolygons(layerm->slices.surfaces),  SVG::ExPolygonAttributes("black")));
+                        expolygons_with_attributes.emplace_back(std::make_pair(union_ex(top),                             SVG::ExPolygonAttributes("green")));
+                        expolygons_with_attributes.emplace_back(std::make_pair(union_ex(bottom),                          SVG::ExPolygonAttributes("brown")));
+                        expolygons_with_attributes.emplace_back(std::make_pair(to_expolygons(layerm->slices().surfaces),  SVG::ExPolygonAttributes("black")));
                         SVG::export_expolygons(debug_out_path("1_detect_surfaces_type_%d_region%d-layer_%f.svg", iRun ++, region_id, layer->print_z).c_str(), expolygons_with_attributes);
                     }
         #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
@@ -1399,26 +1399,26 @@ void PrintObject::discover_vertical_shells()
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
                     {
                         Slic3r::SVG svg(debug_out_path("discover_vertical_shells-internal-wshell-%d.svg", debug_idx), get_extents(shell));
-                        svg.draw(layerm->fill_surfaces.filter_by_type(stInternal), "yellow", 0.5);
-                        svg.draw_outline(layerm->fill_surfaces.filter_by_type(stInternal), "black", "blue", scale_(0.05));
+                        svg.draw(layerm->fill_surfaces().filter_by_type(stInternal), "yellow", 0.5);
+                        svg.draw_outline(layerm->fill_surfaces().filter_by_type(stInternal), "black", "blue", scale_(0.05));
                         svg.draw(shell_ex, "blue", 0.5);
                         svg.draw_outline(shell_ex, "black", "blue", scale_(0.05));
                         svg.Close();
                     } 
                     {
                         Slic3r::SVG svg(debug_out_path("discover_vertical_shells-internalvoid-wshell-%d.svg", debug_idx), get_extents(shell));
-                        svg.draw(layerm->fill_surfaces.filter_by_type(stInternalVoid), "yellow", 0.5);
-                        svg.draw_outline(layerm->fill_surfaces.filter_by_type(stInternalVoid), "black", "blue", scale_(0.05));
+                        svg.draw(layerm->fill_surfaces().filter_by_type(stInternalVoid), "yellow", 0.5);
+                        svg.draw_outline(layerm->fill_surfaces().filter_by_type(stInternalVoid), "black", "blue", scale_(0.05));
                         svg.draw(shell_ex, "blue", 0.5);
                         svg.draw_outline(shell_ex, "black", "blue", scale_(0.05));
                         svg.Close();
                     } 
                     {
-                        Slic3r::SVG svg(debug_out_path("discover_vertical_shells-internalvoid-wshell-%d.svg", debug_idx), get_extents(shell));
-                        svg.draw(layerm->fill_surfaces.filter_by_type(stInternalVoid), "yellow", 0.5);
-                        svg.draw_outline(layerm->fill_surfaces.filter_by_type(stInternalVoid), "black", "blue", scale_(0.05));
+                        Slic3r::SVG svg(debug_out_path("discover_vertical_shells-internalsolid-wshell-%d.svg", debug_idx), get_extents(shell));
+                        svg.draw(layerm->fill_surfaces().filter_by_type(stInternalSolid), "yellow", 0.5);
+                        svg.draw_outline(layerm->fill_surfaces().filter_by_type(stInternalSolid), "black", "blue", scale_(0.05));
                         svg.draw(shell_ex, "blue", 0.5);
-                        svg.draw_outline(shell_ex, "black", "blue", scale_(0.05)); 
+                        svg.draw_outline(shell_ex, "black", "blue", scale_(0.05));
                         svg.Close();
                     } 
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
@@ -1544,7 +1544,7 @@ void PrintObject::bridge_over_infill()
     internals.reserve(this->layer_count());
     for (Layer *layer : m_layers) {
         Polygons sum;
-        for (const LayerRegion *layerm : layer->m_regions)
+        for (const LayerRegion *layerm : layer->regions())
             layerm->fill_surfaces().filter_by_type(stInternal, &sum);
         internals.emplace_back(std::move(sum));
     }
@@ -1558,7 +1558,7 @@ void PrintObject::bridge_over_infill()
             const size_t region_id   = sparse_infill_regions[task_id % sparse_infill_regions.size()];
             Layer       *layer       = this->get_layer(layer_id);
             LayerRegion *layerm      = layer->m_regions[region_id];
-            Flow         bridge_flow = layerm->bridging_flow(frSolidInfill);
+            Flow         bridge_flow = layerm->bridging_flow(frSolidInfill, true /* Internal bridges are always thick. */);
 
             // Extract the stInternalSolid surfaces that might be transformed into bridges.
             ExPolygons internal_solid;
@@ -1567,32 +1567,27 @@ void PrintObject::bridge_over_infill()
                 // No internal solid -> no new bridges for this layer region.
                 continue;
 
-            // check whether the lower area is deep enough for absorbing the extra flow
-            // (for obvious physical reasons but also for preventing the bridge extrudates
-            // from overflowing in 3D preview)
+            // Check whether the lower area is deep enough for absorbing the extra flow, also filter out
+            // tiny regions from bridging.
             ExPolygons to_bridge;
             {
                 Polygons to_bridge_pp = to_polygons(internal_solid);
                 // Iterate through lower layers spanned by bridge_flow.
                 double bottom_z = layer->print_z - bridge_flow.height() - EPSILON;
-                for (auto i = int(layer_id) - 1; i >= 0; -- i) {
-                    // Stop iterating if layer is lower than bottom_z.
-                    if (m_layers[i]->print_z < bottom_z)
-                        break;
+                for (auto i = int(layer_id) - 1; i >= 0 && m_layers[i]->print_z > bottom_z; -- i)
                     // Intersect lower sparse infills with the candidate solid surfaces.
                     to_bridge_pp = intersection(to_bridge_pp, internals[i]);
-                }
                 // there's no point in bridging too thin/short regions
                 //FIXME Vojtech: The offset2 function is not a geometric offset, 
                 // therefore it may create 1) gaps, and 2) sharp corners, which are outside the original contour.
                 // The gaps will be filled by a separate region, which makes the infill less stable and it takes longer.
                 {
                     float min_width = float(bridge_flow.scaled_width()) * 3.f;
-                    to_bridge_pp = opening(to_bridge_pp, min_width);
+                    to_bridge_pp = opening(to_bridge_pp, min_width); //, ClipperLib::jtSquare);
                 }
                 
                 if (to_bridge_pp.empty()) {
-                    // Restore internal_solid surfaces. 
+                    // Optimization: Nothing to bridge, restore internal_solid surfaces.
                     for (ExPolygon &ex : internal_solid)
                         layerm->m_fill_surfaces.surfaces.push_back(Surface(stInternalSolid, std::move(ex)));
                     continue;
@@ -1613,39 +1608,6 @@ void PrintObject::bridge_over_infill()
                 layerm->m_fill_surfaces.surfaces.push_back(Surface(stInternalBridge, std::move(ex)));
             for (ExPolygon &ex : not_to_bridge)
                 layerm->m_fill_surfaces.surfaces.push_back(Surface(stInternalSolid, std::move(ex)));
-            /*
-            # exclude infill from the layers below if needed
-            # see discussion at https://github.com/alexrj/Slic3r/issues/240
-            # Update: do not exclude any infill. Sparse infill is able to absorb the excess material.
-            if (0) {
-                my $excess = $layerm->extruders->{infill}->bridge_flow->width - $layerm->height;
-                for (my $i = $layer_id-1; $excess >= $self->get_layer($i)->height; $i--) {
-                    Slic3r::debugf "  skipping infill below those areas at layer %d\n", $i;
-                    foreach my $lower_layerm (@{$self->get_layer($i)->regions}) {
-                        my @new_surfaces = ();
-                        # subtract the area from all types of surfaces
-                        foreach my $group (@{$lower_layerm->fill_surfaces->group}) {
-                            push @new_surfaces, map $group->[0]->clone(expolygon => $_),
-                                @{diff_ex(
-                                    [ map $_->p, @$group ],
-                                    [ map @$_, @$to_bridge ],
-                                )};
-                            push @new_surfaces, map Slic3r::Surface->new(
-                                expolygon       => $_,
-                                surface_type    => stInternalVoid,
-                            ), @{intersection_ex(
-                                [ map $_->p, @$group ],
-                                [ map @$_, @$to_bridge ],
-                            )};
-                        }
-                        $lower_layerm->fill_surfaces->clear;
-                        $lower_layerm->fill_surfaces->append($_) for @new_surfaces;
-                    }
-                    
-                    $excess -= $self->get_layer($i)->height;
-                }
-            }
-            */
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
             layerm->export_region_slices_to_svg_debug("7_bridge_over_infill");
             layerm->export_region_fill_surfaces_to_svg_debug("7_bridge_over_infill");

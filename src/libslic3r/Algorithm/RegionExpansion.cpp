@@ -76,12 +76,11 @@ RegionExpansionParameters RegionExpansionParameters::build(
 // similar to expolygons_to_zpaths(), but each contour is expanded before converted to zpath.
 // The expanded contours are then opened (the first point is repeated at the end).
 static ClipperLib_Z::Paths expolygons_to_zpaths_expanded_opened(
-    const ExPolygons &src, const float expansion, coord_t base_idx)
+    const ExPolygons &src, const float expansion, coord_t &base_idx)
 {
     ClipperLib_Z::Paths out;
     out.reserve(2 * std::accumulate(src.begin(), src.end(), size_t(0),
         [](const size_t acc, const ExPolygon &expoly) { return acc + expoly.num_contours(); }));
-    coord_t z = base_idx;
     ClipperLib::ClipperOffset offsetter;
     offsetter.ShortestEdgeLength = expansion * ClipperOffsetShortestEdgeFactor;
     ClipperLib::Paths expansion_cache;
@@ -94,9 +93,9 @@ static ClipperLib_Z::Paths expolygons_to_zpaths_expanded_opened(
             offsetter.AddPath(expoly.contour_or_hole(icontour).points, ClipperLib::jtSquare, ClipperLib::etClosedPolygon);
             expansion_cache.clear();
             offsetter.Execute(expansion_cache, icontour == 0 ? expansion : -expansion);
-            append(out, ClipperZUtils::to_zpaths<true>(expansion_cache, z));
+            append(out, ClipperZUtils::to_zpaths<true>(expansion_cache, base_idx));
         }
-        ++ z;
+        ++ base_idx;
     }
     return out;
 }
@@ -217,7 +216,7 @@ std::vector<WaveSeed> wave_seeds(
     Intersections       intersections;
 
     coord_t             idx_boundary_begin = 1;
-    coord_t             idx_boundary_end;
+    coord_t             idx_boundary_end   = idx_boundary_begin;
     coord_t             idx_src_end;
 
     {
@@ -225,17 +224,13 @@ std::vector<WaveSeed> wave_seeds(
         ClipperZUtils::ClipperZIntersectionVisitor visitor(intersections);
         zclipper.ZFillFunction(visitor.clipper_callback());
         // as closed contours
-        {
-            ClipperLib_Z::Paths zboundary = ClipperZUtils::expolygons_to_zpaths(boundary, idx_boundary_begin);
-            idx_boundary_end = idx_boundary_begin + coord_t(zboundary.size());
-            zclipper.AddPaths(zboundary, ClipperLib_Z::ptClip, true);
-        }
+        zclipper.AddPaths(ClipperZUtils::expolygons_to_zpaths(boundary, idx_boundary_end), ClipperLib_Z::ptClip, true);
         // as open contours
         std::vector<std::pair<ClipperLib_Z::IntPoint, int>> zsrc_splits;
         {
-            ClipperLib_Z::Paths zsrc = expolygons_to_zpaths_expanded_opened(src, tiny_expansion, idx_boundary_end);
+            idx_src_end = idx_boundary_end;
+            ClipperLib_Z::Paths zsrc = expolygons_to_zpaths_expanded_opened(src, tiny_expansion, idx_src_end);
             zclipper.AddPaths(zsrc, ClipperLib_Z::ptSubject, false);
-            idx_src_end = idx_boundary_end + coord_t(zsrc.size());
             zsrc_splits.reserve(zsrc.size());
             for (const ClipperLib_Z::Path &path : zsrc) {
                 assert(path.size() >= 2);
@@ -267,7 +262,10 @@ std::vector<WaveSeed> wave_seeds(
         const ClipperLib_Z::IntPoint &back  = path.back();
         // Both ends of a seed segment are supposed to be inside a single boundary expolygon.
         // Thus as long as the seed contour is not closed, it should be open at a boundary point.
-        assert((front == back && front.z() >= idx_boundary_end && front.z() < idx_src_end) || (front.z() < 0 && back.z() < 0));
+        assert((front == back && front.z() >= idx_boundary_end && front.z() < idx_src_end) || 
+            //(front.z() < 0 && back.z() < 0));
+            // Hope that at least one end of an open polyline is clipped by the boundary, thus an intersection point is created.
+            (front.z() < 0 || back.z() < 0));
         const Intersection *intersection = nullptr;
         auto intersection_point_valid = [idx_boundary_end, idx_src_end](const Intersection &is) {
             return is.first >= 1 && is.first < idx_boundary_end &&

@@ -1320,7 +1320,7 @@ namespace SupportMaterialInternal {
             bridges = union_(bridges);
         }
         // remove the entire bridges and only support the unsupported edges
-        //FIXME the brided regions are already collected as layerm.bridged. Use it?
+        //FIXME the bridged regions are already collected as layerm.bridged. Use it?
         for (const Surface &surface : layerm.fill_surfaces())
             if (surface.surface_type == stBottomBridge && surface.bridge_angle < 0.0)
                 polygons_append(bridges, surface.expolygon);

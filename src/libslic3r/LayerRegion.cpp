@@ -215,19 +215,19 @@ Surfaces expand_bridges_detect_orientations(
         // bridge_expansions are sorted by boundary id and source id.
         for (auto it = bridge_expansions.begin(); it != bridge_expansions.end();) {
             // For each boundary region:
-            auto it2 = it;
-            for (++ it2; it2 != bridge_expansions.end() && it2->boundary_id == it->boundary_id; ++ it2);
+            auto it_begin = it;
+            auto it_end   = std::next(it_begin);
+            for (; it_end != bridge_expansions.end() && it_end->boundary_id == it_begin->boundary_id; ++ it_end) ;
             bboxes.clear();
-            bboxes.reserve(it2 - it);
-            for (it2 = it; it2 != bridge_expansions.end() && it2->boundary_id == it->boundary_id; ++ it2)
+            bboxes.reserve(it_end - it_begin);
+            for (auto it2 = it_begin; it2 != it_end; ++ it2)
                 bboxes.emplace_back(get_extents(it2->expolygon.contour));
-            auto it_end = it2;
             // For each bridge anchor of the current source:
             for (; it != it_end; ++ it) {
                 // A grup id for this bridge.
-                for (it2 = std::next(it); it2 != it_end; ++ it2)
+                for (auto it2 = std::next(it); it2 != it_end; ++ it2)
                     if (it->src_id != it2->src_id &&
-                        bboxes[it - bridge_expansions.begin()].overlap(bboxes[it2 - bridge_expansions.begin()]) &&
+                        bboxes[it - it_begin].overlap(bboxes[it2 - it_begin]) &&
                         // One may ignore holes, they are irrelevant for intersection test.
                         ! intersection(it->expolygon.contour, it2->expolygon.contour).empty()) {
                         // The two bridge regions intersect. Give them the same group id.

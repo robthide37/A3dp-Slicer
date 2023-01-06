@@ -53,17 +53,16 @@ inline ZPaths to_zpaths(const std::vector<Points> &paths, coord_t z)
 // offsetted by base_index.
 // If Open, then duplicate the first point of each path at its end.
 template<bool Open = false>
-inline ZPaths expolygons_to_zpaths(const ExPolygons &src, coord_t base_idx)
+inline ZPaths expolygons_to_zpaths(const ExPolygons &src, coord_t &base_idx)
 {
     ZPaths out;
     out.reserve(std::accumulate(src.begin(), src.end(), size_t(0),
         [](const size_t acc, const ExPolygon &expoly) { return acc + expoly.num_contours(); }));
-    coord_t z = base_idx;
     for (const ExPolygon &expoly : src) {
-        out.emplace_back(to_zpath<Open>(expoly.contour.points, z));
+        out.emplace_back(to_zpath<Open>(expoly.contour.points, base_idx));
         for (const Polygon &hole : expoly.holes)
-            out.emplace_back(to_zpath<Open>(hole.points, z));
-        ++ z;
+            out.emplace_back(to_zpath<Open>(hole.points, base_idx));
+        ++ base_idx;
     }
     return out;
 }
