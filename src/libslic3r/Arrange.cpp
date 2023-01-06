@@ -425,24 +425,11 @@ template<> std::function<double(const Item&)> AutoArranger<Circle>::get_objfn()
 {
     auto bincenter = m_bin.center();
     return [this, bincenter](const Item &item) {
-        
+
         auto result = objfunc(item, bincenter);
-        
+
         double score = std::get<0>(result);
-        
-        auto isBig = [this](const Item& itm) {
-            return itm.area() / m_bin_area > BIG_ITEM_TRESHOLD ;
-        };
-        
-        if(isBig(item)) {
-            auto mp = m_merged_pile;
-            mp.push_back(item.transformedShape());
-            auto chull = sl::convexHull(mp);
-            double miss = Placer::overfit(chull, m_bin);
-            if(miss < 0) miss = 0;
-            score += miss*miss;
-        }
-        
+
         return score;
     };
 }
