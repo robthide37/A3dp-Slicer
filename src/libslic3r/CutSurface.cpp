@@ -78,6 +78,8 @@ using EI = CGAL::SM_Edge_index;
 using FI = CGAL::SM_Face_index;
 using P3 = CGAL::Epick::Point_3;
 
+inline Vec3d to_vec3d(const P3 &p) { return Vec3d(p.x(),p.y(),p.z()); }
+
 /// <summary>
 /// Convert triangle mesh model to CGAL Surface_mesh
 /// Filtrate out opposite triangles
@@ -1573,8 +1575,52 @@ void priv::create_reduce_map(ReductionMap &reduction_map, const CutMesh &mesh)
         assert(!is_reducible_vertex(left));
         VI &vi = reduction_map[erase];
         // check if it is first add
-        if (!vi.is_valid())
-            reduction_map[erase] = left;
+        if (vi.is_valid())
+            return;
+
+        // check that all triangles after reduction has 'erase' and 'left' vertex
+        // on same side of opposite line of vertex in triangle
+        Vec3d v_erase = to_vec3d(mesh.point(erase));
+        Vec3d v_left = to_vec3d(mesh.point(left));
+        for (FI fi : mesh.faces_around_target(hi)) {
+            if (!fi.is_valid())
+                continue;
+            // get vertices of rest 
+            VI vi_a, vi_b;
+            for (VI vi : mesh.vertices_around_face(mesh.halfedge(fi))) {
+                if (!vi.is_valid())
+                    continue;
+                if (vi == erase)
+                    continue;
+                if (!vi_a.is_valid())
+                    vi_a = vi;
+                else {
+                    assert(!vi_b.is_valid());
+                    vi_b = vi;
+                }
+            } 
+            assert(vi_b.is_valid());
+            // do not check triangle, which will be removed
+            if (vi_a == left || vi_b == left)
+                continue;
+            
+            Vec3d v_a = to_vec3d(mesh.point(vi_a));
+            Vec3d v_b = to_vec3d(mesh.point(vi_b));
+            // Vectors of triangle edges
+            Vec3d v_ab = v_b - v_a;
+            Vec3d v_ae = v_erase - v_a;
+            Vec3d v_al = v_left - v_a;
+
+            Vec3d n1 = v_ab.cross(v_ae);
+            Vec3d n2 = v_ab.cross(v_al);
+            // check that normal has same direction
+            if ((n1.x() > 0 != n2.x() > 0) ||
+                (n1.y() > 0 != n2.y() > 0) ||
+                (n1.z() > 0 != n2.z() > 0))
+                return; // this reduction will create CCW triangle
+        }
+
+        reduction_map[erase] = left;
         // I have no better rule than take the first
         // for decide which reduction will be better
         // But it could be use only one of them
@@ -2521,7 +2567,7 @@ bool priv::clip_cut(SurfacePatch &cut, CutMesh clipper)
 
 BoundingBoxf3 priv::bounding_box(const CutAOI &cut, const CutMesh &mesh) {
     const P3& p_from_cut = mesh.point(mesh.target(mesh.halfedge(cut.first.front())));
-    Vec3d min(p_from_cut.x(), p_from_cut.y(), p_from_cut.z());
+    Vec3d min = to_vec3d(p_from_cut);
     Vec3d max = min;
     for (FI fi : cut.first) { 
         for(VI vi: mesh.vertices_around_face(mesh.halfedge(fi))){
@@ -2537,9 +2583,8 @@ BoundingBoxf3 priv::bounding_box(const CutAOI &cut, const CutMesh &mesh) {
 
 BoundingBoxf3 priv::bounding_box(const CutMesh &mesh)
 {
-    const P3      &p_from_cut = *mesh.points().begin();
-    Vec3d          min(p_from_cut.x(), p_from_cut.y(), p_from_cut.z());
-    Vec3d          max = min;
+    Vec3d min = to_vec3d(*mesh.points().begin());
+    Vec3d max = min;
     for (VI vi : mesh.vertices()) {
         const P3 &p = mesh.point(vi);
         for (size_t i = 0; i < 3; ++i) {
@@ -2806,7 +2851,7 @@ bool priv::is_patch_inside_of_model(const SurfacePatch &patch,
 {
     // TODO: Solve model with hole in projection direction !!!
     const P3 &a = patch.mesh.point(VI(0));
-    Vec3d a_(a.x(), a.y(), a.z());
+    Vec3d a_ = to_vec3d(a);
     Vec3d b_ = projection.project(a_);
     P3 b(b_.x(), b_.y(), b_.z());
 
@@ -3396,7 +3441,7 @@ Polygons priv::unproject_loops(const SurfacePatch &patch, const Project &project
         pts.reserve(l.size());
         for (VI vi : l) {
             const P3 &p3 = patch.mesh.point(vi);
-            Vec3d p(p3.x(), p3.y(), p3.z());
+            Vec3d p = to_vec3d(p3);
             double depth;
             std::optional<Vec2d> p2_opt = projection.unproject(p, &depth);
             if (depth_range[0] > depth) depth_range[0] = depth; // min
@@ -3426,9 +3471,21 @@ ExPolygon priv::to_expoly(const SurfacePatch &patch, const Project &projection, 
     // should not be used when no opposit triangle are counted so should not create overlaps
     ClipperLib::PolyFillType fill_type = ClipperLib::PolyFillType::pftEvenOdd;
     ExPolygons expolys = Slic3r::union_ex(polys, fill_type);
-    assert(expolys.size() == 1);
+    if (expolys.size() == 1)
+        return expolys.front();
+
+    // It should be one expolygon
+    assert(false);
+
     if (expolys.empty()) return {};
-    return expolys.front();
+    // find biggest
+    const ExPolygon *biggest = &expolys.front();
+    for (size_t index = 1; index < expolys.size(); ++index) {
+        const ExPolygon *current = &expolys[index];
+        if (biggest->contour.size() < current->contour.size())
+            biggest = current;
+    }
+    return *biggest;
 }
 
 SurfaceCut priv::patch2cut(SurfacePatch &patch)
@@ -3597,7 +3654,7 @@ void priv::store(const CutMesh &mesh, const FaceTypeMap &face_type_map, const st
         default: color = CGAL::Color{0, 0, 255}; // blue
         }
     }
-    CGAL::IO::write_OFF(off_file, mesh);
+    CGAL::IO::write_OFF(off_file, mesh, CGAL::parameters::face_color_map(face_colors));
     mesh_.remove_property_map(face_colors);
 }
 
@@ -3624,7 +3681,7 @@ void priv::store(const CutMesh &mesh, const ReductionMap &reduction_map, const s
         vertex_colors[reduction_to] = CGAL::Color{0, 0, 255};
     }
     
-    CGAL::IO::write_OFF(off_file, mesh);
+    CGAL::IO::write_OFF(off_file, mesh, CGAL::parameters::vertex_color_map(vertex_colors));
     mesh_.remove_property_map(vertex_colors);
 }
 

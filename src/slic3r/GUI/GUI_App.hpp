@@ -46,6 +46,7 @@ class ObjectList;
 class ObjectLayers;
 class Plater;
 class NotificationManager;
+class Downloader;
 struct GUI_InitParams;
 class GalleryDialog;
 
@@ -165,6 +166,7 @@ private:
 	std::unique_ptr <OtherInstanceMessageHandler> m_other_instance_message_handler;
     std::unique_ptr <AppUpdater> m_app_updater;
     std::unique_ptr <wxSingleInstanceChecker> m_single_instance_checker;
+    std::unique_ptr <Downloader> m_downloader;
     std::string m_instance_hash_string;
 	size_t m_instance_hash_int;
 
@@ -292,6 +294,7 @@ public:
     void            OSXStoreOpenFiles(const wxArrayString &files) override;
     // wxWidgets override to get an event on open files.
     void            MacOpenFiles(const wxArrayString &fileNames) override;
+    void            MacOpenURL(const wxString& url) override;
 #endif /* __APPLE */
 
     Sidebar&             sidebar();
@@ -304,6 +307,7 @@ public:
     Model&      		 model();
     NotificationManager * notification_manager();
     GalleryDialog *     gallery_dialog();
+    Downloader*          downloader();
 
     // Parameters extracted from the command line to be passed to GUI after initialization.
     GUI_InitParams* init_params { nullptr };
@@ -358,6 +362,10 @@ public:
     void            associate_gcode_files();
 #endif // __WXMSW__
 
+
+    // URL download - PrusaSlicer gets system call to open prusaslicer:// URL which should contain address of download
+    void            start_download(std::string url);
+
 private:
     bool            on_init_inner();
 	void            init_app_config();
@@ -380,6 +388,7 @@ private:
     void            app_version_check(bool from_user);
 
     bool            m_datadir_redefined { false }; 
+
 };
 
 DECLARE_APP(GUI_App)

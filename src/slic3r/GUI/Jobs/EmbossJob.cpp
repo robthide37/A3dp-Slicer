@@ -63,7 +63,8 @@ static TriangleMesh create_default_mesh();
 /// </summary>
 /// <param name="mesh">New mesh data</param>
 /// <param name="data">Text configuration, ...</param>
-static void update_volume(TriangleMesh &&mesh, const DataUpdate &data);
+/// <param name="mesh">Transformation of volume</param>
+static void update_volume(TriangleMesh &&mesh, const DataUpdate &data, Transform3d *tr = nullptr);
 
 /// <summary>
 /// Add new volume to object
@@ -316,16 +317,8 @@ void CreateSurfaceVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
     // doesn't care about exception when process was canceled by user
     if (canceled) return;
     if (priv::process(eptr)) return;
-
-    // TODO: Find better way to Not center volume data when add !!!
-    TriangleMesh mesh = m_result; // Part1: copy
-
     priv::create_volume(std::move(m_result), m_input.object_id,
         m_input.volume_type, m_input.text_tr, m_input);
-
-    // Part2: update volume data
-    //auto vol = wxGetApp().plater()->model().objects[m_input.object_idx]->volumes.back();
-    //UpdateJob::update_volume(vol, std::move(mesh), m_input.text_configuration, m_input.volume_name);
 }
 
 /////////////////
@@ -358,7 +351,11 @@ void UpdateSurfaceVolumeJob::finalize(bool canceled, std::exception_ptr &eptr)
     }
     if (canceled) return;
     if (priv::process(eptr)) return;
-    priv::update_volume(std::move(m_result), m_input);
+
+    // when start using surface it is wanted to move text origin on surface of model
+    // also when repeteadly move above surface result position should match
+    Transform3d *tr = &m_input.text_tr;
+    priv::update_volume(std::move(m_result), m_input, tr);
 }
 
 ////////////////////////////
@@ -535,31 +532,37 @@ void UpdateJob::update_volume(ModelVolume             *volume,
     canvas->reload_scene(refresh_immediately);
 }
 
-void priv::update_volume(TriangleMesh &&mesh, const DataUpdate &data)
+void priv::update_volume(TriangleMesh &&mesh, const DataUpdate &data, Transform3d* tr)
 {
     // for sure that some object will be created
-    if (mesh.its.empty())
-        return priv::create_message("Empty mesh can't be created.");
+    if (mesh.its.empty()) 
+        return create_message("Empty mesh can't be created.");
 
     Plater     *plater = wxGetApp().plater();
     GLCanvas3D *canvas = plater->canvas3D();
 
     // Check emboss gizmo is still open
     GLGizmosManager &manager  = canvas->get_gizmos_manager();
-    if (manager.get_current_type() != GLGizmosManager::Emboss) return;
+    if (manager.get_current_type() != GLGizmosManager::Emboss) 
+        return;
 
     std::string snap_name = GUI::format(_L("Text: %1%"), data.text_configuration.text);
     Plater::TakeSnapshot snapshot(plater, snap_name, UndoRedo::SnapshotType::GizmoAction);
     ModelVolume *volume = get_volume(plater->model().objects, data.volume_id);
+
     // could appear when user delete edited volume
     if (volume == nullptr)
         return;
 
-    // apply fix matrix made by store to .3mf
-    const auto &tc = volume->text_configuration;
-    assert(tc.has_value());
-    if (tc.has_value() && tc->fix_3mf_tr.has_value())
-        volume->set_transformation(volume->get_matrix() * tc->fix_3mf_tr->inverse());
+    if (tr) {
+        volume->set_transformation(*tr);
+    } else {
+        // apply fix matrix made by store to .3mf
+        const auto &tc = volume->text_configuration;
+        assert(tc.has_value());
+        if (tc.has_value() && tc->fix_3mf_tr.has_value())
+            volume->set_transformation(volume->get_matrix() * tc->fix_3mf_tr->inverse());
+    }
 
     UpdateJob::update_volume(volume, std::move(mesh), data.text_configuration, data.volume_name);
 }
@@ -726,45 +729,68 @@ TriangleMesh priv::cut_surface(DataBase& input1, const SurfaceVolumeData& input2
             biggest_count = its.vertices.size();
             biggest       = &s;
         }
-        s_to_itss[&s - &sources.front()] = itss.size();
+        size_t source_index = &s - &sources.front();
+        size_t its_index = itss.size();
+        s_to_itss[source_index] = its_index;
         itss.emplace_back(std::move(its));
     }
     if (itss.empty())
         throw JobException(_u8L("There is no volume in projection direction.").c_str());
 
-    Transform3d   tr_inv     = biggest->tr.inverse();
+    Transform3d tr_inv = biggest->tr.inverse();
+    Transform3d cut_projection_tr = tr_inv * input2.text_tr;
+
     size_t        itss_index = s_to_itss[biggest - &sources.front()];
     BoundingBoxf3 mesh_bb    = bounding_box(itss[itss_index]);
     for (const SurfaceVolumeData::ModelSource &s : sources) {
-        if (&s == biggest) continue;
         size_t itss_index = s_to_itss[&s - &sources.front()];
         if (itss_index == std::numeric_limits<size_t>::max()) continue;
-        Transform3d           tr  = s.tr * tr_inv;
+        if (&s == biggest) 
+            continue;
+
+        Transform3d tr = s.tr * tr_inv;
+        bool fix_reflected = true;
         indexed_triangle_set &its = itss[itss_index];
-        its_transform(its, tr);
+        its_transform(its, tr, fix_reflected);
         BoundingBoxf3 bb = bounding_box(its);
         mesh_bb.merge(bb);
     }
 
     // tr_inv = transformation of mesh inverted
-    Transform3d   cut_projection_tr = tr_inv * input2.text_tr;
-    Transform3d   emboss_tr         = cut_projection_tr.inverse();
-    BoundingBoxf3 mesh_bb_tr        = mesh_bb.transformed(emboss_tr);
+    Transform3d   emboss_tr  = cut_projection_tr.inverse();
+    BoundingBoxf3 mesh_bb_tr = mesh_bb.transformed(emboss_tr);
     std::pair<float, float> z_range{mesh_bb_tr.min.z(), mesh_bb_tr.max.z()};
     OrthoProject cut_projection = create_projection_for_cut(cut_projection_tr, shape_scale, z_range);
     float projection_ratio = (-z_range.first + safe_extension) / (z_range.second - z_range.first + 2 * safe_extension);
 
+    bool is_text_reflected = Slic3r::has_reflection(input2.text_tr);
+    if (is_text_reflected) {
+        // revert order of points in expolygons
+        // CW --> CCW
+        for (ExPolygon &shape : shapes) {
+            shape.contour.reverse();
+            for (Slic3r::Polygon &hole : shape.holes)
+                hole.reverse();
+        }
+    }
+
     // Use CGAL to cut surface from triangle mesh
     SurfaceCut cut = cut_surface(shapes, itss, cut_projection, projection_ratio);
+
+    if (is_text_reflected) {
+        for (SurfaceCut::Contour &c : cut.contours)
+            std::reverse(c.begin(), c.end());
+        for (Vec3i &t : cut.indices)
+            std::swap(t[0], t[1]);
+    }
+
     if (cut.empty()) throw JobException(_u8L("There is no valid surface for text projection.").c_str());
     if (was_canceled()) return {};
 
     // !! Projection needs to transform cut
     OrthoProject3d projection = create_emboss_projection(input2.is_outside, fp.emboss, emboss_tr, cut);
-
     indexed_triangle_set new_its = cut2model(cut, projection);
     assert(!new_its.empty());
-
     if (was_canceled()) return {};
     return TriangleMesh(std::move(new_its));
 }

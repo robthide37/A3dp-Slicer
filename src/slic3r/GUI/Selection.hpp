@@ -242,6 +242,9 @@ private:
     // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
     // Modifiers are taken in account
     std::optional<BoundingBoxf3> m_full_unscaled_instance_local_bounding_box;
+    // Bounding box aligned to the axis of the currently selected reference system (World/Object/Part)
+    // and transform to place and orient it in world coordinates
+    std::optional<std::pair<BoundingBoxf3, Transform3d>> m_bounding_box_in_current_reference_system;
 #endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_RENDER_SELECTION_CENTER
@@ -385,10 +388,12 @@ public:
     // Bounding box of a single full instance selection, in world coordinates.
     // Modifiers are taken in account
     const BoundingBoxf3& get_full_scaled_instance_bounding_box() const;
-
     // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
     // Modifiers are taken in account
     const BoundingBoxf3& get_full_unscaled_instance_local_bounding_box() const;
+    // Returns the bounding box aligned to the axis of the currently selected reference system (World/Object/Part)
+    // and the transform to place and orient it in world coordinates
+    const std::pair<BoundingBoxf3, Transform3d>& get_bounding_box_in_current_reference_system() const;
 #endif // ENABLE_WORLD_COORDINATE
 
     void setup_cache();
@@ -446,6 +451,10 @@ public:
     // returns the list of idxs of the volumes contained in the given list but not in the selection
     std::vector<unsigned int> get_unselected_volume_idxs_from(const std::vector<unsigned int>& volume_idxs) const;
 
+#if ENABLE_WORLD_COORDINATE_DEBUG
+    void render_debug_window() const;
+#endif // ENABLE_WORLD_COORDINATE_DEBUG
+
 private:
     void update_valid();
     void update_type();
@@ -460,7 +469,8 @@ private:
         m_bounding_box.reset();
         m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset();
         m_full_unscaled_instance_bounding_box.reset(); m_full_scaled_instance_bounding_box.reset();
-        m_full_unscaled_instance_local_bounding_box.reset();;
+        m_full_unscaled_instance_local_bounding_box.reset();
+        m_bounding_box_in_current_reference_system.reset();
     }
 #else
     void set_bounding_boxes_dirty() { m_bounding_box.reset(); m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset(); }

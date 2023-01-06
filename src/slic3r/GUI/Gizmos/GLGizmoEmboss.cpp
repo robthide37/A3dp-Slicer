@@ -274,8 +274,12 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
         Vec3d offset(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z());
         // offset += 0.5 * mesh_bb.size(); // No size of text volume at this position
         offset -= vol->get_instance_offset();
+#if ENABLE_WORLD_COORDINATE
         Transform3d tr = vol->get_instance_transformation().get_matrix_no_offset().inverse();
-        Vec3d offset_tr = tr * offset;        
+#else
+        Transform3d tr = vol->get_instance_transformation().get_matrix(true).inverse();
+#endif // ENABLE_WORLD_COORDINATE
+        Vec3d offset_tr = tr * offset;
         Transform3d volume_trmat = tr.translate(offset_tr);
         priv::start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
     }
@@ -531,7 +535,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Transform3d volume_trmat =
             gl_volume->get_instance_transformation().get_matrix().inverse() *
             *m_temp_transformation;
-        gl_volume->set_volume_transformation(volume_trmat);
+        gl_volume->set_volume_transformation(Geometry::Transformation(volume_trmat));
         m_parent.toggle_model_objects_visibility(true);
         // Apply temporary position
         m_temp_transformation = {};
@@ -605,12 +609,20 @@ void GLGizmoEmboss::on_render() {
             glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
         }
 
+        bool is_left_handed = has_reflection(*m_temp_transformation);
+        if (is_left_handed)
+            glsafe(::glFrontFace(GL_CW));        
+
         glsafe(::glEnable(GL_DEPTH_TEST));
         gl_volume.model.set_color(color);
         gl_volume.model.render();
         glsafe(::glDisable(GL_DEPTH_TEST));
 
-        if (is_transparent) glsafe(::glDisable(GL_BLEND));
+        // set it back to pevious state
+        if (is_left_handed)
+            glsafe(::glFrontFace(GL_CCW));
+        if (is_transparent)
+            glsafe(::glDisable(GL_BLEND));
 
         shader->stop_using();
     }
@@ -1120,6 +1132,17 @@ static inline void execute_job(std::shared_ptr<Job> j)
     });
 }
 
+namespace priv {
+/// <summary>
+/// Calculate translation of text volume onto surface of model
+/// </summary>
+/// <param name="volume">Text</param>
+/// <param name="raycast_manager">AABB trees of object. Actualize object containing text</param>
+/// <param name="selection">Transformation of actual instance</param>
+/// <returns>Offset of volume in volume coordinate</returns>
+std::optional<Vec3d> calc_surface_offset(const ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection);
+} // namespace priv
+
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
@@ -1159,6 +1182,13 @@ bool GLGizmoEmboss::process()
         auto& fix_3mf = m_volume->text_configuration->fix_3mf_tr;
         if (fix_3mf.has_value())
             text_tr = text_tr * fix_3mf->inverse();
+
+        // when it is new applying of use surface than move origin onto surfaca
+        if (!m_volume->text_configuration->style.prop.use_surface) {
+            auto offset = priv::calc_surface_offset(*m_volume, m_raycast_manager, m_parent.get_selection());
+            if (offset.has_value())
+                text_tr *= Eigen::Translation<double, 3>(*offset);
+        }
 
         bool is_outside = m_volume->is_model_part();
         // check that there is not unexpected volume type
@@ -1277,7 +1307,7 @@ bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
         vol_rot * 
         Eigen::Translation<double, 3>(offset_inv);
     //Transform3d res = vol_tr * vol_rot;
-    vol->set_volume_transformation(res);
+    vol->set_volume_transformation(Geometry::Transformation(res));
     priv::get_model_volume(vol, sel.get_model()->objects)->set_transformation(res);
     return true;
 }
@@ -2231,18 +2261,7 @@ void GLGizmoEmboss::draw_delete_style_button() {
     }
 }
 
-namespace priv {
-/// <summary>
-/// Transform origin of Text volume onto surface of model.
-/// </summary>
-/// <param name="volume">Text</param>
-/// <param name="raycast_manager">AABB trees of object</param>
-/// <param name="selection">Transformation of actual instance</param>
-/// <returns>True when transform otherwise false</returns>
-bool transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection);
-} // namespace priv
-
-
+// FIX IT: it should not change volume position before successfull change
 void GLGizmoEmboss::fix_transformation(const FontProp &from,
                                        const FontProp &to)
 {
@@ -2264,10 +2283,6 @@ void GLGizmoEmboss::fix_transformation(const FontProp &from,
         float t_move = t_move_opt.has_value() ? *t_move_opt : .0f;
         do_translate(Vec3d::UnitZ() * (t_move - f_move));
     }
-
-    // when start using surface than move volume origin onto surface
-    if (!from.use_surface && to.use_surface)
-        priv::transform_on_surface(*m_volume, m_raycast_manager, m_parent.get_selection());
 }
 
 void GLGizmoEmboss::draw_style_list() {
@@ -2361,7 +2376,7 @@ void GLGizmoEmboss::draw_style_list() {
     if (selected_style_index.has_value() && is_modified) { 
         wxString title   = _L("Style modification will be lost.");
         const EmbossStyle &style = m_style_manager.get_styles()[*selected_style_index].style;        
-        wxString message = GUI::format_wxstr(_L("Changing style to '%1%' will discard actual style modification.\n\n Would you like to continue anyway?"), style.name);
+        wxString message = GUI::format_wxstr(_L("Changing style to '%1%' will discard current style modification.\n\n Would you like to continue anyway?"), style.name);
         MessageDialog not_loaded_style_message(nullptr, message, title, wxICON_WARNING | wxYES|wxNO);
         if (not_loaded_style_message.ShowModal() != wxID_YES) 
             selected_style_index.reset();
@@ -2887,8 +2902,7 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     m_parent.do_rotate(snapshot_name);
 }
 
-bool priv::transform_on_surface(ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection)
-{
+std::optional<Vec3d> priv::calc_surface_offset(const ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection) {
     // Move object on surface
     auto cond = RaycastManager::SkipVolume({volume.id().id});
     raycast_manager.actualize(volume.get_object(), &cond);
@@ -2901,26 +2915,31 @@ bool priv::transform_on_surface(ModelVolume &volume, RaycastManager &raycast_man
 
     // ray in direction of text projection(from volume zero to z-dir)
     std::optional<RaycastManager::Hit> hit_opt = raycast_manager.unproject(point, direction, &cond);
+    // start point lay on surface could appear slightly behind surface
+    std::optional<RaycastManager::Hit> hit_opt_opposit = raycast_manager.unproject(point, -direction, &cond);
+    if (!hit_opt.has_value() || 
+        (hit_opt_opposit.has_value() && hit_opt->squared_distance > hit_opt_opposit->squared_distance))
+        hit_opt = hit_opt_opposit;
+
+    // Try to find closest point when no hit object in emboss direction
     if (!hit_opt.has_value())
         hit_opt = raycast_manager.closest(point);
 
+    // It should NOT appear. Closest point always exists.
     if (!hit_opt.has_value())
-        return false;
-    const RaycastManager::Hit &hit = *hit_opt;
+        return {};
 
+    // It is no neccesary to move with origin by very small value
+    if (hit_opt->squared_distance < EPSILON)
+        return {};
+
+    const RaycastManager::Hit &hit = *hit_opt;
     Transform3d hit_tr       = raycast_manager.get_transformation(hit.tr_key);
     Vec3d       hit_world    = hit_tr * hit.position.cast<double>();
     Vec3d       offset_world = hit_world - point; // vector in world
     // TIP: It should be close to only z move
     Vec3d offset_volume = to_world.inverse().linear() * offset_world;
-
-    // when try to use surface on just loaded text from 3mf
-    auto fix = volume.text_configuration->fix_3mf_tr;
-    if (fix.has_value())
-        offset_volume = fix->linear() * offset_volume;
-
-    volume.set_transformation(volume.get_matrix() * Eigen::Translation<double, 3>(offset_volume));
-    return true;
+    return offset_volume;
 }
 
 void GLGizmoEmboss::draw_advanced()
@@ -2975,8 +2994,6 @@ void GLGizmoEmboss::draw_advanced()
             // there should be minimal embossing depth
             if (font_prop.emboss < 0.1)
                 font_prop.emboss = 1;
-
-            priv::transform_on_surface(*m_volume, m_raycast_manager, m_parent.get_selection());
         }
         process();
     }

@@ -5653,6 +5653,10 @@ void GLCanvas3D::_render_selection()
 
     if (!m_gizmos.is_running())
         m_selection.render(scale_factor);
+
+#if ENABLE_WORLD_COORDINATE_DEBUG
+    m_selection.render_debug_window();
+#endif // ENABLE_WORLD_COORDINATE_DEBUG
 }
 
 void GLCanvas3D::_render_sequential_clearance()
