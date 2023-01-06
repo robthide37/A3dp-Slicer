@@ -81,7 +81,7 @@ struct FillParams
     ExtrusionRole role      { erNone };
 
     // flow to use
-    Flow        flow        = Flow(0.f, 0.f, 0.f, 1.f); // width,  height,  nozzle_diameter, spacing_ratio
+    Flow        flow        {};
 
     // to order the fills by priority
     int32_t     priority    = 0;
@@ -94,6 +94,8 @@ struct FillParams
 
     // For Concentric infill, to switch between Classic and Arachne.
     bool        use_arachne     { false };
+    // Layer height for Concentric infill with Arachne.
+    coordf_t    layer_height    { 0.f };
 };
 static_assert(IsTriviallyCopyable<FillParams>::value, "FillParams class is not POD (and it should be - see constructor).");
 

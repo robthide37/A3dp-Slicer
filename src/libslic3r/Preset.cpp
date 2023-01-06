@@ -470,6 +470,7 @@ static std::vector<std::string> s_Preset_print_options {
         "avoid_crossing_not_first_layer",
         "thin_perimeters", "thin_perimeters_all",
         "overhangs_speed",
+        "overhangs_speed_enforce",
         "overhangs_width",
         "overhangs_width_speed", 
         "overhangs_reverse",
@@ -505,9 +506,7 @@ static std::vector<std::string> s_Preset_print_options {
         "only_retract_when_crossing_perimeters", "enforce_retract_first_layer",
         "infill_first",
         "avoid_crossing_perimeters_max_detour",
-#ifdef HAS_PRESSURE_EQUALIZER
         "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative", 
-#endif /* HAS_PRESSURE_EQUALIZER */
         "min_width_top_surface",
         // speeds
         "default_speed",
@@ -577,6 +576,7 @@ static std::vector<std::string> s_Preset_print_options {
         "draft_shield",
         // brim
         "brim_inside_holes",
+        "brim_per_object",
         "brim_width",
         "brim_width_interior",
         "brim_ears",
@@ -614,7 +614,6 @@ static std::vector<std::string> s_Preset_print_options {
         "print_custom_variables",
         "complete_objects",
         "complete_objects_one_skirt",
-        "complete_objects_one_brim",
         "complete_objects_sort",
         "extruder_clearance_radius", 
         "extruder_clearance_height", "gcode_comments", "gcode_label_objects", "output_filename_format", "post_process", "perimeter_extruder",
@@ -708,7 +707,7 @@ static std::vector<std::string> s_Preset_print_options {
         "milling_speed",
         //Arachne
         "perimeter_generator", "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle",
-        "wall_distribution_count", "wall_split_middle_threshold", "wall_add_middle_threshold", "min_feature_size", "min_bead_width",
+        "wall_distribution_count", "min_feature_size", "min_bead_width"
 };
 
 static std::vector<std::string> s_Preset_filament_options {
@@ -912,7 +911,7 @@ static std::vector<std::string> s_Preset_sla_printer_options {
     "display_width", "display_height", "display_pixels_x", "display_pixels_y",
     "display_mirror_x", "display_mirror_y",
     "display_orientation",
-    "fast_tilt_time", "slow_tilt_time", "area_fill",
+    "fast_tilt_time", "slow_tilt_time", "high_viscosity_tilt_time", "area_fill",
     "relative_correction",
     "relative_correction_x",
     "relative_correction_y",

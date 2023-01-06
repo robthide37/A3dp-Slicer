@@ -193,7 +193,7 @@ std::shared_ptr<SlicingParameters> SlicingParameters::create_from_config(
                 params.gap_raft_object += nzd_avg * sqrt(default_region_config.bridge_flow_ratio.get_abs_value(1)) - params.layer_height;
             } else if (default_region_config.bridge_type == BridgeType::btFromFlow) {
                 float nzd_solid_infill = print_config.nozzle_diameter.get_at(default_region_config.solid_infill_extruder - 1);
-                Flow reference_flow = Flow::new_from_config_width(frInfill, default_region_config.infill_extrusion_width, nzd_solid_infill, (float)params.layer_height, 1);
+                Flow reference_flow = Flow::new_from_config_width(frInfill, default_region_config.infill_extrusion_width, default_region_config.infill_extrusion_spacing, nzd_solid_infill, (float)params.layer_height, 1);
                 double diameter = sqrt(4 * reference_flow.mm3_per_mm() / PI);
                 params.gap_raft_object += diameter - params.layer_height;
             } /*else if (default_region_config.bridge_type == BridgeType::btFromHeight) {

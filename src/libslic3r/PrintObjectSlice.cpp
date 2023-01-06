@@ -502,7 +502,8 @@ std::string fix_slicing_errors(LayerPtrs &layers, const std::function<void()> &t
     while (! layers.empty() && (layers.front()->lslices.empty() || layers.front()->empty())) {
         delete layers.front();
         layers.erase(layers.begin());
-        layers.front()->lower_layer = nullptr;
+        if(!layers.empty())
+            layers.front()->lower_layer = nullptr;
         for (size_t i = 0; i < layers.size(); ++ i)
             layers[i]->set_id(layers[i]->id() - 1);
     }
@@ -697,6 +698,7 @@ ExPolygons PrintObject::_shrink_contour_holes(double contour_delta, double not_c
         Polygons contours;
         ExPolygons holes;
         for (const Polygon& hole : ex_poly.holes) {
+            assert(hole.points.size() >= 3);
             //check if convex to reduce it
             // check whether first point forms a convex angle
             //note: we allow a deviation of 5.7° (0.01rad = 0.57°)

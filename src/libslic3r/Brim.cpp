@@ -317,7 +317,7 @@ static std::vector<InnerBrimExPolygons> inner_brim_area(const Print             
             // After 7ff76d07684858fd937ef2f5d863f105a10f798e offset and shrink don't work with CW polygons (holes), so let's make it CCW.
             Polygons ex_poly_holes_reversed = ex_poly.holes;
             polygons_reverse(ex_poly_holes_reversed);
-            for (const PrintInstance &instance : object->instances()) {
+            for ([[maybe_unused]] const PrintInstance &instance : object->instances()) {
                 ++polygon_idx; // Increase idx because of the contour of the ExPolygon.
 
                 if (brim_type == BrimType::btInnerOnly || brim_type == BrimType::btOuterAndInner)
@@ -973,6 +973,8 @@ Polylines reorder_brim_polyline(Polylines lines, ExtrusionEntityCollection& out,
 }
 
 
+//note: unbrimmable must keep its ordering. don't union_ex it.
+
 //TODO: test if no regression vs old _make_brim.
 // this new one can extrude brim for an object inside an other object.
 void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& objects, ExPolygons& unbrimmable, ExtrusionEntityCollection& out) {
@@ -983,7 +985,7 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     for (PrintObject* object : objects) {
         ExPolygons object_islands;
         for (ExPolygon& expoly : object->layers().front()->lslices)
-            if (brim_config.brim_inside_holes || brim_config.brim_width_interior > 0) {
+            if (brim_config.brim_inside_holes && brim_config.brim_width_interior == 0) {
                 if (brim_offset == 0) {
                     object_islands.push_back(expoly);
                 } else {
@@ -1123,7 +1125,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
         ExPolygons object_islands;
         ExPolygons support_island;
         for (const ExPolygon& expoly : object->layers().front()->lslices) {
-            if (brim_config.brim_inside_holes || brim_config.brim_width_interior > 0){
+            if (brim_config.brim_inside_holes && brim_config.brim_width_interior == 0) {
                 if (brim_offset == 0) {
                     object_islands.push_back(expoly);
                 } else {
@@ -1263,7 +1265,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
             float(print.get_first_layer_height())
         );
 
-        unbrimmable = union_ex(unbrimmable, offset_ex(mouse_ears_ex, flow.scaled_spacing() / 2));
+        append(unbrimmable, offset_ex(mouse_ears_ex, flow.scaled_spacing() / 2));
 
     } else /* brim_config.brim_ears_pattern.value == InfillPattern::ipRectilinear */ {
 

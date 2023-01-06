@@ -161,8 +161,8 @@ Here are all the functions you need to define for your custom widget to work (fo
  * float **OPTNAME_get**()
  * void **OPTNAME_set**(float set)
  ### type float_or_percent:
- * float **OPTNAME_get**(bool &out is_percent)
- * void **OPTNAME_set**(float set, bool is_percent)
+ * float **OPTNAME_get**(bool &out isPercent)
+ * void **OPTNAME_set**(float set, bool isPercent)
 ###  type string:
  * void **OPTNAME_get**(string &out get)
  * void **OPTNAME_set**(string &in set)

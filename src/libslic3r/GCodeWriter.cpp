@@ -10,8 +10,12 @@
 #include <iostream>
 #include <map>
 
+#ifdef DONT_USE_CHARCONV
+    #include <boost/spirit/include/karma.hpp>
+#else
 #ifdef __APPLE__
     #include <boost/spirit/include/karma.hpp>
+#endif
 #endif
 
 #define FLAVOR_IS(val) this->config.gcode_flavor.value == val
@@ -824,6 +828,7 @@ std::string GCodeWriter::set_fan(const uint8_t speed, uint16_t default_tool)
 void GCodeFormatter::emit_axis(const char axis, const double v, size_t digits) {
     assert(digits <= 9);
     static constexpr const std::array<int, 10> pow_10{1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000};
+#ifndef DONT_USE_CHARCONV
     *ptr_err.ptr++ = ' '; *ptr_err.ptr++ = axis;
 
     char *base_ptr = this->ptr_err.ptr;
@@ -863,11 +868,51 @@ void GCodeFormatter::emit_axis(const char axis, const double v, size_t digits) {
     if ((this->ptr_err.ptr + 1) == base_ptr || *this->ptr_err.ptr == '-')
         *(++this->ptr_err.ptr) = '0';
     this->ptr_err.ptr++;
+#else
+    * ptr_err_ptr++ = ' '; *ptr_err_ptr++ = axis;
 
-#if 0 // #ifndef NDEBUG
+    char* base_ptr = this->ptr_err_ptr;
+    auto  v_int = int64_t(std::round(v * pow_10[digits]));
+    // Older stdlib doesn't support std::from_chars at all, so it is used boost::spirit::karma::generate instead of it.
+    // That is a little bit slower than std::to_chars but not much.
+    boost::spirit::karma::generate(this->ptr_err_ptr, boost::spirit::karma::int_generator<int64_t>(), v_int);
+    size_t writen_digits = (this->ptr_err_ptr - base_ptr) - (v_int < 0 ? 1 : 0);
+    if (writen_digits < digits) {
+        // Number is smaller than 10^digits, so that we will pad it with zeros.
+        size_t remaining_digits = digits - writen_digits;
+        // Move all newly inserted chars by remaining_digits to allocate space for padding with zeros.
+        for (char* from_ptr = this->ptr_err_ptr - 1, *to_ptr = from_ptr + remaining_digits; from_ptr >= this->ptr_err_ptr - writen_digits; --to_ptr, --from_ptr)
+            *to_ptr = *from_ptr;
+
+        memset(this->ptr_err_ptr - writen_digits, '0', remaining_digits);
+        this->ptr_err_ptr += remaining_digits;
+    }
+
+    // Move all newly inserted chars by one to allocate space for a decimal point.
+    for (char* to_ptr = this->ptr_err_ptr, *from_ptr = to_ptr - 1; from_ptr >= this->ptr_err_ptr - digits; --to_ptr, --from_ptr)
+        *to_ptr = *from_ptr;
+
+    *(this->ptr_err_ptr - digits) = '.';
+    for (size_t i = 0; i < digits; ++i) {
+        if (*this->ptr_err_ptr != '0')
+            break;
+        this->ptr_err_ptr--;
+    }
+    if (*this->ptr_err_ptr == '.')
+        this->ptr_err_ptr--;
+    if ((this->ptr_err_ptr + 1) == base_ptr || *this->ptr_err_ptr == '-')
+        *(++this->ptr_err_ptr) = '0';
+    this->ptr_err_ptr++;
+#endif
+
+#ifndef NDEBUG
     {
         // Verify that the optimized formatter produces the same result as the standard sprintf().
+#ifndef DONT_USE_CHARCONV
         double v1 = atof(std::string(base_ptr, this->ptr_err.ptr).c_str());
+#else
+        double v1 = atof(std::string(base_ptr, this->ptr_err_ptr).c_str());
+#endif
         char buf[2048];
         sprintf(buf, "%.*lf", int(digits), v);
         double v2 = atof(buf);

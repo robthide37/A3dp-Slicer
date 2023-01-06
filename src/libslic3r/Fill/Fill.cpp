@@ -8,10 +8,10 @@
 #include "../Print.hpp"
 #include "../PrintConfig.hpp"
 #include "../Surface.hpp"
-#include "../PerimeterGenerator.hpp"
 
 #include "FillBase.hpp"
 #include "FillRectilinear.hpp"
+#include "FillLightning.hpp"
 #include "FillConcentric.hpp"
 
 namespace Slic3r {
@@ -216,13 +216,14 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                         diameter = nozzle_diameter;
                     }
                     params.flow = Flow::bridging_flow((float)(diameter * std::sqrt(region_config.bridge_flow_ratio.get_abs_value(1))), nozzle_diameter);
-                } else
+                } else {
                     params.flow = layerm.region().flow(
                         *layer.object(),
                         extrusion_role,
                         (surface.thickness == -1) ? layer.height : surface.thickness,   // extrusion height
                         layer.id() == 0                                                 // first layer?
                     );
+                }
                 
                 // Calculate flow spacing for infill pattern generation.
                 if (surface.has_fill_solid() || is_bridge) {
@@ -414,7 +415,7 @@ void export_group_fills_to_svg(const char *path, const std::vector<SurfaceFill> 
 #endif
 
 // friend to Layer
-void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree)
+void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree, FillLightning::Generator* lightning_generator)
 {
     for (LayerRegion* layerm : m_regions) {
         layerm->fills.clear();
@@ -480,6 +481,9 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         f->angle    = surface_fill.params.angle;
         f->adapt_fill_octree = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
 
+        if (surface_fill.params.pattern == ipLightning)
+            dynamic_cast<FillLightning::Filler*>(f.get())->generator = lightning_generator;
+
         if (perimeter_generator.value == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) {
             FillConcentric *fill_concentric = dynamic_cast<FillConcentric *>(f.get());
             assert(fill_concentric != nullptr);
@@ -522,18 +526,8 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         //params.anchor_length   = surface_fill.params.anchor_length;
         //params.anchor_length_max = surface_fill.params.anchor_length_max;
         //params.resolution        = resolution;
-        surface_fill.params.use_arachne       = perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric;
-
-        if (using_internal_flow) {
-            // if we used the internal flow we're not doing a solid infill
-            // so we can safely ignore the slight variation that might have
-            // been applied to $f->flow_spacing
-        } else {
-            float overlap = surface_fill.params.config->get_computed_value("filament_max_overlap", surface_fill.params.extruder - 1);
-            //FIXME FLOW decide what to use
-            //Flow new_flow = surface_fill.params.flow.with_spacing(float(f->spacing));
-            surface_fill.params.flow = Flow::new_from_spacing((float)f->get_spacing(), surface_fill.params.flow.nozzle_diameter(), (float)surface_fill.params.flow.height(), overlap, surface_fill.params.flow.bridge());
-        }
+        surface_fill.params.use_arachne = perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric;
+        //params.layer_height      = m_regions[surface_fill.region_id]->layer()->height;
 
         //union with safety offset to avoid separation from the appends of different surface with same settings.
         surface_fill.expolygons = union_safety_offset_ex(surface_fill.expolygons);
@@ -560,6 +554,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
             surface_fill.params.dont_adjust = dont_adjust;
             surface_fill.params.bridge_offset = 0;
             surface_fill.params.density = density;
+            surface_fill.params.layer_height = m_regions[surface_fill.region_id]->layer()->height;
 
             //init the surface with the current polygon
             if (!expoly.contour.empty()) {
@@ -624,10 +619,6 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                         surface_fill.params.dont_adjust = true;
                         surface_fill.params.bridge_offset = std::abs(poly.bounding_box().min.x() - bounding_box_min_x);
                     }
-                }
-
-                if (!surface_fill.params.flow.bridge() && surface_fill.params.full_infill()) {
-                    surface_fill.params.flow = surface_fill.params.flow.with_spacing_ratio(surface_fill.params.config->solid_infill_overlap.get_abs_value(1.));
                 }
 
                 //make fill
@@ -805,6 +796,7 @@ void Layer::make_ironing()
         // Create the ironing extrusions for regions <i, j)
         ExPolygons ironing_areas;
         double nozzle_dmr = this->object()->print()->config().nozzle_diameter.values[ironing_params.extruder - 1];
+        const PrintRegionConfig& region_config = ironing_params.layerm->region().config();
         if (ironing_params.just_infill) {
             // Just infill.
         } else {
@@ -814,7 +806,6 @@ void Layer::make_ironing()
             Polygons infills;
             for (size_t k = i; k < j; ++k) {
                 const IroningParams& ironing_params = by_extruder[k];
-                const PrintRegionConfig& region_config = ironing_params.layerm->region().config();
                 bool					  iron_everything = region_config.ironing_type == IroningType::AllSolid;
                 bool					  iron_completely = iron_everything;
                 if (iron_everything) {
@@ -865,7 +856,9 @@ void Layer::make_ironing()
         fill.link_max_length = (coord_t)scale_(3. * fill.get_spacing());
         double extrusion_height = ironing_params.height * fill.get_spacing() / nozzle_dmr;
         //FIXME FLOW decide if it's good
-        float  extrusion_width = Flow::rounded_rectangle_extrusion_width_from_spacing(float(nozzle_dmr), float(extrusion_height));
+        double max_overlap = region_config.get_computed_value("filament_max_overlap", ironing_params.extruder - 1);
+        double overlap = std::min(max_overlap, region_config.solid_infill_overlap.get_abs_value(1.));
+        float  extrusion_width = Flow::rounded_rectangle_extrusion_width_from_spacing(float(nozzle_dmr), float(extrusion_height), float(overlap));
         double flow_mm3_per_mm = nozzle_dmr * extrusion_height;
         //Flow flow = Flow::new_from_spacing(float(nozzle_dmr), 0., float(height), 1.f, false);
         //double flow_mm3_per_mm = flow.mm3_per_mm();
@@ -874,6 +867,7 @@ void Layer::make_ironing()
             surface_fill.expolygon = std::move(expoly);
             Polylines polylines;
             try {
+                assert(!fill_params.use_arachne);
                 polylines = fill.fill_surface(&surface_fill, fill_params);
             } catch (InfillFailedException &) {
             }

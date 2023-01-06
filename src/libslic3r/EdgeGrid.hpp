@@ -179,6 +179,11 @@ public:
 		assert(m_bbox.contains(p2));
 		p1 -= m_bbox.min;
 		p2 -= m_bbox.min;
+		assert(std::abs(p1.x()) < coord_t(int32_t(0x7FFFFFFF)));
+		assert(std::abs(p1.y()) < coord_t(int32_t(0x7FFFFFFF)));
+		assert(std::abs(p2.x()) < coord_t(int32_t(0x7FFFFFFF)));
+		assert(std::abs(p2.y()) < coord_t(int32_t(0x7FFFFFFF)));
+		assert(p1.x() >= 0 && p1.x() < coord_t(m_cols) * m_resolution);
 		assert(p1.x() >= 0 && p1.x() < coord_t(m_cols) * m_resolution);
 		assert(p1.y() >= 0 && p1.y() < coord_t(m_rows) * m_resolution);
 		assert(p2.x() >= 0 && p2.x() < coord_t(m_cols) * m_resolution);

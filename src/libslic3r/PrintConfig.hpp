@@ -39,8 +39,6 @@
 #include <boost/preprocessor/tuple/elem.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
 
-// #define HAS_PRESSURE_EQUALIZER
-
 namespace Slic3r {
 
 enum CompleteObjectSort {
@@ -110,8 +108,6 @@ enum class FuzzySkinType {
     All,
 };
 
-#define HAS_LIGHTNING_INFILL 0
-
 enum InfillPattern : uint8_t{
     ipRectilinear, ipAlignedRectilinear, ipGrid, ipTriangles, ipStars, ipCubic, ipLine,
     ipConcentric, ipConcentricGapFill,
@@ -124,9 +120,7 @@ enum InfillPattern : uint8_t{
     ipRectilinearWGapFill,
     ipMonotonic,
     ipMonotonicWGapFill,
-#if HAS_LIGHTNING_INFILL
     ipLightning,
-#endif // HAS_LIGHTNING_INFILL
     ipAuto,
     ipCount,
 };
@@ -696,6 +690,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                brim_ears_detection_length))
     ((ConfigOptionFloat,                brim_ears_max_angle))
     ((ConfigOptionEnum<InfillPattern>,  brim_ears_pattern))
+    ((ConfigOptionBool,                 brim_per_object))
     ((ConfigOptionFloat,                brim_separation))
     //((ConfigOptionEnum<BrimType>,       brim_type))
     ((ConfigOptionBool,                 clip_multipart_objects))
@@ -718,7 +713,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 interface_shells))
     ((ConfigOptionFloat,                layer_height))
     ((ConfigOptionFloatOrPercent,       min_bead_width))
-    ((ConfigOptionFloat,                min_feature_size))
+    ((ConfigOptionFloatOrPercent,       min_feature_size))
     ((ConfigOptionFloat,                mmu_segmented_region_max_width))
     ((ConfigOptionFloat,                model_precision))
     ((ConfigOptionPercent,              perimeter_bonding))
@@ -738,12 +733,10 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                slice_closing_radius))
     ((ConfigOptionEnum<SlicingMode>,    slicing_mode))
     ((ConfigOptionBool,                 support_material))
-    ((ConfigOptionFloat,                wall_transition_length))
+    ((ConfigOptionFloatOrPercent,       wall_transition_length))
     ((ConfigOptionFloatOrPercent,       wall_transition_filter_deviation))
     ((ConfigOptionFloat,                wall_transition_angle))
     ((ConfigOptionInt,                  wall_distribution_count))
-    ((ConfigOptionPercent,              wall_split_middle_threshold))
-    ((ConfigOptionPercent,              wall_add_middle_threshold))
     // Automatic supports (generated based on support_material_threshold).
     ((ConfigOptionBool,                 support_material_auto))
     // Direction of the support pattern (in XY plane).
@@ -883,6 +876,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       min_width_top_surface))
     // Detect bridging perimeters
     ((ConfigOptionFloatOrPercent,       overhangs_speed))
+    ((ConfigOptionInt,                  overhangs_speed_enforce))
     ((ConfigOptionFloatOrPercent,       overhangs_width))
     ((ConfigOptionFloatOrPercent,       overhangs_width_speed))
     ((ConfigOptionBool,                 overhangs_reverse))
@@ -1047,6 +1041,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,               max_gcode_per_second))
     ((ConfigOptionFloatOrPercent,      max_print_speed))
     ((ConfigOptionFloat,               max_volumetric_speed))
+    ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_positive))
+    ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_negative))
     ((ConfigOptionFloats,              milling_z_lift))
     ((ConfigOptionFloat,               min_length))
     ((ConfigOptionPercents,            retract_before_wipe))
@@ -1213,6 +1209,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionString,               thumbnails_color))
     ((ConfigOptionBool,                 thumbnails_custom_color))
     ((ConfigOptionBool,                 thumbnails_end_file))
+    ((ConfigOptionEnum<GCodeThumbnailsFormat>, thumbnails_format))
     ((ConfigOptionBool,                 thumbnails_with_bed))
     ((ConfigOptionPercent,              time_estimation_compensation))
     ((ConfigOptionFloat,                time_cost))
@@ -1404,7 +1401,7 @@ PRINT_CONFIG_CLASS_DEFINE(
 
 )
 
-enum SLAMaterialSpeed { slamsSlow, slamsFast };
+enum SLAMaterialSpeed { slamsSlow, slamsFast, slamsHighViscosity };
 
 PRINT_CONFIG_CLASS_DEFINE(
     SLAMaterialConfig,
@@ -1449,6 +1446,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                        gamma_correction))
     ((ConfigOptionFloat,                        fast_tilt_time))
     ((ConfigOptionFloat,                        slow_tilt_time))
+    ((ConfigOptionFloat,                        high_viscosity_tilt_time))
     ((ConfigOptionFloat,                        area_fill))
     ((ConfigOptionFloat,                        min_exposure_time))
     ((ConfigOptionFloat,                        max_exposure_time))

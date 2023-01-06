@@ -151,8 +151,8 @@ void Polyline::split_at(const Point &point, Polyline* p1, Polyline* p2) const
         Point  proj = point.projection_onto(Line(prev, *it));
         double d2   = (proj - point).cast<double>().squaredNorm();
         if (d2 < min_dist2) {
-	        min_dist2    = d2;
-	        min_point_it = it;
+            min_dist2    = d2;
+            min_point_it = it;
         }
         prev = *it;
     }
@@ -224,6 +224,29 @@ bool remove_degenerate(Polylines &polylines)
     if (j < polylines.size())
         polylines.erase(polylines.begin() + j, polylines.end());
     return modified;
+}
+
+std::pair<int, Point> foot_pt(const Points &polyline, const Point &pt)
+{
+    if (polyline.size() < 2)
+        return std::make_pair(-1, Point(0, 0));
+
+    auto  d2_min  = std::numeric_limits<double>::max();
+    Point foot_pt_min;
+    Point prev = polyline.front();
+    auto  it = polyline.begin();
+    auto  it_proj = polyline.begin();
+    for (++ it; it != polyline.end(); ++ it) {
+        Point  foot_pt = pt.projection_onto(Line(prev, *it));
+        double d2 = (foot_pt - pt).cast<double>().squaredNorm();
+        if (d2 < d2_min) {
+            d2_min      = d2;
+            foot_pt_min = foot_pt;
+            it_proj     = it;
+        }
+        prev = *it;
+    }
+    return std::make_pair(int(it_proj - polyline.begin()) - 1, foot_pt_min);
 }
 
 ThickLines ThickPolyline::thicklines() const

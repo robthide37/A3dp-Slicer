@@ -147,7 +147,7 @@ public:
         m_action_font = m_constant_text.credits_font.Bold();
 
         // draw logo and constant info text
-        Decorate(m_main_bitmap);
+        Decorate();
     }
 
     void SetText(const wxString& text)
@@ -201,14 +201,14 @@ public:
         return new_bmp;
     }
 
-    void Decorate(wxBitmap& bmp)
+    void Decorate()
     {
-        if (!bmp.IsOk())
+        if (!m_main_bitmap.IsOk())
             return;
 
         // draw text to the box at the left of the splashscreen.
         // this box will be 2/5 of the weight of the bitmap, and be at the left.
-        int width = lround(bmp.GetWidth() * 0.4);
+        int width = lround(m_main_bitmap.GetWidth() * 0.4);
 
         // load bitmap for logo
         BitmapCache bmp_cache;
@@ -218,11 +218,11 @@ public:
 
         wxCoord margin = int(m_scale * 20);
 
-        wxRect banner_rect(wxPoint(0, logo_size), wxPoint(width, bmp.GetHeight()));
+        wxRect banner_rect(wxPoint(0, logo_size), wxPoint(width, m_main_bitmap.GetHeight()));
         banner_rect.Deflate(margin, 2 * margin);
 
         // use a memory DC to draw directly onto the bitmap
-        wxMemoryDC memDc(bmp);
+        wxMemoryDC memDc(m_main_bitmap);
 
         // draw logo
         memDc.DrawBitmap(*logo_bmp, margin, margin, true);
@@ -251,7 +251,7 @@ public:
 
         // calculate position for the dynamic text
         int logo_and_header_height = margin + logo_size + title_height + version_height;
-        m_action_line_y_position = logo_and_header_height + 0.5 * (bmp.GetHeight() - margin - credits_height - logo_and_header_height - text_height);
+        m_action_line_y_position = logo_and_header_height + 0.5 * (m_main_bitmap.GetHeight() - margin - credits_height - logo_and_header_height - text_height);
     }
 
 private:
@@ -281,7 +281,7 @@ private:
 
             // credits infornation
             credits = _L("SuperSlicer is a skinned version of Slic3r, based on PrusaSlicer by Prusa and the original Slic3r by Alessandro Ranellucci & the RepRap community.") + "\n\n" +
-                        title + " " + _L("is licensed under the") + " " + _L("GNU Affero General Public License, version 3") + "\n\n" +
+                        title + " " + _L("is licensed under the") + " " + _L("GNU Affero General Public License, version 3") + ".\n\n" +
                         _L("Contributions by Vojtech Bubnik, Enrico Turri, Durand Remi, Oleksandra Iushchenko, Tamas Meszaros, Lukas Matena, Vojtech Kral, David Kocik and numerous others.");
 
             title_font = version_font = credits_font = init_font;
@@ -497,10 +497,11 @@ struct FileWildcards {
 static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_STL */     { "STL files"sv,       { ".stl"sv } },
     /* FT_OBJ */     { "OBJ files"sv,       { ".obj"sv } },
+    /* FT_STEP */    { "STEP files"sv,      { ".stp"sv, ".step"sv } },
     /* FT_AMF */     { "AMF files"sv,       { ".amf"sv, ".zip.amf"sv, ".xml"sv } },
     /* FT_3MF */     { "3MF files"sv,       { ".3mf"sv } },
     /* FT_GCODE */   { "G-code files"sv,    { ".gcode"sv, ".gco"sv, ".g"sv, ".ngc"sv } },
-    /* FT_MODEL */   { "Known files"sv,     { ".stl"sv, ".obj"sv, ".3mf"sv, ".amf"sv, ".zip.amf"sv, ".xml"sv } },
+    /* FT_MODEL */   { "Known files"sv,     { ".stl"sv, ".obj"sv, ".3mf"sv, ".amf"sv, ".zip.amf"sv, ".xml"sv, ".step"sv, ".stp"sv } },
     /* FT_PROJECT */ { "Project files"sv,   { ".3mf"sv, ".amf"sv, ".zip.amf"sv } },
     /* FT_GALLERY */ { "Known files"sv,     { ".stl"sv, ".obj"sv } },
 
@@ -737,7 +738,7 @@ void GUI_App::post_init()
     if (! this->initialized())
         throw Slic3r::RuntimeError("Calling post_init() while not yet initialized");
 
-    if (this->init_params->start_as_gcodeviewer) {
+    if (this->is_gcode_viewer()) {
         if (! this->init_params->input_files.empty())
             this->plater()->load_gcode(wxString::FromUTF8(this->init_params->input_files[0].c_str()));
     }
@@ -1180,15 +1181,17 @@ bool GUI_App::on_init_inner()
         std::string file_name = app_config->splashscreen(is_editor());
         wxString artist;
         if (!file_name.empty()) {
-            wxString splash_screen_path = wxString::FromUTF8((boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen" / file_name).string().c_str());
+            boost::filesystem::path splash_screen_path = (boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen" / file_name);
+            if (boost::filesystem::exists(splash_screen_path)) {
+                wxString path_str = wxString::FromUTF8((splash_screen_path).string().c_str());
         // make a bitmap with dark grey banner on the left side
-            bmp = SplashScreen::MakeBitmap(wxBitmap(splash_screen_path, wxBITMAP_TYPE_JPEG));
+                bmp = SplashScreen::MakeBitmap(wxBitmap(path_str, wxBITMAP_TYPE_JPEG));
 
-
+                //get the artist name from metadata
             int result;
             void** ifdArray = nullptr;
             ExifTagNodeInfo* tag;
-            ifdArray = exif_createIfdTableArray(splash_screen_path.c_str(), &result);
+                ifdArray = exif_createIfdTableArray(path_str.c_str(), &result);
             if (result > 0 && ifdArray) {
                 tag = exif_getTagInfo(ifdArray, IFD_0TH, TAG_Artist);
                 if (tag) {
@@ -1197,6 +1200,7 @@ bool GUI_App::on_init_inner()
                     }
                 }
             }
+        }
         }
 
         // Detect position (display) to show the splash screen
@@ -1216,8 +1220,8 @@ bool GUI_App::on_init_inner()
             get_app_config()->save();
         }
 
-        // create splash screen with updated bmp
-        scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap(SLIC3R_APP_KEY, nullptr, 400), 
+        // make a bitmap with dark grey banner on the left side
+        scrn = new SplashScreen(bmp.IsOk() ? bmp : SplashScreen::MakeBitmap(create_scaled_bitmap(SLIC3R_APP_KEY, nullptr, 600)),
                                 wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos, artist);
 
         if (!default_splashscreen_pos)
@@ -1259,7 +1263,7 @@ bool GUI_App::on_init_inner()
                         , NotificationManager::NotificationLevel::ImportantNotificationLevel
                         , Slic3r::format(_u8L("New release version %1% is available."), evt.GetString())
                         , _u8L("See Download page.")
-                        , [](wxEvtHandler* evnthndlr) {wxGetApp().open_web_page_localized("https://www.prusa3d.com/slicerweb"); return true; }
+                        , [](wxEvtHandler* evnthndlr) {wxGetApp().open_web_page_localized(SLIC3R_DOWNLOAD); return true; }
                     );
                 //}
             }
@@ -1274,7 +1278,7 @@ bool GUI_App::on_init_inner()
                         , NotificationManager::NotificationLevel::ImportantNotificationLevel
                         , Slic3r::format(_u8L("New prerelease version %1% is available."), evt_string)
                         , _u8L("See Releases page.")
-                        , [](wxEvtHandler* evnthndlr) {wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); return true; }
+                        , [](wxEvtHandler* evnthndlr) {wxGetApp().open_browser_with_warning_dialog("https://github.com/" SLIC3R_GITHUB "/releases"); return true; }
                     );
     }
             }
@@ -2076,7 +2080,7 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
 {
     input_files.Clear();
     wxFileDialog dialog(parent ? parent : GetTopWindow(),
-        _L("Choose one or more files (STL/OBJ/AMF/3MF/PRUSA):"),
+        _L("Choose one or more files (STL/3MF/STEP/OBJ/AMF/PRUSA):"),
         from_u8(app_config->get_last_dir()), "",
         file_wildcards(FT_MODEL), wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
 
@@ -3375,7 +3379,7 @@ bool GUI_App::open_browser_with_warning_dialog(const wxString& url, wxWindow* pa
     // warning dialog doesn't containe a "Remember my choice" checkbox
     // and will be shown only when "Suppress to open hyperlink in browser" is ON.
     else if (app_config->get(option_key) == "1") {
-        MessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
+        MessageDialog dialog(parent, _L("Open hyperlink in default browser?"), format_wxstr(_L("%1%: Open hyperlink"), SLIC3R_APP_NAME), wxICON_QUESTION | wxYES_NO);
         launch = dialog.ShowModal() == wxID_YES;
     }
 

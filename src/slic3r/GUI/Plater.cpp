@@ -1135,7 +1135,7 @@ void Sidebar::jump_to_option(size_t selected)
         }
     }
 
-    wxGetApp().get_tab(opt.type)->activate_option(opt.opt_key(), boost::nowide::narrow(opt.category));
+    wxGetApp().get_tab(opt.type)->activate_option(opt.opt_key_with_idx(), boost::nowide::narrow(opt.category));
 
     // Switch to the Settings NotePad
 //    wxGetApp().mainframe->select_tab(MainFrame::ETabType::LastSettings);
@@ -2033,7 +2033,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "complete_objects",
         "complete_objects_sort",
         "complete_objects_one_skirt",
-        "complete_objects_one_brim",
+        "brim_per_object",
         "duplicate_distance", 
         "draft_shield",
         "extruder_clearance_radius",
@@ -2043,7 +2043,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "perimeter_extrusion_width",
         "extrusion_width",
         "skirts", "skirt_brim", "skirt_distance", "skirt_distance_from_brim", 
-        "skirt_extrusion_width", "skirt_height",
+        "skirt_extrusion_width", "skirt_height", "first_layer_extrusion_spacing", "perimeter_extrusion_spacing", "extrusion_spacing",
         "variable_layer_height", "nozzle_diameter", "single_extruder_multi_material",
         "wipe_tower", "wipe_tower_brim_width", "wipe_tower_rotation_angle", "wipe_tower_width", "wipe_tower_x", "wipe_tower_y",
         "extruder_colour", "filament_colour", "material_colour",
@@ -2427,9 +2427,20 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     const auto loading = _L("Loading") + dots;
 
-    // Create wxProgressDialog on heap, see the linux ifdef below.
-    auto progress_dlg = new wxProgressDialog(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
+    // The situation with wxProgressDialog is quite interesting here.
+    // On Linux (only), there are issues when FDM/SLA is switched during project file loading (disabling of controls,
+    // see a comment below). This can be bypassed by creating the wxProgressDialog on heap and destroying it
+    // when loading a project file. However, creating the dialog on heap causes issues on macOS, where it does not
+    // appear at all. Therefore, we create the dialog on stack on Win and macOS, and on heap on Linux, which
+    // is the only system that needed the workarounds in the first place.
+#ifdef __linux__
+    auto progress_dlg = new wxProgressDialog(loading, "", 100, find_toplevel_parent(q), wxPD_APP_MODAL | wxPD_AUTO_HIDE);
     Slic3r::ScopeGuard([&progress_dlg](){ if (progress_dlg) progress_dlg->Destroy(); progress_dlg = nullptr; });
+#else
+    wxProgressDialog progress_dlg_stack(loading, "", 100, find_toplevel_parent(q), wxPD_APP_MODAL | wxPD_AUTO_HIDE);
+    wxProgressDialog* progress_dlg = &progress_dlg_stack;    
+#endif
+    
 
     wxBusyCursor busy;
 
@@ -3190,6 +3201,8 @@ void Plater::priv::split_object()
         for (size_t idx : idxs)
         {
             get_selection().add_object((unsigned int)idx, false);
+            // update printable state for new volumes on canvas3D
+            q->canvas3D()->update_instance_printable_state_for_object(idx);
         }
     }
 }
@@ -5460,7 +5473,7 @@ void ProjectDropDialog::on_dpi_changed(const wxRect& suggested_rect)
 
 bool Plater::load_files(const wxArrayString& filenames)
 {
-    const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa)", std::regex::icase);
+    const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa|step|stp)", std::regex::icase);
     const std::regex pattern_gcode_drop(".*[.](gcode|g)", std::regex::icase);
 
     std::vector<fs::path> paths;
@@ -6179,7 +6192,7 @@ void Plater::export_stl(std::string path_u8, bool extended, bool selection_only)
                 mesh.merge(m);
             }
         }
-        else if (0 <= instance_id && instance_id < mo.instances.size())
+        else if (0 <= instance_id && instance_id < int(mo.instances.size()))
             mesh.transform(mo.instances[instance_id]->get_matrix(), true);
 
         return mesh;

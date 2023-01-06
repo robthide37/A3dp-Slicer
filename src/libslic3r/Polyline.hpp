@@ -164,6 +164,8 @@ const Point& leftmost_point(const Polylines &polylines);
 
 bool remove_degenerate(Polylines &polylines);
 
+// Returns index of a segment of a polyline and foot point of pt on polyline.
+std::pair<int, Point> foot_pt(const Points &polyline, const Point &pt);
 
 /// ThickPolyline : a polyline with a width for each point
 /// This class has a vector of coordf_t, it must be the same size as points.
