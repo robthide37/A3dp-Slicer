@@ -1848,27 +1848,7 @@ void Selection::render(float scale_factor)
     m_scale_factor = scale_factor;
     // render cumulative bounding box of selected volumes
 #if ENABLE_WORLD_COORDINATE
-    BoundingBoxf3 box;
-    Transform3d trafo;
-    const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
-    if (coordinates_type == ECoordinatesType::World) {
-        box = get_bounding_box();
-        trafo = Transform3d::Identity();
-    }
-    else if (coordinates_type == ECoordinatesType::Local && is_single_volume_or_modifier()) {
-        const GLVolume& v = *get_first_volume();
-        box = v.bounding_box();
-        trafo = v.world_matrix();
-    }
-    else {
-        const Selection::IndicesList& ids = get_volume_idxs();
-        for (unsigned int id : ids) {
-            const GLVolume& v = *get_volume(id);
-            box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
-        }
-        trafo = get_first_volume()->get_instance_transformation().get_matrix();
-    }
-
+    const auto [box, trafo] = get_bounding_box_in_current_reference_system();
     render_bounding_box(box, trafo, ColorRGB::WHITE());
 #else
     render_bounding_box(get_bounding_box(), ColorRGB::WHITE());
