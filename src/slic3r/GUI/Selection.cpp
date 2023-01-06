@@ -802,7 +802,6 @@ const BoundingBoxf3& Selection::get_full_unscaled_instance_local_bounding_box() 
     return *m_full_unscaled_instance_local_bounding_box;
 }
 
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 const std::pair<BoundingBoxf3, Transform3d>& Selection::get_bounding_box_in_current_reference_system() const
 {
     static int last_coordinates_type = -1;
@@ -925,7 +924,6 @@ const std::pair<BoundingBoxf3, Transform3d>& Selection::get_bounding_box_in_curr
 
     return *m_bounding_box_in_current_reference_system;
 }
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #endif // ENABLE_WORLD_COORDINATE
 
 void Selection::setup_cache()
@@ -961,7 +959,8 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
         else {
             if (transformation_type.local()) {
                 const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
-                v.set_volume_offset(vol_trafo.get_offset() + vol_trafo.get_rotation_matrix() * displacement);
+                const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
+                v.set_volume_offset(vol_trafo.get_offset() + inst_trafo.get_scaling_factor_matrix().inverse() * vol_trafo.get_rotation_matrix() * displacement);
             }
             else {
                 Vec3d relative_disp = displacement;

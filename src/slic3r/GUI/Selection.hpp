@@ -242,11 +242,9 @@ private:
     // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
     // Modifiers are taken in account
     std::optional<BoundingBoxf3> m_full_unscaled_instance_local_bounding_box;
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     // Bounding box aligned to the axis of the currently selected reference system (World/Object/Part)
     // and transform to place and orient it in world coordinates
     std::optional<std::pair<BoundingBoxf3, Transform3d>> m_bounding_box_in_current_reference_system;
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_RENDER_SELECTION_CENTER
@@ -393,11 +391,9 @@ public:
     // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
     // Modifiers are taken in account
     const BoundingBoxf3& get_full_unscaled_instance_local_bounding_box() const;
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     // Returns the bounding box aligned to the axis of the currently selected reference system (World/Object/Part)
     // and the transform to place and orient it in world coordinates
     const std::pair<BoundingBoxf3, Transform3d>& get_bounding_box_in_current_reference_system() const;
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #endif // ENABLE_WORLD_COORDINATE
 
     void setup_cache();
@@ -474,9 +470,7 @@ private:
         m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset();
         m_full_unscaled_instance_bounding_box.reset(); m_full_scaled_instance_bounding_box.reset();
         m_full_unscaled_instance_local_bounding_box.reset();
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         m_bounding_box_in_current_reference_system.reset();
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     }
 #else
     void set_bounding_boxes_dirty() { m_bounding_box.reset(); m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset(); }
