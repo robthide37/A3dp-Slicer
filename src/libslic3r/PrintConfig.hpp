@@ -60,7 +60,7 @@ enum InfillPattern : int {
     ipRectilinear, ipMonotonic, ipAlignedRectilinear, ipGrid, ipTriangles, ipStars, ipCubic, ipLine, ipConcentric, ipHoneycomb, ip3DHoneycomb,
     ipGyroid, ipHilbertCurve, ipArchimedeanChords, ipOctagramSpiral, ipAdaptiveCubic, ipSupportCubic, ipSupportBase,
     ipLightning,
-    ipBoundedRectilinear,
+    ipEnsuring,
     ipCount,
 };
 
@@ -133,6 +133,11 @@ enum class PerimeterGeneratorType
     Arachne
 };
 
+enum class EnsuringInfillPattern {
+    eipBoundedRectilinear,
+    eipConcentric
+};
+
 enum class GCodeThumbnailsFormat {
     PNG, JPG, QOI
 };
@@ -162,6 +167,8 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(EnsuringInfillPattern)
+
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -490,6 +497,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                clip_multipart_objects))
     ((ConfigOptionBool,                dont_support_bridges))
     ((ConfigOptionFloat,               elefant_foot_compensation))
+    ((ConfigOptionEnum<EnsuringInfillPattern>, ensure_vertical_shell_infill))
     ((ConfigOptionFloatOrPercent,      extrusion_width))
     ((ConfigOptionFloat,               first_layer_acceleration_over_raft))
     ((ConfigOptionFloatOrPercent,      first_layer_speed_over_raft))
