@@ -1,7 +1,7 @@
 
 [![you can get this shield at shields.io](https://img.shields.io/discord/771316156203270154?color=7289da&logo=discord&logoColor=white)](https://github.com/supermerill/SuperSlicer/issues/611#issuecomment-907833287) [![you can get this shield at shields.io](https://img.shields.io/reddit/subreddit-subscribers/slic3r)](https://reddit.com/r/slic3r) [![you can get this shield at shields.io](https://img.shields.io/github/discussions/supermerill/superslicer)](https://github.com/supermerill/SuperSlicer/discussions)
 
-[![Packaging status](https://repology.org/badge/tiny-repos/superslicer.svg)](https://repology.org/project/superslicer/versions) [![you can get this shield at shields.io](https://img.shields.io/chocolatey/v/superslicer)](https://community.chocolatey.org/packages/superslicer) [![you can get this shield at shields.io](https://img.shields.io/homebrew/cask/v/superslicer)](https://formulae.brew.sh/cask/superslicer) [![you can get this shield at shields.io](https://img.shields.io/aur/version/superslicer)](https://aur.archlinux.org/packages/superslicer)
+[![Packaging status](https://repology.org/badge/tiny-repos/superslicer.svg)](https://repology.org/project/superslicer/versions) [![you can get this shield at shields.io](https://img.shields.io/chocolatey/v/superslicer)](https://community.chocolatey.org/packages/superslicer) [![you can get this shield at shields.io](https://img.shields.io/homebrew/cask/v/superslicer)](https://formulae.brew.sh/cask/superslicer) [![you can get this shield at shields.io](https://img.shields.io/archlinux/v/community/x86_64/superslicer)](https://archlinux.org/packages/community/x86_64/superslicer/)
 # SuperSlicer
 
 **A PrusaSlicer fork (which is a slic3r fork)** (previously Slic3r++)
