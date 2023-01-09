@@ -469,6 +469,9 @@ inline long build_ground_connection(SupportTreeBuilder &builder,
     gp.z() = ground_level(sm);
     double h = conn.path.back().pos.z() - gp.z();
 
+    if (conn.pillar_base->r_top < sm.cfg.head_back_radius_mm)
+        h += sm.pad_cfg.wall_thickness_mm;
+
 // TODO: does not work yet
 //    if (conn.path.back().id < 0) {
 //        // this is a head
@@ -477,7 +480,8 @@ inline long build_ground_connection(SupportTreeBuilder &builder,
 //    } else
         ret = builder.add_pillar(gp, h, conn.path.back().r, conn.pillar_base->r_top);
 
-    builder.add_pillar_base(ret, conn.pillar_base->height, conn.pillar_base->r_bottom);
+    if (conn.pillar_base->r_top >= sm.cfg.head_back_radius_mm)
+        builder.add_pillar_base(ret, conn.pillar_base->height, conn.pillar_base->r_bottom);
 
     return ret;
 }
@@ -555,7 +559,7 @@ Vec3d check_ground_route(
         auto gndhit = beam_mesh_hit(policy, sm.emesh, gndbeam, sd);
         double gnd_hit_d = std::min(gndhit.distance(), down_l + EPSILON);
 
-        if (gndhit.distance() > down_l && sm.cfg.object_elevation_mm < EPSILON) {
+        if (source.r >= sm.cfg.head_back_radius_mm && gndhit.distance() > down_l && sm.cfg.object_elevation_mm < EPSILON) {
             // Dealing with zero elevation mode, to not route pillars
             // into the gap between the optional pad and the model
             double gap     = std::sqrt(sm.emesh.squared_distance(gp));
