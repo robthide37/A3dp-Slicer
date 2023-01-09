@@ -658,7 +658,7 @@ SendSystemInfoDialog::SendSystemInfoDialog(wxWindow* parent)
                                         wxString message;
                                         bool success = send_info(message);
                                         if (! message.IsEmpty())
-                                            InfoDialog(nullptr, wxEmptyString, message).ShowModal();
+                                            InfoDialog(this, wxEmptyString, message).ShowModal();
                                         if (success) {
                                             save_version();
                                             EndModal(0);
