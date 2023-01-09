@@ -848,7 +848,7 @@ std::pair<BoundingBoxf3, Transform3d> Selection::get_bounding_box_in_reference_s
         break;
     }
     case ECoordinatesType::Local: {
-        assert(is_single_volume_or_modifier());
+        assert(is_single_volume_or_modifier() || is_single_volume_instance());
         const GLVolume& v = *get_first_volume();
         original_box = v.bounding_box();
         trafo = v.world_matrix();
