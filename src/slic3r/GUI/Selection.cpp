@@ -1848,7 +1848,7 @@ void Selection::render(float scale_factor)
     m_scale_factor = scale_factor;
     // render cumulative bounding box of selected volumes
 #if ENABLE_WORLD_COORDINATE
-    const auto [box, trafo] = get_bounding_box_in_current_reference_system();
+    const auto& [box, trafo] = get_bounding_box_in_current_reference_system();
     render_bounding_box(box, trafo, ColorRGB::WHITE());
 #else
     render_bounding_box(get_bounding_box(), ColorRGB::WHITE());
