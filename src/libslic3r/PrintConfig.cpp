@@ -4802,6 +4802,23 @@ Points get_bed_shape(const PrintConfig &cfg)
 
 Points get_bed_shape(const SLAPrinterConfig &cfg) { return to_points(cfg.bed_shape.values); }
 
+std::string get_sla_suptree_prefix(const DynamicPrintConfig &config)
+{
+    const auto *suptreetype = config.option<ConfigOptionEnum<sla::SupportTreeType>>("support_tree_type");
+    std::string slatree = "";
+    if (suptreetype) {
+        auto ttype = static_cast<sla::SupportTreeType>(suptreetype->getInt());
+        switch (ttype) {
+        case sla::SupportTreeType::Branching: slatree = "branching"; break;
+        case sla::SupportTreeType::Organic: slatree = "organic"; break;
+        default:
+            ;
+        }
+    }
+
+    return slatree;
+}
+
 } // namespace Slic3r
 
 #include <cereal/types/polymorphic.hpp>
