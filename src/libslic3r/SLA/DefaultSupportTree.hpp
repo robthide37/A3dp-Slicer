@@ -62,7 +62,6 @@ class DefaultSupportTree {
 
     PtIndices m_iheads;            // support points with pinhead
     PtIndices m_iheads_onmodel;
-    PtIndices m_iheadless;         // headless support points
 
     std::map<unsigned, AABBMesh::hit_result> m_head_to_ground_scans;
 

@@ -372,7 +372,6 @@ void DefaultSupportTree::add_pinheads()
     PtIndices filtered_indices;
     filtered_indices.reserve(aliases.size());
     m_iheads.reserve(aliases.size());
-    m_iheadless.reserve(aliases.size());
     for(auto& a : aliases) {
         // Here we keep only the front point of the cluster.
         filtered_indices.emplace_back(a.front());
@@ -602,7 +601,7 @@ void DefaultSupportTree::routing_to_ground()
        // sidepoints with the cluster centroid (which is a ground pillar)
        // or a nearby pillar if the centroid is unreachable.
     size_t ci = 0;
-    for (auto cl : m_pillar_clusters) {
+    for (const std::vector<unsigned> &cl : m_pillar_clusters) {
         m_thr();
 
         auto cidx = cl_centroids[ci++];
