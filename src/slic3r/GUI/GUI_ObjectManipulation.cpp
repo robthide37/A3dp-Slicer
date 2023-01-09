@@ -884,7 +884,10 @@ void ObjectManipulation::update_if_dirty()
         m_lock_bnt->SetLock(m_uniform_scale);
         m_lock_bnt->SetToolTip(wxEmptyString);
         m_lock_bnt->enable();
-#if !ENABLE_WORLD_COORDINATE
+#if ENABLE_WORLD_COORDINATE
+        if (m_word_local_combo->GetSelection() != (int)m_coordinates_type)
+            m_word_local_combo->SetSelection((int)m_coordinates_type);
+#else
     }
 
     {
@@ -892,7 +895,7 @@ void ObjectManipulation::update_if_dirty()
         if (m_word_local_combo->GetSelection() != new_selection)
             m_word_local_combo->SetSelection(new_selection);
     }
-#endif // !ENABLE_WORLD_COORDINATE
+#endif // ENABLE_WORLD_COORDINATE
 
     if (m_new_enabled)
         m_og->enable();

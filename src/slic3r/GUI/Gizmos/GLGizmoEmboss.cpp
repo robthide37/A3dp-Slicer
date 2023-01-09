@@ -129,7 +129,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_update_job_cancel(nullptr)
 {
     m_rotate_gizmo.set_group_id(0);
-    m_rotate_gizmo.set_using_local_coordinate(true);
+    m_rotate_gizmo.set_force_local_coordinate(true);
     // TODO: add suggestion to use https://fontawesome.com/
     // (copy & paste) unicode symbols from web    
     // paste HEX unicode into notepad move cursor after unicode press [alt] + [x]
