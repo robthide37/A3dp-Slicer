@@ -1040,7 +1040,13 @@ void ObjectManipulation::update_mirror_buttons_visibility()
 #endif // !ENABLE_WORLD_COORDINATE
         }
     }
-#if !ENABLE_WORLD_COORDINATE
+
+#if ENABLE_WORLD_COORDINATE
+    const bool can_mirror = wxGetApp().plater()->can_mirror();
+    for (ScalableButton* button : m_mirror_buttons) {
+        button->Enable(can_mirror);
+    }
+#else
     else {
         // the mirroring buttons should be hidden in world coordinates,
         // unless we make it actually mirror in world coords.
@@ -1062,7 +1068,7 @@ void ObjectManipulation::update_mirror_buttons_visibility()
             }
         }
     });
-#endif // !ENABLE_WORLD_COORDINATE
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 
