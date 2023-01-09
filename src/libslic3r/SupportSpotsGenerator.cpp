@@ -45,7 +45,7 @@ namespace Slic3r {
 class ExtrusionLine
 {
 public:
-    ExtrusionLine() : a(Vec2f::Zero()), b(Vec2f::Zero()), origin_entity(nullptr) {}
+    ExtrusionLine() : a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0), origin_entity(nullptr) {}
     ExtrusionLine(const Vec2f &a, const Vec2f &b, float len, const ExtrusionEntity *origin_entity)
         : a(a), b(b), len(len), origin_entity(origin_entity)
     {}
@@ -213,12 +213,13 @@ float estimate_curled_up_height(
     }
     if (point.distance > params.malformation_distance_factors.first * flow_width &&
         point.distance < params.malformation_distance_factors.second * flow_width && point.curvature > -0.1f) {
-        float dist_factor = (point.distance - params.malformation_distance_factors.first * flow_width) /
+        float dist_factor = std::max(point.distance - params.malformation_distance_factors.first * flow_width, 0.01f) /
                             ((params.malformation_distance_factors.second - params.malformation_distance_factors.first) * flow_width);
 
         curled_up_height = layer_height * 2.0f * sqrt(sqrt(dist_factor)) * std::clamp(6.0f * point.curvature, 1.0f, 6.0f);
-        curled_up_height = std::min(curled_up_height, params.max_malformation_factor * layer_height);
+        curled_up_height = std::min(curled_up_height, params.max_curled_height_factor * layer_height);
     }
+
     return curled_up_height;
 }
 
@@ -507,7 +508,8 @@ public:
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_movement_arm: " << bed_movement_arm;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_movement_torque: " << bed_movement_torque;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_conflict_torque_arm: " << bed_conflict_torque_arm;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: extruded_line.malformation: " << extruded_line.malformation;
+            BOOST_LOG_TRIVIAL(debug) << "SSG: extruded_line.curled_up_height: " << extruded_line.curled_up_height;
+            BOOST_LOG_TRIVIAL(debug) << "SSG: extruded_line.form_quality: " << extruded_line.form_quality;
             BOOST_LOG_TRIVIAL(debug) << "SSG: extruder_conflict_force: " << extruder_conflict_force;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_extruder_conflict_torque: " << bed_extruder_conflict_torque;
             BOOST_LOG_TRIVIAL(debug) << "SSG: total_torque: " << bed_total_torque << "   layer_z: " << layer_z;
@@ -541,7 +543,7 @@ public:
             float conn_total_torque = conn_movement_torque + conn_extruder_conflict_torque + conn_weight_torque - conn_yield_torque;
 
 #ifdef DETAILED_DEBUG_LOGS
-            BOOST_LOG_TRIVIAL(debug) << "bed_centroid: " << conn_centroid.x() << "  " << conn_centroid.y() << "  " << conn_centroid.z();
+            BOOST_LOG_TRIVIAL(debug) << "conn_centroid: " << conn_centroid.x() << "  " << conn_centroid.y() << "  " << conn_centroid.z();
             BOOST_LOG_TRIVIAL(debug) << "SSG: conn_yield_torque: " << conn_yield_torque;
             BOOST_LOG_TRIVIAL(debug) << "SSG: conn_weight_arm: " << conn_weight_arm;
             BOOST_LOG_TRIVIAL(debug) << "SSG: conn_weight_torque: " << conn_weight_torque;
@@ -575,7 +577,7 @@ std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &sli
             new_object_part.volume += volume;
             new_object_part.volume_centroid_accumulator += to_3d(Vec2f((line.a + line.b) / 2.0f), slice_z) * volume;
 
-            if (l->id() == 0) { // first layer
+            if (l->bottom_z() < EPSILON) { // layer attached on bed
                 float sticking_area = line.len * flow_width;
                 new_object_part.sticking_area += sticking_area;
                 Vec2f middle = Vec2f((line.a + line.b) / 2.0f);
@@ -822,7 +824,7 @@ SupportPoints check_stability(const PrintObject *po, const Params &params)
             float unchecked_dist = params.min_distance_between_support_points + 1.0f;
 
             for (const ExtrusionLine &line : current_slice_ext_perims_lines) {
-                if ((unchecked_dist + line.len < params.min_distance_between_support_points && line.curled_up_height < 0.3f) || line.len == 0) {
+                if ((unchecked_dist + line.len < params.min_distance_between_support_points && line.curled_up_height < 0.3f) || line.len < EPSILON) {
                     unchecked_dist += line.len;
                 } else {
                     unchecked_dist                = line.len;
@@ -885,6 +887,7 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
 {
 #ifdef DEBUG_FILES
     FILE *debug_file = boost::nowide::fopen(debug_out_path("supports_malformations.obj").c_str(), "w");
+    FILE *full_file = boost::nowide::fopen(debug_out_path("supports_full.obj").c_str(), "w");
 #endif
 
     AABBTreeLines::LinesDistancer<ExtrusionLine> prev_layer_lines{};
@@ -905,7 +908,7 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
                 ExtrusionLine  line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
                                        curr_point.position.cast<float>(), line_len, extrusion};
 
-                const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > curr_point.nearest_prev_layer_line ?
+                const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > 0 ?
                                                                   prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
                                                                   ExtrusionLine{};
 
@@ -932,9 +935,13 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
 #ifdef DEBUG_FILES
         for (const ExtrusionLine &line : current_layer_lines) {
             if (line.curled_up_height > 0.3f) {
-                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_malformation_factor, line.curled_up_height);
+                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
                 fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
             }
+        }
+        for (const ExtrusionLine &line : current_layer_lines) {
+            Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
+            fprintf(full_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
         }
 #endif
 
@@ -943,6 +950,7 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
 
 #ifdef DEBUG_FILES
     fclose(debug_file);
+    fclose(full_file);
 #endif
 }
 
@@ -950,6 +958,7 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
 {
 #ifdef DEBUG_FILES
     FILE *debug_file = boost::nowide::fopen(debug_out_path("object_malformations.obj").c_str(), "w");
+    FILE *full_file = boost::nowide::fopen(debug_out_path("object_full.obj").c_str(), "w");
 #endif
 
     LD prev_layer_lines{};
@@ -996,9 +1005,13 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
 #ifdef DEBUG_FILES
         for (const ExtrusionLine &line : current_layer_lines) {
             if (line.curled_up_height > 0.3f) {
-                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_malformation_factor, line.curled_up_height);
+                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
                 fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
             }
+        }
+         for (const ExtrusionLine &line : current_layer_lines) {
+                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
+                fprintf(full_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
         }
 #endif
 
@@ -1007,6 +1020,7 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
 
 #ifdef DEBUG_FILES
     fclose(debug_file);
+    fclose(full_file);
 #endif
 }
 

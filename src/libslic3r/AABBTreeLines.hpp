@@ -128,7 +128,7 @@ inline std::vector<std::pair<VectorType, size_t>> get_intersections_with_line(si
     if (node.is_leaf()) {
         VectorType intersection_pt;
         if (line_alg::intersection(line, lines[node.idx], &intersection_pt)) {
-            return {std::pair<VectorType, size_t>(intersection_pt, node_idx)};
+            return {std::pair<VectorType, size_t>(intersection_pt, node.idx)};
         } else {
             return {};
         }
