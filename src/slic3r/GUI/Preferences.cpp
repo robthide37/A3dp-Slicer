@@ -562,7 +562,7 @@ void PreferencesDialog::build()
 			if (opt_key == "suppress_hyperlinks")
 				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
 			else
-				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0"; m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
+				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 		};
 
 
