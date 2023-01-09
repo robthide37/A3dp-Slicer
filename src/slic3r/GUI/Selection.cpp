@@ -2159,8 +2159,7 @@ void Selection::update_type()
 
     if (!m_valid)
         m_type = Invalid;
-    else
-    {
+    else {
         if (m_list.empty())
             m_type = Empty;
         else if (m_list.size() == 1) {
@@ -2176,12 +2175,19 @@ void Selection::update_type()
                 unsigned int volumes_count = (unsigned int)model_object->volumes.size();
                 unsigned int instances_count = (unsigned int)model_object->instances.size();
                 if (volumes_count * instances_count == 1) {
-                    m_type = SingleFullObject;
-                    // ensures the correct mode is selected
-                    m_mode = Instance;
+                    const ModelVolume* model_volume = model_object->volumes[first->volume_idx()];
+                    if (model_volume->text_configuration.has_value()) { // text volume
+                        m_type = SingleVolume;
+                        // ensures the correct mode is selected
+                        m_mode = Volume;
+                    }
+                    else {
+                        m_type = SingleFullObject;
+                        // ensures the correct mode is selected
+                        m_mode = Instance;
+                    }
                 }
-                else if (volumes_count == 1) // instances_count > 1
-                {
+                else if (volumes_count == 1) { // instances_count > 1
                     m_type = SingleFullInstance;
                     // ensures the correct mode is selected
                     m_mode = Instance;
