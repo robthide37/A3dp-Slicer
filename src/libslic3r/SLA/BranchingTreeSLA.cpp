@@ -231,6 +231,8 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
     namespace bgi = boost::geometry::index;
 
     auto it = m_gnd_connections.find(from.id);
+    const GroundConnection *connptr = nullptr;
+
     if (it == m_gnd_connections.end()) {
         sla::Junction j{from.pos.cast<double>(), get_radius(from)};
         Vec3d init_dir = (to.pos - from.pos).cast<double>().normalized();
@@ -241,15 +243,14 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
         // Remember that this node was tested if can go to ground, don't
         // test it with any other destination ground point because
         // it is unlikely that search_ground_route would find a better solution
-        m_gnd_connections[from.id] = conn;
-
-        if (conn) {
-            m_pillars.emplace_back(from);
-            ret = true;
-        }
+        connptr = &(m_gnd_connections[from.id] = conn);
+    } else {
+        connptr = &(it->second);
     }
 
-    if (ret) {
+    if (connptr && *connptr) {
+        m_pillars.emplace_back(from);
+        ret = true;
         build_subtree(from.id);
     }
 
