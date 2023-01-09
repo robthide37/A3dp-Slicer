@@ -125,8 +125,11 @@ struct Beam_ { // Defines a set of rays displaced along a cone's surface
     Beam_(const Ball &src_ball, const Ball &dst_ball)
         : src{src_ball.p}, dir{dirv(src_ball.p, dst_ball.p)}, r1{src_ball.R}
     {
-        r2 = src_ball.R
-             + (dst_ball.R - src_ball.R) / distance(src_ball.p, dst_ball.p);
+        r2 = src_ball.R;
+        auto d = distance(src_ball.p, dst_ball.p);
+
+        if (d > EPSILON)
+            r2 += (dst_ball.R - src_ball.R) / d;
     }
 
     Beam_(const Vec3d &s, const Vec3d &d, double R)
@@ -542,7 +545,7 @@ Vec3d check_ground_route(
 
     if (brhit_dist < bridge_len) {
         ret = (source.pos + brhit_dist * dir);
-    } else {
+    } else if (down_l > 0.) {
         // check if pillar can be placed below
         auto   gp         = Vec3d{bridge_end.x(), bridge_end.y(), gndlvl};
         double end_radius = wideningfn(
@@ -565,6 +568,8 @@ Vec3d check_ground_route(
         }
 
         ret = Vec3d{bridge_end.x(), bridge_end.y(), bridge_end.z() - gnd_hit_d};
+    } else {
+        ret = bridge_end;
     }
 
     return ret;
@@ -709,6 +714,9 @@ GroundConnection deepsearch_ground_connection(Ex policy,
 {
     double gndlvl = ground_level(sm);
     auto wfn = [end_radius, gndlvl](const Ball &src, const Vec3d &dir, double len) {
+        if (len < EPSILON)
+            return src.R;
+
         Vec3d  dst = src.p + len * dir;
         double widening = end_radius - src.R;
         double zlen = dst.z() - gndlvl;
