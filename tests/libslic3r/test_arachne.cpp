@@ -414,3 +414,40 @@ TEST_CASE("Arachne - #8597 - removeSmallAreas", "[ArachneRemoveSmallAreas8597]")
 
     REQUIRE(perimeters.size() == 1);
 }
+
+// Test case for missing infill that is probably caused by PolylineStitcher, which produced an open polyline.
+TEST_CASE("Arachne - Missing infill", "[ArachneMissingInfill]") {
+    const Polygon poly_0 = {
+        Point( 5525881,  3649657),
+        Point(  452351, -2035297),
+        Point(-1014702, -2144286),
+        Point(-5142096, -9101108),
+        Point( 5525882, -9101108),
+    };
+
+     const Polygon poly_1 = {
+        Point(1415524, -2217520),
+        Point(1854189, -2113857),
+        Point(1566974, -2408538),
+    };
+
+    const Polygon poly_2 = {
+        Point(-42854, -3771357),
+        Point(310500, -3783332),
+        Point( 77735, -4059215),
+    };
+
+    Polygons polygons    = {poly_0, poly_1, poly_2};
+    coord_t  spacing     = 357079;
+    coord_t  inset_count = 2;
+
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    wallToolPaths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
+
+#ifdef ARACHNE_DEBUG_OUT
+    export_perimeters_to_svg(debug_out_path("arachne-missing-infill.svg"), polygons, perimeters, union_ex(wallToolPaths.getInnerContour()));
+#endif
+
+//    REQUIRE(wallToolPaths.getInnerContour().size() == 1);
+}
