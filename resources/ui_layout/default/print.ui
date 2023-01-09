@@ -82,6 +82,12 @@ group:sidetext_width$5:Advanced
 		setting:tags$Advanced$Expert$SuSi:width$3:sidetext_width$0:seam_angle_cost
 		setting:tags$Advanced$Expert$SuSi:width$3:sidetext_width$0:seam_travel_cost
 	end_line
+	line:Seam notch
+		setting:seam_notch_inner
+		setting:seam_notch_outer
+		setting:seam_notch_all
+		setting:seam_notch_angle
+	end_line
 	line:One-loop perimeters
 		setting:sidetext_width$0:label$_:perimeter_loop
 		setting:label_width$5:label$Seam:perimeter_loop_seam

@@ -1347,6 +1347,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     }
     print.throw_if_canceled();
 
+    //now that we have the layer count, init the status
+    print.set_status(int(0), std::string(L("Generating G-code layer %s / %s")), std::vector<std::string>{ std::to_string(0), std::to_string(layer_count()) }, PrintBase::SlicingStatus::DEFAULT | PrintBase::SlicingStatus::SECONDARY_STATE);
+
     m_enable_cooling_markers = true;
 
     m_volumetric_speed = DoExport::autospeed_volumetric_limit(print);
@@ -3879,6 +3882,349 @@ namespace check_wipe {
     }
 }
 
+void GCode::seam_notch(const ExtrusionLoop& original_loop,
+    ExtrusionPaths& building_paths,
+    ExtrusionPaths& notch_extrusion_start,
+    ExtrusionPaths& notch_extrusion_end,
+    bool is_hole_loop,
+    bool is_full_loop_ccw) {
+
+    if (original_loop.role() == erExternalPerimeter && building_paths.front().size() > 1 && building_paths.back().size() > 1
+        && (this->m_config.seam_notch_all.get_abs_value(1.) > 0 || this->m_config.seam_notch_inner.get_abs_value(1.) > 0 || this->m_config.seam_notch_outer.get_abs_value(1.) > 0)) {
+        //TODO: check there is at least 4 points
+        coord_t notch_value = 0;
+        //check if applicable to seam_notch_inner
+        if ((is_hole_loop && this->m_config.seam_notch_inner.get_abs_value(1.) > 0)
+            || (!is_hole_loop && this->m_config.seam_notch_outer.get_abs_value(1.) > 0)
+            ) {
+            Polygon polygon_to_test = original_loop.polygon();
+            if (polygon_to_test.points.size() > 8) {
+                //check if the path is quasi-convex (~= as PrintObject::_transform_hole_to_polyholes)
+                bool is_convex = false;
+                if (is_hole_loop) {
+                    //test if convex (as it's clockwise bc it's a hole, we have to do the opposite)
+                    is_convex = polygon_to_test.convex_points().empty();
+                } else {
+                    is_convex = polygon_to_test.concave_points().empty();
+                }
+                if (is_convex) {
+                    // Computing circle center
+                    Point center = polygon_to_test.centroid();
+                    double diameter_min = std::numeric_limits<float>::max(), diameter_max = 0;
+                    double diameter_sum = 0;
+                    for (int i = 0; i < polygon_to_test.points.size(); ++i) {
+                        double dist = polygon_to_test.points[i].distance_to(center);
+                        diameter_min = std::min(diameter_min, dist);
+                        diameter_max = std::max(diameter_max, dist);
+                        diameter_sum += dist;
+                    }
+                    //also use center of lines to check it's not a rectangle
+                    double diameter_line_min = std::numeric_limits<float>::max(), diameter_line_max = 0;
+                    Lines hole_lines = polygon_to_test.lines();
+                    for (Line l : hole_lines) {
+                        Point midline = (l.a + l.b) / 2;
+                        double dist = center.distance_to(midline);
+                        diameter_line_min = std::min(diameter_line_min, dist);
+                        diameter_line_max = std::max(diameter_line_max, dist);
+                    }
+                    // allow flat ellipse up to 10*
+                    coord_t max_variation = std::max(SCALED_EPSILON, scale_t(10 * (unscaled(diameter_sum / polygon_to_test.points.size()))));
+                    if (diameter_max - diameter_min < max_variation * 2 && diameter_line_max - diameter_line_min < max_variation * 2) {
+                        if (is_hole_loop) {
+                            notch_value = scale_t(this->m_config.seam_notch_inner.get_abs_value(building_paths.front().width));
+                        } else {
+                            notch_value = scale_t(this->m_config.seam_notch_outer.get_abs_value(building_paths.front().width));
+                        }
+                    }
+                }
+            }
+        }
+        if (notch_value == 0) {
+            notch_value = scale_t(this->m_config.seam_notch_all.get_abs_value(building_paths.front().width));
+        }
+        if (notch_value == 0) {
+            return;
+        }
+        //check the loop is long enough
+        if (original_loop.length() < notch_value * 4) {
+            return;
+        }
+        //ensure it doesn't go too far
+        notch_value = std::min(notch_value, scale_t(building_paths.front().width) / 2);
+
+        // found a suitable path, move the seam inner
+        //kind of the same as the wipe
+        Point prev_point = *(building_paths.back().polyline.points.end() - 2);       // second to last point
+        Point end_point = building_paths.back().last_point();
+        Point start_point = building_paths.front().first_point();
+        Point next_point = building_paths.front().polyline.points[1];  // second point
+        //safeguard : if a error exist abord;
+        if (next_point == start_point || prev_point == end_point) {
+            throw Slic3r::SlicingError(_(L("Error while writing gcode: two points are at the same position. Please send the .3mf project to the dev team for debugging. Extrude loop: seam notch.")));
+        }
+        double angle = PI / 2;
+        if (is_hole_loop ? is_full_loop_ccw : (!is_full_loop_ccw)) {
+            // swap points
+            next_point = *(building_paths.back().polyline.points.end() - 2);
+            angle *= -1;
+        }
+        Vec2d  vec_start = next_point.cast<double>() - start_point.cast<double>();
+        vec_start.normalize();
+        Vec2d  vec_end = end_point.cast<double>() - prev_point.cast<double>();
+        vec_end.normalize();
+        //abord if the two vec are too different
+        double prod_scal = vec_start.dot(vec_end);
+        if (prod_scal < 0.2) {
+            std::cout << "notch abord: too different sides\n";
+            return;
+        }
+        //use a vec that is the mean between the two.
+        vec_start = (vec_start + vec_end) / 2;
+
+        Point moved_start = (start_point.cast<double>() + vec_start * notch_value).cast<coord_t>();;
+        moved_start.rotate(angle, start_point);
+        Point moved_end = (end_point.cast<double>() + vec_start * notch_value).cast<coord_t>();;
+        moved_end.rotate(angle, end_point);
+
+        //check if the current angle isn't too sharp
+        double check_angle = 0;
+        if (end_point.distance_to_square(start_point) < SCALED_EPSILON * SCALED_EPSILON) {
+            check_angle = start_point.ccw_angle(prev_point, next_point);
+        } else {
+            check_angle = end_point.ccw_angle(prev_point, start_point);
+            if ((is_hole_loop ? -check_angle : check_angle) > this->m_config.seam_notch_angle.value * PI / 180.) {
+                std::cout << "notch abord: too big angle\n";
+                return;
+            }
+            check_angle = start_point.ccw_angle(end_point, next_point);
+        }
+        assert(end_point != start_point);
+        assert(end_point != next_point);
+        std::cout << "angle is " << check_angle << "\n";
+        if ((is_hole_loop ? -check_angle : check_angle) > this->m_config.seam_notch_angle.value * PI / 180.) {
+            std::cout << "notch abord: too big angle\n";
+            return;
+        }
+        std::cout << "angle is okay! " << check_angle<< " ? "<< (this->m_config.seam_notch_angle.value * PI / 180.) << "\n";
+        //std::cout << "points:" << building_paths.back().polyline.points.size() << "\n";
+        //std::cout << "angle between " << unscaled(building_paths.back().polyline.points[2]).x() << ":" << unscaled(building_paths.back().polyline.points[2]).y() << " -> "
+        //    << unscaled(building_paths.back().polyline.points[0]).x() << ":" << unscaled(building_paths.back().polyline.points[0]).y() << " -> "
+        //    << unscaled(building_paths.back().polyline.points[1]).x() << ":" << unscaled(building_paths.back().polyline.points[1]).y() << " = "
+        //    << building_paths.back().polyline.points[0].ccw_angle(building_paths.back().polyline.points[2], building_paths.back().polyline.points[1]) << "rad = "
+        //    << int(building_paths.back().polyline.points[0].ccw_angle(building_paths.back().polyline.points[2], building_paths.back().polyline.points[1]) * 180 / PI) << "°\n";
+        //std::cout << "angle between " << unscaled(building_paths.back().polyline.points[0]).x() << ":" << unscaled(building_paths.back().polyline.points[0]).y() << " -> "
+        //    << unscaled(building_paths.back().polyline.points[1]).x() << ":" << unscaled(building_paths.back().polyline.points[1]).y() << " -> "
+        //    << unscaled(building_paths.back().polyline.points[2]).x() << ":" << unscaled(building_paths.back().polyline.points[2]).y() << " = "
+        //    << building_paths.back().polyline.points[1].ccw_angle(building_paths.back().polyline.points[0], building_paths.back().polyline.points[2]) << "rad = "
+        //    << int(building_paths.back().polyline.points[1].ccw_angle(building_paths.back().polyline.points[0], building_paths.back().polyline.points[2]) * 180 / PI) << "°\n";
+        //std::cout << "angle between " << unscaled(building_paths.back().polyline.points[1]).x() << ":" << unscaled(building_paths.back().polyline.points[1]).y() << " -> "
+        //    << unscaled(building_paths.back().polyline.points[2]).x() << ":" << unscaled(building_paths.back().polyline.points[2]).y() << " -> "
+        //    << unscaled(building_paths.back().polyline.points[0]).x() << ":" << unscaled(building_paths.back().polyline.points[0]).y() << " = "
+        //    << building_paths.back().polyline.points[2].ccw_angle(building_paths.back().polyline.points[1], building_paths.back().polyline.points[0]) << "rad = "
+        //    << int(building_paths.back().polyline.points[2].ccw_angle(building_paths.back().polyline.points[1], building_paths.back().polyline.points[0]) * 180 / PI) << "°\n";
+
+        //check if the point is inside
+        bool is_inside = original_loop.polygon().contains(moved_start) && original_loop.polygon().contains(moved_end);
+        std::cout << "is_inside? " << is_inside << "\n";
+        if ( (is_hole_loop && is_inside) || (!is_hole_loop && !is_inside) ) {
+            std::cout << "notch abord: not inside\n";
+            return;
+        }
+        // set new start point
+        bool good_start_point = false;
+        Point control_start_point = start_point;
+        Line start_line(start_point, next_point);
+        if (start_line.length() > notch_value * 2) {
+            std::cout << "start is in the first segment\n";
+            control_start_point = start_line.point_at(notch_value);
+            building_paths.front().polyline.points.front() = start_line.point_at(notch_value * 2);
+            good_start_point = true;
+        } else {
+            // move the next point further away
+            double push_way_dist = notch_value * 2 - start_line.length();
+            double push_way_ctrl_dist = notch_value - start_line.length();
+            if (push_way_ctrl_dist < 0) {
+                control_start_point = start_line.point_at(notch_value);
+            }
+            std::cout << "start is not in the first segment\n";
+            if (building_paths.front().polyline.points.size() > 2) {
+                building_paths.front().polyline.points.erase(building_paths.front().polyline.points.begin());
+            }
+            while (push_way_dist > 0 && building_paths.front().polyline.points.size() > 2) {
+                Line next_line(building_paths.front().first_point(), building_paths.front().polyline.points[1]);
+                if (push_way_ctrl_dist > 0) {
+                    if (next_line.length() > push_way_ctrl_dist) {
+                        control_start_point = next_line.point_at(push_way_ctrl_dist);
+                        push_way_ctrl_dist = 0;
+                    } else {
+                        push_way_ctrl_dist -= next_line.length();
+                    }
+                }
+                if (next_line.length() > push_way_dist) {
+                    std::cout << "start is in the next segment\n";
+                    building_paths.front().polyline.points.front() = next_line.point_at(push_way_dist);
+                    push_way_dist = 0;
+                    good_start_point = true;
+                } else {
+                    std::cout << "start is not in the next segment\n";
+                    if (std::abs(next_line.a.ccw_angle(start_point, next_line.b) - PI) > PI * 0.4) {
+                        std::cout << " stop start search, angle is " << (next_line.a.ccw_angle(start_point, next_line.b) * 180 / PI) << " => " << (std::abs(next_line.a.ccw_angle(start_point, next_line.b) - PI) * 180 / PI) << " > " << (180 * 0.4) << "\n";
+                        // if angle is sharp (not near 180°), stop search
+                        break;
+                    }
+                    building_paths.front().polyline.points.erase(building_paths.front().polyline.points.begin());
+                    push_way_dist -= next_line.length();
+                }
+            }
+            //TODO: continue onthe next path
+            if (push_way_dist > 0) {
+                //push as much as possible
+                Line next_line(building_paths.front().first_point(), building_paths.front().polyline.points[1]);
+                building_paths.front().polyline.points.front() = next_line.midpoint();
+            }
+            if (push_way_ctrl_dist > 0) {
+                control_start_point = Line(start_point, building_paths.front().polyline.points.front()).midpoint();
+            }
+        }
+        // set new end point
+        bool good_end_point = false;
+        Point control_end_point = end_point;
+        Line end_line(end_point, prev_point);
+        coordf_t length_clipped = 0;
+        static int isazfqsdqs = 0;
+        std::stringstream stri;
+        stri << m_layer_index << "_" << is_hole_loop << "_" << isazfqsdqs++ << "_Nnotch" << ".svg";
+        SVG svg1(stri.str());
+        if (end_line.length() > notch_value * 2) {
+            std::cout << "end is in the first segment\n";
+            control_end_point = end_line.point_at(notch_value);
+            building_paths.back().polyline.points.back() = end_line.point_at(notch_value * 2);
+            good_end_point = true;
+        } else {
+            std::cout << "end is NOT in the first segment\n";
+            // move the other point further away
+            double push_way_dist = notch_value * 2;
+            double push_way_ctrl_dist = notch_value;
+            //for each extrusion path
+            bool polyline_removed = false;
+            do {
+                ExtrusionPath& current_end_line = building_paths.back();
+                // remove a point until it's enough, then displace it at the right pos
+                while (push_way_dist > 0 && current_end_line.polyline.points.size() > 1) {
+                    Line next_line(current_end_line.polyline.points.back(), current_end_line.polyline.points[current_end_line.polyline.points.size() - 2]);
+                    svg1.draw(next_line, "green", scale_d(0.1));
+                    //try to get the control point (to create a curve)
+                    if (push_way_ctrl_dist > 0) {
+                        if (next_line.length() > push_way_ctrl_dist) {
+                            control_end_point = next_line.point_at(push_way_ctrl_dist);
+                            push_way_ctrl_dist = 0;
+                        } else {
+                            push_way_ctrl_dist -= next_line.length();
+                        }
+                    }
+                    //try to get the end point
+                    if (next_line.length() > push_way_dist) {
+                        std::cout << "end is in the next segment\n";
+                        current_end_line.polyline.points.back() = next_line.point_at(push_way_dist);
+                        push_way_dist = 0;
+                        good_end_point = true;
+                    } else {
+                        std::cout << "end is not in the next segment\n";
+                        if (end_point != next_line.a && std::abs(next_line.a.ccw_angle(end_point, next_line.b) - PI) > PI * 0.4) {
+                            svg1.draw(Polyline{end_point, next_line.a, next_line.b}, "red", scale_d(0.05));
+                            std::cout << " stop end search, angle is " << (next_line.a.ccw_angle(end_point, next_line.b) * 180 / PI) << " => " << (std::abs(next_line.a.ccw_angle(end_point, next_line.b) - PI) * 180 / PI) << " > " << (180 * 0.4) << "\n";
+                            //if clipped, full clip -> don't need to do anything.
+                            // if angle is sharp (not near 180°), stop search
+                            break;
+                        }
+                        current_end_line.polyline.points.erase(current_end_line.polyline.points.end() - 1);
+                        push_way_dist -= next_line.length();
+                        //update length_clipped
+                        if (current_end_line.mm3_per_mm == 0) {
+                            length_clipped += next_line.length();
+                        }
+                    }
+                }
+                // not enough points
+                if (current_end_line.polyline.points.size() <= 1) {
+                    //remove the polyline
+                    building_paths.erase(building_paths.end() - 1);
+                    polyline_removed = true;
+                 }
+                //continue on the next path if needed
+                assert(!building_paths.empty());
+            } while (push_way_dist > 0 && building_paths.size() > 0 && polyline_removed);
+            if (push_way_dist > 0) {
+                std::cout << "end is too short, guess a control point\n";
+                //push as much as possible
+                Line next_line(building_paths.back().last_point(), building_paths.back().polyline.points[building_paths.back().polyline.points.size() - 2]);
+                building_paths.back().polyline.points.back() = next_line.point_at(std::max(next_line.length() / 10, m_scaled_gcode_resolution));
+            }
+            if (push_way_ctrl_dist > 0) {
+                std::cout << "end is too short, try to advance a bit more\n";
+                control_end_point = Line(end_point, building_paths.back().polyline.points.back()).midpoint();
+            }
+        }
+        svg1.Close();
+        std::cout << "good_start_point=" << good_start_point << ", good_end_point=" << good_end_point << "\n";
+        auto create_new_extrusion = [](ExtrusionPaths& paths, const ExtrusionPath& model, float ratio, const Point& start, const Point& end) {
+            // add notch extrutsions
+            paths.emplace_back(model);
+            ExtrusionPath& path = paths.back();
+            path.polyline.clear();
+            path.polyline.points.push_back(start);
+            path.polyline.points.push_back(end);
+            //reduce the flow of the notch path, as it's longer than previously
+            path.width = path.width * ratio;
+            path.mm3_per_mm = path.mm3_per_mm * ratio;
+        };
+
+        static int isazfn = 0;
+        std::stringstream stri1;
+        stri1 <<m_layer_index << "_"<< is_hole_loop<<"_"<<isazfn++ << "_notch" << ".svg";
+        SVG svg(stri1.str());
+        svg.draw(Polyline{ prev_point, end_point, start_point, next_point }, "green", scale_d(0.3));
+        //reduce the flow of the notch path, as it's longer than previously
+        if (good_start_point) {
+            //create a gentle curve
+            Point p1 = Line(moved_start, control_start_point).midpoint();
+            Point p2 = Line(p1, building_paths.front().first_point()).midpoint();
+            p2 = Line(p2, control_start_point).midpoint();
+            create_new_extrusion(notch_extrusion_start, building_paths.front(), 0.25f, moved_start, p1);
+            create_new_extrusion(notch_extrusion_start, building_paths.front(), 0.5f, p1, p2);
+            create_new_extrusion(notch_extrusion_start, building_paths.front(), 0.75f, p2, building_paths.front().first_point());
+            svg.draw(Polyline{ moved_start, p1, p2, building_paths.front().first_point(), control_start_point, start_point }, "orange", scale_d(0.2));
+        } else {
+            create_new_extrusion(notch_extrusion_start, building_paths.front(), 0.5f, moved_start, building_paths.front().first_point());
+        }
+        std::cout << "length_clipped=" << unscaled(length_clipped) << "\n";
+        //reduce the flow of the notch path, as it's longer than previously
+        if (good_end_point) {
+            //create a gentle curve
+            Point p1 = Line(moved_end, control_end_point).midpoint();
+            Point p2 = Line(p1, building_paths.back().last_point()).midpoint();
+            p2 = Line(p2, control_end_point).midpoint();
+            float flow_ratio = 0.75f;
+            auto check_length_clipped = [&building_paths, &end_point, length_clipped](const Point& pt_to_check) {
+                if (length_clipped > 0) {
+                    double dist = pt_to_check.projection_onto(Line(building_paths.back().last_point(), end_point)).distance_to(end_point);
+                    if (dist < length_clipped) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            create_new_extrusion(notch_extrusion_end, building_paths.back(), check_length_clipped(p2)?0.75f:0.f, building_paths.back().last_point(), p2);
+            create_new_extrusion(notch_extrusion_end, building_paths.back(), check_length_clipped(p1) ? 0.5f : 0.f, p2, p1);
+            create_new_extrusion(notch_extrusion_end, building_paths.back(), 0.f, p1, moved_end);
+            svg.draw(Polyline{ moved_end, p1, p2, building_paths.front().last_point(), control_end_point, end_point }, "red", scale_d(0.2));
+        } else {
+            create_new_extrusion(notch_extrusion_end, building_paths.back(), 0.5f, building_paths.back().last_point(), moved_end);
+        }
+        svg.Close();
+    }
+}
+
 std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::string &description, double speed)
 {
 #if _DEBUG
@@ -3976,6 +4322,14 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         }
     }
     if (building_paths.empty()) return "";
+
+    const ExtrusionPaths& wipe_paths = building_paths;
+
+    ExtrusionPaths notch_extrusion_start;
+    ExtrusionPaths notch_extrusion_end;
+    // seam notch if applicable
+    seam_notch(original_loop, building_paths, notch_extrusion_start, notch_extrusion_end, is_hole_loop, is_full_loop_ccw);
+
     const ExtrusionPaths& paths = building_paths;
 
     // apply the small perimeter speed
@@ -3995,17 +4349,20 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     std::string gcode;
 
     // generate the unretracting/wipe start move (same thing than for the end, but on the other side)
-    assert(!paths.empty() && paths.front().size() > 1 && !paths.back().empty());
-    if (EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_start, true) && !paths.empty() && paths.front().size() > 1 && paths.back().size() > 1 && paths.front().role() == erExternalPerimeter) {
-        //note: previous & next are inverted to extrude "in the opposite direction, ans we are "rewinding"
-        //Point previous_point = paths.back().polyline.points.back();
-        Point previous_point = paths.front().polyline.points[1];
-        Point current_point = paths.front().polyline.points.front();
-        //Point next_point = paths.front().polyline.points[1];
-        Point next_point = paths.back().polyline.points.back();
+    assert(!wipe_paths.empty() && wipe_paths.front().size() > 1 && !wipe_paths.back().empty());
+    if (EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_start, true) && !wipe_paths.empty() && wipe_paths.front().size() > 1 && wipe_paths.back().size() > 1 && wipe_paths.front().role() == erExternalPerimeter) {
+        //note: previous & next are inverted to extrude "in the opposite direction, as we are "rewinding"
+        //Point previous_point = wipe_paths.back().polyline.points.back();
+        Point previous_point = wipe_paths.front().polyline.points[1];
+        Point current_point = wipe_paths.front().first_point();
+        //Point next_point = wipe_paths.front().polyline.points[1];
+        Point next_point = wipe_paths.front().last_point();
         if (next_point == current_point) {
             //can happen if seam_gap is null
-            next_point = paths.back().polyline.points[paths.back().polyline.points.size()-2];
+            next_point = wipe_paths.back().polyline.points[wipe_paths.back().polyline.points.size()-2];
+        }
+        if (next_point == current_point || previous_point == current_point) {
+            throw Slic3r::SlicingError(_(L("Error while writing gcode: two points are at the same position. Please send the .3mf project to the dev team for debugging. Extrude loop: wipe_inside_start.")));
         }
         Point a = next_point;  // second point
         Point b = previous_point;  // second to last point
@@ -4032,9 +4389,9 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         //check if we can go to higher dist
         if (nozzle_diam != 0 && setting_max_depth > nozzle_diam * 0.55) {
             // call travel_to to trigger retract, so we can check it (but don't use the travel)
-            travel_to(gcode, pt, paths.front().role());
+            travel_to(gcode, pt, wipe_paths.front().role());
             if (m_writer.tool()->need_unretract())
-                dist = coordf_t(check_wipe::max_depth(paths, scale_t(setting_max_depth), scale_t(nozzle_diam), [current_pos, current_point, vec_dist, vec_norm, angle](coord_t dist)->Point {
+                dist = coordf_t(check_wipe::max_depth(wipe_paths, scale_t(setting_max_depth), scale_t(nozzle_diam), [current_pos, current_point, vec_dist, vec_norm, angle](coord_t dist)->Point {
                     Point pt = (current_pos + vec_dist * (2 * dist / vec_norm)).cast<coord_t>();
                     pt.rotate(angle, current_point);
                     return pt;
@@ -4047,46 +4404,53 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         //gcode += m_writer.travel_to_xy(this->point_to_gcode(pt), 0.0, "move inwards before retraction/seam");
         //this->set_last_pos(pt);
         // use extrude instead of travel_to_xy to trigger the unretract
-        ExtrusionPath fake_path_wipe(Polyline{ pt , current_point }, paths.front());
+        ExtrusionPath fake_path_wipe(Polyline{ pt , current_point }, wipe_paths.front());
         fake_path_wipe.mm3_per_mm = 0;
         gcode += extrude_path(fake_path_wipe, "move inwards before retraction/seam", speed);
     }
     
+    //extrusion notch start if any
+    for (const ExtrusionPath& path : notch_extrusion_start) {
+        gcode += extrude_path(path, description, speed);
+    }
     // extrude along the path
     //FIXME: we can have one-point paths in the loop that don't move : it's useless! and can create problems!
     for (auto path = paths.begin(); path != paths.end(); ++path) {
-        if(path->polyline.points.size()>1)
+        if(path->polyline.points.size() > 1)
             gcode += extrude_path(*path, description, speed);
+    }
+    //extrusion notch end if any
+    for (const ExtrusionPath& path : notch_extrusion_end) {
+        gcode += extrude_path(path, description, speed);
     }
 
     // reset acceleration
     m_writer.set_acceleration((uint16_t)floor(get_default_acceleration(m_config) + 0.5));
 
     //basic wipe, may be erased after if we need a more complex one
-    add_wipe_points(paths);
+    add_wipe_points(wipe_paths);
 
     //wipe for External Perimeter (and not vase)
-    if (paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 0 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 2
+    if (wipe_paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 0 && wipe_paths.front().size() >= 2 && wipe_paths.back().polyline.points.size() >= 2
         && (m_enable_loop_clipping && m_writer.tool_is_extruder()) ) {
         double dist_wipe_extra_perimeter = EXTRUDER_CONFIG_WITH_DEFAULT(wipe_extra_perimeter, 0);
 
         //safeguard : if not possible to wipe, abord.
-        if (paths.size() == 1 && paths.front().size() <= 2) {
+        if (wipe_paths.size() == 1 && wipe_paths.front().size() <= 2) {
             return gcode;
         }
         //TODO: abord if the wipe is too big for a mini loop (in a better way)
-        if (paths.size() == 1 && unscaled(paths.front().length()) < EXTRUDER_CONFIG_WITH_DEFAULT(wipe_extra_perimeter, 0) + nozzle_diam) {
+        if (wipe_paths.size() == 1 && unscaled(wipe_paths.front().length()) < EXTRUDER_CONFIG_WITH_DEFAULT(wipe_extra_perimeter, 0) + nozzle_diam) {
             return gcode;
         }
         //get points for wipe
-        Point prev_point = *(paths.back().polyline.points.end() - 2);       // second to last point
-        // *(paths.back().polyline.points.end() - 2) this is the same as (or should be) as paths.front().first_point();
-        Point current_point = paths.front().first_point();
-        Point next_point = paths.front().polyline.points[1];  // second point
+        Point prev_point = *(wipe_paths.back().polyline.points.end() - 2);       // second to last point
+        // *(wipe_paths.back().polyline.points.end() - 2) this is the same as (or should be) as wipe_paths.front().first_point();
+        Point current_point = wipe_paths.front().first_point();
+        Point next_point = wipe_paths.front().polyline.points[1];  // second point
         //safeguard : if a error exist abord;
         if (next_point == current_point || prev_point == current_point) {
-            assert(false);
-            return gcode;
+            throw Slic3r::SlicingError(_(L("Error while writing gcode: two points are at the same position. Please send the .3mf project to the dev team for debugging. Extrude loop: wipe.")));
         }
 
         gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
@@ -4095,8 +4459,8 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
             coordf_t wipe_dist = scale_(dist_wipe_extra_perimeter);
             ExtrusionPaths paths_wipe;
             m_wipe.reset_path();
-            for (int i = 0; i < paths.size(); i++) {
-                const ExtrusionPath& path = paths[i];
+            for (int i = 0; i < wipe_paths.size(); i++) {
+                const ExtrusionPath& path = wipe_paths[i];
                 if (wipe_dist > 0) {
                     //first, we use the polyline for wipe_extra_perimeter
                     if (path.length() < wipe_dist) {
@@ -4112,10 +4476,10 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
                         next_point_path.reverse();
                         if (next_point_path.size() > 1) {
                             next_point = next_point_path.polyline.points[1];
-                        } else if (i + 1 < paths.size()) {
-                            next_point = paths[i + 1].first_point();
+                        } else if (i + 1 < wipe_paths.size()) {
+                            next_point = wipe_paths[i + 1].first_point();
                         } else {
-                            next_point = paths[0].first_point();
+                            next_point = wipe_paths[0].first_point();
                         }
                             m_wipe.path.append(path.polyline);
                             m_wipe.path.clip_start(wipe_dist);
@@ -4164,7 +4528,7 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         const double setting_max_depth = (m_config.wipe_inside_depth.get_abs_value(m_writer.tool()->id(), nozzle_diam));
         coordf_t dist = scale_d(nozzle_diam) / 2;
         if (nozzle_diam != 0 && setting_max_depth > nozzle_diam * 0.55)
-            dist = coordf_t(check_wipe::max_depth(paths, scale_t(setting_max_depth), scale_t(nozzle_diam), [current_pos, current_point, vec_dist, vec_norm, angle](coord_t dist)->Point {
+            dist = coordf_t(check_wipe::max_depth(wipe_paths, scale_t(setting_max_depth), scale_t(nozzle_diam), [current_pos, current_point, vec_dist, vec_norm, angle](coord_t dist)->Point {
             Point pt = (current_pos + vec_dist * (2 * dist / vec_norm)).cast<coord_t>();
             pt.rotate(angle, current_point);
             return pt;

@@ -172,6 +172,8 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
                 std::vector<igl::Hit> hits;
                 for (size_t s_idx = r.begin(); s_idx < r.end(); ++s_idx) {
                     result[s_idx] = 1.0f;
+#if _DEBUG
+#else
                     constexpr float decrease_step = 1.0f
                             / (SeamPlacer::sqr_rays_per_sample_point * SeamPlacer::sqr_rays_per_sample_point);
 
@@ -226,6 +228,7 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
                             }
                         }
                     }
+#endif
                 }
             });
 

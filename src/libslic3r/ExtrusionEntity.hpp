@@ -225,7 +225,7 @@ public:
     Polyline polyline;
     // Volumetric velocity. mm^3 of plastic per mm of linear head motion. Used by the G-code generator.
     double mm3_per_mm;
-    // Width of the extrusion, used for visualization purposes. Unscaled
+    // Width of the extrusion, used for visualization purposes & for seam notch %. Unscaled
     float width;
     // Height of the extrusion, used for visualization purposes. Unscaled
     float height;

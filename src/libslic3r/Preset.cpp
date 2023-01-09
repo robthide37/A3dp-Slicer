@@ -476,6 +476,12 @@ static std::vector<std::string> s_Preset_print_options {
         "overhangs_reverse",
         "overhangs_reverse_threshold",
         "seam_position",
+        "seam_angle_cost",
+        "seam_travel_cost",
+        "seam_notch_all",
+        "seam_notch_angle",
+        "seam_notch_inner",
+        "seam_notch_outer",
         // external_perimeters
         "external_perimeters_first",
         "external_perimeters_vase",
@@ -673,8 +679,6 @@ static std::vector<std::string> s_Preset_print_options {
         "exact_last_layer_height",
         "perimeter_loop",
         "perimeter_loop_seam",
-        "seam_angle_cost",
-        "seam_travel_cost",
         "infill_connection", "infill_connection_solid", "infill_connection_top", "infill_connection_bottom", "infill_connection_bridge",
         "first_layer_infill_speed",
         // thin wall
