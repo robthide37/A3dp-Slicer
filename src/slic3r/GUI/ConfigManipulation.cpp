@@ -255,7 +255,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, has_top_solid_infill || (has_spiral_vase && has_bottom_solid_infill));
 
     bool have_default_acceleration = config->opt_float("default_acceleration") > 0;
-    for (auto el : { "perimeter_acceleration", "infill_acceleration",
+    for (auto el : { "perimeter_acceleration", "infill_acceleration", "top_solid_infill_acceleration",
+                    "solid_infill_acceleration", "external_perimeter_acceleration"
                     "bridge_acceleration", "first_layer_acceleration" })
         toggle_field(el, have_default_acceleration);
 
