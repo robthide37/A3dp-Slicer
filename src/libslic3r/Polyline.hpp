@@ -10,7 +10,7 @@
 namespace Slic3r {
 
 class Polyline;
-class ThickPolyline;
+struct ThickPolyline;
 typedef std::vector<Polyline> Polylines;
 typedef std::vector<ThickPolyline> ThickPolylines;
 
@@ -160,20 +160,28 @@ bool remove_degenerate(Polylines &polylines);
 // Returns index of a segment of a polyline and foot point of pt on polyline.
 std::pair<int, Point> foot_pt(const Points &polyline, const Point &pt);
 
-class ThickPolyline : public Polyline {
-public:
-    ThickPolyline() : endpoints(std::make_pair(false, false)) {}
+struct ThickPolyline {
+    ThickPolyline() = default;
     ThickLines thicklines() const;
+
+    const Point& first_point()  const { return this->points.front(); }
+    const Point& last_point()   const { return this->points.back(); }
+    bool         is_valid()     const { return this->points.size() >= 2; }
+    double       length()       const { return Slic3r::length(this->points); }
+
+    void         clear() { this->points.clear(); this->width.clear(); }
+
     void reverse() {
-        Polyline::reverse();
+        std::reverse(this->points.begin(), this->points.end());
         std::reverse(this->width.begin(), this->width.end());
         std::swap(this->endpoints.first, this->endpoints.second);
     }
 
     void clip_end(double distance);
 
-    std::vector<coordf_t> width;
-    std::pair<bool,bool>  endpoints;
+    Points                  points;
+    std::vector<coordf_t>   width;
+    std::pair<bool,bool>    endpoints { false, false };
 };
 
 inline ThickPolylines to_thick_polylines(Polylines &&polylines, const coordf_t width)

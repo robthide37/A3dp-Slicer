@@ -497,15 +497,18 @@ void Layer::make_perimeters()
     	        } else {
     	            SurfaceCollection new_slices;
     	            // Use the region with highest infill rate, as the make_perimeters() function below decides on the gap fill based on the infill existence.
-    	            LayerRegion *layerm_config = m_regions[layer_region_ids.front()];
-    	            {
+                    uint32_t     region_id_config = layer_region_ids.front();
+                    LayerRegion* layerm_config = m_regions[region_id_config];
+                    {
     	                // Merge slices (surfaces) according to number of extra perimeters.
     	                for (uint32_t region_id : layer_region_ids) {
                             LayerRegion &layerm = *m_regions[region_id];
     	                    for (const Surface &surface : layerm.slices())
                                 surfaces_to_merge.emplace_back(&surface);
-    	                    if (layerm.region().config().fill_density > layerm_config->region().config().fill_density)
-    	                    	layerm_config = &layerm;
+                            if (layerm.region().config().fill_density > layerm_config->region().config().fill_density) {
+                                region_id_config = region_id;
+                                layerm_config    = &layerm;
+                            }
     	                }
                         std::sort(surfaces_to_merge.begin(), surfaces_to_merge.end(), [](const Surface *l, const Surface *r){ return l->extra_perimeters < r->extra_perimeters; });
                         for (size_t i = 0; i < surfaces_to_merge.size();) {
@@ -525,7 +528,7 @@ void Layer::make_perimeters()
     	            }
     	            // make perimeters
     	            layerm_config->make_perimeters(new_slices, perimeter_and_gapfill_ranges, fill_expolygons, fill_expolygons_ranges);
-                    this->sort_perimeters_into_islands(new_slices, region_id, perimeter_and_gapfill_ranges, std::move(fill_expolygons), fill_expolygons_ranges, layer_region_ids);
+                    this->sort_perimeters_into_islands(new_slices, region_id_config, perimeter_and_gapfill_ranges, std::move(fill_expolygons), fill_expolygons_ranges, layer_region_ids);
     	        }
     	    }
         }

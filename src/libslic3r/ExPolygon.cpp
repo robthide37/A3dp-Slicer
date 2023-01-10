@@ -320,7 +320,9 @@ void ExPolygon::medial_axis(double min_width, double max_width, Polylines* polyl
 {
     ThickPolylines tp;
     this->medial_axis(min_width, max_width, &tp);
-    polylines->insert(polylines->end(), tp.begin(), tp.end());
+    polylines->reserve(polylines->size() + tp.size());
+    for (auto &pl : tp)
+        polylines->emplace_back(pl.points);
 }
 
 Lines ExPolygon::lines() const

@@ -498,6 +498,7 @@ void MedialAxis::build(ThickPolylines* polylines)
             polyline.width.emplace_back(seed_edge_data.width_end);        
             // Grow the polyline in a forward direction.
             this->process_edge_neighbors(&*seed_edge, &polyline);
+            assert(polyline.width.size() == polyline.points.size() * 2 - 2);
         
             // Grow the polyline in a backward direction.
             reverse_polyline.clear();
@@ -505,7 +506,6 @@ void MedialAxis::build(ThickPolylines* polylines)
             polyline.points.insert(polyline.points.begin(), reverse_polyline.points.rbegin(), reverse_polyline.points.rend());
             polyline.width.insert(polyline.width.begin(), reverse_polyline.width.rbegin(), reverse_polyline.width.rend());
             polyline.endpoints.first = reverse_polyline.endpoints.second;
-        
             assert(polyline.width.size() == polyline.points.size() * 2 - 2);
         
             // Prevent loop endpoints from being extended.
@@ -538,7 +538,9 @@ void MedialAxis::build(Polylines* polylines)
 {
     ThickPolylines tp;
     this->build(&tp);
-    polylines->insert(polylines->end(), tp.begin(), tp.end());
+    polylines->reserve(polylines->size() + tp.size());
+    for (auto &pl : tp)
+        polylines->emplace_back(pl.points);
 }
 
 void MedialAxis::process_edge_neighbors(const VD::edge_type *edge, ThickPolyline* polyline)
