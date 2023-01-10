@@ -409,7 +409,8 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
         po.m_preview_meshes[slaposDrillHoles] = po.get_mesh_to_print();
 
     // Release the data, won't be needed anymore, takes huge amount of ram
-    po.m_hollowing_data->interior.reset();
+    if (po.m_hollowing_data && po.m_hollowing_data->interior)
+        po.m_hollowing_data->interior.reset();
 }
 
 template<class Pred>
