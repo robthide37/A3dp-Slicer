@@ -4837,8 +4837,13 @@ bool Plater::priv::layers_height_allowed() const
 
 bool Plater::priv::can_mirror() const
 {
+#if ENABLE_WORLD_COORDINATE
+    return !sidebar->obj_list()->has_selected_cut_object();
+#else
     return !sidebar->obj_list()->has_selected_cut_object() && get_selection().is_from_single_instance();
+#endif // ENABLE_WORLD_COORDINATE
 }
+
 
 bool Plater::priv::can_replace_with_stl() const
 {

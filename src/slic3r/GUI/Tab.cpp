@@ -2373,7 +2373,7 @@ void TabPrinter::build_fff()
         option = optgroup->get_option("start_gcode");
         option.opt.full_width = true;
         option.opt.is_code = true;
-        option.opt.height = gcode_field_height;//150;
+        option.opt.height = 3 * gcode_field_height;//150;
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("End G-code"), 0);
@@ -2383,7 +2383,7 @@ void TabPrinter::build_fff()
         option = optgroup->get_option("end_gcode");
         option.opt.full_width = true;
         option.opt.is_code = true;
-        option.opt.height = gcode_field_height;//150;
+        option.opt.height = 1.75 * gcode_field_height;//150;
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("Before layer change G-code"), 0);

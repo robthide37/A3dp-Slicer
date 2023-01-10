@@ -129,7 +129,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_update_job_cancel(nullptr)
 {
     m_rotate_gizmo.set_group_id(0);
-    m_rotate_gizmo.set_using_local_coordinate(true);
+    m_rotate_gizmo.set_force_local_coordinate(true);
     // TODO: add suggestion to use https://fontawesome.com/
     // (copy & paste) unicode symbols from web    
     // paste HEX unicode into notepad move cursor after unicode press [alt] + [x]
@@ -300,7 +300,8 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
         angle -= PI / 2; // Grabber is upward
 
         // temporary rotation
-        TransformationType transformation_type = TransformationType::Local_Relative_Joint;
+        const TransformationType transformation_type = m_parent.get_selection().is_single_text() ?
+          TransformationType::Local_Relative_Joint : TransformationType::World_Relative_Joint;
         m_parent.get_selection().rotate(Vec3d(0., 0., angle), transformation_type);
 
         angle += *m_rotate_start_angle;
