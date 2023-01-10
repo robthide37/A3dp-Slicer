@@ -619,7 +619,7 @@ std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &sli
         }
         const LayerRegion *thin_fill_region = layer->get_region(island.fill_region_id);
         for (const auto &thin_fill_idx : island.thin_fills) {
-            add_extrusions_to_object(thin_fill_region->thin_fills().entities[thin_fill_idx], perimeter_region);
+            add_extrusions_to_object(perimeter_region->thin_fills().entities[thin_fill_idx], perimeter_region);
         }
     }
 
