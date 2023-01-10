@@ -5545,7 +5545,6 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
-
     def = this->add("threads", coInt);
     def->label = L("Threads");
     def->tooltip = L("Threads are used to parallelize long-running tasks. Optimal threads number "
@@ -5861,6 +5860,26 @@ void PrintConfigDef::init_fff_params()
                    "Extrude the excess material into the wipe tower.");
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("wipe_tower_speed", coFloat);
+    def->label = L("Wipe Tower Speed");
+    def->category = OptionCategory::speed;
+    def->tooltip = L("Printing speed of the wipe tower. Capped by filament_max_volumetric_speed (if set)."
+        "\nIf set to zero, a value of 80mm/s is used.");
+    def->sidetext = L("mm/s");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(80.));
+
+    def = this->add("wipe_tower_wipe_starting_speed", coFloatOrPercent);
+    def->label = L("Wipe tower starting speed");
+    def->category = OptionCategory::speed;
+    def->tooltip = L("Start of the wiping speed ramp up (for wipe tower)."
+        "\nCan be a % of the 'Wipe tower speed'."
+        "\nSet to 0 to disable.");
+    def->sidetext = L("mm/s or %");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(33, true));
+
 
     def = this->add("wiping_volumes_extruders", coFloats);
     def->label = L("Purging volumes - load/unload volumes");
