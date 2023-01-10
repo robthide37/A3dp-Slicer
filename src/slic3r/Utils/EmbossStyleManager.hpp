@@ -139,7 +139,7 @@ public:
     // Extend font atlas when not in glyph range
     ImFont *get_imgui_font();
     // initialize font range by unique symbols in text
-    ImFont *create_imgui_font(const std::string& text);
+    ImFont *create_imgui_font(const std::string& text, double scale);
     
     // init truncated names of styles
     void init_trunc_names(float max_width);
@@ -191,7 +191,7 @@ public:
     // Value out of limits is crop
     static float min_imgui_font_size;
     static float max_imgui_font_size;
-    static float get_imgui_font_size(const FontProp &prop, const Slic3r::Emboss::FontFile &file);
+    static float get_imgui_font_size(const FontProp &prop, const Slic3r::Emboss::FontFile &file, double scale);
 
 private:
     // erase font when not possible to load
@@ -231,11 +231,6 @@ private:
         size_t style_index = std::numeric_limits<size_t>::max();
 
     } m_style_cache;
-            
-    // extend actual imgui font when exist unknown char in text
-    // NOTE: imgui_font has to be unused
-    // return true when extend range otherwise FALSE
-    ImFont *extend_imgui_font_range(size_t font_index, const std::string &text);
 
     void make_unique_name(std::string &name);
 

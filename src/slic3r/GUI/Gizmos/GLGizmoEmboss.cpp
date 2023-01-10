@@ -1100,7 +1100,27 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
     m_unmodified_volume = {*volume->get_mesh_shared_ptr(), // copy
                            tc, volume->get_matrix(), volume->name};
 
+    // calculate scale for height and depth inside of scaled object instance
+    calculate_scale();
     return true;
+}
+
+void GLGizmoEmboss::calculate_scale() {
+    Transform3d to_world = priv::world_matrix(m_parent.get_selection());
+    auto to_world_linear = to_world.linear();
+    Vec3d up_world = to_world_linear * Vec3d::UnitY();
+    double norm_sq = up_world.squaredNorm();
+    if (is_approx(norm_sq, 1.))
+        m_scale_height.reset();
+    else 
+        m_scale_height = sqrt(norm_sq);
+
+    Vec3d depth_world = to_world_linear * Vec3d::UnitZ();
+    double depth_sq = depth_world.squaredNorm();
+    if (is_approx(depth_sq, 1.))
+        m_scale_depth.reset();
+    else
+        m_scale_depth = sqrt(depth_sq);
 }
 
 ModelVolume *priv::get_model_volume(const GLVolume *gl_volume, const ModelObject *object)
@@ -1455,10 +1475,11 @@ void GLGizmoEmboss::draw_text_input()
         return create_range_text(text, *ff.font_file, font_index, &exist_unknown);
     };
     
+    double scale = m_scale_height.has_value() ? *m_scale_height : 1.;
     ImFont *imgui_font = m_style_manager.get_imgui_font();
     if (imgui_font == nullptr) {
         // try create new imgui font
-        m_style_manager.create_imgui_font(create_range_text_prep());
+        m_style_manager.create_imgui_font(create_range_text_prep(), scale);
         imgui_font = m_style_manager.get_imgui_font();
     }
     bool exist_font = 
@@ -1498,7 +1519,7 @@ void GLGizmoEmboss::draw_text_input()
         if (prop.line_gap.has_value())
             append_warning(_u8L("Line gap"), _u8L("Unsupported visualization of gap between lines inside text input."));
         auto &ff         = m_style_manager.get_font_file_with_cache();
-        float imgui_size = StyleManager::get_imgui_font_size(prop, *ff.font_file);
+        float imgui_size = StyleManager::get_imgui_font_size(prop, *ff.font_file, scale);
         if (imgui_size > StyleManager::max_imgui_font_size)
             append_warning(_u8L("To tall"), _u8L("Diminished font height inside text input."));
         if (imgui_size < StyleManager::min_imgui_font_size)
@@ -1552,7 +1573,7 @@ void GLGizmoEmboss::draw_text_input()
     if (!range_text.empty() &&
         !m_imgui->contain_all_glyphs(imgui_font, range_text) ) { 
         m_style_manager.clear_imgui_font(); 
-        m_style_manager.create_imgui_font(range_text);
+        m_style_manager.create_imgui_font(range_text, scale);
     }
 }
 
@@ -2628,7 +2649,7 @@ bool GLGizmoEmboss::rev_input_mm(const std::string   &name,
                                  float                step_fast,
                                  const char          *format,
                                  bool                 use_inch,
-                                 std::optional<float> scale)
+                                 const std::optional<float>& scale)
 {
     // _variable which temporary keep value
     float  value_ = value;
@@ -2758,16 +2779,8 @@ void GLGizmoEmboss::draw_style_edit() {
     }
 
     bool use_inch = wxGetApp().app_config->get("use_inches") == "1";
-
-    // IMPROVE: calc scale only when neccessary not each frame
-    Transform3d to_world = priv::world_matrix(m_parent.get_selection());
-    Vec3d up_world = to_world.linear() * Vec3d(0., 1., 0.);
-    double norm_sq = up_world.squaredNorm();
-    std::optional<float> height_scale;
-    if (!is_approx(norm_sq, 1.))
-        height_scale = sqrt(norm_sq);
-
-    draw_height(height_scale, use_inch);
+    draw_height(use_inch);
+    draw_depth(use_inch);
 
 #ifdef SHOW_WX_WEIGHT_INPUT
     if (wx_font.has_value()) {
@@ -2793,16 +2806,10 @@ void GLGizmoEmboss::draw_style_edit() {
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("wx Make bold").c_str());
     }
-#endif // SHOW_WX_WEIGHT_INPUT
-
-    Vec3d depth_world = to_world.linear() * Vec3d(0., 0., 1.);
-    double depth_sq = depth_world.squaredNorm();
-    std::optional<float> depth_scale;
-    if (!is_approx(depth_sq, 1.)) depth_scale = sqrt(depth_sq);   
-    draw_depth(depth_scale, use_inch);
+#endif // SHOW_WX_WEIGHT_INPUT 
 }
 
-void GLGizmoEmboss::draw_height(std::optional<float> scale, bool use_inch)
+void GLGizmoEmboss::draw_height(bool use_inch)
 {
     float &value = m_style_manager.get_style().prop.size_in_mm;
     const EmbossStyle* stored_style = m_style_manager.get_stored_style();
@@ -2810,7 +2817,7 @@ void GLGizmoEmboss::draw_height(std::optional<float> scale, bool use_inch)
     const char *size_format = ((use_inch) ? "%.2f in" : "%.1f mm");
     const std::string revert_text_size = _u8L("Revert text size.");
     const std::string& name = m_gui_cfg->translations.size;
-    if(rev_input_mm(name, value, stored, revert_text_size, 0.1f, 1.f, size_format, use_inch, scale)){
+    if (rev_input_mm(name, value, stored, revert_text_size, 0.1f, 1.f, size_format, use_inch, m_scale_height)) {
         // size can't be zero or negative
         priv::Limits::apply(value, priv::limits.size_in_mm);
         // only different value need process
@@ -2830,7 +2837,7 @@ void GLGizmoEmboss::draw_height(std::optional<float> scale, bool use_inch)
     }
 }
 
-void GLGizmoEmboss::draw_depth(std::optional<float> scale, bool use_inch)
+void GLGizmoEmboss::draw_depth(bool use_inch)
 {
     float &value = m_style_manager.get_style().prop.emboss;
     const EmbossStyle* stored_style = m_style_manager.get_stored_style();
@@ -2838,7 +2845,7 @@ void GLGizmoEmboss::draw_depth(std::optional<float> scale, bool use_inch)
     const std::string  revert_emboss_depth = _u8L("Revert embossed depth.");
     const char *size_format = ((use_inch) ? "%.3f in" : "%.2f mm");
     const std::string  name = m_gui_cfg->translations.depth;
-    if (rev_input_mm(name, value, stored, revert_emboss_depth, 0.1f, 1.f, size_format, use_inch, scale)) {
+    if (rev_input_mm(name, value, stored, revert_emboss_depth, 0.1f, 1.f, size_format, use_inch, m_scale_depth)) {
         // size can't be zero or negative
         priv::Limits::apply(value, priv::limits.emboss);
         process();

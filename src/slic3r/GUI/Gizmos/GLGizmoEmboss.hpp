@@ -111,8 +111,8 @@ private:
     void draw_font_preview(FaceName &face, bool is_visible);
     void draw_font_list();
     void draw_style_edit();
-    void draw_height(std::optional<float> scale, bool use_inch);
-    void draw_depth(std::optional<float> scale, bool use_inch);
+    void draw_height(bool use_inch);
+    void draw_depth(bool use_inch);
 
     bool draw_italic_button();
     bool draw_bold_button();
@@ -126,7 +126,7 @@ private:
 
     bool rev_input_mm(const std::string &name, float &value, const float *default_value,
         const std::string &undo_tooltip, float step, float step_fast, const char *format,
-        bool use_inch = false, std::optional<float> scale = {});
+        bool use_inch, const std::optional<float>& scale);
 
     /// <summary>
     /// Reversible input float with option to restor default value
@@ -308,6 +308,11 @@ private:
 
     // Only when drag text object it stores world position
     std::optional<Transform3d> m_temp_transformation;
+
+    // For text on scaled objects
+    std::optional<float> m_scale_height;
+    std::optional<float> m_scale_depth;
+    void calculate_scale();
 
     // drawing icons
     GLTexture m_icons_texture;

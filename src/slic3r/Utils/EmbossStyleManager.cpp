@@ -244,13 +244,6 @@ ImFont *StyleManager::get_imgui_font()
 
 const std::vector<StyleManager::Item> &StyleManager::get_styles() const{ return m_style_items; }
 
-ImFont* StyleManager::extend_imgui_font_range(size_t index, const std::string& text)
-{
-    // TODO: start using merge mode
-    // ImFontConfig::MergeMode = true;
-    return create_imgui_font(text);
-}
-
 void StyleManager::make_unique_name(std::string &name)
 {
     auto is_unique = [&](const std::string &name) -> bool {
@@ -369,8 +362,7 @@ void StyleManager::free_style_images() {
 
 float StyleManager::min_imgui_font_size = 18.f;
 float StyleManager::max_imgui_font_size = 60.f;
-float StyleManager::get_imgui_font_size(const FontProp         &prop,
-                                              const FontFile &file)
+float StyleManager::get_imgui_font_size(const FontProp &prop, const FontFile &file, double scale)
 {
     const auto  &cn = prop.collection_number;
     unsigned int font_index = (cn.has_value()) ? *cn : 0;
@@ -381,10 +373,10 @@ float StyleManager::get_imgui_font_size(const FontProp         &prop,
 
     // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm):
     // It is approximately 0.0139 inch or 352.8 um.
-    return c1 * std::abs(prop.size_in_mm) / 0.3528f;
+    return c1 * std::abs(prop.size_in_mm) / 0.3528f * scale;
 }
 
-ImFont *StyleManager::create_imgui_font(const std::string &text)
+ImFont *StyleManager::create_imgui_font(const std::string &text, double scale)
 {
     // inspiration inside of ImGuiWrapper::init_font
     auto& ff = m_style_cache.font_file;
@@ -404,7 +396,7 @@ ImFont *StyleManager::create_imgui_font(const std::string &text)
                                 ImFontAtlasFlags_NoPowerOfTwoHeight;
 
     const FontProp &font_prop = m_style_cache.style.prop;
-    float font_size = get_imgui_font_size(font_prop, font_file);
+    float font_size = get_imgui_font_size(font_prop, font_file, scale);
     if (font_size < min_imgui_font_size)
         font_size = min_imgui_font_size;
     if (font_size > max_imgui_font_size)
