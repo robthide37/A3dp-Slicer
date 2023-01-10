@@ -2,17 +2,21 @@
 #include <optional>
 #include <numeric>
 #include <unordered_set>
+#include <random>
 
 #include <libslic3r/OpenVDBUtils.hpp>
 #include <libslic3r/TriangleMesh.hpp>
 #include <libslic3r/TriangleMeshSlicer.hpp>
 #include <libslic3r/SLA/Hollowing.hpp>
+#include <libslic3r/AABBTreeIndirect.hpp>
 #include <libslic3r/AABBMesh.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/QuadricEdgeCollapse.hpp>
 #include <libslic3r/SLA/SupportTreeMesher.hpp>
 #include <libslic3r/Execution/ExecutionSeq.hpp>
 #include <libslic3r/Model.hpp>
+
+#include <libslic3r/MeshBoolean.hpp>
 
 #include <boost/log/trivial.hpp>
 
@@ -291,6 +295,19 @@ void hollow_mesh(TriangleMesh &mesh, const Interior &interior, int flags)
     mesh.merge(inter);
 }
 
+void hollow_mesh(indexed_triangle_set &mesh, const Interior &interior, int flags)
+{
+    if (mesh.empty() || interior.mesh.empty()) return;
+
+    if (flags & hfRemoveInsideTriangles && interior.gridptr)
+        remove_inside_triangles(mesh, interior);
+
+    indexed_triangle_set interi = interior.mesh;
+    sla::swap_normals(interi);
+
+    its_merge(mesh, interi);
+}
+
 // Get the distance of p to the interior's zero iso_surface. Interior should
 // have its zero isosurface positioned at offset + closing_distance inwards form
 // the model surface.
@@ -378,14 +395,14 @@ void divide_triangle(const DivFace &face, Fn &&visitor)
         divide_triangle(child2, std::forward<Fn>(visitor));
 }
 
-void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
+void remove_inside_triangles(indexed_triangle_set &mesh, const Interior &interior,
                              const std::vector<bool> &exclude_mask)
 {
     enum TrPos { posInside, posTouch, posOutside };
 
-    auto &faces       = mesh.its.indices;
-    auto &vertices    = mesh.its.vertices;
-    auto bb           = mesh.bounding_box();
+    auto &faces       = mesh.indices;
+    auto &vertices    = mesh.vertices;
+    auto bb           = bounding_box(mesh); //mesh.bounding_box();
 
     bool use_exclude_mask = faces.size() == exclude_mask.size();
     auto is_excluded = [&exclude_mask, use_exclude_mask](size_t face_id) {
@@ -421,8 +438,8 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
         // or not.
         std::vector<bool> to_remove;
 
-        MeshMods(const TriangleMesh &mesh):
-            to_remove(mesh.its.indices.size(), false) {}
+        MeshMods(const indexed_triangle_set &mesh):
+            to_remove(mesh.indices.size(), false) {}
 
         // Number of triangles that need to be removed.
         size_t to_remove_cnt() const
@@ -484,7 +501,8 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
             const Vec3i &face = faces[face_idx];
 
             // If the triangle is excluded, we need to keep it.
-            if (is_excluded(face_idx)) return;
+            if (is_excluded(face_idx))
+                return;
 
             std::array<Vec3f, 3> pts = {vertices[face(0)], vertices[face(1)],
                                         vertices[face(2)]};
@@ -492,7 +510,8 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
             BoundingBoxf3 facebb{pts.begin(), pts.end()};
 
             // Face is certainly outside the cavity
-            if (!facebb.intersects(bb)) return;
+            if (!facebb.intersects(bb))
+                return;
 
             DivFace df{face, pts, long(face_idx)};
 
@@ -525,8 +544,14 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
     faces.swap(new_faces);
     new_faces = {};
 
-    mesh = TriangleMesh{mesh.its};
+//    mesh = TriangleMesh{mesh.its};
     //FIXME do we want to repair the mesh? Are there duplicate vertices or flipped triangles?
+}
+
+void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
+                             const std::vector<bool> &exclude_mask)
+{
+    remove_inside_triangles(mesh.its, interior, exclude_mask);
 }
 
 struct FaceHash {
@@ -590,8 +615,10 @@ struct FaceHash {
 
     FaceHash (const indexed_triangle_set &its): facehash(its.indices.size())
     {
-        for (const Vec3i &face : its.indices)
+        for (Vec3i face : its.indices) {
+            std::swap(face(0), face(2));
             facehash.insert(facekey(face, its.vertices));
+        }
     }
 
     bool find(const std::string &key)
@@ -745,6 +772,128 @@ double get_voxel_scale(double mesh_volume, const HollowingConfig &hc)
     BOOST_LOG_TRIVIAL(debug) << "Hollowing: mesh volume is: " << mesh_volume;
 
     return voxel_scale;
+}
+
+// The same as its_compactify_vertices, but returns a new mesh, doesn't touch
+// the original
+static indexed_triangle_set
+remove_unconnected_vertices(const indexed_triangle_set &its)
+{
+    if (its.indices.empty()) {};
+
+    indexed_triangle_set M;
+
+    std::vector<int> vtransl(its.vertices.size(), -1);
+    int vcnt = 0;
+    for (auto &f : its.indices) {
+
+        for (int i = 0; i < 3; ++i)
+            if (vtransl[size_t(f(i))] < 0) {
+
+                M.vertices.emplace_back(its.vertices[size_t(f(i))]);
+                vtransl[size_t(f(i))] = vcnt++;
+            }
+
+        std::array<int, 3> new_f = {
+            vtransl[size_t(f(0))],
+            vtransl[size_t(f(1))],
+            vtransl[size_t(f(2))]
+        };
+
+        M.indices.emplace_back(new_f[0], new_f[1], new_f[2]);
+    }
+
+    return M;
+}
+
+int hollow_mesh_and_drill(indexed_triangle_set &hollowed_mesh,
+                           const Interior &interior,
+                           const DrainHoles &drainholes,
+                           std::function<void(size_t)> on_hole_fail)
+{
+    auto tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(
+        hollowed_mesh.vertices,
+        hollowed_mesh.indices
+        );
+
+    std::uniform_real_distribution<float> dist(0., float(EPSILON));
+    auto holes_mesh_cgal = MeshBoolean::cgal::triangle_mesh_to_cgal({}, {});
+    indexed_triangle_set part_to_drill = hollowed_mesh;
+
+    std::mt19937 m_rng{std::random_device{}()};
+
+    for (size_t i = 0; i < drainholes.size(); ++i) {
+        sla::DrainHole holept = drainholes[i];
+
+        holept.normal += Vec3f{dist(m_rng), dist(m_rng), dist(m_rng)};
+        holept.normal.normalize();
+        holept.pos += Vec3f{dist(m_rng), dist(m_rng), dist(m_rng)};
+        indexed_triangle_set m = holept.to_mesh();
+
+        part_to_drill.indices.clear();
+        auto bb = bounding_box(m);
+        Eigen::AlignedBox<float, 3> ebb{bb.min.cast<float>(),
+                                        bb.max.cast<float>()};
+
+        AABBTreeIndirect::traverse(
+            tree,
+            AABBTreeIndirect::intersecting(ebb),
+            [&part_to_drill, &hollowed_mesh](const auto& node)
+            {
+                part_to_drill.indices.emplace_back(hollowed_mesh.indices[node.idx]);
+                // continue traversal
+                return true;
+            });
+
+        auto cgal_meshpart = MeshBoolean::cgal::triangle_mesh_to_cgal(
+            remove_unconnected_vertices(part_to_drill));
+
+        if (MeshBoolean::cgal::does_self_intersect(*cgal_meshpart)) {
+            on_hole_fail(i);
+            continue;
+        }
+
+        auto cgal_hole = MeshBoolean::cgal::triangle_mesh_to_cgal(m);
+        MeshBoolean::cgal::plus(*holes_mesh_cgal, *cgal_hole);
+    }
+
+    auto ret = static_cast<int>(HollowMeshResult::Ok);
+
+    if (MeshBoolean::cgal::does_self_intersect(*holes_mesh_cgal)) {
+        ret |= static_cast<int>(HollowMeshResult::DrillingFailed);
+    }
+
+    auto hollowed_mesh_cgal = MeshBoolean::cgal::triangle_mesh_to_cgal(hollowed_mesh);
+
+    if (!MeshBoolean::cgal::does_bound_a_volume(*hollowed_mesh_cgal)) {
+        ret |= static_cast<int>(HollowMeshResult::FaultyMesh);
+    }
+
+    if (!MeshBoolean::cgal::empty(*holes_mesh_cgal)
+        && !MeshBoolean::cgal::does_bound_a_volume(*holes_mesh_cgal)) {
+        ret |= static_cast<int>(HollowMeshResult::FaultyHoles);
+    }
+
+    // Don't even bother
+    if (ret & static_cast<int>(HollowMeshResult::DrillingFailed))
+        return ret;
+
+    try {
+        if (!MeshBoolean::cgal::empty(*holes_mesh_cgal))
+            MeshBoolean::cgal::minus(*hollowed_mesh_cgal, *holes_mesh_cgal);
+
+        hollowed_mesh =
+            MeshBoolean::cgal::cgal_to_indexed_triangle_set(*hollowed_mesh_cgal);
+
+        std::vector<bool> exclude_mask =
+            create_exclude_mask(hollowed_mesh, interior, drainholes);
+
+        sla::remove_inside_triangles(hollowed_mesh, interior, exclude_mask);
+    } catch (const Slic3r::RuntimeError &) {
+        ret |= static_cast<int>(HollowMeshResult::DrillingFailed);
+    }
+
+    return ret;
 }
 
 }} // namespace Slic3r::sla

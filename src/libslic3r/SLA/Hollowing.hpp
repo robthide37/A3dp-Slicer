@@ -159,7 +159,30 @@ void hollow_mesh(TriangleMesh &mesh, const HollowingConfig &cfg, int flags = 0);
 // Hollowing prepared in "interior", merge with original mesh
 void hollow_mesh(TriangleMesh &mesh, const Interior &interior, int flags = 0);
 
+// Will do the hollowing
+void hollow_mesh(indexed_triangle_set &mesh, const HollowingConfig &cfg, int flags = 0);
+
+// Hollowing prepared in "interior", merge with original mesh
+void hollow_mesh(indexed_triangle_set &mesh, const Interior &interior, int flags = 0);
+
+enum class HollowMeshResult {
+    Ok = 0,
+    FaultyMesh = 1,
+    FaultyHoles = 2,
+    DrillingFailed = 4
+};
+
+// Return HollowMeshResult codes OR-ed.
+int hollow_mesh_and_drill(
+    indexed_triangle_set &mesh,
+    const Interior& interior,
+    const DrainHoles &holes,
+    std::function<void(size_t)> on_hole_fail = [](size_t){});
+
 void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
+                             const std::vector<bool> &exclude_mask = {});
+
+void remove_inside_triangles(indexed_triangle_set &mesh, const Interior &interior,
                              const std::vector<bool> &exclude_mask = {});
 
 sla::DrainHoles transformed_drainhole_points(const ModelObject &mo,

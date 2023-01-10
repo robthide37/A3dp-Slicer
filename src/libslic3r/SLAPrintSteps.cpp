@@ -87,7 +87,6 @@ std::string PRINT_STEP_LABELS(size_t idx)
 
 SLAPrint::Steps::Steps(SLAPrint *print)
     : m_print{print}
-    , m_rng{std::random_device{}()}
     , objcount{m_print->m_objects.size()}
     , ilhd{m_print->m_material_config.initial_layer_height.getFloat()}
     , ilh{float(ilhd)}
@@ -187,6 +186,12 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
     return m;
 }
 
+inline auto parts_to_slice(const std::multiset<CSGPartForStep> &parts,
+                           SLAPrintObjectStep step)
+{
+    auto r = parts.equal_range(step);
+    return Range{r.first, r.second};
+}
 
 void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
 {
@@ -196,13 +201,91 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
 
     auto r = range(po.m_mesh_to_slice);
     auto m = indexed_triangle_set{};
+
+    bool handled   = false;
+
     if (is_all_positive(r)) {
         m = csgmesh_merge_positive_parts(r);
+        handled = true;
     } else if (csg::check_csgmesh_booleans(r) == r.end()) {
         auto cgalmeshptr = csg::perform_csgmesh_booleans(r);
-        if (cgalmeshptr)
+        if (cgalmeshptr) {
             m = MeshBoolean::cgal::cgal_to_indexed_triangle_set(*cgalmeshptr);
+            handled = true;
+        }
     } else {
+        // Normal cgal processing failed. If there are no negative volumes,
+        // the hollowing can be tried with the old algorithm which didn't handled volumes.
+        // If that fails for any of the drillholes, the voxelization fallback is
+        // used.
+
+        bool is_pure_model = is_all_positive(parts_to_slice(po.m_mesh_to_slice, slaposAssembly));
+        bool can_hollow    = po.m_hollowing_data && po.m_hollowing_data->interior &&
+                          !sla::get_mesh(*po.m_hollowing_data->interior).empty();
+
+
+        bool hole_fail = false;
+        if (step == slaposHollowing && is_pure_model) {
+            if (can_hollow) {
+                m = csgmesh_merge_positive_parts(r);
+                sla::hollow_mesh(m, *po.m_hollowing_data->interior,
+                                 sla::hfRemoveInsideTriangles);
+            }
+
+            handled = true;
+        } else if (step == slaposDrillHoles && is_pure_model) {
+            if (po.m_model_object->sla_drain_holes.empty()) {
+                m = po.m_preview_meshes[slaposHollowing].its;
+                handled = true;
+            } else if (can_hollow) {
+                m = csgmesh_merge_positive_parts(r);
+                sla::hollow_mesh(m, *po.m_hollowing_data->interior);
+                sla::DrainHoles drainholes = po.transformed_drainhole_points();
+
+                auto ret = sla::hollow_mesh_and_drill(
+                    m, *po.m_hollowing_data->interior, drainholes,
+                    [/*&po, &drainholes, */&hole_fail](size_t i)
+                    {
+                        hole_fail = /*drainholes[i].failed =
+                                po.model_object()->sla_drain_holes[i].failed =*/ true;
+                    });
+
+                if (ret & static_cast<int>(sla::HollowMeshResult::FaultyMesh)) {
+                    po.active_step_add_warning(
+                        PrintStateBase::WarningLevel::NON_CRITICAL,
+                        L("Mesh to be hollowed is not suitable for hollowing (does not "
+                          "bound a volume)."));
+                }
+
+                if (ret & static_cast<int>(sla::HollowMeshResult::FaultyHoles)) {
+                    po.active_step_add_warning(
+                        PrintStateBase::WarningLevel::NON_CRITICAL,
+                        L("Unable to drill the current configuration of holes into the "
+                          "model."));
+                }
+
+                handled = true;
+
+                if (ret & static_cast<int>(sla::HollowMeshResult::DrillingFailed)) {
+                    po.active_step_add_warning(
+                        PrintStateBase::WarningLevel::NON_CRITICAL, L(
+                        "Drilling holes into the mesh failed. "
+                        "This is usually caused by broken model. Try to fix it first."));
+
+                    handled = false;
+                }
+
+                if (hole_fail) {
+                    po.active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
+                                               L("Failed to drill some holes into the model"));
+
+                    handled = false;
+                }
+            }
+        }
+    }
+
+    if (!handled) { // Last resort to voxelization.
         po.active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
                                    L("Can't perform full mesh booleans! "
                                      "Some parts of the print will be previewed with approximated meshes. "
@@ -290,9 +373,6 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
 
         indexed_triangle_set m = sla::get_mesh(*po.m_hollowing_data->interior);
 
-        // Release the data, won't be needed anymore, takes huge amount of ram
-        po.m_hollowing_data->interior.reset();
-
         if (!m.empty()) {
             // simplify mesh lossless
             float loss_less_max_error = 2*std::numeric_limits<float>::epsilon();
@@ -327,6 +407,9 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
         generate_preview(po, slaposDrillHoles);
     else
         po.m_preview_meshes[slaposDrillHoles] = po.get_mesh_to_print();
+
+    // Release the data, won't be needed anymore, takes huge amount of ram
+    po.m_hollowing_data->interior.reset();
 }
 
 template<class Pred>

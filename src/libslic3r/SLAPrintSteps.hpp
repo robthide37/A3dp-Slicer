@@ -14,7 +14,6 @@ class SLAPrint::Steps
 {
 private:
     SLAPrint *m_print = nullptr;
-    std::mt19937 m_rng;
 
 public:
     // where the per object operations start and end
