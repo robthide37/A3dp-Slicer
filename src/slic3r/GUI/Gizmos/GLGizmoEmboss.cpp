@@ -1024,10 +1024,12 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
     wxFont wx_font;
     bool is_exact_font = true;
     bool is_path_changed = false;
+    // load wxFont from same OS
     if (style.type == WxFontUtils::get_actual_type())
         wx_font = WxFontUtils::load_wxFont(style.path);
 
-    if (!wx_font.IsOk()) {        
+    // Different OS or not found on same OS
+    if (!wx_font.IsOk()) {
         is_exact_font = false;
         // Try create similar wx font
         wx_font = WxFontUtils::create_wxFont(style);
@@ -1043,23 +1045,24 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
             if (it != m_face_names.faces.end())
                 wx_font.SetFaceName(face_name);
         }
-        is_path_changed = wx_font.IsOk();
+
+        // Have to use some wxFont
+        if (!wx_font.IsOk())
+            wx_font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
     }
+    assert(wx_font.IsOk());
 
     const auto& styles = m_style_manager.get_styles();
     auto it = std::find_if(styles.begin(), styles.end(), has_same_name);
     if (it == styles.end()) {
         // style was not found
-        if (wx_font.IsOk())
-            m_style_manager.load_style(style, wx_font);
+        m_style_manager.load_style(style, wx_font);
     } else {
         size_t style_index = it - styles.begin();
         if (!m_style_manager.load_style(style_index)) {
             // can`t load stored style
             m_style_manager.erase(style_index);
-            if (wx_font.IsOk())
-                m_style_manager.load_style(style, wx_font);
-
+            m_style_manager.load_style(style, wx_font);
         } else {
             // stored style is loaded, now set modification of style
             m_style_manager.get_style() = style;
