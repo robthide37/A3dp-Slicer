@@ -3,6 +3,7 @@
 
 #include "Layer.hpp"
 #include "Line.hpp"
+#include "PrintBase.hpp"
 #include <boost/log/trivial.hpp>
 #include <vector>
 
@@ -22,6 +23,8 @@ struct Params {
             filament_type = std::string("PLA");
         } else {
             filament_type = filament_types[0];
+             BOOST_LOG_TRIVIAL(debug)
+            << "SupportSpotsGenerator: applying filament type: " << filament_type;
         }
     }
 
@@ -76,7 +79,7 @@ struct Malformations {
 };
 
 // std::vector<size_t> quick_search(const PrintObject *po, const Params &params);
-SupportPoints full_search(const PrintObject *po, const Params &params);
+SupportPoints full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params);
 
 void estimate_supports_malformations(std::vector<SupportLayer*> &layers, float supports_flow_width, const Params &params);
 void estimate_malformations(std::vector<Layer*> &layers, const Params &params);

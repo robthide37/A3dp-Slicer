@@ -8,6 +8,7 @@
 #include "Point.hpp"
 #include "Polygon.hpp"
 #include "Print.hpp"
+#include "PrintBase.hpp"
 #include "Tesselate.hpp"
 #include "libslic3r.h"
 #include "tbb/parallel_for.h"
@@ -32,8 +33,8 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
 
-// #define DETAILED_DEBUG_LOGS
-// #define DEBUG_FILES
+#define DETAILED_DEBUG_LOGS
+#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -661,7 +662,7 @@ public:
     }
 };
 
-SupportPoints check_stability(const PrintObject *po, const Params &params)
+SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params)
 {
     SupportPoints            supp_points{};
     SupportGridFilter supports_presence_grid(po, params.min_distance_between_support_points);
@@ -674,6 +675,7 @@ SupportPoints check_stability(const PrintObject *po, const Params &params)
     std::unordered_map<size_t, SliceConnection> next_slice_idx_to_weakest_connection;
 
     for (size_t layer_idx = 0; layer_idx < po->layer_count(); ++layer_idx) {
+        cancel_func();
         const Layer *layer                 = po->get_layer(layer_idx);
         float        bottom_z              = layer->bottom_z();
         auto create_support_point_position = [bottom_z](const Vec2f &layer_pos) { return Vec3f{layer_pos.x(), layer_pos.y(), bottom_z}; };
@@ -873,9 +875,9 @@ void debug_export(SupportPoints support_points, std::string file_name)
 // std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
 //     return {};
 // }
-SupportPoints full_search(const PrintObject *po, const Params &params)
+SupportPoints full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params)
 {
-    SupportPoints supp_points = check_stability(po, params);
+    SupportPoints supp_points = check_stability(po, cancel_func, params);
 #ifdef DEBUG_FILES
     debug_export(supp_points, "issues");
 #endif
