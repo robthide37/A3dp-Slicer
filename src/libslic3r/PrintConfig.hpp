@@ -769,6 +769,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloatOrPercent,     first_layer_height))
     ((ConfigOptionFloatOrPercent,     first_layer_speed))
     ((ConfigOptionInts,               first_layer_temperature))
+    ((ConfigOptionIntsNullable,       idle_temperature))
     ((ConfigOptionInts,               full_fan_speed_layer))
     ((ConfigOptionFloat,              infill_acceleration))
     ((ConfigOptionBool,               infill_first))

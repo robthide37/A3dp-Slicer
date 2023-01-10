@@ -113,26 +113,19 @@ namespace Slic3r {
     {
         std::string gcode;
 
-        // move to the nearest standby point
-        if (!this->standby_points.empty()) {
-            // get current position in print coordinates
-            Vec3d writer_pos = gcodegen.writer().get_position();
-            Point pos = Point::new_scale(writer_pos(0), writer_pos(1));
-
-            // find standby point
-            Point standby_point = nearest_point(this->standby_points, pos).first;
-
-            /*  We don't call gcodegen.travel_to() because we don't need retraction (it was already
-                triggered by the caller) nor avoid_crossing_perimeters and also because the coordinates
-                of the destination point must not be transformed by origin nor current extruder offset.  */
-            gcode += gcodegen.writer().travel_to_xy(unscale(standby_point),
-                "move to standby position");
-        }
-
-        if (gcodegen.config().standby_temperature_delta.value != 0) {
-            // we assume that heating is always slower than cooling, so no need to block
-            gcode += gcodegen.writer().set_temperature
-            (this->_get_temp(gcodegen) + gcodegen.config().standby_temperature_delta.value, false, gcodegen.writer().extruder()->id());
+        unsigned int extruder_id = gcodegen.writer().extruder()->id();
+        const ConfigOptionIntsNullable& filament_idle_temp = gcodegen.config().idle_temperature;
+        if (filament_idle_temp.is_nil(extruder_id)) {
+            // There is no idle temperature defined in filament settings.
+            // Use the delta value from print config.
+            if (gcodegen.config().standby_temperature_delta.value != 0) {
+                // we assume that heating is always slower than cooling, so no need to block
+                gcode += gcodegen.writer().set_temperature
+                (this->_get_temp(gcodegen) + gcodegen.config().standby_temperature_delta.value, false, extruder_id);
+            }
+        } else {
+            // Use the value from filament settings. That one is absolute, not delta.
+            gcode += gcodegen.writer().set_temperature(filament_idle_temp.get_at(extruder_id), false, extruder_id);
         }
 
         return gcode;
@@ -145,8 +138,7 @@ namespace Slic3r {
             std::string();
     }
 
-    int
-        OozePrevention::_get_temp(GCode& gcodegen)
+    int OozePrevention::_get_temp(const GCode& gcodegen) const
     {
         return (gcodegen.layer() != nullptr && gcodegen.layer()->id() == 0)
             ? gcodegen.config().first_layer_temperature.get_at(gcodegen.writer().extruder()->id())
@@ -885,34 +877,7 @@ namespace DoExport {
 
     static void init_ooze_prevention(const Print &print, OozePrevention &ooze_prevention)
 	{
-	    // Calculate wiping points if needed
-	    if (print.config().ooze_prevention.value && ! print.config().single_extruder_multi_material) {
-	        Points skirt_points;
-	        for (const ExtrusionEntity *ee : print.skirt().entities)
-	            for (const ExtrusionPath &path : dynamic_cast<const ExtrusionLoop*>(ee)->paths)
-	                append(skirt_points, path.polyline.points);
-	        if (! skirt_points.empty()) {
-	            Polygon outer_skirt = Slic3r::Geometry::convex_hull(skirt_points);
-	            Polygons skirts;
-	            for (unsigned int extruder_id : print.extruders()) {
-	                const Vec2d &extruder_offset = print.config().extruder_offset.get_at(extruder_id);
-	                Polygon s(outer_skirt);
-	                s.translate(Point::new_scale(-extruder_offset(0), -extruder_offset(1)));
-	                skirts.emplace_back(std::move(s));
-	            }
-	            ooze_prevention.enable = true;
-	            //ooze_prevention.standby_points = offset(Slic3r::Geometry::convex_hull(skirts), float(scale_(3.))).front().equally_spaced_points(float(scale_(10.)));
-	#if 0
-	                require "Slic3r/SVG.pm";
-	                Slic3r::SVG::output(
-	                    "ooze_prevention.svg",
-	                    red_polygons    => \@skirts,
-	                    polygons        => [$outer_skirt],
-	                    points          => $gcodegen->ooze_prevention->standby_points,
-	                );
-	#endif
-	        }
-	    }
+	    ooze_prevention.enable = print.config().ooze_prevention.value && ! print.config().single_extruder_multi_material;
 	}
 
 	// Fill in print_statistics and return formatted string containing filament statistics to be inserted into G-code comment section.
@@ -1274,8 +1239,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // Set other general things.
     file.write(this->preamble());
 
-    // Calculate wiping points if needed
+    // Enable ooze prevention if configured so.
     DoExport::init_ooze_prevention(print, m_ooze_prevention);
+
     print.throw_if_canceled();
 
     // Collect custom seam data from all objects.
@@ -1806,7 +1772,7 @@ void GCode::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, Pr
         m_writer.set_temperature(temp, wait, first_printing_extruder_id);
     } else {
         // Custom G-code does not set the extruder temperature. Do it now.
-        if (print.config().single_extruder_multi_material.value) {
+        if (print.config().single_extruder_multi_material.value || m_ooze_prevention.enable) {
             // Set temperature of the first printing extruder only.
             int temp = print.config().first_layer_temperature.get_at(first_printing_extruder_id);
             if (temp > 0)
@@ -2128,11 +2094,14 @@ LayerResult GCode::process_layer(
         // Transition from 1st to 2nd layer. Adjust nozzle temperatures as prescribed by the nozzle dependent
         // first_layer_temperature vs. temperature settings.
         for (const Extruder &extruder : m_writer.extruders()) {
-            if (print.config().single_extruder_multi_material.value && extruder.id() != m_writer.extruder()->id())
+            if (print.config().single_extruder_multi_material.value || m_ooze_prevention.enable) {
                 // In single extruder multi material mode, set the temperature for the current extruder only.
-                continue;
+                // The same applies when ooze prevention is enabled.
+                if (extruder.id() != m_writer.extruder()->id())
+                    continue;
+            }
             int temperature = print.config().temperature.get_at(extruder.id());
-            if (temperature > 0 && temperature != print.config().first_layer_temperature.get_at(extruder.id()))
+            if (temperature > 0 && (temperature != print.config().first_layer_temperature.get_at(extruder.id())))
                 gcode += m_writer.set_temperature(temperature, false, extruder.id());
         }
         gcode += m_writer.set_bed_temperature(print.config().bed_temperature.get_at(first_extruder_id));
@@ -3206,8 +3175,7 @@ std::string GCode::set_extruder(unsigned int extruder_id, double print_z)
     }
 
 
-    // If ooze prevention is enabled, park current extruder in the nearest
-    // standby point and set it to the standby temperature.
+    // If ooze prevention is enabled, set current extruder to the standby temperature.
     if (m_ooze_prevention.enable && m_writer.extruder() != nullptr)
         gcode += m_ooze_prevention.pre_toolchange(*this);
 

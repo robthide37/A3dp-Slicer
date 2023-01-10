@@ -1957,6 +1957,8 @@ void TabFilament::build()
         line.append_option(optgroup->get_option("temperature"));
         optgroup->append_line(line);
 
+        optgroup->append_single_option_line("idle_temperature");
+
         line = { L("Bed"), "" };
         line.append_option(optgroup->get_option("first_layer_bed_temperature"));
         line.append_option(optgroup->get_option("bed_temperature"));
