@@ -186,13 +186,6 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
     return m;
 }
 
-inline auto parts_to_slice(const std::multiset<CSGPartForStep> &parts,
-                           SLAPrintObjectStep step)
-{
-    auto r = parts.equal_range(step);
-    return Range{r.first, r.second};
-}
-
 void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
 {
     Benchmark bench;
@@ -219,7 +212,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
         // If that fails for any of the drillholes, the voxelization fallback is
         // used.
 
-        bool is_pure_model = is_all_positive(parts_to_slice(po.m_mesh_to_slice, slaposAssembly));
+        bool is_pure_model = is_all_positive(po.get_parts_to_slice(slaposAssembly));
         bool can_hollow    = po.m_hollowing_data && po.m_hollowing_data->interior &&
                           !sla::get_mesh(*po.m_hollowing_data->interior).empty();
 
