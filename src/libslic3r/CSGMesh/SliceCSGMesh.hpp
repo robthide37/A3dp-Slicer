@@ -13,7 +13,7 @@ namespace Slic3r { namespace csg {
 
 namespace detail {
 
-void merge_slices(csg::CSGType op, size_t i,
+inline void merge_slices(csg::CSGType op, size_t i,
                   std::vector<ExPolygons> &target,
                   std::vector<ExPolygons> &source)
 {
@@ -31,7 +31,7 @@ void merge_slices(csg::CSGType op, size_t i,
     }
 }
 
-void collect_nonempty_indices(csg::CSGType                   op,
+inline void collect_nonempty_indices(csg::CSGType                   op,
                               const std::vector<float>      &slicegrid,
                               const std::vector<ExPolygons> &slices,
                               std::vector<size_t>           &indices)

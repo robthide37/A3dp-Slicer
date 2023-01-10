@@ -44,6 +44,8 @@ set(SLIC3R_SOURCES
     CSGMesh/ModelToCSGMesh.hpp
     CSGMesh/PerformCSGMeshBooleans.hpp
     CSGMesh/VoxelizeCSGMesh.hpp
+    CSGMesh/TriangleMeshAdapter.hpp
+    CSGMesh/CSGMeshCopy.hpp
     EdgeGrid.cpp
     EdgeGrid.hpp
     ElephantFootCompensation.cpp
