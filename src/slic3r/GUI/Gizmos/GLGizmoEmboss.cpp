@@ -1403,25 +1403,6 @@ void GLGizmoEmboss::draw_window()
         m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_style_manager.get_style().path);
 #endif // SHOW_WX_FONT_DESCRIPTOR
 
-    if (false) {
-        ImGui::Separator();
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGuiWrapper::COL_GREY_DARK);
-        if (ImGui::Button(_u8L("Close").c_str()))
-            discard_and_close();
-        else if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("Discard changes on embossed text and close.").c_str());
-        ImGui::PopStyleColor();
-
-        ImGui::SameLine();
-        if (ImGui::Button(_u8L("Apply").c_str())) {
-            if (m_is_unknown_font) {
-                process();
-            } else {
-                close();
-            }
-        }
-    }
-
 #ifdef SHOW_CONTAIN_3MF_FIX
     if (m_volume!=nullptr &&
         m_volume->text_configuration.has_value() &&
@@ -2025,48 +2006,31 @@ void GLGizmoEmboss::draw_model_type()
     ModelVolumeType part = ModelVolumeType::MODEL_PART;
     ModelVolumeType type = m_volume->type();
 
-    if (type == part) { 
-        draw_icon(IconType::part, IconState::hovered);
-    } else {
-        if (draw_button(IconType::part)) new_type = part;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("Click to change text into object part.").c_str());
-    }
+    if (ImGui::RadioButton(_u8L("Added").c_str(), type == part))
+        new_type = part;
+    else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Click to change text into object part.").c_str());
     ImGui::SameLine();
-    ImGui::Text("%s", _u8L("Added").c_str());
 
     std::string last_solid_part_hint = _u8L("You can't change a type of the last solid part of the object.");
-    ImGui::SameLine();
-    if (type == negative) { 
-        draw_icon(IconType::negative, IconState::hovered);
-    } else {
-        if (draw_button(IconType::negative, is_last_solid_part))
-            new_type = negative;        
-        if(ImGui::IsItemHovered()){
-            if(is_last_solid_part)
-                ImGui::SetTooltip("%s", last_solid_part_hint.c_str());
-            else if (type != negative)
-                ImGui::SetTooltip("%s", _u8L("Click to change part type into negative volume.").c_str());
-        }
+    if (ImGui::RadioButton(_u8L("Subtracted").c_str(), type == negative))
+        new_type = negative;
+    else if (ImGui::IsItemHovered()) {
+        if (is_last_solid_part)
+            ImGui::SetTooltip("%s", last_solid_part_hint.c_str());
+        else if (type != negative)
+            ImGui::SetTooltip("%s", _u8L("Click to change part type into negative volume.").c_str());
     }
     ImGui::SameLine();
-    ImGui::Text("%s", _u8L("Subtracted").c_str());
 
-    ImGui::SameLine();
-    if (type == modifier) {
-        draw_icon(IconType::modifier, IconState::hovered);  
-    } else {
-        if(draw_button(IconType::modifier, is_last_solid_part))
-            new_type = modifier;    
-        if (ImGui::IsItemHovered()) {
-            if(is_last_solid_part)
-                ImGui::SetTooltip("%s", last_solid_part_hint.c_str());
-            else if (type != modifier)
-                ImGui::SetTooltip("%s", _u8L("Click to change part type into modifier.").c_str());
-        }
+    if (ImGui::RadioButton(_u8L("Modifier").c_str(), type == modifier))
+        new_type = modifier;
+    else if (ImGui::IsItemHovered()) {
+        if (is_last_solid_part)
+            ImGui::SetTooltip("%s", last_solid_part_hint.c_str());
+        else if (type != modifier)
+            ImGui::SetTooltip("%s", _u8L("Click to change part type into modifier.").c_str());
     }
-    ImGui::SameLine();
-    ImGui::Text("%s", _u8L("Modifier").c_str());
 
     if (m_volume != nullptr && new_type.has_value() && !is_last_solid_part) {
         GUI_App &app    = wxGetApp();
@@ -3438,10 +3402,7 @@ void GLGizmoEmboss::init_icons()
         "make_bold.svg",
         "make_unbold.svg",   
         "search.svg",
-        "open.svg",
-        "add_text_part.svg",
-        "add_text_negative.svg",
-        "add_text_modifier.svg"
+        "open.svg"
     };
     assert(filenames.size() == static_cast<size_t>(IconType::_count));
     std::string path = resources_dir() + "/icons/";

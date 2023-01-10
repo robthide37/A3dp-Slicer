@@ -329,10 +329,6 @@ private:
         unbold,
         system_selector,
         open_file,
-        // VolumeType icons
-        part,
-        negative,
-        modifier,
         // automatic calc of icon's count
         _count
     };
