@@ -1768,26 +1768,38 @@ void GLGizmoEmboss::init_font_name_texture() {
 
 void GLGizmoEmboss::draw_font_preview(FaceName& face, bool is_visible)
 {
+    // Limit for opened font files at one moment
     unsigned int &count_opened_fonts = m_face_names.count_opened_font_files; 
+    // Size of texture
     ImVec2 size(m_gui_cfg->face_name_size.x(), m_gui_cfg->face_name_size.y());
-    // set to pixel 0,0 in texture
-    ImVec2      uv0(0.f, 0.f), uv1(1.f / size.x, 1.f / size.y / m_face_names.count_cached_textures);
-    ImTextureID tex_id = (void *) (intptr_t) m_face_names.texture_id;
+    float  count_cached_textures_f = static_cast<float>(m_face_names.count_cached_textures);
+    std::string state_text;
+    // uv0 and uv1 set to pixel 0,0 in texture
+    ImVec2 uv0(0.f, 0.f), uv1(1.f / size.x, 1.f / size.y / count_cached_textures_f);
     if (face.is_created != nullptr) {
+        // not created preview 
         if (*face.is_created) {
+            // Already created preview
             size_t texture_index = face.texture_index;
-            uv0                  = ImVec2(0.f, texture_index / (float) m_face_names.count_cached_textures),
-            uv1                  = ImVec2(1.f, (texture_index + 1) / (float) m_face_names.count_cached_textures);
-        } else if (!is_visible) {
-            face.is_created = nullptr;
-            face.cancel->store(true);
+            uv0 = ImVec2(0.f, texture_index / count_cached_textures_f);
+            uv1 = ImVec2(1.f, (texture_index + 1) / count_cached_textures_f);
+        } else {
+            // Not finished preview
+            if (is_visible) {
+                // when not canceled still loading
+                state_text = (face.cancel->load())? 
+                    _u8L(" No symbol"):
+                    _u8L(" ... Loading");                
+            } else {
+                // not finished and not visible cancel job
+                face.is_created = nullptr;
+                face.cancel->store(true);
+            }
         }
     } else if (is_visible && count_opened_fonts < m_gui_cfg->max_count_opened_font_files) {
         ++count_opened_fonts;
         face.cancel     = std::make_shared<std::atomic_bool>(false);
         face.is_created = std::make_shared<bool>(false);
-
-        std::string text = m_text.empty() ? "AaBbCc" : m_text;
 
         const unsigned char gray_level = 5;
         // format type and level must match to texture data
@@ -1795,6 +1807,7 @@ void GLGizmoEmboss::draw_font_preview(FaceName& face, bool is_visible)
         const GLint  level = 0;
         // select next texture index
         size_t texture_index = (m_face_names.texture_index + 1) % m_face_names.count_cached_textures;
+
         // set previous cach as deleted
         for (FaceName &f : m_face_names.faces)
             if (f.texture_index == texture_index) {
@@ -1805,12 +1818,9 @@ void GLGizmoEmboss::draw_font_preview(FaceName& face, bool is_visible)
         m_face_names.texture_index = texture_index;
         face.texture_index         = texture_index;
 
-        // clear texture
-
-
         // render text to texture
         FontImageData data{
-            text,
+            m_text,
             face.wx_name,
             m_face_names.encoding,
             m_face_names.texture_id,
@@ -1827,9 +1837,18 @@ void GLGizmoEmboss::draw_font_preview(FaceName& face, bool is_visible)
         auto  job    = std::make_unique<CreateFontImageJob>(std::move(data));
         auto &worker = wxGetApp().plater()->get_ui_job_worker();
         queue_job(worker, std::move(job));
+    } else {
+        // cant start new thread at this moment so wait in queue
+        state_text = _u8L(" ... In queue");
+    }
+
+    if (!state_text.empty()) {
+        ImGui::SameLine(m_gui_cfg->face_name_texture_offset_x);
+        m_imgui->text(state_text);
     }
 
     ImGui::SameLine(m_gui_cfg->face_name_texture_offset_x);
+    ImTextureID tex_id = (void *) (intptr_t) m_face_names.texture_id;
     ImGui::Image(tex_id, size, uv0, uv1);
 }
 
@@ -2674,7 +2693,6 @@ void GLGizmoEmboss::draw_style_edit() {
         ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("WxFont is not loaded properly.").c_str());
         return;
     }
-
     bool exist_stored_style = m_style_manager.exist_stored_style();
     bool exist_change_in_font = is_font_changed(m_style_manager);
     const GuiCfg::Translations &tr = m_gui_cfg->translations;

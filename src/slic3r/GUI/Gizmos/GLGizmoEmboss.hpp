@@ -258,6 +258,7 @@ private:
                 
         // protection for open too much font files together
         // Gtk:ERROR:../../../../gtk/gtkiconhelper.c:494:ensure_surface_for_gicon: assertion failed (error == NULL): Failed to load /usr/share/icons/Yaru/48x48/status/image-missing.png: Error opening file /usr/share/icons/Yaru/48x48/status/image-missing.png: Too many open files (g-io-error-quark, 31)
+        // This variable must exist until no CreateFontImageJob is running
         unsigned int count_opened_font_files = 0; 
 
         // Configuration for texture height
