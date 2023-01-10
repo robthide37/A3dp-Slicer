@@ -2023,13 +2023,16 @@ void GLGizmoEmboss::draw_model_type()
     }
     ImGui::SameLine();
 
-    if (ImGui::RadioButton(_u8L("Modifier").c_str(), type == modifier))
-        new_type = modifier;
-    else if (ImGui::IsItemHovered()) {
-        if (is_last_solid_part)
-            ImGui::SetTooltip("%s", last_solid_part_hint.c_str());
-        else if (type != modifier)
-            ImGui::SetTooltip("%s", _u8L("Click to change part type into modifier.").c_str());
+    // In simple mode are not modifiers
+    if (wxGetApp().get_mode() != ConfigOptionMode::comSimple) {
+        if (ImGui::RadioButton(_u8L("Modifier").c_str(), type == modifier))
+            new_type = modifier;
+        else if (ImGui::IsItemHovered()) {
+            if (is_last_solid_part)
+                ImGui::SetTooltip("%s", last_solid_part_hint.c_str());
+            else if (type != modifier)
+                ImGui::SetTooltip("%s", _u8L("Click to change part type into modifier.").c_str());
+        }
     }
 
     if (m_volume != nullptr && new_type.has_value() && !is_last_solid_part) {
