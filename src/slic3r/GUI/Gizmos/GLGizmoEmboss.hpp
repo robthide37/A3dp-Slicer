@@ -179,7 +179,6 @@ private:
         // maximal width and height of style image
         Vec2i max_style_image_size = Vec2i(0, 0);
 
-        float style_offset          = 0.f;
         float input_offset          = 0.f;
         float advanced_input_offset = 0.f;
 
@@ -196,8 +195,6 @@ private:
         // Only translations needed for calc GUI size
         struct Translations
         {
-            std::string type;
-            std::string style;
             std::string font;
             std::string size;
             std::string depth;
