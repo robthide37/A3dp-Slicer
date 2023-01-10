@@ -1016,35 +1016,46 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
     const TextConfiguration &tc    = *tc_opt;
     const EmbossStyle       &style = tc.style;
 
-    auto has_same_name = [&style](const StyleManager::Item &style_item) -> bool {
-        const EmbossStyle &es = style_item.style;
-        return es.name == style.name;
-    };
+    // Could exist OS without getter on face_name,
+    // but it is able to restore font from descriptor
+    // Soo default value must be TRUE
+    bool is_font_installed = true; 
+    wxString face_name;
+    std::optional<std::string> face_name_opt = style.prop.face_name;
+    if (face_name_opt.has_value()) {
+        face_name = wxString(face_name_opt->c_str());
+
+        //* SWITCH for search in OS fonts
+        // search in enumerated fonts
+        // refresh list of installed font in the OS.
+        init_face_names();
+        m_face_names.is_init = false;
+        auto cmp = [](const FaceName &fn, const wxString& face_name)->bool { return fn.wx_name < face_name; };
+        const std::vector<FaceName> &faces = m_face_names.faces;
+        auto it = std::lower_bound(faces.begin(), faces.end(), face_name, cmp);
+        is_font_installed = it != faces.end() && it->wx_name == face_name;
+        /*/ 
+        // test it by Wx
+        wxFontEnumerator::InvalidateCache();
+        wxFont wx_font_; // temporary structure
+        is_font_installed = wx_font_.SetFaceName(face_name);
+        //  */
+    }
 
     wxFont wx_font;
-    bool is_exact_font = true;
-    bool is_path_changed = false;
-    // load wxFont from same OS
-    if (style.type == WxFontUtils::get_actual_type())
-        wx_font = WxFontUtils::load_wxFont(style.path);
+    // load wxFont from same OS when font name is installed
+    if (style.type == WxFontUtils::get_actual_type() && is_font_installed) 
+        wx_font = WxFontUtils::load_wxFont(style.path);    
 
-    // Different OS or not found on same OS
+    // Flag that is selected same font
+    bool is_exact_font = true;
+    // Different OS or try found on same OS
     if (!wx_font.IsOk()) {
         is_exact_font = false;
-        // Try create similar wx font
+        // Try create similar wx font by FontFamily
         wx_font = WxFontUtils::create_wxFont(style);
-        std::optional<std::string> face_name_opt = style.prop.face_name;
-        if (face_name_opt.has_value()) {
-            wxString face_name(style.prop.face_name->c_str());
-            init_face_names();
-            m_face_names.is_init = false;
-            auto it = std::lower_bound(m_face_names.faces.begin(), m_face_names.faces.end(), face_name, 
-                [](const FaceName &fn, const wxString& face_name)->bool { return fn.wx_name == face_name; });
-            // only known font could be setted 
-            // (unknown has undefined behavior)
-            if (it != m_face_names.faces.end())
-                wx_font.SetFaceName(face_name);
-        }
+        if (is_font_installed)
+            is_exact_font = wx_font.SetFaceName(face_name);        
 
         // Have to use some wxFont
         if (!wx_font.IsOk())
@@ -1052,12 +1063,18 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
     }
     assert(wx_font.IsOk());
 
+    // Load style to style manager
     const auto& styles = m_style_manager.get_styles();
+    auto has_same_name = [&style](const StyleManager::Item &style_item) -> bool {
+        const EmbossStyle &es = style_item.style;
+        return es.name == style.name;
+    };
     auto it = std::find_if(styles.begin(), styles.end(), has_same_name);
     if (it == styles.end()) {
         // style was not found
         m_style_manager.load_style(style, wx_font);
     } else {
+        // style name is in styles list
         size_t style_index = it - styles.begin();
         if (!m_style_manager.load_style(style_index)) {
             // can`t load stored style
@@ -1070,13 +1087,16 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
         }
     }
 
-    if (is_path_changed) {
-        std::string path = WxFontUtils::store_wxFont(wx_font);
-        m_style_manager.get_style().path = path;
-    }
-
-    if (!is_exact_font)        
+    if (!is_exact_font) {
         create_notification_not_valid_font(tc);
+
+        // update changed wxFont path
+        std::string path = WxFontUtils::store_wxFont(wx_font);
+        // current used style
+        EmbossStyle &act_style = m_style_manager.get_style();
+        act_style.path         = path;
+        act_style.type         = WxFontUtils::get_actual_type();
+    }
 
     m_text   = tc.text;
     m_volume = volume;
