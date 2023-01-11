@@ -67,8 +67,8 @@ public:
 
 class CurvatureEstimator
 {
-    static const size_t               sliders_count          = 2;
-    SlidingWindowCurvatureAccumulator sliders[sliders_count] = {{4.0}, {10.0}};
+    static const size_t               sliders_count          = 3;
+    SlidingWindowCurvatureAccumulator sliders[sliders_count] = {{1.0},{4.0}, {10.0}};
 
 public:
     void add_point(float distance, float angle)

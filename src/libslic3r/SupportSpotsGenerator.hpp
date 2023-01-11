@@ -30,14 +30,13 @@ struct Params {
 
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
     const float bridge_distance = 12.0f; //mm
-    const float bridge_distance_decrease_by_curvature_factor = 10.0f; // allowed bridge distance = bridge_distance / (1 + this factor * curvature )
     const std::pair<float,float> malformation_distance_factors = std::pair<float, float> { 0.4, 1.2 };
     const float max_curled_height_factor = 10.0f;
 
     const float min_distance_between_support_points = 3.0f; //mm
     const float support_points_interface_radius = 1.5f; // mm
     const float connections_min_considerable_area = 1.5f; //mm^2
-    const float min_distance_to_allow_local_supports = 2.0f; //mm
+    const float min_distance_to_allow_local_supports = 1.0f; //mm
 
     std::string filament_type;
     const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.

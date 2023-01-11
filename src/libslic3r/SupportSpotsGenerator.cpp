@@ -33,8 +33,8 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
 
-#define DETAILED_DEBUG_LOGS
-#define DEBUG_FILES
+// #define DETAILED_DEBUG_LOGS
+// #define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -265,24 +265,23 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
 
             float sign = (prev_layer_boundary.distance_from_lines<true>(curr_point.position) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
             curr_point.distance *= sign;
+        
+            float max_bridge_len = params.bridge_distance / (1.0f + std::abs(curr_point.curvature));
 
-            if (curr_point.distance > 0.9f * flow_width) {
-                line_out.form_quality = 0.7f;
+            if (curr_point.distance > 2.0f * flow_width) {
+                line_out.form_quality = 0.8f;
                 bridged_distance += line_len;
-                // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
-                bool in_layer_dist_condition = bridged_distance >
-                                               params.bridge_distance / (1.0f + std::abs(curr_point.curvature) *
-                                                                                    params.bridge_distance_decrease_by_curvature_factor);
-                if (in_layer_dist_condition) {
+                if (bridged_distance > max_bridge_len) {
                     line_out.support_point_generated = true;
                     bridged_distance                 = 0.0f;
                 }
-            } else if (curr_point.distance > flow_width * (0.8 + std::clamp(curr_point.curvature, -0.2f, 0.2f))) {
+            } else if (curr_point.distance > flow_width * (1.0 + std::clamp(curr_point.curvature, -0.30f, 0.20f))) {
                 bridged_distance += line_len;
-                line_out.form_quality = nearest_prev_layer_line.form_quality - std::abs(curr_point.curvature);
-                if (line_out.form_quality < 0) {
+                line_out.form_quality = nearest_prev_layer_line.form_quality - 0.3f;
+                if (line_out.form_quality < 0 && bridged_distance > max_bridge_len) {
                     line_out.support_point_generated = true;
-                    line_out.form_quality            = 0.7f;
+                    line_out.form_quality            = 0.5f;
+                    bridged_distance                 = 0.0f;
                 }
             } else {
                 bridged_distance = 0.0f;
@@ -773,14 +772,17 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
             // and the support presence grid and add the point to the issues.
             auto reckon_new_support_point = [&part, &weakest_conn, &supp_points, &supports_presence_grid, &params,
                                              &layer_idx](const Vec3f &support_point, float force, const Vec2f &dir) {
-                if (supports_presence_grid.position_taken(support_point) || layer_idx <= 1) { return; }
+                if ((supports_presence_grid.position_taken(support_point) && force > 0) || layer_idx <= 1) {
+                    return;
+                }
                 float area = params.support_points_interface_radius * params.support_points_interface_radius * float(PI);
                 part.add_support_point(support_point, area);
 
                 float radius = params.support_points_interface_radius;
                 supp_points.emplace_back(support_point, force, radius, dir);
-                supports_presence_grid.take_position(support_point);
-
+                if (force > 0) {
+                    supports_presence_grid.take_position(support_point);
+                }
                 if (weakest_conn.area > EPSILON) { // Do not add it to the weakest connection if it is not valid - does not exist
                     weakest_conn.area += area;
                     weakest_conn.centroid_accumulator += support_point * area;
