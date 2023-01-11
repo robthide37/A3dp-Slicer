@@ -3740,8 +3740,8 @@ void PrintConfigDef::init_sla_params()
     def->tooltip = L("Nozzle temperature when the tool is currently not used in multi-tool setups."
                      "This is only used when 'Ooze prevention is active in Print Settings.'");
     def->sidetext = L("°C");
-    //def->min = 0;
-    //def->max = max_temp;
+    def->min = 0;
+    def->max = max_temp;
     def->set_default_value(new ConfigOptionIntsNullable { ConfigOptionIntsNullable::nil_value() });
 
     def = this->add("bottle_volume", coFloat);

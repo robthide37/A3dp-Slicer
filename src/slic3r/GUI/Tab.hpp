@@ -436,6 +436,8 @@ private:
 	ogStaticText*	m_volumetric_speed_description_line {nullptr};
 	ogStaticText*	m_cooling_description_line {nullptr};
 
+    void            create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string &opt_key, int opt_index = 0);
+    void            update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string &opt_key, int opt_index = 0, bool is_checked = true);
     void            add_filament_overrides_page();
     void            update_filament_overrides_page();
 	void 			update_volumetric_flow_preset_hints();

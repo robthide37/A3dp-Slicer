@@ -330,24 +330,18 @@ public:
 	void			BUILD() override;
     /// Propagate value from field to the OptionGroupe and Config after kill_focus/ENTER
     void	        propagate_value() ;
-
+/*
     void			set_value(const std::string& value, bool change_event = false) {
 		m_disable_change_event = !change_event;
 		dynamic_cast<wxSpinCtrl*>(window)->SetValue(value);
 		m_disable_change_event = false;
     }
-    void			set_value(const boost::any& value, bool change_event = false) override {
-		m_disable_change_event = !change_event;
-		tmp_value = boost::any_cast<int>(value);
-        m_value = value;
-		dynamic_cast<wxSpinCtrl*>(window)->SetValue(tmp_value);
-		m_disable_change_event = false;
-	}
+*/
+    void            set_value(const boost::any& value, bool change_event = false) override;
+    void            set_last_meaningful_value() override;
+    void            set_na_value() override;
 
-	boost::any&		get_value() override {
-		int value = static_cast<wxSpinCtrl*>(window)->GetValue();
-		return m_value = value;
-	}
+	boost::any&		get_value() override;
 
     void            msw_rescale() override;
 
