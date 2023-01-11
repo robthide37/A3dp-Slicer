@@ -55,7 +55,7 @@
 #define SHOW_FINE_POSITION // draw convex hull around volume
 #define SHOW_WX_WEIGHT_INPUT
 #define DRAW_PLACE_TO_ADD_TEXT // Interactive draw of window position 
-#define ALLOW_FLOAT_WINDOW
+#define ALLOW_OPEN_NEAR_VOLUME
 #endif // ALLOW_DEBUG_MODE
 
 using namespace Slic3r;
@@ -743,20 +743,24 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     draw_mouse_offset(m_dragging_mouse_offset);
 #endif // SHOW_OFFSET_DURING_DRAGGING
 
-    ImGuiWindowFlags flag = ImGuiWindowFlags_NoCollapse;
-    if (m_allow_float_window){
+    std::string window_title_string = on_get_name();
+    const char* window_title = window_title_string.c_str();
+    if (m_allow_open_near_volume){
         // check if is set window offset
         if (m_set_window_offset.has_value()) {
             ImGui::SetNextWindowPos(*m_set_window_offset, ImGuiCond_Always);
             m_set_window_offset.reset();
         }
     } else {
-        flag |= ImGuiWindowFlags_NoMove;
         y = std::min(y, bottom_limit - min_window_size.y);
-        ImGui::SetNextWindowPos(ImVec2(x, y), ImGuiCond_Always);
+        // position near toolbar
+        ImVec2 pos(x, y);
+        ImGui::SetNextWindowPos(pos, ImGuiCond_Once);
     }
 
-    if (ImGui::Begin(on_get_name().c_str(), nullptr, flag)) {
+    bool is_opened = true;
+    ImGuiWindowFlags flag = ImGuiWindowFlags_NoCollapse;
+    if (ImGui::Begin(on_get_name().c_str(), &is_opened, flag)) {
         // Need to pop var before draw window
         ImGui::PopStyleVar(); // WindowMinSize
         draw_window();
@@ -764,6 +768,8 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         ImGui::PopStyleVar(); // WindowMinSize
     }
     ImGui::End();
+    if (!is_opened)
+        close();
 }
 
 namespace priv {
@@ -832,7 +838,7 @@ void GLGizmoEmboss::on_set_state()
         }
 
         // change position of just opened emboss window
-        if (m_allow_float_window) 
+        if (m_allow_open_near_volume) 
             m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
 
         // when open by hyperlink it needs to show up
@@ -1433,13 +1439,13 @@ void GLGizmoEmboss::draw_window()
     ImGui::Image(atlas.TexID, ImVec2(atlas.TexWidth, atlas.TexHeight));
 #endif // SHOW_IMGUI_ATLAS
 
-#ifdef ALLOW_FLOAT_WINDOW
+#ifdef ALLOW_OPEN_NEAR_VOLUME
     ImGui::SameLine();
-    if (ImGui::Checkbox("##allow_float_window", &m_allow_float_window)) {
-        if (m_allow_float_window)
+    if (ImGui::Checkbox("##ALLOW_OPEN_NEAR_VOLUME", &m_allow_open_near_volume)) {
+        if (m_allow_open_near_volume)
             m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
     } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", ((m_allow_float_window) ? 
+        ImGui::SetTooltip("%s", ((m_allow_open_near_volume) ? 
             _u8L("Fix settings possition"):
             _u8L("Allow floating window near text")).c_str());
     }

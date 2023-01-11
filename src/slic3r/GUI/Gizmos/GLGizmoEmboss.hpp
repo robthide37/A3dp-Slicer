@@ -216,8 +216,9 @@ private:
     std::optional<const GuiCfg> m_gui_cfg;
     bool m_is_advanced_edit_style = false;
 
-    // when true window will appear near to text
-    bool m_allow_float_window = false;
+    // when true window will appear near to text volume when open
+    // When false it opens on last position
+    bool m_allow_open_near_volume = false;
     // setted only when wanted to use - not all the time
     std::optional<ImVec2> m_set_window_offset;
 
