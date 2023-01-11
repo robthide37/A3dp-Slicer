@@ -1995,6 +1995,13 @@ void GLGizmoEmboss::draw_font_list()
         store(m_face_names);
     }
 
+    if (m_is_unknown_font) {
+        ImGui::SameLine();
+        // Apply for actual selected font
+        if (ImGui::Button(_u8L("Apply").c_str()))
+            process();
+    }
+
 #ifdef ALLOW_ADD_FONT_BY_FILE
     ImGui::SameLine();
     // select font file by file browser
@@ -2745,13 +2752,15 @@ void GLGizmoEmboss::draw_style_edit() {
         ImGuiWrapper::text(tr.font);
     ImGui::SameLine(m_gui_cfg->input_offset);
     draw_font_list();
-    ImGui::SameLine();
     bool exist_change = false;
-    if (draw_italic_button()) exist_change = true;
-
-    ImGui::SameLine();
-    if (draw_bold_button()) exist_change = true;
-        
+    if (!m_is_unknown_font) {
+        ImGui::SameLine();
+        if (draw_italic_button())
+            exist_change = true;
+        ImGui::SameLine();
+        if (draw_bold_button())
+            exist_change = true;
+    }
     EmbossStyle &style = m_style_manager.get_style();
     if (exist_change_in_font) {
         ImGui::SameLine(ImGui::GetStyle().FramePadding.x);
