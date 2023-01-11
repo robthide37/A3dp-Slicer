@@ -1647,7 +1647,31 @@ void ModelObject::split(ModelObjectPtrs* new_objects)
         if (volume->type() != ModelVolumeType::MODEL_PART)
             continue;
 
+        // splited volume should not be text object 
+        if (volume->text_configuration.has_value())
+            volume->text_configuration.reset();
+
         std::vector<TriangleMesh> meshes = volume->mesh().split();
+
+        // sort splitted meshes by Z, Y and X
+        auto sort_fnc = [](const TriangleMesh &t1, const TriangleMesh &t2)->bool {
+            // stats form t1
+            const Vec3f &min1 = t1.stats().min;
+            const Vec3f &max1 = t1.stats().max;
+            // stats from t2
+            const Vec3f &min2 = t2.stats().min;
+            const Vec3f &max2 = t2.stats().max;
+            // priority Z, Y, X
+            for (int axe = 2; axe >= 0; --axe) {
+                if (max1[axe] < min2[axe])
+                    return true;
+                if (min1[axe] > max2[axe])
+                    return false;
+            }
+            return min1.x() < min2.x();
+        };
+        std::sort(meshes.begin(), meshes.end(), sort_fnc);
+
         size_t counter = 1;
         for (TriangleMesh &mesh : meshes) {
             // FIXME: crashes if not satisfied
