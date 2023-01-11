@@ -983,20 +983,24 @@ Sidebar::Sidebar(Plater *parent)
 
 Sidebar::~Sidebar() {}
 
-void Sidebar::init_filament_combo(PlaterPresetComboBox **combo, const int extr_idx) {
+void Sidebar::init_filament_combo(PlaterPresetComboBox** combo, const int extr_idx)
+{
     *combo = new PlaterPresetComboBox(p->presets_panel, Slic3r::Preset::TYPE_FILAMENT);
-//         # copy icons from first choice
-//         $choice->SetItemBitmap($_, $choices->[0]->GetItemBitmap($_)) for 0..$#presets;
-
     (*combo)->set_extruder_idx(extr_idx);
+
+#ifdef __WXMSW__
+    // When project is loading and progress dialog is processing
+    // In this case mainframe is marked as a disabled, that is why new created filament preset comboboxes are disabled
+    if (wxWindow* mf = wxGetApp().mainframe; mf && !mf->IsThisEnabled())
+        mf->Enable();
+#endif //__WXMSW__
 
     auto combo_and_btn_sizer = new wxBoxSizer(wxHORIZONTAL);
     combo_and_btn_sizer->Add(*combo, 1, wxEXPAND);
     combo_and_btn_sizer->Add((*combo)->edit_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT,
                             int(0.3*wxGetApp().em_unit()));
 
-    auto /***/sizer_filaments = this->p->sizer_filaments;
-    sizer_filaments->Add(combo_and_btn_sizer, 1, wxEXPAND |
+    this->p->sizer_filaments->Add(combo_and_btn_sizer, 1, wxEXPAND |
 #ifdef __WXGTK3__
         wxRIGHT, int(0.5 * wxGetApp().em_unit()));
 #else
