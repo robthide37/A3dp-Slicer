@@ -451,3 +451,242 @@ TEST_CASE("Arachne - Missing infill", "[ArachneMissingInfill]") {
 
 //    REQUIRE(wallToolPaths.getInnerContour().size() == 1);
 }
+
+// This test case was distilled from GitHub issue #8849.
+// Missing part of the model after simplifying generated tool-paths by simplifyToolPaths.
+TEST_CASE("Arachne - #8849 - Missing part of model", "[ArachneMissingPart8849]") {
+    const Polygon poly_0 = {
+        Point(-29700000, -10600000),
+        Point(-28200000, -10600000),
+        Point( 20000000, -10600000),
+        Point( 20000000, - 9900000),
+        Point(-28200000, - 9900000),
+        Point(-28200000,         0),
+        Point(-29700000,         0),
+    };
+
+    Polygons polygons              = {poly_0};
+    coord_t  ext_perimeter_spacing = 449999;
+    coord_t  perimeter_spacing     = 757079;
+    coord_t  inset_count           = 2;
+
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.32, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    wall_tool_paths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
+
+#ifdef ARACHNE_DEBUG_OUT
+    export_perimeters_to_svg(debug_out_path("arachne-missing-part-8849.svg"), polygons, perimeters, union_ex(wall_tool_paths.getInnerContour()));
+#endif
+
+    int64_t total_extrusion_length = 0;
+    for (Arachne::VariableWidthLines &perimeter : perimeters)
+        for (Arachne::ExtrusionLine &extrusion_line : perimeter)
+            total_extrusion_length += extrusion_line.getLength();
+
+    // Total extrusion length should be around 30mm when the part is missing and around 120 when everything is ok.
+    // REQUIRE(total_extrusion_length >= scaled<int64_t>(120.));
+}
+
+// This test case was distilled from GitHub issue #8446.
+// Boost Voronoi generator produces non-planar Voronoi diagram with two intersecting linear Voronoi edges.
+// Those intersecting edges are causing that perimeters are also generated in places where they shouldn't be.
+TEST_CASE("Arachne - #8446 - Degenerated Voronoi diagram - Linear edges", "[ArachneDegeneratedDiagram8446LinearEdges]") {
+    Polygon poly_0 = {
+        Point( 42240656,  9020315),
+        Point(  4474248, 42960681),
+        Point( -4474248, 42960681),
+        Point( -4474248, 23193537),
+        Point( -6677407, 22661038),
+        Point( -8830542, 21906307),
+        Point( -9702935, 21539826),
+        Point(-13110431, 19607811),
+        Point(-18105334, 15167780),
+        Point(-20675743, 11422461),
+        Point(-39475413, 17530840),
+        Point(-42240653,  9020315)
+    };
+
+    Polygons polygons              = {poly_0};
+    coord_t  ext_perimeter_spacing = 407079;
+    coord_t  perimeter_spacing     = 407079;
+    coord_t  inset_count           = 1;
+
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    wall_tool_paths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
+
+#ifdef ARACHNE_DEBUG_OUT
+    export_perimeters_to_svg(debug_out_path("arachne-degenerated-diagram-8446-linear-edges.svg"), polygons, perimeters, union_ex(wall_tool_paths.getInnerContour()));
+#endif
+
+    int64_t total_extrusion_length = 0;
+    for (Arachne::VariableWidthLines &perimeter : perimeters)
+        for (Arachne::ExtrusionLine &extrusion_line : perimeter)
+            total_extrusion_length += extrusion_line.getLength();
+
+    // Total extrusion length should be around 211.2mm when the part is ok and 212.1mm when it has perimeters in places where they shouldn't be.
+    REQUIRE(total_extrusion_length <= scaled<int64_t>(211.5));
+}
+
+// This test case was distilled from GitHub issue #8846.
+// Boost Voronoi generator produces degenerated Voronoi diagram with one parabolic edge intersecting linear Voronoi edge.
+// Those intersecting edges are causing that perimeters are also generated in places where they shouldn't be.
+TEST_CASE("Arachne - #8846 - Degenerated Voronoi diagram - One Parabola", "[ArachneDegeneratedDiagram8846OneParabola]") {
+    const Polygon poly_0 = {
+        Point(101978540, -41304489),  Point(101978540, 41304489),
+        Point(94709788, 42514051),    Point(94709788, 48052315),
+        Point(93352716, 48052315),    Point(93352716, 42514052),
+        Point(75903540, 42514051),    Point(75903540, 48052315),
+        Point(74546460, 48052315),    Point(74546460, 42514052),
+        Point(69634788, 42514051),    Point(69634788, 48052315),
+        Point(68277708, 48052315),    Point(68277708, 42514051),
+        Point(63366040, 42514051),    Point(63366040, 48052315),
+        Point(62008960, 48052315),    Point(62008960, 42514051),
+        Point(57097292, 42514051),    Point(57097292, 48052315),
+        Point(55740212, 48052315),    Point(55740212, 42514052),
+        Point(50828540, 42514052),    Point(50828540, 48052315),
+        Point(49471460, 48052315),    Point(49471460, 42514051),
+        Point(25753540, 42514051),    Point(25753540, 48052315),
+        Point(24396460, 48052315),    Point(24396460, 42514051),
+        Point(19484790, 42514052),    Point(19484790, 48052315),
+        Point(18127710, 48052315),    Point(18127710, 42514051),
+        Point(-5590210, 42514051),    Point(-5590210, 48052315),
+        Point(-6947290, 48052315),    Point(-6947290, 42514051),
+        Point(-11858960, 42514051),   Point(-11858960, 48052315),
+        Point(-13216040, 48052315),   Point(-13216040, 42514051),
+        Point(-18127710, 42514051),   Point(-18127710, 48052315),
+        Point(-19484790, 48052315),   Point(-19484790, 42514052),
+        Point(-49471460, 42514051),   Point(-49471460, 48052315),
+        Point(-50828540, 48052315),   Point(-50828540, 42514052),
+        Point(-55740212, 42514052),   Point(-55740212, 48052315),
+        Point(-57097292, 48052315),   Point(-57097292, 42514051),
+        Point(-68277708, 42514051),   Point(-68277708, 48052315),
+        Point(-69634788, 48052315),   Point(-69634788, 42514051),
+        Point(-74546460, 42514052),   Point(-74546460, 48052315),
+        Point(-75903540, 48052315),   Point(-75903540, 42514051),
+        Point(-80815204, 42514051),   Point(-80815204, 48052315),
+        Point(-82172292, 48052315),   Point(-82172292, 42514051),
+        Point(-87083956, 42514051),   Point(-87083956, 48052315),
+        Point(-88441044, 48052315),   Point(-88441044, 42514051),
+        Point(-99621460, 42514051),   Point(-99621460, 48052315),
+        Point(-100978540, 48052315),  Point(-100978540, 42528248),
+        Point(-101978540, 41304489),  Point(-101978540, -41304489),
+        Point(-100978540, -48052315), Point(-99621460, -48052315),
+    };
+
+    Polygon poly_1 = {
+        Point(-100671460, -40092775),
+        Point(-100671460, 40092775),
+        Point(100671460, 40092775),
+        Point(100671460, -40092775),
+    };
+
+    Polygons polygons              = {poly_0, poly_1};
+    coord_t  ext_perimeter_spacing = 607079;
+    coord_t  perimeter_spacing     = 607079;
+    coord_t  inset_count           = 1;
+
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    wall_tool_paths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
+
+#ifdef ARACHNE_DEBUG_OUT
+    export_perimeters_to_svg(debug_out_path("arachne-degenerated-diagram-8846-one-parabola.svg"), polygons, perimeters, union_ex(wall_tool_paths.getInnerContour()));
+#endif
+
+    int64_t total_extrusion_length = 0;
+    for (Arachne::VariableWidthLines &perimeter : perimeters)
+        for (Arachne::ExtrusionLine &extrusion_line : perimeter)
+            total_extrusion_length += extrusion_line.getLength();
+
+    // Total extrusion length should be around 1335mm when the part is ok and 1347mm when it has perimeters in places where they shouldn't be.
+    REQUIRE(total_extrusion_length <= scaled<int64_t>(1335.));
+}
+
+// This test case was distilled from GitHub issue #9357.
+// Boost Voronoi generator produces degenerated Voronoi diagram with two intersecting parabolic Voronoi edges.
+// Those intersecting edges are causing that perimeters are also generated in places where they shouldn't be.
+TEST_CASE("Arachne - #9357 - Degenerated Voronoi diagram - Two parabolas", "[ArachneDegeneratedDiagram9357TwoParabolas]") {
+    const Polygon poly_0 = {
+        Point(78998946, -11733905),
+        Point(40069507,  -7401251),
+        Point(39983905,  -6751055),
+        Point(39983905,   8251054),
+        Point(79750000,  10522762),
+        Point(79983905,  10756667),
+        Point(79983905,  12248946),
+        Point(79950248,  12504617),
+        Point(79709032,  12928156),
+        Point(79491729,  13102031),
+        Point(78998946,  13233905),
+        Point(38501054,  13233905),
+        Point(37258117,  12901005),
+        Point(36349000,  11991885),
+        Point(36100868,  11392844),
+        Point(36016095,  10748947),
+        Point(36016095,  -6751054),
+        Point(35930493,  -7401249),
+        Point(4685798,  -11733905),
+    };
+
+    Polygons polygons              = {poly_0};
+    coord_t  ext_perimeter_spacing = 407079;
+    coord_t  perimeter_spacing     = 407079;
+    coord_t  inset_count           = 1;
+
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    wall_tool_paths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
+
+#ifdef ARACHNE_DEBUG_OUT
+    export_perimeters_to_svg(debug_out_path("arachne-degenerated-diagram-9357-two-parabolas.svg"), polygons, perimeters, union_ex(wall_tool_paths.getInnerContour()));
+#endif
+
+    int64_t total_extrusion_length = 0;
+    for (Arachne::VariableWidthLines &perimeter : perimeters)
+        for (Arachne::ExtrusionLine &extrusion_line : perimeter)
+            total_extrusion_length += extrusion_line.getLength();
+
+    // Total extrusion length should be around 256mm when the part is ok and 293mm when it has perimeters in places where they shouldn't be.
+    REQUIRE(total_extrusion_length <= scaled<int64_t>(256.));
+}
+
+// This test case was distilled from GitHub issue #8846.
+// Boost Voronoi generator produces degenerated Voronoi diagram with some Voronoi edges intersecting input segments.
+// Those Voronoi edges intersecting input segments are causing that perimeters are also generated in places where they shouldn't be.
+TEST_CASE("Arachne - #8846 - Degenerated Voronoi diagram - Voronoi edges intersecting input segment", "[ArachneDegeneratedDiagram8846IntersectingInputSegment]") {
+    const Polygon poly_0 = {
+        Point( 60000000,  58000000),
+        Point(-20000000,  53229451),
+        Point( 49312250,  53229452),
+        Point( 49443687,  53666225),
+        Point( 55358348,  50908580),
+        Point( 53666223,  49443687),
+        Point( 53229452,  49312250),
+        Point( 53229452, -49312250),
+        Point( 53666014, -49443623),
+        Point(-10000000, -58000000),
+        Point( 60000000, -58000000),
+    };
+
+    Polygons polygons              = {poly_0};
+    coord_t  ext_perimeter_spacing = 407079;
+    coord_t  perimeter_spacing     = 407079;
+    coord_t  inset_count           = 1;
+
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.32, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    wall_tool_paths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
+
+#ifdef ARACHNE_DEBUG_OUT
+    export_perimeters_to_svg(debug_out_path("arachne-degenerated-diagram-8846-intersecting-input-segment.svg"), polygons, perimeters, union_ex(wall_tool_paths.getInnerContour()));
+#endif
+
+    int64_t total_extrusion_length = 0;
+    for (Arachne::VariableWidthLines &perimeter : perimeters)
+        for (Arachne::ExtrusionLine &extrusion_line : perimeter)
+            total_extrusion_length += extrusion_line.getLength();
+
+    // Total extrusion length should be around 500mm when the part is ok and 680mm when it has perimeters in places where they shouldn't be.
+    REQUIRE(total_extrusion_length <= scaled<int64_t>(500.));
+}

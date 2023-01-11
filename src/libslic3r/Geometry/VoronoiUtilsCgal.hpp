@@ -2,6 +2,7 @@
 #define slic3r_VoronoiUtilsCgal_hpp_
 
 #include "Voronoi.hpp"
+#include "../Arachne/utils/VoronoiUtils.hpp"
 
 namespace Slic3r::Geometry {
 class VoronoiDiagram;
@@ -13,7 +14,7 @@ public:
     static bool is_voronoi_diagram_planar_intersection(const VoronoiDiagram &voronoi_diagram);
 
     // Check if the Voronoi diagram is planar using verification that all neighboring edges are ordered CCW for each vertex.
-    static bool is_voronoi_diagram_planar_angle(const VoronoiDiagram &voronoi_diagram);
+    static bool is_voronoi_diagram_planar_angle(const VoronoiDiagram &voronoi_diagram, const std::vector<Arachne::VoronoiUtils::Segment> &segments);
 
 };
 } // namespace Slic3r::Geometry
