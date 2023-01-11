@@ -664,11 +664,11 @@ bool paths_touch(const ExtrusionPath &path_one, const ExtrusionPath &path_two, d
     AABBTreeLines::LinesDistancer<Line> lines_two{path_two.as_polyline().lines()};
 
     for (size_t pt_idx = 0; pt_idx < path_one.polyline.size(); pt_idx++) {
-        if (std::abs(lines_two.signed_distance_from_lines(path_one.polyline.points[pt_idx])) < limit_distance) { return true; }
+        if (lines_two.distance_from_lines<false>(path_one.polyline.points[pt_idx]) < limit_distance) { return true; }
     }
 
     for (size_t pt_idx = 0; pt_idx < path_two.polyline.size(); pt_idx++) {
-        if (std::abs(lines_one.signed_distance_from_lines(path_two.polyline.points[pt_idx])) < limit_distance) { return true; }
+        if (lines_one.distance_from_lines<false>(path_two.polyline.points[pt_idx]) < limit_distance) { return true; }
     }
     return false;
 }
@@ -831,23 +831,21 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
 
         std::vector<Polygons> anchor_areas_w_delta_anchor_size{};
         for (double delta : deltas) {
+            // for each delta, store anchors without the delta region around overhangs
             anchor_areas_w_delta_anchor_size.push_back(diff(anchors, expand(overhangs, delta, EXTRA_PERIMETER_OFFSET_PARAMETERS)));
         }
 
         for (size_t i = 0; i < anchor_areas_w_delta_anchor_size.size() - 1; i++) {
-            Polygons clipped = diff(anchor_areas_w_delta_anchor_size[i], expand(anchor_areas_w_delta_anchor_size[i + 1],
+            // Then, clip off each anchor area by the next area expanded back to original size, so that this smaller anchor region is only where larger wouldnt fit
+           anchor_areas_w_delta_anchor_size[i] = diff(anchor_areas_w_delta_anchor_size[i], expand(anchor_areas_w_delta_anchor_size[i + 1],
                                                                                         deltas[i + 1], EXTRA_PERIMETER_OFFSET_PARAMETERS));
-            anchor_areas_w_delta_anchor_size[i] = intersection(anchor_areas_w_delta_anchor_size[i],
-                                                                  expand(clipped, deltas[i+1] + 0.1*overhang_flow.scaled_spacing(),
-                                                                            EXTRA_PERIMETER_OFFSET_PARAMETERS));
         }
 
         for (size_t i = 0; i < anchor_areas_w_delta_anchor_size.size(); i++) {
             inset_anchors = union_(inset_anchors,  anchor_areas_w_delta_anchor_size[i]);
         }
 
-        inset_anchors = opening(inset_anchors, 0.8 * deltas[0], EXTRA_PERIMETER_OFFSET_PARAMETERS);
-        inset_anchors = closing(inset_anchors, 0.8 * deltas[0], EXTRA_PERIMETER_OFFSET_PARAMETERS);
+        inset_anchors = expand(inset_anchors, 0.1*overhang_flow.scaled_width());
 
 #ifdef EXTRA_PERIM_DEBUG_FILES
         {
@@ -901,12 +899,6 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
 
         Polygon anchoring_convex_hull = Geometry::convex_hull(anchoring);
         double  unbridgeable_area     = area(diff(real_overhang, {anchoring_convex_hull}));
-        // penalize also holes
-        for (const Polygon &poly : perimeter_polygon) {
-            if (poly.is_clockwise()) { // hole, penalize bridges.
-                unbridgeable_area += std::abs(area(poly));
-            }
-        }
 
         auto [dir, unsupp_dist] = detect_bridging_direction(real_overhang, anchors);
 
@@ -920,16 +912,19 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
             for (const Line &line : to_lines(anchoring_convex_hull)) svg.draw(line, "green", scale_(0.15));
             for (const Line &line : to_lines(anchoring)) svg.draw(line, "yellow", scale_(0.10));
             for (const Line &line : to_lines(diff_ex(perimeter_polygon, {anchoring_convex_hull}))) svg.draw(line, "black", scale_(0.10));
+            for (const Line &line : to_lines(diff_pl(to_polylines(diff(real_overhang, anchors)), expand(anchors, float(SCALED_EPSILON)))))
+                svg.draw(line, "blue", scale_(0.30));
             svg.Close();
         }
 #endif
-        if (unbridgeable_area < 0.2 * area(real_overhang) && unsupp_dist < total_length(real_overhang) * 0.125) {
+
+        if (unbridgeable_area < 0.2 * area(real_overhang) && unsupp_dist < total_length(real_overhang) * 0.2) {
             inset_overhang_area_left_unfilled.insert(inset_overhang_area_left_unfilled.end(),overhang_to_cover.begin(),overhang_to_cover.end());
             perimeter_polygon.clear();
         } else {
             //  fill the overhang with perimeters
             int continuation_loops = 2;
-            while (continuation_loops > 0) {
+            while (continuation_loops >= 0) {
                 auto prev = perimeter_polygon;
                 // prepare next perimeter lines
                 Polylines perimeter = intersection_pl(to_polylines(perimeter_polygon), shrinked_overhang_to_cover);

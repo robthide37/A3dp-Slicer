@@ -222,7 +222,6 @@ public:
         all_regions.clear();
         layer_ranges.clear();
         cached_volume_ids.clear();
-        generated_support_points.reset();
     }
 
 private:

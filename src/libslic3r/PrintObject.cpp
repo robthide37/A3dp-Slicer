@@ -7,6 +7,7 @@
 #include "I18N.hpp"
 #include "Layer.hpp"
 #include "MutablePolygon.hpp"
+#include "PrintBase.hpp"
 #include "SupportMaterial.hpp"
 #include "TreeSupport.hpp"
 #include "Surface.hpp"
@@ -420,8 +421,9 @@ void PrintObject::generate_support_spots()
         BOOST_LOG_TRIVIAL(debug) << "Searching support spots - start";
         m_print->set_status(75, L("Searching support spots"));
         if (!this->shared_regions()->generated_support_points.has_value()) {
+            PrintTryCancel cancel_func = m_print->make_try_cancel();
             SupportSpotsGenerator::Params        params{this->print()->m_config.filament_type.values};
-            SupportSpotsGenerator::SupportPoints supp_points = SupportSpotsGenerator::full_search(this, params);
+            SupportSpotsGenerator::SupportPoints supp_points = SupportSpotsGenerator::full_search(this, cancel_func, params);
             this->m_shared_regions->generated_support_points = {this->trafo_centered(), supp_points};
             m_print->throw_if_canceled();
         }
@@ -454,7 +456,7 @@ void PrintObject::generate_support_material()
 void PrintObject::estimate_curled_extrusions()
 {
     if (this->set_started(posEstimateCurledExtrusions)) {
-        if (this->print()->config().avoid_curled_filament_during_travels) {
+        if (this->print()->config().avoid_crossing_curled_overhangs) {
             BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - start";
             m_print->set_status(88, L("Estimating curled extrusions"));
 
@@ -463,7 +465,6 @@ void PrintObject::estimate_curled_extrusions()
             SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values};
             SupportSpotsGenerator::estimate_supports_malformations(this->support_layers(), support_flow_width, params);
             SupportSpotsGenerator::estimate_malformations(this->layers(), params);
-
             m_print->throw_if_canceled();
             BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - end";
         }
@@ -749,7 +750,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "support_material_interface_speed"
             || opt_key == "bridge_speed"
             || opt_key == "enable_dynamic_overhang_speeds"
-            || opt_key == "overhang_steepness_levels"
+            || opt_key == "overhang_overlap_levels"
             || opt_key == "dynamic_overhang_speeds"
             || opt_key == "external_perimeter_speed"
             || opt_key == "infill_speed"
@@ -787,10 +788,10 @@ bool PrintObject::invalidate_step(PrintObjectStep step)
     } else if (step == posPrepareInfill) {
         invalidated |= this->invalidate_steps({ posInfill, posIroning });
     } else if (step == posInfill) {
-        invalidated |= this->invalidate_steps({ posIroning });
+        invalidated |= this->invalidate_steps({ posIroning, posSupportSpotsSearch });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posSlice) {
-		invalidated |= this->invalidate_steps({ posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportMaterial, posEstimateCurledExtrusions });
+		invalidated |= this->invalidate_steps({ posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportSpotsSearch, posSupportMaterial, posEstimateCurledExtrusions });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
         m_slicing_params.valid = false;
     } else if (step == posSupportMaterial) {

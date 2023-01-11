@@ -222,7 +222,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             osteps.emplace_back(posInfill);
             osteps.emplace_back(posSupportMaterial);
             steps.emplace_back(psSkirtBrim);
-        } else if (opt_key == "avoid_curled_filament_during_travels") {
+        } else if (opt_key == "avoid_crossing_curled_overhangs") {
             osteps.emplace_back(posEstimateCurledExtrusions);
         } else {
             // for legacy, if we can't handle this option let's invalidate all steps

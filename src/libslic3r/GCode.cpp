@@ -2161,11 +2161,11 @@ LayerResult GCode::process_layer(
         Skirt::make_skirt_loops_per_extruder_1st_layer(print, layer_tools, m_skirt_done) :
         Skirt::make_skirt_loops_per_extruder_other_layers(print, layer_tools, m_skirt_done);
 
-    if (this->config().avoid_curled_filament_during_travels) {
-        m_avoid_curled_filaments.clear();
+    if (this->config().avoid_crossing_curled_overhangs) {
+        m_avoid_crossing_curled_overhangs.clear();
         for (const ObjectLayerToPrint &layer_to_print : layers) {
-            m_avoid_curled_filaments.add_obstacles(layer_to_print.object_layer, Point(scaled(this->origin())));
-            m_avoid_curled_filaments.add_obstacles(layer_to_print.support_layer, Point(scaled(this->origin())));
+            m_avoid_crossing_curled_overhangs.add_obstacles(layer_to_print.object_layer, Point(scaled(this->origin())));
+            m_avoid_crossing_curled_overhangs.add_obstacles(layer_to_print.support_layer, Point(scaled(this->origin())));
         }
     }
 
@@ -2916,7 +2916,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
     bool                        variable_speed = false;
     std::vector<ProcessedPoint> new_points{};
     if (this->m_config.enable_dynamic_overhang_speeds && !this->on_first_layer() && is_perimeter(path.role())) {
-        new_points     = m_extrusion_quality_estimator.estimate_extrusion_quality(path, m_config.overhang_steepness_levels,
+        new_points     = m_extrusion_quality_estimator.estimate_extrusion_quality(path, m_config.overhang_overlap_levels,
                                                                                   m_config.dynamic_overhang_speeds,
                                                                                   m_config.get_abs_value("external_perimeter_speed"), speed);
         variable_speed = std::any_of(new_points.begin(), new_points.end(), [speed](const ProcessedPoint &p) { return p.speed != speed; });
@@ -3040,13 +3040,13 @@ std::string GCode::travel_to(const Point &point, ExtrusionRole role, std::string
         this->origin in order to get G-code coordinates.  */
     Polyline travel { this->last_pos(), point };
 
-    if (this->config().avoid_curled_filament_during_travels) {
+    if (this->config().avoid_crossing_curled_overhangs) {
         if (m_config.avoid_crossing_perimeters) {
             BOOST_LOG_TRIVIAL(warning)
-                << "Option >avoid curled filament during travels< is not compatible with avoid crossing perimeters and it will be ignored!";
+                << "Option >avoid crossing curled overhangs< is not compatible with avoid crossing perimeters and it will be ignored!";
         } else {
             Point scaled_origin = Point(scaled(this->origin()));
-            travel              = m_avoid_curled_filaments.find_path(this->last_pos() + scaled_origin, point + scaled_origin);
+            travel              = m_avoid_crossing_curled_overhangs.find_path(this->last_pos() + scaled_origin, point + scaled_origin);
             travel.translate(-scaled_origin);
         }
     }

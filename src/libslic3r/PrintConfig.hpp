@@ -565,7 +565,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       external_perimeter_extrusion_width))
     ((ConfigOptionFloatOrPercent,       external_perimeter_speed))
     ((ConfigOptionBool,                 enable_dynamic_overhang_speeds))
-    ((ConfigOptionPercents,             overhang_steepness_levels))
+    ((ConfigOptionPercents,             overhang_overlap_levels))
     ((ConfigOptionFloatsOrPercents,     dynamic_overhang_speeds))
     ((ConfigOptionBool,                 external_perimeters_first))
     ((ConfigOptionBool,                 extra_perimeters))
@@ -732,7 +732,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     PrintConfig, 
     (MachineEnvelopeConfig, GCodeConfig),
 
-    ((ConfigOptionBool,               avoid_curled_filament_during_travels))
+    ((ConfigOptionBool,               avoid_crossing_curled_overhangs))
     ((ConfigOptionBool,               avoid_crossing_perimeters))
     ((ConfigOptionFloatOrPercent,     avoid_crossing_perimeters_max_detour))
     ((ConfigOptionPoints,             bed_shape))

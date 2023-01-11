@@ -1425,7 +1425,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("extra_perimeters", category_path + "extra-perimeters-if-needed");
         optgroup->append_single_option_line("extra_perimeters_on_overhangs", category_path + "extra-perimeters-on-overhangs");
         optgroup->append_single_option_line("ensure_vertical_shell_thickness", category_path + "ensure-vertical-shell-thickness");
-        optgroup->append_single_option_line("avoid_curled_filament_during_travels", category_path + "avoid-curled-filament-during-travels");
+        optgroup->append_single_option_line("avoid_crossing_curled_overhangs", category_path + "avoid-crossing-curled-overhangs");
         optgroup->append_single_option_line("avoid_crossing_perimeters", category_path + "avoid-crossing-perimeters");
         optgroup->append_single_option_line("avoid_crossing_perimeters_max_detour", category_path + "avoid_crossing_perimeters_max_detour");
         optgroup->append_single_option_line("thin_walls", category_path + "detect-thin-walls");
@@ -1548,7 +1548,7 @@ void TabPrint::build()
             optgroup->append_line(line);
         };
         optgroup->append_single_option_line("enable_dynamic_overhang_speeds");
-	    append_option_line(optgroup,"overhang_steepness_levels");
+	    append_option_line(optgroup,"overhang_overlap_levels");
         append_option_line(optgroup,"dynamic_overhang_speeds");
 
         optgroup = page->new_optgroup(L("Speed for non-print moves"));
