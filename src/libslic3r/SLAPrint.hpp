@@ -123,16 +123,9 @@ public:
     // like hollowing and drilled holes.
     const TriangleMesh & get_mesh_to_print() const;
 
-    const Range<CSGContainer::const_iterator> get_parts_to_slice() const
-    {
-        return range(m_mesh_to_slice);
-    }
+    std::vector<csg::CSGPart> get_parts_to_slice() const;
 
-    const Range<CSGContainer::const_iterator> get_parts_to_slice(SLAPrintObjectStep step) const
-    {
-        auto r = m_mesh_to_slice.equal_range(step);
-        return {r.first, r.second};
-    }
+    std::vector<csg::CSGPart> get_parts_to_slice(SLAPrintObjectStep step) const;
 
     sla::SupportPoints      transformed_support_points() const;
     sla::DrainHoles         transformed_drainhole_points() const;
@@ -372,6 +365,15 @@ private:
 
     // Holds CSG operations for the printed object, prioritized by print steps.
     CSGContainer                  m_mesh_to_slice;
+
+    auto mesh_to_slice(SLAPrintObjectStep s) const
+    {
+        auto r = m_mesh_to_slice.equal_range(s);
+
+        return Range{r.first, r.second};
+    }
+
+    auto mesh_to_slice() const { return range(m_mesh_to_slice); }
 
     // Holds the preview of the object to be printed (as it will look like with
     // all its holes and cavities, negatives and positive volumes unified.

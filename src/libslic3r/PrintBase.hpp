@@ -690,6 +690,21 @@ public:
     PrintStateBase::StateWithTimeStamp step_state_with_timestamp(PrintObjectStepEnum step) const { return m_state.state_with_timestamp(step, PrintObjectBase::state_mutex(m_print)); }
     PrintStateBase::StateWithWarnings  step_state_with_warnings(PrintObjectStepEnum step) const { return m_state.state_with_warnings(step, PrintObjectBase::state_mutex(m_print)); }
 
+    auto last_completed_step() const
+    {
+        static_assert(COUNT > 0, "Step count should be > 0");
+        auto s = int(COUNT) - 1;
+
+        std::lock_guard lk(state_mutex(m_print));
+        while (s >= 0 && ! is_step_done_unguarded(PrintObjectStepEnum(s)))
+            --s;
+
+        if (s < 0)
+            s = COUNT;
+
+        return PrintObjectStepEnum(s);
+    }
+
 protected:
 	PrintObjectBaseWithState(PrintType *print, ModelObject *model_object) : PrintObjectBase(model_object), m_print(print) {}
 

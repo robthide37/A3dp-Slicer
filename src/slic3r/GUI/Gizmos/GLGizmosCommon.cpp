@@ -324,7 +324,7 @@ void ObjectClipper::on_update()
         auto partstoslice = po->get_parts_to_slice();
         if (! partstoslice.empty()) {
             mc = std::make_unique<MeshClipper>();
-            mc->set_mesh(partstoslice);
+            mc->set_mesh(range(partstoslice));
             mc_tr = Geometry::Transformation{po->trafo().inverse().cast<double>()};
         }
     }

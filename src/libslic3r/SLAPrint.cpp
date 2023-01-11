@@ -1,5 +1,6 @@
 #include "SLAPrint.hpp"
 #include "SLAPrintSteps.hpp"
+#include "CSGMesh/CSGMeshCopy.hpp"
 #include "CSGMesh/PerformCSGMeshBooleans.hpp"
 
 #include "Geometry.hpp"
@@ -1017,18 +1018,46 @@ const TriangleMesh &SLAPrintObject::get_mesh_to_print() const
 {
     const TriangleMesh *ret = nullptr;
 
-    int s = SLAPrintObjectStep::slaposCount;
+    int s = last_completed_step();
 
-    while (s > 0 && !ret) {
-        --s;
-        if (is_step_done(SLAPrintObjectStep(s)) && !m_preview_meshes[s].empty())
+    if (s == slaposCount)
+        ret = &EMPTY_MESH;
+
+    while (s >= 0 && !ret) {
+        if (!m_preview_meshes[s].empty())
             ret = &m_preview_meshes[s];
+
+        --s;
     }
 
     if (!ret)
         ret = &EMPTY_MESH;
 
     return *ret;
+}
+
+std::vector<csg::CSGPart> SLAPrintObject::get_parts_to_slice() const
+{
+    return get_parts_to_slice(slaposCount);
+}
+
+std::vector<csg::CSGPart>
+SLAPrintObject::get_parts_to_slice(SLAPrintObjectStep untilstep) const
+{
+    auto laststep = last_completed_step();
+    SLAPrintObjectStep s = std::min(untilstep, laststep);
+
+    if (s == slaposCount)
+        return {};
+
+    std::vector<csg::CSGPart> ret;
+
+    for (int step = 0; step < s; ++step) {
+        auto r = m_mesh_to_slice.equal_range(SLAPrintObjectStep(step));
+        csg::copy_csgrange_shallow(Range{r.first, r.second}, std::back_inserter(ret));
+    }
+
+    return ret;
 }
 
 sla::SupportPoints SLAPrintObject::transformed_support_points() const

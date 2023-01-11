@@ -5,16 +5,27 @@
 
 namespace Slic3r { namespace csg {
 
-// Copy a csg range but for the meshes, only copy the pointers.
+// Copy a csg range but for the meshes, only copy the pointers. If the copy
+// is made from a CSGPart compatible object, and the pointer is a shared one,
+// it will be copied with reference counting.
 template<class It, class OutIt>
 void copy_csgrange_shallow(const Range<It> &csgrange, OutIt out)
 {
     for (const auto &part : csgrange) {
-        CSGPart cpy{AnyPtr<const indexed_triangle_set>{get_mesh(part)},
+        CSGPart cpy{{},
                     get_operation(part),
                     get_transform(part)};
 
         cpy.stack_operation = get_stack_operation(part);
+
+        if constexpr (std::is_convertible_v<decltype(part), const CSGPart&>) {
+            if (auto shptr = part.its_ptr.get_shared_cpy()) {
+                cpy.its_ptr = shptr;
+            }
+        }
+
+        if (!cpy.its_ptr)
+            cpy.its_ptr = AnyPtr<const indexed_triangle_set>{get_mesh(part)};
 
         *out = std::move(cpy);
         ++out;

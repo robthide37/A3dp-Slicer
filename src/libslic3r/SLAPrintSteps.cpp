@@ -212,7 +212,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
         // If that fails for any of the drillholes, the voxelization fallback is
         // used.
 
-        bool is_pure_model = is_all_positive(po.get_parts_to_slice(slaposAssembly));
+        bool is_pure_model = is_all_positive(po.mesh_to_slice(slaposAssembly));
         bool can_hollow    = po.m_hollowing_data && po.m_hollowing_data->interior &&
                           !sla::get_mesh(*po.m_hollowing_data->interior).empty();
 
@@ -317,7 +317,11 @@ struct csg_inserter {
     SLAPrintObjectStep key;
 
     csg_inserter &operator*() { return *this; }
-    void operator=(csg::CSGPart &&part) { m.emplace(key, std::move(part)); }
+    void operator=(csg::CSGPart &&part)
+    {
+        part.its_ptr.convert_unique_to_shared();
+        m.emplace(key, std::move(part));
+    }
     csg_inserter& operator++() { return *this; }
 };
 
@@ -356,7 +360,7 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
     ctl.cancelfn = [this]() { throw_if_canceled(); };
 
     sla::InteriorPtr interior =
-        generate_interior(range(po.m_mesh_to_slice), hlwcfg, ctl);
+        generate_interior(po.mesh_to_slice(), hlwcfg, ctl);
 
     if (!interior || sla::get_mesh(*interior).empty())
         BOOST_LOG_TRIVIAL(warning) << "Hollowed interior is empty!";
@@ -378,7 +382,7 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
         // Put the interior into the target mesh as a negative
         po.m_mesh_to_slice
             .emplace(slaposHollowing,
-                     csg::CSGPart{std::make_unique<indexed_triangle_set>(std::move(m)), csg::CSGType::Difference});
+                     csg::CSGPart{std::make_shared<indexed_triangle_set>(std::move(m)), csg::CSGType::Difference});
 
         generate_preview(po, slaposHollowing);
     }
@@ -518,7 +522,7 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
     auto  thr        = [this]() { m_print->throw_if_canceled(); };
     auto &slice_grid = po.m_model_height_levels;
 
-    po.m_model_slices = slice_csgmesh_ex(range(po.m_mesh_to_slice), slice_grid, params, thr);
+    po.m_model_slices = slice_csgmesh_ex(po.mesh_to_slice(), slice_grid, params, thr);
 
     auto mit = slindex_it;
     for (size_t id = 0;

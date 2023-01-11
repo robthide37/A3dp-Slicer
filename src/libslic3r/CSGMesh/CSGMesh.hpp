@@ -1,7 +1,7 @@
 #ifndef CSGMESH_HPP
 #define CSGMESH_HPP
 
-#include <libslic3r/MTUtils.hpp> // for AnyPtr
+#include <libslic3r/AnyPtr.hpp>
 #include <admesh/stl.h>
 
 namespace Slic3r { namespace csg {

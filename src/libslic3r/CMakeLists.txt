@@ -22,6 +22,7 @@ set(SLIC3R_SOURCES
     AABBTreeLines.hpp
     AABBMesh.hpp
     AABBMesh.cpp
+    AnyPtr.hpp
     BoundingBox.cpp
     BoundingBox.hpp
     BridgeDetector.cpp
