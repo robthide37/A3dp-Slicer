@@ -1451,26 +1451,30 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
     for (PrintObject *object : m_objects)
         object->update_slicing_parameters();
 
-    if (apply_status == APPLY_STATUS_INVALIDATED) {
-        // Invalidate data of a single ModelObject shared by multiple PrintObjects.
-        // Find spans of PrintObjects sharing the same PrintObjectRegions.
-        std::vector<PrintObject*> all_objects(m_objects);
-        std::sort(all_objects.begin(), all_objects.end(), [](const PrintObject *l, const PrintObject *r){ return l->shared_regions() < r->shared_regions(); } );
-        for (auto it = all_objects.begin(); it != all_objects.end();) {
-            PrintObjectRegions *shared_regions = (*it)->m_shared_regions;
-            auto it_begin = it;
-            for (++ it; it != all_objects.end() && shared_regions == (*it)->shared_regions(); ++ it);
-            auto this_objects = SpanOfConstPtrs<PrintObject>(const_cast<const PrintObject* const* const>(&(*it_begin)), it - it_begin);
-            if (Print::is_shared_print_object_step_valid_unguarded(this_objects, posSupportSpotsSearch))
-                shared_regions->generated_support_points.reset();
-        }
-    }
+    if (apply_status == APPLY_STATUS_CHANGED || apply_status == APPLY_STATUS_INVALIDATED)
+        this->cleanup();
 
 #ifdef _DEBUG
     check_model_ids_equal(m_model, model);
 #endif /* _DEBUG */
 
 	return static_cast<ApplyStatus>(apply_status);
+}
+
+void Print::cleanup()
+{
+    // Invalidate data of a single ModelObject shared by multiple PrintObjects.
+    // Find spans of PrintObjects sharing the same PrintObjectRegions.
+    std::vector<PrintObject*> all_objects(m_objects);
+    std::sort(all_objects.begin(), all_objects.end(), [](const PrintObject *l, const PrintObject *r){ return l->shared_regions() < r->shared_regions(); } );
+    for (auto it = all_objects.begin(); it != all_objects.end();) {
+        PrintObjectRegions *shared_regions = (*it)->m_shared_regions;
+        auto it_begin = it;
+        for (++ it; it != all_objects.end() && shared_regions == (*it)->shared_regions(); ++ it);
+        auto this_objects = SpanOfConstPtrs<PrintObject>(const_cast<const PrintObject* const* const>(&(*it_begin)), it - it_begin);
+        if (Print::is_shared_print_object_step_valid_unguarded(this_objects, posSupportSpotsSearch))
+            shared_regions->generated_support_points.reset();
+    }    
 }
 
 bool Print::is_shared_print_object_step_valid_unguarded(SpanOfConstPtrs<PrintObject> print_objects, PrintObjectStep print_object_step)

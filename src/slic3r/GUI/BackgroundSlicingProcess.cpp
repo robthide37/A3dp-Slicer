@@ -251,6 +251,9 @@ void BackgroundSlicingProcess::thread_proc()
 				(m_state == STATE_CANCELED) ? SlicingProcessCompletedEvent::Cancelled :
 				exception ? SlicingProcessCompletedEvent::Error : SlicingProcessCompletedEvent::Finished, exception);
         	wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, evt.Clone());
+        	// Cancelled by the user, not internally, thus cleanup() was not called yet.
+        	// Otherwise cleanup() is called from Print::apply()
+        	m_print->cleanup();
         }
 	    m_print->restart();
 		lck.unlock();
