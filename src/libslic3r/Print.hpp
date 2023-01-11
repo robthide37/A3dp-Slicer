@@ -609,6 +609,12 @@ private:
     // Return 4 wipe tower corners in the world coordinates (shifted and rotated), including the wipe tower brim.
     std::vector<Point>  first_layer_wipe_tower_corners() const;
 
+    // Returns true if any of the print_objects has print_object_step valid.
+    // That means data shared by all print objects of the print_objects span may still use the shared data.
+    // Otherwise the shared data shall be released.
+    // Unguarded variant, thus it shall only be called from main thread with background processing stopped.
+    static bool         is_shared_print_object_step_valid_unguarded(SpanOfConstPtrs<PrintObject> print_objects, PrintObjectStep print_object_step);
+
     PrintConfig                             m_config;
     PrintObjectConfig                       m_default_object_config;
     PrintRegionConfig                       m_default_region_config;
