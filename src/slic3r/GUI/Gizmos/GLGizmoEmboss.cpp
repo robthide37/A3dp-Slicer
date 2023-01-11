@@ -1538,14 +1538,12 @@ void GLGizmoEmboss::draw_text_input()
     }
 
     // add border around input when warning appears
-#ifndef __APPLE__
     ScopeGuard input_border_sg;
     if (!warning.empty()) { 
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
         ImGui::PushStyleColor(ImGuiCol_Border, ImGuiWrapper::COL_ORANGE_LIGHT);
         input_border_sg.closure = []() { ImGui::PopStyleColor(); ImGui::PopStyleVar(); };
     }
-#endif
 
     // flag for extend font ranges if neccessary
     // ranges can't be extend during font is activ(pushed)
