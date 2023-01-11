@@ -524,8 +524,11 @@ void UpdateJob::update_volume(ModelVolume             *volume,
         obj_list->update_name_in_list(object_idx, volume_idx);
     }
 
-    // Move object on bed
-    if (GLGizmoEmboss::is_text_object(volume)) volume->get_object()->ensure_on_bed();
+    // When text is object.
+    // When text positive volume is lowest part of object than modification of text 
+    // have to move object on bed.
+    if (volume->type() == ModelVolumeType::MODEL_PART)
+        volume->get_object()->ensure_on_bed();
 
     // redraw scene
     bool refresh_immediately = false;
@@ -617,6 +620,12 @@ void priv::create_volume(
     volume->text_configuration = data.text_configuration; // copy
     volume->set_transformation(trmat);
 
+    // update printable state on canvas
+    if (type == ModelVolumeType::MODEL_PART) {
+        volume->get_object()->ensure_on_bed();
+        canvas->update_instance_printable_state_for_object(object_idx);
+    }
+
     // update volume name in object list
     // updata selection after new volume added
     // change name of volume in right panel
@@ -625,9 +634,6 @@ void priv::create_volume(
     auto                add_to_selection = [volume](const ModelVolume *vol) { return vol == volume; };
     wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection(object_idx, add_to_selection);
     if (!sel.IsEmpty()) obj_list->select_item(sel.front());
-
-    // update printable state on canvas
-    if (type == ModelVolumeType::MODEL_PART) canvas->update_instance_printable_state_for_object(object_idx);
 
     obj_list->selection_changed();
 
