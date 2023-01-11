@@ -146,8 +146,9 @@ private:
     template<typename T, typename Draw>
     bool revertible(const std::string &name, T &value, const T *default_value, const std::string &undo_tooltip, float undo_offset, Draw draw);
 
+    bool   m_should_set_minimal_windows_size = false;
     void set_minimal_window_size(bool is_advance_edit_style);
-    const ImVec2 &get_minimal_window_size() const;
+    ImVec2 get_minimal_window_size() const;
 
     // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
@@ -171,10 +172,11 @@ private:
         ImVec2 minimal_window_size              = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_collections = ImVec2(0, 0);
-        float        input_width                      = 0.f;
-        float        delete_pos_x                     = 0.f;
-        float        max_style_name_width             = 0.f;
-        unsigned int icon_width                       = 0;
+        float height_of_volume_type_selector = 0.f;
+        float input_width                    = 0.f;
+        float delete_pos_x                   = 0.f;
+        float max_style_name_width           = 0.f;
+        unsigned int icon_width              = 0;
 
         // maximal width and height of style image
         Vec2i max_style_image_size = Vec2i(0, 0);

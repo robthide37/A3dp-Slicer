@@ -628,6 +628,9 @@ void GLGizmoEmboss::on_render() {
         shader->stop_using();
     }
 
+    // prevent get local coordinate system on multi volumes
+    if (!selection.is_single_volume_or_modifier() && 
+        !selection.is_single_volume_instance()) return;
     bool is_surface_dragging = m_temp_transformation.has_value();
     // Do NOT render rotation grabbers when dragging object
     bool is_rotate_by_grabbers = m_dragging;
@@ -727,7 +730,6 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         return;
     }
 
-    // TODO: fix width - showing scroll in first draw of advanced.
     const ImVec2 &min_window_size = get_minimal_window_size();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, min_window_size);
 
@@ -767,6 +769,14 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     } else {
         ImGui::PopStyleVar(); // WindowMinSize
     }
+
+    // after change volume from object to volume it is necessary to recalculate
+    // minimal windows size because of set type
+    if (m_should_set_minimal_windows_size) {
+        m_should_set_minimal_windows_size = false;
+        ImGui::SetWindowSize(ImVec2(0.f, min_window_size.y), ImGuiCond_Always);
+    }
+
     ImGui::End();
     if (!is_opened)
         close();
@@ -926,13 +936,17 @@ void GLGizmoEmboss::initialize()
     float input_height = line_height_with_spacing + 2*style.FramePadding.y;
     float tree_header  = line_height_with_spacing;
     float separator_height = 1 + style.FramePadding.y;
+
+    // "Text is to object" + radio buttons
+    cfg.height_of_volume_type_selector = separator_height + line_height_with_spacing + input_height;
+
     float window_height = 
         window_title + // window title
         cfg.text_size.y +  // text field
-        input_height * 5 + // type Radios + style selector + font name + height + depth
+        input_height * 4 + // font name + height + depth + style selector 
         tree_header +      // advance tree
-        2 * separator_height + // separator lines
-        2 * line_height_with_spacing + // "Text is to object" + "Presets"
+        separator_height + // presets separator line
+        line_height_with_spacing + // "Presets"
         2 * style.WindowPadding.y;
     float window_width = cfg.input_offset + cfg.input_width + 2*style.WindowPadding.x 
         + 2 * (cfg.icon_width + space);
@@ -1097,6 +1111,13 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
         EmbossStyle &act_style = m_style_manager.get_style();
         act_style.path         = path;
         act_style.type         = WxFontUtils::get_actual_type();
+    }
+        
+    // The change of volume could show or hide part with setter on volume type
+    if (m_volume == nullptr || 
+        (m_volume->get_object()->volumes.size() == 1) != 
+        (volume->get_object()->volumes.size() == 1)){
+        m_should_set_minimal_windows_size = true;
     }
 
     m_text   = tc.text;
@@ -1398,9 +1419,11 @@ void GLGizmoEmboss::draw_window()
 
     draw_style_list();
 
-    ImGui::Separator();
-
-    draw_model_type();
+    // Do not select volume type, when it is text object
+    if (m_volume->get_object()->volumes.size() != 1) {
+        ImGui::Separator();
+        draw_model_type();
+    }
 
     m_imgui->disabled_end(); // !is_active_font
        
@@ -3227,11 +3250,20 @@ void GLGizmoEmboss::set_minimal_window_size(bool is_advance_edit_style)
                          ImGuiCond_Always);
 }
 
-const ImVec2 &GLGizmoEmboss::get_minimal_window_size() const
+ImVec2 GLGizmoEmboss::get_minimal_window_size() const
 {
-    return (!m_is_advanced_edit_style) ? m_gui_cfg->minimal_window_size :
-        ((!m_style_manager.has_collections())? m_gui_cfg->minimal_window_size_with_advance :
-            m_gui_cfg->minimal_window_size_with_collections);
+    ImVec2 res;
+    if (!m_is_advanced_edit_style)
+        res = m_gui_cfg->minimal_window_size;
+    else if (!m_style_manager.has_collections())
+        res = m_gui_cfg->minimal_window_size_with_advance;
+    else
+        res = m_gui_cfg->minimal_window_size_with_collections;
+
+    bool is_object = m_volume->get_object()->volumes.size() == 1;
+    if (!is_object)
+        res.y += m_gui_cfg->height_of_volume_type_selector;
+    return res;
 }
 
 #ifdef ALLOW_ADD_FONT_BY_OS_SELECTOR
