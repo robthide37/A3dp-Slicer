@@ -837,12 +837,8 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
 
         for (size_t i = 0; i < anchor_areas_w_delta_anchor_size.size() - 1; i++) {
             // Then, clip off each anchor area by the next area expanded back to original size, so that this smaller anchor region is only where larger wouldnt fit
-            Polygons clipped = diff(anchor_areas_w_delta_anchor_size[i], expand(anchor_areas_w_delta_anchor_size[i + 1],
-                                                                                        deltas[i], EXTRA_PERIMETER_OFFSET_PARAMETERS));
-            // Finally, intersect the region with clipped part
-            anchor_areas_w_delta_anchor_size[i] = intersection(anchor_areas_w_delta_anchor_size[i],
-                                                               expand(clipped, deltas[i + 1] + 0.1 * overhang_flow.scaled_spacing(),
-                                                                      EXTRA_PERIMETER_OFFSET_PARAMETERS));
+           anchor_areas_w_delta_anchor_size[i] = diff(anchor_areas_w_delta_anchor_size[i], expand(anchor_areas_w_delta_anchor_size[i + 1],
+                                                                                        deltas[i + 1], EXTRA_PERIMETER_OFFSET_PARAMETERS));
         }
 
         for (size_t i = 0; i < anchor_areas_w_delta_anchor_size.size(); i++) {

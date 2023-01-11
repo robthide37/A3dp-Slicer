@@ -780,9 +780,6 @@ bool PrintObject::invalidate_state_by_config_options(
 bool PrintObject::invalidate_step(PrintObjectStep step)
 {
 	bool invalidated = Inherited::invalidate_step(step);
-    if (invalidated && step == posSupportSpotsSearch) {
-        this->m_shared_regions->generated_support_points.reset();
-    }
     
     // propagate to dependent steps
     if (step == posPerimeters) {

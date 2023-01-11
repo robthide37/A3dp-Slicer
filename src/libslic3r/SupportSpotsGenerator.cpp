@@ -265,8 +265,9 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
 
             float sign = (prev_layer_boundary.distance_from_lines<true>(curr_point.position) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
             curr_point.distance *= sign;
-        
-            float max_bridge_len = params.bridge_distance / (1.0f + std::abs(curr_point.curvature));
+
+            float max_bridge_len = params.bridge_distance /
+                                   ((1.0f + std::abs(curr_point.curvature)) * (1.0f + std::abs(curr_point.curvature)));
 
             if (curr_point.distance > 2.0f * flow_width) {
                 line_out.form_quality = 0.8f;
