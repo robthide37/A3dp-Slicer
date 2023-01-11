@@ -1543,7 +1543,7 @@ void GLGizmoEmboss::draw_text_input()
     if (!warning.empty()) { 
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
         ImGui::PushStyleColor(ImGuiCol_Border, ImGuiWrapper::COL_ORANGE_LIGHT);
-        input_border_sg = ScopeGuard([]() { ImGui::PopStyleColor(); ImGui::PopStyleVar(); });
+        input_border_sg.closure = []() { ImGui::PopStyleColor(); ImGui::PopStyleVar(); };
     }
 #endif
 
@@ -1935,12 +1935,12 @@ void GLGizmoEmboss::draw_font_list()
 
     // When is unknown font is inside .3mf only font selection is allowed
     // Stop Imgui disable + Guard again start disabling
-    ScopeGuard unknown_font_sc; // TODO: fix it for macOS
+    ScopeGuard unknown_font_sc;
     if (m_is_unknown_font) {
         m_imgui->disabled_end(); 
-        unknown_font_sc = ScopeGuard([&]() { 
+        unknown_font_sc.closure = [&]() { 
             m_imgui->disabled_begin(true); 
-        });
+        };
     }
 
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
