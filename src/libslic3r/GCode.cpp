@@ -740,7 +740,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     // Does the file exist? If so, we hope that it is still valid.
     {
         PrintStateBase::StateWithTimeStamp state = print->step_state_with_timestamp(psGCodeExport);
-        if (! state.enabled || (state.state == PrintStateBase::DONE && boost::filesystem::exists(boost::filesystem::path(path))))
+        if (! state.enabled || (state.is_done() && boost::filesystem::exists(boost::filesystem::path(path))))
             return;
     }
 

@@ -23,10 +23,29 @@ public:
 
 class PrintStateBase {
 public:
-    enum State {
-        INVALID,
-        STARTED,
-        DONE,
+    enum class State {
+        // Fresh state, either the object is new or the data of that particular milestone was cleaned up.
+        // Fresh state may transit to Started.
+        Fresh,
+        // Milestone was started and now it is being executed.
+        // Started state may transit to Canceled with invalid data or Done with valid data.
+        Started,
+        // Milestone was being executed, but now it is canceled and not yet cleaned up.
+        // Canceled state may transit to Fresh state if its invalid data is cleaned up
+        // or to Started state.
+        // Canceled and Invalidated states are of similar nature: Canceled step was Started but canceled,
+        // while Invalidated state was Done but invalidated.
+        Canceled,
+        // Milestone was finished successfully, it's data is now valid.
+        // Done state may transit to Invalidated state if its data is no more valid
+        // or to a Started state.
+        Done,
+        // Milestone was finished successfully (done), but now it is invalidated and it's data is no more valid.
+        // Invalidated state may transit to Fresh if its invalid data is cleaned up,
+        // or to state Started.
+        // Canceled and Invalidated states are of similar nature: Canceled step was Started but canceled,
+        // while Invalidated state was Done but invalidated.
+        Invalidated,
     };
 
     enum class WarningLevel {
@@ -39,9 +58,25 @@ public:
     // A new unique timestamp is being assigned to the step every time the step changes its state.
     struct StateWithTimeStamp
     {
-        State       state { INVALID };
+        State       state { State::Fresh };
         TimeStamp   timestamp { 0 };
         bool        enabled { true };
+
+        bool        is_done() const { return state == State::Done; }
+        // The milestone may have some data available, but it is no more valid and it should be cleaned up to conserve memory.
+        bool        is_dirty() const { return state == State::Canceled || state == State::Invalidated; }
+
+        // If the milestone is Started or Done, invalidate it:
+        // Turn Started to Canceled, turn Done to Invalidated.
+        // Update timestamp of this milestone.
+        bool        try_invalidate() {
+            bool invalidated = this->state == State::Started || this->state == State::Done;
+            if (invalidated) {
+                this->state = this->state == State::Started ? State::Canceled : State::Invalidated;
+                this->timestamp = ++ g_last_timestamp;
+            }
+            return invalidated;
+        }
     };
 
     struct Warning
@@ -93,11 +128,11 @@ public:
     }
 
     bool is_started(StepType step, std::mutex &mtx) const {
-        return this->state_with_timestamp(step, mtx).state == STARTED;
+        return this->state_with_timestamp(step, mtx).state == State::Started;
     }
 
     bool is_done(StepType step, std::mutex &mtx) const {
-        return this->state_with_timestamp(step, mtx).state == DONE;
+        return this->state_with_timestamp(step, mtx).state == State::Done;
     }
 
     StateWithTimeStamp state_with_timestamp_unguarded(StepType step) const { 
@@ -105,11 +140,11 @@ public:
     }
 
     bool is_started_unguarded(StepType step) const {
-        return this->state_with_timestamp_unguarded(step).state == STARTED;
+        return this->state_with_timestamp_unguarded(step).state == State::Started;
     }
 
     bool is_done_unguarded(StepType step) const {
-        return this->state_with_timestamp_unguarded(step).state == DONE;
+        return this->state_with_timestamp_unguarded(step).state == State::Done;
     }
 
     void enable_unguarded(StepType step, bool enable) {
@@ -146,12 +181,12 @@ public:
 //
 //        assert(m_step_active == -1);
 //        for (int i = 0; i < int(COUNT); ++ i)
-//            assert(m_state[i].state != STARTED);
+//            assert(m_state[i].state != State::Started);
 #endif // NDEBUG
         PrintStateBase::StateWithWarnings &state = m_state[step];
-        if (! state.enabled || state.state == DONE)
+        if (! state.enabled || state.state == State::Done)
             return false;
-        state.state = STARTED;
+        state.state = State::Started;
         state.timestamp = ++ g_last_timestamp;
         state.mark_warnings_non_current();
         m_step_active = static_cast<int>(step);
@@ -161,17 +196,17 @@ public:
     // Set the step as done. Block on mutex while the Print / PrintObject / PrintRegion objects are being
     // modified by the UI thread.
     // Return value:
-    // 		Timestamp when this stepentered the DONE state.
+    // 		Timestamp when this step entered the Done state.
     // 		bool indicates whether the UI has to update the slicing warnings of this step or not.
 	template<typename ThrowIfCanceled>
 	std::pair<TimeStamp, bool> set_done(StepType step, std::mutex &mtx, ThrowIfCanceled throw_if_canceled) {
         std::scoped_lock<std::mutex> lock(mtx);
         // If canceled, throw before changing the step state.
         throw_if_canceled();
-        assert(m_state[step].state == STARTED);
+        assert(m_state[step].state == State::Started);
         assert(m_step_active == static_cast<int>(step));
         PrintStateBase::StateWithWarnings &state = m_state[step];
-        state.state = DONE;
+        state.state = State::Done;
         state.timestamp = ++ g_last_timestamp;
         m_step_active = -1;
         // Remove all non-current warnings.
@@ -190,16 +225,12 @@ public:
     // processing by calling the cancel callback.
     template<typename CancelationCallback>
     bool invalidate(StepType step, CancelationCallback cancel) {
-        bool invalidated = m_state[step].state != INVALID;
-        if (invalidated) {
+        if (PrintStateBase::StateWithWarnings &state = m_state[step]; state.try_invalidate()) {
 #if 0
             if (mtx.state != mtx.HELD) {
                 printf("Not held!\n");
             }
 #endif
-            PrintStateBase::StateWithWarnings &state = m_state[step];
-            state.state = INVALID;
-            state.timestamp = ++ g_last_timestamp;
             // Raise the mutex, so that the following cancel() callback could cancel
             // the background processing.
             // Internally the cancel() callback shall unlock the PrintBase::m_status_mutex to let
@@ -209,21 +240,17 @@ public:
             // It is safe to modify it.
             state.mark_warnings_non_current();
             m_step_active = -1;
-        }
-        return invalidated;
+            return true;
+        } else
+            return false;
     }
 
     template<typename CancelationCallback, typename StepTypeIterator>
     bool invalidate_multiple(StepTypeIterator step_begin, StepTypeIterator step_end, CancelationCallback cancel) {
         bool invalidated = false;
-        for (StepTypeIterator it = step_begin; it != step_end; ++ it) {
-            StateWithTimeStamp &state = m_state[*it];
-            if (state.state != INVALID) {
+        for (StepTypeIterator it = step_begin; it != step_end; ++ it)
+            if (m_state[*it].try_invalidate())
                 invalidated = true;
-                state.state = INVALID;
-                state.timestamp = ++ g_last_timestamp;
-            }
-        }
         if (invalidated) {
 #if 0
             if (mtx.state != mtx.HELD) {
@@ -251,14 +278,9 @@ public:
     template<typename CancelationCallback>
     bool invalidate_all(CancelationCallback cancel) {
         bool invalidated = false;
-        for (size_t i = 0; i < COUNT; ++ i) {
-            StateWithTimeStamp &state = m_state[i];
-            if (state.state != INVALID) {
+        for (size_t i = 0; i < COUNT; ++ i)
+            if (m_state[i].try_invalidate())
                 invalidated = true;
-                state.state = INVALID;
-                state.timestamp = ++ g_last_timestamp;
-            }
-        }
         if (invalidated) {
             cancel();
             // Now the worker thread should be stopped, therefore it cannot write into the warnings field.
@@ -268,6 +290,26 @@ public:
             m_step_active = -1;
         }
         return invalidated;
+    }
+
+    // If the milestone is Canceled or Invalidated, return true and turn the state of the milestone to Fresh.
+    // The caller is responsible for releasing the data of the milestone that is no more valid.
+    bool query_reset_dirty_unguarded(StepType step) {
+        if (PrintStateBase::StateWithWarnings &state = m_state[step]; state.is_dirty()) {
+            state.state = State::Fresh;
+            return true;
+        } else
+            return false;
+    }
+
+    // To be called after the background thread was stopped by the user pressing the Cancel button,
+    // which in turn stops the background thread without adjusting state of the milestone being executed.
+    // This method fixes the state of the canceled milestone by setting it to a Canceled state.
+    void mark_canceled_unguarded() {
+        for (size_t i = 0; i < COUNT; ++ i) {
+            if (State &state = m_state[i].state; state == State::Started)
+                state = State::Canceled;
+        }
     }
 
     // Update list of warnings of the current milestone with a new warning.
@@ -281,7 +323,7 @@ public:
         std::scoped_lock<std::mutex> lock(mtx);
         assert(m_step_active != -1);
         StateWithWarnings &state = m_state[m_step_active];
-        assert(state.state == STARTED);
+        assert(state.state == State::Started);
         std::pair<StepType, bool> retval(static_cast<StepType>(m_step_active), true);
         // Does a warning of the same level and message or message_id exist already?
 		auto it = (message_id == 0) ? 
@@ -664,15 +706,19 @@ protected:
     }
 
     // Clean up after process() finished, either with success, error or if canceled.
-    // The adjustments on the Print / PrintObject m_stepmask data due to set_task() are to be reverted here.
+    // The adjustments on the Print / PrintObject m_stepmask data due to set_task() are to be reverted here:
+    // Execution of all milestones is enabled in case some of them were suppressed for the last background execution.
+    // Also if the background processing was canceled, the current milestone that was just abandoned 
+    // in Started state is to be reset to Canceled state.
     template<typename PrintObject>
     void finalize_impl(std::vector<PrintObject*> &print_objects)
     {
         // Grab the lock for the Print / PrintObject milestones.
         std::scoped_lock<std::mutex> lock(this->state_mutex());
         for (auto *po : print_objects)
-            po->enable_all_steps_unguarded(true);
+            po->finalize_impl();
         m_state.enable_all_unguarded(true);
+        m_state.mark_canceled_unguarded();
     }
 
 private:
@@ -722,6 +768,11 @@ protected:
     bool            is_step_enabled_unguarded(PrintObjectStepEnum step) const { return m_state.is_enabled_unguarded(step); }
     void            enable_step_unguarded(PrintObjectStepEnum step, bool enable) { m_state.enable_unguarded(step, enable); }
     void            enable_all_steps_unguarded(bool enable) { m_state.enable_all_unguarded(enable); }
+    // See the comment at PrintBaseWithState::finalize_impl()
+    void            finalize_impl() { m_state.enable_all_unguarded(true); m_state.mark_canceled_unguarded(); }
+    // If the milestone is Canceled or Invalidated, return true and turn the state of the milestone to Fresh.
+    // The caller is responsible for releasing the data of the milestone that is no more valid.
+    bool            query_reset_dirty_step_unguarded(PrintObjectStepEnum step) { return m_state.query_reset_dirty_unguarded(step); }
 
     // Add a slicing warning to the active PrintObject step and send a status notification.
     // This method could be called multiple times between this->set_started() and this->set_done().

@@ -1867,11 +1867,11 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             SLASupportState state;
             for (size_t istep = 0; istep < sla_steps.size(); ++istep) {
                 state.step[istep] = print_object->step_state_with_timestamp(sla_steps[istep]);
-                if (state.step[istep].state == PrintStateBase::DONE) {
+                if (state.step[istep].is_done()) {
                     if (!print_object->has_mesh(sla_steps[istep]))
-                        // Consider the DONE step without a valid mesh as invalid for the purpose
+                        // Consider the Done step without a valid mesh as invalid for the purpose
                         // of mesh visualization.
-                        state.step[istep].state = PrintStateBase::INVALID;
+                        state.step[istep].state = PrintStateBase::State::Fresh;
                     else if (sla_steps[istep] != slaposDrillHoles)
                         for (const ModelInstance* model_instance : print_object->model_object()->instances)
                             // Only the instances, which are currently printable, will have the SLA support structures kept.
@@ -2038,7 +2038,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                         if (! volume.offsets.empty() && state.step[istep].timestamp != volume.offsets.front()) {
                         	// The backend either produced a new hollowed mesh, or it invalidated the one that the front end has seen.
                             volume.model.reset();
-                            if (state.step[istep].state == PrintStateBase::DONE) {
+                            if (state.step[istep].is_done()) {
                                 TriangleMesh mesh = print_object->get_mesh(slaposDrillHoles);
 	                            assert(! mesh.empty());
 
@@ -2071,7 +2071,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                         // of various concenrs (model vs. 3D print path).
                         volume.offsets = { state.step[istep].timestamp };
                     }
-                    else if (state.step[istep].state == PrintStateBase::DONE) {
+                    else if (state.step[istep].is_done()) {
                         // Check whether there is an existing auxiliary volume to be updated, or a new auxiliary volume to be created.
 						ModelVolumeState key(state.step[istep].timestamp, instance.instance_id.id);
 						auto it = std::lower_bound(aux_volume_state.begin(), aux_volume_state.end(), key, model_volume_state_lower);
