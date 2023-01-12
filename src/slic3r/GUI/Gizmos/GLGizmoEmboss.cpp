@@ -264,23 +264,20 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
         // soo create transfomation on border of object
         
         // there is no point on surface so no use of surface will be applied
-        if (emboss_data.text_configuration.style.prop.use_surface)
-            emboss_data.text_configuration.style.prop.use_surface = false;
+        FontProp &prop = emboss_data.text_configuration.style.prop;
+        if (prop.use_surface)
+            prop.use_surface = false;
         
         // Transformation is inspired add generic volumes in ObjectList::load_generic_subobject
         const ModelObject *obj = objects[vol->object_idx()];
         BoundingBoxf3 instance_bb = obj->instance_bounding_box(vol->instance_idx());
         // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
-        Vec3d offset(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z());
-        // offset += 0.5 * mesh_bb.size(); // No size of text volume at this position
-        offset -= vol->get_instance_offset();
-#if ENABLE_WORLD_COORDINATE
         Transform3d tr = vol->get_instance_transformation().get_matrix_no_offset().inverse();
-#else
-        Transform3d tr = vol->get_instance_transformation().get_matrix(true).inverse();
-#endif // ENABLE_WORLD_COORDINATE
-        Vec3d offset_tr = tr * offset;
-        Transform3d volume_trmat = tr.translate(offset_tr);
+        Vec3d offset_tr(0, // center of instance - Can't suggest width of text before it will be created
+            - instance_bb.size().y() / 2 - prop.size_in_mm / 2, // under
+            prop.emboss / 2 - instance_bb.size().z() / 2 // lay on bed
+        );
+        Transform3d volume_trmat = tr * Eigen::Translation3d(offset_tr);
         priv::start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
     }
 }
