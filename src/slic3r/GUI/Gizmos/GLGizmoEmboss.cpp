@@ -1707,17 +1707,19 @@ void GLGizmoEmboss::draw_model_type()
         }
     }
 
-    ImGui::SameLine();
-    if (type == modifier) {
-        draw_icon(IconType::modifier, IconState::hovered);  
-    } else {
-        if(draw_button(IconType::modifier, is_last_solid_part))
-            new_type = modifier;    
-        if (ImGui::IsItemHovered()) {
-            if(is_last_solid_part)
-                ImGui::SetTooltip("%s", _u8L("You can't change a type of the last solid part of the object.").c_str());
-            else if (type != modifier)
-                ImGui::SetTooltip("%s", _u8L("Click to change part type into modifier.").c_str());
+    if (wxGetApp().plater()->printer_technology() != ptSLA) {
+        ImGui::SameLine();
+        if (type == modifier) {
+            draw_icon(IconType::modifier, IconState::hovered);
+        } else {
+            if(draw_button(IconType::modifier, is_last_solid_part))
+                new_type = modifier;
+            if (ImGui::IsItemHovered()) {
+                if(is_last_solid_part)
+                    ImGui::SetTooltip("%s", _u8L("You can't change a type of the last solid part of the object.").c_str());
+                else if (type != modifier)
+                    ImGui::SetTooltip("%s", _u8L("Click to change part type into modifier.").c_str());
+            }
         }
     }
 
