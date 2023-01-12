@@ -55,7 +55,8 @@ void GLGizmoHollow::data_changed()
         }
 
         const SLAPrintObject* po = m_c->selection_info()->print_object();
-        if (po != nullptr && po->get_mesh_to_print().empty())
+        std::shared_ptr<const indexed_triangle_set> preview_mesh_ptr = po->get_mesh_to_print();
+        if (po != nullptr && (!preview_mesh_ptr || preview_mesh_ptr->empty()))
             reslice_until_step(slaposAssembly);
 
         update_volumes();

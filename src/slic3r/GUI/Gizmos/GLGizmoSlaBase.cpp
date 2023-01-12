@@ -48,7 +48,11 @@ void GLGizmoSlaBase::update_volumes()
 
     m_input_enabled = false;
 
-    TriangleMesh backend_mesh = po->get_mesh_to_print();
+    TriangleMesh backend_mesh;
+    std::shared_ptr<const indexed_triangle_set> preview_mesh_ptr = po->get_mesh_to_print();
+    if (preview_mesh_ptr)
+        backend_mesh = TriangleMesh{*preview_mesh_ptr};
+
     if (!backend_mesh.empty()) {
         // The backend has generated a valid mesh. Use it
         backend_mesh.transform(po->trafo().inverse());

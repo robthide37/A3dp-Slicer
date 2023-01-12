@@ -1014,26 +1014,15 @@ const TriangleMesh& SLAPrintObject::pad_mesh() const
     return EMPTY_MESH;
 }
 
-const TriangleMesh &SLAPrintObject::get_mesh_to_print() const
+const std::shared_ptr<const indexed_triangle_set> &
+SLAPrintObject::get_mesh_to_print() const
 {
-    const TriangleMesh *ret = nullptr;
-
     int s = last_completed_step();
 
-    if (s == slaposCount)
-        ret = &EMPTY_MESH;
-
-    while (s >= 0 && !ret) {
-        if (!m_preview_meshes[s].empty())
-            ret = &m_preview_meshes[s];
-
+    while (s > 0 && ! m_preview_meshes[s])
         --s;
-    }
 
-    if (!ret)
-        ret = &EMPTY_MESH;
-
-    return *ret;
+    return m_preview_meshes[s];
 }
 
 std::vector<csg::CSGPart> SLAPrintObject::get_parts_to_slice() const

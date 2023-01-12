@@ -6628,7 +6628,7 @@ void GLCanvas3D::_load_sla_shells()
         return;
 
     auto add_volume = [this](const SLAPrintObject &object, int volume_id, const SLAPrintObject::Instance& instance,
-        const TriangleMesh& mesh, const ColorRGBA& color, bool outside_printer_detection_enabled) {
+        const indexed_triangle_set& mesh, const ColorRGBA& color, bool outside_printer_detection_enabled) {
         m_volumes.volumes.emplace_back(new GLVolume(color));
         GLVolume& v = *m_volumes.volumes.back();
 #if ENABLE_SMOOTH_NORMALS
@@ -6641,22 +6641,22 @@ void GLCanvas3D::_load_sla_shells()
         v.set_instance_offset(unscale(instance.shift.x(), instance.shift.y(), 0.0));
         v.set_instance_rotation({ 0.0, 0.0, (double)instance.rotation });
         v.set_instance_mirror(X, object.is_left_handed() ? -1. : 1.);
-        v.set_convex_hull(mesh.convex_hull_3d());
+        v.set_convex_hull(TriangleMesh{its_convex_hull(mesh)});
     };
 
     // adds objects' volumes 
     for (const SLAPrintObject* obj : print->objects()) {
         unsigned int initial_volumes_count = (unsigned int)m_volumes.volumes.size();
         for (const SLAPrintObject::Instance& instance : obj->instances()) {
-            auto & m = obj->get_mesh_to_print();
-            if (!m.empty()) {
-                add_volume(*obj, 0, instance, m, GLVolume::MODEL_COLOR[0], true);
+            std::shared_ptr<const indexed_triangle_set> m = obj->get_mesh_to_print();
+            if (m && !m->empty()) {
+                add_volume(*obj, 0, instance, *m, GLVolume::MODEL_COLOR[0], true);
                 // Set the extruder_id and volume_id to achieve the same color as in the 3D scene when
                 // through the update_volumes_colors_by_extruder() call.
                 m_volumes.volumes.back()->extruder_id = obj->model_object()->volumes.front()->extruder_id();
-                if (auto &tree_mesh = obj->support_mesh(); !tree_mesh.empty())
+                if (auto &tree_mesh = obj->support_mesh().its; !tree_mesh.empty())
                     add_volume(*obj, -int(slaposSupportTree), instance, tree_mesh, GLVolume::SLA_SUPPORT_COLOR, true);
-                if (auto &pad_mesh = obj->pad_mesh(); !pad_mesh.empty())
+                if (auto &pad_mesh = obj->pad_mesh().its; !pad_mesh.empty())
                     add_volume(*obj, -int(slaposPad), instance, pad_mesh, GLVolume::SLA_PAD_COLOR, false);
             }
         }

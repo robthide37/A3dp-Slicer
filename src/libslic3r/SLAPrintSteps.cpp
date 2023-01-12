@@ -228,7 +228,11 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
             handled = true;
         } else if (step == slaposDrillHoles && is_pure_model) {
             if (po.m_model_object->sla_drain_holes.empty()) {
-                m = po.m_preview_meshes[slaposHollowing].its;
+                // Get the last printable preview
+                auto &meshp = po.get_mesh_to_print();
+                if (meshp)
+                    m = *(meshp);
+
                 handled = true;
             } else if (can_hollow) {
                 m = csgmesh_merge_positive_parts(r);
@@ -286,7 +290,11 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
         m = generate_preview_vdb(po, step);
     }
 
-    po.m_preview_meshes[step] = TriangleMesh{std::move(m)};
+    assert(po.m_preview_meshes[step].empty());
+
+    if (!m.empty())
+        po.m_preview_meshes[step] =
+                std::make_shared<const indexed_triangle_set>(std::move(m));
 
     for (size_t i = size_t(step) + 1; i < slaposCount; ++i)
     {
@@ -604,11 +612,12 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
     // If supports are disabled, we can skip the model scan.
     if(!po.m_config.supports_enable.getBool()) return;
 
-    if (!po.m_supportdata)
+    if (!po.m_supportdata) {
+        auto &meshp = po.get_mesh_to_print();
+        assert(meshp);
         po.m_supportdata =
-            std::make_unique<SLAPrintObject::SupportData>(
-                po.get_mesh_to_print()
-            );
+            std::make_unique<SLAPrintObject::SupportData>(*meshp);
+    }
 
     po.m_supportdata->input.zoffset = csgmesh_positive_bb(po.m_mesh_to_slice)
                                           .min.z();
@@ -750,11 +759,12 @@ void SLAPrint::Steps::generate_pad(SLAPrintObject &po) {
     // repeated)
 
     if(po.m_config.pad_enable.getBool()) {
-        if (!po.m_supportdata)
+        if (!po.m_supportdata) {
+            auto &meshp = po.get_mesh_to_print();
+            assert(meshp);
             po.m_supportdata =
-                std::make_unique<SLAPrintObject::SupportData>(
-                    po.get_mesh_to_print()
-                    );
+                std::make_unique<SLAPrintObject::SupportData>(*meshp);
+        }
 
         // Get the distilled pad configuration from the config
         // (Again, despite it was retrieved in the previous step. Note that

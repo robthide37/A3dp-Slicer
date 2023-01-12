@@ -121,7 +121,7 @@ public:
 
     // Get the mesh that is going to be printed with all the modifications
     // like hollowing and drilled holes.
-    const TriangleMesh & get_mesh_to_print() const;
+    const std::shared_ptr<const indexed_triangle_set>& get_mesh_to_print() const;
 
     std::vector<csg::CSGPart> get_parts_to_slice() const;
 
@@ -379,7 +379,7 @@ private:
     // all its holes and cavities, negatives and positive volumes unified.
     // Essentially this should be a m_mesh_to_slice after the CSG operations
     // or an approximation of that.
-    std::array<TriangleMesh, SLAPrintObjectStep::slaposCount> m_preview_meshes;
+    std::array<std::shared_ptr<const indexed_triangle_set>, SLAPrintObjectStep::slaposCount + 1> m_preview_meshes;
 
     class HollowingData
     {
