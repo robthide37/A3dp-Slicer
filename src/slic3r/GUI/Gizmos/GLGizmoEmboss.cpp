@@ -524,6 +524,9 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
         // temp is in world coors
         m_temp_transformation = object_trmat * trmat;
+
+        // calculate scale
+        calculate_scale();
     } else if (mouse_event.LeftUp()) {
         // Added because of weird case after double click into scene 
         // with Mesa driver OR on Linux
@@ -545,6 +548,9 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             m_volume->set_transformation(volume_trmat);
             process();
         }
+
+        // calculate scale
+        calculate_scale();
     }
     return false;
 }
@@ -1130,21 +1136,30 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
 }
 
 void GLGizmoEmboss::calculate_scale() {
-    Transform3d to_world = priv::world_matrix(m_parent.get_selection());
+    Transform3d to_world = m_temp_transformation.has_value()?
+        *m_temp_transformation :        
+        priv::world_matrix(m_parent.get_selection());
     auto to_world_linear = to_world.linear();
-    Vec3d up_world = to_world_linear * Vec3d::UnitY();
-    double norm_sq = up_world.squaredNorm();
-    if (is_approx(norm_sq, 1.))
-        m_scale_height.reset();
-    else 
-        m_scale_height = sqrt(norm_sq);
+    auto calc = [&to_world_linear](const Vec3d &axe, std::optional<float>& scale)->bool {
+        Vec3d  axe_world = to_world_linear * axe;
+        double norm_sq   = axe_world.squaredNorm();
+        if (is_approx(norm_sq, 1.)) {
+            if (scale.has_value())
+                scale.reset();
+            else
+                return false;
+        } else {
+            scale = sqrt(norm_sq);
+        }
+        return true;
+    };
 
-    Vec3d depth_world = to_world_linear * Vec3d::UnitZ();
-    double depth_sq = depth_world.squaredNorm();
-    if (is_approx(depth_sq, 1.))
-        m_scale_depth.reset();
-    else
-        m_scale_depth = sqrt(depth_sq);
+    bool exist_change = calc(Vec3d::UnitY(), m_scale_height);
+    exist_change |= calc(Vec3d::UnitZ(), m_scale_depth);
+
+    // Change of scale has to change font imgui font size
+    if (exist_change)
+        m_style_manager.clear_imgui_font();
 }
 
 ModelVolume *priv::get_model_volume(const GLVolume *gl_volume, const ModelObject *object)
