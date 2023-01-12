@@ -199,6 +199,8 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
     out << b_start << "Vendor:       " << b_end << m_vendor << line_end;
     out << b_start << "Renderer:     " << b_end << m_renderer << line_end;
     out << b_start << "GLSL version: " << b_end << m_glsl_version << line_end;
+    out << b_start << "Textures compression:       " << b_end << (are_compressed_textures_supported() ? "Enabled" : "Disabled") << line_end;
+    out << b_start << "Textures mipmap generation: " << b_end << (use_manually_generated_mipmaps() ? "Manual" : "Automatic") << line_end;
 
     {
 #if ENABLE_GL_CORE_PROFILE
@@ -347,17 +349,11 @@ bool OpenGLManager::init_gl()
 #endif // ENABLE_GL_CORE_PROFILE
 
         m_gl_initialized = true;
-#if ENABLE_GL_CORE_PROFILE
-        if (GLEW_ARB_texture_compression)
-            s_compressed_textures_supported = true;
-        else
-            s_compressed_textures_supported = false;
-#else
+
         if (GLEW_EXT_texture_compression_s3tc)
             s_compressed_textures_supported = true;
         else
             s_compressed_textures_supported = false;
-#endif // ENABLE_GL_CORE_PROFILE
 
         if (GLEW_ARB_framebuffer_object)
             s_framebuffers_type = EFramebufferType::Arb;
